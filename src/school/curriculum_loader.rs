@@ -387,7 +387,7 @@ fn yaml_to_json(yaml: &str) -> Result<String, String> {
                 first_item = true;
             }
 
-            let content = trimmed.strip_prefix('-').unwrap().trim();
+            let content = trimmed.strip_prefix('-').unwrap_or(trimmed).trim();
 
             if !first_item {
                 result.push(',');

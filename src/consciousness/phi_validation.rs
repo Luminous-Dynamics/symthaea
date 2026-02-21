@@ -672,7 +672,8 @@ impl PhiValidationFramework {
 
     /// Export data for external analysis
     pub fn export_data(&self) -> String {
-        serde_json::to_string_pretty(&self.validation_data).unwrap()
+        serde_json::to_string_pretty(&self.validation_data)
+            .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e))
     }
 
     /// Get current results (if available)

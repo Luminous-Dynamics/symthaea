@@ -358,13 +358,12 @@ impl PrefrontalCortex {
                 a.id.clone()
             });
 
-        let confidence = if selected.is_some() {
-            let action = self
-                .action_stack
+        let confidence = if let Some(ref sel_id) = selected {
+            self.action_stack
                 .iter()
-                .find(|a| Some(&a.id) == selected.as_ref())
-                .unwrap();
-            action.priority
+                .find(|a| &a.id == sel_id)
+                .map(|a| a.priority)
+                .unwrap_or(0.0)
         } else {
             0.0
         };

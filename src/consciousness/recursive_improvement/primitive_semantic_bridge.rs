@@ -58,6 +58,8 @@
 
 use crate::embeddings::HdcBridge;
 use symthaea_core::hdc::binary_hv::BinaryHV;
+use super::semantic_bridge::SemanticBridgeConfig;
+#[allow(unused_imports)]
 use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
 
 // Stub for SemanticPrimitiveEncoder until it's properly implemented
@@ -77,10 +79,9 @@ impl SemanticPrimitiveEncoder {
         use std::sync::OnceLock;
         static INSTANCE: OnceLock<SemanticPrimitiveEncoder> = OnceLock::new();
         INSTANCE.get_or_init(|| {
-            let prim_system = PrimitiveSystem::global_instance();
+            let prim_system = PrimitiveSystem::global();
             let primitives = prim_system
                 .all_primitives()
-                .iter()
                 .map(|p| AlignedPrimitive {
                     name: p.name.clone(),
                     tier: p.tier,
@@ -678,6 +679,7 @@ pub fn tier_name(tier: PrimitiveTier) -> &'static str {
         PrimitiveTier::Temporal => "Temporal",
         PrimitiveTier::Compositional => "Compositional",
         PrimitiveTier::Consciousness => "Consciousness",
+        PrimitiveTier::Code => "Code",
     }
 }
 

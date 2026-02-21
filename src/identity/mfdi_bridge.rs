@@ -185,7 +185,7 @@ impl SignedRequest {
         let payload = payload.into();
         let nonce = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_nanos() as u64;
 
         // Create signing message: payload + nonce

@@ -65,24 +65,26 @@ impl RestlessBanditBenchmark {
                 *val = (*val + drift).clamp(0.0, 1.0);
             }
 
-            // Action selection: epsilon-greedy with forced exploration early on
-            rng_state ^= rng_state << 13;
-            rng_state ^= rng_state >> 7;
-            rng_state ^= rng_state << 17;
-            let roll = (rng_state % 10000) as f64 / 10000.0;
-
+            // Action selection: UCB1 with forced initial sampling.
+            // UCB adds sqrt(2 * ln(t) / n_i) bonus to under-sampled arms,
+            // providing principled exploration without wasting trials on
+            // random epsilon exploration.
             let chosen_arm = if trial < num_arms {
                 // Phase 1: sample each arm once
                 trial
-            } else if roll < 0.1 {
-                // Phase 2: 10% epsilon-greedy exploration
-                rng_state ^= rng_state << 13;
-                rng_state ^= rng_state >> 7;
-                rng_state ^= rng_state << 17;
-                (rng_state as usize) % num_arms
             } else {
-                // Phase 2: exploit — pick arm with highest EMA
+                // Phase 2: UCB1 — pick arm maximizing EMA + exploration bonus
+                let total_pulls: u64 = arm_pulls.iter().sum();
+                let ln_total = (total_pulls as f64).ln();
                 arm_ema.iter().enumerate()
+                    .map(|(i, &ema)| {
+                        let bonus = if arm_pulls[i] > 0 {
+                            (2.0 * ln_total / arm_pulls[i] as f64).sqrt()
+                        } else {
+                            f64::MAX
+                        };
+                        (i, ema + bonus * 0.15) // Scale bonus down for restless setting
+                    })
                     .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i)
                     .unwrap_or(0)

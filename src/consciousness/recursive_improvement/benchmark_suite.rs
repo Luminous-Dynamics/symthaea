@@ -22,9 +22,10 @@
 
 use serde::{Deserialize, Serialize};
 
+#[allow(unused_imports)]
 use super::routers::{
     ConsciousnessRouter, ConsolidatingRouter, DirectRouter, ExploratoryRouter, PhiMaximizingRouter,
-    RouterType, RoutingDecision,
+    RoutingDecision,
 };
 use super::world_model::LatentConsciousnessState;
 

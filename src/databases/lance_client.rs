@@ -103,7 +103,7 @@ fn record_to_batch(record: &MemoryRecord) -> DbResult<RecordBatch> {
             Arc::new(StringArray::from(vec![record.content.as_str()])),
             Arc::new(Float32Array::from(vec![record.valence])),
             Arc::new(Float32Array::from(vec![record.arousal])),
-            Arc::new(Float64Array::from(vec![record.phi])),
+            Arc::new(Float64Array::from(vec![record.psi])),
             Arc::new(StringArray::from(vec![topics_json.as_str()])),
             Arc::new(StringArray::from(vec![record.metadata.as_str()])),
             Arc::new(Float64Array::from(vec![record.consolidation_strength])),
@@ -816,7 +816,7 @@ mod tests {
         // Get by ID
         let retrieved = db.get("test-1").await.unwrap().unwrap();
         assert_eq!(retrieved.content, "Test memory test-1");
-        assert!((retrieved.phi - 0.75).abs() < 0.001);
+        assert!((retrieved.psi - 0.75).abs() < 0.001);
 
         // Search similar (same seed = identical encoding)
         let results = db.search_similar(&BinaryHV::random(42), 5).await.unwrap();
@@ -870,7 +870,7 @@ mod tests {
             } else {
                 MemoryType::Semantic
             };
-            rec.phi = 0.5 + i as f64 * 0.1;
+            rec.psi = 0.5 + i as f64 * 0.1;
             rec.timestamp_ms = 1000000000 + i * 1000;
             db.store(rec).await.unwrap();
         }

@@ -659,7 +659,8 @@ impl ConsciousnessDatabase for SqliteMemory {
         };
         let query = *query;
         self.with_connection(move |conn| {
-            let filter_str = filter.unwrap();
+            // SAFETY: filter is guaranteed Some by the match above
+            let filter_str = filter.unwrap_or_default();
 
             // Parse simple filter expressions: "memory_type = 'episodic'" or "phi > 0.5"
             // We validate the filter to prevent SQL injection by allowing only safe patterns.

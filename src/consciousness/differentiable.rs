@@ -301,10 +301,11 @@ impl ConsciousnessGradient {
             (CoreComponent::Knowledge, self.knowledge),
         ];
 
+        // SAFETY: components array is always non-empty (7 elements)
         components
             .into_iter()
             .max_by(|a, b| a.1.total_cmp(&b.1))
-            .unwrap()
+            .unwrap_or((CoreComponent::Integration, 0.0))
     }
 
     /// Convert to vector for optimization

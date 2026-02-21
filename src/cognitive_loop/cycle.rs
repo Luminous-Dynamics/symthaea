@@ -14,8 +14,15 @@ use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
 // Tuning Constants: centralized for sweep-ability and self-documentation
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// -- Amortization strategy --
+// Subsystem intervals use co-prime (prime) values to prevent processing pileups.
+// Old round-number intervals (10, 20, 50, 100, …) all aligned at LCM boundaries
+// (e.g., cycle 100 fired ~15 subsystems simultaneously). Prime intervals ensure
+// at most 2 subsystems coincide on any given cycle.
+//   5→7, 10→11, 15→13, 20→19, 25→23, 50→47, 100→97, 200→199, 1000→997
+
 // -- Moral evaluation --
-const MORAL_EVAL_INTERVAL: usize = 5; // evaluate every Nth cycle (amortizes cost)
+const MORAL_EVAL_INTERVAL: usize = 7; // evaluate every Nth cycle (amortizes cost, prime)
 const MORAL_CONCERN_THRESHOLD: f32 = -0.3; // score below this triggers concern
 const MORAL_BENEFIT_THRESHOLD: f32 = 0.5; // score above this boosts confidence
 const NEGATION_POLARITY_THRESHOLD: f32 = 0.5; // above this = negated input
@@ -132,9 +139,9 @@ impl CognitiveLoopService {
         // Snapshot confidence for end-of-cycle drift clamping (Task G)
         self.carryover.learning.prediction_confidence = self.prediction_confidence;
 
-        // Chronobiology: refresh biorhythm every 100 cycles (time-of-day modulation)
+        // Chronobiology: refresh biorhythm every 97 cycles (co-prime amortization)
         self.biorhythm_refresh_counter += 1;
-        if self.biorhythm_refresh_counter >= 100 {
+        if self.biorhythm_refresh_counter >= 97 {
             self.biorhythm = crate::chronobiology::Biorhythm::current();
             self.biorhythm_refresh_counter = 0;
         }
@@ -1860,8 +1867,8 @@ impl CognitiveLoopService {
                 interval.content = Some(hv16_cached);
                 analyzer.add_interval(interval);
 
-                // Amortized analysis: causal chains every 50 cycles
-                let (chains, ccn, cce) = if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 0 {
+                // Amortized analysis: causal chains every 47 cycles (co-prime)
+                let (chains, ccn, cce) = if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
                     let detected = analyzer.detect_causal_chains(3);
                     let count = detected.len();
                     let max_len = detected.iter().map(|c| c.intervals.len()).max().unwrap_or(0);
@@ -1901,8 +1908,8 @@ impl CognitiveLoopService {
                     ((self.carryover.quality.causal_chain_count, 0), Vec::new(), Vec::new())
                 };
 
-                // Amortized analysis: continuity every 100 cycles
-                let (continuity, cont_replay) = if self.stats.total_cycles % 100 == 0 && self.stats.total_cycles > 0 {
+                // Amortized analysis: continuity every 97 cycles (co-prime)
+                let (continuity, cont_replay) = if self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0 {
                     let analysis = analyzer.analyze_continuity();
                     self.carryover.quality.temporal_continuity = analysis.continuity_score;
                     // Track A: Detect continuity gaps that warrant demand replay
@@ -1969,8 +1976,8 @@ impl CognitiveLoopService {
                 self.carryover.learning.subsystem_lr_factor *= depth_factor;
             }
 
-            // Track B: Lattice join for concept composition (every 5 cycles — join is O(1) via precomputed table)
-            let join_concept = if active_primitive_names.len() >= 2 && self.stats.total_cycles % 5 == 0 {
+            // Track B: Lattice join for concept composition (every 7 cycles — join is O(1) via precomputed table)
+            let join_concept = if active_primitive_names.len() >= 2 && self.stats.total_cycles % 7 == 0 {
                 let mut best_join: Option<usize> = None;
                 for i in 0..active_primitive_names.len() {
                     for j in (i + 1)..active_primitive_names.len() {
@@ -2016,13 +2023,13 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // UNIFIED VALUE EVALUATOR: Seven Harmonies alignment scoring
         // Evaluates current cognitive action against fiduciary harmonics.
-        // Amortized: every 20 cycles (lightweight keyword match + harmony check).
+        // Amortized: every 19 cycles (lightweight keyword match + harmony check, co-prime).
         // Science: Panksepp (1998) affective neuroscience + value alignment.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (value_evaluator_score, value_evaluator_decision) =
             if let Some(ref mut evaluator) = self.value_evaluator {
-                if self.stats.total_cycles % 20 == 0 {
+                if self.stats.total_cycles % 19 == 0 {
                     let ctx = crate::consciousness::unified_value_evaluator::EvaluationContext {
                         consciousness_level: unified_psi,
                         ..Default::default()
@@ -2061,7 +2068,7 @@ impl CognitiveLoopService {
             self.carryover.history.recent_hvs.remove(0);
         }
         let (consciousness_profile_composite, synergy_enhanced_composite, emergent_properties_count) =
-            if self.stats.total_cycles % 25 == 0 && self.primitive_processor.is_some() {
+            if self.stats.total_cycles % 23 == 0 && self.primitive_processor.is_some() {
                 let profile =
                     crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
                         &self.carryover.history.recent_hvs,
@@ -2104,7 +2111,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (value_embeddings_created, value_cache_hit_rate) =
             if let Some(ref mut embedder) = self.semantic_value_embedder {
-                if self.stats.total_cycles % 10 == 0 {
+                if self.stats.total_cycles % 11 == 0 {
                     let continuous = symthaea_core::hdc::ContinuousHV::from_slice(&compressed_state);
                     let _concept = embedder.embed(
                         format!("cycle_{}", self.stats.total_cycles),
@@ -2123,13 +2130,13 @@ impl CognitiveLoopService {
         // HARMONIES INTEGRATOR: Per-action ethical alignment via Seven Harmonies
         // Evaluates the current cycle's compressed state as a ValuedAction and
         // scores it against harmony embeddings for approval/rejection.
-        // Amortized: every 20 cycles (embedding similarity + scoring).
+        // Amortized: every 19 cycles (embedding similarity + scoring, co-prime).
         // Science: Schwartz (2012) — basic human values, Deci & Ryan (2000).
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (harmonies_alignment, harmonies_approved) =
             if let Some(ref mut integrator) = self.harmonies_integrator {
-                if self.stats.total_cycles % 20 == 0 {
+                if self.stats.total_cycles % 19 == 0 {
                     let embedding = symthaea_core::hdc::ContinuousHV::from_slice(&compressed_state);
                     let action = crate::consciousness::harmonies_integration::ValuedAction::new(
                         format!("cycle_{}", self.stats.total_cycles),
@@ -2181,13 +2188,13 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // FIDUCIARY HARMONICS: Seven Harmonies field coherence + interference
         // Tracks harmonic levels driven by consciousness metrics, detects tensions.
-        // Amortized: every 10 cycles (field update + interference scan).
+        // Amortized: every 11 cycles (field update + interference scan, co-prime).
         // Science: Whitehead (1929), Deci & Ryan (2000) — value coherence theory.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (harmonic_field_coherence, harmonic_love_resonance, harmonic_interferences) =
             if let Some(ref mut field) = self.harmonic_field {
-                if self.stats.total_cycles % 10 == 0 {
+                if self.stats.total_cycles % 11 == 0 {
                     // Drive harmonic levels from consciousness metrics
                     use crate::consciousness::harmonics::FiduciaryHarmonic;
                     field.set_level(FiduciaryHarmonic::ResonantCoherence, coherence as f64);
@@ -2228,13 +2235,13 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // PRIMITIVE REASONING: HDC-based analogical reasoning
         // Runs a quick reasoning chain on the current input for concept binding.
-        // Amortized: every 25 cycles (reasoning chains have some compute cost).
+        // Amortized: every 23 cycles (reasoning chains have some compute cost, co-prime).
         // Science: Kanerva (2009) — hyperdimensional analogical reasoning.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (reasoning_chain_confidence, reasoning_chain_depth) =
             if let Some(ref mut reasoner) = self.primitive_reasoner {
-                if self.stats.total_cycles % 25 == 0 && self.stats.total_cycles > 0 {
+                if self.stats.total_cycles % 23 == 0 && self.stats.total_cycles > 0 {
                     let result = reasoner.reason("cognitive_state", &[]);
                     (result.confidence, result.reasoning_chain.len())
                 } else {
@@ -2254,13 +2261,13 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // CAUSAL SELF-EXPLANATION: Builds causal model of primitive→Φ effects.
         // Learns which primitives cause which Φ changes and accumulates evidence.
-        // Amortized: every 25 cycles (matches primitive reasoning cadence).
+        // Amortized: every 23 cycles (matches primitive reasoning cadence, co-prime).
         // Science: Pearl (2009) — causal inference, Woodward (2003) — interventionism.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (causal_relations_count, causal_avg_confidence) =
             if let Some(ref mut explainer) = self.causal_explainer {
-                if self.stats.total_cycles % 25 == 0
+                if self.stats.total_cycles % 23 == 0
                     && self.stats.total_cycles > 0
                     && !active_primitive_names.is_empty()
                 {
@@ -2306,13 +2313,13 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // ADAPTIVE REASONING: Q-learning-guided primitive selection
         // Builds reasoning chains with RL-optimized primitive selection.
-        // Amortized: every 50 cycles (Q-learning step + chain construction).
+        // Amortized: every 47 cycles (Q-learning step + chain construction, co-prime).
         // Science: Sutton & Barto (2018) — reinforcement learning + HDC.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let adaptive_reasoning_phi =
             if let Some(ref mut reasoner) = self.adaptive_reasoner {
-                if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 0 {
+                if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
                     match reasoner.reason_adaptive(hv16_cached, 5) {
                         Ok(chain) => chain.total_phi,
                         Err(_) => 0.0,
@@ -2333,7 +2340,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let epistemic_quality = if self.primitive_processor.is_some() {
-            if self.stats.total_cycles % 50 == 0 {
+            if self.stats.total_cycles % 47 == 0 {
                 use crate::consciousness::epistemic_tiers::*;
                 // Classify based on cycle count (more cycles = higher empirical tier)
                 let empirical = if self.stats.total_cycles > 1000 {
@@ -2418,7 +2425,7 @@ impl CognitiveLoopService {
             if let (Some(ref mut detector), Some(ref calibrator)) =
                 (&mut self.epistemic_conflict_detector, &self.theory_calibrator)
             {
-                if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 0 {
+                if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
                     use crate::consciousness::epistemic_conflict::{
                         compute_phi_eff, ConflictMatrix, MultiTheoryMetrics,
                     };
@@ -2452,7 +2459,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let equation_v2_consciousness =
             if let Some(ref mut eq) = self.consciousness_equation_v2 {
-                if self.stats.total_cycles % 25 == 0 && self.stats.total_cycles > 0 {
+                if self.stats.total_cycles % 23 == 0 && self.stats.total_cycles > 0 {
                     use crate::consciousness::consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent};
                     use std::collections::HashMap;
                     let mut core_values = HashMap::new();
@@ -2503,7 +2510,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let hierarchical_ltc_phi =
             if let Some(ref mut hltc) = self.hierarchical_ltc {
-                if self.stats.total_cycles % 10 == 0 {
+                if self.stats.total_cycles % 11 == 0 {
                     let input: Vec<f32> = (0..64).map(|i| {
                         if hv16_cached.get_bit(i) != 0 { 1.0f32 } else { -1.0f32 }
                     }).collect();
@@ -2530,13 +2537,13 @@ impl CognitiveLoopService {
         // EVOLUTION COORDINATOR: Stateful co-evolution of primitives + architecture
         // Replaces one-shot PrimitiveEvolution with cross-generation Thompson sampling.
         // The coordinator manages its own Interleaved schedule internally.
-        // EXPENSIVE — called every 200 cycles (actual evolution runs every 5th step).
+        // EXPENSIVE — called every 199 cycles (actual evolution runs every 5th step, co-prime).
         // Science: Holland (1975), Kauffman (1993), Thompson (1933).
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (evolution_generation, evolution_phi_delta) =
             if let Some(ref mut coordinator) = self.evolution_coordinator {
-                if self.stats.total_cycles % 200 == 0 && self.stats.total_cycles > 0 {
+                if self.stats.total_cycles % 199 == 0 && self.stats.total_cycles > 0 {
                     match coordinator.step() {
                         Ok(result) => (result.generation, result.primitive_psi_delta),
                         Err(_) => (coordinator.generation(), 0.0),
@@ -2564,7 +2571,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (holographic_unity, holographic_binding) =
             if let Some(ref mut ha) = self.holographic_analyzer {
-                if self.stats.total_cycles % 20 == 0 {
+                if self.stats.total_cycles % 19 == 0 {
                     let content: Vec<f64> = (0..64).map(|i| {
                         if hv16_cached.get_bit(i) != 0 { 1.0 } else { -1.0 }
                     }).collect();
@@ -2603,7 +2610,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (consciousness_gradient_magnitude, consciousness_limiting_component) =
             if let Some(ref dc) = self.differentiable_consciousness {
-                if self.stats.total_cycles % 25 == 0 && self.stats.total_cycles > 0 {
+                if self.stats.total_cycles % 23 == 0 && self.stats.total_cycles > 0 {
                     use crate::consciousness::consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent};
                     use std::collections::HashMap;
                     let mut core_values = HashMap::new();
@@ -2651,7 +2658,7 @@ impl CognitiveLoopService {
         let (affect_cons_valence, affect_cons_arousal) =
             if let Some(ref mut ac) = self.affective_consciousness {
                 ac.decay(0.05);
-                if self.stats.total_cycles % 10 == 0 {
+                if self.stats.total_cycles % 11 == 0 {
                     let valence = 1.0 - 2.0 * prediction_error;
                     let base_affect = crate::consciousness::affective_consciousness::CoreAffect {
                         valence,
@@ -2683,13 +2690,13 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // UNIFIED CONSCIOUSNESS PIPELINE: End-to-end sensory→consciousness
-        // EXPENSIVE — runs every 50 cycles. Combines HDC, LTC, binding, equation.
+        // EXPENSIVE — runs every 47 cycles (co-prime). Combines HDC, LTC, binding, equation.
         // Science: Dehaene (2011), Tononi (2004), Hasani et al. (2021).
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let pipeline_consciousness =
             if let Some(ref mut pipeline) = self.unified_consciousness_pipeline {
-                if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 0 {
+                if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
                     let sensory: Vec<f64> = (0..64).map(|i| {
                         if hv16_cached.get_bit(i) != 0 { 1.0 } else { -1.0 }
                     }).collect();
@@ -2722,7 +2729,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let multimodal_integrated_phi =
             if let Some(ref mut mmi) = self.multi_modal_integrator {
-                if self.stats.total_cycles % 15 == 0 && self.stats.total_cycles > 0 {
+                if self.stats.total_cycles % 13 == 0 && self.stats.total_cycles > 0 {
                     use crate::consciousness::multi_modal_integration::{ModalInput};
                     let visual_input = ModalInput::new(
                         Modality::Visual,
@@ -2763,7 +2770,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (consciousness_state_label, consciousness_state_level) =
             if let Some(ref sg) = self.synthetic_grounding {
-                if self.stats.total_cycles % 100 == 0 {
+                if self.stats.total_cycles % 97 == 0 {
                     let similar = sg.find_similar(&hv16_cached, 0.1);
                     if let Some((state_type, _sim)) = similar.first() {
                         let label = format!("{:?}", state_type);
@@ -2789,7 +2796,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (epistemic_gate_confidence, epistemic_gate_approved) =
             if let Some(ref mut gate) = self.epistemic_gate {
-                if self.stats.total_cycles % 5 == 0 {
+                if self.stats.total_cycles % 7 == 0 {
                     let action_risk = (1.0 - self.prediction_confidence).clamp(0.0, 1.0);
                     let decision = gate.evaluate(input, action_risk);
                     let (confidence, approved) = match &decision {
@@ -2897,13 +2904,13 @@ impl CognitiveLoopService {
         // META-COGNITIVE REASONER: Self-reflective reasoning about reasoning
         // Reflects on context detection confidence, strategy effectiveness, and
         // learns meta-patterns across reasoning episodes.
-        // Amortized: every 50 cycles (heavy — creates CandidatePrimitives + chain).
+        // Amortized: every 47 cycles (heavy — creates CandidatePrimitives + chain, co-prime).
         // Science: Flavell (1979), Nelson & Narens (1990) — metacognition hierarchy.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (meta_reasoning_confidence, meta_reasoning_insights) =
             if let Some(ref mut reasoner) = self.meta_cognitive_reasoner {
-                if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 0 {
+                if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
                     // Build lightweight candidate primitives from active set
                     let candidates: Vec<crate::consciousness::primitive_evolution::CandidatePrimitive> =
                         active_primitive_names.iter().take(3).map(|name| {
@@ -2944,13 +2951,13 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // CODE PRIMITIVE ROUTER: Consciousness-aware code reasoning
         // Selects optimal code-tier primitives when input looks code-related.
-        // Amortized: every 10 cycles (lightweight O(1) lookup).
+        // Amortized: every 11 cycles (lightweight O(1) lookup, co-prime).
         // Science: Plate (2003) — VSA for structured representations.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let code_primitives_selected =
             if let Some(ref router) = self.code_primitive_router {
-                if self.stats.total_cycles % 10 == 0 {
+                if self.stats.total_cycles % 11 == 0 {
                     // Heuristic: detect code-related input
                     let code_related = input.contains("code")
                         || input.contains("function")
@@ -2983,13 +2990,13 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // EMPATHIC UNIFICATION: Resonant empathy via user state inference
         // Senses user emotional state from input, generates compassion response.
-        // Amortized: every 10 cycles (lightweight keyword + inference).
+        // Amortized: every 11 cycles (lightweight keyword + inference, co-prime).
         // Science: Decety & Jackson (2004) — shared neural representations.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (empathic_compassion, empathic_tone_adj) =
             if let Some(ref mut empathy) = self.empathic_unification {
-                if self.stats.total_cycles % 10 == 0 {
+                if self.stats.total_cycles % 11 == 0 {
                     let context = crate::user_state_inference::ContextKind::Task;
                     let response = empathy.process(input, context);
                     (response.compassion, response.patience_adjustment)
@@ -3019,7 +3026,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let multi_obj_frontier_size =
             if let Some(ref mut moe) = self.multi_objective_evolution {
-                if self.stats.total_cycles % 1000 == 0 && self.stats.total_cycles > 0 {
+                if self.stats.total_cycles % 997 == 0 && self.stats.total_cycles > 0 {
                     match moe.evolve() {
                         Ok(result) => result.frontier_size,
                         Err(_) => 0,
@@ -3219,10 +3226,10 @@ impl CognitiveLoopService {
                 }
             }
 
-            // Predictive telemetry check every 50 cycles
+            // Predictive telemetry check every 47 cycles (co-prime)
             let mut alert_fired = false;
             let mut efe = 0.0_f64;
-            if self.support_cycle_counter % 50 == 0 {
+            if self.support_cycle_counter % 47 == 0 {
                 if let Some(ref engine) = self.support_predictive_engine {
                     let telemetry = symthaea_support::telemetry::collect_telemetry();
                     let prediction = engine.assess_system_state(&telemetry);
@@ -3238,9 +3245,9 @@ impl CognitiveLoopService {
                 }
             }
 
-            // Federation: graduation check every 100 cycles (privacy-gated)
+            // Federation: graduation check every 97 cycles (co-prime, privacy-gated)
             let mut graduated: usize = 0;
-            if self.support_cycle_counter % 100 == 0 {
+            if self.support_cycle_counter % 97 == 0 {
                 let can_share = self
                     .support_privacy_manager
                     .as_ref()
@@ -3405,8 +3412,8 @@ impl CognitiveLoopService {
             if was_informed {
                 self.prediction_confidence = (adjusted as f32).clamp(0.0, 1.0);
             }
-            // Decay priors every 200 cycles to forget stale wisdom
-            if self.stats.total_cycles % 200 == 0 {
+            // Decay priors every 199 cycles to forget stale wisdom (co-prime)
+            if self.stats.total_cycles % 199 == 0 {
                 self.dream_feedback_bridge.decay_priors(0.95);
             }
         }
@@ -4485,27 +4492,27 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // SPECTRAL MIP — O(n³) Fiedler-ordered MIP search (Layer 2)
         // Replaces SynergisticIntegration: 128 dims (vs 64), better MIP via
-        // Fiedler ordering + bordered Cholesky. Computed every 50 cycles.
+        // Fiedler ordering + bordered Cholesky. Computed every 47 cycles (co-prime).
         // sigma derived from spectral_mip_phi for backward compatibility.
         // ═══════════════════════════════════════════════════════════════════════
         self.spectral_mip_finder.push(&encoding_result.hdv);
-        let spectral_mip_phi = if self.stats.total_cycles % 50 == 0 {
+        let spectral_mip_phi = if self.stats.total_cycles % 47 == 0 {
             let result = self.spectral_mip_finder.compute();
             let phi = result.as_ref().map(|r| r.phi);
             if phi.is_some() {
                 self.carryover.consciousness.last_spectral_mip_phi = phi;
                 self.carryover.consciousness.last_sigma = phi; // backward compat for memory coordinator
             }
-            // Adaptive dimension selection: every 100 cycles (every 2nd compute),
+            // Adaptive dimension selection: every 94 cycles (every 2nd compute at 47-cycle cadence),
             // concentrate tracked dimensions near the MIP boundary for better
             // partition quality. Fiedler ordering identifies informative dims.
-            if self.stats.total_cycles % 100 == 0 {
+            if self.stats.total_cycles % 94 == 0 {
                 if let Some(ref r) = result {
                     self.spectral_mip_finder.adapt(r);
                 }
                 // Hierarchical spectral MIP: multi-scale (32→64→128) Phi.
                 // Coarser scales focus finer scales on MIP boundary region.
-                // Runs every 100 cycles (~2s at 50Hz) for deeper integration analysis.
+                // Runs every 94 cycles (~1.9s at 50Hz) for deeper integration analysis.
                 if let Some(hier) = self.spectral_mip_finder.compute_hierarchical() {
                     self.carryover.consciousness.last_hierarchical_mip_phi = Some(hier.phi);
                 }

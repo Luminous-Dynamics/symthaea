@@ -326,6 +326,7 @@ pub use symthaea_embeddings as embeddings;
 
 // Benchmarks: causal validation tests (not criterion benchmarks).
 // Used by examples/ for validation experiments.
+#[cfg(feature = "benchmarks")]
 pub mod benchmarks;
 
 // Integration (cfg-gated - needs significant API alignment)

@@ -725,9 +725,9 @@ impl ReplSession {
         };
 
         // Generate response through LLM organ
-        let response = if action_result.is_some() {
+        let response = if let Some(ref result) = action_result {
             // For actions, use the action result as response
-            action_result.as_ref().unwrap().display_output.clone()
+            result.display_output.clone()
         } else {
             // Normal conversation - translate through Broca's Area
             let llm_response = self.llm.generate(input);

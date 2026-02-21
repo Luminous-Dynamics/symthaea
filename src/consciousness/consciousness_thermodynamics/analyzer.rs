@@ -757,7 +757,7 @@ fn rand_seed() -> u64 {
     use std::time::SystemTime;
     (SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_default()
         .as_nanos() as u64)
         .wrapping_mul(6364136223846793005)
         .wrapping_add(1)

@@ -225,7 +225,8 @@ impl SelfPredictor {
         }
 
         let mut predictions = Vec::with_capacity(steps);
-        let current = self.history.back().unwrap().self_phi;
+        // SAFETY: guarded by history.len() >= 3 check above
+        let current = self.history.back().map(|s| s.self_phi).unwrap_or(0.5);
 
         // Compute trend from recent history
         let trend = self.compute_trend();
@@ -250,7 +251,8 @@ impl SelfPredictor {
         }
 
         let mut predictions = Vec::with_capacity(steps);
-        let current = self.history.back().unwrap().coherence;
+        // SAFETY: guarded by history.len() >= 3 check above
+        let current = self.history.back().map(|s| s.coherence).unwrap_or(0.5);
         let trend = self.compute_coherence_trend();
         let action_influence = self.estimate_action_influence(action) * 0.5;
 
@@ -616,7 +618,9 @@ impl ProspectiveMemory {
             .iter()
             .position(|i| i.action == action && !i.completed)
         {
-            let mut intention = self.intentions.remove(idx).unwrap();
+            let Some(mut intention) = self.intentions.remove(idx) else {
+                return;
+            };
             intention.completed = true;
             if self.completed_history.len() >= self.capacity {
                 self.completed_history.pop_front();

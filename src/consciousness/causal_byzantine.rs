@@ -624,7 +624,18 @@ impl CausalByzantineDefense {
         }
 
         // Find most common attack type
-        let most_common_pattern = patterns.iter().max_by_key(|p| p.occurrence_count).unwrap();
+        // SAFETY: patterns.is_empty() was checked above with early return
+        let Some(most_common_pattern) = patterns.iter().max_by_key(|p| p.occurrence_count) else {
+            return Ok(InterventionPlan {
+                id: "NO_PATTERNS".to_string(),
+                parameter: "None".to_string(),
+                current_value: 0.0,
+                recommended_value: 0.0,
+                effectiveness: 0.0,
+                justification: "No attack patterns found".to_string(),
+                side_effects: vec![],
+            });
+        };
 
         // Recommend intervention based on pattern
         let thresholds = self.get_threshold_snapshot();

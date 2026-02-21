@@ -386,7 +386,7 @@ fn rand_simple() -> f64 {
     use std::time::SystemTime;
     let nanos = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_default()
         .subsec_nanos();
     (nanos % 10000) as f64 / 10000.0
 }

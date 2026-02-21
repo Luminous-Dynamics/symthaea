@@ -27,9 +27,9 @@ use std::f64::consts::PI;
 use crate::consciousness::primitive_reasoning::{AdaptivePrimitiveSelector, TaskType};
 use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
 
+#[allow(unused_imports)]
 use super::routers::{
     ConsciousnessRouter, ConsolidatingRouter, DirectRouter, ExploratoryRouter, PhiMaximizingRouter,
-    RouterType,
 };
 use super::world_model::LatentConsciousnessState;
 
@@ -426,7 +426,7 @@ impl PrimitiveRoutingContext {
     /// Create primitive context from selector statistics
     pub fn from_selector(selector: &AdaptivePrimitiveSelector) -> Self {
         // Use cached global instance for O(1) access
-        let prim_system = PrimitiveSystem::global_instance();
+        let prim_system = PrimitiveSystem::global();
 
         // Aggregate stats by tier
         let mut tier_counts: HashMap<PrimitiveTier, (usize, f64)> = HashMap::new();
@@ -468,10 +468,11 @@ impl PrimitiveRoutingContext {
             PrimitiveTier::Geometric => TaskType::Spatial,
             PrimitiveTier::Strategic => TaskType::Social,
             PrimitiveTier::MetaCognitive => TaskType::MetaCognitive,
-            PrimitiveTier::Temporal => TaskType::Memory,
-            PrimitiveTier::Compositional => TaskType::Creative,
+            PrimitiveTier::Temporal => TaskType::General,
+            PrimitiveTier::Compositional => TaskType::General,
             PrimitiveTier::Consciousness => TaskType::MetaCognitive,
             PrimitiveTier::NSM => TaskType::General,
+            PrimitiveTier::Code => TaskType::Logical,
         };
 
         // Estimate complexity based on tier diversity

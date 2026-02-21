@@ -243,7 +243,7 @@ impl HolographicField {
             label: label.to_string(),
             created_at: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs_f64(),
         };
 
