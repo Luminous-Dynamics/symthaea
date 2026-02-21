@@ -317,8 +317,43 @@ impl CognitiveLoopService {
             // Bias toward supportive strategy when moral concerns detected
             ResponseStrategy::Supportive
         } else {
-            self.closed_learning_loop
-                .select_strategy(prior_phi, prior_reward)
+            let base_strategy = self
+                .closed_learning_loop
+                .select_strategy(prior_phi, prior_reward);
+
+            // MCTS-informed strategy bias: peek at prior cycle's deliberative plan.
+            // When the MCTS planner produced a confident plan (confidence > 0.7),
+            // nudge strategy toward the plan's intent — aligning deliberative and
+            // habitual systems (Kahneman dual-process, Phase 10i applies the action).
+            if let Some(&(plan_action, plan_confidence)) =
+                self.carryover.history.mcts_plan.as_ref()
+            {
+                if plan_confidence > 0.7 {
+                    match plan_action {
+                        0 => {
+                            // Plan says "exploit" — favor Detailed (depth over breadth)
+                            match base_strategy {
+                                ResponseStrategy::Exploratory => ResponseStrategy::Detailed,
+                                other => other,
+                            }
+                        }
+                        2 => {
+                            // Plan says "explore" — favor Exploratory
+                            match base_strategy {
+                                ResponseStrategy::Supportive | ResponseStrategy::Concise => {
+                                    ResponseStrategy::Exploratory
+                                }
+                                other => other,
+                            }
+                        }
+                        _ => base_strategy, // consolidate(1) or unknown: no bias
+                    }
+                } else {
+                    base_strategy
+                }
+            } else {
+                base_strategy
+            }
         };
 
         // Strategy influences adaptive behavior
@@ -3263,6 +3298,23 @@ impl CognitiveLoopService {
 
             dream_wisdom_count = dream.wisdom().len();
 
+            // Feed dream wisdom into DreamFeedbackBridge for context-aware priors.
+            // Bridge converts Wisdom → action priors + confidence adjustments keyed
+            // by context hash, enabling future cycles to leverage dream discoveries.
+            #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
+            for wisdom in dream.wisdom().iter() {
+                let context_hash =
+                    crate::consciousness::recursive_improvement::hash_context(&wisdom.context_state);
+                let insight =
+                    crate::consciousness::recursive_improvement::DreamInsight::new(
+                        context_hash,
+                        wisdom.context_state.clone(),    // original action = context state
+                        wisdom.better_action.clone(),     // alternative action
+                        wisdom.phi_improvement as f64,
+                    );
+                self.dream_feedback_bridge.process_insight(insight);
+            }
+
             // Apply wisdom: if we have accumulated wisdom, modulate exploration
             // toward states where dream counterfactuals found Phi improvements
             if !dream.wisdom().is_empty() {
@@ -3295,6 +3347,26 @@ impl CognitiveLoopService {
         // (reinforces pathways that produced the insight)
         if dream_phi_improvement > 0.05 {
             self.fep_learning_signal *= 1.0 + (dream_phi_improvement * 0.2).min(0.15);
+        }
+
+        // Dream feedback bridge: adjust prediction confidence based on accumulated
+        // dream priors. Context hash from compressed state enables context-specific
+        // calibration — contexts where dreams found better alternatives get a boost.
+        #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
+        if self.dream_feedback_bridge.num_priors() > 0 {
+            let context_hash = crate::consciousness::recursive_improvement::hash_context(
+                &compressed_state[..64.min(compressed_state.len())],
+            );
+            let (adjusted, was_informed) = self
+                .dream_feedback_bridge
+                .adjust_confidence(self.prediction_confidence as f64, context_hash);
+            if was_informed {
+                self.prediction_confidence = (adjusted as f32).clamp(0.0, 1.0);
+            }
+            // Decay priors every 200 cycles to forget stale wisdom
+            if self.stats.total_cycles % 200 == 0 {
+                self.dream_feedback_bridge.decay_priors(0.95);
+            }
         }
 
         module_timings.dream_replay = _t.elapsed().as_micros() as u64;

@@ -146,6 +146,8 @@ use crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynam
 use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
 use crate::consciousness::cross_modal_binding::CrossModalBinder;
 use crate::consciousness::dream::DreamEngine;
+#[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
+use crate::consciousness::recursive_improvement::DreamFeedbackBridge;
 use crate::consciousness::embodied_cognition::EmbodiedConsciousnessAnalyzer;
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::enactive_cognition::EnactiveCognition;
@@ -484,6 +486,12 @@ pub struct CognitiveLoopService {
     /// When enabled, records high-surprise events during waking cycles and
     /// dreams during Cruise urgency to discover Phi-improving alternative actions.
     dream_engine: Option<DreamEngine>,
+
+    /// Dream feedback bridge: converts dream insights into action priors and
+    /// confidence adjustments. Connects the DreamEngine's wisdom to MAGI Loop
+    /// calibration — dream-discovered Phi improvements bias future action selection.
+    #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
+    dream_feedback_bridge: DreamFeedbackBridge,
 
     /// Predictive processing mind (hierarchical predictive coding + precision dynamics).
     /// When enabled, provides phi_modulation from free energy minimization.
