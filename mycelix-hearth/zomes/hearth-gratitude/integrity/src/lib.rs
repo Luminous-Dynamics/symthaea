@@ -163,7 +163,7 @@ fn validate_gratitude(
     }
     if expr.message.len() > 2048 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Gratitude message must be 2048 characters or fewer".into(),
+            "Gratitude message must be <= 2048 characters".into(),
         ));
     }
     if expr.from_agent == expr.to_agent {
@@ -185,7 +185,7 @@ fn validate_circle(
     }
     if circle.theme.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Circle theme must be 256 characters or fewer".into(),
+            "Circle theme must be <= 256 characters".into(),
         ));
     }
     if circle.participants.len() < 2 {
@@ -209,7 +209,7 @@ fn validate_circle_update(circle: AppreciationCircle) -> ExternResult<ValidateCa
     }
     if circle.theme.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Circle theme must be 256 characters or fewer".into(),
+            "Circle theme must be <= 256 characters".into(),
         ));
     }
     if circle.participants.len() < 2 {
@@ -419,7 +419,7 @@ mod tests {
         let result = validate_gratitude(action, expr).unwrap();
         match result {
             ValidateCallbackResult::Invalid(msg) => {
-                assert_eq!(msg, "Gratitude message must be 2048 characters or fewer");
+                assert_eq!(msg, "Gratitude message must be <= 2048 characters");
             }
             _ => panic!("Expected Invalid result"),
         }
@@ -516,7 +516,7 @@ mod tests {
         let result = validate_circle(action, circle).unwrap();
         match result {
             ValidateCallbackResult::Invalid(msg) => {
-                assert_eq!(msg, "Circle theme must be 256 characters or fewer");
+                assert_eq!(msg, "Circle theme must be <= 256 characters");
             }
             _ => panic!("Expected Invalid result"),
         }

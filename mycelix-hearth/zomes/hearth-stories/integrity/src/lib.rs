@@ -132,10 +132,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             OpEntry::UpdateEntry {
                 app_entry,
                 action: _,
-                original_action_hash: _,
+                original_action_hash,
                 original_entry_hash: _,
             } => match app_entry {
-                EntryTypes::FamilyStory(story) => validate_story_update(story),
+                EntryTypes::FamilyStory(story) => {
+                    validate_story_update(&story)?;
+                    validate_story_immutable_fields(&story, &original_action_hash)
+                }
                 EntryTypes::StoryCollection(collection) => validate_collection_update(collection),
                 EntryTypes::FamilyTradition(tradition) => validate_tradition_update(tradition),
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
@@ -172,12 +175,12 @@ fn validate_story(_action: Create, story: FamilyStory) -> ExternResult<ValidateC
     }
     if story.title.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Story title must be 256 characters or fewer".into(),
+            "Story title must be <= 256 characters".into(),
         ));
     }
     if story.content.len() > 65536 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Story content must be 65536 characters or fewer".into(),
+            "Story content must be <= 65536 characters".into(),
         ));
     }
     if story.media_hashes.len() > 20 {
@@ -193,7 +196,7 @@ fn validate_story(_action: Create, story: FamilyStory) -> ExternResult<ValidateC
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_story_update(story: FamilyStory) -> ExternResult<ValidateCallbackResult> {
+fn validate_story_update(story: &FamilyStory) -> ExternResult<ValidateCallbackResult> {
     if story.title.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Story title cannot be empty".into(),
@@ -201,12 +204,12 @@ fn validate_story_update(story: FamilyStory) -> ExternResult<ValidateCallbackRes
     }
     if story.title.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Story title must be 256 characters or fewer".into(),
+            "Story title must be <= 256 characters".into(),
         ));
     }
     if story.content.len() > 65536 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Story content must be 65536 characters or fewer".into(),
+            "Story content must be <= 65536 characters".into(),
         ));
     }
     if story.media_hashes.len() > 20 {
@@ -217,6 +220,37 @@ fn validate_story_update(story: FamilyStory) -> ExternResult<ValidateCallbackRes
     if story.tags.len() > 20 {
         return Ok(ValidateCallbackResult::Invalid(
             "Story cannot have more than 20 tags".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate that immutable fields have not changed on a FamilyStory update.
+fn validate_story_immutable_fields(
+    new_story: &FamilyStory,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original_story: FamilyStory = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original FamilyStory: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original FamilyStory entry is missing".into()
+        )))?;
+
+    if new_story.hearth_hash != original_story.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a FamilyStory".into(),
+        ));
+    }
+    if new_story.storyteller != original_story.storyteller {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change storyteller on a FamilyStory".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -233,12 +267,12 @@ fn validate_collection(
     }
     if collection.name.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Collection name must be 256 characters or fewer".into(),
+            "Collection name must be <= 256 characters".into(),
         ));
     }
     if collection.description.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Collection description must be 4096 characters or fewer".into(),
+            "Collection description must be <= 4096 characters".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -252,12 +286,12 @@ fn validate_collection_update(collection: StoryCollection) -> ExternResult<Valid
     }
     if collection.name.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Collection name must be 256 characters or fewer".into(),
+            "Collection name must be <= 256 characters".into(),
         ));
     }
     if collection.description.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Collection description must be 4096 characters or fewer".into(),
+            "Collection description must be <= 4096 characters".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -274,17 +308,17 @@ fn validate_tradition(
     }
     if tradition.name.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Tradition name must be 256 characters or fewer".into(),
+            "Tradition name must be <= 256 characters".into(),
         ));
     }
     if tradition.description.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Tradition description must be 4096 characters or fewer".into(),
+            "Tradition description must be <= 4096 characters".into(),
         ));
     }
     if tradition.instructions.len() > 16384 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Tradition instructions must be 16384 characters or fewer".into(),
+            "Tradition instructions must be <= 16384 characters".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -298,17 +332,17 @@ fn validate_tradition_update(tradition: FamilyTradition) -> ExternResult<Validat
     }
     if tradition.name.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Tradition name must be 256 characters or fewer".into(),
+            "Tradition name must be <= 256 characters".into(),
         ));
     }
     if tradition.description.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Tradition description must be 4096 characters or fewer".into(),
+            "Tradition description must be <= 4096 characters".into(),
         ));
     }
     if tradition.instructions.len() > 16384 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Tradition instructions must be 16384 characters or fewer".into(),
+            "Tradition instructions must be <= 16384 characters".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -478,7 +512,7 @@ mod tests {
         let result = validate_story(action, story).unwrap();
         match result {
             ValidateCallbackResult::Invalid(msg) => {
-                assert_eq!(msg, "Story title must be 256 characters or fewer");
+                assert_eq!(msg, "Story title must be <= 256 characters");
             }
             _ => panic!("Expected Invalid result"),
         }
@@ -510,7 +544,7 @@ mod tests {
         let result = validate_story(action, story).unwrap();
         match result {
             ValidateCallbackResult::Invalid(msg) => {
-                assert_eq!(msg, "Story content must be 65536 characters or fewer");
+                assert_eq!(msg, "Story content must be <= 65536 characters");
             }
             _ => panic!("Expected Invalid result"),
         }
@@ -636,7 +670,7 @@ mod tests {
         let result = validate_collection(action, collection).unwrap();
         match result {
             ValidateCallbackResult::Invalid(msg) => {
-                assert_eq!(msg, "Collection name must be 256 characters or fewer");
+                assert_eq!(msg, "Collection name must be <= 256 characters");
             }
             _ => panic!("Expected Invalid result"),
         }
@@ -661,7 +695,7 @@ mod tests {
             ValidateCallbackResult::Invalid(msg) => {
                 assert_eq!(
                     msg,
-                    "Collection description must be 4096 characters or fewer"
+                    "Collection description must be <= 4096 characters"
                 );
             }
             _ => panic!("Expected Invalid result"),
@@ -718,7 +752,7 @@ mod tests {
         let result = validate_tradition(action, tradition).unwrap();
         match result {
             ValidateCallbackResult::Invalid(msg) => {
-                assert_eq!(msg, "Tradition name must be 256 characters or fewer");
+                assert_eq!(msg, "Tradition name must be <= 256 characters");
             }
             _ => panic!("Expected Invalid result"),
         }
@@ -743,7 +777,7 @@ mod tests {
             ValidateCallbackResult::Invalid(msg) => {
                 assert_eq!(
                     msg,
-                    "Tradition description must be 4096 characters or fewer"
+                    "Tradition description must be <= 4096 characters"
                 );
             }
             _ => panic!("Expected Invalid result"),
@@ -769,7 +803,7 @@ mod tests {
             ValidateCallbackResult::Invalid(msg) => {
                 assert_eq!(
                     msg,
-                    "Tradition instructions must be 16384 characters or fewer"
+                    "Tradition instructions must be <= 16384 characters"
                 );
             }
             _ => panic!("Expected Invalid result"),
@@ -979,7 +1013,7 @@ mod tests {
     #[test]
     fn test_story_update_valid() {
         let story = valid_story();
-        let result = validate_story_update(story).unwrap();
+        let result = validate_story_update(&story).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
@@ -987,7 +1021,7 @@ mod tests {
     fn test_story_update_empty_title_rejected() {
         let mut story = valid_story();
         story.title = "".to_string();
-        let result = validate_story_update(story).unwrap();
+        let result = validate_story_update(&story).unwrap();
         match result {
             ValidateCallbackResult::Invalid(msg) => {
                 assert_eq!(msg, "Story title cannot be empty");
@@ -1034,5 +1068,23 @@ mod tests {
             }
             _ => panic!("Expected Invalid result"),
         }
+    }
+
+    // ── Immutable field tests (pure equality, no conductor) ─────────
+
+    #[test]
+    fn immutable_field_hearth_hash_difference_detected() {
+        let s1 = valid_story();
+        let mut s2 = s1.clone();
+        s2.hearth_hash = ActionHash::from_raw_36(vec![0xCD; 36]);
+        assert_ne!(s1.hearth_hash, s2.hearth_hash);
+    }
+
+    #[test]
+    fn immutable_field_storyteller_difference_detected() {
+        let s1 = valid_story();
+        let mut s2 = s1.clone();
+        s2.storyteller = AgentPubKey::from_raw_36(vec![0xCD; 36]);
+        assert_ne!(s1.storyteller, s2.storyteller);
     }
 }

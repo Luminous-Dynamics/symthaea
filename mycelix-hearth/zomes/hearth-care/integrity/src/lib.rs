@@ -131,10 +131,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             OpEntry::UpdateEntry {
                 app_entry,
                 action: _,
-                original_action_hash: _,
+                original_action_hash,
                 original_entry_hash: _,
             } => match app_entry {
-                EntryTypes::CareSchedule(schedule) => validate_schedule_update(&schedule),
+                EntryTypes::CareSchedule(schedule) => {
+                    validate_schedule_update(&schedule)?;
+                    validate_schedule_immutable_fields(&schedule, &original_action_hash)
+                }
                 EntryTypes::CareSwap(swap) => validate_swap_update(&swap),
                 EntryTypes::MealPlan(plan) => validate_meal_plan_update(&plan),
             },
@@ -173,38 +176,74 @@ fn validate_schedule(
     schedule: &CareSchedule,
     _action: &Create,
 ) -> ExternResult<ValidateCallbackResult> {
-    if schedule.title.is_empty() || schedule.title.len() > 256 {
+    if schedule.title.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
-            "Care schedule title must be 1-256 characters".into(),
+            "Care schedule title cannot be empty".into(),
+        ));
+    }
+    if schedule.title.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Care schedule title must be <= 256 characters".into(),
         ));
     }
     if schedule.description.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Care schedule description must be 0-4096 characters".into(),
+            "Care schedule description must be <= 4096 characters".into(),
         ));
     }
     if schedule.notes.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Care schedule notes must be 0-4096 characters".into(),
+            "Care schedule notes must be <= 4096 characters".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_schedule_update(schedule: &CareSchedule) -> ExternResult<ValidateCallbackResult> {
-    if schedule.title.is_empty() || schedule.title.len() > 256 {
+    if schedule.title.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
-            "Care schedule title must be 1-256 characters".into(),
+            "Care schedule title cannot be empty".into(),
+        ));
+    }
+    if schedule.title.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Care schedule title must be <= 256 characters".into(),
         ));
     }
     if schedule.description.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Care schedule description must be 0-4096 characters".into(),
+            "Care schedule description must be <= 4096 characters".into(),
         ));
     }
     if schedule.notes.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Care schedule notes must be 0-4096 characters".into(),
+            "Care schedule notes must be <= 4096 characters".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate that immutable fields have not changed on a CareSchedule update.
+fn validate_schedule_immutable_fields(
+    new_schedule: &CareSchedule,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original_schedule: CareSchedule = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original CareSchedule: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original CareSchedule entry is missing".into()
+        )))?;
+
+    if new_schedule.hearth_hash != original_schedule.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a CareSchedule".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -236,7 +275,7 @@ fn validate_meal_plan(plan: &MealPlan) -> ExternResult<ValidateCallbackResult> {
     }
     if plan.dietary_notes.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Meal plan dietary notes must be 0-4096 characters".into(),
+            "Meal plan dietary_notes must be <= 4096 characters".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -250,7 +289,7 @@ fn validate_meal_plan_update(plan: &MealPlan) -> ExternResult<ValidateCallbackRe
     }
     if plan.dietary_notes.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Meal plan dietary notes must be 0-4096 characters".into(),
+            "Meal plan dietary_notes must be <= 4096 characters".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -515,5 +554,15 @@ mod tests {
         let json = serde_json::to_string(&meal).unwrap();
         let back: PlannedMeal = serde_json::from_str(&json).unwrap();
         assert_eq!(meal, back);
+    }
+
+    // ---- Immutable field tests (pure equality, no conductor) ----
+
+    #[test]
+    fn schedule_immutable_hearth_hash_difference_detected() {
+        let s1 = valid_schedule();
+        let mut s2 = s1.clone();
+        s2.hearth_hash = ActionHash::from_raw_36(vec![0xCD; 36]);
+        assert_ne!(s1.hearth_hash, s2.hearth_hash);
     }
 }

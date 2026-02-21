@@ -1,0 +1,9 @@
+[package]
+name = "hearth-coordinator-common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hdk = { workspace = true }
+hearth-types = { path = "../hearth-types" }
+serde = { workspace = true }

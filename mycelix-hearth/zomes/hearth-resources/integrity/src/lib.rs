@@ -106,12 +106,48 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::ResourceLoan(loan) => validate_loan(&loan),
             EntryTypes::BudgetCategory(budget) => validate_budget(&budget),
         },
-        FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
-            EntryTypes::SharedResource(resource) => validate_resource(&resource),
+        FlatOp::StoreEntry(OpEntry::UpdateEntry {
+            app_entry,
+            original_action_hash,
+            ..
+        }) => match app_entry {
+            EntryTypes::SharedResource(resource) => {
+                validate_resource(&resource)?;
+                validate_resource_immutable_fields(&resource, &original_action_hash)
+            }
             EntryTypes::ResourceLoan(loan) => validate_loan(&loan),
             EntryTypes::BudgetCategory(budget) => validate_budget(&budget),
         },
         FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink {
+            link_type: _,
+            base_address: _,
+            target_address: _,
+            tag,
+            action: _,
+        } => {
+            if tag.0.len() > 512 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Link tag exceeds 512 bytes".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        FlatOp::RegisterDeleteLink {
+            link_type: _,
+            original_action: _,
+            base_address: _,
+            target_address: _,
+            tag,
+            action: _,
+        } => {
+            if tag.0.len() > 512 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Link tag exceeds 512 bytes".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -153,6 +189,32 @@ pub fn validate_loan(loan: &ResourceLoan) -> ExternResult<ValidateCallbackResult
     // Basic structural validation
     match loan.status {
         LoanStatus::Active | LoanStatus::Returned | LoanStatus::Overdue => {}
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate that immutable fields have not changed on a SharedResource update.
+pub fn validate_resource_immutable_fields(
+    new_resource: &SharedResource,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original_resource: SharedResource = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original SharedResource: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original SharedResource entry is missing".into()
+        )))?;
+
+    if new_resource.hearth_hash != original_resource.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a SharedResource".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -488,5 +550,15 @@ mod tests {
                 ValidateCallbackResult::Valid
             ));
         }
+    }
+
+    // ---- Immutable field tests (pure equality, no conductor) ----
+
+    #[test]
+    fn resource_immutable_hearth_hash_difference_detected() {
+        let r1 = make_resource("Tool", "desc");
+        let mut r2 = r1.clone();
+        r2.hearth_hash = ActionHash::from_raw_36(vec![0xCDu8; 36]);
+        assert_ne!(r1.hearth_hash, r2.hearth_hash);
     }
 }

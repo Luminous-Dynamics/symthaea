@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     # Shared crates
     "crates/hearth-types",
+    "crates/hearth-coordinator-common",
 
     # Kinship (core membership + relationships)
     "zomes/hearth-kinship/integrity",
@@ -74,6 +75,7 @@ getrandom_03 = { package = "getrandom", version = "0.3" }
 
 # Internal shared crates
 hearth-types = { path = "crates/hearth-types" }
+hearth-coordinator-common = { path = "crates/hearth-coordinator-common" }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
 mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
 

@@ -114,6 +114,35 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::PresenceStatus(presence) => validate_presence(&presence),
         },
         FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink {
+            link_type: _,
+            base_address: _,
+            target_address: _,
+            tag,
+            action: _,
+        } => {
+            if tag.0.len() > 512 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Link tag exceeds 512 bytes".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        FlatOp::RegisterDeleteLink {
+            link_type: _,
+            original_action: _,
+            base_address: _,
+            target_address: _,
+            tag,
+            action: _,
+        } => {
+            if tag.0.len() > 512 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Link tag exceeds 512 bytes".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }

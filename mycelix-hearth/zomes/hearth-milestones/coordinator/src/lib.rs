@@ -4,6 +4,7 @@
 //! Milestones are immutable records; transitions progress forward through phases.
 
 use hdk::prelude::*;
+use hearth_coordinator_common::{records_from_links, require_guardian, require_membership};
 use hearth_milestones_integrity::*;
 use hearth_types::*;
 
@@ -295,74 +296,6 @@ fn next_phase_for(current: &TransitionPhase) -> ExternResult<TransitionPhase> {
             "Transition is already Integrated and cannot be advanced further".into()
         ))),
     }
-}
-
-/// Require the caller to be an active member of the hearth. Cross-zome call to kinship.
-fn require_membership(hearth_hash: &ActionHash) -> ExternResult<MemberRole> {
-    let response = call(
-        CallTargetCell::Local,
-        ZomeName::new("hearth_kinship"),
-        FunctionName::new("get_caller_role"),
-        None,
-        hearth_hash.clone(),
-    )?;
-    let caller_role: Option<MemberRole> = match response {
-        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("Failed to decode role: {e}")))
-        })?,
-        other => {
-            return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "get_caller_role call failed: {:?}",
-                other
-            ))));
-        }
-    };
-    caller_role.ok_or(wasm_error!(WasmErrorInner::Guest(
-        "You are not an active member of this hearth".into()
-    )))
-}
-
-/// Require the caller to be a guardian of the hearth. Cross-zome call to kinship.
-fn require_guardian(hearth_hash: &ActionHash) -> ExternResult<MemberRole> {
-    let response = call(
-        CallTargetCell::Local,
-        ZomeName::new("hearth_kinship"),
-        FunctionName::new("get_caller_role"),
-        None,
-        hearth_hash.clone(),
-    )?;
-    let caller_role: Option<MemberRole> = match response {
-        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("Failed to decode role: {e}")))
-        })?,
-        other => {
-            return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "get_caller_role call failed: {:?}",
-                other
-            ))));
-        }
-    };
-    let role = caller_role.ok_or(wasm_error!(WasmErrorInner::Guest(
-        "You are not an active member of this hearth".into()
-    )))?;
-    if !role.is_guardian() {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Only guardians can advance or complete transitions".into()
-        )));
-    }
-    Ok(role)
-}
-
-fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
-    let mut records = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            records.push(record);
-        }
-    }
-    Ok(records)
 }
 
 // ============================================================================

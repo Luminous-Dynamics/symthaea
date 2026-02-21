@@ -241,28 +241,48 @@ fn validate_profile_update(profile: &AutonomyProfile) -> ExternResult<ValidateCa
 }
 
 fn validate_request(request: &AutonomyRequest) -> ExternResult<ValidateCallbackResult> {
-    if request.capability.is_empty() || request.capability.len() > 256 {
+    if request.capability.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
-            "Autonomy request capability must be 1-256 characters".into(),
+            "Autonomy request capability cannot be empty".into(),
         ));
     }
-    if request.justification.is_empty() || request.justification.len() > 4096 {
+    if request.capability.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Autonomy request justification must be 1-4096 characters".into(),
+            "Autonomy request capability must be <= 256 characters".into(),
+        ));
+    }
+    if request.justification.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Autonomy request justification cannot be empty".into(),
+        ));
+    }
+    if request.justification.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Autonomy request justification must be <= 4096 characters".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_request_update(request: &AutonomyRequest) -> ExternResult<ValidateCallbackResult> {
-    if request.capability.is_empty() || request.capability.len() > 256 {
+    if request.capability.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
-            "Autonomy request capability must be 1-256 characters".into(),
+            "Autonomy request capability cannot be empty".into(),
         ));
     }
-    if request.justification.is_empty() || request.justification.len() > 4096 {
+    if request.capability.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Autonomy request justification must be 1-4096 characters".into(),
+            "Autonomy request capability must be <= 256 characters".into(),
+        ));
+    }
+    if request.justification.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Autonomy request justification cannot be empty".into(),
+        ));
+    }
+    if request.justification.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Autonomy request justification must be <= 4096 characters".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -273,7 +293,7 @@ fn validate_approval(approval: &GuardianApproval) -> ExternResult<ValidateCallba
     if let Some(ref conditions) = approval.conditions {
         if conditions.len() > 4096 {
             return Ok(ValidateCallbackResult::Invalid(
-                "Guardian approval conditions must be 0-4096 characters".into(),
+                "Guardian approval conditions must be <= 4096 characters".into(),
             ));
         }
     }

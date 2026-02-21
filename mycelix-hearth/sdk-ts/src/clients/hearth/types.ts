@@ -1201,6 +1201,65 @@ export type MilestoneSignal =
 export type MilestoneSignalType = MilestoneSignal['type'];
 
 // ============================================================================
+// Signal Types — Autonomy Signals
+// ============================================================================
+
+export interface TierAdvancedSignal {
+  type: 'TierAdvanced';
+  profile_hash: ActionHash;
+  from_tier: AutonomyTier;
+  to_tier: AutonomyTier;
+}
+
+export interface CapabilityApprovedSignal {
+  type: 'CapabilityApproved';
+  request_hash: ActionHash;
+  capability: string;
+}
+
+export interface CapabilityDeniedSignal {
+  type: 'CapabilityDenied';
+  request_hash: ActionHash;
+  capability: string;
+}
+
+export interface TransitionProgressedSignal {
+  type: 'TransitionProgressed';
+  transition_hash: ActionHash;
+  new_phase: TransitionPhase;
+}
+
+export type AutonomySignal =
+  | TierAdvancedSignal
+  | CapabilityApprovedSignal
+  | CapabilityDeniedSignal
+  | TransitionProgressedSignal;
+
+export type AutonomySignalType = AutonomySignal['type'];
+
+// ============================================================================
+// Signal Types — Care Swap Signals
+// ============================================================================
+
+export interface SwapAcceptedSignal {
+  type: 'SwapAccepted';
+  swap_hash: ActionHash;
+  hearth_hash: ActionHash;
+}
+
+export interface SwapDeclinedSignal {
+  type: 'SwapDeclined';
+  swap_hash: ActionHash;
+  hearth_hash: ActionHash;
+}
+
+export type SwapSignal =
+  | SwapAcceptedSignal
+  | SwapDeclinedSignal;
+
+export type SwapSignalType = SwapSignal['type'];
+
+// ============================================================================
 // Unified HearthSignal
 // ============================================================================
 
@@ -1210,6 +1269,8 @@ export type HearthSignal =
   | StorySignal
   | ResourceSignal
   | MilestoneSignal
+  | AutonomySignal
+  | SwapSignal
   | GratitudeExpressedSignal
   | CareTaskCompletedSignal
   | EmergencyAlertSignal

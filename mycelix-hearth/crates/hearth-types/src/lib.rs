@@ -706,6 +706,37 @@ pub enum HearthSignal {
         transition_hash: ActionHash,
         new_phase: TransitionPhase,
     },
+    /// An autonomy tier was advanced (guardian action).
+    TierAdvanced {
+        profile_hash: ActionHash,
+        from_tier: AutonomyTier,
+        to_tier: AutonomyTier,
+    },
+    /// A capability request was approved by a guardian.
+    CapabilityApproved {
+        request_hash: ActionHash,
+        capability: String,
+    },
+    /// A capability request was denied by a guardian.
+    CapabilityDenied {
+        request_hash: ActionHash,
+        capability: String,
+    },
+    /// A tier transition was progressed to the next phase.
+    TransitionProgressed {
+        transition_hash: ActionHash,
+        new_phase: TransitionPhase,
+    },
+    /// A care swap was accepted by the responder.
+    SwapAccepted {
+        swap_hash: ActionHash,
+        hearth_hash: ActionHash,
+    },
+    /// A care swap was declined by the responder.
+    SwapDeclined {
+        swap_hash: ActionHash,
+        hearth_hash: ActionHash,
+    },
 }
 
 #[cfg(test)]
@@ -1791,6 +1822,132 @@ mod tests {
         match back {
             HearthSignal::TransitionAdvanced { new_phase, .. } => {
                 assert_eq!(new_phase, TransitionPhase::PostLiminal);
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn signal_tier_advanced_serde() {
+        let sig = HearthSignal::TierAdvanced {
+            profile_hash: fake_hash(),
+            from_tier: AutonomyTier::Supervised,
+            to_tier: AutonomyTier::Guided,
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        assert!(json.contains("TierAdvanced"));
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::TierAdvanced {
+                from_tier, to_tier, ..
+            } => {
+                assert_eq!(from_tier, AutonomyTier::Supervised);
+                assert_eq!(to_tier, AutonomyTier::Guided);
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn signal_capability_approved_serde() {
+        let sig = HearthSignal::CapabilityApproved {
+            request_hash: fake_hash(),
+            capability: "use_stove".into(),
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        assert!(json.contains("CapabilityApproved"));
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::CapabilityApproved {
+                request_hash,
+                capability,
+            } => {
+                assert_eq!(request_hash, fake_hash());
+                assert_eq!(capability, "use_stove");
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn signal_capability_denied_serde() {
+        let sig = HearthSignal::CapabilityDenied {
+            request_hash: fake_hash(),
+            capability: "drive_car".into(),
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        assert!(json.contains("CapabilityDenied"));
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::CapabilityDenied {
+                request_hash,
+                capability,
+            } => {
+                assert_eq!(request_hash, fake_hash());
+                assert_eq!(capability, "drive_car");
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn signal_transition_progressed_serde() {
+        let sig = HearthSignal::TransitionProgressed {
+            transition_hash: fake_hash(),
+            new_phase: TransitionPhase::Liminal,
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        assert!(json.contains("TransitionProgressed"));
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::TransitionProgressed {
+                transition_hash,
+                new_phase,
+            } => {
+                assert_eq!(transition_hash, fake_hash());
+                assert_eq!(new_phase, TransitionPhase::Liminal);
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn signal_swap_accepted_serde() {
+        let sig = HearthSignal::SwapAccepted {
+            swap_hash: fake_hash(),
+            hearth_hash: fake_hash_b(),
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        assert!(json.contains("SwapAccepted"));
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::SwapAccepted {
+                swap_hash,
+                hearth_hash,
+            } => {
+                assert_eq!(swap_hash, fake_hash());
+                assert_eq!(hearth_hash, fake_hash_b());
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn signal_swap_declined_serde() {
+        let sig = HearthSignal::SwapDeclined {
+            swap_hash: fake_hash(),
+            hearth_hash: fake_hash_b(),
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        assert!(json.contains("SwapDeclined"));
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::SwapDeclined {
+                swap_hash,
+                hearth_hash,
+            } => {
+                assert_eq!(swap_hash, fake_hash());
+                assert_eq!(hearth_hash, fake_hash_b());
             }
             _ => panic!("Wrong variant"),
         }

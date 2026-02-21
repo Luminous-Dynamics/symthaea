@@ -4,6 +4,7 @@
 //! and budget tracking with guardian authorization and signal emission.
 
 use hdk::prelude::*;
+use hearth_coordinator_common::decode_zome_response;
 use hearth_resources_integrity::*;
 use hearth_types::*;
 
@@ -68,25 +69,6 @@ fn budget_usage_pct(actual: u64, target: u64) -> u32 {
         return 10000;
     }
     ((actual as u128 * 10000) / target as u128).min(10000) as u32
-}
-
-/// Decode a typed value from a ZomeCallResponse.
-fn decode_zome_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
-    response: ZomeCallResponse,
-    context: &str,
-) -> ExternResult<T> {
-    match response {
-        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "Failed to decode {} response: {}",
-                context, e
-            )))
-        }),
-        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Cross-zome call to {} failed: {:?}",
-            context, other
-        )))),
-    }
 }
 
 /// Fetch the caller's role in the given hearth via cross-zome call to kinship.

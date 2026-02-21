@@ -4,6 +4,7 @@
 //! logging rhythm occurrences, and tracking member presence.
 
 use hdk::prelude::*;
+use hearth_coordinator_common::{records_from_links, require_membership};
 use hearth_rhythms_integrity::*;
 use hearth_types::*;
 
@@ -37,48 +38,6 @@ pub struct SetPresenceInput {
     pub hearth_hash: ActionHash,
     pub status: PresenceStatusType,
     pub expected_return: Option<Timestamp>,
-}
-
-// ============================================================================
-// Cross-Zome Membership Validation
-// ============================================================================
-
-/// Decode a typed value from a ZomeCallResponse.
-fn decode_zome_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
-    response: ZomeCallResponse,
-    context: &str,
-) -> ExternResult<T> {
-    match response {
-        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "Failed to decode {} response: {}",
-                context, e
-            )))
-        }),
-        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Cross-zome call to {} failed: {:?}",
-            context, other
-        )))),
-    }
-}
-
-/// Fetch the caller's role in the given hearth via cross-zome call to kinship.
-/// Returns the role if the caller is an active member, Err otherwise.
-fn require_membership(hearth_hash: &ActionHash) -> ExternResult<MemberRole> {
-    let caller_role: Option<MemberRole> = decode_zome_response(
-        call(
-            CallTargetCell::Local,
-            ZomeName::new("hearth_kinship"),
-            FunctionName::new("get_caller_role"),
-            None,
-            hearth_hash.clone(),
-        )?,
-        "get_caller_role",
-    )?;
-
-    caller_role.ok_or(wasm_error!(WasmErrorInner::Guest(
-        "You are not an active member of this hearth".into()
-    )))
 }
 
 // ============================================================================
@@ -387,22 +346,6 @@ pub fn create_rhythm_digest(input: DigestEpochInput) -> ExternResult<Vec<RhythmS
     }
 
     Ok(summaries)
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
-    let mut records = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            records.push(record);
-        }
-    }
-    Ok(records)
 }
 
 // ============================================================================
