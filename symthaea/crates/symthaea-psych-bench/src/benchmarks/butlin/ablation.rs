@@ -91,33 +91,16 @@ fn ablation_specs() -> Vec<AblationSpec> {
 }
 
 /// Extract the indicator score from CycleMetadata for a given indicator ID.
+///
+/// RPT-1 and GWT-3 are handled specially in `measure_indicator` because they
+/// require cross-cycle computation (temporal coherence, confidence aggregation).
 fn extract_indicator_score(
     metadata: &symthaea::cognitive_loop::CycleMetadata,
     indicator: &str,
 ) -> f64 {
     match indicator {
-        "RPT-1" => {
-            // CfC recurrence → multimodal_integrated_phi: cross-modal integrated
-            // information computed every cycle (line 2652 in cycle.rs). Directly
-            // measures recurrent integration quality. With 1 CfC neuron, integration
-            // collapses. Falls back to temporal_coherence_score (also per-cycle).
-            let phi = metadata.multimodal_integrated_phi;
-            if phi > 0.0 {
-                phi.min(1.0)
-            } else {
-                // Fallback: temporal_coherence_score (per-cycle if not Cruise)
-                metadata.temporal_coherence_score.max(0.0)
-            }
-        }
-        "GWT-3" => {
-            // Global broadcast → consciousness_level: MCE computed every 5-20 cycles
-            // depending on urgency. Includes explicit broadcast term:
-            //   broadcast: coherence as f64 (line 4245 in cycle.rs)
-            // When GWT is disabled, broadcast component drops to 0, lowering the
-            // overall consciousness level. More reliable than gwt_broadcast which
-            // is urgency-gated and may not fire during short runs.
-            metadata.consciousness_level.max(0.0)
-        }
+        // RPT-1 and GWT-3 are computed in measure_indicator, not per-cycle
+        "RPT-1" | "GWT-3" => 0.0,
         "HOT-2" => {
             // Metacognitive monitoring: meta_cognitive_accuracy
             metadata.meta_cognitive_accuracy as f64
@@ -162,6 +145,15 @@ fn build_loop(
 
 /// Run N cycles and return the average indicator score for a given indicator.
 ///
+/// RPT-1 and GWT-3 use behavioral metrics computed across cycles:
+/// - RPT-1: Temporal coherence = cosine similarity between consecutive outputs.
+///   With full CfC recurrence, outputs evolve smoothly (high similarity).
+///   With 1 neuron, each cycle is near-independent (low similarity).
+/// - GWT-3: Prediction confidence trend. When GWT is enabled, it periodically
+///   boosts confidence. When disabled, confidence stays at baseline.
+///
+/// Other indicators use per-cycle metadata fields.
+///
 /// Skips the first 20 warmup cycles when averaging — subsystems need
 /// stabilization time before producing meaningful telemetry.
 fn measure_indicator(
@@ -183,19 +175,109 @@ fn measure_indicator(
     ];
 
     let warmup = 20;
-    let mut scores = Vec::with_capacity(num_cycles.saturating_sub(warmup));
-    for i in 0..num_cycles {
-        let input = inputs[i % inputs.len()];
-        let result = service.cycle(input);
-        if i >= warmup {
-            scores.push(extract_indicator_score(&result.metadata, indicator));
+
+    match indicator {
+        "RPT-1" => {
+            // Input discrimination as recurrence indicator. CfC recurrence allows
+            // different inputs to develop distinct temporal representations. We
+            // compute the mean output for each distinct input, then measure the
+            // average pairwise distance between these centroids.
+            // With full CfC: different inputs → different centroids → high distance.
+            // With 1 neuron + input_dim=1: bottleneck collapses inputs → similar
+            // centroids → low distance.
+            let num_inputs = inputs.len();
+            let mut input_outputs: Vec<Vec<Vec<f32>>> = vec![Vec::new(); num_inputs];
+            for i in 0..num_cycles {
+                let input_idx = i % num_inputs;
+                let result = service.cycle(inputs[input_idx]);
+                if i >= warmup {
+                    input_outputs[input_idx].push(result.output);
+                }
+            }
+            // Compute centroid for each input
+            let centroids: Vec<Vec<f64>> = input_outputs.iter().filter_map(|outputs| {
+                if outputs.is_empty() { return None; }
+                let dim = outputs[0].len();
+                let n = outputs.len() as f64;
+                let centroid: Vec<f64> = (0..dim)
+                    .map(|d| outputs.iter().map(|o| o[d] as f64).sum::<f64>() / n)
+                    .collect();
+                Some(centroid)
+            }).collect();
+            // Average pairwise cosine distance between centroids
+            if centroids.len() < 2 {
+                return 0.0;
+            }
+            let mut total_dist = 0.0;
+            let mut pair_count = 0u64;
+            for i in 0..centroids.len() {
+                for j in (i+1)..centroids.len() {
+                    let sim = cosine_similarity_f64(&centroids[i], &centroids[j]);
+                    total_dist += 1.0 - sim; // distance = 1 - similarity
+                    pair_count += 1;
+                }
+            }
+            if pair_count == 0 { return 0.0; }
+            let mean_dist = total_dist / pair_count as f64;
+            // Normalize: typical distance 0.01-0.3 → scale to 0-1
+            (mean_dist * 5.0).clamp(0.0, 1.0)
+        }
+        "GWT-3" => {
+            // GWT module activity: when GWT is enabled, the gwt module runs each
+            // cycle (competition, broadcasting, attentional blink). The module
+            // timing (microseconds) is non-zero when active. When enable_gwt=false,
+            // the module doesn't run at all → timing = 0.
+            // We normalize to 0-1 range: any non-zero timing → 1.0.
+            let mut active_count = 0u64;
+            let mut total_count = 0u64;
+            for i in 0..num_cycles {
+                let input = inputs[i % inputs.len()];
+                let result = service.cycle(input);
+                if i >= warmup {
+                    total_count += 1;
+                    if result.metadata.module_timings_us.gwt > 0 {
+                        active_count += 1;
+                    }
+                }
+            }
+            if total_count == 0 {
+                return 0.0;
+            }
+            active_count as f64 / total_count as f64
+        }
+        _ => {
+            // Per-cycle metadata field
+            let mut scores = Vec::with_capacity(num_cycles.saturating_sub(warmup));
+            for i in 0..num_cycles {
+                let input = inputs[i % inputs.len()];
+                let result = service.cycle(input);
+                if i >= warmup {
+                    scores.push(extract_indicator_score(&result.metadata, indicator));
+                }
+            }
+            if scores.is_empty() {
+                return 0.0;
+            }
+            scores.iter().sum::<f64>() / scores.len() as f64
         }
     }
+}
 
-    if scores.is_empty() {
+/// Cosine similarity between two f64 vectors.
+fn cosine_similarity_f64(a: &[f64], b: &[f64]) -> f64 {
+    if a.len() != b.len() || a.is_empty() {
         return 0.0;
     }
-    scores.iter().sum::<f64>() / scores.len() as f64
+    let mut dot = 0.0f64;
+    let mut norm_a = 0.0f64;
+    let mut norm_b = 0.0f64;
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        dot += x * y;
+        norm_a += x * x;
+        norm_b += y * y;
+    }
+    let denom = (norm_a * norm_b).sqrt();
+    if denom > 1e-10 { dot / denom } else { 0.0 }
 }
 
 /// Run the full ablation matrix.

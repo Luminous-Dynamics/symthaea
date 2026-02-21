@@ -84,7 +84,7 @@ impl BartBenchmark {
             let min_pop_estimate = 5.0; // prior: balloons survive at least 5 pumps
             let max_pop_estimate = if experienced_balloons > 3 {
                 // After pops, estimate max range from pop rate
-                let pop_rate = experienced_pops as f64 / experienced_balloons as f64;
+                let _pop_rate = experienced_pops as f64 / experienced_balloons as f64;
                 // If pop_rate is high, range is small; if low, range is large
                 let avg_pumped = if experienced_balloons > experienced_pops {
                     total_pumps as f64 / (experienced_balloons - experienced_pops).max(1) as f64
