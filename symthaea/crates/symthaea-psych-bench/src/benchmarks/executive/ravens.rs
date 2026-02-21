@@ -205,8 +205,9 @@ impl RavensProgressiveMatricesBenchmark {
                 let grid_size: Vec<&ContinuousHV> = item.cells.iter().map(|c| &size_hvs[c.size]).collect();
                 let grid_color: Vec<&ContinuousHV> = item.cells.iter().map(|c| &color_hvs[c.color]).collect();
 
-                // For each feature, extract row rules (col2 = rule(col0)) from 2 complete rows,
-                // then predict the missing cell's feature.
+                // For each feature, extract row, column, and diagonal rules
+                // from complete rows/columns, then predict the missing cell's
+                // feature using a 3-source ensemble.
                 let predict_feature = |feat: &[&ContinuousHV]| -> ContinuousHV {
                     // Row 0: cells [0,1,2], Row 1: cells [3,4,5], Row 2: cells [6,7,?]
                     // Row rule: unbind(col2, col0) — what maps col0 to col2?
@@ -216,17 +217,26 @@ impl RavensProgressiveMatricesBenchmark {
                     // Predict: apply average row rule to row2's col0 (cell 6)
                     let row_pred = avg_row_rule.bind(feat[6]);
 
-                    // Column rule: unbind(row2, row0) in col 2 — but col2 is incomplete
-                    // Use col 0 instead: cells [0, 3, 6] all known
-                    // col0 rule: unbind(row2, row0) = how row progresses
+                    // Column rule: cells [0,3,6] (col0), [1,4,7] (col1), [2,5,?] (col2)
                     let col0_rule = feat[6].bind(&feat[0].inverse());
                     let col1_rule = feat[7].bind(&feat[1].inverse());
                     let avg_col_rule = ContinuousHV::bundle(&[&col0_rule, &col1_rule]);
                     // Predict: apply column rule to row0's col2 (cell 2)
                     let col_pred = avg_col_rule.bind(feat[2]);
 
-                    // Ensemble: average row and column predictions
-                    ContinuousHV::bundle(&[&row_pred, &col_pred])
+                    // Diagonal rule: main diagonal [0,4,?] and anti-diagonal [2,4,6]
+                    // Main diag: cells 0→4→8(missing). Rule: unbind(4, 0)
+                    let diag_rule = feat[4].bind(&feat[0].inverse());
+                    let diag_pred = diag_rule.bind(feat[4]); // Apply to cell 4 to get cell 8
+
+                    // Also use row-col cross-validation: row1 rule applied to row2
+                    let row1_col2_rule = feat[5].bind(&feat[3].inverse());
+                    let cross_pred = row1_col2_rule.bind(feat[6]);
+
+                    // 4-source weighted ensemble: row + column + diagonal + cross
+                    ContinuousHV::weighted_bundle(&[
+                        &row_pred, &col_pred, &diag_pred, &cross_pred,
+                    ], &[1.0, 1.0, 0.5, 0.5])
                 };
 
                 let pred_shape = predict_feature(&grid_shape);
