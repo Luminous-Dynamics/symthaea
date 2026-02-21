@@ -1,5 +1,6 @@
 //! Benchmark harness: traits, configuration, reporting, and baselines.
 
+pub mod analysis;
 pub mod baselines;
 pub mod config;
 pub mod report;

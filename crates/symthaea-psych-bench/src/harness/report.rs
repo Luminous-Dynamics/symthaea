@@ -135,6 +135,8 @@ pub struct BaselineComparison {
     pub population: String,
     /// Ratio: system_value / human_value.
     pub ratio: f64,
+    /// Cohen's d effect size (agent vs. baseline), if computable.
+    pub effect_size: Option<f64>,
 }
 
 /// Collection of benchmark results with comparison support.
@@ -162,7 +164,7 @@ impl BenchmarkReport {
 
     /// Full summary of all results with baseline comparisons.
     pub fn summary(&self) -> String {
-        use super::baselines;
+        use crate::harness::baselines;
 
         let worm_bl = baselines::worm_baselines();
         let cog_bl = baselines::cogbench_baselines();
@@ -170,6 +172,8 @@ impl BenchmarkReport {
         let mem_bl = baselines::memory_agent_baselines();
         let exec_bl = baselines::executive_baselines();
         let meta_bl = baselines::metacognition_baselines();
+        let affect_bl = baselines::affect_baselines();
+        let creativity_bl = baselines::creativity_baselines();
 
         let mut lines = vec![format!("Psych Benchmark Report ({})", self.timestamp)];
         lines.push(format!("{} benchmarks run", self.results.len()));
@@ -178,7 +182,7 @@ impl BenchmarkReport {
             lines.push(result.summary());
 
             // Add baseline comparisons for known metrics
-            let comparisons = self.find_comparisons(result, &worm_bl, &cog_bl, &tom_bl, &mem_bl, &exec_bl, &meta_bl);
+            let comparisons = self.find_comparisons(result, &worm_bl, &cog_bl, &tom_bl, &mem_bl, &exec_bl, &meta_bl, &affect_bl, &creativity_bl);
             if !comparisons.is_empty() {
                 lines.push("  --- Baseline Comparisons ---".to_string());
                 for (metric, comp) in &comparisons {
@@ -195,6 +199,17 @@ impl BenchmarkReport {
         lines.join("\n")
     }
 
+    /// Compute Cohen's d for a metric vs. a baseline value.
+    ///
+    /// Uses the metric's std_dev as the pooled SD estimate.
+    fn compute_effect_size(metric: &MetricValue, baseline_value: f64) -> Option<f64> {
+        if metric.std_dev.abs() < 1e-15 {
+            None
+        } else {
+            Some(super::analysis::cohens_d(metric.mean, baseline_value, metric.std_dev))
+        }
+    }
+
     /// Find applicable baseline comparisons for a benchmark result.
     fn find_comparisons(
         &self,
@@ -205,6 +220,8 @@ impl BenchmarkReport {
         mem_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
         exec_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
         meta_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
+        affect_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
+        creativity_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
     ) -> Vec<(String, BaselineComparison)> {
         let mut comps = Vec::new();
         let benchmark = result.benchmark.as_str();
@@ -221,7 +238,7 @@ impl BenchmarkReport {
             ("false_belief_accuracy", "false_belief_accuracy", tom_bl),
             ("faux_pas_accuracy", "faux_pas_accuracy", tom_bl),
             ("hinting_accuracy", "hinting_accuracy", tom_bl),
-            ("retrieval_accuracy", "accurate_retrieval", mem_bl),
+            ("overall_retrieval_accuracy", "accurate_retrieval", mem_bl),
             ("correction_accuracy", "test_time_learning", mem_bl),
             // Executive
             ("categories_completed", "wcst_categories_completed", exec_bl),
@@ -248,6 +265,18 @@ impl BenchmarkReport {
             // Metacognition
             ("calibration_error_ece", "calibration_error_ece", meta_bl),
             ("discrimination_gamma", "discrimination_gamma", meta_bl),
+            // ToMBench: Persuasion
+            ("persuasion_detection", "persuasion_detection", tom_bl),
+            // MemoryAgent: Long-range
+            ("delay_50::retention", "long_range_delay_50", mem_bl),
+            // MemoryAgent: Conflict resolution
+            ("recency_preference", "conflict_recency_preference", mem_bl),
+            // Affect: Valence classification
+            ("valence_accuracy", "valence_accuracy", affect_bl),
+            // Affect: Mood-congruent recall
+            ("congruence_ratio", "congruence_ratio", affect_bl),
+            // Creativity: Alternate Uses fluency
+            ("fluency", "aut_fluency", creativity_bl),
         ];
 
         for (metric_key, baseline_key, baselines) in mappings {
@@ -265,74 +294,53 @@ impl BenchmarkReport {
                             source: bl.source.to_string(),
                             population: bl.population.to_string(),
                             ratio,
+                            effect_size: Self::compute_effect_size(metric, bl.value),
                         },
                     ));
                 }
             }
         }
 
+        // Helper closure for benchmark-specific comparisons
+        let mut push_specific = |metric_key: &str, baseline_key: &str,
+                                  baselines: &std::collections::BTreeMap<&str, super::baselines::Baseline>| {
+            if let Some(metric) = result.metrics.get(metric_key) {
+                if let Some(bl) = baselines.get(baseline_key) {
+                    let ratio = if bl.value.abs() > 1e-10 { metric.mean / bl.value } else { 0.0 };
+                    comps.push((metric_key.to_string(), BaselineComparison {
+                        human_value: bl.value, source: bl.source.to_string(),
+                        population: bl.population.to_string(), ratio,
+                        effect_size: Self::compute_effect_size(metric, bl.value),
+                    }));
+                }
+            }
+        };
+
         // Benchmark-specific metrics (avoid cross-benchmark collisions)
         if benchmark.contains("Ravens") {
-            if let Some(metric) = result.metrics.get("overall_accuracy") {
-                if let Some(bl) = exec_bl.get("ravens_overall_accuracy") {
-                    let ratio = if bl.value.abs() > 1e-10 { metric.mean / bl.value } else { 0.0 };
-                    comps.push(("overall_accuracy".to_string(), BaselineComparison {
-                        human_value: bl.value, source: bl.source.to_string(),
-                        population: bl.population.to_string(), ratio,
-                    }));
-                }
-            }
-            if let Some(metric) = result.metrics.get("easy_accuracy") {
-                if let Some(bl) = exec_bl.get("ravens_easy_accuracy") {
-                    let ratio = if bl.value.abs() > 1e-10 { metric.mean / bl.value } else { 0.0 };
-                    comps.push(("easy_accuracy".to_string(), BaselineComparison {
-                        human_value: bl.value, source: bl.source.to_string(),
-                        population: bl.population.to_string(), ratio,
-                    }));
-                }
-            }
+            push_specific("overall_accuracy", "ravens_overall_accuracy", exec_bl);
+            push_specific("easy_accuracy", "ravens_easy_accuracy", exec_bl);
         }
-
-        // Stroop-specific: congruent_accuracy, incongruent_accuracy
+        if benchmark.contains("RemoteAssociates") {
+            push_specific("overall_accuracy", "rat_overall_accuracy", creativity_bl);
+        }
+        if benchmark.contains("StrangeStory") {
+            push_specific("overall_accuracy", "strange_story_accuracy", tom_bl);
+        }
         if benchmark.contains("Stroop") {
-            for (metric_key, baseline_key) in [
-                ("congruent_accuracy", "stroop_congruent_accuracy"),
-                ("incongruent_accuracy", "stroop_incongruent_accuracy"),
-            ] {
-                if let Some(metric) = result.metrics.get(metric_key) {
-                    if let Some(bl) = exec_bl.get(baseline_key) {
-                        let ratio = if bl.value.abs() > 1e-10 { metric.mean / bl.value } else { 0.0 };
-                        comps.push((metric_key.to_string(), BaselineComparison {
-                            human_value: bl.value, source: bl.source.to_string(),
-                            population: bl.population.to_string(), ratio,
-                        }));
-                    }
-                }
-            }
+            push_specific("congruent_accuracy", "stroop_congruent_accuracy", exec_bl);
+            push_specific("incongruent_accuracy", "stroop_incongruent_accuracy", exec_bl);
         }
-
-        // Flanker-specific: congruent_accuracy, incongruent_accuracy
         if benchmark.contains("Flanker") {
-            for (metric_key, baseline_key) in [
-                ("congruent_accuracy", "flanker_congruent_accuracy"),
-                ("incongruent_accuracy", "flanker_incongruent_accuracy"),
-            ] {
-                if let Some(metric) = result.metrics.get(metric_key) {
-                    if let Some(bl) = exec_bl.get(baseline_key) {
-                        let ratio = if bl.value.abs() > 1e-10 { metric.mean / bl.value } else { 0.0 };
-                        comps.push((metric_key.to_string(), BaselineComparison {
-                            human_value: bl.value, source: bl.source.to_string(),
-                            population: bl.population.to_string(), ratio,
-                        }));
-                    }
-                }
-            }
+            push_specific("congruent_accuracy", "flanker_congruent_accuracy", exec_bl);
+            push_specific("incongruent_accuracy", "flanker_incongruent_accuracy", exec_bl);
         }
 
         // Only return comparisons relevant to this benchmark
         if benchmark.contains("WorM") || benchmark.contains("CogBench")
             || benchmark.contains("ToM") || benchmark.contains("Memory")
             || benchmark.contains("Executive") || benchmark.contains("Metacognition")
+            || benchmark.contains("Affect") || benchmark.contains("Creativity")
         {
             comps
         } else {
@@ -374,6 +382,259 @@ impl BenchmarkReport {
         std::fs::write(path, json)?;
         Ok(())
     }
+
+    /// Publication-ready Markdown summary table.
+    ///
+    /// One row per benchmark, showing key metric, agent value, human baseline, % of human, and 95% CI.
+    pub fn paper_summary(&self) -> String {
+        use crate::harness::baselines;
+
+        let worm_bl = baselines::worm_baselines();
+        let cog_bl = baselines::cogbench_baselines();
+        let tom_bl = baselines::tombench_baselines();
+        let mem_bl = baselines::memory_agent_baselines();
+        let exec_bl = baselines::executive_baselines();
+        let meta_bl = baselines::metacognition_baselines();
+        let affect_bl = baselines::affect_baselines();
+        let creativity_bl = baselines::creativity_baselines();
+
+        let mut lines = Vec::new();
+        lines.push("| Domain | Benchmark | Key Metric | Agent | Human | % of Human | d | 95% CI |".to_string());
+        lines.push("|--------|-----------|------------|-------|-------|------------|---|--------|".to_string());
+
+        for result in &self.results {
+            let domain = domain_of(&result.benchmark);
+            let key = key_metric_for_benchmark(&result.benchmark);
+            let metric = match result.metrics.get(key) {
+                Some(m) => m,
+                None => continue,
+            };
+
+            let comparisons = self.find_comparisons(
+                result, &worm_bl, &cog_bl, &tom_bl, &mem_bl, &exec_bl, &meta_bl,
+                &affect_bl, &creativity_bl,
+            );
+
+            let comp = comparisons.iter().find(|(k, _)| k == key);
+            let (human_str, pct_str) = comp
+                .map(|(_, c)| (format!("{:.3}", c.human_value), format!("{:.1}%", c.ratio * 100.0)))
+                .unwrap_or_else(|| ("—".to_string(), "—".to_string()));
+
+            let d_str = comp
+                .and_then(|(_, c)| c.effect_size)
+                .map(|d| format!("{:.2}", d))
+                .unwrap_or_else(|| "—".to_string());
+
+            let ci_str = format!("[{:.3}, {:.3}]", metric.ci_lower, metric.ci_upper);
+
+            lines.push(format!(
+                "| {} | {} | {} | {:.3} | {} | {} | {} | {} |",
+                domain,
+                result.benchmark.split("::").last().unwrap_or(&result.benchmark),
+                key,
+                metric.mean,
+                human_str,
+                pct_str,
+                d_str,
+                ci_str,
+            ));
+        }
+
+        lines.join("\n")
+    }
+
+    /// Publication-ready LaTeX tabular output.
+    pub fn paper_summary_latex(&self) -> String {
+        use crate::harness::baselines;
+
+        let worm_bl = baselines::worm_baselines();
+        let cog_bl = baselines::cogbench_baselines();
+        let tom_bl = baselines::tombench_baselines();
+        let mem_bl = baselines::memory_agent_baselines();
+        let exec_bl = baselines::executive_baselines();
+        let meta_bl = baselines::metacognition_baselines();
+        let affect_bl = baselines::affect_baselines();
+        let creativity_bl = baselines::creativity_baselines();
+
+        let mut lines = Vec::new();
+        lines.push(r"\begin{tabular}{llllrrrl}".to_string());
+        lines.push(r"\toprule".to_string());
+        lines.push(r"Domain & Benchmark & Key Metric & Agent & Human & \% Human & $d$ & 95\% CI \\".to_string());
+        lines.push(r"\midrule".to_string());
+
+        for result in &self.results {
+            let domain = domain_of(&result.benchmark);
+            let key = key_metric_for_benchmark(&result.benchmark);
+            let metric = match result.metrics.get(key) {
+                Some(m) => m,
+                None => continue,
+            };
+
+            let comparisons = self.find_comparisons(
+                result, &worm_bl, &cog_bl, &tom_bl, &mem_bl, &exec_bl, &meta_bl,
+                &affect_bl, &creativity_bl,
+            );
+
+            let comp = comparisons.iter().find(|(k, _)| k == key);
+            let (human_str, pct_str) = comp
+                .map(|(_, c)| (format!("{:.3}", c.human_value), format!("{:.1}\\%", c.ratio * 100.0)))
+                .unwrap_or_else(|| ("---".to_string(), "---".to_string()));
+
+            let d_str = comp
+                .and_then(|(_, c)| c.effect_size)
+                .map(|d| format!("{:.2}", d))
+                .unwrap_or_else(|| "---".to_string());
+
+            let bench_name = result.benchmark.split("::").last().unwrap_or(&result.benchmark);
+
+            lines.push(format!(
+                "{} & {} & {} & {:.3} & {} & {} & {} & [{:.3}, {:.3}] \\\\",
+                domain, bench_name, key, metric.mean, human_str, pct_str, d_str,
+                metric.ci_lower, metric.ci_upper,
+            ));
+        }
+
+        lines.push(r"\bottomrule".to_string());
+        lines.push(r"\end{tabular}".to_string());
+        lines.join("\n")
+    }
+}
+
+/// Extract domain prefix from benchmark name.
+pub fn domain_of(benchmark: &str) -> &str {
+    benchmark.split("::").next().unwrap_or(benchmark)
+}
+
+/// Map each benchmark to its primary metric for paper-table output.
+pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
+    match benchmark {
+        b if b.contains("NBack") => "nback_2::accuracy",
+        b if b.contains("ChangeDetection") => "set_size_4::accuracy",
+        b if b.contains("SerialRecall") => "primacy_advantage",
+        b if b.contains("SpatialUpdating") => "overall_accuracy",
+        b if b.contains("Binding") => "overall_accuracy",
+        b if b.contains("DigitSpan") => "forward_span",
+        b if b.contains("Stroop") && !b.contains("Strange") => "stroop_effect",
+        b if b.contains("Flanker") => "flanker_effect",
+        b if b.contains("Wisconsin") => "categories_completed",
+        b if b.contains("Iowa") => "overall_net_score",
+        b if b.contains("Ravens") => "overall_accuracy",
+        b if b.contains("TowerOfLondon") => "overall_optimal_rate",
+        b if b.contains("Probabilistic") => "correct_rate",
+        b if b.contains("Horizon") => "horizon_6::directed_exploration",
+        b if b.contains("RestlessBandit") => "restless_bandit_regret",
+        b if b.contains("Instrumental") => "instrumental_sensitivity",
+        b if b.contains("TwoStep") => "beta3_model_basedness",
+        b if b.contains("Temporal") => "discounting_score_S",
+        b if b.contains("Bart") => "average_pumps",
+        b if b.contains("Reversal") => "win_stay_rate",
+        b if b.contains("FalseBelief") => "false_belief_accuracy",
+        b if b.contains("FauxPas") => "faux_pas_accuracy",
+        b if b.contains("Hinting") => "hinting_accuracy",
+        b if b.contains("Persuasion") => "persuasion_detection",
+        b if b.contains("StrangeStory") => "overall_accuracy",
+        b if b.contains("AccurateRetrieval") => "overall_retrieval_accuracy",
+        b if b.contains("TestTimeLearning") => "correction_accuracy",
+        b if b.contains("LongRange") => "delay_50::retention",
+        b if b.contains("ConflictResolution") => "recency_preference",
+        b if b.contains("Calibration") => "calibration_error_ece",
+        b if b.contains("Butlin") => "present_count",
+        b if b.contains("ValenceClassification") => "valence_accuracy",
+        b if b.contains("MoodCongruent") => "congruence_ratio",
+        b if b.contains("RemoteAssociates") => "overall_accuracy",
+        b if b.contains("AlternateUses") => "fluency",
+        _ => "overall_accuracy",
+    }
+}
+
+/// Returns true if a lower metric value is better (inverted scoring).
+fn is_lower_better(metric_key: &str) -> bool {
+    matches!(
+        metric_key,
+        "calibration_error_ece"
+            | "perseverative_errors"
+            | "trials_to_first_category"
+            | "restless_bandit_regret"
+    )
+}
+
+impl BenchmarkReport {
+    /// Compute a normalized cognitive profile: domain → score [0.0, 1.0].
+    ///
+    /// Groups benchmarks by domain via `domain_of()`, looks up baseline
+    /// comparisons, and averages the ratios per domain. Lower-is-better
+    /// metrics are inverted so that 1.0 always means "at or above baseline".
+    pub fn cognitive_profile(&self) -> BTreeMap<String, f64> {
+        use crate::harness::baselines;
+
+        let worm_bl = baselines::worm_baselines();
+        let cog_bl = baselines::cogbench_baselines();
+        let tom_bl = baselines::tombench_baselines();
+        let mem_bl = baselines::memory_agent_baselines();
+        let exec_bl = baselines::executive_baselines();
+        let meta_bl = baselines::metacognition_baselines();
+        let affect_bl = baselines::affect_baselines();
+        let creativity_bl = baselines::creativity_baselines();
+
+        let mut domain_scores: BTreeMap<String, Vec<f64>> = BTreeMap::new();
+
+        for result in &self.results {
+            let domain = domain_of(&result.benchmark).to_string();
+            let key = key_metric_for_benchmark(&result.benchmark);
+
+            let comparisons = self.find_comparisons(
+                result, &worm_bl, &cog_bl, &tom_bl, &mem_bl,
+                &exec_bl, &meta_bl, &affect_bl, &creativity_bl,
+            );
+
+            if let Some((_, comp)) = comparisons.iter().find(|(k, _)| k == key) {
+                let score = if is_lower_better(key) {
+                    // Lower is better: score = baseline / agent (capped at 1.0)
+                    if comp.ratio.abs() > 1e-10 {
+                        (1.0 / comp.ratio).min(1.0)
+                    } else {
+                        0.0
+                    }
+                } else {
+                    comp.ratio.min(1.0)
+                };
+                domain_scores.entry(domain).or_default().push(score.max(0.0));
+            }
+        }
+
+        domain_scores
+            .into_iter()
+            .map(|(domain, scores)| {
+                let avg = scores.iter().sum::<f64>() / scores.len() as f64;
+                (domain, avg)
+            })
+            .collect()
+    }
+
+    /// Format the cognitive profile as an ASCII horizontal bar chart.
+    pub fn format_profile(&self) -> String {
+        let profile = self.cognitive_profile();
+        if profile.is_empty() {
+            return "No profile data available.".to_string();
+        }
+
+        let bar_width = 20;
+        let mut lines = vec!["Cognitive Profile".to_string()];
+
+        for (domain, score) in &profile {
+            let filled = (score * bar_width as f64).round() as usize;
+            let filled = filled.min(bar_width);
+            let empty = bar_width - filled;
+            let bar = format!(
+                "{}{}",
+                "\u{2588}".repeat(filled),
+                "\u{2591}".repeat(empty),
+            );
+            lines.push(format!("{:<14}{} {:.2}", domain, bar, score));
+        }
+
+        lines.join("\n")
+    }
 }
 
 impl Default for BenchmarkReport {
@@ -408,6 +669,74 @@ mod tests {
         let m = MetricValue::from_samples(&[42.0]);
         assert!((m.mean - 42.0).abs() < 1e-10);
         assert_eq!(m.std_dev, 0.0);
+    }
+
+    #[test]
+    fn test_cognitive_profile_domains_present() {
+        let mut report = BenchmarkReport::new();
+        let mut r1 = BenchmarkResult::new("WorM::N-back", None);
+        r1.insert("nback_2::accuracy", MetricValue::from_samples(&[0.9, 0.85]));
+        report.add(r1);
+        let mut r2 = BenchmarkResult::new("Executive::WCST", None);
+        r2.insert("categories_completed", MetricValue::from_samples(&[5.0, 4.5]));
+        report.add(r2);
+        let profile = report.cognitive_profile();
+        assert!(profile.contains_key("WorM"));
+        assert!(profile.contains_key("Executive"));
+    }
+
+    #[test]
+    fn test_cognitive_profile_values_clamped() {
+        let mut report = BenchmarkReport::new();
+        let mut r = BenchmarkResult::new("WorM::N-back", None);
+        r.insert("nback_2::accuracy", MetricValue::from_samples(&[2.0, 1.8])); // way above human
+        report.add(r);
+        let profile = report.cognitive_profile();
+        for (_, &score) in &profile {
+            assert!(score >= 0.0 && score <= 1.0, "Score out of range: {}", score);
+        }
+    }
+
+    #[test]
+    fn test_format_profile_non_empty() {
+        let mut report = BenchmarkReport::new();
+        let mut r = BenchmarkResult::new("WorM::N-back", None);
+        r.insert("nback_2::accuracy", MetricValue::from_samples(&[0.85]));
+        report.add(r);
+        let output = report.format_profile();
+        assert!(!output.is_empty());
+        assert!(output.contains("Cognitive Profile"));
+        assert!(output.contains("WorM"));
+    }
+
+    #[test]
+    fn test_effect_size_populated_in_comparisons() {
+        let mut report = BenchmarkReport::new();
+        let mut result = BenchmarkResult::new("WorM::N-back", None);
+        result.insert(
+            "nback_2::accuracy",
+            MetricValue::from_samples(&[0.9, 0.85, 0.88, 0.92, 0.87]),
+        );
+        report.add(result);
+
+        use crate::harness::baselines;
+        let worm_bl = baselines::worm_baselines();
+        let cog_bl = baselines::cogbench_baselines();
+        let tom_bl = baselines::tombench_baselines();
+        let mem_bl = baselines::memory_agent_baselines();
+        let exec_bl = baselines::executive_baselines();
+        let meta_bl = baselines::metacognition_baselines();
+        let affect_bl = baselines::affect_baselines();
+        let creativity_bl = baselines::creativity_baselines();
+
+        let comparisons = report.find_comparisons(
+            &report.results[0], &worm_bl, &cog_bl, &tom_bl, &mem_bl,
+            &exec_bl, &meta_bl, &affect_bl, &creativity_bl,
+        );
+        assert!(!comparisons.is_empty());
+        let (_, comp) = &comparisons[0];
+        assert!(comp.effect_size.is_some(), "effect_size should be populated");
+        assert!(comp.effect_size.unwrap().is_finite());
     }
 
     #[test]

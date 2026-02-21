@@ -34,6 +34,8 @@ pub struct EpisodeMetrics {
     pub exploration_count: usize,
     /// Total training steps.
     pub total_steps: usize,
+    /// Per-step telemetry (populated when `FlightConfig::collect_telemetry` is true).
+    pub telemetry: Vec<FlightTelemetry>,
 }
 
 /// Simple ballistic physics model for pure-Rust testing.
@@ -227,6 +229,13 @@ impl FlightTrainer {
         let mut hover_steps = 0usize;
         let mut exploration_count = 0usize;
         let mut fe_samples = 0usize;
+        let mut telemetry = if self.config.collect_telemetry {
+            Vec::with_capacity(self.config.steps_per_episode)
+        } else {
+            Vec::new()
+        };
+        let mut current_tau_factor = fep_result.tau_factor;
+        let mut current_fe = fep_result.free_energy;
 
         for step in 0..self.config.steps_per_episode {
             // ── MOTOR REFLEX (every step, 500Hz) ──
@@ -253,6 +262,22 @@ impl FlightTrainer {
                 hover_steps += 1;
             }
 
+            // Collect telemetry if enabled
+            if self.config.collect_telemetry {
+                telemetry.push(FlightTelemetry {
+                    step,
+                    time: state.timestamp,
+                    position_error: pos_err,
+                    attitude_error: att_err,
+                    speed: state.speed(),
+                    altitude: state.altitude(),
+                    free_energy: current_fe,
+                    tau_factor: current_tau_factor,
+                    learning_rate: controller.learning_rate(),
+                    command,
+                });
+            }
+
             // ── TRAINING (every train_every steps, 125Hz) ──
             if step % self.config.train_every == 0 {
                 let target = pd_baseline(&state, &setpoint, &self.pd_gains);
@@ -269,6 +294,8 @@ impl FlightTrainer {
                     controller.modulate_tau(fep_result.tau_factor);
                 }
 
+                current_tau_factor = fep_result.tau_factor;
+                current_fe = fep_result.free_energy;
                 total_fe += fep_result.free_energy;
                 fe_samples += 1;
             }
@@ -290,6 +317,7 @@ impl FlightTrainer {
             final_position_error: setpoint.position_error_magnitude(&final_state),
             exploration_count,
             total_steps: self.config.steps_per_episode,
+            telemetry,
         }
     }
 

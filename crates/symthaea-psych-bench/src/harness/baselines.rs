@@ -212,6 +212,26 @@ pub fn tombench_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    // Persuasion detection
+    m.insert(
+        "persuasion_detection",
+        Baseline {
+            value: 0.85,
+            source: "Happé (1994), An advanced test of theory of mind",
+            population: "human adults",
+        },
+    );
+
+    // Strange story accuracy
+    m.insert(
+        "strange_story_accuracy",
+        Baseline {
+            value: 0.85,
+            source: "Happé (1994), An advanced test of theory of mind",
+            population: "human adults",
+        },
+    );
+
     m
 }
 
@@ -400,6 +420,80 @@ pub fn memory_agent_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    // Long-range retention at 50-cycle delay
+    m.insert(
+        "long_range_delay_50",
+        Baseline {
+            value: 0.70,
+            source: "Baddeley (1997), Human Memory: Theory and Practice",
+            population: "human adults",
+        },
+    );
+
+    // Conflict resolution: recency preference
+    m.insert(
+        "conflict_recency_preference",
+        Baseline {
+            value: 0.65,
+            source: "Oberauer (2002), Access to information in working memory",
+            population: "human adults",
+        },
+    );
+
+    m
+}
+
+/// Get all affect baselines.
+pub fn affect_baselines() -> BTreeMap<&'static str, Baseline> {
+    let mut m = BTreeMap::new();
+
+    // Valence classification accuracy (Bradley & Lang, IAPS)
+    m.insert(
+        "valence_accuracy",
+        Baseline {
+            value: 0.90,
+            source: "Bradley & Lang (1999), IAPS affective ratings",
+            population: "human adults",
+        },
+    );
+
+    // Mood-congruent recall congruence ratio (Blaney, 1986)
+    m.insert(
+        "congruence_ratio",
+        Baseline {
+            value: 0.60,
+            source: "Blaney (1986), Affect and memory: a review",
+            population: "human adults",
+        },
+    );
+
+    m
+}
+
+/// Get all creativity baselines.
+pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
+    let mut m = BTreeMap::new();
+
+    // Remote Associates Test accuracy (Bowden & Jung-Beeman, 2003)
+    m.insert(
+        "rat_overall_accuracy",
+        Baseline {
+            value: 0.50,
+            source: "Bowden & Jung-Beeman (2003), Normative data for 144 compound remote associate problems",
+            population: "human adults",
+        },
+    );
+
+    // Alternate Uses Task fluency (Torrance, 1974)
+    m.insert(
+        "aut_fluency",
+        Baseline {
+            value: 8.0,
+            source: "Torrance (1974), Torrance Tests of Creative Thinking",
+            population: "human adults",
+        },
+    );
+
     m
 }
 
@@ -415,5 +509,7 @@ mod tests {
         assert!(!memory_agent_baselines().is_empty());
         assert!(!executive_baselines().is_empty());
         assert!(!metacognition_baselines().is_empty());
+        assert!(!affect_baselines().is_empty());
+        assert!(!creativity_baselines().is_empty());
     }
 }

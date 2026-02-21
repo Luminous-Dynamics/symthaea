@@ -5,6 +5,7 @@
 
 pub mod reward;
 pub mod scenario;
+pub mod semantic;
 pub mod sequence;
 pub mod spatial;
 

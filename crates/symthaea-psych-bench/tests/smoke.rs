@@ -2,22 +2,33 @@
 //! Verifies no panics and all metrics are finite.
 
 use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
+use symthaea_psych_bench::benchmarks::affect::{
+    MoodCongruentRecallBenchmark, ValenceClassificationBenchmark,
+};
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
-    ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, TemporalDiscountingBenchmark,
-    TwoStepBenchmark,
+    ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
+    TemporalDiscountingBenchmark, TwoStepBenchmark,
+};
+use symthaea_psych_bench::benchmarks::creativity::{
+    AlternateUsesBenchmark, RemoteAssociatesBenchmark,
+};
+use symthaea_psych_bench::benchmarks::executive::{
+    FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark,
+    StroopBenchmark, TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
 };
 use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
     TestTimeLearningBenchmark,
 };
+use symthaea_psych_bench::benchmarks::metacognition::MetacognitiveCalibrationBenchmark;
 use symthaea_psych_bench::benchmarks::tombench::{
     FalseBeliefBenchmark, FauxPasBenchmark, HintingBenchmark, PersuasionBenchmark,
     StrangeStoryBenchmark,
 };
 use symthaea_psych_bench::benchmarks::worm::{
-    BindingBenchmark, ChangeDetectionBenchmark, NBackBenchmark, SerialRecallBenchmark,
-    SpatialUpdatingBenchmark,
+    BindingBenchmark, ChangeDetectionBenchmark, DigitSpanBenchmark, NBackBenchmark,
+    SerialRecallBenchmark, SpatialUpdatingBenchmark,
 };
 use symthaea_psych_bench::harness::{BenchmarkConfig, PsychBenchmark};
 
@@ -202,6 +213,97 @@ fn smoke_memory_long_range() {
 #[test]
 fn smoke_memory_conflict_resolution() {
     let result = ConflictResolutionBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_worm_digit_span() {
+    let result = DigitSpanBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_cogbench_reversal_learning() {
+    let result = ReversalLearningBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_executive_wcst() {
+    let result = WisconsinCardSortingBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_executive_igt() {
+    let result = IowaGamblingBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_executive_ravens() {
+    let result = RavensProgressiveMatricesBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_executive_stroop() {
+    let result = StroopBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_executive_flanker() {
+    let result = FlankerBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_executive_tower_of_london() {
+    let result = TowerOfLondonBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_metacognitive_calibration() {
+    let result = MetacognitiveCalibrationBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_affect_valence_classification() {
+    let result = ValenceClassificationBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_affect_mood_congruent_recall() {
+    let result = MoodCongruentRecallBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_creativity_remote_associates() {
+    let result = RemoteAssociatesBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_creativity_alternate_uses() {
+    let result = AlternateUsesBenchmark.run(&smoke_config());
     assert!(!result.metrics.is_empty());
     assert_metrics_finite(&result);
 }
