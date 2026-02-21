@@ -97,22 +97,26 @@ fn extract_indicator_score(
 ) -> f64 {
     match indicator {
         "RPT-1" => {
-            // CfC recurrence → temporal causal chains: counts detected causal chains
-            // from recurrent dynamics. With 1 neuron, no temporal chains form.
-            // Falls back to temporal_continuity (ungated, runs every cycle).
-            let chains = metadata.temporal_causal_chains as f64;
-            if chains > 0.0 {
-                chains.min(10.0) / 10.0 // Normalize to [0, 1]
+            // CfC recurrence → multimodal_integrated_phi: cross-modal integrated
+            // information computed every cycle (line 2652 in cycle.rs). Directly
+            // measures recurrent integration quality. With 1 CfC neuron, integration
+            // collapses. Falls back to temporal_coherence_score (also per-cycle).
+            let phi = metadata.multimodal_integrated_phi;
+            if phi > 0.0 {
+                phi.min(1.0)
             } else {
-                // Use temporal_continuity as fallback (ratio 0-1, runs every cycle)
-                metadata.temporal_continuity.max(0.0)
+                // Fallback: temporal_coherence_score (per-cycle if not Cruise)
+                metadata.temporal_coherence_score.max(0.0)
             }
         }
         "GWT-3" => {
-            // Global broadcast → gwt_broadcast: direct binary indicator of whether
-            // GWT submitted this cycle. Always false when GWT is disabled.
-            // More reliable than consciousness_level which runs only every 10 cycles.
-            if metadata.gwt_broadcast { 1.0 } else { 0.0 }
+            // Global broadcast → consciousness_level: MCE computed every 5-20 cycles
+            // depending on urgency. Includes explicit broadcast term:
+            //   broadcast: coherence as f64 (line 4245 in cycle.rs)
+            // When GWT is disabled, broadcast component drops to 0, lowering the
+            // overall consciousness level. More reliable than gwt_broadcast which
+            // is urgency-gated and may not fire during short runs.
+            metadata.consciousness_level.max(0.0)
         }
         "HOT-2" => {
             // Metacognitive monitoring: meta_cognitive_accuracy
@@ -204,7 +208,7 @@ fn measure_indicator(
 /// 5. Assert: indicator dropped AND benchmark degraded
 pub fn run_ablation_matrix(_config: &BenchmarkConfig) -> Vec<AblationResult> {
     let specs = ablation_specs();
-    let num_cycles = 100;
+    let num_cycles = 200; // Enough for fields updated every 50 cycles to have data
     let mut results = Vec::with_capacity(specs.len());
 
     for spec in &specs {

@@ -402,7 +402,7 @@ fn test_all_modules_synergy() {
         if result.metadata.meta_cognitive_accuracy > 0.0 {
             metadata_populated |= 4;
         }
-        if result.metadata.narrative_self_phi > 0.0 {
+        if result.metadata.narrative_self_psi > 0.0 {
             metadata_populated |= 8;
         }
         if (result.metadata.body_phi_modulation - 1.0).abs() > 0.001 {

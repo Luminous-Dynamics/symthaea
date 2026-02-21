@@ -11,7 +11,7 @@
 //! - `TieredPhi` - Binary with multiple approximation tiers
 //! - `ResonatorPhi` - O(n log N) resonator-based approximation
 
-use super::result::{PhiResult, PhiUncertainty};
+use super::result::{PhiCategory, PhiResult, PhiUncertainty};
 use crate::hdc::unified_hv::ContinuousHV;
 use rand::Rng;
 use std::time::Instant;
@@ -131,6 +131,7 @@ pub trait PhiCalculator: Send + Sync {
         let result = PhiResult {
             phi: mean,
             method: self.method_name(),
+            category: PhiCategory::SpectralConnectivity,
             computation_time: start.elapsed(),
             n_nodes: node_representations.len(),
             limiting_partition: None,

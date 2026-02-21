@@ -523,7 +523,7 @@ fn test_all_consciousness_modules_enabled() {
     // Embodied cognition should have valid phi modulation
     assert!(result.metadata.embodied_phi_modulation.is_finite());
     // Narrative-GWT self phi should be finite
-    assert!(result.metadata.narrative_gwt_self_phi.is_finite());
+    assert!(result.metadata.narrative_gwt_self_psi.is_finite());
 }
 
 #[test]
@@ -584,7 +584,7 @@ fn test_cycle_with_narrative_gwt() {
 
     let result = service.cycle("governance check");
     // Self-phi should be finite
-    assert!(result.metadata.narrative_gwt_self_phi.is_finite());
+    assert!(result.metadata.narrative_gwt_self_psi.is_finite());
     // Veto is a boolean - just verify valid
     assert!(result.metadata.narrative_gwt_veto || !result.metadata.narrative_gwt_veto);
 }

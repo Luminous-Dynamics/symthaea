@@ -720,7 +720,7 @@ fn test_cycle_metadata_compact() {
     assert_eq!(compact.gwt_broadcast, result.metadata.gwt_broadcast);
     assert_eq!(compact.body_phi_modulation, result.metadata.body_phi_modulation);
     assert_eq!(compact.meta_cognitive_accuracy, result.metadata.meta_cognitive_accuracy);
-    assert_eq!(compact.narrative_self_phi, result.metadata.narrative_self_phi);
+    assert_eq!(compact.narrative_self_psi, result.metadata.narrative_self_psi);
     assert_eq!(compact.affective_valence, result.metadata.affective_valence);
     assert_eq!(compact.affective_arousal, result.metadata.affective_arousal);
 

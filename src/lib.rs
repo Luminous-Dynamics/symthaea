@@ -309,6 +309,7 @@ pub mod soul;
 pub mod language;
 
 // School: anticipatory curriculum learning with CfC lookahead, mastery tracking
+#[cfg(feature = "school_learning")]
 pub mod school;
 
 // Physiology (enabled - social coherence and hormone modeling)
@@ -324,7 +325,7 @@ pub mod resonant_speech;
 pub use symthaea_embeddings as embeddings;
 
 // Benchmarks: causal validation tests (not criterion benchmarks).
-// Unconditional so integration tests in tests/ can import these types.
+// Used by examples/ for validation experiments.
 pub mod benchmarks;
 
 // Integration (cfg-gated - needs significant API alignment)

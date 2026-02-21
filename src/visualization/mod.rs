@@ -43,5 +43,6 @@
 pub mod attention_viz;
 
 pub use attention_viz::{
-    AttentionFlowEdge, AttentionFlowGraph, AttentionHistory, AttentionSnapshot, AttentionVisualizer,
+    AttentionFlowEdge, AttentionFlowGraph, AttentionHistory, AttentionSnapshot, AttentionSummary,
+    AttentionVisualizer,
 };

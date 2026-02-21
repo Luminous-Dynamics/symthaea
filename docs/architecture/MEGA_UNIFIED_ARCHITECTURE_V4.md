@@ -338,7 +338,7 @@ The unified snapshot exposes all architecture state:
 - `cognitive_depth`: CognitiveDepth enum
 
 ### Unified Architecture Stats
-- `unified_phi`: Φ from unification engine
+- `unified_psi`: Ψ consciousness estimate (formerly unified_phi)
 - `unified_valence/arousal/dominance`: VAD emotions
 - `unified_discrete_emotion`: Optional discrete emotion
 - `emotional_pattern`: Stable/Escalating/Calming/Volatile

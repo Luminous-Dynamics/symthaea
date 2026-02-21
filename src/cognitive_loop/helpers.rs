@@ -191,7 +191,7 @@ impl CognitiveLoopService {
 
         // Effective threshold matches cycle() behavior (adaptive scaling)
         let effective_threshold =
-            self.config.learning_threshold * self.carryover.adaptive_threshold_scale;
+            self.config.learning_threshold * self.carryover.learning.adaptive_threshold_scale;
 
         // 9. Learn if error is significant
         let (learning_occurred, training_loss) =
@@ -227,7 +227,7 @@ impl CognitiveLoopService {
         // 11. Buffer PsiAttestation record if enabled (mirrors cycle.rs step 10h.0)
         // For the HV path, unified_psi is derived from temporal coherence since
         // we don't run the full consciousness subsystems.
-        let urgency = self.carryover.urgency;
+        let urgency = self.carryover.urgency.urgency;
         if self.config.enable_psi_attestation && self.config.agent_did.is_some() {
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -623,7 +623,7 @@ impl CognitiveLoopService {
         if let Some(ref mut pp) = self.primitive_processor {
             *pp = crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor::new();
         }
-        // Note: predictive_phi_modulation and cross_modal_phi already reset
+        // Note: predictive_phi_modulation and cross_modal_psi already reset
         // via self.carryover = CycleCarryover::default() above.
     }
 }

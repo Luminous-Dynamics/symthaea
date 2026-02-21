@@ -311,7 +311,13 @@ impl ContinuousHV {
     /// Uses SIMD acceleration when the `simd` feature is enabled (4x+ speedup).
     #[inline]
     pub fn similarity(&self, other: &Self) -> f32 {
-        debug_assert_eq!(self.values.len(), other.values.len(), "Dimension mismatch");
+        assert_eq!(
+            self.values.len(),
+            other.values.len(),
+            "Dimension mismatch in similarity(): {} vs {}",
+            self.values.len(),
+            other.values.len()
+        );
 
         #[cfg(feature = "simd")]
         {

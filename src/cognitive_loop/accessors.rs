@@ -513,14 +513,14 @@ impl CognitiveLoopService {
                 .map(|fe| fe.total)
                 .unwrap_or(0.0),
             fep_precision: self.fep_agent.precision.perceptual_precision(),
-            spectral_mip_phi: self.carryover.last_spectral_mip_phi,
+            spectral_mip_phi: self.carryover.consciousness.last_spectral_mip_phi,
             harmonies_alignment: self.harmonies_integrator.as_ref()
                 .map(|h| h.stats().avg_alignment)
                 .unwrap_or(0.0),
             empathic_compassion: self.empathic_unification.as_ref()
                 .map(|_| 0.0) // Compassion is per-cycle; snapshot shows lifetime average
                 .unwrap_or(0.0),
-            sigma: self.carryover.last_sigma,
+            sigma: self.carryover.consciousness.last_sigma,
         }
     }
 
@@ -1058,5 +1058,26 @@ impl CognitiveLoopService {
     /// Current guiding question from wisdom system.
     pub fn guiding_question(&self) -> Option<&'static str> {
         self.experience_bus.as_ref().map(|bus| bus.current_guiding_question())
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ATTENTION VISUALIZATION ACCESSORS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Get attention visualization summary (snapshot count, avg entropy, top attended).
+    pub fn attention_summary(&self) -> Option<crate::visualization::AttentionSummary> {
+        self.attention_visualizer.as_ref().map(|viz| viz.summary())
+    }
+
+    /// Export attention history as JSON for external analysis tools.
+    pub fn attention_history_json(&self) -> Option<String> {
+        self.attention_visualizer
+            .as_ref()
+            .and_then(|viz| viz.export_json().ok())
+    }
+
+    /// Render attention heatmap as ASCII art (inputs x time).
+    pub fn attention_heatmap(&self) -> Option<String> {
+        self.attention_visualizer.as_ref().map(|viz| viz.render_heatmap())
     }
 }

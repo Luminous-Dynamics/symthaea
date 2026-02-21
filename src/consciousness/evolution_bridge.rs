@@ -151,7 +151,7 @@ impl Default for EvolutionSchedule {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvolutionSnapshot {
     pub generation: usize,
-    pub primitive_phi: f64,
+    pub primitive_psi: f64,
     pub architecture_phi: f64,
     pub evolved_primitives: usize,
     pub active_tier: Option<PrimitiveTier>,
@@ -193,7 +193,7 @@ impl EvolutionCoordinator {
         let mut result = EvolutionStepResult {
             generation: self.generation,
             primitive_evolution_ran: false,
-            primitive_phi_delta: 0.0,
+            primitive_psi_delta: 0.0,
             architecture_evolution_ran: false,
             architecture_phi_delta: 0.0,
             new_primitives: Vec::new(),
@@ -202,14 +202,14 @@ impl EvolutionCoordinator {
         if should_evolve_primitives {
             let primitive_result = self.evolve_primitives()?;
             result.primitive_evolution_ran = true;
-            result.primitive_phi_delta = primitive_result.phi_delta;
+            result.primitive_psi_delta = primitive_result.phi_delta;
             result.new_primitives = primitive_result.new_primitives;
         }
 
         // Record snapshot
         self.history.push(EvolutionSnapshot {
             generation: self.generation,
-            primitive_phi: self.get_current_primitive_phi(),
+            primitive_psi: self.get_current_primitive_psi(),
             architecture_phi: 0.0, // Would be filled by architecture evolution
             evolved_primitives: result.new_primitives.len(),
             active_tier: self.get_active_evolution_tier(),
@@ -347,16 +347,16 @@ impl EvolutionCoordinator {
         }
 
         let recent = &self.history[self.history.len() - stall_generations..];
-        let first_phi = recent.first().map(|s| s.primitive_phi).unwrap_or(0.0);
-        let last_phi = recent.last().map(|s| s.primitive_phi).unwrap_or(0.0);
+        let first_phi = recent.first().map(|s| s.primitive_psi).unwrap_or(0.0);
+        let last_phi = recent.last().map(|s| s.primitive_psi).unwrap_or(0.0);
 
         // Plateau if improvement < 1%
         (last_phi - first_phi).abs() < 0.01
     }
 
     /// Get current primitive phi
-    fn get_current_primitive_phi(&self) -> f64 {
-        self.history.last().map(|s| s.primitive_phi).unwrap_or(0.5)
+    fn get_current_primitive_psi(&self) -> f64 {
+        self.history.last().map(|s| s.primitive_psi).unwrap_or(0.5)
     }
 
     /// Get currently evolving tier
@@ -391,7 +391,7 @@ impl Default for EvolutionCoordinator {
 pub struct EvolutionStepResult {
     pub generation: usize,
     pub primitive_evolution_ran: bool,
-    pub primitive_phi_delta: f64,
+    pub primitive_psi_delta: f64,
     pub architecture_evolution_ran: bool,
     pub architecture_phi_delta: f64,
     pub new_primitives: Vec<String>,
@@ -587,7 +587,7 @@ impl EvolutionCoordinator {
             new_primitives,
             deprecated_primitives,
             tier_stats,
-            primitive_fitness: self.get_current_primitive_phi(),
+            primitive_fitness: self.get_current_primitive_psi(),
         }
     }
 }

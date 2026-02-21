@@ -51,15 +51,27 @@ pub fn hybrid_trimmed_mean(
     contributions: &[ReputationGradient],
     config: &HybridBftConfig,
 ) -> Option<HybridAggregationResult> {
-    // Convert Symthaea's ReputationGradient to core's ReputationGradient
+    if contributions.is_empty() {
+        return None;
+    }
+
+    // Convert Symthaea's ReputationGradient to core's ReputationGradient,
+    // filtering out invalid contributions
     let core_contributions: Vec<mycelix_fl_core::hybrid_bft::ReputationGradient> = contributions
         .iter()
+        .filter(|c| {
+            c.reputation.is_finite()
+                && c.reputation >= 0.0
+                && c.reputation <= 1.0
+                && c.gradient.gradient_data.len() < 1_000_000
+        })
         .map(|c| {
+            let sample_count = (c.gradient.sample_count as u64).min(u32::MAX as u64) as u32;
             let update = mycelix_fl_core::types::GradientUpdate::new(
                 hex::encode(c.gradient.source_id),
                 c.gradient.model_version,
                 c.gradient.gradient_data.clone(),
-                c.gradient.sample_count as u32,
+                sample_count,
                 0.5, // loss not tracked in GradientMessage
             );
             mycelix_fl_core::hybrid_bft::ReputationGradient {

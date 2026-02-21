@@ -5,6 +5,48 @@
 use super::calculator::PartitionInfo;
 use std::time::Duration;
 
+/// Classifies what a Φ-like measurement actually computes.
+///
+/// Symthaea uses three layers of consciousness measurement, each with
+/// a distinct mathematical basis and computational cost:
+///
+/// | Layer | Symbol | Category | Cost |
+/// |-------|--------|----------|------|
+/// | 1 | Ψ | `ConsciousnessEstimate` | O(1) |
+/// | 2 | λ₂ | `SpectralConnectivity` | O(n³) |
+/// | 3 | Σ | `SynergisticIntegration` | O(n²) |
+/// | 4 | Φ | `IntegratedInformation` | O(2ⁿ) |
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PhiCategory {
+    /// Ψ — Fast consciousness estimate from composite soft signals.
+    /// Computed every cycle (50Hz). NOT IIT Φ.
+    ConsciousnessEstimate,
+
+    /// λ₂ — Spectral connectivity (Fiedler value of the cosine-similarity
+    /// graph Laplacian). Measures network integration structure.
+    SpectralConnectivity,
+
+    /// Σ — Synergistic integration via information decomposition.
+    /// Measures how much information exists in the whole that isn't
+    /// in any partition (PhiR-inspired, Mediano et al. 2021).
+    SynergisticIntegration,
+
+    /// Φ — True IIT Integrated Information via MIP search.
+    /// Exact or heuristic approximation of Tononi's Φ.
+    IntegratedInformation,
+}
+
+impl std::fmt::Display for PhiCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ConsciousnessEstimate => write!(f, "Ψ (consciousness estimate)"),
+            Self::SpectralConnectivity => write!(f, "λ₂ (spectral connectivity)"),
+            Self::SynergisticIntegration => write!(f, "Σ (synergistic integration)"),
+            Self::IntegratedInformation => write!(f, "Φ (integrated information)"),
+        }
+    }
+}
+
 /// Result of a Φ calculation
 ///
 /// Contains the Φ value along with metadata about the computation.
@@ -19,6 +61,9 @@ pub struct PhiResult {
     /// Name of the calculation method used
     pub method: &'static str,
 
+    /// What this measurement actually computes (see [`PhiCategory`]).
+    pub category: PhiCategory,
+
     /// Time taken for computation
     pub computation_time: Duration,
 
@@ -30,26 +75,34 @@ pub struct PhiResult {
 }
 
 impl PhiResult {
-    /// Create a new PhiResult
+    /// Create a new PhiResult with default category [`PhiCategory::SpectralConnectivity`].
     pub fn new(phi: f64, method: &'static str, n_nodes: usize) -> Self {
         Self {
             phi,
             method,
+            category: PhiCategory::SpectralConnectivity,
             computation_time: Duration::ZERO,
             n_nodes,
             limiting_partition: None,
         }
     }
 
-    /// Create with timing
+    /// Create with timing and default category.
     pub fn with_timing(phi: f64, method: &'static str, n_nodes: usize, time: Duration) -> Self {
         Self {
             phi,
             method,
+            category: PhiCategory::SpectralConnectivity,
             computation_time: time,
             n_nodes,
             limiting_partition: None,
         }
+    }
+
+    /// Set the measurement category.
+    pub fn with_category(mut self, category: PhiCategory) -> Self {
+        self.category = category;
+        self
     }
 
     /// Check if this Φ indicates high integration
@@ -79,7 +132,8 @@ impl std::fmt::Display for PhiResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Φ = {:.4} ({}, n={}, {:.2}ms)",
+            "{} = {:.4} ({}, n={}, {:.2}ms)",
+            self.category,
             self.phi,
             self.method,
             self.n_nodes,

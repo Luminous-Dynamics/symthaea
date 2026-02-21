@@ -369,7 +369,7 @@ fn run_depth_assessment(
 
     let mut phi_samples = Vec::new();
     let mut mce_samples = Vec::new();
-    let mut narrative_phi_samples = Vec::new();
+    let mut narrative_psi_samples = Vec::new();
     let mut embodied_agency_samples = Vec::new();
     let mut meta_accuracy_samples = Vec::new();
     let mut surprise_count = 0usize;
@@ -383,8 +383,8 @@ fn run_depth_assessment(
         if m.consciousness_level > 0.0 {
             mce_samples.push(m.consciousness_level);
         }
-        if m.narrative_self_phi > 0.0 {
-            narrative_phi_samples.push(m.narrative_self_phi);
+        if m.narrative_self_psi > 0.0 {
+            narrative_psi_samples.push(m.narrative_self_psi);
         }
         if m.embodied_agency > 0.0 {
             embodied_agency_samples.push(m.embodied_agency);
@@ -421,10 +421,10 @@ fn run_depth_assessment(
         } else {
             mce_samples.iter().sum::<f64>() / mce_samples.len() as f64
         },
-        narrative_phi_mean: if narrative_phi_samples.is_empty() {
+        narrative_phi_mean: if narrative_psi_samples.is_empty() {
             0.0
         } else {
-            narrative_phi_samples.iter().sum::<f64>() / narrative_phi_samples.len() as f64
+            narrative_psi_samples.iter().sum::<f64>() / narrative_psi_samples.len() as f64
         },
         embodied_agency_mean: if embodied_agency_samples.is_empty() {
             0.0

@@ -60,7 +60,7 @@ pub struct HealthFactors {
     pub structure: f32,
 
     /// Primitive phi - integration score from Code tier primitives
-    pub primitive_phi: f32,
+    pub primitive_psi: f32,
 }
 
 impl Default for HealthFactors {
@@ -71,7 +71,7 @@ impl Default for HealthFactors {
             cohesion: 0.5,
             density: 0.5,
             structure: 0.5,
-            primitive_phi: 0.5,
+            primitive_psi: 0.5,
         }
     }
 }
@@ -84,7 +84,7 @@ impl HealthFactors {
             + weights.cohesion
             + weights.density
             + weights.structure
-            + weights.primitive_phi;
+            + weights.primitive_psi;
 
         if total_weight == 0.0 {
             return 0.5;
@@ -95,7 +95,7 @@ impl HealthFactors {
             + self.cohesion * weights.cohesion
             + self.density * weights.density
             + self.structure * weights.structure
-            + self.primitive_phi * weights.primitive_phi)
+            + self.primitive_psi * weights.primitive_psi)
             / total_weight
     }
 }
@@ -108,7 +108,7 @@ pub struct HealthWeights {
     pub cohesion: f32,
     pub density: f32,
     pub structure: f32,
-    pub primitive_phi: f32,
+    pub primitive_psi: f32,
 }
 
 impl Default for HealthWeights {
@@ -119,7 +119,7 @@ impl Default for HealthWeights {
             cohesion: 1.2,      // Cohesion matters for maintainability
             density: 0.5,       // Less important
             structure: 1.0,     // Good structure helps
-            primitive_phi: 0.8, // Primitive integration is useful
+            primitive_psi: 0.8, // Primitive integration is useful
         }
     }
 }
@@ -251,7 +251,7 @@ impl CodeHealthScanner {
             cohesion: self.compute_cohesion(parsed),
             density: self.compute_density(parsed),
             structure: self.compute_structure_score(parsed),
-            primitive_phi: self.compute_primitive_phi(),
+            primitive_psi: self.compute_primitive_psi(),
         }
     }
 
@@ -462,7 +462,7 @@ impl CodeHealthScanner {
     }
 
     /// Compute primitive phi using Code tier
-    fn compute_primitive_phi(&self) -> f32 {
+    fn compute_primitive_psi(&self) -> f32 {
         // Use Verify operation as it exercises multiple primitives
         let result = self.primitive_executor.execute(CodeOperation::Verify);
         result.phi

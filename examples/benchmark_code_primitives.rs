@@ -516,7 +516,7 @@ fn benchmark_code_health() {
         println!("      Cohesion:      {:.4}", health.factors.cohesion);
         println!("      Density:       {:.4}", health.factors.density);
         println!("      Structure:     {:.4}", health.factors.structure);
-        println!("      Primitive Φ:   {:.4}", health.factors.primitive_phi);
+        println!("      Primitive Φ:   {:.4}", health.factors.primitive_psi);
 
         if !health.suggestions.is_empty() {
             println!(

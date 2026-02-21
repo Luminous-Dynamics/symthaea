@@ -65,7 +65,7 @@ mod result;
 // Re-export main types
 pub use cache::{CacheStats, CachedPhiEngine};
 pub use calculator::{Complexity, PhiCalculator};
-pub use result::{PhiResult, PhiUncertainty};
+pub use result::{PhiCategory, PhiResult, PhiUncertainty};
 
 // Re-export specific implementations (from existing hdc module)
 pub use crate::hdc::spectral_connectivity::ConnectivityCalculator as ContinuousPhiCalculator;
@@ -214,8 +214,14 @@ impl PhiEngine {
             PhiMethod::Auto => unreachable!(),
         };
 
-        // Wrap in PhiResult
-        result::PhiResult::new(phi_value, method_name, n_nodes)
+        // Wrap in PhiResult with appropriate category
+        let category = match effective_method {
+            PhiMethod::SpectralConnectivity => result::PhiCategory::SpectralConnectivity,
+            PhiMethod::Tiered(_) => result::PhiCategory::IntegratedInformation,
+            PhiMethod::Resonator => result::PhiCategory::SpectralConnectivity,
+            PhiMethod::Auto => unreachable!(),
+        };
+        result::PhiResult::new(phi_value, method_name, n_nodes).with_category(category)
     }
 
     /// Get estimated computation time for a given topology size

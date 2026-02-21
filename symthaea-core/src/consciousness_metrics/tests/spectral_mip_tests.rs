@@ -488,6 +488,129 @@ fn test_compute_from_covariance_consistent() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// ADAPTIVE DIMENSION SELECTION TESTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_adapt_produces_valid_dims() {
+    let config = SpectralMIPConfig {
+        num_components: 16,
+        window_size: 10,
+        min_samples: 5,
+        regularization: 1e-6,
+    };
+    let mut finder = SpectralMIPFinder::new(config);
+
+    // Simulate a full HDC state space of 1024 dimensions
+    let full_dim = 1024;
+    for i in 0..10 {
+        let values: Vec<f32> = (0..full_dim).map(|j| ((i * 7 + j * 3) % 100) as f32 / 50.0 - 1.0).collect();
+        let hv = ContinuousHV::from_slice(&values);
+        finder.push(&hv);
+    }
+    assert!(finder.ready());
+    assert!(!finder.is_adapted());
+
+    let result = finder.compute().expect("should compute");
+    finder.adapt(&result);
+
+    assert!(finder.is_adapted());
+    let dims = finder.active_dim_indices().unwrap();
+    assert_eq!(dims.len(), 16);
+
+    // All dims should be valid indices into the full space
+    for &d in dims {
+        assert!(d < full_dim, "dim {d} out of range [0, {full_dim})");
+    }
+
+    // Dims should be sorted (for cache-friendly access)
+    for w in dims.windows(2) {
+        assert!(w[0] <= w[1], "dims should be sorted: {} > {}", w[0], w[1]);
+    }
+
+    // No duplicates
+    let mut deduped = dims.to_vec();
+    deduped.dedup();
+    assert_eq!(deduped.len(), dims.len(), "dims should have no duplicates");
+
+    // Window should be cleared after adaptation
+    assert_eq!(finder.window_len(), 0);
+}
+
+#[test]
+fn test_adapt_concentrates_near_mip() {
+    let config = SpectralMIPConfig {
+        num_components: 32,
+        window_size: 15,
+        min_samples: 10,
+        regularization: 1e-6,
+    };
+    let mut finder = SpectralMIPFinder::new(config);
+
+    // Use block-diagonal structure: dims 0..16 correlated, 16..32 correlated
+    let full_dim = 2048;
+    for i in 0..15 {
+        let values: Vec<f32> = (0..full_dim).map(|j| {
+            let block_signal = if j < full_dim / 2 { 1.0 } else { -1.0 };
+            let noise = ((i * 13 + j * 7 + 42) % 200) as f32 / 200.0 - 0.5;
+            block_signal * 0.5 + noise * 0.3
+        }).collect();
+        let hv = ContinuousHV::from_slice(&values);
+        finder.push(&hv);
+    }
+
+    let result = finder.compute().expect("should compute");
+    let mip_bond = result.mip_bond;
+
+    finder.adapt(&result);
+    let dims = finder.active_dim_indices().unwrap();
+
+    // After adaptation, the boundary dims should be concentrated.
+    // The non-adapted version was evenly spaced (stride=64).
+    // The adapted version should have more dims from the boundary region.
+    // We can't assert exact indices (depends on Fiedler ordering), but we can
+    // check that the dims are NOT evenly spaced anymore.
+    let stride = full_dim / 32;
+    let evenly_spaced: Vec<usize> = (0..32).map(|i| i * stride).collect();
+    assert_ne!(dims, &evenly_spaced[..], "adapted dims should differ from evenly-spaced");
+
+    // The adaptation result should be usable for a new compute cycle
+    for i in 0..15 {
+        let values: Vec<f32> = (0..full_dim).map(|j| {
+            let block_signal = if j < full_dim / 2 { 1.0 } else { -1.0 };
+            let noise = ((i * 17 + j * 11 + 99) % 200) as f32 / 200.0 - 0.5;
+            block_signal * 0.5 + noise * 0.3
+        }).collect();
+        let hv = ContinuousHV::from_slice(&values);
+        finder.push(&hv);
+    }
+
+    let result2 = finder.compute().expect("should compute after adaptation");
+    assert!(result2.phi.is_finite() && result2.phi >= 0.0);
+}
+
+#[test]
+fn test_adapt_noop_on_small_n() {
+    let config = SpectralMIPConfig {
+        num_components: 2,
+        window_size: 5,
+        min_samples: 3,
+        regularization: 1e-6,
+    };
+    let mut finder = SpectralMIPFinder::new(config);
+
+    for i in 0..5 {
+        let values: Vec<f32> = (0..64).map(|j| ((i + j) % 10) as f32 / 5.0).collect();
+        finder.push(&ContinuousHV::from_slice(&values));
+    }
+
+    let result = finder.compute().expect("should compute");
+    // n=2 is below the minimum (4) for adaptation
+    finder.adapt(&result);
+    assert!(!finder.is_adapted(), "should not adapt when n < 4");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // PROPTEST: Property-based fuzzing for numerical robustness
 // ═══════════════════════════════════════════════════════════════════════════
 
