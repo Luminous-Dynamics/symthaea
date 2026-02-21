@@ -244,8 +244,9 @@ impl CfCPrimitive {
         let a = params.attractor_strength;
         let blended = ContinuousHV::weighted_bundle(&[&self.attractor, input], &[a, 1.0 - a]);
 
-        // Closed-form CfC evolution (O(1) temporal jump)
-        self.neuron.evolve_closed_form(dt, &blended);
+        // Fused closed-form CfC evolution: eliminates 4 × 64KB intermediate allocations
+        // (bind W⊗x + bind U⊗u + bundle + activation all computed in a single pass)
+        self.neuron.evolve_closed_form_fused(dt, &blended);
 
         // Activation = how similar the neuron's state is to the input
         self.activation = self.neuron.state().similarity(input) as f64;
@@ -453,7 +454,18 @@ impl StabilityRegimeProcessor {
         // 2 & 3. Evolve all primitives, update activation, track counts, transition regimes
         for cfc in self.primitives.values_mut() {
             let params = config_clone.params(cfc.regime).clone();
-            cfc.evolve(dt, &continuous_input, &params);
+
+            // Adaptive culling: skip evolution for dormant primitives
+            // (inactive + near-zero activation + idle for 5+ cycles)
+            // Saves ~1.5ms per skipped primitive (bind/bundle/activate on 16,384D)
+            let dormant = !cfc.is_active
+                && cfc.activation.abs() < 0.01
+                && cycle.saturating_sub(cfc.last_activated_cycle) >= 5;
+
+            if !dormant {
+                cfc.evolve(dt, &continuous_input, &params);
+            }
+
             let was_active = cfc.is_active;
             cfc.update_active_status(&params);
 

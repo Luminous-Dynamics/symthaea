@@ -452,6 +452,81 @@ impl HdcLtcUnifiedNeuron {
         self.update_stats(dt);
     }
 
+    /// **FUSED closed-form evolution** — zero intermediate allocations.
+    ///
+    /// Combines `compute_equilibrium` (2 binds + 1 bundle + 1 activation) and
+    /// `lerp_in_place` into a single pass through the dimension.
+    ///
+    /// Eliminates 4 × D × sizeof(f32) bytes of intermediate allocations per call.
+    /// For D=16384, that is **256 KB saved per invocation**.
+    ///
+    /// Mathematically identical to `evolve_closed_form`.
+    #[inline]
+    pub fn evolve_closed_form_fused(&mut self, dt: f32, input: &ContinuousHV) {
+        // Compute gating FIRST (reads self.state immutably, no mutation)
+        let sigma = self.compute_gating(input, dt);
+        let one_minus_sigma = 1.0 - sigma;
+        let dim = self.config.dimension;
+
+        // Single fused pass: bind(W⊗x) + bind(U⊗u) + bundle + activate + lerp
+        // Replaces: compute_equilibrium (4 allocs) + lerp_in_place
+        match self.config.activation {
+            UnifiedActivation::Tanh => {
+                for i in 0..dim {
+                    let state_i = self.state.values[i];
+                    let x_inf = ((self.weight_hv.values[i] * state_i
+                        + self.input_mask.values[i] * input.values[i])
+                        * 0.5)
+                        .tanh();
+                    self.state.values[i] = one_minus_sigma * state_i + sigma * x_inf;
+                }
+            }
+            UnifiedActivation::Sigmoid => {
+                for i in 0..dim {
+                    let state_i = self.state.values[i];
+                    let combined = (self.weight_hv.values[i] * state_i
+                        + self.input_mask.values[i] * input.values[i])
+                        * 0.5;
+                    let x_inf = 1.0 / (1.0 + (-combined).exp());
+                    self.state.values[i] = one_minus_sigma * state_i + sigma * x_inf;
+                }
+            }
+            UnifiedActivation::SiLU => {
+                for i in 0..dim {
+                    let state_i = self.state.values[i];
+                    let combined = (self.weight_hv.values[i] * state_i
+                        + self.input_mask.values[i] * input.values[i])
+                        * 0.5;
+                    let x_inf = combined / (1.0 + (-combined).exp());
+                    self.state.values[i] = one_minus_sigma * state_i + sigma * x_inf;
+                }
+            }
+            UnifiedActivation::Identity => {
+                for i in 0..dim {
+                    let state_i = self.state.values[i];
+                    let x_inf = (self.weight_hv.values[i] * state_i
+                        + self.input_mask.values[i] * input.values[i])
+                        * 0.5;
+                    self.state.values[i] = one_minus_sigma * state_i + sigma * x_inf;
+                }
+            }
+            UnifiedActivation::BoundedTanh { scale } => {
+                for i in 0..dim {
+                    let state_i = self.state.values[i];
+                    let x_inf = ((self.weight_hv.values[i] * state_i
+                        + self.input_mask.values[i] * input.values[i])
+                        * 0.5
+                        * scale)
+                        .tanh();
+                    self.state.values[i] = one_minus_sigma * state_i + sigma * x_inf;
+                }
+            }
+        }
+
+        self.apply_state_bounds();
+        self.update_stats(dt);
+    }
+
     /// **PURE ANALYTICAL CLOSED-FORM EVOLUTION** - Single-step exponential decay
     ///
     /// This method implements the exponential decay solution WITHOUT learned gating.
