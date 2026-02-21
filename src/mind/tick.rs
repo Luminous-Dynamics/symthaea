@@ -270,13 +270,38 @@ impl ContinuousMind {
             );
         }
 
-        // Step 2: Update self-model with current mind state every 10 ticks
+        // Step 2: Update self-model with decomposed mind facets every 10 ticks
+        // Beliefs = perception (bundle of recent WM items — what we've observed)
+        // Desires = goal-oriented (current thought modulated by emotional valence)
+        // Intentions = current thought (what we're actively doing/planning)
         if self.state.tick.is_multiple_of(10) {
-            sc.update_self_model(
-                self.state.current_thought.clone(),
-                self.state.current_thought.clone(),
-                self.state.current_thought.clone(),
-            );
+            let beliefs = if self.working_memory.len() >= 2 {
+                // Bundle top-3 most recent perceptions as our belief state
+                let recent: Vec<ContinuousHV> = self.working_memory.iter()
+                    .rev()
+                    .take(3)
+                    .cloned()
+                    .collect();
+                ContinuousHV::bundle_owned(&recent)
+            } else {
+                self.state.current_thought.clone()
+            };
+
+            let desires = {
+                // Modulate thought by emotional valence to represent desires:
+                // positive valence → approach-oriented desires
+                // negative valence → avoidance-oriented desires
+                let mut d = self.state.current_thought.clone();
+                let valence_scale = 1.0 + self.state.emotional_valence * 0.3;
+                for v in d.values.iter_mut() {
+                    *v *= valence_scale;
+                }
+                d
+            };
+
+            let intentions = self.state.current_thought.clone();
+
+            sc.update_self_model(beliefs, desires, intentions);
         }
 
         // Step 3: Decay trust periodically (every 50 ticks)

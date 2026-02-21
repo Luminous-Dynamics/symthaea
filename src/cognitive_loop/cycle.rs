@@ -1839,8 +1839,9 @@ impl CognitiveLoopService {
                     timestamp,
                     timestamp + 0.02,
                 ).unwrap_or_else(|_| {
-                    // Fallback for cycle 0 where start==0.0, end==0.02 (always valid)
-                    TemporalInterval::new("c_fallback", 0.0, 0.02).unwrap()
+                    // Fallback: 0.0..0.02 is always valid (end > start)
+                    TemporalInterval::new("c_fallback", 0.0, 0.02)
+                        .expect("hardcoded valid interval 0.0..0.02")
                 });
                 ti.phi = Some(unified_psi);
                 let mut interval = ConsciousInterval::new(
@@ -3414,57 +3415,67 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // PREFRONTAL CORTEX: Executive control and working memory gating
+        // Amortized: Critical=every cycle, Normal=every 2nd, Cruise=every 5th
+        // PFC inhibition is a stable control policy (Miller & Cohen 2001);
+        // caching the veto for 5 cycles (~100ms at 50Hz) is within the
+        // temporal binding window for executive control.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let prefrontal_veto = if let Some(ref mut pfc) = self.prefrontal {
-            // Add current input as a working memory item
-            let wm_item = crate::brain::prefrontal::WorkingMemoryItem::new(
-                format!("cycle_{}", self.stats.total_cycles),
-                symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(compressed_state.clone()),
-            );
-            pfc.add_to_memory(wm_item);
-
-            // Advance time (decay activations, evict expired items)
-            pfc.tick();
-
-            // Check memory utilization — high utilization triggers inhibition
-            let utilization = pfc.memory_contents().len() as f32 / 7.0; // default capacity
-            let veto = utilization > self.config.learning_threshold.max(0.8);
-
-            if veto {
-                tracing::debug!(
-                    utilization,
-                    cycle = self.stats.total_cycles,
-                    "Prefrontal veto: working memory overloaded"
+        let prefrontal_veto = if urgency.should_run(self.stats.total_cycles, 1, 2, 5) {
+            if let Some(ref mut pfc) = self.prefrontal {
+                // Add current input as a working memory item
+                let wm_item = crate::brain::prefrontal::WorkingMemoryItem::new(
+                    format!("cycle_{}", self.stats.total_cycles),
+                    symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(compressed_state.clone()),
                 );
-            }
+                pfc.add_to_memory(wm_item);
 
-            // Graduate evicted items to episodic memory
-            let graduates = pfc.drain_graduates();
-            if !graduates.is_empty() {
-                for grad in &graduates {
-                    self.episodic_memory.encode(
-                        &grad.id,
-                        grad.embedding
-                            .values
-                            .iter()
-                            .take(64)
-                            .copied()
-                            .collect::<Vec<_>>(),
-                        0.0,
-                        pp_phi,
-                        self.stats.total_cycles,
+                // Advance time (decay activations, evict expired items)
+                pfc.tick();
+
+                // Check memory utilization — high utilization triggers inhibition
+                let utilization = pfc.memory_contents().len() as f32 / 7.0; // default capacity
+                let veto = utilization > self.config.learning_threshold.max(0.8);
+
+                if veto {
+                    tracing::debug!(
+                        utilization,
+                        cycle = self.stats.total_cycles,
+                        "Prefrontal veto: working memory overloaded"
                     );
                 }
-                tracing::debug!(
-                    count = graduates.len(),
-                    "Prefrontal graduated items to episodic memory"
-                );
-            }
 
-            veto
+                // Graduate evicted items to episodic memory
+                let graduates = pfc.drain_graduates();
+                if !graduates.is_empty() {
+                    for grad in &graduates {
+                        self.episodic_memory.encode(
+                            &grad.id,
+                            grad.embedding
+                                .values
+                                .iter()
+                                .take(64)
+                                .copied()
+                                .collect::<Vec<_>>(),
+                            0.0,
+                            pp_phi,
+                            self.stats.total_cycles,
+                        );
+                    }
+                    tracing::debug!(
+                        count = graduates.len(),
+                        "Prefrontal graduated items to episodic memory"
+                    );
+                }
+
+                self.carryover.quality.cached_prefrontal_veto = veto;
+                veto
+            } else {
+                false
+            }
         } else {
-            false
+            // Reuse cached veto from last computed cycle
+            self.carryover.quality.cached_prefrontal_veto
         };
 
         // FEEDBACK: Prefrontal veto suppresses exploration (executive control)
@@ -4492,6 +4503,12 @@ impl CognitiveLoopService {
                 if let Some(ref r) = result {
                     self.spectral_mip_finder.adapt(r);
                 }
+                // Hierarchical spectral MIP: multi-scale (32→64→128) Phi.
+                // Coarser scales focus finer scales on MIP boundary region.
+                // Runs every 100 cycles (~2s at 50Hz) for deeper integration analysis.
+                if let Some(hier) = self.spectral_mip_finder.compute_hierarchical() {
+                    self.carryover.consciousness.last_hierarchical_mip_phi = Some(hier.phi);
+                }
             }
             phi
         } else {
@@ -4642,6 +4659,9 @@ impl CognitiveLoopService {
             support_efe,
             sigma,
             spectral_mip_phi,
+            hierarchical_mip_phi: self.carryover.consciousness.last_hierarchical_mip_phi,
+            hierarchical_mip_scales: self.carryover.consciousness.last_hierarchical_mip_phi
+                .map(|_| 3usize).unwrap_or(0), // 3 scales: 32→64→128
             resonator_codebook_size: self.resonator_memory.as_ref()
                 .and_then(|m| m.resonator.codebooks.first())
                 .map(|cb| cb.len())

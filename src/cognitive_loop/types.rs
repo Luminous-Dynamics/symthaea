@@ -33,6 +33,8 @@ pub(crate) struct ConsciousnessCache {
     pub(crate) last_multimodal_phi: f64,
     /// Last consciousness equation v2 result (cached, updated every 25 cycles).
     pub(crate) last_equation_v2_consciousness: f64,
+    /// Last hierarchical spectral MIP Phi (cached, updated every 100 cycles).
+    pub(crate) last_hierarchical_mip_phi: Option<f64>,
 }
 
 impl Default for ConsciousnessCache {
@@ -49,6 +51,7 @@ impl Default for ConsciousnessCache {
             last_holographic_unity: 0.0,
             last_multimodal_phi: 0.0,
             last_equation_v2_consciousness: 0.0,
+            last_hierarchical_mip_phi: None,
         }
     }
 }
@@ -126,6 +129,8 @@ pub(crate) struct QualityMetrics {
     pub(crate) last_pipeline_consciousness: f64,
     /// Whether narrative-GWT vetoed the previous cycle (suppresses learning)
     pub(crate) narrative_veto_active: bool,
+    /// Cached prefrontal veto (reused on skip cycles when amortized)
+    pub(crate) cached_prefrontal_veto: bool,
 }
 
 impl Default for QualityMetrics {
@@ -143,6 +148,7 @@ impl Default for QualityMetrics {
             last_epistemic_confidence: 0.5,
             last_pipeline_consciousness: 0.0,
             narrative_veto_active: false,
+            cached_prefrontal_veto: false,
         }
     }
 }
@@ -640,6 +646,14 @@ pub struct CycleMetadata {
     /// Spectral MIP Phi — O(n³) Fiedler-ordered MIP approximation (Layer 2+).
     /// `None` when not computed this cycle (only computed every 50 cycles).
     pub spectral_mip_phi: Option<f64>,
+
+    /// Hierarchical spectral MIP Phi (multi-scale: 32→64→128 components).
+    /// Uses coarser scales to focus finer scales on the MIP boundary region.
+    /// `None` when not computed this cycle (only computed every 100 cycles).
+    pub hierarchical_mip_phi: Option<f64>,
+
+    /// Number of scales used in hierarchical MIP (0 when not computed).
+    pub hierarchical_mip_scales: usize,
 
     /// Number of symbols in the resonator semantic codebook (0 when disabled).
     pub resonator_codebook_size: usize,
