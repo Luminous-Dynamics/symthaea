@@ -205,12 +205,11 @@ fn test_tier_aware_selection_config() {
     println!("Mathematical tier: {} primitives", math_prims.len());
 
     // Verify config has valid fields
-    assert!(config.consciousness_boost >= 0.0);
-    // match_complexity is a bool controlling whether to prefer matching tier complexity
+    assert!(config.consciousness_weight >= 0.0);
 
     println!("✓ Tier-aware selection configured");
-    println!("  Consciousness boost: {:.2}", config.consciousness_boost);
-    println!("  Match complexity: {}", config.match_complexity);
+    println!("  Consciousness weight: {:.2}", config.consciousness_weight);
+    println!("  Code weight: {:.2}", config.code_weight);
 }
 
 // =============================================================================

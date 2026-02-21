@@ -335,7 +335,7 @@ impl ParetoFrontier3D {
             .max_by(|(pt_a, _), (pt_b, _)| {
                 pt_a.weighted_fitness(weights)
                     .partial_cmp(&pt_b.weighted_fitness(weights))
-                    .unwrap()
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(_, prim)| prim)
     }
@@ -658,7 +658,7 @@ impl ContextAwareOptimizer {
             .max_by(|(pt_a, _), (pt_b, _)| {
                 pt_a.weighted_fitness(&weights)
                     .partial_cmp(&pt_b.weighted_fitness(&weights))
-                    .unwrap()
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(pt, prim)| (*pt, prim.clone()))
             .ok_or_else(|| anyhow::anyhow!("No primitives in frontier"))?;

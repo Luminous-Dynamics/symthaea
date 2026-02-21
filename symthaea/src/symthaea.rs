@@ -320,7 +320,10 @@ impl Symthaea {
     ) -> &crate::inference::StreamingInference {
         self.streaming_inference =
             Some(crate::inference::default_streaming(input_dim, output_dim));
-        self.streaming_inference.as_ref().unwrap()
+        // SAFETY: We just assigned Some(...) above, so this is always Some
+        self.streaming_inference
+            .as_ref()
+            .expect("streaming_inference was just set to Some")
     }
 
     /// Get a reference to the streaming inference engine (if created).

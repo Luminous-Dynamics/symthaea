@@ -447,9 +447,10 @@ impl DomainPlugin for MathPlugin {
         // Check for trailing operators
         let trimmed = input.trim();
         if !trimmed.is_empty() {
-            let last_char = trimmed.chars().last().unwrap();
-            if ['+', '-', '*', '/', '^'].contains(&last_char) {
-                warnings.push("Expression ends with an operator; it may be incomplete".to_string());
+            if let Some(last_char) = trimmed.chars().last() {
+                if ['+', '-', '*', '/', '^'].contains(&last_char) {
+                    warnings.push("Expression ends with an operator; it may be incomplete".to_string());
+                }
             }
         }
 

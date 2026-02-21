@@ -602,8 +602,13 @@ impl ConsciousnessProbeV2 {
     pub fn load_with_probe<P: AsRef<Path>>(probe_path: P) -> Result<Self> {
         use super::neural_bridge_v2::{NeuralBridgeV2Builder, NeuralBridgeV2Config};
 
+        let path_str = probe_path
+            .as_ref()
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("probe path contains non-UTF8 characters"))?;
+
         let bridge = NeuralBridgeV2Builder::new()
-            .probe_path(probe_path.as_ref().to_str().unwrap())
+            .probe_path(path_str)
             .build()?;
 
         Ok(Self {

@@ -642,7 +642,10 @@ impl StoryArcDynamics {
         if self.mood_history.is_empty() {
             return 1.0;
         }
-        let prev = *self.mood_history.back().unwrap();
+        let prev = match self.mood_history.back() {
+            Some(m) => *m,
+            None => return 1.0,
+        };
         if std::mem::discriminant(&prev) == std::mem::discriminant(&current) {
             // Same mood repeating — compound by counting consecutive
             let consecutive = self

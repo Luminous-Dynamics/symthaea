@@ -1365,7 +1365,7 @@ pub fn generate_synthetic_data(config: &SyntheticConfig) -> Vec<CModShot> {
 
             // Calculate time-to-disruption if applicable
             let ttd = if shot.disrupted {
-                Some(shot.disruption_time_ms.unwrap() - time_ms)
+                shot.disruption_time_ms.map(|dt| dt - time_ms)
             } else {
                 None
             };

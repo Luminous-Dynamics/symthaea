@@ -50,34 +50,53 @@ impl MetacognitiveCalibrationBenchmark {
         let mut all_accuracies = Vec::new();
         let items_per_difficulty = 15;
 
-        for diff in &DIFFICULTIES {
-            let mut wm = WorkingMemory::new(WmConfig {
-                dimension: dim,
-                capacity: config.working_memory_capacity,
-                ..Default::default()
-            });
+        // Generate category prototypes — items within a category are confusable.
+        // This creates realistic memory interference where similar items compete,
+        // breaking the perfect confidence-accuracy coupling that occurs with
+        // orthogonal random vectors.
+        let num_categories = 3;
+        let category_protos: Vec<ContinuousHV> = (0..num_categories)
+            .map(|c| {
+                rng ^= rng << 13;
+                rng ^= rng >> 7;
+                rng ^= rng << 17;
+                ContinuousHV::random(dim, rng.wrapping_add(9000 + c as u64))
+            })
+            .collect();
 
-            for item_trial in 0..items_per_difficulty {
-                // Generate items to store
+        for diff in &DIFFICULTIES {
+            for _item_trial in 0..items_per_difficulty {
+                let mut wm = WorkingMemory::new(WmConfig {
+                    dimension: dim,
+                    capacity: config.working_memory_capacity,
+                    ..Default::default()
+                });
+
+                // Generate items as noisy variants of category prototypes.
+                // Items in the same category have moderate similarity (~0.5-0.7).
                 let items: Vec<ContinuousHV> = (0..diff.num_items)
                     .map(|i| {
                         rng ^= rng << 13;
                         rng ^= rng >> 7;
                         rng ^= rng << 17;
-                        ContinuousHV::random(dim, rng.wrapping_add(i as u64))
+                        let cat = i % num_categories;
+                        let item_noise = ContinuousHV::random(dim, rng.wrapping_add(i as u64));
+                        // Within-category variation: 25-40% noise
+                        let noise_frac = 0.25 + 0.05 * (i as f32 / diff.num_items as f32);
+                        ContinuousHV::weighted_bundle(
+                            &[&category_protos[cat], &item_noise],
+                            &[1.0 - noise_frac, noise_frac],
+                        )
                     })
                     .collect();
 
-                // Store items in working memory with encoding noise.
-                // Real memory systems don't store perfect copies — this creates
-                // genuine accuracy variance across difficulty levels.
+                // Store items in working memory with encoding noise
                 for item in &items {
                     rng ^= rng << 13;
                     rng ^= rng >> 7;
                     rng ^= rng << 17;
                     let noise = ContinuousHV::random(dim, rng.wrapping_add(5000));
-                    // Noise magnitude scales with difficulty (more items = more interference)
-                    let noise_weight = 0.05 + 0.03 * diff.num_items as f32;
+                    let noise_weight = 0.05 + 0.02 * diff.num_items as f32;
                     let noisy = ContinuousHV::weighted_bundle(
                         &[item, &noise],
                         &[1.0 - noise_weight, noise_weight],
@@ -90,39 +109,23 @@ impl MetacognitiveCalibrationBenchmark {
                 rng ^= rng >> 7;
                 rng ^= rng << 17;
                 let target_idx = (rng % diff.num_items as u64) as usize;
-                let target = items[target_idx].clone();
+                let target = &items[target_idx];
 
-                // Delay: push intervening distractors
+                // Delay: push intervening distractors (from same categories)
                 for d in 0..diff.delay {
                     rng ^= rng << 13;
                     rng ^= rng >> 7;
                     rng ^= rng << 17;
-                    let distractor = ContinuousHV::random(dim, rng.wrapping_add(1000 + d as u64));
+                    let cat = d % num_categories;
+                    let d_noise = ContinuousHV::random(dim, rng.wrapping_add(2000 + d as u64));
+                    let distractor = ContinuousHV::weighted_bundle(
+                        &[&category_protos[cat], &d_noise],
+                        &[0.65, 0.35],
+                    );
                     wm.perceive(distractor);
                 }
 
-                // Signal-detection recognition task:
-                // - "Old" trials (70%): query = target (stored item)
-                // - "New" trials (30%): query = lure (similar to target but not stored)
-                // This creates false alarms (high confidence + wrong) that break
-                // the degenerate gamma=1.0 from confidence=accuracy coupling.
-                rng ^= rng << 13;
-                rng ^= rng >> 7;
-                rng ^= rng << 17;
-                let is_new_trial = item_trial % 3 == 0; // 33% "new" trials
-                let query = if is_new_trial {
-                    // Lure: similar to target (confusable) but NOT stored
-                    let lure_noise = ContinuousHV::random(dim, rng.wrapping_add(7777));
-                    let lure_weight = 0.20 + 0.03 * diff.num_items as f32;
-                    ContinuousHV::weighted_bundle(
-                        &[&target, &lure_noise],
-                        &[1.0 - lure_weight, lure_weight],
-                    )
-                } else {
-                    target.clone()
-                };
-
-                // Retrieve: find most similar item in WM to query
+                // Retrieval: query WM with original target
                 let contents = wm.contents();
                 if contents.is_empty() {
                     all_confidences.push(0.0);
@@ -130,36 +133,45 @@ impl MetacognitiveCalibrationBenchmark {
                     continue;
                 }
 
-                let (_best_idx, best_sim) = contents
+                // Compute similarity of query to ALL items in WM
+                let mut sims: Vec<f32> = contents
+                    .iter()
+                    .map(|hv| target.similarity(hv))
+                    .collect();
+                sims.sort_by(|a, b| b.total_cmp(a));
+
+                let best_sim = sims[0];
+                let second_sim = if sims.len() > 1 { sims[1] } else { 0.0 };
+
+                // Confidence = gap between best and second-best similarity.
+                // With category-based items, same-category items compete,
+                // creating small gaps even when the correct item is retrieved.
+                // Scale gap so the typical range (0.0-0.2) maps broadly to (0.0-1.0).
+                let gap = (best_sim - second_sim) as f64;
+                let confidence = (gap * 5.0).clamp(0.0, 1.0);
+
+                // Accuracy: verify retrieved item is actually the target.
+                // Check similarity between best WM item and ALL original items.
+                // Correct if the best WM match is closest to the target, not
+                // to another original item from the same category.
+                let best_wm_idx = contents
                     .iter()
                     .enumerate()
-                    .map(|(i, hv)| (i, query.similarity(hv)))
-                    .max_by(|(_, a), (_, b)| a.total_cmp(b))
-                    .unwrap_or((0, 0.0));
-
-                // Confidence = max similarity (natural HDC metric), clamped to [0, 1]
-                let confidence = (best_sim as f64).clamp(0.0, 1.0);
-
-                // Accuracy depends on trial type:
-                // - Old trial: correct if recognized (high similarity to stored item)
-                // - New trial: correct if REJECTED (low similarity = "not in memory")
-                // This decouples confidence from accuracy: on new trials, high
-                // similarity to the stored target creates false alarms.
-                let accurate = if is_new_trial {
-                    best_sim <= 0.3 // Correct rejection
-                } else {
-                    best_sim > 0.3 // Hit
-                };
+                    .max_by(|(_, a), (_, b)| target.similarity(a).total_cmp(&target.similarity(b)))
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+                let retrieved = &contents[best_wm_idx];
+                let mut correct = true;
+                let target_sim = target.similarity(retrieved);
+                for (i, item) in items.iter().enumerate() {
+                    if i != target_idx && item.similarity(retrieved) > target_sim {
+                        correct = false;
+                        break;
+                    }
+                }
 
                 all_confidences.push(confidence);
-                all_accuracies.push(if accurate { 1.0 } else { 0.0 });
-
-                // Reset WM for next sub-trial
-                wm = WorkingMemory::new(WmConfig {
-                    dimension: dim,
-                    capacity: config.working_memory_capacity,
-                    ..Default::default()
-                });
+                all_accuracies.push(if correct { 1.0 } else { 0.0 });
             }
         }
 
