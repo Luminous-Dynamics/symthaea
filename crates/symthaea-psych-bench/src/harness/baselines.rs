@@ -175,12 +175,14 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
     // Reversal learning perseverative errors (distinct from WCST)
-    // Binary reversal: ~3 perseverative errors per reversal × ~5 reversals
+    // Binary reversal: ~1.5 perseverative errors per reversal (first-trial
+    // + stochastic recovery), ~15-20 reversals in 200-trial session.
+    // Estimated from Cools et al. (2002) scaled to 200-trial deterministic paradigm.
     m.insert(
         "reversal_perseverative_errors",
         Baseline {
-            value: 15.0,
-            source: "Cools et al. (2002); Clark et al. (2004), binary reversal paradigm",
+            value: 25.0,
+            source: "Cools et al. (2002); Clark et al. (2004), binary reversal paradigm (200 trials)",
             population: "human adults",
         },
     );

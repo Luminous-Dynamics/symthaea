@@ -48,21 +48,11 @@ const QUANTUM_COHERENCE_BOOST_SCALE: f32 = 0.2; // strength of coherence → exp
 //
 // For actual integrated information, use PhiEngine or true_phi.
 // ═══════════════════════════════════════════════════════════════════
-const FLOW_PSI_WEIGHT: f32 = 0.2; // flow state → psi
-const RELATIONAL_PSI_WEIGHT: f32 = 0.15; // relational dyad → psi
-const BODY_PSI_WEIGHT: f64 = 0.1; // interoceptive body → psi
-const EMBODIED_PSI_WEIGHT: f64 = 0.05; // embodied cognition → psi
 
 // -- FEP tuning --
 const FEP_SURPRISE_SCALE: f32 = 3.0; // free-energy divisor for surprise boost
 const FEP_LR_DECAY: f32 = 0.95; // boost decay rate when not surprised
 
-// -- Strategy modulation --
-const STRATEGY_EXPLORATORY_FACTOR: f32 = 0.8;
-const STRATEGY_DETAILED_SENSITIVITY: f32 = 1.2;
-const STRATEGY_CONCISE_SPEECH_RATE: f32 = 1.2;
-const STRATEGY_CLARIFYING_FACTOR: f32 = 0.5;
-const STRATEGY_SUPPORTIVE_PAUSE: f32 = 1.3;
 
 // -- Dominance estimation --
 const DOMINANCE_FLOW_BASE: f64 = 0.6;
@@ -74,14 +64,6 @@ const DOMINANCE_DEFAULT: f64 = 0.2;
 const RESONANCE_TAU_CENTER: f64 = 0.5; // neutral frequency
 const RESONANCE_TAU_SCALE: f32 = 0.1; // ±5% CfC time-step modulation
 
-// -- Reward computation (RL) --
-const REWARD_GOOD_BASE: f32 = 0.5; // base reward for low-error cycles
-const REWARD_GOOD_CONFIDENCE_SCALE: f32 = 0.5; // confidence multiplier
-const REWARD_BAD_BASE: f32 = -0.3; // penalty for high-error cycles
-const REWARD_BAD_SCALE: f32 = -0.2; // scaling above 0.5 error
-const REWARD_MID_BASE: f32 = 0.2; // moderate error reward
-const REWARD_MID_SCALE: f32 = -0.5; // moderate error scaling
-const REWARD_EXTERNAL_BLEND: f32 = 0.5; // internal vs external mix
 
 // -- Policy agreement (KL gate) --
 const POLICY_SOFT_THRESHOLD: f64 = 0.2; // FEP prob to accept MCTS choice
@@ -102,8 +84,8 @@ use super::helpers::MEMORY_RECALL_TOP_K;
 use super::temporal_network::TemporalNetwork;
 use super::training::TrainingSample;
 use super::{
-    AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, CycleResult, ResponseStrategy,
-    TrainingMethod,
+    ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, CycleResult,
+    ResponseStrategy, TrainingMethod,
 };
 use crate::consciousness::cross_modal_binding::{ModalRepresentation, Modality};
 
@@ -234,23 +216,7 @@ impl CognitiveLoopService {
         };
 
         // Strategy influences adaptive behavior
-        match selected_strategy {
-            ResponseStrategy::Exploratory => {
-                self.adaptive_behavior.exploration_factor = STRATEGY_EXPLORATORY_FACTOR;
-            }
-            ResponseStrategy::Detailed => {
-                self.adaptive_behavior.attention_sensitivity = STRATEGY_DETAILED_SENSITIVITY;
-            }
-            ResponseStrategy::Concise => {
-                self.adaptive_behavior.speech_rate_multiplier = STRATEGY_CONCISE_SPEECH_RATE;
-            }
-            ResponseStrategy::Clarifying => {
-                self.adaptive_behavior.exploration_factor = STRATEGY_CLARIFYING_FACTOR;
-            }
-            ResponseStrategy::Supportive => {
-                self.adaptive_behavior.pause_multiplier = STRATEGY_SUPPORTIVE_PAUSE;
-            }
-        }
+        self.apply_strategy_modulation(selected_strategy);
 
         // 1. HDC encode with attention from previous prediction
         let _t_core = Instant::now();
@@ -394,6 +360,7 @@ impl CognitiveLoopService {
         // Urgency-gated: Critical=always, Normal=always, Cruise=every 4th
         let mut resonator_wm_primed = false;
         let mut resonator_reconsolidated: usize = 0;
+        let mut resonator_best_sim: f32 = 0.0;
         if urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
         if let Some(ref mut res_mem) = self.resonator_memory {
             let res_start = Instant::now();
@@ -422,6 +389,7 @@ impl CognitiveLoopService {
                     let match_timestamps: Vec<u64> = top_matches.iter()
                         .map(|m| m.timestamp)
                         .collect();
+                    resonator_best_sim = best_match_sim;
 
                     // Pre-compute bundled vector while we still hold episode references
                     let bundled = if top_matches.len() >= 2 {
@@ -491,6 +459,16 @@ impl CognitiveLoopService {
             module_timings.resonator_recall = res_start.elapsed().as_micros() as u64;
         }
         } // urgency gate
+
+        // Track 3d: Resonator recall → FEP prior confidence
+        // Science: Tulving (1983) — familiar context boosts model confidence
+        // High resonator similarity → "I've seen this before" → boost prior precision
+        if resonator_best_sim > 0.5 {
+            self.fep_agent.precision.prior_precision =
+                (self.fep_agent.precision.prior_precision
+                    + (resonator_best_sim - 0.5) as f64 * 0.1)
+                    .min(2.0);
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1a.2. Goal System: Apply attention bias from active goals
@@ -688,29 +666,7 @@ impl CognitiveLoopService {
         // Before this fix, from_consciousness_state() obliterated the strategy set at Phase 0.5,
         // making the entire Q-learning ClosedLearningLoop dead code.
         // Science: Strategy = voluntary override; consciousness = involuntary substrate.
-        match selected_strategy {
-            ResponseStrategy::Exploratory => {
-                self.adaptive_behavior.exploration_factor =
-                    self.adaptive_behavior.exploration_factor.max(STRATEGY_EXPLORATORY_FACTOR);
-            }
-            ResponseStrategy::Detailed => {
-                self.adaptive_behavior.attention_sensitivity *= STRATEGY_DETAILED_SENSITIVITY;
-            }
-            ResponseStrategy::Concise => {
-                self.adaptive_behavior.speech_rate_multiplier = self
-                    .adaptive_behavior
-                    .speech_rate_multiplier
-                    .max(STRATEGY_CONCISE_SPEECH_RATE);
-            }
-            ResponseStrategy::Clarifying => {
-                self.adaptive_behavior.exploration_factor =
-                    self.adaptive_behavior.exploration_factor.min(STRATEGY_CLARIFYING_FACTOR);
-            }
-            ResponseStrategy::Supportive => {
-                self.adaptive_behavior.pause_multiplier =
-                    self.adaptive_behavior.pause_multiplier.max(STRATEGY_SUPPORTIVE_PAUSE);
-            }
-        }
+        self.reapply_strategy_modulation(selected_strategy);
 
         // Re-apply goal and world-model attention biases after consciousness reset + strategy.
         // Previously at lines 436 and 581, these were destroyed by from_consciousness_state().
@@ -863,6 +819,39 @@ impl CognitiveLoopService {
                 if enhancer.should_discover() {
                     let _graph = enhancer.run_discovery();
                 }
+            }
+        }
+
+        // ── FEP decomposition → adaptive behavior modulation ─────────────
+        // Science: Friston (2010) — free energy components shape behavioral policy
+        // High accuracy + low complexity → exploit (FlowRiding)
+        if fep_accuracy > 0.5 && fep_complexity < 0.5 {
+            self.adaptive_behavior.learning_rate_multiplier =
+                (self.adaptive_behavior.learning_rate_multiplier * 1.1).min(2.0);
+            self.adaptive_behavior.exploration_factor *= 0.8;
+        }
+        // High surprise → explore (Exploring)
+        if fep_surprise > 0.8 {
+            self.adaptive_behavior.exploration_factor =
+                (self.adaptive_behavior.exploration_factor + 0.15).min(1.0);
+            self.adaptive_behavior.action_hint = ActionHint::Explore;
+        }
+        // High complexity → consolidate (slow down, reduce LR)
+        if fep_complexity > 1.0 {
+            self.adaptive_behavior.learning_rate_multiplier =
+                (self.adaptive_behavior.learning_rate_multiplier * 0.85).max(0.1);
+            self.adaptive_behavior.pause_multiplier =
+                (self.adaptive_behavior.pause_multiplier * 1.2).min(2.0);
+            self.adaptive_behavior.action_hint = ActionHint::SlowDown;
+        }
+
+        // ── FEP surprise → episodic replay priority boost ────────────────
+        // Science: Nader (2003) + Friston — surprising events deserve
+        // accelerated consolidation for model updating
+        if fep_surprise > 0.8 {
+            if let Some(ref mut replay) = self.phi_episodic_replay {
+                let surprise_boost = (fep_surprise - 0.8).min(0.5) * 0.2;
+                replay.boost_recent_consolidation(surprise_boost);
             }
         }
 
@@ -1092,32 +1081,7 @@ impl CognitiveLoopService {
         // Compute unified Phi from coherence, confidence, and flow state
         // This feeds the dialogue pipeline for consciousness-aware responses
 
-        let coherence_psi = self.coherence_bridge.phi_contribution();
-        let voice_psi = self.voice_feedback_bridge.summary().phi_adjustment;
-        let flow_psi = if self.flow_state.in_flow {
-            self.flow_state.intensity * FLOW_PSI_WEIGHT
-        } else {
-            0.0
-        };
-        // Combine contributions: temporal coherence + voice quality + flow state + relational + body
-        let relational_psi_contrib = if self.relational_psi > 0.0 {
-            self.relational_psi as f32 * RELATIONAL_PSI_WEIGHT
-        } else {
-            0.0
-        };
-        // Previous cycle's body psi modulation feeds back into unified_psi
-        let body_psi_contrib = (self.carryover.consciousness.body_phi_modulation - 1.0) * BODY_PSI_WEIGHT;
-        // FEEDBACK: Embodied cognition psi modulation feeds back into unified_psi
-        // Science: Merleau-Ponty, Damasio — body schema modulates consciousness level
-        let embodied_psi_contrib = (self.carryover.consciousness.embodied_phi_modulation - 1.0) * EMBODIED_PSI_WEIGHT;
-        let unified_psi = (coherence_psi
-            + voice_psi
-            + flow_psi
-            + relational_psi_contrib
-            + body_psi_contrib as f32
-            + embodied_psi_contrib as f32)
-            .clamp(0.0, 1.0) as f64;
-        self.unification_engine.update_psi(unified_psi);
+        let unified_psi = self.compute_unified_psi();
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10h.exp EXPERIENCE BUS: Update principled signals from cognitive state
@@ -3048,6 +3012,7 @@ impl CognitiveLoopService {
         // Co-prime cadence (97 cycles) avoids interference with other periodic tasks
         let _t = Instant::now();
         let mut resonator_promotions: usize = 0;
+        let mut codebook_evictions: usize = 0;
         if self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0 {
             let top_eps = self
                 .phi_episodic_replay
@@ -3057,13 +3022,63 @@ impl CognitiveLoopService {
 
             if !top_eps.is_empty() {
                 if let Some(ref mut res_mem) = self.resonator_memory {
+                    let dim = res_mem.resonator.config.dim;
                     if let Some(ref mut semantic_cb) = res_mem.resonator.codebooks.get_mut(0) {
                         for ep in &top_eps {
-                            if ep.psi > 0.5
-                                && semantic_cb.len() < self.config.resonator_max_symbols
-                            {
+                            if ep.psi > 0.5 {
                                 let ep_vec = &ep.input.values;
-                                if ep_vec.len() == res_mem.resonator.config.dim {
+                                if ep_vec.len() != dim {
+                                    continue;
+                                }
+
+                                // Track 3c-evict: Prune most redundant entry when at capacity
+                                // Science: competitive learning — maintain codebook diversity
+                                if semantic_cb.len() >= self.config.resonator_max_symbols
+                                    && semantic_cb.len() > 1
+                                {
+                                    let n = semantic_cb.symbols.len();
+                                    let mut max_redundancy = f32::MIN;
+                                    let mut evict_idx = 0;
+                                    for i in 0..n {
+                                        let avg_sim: f32 = (0..n)
+                                            .filter(|&j| j != i)
+                                            .map(|j| {
+                                                let dot: f32 = semantic_cb.symbols[i]
+                                                    .1
+                                                    .iter()
+                                                    .zip(semantic_cb.symbols[j].1.iter())
+                                                    .map(|(a, b)| a * b)
+                                                    .sum();
+                                                let na: f32 = semantic_cb.symbols[i]
+                                                    .1
+                                                    .iter()
+                                                    .map(|x| x * x)
+                                                    .sum::<f32>()
+                                                    .sqrt();
+                                                let nb: f32 = semantic_cb.symbols[j]
+                                                    .1
+                                                    .iter()
+                                                    .map(|x| x * x)
+                                                    .sum::<f32>()
+                                                    .sqrt();
+                                                if na > 0.0 && nb > 0.0 {
+                                                    dot / (na * nb)
+                                                } else {
+                                                    0.0
+                                                }
+                                            })
+                                            .sum::<f32>()
+                                            / (n - 1) as f32;
+                                        if avg_sim > max_redundancy {
+                                            max_redundancy = avg_sim;
+                                            evict_idx = i;
+                                        }
+                                    }
+                                    semantic_cb.symbols.remove(evict_idx);
+                                    codebook_evictions += 1;
+                                }
+
+                                if semantic_cb.len() < self.config.resonator_max_symbols {
                                     semantic_cb.add(
                                         &format!(
                                             "phi_{:.0}_{}",
@@ -3082,6 +3097,63 @@ impl CognitiveLoopService {
         }
 
         module_timings.high_phi_promotion = _t.elapsed().as_micros() as u64;
+
+        // Track 3e: Codebook diversity metric
+        // Science: competitive learning — low diversity = redundant representations
+        // Compute average pairwise cosine distance (every 50 cycles to amortize cost)
+        let codebook_diversity: f32 = if self.stats.total_cycles % 50 == 0 {
+            if let Some(ref res_mem) = self.resonator_memory {
+                if let Some(ref semantic_cb) = res_mem.resonator.codebooks.first() {
+                    let n = semantic_cb.symbols.len();
+                    if n >= 2 {
+                        let mut total_dist = 0.0f32;
+                        let mut pairs = 0u32;
+                        for i in 0..n {
+                            for j in (i + 1)..n {
+                                let dot: f32 = semantic_cb.symbols[i]
+                                    .1
+                                    .iter()
+                                    .zip(semantic_cb.symbols[j].1.iter())
+                                    .map(|(a, b)| a * b)
+                                    .sum();
+                                let na: f32 = semantic_cb.symbols[i]
+                                    .1
+                                    .iter()
+                                    .map(|x| x * x)
+                                    .sum::<f32>()
+                                    .sqrt();
+                                let nb: f32 = semantic_cb.symbols[j]
+                                    .1
+                                    .iter()
+                                    .map(|x| x * x)
+                                    .sum::<f32>()
+                                    .sqrt();
+                                let sim = if na > 0.0 && nb > 0.0 {
+                                    dot / (na * nb)
+                                } else {
+                                    0.0
+                                };
+                                total_dist += 1.0 - sim; // distance = 1 - similarity
+                                pairs += 1;
+                            }
+                        }
+                        if pairs > 0 {
+                            total_dist / pairs as f32
+                        } else {
+                            0.0
+                        }
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            }
+        } else {
+            self.stats.codebook_diversity // carry forward cached value
+        };
 
         // ═══════════════════════════════════════════════════════════════════════
         // DEMAND-DRIVEN CONSOLIDATION TRIGGERS
@@ -4699,6 +4771,9 @@ impl CognitiveLoopService {
             fep_complexity,
             fep_surprise,
             fep_td_error,
+            resonator_best_sim,
+            codebook_evictions,
+            codebook_diversity,
         };
 
         // Update cumulative stats for resonator-memory loop diagnostics
@@ -4706,6 +4781,13 @@ impl CognitiveLoopService {
             self.stats.resonator_wm_primed_count += 1;
         }
         self.stats.resonator_promotions_total += resonator_promotions as u64;
+        self.stats.codebook_evictions_total += codebook_evictions as u64;
+        if codebook_diversity > 0.0 {
+            self.stats.codebook_diversity = codebook_diversity;
+        }
+        if fep_surprise > 0.8 {
+            self.stats.fep_surprise_replay_boosts += 1;
+        }
 
         tracing::debug!(
             surprise = metadata.surprise_triggered,

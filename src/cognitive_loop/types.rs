@@ -699,6 +699,14 @@ pub struct CycleMetadata {
     pub fep_surprise: f64,
     /// FEP TD error magnitude (0.0 when not computed).
     pub fep_td_error: f64,
+
+    // ── Phase 10: Self-Regulating Resonator + FEP-Behavior Coupling ─────
+    /// Best cosine similarity from resonator recall (0.0 when no matches).
+    pub resonator_best_sim: f32,
+    /// Number of codebook entries evicted this cycle (redundancy pruning).
+    pub codebook_evictions: usize,
+    /// Codebook diversity: average pairwise cosine distance (0.0–1.0).
+    pub codebook_diversity: f32,
 }
 
 /// Compact subset of CycleMetadata with the most essential telemetry fields.
@@ -724,6 +732,8 @@ pub struct CycleMetadataCompact {
     pub fep_td_error: f64,
     /// FEP pragmatic value for selected action (0.0 when not computed).
     pub fep_pragmatic_value: f64,
+    /// Codebook diversity: average pairwise cosine distance (0.0–1.0).
+    pub codebook_diversity: f32,
 }
 
 impl CycleMetadata {
@@ -744,6 +754,7 @@ impl CycleMetadata {
             prediction_error_trend: 0.0, // caller fills from CycleResult
             fep_td_error: self.fep_td_error,
             fep_pragmatic_value: self.fep_pragmatic_value,
+            codebook_diversity: self.codebook_diversity,
         }
     }
 }
