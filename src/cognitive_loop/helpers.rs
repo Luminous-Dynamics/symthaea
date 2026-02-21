@@ -11,7 +11,28 @@ use anyhow::Result;
 use ndarray::Array1;
 use std::time::{Duration, Instant};
 
-use super::{ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleResult, Experience, LoopStats};
+use super::{
+    ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleResult, Experience, LoopStats,
+    MoralJudgmentSummary,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Tuning constants for extracted helpers (moved from cycle.rs)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// -- Moral evaluation --
+const MORAL_EVAL_INTERVAL: usize = 7;
+const MORAL_CONCERN_THRESHOLD: f32 = -0.3;
+const NEGATION_POLARITY_THRESHOLD: f32 = 0.5;
+const NEGATION_DAMPENING: f32 = 0.3;
+
+// -- Memory recall --
+pub(super) const MEMORY_RECALL_TOP_K: usize = 3;
+pub(super) const MEMORY_RECALL_SIM_THRESHOLD: f32 = 0.3;
+const MEMORY_CONTEXT_BOOST_SCALE: f32 = 0.1;
+
+// -- Surprise & exploration --
+const SURPRISE_BOREDOM_DAMPEN: f32 = 0.7;
 
 impl CognitiveLoopService {
     /// Process a pre-computed text embedding through the neural bridge and
@@ -720,5 +741,197 @@ impl CognitiveLoopService {
             * (1.0 + self.carryover.learning.mce_lr_boost)
             * subsystem_lr)
             .clamp(0.0, 0.01)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Extracted helpers from cycle() — Phase 2 (MEDIUM-LOW risk)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Run the full moral evaluation phase: throttle, evaluate, apply negation,
+    /// contextual weights, and value feedback.
+    ///
+    /// Returns `(moral_score, moral_concern_detected, moral_judgment)`.
+    /// The judgment is cached in `self.last_moral_judgment` for throttled reuse.
+    pub(super) fn run_moral_phase(
+        &mut self,
+        input: &str,
+        input_negation_polarity: f32,
+    ) -> (f32, bool, MoralJudgmentSummary) {
+        // Throttled evaluation: re-evaluate on interval or new input
+        let moral_judgment = if self.stats.total_cycles % MORAL_EVAL_INTERVAL == 1
+            || self
+                .last_moral_judgment
+                .as_ref()
+                .map_or(true, |j| j.input != input)
+        {
+            let j = self.evaluate_moral_alignment(input);
+            self.stats.moral_evaluations += 1;
+            j
+        } else {
+            self.last_moral_judgment
+                .clone()
+                .expect("last_moral_judgment guaranteed Some by map_or guard")
+        };
+
+        let moral_concern_detected = moral_judgment.moral_score < MORAL_CONCERN_THRESHOLD
+            || moral_judgment.consent_violation
+            || !moral_judgment.violations.is_empty();
+
+        if moral_concern_detected {
+            self.stats.moral_concerns_detected += 1;
+        }
+
+        // Write moral stats
+        self.stats.moral_score = moral_judgment.moral_score;
+        self.stats.consent_violation = moral_judgment.consent_violation;
+        self.stats.deontological_violations = moral_judgment
+            .violations
+            .iter()
+            .filter(|v| {
+                v.contains("perfect") || v.contains("impermissible") || v.contains("deontological")
+            })
+            .count();
+
+        // Apply negation polarity: "not harmful" dampens negative moral score toward 0
+        let moral_score = if input_negation_polarity > NEGATION_POLARITY_THRESHOLD {
+            moral_judgment.moral_score * NEGATION_DAMPENING
+        } else {
+            moral_judgment.moral_score
+        };
+
+        // Contextual harmony weighting: domain-aware moral modulation
+        // Science: Haidt (2001) — moral foundations vary across contexts
+        let contextual_weight_factor = if let Some(ref mut cw) = self.contextual_weights {
+            use crate::consciousness::contextual_weights::{ActionType, DomainClassifier};
+            let domain = DomainClassifier::new().classify(input);
+            let action_type = if moral_concern_detected {
+                ActionType::Governance
+            } else {
+                ActionType::Basic
+            };
+            let weights = cw.get_all_weights(action_type, domain);
+            let weight_avg =
+                weights.iter().map(|(_, w)| w).sum::<f32>() / weights.len().max(1) as f32;
+            if weight_avg.abs() < f32::EPSILON {
+                1.0
+            } else {
+                weight_avg
+            }
+        } else {
+            1.0
+        };
+        let moral_score = moral_score * contextual_weight_factor;
+
+        // Value feedback: self-correcting moral alignment via TD-learning trend
+        let value_trend = self.value_feedback.recent_trend(50);
+        let moral_feedback = 1.0 + (value_trend * 0.1).clamp(-0.1, 0.1);
+        let moral_score = moral_score * moral_feedback;
+        {
+            let signal = self.value_feedback.create_signal(
+                input,
+                crate::consciousness::value_feedback_loop::FeedbackType::SelfAssessment,
+                moral_score,
+            );
+            self.value_feedback.process_feedback(signal);
+        }
+
+        (moral_score, moral_concern_detected, moral_judgment)
+    }
+
+    /// Recall episodic memories and apply emotional/consciousness priming.
+    ///
+    /// Returns the memory context boost (confidence contribution from recalled
+    /// memories). Side effects: biases emotional valence and prediction confidence
+    /// from recalled episode metadata (Damasio 1999).
+    pub(super) fn recall_episodic_context(&mut self, compressed_state: &[f32]) -> f32 {
+        let hdv_sample: Vec<f32> =
+            compressed_state[..64.min(compressed_state.len())].to_vec();
+        let recalled_memories = self.episodic_memory.recall(
+            &hdv_sample,
+            MEMORY_RECALL_TOP_K,
+            MEMORY_RECALL_SIM_THRESHOLD,
+        );
+
+        let memory_context_boost = if !recalled_memories.is_empty() {
+            recalled_memories
+                .iter()
+                .map(|(_, sim)| sim)
+                .sum::<f32>()
+                / recalled_memories.len().max(1) as f32
+                * MEMORY_CONTEXT_BOOST_SCALE
+        } else {
+            0.0
+        };
+
+        // Extract rich context from recalled memories (valence + Phi at encoding time)
+        // Science: Damasio (1999) — emotional re-experiencing from recalled episodes
+        if !recalled_memories.is_empty() {
+            let n = recalled_memories.len() as f32;
+            let memory_valence_avg: f32 =
+                recalled_memories.iter().map(|(m, _)| m.valence).sum::<f32>() / n;
+            let memory_phi_avg: f32 =
+                recalled_memories.iter().map(|(m, _)| m.phi_at_encoding).sum::<f32>() / n;
+
+            // Memory valence biases current emotional state (emotional re-experiencing)
+            if memory_valence_avg.abs() > 0.1 {
+                let valence_nudge = memory_valence_avg * 0.15;
+                self.emotion_contagion.valence =
+                    (self.emotion_contagion.valence + valence_nudge).clamp(-1.0, 1.0);
+            }
+            // Memory Phi primes consciousness expectation
+            if memory_phi_avg > 0.4 {
+                self.prediction_confidence =
+                    (self.prediction_confidence + (memory_phi_avg - 0.4) * 0.05).clamp(0.0, 1.0);
+            }
+        }
+
+        memory_context_boost
+    }
+
+    /// Run the surprise exploration bridge cycle.
+    ///
+    /// Returns `(surprise_triggered, exploration_action)`. Side effects: adjusts
+    /// boredom threshold and exploration urge when surprise is detected.
+    pub(super) fn run_surprise_exploration(
+        &mut self,
+        compressed_state: &[f32],
+    ) -> (bool, Option<String>) {
+        let mut surprise_triggered = false;
+        let mut exploration_action = None;
+
+        if let Some(ref mut bridge) = self.surprise_bridge {
+            let predicted = self.last_prediction.as_deref().unwrap_or(&[]);
+            let actual_len = predicted.len().max(1).min(compressed_state.len());
+            let actual = &compressed_state[..actual_len];
+            let current_state = self.last_state.as_deref().unwrap_or(compressed_state);
+            let (surprise, should_explore, action) =
+                bridge.cycle(predicted, actual, current_state);
+
+            if should_explore {
+                surprise_triggered = true;
+                let current_threshold = self.curiosity_drive.get_boredom_threshold();
+                self.curiosity_drive
+                    .set_boredom_threshold(current_threshold * SURPRISE_BOREDOM_DAMPEN);
+                self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
+                    + bridge.exploration_factor * 0.3)
+                    .clamp(0.0, 1.0);
+                exploration_action = action.map(|a| {
+                    format!(
+                        "perturbation[{}d,scale={:.3}]",
+                        a.len(),
+                        bridge.exploration_factor
+                    )
+                });
+                tracing::debug!(
+                    surprise = surprise,
+                    threshold = bridge.tracker().threshold(),
+                    exploration_factor = bridge.exploration_factor,
+                    cycle = self.stats.total_cycles,
+                    "Surprise exploration triggered"
+                );
+            }
+        }
+
+        (surprise_triggered, exploration_action)
     }
 }
