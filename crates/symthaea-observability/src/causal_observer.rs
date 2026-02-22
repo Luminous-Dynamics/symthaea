@@ -312,10 +312,9 @@ impl WithCausalMetadata for BrocaPipelineEvent {
 mod tests {
     use super::*;
     use crate::{
-        ErrorEvent, ErrorSeverity, NullObserver, CrossModalBindingEvent,
-        GWTIntegrationEvent, LanguageStepEvent, NarrativeSelfEvent,
+        BrocaPhase, BrocaPipelineEvent, CrossModalBindingEvent, ErrorEvent, ErrorSeverity,
+        GWTIntegrationEvent, LanguageStepEvent, NarrativeSelfEvent, NullObserver,
         PrimitiveActivationEvent, ResponseGeneratedEvent, SecurityCheckEvent,
-        BrocaPipelineEvent, BrocaPhase,
     };
 
     fn make_phi_event() -> PhiMeasurementEvent {
@@ -521,35 +520,20 @@ mod tests {
         let mut obs = CausalTraceObserver::new(base, "nested");
 
         obs.begin_scope("level-1");
-        assert_eq!(
-            obs.context().current_parent(),
-            Some(&"level-1".to_string())
-        );
+        assert_eq!(obs.context().current_parent(), Some(&"level-1".to_string()));
 
         obs.begin_scope("level-2");
-        assert_eq!(
-            obs.context().current_parent(),
-            Some(&"level-2".to_string())
-        );
+        assert_eq!(obs.context().current_parent(), Some(&"level-2".to_string()));
 
         obs.begin_scope("level-3");
-        assert_eq!(
-            obs.context().current_parent(),
-            Some(&"level-3".to_string())
-        );
+        assert_eq!(obs.context().current_parent(), Some(&"level-3".to_string()));
 
         // Pop back up
         obs.end_scope();
-        assert_eq!(
-            obs.context().current_parent(),
-            Some(&"level-2".to_string())
-        );
+        assert_eq!(obs.context().current_parent(), Some(&"level-2".to_string()));
 
         obs.end_scope();
-        assert_eq!(
-            obs.context().current_parent(),
-            Some(&"level-1".to_string())
-        );
+        assert_eq!(obs.context().current_parent(), Some(&"level-1".to_string()));
 
         obs.end_scope();
         assert!(obs.context().current_parent().is_none());
@@ -622,10 +606,7 @@ mod tests {
         let inner = obs.into_inner();
         let stats = inner.stats();
         assert_eq!(stats.total_events, 2);
-        assert_eq!(
-            *stats.events_by_type.get("broca_pipeline").unwrap_or(&0),
-            2
-        );
+        assert_eq!(*stats.events_by_type.get("broca_pipeline").unwrap_or(&0), 2);
     }
 
     // ── Composite observer pattern (CausalTraceObserver wrapping CausalTraceObserver) ──
@@ -646,10 +627,7 @@ mod tests {
         outer_causal.end_scope();
 
         assert_eq!(outer_causal.event_count(), 2);
-        assert_eq!(
-            outer_causal.context().correlation_id,
-            "outer_corr"
-        );
+        assert_eq!(outer_causal.context().correlation_id, "outer_corr");
 
         // Unwrap one layer
         let inner = outer_causal.into_inner();
@@ -707,14 +685,18 @@ mod tests {
 
         obs.record_phi_measurement(make_phi_event()).unwrap();
         obs.record_router_selection(make_router_event()).unwrap();
-        obs.record_workspace_ignition(make_workspace_event()).unwrap();
-        obs.record_primitive_activation(make_primitive_event()).unwrap();
-        obs.record_response_generated(make_response_event()).unwrap();
+        obs.record_workspace_ignition(make_workspace_event())
+            .unwrap();
+        obs.record_primitive_activation(make_primitive_event())
+            .unwrap();
+        obs.record_response_generated(make_response_event())
+            .unwrap();
         obs.record_security_check(make_security_event()).unwrap();
         obs.record_error(make_error_event()).unwrap();
         obs.record_language_step(make_language_event()).unwrap();
         obs.record_narrative_self(make_narrative_event()).unwrap();
-        obs.record_cross_modal_binding(make_cross_modal_event()).unwrap();
+        obs.record_cross_modal_binding(make_cross_modal_event())
+            .unwrap();
         obs.record_gwt_integration(make_gwt_event()).unwrap();
         obs.record_broca_pipeline(make_broca_event()).unwrap();
 
@@ -736,10 +718,7 @@ mod tests {
         let mut event = make_phi_event();
         event.set_metadata(meta.clone());
         assert_eq!(event.get_metadata().correlation_id, "corr-1");
-        assert_eq!(
-            event.get_metadata().parent_id,
-            Some("parent-1".to_string())
-        );
+        assert_eq!(event.get_metadata().parent_id, Some("parent-1".to_string()));
         assert_eq!(event.get_metadata().timestamp, 12345);
     }
 }
