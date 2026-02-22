@@ -491,6 +491,36 @@ pub fn affect_baselines() -> BTreeMap<&'static str, Baseline> {
     m
 }
 
+/// Get Butlin consciousness indicator baselines.
+///
+/// Consciousness indicators (recurrent processing, global workspace access, etc.)
+/// are philosophical criteria from Butlin et al. (2023), not psychometric tests.
+/// There are no published "human norms" — all neurotypical adults have all 14
+/// indicators present. The baseline therefore represents perfect presence.
+pub fn butlin_baselines() -> BTreeMap<&'static str, Baseline> {
+    let mut m = BTreeMap::new();
+
+    m.insert(
+        "present_count",
+        Baseline {
+            value: 14.0,
+            source: "Butlin et al. (2023), Consciousness in Artificial Intelligence: Insights from the Science of Consciousness",
+            population: "human adults (all indicators present by definition)",
+        },
+    );
+
+    m.insert(
+        "presence_ratio",
+        Baseline {
+            value: 1.0,
+            source: "Butlin et al. (2023), 14/14 indicators present in neurotypical adults",
+            population: "human adults",
+        },
+    );
+
+    m
+}
+
 /// Get all creativity baselines.
 pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
     let mut m = BTreeMap::new();
@@ -532,5 +562,6 @@ mod tests {
         assert!(!metacognition_baselines().is_empty());
         assert!(!affect_baselines().is_empty());
         assert!(!creativity_baselines().is_empty());
+        assert!(!butlin_baselines().is_empty());
     }
 }

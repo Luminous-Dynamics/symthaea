@@ -21,6 +21,9 @@ pub struct MetricValue {
 
 impl MetricValue {
     /// Compute from a slice of samples.
+    ///
+    /// Uses proper t-distribution critical values for the 95% CI when n < 30,
+    /// falling back to z = 1.96 for larger samples.
     pub fn from_samples(samples: &[f64]) -> Self {
         let n = samples.len();
         if n == 0 {
@@ -39,16 +42,63 @@ impl MetricValue {
             0.0
         };
         let std_dev = variance.sqrt();
-        // 95% CI using t-approximation (z=1.96 for large n)
         let se = std_dev / (n as f64).sqrt();
-        let z = 1.96;
+        let t = t_critical_95(n);
         Self {
             mean,
             std_dev,
             n,
-            ci_lower: mean - z * se,
-            ci_upper: mean + z * se,
+            ci_lower: mean - t * se,
+            ci_upper: mean + t * se,
         }
+    }
+}
+
+/// Two-tailed t critical value for 95% CI (alpha=0.05) given sample size n.
+///
+/// Uses a lookup table for df=1..29 (n=2..30), then z=1.96 for n>30.
+/// Values from standard t-distribution tables.
+fn t_critical_95(n: usize) -> f64 {
+    if n <= 1 {
+        return 1.96; // degenerate; CI width will be 0 anyway (std_dev=0)
+    }
+    let df = n - 1;
+    // t(0.025, df) for df = 1..29
+    const T_TABLE: [f64; 29] = [
+        12.706, // df=1
+        4.303,  // df=2
+        3.182,  // df=3
+        2.776,  // df=4
+        2.571,  // df=5
+        2.447,  // df=6
+        2.365,  // df=7
+        2.306,  // df=8
+        2.262,  // df=9
+        2.228,  // df=10
+        2.201,  // df=11
+        2.179,  // df=12
+        2.160,  // df=13
+        2.145,  // df=14
+        2.131,  // df=15
+        2.120,  // df=16
+        2.110,  // df=17
+        2.101,  // df=18
+        2.093,  // df=19
+        2.086,  // df=20
+        2.080,  // df=21
+        2.074,  // df=22
+        2.069,  // df=23
+        2.064,  // df=24
+        2.060,  // df=25
+        2.056,  // df=26
+        2.052,  // df=27
+        2.048,  // df=28
+        2.045,  // df=29
+    ];
+    if df <= 29 {
+        T_TABLE[df - 1]
+    } else {
+        1.96
     }
 }
 
@@ -174,6 +224,7 @@ impl BenchmarkReport {
         let meta_bl = baselines::metacognition_baselines();
         let affect_bl = baselines::affect_baselines();
         let creativity_bl = baselines::creativity_baselines();
+        let butlin_bl = baselines::butlin_baselines();
 
         let mut lines = vec![format!("Psych Benchmark Report ({})", self.timestamp)];
         lines.push(format!("{} benchmarks run", self.results.len()));
@@ -182,7 +233,7 @@ impl BenchmarkReport {
             lines.push(result.summary());
 
             // Add baseline comparisons for known metrics
-            let comparisons = self.find_comparisons(result, &worm_bl, &cog_bl, &tom_bl, &mem_bl, &exec_bl, &meta_bl, &affect_bl, &creativity_bl);
+            let comparisons = self.find_comparisons(result, &worm_bl, &cog_bl, &tom_bl, &mem_bl, &exec_bl, &meta_bl, &affect_bl, &creativity_bl, &butlin_bl);
             if !comparisons.is_empty() {
                 lines.push("  --- Baseline Comparisons ---".to_string());
                 for (metric, comp) in &comparisons {
@@ -222,6 +273,7 @@ impl BenchmarkReport {
         meta_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
         affect_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
         creativity_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
+        butlin_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
     ) -> Vec<(String, BaselineComparison)> {
         let mut comps = Vec::new();
         let benchmark = result.benchmark.as_str();
@@ -276,6 +328,9 @@ impl BenchmarkReport {
             ("congruence_ratio", "congruence_ratio", affect_bl),
             // Creativity: Alternate Uses fluency
             ("fluency", "aut_fluency", creativity_bl),
+            // Butlin: Consciousness indicator count
+            ("present_count", "present_count", butlin_bl),
+            ("presence_ratio", "presence_ratio", butlin_bl),
         ];
 
         for (metric_key, baseline_key, baselines) in mappings {
@@ -352,6 +407,7 @@ impl BenchmarkReport {
             || benchmark.contains("ToM") || benchmark.contains("Memory")
             || benchmark.contains("Executive") || benchmark.contains("Metacognition")
             || benchmark.contains("Affect") || benchmark.contains("Creativity")
+            || benchmark.contains("Butlin")
         {
             comps
         } else {
@@ -408,6 +464,7 @@ impl BenchmarkReport {
         let meta_bl = baselines::metacognition_baselines();
         let affect_bl = baselines::affect_baselines();
         let creativity_bl = baselines::creativity_baselines();
+        let butlin_bl = baselines::butlin_baselines();
 
         let mut lines = Vec::new();
         lines.push("| Domain | Benchmark | Key Metric | Agent | Human | % of Human | d | 95% CI |".to_string());
@@ -423,7 +480,7 @@ impl BenchmarkReport {
 
             let comparisons = self.find_comparisons(
                 result, &worm_bl, &cog_bl, &tom_bl, &mem_bl, &exec_bl, &meta_bl,
-                &affect_bl, &creativity_bl,
+                &affect_bl, &creativity_bl, &butlin_bl,
             );
 
             let comp = comparisons.iter().find(|(k, _)| k == key);
@@ -466,6 +523,7 @@ impl BenchmarkReport {
         let meta_bl = baselines::metacognition_baselines();
         let affect_bl = baselines::affect_baselines();
         let creativity_bl = baselines::creativity_baselines();
+        let butlin_bl = baselines::butlin_baselines();
 
         let mut lines = Vec::new();
         lines.push(r"\begin{tabular}{llllrrrl}".to_string());
@@ -483,7 +541,7 @@ impl BenchmarkReport {
 
             let comparisons = self.find_comparisons(
                 result, &worm_bl, &cog_bl, &tom_bl, &mem_bl, &exec_bl, &meta_bl,
-                &affect_bl, &creativity_bl,
+                &affect_bl, &creativity_bl, &butlin_bl,
             );
 
             let comp = comparisons.iter().find(|(k, _)| k == key);
@@ -586,6 +644,7 @@ impl BenchmarkReport {
         let meta_bl = baselines::metacognition_baselines();
         let affect_bl = baselines::affect_baselines();
         let creativity_bl = baselines::creativity_baselines();
+        let butlin_bl = baselines::butlin_baselines();
 
         let mut domain_scores: BTreeMap<String, Vec<f64>> = BTreeMap::new();
 
@@ -595,7 +654,7 @@ impl BenchmarkReport {
 
             let comparisons = self.find_comparisons(
                 result, &worm_bl, &cog_bl, &tom_bl, &mem_bl,
-                &exec_bl, &meta_bl, &affect_bl, &creativity_bl,
+                &exec_bl, &meta_bl, &affect_bl, &creativity_bl, &butlin_bl,
             );
 
             if let Some((_, comp)) = comparisons.iter().find(|(k, _)| k == key) {
@@ -666,6 +725,35 @@ mod tests {
         assert_eq!(m.n, 5);
         assert!(m.ci_lower < m.mean);
         assert!(m.ci_upper > m.mean);
+    }
+
+    #[test]
+    fn test_small_sample_ci_wider_than_large() {
+        // With n=5, t(0.025,4)=2.776 > z=1.96, so CI should be wider
+        let small = MetricValue::from_samples(&[1.0, 2.0, 3.0, 4.0, 5.0]);
+        // Simulate what z=1.96 CI would give
+        let se = small.std_dev / (5.0f64).sqrt();
+        let z_width = 2.0 * 1.96 * se;
+        let t_width = small.ci_upper - small.ci_lower;
+        assert!(
+            t_width > z_width,
+            "t-based CI ({:.4}) should be wider than z-based CI ({:.4}) for n=5",
+            t_width, z_width
+        );
+    }
+
+    #[test]
+    fn test_large_sample_ci_uses_z() {
+        // For n=50, should use z=1.96
+        let samples: Vec<f64> = (0..50).map(|i| i as f64).collect();
+        let m = MetricValue::from_samples(&samples);
+        let se = m.std_dev / (50.0f64).sqrt();
+        let expected_width = 2.0 * 1.96 * se;
+        let actual_width = m.ci_upper - m.ci_lower;
+        assert!(
+            (actual_width - expected_width).abs() < 1e-10,
+            "n=50 should use z=1.96"
+        );
     }
 
     #[test]
@@ -740,10 +828,11 @@ mod tests {
         let meta_bl = baselines::metacognition_baselines();
         let affect_bl = baselines::affect_baselines();
         let creativity_bl = baselines::creativity_baselines();
+        let butlin_bl = baselines::butlin_baselines();
 
         let comparisons = report.find_comparisons(
             &report.results[0], &worm_bl, &cog_bl, &tom_bl, &mem_bl,
-            &exec_bl, &meta_bl, &affect_bl, &creativity_bl,
+            &exec_bl, &meta_bl, &affect_bl, &creativity_bl, &butlin_bl,
         );
         assert!(!comparisons.is_empty());
         let (_, comp) = &comparisons[0];
