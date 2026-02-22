@@ -179,9 +179,9 @@ impl FlightTrainer {
                 // Store in replay buffer
                 if replay_cap > 0 {
                     if replay_buf.len() < replay_cap {
-                        replay_buf.push((sensor_hv.clone(), target.clone()));
+                        replay_buf.push((sensor_hv.clone(), target));
                     } else {
-                        replay_buf[replay_idx % replay_cap] = (sensor_hv.clone(), target.clone());
+                        replay_buf[replay_idx % replay_cap] = (sensor_hv.clone(), target);
                     }
                     replay_idx += 1;
 

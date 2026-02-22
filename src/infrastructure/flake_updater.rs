@@ -137,7 +137,7 @@ impl FlakeUpdater {
                     .or_else(|| {
                         original
                             .and_then(|o| o.get("owner"))
-                            .and_then(|_| original)
+                            .and(original)
                     })
                     .map(|v| {
                         if let Some(owner) = original

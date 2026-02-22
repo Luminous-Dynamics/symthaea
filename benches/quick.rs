@@ -59,19 +59,19 @@ fn bench_phi_quick(c: &mut Criterion) {
     // Star topology (low Φ baseline)
     group.bench_function("star_8", |b| {
         let topo = ConsciousnessTopology::star(n_nodes, HDC_DIMENSION, 42);
-        b.iter(|| black_box(calc.compute(&topo.node_representations)))
+        b.iter(|| black_box(calc.algebraic_connectivity(&topo.node_representations)))
     });
 
     // Ring topology (high Φ - uniform structure)
     group.bench_function("ring_8", |b| {
         let topo = ConsciousnessTopology::ring(n_nodes, HDC_DIMENSION, 42);
-        b.iter(|| black_box(calc.compute(&topo.node_representations)))
+        b.iter(|| black_box(calc.algebraic_connectivity(&topo.node_representations)))
     });
 
     // Random topology (medium Φ baseline)
     group.bench_function("random_8", |b| {
         let topo = ConsciousnessTopology::random(n_nodes, HDC_DIMENSION, 42);
-        b.iter(|| black_box(calc.compute(&topo.node_representations)))
+        b.iter(|| black_box(calc.algebraic_connectivity(&topo.node_representations)))
     });
 
     group.finish();
@@ -95,9 +95,9 @@ fn bench_phi_values(c: &mut Criterion) {
             let ring = ConsciousnessTopology::ring(8, HDC_DIMENSION, 42);
             let random = ConsciousnessTopology::random(8, HDC_DIMENSION, 42);
 
-            let phi_star = calc.compute(&star.node_representations);
-            let phi_ring = calc.compute(&ring.node_representations);
-            let phi_random = calc.compute(&random.node_representations);
+            let phi_star = calc.algebraic_connectivity(&star.node_representations);
+            let phi_ring = calc.algebraic_connectivity(&ring.node_representations);
+            let phi_random = calc.algebraic_connectivity(&random.node_representations);
 
             // Return tuple for validation
             black_box((phi_star, phi_ring, phi_random))
@@ -120,7 +120,7 @@ fn bench_hypercube_quick(c: &mut Criterion) {
     // 4D Hypercube (Tesseract) - the Φ champion
     group.bench_function("tesseract_4d", |b| {
         let topo = ConsciousnessTopology::hypercube(4, HDC_DIMENSION, 42);
-        b.iter(|| black_box(calc.compute(&topo.node_representations)))
+        b.iter(|| black_box(calc.algebraic_connectivity(&topo.node_representations)))
     });
 
     group.finish();

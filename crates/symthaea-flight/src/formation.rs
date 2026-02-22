@@ -132,7 +132,7 @@ impl FormationShape {
                 let mut setpoints = vec![[0.0, 0.0, 0.0]]; // Leader at center
                 for i in 1..n_agents {
                     let side = if i % 2 == 1 { 1.0 } else { -1.0 };
-                    let arm_idx = ((i + 1) / 2) as f64;
+                    let arm_idx = i.div_ceil(2) as f64;
                     let x = -arm_idx * spacing * angle.cos();
                     let y = side * arm_idx * spacing * angle.sin();
                     setpoints.push([x, y, 0.0]);
