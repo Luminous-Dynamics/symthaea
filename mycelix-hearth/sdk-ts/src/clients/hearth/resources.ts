@@ -13,6 +13,7 @@ import type {
   ResourceSignalType,
 } from './types';
 import { HearthError, classifyError } from './errors';
+import { withGateRetry } from './consciousness-gate';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_resources';
@@ -28,8 +29,15 @@ export type ResourceSignalHandler = (signal: ResourceSignal) => void;
 export class ResourcesClient {
   private signalHandlers: Map<string, Set<ResourceSignalHandler>> = new Map();
   private listening = false;
+  private refreshFn?: () => Promise<void>;
 
-  constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
+  constructor(
+    private readonly client: AppClient,
+    private readonly roleName = ROLE_NAME,
+    refreshFn?: () => Promise<void>,
+  ) {
+    this.refreshFn = refreshFn;
+  }
 
   // ============================================================================
   // Private helper
@@ -60,27 +68,32 @@ export class ResourcesClient {
 
   /** Register a shared resource in the hearth inventory. */
   async registerResource(input: RegisterResourceInput): Promise<HolochainRecord> {
-    return this.callZome('register_resource', input);
+    const call = () => this.callZome<HolochainRecord>('register_resource', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Lend a resource to another member. */
   async lendResource(input: LendResourceInput): Promise<HolochainRecord> {
-    return this.callZome('lend_resource', input);
+    const call = () => this.callZome<HolochainRecord>('lend_resource', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Return a borrowed resource. */
   async returnResource(loanHash: ActionHash): Promise<HolochainRecord> {
-    return this.callZome('return_resource', loanHash);
+    const call = () => this.callZome<HolochainRecord>('return_resource', loanHash);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Create a budget category for expense tracking. */
   async createBudgetCategory(input: CreateBudgetInput): Promise<HolochainRecord> {
-    return this.callZome('create_budget_category', input);
+    const call = () => this.callZome<HolochainRecord>('create_budget_category', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Log an expense against a budget category. */
   async logExpense(input: LogExpenseInput): Promise<HolochainRecord> {
-    return this.callZome('log_expense', input);
+    const call = () => this.callZome<HolochainRecord>('log_expense', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Get the full resource inventory for a hearth. */

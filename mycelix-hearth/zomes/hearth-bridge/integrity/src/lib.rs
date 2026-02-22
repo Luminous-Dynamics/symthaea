@@ -35,6 +35,7 @@ pub enum LinkTypes {
     AgentToQuery,
     DomainToQuery,
     AllEvents,
+    EventTypeToEvent,
     AgentToEvent,
     DomainToEvent,
     DispatchRateLimit,
@@ -120,6 +121,7 @@ const VALID_DOMAINS: &[&str] = &[
     "resources",
     "milestones",
     "rhythms",
+    "governance_gate",
 ];
 
 fn validate_query(query: &BridgeQueryEntry) -> ExternResult<ValidateCallbackResult> {
@@ -281,7 +283,7 @@ mod tests {
 
     #[test]
     fn valid_domains_has_expected_count() {
-        assert_eq!(VALID_DOMAINS.len(), 10);
+        assert_eq!(VALID_DOMAINS.len(), 11);
     }
 
     #[test]

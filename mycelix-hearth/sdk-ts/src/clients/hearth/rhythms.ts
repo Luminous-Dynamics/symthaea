@@ -14,6 +14,7 @@ import type {
   PresenceChangedSignal,
 } from './types';
 import { HearthError, classifyError } from './errors';
+import { withGateRetry } from './consciousness-gate';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_rhythms';
@@ -31,8 +32,15 @@ export type RhythmsSignalHandler = (signal: RhythmsSignal) => void;
 export class RhythmsClient {
   private signalHandlers: Map<string, Set<RhythmsSignalHandler>> = new Map();
   private listening = false;
+  private refreshFn?: () => Promise<void>;
 
-  constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
+  constructor(
+    private readonly client: AppClient,
+    private readonly roleName = ROLE_NAME,
+    refreshFn?: () => Promise<void>,
+  ) {
+    this.refreshFn = refreshFn;
+  }
 
   // ============================================================================
   // Private Helpers
@@ -63,17 +71,20 @@ export class RhythmsClient {
 
   /** Create a new family rhythm or ritual. */
   async createRhythm(input: CreateRhythmInput): Promise<HolochainRecord> {
-    return this.callZome('create_rhythm', input);
+    const call = () => this.callZome<HolochainRecord>('create_rhythm', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Log an occurrence of a rhythm. */
   async logOccurrence(input: LogOccurrenceInput): Promise<HolochainRecord> {
-    return this.callZome('log_occurrence', input);
+    const call = () => this.callZome<HolochainRecord>('log_occurrence', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Set the caller's presence status for the hearth. */
   async setPresence(input: SetPresenceInput): Promise<HolochainRecord> {
-    return this.callZome('set_presence', input);
+    const call = () => this.callZome<HolochainRecord>('set_presence', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Get all rhythms for a hearth. */
@@ -93,7 +104,8 @@ export class RhythmsClient {
 
   /** Create a rhythm digest for a time epoch. */
   async createRhythmDigest(input: DigestEpochInput): Promise<RhythmSummary[]> {
-    return this.callZome('create_rhythm_digest', input);
+    const call = () => this.callZome<RhythmSummary[]>('create_rhythm_digest', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   // ============================================================================

@@ -12,12 +12,21 @@ import type {
   CheckCapabilityInput,
 } from './types';
 import { HearthError, classifyError } from './errors';
+import { withGateRetry } from './consciousness-gate';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_autonomy';
 
 export class AutonomyClient {
-  constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
+  private refreshFn?: () => Promise<void>;
+
+  constructor(
+    private readonly client: AppClient,
+    private readonly roleName = ROLE_NAME,
+    refreshFn?: () => Promise<void>,
+  ) {
+    this.refreshFn = refreshFn;
+  }
 
   // ============================================================================
   // Private helper
@@ -48,32 +57,38 @@ export class AutonomyClient {
 
   /** Create an autonomy profile for a youth member. */
   async createAutonomyProfile(input: CreateAutonomyProfileInput): Promise<HolochainRecord> {
-    return this.callZome('create_autonomy_profile', input);
+    const call = () => this.callZome<HolochainRecord>('create_autonomy_profile', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Request a new capability (permission) for a youth. */
   async requestCapability(input: RequestCapabilityInput): Promise<HolochainRecord> {
-    return this.callZome('request_capability', input);
+    const call = () => this.callZome<HolochainRecord>('request_capability', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Approve a pending capability request (guardian action). */
   async approveCapability(input: ApproveCapabilityInput): Promise<HolochainRecord> {
-    return this.callZome('approve_capability', input);
+    const call = () => this.callZome<HolochainRecord>('approve_capability', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Deny a pending capability request (guardian action). */
   async denyCapability(input: ApproveCapabilityInput): Promise<HolochainRecord> {
-    return this.callZome('deny_capability', input);
+    const call = () => this.callZome<HolochainRecord>('deny_capability', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Advance a youth to the next autonomy tier. */
   async advanceTier(input: AdvanceTierInput): Promise<HolochainRecord> {
-    return this.callZome('advance_tier', input);
+    const call = () => this.callZome<HolochainRecord>('advance_tier', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Record progress on an active tier transition. */
   async progressTransition(transitionHash: ActionHash): Promise<HolochainRecord> {
-    return this.callZome('progress_transition', transitionHash);
+    const call = () => this.callZome<HolochainRecord>('progress_transition', transitionHash);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Get the autonomy profile for an agent. Returns null if none exists. */

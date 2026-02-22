@@ -184,6 +184,17 @@ export class BridgeClient {
     return this.callZome('log_governance_gate', input);
   }
 
+  /**
+   * Force-refresh the caller's consciousness credential.
+   *
+   * Used by `withGateRetry` as the retry callback: when a domain zome
+   * rejects a call because the cached credential has expired, this
+   * method asks the bridge to re-fetch from identity and cache a fresh one.
+   */
+  async refreshCredential(): Promise<void> {
+    await this.callZome('get_consciousness_credential', null);
+  }
+
   // ============================================================================
   // Signal Handling
   // ============================================================================

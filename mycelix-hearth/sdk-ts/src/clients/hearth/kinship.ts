@@ -19,6 +19,7 @@ import type {
   KinshipSignalType,
 } from './types';
 import { HearthError, classifyError } from './errors';
+import { withGateRetry } from './consciousness-gate';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_kinship';
@@ -34,8 +35,15 @@ export type KinshipSignalHandler = (signal: KinshipSignal) => void;
 export class KinshipClient {
   private signalHandlers: Map<string, Set<KinshipSignalHandler>> = new Map();
   private listening = false;
+  private refreshFn?: () => Promise<void>;
 
-  constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
+  constructor(
+    private readonly client: AppClient,
+    private readonly roleName = ROLE_NAME,
+    refreshFn?: () => Promise<void>,
+  ) {
+    this.refreshFn = refreshFn;
+  }
 
   // ============================================================================
   // Zome Calls
@@ -62,42 +70,50 @@ export class KinshipClient {
 
   /** Create a new hearth (family/household unit). */
   async createHearth(input: CreateHearthInput): Promise<HolochainRecord> {
-    return this.callZome('create_hearth', input);
+    const call = () => this.callZome<HolochainRecord>('create_hearth', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Invite an agent to join the hearth. */
   async inviteMember(input: InviteMemberInput): Promise<HolochainRecord> {
-    return this.callZome('invite_member', input);
+    const call = () => this.callZome<HolochainRecord>('invite_member', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Accept a pending hearth invitation. */
   async acceptInvitation(input: AcceptInvitationInput): Promise<HolochainRecord> {
-    return this.callZome('accept_invitation', input);
+    const call = () => this.callZome<HolochainRecord>('accept_invitation', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Decline a pending hearth invitation. */
   async declineInvitation(invitationHash: ActionHash): Promise<HolochainRecord> {
-    return this.callZome('decline_invitation', invitationHash);
+    const call = () => this.callZome<HolochainRecord>('decline_invitation', invitationHash);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Leave a hearth voluntarily. */
   async leaveHearth(membershipHash: ActionHash): Promise<HolochainRecord> {
-    return this.callZome('leave_hearth', membershipHash);
+    const call = () => this.callZome<HolochainRecord>('leave_hearth', membershipHash);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Update a member's role within the hearth. */
   async updateMemberRole(input: UpdateMemberRoleInput): Promise<HolochainRecord> {
-    return this.callZome('update_member_role', input);
+    const call = () => this.callZome<HolochainRecord>('update_member_role', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Create a kinship bond between the caller and another member. */
   async createKinshipBond(input: CreateBondInput): Promise<HolochainRecord> {
-    return this.callZome('create_kinship_bond', input);
+    const call = () => this.callZome<HolochainRecord>('create_kinship_bond', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Tend (strengthen) an existing kinship bond. */
   async tendBond(input: TendBondInput): Promise<HolochainRecord> {
-    return this.callZome('tend_bond', input);
+    const call = () => this.callZome<HolochainRecord>('tend_bond', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Get the health status of a kinship bond. */
@@ -107,7 +123,8 @@ export class KinshipClient {
 
   /** Create a weekly digest entry for a hearth epoch. */
   async createWeeklyDigest(input: WeeklyDigest): Promise<HolochainRecord> {
-    return this.callZome('create_weekly_digest', input);
+    const call = () => this.callZome<HolochainRecord>('create_weekly_digest', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Get all weekly digests for a hearth. */

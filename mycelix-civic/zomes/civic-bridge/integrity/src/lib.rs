@@ -73,7 +73,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
-const VALID_DOMAINS: &[&str] = &["justice", "emergency", "media"];
+const VALID_DOMAINS: &[&str] = &["justice", "emergency", "media", "governance_gate"];
 
 fn validate_query(query: &BridgeQueryEntry) -> ExternResult<ValidateCallbackResult> {
     match validate_query_fields(query, VALID_DOMAINS) {
@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn valid_domains_has_expected_count() {
-        assert_eq!(VALID_DOMAINS.len(), 3, "expected 3 civic domains");
+        assert_eq!(VALID_DOMAINS.len(), 4, "expected 4 civic domains (3 + governance_gate)");
     }
 
     #[test]

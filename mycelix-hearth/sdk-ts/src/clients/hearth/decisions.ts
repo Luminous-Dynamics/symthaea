@@ -14,6 +14,7 @@ import type {
   DecisionSignalType,
 } from './types';
 import { HearthError, classifyError } from './errors';
+import { withGateRetry } from './consciousness-gate';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_decisions';
@@ -30,8 +31,15 @@ export type DecisionSignalHandler = (signal: DecisionSignal) => void;
 export class DecisionsClient {
   private signalHandlers: Map<string, Set<DecisionSignalHandler>> = new Map();
   private listening = false;
+  private refreshFn?: () => Promise<void>;
 
-  constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
+  constructor(
+    private readonly client: AppClient,
+    private readonly roleName = ROLE_NAME,
+    refreshFn?: () => Promise<void>,
+  ) {
+    this.refreshFn = refreshFn;
+  }
 
   // ============================================================================
   // Zome Calls
@@ -58,17 +66,20 @@ export class DecisionsClient {
 
   /** Create a new decision for hearth members to vote on. */
   async createDecision(input: CreateDecisionInput): Promise<HolochainRecord> {
-    return this.callZome('create_decision', input);
+    const call = () => this.callZome<HolochainRecord>('create_decision', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Cast a vote on an open decision. */
   async castVote(input: CastVoteInput): Promise<HolochainRecord> {
-    return this.callZome('cast_vote', input);
+    const call = () => this.callZome<HolochainRecord>('cast_vote', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Amend a previously cast vote. */
   async amendVote(input: AmendVoteInput): Promise<HolochainRecord> {
-    return this.callZome('amend_vote', input);
+    const call = () => this.callZome<HolochainRecord>('amend_vote', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Tally current votes for a decision. Returns array of [choice, weight] tuples. */
@@ -78,13 +89,15 @@ export class DecisionsClient {
 
   /** Finalize a decision after voting closes. */
   async finalizeDecision(input: FinalizeDecisionInput): Promise<HolochainRecord> {
-    return this.callZome('finalize_decision', input);
+    const call = () => this.callZome<HolochainRecord>('finalize_decision', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Close a decision without finalizing (cancel). */
   async closeDecision(decisionHash: ActionHash): Promise<HolochainRecord> {
-    const input: CloseDecisionInput = { decision_hash: decisionHash };
-    return this.callZome('close_decision', input);
+    const closeInput: CloseDecisionInput = { decision_hash: decisionHash };
+    const call = () => this.callZome<HolochainRecord>('close_decision', closeInput);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Get a decision record by hash. Returns null if not found. */

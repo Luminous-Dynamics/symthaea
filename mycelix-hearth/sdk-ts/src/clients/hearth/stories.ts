@@ -15,6 +15,7 @@ import type {
   StorySignalType,
 } from './types';
 import { HearthError, classifyError } from './errors';
+import { withGateRetry } from './consciousness-gate';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_stories';
@@ -30,8 +31,15 @@ export type StorySignalHandler = (signal: StorySignal) => void;
 export class StoriesClient {
   private signalHandlers: Map<string, Set<StorySignalHandler>> = new Map();
   private listening = false;
+  private refreshFn?: () => Promise<void>;
 
-  constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
+  constructor(
+    private readonly client: AppClient,
+    private readonly roleName = ROLE_NAME,
+    refreshFn?: () => Promise<void>,
+  ) {
+    this.refreshFn = refreshFn;
+  }
 
   // ============================================================================
   // Zome Calls
@@ -58,37 +66,44 @@ export class StoriesClient {
 
   /** Create a new family story. */
   async createStory(input: CreateStoryInput): Promise<HolochainRecord> {
-    return this.callZome('create_story', input);
+    const call = () => this.callZome<HolochainRecord>('create_story', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Update an existing family story. */
   async updateStory(input: UpdateStoryInput): Promise<HolochainRecord> {
-    return this.callZome('update_story', input);
+    const call = () => this.callZome<HolochainRecord>('update_story', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Add media (photo, video, audio) to a story. */
   async addMediaToStory(input: AddMediaInput): Promise<void> {
-    return this.callZome('add_media_to_story', input);
+    const call = () => this.callZome<void>('add_media_to_story', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Create a new story collection. */
   async createCollection(input: CreateCollectionInput): Promise<HolochainRecord> {
-    return this.callZome('create_collection', input);
+    const call = () => this.callZome<HolochainRecord>('create_collection', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Add a story to an existing collection. */
   async addToCollection(input: AddToCollectionInput): Promise<void> {
-    return this.callZome('add_to_collection', input);
+    const call = () => this.callZome<void>('add_to_collection', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Create a new family tradition. */
   async createTradition(input: CreateTraditionInput): Promise<HolochainRecord> {
-    return this.callZome('create_tradition', input);
+    const call = () => this.callZome<HolochainRecord>('create_tradition', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Record an observation of a family tradition. */
   async observeTradition(traditionHash: ActionHash): Promise<HolochainRecord> {
-    return this.callZome('observe_tradition', traditionHash);
+    const call = () => this.callZome<HolochainRecord>('observe_tradition', traditionHash);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Get all stories for a hearth. */

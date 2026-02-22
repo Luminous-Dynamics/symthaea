@@ -12,6 +12,7 @@ import type {
   EmergencyAlertSignal,
 } from './types';
 import { HearthError, classifyError } from './errors';
+import { withGateRetry } from './consciousness-gate';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_emergency';
@@ -25,8 +26,15 @@ export type EmergencySignalHandler = (signal: EmergencyAlertSignal) => void;
 export class EmergencyClient {
   private signalHandlers: Map<string, Set<EmergencySignalHandler>> = new Map();
   private listening = false;
+  private refreshFn?: () => Promise<void>;
 
-  constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
+  constructor(
+    private readonly client: AppClient,
+    private readonly roleName = ROLE_NAME,
+    refreshFn?: () => Promise<void>,
+  ) {
+    this.refreshFn = refreshFn;
+  }
 
   // ============================================================================
   // Private helper
@@ -57,27 +65,32 @@ export class EmergencyClient {
 
   /** Create an emergency plan for the hearth. */
   async createEmergencyPlan(input: CreateEmergencyPlanInput): Promise<HolochainRecord> {
-    return this.callZome('create_emergency_plan', input);
+    const call = () => this.callZome<HolochainRecord>('create_emergency_plan', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Update an existing emergency plan. */
   async updateEmergencyPlan(input: UpdatePlanInput): Promise<HolochainRecord> {
-    return this.callZome('update_emergency_plan', input);
+    const call = () => this.callZome<HolochainRecord>('update_emergency_plan', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Raise an emergency alert. */
   async raiseAlert(input: RaiseAlertInput): Promise<HolochainRecord> {
-    return this.callZome('raise_alert', input);
+    const call = () => this.callZome<HolochainRecord>('raise_alert', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Submit a safety check-in response to an alert. */
   async checkIn(input: CheckInInput): Promise<HolochainRecord> {
-    return this.callZome('check_in', input);
+    const call = () => this.callZome<HolochainRecord>('check_in', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Resolve (close) an active emergency alert. */
   async resolveAlert(alertHash: ActionHash): Promise<HolochainRecord> {
-    return this.callZome('resolve_alert', alertHash);
+    const call = () => this.callZome<HolochainRecord>('resolve_alert', alertHash);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Get all active emergency alerts for a hearth. */

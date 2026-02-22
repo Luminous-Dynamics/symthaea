@@ -12,6 +12,7 @@ import type {
   GratitudeExpressedSignal,
 } from './types';
 import { HearthError, classifyError } from './errors';
+import { withGateRetry } from './consciousness-gate';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_gratitude';
@@ -25,8 +26,15 @@ export type GratitudeSignalHandler = (signal: GratitudeExpressedSignal) => void;
 export class GratitudeClient {
   private signalHandlers: Map<string, Set<GratitudeSignalHandler>> = new Map();
   private listening = false;
+  private refreshFn?: () => Promise<void>;
 
-  constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
+  constructor(
+    private readonly client: AppClient,
+    private readonly roleName = ROLE_NAME,
+    refreshFn?: () => Promise<void>,
+  ) {
+    this.refreshFn = refreshFn;
+  }
 
   // ============================================================================
   // Zome Calls
@@ -53,22 +61,26 @@ export class GratitudeClient {
 
   /** Express gratitude toward another hearth member. */
   async expressGratitude(input: ExpressGratitudeInput): Promise<HolochainRecord> {
-    return this.callZome('express_gratitude', input);
+    const call = () => this.callZome<HolochainRecord>('express_gratitude', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Start a new appreciation circle in the hearth. */
   async startAppreciationCircle(input: StartCircleInput): Promise<HolochainRecord> {
-    return this.callZome('start_appreciation_circle', input);
+    const call = () => this.callZome<HolochainRecord>('start_appreciation_circle', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Join an active appreciation circle. */
   async joinCircle(circleHash: ActionHash): Promise<HolochainRecord> {
-    return this.callZome('join_circle', circleHash);
+    const call = () => this.callZome<HolochainRecord>('join_circle', circleHash);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Complete (close) an appreciation circle. */
   async completeCircle(circleHash: ActionHash): Promise<HolochainRecord> {
-    return this.callZome('complete_circle', circleHash);
+    const call = () => this.callZome<HolochainRecord>('complete_circle', circleHash);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Get the gratitude stream for a hearth. */
@@ -88,7 +100,8 @@ export class GratitudeClient {
 
   /** Create a gratitude digest for a time epoch. */
   async createGratitudeDigest(input: DigestEpochInput): Promise<GratitudeSummary[]> {
-    return this.callZome('create_gratitude_digest', input);
+    const call = () => this.callZome<GratitudeSummary[]>('create_gratitude_digest', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   // ============================================================================

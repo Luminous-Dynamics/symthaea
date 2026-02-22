@@ -11,6 +11,7 @@ import type {
   MilestoneSignalType,
 } from './types';
 import { HearthError, classifyError } from './errors';
+import { withGateRetry } from './consciousness-gate';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_milestones';
@@ -25,8 +26,15 @@ export type MilestoneSignalHandler = (signal: MilestoneSignal) => void;
 export class MilestonesClient {
   private signalHandlers: Map<string, Set<MilestoneSignalHandler>> = new Map();
   private listening = false;
+  private refreshFn?: () => Promise<void>;
 
-  constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
+  constructor(
+    private readonly client: AppClient,
+    private readonly roleName = ROLE_NAME,
+    refreshFn?: () => Promise<void>,
+  ) {
+    this.refreshFn = refreshFn;
+  }
 
   // ============================================================================
   // Private Helpers
@@ -57,22 +65,26 @@ export class MilestonesClient {
 
   /** Record a life milestone for a hearth member. */
   async recordMilestone(input: RecordMilestoneInput): Promise<HolochainRecord> {
-    return this.callZome('record_milestone', input);
+    const call = () => this.callZome<HolochainRecord>('record_milestone', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Begin a life transition (e.g., new school, moving). */
   async beginTransition(input: BeginTransitionInput): Promise<HolochainRecord> {
-    return this.callZome('begin_transition', input);
+    const call = () => this.callZome<HolochainRecord>('begin_transition', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Record progress on an active life transition. */
   async advanceTransition(transitionHash: ActionHash): Promise<HolochainRecord> {
-    return this.callZome('advance_transition', transitionHash);
+    const call = () => this.callZome<HolochainRecord>('advance_transition', transitionHash);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Mark a life transition as complete. */
   async completeTransition(transitionHash: ActionHash): Promise<HolochainRecord> {
-    return this.callZome('complete_transition', transitionHash);
+    const call = () => this.callZome<HolochainRecord>('complete_transition', transitionHash);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Get the full milestone timeline for a hearth. */

@@ -14,6 +14,7 @@ import type {
   CareTaskCompletedSignal,
 } from './types';
 import { HearthError, classifyError } from './errors';
+import { withGateRetry } from './consciousness-gate';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_care';
@@ -27,8 +28,15 @@ export type CareSignalHandler = (signal: CareTaskCompletedSignal) => void;
 export class CareClient {
   private signalHandlers: Map<string, Set<CareSignalHandler>> = new Map();
   private listening = false;
+  private refreshFn?: () => Promise<void>;
 
-  constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
+  constructor(
+    private readonly client: AppClient,
+    private readonly roleName = ROLE_NAME,
+    refreshFn?: () => Promise<void>,
+  ) {
+    this.refreshFn = refreshFn;
+  }
 
   // ============================================================================
   // Private helper
@@ -59,32 +67,38 @@ export class CareClient {
 
   /** Create a care schedule for the hearth. */
   async createCareSchedule(input: CreateCareScheduleInput): Promise<HolochainRecord> {
-    return this.callZome('create_care_schedule', input);
+    const call = () => this.callZome<HolochainRecord>('create_care_schedule', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Mark a care task as completed. */
   async completeTask(input: CompleteTaskInput): Promise<HolochainRecord> {
-    return this.callZome('complete_task', input);
+    const call = () => this.callZome<HolochainRecord>('complete_task', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Propose a care duty swap with another member. */
   async proposeSwap(input: ProposeSwapInput): Promise<HolochainRecord> {
-    return this.callZome('propose_swap', input);
+    const call = () => this.callZome<HolochainRecord>('propose_swap', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Accept a proposed care swap. */
   async acceptSwap(swapHash: ActionHash): Promise<HolochainRecord> {
-    return this.callZome('accept_swap', swapHash);
+    const call = () => this.callZome<HolochainRecord>('accept_swap', swapHash);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Decline a proposed care swap. */
   async declineSwap(swapHash: ActionHash): Promise<HolochainRecord> {
-    return this.callZome('decline_swap', swapHash);
+    const call = () => this.callZome<HolochainRecord>('decline_swap', swapHash);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Create a meal plan for the hearth. */
   async createMealPlan(input: CreateMealPlanInput): Promise<HolochainRecord> {
-    return this.callZome('create_meal_plan', input);
+    const call = () => this.callZome<HolochainRecord>('create_meal_plan', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   /** Get the caller's current care duties. */
@@ -104,7 +118,8 @@ export class CareClient {
 
   /** Create a care digest for a time epoch. */
   async createCareDigest(input: DigestEpochInput): Promise<CareSummary[]> {
-    return this.callZome('create_care_digest', input);
+    const call = () => this.callZome<CareSummary[]>('create_care_digest', input);
+    return this.refreshFn ? withGateRetry(call, this.refreshFn) : call();
   }
 
   // ============================================================================

@@ -272,14 +272,29 @@ pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
     let event = CivicEventEntry {
         domain: "governance_gate".to_string(),
         event_type: input.action_name.clone(),
-        source_agent: agent,
+        source_agent: agent.clone(),
         payload: serde_json::to_string(&input).unwrap_or_default(),
         created_at: sys_time()?,
         related_hashes: vec![],
     };
     let action_hash = create_entry(&EntryTypes::Event(event))?;
+
+    // All events index
+    let all_anchor = ensure_anchor("all_civic_events")?;
+    create_link(all_anchor, action_hash.clone(), LinkTypes::AllEvents, ())?;
+
+    // Event type index
+    let type_anchor = ensure_anchor(&format!("event_type:governance_gate:{}", input.action_name))?;
+    create_link(type_anchor, action_hash.clone(), LinkTypes::EventTypeToEvent, ())?;
+
+    // Agent index
+    let agent_anchor = ensure_anchor(&format!("agent_events:{}", agent))?;
+    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToEvent, ())?;
+
+    // Domain index
     let domain_anchor = ensure_anchor("domain_events:governance_gate")?;
     create_link(domain_anchor, action_hash, LinkTypes::DomainToEvent, ())?;
+
     Ok(())
 }
 
