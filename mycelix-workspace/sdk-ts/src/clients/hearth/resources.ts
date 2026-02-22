@@ -14,6 +14,7 @@ import type {
   LogExpenseInput,
 } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { Record } from '@holochain/client';
 
 export interface ResourcesClientConfig {
   roleName?: string;
@@ -36,39 +37,43 @@ export class ResourcesClient {
   // Resource Inventory
   // ============================================================================
 
-  async registerResource(input: RegisterResourceInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'register_resource', payload: input });
+  async registerResource(input: RegisterResourceInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'register_resource', payload: input });
   }
 
-  async getHearthInventory(hearthHash: ActionHash) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_hearth_inventory', payload: hearthHash });
+  async getHearthInventory(hearthHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_hearth_inventory', payload: hearthHash });
   }
 
   // ============================================================================
   // Loans
   // ============================================================================
 
-  async lendResource(input: LendResourceInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'lend_resource', payload: input });
+  async lendResource(input: LendResourceInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'lend_resource', payload: input });
   }
 
-  async returnResource(loanHash: ActionHash) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'return_resource', payload: loanHash });
+  async returnResource(loanHash: ActionHash): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'return_resource', payload: loanHash });
+  }
+
+  async getResourceLoans(resourceHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_resource_loans', payload: resourceHash });
   }
 
   // ============================================================================
   // Budgets
   // ============================================================================
 
-  async createBudgetCategory(input: CreateBudgetInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_budget_category', payload: input });
+  async createBudgetCategory(input: CreateBudgetInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_budget_category', payload: input });
   }
 
-  async logExpense(input: LogExpenseInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'log_expense', payload: input });
+  async logExpense(input: LogExpenseInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'log_expense', payload: input });
   }
 
-  async getBudgetSummary(hearthHash: ActionHash) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_budget_summary', payload: hearthHash });
+  async getBudgetSummary(hearthHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_budget_summary', payload: hearthHash });
   }
 }

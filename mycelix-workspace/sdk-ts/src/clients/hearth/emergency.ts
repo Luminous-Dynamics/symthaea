@@ -9,10 +9,12 @@
 
 import type {
   CreateEmergencyPlanInput,
+  UpdatePlanInput,
   RaiseAlertInput,
   CheckInInput,
 } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { Record } from '@holochain/client';
 
 export interface EmergencyClientConfig {
   roleName?: string;
@@ -35,43 +37,43 @@ export class EmergencyClient {
   // Emergency Plans
   // ============================================================================
 
-  async createPlan(input: CreateEmergencyPlanInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_plan', payload: input });
+  async createEmergencyPlan(input: CreateEmergencyPlanInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_emergency_plan', payload: input });
+  }
+
+  async updateEmergencyPlan(input: UpdatePlanInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'update_emergency_plan', payload: input });
+  }
+
+  async getEmergencyPlan(hearthHash: ActionHash): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_emergency_plan', payload: hearthHash });
   }
 
   // ============================================================================
   // Alerts
   // ============================================================================
 
-  async raiseAlert(input: RaiseAlertInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'raise_alert', payload: input });
+  async raiseAlert(input: RaiseAlertInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'raise_alert', payload: input });
   }
 
-  async resolveAlert(alertHash: ActionHash) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'resolve_alert', payload: alertHash });
+  async resolveAlert(alertHash: ActionHash): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'resolve_alert', payload: alertHash });
   }
 
-  async getActiveAlerts(hearthHash: ActionHash) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_active_alerts', payload: hearthHash });
+  async getActiveAlerts(hearthHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_active_alerts', payload: hearthHash });
   }
 
   // ============================================================================
   // Safety Check-Ins
   // ============================================================================
 
-  async checkIn(input: CheckInInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'check_in', payload: input });
+  async checkIn(input: CheckInInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'check_in', payload: input });
   }
 
-  async markSafe(hearthHash: ActionHash) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'mark_safe', payload: hearthHash });
-  }
-
-  async requestHelp(hearthHash: ActionHash) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'request_help', payload: hearthHash });
-  }
-
-  async getMissingCheckins(hearthHash: ActionHash) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_missing_checkins', payload: hearthHash });
+  async getAlertCheckins(alertHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_alert_checkins', payload: alertHash });
   }
 }

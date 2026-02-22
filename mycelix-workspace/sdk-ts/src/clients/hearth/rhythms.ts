@@ -11,8 +11,10 @@ import type {
   CreateRhythmInput,
   LogOccurrenceInput,
   SetPresenceInput,
+  DigestEpochInput,
 } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { Record } from '@holochain/client';
 
 export interface RhythmsClientConfig {
   roleName?: string;
@@ -35,39 +37,43 @@ export class RhythmsClient {
   // Rhythm Management
   // ============================================================================
 
-  async createRhythm(input: CreateRhythmInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_rhythm', payload: input });
+  async createRhythm(input: CreateRhythmInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_rhythm', payload: input });
   }
 
-  async getTodayRhythms(hearthHash: ActionHash) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_today_rhythms', payload: hearthHash });
-  }
-
-  async getRhythmConsistency(rhythmHash: ActionHash) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_rhythm_consistency', payload: rhythmHash });
+  async getHearthRhythms(hearthHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_hearth_rhythms', payload: hearthHash });
   }
 
   // ============================================================================
   // Occurrences
   // ============================================================================
 
-  async logOccurrence(input: LogOccurrenceInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'log_occurrence', payload: input });
+  async logOccurrence(input: LogOccurrenceInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'log_occurrence', payload: input });
   }
 
-  async skipOccurrence(rhythmHash: ActionHash) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'skip_occurrence', payload: rhythmHash });
+  async getRhythmOccurrences(rhythmHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_rhythm_occurrences', payload: rhythmHash });
   }
 
   // ============================================================================
   // Presence
   // ============================================================================
 
-  async setPresence(input: SetPresenceInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'set_presence', payload: input });
+  async setPresence(input: SetPresenceInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'set_presence', payload: input });
   }
 
-  async getHearthPresence(hearthHash: ActionHash) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_hearth_presence', payload: hearthHash });
+  async getHearthPresence(hearthHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_hearth_presence', payload: hearthHash });
+  }
+
+  // ============================================================================
+  // Digests
+  // ============================================================================
+
+  async createRhythmDigest(input: DigestEpochInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_rhythm_digest', payload: input });
   }
 }

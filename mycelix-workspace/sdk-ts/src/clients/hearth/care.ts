@@ -10,8 +10,10 @@ import type {
   CreateCareScheduleInput,
   ProposeSwapInput,
   CreateMealPlanInput,
+  DigestEpochInput,
 } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { Record } from '@holochain/client';
 
 export interface HearthCareClientConfig {
   roleName?: string;
@@ -34,51 +36,55 @@ export class HearthCareClient {
   // Care Schedules
   // ============================================================================
 
-  async createCareSchedule(input: CreateCareScheduleInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_care_schedule', payload: input });
+  async createCareSchedule(input: CreateCareScheduleInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_care_schedule', payload: input });
   }
 
-  async completeTask(scheduleHash: ActionHash) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'complete_task', payload: scheduleHash });
+  async completeTask(scheduleHash: ActionHash): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'complete_task', payload: scheduleHash });
   }
 
-  async getMyCareduties(hearthHash: ActionHash) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_my_careduties', payload: hearthHash });
+  async getMyCareDuties(): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_my_care_duties', payload: null });
   }
 
-  async getHearthSchedule(hearthHash: ActionHash) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_hearth_schedule', payload: hearthHash });
-  }
-
-  async getCareLoadBalance(hearthHash: ActionHash) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_care_load_balance', payload: hearthHash });
+  async getHearthSchedule(hearthHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_hearth_schedule', payload: hearthHash });
   }
 
   // ============================================================================
   // Care Swaps
   // ============================================================================
 
-  async proposeSwap(input: ProposeSwapInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'propose_swap', payload: input });
+  async proposeSwap(input: ProposeSwapInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'propose_swap', payload: input });
   }
 
-  async acceptSwap(swapHash: ActionHash) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'accept_swap', payload: swapHash });
+  async acceptSwap(swapHash: ActionHash): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'accept_swap', payload: swapHash });
+  }
+
+  async declineSwap(swapHash: ActionHash): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'decline_swap', payload: swapHash });
   }
 
   // ============================================================================
   // Meal Plans
   // ============================================================================
 
-  async createMealPlan(input: CreateMealPlanInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_meal_plan', payload: input });
+  async createMealPlan(input: CreateMealPlanInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_meal_plan', payload: input });
+  }
+
+  async getHearthMealPlans(hearthHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_hearth_meal_plans', payload: hearthHash });
   }
 
   // ============================================================================
   // Digests
   // ============================================================================
 
-  async createCareDigest(hearthHash: ActionHash) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_care_digest', payload: hearthHash });
+  async createCareDigest(input: DigestEpochInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_care_digest', payload: input });
   }
 }

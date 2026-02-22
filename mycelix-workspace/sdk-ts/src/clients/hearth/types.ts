@@ -272,6 +272,23 @@ export interface CreateTraditionInput {
   hearth_hash: ActionHash;
 }
 
+export interface UpdateStoryInput {
+  story_hash: ActionHash;
+  title: string;
+  content: string;
+  tags: string[];
+}
+
+export interface AddMediaInput {
+  story_hash: ActionHash;
+  media_hash: ActionHash;
+}
+
+export interface AddToCollectionInput {
+  collection_hash: ActionHash;
+  story_hash: ActionHash;
+}
+
 // ============================================================================
 // Care Types
 // ============================================================================
@@ -450,6 +467,11 @@ export interface CheckInInput {
   hearth_hash: ActionHash;
   status: SafetyStatus;
   location_hint?: string;
+}
+
+export interface UpdatePlanInput {
+  plan_hash: ActionHash;
+  input: CreateEmergencyPlanInput;
 }
 
 // ============================================================================
@@ -650,6 +672,12 @@ export interface SetPresenceInput {
   hearth_hash: ActionHash;
 }
 
+export interface DigestEpochInput {
+  hearth_hash: ActionHash;
+  epoch_start: Timestamp;
+  epoch_end: Timestamp;
+}
+
 // ============================================================================
 // Bridge Types
 // ============================================================================
@@ -738,10 +766,25 @@ export interface BridgeHealth {
 }
 
 export interface GateAuditInput {
-  gate_name: string;
-  agent: AgentPubKey;
-  allowed: boolean;
-  reason?: string;
+  action_name: string;
+  zome_name: string;
+  eligible: boolean;
+  actual_tier: string;
+  required_tier: string;
+  weight_bp: number;
+}
+
+export interface GovernanceAuditFilter {
+  action_name?: string;
+  zome_name?: string;
+  eligible?: boolean;
+  from_us?: number;
+  to_us?: number;
+}
+
+export interface GovernanceAuditResult {
+  entries: GateAuditInput[];
+  total_matched: number;
 }
 
 export type ConsciousnessTier = 'Dormant' | 'Awakening' | 'Aware' | 'Reflective' | 'Transcendent';

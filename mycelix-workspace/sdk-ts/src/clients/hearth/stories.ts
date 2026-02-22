@@ -8,10 +8,14 @@
 
 import type {
   CreateStoryInput,
+  UpdateStoryInput,
+  AddMediaInput,
   CreateCollectionInput,
+  AddToCollectionInput,
   CreateTraditionInput,
 } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { Record } from '@holochain/client';
 
 export interface StoriesClientConfig {
   roleName?: string;
@@ -34,55 +38,55 @@ export class StoriesClient {
   // Stories
   // ============================================================================
 
-  async createStory(input: CreateStoryInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_story', payload: input });
+  async createStory(input: CreateStoryInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_story', payload: input });
   }
 
-  async updateStory(storyHash: ActionHash, input: Partial<CreateStoryInput>) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'update_story', payload: { story_hash: storyHash, ...input } });
+  async updateStory(input: UpdateStoryInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'update_story', payload: input });
   }
 
-  async addMediaToStory(storyHash: ActionHash, mediaHash: ActionHash) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'add_media_to_story', payload: { story_hash: storyHash, media_hash: mediaHash } });
+  async addMediaToStory(input: AddMediaInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'add_media_to_story', payload: input });
   }
 
-  async getHearthStories(hearthHash: ActionHash) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_hearth_stories', payload: hearthHash });
+  async getHearthStories(hearthHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_hearth_stories', payload: hearthHash });
   }
 
-  async searchStoriesByTag(hearthHash: ActionHash, tag: string) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'search_stories_by_tag', payload: { hearth_hash: hearthHash, tag } });
-  }
-
-  async getFamilyTimeline(hearthHash: ActionHash) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_family_timeline', payload: hearthHash });
+  async searchStoriesByTag(hearthHash: ActionHash, tag: string): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'search_stories_by_tag', payload: { hearth_hash: hearthHash, tag } });
   }
 
   // ============================================================================
   // Collections
   // ============================================================================
 
-  async createCollection(input: CreateCollectionInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_collection', payload: input });
+  async createCollection(input: CreateCollectionInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_collection', payload: input });
   }
 
-  async addToCollection(collectionHash: ActionHash, storyHash: ActionHash) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'add_to_collection', payload: { collection_hash: collectionHash, story_hash: storyHash } });
+  async addToCollection(input: AddToCollectionInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'add_to_collection', payload: input });
+  }
+
+  async getHearthCollections(hearthHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_hearth_collections', payload: hearthHash });
   }
 
   // ============================================================================
   // Traditions
   // ============================================================================
 
-  async createTradition(input: CreateTraditionInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_tradition', payload: input });
+  async createTradition(input: CreateTraditionInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'create_tradition', payload: input });
   }
 
-  async observeTradition(traditionHash: ActionHash) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'observe_tradition', payload: traditionHash });
+  async observeTradition(traditionHash: ActionHash): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'observe_tradition', payload: traditionHash });
   }
 
-  async getUpcomingTraditions(hearthHash: ActionHash) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_upcoming_traditions', payload: hearthHash });
+  async getHearthTraditions(hearthHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_hearth_traditions', payload: hearthHash });
   }
 }

@@ -1,7 +1,7 @@
 /**
  * Milestones Zome Client
  *
- * Life milestones, transitions, family timelines, and birthday tracking
+ * Life milestones, liminal transitions, and family timelines
  * for Hearth clusters.
  *
  * @module @mycelix/sdk/clients/hearth/milestones
@@ -13,6 +13,7 @@ import type {
   AdvanceTransitionInput,
 } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { Record } from '@holochain/client';
 
 export interface MilestonesClientConfig {
   roleName?: string;
@@ -35,35 +36,35 @@ export class MilestonesClient {
   // Milestones
   // ============================================================================
 
-  async recordMilestone(input: RecordMilestoneInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'record_milestone', payload: input });
+  async recordMilestone(input: RecordMilestoneInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'record_milestone', payload: input });
   }
 
-  async getFamilyTimeline(hearthHash: ActionHash) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_family_timeline', payload: hearthHash });
+  async getFamilyTimeline(hearthHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_family_timeline', payload: hearthHash });
   }
 
-  async getUpcomingBirthdays(hearthHash: ActionHash) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_upcoming_birthdays', payload: hearthHash });
+  async getMemberMilestones(memberHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_member_milestones', payload: memberHash });
   }
 
   // ============================================================================
   // Life Transitions
   // ============================================================================
 
-  async beginTransition(input: BeginTransitionInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'begin_transition', payload: input });
+  async beginTransition(input: BeginTransitionInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'begin_transition', payload: input });
   }
 
-  async advanceTransition(input: AdvanceTransitionInput) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'advance_transition', payload: input });
+  async advanceTransition(input: AdvanceTransitionInput): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'advance_transition', payload: input });
   }
 
-  async completeTransition(transitionHash: ActionHash) {
-    return this.client.callZome<unknown>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'complete_transition', payload: transitionHash });
+  async completeTransition(transitionHash: ActionHash): Promise<Record> {
+    return this.client.callZome<Record>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'complete_transition', payload: transitionHash });
   }
 
-  async getActiveTransitions(hearthHash: ActionHash) {
-    return this.client.callZome<unknown[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_active_transitions', payload: hearthHash });
+  async getActiveTransitions(hearthHash: ActionHash): Promise<Record[]> {
+    return this.client.callZome<Record[]>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_active_transitions', payload: hearthHash });
   }
 }

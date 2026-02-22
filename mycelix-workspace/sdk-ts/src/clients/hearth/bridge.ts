@@ -17,6 +17,8 @@ import type {
   HearthSyncInput,
   BridgeHealth,
   GateAuditInput,
+  GovernanceAuditFilter,
+  GovernanceAuditResult,
   ConsciousnessCredential,
 } from './types';
 import type { ActionHash, AgentPubKey } from '../../generated/common';
@@ -105,6 +107,10 @@ export class BridgeClient {
 
   async logGovernanceGate(input: GateAuditInput): Promise<void> {
     return this.client.callZome<void>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'log_governance_gate', payload: input });
+  }
+
+  async getGovernanceAuditTrail(filter: GovernanceAuditFilter): Promise<GovernanceAuditResult> {
+    return this.client.callZome<GovernanceAuditResult>({ role_name: this.config.roleName, zome_name: this.zomeName, fn_name: 'get_governance_audit_trail', payload: filter });
   }
 
   // ============================================================================
