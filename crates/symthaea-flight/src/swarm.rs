@@ -19,6 +19,7 @@ use crate::controller::FlightController;
 use crate::encoder::QuadrotorHdcEncoder;
 use crate::fep_agent::{ActiveInferenceFlightAgent, FlightFepConfig};
 use crate::mujoco_sim::MuJoCoSimulator;
+use crate::simulator::PhysicsSimulator;
 use crate::training::EpisodeMetrics;
 use crate::types::*;
 
@@ -164,7 +165,7 @@ pub fn train_swarm(config: &SwarmConfig) -> SwarmResult {
                 rng_state ^= rng_state << 13;
                 rng_state ^= rng_state >> 7;
                 rng_state ^= rng_state << 17;
-                (rng_state as f64 / u64::MAX as f64)
+                rng_state as f64 / u64::MAX as f64
             };
 
             // Randomize this drone's physics
@@ -375,6 +376,25 @@ mod tests {
         assert!(config.num_drones > 0);
         assert!(config.buffer_size > 0);
         assert!(config.mass_range.0 < config.mass_range.1);
+    }
+
+    #[test]
+    fn test_deterministic_sampling() {
+        let buf = SwarmExperienceBuffer::new(100);
+        let cmd = QuadrotorCommand::hover();
+
+        for i in 0..20 {
+            let mut ch = [0.0f32; 13];
+            ch[0] = i as f32;
+            buf.store(ch, cmd);
+        }
+
+        let s1 = buf.sample(5, 12345);
+        let s2 = buf.sample(5, 12345);
+        assert_eq!(s1.len(), s2.len());
+        for (a, b) in s1.iter().zip(s2.iter()) {
+            assert_eq!(a.0, b.0, "Same seed must produce same samples");
+        }
     }
 
     // Note: train_swarm() requires MuJoCo library — tested via examples only

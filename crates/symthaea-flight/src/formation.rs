@@ -232,4 +232,76 @@ mod tests {
         let setpoints = shape.compute_setpoints(3);
         assert_eq!(setpoints, positions);
     }
+
+    #[test]
+    fn test_line_half_spacing() {
+        let shape = FormationShape::Line { spacing: 0.5 };
+        let setpoints = shape.compute_setpoints(3);
+        assert_eq!(setpoints.len(), 3);
+        // With spacing 0.5, 3 agents: half-width = (2 * 0.5) / 2 = 0.5
+        assert!((setpoints[0][0] - (-0.5)).abs() < 1e-10);
+        assert!((setpoints[1][0] - 0.0).abs() < 1e-10);
+        assert!((setpoints[2][0] - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_circle_angular_positions() {
+        let shape = FormationShape::Circle { radius: 1.0 };
+        let sp = shape.compute_setpoints(4);
+        // Agent 0: angle=0 → (1, 0)
+        assert!((sp[0][0] - 1.0).abs() < 1e-10);
+        assert!((sp[0][1] - 0.0).abs() < 1e-10);
+        // Agent 1: angle=π/2 → (0, 1)
+        assert!((sp[1][0] - 0.0).abs() < 1e-10);
+        assert!((sp[1][1] - 1.0).abs() < 1e-10);
+        // Agent 2: angle=π → (-1, 0)
+        assert!((sp[2][0] - (-1.0)).abs() < 1e-10);
+        assert!((sp[2][1] - 0.0).abs() < 1e-10);
+        // Agent 3: angle=3π/2 → (0, -1)
+        assert!((sp[3][0] - 0.0).abs() < 1e-10);
+        assert!((sp[3][1] - (-1.0)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_vee_symmetry() {
+        let shape = FormationShape::Vee {
+            angle: std::f64::consts::FRAC_PI_6, // 30 degrees
+            spacing: 0.5,
+        };
+        let sp = shape.compute_setpoints(5);
+        // Leader at origin
+        assert!((sp[0][0]).abs() < 1e-10);
+        assert!((sp[0][1]).abs() < 1e-10);
+        // Agents 1 & 2 should be symmetric about y=0 (same x, opposite y)
+        assert!((sp[1][0] - sp[2][0]).abs() < 1e-10, "Same x offset");
+        assert!((sp[1][1] + sp[2][1]).abs() < 1e-10, "Symmetric y");
+        // Agents 3 & 4 should be symmetric too, and farther back
+        assert!((sp[3][0] - sp[4][0]).abs() < 1e-10);
+        assert!((sp[3][1] + sp[4][1]).abs() < 1e-10);
+        assert!(sp[3][0] < sp[1][0], "Farther agents are farther back");
+    }
+
+    #[test]
+    fn test_controller_center_offset() {
+        let shape = FormationShape::Line { spacing: 1.0 };
+        let mut ctrl = FormationController::new(0, shape, 3);
+        ctrl.set_center([5.0, 3.0, 1.0]);
+        let sp = ctrl.compute_setpoint();
+        // Agent 0 in 3-agent line: offset is -1.0 on x
+        assert!((sp.offset[0] - 4.0).abs() < 1e-10);
+        assert!((sp.offset[1] - 3.0).abs() < 1e-10);
+        assert!((sp.offset[2] - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_custom_padding_extends() {
+        let positions = vec![[1.0, 0.0, 0.0]];
+        let shape = FormationShape::Custom(positions);
+        let sp = shape.compute_setpoints(3);
+        assert_eq!(sp.len(), 3);
+        assert_eq!(sp[0], [1.0, 0.0, 0.0]);
+        // Padded positions should be at origin
+        assert_eq!(sp[1], [0.0, 0.0, 0.0]);
+        assert_eq!(sp[2], [0.0, 0.0, 0.0]);
+    }
 }

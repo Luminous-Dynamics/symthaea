@@ -300,6 +300,9 @@ pub struct FlightConfig {
     /// Enable early termination on crash or divergence (default: true).
     /// Terminates episode if position error > 5m or altitude < 0.
     pub early_termination: bool,
+    /// Custom curriculum of setpoints cycled across episodes.
+    /// Empty (default) uses the built-in 5-setpoint cycle.
+    pub curriculum: Vec<FlightSetpoint>,
 }
 
 impl Default for FlightConfig {
@@ -320,6 +323,7 @@ impl Default for FlightConfig {
             replay_count: 3,
             enable_lr_schedule: true,
             early_termination: true,
+            curriculum: Vec::new(),
         }
     }
 }
@@ -351,6 +355,8 @@ pub struct PdGains {
     pub kp_yaw: f64,
     /// Yaw derivative gain.
     pub kd_yaw: f64,
+    /// Position integral gain (used by `pid_baseline`).
+    pub ki_pos: f64,
 }
 
 impl Default for PdGains {
@@ -362,8 +368,16 @@ impl Default for PdGains {
             kd_att: 0.01,
             kp_yaw: 0.01,
             kd_yaw: 0.005,
+            ki_pos: 2.0,
         }
     }
+}
+
+/// PID controller state (integral accumulators).
+#[derive(Debug, Clone, Default)]
+pub struct PidState {
+    /// Integral accumulator for position error [x, y, z].
+    pub integral: [f64; 3],
 }
 
 /// Compute PD baseline command for a given state and setpoint.
@@ -397,6 +411,63 @@ pub fn pd_baseline(
     let pitch_moment = gains.kp_att * (desired_pitch - pitch) - gains.kd_att * wy;
 
     // Yaw control
+    let yaw_err = angle_wrap(setpoint.yaw - yaw);
+    let yaw_moment = gains.kp_yaw * yaw_err - gains.kd_yaw * wz;
+
+    QuadrotorCommand {
+        thrust: thrust as f32,
+        roll_moment: roll_moment as f32,
+        pitch_moment: pitch_moment as f32,
+        yaw_moment: yaw_moment as f32,
+    }
+    .clamped()
+}
+
+/// Compute PID baseline command (PD + integral term for zero steady-state error).
+///
+/// The integral term eliminates steady-state offset under sustained disturbances
+/// (e.g., constant wind). Includes anti-windup clamping and zero-crossing reset.
+pub fn pid_baseline(
+    state: &FlightState,
+    setpoint: &FlightSetpoint,
+    gains: &PdGains,
+    pid_state: &mut PidState,
+    dt: f64,
+) -> QuadrotorCommand {
+    let pos_err = setpoint.position_error(state);
+
+    // Update integral with anti-windup
+    for i in 0..3 {
+        // Zero-crossing reset: halve integral when error changes sign
+        if pid_state.integral[i] != 0.0 && pid_state.integral[i].signum() != pos_err[i].signum() {
+            pid_state.integral[i] *= 0.5;
+        }
+        pid_state.integral[i] += pos_err[i] * dt;
+        pid_state.integral[i] = pid_state.integral[i].clamp(-0.5, 0.5);
+    }
+
+    // Thrust: PD + I on z-axis
+    let z_err = pos_err[2];
+    let vz = state.linear_velocity[2];
+    let thrust_adj =
+        gains.kp_pos * z_err - gains.kd_pos * vz + gains.ki_pos * pid_state.integral[2];
+    let thrust = (QuadrotorCommand::HOVER_THRUST as f64 + thrust_adj)
+        .clamp(0.0, QuadrotorCommand::MAX_THRUST as f64);
+
+    // Attitude error → moment commands (same as pd_baseline)
+    let (roll, pitch, yaw) = state.euler_angles();
+    let [wx, wy, wz] = state.angular_velocity;
+
+    let desired_pitch = (gains.kp_pos * pos_err[0] - gains.kd_pos * state.linear_velocity[0]
+        + gains.ki_pos * pid_state.integral[0])
+        .clamp(-0.3, 0.3);
+    let desired_roll = -(gains.kp_pos * pos_err[1] - gains.kd_pos * state.linear_velocity[1]
+        + gains.ki_pos * pid_state.integral[1])
+        .clamp(-0.3, 0.3);
+
+    let roll_moment = gains.kp_att * (desired_roll - roll) - gains.kd_att * wx;
+    let pitch_moment = gains.kp_att * (desired_pitch - pitch) - gains.kd_att * wy;
+
     let yaw_err = angle_wrap(setpoint.yaw - yaw);
     let yaw_moment = gains.kp_yaw * yaw_err - gains.kd_yaw * wz;
 
@@ -538,6 +609,7 @@ mod tests {
         let config = FlightConfig::default();
         assert!((config.motor_dt() - 0.002).abs() < 1e-10);
         assert_eq!(config.cognitive_interval(), 20);
+        assert!(config.curriculum.is_empty());
     }
 
     #[test]
@@ -547,5 +619,85 @@ mod tests {
         assert_eq!(ch.len(), 13);
         assert!((ch[2] - 0.1).abs() < 1e-6); // z
         assert!((ch[3] - 1.0).abs() < 1e-6); // qw = 1
+    }
+
+    #[test]
+    fn test_pid_reduces_steady_state_error() {
+        // Simulate sustained downward force (wind) — PID integral should compensate
+        let setpoint = FlightSetpoint {
+            position: [0.0, 0.0, 0.5],
+            yaw: 0.0,
+        };
+        let gains = PdGains::default();
+        let dt = 0.002;
+
+        // PD baseline with sustained offset
+        let mut state = FlightState::hover(0.45); // 5cm below setpoint
+        let pd_cmd = pd_baseline(&state, &setpoint, &gains);
+
+        // PID baseline with accumulated integral
+        let mut pid_state = PidState::default();
+        // Simulate 100 steps of integration at the same error
+        for _ in 0..100 {
+            state.position[2] = 0.45; // sustained offset
+            let _ = pid_baseline(&state, &setpoint, &gains, &mut pid_state, dt);
+        }
+        let pid_cmd = pid_baseline(&state, &setpoint, &gains, &mut pid_state, dt);
+
+        // PID should command MORE thrust than PD due to accumulated integral
+        assert!(
+            pid_cmd.thrust > pd_cmd.thrust,
+            "PID should command more thrust: pid={:.6}, pd={:.6}",
+            pid_cmd.thrust,
+            pd_cmd.thrust
+        );
+    }
+
+    #[test]
+    fn test_pid_anti_windup() {
+        let setpoint = FlightSetpoint {
+            position: [0.0, 0.0, 10.0], // Huge offset to saturate integral
+            yaw: 0.0,
+        };
+        let gains = PdGains::default();
+        let mut pid_state = PidState::default();
+        let state = FlightState::hover(0.1);
+        let dt = 0.002;
+
+        // Run many steps to try to blow up the integral
+        for _ in 0..10_000 {
+            pid_baseline(&state, &setpoint, &gains, &mut pid_state, dt);
+        }
+
+        // Integral should be clamped to ±0.5
+        for i in 0..3 {
+            assert!(
+                pid_state.integral[i].abs() <= 0.5 + 1e-10,
+                "Integral[{i}] should be clamped: {}",
+                pid_state.integral[i]
+            );
+        }
+    }
+
+    #[test]
+    fn test_curriculum_custom_cycle() {
+        let config = FlightConfig {
+            curriculum: vec![
+                FlightSetpoint {
+                    position: [0.0, 0.0, 0.2],
+                    yaw: 0.0,
+                },
+                FlightSetpoint {
+                    position: [0.1, 0.0, 0.1],
+                    yaw: 0.0,
+                },
+            ],
+            ..FlightConfig::default()
+        };
+        assert_eq!(config.curriculum.len(), 2);
+        // Episode 0 → curriculum[0], episode 1 → curriculum[1], episode 2 → curriculum[0]
+        assert!((config.curriculum[0 % 2].position[2] - 0.2).abs() < 1e-10);
+        assert!((config.curriculum[1 % 2].position[0] - 0.1).abs() < 1e-10);
+        assert!((config.curriculum[2 % 2].position[2] - 0.2).abs() < 1e-10);
     }
 }

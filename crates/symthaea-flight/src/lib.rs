@@ -38,13 +38,12 @@ pub mod fep_agent;
 pub mod formation;
 pub mod simulator;
 pub mod training;
+pub mod perturbations;
 pub mod types;
 
 // ── MuJoCo-dependent modules ──
 #[cfg(feature = "mujoco")]
 pub mod mujoco_sim;
-#[cfg(feature = "mujoco")]
-pub mod perturbations;
 #[cfg(feature = "mujoco")]
 pub mod scenarios;
 #[cfg(feature = "mujoco")]
@@ -60,13 +59,12 @@ pub use controller::FlightController;
 pub use encoder::QuadrotorHdcEncoder;
 pub use fep_agent::ActiveInferenceFlightAgent;
 pub use simulator::{PhysicsSimulator, SimplePhysicsSimulator};
+pub use perturbations::{FlightPerturbation, PerturbationSchedule};
 pub use training::FlightTrainer;
 pub use types::*;
 
 // Re-export MuJoCo types when feature is enabled
 #[cfg(feature = "mujoco")]
 pub use mujoco_sim::MuJoCoSimulator;
-#[cfg(feature = "mujoco")]
-pub use perturbations::{FlightPerturbation, PerturbationSchedule};
 #[cfg(feature = "mujoco")]
 pub use sensory_filter::{SensoryFilter, SensoryFilterConfig};

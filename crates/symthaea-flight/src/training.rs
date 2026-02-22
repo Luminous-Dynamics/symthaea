@@ -87,23 +87,26 @@ impl FlightTrainer {
         let dt = self.config.motor_dt();
         let cognitive_interval = self.config.cognitive_interval();
 
-        // Setpoint variety: cycle through different targets across episodes.
-        // Early episodes use default hover; later episodes introduce position offsets.
-        let setpoint = match episode % 5 {
-            0 => FlightSetpoint::hover(), // z=0.1
-            1 => FlightSetpoint {
-                position: [0.0, 0.0, 0.2],
-                yaw: 0.0,
-            }, // higher hover
-            2 => FlightSetpoint {
-                position: [0.05, 0.0, 0.1],
-                yaw: 0.0,
-            }, // slight x offset
-            3 => FlightSetpoint {
-                position: [0.0, 0.05, 0.15],
-                yaw: 0.0,
-            }, // y + z offset
-            _ => FlightSetpoint::hover(), // back to default
+        // Setpoint variety: custom curriculum takes priority over built-in cycle.
+        let setpoint = if !self.config.curriculum.is_empty() {
+            self.config.curriculum[episode % self.config.curriculum.len()].clone()
+        } else {
+            match episode % 5 {
+                0 => FlightSetpoint::hover(), // z=0.1
+                1 => FlightSetpoint {
+                    position: [0.0, 0.0, 0.2],
+                    yaw: 0.0,
+                }, // higher hover
+                2 => FlightSetpoint {
+                    position: [0.05, 0.0, 0.1],
+                    yaw: 0.0,
+                }, // slight x offset
+                3 => FlightSetpoint {
+                    position: [0.0, 0.05, 0.15],
+                    yaw: 0.0,
+                }, // y + z offset
+                _ => FlightSetpoint::hover(), // back to default
+            }
         };
 
         // Curriculum: perturbation grows across episodes
@@ -143,6 +146,8 @@ impl FlightTrainer {
         let replay_cap = self.config.replay_buffer_size;
         let replay_count = self.config.replay_count;
         let mut replay_buf: Vec<(ContinuousHV, QuadrotorCommand)> = Vec::with_capacity(replay_cap);
+        let mut replay_priorities: Vec<f32> = Vec::with_capacity(replay_cap);
+        let priority_alpha: f32 = 0.6;
         let mut replay_idx = 0usize; // next write position (ring buffer)
         let mut replay_rng = episode as u64 + 7919; // simple hash for replay sampling
         let mut steps_completed = 0usize;
@@ -214,25 +219,38 @@ impl FlightTrainer {
                 // Train on current observation
                 controller.train_step(&sensor_hv, &target, dt as f32, Some(lr));
 
-                // Store in replay buffer
+                // Store in replay buffer with default priority
                 if replay_cap > 0 {
                     if replay_buf.len() < replay_cap {
                         replay_buf.push((sensor_hv.clone(), target));
+                        replay_priorities.push(1.0);
                     } else {
-                        replay_buf[replay_idx % replay_cap] = (sensor_hv.clone(), target);
+                        let widx = replay_idx % replay_cap;
+                        replay_buf[widx] = (sensor_hv.clone(), target);
+                        replay_priorities[widx] = 1.0;
                     }
                     replay_idx += 1;
 
-                    // Replay past experiences
+                    // Prioritized experience replay: sample proportional to priority^alpha
                     let buf_len = replay_buf.len();
                     if buf_len > 1 {
                         for _ in 0..replay_count.min(buf_len) {
-                            // Simple LCG for deterministic pseudo-random sampling
-                            replay_rng =
-                                replay_rng.wrapping_mul(6364136223846793005).wrapping_add(1);
-                            let idx = (replay_rng >> 33) as usize % buf_len;
+                            let idx = sample_prioritized_index(
+                                &replay_priorities,
+                                priority_alpha,
+                                &mut replay_rng,
+                            );
                             let (ref replay_hv, ref replay_target) = replay_buf[idx];
+                            let pre = controller.forward(replay_hv, dt as f32);
                             controller.train_step(replay_hv, replay_target, dt as f32, Some(lr));
+
+                            // Update priority with TD error magnitude
+                            let td = ((replay_target.thrust - pre.thrust).powi(2)
+                                + (replay_target.roll_moment - pre.roll_moment).powi(2)
+                                + (replay_target.pitch_moment - pre.pitch_moment).powi(2)
+                                + (replay_target.yaw_moment - pre.yaw_moment).powi(2))
+                            .sqrt();
+                            replay_priorities[idx] = td.max(0.01);
                         }
                     }
                 }
@@ -395,6 +413,33 @@ impl FlightTrainer {
     pub fn config(&self) -> &FlightConfig {
         &self.config
     }
+}
+
+/// Sample an index from a weighted priority distribution.
+///
+/// Probability proportional to `priority^alpha`. Falls back to uniform if all priorities are zero.
+fn sample_prioritized_index(priorities: &[f32], alpha: f32, rng: &mut u64) -> usize {
+    let len = priorities.len();
+    if len == 0 {
+        return 0;
+    }
+
+    *rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1);
+
+    let total: f32 = priorities.iter().map(|p| p.powf(alpha)).sum();
+    if total <= 0.0 {
+        return (*rng >> 33) as usize % len;
+    }
+
+    let r = ((*rng >> 33) as f64 / u32::MAX as f64) as f32 * total;
+    let mut cumsum = 0.0f32;
+    for (i, p) in priorities.iter().enumerate() {
+        cumsum += p.powf(alpha);
+        if cumsum >= r {
+            return i;
+        }
+    }
+    len - 1
 }
 
 #[cfg(test)]
@@ -738,6 +783,67 @@ mod tests {
         // (or complete normally if drag keeps things stable — either outcome is acceptable)
         assert!(metrics.total_steps > 0);
         assert!(metrics.avg_position_error.is_finite());
+    }
+
+    #[test]
+    fn test_prioritized_replay_high_priority_sampled_more() {
+        let priorities = vec![0.01, 0.01, 10.0, 0.01];
+        let mut counts = [0u32; 4];
+        let mut rng = 42u64;
+        for _ in 0..1000 {
+            let idx = sample_prioritized_index(&priorities, 0.6, &mut rng);
+            counts[idx] += 1;
+        }
+        // Index 2 (priority 10.0) should be sampled most frequently
+        assert!(
+            counts[2] > counts[0] + counts[1] + counts[3],
+            "High-priority sample should dominate: {:?}",
+            counts
+        );
+    }
+
+    #[test]
+    fn test_prioritized_replay_uniform_when_equal() {
+        let priorities = vec![1.0, 1.0, 1.0, 1.0];
+        let mut counts = [0u32; 4];
+        let mut rng = 42u64;
+        for _ in 0..4000 {
+            let idx = sample_prioritized_index(&priorities, 0.6, &mut rng);
+            counts[idx] += 1;
+        }
+        for c in &counts {
+            assert!(
+                *c > 400 && *c < 1600,
+                "Equal priorities should give roughly uniform sampling: {:?}",
+                counts
+            );
+        }
+    }
+
+    #[test]
+    fn test_curriculum_custom_setpoints() {
+        let config = FlightConfig {
+            num_episodes: 4,
+            steps_per_episode: 50,
+            curriculum: vec![
+                FlightSetpoint {
+                    position: [0.0, 0.0, 0.3],
+                    yaw: 0.0,
+                },
+                FlightSetpoint {
+                    position: [0.1, 0.0, 0.2],
+                    yaw: 0.0,
+                },
+            ],
+            ..FlightConfig::default()
+        };
+        let mut trainer = FlightTrainer::new(config);
+        let metrics = trainer.train();
+        assert_eq!(metrics.len(), 4);
+        // All episodes should complete with finite metrics
+        for m in &metrics {
+            assert!(m.avg_position_error.is_finite());
+        }
     }
 
     #[test]
