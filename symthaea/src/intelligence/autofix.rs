@@ -154,12 +154,9 @@ struct FixPattern {
 }
 
 #[derive(Clone)]
-#[allow(dead_code)] // Variants reserved for future fix pattern expansion
 enum FixGenerator {
     /// Fix missing semicolon
     MissingSemicolon,
-    /// Fix missing bracket
-    MissingBracket,
     /// Fix undefined variable
     UndefinedVariable,
     /// Fix option collision
@@ -168,22 +165,15 @@ enum FixGenerator {
     DeprecatedOption,
     /// Fix type mismatch
     TypeMismatch,
-    /// Fix missing import
-    MissingImport,
-    /// Fix package name
-    PackageName,
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Variants reserved for type inference expansion
 enum NixType {
     Bool,
     String,
     Int,
     List,
     AttrsOf(Box<NixType>),
-    Path,
-    Package,
 }
 
 impl AutoFixer {
@@ -279,7 +269,6 @@ impl AutoFixer {
             FixGenerator::DeprecatedOption => {
                 self.fix_deprecated_option(error, context);
             }
-            _ => {}
         }
     }
 

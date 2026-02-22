@@ -48,12 +48,6 @@ impl ParserRegistry {
         self.parsers.insert(name, parser);
     }
 
-    /// Get a mutable reference to a parser by language name
-    #[allow(dead_code)]
-    pub fn get_mut(&mut self, language: &str) -> Option<&mut Box<dyn CodeParser>> {
-        self.parsers.get_mut(language)
-    }
-
     /// List all registered languages
     pub fn languages(&self) -> Vec<&str> {
         self.parsers.keys().map(|s| s.as_str()).collect()

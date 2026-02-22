@@ -229,15 +229,6 @@ impl CpuCfcLayer {
         new_state
     }
 
-    #[allow(dead_code)] // Batch API reserved for GPU acceleration path
-    fn forward_batch(&mut self, inputs: &[Array1<f32>], dts: &[f32]) -> Vec<Array1<f32>> {
-        inputs
-            .iter()
-            .zip(dts.iter())
-            .map(|(input, dt)| self.forward(input, *dt))
-            .collect()
-    }
-
     fn reset(&mut self) {
         self.state = Array1::zeros(self.hidden_dim);
     }

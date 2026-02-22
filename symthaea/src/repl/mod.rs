@@ -226,7 +226,7 @@ use crate::action::{
 use crate::voice::{LTCPacing, VoiceOutput, VoiceOutputConfig};
 
 // Shell/IPC infrastructure
-use crate::shell::ipc_client::{ConnectionState, MetricsSnapshot};
+use crate::shell::ipc_client::MetricsSnapshot;
 
 pub mod io_bridge;
 pub mod observability_hooks;
@@ -330,10 +330,6 @@ pub struct ReplSession {
     ///
     /// Each hook receives callbacks for input, output, action, and reset events.
     pub observers: Vec<Box<dyn ObservabilityHook>>,
-
-    /// IPC connection state (for daemon mode).
-    #[allow(dead_code)]
-    ipc_state: Option<IpcConnectionState>,
 }
 
 /// Single turn in conversation
@@ -385,15 +381,6 @@ pub struct TurnAction {
     pub executed: bool,
     pub output: Option<String>,
     pub blocked_reason: Option<String>,
-}
-
-/// IPC connection state for daemon mode
-#[derive(Debug)]
-#[allow(dead_code)]
-struct IpcConnectionState {
-    connection: ConnectionState,
-    last_metrics: MetricsSnapshot,
-    last_update: Instant,
 }
 
 /// Session configuration for the REPL.
@@ -594,7 +581,6 @@ impl ReplSession {
                 ..Default::default()
             },
             observers: Vec::new(),
-            ipc_state: None,
         })
     }
 
