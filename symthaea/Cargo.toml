@@ -421,6 +421,11 @@ path = "src/bin/symthaea-story.rs"
 # Examples that need cfg-gated modules are marked with required-features
 # They won't be built by default until the required modules are fixed
 
+# Integration tests needing cfg-gated modules
+[[test]]
+name = "flight_integration"
+required-features = ["flight"]
+
 # Examples needing cfg-gated modules
 [[example]]
 name = "quadrotor_hover"
