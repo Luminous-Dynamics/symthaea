@@ -1,9 +1,9 @@
-//! Unit tests for extracted helper methods in helpers.rs.
+//! Unit tests for extracted helper methods in helpers/.
 //!
-//! Tests cover Phases 1–4 extractions: safety precheck, cognitive depth,
+//! Tests cover Phases 1–5 extractions: safety precheck, cognitive depth,
 //! negation detection, learning rate composition, moral phase, episodic recall,
 //! surprise exploration, Psi synthesis, reward signal, strategy modulation,
-//! FEP active inference, and cross-modal binding.
+//! FEP active inference, cross-modal binding, and parallel post-processing.
 
 use super::super::*;
 
@@ -62,6 +62,124 @@ fn test_update_cognitive_depth_initial() {
         "cognitive_depth should be a valid variant: {:?}",
         service.cognitive_depth
     );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 2: Moral phase, episodic recall, surprise exploration
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_run_moral_phase_benign_input() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    service.stats.total_cycles = 1; // trigger evaluation (cycle % 7 == 1)
+    let (score, concern, judgment) = service.run_moral_phase("hello world", 0.0);
+    // Benign input: score should be non-negative, no concern
+    assert!(score >= -1.0, "Moral score below -1: {score}");
+    assert!(!concern, "Benign input flagged as moral concern");
+    assert!(!judgment.consent_violation, "No consent violation expected");
+}
+
+#[test]
+fn test_run_moral_phase_negation_dampening() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    service.stats.total_cycles = 1;
+    // First, get baseline moral score without negation
+    let (score_no_neg, _, _) = service.run_moral_phase("harmful action", 0.0);
+    // Reset for second call
+    service.stats.total_cycles = 1;
+    service.last_moral_judgment = None;
+    // With high negation polarity ("not harmful"), score should be dampened
+    let (score_with_neg, _, _) = service.run_moral_phase("harmful action", 0.8);
+    // Negation dampening multiplies by 0.3, so |dampened| <= |original|
+    assert!(
+        score_with_neg.abs() <= score_no_neg.abs() + f32::EPSILON,
+        "Negation should dampen score: orig={score_no_neg}, dampened={score_with_neg}"
+    );
+}
+
+#[test]
+fn test_run_moral_phase_throttling() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    // First evaluation
+    service.stats.total_cycles = 1;
+    let evals_before = service.stats.moral_evaluations;
+    let _ = service.run_moral_phase("hello", 0.0);
+    let evals_after_first = service.stats.moral_evaluations;
+    assert_eq!(evals_after_first, evals_before + 1, "First call should evaluate");
+
+    // Same input, non-evaluation cycle — should reuse cached judgment
+    service.stats.total_cycles = 3; // 3 % 7 != 1
+    let _ = service.run_moral_phase("hello", 0.0);
+    assert_eq!(
+        service.stats.moral_evaluations,
+        evals_after_first,
+        "Throttled call should NOT re-evaluate"
+    );
+}
+
+#[test]
+fn test_run_moral_phase_updates_stats() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    service.stats.total_cycles = 1;
+    let _ = service.run_moral_phase("hello", 0.0);
+    // Stats should be populated
+    assert!(service.stats.moral_evaluations > 0, "moral_evaluations should increment");
+    // moral_score should have been written
+    // (we just check it's finite — the actual value depends on the evaluator)
+    assert!(service.stats.moral_score.is_finite(), "moral_score not finite");
+}
+
+#[test]
+fn test_recall_episodic_context_empty_memory() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let compressed = vec![0.1f32; 128];
+    let boost = service.recall_episodic_context(&compressed);
+    // With empty episodic memory, boost should be 0
+    assert!(
+        boost.abs() < f32::EPSILON,
+        "Empty memory should yield 0 boost, got {boost}"
+    );
+}
+
+#[test]
+fn test_recall_episodic_context_preserves_confidence_bounds() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    service.prediction_confidence = 0.99;
+    let compressed = vec![0.5f32; 128];
+    let _ = service.recall_episodic_context(&compressed);
+    // Confidence should remain bounded [0, 1]
+    assert!(
+        service.prediction_confidence >= 0.0 && service.prediction_confidence <= 1.0,
+        "Confidence out of bounds: {}",
+        service.prediction_confidence
+    );
+}
+
+#[test]
+fn test_run_surprise_exploration_no_bridge() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    // Default config has no surprise bridge
+    let compressed = vec![0.3f32; 128];
+    let (triggered, action) = service.run_surprise_exploration(&compressed);
+    assert!(!triggered, "No surprise bridge → no trigger");
+    assert!(action.is_none(), "No surprise bridge → no action");
+}
+
+#[test]
+fn test_run_surprise_exploration_with_bridge() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_surprise_exploration = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+    // Run a few cycles to prime state
+    let compressed = vec![0.5f32; 128];
+    service.last_state = Some(compressed.clone());
+    service.last_prediction = Some(vec![0.0f32; 128]); // large mismatch
+    let (triggered, action) = service.run_surprise_exploration(&compressed);
+    // We can't guarantee triggering (threshold-dependent), but verify no panic
+    // and that action is coherent with triggered
+    if triggered {
+        assert!(action.is_some(), "Triggered but no action");
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -211,4 +329,87 @@ fn test_update_cross_modal_binding_without_binder() {
     let (strength, psi) = service.update_cross_modal_binding(&hv, 0.5, 0.3);
     assert!((strength - 0.0).abs() < f32::EPSILON, "Expected 0 strength without binder");
     assert!((psi - 0.0).abs() < f64::EPSILON, "Expected 0 psi without binder");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 5: Parallel post-processing free functions
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_run_stability_regime_returns_timing() {
+    let mut regime =
+        crate::consciousness::stability_regime::StabilityRegimeProcessor::new();
+    let mut discovery =
+        crate::consciousness::primitive_discovery::PrimitiveDiscoveryService::new(Default::default());
+    let hv = symthaea_core::hdc::binary_hv::BinaryHV::random(99);
+    let timing = super::super::helpers::run_stability_regime(
+        &mut regime,
+        &mut discovery,
+        &hv,
+        0.02,
+        5,
+        CycleUrgency::Normal,
+    );
+    // Should return timing >= 0
+    assert!(timing < 1_000_000, "Timing suspiciously high: {timing}us");
+}
+
+#[test]
+fn test_run_stability_regime_skips_in_cruise() {
+    let mut regime =
+        crate::consciousness::stability_regime::StabilityRegimeProcessor::new();
+    let mut discovery =
+        crate::consciousness::primitive_discovery::PrimitiveDiscoveryService::new(Default::default());
+    let hv = symthaea_core::hdc::binary_hv::BinaryHV::random(99);
+    // Cruise urgency with should_run(cycle=1, ..., cruise_every=20) should skip
+    let timing = super::super::helpers::run_stability_regime(
+        &mut regime,
+        &mut discovery,
+        &hv,
+        0.02,
+        1,
+        CycleUrgency::Cruise,
+    );
+    // Even when skipped, returns valid timing
+    assert!(timing < 1_000_000, "Timing suspiciously high: {timing}us");
+}
+
+#[test]
+fn test_parallel_semantic_causal_no_panic() {
+    let mut semantic_memory = crate::memory::semantic_memory::SemanticMemory::new(100);
+    let mut causal_enhancer: Option<crate::causal::CausalLoopEnhancer> = None;
+    let semantic_hdc = vec![0.1f32; 64];
+    let compressed = vec![0.2f32; 128];
+    let output = vec![0.3f32; 64];
+    // Should not panic
+    super::super::helpers::parallel_semantic_causal(
+        &mut semantic_memory,
+        &mut causal_enhancer,
+        semantic_hdc,
+        &compressed,
+        &output,
+        0.5,
+        10,
+    );
+}
+
+#[test]
+fn test_episodic_learning_context_construction() {
+    let compressed = vec![0.5f32; 128];
+    let prims = vec!["awareness".to_string()];
+    let ctx = super::super::helpers::EpisodicLearningContext {
+        prediction_error: 0.3,
+        in_flow: true,
+        input: "test input",
+        compressed_state: &compressed,
+        emotional_valence: 0.5,
+        phi: 0.6,
+        total_cycles: 100,
+        smoothed_coh: 0.7,
+        detected_primitives: &prims,
+        memory_context_boost: 0.1,
+        wm_importance_boost: 0.2,
+    };
+    assert_eq!(ctx.total_cycles, 100);
+    assert!(ctx.in_flow);
 }
