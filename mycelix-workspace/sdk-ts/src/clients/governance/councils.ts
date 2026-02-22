@@ -41,7 +41,7 @@ export interface Council {
   purpose: string;
   councilType: CouncilType;
   parentCouncilId?: string;
-  consciousnessThreshold: number;
+  phiThreshold: number;
   quorum: number;
   supermajority: number;
   canSpawnChildren: boolean;
@@ -314,7 +314,7 @@ export class CouncilsClient extends ZomeClient {
       purpose: entry.purpose,
       councilType: entry.council_type,
       parentCouncilId: entry.parent_council_id,
-      consciousnessThreshold: entry.phi_threshold,
+      phiThreshold: entry.phi_threshold,
       quorum: entry.quorum,
       supermajority: entry.supermajority,
       canSpawnChildren: entry.can_spawn_children,

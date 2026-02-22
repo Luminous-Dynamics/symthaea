@@ -68,9 +68,9 @@ function createMockClient() {
 // ============================================================================
 
 describe('Cluster Constants', () => {
-  it('should export all 7 commons domains', () => {
-    expect(COMMONS_DOMAINS).toEqual(['property', 'housing', 'care', 'mutualaid', 'water', 'food', 'transport']);
-    expect(COMMONS_DOMAINS).toHaveLength(7);
+  it('should export all 9 commons domains', () => {
+    expect(COMMONS_DOMAINS).toEqual(['property', 'housing', 'care', 'mutualaid', 'water', 'food', 'transport', 'support', 'space']);
+    expect(COMMONS_DOMAINS).toHaveLength(9);
   });
 
   it('should export all 3 civic domains', () => {
@@ -123,7 +123,7 @@ describe('CommonsBridgeClient', () => {
       const result = await bridge.dispatch('property_registry', 'get_asset', payload);
 
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
         zome_name: 'commons_bridge',
         fn_name: 'dispatch_call',
         payload: { zome: 'property_registry', fn_name: 'get_asset', payload: [1, 2, 3] },
@@ -143,7 +143,7 @@ describe('CommonsBridgeClient', () => {
       await bridge.query(input);
 
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
         zome_name: 'commons_bridge',
         fn_name: 'query_commons',
         payload: expect.objectContaining({
@@ -161,7 +161,7 @@ describe('CommonsBridgeClient', () => {
       await bridge.resolveQuery(hash, '{"status":"ok"}', true);
 
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
         zome_name: 'commons_bridge',
         fn_name: 'resolve_query',
         payload: { query_hash: hash, result: '{"status":"ok"}', success: true },
@@ -181,7 +181,7 @@ describe('CommonsBridgeClient', () => {
       await bridge.broadcastEvent(input);
 
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_care',
         zome_name: 'commons_bridge',
         fn_name: 'broadcast_event',
         payload: expect.objectContaining({
@@ -209,7 +209,7 @@ describe('CommonsBridgeClient', () => {
     it('should get domain events', async () => {
       await bridge.getDomainEvents('property');
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
         zome_name: 'commons_bridge',
         fn_name: 'get_domain_events',
         payload: 'property',
@@ -219,27 +219,43 @@ describe('CommonsBridgeClient', () => {
     it('should get events by type', async () => {
       await bridge.getEventsByType({ domain: 'mutualaid', event_type: 'resource_shared' });
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_care',
         zome_name: 'commons_bridge',
         fn_name: 'get_events_by_type',
         payload: { domain: 'mutualaid', event_type: 'resource_shared' },
       });
     });
 
-    it('should get all events', async () => {
+    it('should get all events (merges both DNAs)', async () => {
+      client.callZome.mockResolvedValue([]);
       await bridge.getAllEvents();
+      expect(client.callZome).toHaveBeenCalledTimes(2);
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
+        zome_name: 'commons_bridge',
+        fn_name: 'get_all_events',
+        payload: null,
+      });
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'commons_care',
         zome_name: 'commons_bridge',
         fn_name: 'get_all_events',
         payload: null,
       });
     });
 
-    it('should get my events', async () => {
+    it('should get my events (merges both DNAs)', async () => {
+      client.callZome.mockResolvedValue([]);
       await bridge.getMyEvents();
+      expect(client.callZome).toHaveBeenCalledTimes(2);
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
+        zome_name: 'commons_bridge',
+        fn_name: 'get_my_events',
+        payload: null,
+      });
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'commons_care',
         zome_name: 'commons_bridge',
         fn_name: 'get_my_events',
         payload: null,
@@ -248,10 +264,18 @@ describe('CommonsBridgeClient', () => {
   });
 
   describe('queries', () => {
-    it('should get my queries', async () => {
+    it('should get my queries (merges both DNAs)', async () => {
+      client.callZome.mockResolvedValue([]);
       await bridge.getMyQueries();
+      expect(client.callZome).toHaveBeenCalledTimes(2);
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
+        zome_name: 'commons_bridge',
+        fn_name: 'get_my_queries',
+        payload: null,
+      });
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'commons_care',
         zome_name: 'commons_bridge',
         fn_name: 'get_my_queries',
         payload: null,
@@ -261,7 +285,7 @@ describe('CommonsBridgeClient', () => {
     it('should get domain queries', async () => {
       await bridge.getDomainQueries('housing');
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
         zome_name: 'commons_bridge',
         fn_name: 'get_domain_queries',
         payload: 'housing',
@@ -278,7 +302,7 @@ describe('CommonsBridgeClient', () => {
       const result = await bridge.dispatchCivicCall('justice_cases', 'get_case', payload);
 
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
         zome_name: 'commons_bridge',
         fn_name: 'dispatch_civic_call',
         payload: { role: 'civic', zome: 'justice_cases', fn_name: 'get_case', payload: [7, 8, 9] },
@@ -297,7 +321,7 @@ describe('CommonsBridgeClient', () => {
       const result = await bridge.checkEmergencyForArea({ lat: 32.9, lon: -96.7 });
 
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
         zome_name: 'commons_bridge',
         fn_name: 'check_emergency_for_area',
         payload: { lat: 32.9, lon: -96.7 },
@@ -316,7 +340,7 @@ describe('CommonsBridgeClient', () => {
       const result = await bridge.checkJusticeDisputesForProperty({ resource_id: 'prop_123' });
 
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
         zome_name: 'commons_bridge',
         fn_name: 'check_justice_disputes_for_property',
         payload: { resource_id: 'prop_123' },
@@ -339,7 +363,7 @@ describe('CommonsBridgeClient', () => {
       });
 
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
         zome_name: 'commons_bridge',
         fn_name: 'verify_property_ownership',
         payload: { property_id: 'PROP-001', requester_did: 'did:mycelix:requester_xyz' },
@@ -361,7 +385,7 @@ describe('CommonsBridgeClient', () => {
       });
 
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_care',
         zome_name: 'commons_bridge',
         fn_name: 'check_care_availability',
         payload: { skill_needed: 'nursing', location: 'downtown' },
@@ -395,7 +419,7 @@ describe('CommonsBridgeClient', () => {
       });
 
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
         zome_name: 'commons_bridge',
         fn_name: 'query_audit_trail',
         payload: {
@@ -427,7 +451,7 @@ describe('CommonsBridgeClient', () => {
       });
 
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_care',
         zome_name: 'commons_bridge',
         fn_name: 'query_audit_trail',
         payload: {
@@ -454,7 +478,7 @@ describe('CommonsBridgeClient', () => {
       const result = await bridge.healthCheck();
 
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
         zome_name: 'commons_bridge',
         fn_name: 'health_check',
         payload: null,

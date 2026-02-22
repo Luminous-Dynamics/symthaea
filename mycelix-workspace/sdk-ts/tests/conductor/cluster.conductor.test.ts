@@ -67,11 +67,13 @@ function createBridgeMockClient(role: 'commons' | 'civic') {
       payload: unknown;
     }): Promise<T> => {
       // Validate role name matches the expected cluster
-      const expectedRole = role;
+      const validRoles = role === 'commons'
+        ? ['commons_land', 'commons_care']
+        : ['civic'];
       const expectedBridge = role === 'commons' ? 'commons_bridge' : 'civic_bridge';
 
-      if (role_name !== expectedRole) {
-        throw new Error(`Wrong role_name: expected '${expectedRole}', got '${role_name}'`);
+      if (!validRoles.includes(role_name)) {
+        throw new Error(`Wrong role_name: expected one of ${JSON.stringify(validRoles)}, got '${role_name}'`);
       }
       if (zome_name !== expectedBridge) {
         throw new Error(`Wrong zome_name: expected '${expectedBridge}', got '${zome_name}'`);
