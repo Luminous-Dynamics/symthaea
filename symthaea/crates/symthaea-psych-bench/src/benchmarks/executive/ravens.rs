@@ -167,6 +167,99 @@ fn generate_item(seed: u64, difficulty: usize) -> RpmItem {
     RpmItem { cells, answer, distractors }
 }
 
+/// Symbolic rule detection: try all 4 rule hypotheses against visible cells,
+/// return the predicted value for cell [2][2] if a rule matches with ≤1 error.
+fn predict_feature_symbolic(vals: &[usize]) -> Option<usize> {
+    // vals[0..8] = feature values for 8 visible cells (row-major)
+    // Row 0: [0,1,2], Row 1: [3,4,5], Row 2: [6,7,?]
+
+    // Hypothesis 1: Constant (all cols same in each row)
+    let mut const_errors = 0u32;
+    for row in 0..3 {
+        let base = vals[row * 3];
+        for col in 1..3 {
+            let idx = row * 3 + col;
+            if idx < 8 && vals[idx] != base {
+                const_errors += 1;
+            }
+        }
+    }
+    let const_pred = vals[6];
+
+    // Hypothesis 2: Increment (col_i = (base + i) % 3)
+    let mut inc_errors = 0u32;
+    for row in 0..3 {
+        let base = vals[row * 3];
+        for col in 1..3 {
+            let idx = row * 3 + col;
+            if idx < 8 {
+                let expected = (base + col) % 3;
+                if vals[idx] != expected {
+                    inc_errors += 1;
+                }
+            }
+        }
+    }
+    let inc_pred = (vals[6] + 2) % 3;
+
+    // Hypothesis 3: Distribution (each row is a permutation of {0,1,2})
+    let mut dist_errors = 0u32;
+    for row in 0..2 {
+        let mut seen = [false; 3];
+        for col in 0..3 {
+            let v = vals[row * 3 + col];
+            if v < 3 {
+                seen[v] = true;
+            }
+        }
+        if !seen.iter().all(|&s| s) {
+            dist_errors += 3;
+        }
+    }
+    let dist_pred = (0..3usize).find(|v| *v != vals[6] && *v != vals[7]);
+
+    // Hypothesis 4: XOR (col2 = (col0 + col1) % 3)
+    let mut xor_errors = 0u32;
+    for row in 0..2 {
+        let c0 = vals[row * 3];
+        let c1 = vals[row * 3 + 1];
+        let c2 = vals[row * 3 + 2];
+        if (c0 + c1) % 3 != c2 {
+            xor_errors += 1;
+        }
+    }
+    let xor_pred = (vals[6] + vals[7]) % 3;
+
+    // Pick the hypothesis with fewest errors (prefer simpler rules on tie)
+    let mut best_errors = u32::MAX;
+    let mut best_pred = None;
+
+    if const_errors <= best_errors {
+        best_errors = const_errors;
+        best_pred = Some(const_pred);
+    }
+    if inc_errors < best_errors {
+        best_errors = inc_errors;
+        best_pred = Some(inc_pred);
+    }
+    if dist_errors < best_errors {
+        if let Some(dp) = dist_pred {
+            best_errors = dist_errors;
+            best_pred = Some(dp);
+        }
+    }
+    if xor_errors < best_errors {
+        best_errors = xor_errors;
+        best_pred = Some(xor_pred);
+    }
+
+    if best_errors <= 1 {
+        best_pred
+    } else {
+        None
+    }
+}
+
 impl RavensProgressiveMatricesBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> RpmResult {
         let dim = config.dimension;
@@ -232,11 +325,24 @@ impl RavensProgressiveMatricesBenchmark {
                 let pred_size = predict_feature(&grid_size);
                 let pred_color = predict_feature(&grid_color);
 
-                // Score answer and distractors by per-feature similarity sum
+                // Symbolic rule detection: try to identify exact rule from visible cells
+                let shape_vals: Vec<usize> = item.cells.iter().map(|c| c.shape).collect();
+                let size_vals: Vec<usize> = item.cells.iter().map(|c| c.size).collect();
+                let color_vals: Vec<usize> = item.cells.iter().map(|c| c.color).collect();
+                let sym_shape = predict_feature_symbolic(&shape_vals);
+                let sym_size = predict_feature_symbolic(&size_vals);
+                let sym_color = predict_feature_symbolic(&color_vals);
+
+                // Hybrid scoring: HDC similarity + strong symbolic bonus when rule detected
+                let symbolic_bonus = 2.0f32;
                 let score_cell = |cell: &Cell| -> f32 {
-                    pred_shape.similarity(&shape_hvs[cell.shape])
+                    let mut score = pred_shape.similarity(&shape_hvs[cell.shape])
                         + pred_size.similarity(&size_hvs[cell.size])
-                        + pred_color.similarity(&color_hvs[cell.color])
+                        + pred_color.similarity(&color_hvs[cell.color]);
+                    if sym_shape == Some(cell.shape) { score += symbolic_bonus; }
+                    if sym_size == Some(cell.size) { score += symbolic_bonus; }
+                    if sym_color == Some(cell.color) { score += symbolic_bonus; }
+                    score
                 };
 
                 let answer_sim = score_cell(&item.answer);

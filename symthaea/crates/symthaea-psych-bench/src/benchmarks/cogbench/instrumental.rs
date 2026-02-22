@@ -18,7 +18,7 @@ impl InstrumentalLearningBenchmark {
         &self,
         config: &BenchmarkConfig,
         trial_idx: usize,
-    ) -> (f64, f64, f64) {
+    ) -> (f64, f64, f64, f64) {
         let seed = config.trial_seed("cogbench", "instrumental", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
 
@@ -32,11 +32,20 @@ impl InstrumentalLearningBenchmark {
         };
         let mut agent = ActiveInferenceAgent::new(agent_config);
 
+        // Track contingency sensitivity: proportion of correct choices
+        // (action 0 is always the higher-reward action)
+        let mut late_correct = 0u32;
+
         // Phase 1: Win condition (action 0 = 80% reward, action 1 = 20% reward)
         let mut win_errors = Vec::new();
-        for _ in 0..20 {
+        for trial in 0..20 {
             let action_result = agent.select_action();
             let chosen = sample_action(&action_result.action_probabilities, &mut rng_state);
+
+            // Track contingency sensitivity in last 10 trials (after learning)
+            if trial >= 10 && chosen == 0 {
+                late_correct += 1;
+            }
 
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
@@ -94,8 +103,9 @@ impl InstrumentalLearningBenchmark {
         // Optimism bias: learning faster from wins than losses
         let overall_lr = (win_lr + loss_lr) / 2.0;
         let optimism_bias = win_lr - loss_lr;
+        let contingency_sensitivity = late_correct as f64 / 10.0;
 
-        (overall_lr, optimism_bias, agent.stats.exploration_rate)
+        (overall_lr, optimism_bias, agent.stats.exploration_rate, contingency_sensitivity)
     }
 }
 
@@ -111,17 +121,20 @@ impl PsychBenchmark for InstrumentalLearningBenchmark {
         let mut lrs = Vec::new();
         let mut biases = Vec::new();
         let mut exploration_rates = Vec::new();
+        let mut sensitivities = Vec::new();
 
         for trial in 0..config.trials_per_condition {
-            let (lr, bias, er) = self.run_trial(config, trial);
+            let (lr, bias, er, cs) = self.run_trial(config, trial);
             lrs.push(lr);
             biases.push(bias);
             exploration_rates.push(er);
+            sensitivities.push(cs);
         }
 
         result.insert("learning_rate", MetricValue::from_samples(&lrs));
         result.insert("optimism_bias", MetricValue::from_samples(&biases));
         result.insert("exploration_rate", MetricValue::from_samples(&exploration_rates));
+        result.insert("contingency_sensitivity", MetricValue::from_samples(&sensitivities));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;
