@@ -88,6 +88,11 @@
           # Note: ort crate uses load-dynamic, so we need the shared lib
           onnxruntime
 
+          # MuJoCo physics engine (for symthaea-flight mujoco feature)
+          mujoco
+          glfw
+          libGL
+
           # C++ standard library (libstdc++.so.6 for neural bridge tests)
           stdenv.cc.cc.lib
 
@@ -124,12 +129,16 @@
         # ONNX Runtime path for dynamic loading
         onnxPath = "${pkgs.onnxruntime}/lib";
 
+        # MuJoCo library path
+        mujocoPath = "${pkgs.mujoco}/lib";
+
       in {
         devShells.default = pkgs.mkShell {
           inherit buildInputs nativeBuildInputs;
 
           shellHook = ''
-            export LD_LIBRARY_PATH="${libPath}:${onnxPath}:$LD_LIBRARY_PATH"
+            export LD_LIBRARY_PATH="${libPath}:${onnxPath}:${mujocoPath}:$LD_LIBRARY_PATH"
+            export MUJOCO_PATH="${pkgs.mujoco}"
             export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig:${pkgs.alsa-lib}/lib/pkgconfig:${pkgs.dbus}/lib/pkgconfig:$PKG_CONFIG_PATH"
 
             # ONNX Runtime dynamic loading

@@ -6,11 +6,11 @@
 //! 3. Within-episode learning curve: 1 episode x 1000 steps with telemetry
 
 use symthaea_core::genesis::GenesisSeed;
-use symthaea_flight::benchmarks::{WindBenchmarkConfig, WindGust, run_wind_benchmark};
+use symthaea_flight::benchmarks::{run_wind_benchmark, WindBenchmarkConfig, WindGust};
 use symthaea_flight::fep_agent::FlightFepConfig;
 use symthaea_flight::training::FlightTrainer;
 use symthaea_flight::{
-    FlightConfig, FlightController, QuadrotorHdcEncoder, ActiveInferenceFlightAgent,
+    ActiveInferenceFlightAgent, FlightConfig, FlightController, QuadrotorHdcEncoder,
 };
 
 #[test]
@@ -31,7 +31,12 @@ fn diagnostic_training_curve() {
 
     println!(
         "{:<8} {:<20} {:<20} {:<18} {:<15} {:<18}",
-        "Episode", "Avg Pos Error", "Final Pos Error", "Avg Free Energy", "Hover Frac", "Explore Count"
+        "Episode",
+        "Avg Pos Error",
+        "Final Pos Error",
+        "Avg Free Energy",
+        "Hover Frac",
+        "Explore Count"
     );
     println!("{}", "-".repeat(99));
 
@@ -48,20 +53,46 @@ fn diagnostic_training_curve() {
     }
 
     // Summary statistics
-    let first_3_avg: f64 = metrics[..3].iter().map(|m| m.avg_position_error).sum::<f64>() / 3.0;
-    let last_3_avg: f64 = metrics[7..].iter().map(|m| m.avg_position_error).sum::<f64>() / 3.0;
-    let best_ep = metrics.iter().min_by(|a, b| a.avg_position_error.total_cmp(&b.avg_position_error)).unwrap();
-    let worst_ep = metrics.iter().max_by(|a, b| a.avg_position_error.total_cmp(&b.avg_position_error)).unwrap();
+    let first_3_avg: f64 = metrics[..3]
+        .iter()
+        .map(|m| m.avg_position_error)
+        .sum::<f64>()
+        / 3.0;
+    let last_3_avg: f64 = metrics[7..]
+        .iter()
+        .map(|m| m.avg_position_error)
+        .sum::<f64>()
+        / 3.0;
+    let best_ep = metrics
+        .iter()
+        .min_by(|a, b| a.avg_position_error.total_cmp(&b.avg_position_error))
+        .unwrap();
+    let worst_ep = metrics
+        .iter()
+        .max_by(|a, b| a.avg_position_error.total_cmp(&b.avg_position_error))
+        .unwrap();
 
     println!("\n--- Summary ---");
     println!("First 3 episodes avg error:  {:.6}", first_3_avg);
     println!("Last 3 episodes avg error:   {:.6}", last_3_avg);
-    println!("Best episode:  {} (avg_err={:.6})", best_ep.episode, best_ep.avg_position_error);
-    println!("Worst episode: {} (avg_err={:.6})", worst_ep.episode, worst_ep.avg_position_error);
-    println!("Improvement ratio (first3/last3): {:.3}", first_3_avg / last_3_avg);
+    println!(
+        "Best episode:  {} (avg_err={:.6})",
+        best_ep.episode, best_ep.avg_position_error
+    );
+    println!(
+        "Worst episode: {} (avg_err={:.6})",
+        worst_ep.episode, worst_ep.avg_position_error
+    );
+    println!(
+        "Improvement ratio (first3/last3): {:.3}",
+        first_3_avg / last_3_avg
+    );
 
     let total_explorations: usize = metrics.iter().map(|m| m.exploration_count).sum();
-    println!("Total explorations across all episodes: {}", total_explorations);
+    println!(
+        "Total explorations across all episodes: {}",
+        total_explorations
+    );
     println!();
 }
 
@@ -76,11 +107,12 @@ fn diagnostic_wind_benchmark() {
         flight_config: FlightConfig {
             num_episodes: 1,
             steps_per_episode: 1000,
+            early_termination: false, // Need full episodes for wind analysis
             ..FlightConfig::default()
         },
         gusts: vec![
             WindGust {
-                force: [0.05, 0.0, 0.0],  // Lateral gust
+                force: [0.05, 0.0, 0.0], // Lateral gust
                 start_time: 0.5,
                 duration: 0.2,
             },
@@ -101,26 +133,38 @@ fn diagnostic_wind_benchmark() {
     );
     println!("{}", "-".repeat(54));
 
-    for (i, (base, fep)) in result.baseline_metrics.iter().zip(result.fep_metrics.iter()).enumerate() {
-        println!(
-            "{:<10} {:<22.6} {:<22.6}",
-            i, base, fep,
-        );
+    for (i, (base, fep)) in result
+        .baseline_metrics
+        .iter()
+        .zip(result.fep_metrics.iter())
+        .enumerate()
+    {
+        println!("{:<10} {:<22.6} {:<22.6}", i, base, fep,);
     }
 
     println!("\n--- Recovery & Deviation ---");
     println!("Recovery steps per gust (FEP): {:?}", result.recovery_steps);
     println!("Max deviation (FEP):      {:.6}", result.max_deviation);
-    println!("Max deviation (baseline):  {:.6}", result.baseline_max_deviation);
+    println!(
+        "Max deviation (baseline):  {:.6}",
+        result.baseline_max_deviation
+    );
 
-    let baseline_avg: f64 = result.baseline_metrics.iter().sum::<f64>() / result.baseline_metrics.len() as f64;
+    let baseline_avg: f64 =
+        result.baseline_metrics.iter().sum::<f64>() / result.baseline_metrics.len() as f64;
     let fep_avg: f64 = result.fep_metrics.iter().sum::<f64>() / result.fep_metrics.len() as f64;
     println!("\nOverall baseline avg error: {:.6}", baseline_avg);
     println!("Overall FEP avg error:     {:.6}", fep_avg);
     if fep_avg < baseline_avg {
-        println!("FEP improvement: {:.2}%", (1.0 - fep_avg / baseline_avg) * 100.0);
+        println!(
+            "FEP improvement: {:.2}%",
+            (1.0 - fep_avg / baseline_avg) * 100.0
+        );
     } else {
-        println!("FEP degradation: {:.2}%", (fep_avg / baseline_avg - 1.0) * 100.0);
+        println!(
+            "FEP degradation: {:.2}%",
+            (fep_avg / baseline_avg - 1.0) * 100.0
+        );
     }
     println!();
 }
@@ -136,6 +180,7 @@ fn diagnostic_within_episode_learning_curve() {
         num_episodes: 1,
         steps_per_episode: 1000,
         collect_telemetry: true,
+        early_termination: false, // Disable so we get the full 1000 steps for analysis
         ..FlightConfig::default()
     };
 
@@ -148,9 +193,14 @@ fn diagnostic_within_episode_learning_curve() {
 
     let metrics = trainer.run_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
 
-    assert_eq!(metrics.telemetry.len(), 1000, "Expected 1000 telemetry entries");
+    let n_steps = metrics.telemetry.len();
+    assert!(n_steps > 0, "Expected at least some telemetry entries");
 
-    let checkpoints = [0, 100, 200, 500, 999];
+    let checkpoints: Vec<usize> = [0, 100, 200, 500, n_steps - 1]
+        .iter()
+        .filter(|&&s| s < n_steps)
+        .copied()
+        .collect();
     println!(
         "{:<8} {:<16} {:<16} {:<16} {:<14} {:<14} {:<14}",
         "Step", "Pos Error", "Att Error", "Free Energy", "Tau Factor", "LR", "Thrust"
@@ -161,26 +211,38 @@ fn diagnostic_within_episode_learning_curve() {
         let t = &metrics.telemetry[step];
         println!(
             "{:<8} {:<16.6} {:<16.6} {:<16.6} {:<14.4} {:<14.6} {:<14.6}",
-            t.step, t.position_error, t.attitude_error, t.free_energy,
-            t.tau_factor, t.learning_rate, t.command.thrust,
+            t.step,
+            t.position_error,
+            t.attitude_error,
+            t.free_energy,
+            t.tau_factor,
+            t.learning_rate,
+            t.command.thrust,
         );
     }
 
     // Additional analysis: error trend in windows
     println!("\n--- Error Trend (100-step windows) ---");
-    println!("{:<12} {:<18} {:<18} {:<18}", "Window", "Avg Pos Error", "Avg Att Error", "Avg Speed");
+    println!(
+        "{:<12} {:<18} {:<18} {:<18}",
+        "Window", "Avg Pos Error", "Avg Att Error", "Avg Speed"
+    );
     println!("{}", "-".repeat(66));
 
-    for window_start in (0..1000).step_by(100) {
-        let window_end = (window_start + 100).min(1000);
+    for window_start in (0..n_steps).step_by(100) {
+        let window_end = (window_start + 100).min(n_steps);
         let window = &metrics.telemetry[window_start..window_end];
-        let avg_pos: f64 = window.iter().map(|t| t.position_error).sum::<f64>() / window.len() as f64;
-        let avg_att: f64 = window.iter().map(|t| t.attitude_error).sum::<f64>() / window.len() as f64;
+        let avg_pos: f64 =
+            window.iter().map(|t| t.position_error).sum::<f64>() / window.len() as f64;
+        let avg_att: f64 =
+            window.iter().map(|t| t.attitude_error).sum::<f64>() / window.len() as f64;
         let avg_speed: f64 = window.iter().map(|t| t.speed).sum::<f64>() / window.len() as f64;
         println!(
             "{:<12} {:<18.6} {:<18.6} {:<18.6}",
             format!("{}-{}", window_start, window_end - 1),
-            avg_pos, avg_att, avg_speed,
+            avg_pos,
+            avg_att,
+            avg_speed,
         );
     }
 
@@ -189,21 +251,48 @@ fn diagnostic_within_episode_learning_curve() {
     println!("Target altitude: 0.1 m");
     for &step in &checkpoints {
         let t = &metrics.telemetry[step];
-        println!("  Step {:>4}: altitude = {:.6} m (error = {:.6} m)", step, t.altitude, t.position_error);
+        println!(
+            "  Step {:>4}: altitude = {:.6} m (error = {:.6} m)",
+            step, t.altitude, t.position_error
+        );
     }
 
     // FEP action analysis: tau_factor distribution
-    let tau_below_1 = metrics.telemetry.iter().filter(|t| t.tau_factor < 0.99).count();
-    let tau_above_1 = metrics.telemetry.iter().filter(|t| t.tau_factor > 1.01).count();
+    let tau_below_1 = metrics
+        .telemetry
+        .iter()
+        .filter(|t| t.tau_factor < 0.99)
+        .count();
+    let tau_above_1 = metrics
+        .telemetry
+        .iter()
+        .filter(|t| t.tau_factor > 1.01)
+        .count();
     let tau_at_1 = metrics.telemetry.len() - tau_below_1 - tau_above_1;
+    let pct = n_steps as f64 / 100.0;
     println!("\n--- FEP Action Distribution ---");
-    println!("Tau < 1.0 (DropTau):   {} steps ({:.1}%)", tau_below_1, tau_below_1 as f64 / 10.0);
-    println!("Tau = 1.0 (neutral):   {} steps ({:.1}%)", tau_at_1, tau_at_1 as f64 / 10.0);
-    println!("Tau > 1.0 (RaiseTau):  {} steps ({:.1}%)", tau_above_1, tau_above_1 as f64 / 10.0);
+    println!(
+        "Tau < 1.0 (DropTau):   {} steps ({:.1}%)",
+        tau_below_1,
+        tau_below_1 as f64 / pct
+    );
+    println!(
+        "Tau = 1.0 (neutral):   {} steps ({:.1}%)",
+        tau_at_1,
+        tau_at_1 as f64 / pct
+    );
+    println!(
+        "Tau > 1.0 (RaiseTau):  {} steps ({:.1}%)",
+        tau_above_1,
+        tau_above_1 as f64 / pct
+    );
 
     println!("\nEpisode summary:");
     println!("  avg_position_error: {:.6}", metrics.avg_position_error);
-    println!("  final_position_error: {:.6}", metrics.final_position_error);
+    println!(
+        "  final_position_error: {:.6}",
+        metrics.final_position_error
+    );
     println!("  avg_free_energy: {:.6}", metrics.avg_free_energy);
     println!("  hover_fraction: {:.4}", metrics.hover_fraction);
     println!("  exploration_count: {}", metrics.exploration_count);

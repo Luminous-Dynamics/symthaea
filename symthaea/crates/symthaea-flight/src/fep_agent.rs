@@ -6,11 +6,10 @@
 //! prior precision — true Active Inference as precision-weighted meta-learning.
 
 use symthaea_fep::{
-    ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation,
-    TemporalDifferenceLearningConfig,
+    ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation, TemporalDifferenceLearningConfig,
 };
 
-use crate::types::{FlightState, FlightSetpoint, QuadrotorCommand};
+use crate::types::{FlightSetpoint, FlightState, QuadrotorCommand};
 
 /// Result of a cognitive tick from the FEP agent.
 #[derive(Debug, Clone)]
@@ -94,6 +93,9 @@ pub struct FlightFepConfig {
     /// Use rule-based policy instead of softmax action selection (default: true).
     /// Rules use observation channels directly for reliable modulation.
     pub use_rule_based_policy: bool,
+    /// Enable extended 10D observation (adds human_danger + mission_progress).
+    /// Used in the Kinetic Sacrifice scenario. Default: false.
+    pub extended_observation: bool,
 }
 
 impl Default for FlightFepConfig {
@@ -102,12 +104,13 @@ impl Default for FlightFepConfig {
             inference_iterations: 5,
             action_temperature: 0.5,
             exploration_fe_threshold: 2.0,
-            exploration_patience: 20,    // Wait longer before injecting noise
+            exploration_patience: 20, // Wait longer before injecting noise
             exploration_magnitude: 0.02, // Subtle noise — avoid destabilizing hover
             enable_td_learning: true,
             td_discount: 0.99,
             td_lambda: 0.8,
             use_rule_based_policy: true,
+            extended_observation: false,
         }
     }
 }
@@ -146,10 +149,11 @@ impl ActiveInferenceFlightAgent {
             ..TemporalDifferenceLearningConfig::default()
         };
 
+        let obs_dim = if config.extended_observation { 10 } else { 8 };
         let agent_config = ActiveInferenceAgentConfig {
-            state_dim: 8,       // expanded observation space
-            obs_dim: 8,
-            num_actions: 6,     // The 6 FlightActions
+            state_dim: obs_dim,
+            obs_dim,
+            num_actions: 6, // The 6 FlightActions
             inference_iterations: config.inference_iterations,
             belief_learning_rate: 0.1,
             planning_horizon: 1, // Single-step (fast cognitive tick)
@@ -205,9 +209,114 @@ impl ActiveInferenceFlightAgent {
         let angular_speed = (state.angular_speed() / 20.0).min(1.0);
 
         vec![
-            norm_pos, norm_att, norm_vel,
-            pe_trend, tau_ema_norm, surprise_rate, alt_err_signed, angular_speed,
+            norm_pos,
+            norm_att,
+            norm_vel,
+            pe_trend,
+            tau_ema_norm,
+            surprise_rate,
+            alt_err_signed,
+            angular_speed,
         ]
+    }
+
+    /// Build an extended 10D observation vector with human danger + mission progress.
+    ///
+    /// Used in the Kinetic Sacrifice scenario. Channels 8-9:
+    /// - `obs[8]` = human_danger (0.0 = safe, 1.0 = imminent impact)
+    /// - `obs[9]` = mission_progress (0.0 = at start, 1.0 = at target)
+    pub fn build_extended_observation(
+        &self,
+        state: &FlightState,
+        setpoint: &FlightSetpoint,
+        human_danger: f64,
+        mission_progress: f64,
+    ) -> Vec<f64> {
+        let mut obs = self.build_observation(state, setpoint);
+        obs.push(human_danger.clamp(0.0, 1.0));
+        obs.push(mission_progress.clamp(0.0, 1.0));
+        obs
+    }
+
+    /// Perform a cognitive tick with extended observation (for sacrifice scenario).
+    pub fn step_extended(
+        &mut self,
+        state: &FlightState,
+        setpoint: &FlightSetpoint,
+        human_danger: f64,
+        mission_progress: f64,
+    ) -> FlightFepResult {
+        let obs_values =
+            self.build_extended_observation(state, setpoint, human_danger, mission_progress);
+
+        let obs = Observation::new(obs_values.clone(), 1.0, "flight_extended");
+
+        let perception = self.agent.perceive(&obs);
+        let free_energy = perception.free_energy.total;
+        let prediction_error = perception.free_energy.prediction_error;
+
+        // Boost free energy proportional to human_danger (safety prior violation)
+        let danger_fe_boost = human_danger * 10.0; // Catastrophic prediction error
+        let effective_fe = free_energy + danger_fe_boost;
+
+        let action = if self.config.use_rule_based_policy {
+            if human_danger > 0.5 {
+                // Overwhelming danger — maximum reactivity
+                FlightAction::DropTau
+            } else {
+                self.rule_based_action(&obs_values)
+            }
+        } else {
+            let action_result = self.agent.select_action();
+            self.agent.act(action_result.action);
+            if self.prev_prediction_error > 0.0 {
+                self.agent.learn_from_outcome(action_result.action, &obs);
+            }
+            FlightAction::from_index(action_result.action)
+        };
+
+        let mut result = FlightFepResult {
+            free_energy: effective_fe,
+            prediction_error,
+            prior_precision: self.agent.precision.prior_precision,
+            ..FlightFepResult::default()
+        };
+
+        match action {
+            FlightAction::DropTau => {
+                result.tau_factor = if human_danger > 0.5 { 0.5 } else { 0.85 };
+            }
+            FlightAction::RaiseTau => {
+                result.tau_factor = 1.15;
+            }
+            FlightAction::BoostLearningRate => {
+                result.learning_rate_factor = 1.5;
+            }
+            FlightAction::ReduceLearningRate => {
+                result.learning_rate_factor = 0.6;
+            }
+            FlightAction::ShiftAttention => {
+                result.tau_factor = 1.0;
+                result.learning_rate_factor = 1.0;
+            }
+            FlightAction::ExplorationBurst => {
+                let mag = self.config.exploration_magnitude;
+                result.exploration_noise = Some(QuadrotorCommand {
+                    thrust: mag * QuadrotorCommand::MAX_THRUST * 0.1,
+                    roll_moment: mag * QuadrotorCommand::MAX_MOMENT_RP,
+                    pitch_moment: mag * QuadrotorCommand::MAX_MOMENT_RP,
+                    yaw_moment: mag * QuadrotorCommand::MAX_MOMENT_YAW,
+                });
+            }
+        }
+
+        // Update tracking state
+        self.prev_prediction_error = setpoint.position_error_magnitude(state);
+        self.tau_ema = 0.8 * self.tau_ema + 0.2 * result.tau_factor as f64;
+        self.prev_fe = self.current_fe;
+        self.current_fe = effective_fe;
+
+        result
     }
 
     /// Rule-based action selection from observation channels.
@@ -242,11 +351,7 @@ impl ActiveInferenceFlightAgent {
     /// Perform a cognitive tick: observe errors, update beliefs, select action.
     ///
     /// Called at 25Hz (every 20th motor step).
-    pub fn step(
-        &mut self,
-        state: &FlightState,
-        setpoint: &FlightSetpoint,
-    ) -> FlightFepResult {
+    pub fn step(&mut self, state: &FlightState, setpoint: &FlightSetpoint) -> FlightFepResult {
         let obs_values = self.build_observation(state, setpoint);
 
         let obs = Observation::new(
@@ -435,7 +540,10 @@ mod tests {
                 had_exploration = true;
             }
         }
-        assert!(had_exploration, "Should eventually trigger exploration after patience exhausted");
+        assert!(
+            had_exploration,
+            "Should eventually trigger exploration after patience exhausted"
+        );
     }
 
     #[test]

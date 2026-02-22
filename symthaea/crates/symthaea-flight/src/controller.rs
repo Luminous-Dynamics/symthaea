@@ -6,8 +6,7 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{
-    ContinuousHV, HdcLtcUnifiedNetwork, HDC_DIMENSION,
-    UnifiedConfig, UnifiedNetworkConfig,
+    ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig, HDC_DIMENSION,
 };
 
 use crate::types::{FlightConfig, QuadrotorCommand};
@@ -34,8 +33,8 @@ impl FlightController {
     /// Create a new controller from a genesis seed and config.
     pub fn new(genesis: &GenesisSeed, config: &FlightConfig) -> Self {
         let neuron_config = UnifiedConfig {
-            tau_base: 0.05,               // 50ms — faster than default for reactive control
-            backbone_tau: 0.3,             // Moderate state dependency
+            tau_base: 0.05,    // 50ms — faster than default for reactive control
+            backbone_tau: 0.3, // Moderate state dependency
             dimension: HDC_DIMENSION,
             learning_rate: config.learning_rate,
             ..UnifiedConfig::default()
@@ -151,7 +150,12 @@ impl FlightController {
             fast_tanh(raw[3]) * QuadrotorCommand::MAX_MOMENT_YAW,
         ];
 
-        let tgt = [target.thrust, target.roll_moment, target.pitch_moment, target.yaw_moment];
+        let tgt = [
+            target.thrust,
+            target.roll_moment,
+            target.pitch_moment,
+            target.yaw_moment,
+        ];
 
         // Compute error (pred - target)
         let errors = [
@@ -211,30 +215,33 @@ impl FlightController {
         for layer_idx in (0..n_layers).rev() {
             let layer_input = self.network.layer_input(layer_idx, sensor_hv);
 
-            // Get the layer output before this layer's update (for propagation)
-            let layer_output = if layer_idx > 0 {
-                self.network
-                    .output_at_layer(layer_idx - 1)
-                    .cloned()
+            // Get the previous layer's output (for gradient-based target propagation)
+            let prev_layer_output = if layer_idx > 0 {
+                self.network.output_at_layer(layer_idx - 1).cloned()
             } else {
                 None
             };
 
+            // Collect d_input gradients from all neurons for inter-layer propagation
+            let mut avg_d_input = ContinuousHV::zero(dim);
+            let mut neuron_count = 0usize;
+
             if let Some(layer) = self.network.layer_mut(layer_idx) {
                 for neuron in layer.iter_mut() {
                     let grads = neuron.backward(&layer_input, &target_hv, dt);
+                    avg_d_input = avg_d_input.add(&grads.d_input);
+                    neuron_count += 1;
                     neuron.apply_gradients(&grads, lr);
                 }
             }
 
-            // Propagate target to previous layer using difference-target approximation
-            if let Some(prev_output) = layer_output {
-                let current_output_at_layer = self.network
-                    .output_at_layer(layer_idx)
-                    .cloned()
-                    .unwrap_or_else(|| ContinuousHV::zero(dim));
-                let diff = target_hv.subtract(&current_output_at_layer);
-                target_hv = prev_output.add(&diff.scale(0.5));
+            // Propagate gradient to previous layer using accumulated d_input.
+            // target_prev = prev_output - α * avg(d_input) — gradient-based target propagation.
+            if let Some(prev_output) = prev_layer_output {
+                if neuron_count > 0 {
+                    let scale = 1.0 / neuron_count as f32;
+                    target_hv = prev_output.subtract(&avg_d_input.scale(scale));
+                }
             }
         }
     }
@@ -242,11 +249,7 @@ impl FlightController {
     /// Train ONLY the output projection weights (no network BPTT).
     ///
     /// Used for ablation studies comparing full BPTT vs output-layer-only training.
-    pub fn train_output_only(
-        &mut self,
-        target: &QuadrotorCommand,
-        lr_override: Option<f32>,
-    ) {
+    pub fn train_output_only(&mut self, target: &QuadrotorCommand, lr_override: Option<f32>) {
         let lr = lr_override.unwrap_or(self.learning_rate);
         let output_lr = lr * (HDC_DIMENSION as f32).sqrt();
         let output_hv = self.network.output().normalize();
@@ -268,8 +271,18 @@ impl FlightController {
             fast_tanh(raw[2]) * QuadrotorCommand::MAX_MOMENT_RP,
             fast_tanh(raw[3]) * QuadrotorCommand::MAX_MOMENT_YAW,
         ];
-        let tgt = [target.thrust, target.roll_moment, target.pitch_moment, target.yaw_moment];
-        let errors = [pred[0] - tgt[0], pred[1] - tgt[1], pred[2] - tgt[2], pred[3] - tgt[3]];
+        let tgt = [
+            target.thrust,
+            target.roll_moment,
+            target.pitch_moment,
+            target.yaw_moment,
+        ];
+        let errors = [
+            pred[0] - tgt[0],
+            pred[1] - tgt[1],
+            pred[2] - tgt[2],
+            pred[3] - tgt[3],
+        ];
 
         let s0 = sigmoid(raw[0]);
         let d_raw = [
@@ -304,6 +317,43 @@ impl FlightController {
                 }
             }
         }
+    }
+
+    /// Normalize all neuron hidden states to unit norm.
+    ///
+    /// Prevents hidden state drift during long episodes by capping the
+    /// state magnitude. Should be called periodically (e.g., every 100 steps).
+    pub fn normalize_states(&mut self) {
+        for layer_idx in 0..self.network.n_layers() {
+            if let Some(layer) = self.network.layer_mut(layer_idx) {
+                for neuron in layer.iter_mut() {
+                    let norm = neuron.state().norm();
+                    if norm > 1.5 {
+                        let normalized = neuron.state().normalize();
+                        *neuron.state_mut() = normalized;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Warmup: pre-train the output projection on static (sensor_hv, target) pairs.
+    ///
+    /// Runs `n_steps` gradient updates using the provided samples, giving the
+    /// output weights a reasonable initial policy before the flight loop starts.
+    pub fn warmup(
+        &mut self,
+        samples: &[(ContinuousHV, QuadrotorCommand)],
+        n_steps: usize,
+        lr: f32,
+    ) {
+        for step in 0..n_steps {
+            let (ref hv, ref target) = samples[step % samples.len()];
+            self.forward(hv, 0.002);
+            self.train_step(hv, target, 0.002, Some(lr));
+        }
+        // Reset network state after warmup so episodes start clean
+        self.network.reset();
     }
 
     /// Set the learning rate directly.
@@ -367,7 +417,11 @@ mod tests {
         let cmd = ctrl.forward(&sensor, 0.002);
 
         // Thrust should be in valid range
-        assert!(cmd.thrust >= 0.0, "Thrust should be non-negative: {}", cmd.thrust);
+        assert!(
+            cmd.thrust >= 0.0,
+            "Thrust should be non-negative: {}",
+            cmd.thrust
+        );
         assert!(
             cmd.thrust <= QuadrotorCommand::MAX_THRUST,
             "Thrust should be <= MAX: {}",

@@ -338,6 +338,8 @@ nix-daemon = ["symthaea-nix", "symthaea-nix/daemon"]
 identity = ["ed25519-dalek", "sha2"]        # Ed25519 signatures, capability gating
 physics = ["dep:symthaea-physics"]           # Tokamak plasma encoding, C-Mod adapter
 flight = ["dep:symthaea-flight"]            # HDC-LTC quadrotor flight control via FEP Active Inference
+flight-mujoco = ["flight", "symthaea-flight/mujoco"]   # Flight control with MuJoCo physics
+flight-swarm = ["flight", "symthaea-flight/swarm"]     # Parallel swarm training via MuJoCo + rayon
 
 # ── Database backends ───────────────────────────────────────────────
 # DuckDB is an unconditional dep. Others deferred:
@@ -423,6 +425,26 @@ path = "src/bin/symthaea-story.rs"
 [[example]]
 name = "quadrotor_hover"
 required-features = ["flight"]
+
+[[example]]
+name = "quadrotor_formation"
+required-features = ["flight"]
+
+[[example]]
+name = "mujoco_vs_simple_benchmark"
+required-features = ["flight-mujoco"]
+
+[[example]]
+name = "mujoco_flight_viewer"
+required-features = ["flight-mujoco"]
+
+[[example]]
+name = "mujoco_swarm_training"
+required-features = ["flight-swarm"]
+
+[[example]]
+name = "kinetic_sacrifice"
+required-features = ["flight-mujoco"]
 
 [[example]]
 name = "demo_self_analysis"

@@ -119,15 +119,12 @@ impl FormationShape {
                     .map(|i| [i as f64 * spacing - half, 0.0, 0.0])
                     .collect()
             }
-            FormationShape::Circle { radius } => {
-                (0..n_agents)
-                    .map(|i| {
-                        let angle =
-                            2.0 * std::f64::consts::PI * i as f64 / n_agents as f64;
-                        [radius * angle.cos(), radius * angle.sin(), 0.0]
-                    })
-                    .collect()
-            }
+            FormationShape::Circle { radius } => (0..n_agents)
+                .map(|i| {
+                    let angle = 2.0 * std::f64::consts::PI * i as f64 / n_agents as f64;
+                    [radius * angle.cos(), radius * angle.sin(), 0.0]
+                })
+                .collect(),
             FormationShape::Vee { angle, spacing } => {
                 let mut setpoints = vec![[0.0, 0.0, 0.0]]; // Leader at center
                 for i in 1..n_agents {
@@ -174,7 +171,10 @@ mod tests {
         // All at distance 1.0 from origin
         for sp in &setpoints {
             let dist = (sp[0] * sp[0] + sp[1] * sp[1]).sqrt();
-            assert!((dist - 1.0).abs() < 1e-10, "Agent at distance {dist} from center");
+            assert!(
+                (dist - 1.0).abs() < 1e-10,
+                "Agent at distance {dist} from center"
+            );
         }
     }
 
