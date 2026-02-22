@@ -995,4 +995,356 @@ mod tests {
         assert!(report.contains("CORE SELF"));
         assert!(report.contains("AUTOBIOGRAPHICAL SELF"));
     }
+
+    // ── complete_goal ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_complete_goal_marks_progress_and_records_episode() {
+        let mut model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+
+        model.add_goal("Build a rocket", 0.9);
+        model.add_goal("Bake bread", 0.5);
+        assert_eq!(model.core.goals.len(), 2);
+
+        model.complete_goal(0);
+
+        // Progress should be 1.0 for the completed goal
+        assert!((model.core.goals[0].progress - 1.0).abs() < f64::EPSILON);
+        // Second goal untouched
+        assert!((model.core.goals[1].progress - 0.0).abs() < f64::EPSILON);
+        // Stats updated
+        assert_eq!(model.stats.goals_completed, 1);
+        // Episode recorded for the completion
+        assert!(!model.autobio.life_story.is_empty());
+        let last_ep = model.autobio.life_story.last().unwrap();
+        assert!(last_ep.description.starts_with("Completed:"));
+    }
+
+    #[test]
+    fn test_complete_goal_out_of_bounds_is_noop() {
+        let mut model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+        model.add_goal("Only goal", 0.5);
+
+        // Out-of-bounds index should not panic or change stats
+        model.complete_goal(99);
+        assert_eq!(model.stats.goals_completed, 0);
+    }
+
+    // ── boost_coherence ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_boost_coherence_increases_self_phi() {
+        let mut model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+
+        let phi_before = model.self_phi();
+        model.boost_coherence(0.1);
+        let phi_after = model.self_phi();
+
+        assert!(
+            phi_after >= phi_before,
+            "self_phi should increase after boost: before={}, after={}",
+            phi_before,
+            phi_after
+        );
+        assert!((phi_after - (phi_before + 0.1).clamp(0.0, 1.0)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_boost_coherence_clamps_to_one() {
+        let mut model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+
+        // Boost by a huge amount
+        model.boost_coherence(100.0);
+        assert!((model.self_phi() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_boost_coherence_negative_clamps_to_zero() {
+        let mut model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+
+        // Boost by a large negative to drive it to zero
+        model.boost_coherence(-100.0);
+        assert!((model.self_phi() - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ── unified_encoding / unified_self ──────────────────────────────────
+
+    #[test]
+    fn test_unified_encoding_is_nonzero() {
+        let model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+
+        let enc = model.unified_encoding();
+        // The initial unified_self is BinaryHV::random(999), so it should not be all zeros
+        assert_ne!(*enc, BinaryHV::zero(), "unified encoding should be non-zero");
+    }
+
+    #[test]
+    fn test_unified_self_equals_unified_encoding() {
+        let model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+
+        // unified_self() is documented as an alias for unified_encoding()
+        assert_eq!(
+            model.unified_self(),
+            model.unified_encoding(),
+            "unified_self and unified_encoding should return the same reference"
+        );
+    }
+
+    // ── current_goals / core_values ──────────────────────────────────────
+
+    #[test]
+    fn test_current_goals_excludes_completed() {
+        let mut model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+
+        model.add_goal("Active goal", 0.9);
+        model.add_goal("Another active goal", 0.5);
+        model.add_goal("Will be completed", 0.3);
+
+        // Complete the last one (index 2 after sort: sorted by priority desc)
+        // After add_goal sorting: [Active goal 0.9, Another active goal 0.5, Will be completed 0.3]
+        model.complete_goal(2); // "Will be completed"
+
+        let active = model.current_goals();
+        assert_eq!(active.len(), 2);
+        // Should only contain uncompleted goals
+        for (desc, hv) in &active {
+            assert_ne!(desc, "Will be completed");
+            assert_ne!(*hv, &BinaryHV::zero());
+        }
+    }
+
+    #[test]
+    fn test_current_goals_empty_when_no_goals() {
+        let model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+        assert!(model.current_goals().is_empty());
+    }
+
+    #[test]
+    fn test_core_values_returns_initialized_values() {
+        let model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+
+        let values = model.core_values();
+        // NarrativeSelfModel::new initializes 3 core values
+        assert_eq!(values.len(), 3);
+
+        let names: Vec<&str> = values.iter().map(|(n, _)| n.as_str()).collect();
+        assert!(names.contains(&"understanding"));
+        assert!(names.contains(&"truthfulness"));
+        assert!(names.contains(&"beneficence"));
+
+        // Each value encoding should be non-zero (created with BinaryHV::random)
+        for (_, hv) in &values {
+            assert_ne!(**hv, BinaryHV::zero());
+        }
+    }
+
+    // ── structured_report ────────────────────────────────────────────────
+
+    #[test]
+    fn test_structured_report_fields() {
+        let mut model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+
+        model.add_goal("Goal A", 0.8);
+        model.add_goal("Goal B", 0.4);
+
+        let input = BinaryHV::random(7);
+        model.process_experience(&input, "Important event", true, 0.6, 0.8);
+
+        let report = model.structured_report();
+
+        // Self-phi should be in valid range
+        assert!(report.self_phi >= 0.0 && report.self_phi <= 1.0);
+        // Coherence should be in valid range
+        assert!(report.coherence >= 0.0 && report.coherence <= 2.0);
+        // Proto/core/autobio coherence present
+        assert!(report.proto_coherence >= -1.0);
+        assert!(report.core_coherence >= -1.0);
+        assert!(report.autobio_coherence >= 0.0);
+        // Active goals: 2 added, none completed
+        assert_eq!(report.active_goals, 2);
+        // Core values: 3 initialized by default
+        assert_eq!(report.core_values, 3);
+        // Traits: 3 initialized by default
+        assert_eq!(report.traits, 3);
+        // 1 experience with significance >= 0.6 (threshold) recorded
+        assert_eq!(report.episodes_recorded, 1);
+        // 1 update processed
+        assert_eq!(report.total_updates, 1);
+    }
+
+    // ── AutobiographicalSelf ─────────────────────────────────────────────
+
+    #[test]
+    fn test_autobiographical_record_episode() {
+        let mut autobio = AutobiographicalSelf::new();
+        let concept_before = autobio.self_concept;
+
+        // Add a few low-significance episodes first so the next episode gets a
+        // different seed (seed = life_story.len()) and thus a distinct encoding.
+        autobio.add_episode("Setup event", 0.1, 0.2);
+
+        autobio.add_episode("Important day", 0.8, 0.9);
+        assert_eq!(autobio.life_story.len(), 2);
+
+        let ep = &autobio.life_story[1];
+        assert_eq!(ep.description, "Important day");
+        assert!((ep.valence - 0.8).abs() < f64::EPSILON);
+        assert!((ep.significance - 0.9).abs() < f64::EPSILON);
+
+        // Significant episode (>0.5) should update self_concept via bundle
+        // The concept after adding two episodes (one significant) differs from
+        // its state after just one low-significance episode.
+        assert_ne!(
+            autobio.self_concept, concept_before,
+            "self_concept should be updated after a significant episode"
+        );
+    }
+
+    #[test]
+    fn test_autobiographical_update_personality() {
+        let mut autobio = AutobiographicalSelf::new();
+
+        autobio.add_trait("courageous", 0.7);
+        autobio.add_trait("patient", 0.6);
+
+        assert_eq!(autobio.traits.len(), 2);
+        assert_eq!(autobio.traits[0].name, "courageous");
+        assert!((autobio.traits[0].strength - 0.7).abs() < f64::EPSILON);
+        // New traits start with consistency 1.0
+        assert!((autobio.traits[0].consistency - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_autobiographical_narrative_coherence() {
+        let mut autobio = AutobiographicalSelf::new();
+
+        // With no episodes, narrative_coherence stays at initial value
+        assert!((autobio.narrative_coherence - 1.0).abs() < f64::EPSILON);
+
+        // Add several episodes to trigger coherence update
+        for i in 0..5 {
+            autobio.runtime_secs = i as f64 * 10.0;
+            autobio.add_episode(&format!("Event {}", i), 0.3, 0.5);
+        }
+
+        // Coherence should have been updated (it is recomputed on each add_episode with >=2 eps)
+        // The exact value depends on random causal links, but it should be in [0, 1]
+        assert!(autobio.narrative_coherence >= 0.0);
+        assert!(autobio.narrative_coherence <= 1.0);
+    }
+
+    #[test]
+    fn test_autobiographical_coherence_with_traits_and_values() {
+        let mut autobio = AutobiographicalSelf::new();
+
+        autobio.add_trait("bold", 0.8);
+        autobio.add_value("justice", 0.9);
+
+        let coh = autobio.coherence();
+        // coherence = (identity_stability + narrative_coherence + trait_coherence + value_coherence) / 4
+        // trait_coherence = 0.8 * 1.0 = 0.8, value_coherence = 0.9
+        // identity_stability = 1.0, narrative_coherence = 1.0
+        let expected = (1.0 + 1.0 + 0.8 + 0.9) / 4.0;
+        assert!(
+            (coh - expected).abs() < f64::EPSILON,
+            "coherence={}, expected={}",
+            coh,
+            expected
+        );
+    }
+
+    // ── ProtoSelf / CoreSelf construction ────────────────────────────────
+
+    #[test]
+    fn test_proto_self_defaults() {
+        let proto = ProtoSelf::new();
+
+        assert!((proto.valence - 0.0).abs() < f64::EPSILON);
+        assert!((proto.arousal - 0.5).abs() < f64::EPSILON);
+        assert!((proto.primordial_phi - 0.0).abs() < f64::EPSILON);
+        assert_eq!(proto.sensory_now, BinaryHV::zero());
+        assert_ne!(proto.body_state, BinaryHV::zero(), "body_state is random, should be non-zero");
+    }
+
+    #[test]
+    fn test_proto_self_update_changes_state() {
+        let mut proto = ProtoSelf::new();
+
+        let input = BinaryHV::random(123);
+        proto.update(&input, true, 0.8);
+
+        // Valence should shift positive on success
+        assert!(proto.valence > 0.0);
+        // Arousal should shift toward effort=0.8
+        assert!(proto.arousal > 0.5);
+
+        // After a second update the sensory_now is bundle of 3 vectors
+        // (prev bundle + new input) so majority vote is no longer tied.
+        let input2 = BinaryHV::random(456);
+        proto.update(&input2, true, 0.6);
+
+        // After two updates, valence should still be positive
+        assert!(proto.valence > 0.0);
+        // Arousal should remain above the initial 0.5
+        assert!(proto.arousal > 0.5);
+    }
+
+    #[test]
+    fn test_core_self_defaults() {
+        let core = CoreSelf::new();
+
+        assert!(core.goals.is_empty());
+        assert_eq!(core.context, BinaryHV::zero());
+        assert!(core.working_memory.is_empty());
+        assert!(core.attention_focus.is_none());
+        assert!((core.agency - 1.0).abs() < f64::EPSILON);
+        assert!((core.efficacy - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_core_self_working_memory_capacity() {
+        let mut core = CoreSelf::new();
+
+        // Fill working memory beyond Miller's 7
+        for i in 0..10 {
+            let hv = BinaryHV::random(i);
+            core.update_context(&hv);
+        }
+
+        // Should be capped at 7
+        assert_eq!(core.working_memory.len(), 7);
+    }
+
+    #[test]
+    fn test_core_self_coherence_without_goals() {
+        let core = CoreSelf::new();
+        // With no goals, coherence returns 0.5
+        assert!((core.coherence() - 0.5).abs() < f64::EPSILON);
+    }
+
+    // ── Edge cases ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_narrative_with_no_episodes_report() {
+        let model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+
+        let report = model.structured_report();
+        assert_eq!(report.episodes_recorded, 0);
+        assert_eq!(report.total_updates, 0);
+        // Coherence should still be valid (non-NaN, non-negative)
+        assert!(!report.coherence.is_nan());
+        assert!(report.coherence >= 0.0);
+    }
+
+    #[test]
+    fn test_valence_clamp_on_episode() {
+        let mut autobio = AutobiographicalSelf::new();
+
+        // Valence beyond range should be clamped
+        autobio.add_episode("extreme positive", 5.0, 0.5);
+        assert!((autobio.life_story[0].valence - 1.0).abs() < f64::EPSILON);
+
+        autobio.add_episode("extreme negative", -5.0, 0.5);
+        assert!((autobio.life_story[1].valence - (-1.0)).abs() < f64::EPSILON);
+    }
 }

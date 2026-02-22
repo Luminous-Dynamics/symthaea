@@ -211,3 +211,126 @@ impl AmbientContexts {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_audio_category_variants() {
+        assert_ne!(AudioCategory::Music, AudioCategory::Speech);
+        assert_eq!(AudioCategory::Unknown, AudioCategory::Unknown);
+        assert_ne!(AudioCategory::Nature, AudioCategory::Urban);
+    }
+
+    #[test]
+    fn test_audio_pattern_new() {
+        let pattern = AudioPattern::new("test_pattern", AudioCategory::Music);
+        assert_eq!(pattern.name, "test_pattern");
+        assert_eq!(pattern.category, AudioCategory::Music);
+        assert_eq!(pattern.frame_count, 0);
+        assert_eq!(pattern.mean_spectral_centroid, 0.0);
+        assert!(pattern.timbre_exemplars.is_empty());
+        assert!(pattern.rhythm_exemplars.is_empty());
+    }
+
+    #[test]
+    fn test_audio_pattern_prototypes_are_zero() {
+        let pattern = AudioPattern::new("test", AudioCategory::Speech);
+        assert!(pattern.timbre_prototype.values.iter().all(|v| *v == 0.0));
+        assert!(pattern.rhythm_prototype.values.iter().all(|v| *v == 0.0));
+        assert!(pattern.envelope_prototype.values.iter().all(|v| *v == 0.0));
+        assert!(pattern.context_prototype.values.iter().all(|v| *v == 0.0));
+    }
+
+    #[test]
+    fn test_audio_pattern_freq_signatures_zero() {
+        let pattern = AudioPattern::new("test", AudioCategory::Nature);
+        assert!(pattern.rhythm_freq_signature.iter().all(|v| *v == 0.0));
+        assert!(pattern.timbre_freq_signature.iter().all(|v| *v == 0.0));
+    }
+
+    #[test]
+    fn test_audio_pattern_mel_bands_correct_size() {
+        let pattern = AudioPattern::new("test", AudioCategory::Urban);
+        assert_eq!(pattern.mean_mel_bands.len(), MEL_BANDS);
+        assert_eq!(pattern.mel_bands_sum.len(), MEL_BANDS);
+    }
+
+    #[test]
+    fn test_audio_pattern_clone() {
+        let mut pattern = AudioPattern::new("original", AudioCategory::Mechanical);
+        pattern.mean_spectral_centroid = 3000.0;
+        pattern.frame_count = 42;
+        let cloned = pattern.clone();
+        assert_eq!(cloned.name, "original");
+        assert_eq!(cloned.category, AudioCategory::Mechanical);
+        assert_eq!(cloned.mean_spectral_centroid, 3000.0);
+        assert_eq!(cloned.frame_count, 42);
+    }
+
+    #[test]
+    fn test_pattern_similarity_clone() {
+        let sim = PatternSimilarity {
+            timbre: 0.8,
+            rhythm: 0.6,
+            envelope: 0.7,
+            rhythm_freq: 0.5,
+            timbre_freq: 0.4,
+            spectral: 0.9,
+            multi_scale: 0.3,
+            combined: 0.65,
+        };
+        let cloned = sim.clone();
+        assert_eq!(cloned.combined, 0.65);
+        assert_eq!(cloned.timbre, 0.8);
+    }
+
+    // =========================================================================
+    // AmbientContexts tests
+    // =========================================================================
+
+    #[test]
+    fn test_ambient_contexts_baseline() {
+        let contexts = AmbientContexts::baseline();
+        assert_eq!(contexts.office.name, "Office");
+        assert_eq!(contexts.office.category, AudioCategory::Urban);
+        assert_eq!(contexts.traffic.name, "Traffic");
+        assert_eq!(contexts.nature.name, "Nature");
+        assert_eq!(contexts.nature.category, AudioCategory::Nature);
+        assert_eq!(contexts.home_quiet.name, "HomeQuiet");
+        assert_eq!(contexts.home_quiet.category, AudioCategory::Silence);
+        assert_eq!(contexts.cafe.name, "Cafe");
+    }
+
+    #[test]
+    fn test_ambient_contexts_have_nonzero_signatures() {
+        let contexts = AmbientContexts::baseline();
+        // All contexts should have some nonzero frequency signature entries
+        assert!(contexts.office.rhythm_freq_signature.iter().any(|v| *v > 0.0));
+        assert!(contexts.traffic.rhythm_freq_signature.iter().any(|v| *v > 0.0));
+        assert!(contexts.nature.timbre_freq_signature.iter().any(|v| *v > 0.0));
+        assert!(contexts.cafe.rhythm_freq_signature.iter().any(|v| *v > 0.0));
+    }
+
+    #[test]
+    fn test_ambient_contexts_home_quiet_lowest_energy() {
+        let contexts = AmbientContexts::baseline();
+        let home_max: f32 = contexts
+            .home_quiet
+            .rhythm_freq_signature
+            .iter()
+            .copied()
+            .fold(0.0f32, f32::max);
+        let traffic_max: f32 = contexts
+            .traffic
+            .rhythm_freq_signature
+            .iter()
+            .copied()
+            .fold(0.0f32, f32::max);
+        assert!(
+            home_max < traffic_max,
+            "Home quiet should have lower rhythm energy than traffic"
+        );
+    }
+}

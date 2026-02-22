@@ -530,3 +530,232 @@ pub struct TopologyMetrics {
     /// Topological complexity (loops + voids)
     pub complexity: f64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    /// Helper: build a small genome suitable for fast tests.
+    fn small_genome(topology: TopologyGene) -> ArchitectureGenome {
+        ArchitectureGenome {
+            num_nodes: 8,
+            hdc_dim: 256,
+            hierarchy_depth: 2,
+            num_modules: 2,
+            connection_density: 0.4,
+            bridge_ratio: 0.3,
+            topology_type: topology,
+            seed: 42,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_from_genome_node_count_matches() {
+        for &n in &[4usize, 8, 16] {
+            let genome = ArchitectureGenome {
+                num_nodes: n,
+                hdc_dim: 256,
+                ..Default::default()
+            };
+            let arch = DecodedArchitecture::from_genome(&genome);
+            assert_eq!(arch.nodes.len(), n);
+            assert_eq!(arch.adjacency.len(), n);
+            assert_eq!(arch.tau_values.len(), n);
+            assert_eq!(arch.module_assignment.len(), n);
+            assert_eq!(arch.level_assignment.len(), n);
+        }
+    }
+
+    #[test]
+    fn test_from_genome_preserves_genome() {
+        let genome = small_genome(TopologyGene::Ring);
+        let arch = DecodedArchitecture::from_genome(&genome);
+        assert_eq!(arch.genome.num_nodes, genome.num_nodes);
+        assert_eq!(arch.genome.topology_type, genome.topology_type);
+        assert_eq!(arch.genome.hdc_dim, genome.hdc_dim);
+    }
+
+    #[test]
+    fn test_tau_values_follow_hierarchy() {
+        let genome = ArchitectureGenome {
+            num_nodes: 6,
+            hierarchy_depth: 3,
+            base_tau: 1000.0,
+            tau_ratio: 0.5,
+            hdc_dim: 256,
+            topology_type: TopologyGene::Ring,
+            ..Default::default()
+        };
+        let arch = DecodedArchitecture::from_genome(&genome);
+
+        // level_assignment = [0, 1, 2, 0, 1, 2]
+        // tau[level] = base_tau * tau_ratio^level
+        let expected_tau_0 = 1000.0 * 0.5f32.powi(0); // 1000
+        let expected_tau_1 = 1000.0 * 0.5f32.powi(1); // 500
+        let expected_tau_2 = 1000.0 * 0.5f32.powi(2); // 250
+
+        assert!((arch.tau_values[0] - expected_tau_0).abs() < 1e-3);
+        assert!((arch.tau_values[1] - expected_tau_1).abs() < 1e-3);
+        assert!((arch.tau_values[2] - expected_tau_2).abs() < 1e-3);
+        // Node 3 wraps back to level 0
+        assert!((arch.tau_values[3] - expected_tau_0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn test_module_assignment_wraps() {
+        let genome = ArchitectureGenome {
+            num_nodes: 10,
+            num_modules: 3,
+            hdc_dim: 256,
+            topology_type: TopologyGene::Ring,
+            ..Default::default()
+        };
+        let arch = DecodedArchitecture::from_genome(&genome);
+        // i % 3 => [0,1,2,0,1,2,0,1,2,0]
+        for (i, &m) in arch.module_assignment.iter().enumerate() {
+            assert_eq!(m, i % 3);
+        }
+    }
+
+    #[test]
+    fn test_ring_topology_edges() {
+        let genome = small_genome(TopologyGene::Ring);
+        let arch = DecodedArchitecture::from_genome(&genome);
+        let n = genome.num_nodes;
+
+        // Ring: each node connects to its neighbor; n edges total (undirected)
+        let stats = arch.stats();
+        assert_eq!(stats.num_edges, n, "Ring should have n edges");
+        assert!((stats.avg_degree - 2.0).abs() < 0.1, "Ring avg degree should be 2");
+    }
+
+    #[test]
+    fn test_star_topology_hub_degree() {
+        let genome = small_genome(TopologyGene::Star);
+        let arch = DecodedArchitecture::from_genome(&genome);
+        let n = genome.num_nodes;
+
+        // Hub (node 0) should connect to all other nodes
+        assert_eq!(arch.adjacency[0].len(), n - 1);
+        // Leaf nodes should connect to hub only
+        for i in 1..n {
+            assert_eq!(arch.adjacency[i].len(), 1);
+            assert_eq!(arch.adjacency[i][0].0, 0);
+        }
+    }
+
+    #[test]
+    fn test_hierarchical_tree_binary_structure() {
+        let genome = ArchitectureGenome {
+            num_nodes: 7, // Perfect binary tree: 3 levels
+            hdc_dim: 256,
+            topology_type: TopologyGene::HierarchicalTree,
+            ..Default::default()
+        };
+        let arch = DecodedArchitecture::from_genome(&genome);
+
+        // Root (node 0) should have children 1, 2
+        let root_neighbors: Vec<usize> = arch.adjacency[0].iter().map(|(j, _)| *j).collect();
+        assert!(root_neighbors.contains(&1));
+        assert!(root_neighbors.contains(&2));
+
+        // Node 1 should have children 3, 4 and parent 0
+        let n1_neighbors: Vec<usize> = arch.adjacency[1].iter().map(|(j, _)| *j).collect();
+        assert!(n1_neighbors.contains(&0)); // parent
+        assert!(n1_neighbors.contains(&3)); // left child
+        assert!(n1_neighbors.contains(&4)); // right child
+    }
+
+    #[test]
+    fn test_all_topologies_produce_valid_adjacency() {
+        for topology in TopologyGene::all() {
+            let genome = small_genome(*topology);
+            let arch = DecodedArchitecture::from_genome(&genome);
+            let n = genome.num_nodes;
+
+            // Adjacency should have exactly n entries
+            assert_eq!(arch.adjacency.len(), n, "Topology {:?}: wrong adjacency len", topology);
+
+            // All neighbor indices should be in range [0, n)
+            for (i, neighbors) in arch.adjacency.iter().enumerate() {
+                for (j, w) in neighbors {
+                    assert!(*j < n, "Topology {:?}: node {} neighbor {} out of range", topology, i, j);
+                    assert!(w.is_finite(), "Topology {:?}: node {} weight to {} is not finite", topology, i, j);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_to_node_representations_dimension() {
+        let genome = small_genome(TopologyGene::Ring);
+        let arch = DecodedArchitecture::from_genome(&genome);
+        let reps = arch.to_node_representations();
+
+        assert_eq!(reps.len(), genome.num_nodes);
+        for hv in &reps {
+            assert_eq!(hv.values.len(), genome.hdc_dim);
+        }
+    }
+
+    #[test]
+    fn test_compute_phi_finite_and_nonnegative() {
+        for topology in TopologyGene::all() {
+            let genome = ArchitectureGenome {
+                num_nodes: 6,
+                hdc_dim: 256,
+                topology_type: *topology,
+                ..Default::default()
+            };
+            let arch = DecodedArchitecture::from_genome(&genome);
+            let phi = arch.compute_phi();
+            assert!(phi.is_finite(), "Phi not finite for {:?}", topology);
+            assert!(phi >= 0.0, "Phi negative for {:?}: {}", topology, phi);
+        }
+    }
+
+    #[test]
+    fn test_stats_density_calculation() {
+        let genome = small_genome(TopologyGene::Star);
+        let arch = DecodedArchitecture::from_genome(&genome);
+        let stats = arch.stats();
+        let n = genome.num_nodes;
+
+        // Star: n-1 edges (undirected), 2*(n-1) directed entries
+        assert_eq!(stats.num_edges, n - 1);
+        // Density = 2*(n-1) / (n*(n-1)) = 2/n
+        let expected_density = 2.0 / n as f32;
+        assert!(
+            (stats.density - expected_density).abs() < 0.01,
+            "expected density ~{}, got {}",
+            expected_density,
+            stats.density
+        );
+    }
+
+    #[test]
+    fn test_topology_metrics_ring_has_loop() {
+        let genome = small_genome(TopologyGene::Ring);
+        let arch = DecodedArchitecture::from_genome(&genome);
+        let topo = arch.topology_metrics();
+
+        // Ring should be one connected component
+        assert_eq!(topo.betti_0, 1, "Ring should have 1 connected component");
+        // Ring should have exactly 1 loop (1-cycle)
+        assert_eq!(topo.betti_1, 1, "Ring should have 1 loop");
+    }
+
+    #[test]
+    fn test_topology_metrics_star_connected() {
+        let genome = small_genome(TopologyGene::Star);
+        let arch = DecodedArchitecture::from_genome(&genome);
+        let topo = arch.topology_metrics();
+
+        // Star is connected: betti_0 = 1
+        assert_eq!(topo.betti_0, 1, "Star should be connected");
+        // Star (tree) has no loops: betti_1 = 0
+        assert_eq!(topo.betti_1, 0, "Star should have no loops");
+        // Unity should be 1.0 for connected graph
+        assert!((topo.unity - 1.0).abs() < 1e-9, "Star unity should be 1.0");
+    }
+}

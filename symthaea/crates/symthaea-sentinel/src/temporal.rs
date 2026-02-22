@@ -473,3 +473,347 @@ impl Default for HierarchicalLtc {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // =========================================================================
+    // CfcCell tests
+    // =========================================================================
+
+    #[test]
+    fn test_cfc_cell_new() {
+        let cell = CfcCell::new(8, 100.0, 42);
+        assert_eq!(cell.get_state().len(), 8);
+        assert!(cell.get_state().iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn test_cfc_cell_step_finite_output() {
+        let mut cell = CfcCell::new(4, 50.0, 1);
+        let input = vec![0.5, -0.3, 0.8, 0.1];
+        cell.step(10.0, &input);
+        assert!(cell.get_state().iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn test_cfc_cell_step_changes_state() {
+        let mut cell = CfcCell::new(4, 50.0, 1);
+        let initial: Vec<f32> = cell.get_state().to_vec();
+        cell.step(10.0, &[1.0, 1.0, 1.0, 1.0]);
+        let after: Vec<f32> = cell.get_state().to_vec();
+        assert_ne!(initial, after, "State should change after step");
+    }
+
+    #[test]
+    fn test_cfc_cell_velocity_initially_zero() {
+        let cell = CfcCell::new(4, 50.0, 1);
+        let vel = cell.get_velocity();
+        assert_eq!(vel.len(), 4);
+        assert!(
+            vel.iter().all(|v| v.abs() < 1e-10),
+            "Velocity should be zero before any step"
+        );
+    }
+
+    #[test]
+    fn test_cfc_cell_velocity_nonzero_after_step() {
+        let mut cell = CfcCell::new(4, 50.0, 1);
+        cell.step(10.0, &[1.0, 0.0, -1.0, 0.5]);
+        let vel = cell.get_velocity();
+        assert!(
+            vel.iter().any(|v| v.abs() > 1e-10),
+            "Velocity should be nonzero after step with input"
+        );
+    }
+
+    #[test]
+    fn test_cfc_cell_phase_space_dimensions() {
+        let cell = CfcCell::new(8, 100.0, 1);
+        let ps = cell.get_phase_space();
+        assert_eq!(ps.len(), 16, "Phase space = 2 * dim");
+    }
+
+    #[test]
+    fn test_cfc_cell_phase_space_is_state_plus_velocity() {
+        let mut cell = CfcCell::new(4, 50.0, 1);
+        cell.step(10.0, &[0.5; 4]);
+        let ps = cell.get_phase_space();
+        let state = cell.get_state();
+        let vel = cell.get_velocity();
+        assert_eq!(&ps[..4], state);
+        assert_eq!(&ps[4..], vel.as_slice());
+    }
+
+    #[test]
+    fn test_cfc_cell_reset() {
+        let mut cell = CfcCell::new(4, 50.0, 42);
+        let initial: Vec<f32> = cell.get_state().to_vec();
+        // Evolve
+        for _ in 0..20 {
+            cell.step(10.0, &[1.0; 4]);
+        }
+        assert_ne!(cell.get_state(), initial.as_slice());
+        // Reset with same seed
+        cell.reset(42);
+        assert_eq!(cell.get_state(), initial.as_slice());
+        let vel = cell.get_velocity();
+        assert!(vel.iter().all(|v| v.abs() < 1e-10), "Velocity zero after reset");
+    }
+
+    #[test]
+    fn test_cfc_cell_short_input_zero_padded() {
+        let mut cell = CfcCell::new(8, 50.0, 1);
+        // Input shorter than dim
+        cell.step(10.0, &[1.0, 2.0]);
+        // Should still produce finite state for all dims
+        assert!(cell.get_state().iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn test_cfc_cell_decay_towards_equilibrium() {
+        let mut cell = CfcCell::new(4, 50.0, 1);
+        // Step with constant input many times
+        for _ in 0..100 {
+            cell.step(10.0, &[1.0; 4]);
+        }
+        let state_a: Vec<f32> = cell.get_state().to_vec();
+        for _ in 0..100 {
+            cell.step(10.0, &[1.0; 4]);
+        }
+        let state_b: Vec<f32> = cell.get_state().to_vec();
+        // Should converge — difference should be small
+        let diff: f32 = state_a
+            .iter()
+            .zip(&state_b)
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        assert!(diff < 0.01, "Should converge: diff={diff}");
+    }
+
+    // =========================================================================
+    // HierarchicalCfc tests
+    // =========================================================================
+
+    #[test]
+    fn test_hierarchical_cfc_default_taus() {
+        let hcfc = HierarchicalCfc::new(4);
+        assert_eq!(hcfc.cells.len(), 5);
+        assert_eq!(hcfc.phi, 0.0);
+    }
+
+    #[test]
+    fn test_hierarchical_cfc_custom_taus() {
+        let hcfc = HierarchicalCfc::with_taus(4, &[100.0, 50.0]);
+        assert_eq!(hcfc.cells.len(), 2);
+    }
+
+    #[test]
+    fn test_hierarchical_cfc_step_updates_phi() {
+        let mut hcfc = HierarchicalCfc::new(8);
+        assert_eq!(hcfc.phi, 0.0);
+        hcfc.step(10.0, &[1.0; 8]);
+        // Phi should be non-negative (variance-based)
+        assert!(hcfc.phi >= 0.0, "Phi should be non-negative");
+        assert!(hcfc.phi.is_finite(), "Phi should be finite");
+    }
+
+    #[test]
+    fn test_hierarchical_cfc_multi_scale_phase_space() {
+        let hcfc = HierarchicalCfc::new(4);
+        let ps = hcfc.get_multi_scale_phase_space();
+        // 5 levels x (4 state + 4 velocity) = 40
+        assert_eq!(ps.len(), 5 * 4 * 2);
+    }
+
+    #[test]
+    fn test_hierarchical_cfc_level_velocities() {
+        let hcfc = HierarchicalCfc::new(4);
+        let vels = hcfc.get_level_velocities();
+        assert_eq!(vels.len(), 5);
+        for v in &vels {
+            assert_eq!(v.len(), 4);
+        }
+    }
+
+    #[test]
+    fn test_hierarchical_cfc_level_states() {
+        let hcfc = HierarchicalCfc::new(4);
+        let states = hcfc.get_level_states();
+        assert_eq!(states.len(), 5);
+        for s in &states {
+            assert_eq!(s.len(), 4);
+        }
+    }
+
+    #[test]
+    fn test_hierarchical_cfc_different_taus_different_dynamics() {
+        let mut hcfc = HierarchicalCfc::new(4);
+        for _ in 0..20 {
+            hcfc.step(10.0, &[1.0; 4]);
+        }
+        let states = hcfc.get_level_states();
+        // Different time constants should produce different states
+        assert_ne!(
+            states[0], states[4],
+            "Fast and slow levels should differ"
+        );
+    }
+
+    #[test]
+    fn test_hierarchical_cfc_reset() {
+        let mut hcfc = HierarchicalCfc::new(4);
+        for _ in 0..20 {
+            hcfc.step(10.0, &[1.0; 4]);
+        }
+        assert!(hcfc.phi > 0.0);
+        hcfc.reset();
+        assert_eq!(hcfc.phi, 0.0);
+    }
+
+    // =========================================================================
+    // TemporalWindow tests
+    // =========================================================================
+
+    #[test]
+    fn test_temporal_window_new() {
+        let tw = TemporalWindow::new(4);
+        assert_eq!(tw.get_averaged_context().len(), 4);
+        assert!(tw.get_averaged_context().iter().all(|v| *v == 0.0));
+    }
+
+    #[test]
+    fn test_temporal_window_push_and_average() {
+        let mut tw = TemporalWindow::new(2);
+        tw.push(&[1.0, 2.0]);
+        let avg = tw.get_averaged_context();
+        assert!((avg[0] - 1.0).abs() < 1e-6);
+        assert!((avg[1] - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_temporal_window_averaging_multiple() {
+        let mut tw = TemporalWindow::new(1);
+        tw.push(&[2.0]);
+        tw.push(&[4.0]);
+        let avg = tw.get_averaged_context();
+        assert!((avg[0] - 3.0).abs() < 1e-6, "Average of 2 and 4 should be 3");
+    }
+
+    #[test]
+    fn test_temporal_window_circular_buffer() {
+        let mut tw = TemporalWindow::new(1);
+        // Fill past capacity
+        for i in 0..10 {
+            tw.push(&[i as f32]);
+        }
+        // Only last TEMPORAL_WINDOW_SIZE values should contribute
+        let avg = tw.get_averaged_context();
+        let expected: f32 =
+            (5..10).map(|i| i as f32).sum::<f32>() / TEMPORAL_WINDOW_SIZE as f32;
+        assert!(
+            (avg[0] - expected).abs() < 1e-5,
+            "Circular buffer average: got {}, expected {}",
+            avg[0],
+            expected
+        );
+    }
+
+    #[test]
+    fn test_temporal_window_weighted_context() {
+        let mut tw = TemporalWindow::new(1);
+        tw.push(&[1.0]);
+        tw.push(&[2.0]);
+        // Most recent (2.0) should have higher weight than older (1.0)
+        let weighted = tw.get_weighted_context(1.0);
+        assert!(weighted[0] > 1.0 && weighted[0] < 2.0);
+        // High decay should weight recent more
+        let weighted_high = tw.get_weighted_context(10.0);
+        assert!(weighted_high[0] > weighted[0], "Higher decay = more recent emphasis");
+    }
+
+    #[test]
+    fn test_temporal_window_is_full() {
+        let mut tw = TemporalWindow::new(2);
+        assert!(!tw.is_full());
+        for i in 0..TEMPORAL_WINDOW_SIZE {
+            tw.push(&[i as f32; 2]);
+        }
+        assert!(tw.is_full());
+    }
+
+    #[test]
+    fn test_temporal_window_concatenated() {
+        let mut tw = TemporalWindow::new(2);
+        tw.push(&[1.0, 2.0]);
+        let concat = tw.get_concatenated();
+        assert_eq!(concat.len(), TEMPORAL_WINDOW_SIZE * 2);
+    }
+
+    #[test]
+    fn test_temporal_window_reset() {
+        let mut tw = TemporalWindow::new(2);
+        tw.push(&[5.0, 10.0]);
+        tw.push(&[3.0, 7.0]);
+        tw.reset();
+        assert!(!tw.is_full());
+        let avg = tw.get_averaged_context();
+        assert!(avg.iter().all(|v| *v == 0.0), "Should be zero after reset");
+    }
+
+    // =========================================================================
+    // HierarchicalLtc tests
+    // =========================================================================
+
+    #[test]
+    fn test_hierarchical_ltc_default() {
+        let ltc = HierarchicalLtc::default();
+        assert_eq!(ltc.nodes.len(), 5);
+        assert_eq!(ltc.phi, 0.0);
+    }
+
+    #[test]
+    fn test_hierarchical_ltc_presets() {
+        let standard = HierarchicalLtc::with_preset(LtcPreset::Standard);
+        let fast = HierarchicalLtc::with_preset(LtcPreset::FastBird);
+        let slow = HierarchicalLtc::with_preset(LtcPreset::SlowWhale);
+        assert_eq!(standard.nodes.len(), 5);
+        assert_eq!(fast.nodes.len(), 5);
+        assert_eq!(slow.nodes.len(), 5);
+    }
+
+    #[test]
+    fn test_hierarchical_ltc_step_updates_phi() {
+        let mut ltc = HierarchicalLtc::new();
+        let input = HV::random_seeded(99);
+        ltc.step(10.0, &input);
+        assert!(ltc.phi >= 0.0);
+        assert!(ltc.phi.is_finite());
+    }
+
+    #[test]
+    fn test_hierarchical_ltc_level_velocities() {
+        let mut ltc = HierarchicalLtc::new();
+        let input = HV::random_seeded(99);
+        ltc.step(10.0, &input);
+        let vels = ltc.get_level_velocities();
+        assert_eq!(vels.len(), 5);
+        assert!(
+            vels.iter().any(|v| v.values.iter().any(|x| x.abs() > 1e-10)),
+            "Some velocity should be nonzero after step"
+        );
+    }
+
+    #[test]
+    fn test_hierarchical_ltc_reset() {
+        let mut ltc = HierarchicalLtc::new();
+        let input = HV::random_seeded(99);
+        for _ in 0..10 {
+            ltc.step(10.0, &input);
+        }
+        assert!(ltc.phi > 0.0);
+        ltc.reset();
+        assert_eq!(ltc.phi, 0.0);
+    }
+}
