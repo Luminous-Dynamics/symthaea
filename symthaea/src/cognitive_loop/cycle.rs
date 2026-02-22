@@ -747,10 +747,29 @@ impl CognitiveLoopService {
         } else {
             1.0
         };
+        // ── Phase 15: Arousal recovery tau modulation ─────────────────────
+        // Science: Porges (2011) — active parasympathetic recovery slows processing.
+        // When arousal trap counter > 5, gradually increase tau (slow CfC) to
+        // allow state to stabilize before the hard exploration escape at counter > 10.
+        let arousal_recovery_tau_factor;
+        let arousal_recovery_active;
+        if self.carryover.urgency.arousal_trap_counter > 5
+            && self.carryover.urgency.arousal_trap_counter <= 10
+        {
+            let recovery_intensity =
+                (self.carryover.urgency.arousal_trap_counter - 5) as f32 / 5.0;
+            arousal_recovery_tau_factor = 1.0 + recovery_intensity * 0.2; // up to 20% slower
+            arousal_recovery_active = true;
+        } else {
+            arousal_recovery_tau_factor = 1.0;
+            arousal_recovery_active = false;
+        }
+
         let delta_t = self.config.cfc_config.delta_t
             * resonance_tau_factor
             * arousal_tau_factor
-            * codebook_tau_factor;
+            * codebook_tau_factor
+            * arousal_recovery_tau_factor;
         let _t_core = Instant::now();
         if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
             tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
@@ -1366,6 +1385,51 @@ impl CognitiveLoopService {
             dominant_harmonic = String::new();
         }
 
+        // ── Phase 15: Guiding question → subsystem priority ─────────────────
+        // Science: Desimone & Duncan (1995) — top-down attention biases processing
+        // toward task-relevant features. Parse the guiding question to boost
+        // urgency of related subsystems.
+        let guiding_priority_category = if !guiding_question.is_empty() {
+            let q = guiding_question.to_lowercase();
+            let cat = if q.contains("know") || q.contains("learn") || q.contains("understand") {
+                // Epistemic question → boost prediction confidence sensitivity
+                self.curiosity_drive.exploration_urge =
+                    (self.curiosity_drive.exploration_urge + 0.03).clamp(0.0, 1.0);
+                "epistemic"
+            } else if q.contains("feel") || q.contains("emotion") || q.contains("care") {
+                // Affective question → boost emotional processing sensitivity
+                self.prediction_confidence =
+                    (self.prediction_confidence + 0.01).clamp(0.0, 1.0);
+                "affective"
+            } else if q.contains("do") || q.contains("act") || q.contains("make") {
+                // Pragmatic question → boost action-oriented processing
+                self.fep_lr_boost = (self.fep_lr_boost * 1.02).clamp(1.0, 2.0);
+                "pragmatic"
+            } else if q.contains("connect") || q.contains("relate") || q.contains("together") {
+                // Social question → boost coherence sensitivity
+                self.prediction_confidence =
+                    (self.prediction_confidence + 0.02).clamp(0.0, 1.0);
+                "social"
+            } else {
+                "general"
+            };
+            self.stats.guiding_question_priority_uses += 1;
+            cat.to_string()
+        } else {
+            String::new()
+        };
+
+        // ── Phase 15: Attention budget check ─────────────────────────────────
+        // Science: Kahneman (1973) — attention is a limited-capacity resource.
+        // Track cumulative cycle time; if we've exceeded budget, flag for
+        // downstream subsystems to respect (skip expensive optional modules).
+        let attention_budget_us = 50_000u64; // 50ms budget (~20Hz target)
+        let attention_budget_elapsed_us = cycle_start.elapsed().as_micros() as u64;
+        let attention_budget_exceeded = attention_budget_elapsed_us > attention_budget_us;
+        if attention_budget_exceeded {
+            self.stats.attention_budget_exceeded_count += 1;
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // 10h.0 Generate PsiAttestation record for governance bridge
         // ═══════════════════════════════════════════════════════════════════════
@@ -1940,20 +2004,30 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH + HIGH-PHI PROMOTION + DIVERSITY (extracted)
+        // Phase 15: Skip when input is memoized (identical stimulus → no new codebook info)
         // ═══════════════════════════════════════════════════════════════════════
         let ResonatorCodebookResult {
             resonator_promotions,
             codebook_evictions,
             codebook_diversity,
             codebook_utilization_rate,
-        } = self.run_resonator_codebook_phase(
-            epistemic_gate_approved,
-            &compressed_state,
-            &active_primitive_names,
-            &causal_codebook_entries,
-            &reflection_thresholds,
-            &mut module_timings,
-        );
+        } = if input_memoized {
+            ResonatorCodebookResult {
+                resonator_promotions: 0,
+                codebook_evictions: 0,
+                codebook_diversity: self.stats.codebook_diversity,
+                codebook_utilization_rate: self.stats.codebook_utilization_rate,
+            }
+        } else {
+            self.run_resonator_codebook_phase(
+                epistemic_gate_approved,
+                &compressed_state,
+                &active_primitive_names,
+                &causal_codebook_entries,
+                &reflection_thresholds,
+                &mut module_timings,
+            )
+        };
 
         // ═══════════════════════════════════════════════════════════════════════
         // EPISODIC REPLAY + MEMORY COORDINATOR (extracted)
@@ -2505,6 +2579,17 @@ impl CognitiveLoopService {
             moral_steering_category,
             codebook_utilization_rate,
             surprise_replay_batch_size,
+            // Phase 15: Adaptive Architecture + Emotional Homeostasis
+            attention_budget_exceeded,
+            attention_budget_elapsed_us,
+            prediction_coherence,
+            valence_homeostasis_pull,
+            arousal_homeostasis_pull,
+            arousal_recovery_active,
+            arousal_recovery_tau_factor,
+            input_similarity,
+            input_memoized,
+            guiding_priority_category,
         };
 
         // Update cumulative stats for resonator-memory loop diagnostics
