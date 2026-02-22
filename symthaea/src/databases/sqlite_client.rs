@@ -2116,7 +2116,6 @@ mod tests {
         let db = SqliteMemory::in_memory().unwrap();
 
         // Store one record
-        let hv = BinaryHV::random(42);
         db.store(make_record("lsh-inval-1", 42, MemoryType::Episodic))
             .await
             .unwrap();
