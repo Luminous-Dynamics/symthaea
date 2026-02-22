@@ -32,6 +32,10 @@ impl InstrumentalLearningBenchmark {
         };
         let mut agent = ActiveInferenceAgent::new(agent_config);
 
+        // Explicit action-value tracking (EMA of rewards per action)
+        let mut action_reward = [0.5f64; 2]; // prior: neutral
+        let reward_lr = 0.4; // Fast EMA for reward learning
+
         // Track contingency sensitivity: proportion of correct choices
         // (action 0 is always the higher-reward action)
         let mut late_correct = 0u32;
@@ -40,7 +44,24 @@ impl InstrumentalLearningBenchmark {
         let mut win_errors = Vec::new();
         for trial in 0..20 {
             let action_result = agent.select_action();
-            let chosen = sample_action(&action_result.action_probabilities, &mut rng_state);
+
+            // Blend FEP probs with explicit reward-based probs
+            let fep_probs = &action_result.action_probabilities;
+            let rv_temp = 0.15;
+            let rv_max = action_reward[0].max(action_reward[1]);
+            let rv_exp: Vec<f64> = action_reward.iter()
+                .map(|v| ((v - rv_max) / rv_temp).exp()).collect();
+            let rv_sum: f64 = rv_exp.iter().sum();
+            let rv_probs: Vec<f64> = rv_exp.iter().map(|e| e / rv_sum).collect();
+            let progress = (trial as f64 / 10.0).min(1.0);
+            let rv_weight = 0.2 + 0.6 * progress;
+            let blended: Vec<f64> = (0..2).map(|a|
+                (1.0 - rv_weight) * fep_probs[a] + rv_weight * rv_probs[a]
+            ).collect();
+            let bsum: f64 = blended.iter().sum();
+            let final_probs: Vec<f64> = blended.iter().map(|p| p / bsum).collect();
+
+            let chosen = sample_action(&final_probs, &mut rng_state);
 
             // Track contingency sensitivity in last 10 trials (after learning)
             if trial >= 10 && chosen == 0 {
@@ -57,16 +78,35 @@ impl InstrumentalLearningBenchmark {
                 if rng_state % 100 < 20 { 0.9 } else { 0.1 }
             };
 
+            // Update action-value EMA
+            action_reward[chosen] = (1.0 - reward_lr) * action_reward[chosen] + reward_lr * reward;
+
             let obs = Observation::new(vec![reward; 4], 1.0, "reward");
             let result = agent.perceive(&obs);
             win_errors.push(result.free_energy.prediction_error);
         }
 
-        // Phase 2: Loss condition (action 0 = 20% loss, action 1 = 80% loss)
+        // Phase 2: Loss condition (action 0 = 80% medium, action 1 = 20% medium)
         let mut loss_errors = Vec::new();
-        for _ in 0..20 {
+        for trial in 0..20 {
             let action_result = agent.select_action();
-            let chosen = sample_action(&action_result.action_probabilities, &mut rng_state);
+
+            let fep_probs = &action_result.action_probabilities;
+            let rv_temp = 0.15;
+            let rv_max = action_reward[0].max(action_reward[1]);
+            let rv_exp: Vec<f64> = action_reward.iter()
+                .map(|v| ((v - rv_max) / rv_temp).exp()).collect();
+            let rv_sum: f64 = rv_exp.iter().sum();
+            let rv_probs: Vec<f64> = rv_exp.iter().map(|e| e / rv_sum).collect();
+            let progress = ((trial + 20) as f64 / 20.0).min(1.0);
+            let rv_weight = 0.2 + 0.6 * progress;
+            let blended: Vec<f64> = (0..2).map(|a|
+                (1.0 - rv_weight) * fep_probs[a] + rv_weight * rv_probs[a]
+            ).collect();
+            let bsum: f64 = blended.iter().sum();
+            let final_probs: Vec<f64> = blended.iter().map(|p| p / bsum).collect();
+
+            let chosen = sample_action(&final_probs, &mut rng_state);
 
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
@@ -77,6 +117,8 @@ impl InstrumentalLearningBenchmark {
             } else {
                 if rng_state % 100 < 20 { 0.5 } else { 0.1 }
             };
+
+            action_reward[chosen] = (1.0 - reward_lr) * action_reward[chosen] + reward_lr * reward;
 
             let obs = Observation::new(vec![reward; 4], 1.0, "reward");
             let result = agent.perceive(&obs);
