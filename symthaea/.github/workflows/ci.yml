@@ -139,6 +139,7 @@ jobs:
           - "consciousness_module"
           - "reasoning_engine"
           - "voice-tts"
+          - "humanoid"
     steps:
       - uses: actions/checkout@v4
 
