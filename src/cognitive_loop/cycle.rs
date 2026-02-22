@@ -4,7 +4,6 @@
 //! HDC-CfC loop with rayon-parallelized subsystem updates.
 
 use crate::consciousness::fep_active_inference::{MotorCommandType, Observation};
-use crate::consciousness::stability_regime::RegimeTransition;
 use ndarray::Array1;
 use rayon::join as rayon_join;
 use std::time::Instant;
@@ -80,6 +79,7 @@ const GWT_BROADCAST_CONFIDENCE_BOOST: f32 = 0.03;
 const MCE_LR_BOOST_SCALE: f32 = 0.1; // up to +10% LR from consciousness
 const MCE_BOOST_DECAY: f32 = 0.9; // decay when MCE doesn't fire
 
+use super::helpers;
 use super::helpers::MEMORY_RECALL_TOP_K;
 use super::temporal_network::TemporalNetwork;
 use super::training::TrainingSample;
@@ -87,7 +87,6 @@ use super::{
     ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, CycleResult,
     ResponseStrategy, TrainingMethod,
 };
-use crate::consciousness::cross_modal_binding::Modality;
 
 impl CognitiveLoopService {
     /// Run one cognitive cycle (the core loop)
@@ -234,12 +233,30 @@ impl CognitiveLoopService {
 
         // Soul value alignment: evaluate encoding against Seven Harmonies.
         // If strongly misaligned with core values, flag moral concern.
-        if let Some(ref soul) = self.soul {
+        // Also modulates learning rate: high alignment → boost, misalignment → dampen.
+        let soul_alignment = if let Some(ref soul) = self.soul {
             let alignment = soul.evaluate_alignment(&encoding_result.hdv);
             if alignment.overall_alignment < MORAL_CONCERN_THRESHOLD {
                 self.stats.moral_concerns_detected += 1;
             }
-        }
+            // Soul-driven learning rate modulation:
+            // High alignment boosts learning (trust the direction).
+            // Misalignment dampens learning (conflict with core values).
+            if alignment.overall_alignment > 0.3 {
+                let boost = (alignment.overall_alignment - 0.3) * 0.1;
+                self.carryover.learning.subsystem_lr_factor *= 1.0 + boost;
+                self.carryover.learning.subsystem_lr_factor =
+                    self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.3);
+            } else if alignment.overall_alignment < -0.3 {
+                let dampening = (alignment.overall_alignment + 0.3).abs() * 0.15;
+                self.carryover.learning.subsystem_lr_factor *= 1.0 - dampening;
+                self.carryover.learning.subsystem_lr_factor =
+                    self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.2);
+            }
+            alignment.overall_alignment
+        } else {
+            0.0
+        };
 
         // ═══════════════════════════════════════════════════════════════════════
         // 0.5 Phi-Guided Attention Gating
@@ -364,7 +381,9 @@ impl CognitiveLoopService {
         // Coherence gate: skip resonator recall during unstable CfC dynamics
         // Science: noisy priors during turbulent dynamics can destabilize predictions
         // Uses previous cycle's smoothed coherence (updated at line ~646)
-        let resonator_coherence_gate = self.coherence_bridge.smoothed_coherence() > 0.3
+        let reflection_thresholds = self.self_reflection.get_thresholds();
+        let resonator_coherence_gate = self.coherence_bridge.smoothed_coherence()
+            > reflection_thresholds.coherence_gate
             || self.stats.total_cycles < 10; // bypass gate during warmup
         if resonator_coherence_gate && urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
         if let Some(ref mut res_mem) = self.resonator_memory {
@@ -761,8 +780,8 @@ impl CognitiveLoopService {
                             .max(1.0);
                 }
                 // High surprise → boost exploration (complement existing is_surprised gate)
-                if fe.surprise > 0.8 {
-                    let s_explore = ((fe.surprise - 0.8) * 0.1).min(0.05) as f32;
+                if fe.surprise > reflection_thresholds.surprise as f64 {
+                    let s_explore = ((fe.surprise - reflection_thresholds.surprise as f64) * 0.1).min(0.05) as f32;
                     self.curiosity_drive.exploration_urge =
                         (self.curiosity_drive.exploration_urge + s_explore).clamp(0.0, 1.0);
                 }
@@ -804,7 +823,8 @@ impl CognitiveLoopService {
             self.adaptive_behavior.exploration_factor *= 0.8;
         }
         // High surprise → explore (Exploring)
-        if fep_surprise > 0.8 {
+        let surprise_thresh = reflection_thresholds.surprise as f64;
+        if fep_surprise > surprise_thresh {
             self.adaptive_behavior.exploration_factor =
                 (self.adaptive_behavior.exploration_factor + 0.15).min(1.0);
             self.adaptive_behavior.action_hint = ActionHint::Explore;
@@ -821,9 +841,9 @@ impl CognitiveLoopService {
         // ── FEP surprise → episodic replay priority boost ────────────────
         // Science: Nader (2003) + Friston — surprising events deserve
         // accelerated consolidation for model updating
-        if fep_surprise > 0.8 {
+        if fep_surprise > surprise_thresh {
             if let Some(ref mut replay) = self.phi_episodic_replay {
-                let surprise_boost = (fep_surprise - 0.8).min(0.5) * 0.2;
+                let surprise_boost = (fep_surprise - surprise_thresh).min(0.5) * 0.2;
                 replay.boost_recent_consolidation(surprise_boost);
             }
         }
@@ -1461,143 +1481,36 @@ impl CognitiveLoopService {
             let prediction_confidence_ref = &mut self.prediction_confidence;
             let resonator_memory = &mut self.resonator_memory;
 
-            // Pre-parallel: Stability regime runs before parallel section for profiling isolation
-            // Throttled: Critical=every 3rd, Normal=every 5th, Cruise=every 20th
-            // (evolves ~250 CfC primitives × 16,384D each — ~400ms/invocation)
-            let _t_stability = Instant::now();
-            if urgency.should_run(pp_total_cycles, 3, 5, 20) {
-                let timestamp = pp_total_cycles as f64 * delta_t as f64;
-                let (_regime_state, transitions) =
-                    stability_regime.process_input(&hv16_cached, delta_t, timestamp);
+            // Pre-parallel: Stability regime (evolves ~250 CfC primitives × 16,384D)
+            module_timings.stability_regime = helpers::run_stability_regime(
+                stability_regime, discovery_service, &hv16_cached,
+                delta_t, pp_total_cycles, urgency,
+            );
 
-                for transition in &transitions {
-                    if let RegimeTransition::Crystallized {
-                        primitive_name,
-                        encoding,
-                    } = transition
-                    {
-                        discovery_service
-                            .seed_neighbor_exploration(primitive_name, encoding);
-                    }
-                }
-            }
-            module_timings.stability_regime = _t_stability.elapsed().as_micros() as u64;
+            let episodic_ctx = helpers::EpisodicLearningContext {
+                prediction_error,
+                in_flow: pp_in_flow,
+                input,
+                compressed_state: &compressed_state,
+                emotional_valence: pp_emotional_valence,
+                phi: pp_phi,
+                total_cycles: pp_total_cycles,
+                smoothed_coh: pp_smoothed_coh,
+                detected_primitives: &encoding_result.detected_primitives,
+                memory_context_boost,
+                wm_importance_boost: pp_wm_importance_boost,
+            };
 
             rayon_join(
-                // -- Branch A: Semantic Memory + Causal Enhancement --
-                || {
-                    // Semantic memory: store HDC vector + prediction error for future similarity lookup
-                    semantic_memory.store_with_timestamp(
-                        semantic_hdc,
-                        prediction_error,
-                        None,
-                        pp_total_cycles as u64,
-                    );
-
-                    // Causal enhancement: track (input, output) pairs and discover structure
-                    if let Some(ref mut enhancer) = causal_enhancer {
-                        enhancer.record_cycle_from_f32(&compressed_state, &output);
-
-                        if enhancer.should_discover() {
-                            let causal_graph = enhancer.run_discovery();
-
-                            if !causal_graph.is_empty() {
-                                tracing::info!(
-                                    edges = causal_graph.edges.len(),
-                                    cycle = pp_total_cycles,
-                                    "Causal structure discovered in cognitive loop"
-                                );
-                                enhancer.log_discoveries();
-                            }
-                        }
-                    }
-                },
-                // -- Branch B: Episodic Memory + Primitive-Belief + Closed Learning --
-                || {
-                    // Episodic memory: encode significant experiences
-                    if prediction_error > 0.1 || pp_in_flow {
-                        // Compute hdv_sample inside closure — avoids clone (only used here)
-                        let hdv_sample: Vec<f32> =
-                            compressed_state[..64.min(compressed_state.len())].to_vec();
-                        episodic_memory.encode(
-                            input,
-                            hdv_sample,
-                            pp_emotional_valence,
-                            pp_phi,
-                            pp_total_cycles,
-                        );
-                    }
-
-                    // Resonator memory: store with bound attributes for factorized recall
-                    // Not urgency-gated: encoding is O(dim) and we don't want to drop
-                    // significant experiences during Cruise. Recall is gated in Phase 1a.1.
-                    if let Some(ref mut res_mem) = resonator_memory {
-                        let res_dim_ok = compressed_state.len() == res_mem.resonator.config.dim;
-                        if res_dim_ok && (prediction_error > 0.1 || pp_in_flow) {
-                            // Quantize valence → nearest band
-                            let val_label = if pp_emotional_valence > 0.3 {
-                                "positive"
-                            } else if pp_emotional_valence < -0.3 {
-                                "negative"
-                            } else {
-                                "neutral"
-                            };
-                            let val_hv = res_mem.resonator.codebooks.get(1)
-                                .and_then(|cb| cb.symbols.iter().find(|(l, _)| l == val_label))
-                                .map(|(_, hv)| hv.clone());
-
-                            // Quantize phi → nearest band
-                            let phi_label = if pp_phi > 0.7 {
-                                "high"
-                            } else if pp_phi > 0.3 {
-                                "medium"
-                            } else {
-                                "low"
-                            };
-                            let phi_hv = res_mem.resonator.codebooks.get(2)
-                                .and_then(|cb| cb.symbols.iter().find(|(l, _)| l == phi_label))
-                                .map(|(_, hv)| hv.clone());
-
-                            if let (Some(v_hv), Some(p_hv)) = (val_hv, phi_hv) {
-                                res_mem.store(
-                                    &format!("ep_{}", pp_total_cycles),
-                                    &[
-                                        ("content", "input", &compressed_state),
-                                        ("valence", val_label, &v_hv),
-                                        ("phi_level", phi_label, &p_hv),
-                                    ],
-                                    // importance = consciousness level + world model error bias
-                                    // Higher WM error → this input is poorly predicted → store with higher priority
-                                    pp_phi + pp_wm_importance_boost,
-                                );
-                            }
-                        }
-                    }
-
-                    // Apply memory context boost to confidence
-                    *prediction_confidence_ref =
-                        (*prediction_confidence_ref + memory_context_boost).clamp(0.0, 1.0);
-
-                    // Primitive-Belief Bridge: map primitives to beliefs, compute TD signals
-                    let prim_state = CognitiveLoopService::build_primitive_state(
-                        &encoding_result.detected_primitives,
-                        pp_smoothed_coh,
-                        pp_total_cycles as f64,
-                    );
-
-                    if let Some(ref prev_state) = prev_primitive_state {
-                        let pred_error = primitive_belief_bridge
-                            .compute_prediction_error(prev_state, &prim_state);
-                        let td_signal = primitive_belief_bridge.td_error_signal(&pred_error);
-                        *fep_learning_signal += td_signal as f32 * 0.2;
-                        *fep_learning_signal = fep_learning_signal.clamp(-1.0, 1.0);
-                    }
-
-                    *prev_primitive_state = Some(prim_state);
-
-                    // Closed learning loop: update Q-values from cycle results
-                    closed_learning_loop.update(cycle_learning_result);
-                },
+                || helpers::parallel_semantic_causal(
+                    semantic_memory, causal_enhancer, semantic_hdc,
+                    &compressed_state, &output, prediction_error, pp_total_cycles,
+                ),
+                || helpers::parallel_episodic_learning(
+                    episodic_memory, resonator_memory, prediction_confidence_ref,
+                    primitive_belief_bridge, prev_primitive_state, fep_learning_signal,
+                    closed_learning_loop, &episodic_ctx, cycle_learning_result,
+                ),
             );
         } // end parallel scope -- disjoint borrows released
 
@@ -1614,1294 +1527,116 @@ impl CognitiveLoopService {
         self.stats.semantic_entries_stored = self.semantic_memory.stats().total_stored;
 
         // ═══════════════════════════════════════════════════════════════════════
-        // PRIMITIVE CONSCIOUSNESS: Decompose consciousness state into primitives
-        // Provides explainable consciousness by mapping HDC encodings to the
-        // 9-tier primitive system with activation tracking and binding.
-        // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
-        // Science: Tononi & Koch (2015) — primitives of consciousness experience
-        // ═══════════════════════════════════════════════════════════════════════
-        let (primitive_psi, active_primitive_names) = if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-            if let Some(ref mut processor) = self.primitive_processor {
-                let timestamp = self.stats.total_cycles as f64 * 0.02; // 50Hz → seconds
-                let state = processor.process_input(&hv16_cached, timestamp);
-                let names: Vec<String> = state.all_active().iter()
-                    .take(4)
-                    .map(|ap| ap.primitive.name.clone())
-                    .collect();
-                (state.phi, names)
-            } else {
-                (0.0, Vec::new())
-            }
-        } else {
-            (0.0, Vec::new())
-        };
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // TEMPORAL PRIMITIVES: Allen's Interval Algebra on conscious states
-        // Records conscious intervals each cycle; amortized causal chain detection
-        // and continuity analysis. Science: Allen (1983), Varela (1999).
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (temporal_causal_chains, temporal_continuity, temporal_max_chain_length,
-             chain_cycle_numbers, causal_codebook_entries, continuity_replay_needed) =
-            if let Some(ref mut analyzer) = self.temporal_analyzer {
-                // Record this cycle as a conscious interval
-                let timestamp = self.stats.total_cycles as f64 * 0.02; // 50Hz → seconds
-                use crate::consciousness::temporal_primitives::{
-                    ConsciousInterval, PhiTrend, TemporalInterval,
-                };
-                let mut ti = TemporalInterval::new(
-                    format!("c{}", self.stats.total_cycles),
-                    timestamp,
-                    timestamp + 0.02,
-                ).unwrap_or_else(|_| {
-                    // Fallback: 0.0..0.02 is always valid (end > start)
-                    TemporalInterval::new("c_fallback", 0.0, 0.02)
-                        .expect("hardcoded valid interval 0.0..0.02")
-                });
-                ti.phi = Some(unified_psi);
-                let mut interval = ConsciousInterval::new(
-                    ti,
-                    unified_psi,
-                    coherence as f64,
-                    if self.stats.total_cycles > 0 { 0.5 } else { 0.0 },
-                );
-                interval.phi_trend = if unified_psi > self.carryover.history.consciousness_level + 0.01 {
-                    PhiTrend::Rising
-                } else if unified_psi < self.carryover.history.consciousness_level - 0.01 {
-                    PhiTrend::Falling
-                } else {
-                    PhiTrend::Stable
-                };
-                interval.content = Some(hv16_cached);
-                analyzer.add_interval(interval);
-
-                // Amortized analysis: causal chains every 47 cycles (co-prime)
-                let (chains, ccn, cce) = if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
-                    let detected = analyzer.detect_causal_chains(3);
-                    let count = detected.len();
-                    let max_len = detected.iter().map(|c| c.intervals.len()).max().unwrap_or(0);
-                    self.carryover.quality.causal_chain_count = count;
-
-                    // Track A: Extract cycle numbers from genuine chains for episodic consolidation
-                    let cycle_nums: Vec<u64> = analyzer.genuine_chain_cycle_numbers();
-
-                    // Track A: Build causal codebook entries by binding content BinaryHVs
-                    let codebook_entries: Vec<(String, Vec<f32>)> = detected.iter()
-                        .filter(|c| c.genuine_causation && c.causal_strength > 0.5)
-                        .filter_map(|c| {
-                            let contents: Vec<&crate::hdc::binary_hv::BinaryHV> = c.intervals.iter()
-                                .filter_map(|id| analyzer.interval_content(id))
-                                .collect();
-                            if contents.len() >= 2 {
-                                let mut bound = *contents[0];
-                                for hv in &contents[1..] { bound = bound.bind(hv); }
-                                // Compress to resonator dim via same pipeline as compressed_state
-                                let continuous = bound.to_continuous();
-                                let compressed = self.encoder.compress_for_ltc(
-                                    &continuous,
-                                    self.config.cfc_config.input_dim,
-                                );
-                                Some((
-                                    format!("causal_{}_{}", self.stats.total_cycles, c.intervals.len()),
-                                    compressed,
-                                ))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-
-                    ((count, max_len), cycle_nums, codebook_entries)
-                } else {
-                    ((self.carryover.quality.causal_chain_count, 0), Vec::new(), Vec::new())
-                };
-
-                // Amortized analysis: continuity every 97 cycles (co-prime)
-                let (continuity, cont_replay) = if self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0 {
-                    let analysis = analyzer.analyze_continuity();
-                    self.carryover.quality.temporal_continuity = analysis.continuity_score;
-                    // Track A: Detect continuity gaps that warrant demand replay
-                    let replay_needed = analysis.continuity_score < 0.3 || analysis.gap_count > 5;
-                    (analysis.continuity_score, replay_needed)
-                } else {
-                    (self.carryover.quality.temporal_continuity, false)
-                };
-
-                (chains.0, continuity, chains.1, ccn, cce, cont_replay)
-            } else {
-                (0, 0.0, 0, Vec::new(), Vec::new(), false)
-            };
-        module_timings.temporal_analyzer = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Temporal continuity → prediction confidence (stable time-axis = reliable predictions)
-        if temporal_continuity > 0.7 {
-            let boost = ((temporal_continuity - 0.7) * 0.05) as f32; // up to +1.5%
-            self.prediction_confidence = (self.prediction_confidence + boost).min(1.0);
-        }
-
-        // FEEDBACK: Causal chain detection → confidence boost (the system found real structure)
-        if temporal_causal_chains > 2 {
-            let chain_boost = (temporal_causal_chains.min(10) as f32 - 2.0) * 0.005; // +0.5% per chain, up to +4%
-            self.prediction_confidence = (self.prediction_confidence + chain_boost).min(1.0);
-        }
-
-        // Track A-1: Causal chain → episodic memory consolidation boost
-        if !chain_cycle_numbers.is_empty() {
-            if let Some(ref mut replay) = self.phi_episodic_replay {
-                replay.boost_causal_consolidation(&chain_cycle_numbers, 0.15);
-            }
-        }
-
-        // Track A-3: Continuity gaps → demand replay
-        if continuity_replay_needed {
-            if let Some(ref mut replay) = self.phi_episodic_replay {
-                replay.trigger_demand_replay();
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // PRIMITIVE LATTICE: Structural metrics from tier system
-        // Computed once at startup; just read height/width per cycle for telemetry.
-        // Science: Davey & Priestley (2002) — lattice theory for knowledge systems
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (lattice_height, lattice_width, lattice_join_concept) = if let Some(ref lattice) = self.primitive_lattice {
-            // Properties (height/width/modularity) are O(n²–n³) on the lattice graph.
-            // The lattice is immutable after construction → compute once on first cycle,
-            // cache in stats, and reuse. This eliminates ~31ms/cycle overhead.
-            let (height, width) = if self.stats.lattice_height_cached == 0 {
-                let props = lattice.properties();
-                self.stats.lattice_height_cached = props.height;
-                self.stats.lattice_width_cached = props.width;
-                (props.height, props.width)
-            } else {
-                (self.stats.lattice_height_cached, self.stats.lattice_width_cached)
-            };
-
-            // FEEDBACK: Lattice height (integration depth) → LR modulation (once)
-            if height > 5 && self.stats.total_cycles == 0 {
-                let depth_factor = 1.0 - (height.min(9) as f32 - 5.0) * 0.01;
-                self.carryover.learning.subsystem_lr_factor *= depth_factor;
-            }
-
-            // Track B: Lattice join for concept composition (every 7 cycles — join is O(1) via precomputed table)
-            let join_concept = if active_primitive_names.len() >= 2 && self.stats.total_cycles % 7 == 0 {
-                let mut best_join: Option<usize> = None;
-                for i in 0..active_primitive_names.len() {
-                    for j in (i + 1)..active_primitive_names.len() {
-                        if let (Some(a), Some(b)) = (
-                            lattice.element_index_by_name(&active_primitive_names[i]),
-                            lattice.element_index_by_name(&active_primitive_names[j]),
-                        ) {
-                            if let Some(idx) = lattice.join(a, b) {
-                                match best_join {
-                                    Some(prev) if lattice.elements[idx].tier < lattice.elements[prev].tier
-                                        => best_join = Some(idx),
-                                    None => best_join = Some(idx),
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
-                }
-                best_join.map(|idx| lattice.elements[idx].name.clone())
-            } else {
-                None
-            };
-
-            (height, width, join_concept)
-        } else {
-            (0, 0, None)
-        };
-        module_timings.primitive_lattice = _t.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // COMPOSITIONALITY ENGINE: Algebraic composition of primitives
-        // Tracks composition stats; actual compositions are demand-driven.
-        // Science: Category Theory (Mac Lane 1998), HDC algebraic operators.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let compositionality_total = if let Some(ref compositionality) = self.compositionality_engine {
-            compositionality.get_stats().total_compositions
-        } else {
-            0
-        };
-        module_timings.compositionality = _t.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // UNIFIED VALUE EVALUATOR: Seven Harmonies alignment scoring
-        // Evaluates current cognitive action against fiduciary harmonics.
-        // Amortized: every 19 cycles (lightweight keyword match + harmony check, co-prime).
-        // Science: Panksepp (1998) affective neuroscience + value alignment.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (value_evaluator_score, value_evaluator_decision) =
-            if let Some(ref mut evaluator) = self.value_evaluator {
-                if self.stats.total_cycles % 19 == 0 {
-                    let ctx = crate::consciousness::unified_value_evaluator::EvaluationContext {
-                        consciousness_level: unified_psi,
-                        ..Default::default()
-                    };
-                    let result = evaluator.evaluate("cognitive_cycle", ctx);
-                    let decision_str = match &result.decision {
-                        crate::consciousness::unified_value_evaluator::Decision::Allow => "Allow",
-                        crate::consciousness::unified_value_evaluator::Decision::Warn(_) => "Warn",
-                        crate::consciousness::unified_value_evaluator::Decision::Veto(_) => "Veto",
-                    };
-                    self.carryover.quality.last_value_score = result.overall_score;
-                    (result.overall_score, decision_str.to_string())
-                } else {
-                    (self.carryover.quality.last_value_score, String::new())
-                }
-            } else {
-                (0.0, String::new())
-            };
-        module_timings.value_evaluator = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Value evaluator Veto → suppress learning for this cycle
-        if value_evaluator_decision == "Veto" {
-            self.carryover.learning.subsystem_lr_factor *= 0.1; // Drastically reduce LR on value violation
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // CONSCIOUSNESS PROFILE: Multi-dimensional consciousness assessment
-        // Computes 5-axis profile (Phi, gradient, entropy, complexity, coherence).
-        // Amortized: every 10 cycles (involves Phi computation over HDC state).
-        // Science: Tononi (2004), Koch (2012) — multi-dimensional consciousness.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        // Maintain ring buffer of last 4 BinaryHVs for multi-component profile
-        // Capacity bound: 4 elements — evict before push to prevent transient over-capacity
-        if self.carryover.history.recent_hvs.len() >= 4 {
-            self.carryover.history.recent_hvs.pop_front();
-        }
-        self.carryover.history.recent_hvs.push_back(hv16_cached);
-        let (consciousness_profile_composite, synergy_enhanced_composite, emergent_properties_count) =
-            if self.stats.total_cycles % 23 == 0 && self.primitive_processor.is_some() {
-                let profile =
-                    crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
-                        self.carryover.history.recent_hvs.make_contiguous(),
-                    );
-                let composite = profile.composite;
-                // Dimension synergies: discover non-linear interactions between consciousness dims
-                let synergy =
-                    crate::consciousness::dimension_synergies::SynergyProfile::from_base(profile);
-                self.carryover.history.last_profile_composite = composite;
-                self.carryover.history.last_synergy_composite = synergy.enhanced_composite;
-                self.carryover.history.last_emergent_count = synergy.emergent_properties.len();
-                (composite, synergy.enhanced_composite, synergy.emergent_properties.len())
-            } else {
-                // Non-compute cycle: return cached values
-                (self.carryover.history.last_profile_composite, self.carryover.history.last_synergy_composite, self.carryover.history.last_emergent_count)
-            };
-        module_timings.consciousness_profile = _t.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // CONTEXT-AWARE EVOLUTION: Dynamic Φ/Harmonic/Epistemic weighting
-        // Detects reasoning context from input text and adjusts objective weights.
-        // Runs every cycle (keyword match is O(1) in input length).
-        // Science: Gigerenzer (2007) — ecological rationality, context-adaptive reasoning.
-        // ═══════════════════════════════════════════════════════════════════════
-        let (reasoning_context, context_phi_weight) =
-            if let Some(ref optimizer) = self.context_optimizer {
-                let ctx = optimizer.detect_context(input, None);
-                let weights = optimizer.get_weights_for_context(&ctx);
-                (ctx.description().to_string(), weights.phi_weight)
-            } else {
-                (String::new(), 0.0)
-            };
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // SEMANTIC VALUE EMBEDDER: Value-aligned embeddings grounded in primitives
-        // Projects compressed state into value-aware space using primitive-tier
-        // harmony bases. Cached — repeated inputs hit O(1) lookup.
-        // Science: Schwartz (2012) — value theory, Kanerva (2009) — HDC semantics.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (value_embeddings_created, value_cache_hit_rate) =
-            if let Some(ref mut embedder) = self.semantic_value_embedder {
-                if self.stats.total_cycles % 11 == 0 {
-                    let continuous = symthaea_core::hdc::ContinuousHV::from_slice(&compressed_state);
-                    let _concept = embedder.embed(
-                        format!("cycle_{}", self.stats.total_cycles),
-                        continuous,
-                    );
-                    (embedder.stats().embeddings_created, embedder.cache_hit_rate())
-                } else {
-                    (embedder.stats().embeddings_created, embedder.cache_hit_rate())
-                }
-            } else {
-                (0, 0.0)
-            };
-        module_timings.semantic_value_embedder = _t.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // HARMONIES INTEGRATOR: Per-action ethical alignment via Seven Harmonies
-        // Evaluates the current cycle's compressed state as a ValuedAction and
-        // scores it against harmony embeddings for approval/rejection.
-        // Amortized: every 19 cycles (embedding similarity + scoring, co-prime).
-        // Science: Schwartz (2012) — basic human values, Deci & Ryan (2000).
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (harmonies_alignment, harmonies_approved) =
-            if let Some(ref mut integrator) = self.harmonies_integrator {
-                if self.stats.total_cycles % 19 == 0 {
-                    let embedding = symthaea_core::hdc::ContinuousHV::from_slice(&compressed_state);
-                    let action = crate::consciousness::harmonies_integration::ValuedAction::new(
-                        format!("cycle_{}", self.stats.total_cycles),
-                        input,
-                        embedding,
-                    );
-                    let eval = integrator.evaluate(&action);
-                    (eval.overall_alignment, eval.approved)
-                } else {
-                    (integrator.stats().avg_alignment, true)
-                }
-            } else {
-                (0.0, true)
-            };
-        module_timings.harmonies_integration = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Low harmony alignment → reduce confidence (ethical uncertainty)
-        if harmonies_alignment > 0.0 && !harmonies_approved {
-            self.prediction_confidence = (self.prediction_confidence - 0.02).max(0.0);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // COMPOSITION RULES: Domain-specific HDC binding operator selection
-        // Selects the best composition rule (temporal-physical, mathematical,
-        // consciousness, cross-tier) for the top-2 active primitives.
-        // Stateless — O(1) rule lookup per cycle.
-        // Science: Plate (2003) — holographic reduced representations.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let composition_rule_applied =
-            if let Some(ref rule_engine) = self.composition_rule_engine {
-                if active_primitive_names.len() >= 2 {
-                    let system = symthaea_core::hdc::primitive_system::PrimitiveSystem::global();
-                    let tier1 = system.get(&active_primitive_names[0])
-                        .map(|p| p.tier)
-                        .unwrap_or(symthaea_core::hdc::primitive_system::PrimitiveTier::NSM);
-                    let tier2 = system.get(&active_primitive_names[1])
-                        .map(|p| p.tier)
-                        .unwrap_or(symthaea_core::hdc::primitive_system::PrimitiveTier::NSM);
-                    rule_engine.matching_rule_name(tier1, tier2).to_string()
-                } else {
-                    String::new()
-                }
-            } else {
-                String::new()
-            };
-        module_timings.composition_rules = _t.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // FIDUCIARY HARMONICS: Seven Harmonies field coherence + interference
-        // Tracks harmonic levels driven by consciousness metrics, detects tensions.
-        // Amortized: every 11 cycles (field update + interference scan, co-prime).
-        // Science: Whitehead (1929), Deci & Ryan (2000) — value coherence theory.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (harmonic_field_coherence, harmonic_love_resonance, harmonic_interferences) =
-            if let Some(ref mut field) = self.harmonic_field {
-                if self.stats.total_cycles % 11 == 0 {
-                    // Drive harmonic levels from consciousness metrics
-                    use crate::consciousness::harmonics::FiduciaryHarmonic;
-                    field.set_level(FiduciaryHarmonic::ResonantCoherence, coherence as f64);
-                    field.set_level(FiduciaryHarmonic::EvolutionaryProgression,
-                        (prediction_error as f64 * 2.0).clamp(0.0, 1.0)); // high error = high evolution pressure
-                    field.set_level(FiduciaryHarmonic::IntegralWisdom,
-                        self.prediction_confidence as f64);
-                    field.set_level(FiduciaryHarmonic::PanSentientFlourishing,
-                        unified_psi.clamp(0.0, 1.0));
-                    field.detect_interferences();
-                    // Resolve interferences if any were detected
-                    if !field.interferences.is_empty() {
-                        if let Some(ref resolver) = self.harmonic_resolver {
-                            let _resolution = resolver.resolve(field);
-                        }
-                    }
-                    self.carryover.consciousness.last_harmonic_coherence = field.field_coherence;
-                    (field.field_coherence, field.infinite_love_resonance, field.interferences.len())
-                } else {
-                    (self.carryover.consciousness.last_harmonic_coherence, 0.0, 0)
-                }
-            } else {
-                (0.0, 0.0, 0)
-            };
-        module_timings.harmonics = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Harmonic coherence → LR stability (coherent values = stable learning)
-        if harmonic_field_coherence > 0.6 {
-            let harmony_boost = 1.0 + ((harmonic_field_coherence - 0.6) * 0.05) as f32; // up to +2%
-            self.carryover.learning.subsystem_lr_factor *= harmony_boost;
-        }
-        // FEEDBACK: Harmonic interferences → reduce confidence (value tensions = uncertainty)
-        if harmonic_interferences > 0 {
-            let interference_penalty = (harmonic_interferences.min(3) as f32) * 0.01; // -1% per interference
-            self.prediction_confidence = (self.prediction_confidence - interference_penalty).max(0.0);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // PRIMITIVE REASONING: HDC-based analogical reasoning
-        // Runs a quick reasoning chain on the current input for concept binding.
-        // Amortized: every 23 cycles (reasoning chains have some compute cost, co-prime).
-        // Science: Kanerva (2009) — hyperdimensional analogical reasoning.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (reasoning_chain_confidence, reasoning_chain_depth) =
-            if let Some(ref mut reasoner) = self.primitive_reasoner {
-                if self.stats.total_cycles % 23 == 0 && self.stats.total_cycles > 0 {
-                    let result = reasoner.reason("cognitive_state", &[]);
-                    (result.confidence, result.reasoning_chain.len())
-                } else {
-                    (0.0, 0)
-                }
-            } else {
-                (0.0, 0)
-            };
-        module_timings.primitive_reasoning = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: High reasoning confidence → boost prediction confidence
-        if reasoning_chain_confidence > 0.7 {
-            let reason_boost = (reasoning_chain_confidence - 0.7) * 0.03; // up to +0.9%
-            self.prediction_confidence = (self.prediction_confidence + reason_boost).min(1.0);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // CAUSAL SELF-EXPLANATION: Builds causal model of primitive→Φ effects.
-        // Learns which primitives cause which Φ changes and accumulates evidence.
-        // Amortized: every 23 cycles (matches primitive reasoning cadence, co-prime).
-        // Science: Pearl (2009) — causal inference, Woodward (2003) — interventionism.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (causal_relations_count, causal_avg_confidence) =
-            if let Some(ref mut explainer) = self.causal_explainer {
-                if self.stats.total_cycles % 23 == 0
-                    && self.stats.total_cycles > 0
-                    && !active_primitive_names.is_empty()
-                {
-                    // Construct PrimitiveExecution entries from active primitives
-                    if let Some(ref mut processor) = self.primitive_processor {
-                        let timestamp = self.stats.total_cycles as f64 * 0.02;
-                        let state = processor.process_input(&hv16_cached, timestamp);
-                        let chain = {
-                            let mut c = crate::consciousness::primitive_reasoning::ReasoningChain::new(
-                                hv16_cached,
-                            );
-                            for ap in state.all_active().iter().take(4) {
-                                let exec = crate::consciousness::primitive_reasoning::PrimitiveExecution {
-                                    primitive: ap.primitive.clone(),
-                                    input: hv16_cached,
-                                    output: hv16_cached.bind(&crate::hdc::BinaryHV::random(
-                                        self.stats.total_cycles as u64,
-                                    )),
-                                    transformation: crate::consciousness::primitive_reasoning::TransformationType::Bind,
-                                    phi_contribution: primitive_psi * ap.activation,
-                                    timestamp,
-                                };
-                                c.executions.push(exec);
-                            }
-                            c
-                        };
-                        explainer.learn_from_chain(&chain, "cognitive_cycle");
-                    }
-                    // Only call summarize_understanding on learning cycles (expensive)
-                    let summary = explainer.summarize_understanding();
-                    self.carryover.history.last_causal_relations = summary.total_causal_relations;
-                    self.carryover.history.last_causal_confidence = summary.average_confidence;
-                    (summary.total_causal_relations, summary.average_confidence)
-                } else {
-                    // Non-learning cycle: return cached summary (avoids ~880µs/cycle)
-                    (self.carryover.history.last_causal_relations, self.carryover.history.last_causal_confidence)
-                }
-            } else {
-                (0, 0.0)
-            };
-        module_timings.causal_explanation = _t.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // ADAPTIVE REASONING: Q-learning-guided primitive selection
-        // Builds reasoning chains with RL-optimized primitive selection.
-        // Amortized: every 47 cycles (Q-learning step + chain construction, co-prime).
-        // Science: Sutton & Barto (2018) — reinforcement learning + HDC.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let adaptive_reasoning_phi =
-            if let Some(ref mut reasoner) = self.adaptive_reasoner {
-                if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
-                    match reasoner.reason_adaptive(hv16_cached, 5) {
-                        Ok(chain) => chain.total_phi,
-                        Err(_) => 0.0,
-                    }
-                } else {
-                    0.0
-                }
-            } else {
-                0.0
-            };
-        module_timings.adaptive_reasoning = _t.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // EPISTEMIC TIERS: 3-axis epistemic classification of Phi measurements
-        // Classifies the current Phi measurement's empirical, normative, and
-        // materiality status. Lightweight — computed each cycle.
-        // Science: Mycelix Epistemic Charter v2.0.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let epistemic_quality = if self.primitive_processor.is_some() {
-            if self.stats.total_cycles % 47 == 0 {
-                use crate::consciousness::epistemic_tiers::*;
-                // Classify based on cycle count (more cycles = higher empirical tier)
-                let empirical = if self.stats.total_cycles > 1000 {
-                    EmpiricalTier::E3CryptographicallyProven
-                } else if self.stats.total_cycles > 100 {
-                    EmpiricalTier::E2PrivatelyVerifiable
-                } else if self.stats.total_cycles > 10 {
-                    EmpiricalTier::E1Testimonial
-                } else {
-                    EmpiricalTier::E0Null
-                };
-                let coord = EpistemicCoordinate::new(
-                    empirical,
-                    NormativeTier::N0Personal,
-                    MaterialityTier::M1Temporal,
-                );
-                let q = coord.quality_score();
-                self.carryover.quality.last_epistemic_quality = q;
-                q
-            } else {
-                self.carryover.quality.last_epistemic_quality
-            }
-        } else {
-            0.0
-        };
-        module_timings.epistemic_tiers = _t.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // PHI VALIDATION: Empirical validation of Phi against synthetic states
-        // EXPENSIVE — runs a validation study very rarely (every 500 cycles).
-        // Results cached as correlation metric for telemetry.
-        // Science: IIT empirical validation (Casali et al. 2013).
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let phi_validation_correlation =
-            if let Some(ref mut validator) = self.phi_validation {
-                if self.stats.total_cycles == 500 {
-                    // Run once at cycle 500 (enough history, one-shot validation)
-                    let results = validator.run_validation_study(10); // small sample for speed
-                    results.pearson_r
-                } else {
-                    0.0
-                }
-            } else {
-                0.0
-            };
-        module_timings.phi_validation = _t.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // DISSIPATIVE CONSCIOUSNESS: Prigogine thermodynamic self-organization
-        // Tracks entropy production, order parameter, and edge-of-chaos criticality.
-        // Science: Prigogine (1977), Kauffman (1993), England (2013).
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (dissipative_health, dissipative_regime, dissipative_entropy_rate) =
-            if let Some(ref mut dc) = self.dissipative_consciousness {
-                let energy = prediction_error as f64;
-                let info = coherence as f64 * unified_psi;
-                dc.update(unified_psi, energy, info, coherence as f64);
-                let health = dc.health_score();
-                self.carryover.quality.last_dissipative_health = health;
-                (health, format!("{:?}", dc.current_regime()), dc.entropy_production_rate)
-            } else {
-                (0.0, String::new(), 0.0)
-            };
-        module_timings.dissipative_consciousness = _t.elapsed().as_micros() as u64;
+        // CONSCIOUSNESS METRICS: Extracted to cycle_consciousness.rs
+        // Includes: primitive consciousness, temporal primitives, lattice,
+        // compositionality, value evaluator, consciousness profile, context-aware
+        // evolution, semantic value embedder, harmonies, composition rules,
+        // fiduciary harmonics, primitive reasoning, causal self-explanation,
+        // adaptive reasoning, epistemic tiers, phi validation, dissipative
+        // consciousness, epistemic conflict, consciousness equation v2.
+        // ═══════════════════════════════════════════════════════════════════════
+        let consciousness_metrics = self.compute_consciousness_metrics(
+            hv16_cached,
+            unified_psi,
+            coherence,
+            prediction_error,
+            phi_attention_weight,
+            &compressed_state,
+            input,
+            urgency,
+            &mut module_timings,
+        );
+
+        // Destructure consciousness metrics for use by later phases
+        let primitive_psi = consciousness_metrics.primitive_psi;
+        let active_primitive_names = consciousness_metrics.active_primitive_names;
+        let temporal_causal_chains = consciousness_metrics.temporal_causal_chains;
+        let temporal_continuity = consciousness_metrics.temporal_continuity;
+        let temporal_max_chain_length = consciousness_metrics.temporal_max_chain_length;
+        let _chain_cycle_numbers = consciousness_metrics.chain_cycle_numbers;
+        let causal_codebook_entries = consciousness_metrics.causal_codebook_entries;
+        let continuity_replay_needed = consciousness_metrics.continuity_replay_needed;
+        let lattice_height = consciousness_metrics.lattice_height;
+        let lattice_width = consciousness_metrics.lattice_width;
+        let lattice_join_concept = consciousness_metrics.lattice_join_concept;
+        let compositionality_total = consciousness_metrics.compositionality_total;
+        let value_evaluator_score = consciousness_metrics.value_evaluator_score;
+        let value_evaluator_decision = consciousness_metrics.value_evaluator_decision;
+        let consciousness_profile_composite = consciousness_metrics.consciousness_profile_composite;
+        let synergy_enhanced_composite = consciousness_metrics.synergy_enhanced_composite;
+        let emergent_properties_count = consciousness_metrics.emergent_properties_count;
+        let reasoning_context = consciousness_metrics.reasoning_context;
+        let context_phi_weight = consciousness_metrics.context_phi_weight;
+        let value_embeddings_created = consciousness_metrics.value_embeddings_created;
+        let value_cache_hit_rate = consciousness_metrics.value_cache_hit_rate;
+        let harmonies_alignment = consciousness_metrics.harmonies_alignment;
+        let harmonies_approved = consciousness_metrics.harmonies_approved;
+        let composition_rule_applied = consciousness_metrics.composition_rule_applied;
+        let harmonic_field_coherence = consciousness_metrics.harmonic_field_coherence;
+        let harmonic_love_resonance = consciousness_metrics.harmonic_love_resonance;
+        let harmonic_interferences = consciousness_metrics.harmonic_interferences;
+        let reasoning_chain_confidence = consciousness_metrics.reasoning_chain_confidence;
+        let reasoning_chain_depth = consciousness_metrics.reasoning_chain_depth;
+        let causal_relations_count = consciousness_metrics.causal_relations_count;
+        let causal_avg_confidence = consciousness_metrics.causal_avg_confidence;
+        let adaptive_reasoning_phi = consciousness_metrics.adaptive_reasoning_phi;
+        let epistemic_quality = consciousness_metrics.epistemic_quality;
+        let phi_validation_correlation = consciousness_metrics.phi_validation_correlation;
+        let dissipative_health = consciousness_metrics.dissipative_health;
+        let dissipative_regime = consciousness_metrics.dissipative_regime;
+        let dissipative_entropy_rate = consciousness_metrics.dissipative_entropy_rate;
+        let epistemic_phi_eff = consciousness_metrics.epistemic_phi_eff;
+        let epistemic_conflict_count = consciousness_metrics.epistemic_conflict_count;
+        let equation_v2_consciousness = consciousness_metrics.equation_v2_consciousness;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ADVANCED SUBSYSTEMS: Extracted to cycle_subsystems.rs
+        // Includes: hierarchical LTC, evolution coordinator, holographic analyzer,
+        // differentiable consciousness, affective consciousness, unified pipeline,
+        // multi-modal integration, synthetic grounding, epistemic gate, primitive
+        // validation, cross-module feedback, meta-cognitive reasoner, code primitive
+        // router, empathic unification, multi-objective evolution.
+        // ═══════════════════════════════════════════════════════════════════════
+        let subsystem_metrics = self.run_advanced_subsystems(
+            hv16_cached,
+            unified_psi,
+            coherence,
+            prediction_error,
+            phi_attention_weight,
+            &compressed_state,
+            input,
+            &active_primitive_names,
+            &mut module_timings,
+        );
+
+        // Destructure subsystem metrics for use by later phases
+        let hierarchical_ltc_phi = subsystem_metrics.hierarchical_ltc_phi;
+        let evolution_generation = subsystem_metrics.evolution_generation;
+        let evolution_phi_delta = subsystem_metrics.evolution_phi_delta;
+        let holographic_unity = subsystem_metrics.holographic_unity;
+        let holographic_binding = subsystem_metrics.holographic_binding;
+        let consciousness_gradient_magnitude = subsystem_metrics.consciousness_gradient_magnitude;
+        let consciousness_limiting_component = subsystem_metrics.consciousness_limiting_component;
+        let affect_cons_valence = subsystem_metrics.affect_cons_valence;
+        let affect_cons_arousal = subsystem_metrics.affect_cons_arousal;
+        let pipeline_consciousness = subsystem_metrics.pipeline_consciousness;
+        let multimodal_integrated_phi = subsystem_metrics.multimodal_integrated_phi;
+        let consciousness_state_label = subsystem_metrics.consciousness_state_label;
+        let consciousness_state_level = subsystem_metrics.consciousness_state_level;
+        let epistemic_gate_confidence = subsystem_metrics.epistemic_gate_confidence;
+        let epistemic_gate_approved = subsystem_metrics.epistemic_gate_approved;
+        let primitive_validation_phi_gain = subsystem_metrics.primitive_validation_phi_gain;
+        let primitive_validation_p_value = subsystem_metrics.primitive_validation_p_value;
+        let meta_reasoning_confidence = subsystem_metrics.meta_reasoning_confidence;
+        let meta_reasoning_insights = subsystem_metrics.meta_reasoning_insights;
+        let code_primitives_selected = subsystem_metrics.code_primitives_selected;
+        let empathic_compassion = subsystem_metrics.empathic_compassion;
+        let empathic_tone_adj = subsystem_metrics.empathic_tone_adj;
+        let multi_obj_frontier_size = subsystem_metrics.multi_obj_frontier_size;
+
+        // (Inline code for HIERARCHICAL LTC through MULTI-OBJECTIVE EVOLUTION
+        //  removed — now in run_advanced_subsystems() in cycle_subsystems.rs)
 
-        // FEEDBACK: Dissipative regime → exploration + learning rate modulation
-        // Science: Prigogine (1977) — dissipative structures self-organize at edge of chaos.
-        // Use recommend_action() to translate thermodynamic state into cognitive adjustments.
-        if let Some(ref dc) = self.dissipative_consciousness {
-            use crate::consciousness::dissipative_consciousness::DissipativeAction;
-            match dc.recommend_action() {
-                DissipativeAction::Maintain { .. } => {
-                    // Optimal regime: slight confidence boost (system is well-organized)
-                    self.prediction_confidence =
-                        (self.prediction_confidence + 0.005).clamp(0.0, 1.0);
-                }
-                DissipativeAction::IncreaseActivity { suggested_increase, .. } => {
-                    // Near equilibrium: boost exploration proportional to suggested increase
-                    let explore_boost = (suggested_increase * 0.15).min(0.05) as f32;
-                    self.curiosity_drive.exploration_urge =
-                        (self.curiosity_drive.exploration_urge + explore_boost).clamp(0.0, 1.0);
-                    self.prediction_confidence =
-                        (self.prediction_confidence - 0.01).max(0.0);
-                }
-                DissipativeAction::IncreaseCoherence { .. } => {
-                    // Chaotic: suppress exploration, boost learning to restore coherence
-                    self.curiosity_drive.exploration_urge =
-                        (self.curiosity_drive.exploration_urge * 0.9).max(0.0);
-                    self.fep_lr_boost = (self.fep_lr_boost * 1.05).clamp(1.0, 2.0);
-                }
-                DissipativeAction::IncreaseDifferentiation { .. } => {
-                    // Too ordered: nudge exploration up, learning down slightly
-                    self.curiosity_drive.exploration_urge =
-                        (self.curiosity_drive.exploration_urge + 0.02).clamp(0.0, 1.0);
-                    self.prediction_confidence =
-                        (self.prediction_confidence - 0.005).max(0.0);
-                }
-                DissipativeAction::IncreaseIntegration { .. } => {
-                    // Too differentiated: boost learning rate for better integration
-                    self.fep_lr_boost = (self.fep_lr_boost * 1.03).clamp(1.0, 2.0);
-                }
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // EPISTEMIC CONFLICT: Multi-theory conflict detection + Φ_eff reliability weighting
-        // Compares IIT, GWT, AST, PP, RPT, 4E scores; computes Φ_eff = Φ × R^γ.
-        // Science: IIT (Tononi 2015), GWT (Baars 1988), AST (Graziano 2013).
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (epistemic_phi_eff, epistemic_conflict_count) =
-            if let (Some(ref mut detector), Some(ref calibrator)) =
-                (&mut self.epistemic_conflict_detector, &self.theory_calibrator)
-            {
-                if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
-                    use crate::consciousness::epistemic_conflict::{
-                        compute_phi_eff, ConflictMatrix, MultiTheoryMetrics,
-                    };
-                    let metrics = MultiTheoryMetrics {
-                        phi: unified_psi,
-                        gwt: coherence as f64 * 0.8,
-                        ast: coherence as f64,
-                        pp: 1.0 - prediction_error as f64,
-                        rpt: coherence as f64 * 0.9,
-                        embodiment: self.carryover.consciousness.body_phi_modulation,
-                        unified: unified_psi,
-                    };
-                    let matrix: ConflictMatrix = detector.detect(&metrics);
-                    let phi_eff_result = compute_phi_eff(&metrics, calibrator);
-                    self.carryover.quality.last_phi_eff = phi_eff_result.phi_eff;
-                    (phi_eff_result.phi_eff, matrix.conflicts.len())
-                } else {
-                    (self.carryover.quality.last_phi_eff, 0)
-                }
-            } else {
-                (0.0, 0)
-            };
-        module_timings.epistemic_conflict = _t.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // CONSCIOUSNESS EQUATION V2: Unified 7-theory formula C(t) = σ × Σ × S × ρ
-        // Combines Integration, Binding, Workspace, Attention, Recursion, Efficacy,
-        // Knowledge into a single consciousness score with PAC modulation.
-        // Science: Tononi (2004), Baars (1988), Friston (2010), Graziano (2013).
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let equation_v2_consciousness =
-            if let Some(ref mut eq) = self.consciousness_equation_v2 {
-                if self.stats.total_cycles % 23 == 0 && self.stats.total_cycles > 0 {
-                    use crate::consciousness::consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent};
-                    use std::collections::HashMap;
-                    let mut core_values = HashMap::new();
-                    core_values.insert(CoreComponent::Integration, unified_psi.clamp(0.0, 1.0));
-                    core_values.insert(CoreComponent::Binding, coherence as f64);
-                    core_values.insert(CoreComponent::Workspace, coherence as f64 * 0.8); // GWT proxy
-                    core_values.insert(CoreComponent::Attention, phi_attention_weight as f64);
-                    core_values.insert(CoreComponent::Recursion, 0.5); // TODO: wire HOT depth
-                    core_values.insert(CoreComponent::Efficacy, 1.0 - prediction_error as f64);
-                    core_values.insert(CoreComponent::Knowledge, self.carryover.quality.last_epistemic_quality);
-                    let state = ConsciousnessStateV2 {
-                        core_values,
-                        extended_values: HashMap::new(),
-                        phase_coherence: HashMap::new(),
-                        substrate_feasibility: 1.0,
-                        timestamp: self.stats.total_cycles as u64,
-                        context: String::new(),
-                    };
-                    let result = eq.compute(&state);
-                    self.carryover.consciousness.last_equation_v2_consciousness = result.consciousness;
-                    result.consciousness
-                } else {
-                    self.carryover.consciousness.last_equation_v2_consciousness
-                }
-            } else {
-                0.0
-            };
-        module_timings.consciousness_equation_v2 = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Unified consciousness score modulates confidence + exploration + consolidation
-        // Science: High C(t) = strong integration across theories → confident, less exploration needed
-        // Additionally: high consciousness moments are episodically significant (Baars 2005 —
-        // GWT predicts conscious moments are preferentially consolidated into long-term memory)
-        if equation_v2_consciousness > 0.6 {
-            let boost = (equation_v2_consciousness - 0.6) * 0.08; // up to +3.2%
-            self.prediction_confidence =
-                (self.prediction_confidence + boost as f32).clamp(0.0, 1.0);
-            // High-consciousness moments → boost episodic consolidation priority
-            // Science: Conscious access correlates with memory formation (Dehaene 2014, ch.4)
-            if let Some(ref mut replay) = self.phi_episodic_replay {
-                let consolidation_boost = (equation_v2_consciousness - 0.6) * 0.1;
-                replay.boost_recent_consolidation(consolidation_boost);
-            }
-        } else if equation_v2_consciousness > 0.0 && equation_v2_consciousness < 0.3 {
-            // Low consciousness → boost exploration to find better integration
-            self.curiosity_drive.exploration_urge =
-                (self.curiosity_drive.exploration_urge + 0.02).clamp(0.0, 1.0);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // HIERARCHICAL LTC: Distributed temporal processing with local circuits
-        // Local circuits + global integrator. Step propagates temporal dynamics;
-        // read consciousness metrics (phi, workspace access, binding coherence).
-        // Science: Hasani et al. (2021), Dehaene et al. (2003).
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let hierarchical_ltc_phi =
-            if let Some(ref mut hltc) = self.hierarchical_ltc {
-                if self.stats.total_cycles % 11 == 0 {
-                    let input: Vec<f32> = (0..64).map(|i| {
-                        if hv16_cached.get_bit(i) != 0 { 1.0f32 } else { -1.0f32 }
-                    }).collect();
-                    hltc.inject_distributed(&input);
-                    let _ = hltc.step();
-                    hltc.estimate_phi()
-                } else {
-                    0.0
-                }
-            } else {
-                0.0
-            };
-        module_timings.hierarchical_ltc = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Hierarchical LTC Phi cross-validates spectral MIP
-        // Science: Independent Phi estimates should converge; divergence signals instability.
-        // When they agree, boost confidence. When they diverge, increase exploration —
-        // the system is uncertain about its own integration level (Tononi 2015, §3.1).
-        if hierarchical_ltc_phi > 0.1 {
-            let spectral_phi = unified_psi as f32;
-            let phi_divergence = (hierarchical_ltc_phi - spectral_phi).abs();
-            if phi_divergence < 0.2 {
-                // Phi estimates converge → strong confidence in integration measure
-                let convergence_boost = (0.2 - phi_divergence) * 0.05;
-                self.prediction_confidence =
-                    (self.prediction_confidence + convergence_boost).clamp(0.0, 1.0);
-            } else if phi_divergence > 0.4 {
-                // Significant divergence → epistemic uncertainty about integration
-                let divergence_penalty = (phi_divergence - 0.4).min(0.3) * 0.03;
-                self.prediction_confidence =
-                    (self.prediction_confidence - divergence_penalty).max(0.0);
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + divergence_penalty).clamp(0.0, 1.0);
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // EVOLUTION COORDINATOR: Stateful co-evolution of primitives + architecture
-        // Replaces one-shot PrimitiveEvolution with cross-generation Thompson sampling.
-        // The coordinator manages its own Interleaved schedule internally.
-        // EXPENSIVE — called every 199 cycles (actual evolution runs every 5th step, co-prime).
-        // Science: Holland (1975), Kauffman (1993), Thompson (1933).
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (evolution_generation, evolution_phi_delta) =
-            if let Some(ref mut coordinator) = self.evolution_coordinator {
-                if self.stats.total_cycles % 199 == 0 && self.stats.total_cycles > 0 {
-                    match coordinator.step() {
-                        Ok(result) => (result.generation, result.primitive_psi_delta),
-                        Err(_) => (coordinator.generation(), 0.0),
-                    }
-                } else {
-                    (coordinator.generation(), 0.0)
-                }
-            } else {
-                (0, 0.0)
-            };
-        module_timings.primitive_evolution = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Positive evolution delta → boost learning rate
-        if evolution_phi_delta > 0.01 {
-            let evo_boost = 1.0 + (evolution_phi_delta * 0.1).min(0.05) as f32; // up to +5%
-            self.carryover.learning.subsystem_lr_factor *= evo_boost;
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // CONSCIOUSNESS HOLOGRAPHY: Interference-based binding and holographic recall
-        // Encodes current experience as holographic pattern; analyzes coherence,
-        // unity score, and binding strength via interference patterns.
-        // Science: Pribram (1971), Gabor (1946), Bohm (1980).
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (holographic_unity, holographic_binding) =
-            if let Some(ref mut ha) = self.holographic_analyzer {
-                if self.stats.total_cycles % 19 == 0 {
-                    let content: Vec<f64> = (0..64).map(|i| {
-                        if hv16_cached.get_bit(i) != 0 { 1.0 } else { -1.0 }
-                    }).collect();
-                    ha.encode_experience(&content, &format!("cycle_{}", self.stats.total_cycles));
-                    let analysis = ha.analyze();
-                    self.carryover.consciousness.last_holographic_unity = analysis.unity_score;
-                    (analysis.unity_score, analysis.binding_strength)
-                } else {
-                    (self.carryover.consciousness.last_holographic_unity, 0.0)
-                }
-            } else {
-                (0.0, 0.0)
-            };
-        module_timings.consciousness_holography = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: High holographic unity boosts prediction confidence
-        // Science: Pribram (1991) — holographic encoding enables stable predictions
-        if holographic_unity > 0.7 {
-            let unity_boost = (holographic_unity - 0.7) * 0.03;
-            self.prediction_confidence = (self.prediction_confidence + unity_boost as f32).clamp(0.0, 1.0);
-        }
-        // FEEDBACK: Binding strength modulates learning rate
-        // Strong binding = coherent representations → safe to learn faster
-        if holographic_binding > 0.7 {
-            self.carryover.learning.subsystem_lr_factor *= 1.01;
-        } else if holographic_binding > 0.0 && holographic_binding < 0.3 {
-            // Weak binding = fragmented representations → dampen learning
-            self.carryover.learning.subsystem_lr_factor *= 0.99;
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // DIFFERENTIABLE CONSCIOUSNESS: Gradient-based consciousness optimization
-        // Computes ∂C/∂component to identify which factor limits consciousness most.
-        // Science: Bengio (2017), Tononi (2004), Oizumi et al. (2014).
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (consciousness_gradient_magnitude, consciousness_limiting_component) =
-            if let Some(ref dc) = self.differentiable_consciousness {
-                if self.stats.total_cycles % 23 == 0 && self.stats.total_cycles > 0 {
-                    use crate::consciousness::consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent};
-                    use std::collections::HashMap;
-                    let mut core_values = HashMap::new();
-                    core_values.insert(CoreComponent::Integration, unified_psi.clamp(0.0, 1.0));
-                    core_values.insert(CoreComponent::Binding, coherence as f64);
-                    core_values.insert(CoreComponent::Workspace, coherence as f64 * 0.8);
-                    core_values.insert(CoreComponent::Attention, phi_attention_weight as f64);
-                    core_values.insert(CoreComponent::Recursion, 0.5);
-                    core_values.insert(CoreComponent::Efficacy, 1.0 - prediction_error as f64);
-                    core_values.insert(CoreComponent::Knowledge, self.carryover.quality.last_epistemic_quality);
-                    let state = ConsciousnessStateV2 {
-                        core_values,
-                        extended_values: HashMap::new(),
-                        phase_coherence: HashMap::new(),
-                        substrate_feasibility: 1.0,
-                        timestamp: self.stats.total_cycles as u64,
-                        context: String::new(),
-                    };
-                    let (_value, gradient) = dc.forward(&state);
-                    let (component, _grad_val, _suggestion) = dc.suggest_improvement(&state);
-                    self.carryover.quality.last_gradient_magnitude = gradient.magnitude;
-                    (gradient.magnitude, format!("{:?}", component))
-                } else {
-                    (self.carryover.quality.last_gradient_magnitude, String::new())
-                }
-            } else {
-                (0.0, String::new())
-            };
-        module_timings.differentiable_consciousness = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Large consciousness gradients drive exploration
-        // Science: Bengio (2017) — gradient information guides search
-        if consciousness_gradient_magnitude > 0.5 {
-            let gradient_explore = (consciousness_gradient_magnitude - 0.5).clamp(0.0, 0.5) * 0.1;
-            self.curiosity_drive.exploration_urge =
-                (self.curiosity_drive.exploration_urge + gradient_explore as f32).clamp(0.0, 1.0);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // AFFECTIVE CONSCIOUSNESS: Valence-arousal-dominance affect tracking
-        // Lightweight: decay every cycle, process stimulus every 10 cycles.
-        // Science: Russell (2003), Barrett (2017), Colombetti (2014).
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (affect_cons_valence, affect_cons_arousal) =
-            if let Some(ref mut ac) = self.affective_consciousness {
-                ac.decay(0.05);
-                if self.stats.total_cycles % 11 == 0 {
-                    let valence = 1.0 - 2.0 * prediction_error;
-                    let base_affect = crate::consciousness::affective_consciousness::CoreAffect {
-                        valence,
-                        arousal: prediction_error.abs().clamp(0.0, 1.0),
-                        dominance: self.prediction_confidence * 2.0 - 1.0,
-                    };
-                    let affect = ac.process_stimulus(
-                        &format!("cycle_{}", self.stats.total_cycles),
-                        Some(base_affect),
-                    );
-                    self.carryover.quality.last_affective_valence = affect.valence;
-                    (affect.valence, affect.arousal)
-                } else {
-                    let affect = ac.current_affect();
-                    (affect.valence, affect.arousal)
-                }
-            } else {
-                (0.0, 0.0)
-            };
-        module_timings.affective_consciousness = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Negative affect strengthens caution (lower confidence)
-        if let Some(ref ac) = self.affective_consciousness {
-            let affect = ac.current_affect();
-            if affect.valence < -0.3 {
-                self.prediction_confidence = (self.prediction_confidence + affect.valence * 0.02).max(0.0);
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // UNIFIED CONSCIOUSNESS PIPELINE: End-to-end sensory→consciousness
-        // EXPENSIVE — runs every 47 cycles (co-prime). Combines HDC, LTC, binding, equation.
-        // Science: Dehaene (2011), Tononi (2004), Hasani et al. (2021).
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let pipeline_consciousness =
-            if let Some(ref mut pipeline) = self.unified_consciousness_pipeline {
-                if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
-                    let sensory: Vec<f64> = (0..64).map(|i| {
-                        if hv16_cached.get_bit(i) != 0 { 1.0 } else { -1.0 }
-                    }).collect();
-                    match pipeline.process(&sensory) {
-                        Ok(moment) => {
-                            self.carryover.quality.last_pipeline_consciousness = moment.consciousness;
-                            moment.consciousness
-                        }
-                        Err(_) => self.carryover.quality.last_pipeline_consciousness,
-                    }
-                } else {
-                    self.carryover.quality.last_pipeline_consciousness
-                }
-            } else {
-                0.0
-            };
-        module_timings.unified_consciousness_pipeline = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: High pipeline consciousness strengthens learning toward coherence
-        // Science: Dehaene (2011) — global workspace broadcasts learning signals
-        if pipeline_consciousness > 0.6 {
-            let pipeline_lr_scale = 1.0 + (pipeline_consciousness - 0.6) * 0.5;
-            self.fep_lr_boost = (self.fep_lr_boost * pipeline_lr_scale as f32).clamp(1.0, 2.0);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // MULTI-MODAL INTEGRATION: Phi-guided cross-modal binding
-        // Science: Damasio (1994), Mesulam (1998), Ghazanfar & Schroeder (2006).
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let multimodal_integrated_phi =
-            if let Some(ref mut mmi) = self.multi_modal_integrator {
-                if self.stats.total_cycles % 13 == 0 && self.stats.total_cycles > 0 {
-                    use crate::consciousness::multi_modal_integration::{ModalInput};
-                    let visual_input = ModalInput::new(
-                        Modality::Visual,
-                        hv16_cached,
-                        coherence as f64,
-                    );
-                    let temporal_input = ModalInput::new(
-                        Modality::Temporal,
-                        hv16_cached,
-                        unified_psi.clamp(0.0, 1.0),
-                    );
-                    let result = mmi.integrate(&[visual_input, temporal_input]);
-                    self.carryover.consciousness.last_multimodal_phi = result.integrated_phi;
-                    result.integrated_phi
-                } else {
-                    self.carryover.consciousness.last_multimodal_phi
-                }
-            } else {
-                0.0
-            };
-        module_timings.multi_modal_integration = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Strong multimodal integration improves learning precision
-        // Science: Ghazanfar & Schroeder (2006) — cross-modal binding enables precise learning
-        if multimodal_integrated_phi > 0.5 {
-            let phi_confidence = (multimodal_integrated_phi - 0.5) * 0.04;
-            self.prediction_confidence = (self.prediction_confidence + phi_confidence as f32).clamp(0.0, 1.0);
-            let phi_subsystem_lr = 1.0 + (multimodal_integrated_phi - 0.5) * 0.4;
-            self.carryover.learning.subsystem_lr_factor *= phi_subsystem_lr as f32;
-            self.carryover.learning.subsystem_lr_factor = self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // SYNTHETIC STATES NSM GROUNDING: Classify current consciousness state
-        // Maps current BinaryHV to closest consciousness state via NSM primitives.
-        // Science: Wierzbicka (1996) — Natural Semantic Metalanguage.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (consciousness_state_label, consciousness_state_level) =
-            if let Some(ref sg) = self.synthetic_grounding {
-                if self.stats.total_cycles % 97 == 0 {
-                    let similar = sg.find_similar(&hv16_cached, 0.1);
-                    if let Some((state_type, _sim)) = similar.first() {
-                        let label = format!("{:?}", state_type);
-                        let level = state_type.consciousness_level();
-                        self.carryover.quality.last_consciousness_state = label.clone();
-                        (label, level)
-                    } else {
-                        (self.carryover.quality.last_consciousness_state.clone(), 0.0)
-                    }
-                } else {
-                    (self.carryover.quality.last_consciousness_state.clone(), 0.0)
-                }
-            } else {
-                (String::new(), 0.0)
-            };
-        module_timings.synthetic_grounding = _t.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // EPISTEMIC DECISION GATE: Evaluate input through Graceful Ignorance
-        // Provides confidence-based gating before actions.
-        // Science: Kruger & Dunning (1999), Schwartz (2004) — epistemic humility.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (epistemic_gate_confidence, epistemic_gate_approved) =
-            if let Some(ref mut gate) = self.epistemic_gate {
-                if self.stats.total_cycles % 7 == 0 {
-                    let action_risk = (1.0 - self.prediction_confidence).clamp(0.0, 1.0);
-                    let decision = gate.evaluate(input, action_risk);
-                    let (confidence, approved) = match &decision {
-                        crate::consciousness::gis_integration::EpistemicDecision::Proceed { confidence } => (*confidence, true),
-                        crate::consciousness::gis_integration::EpistemicDecision::ProceedWithCaveat { confidence, .. } => (*confidence, true),
-                        crate::consciousness::gis_integration::EpistemicDecision::Defer { .. } => (0.0, false),
-                        crate::consciousness::gis_integration::EpistemicDecision::RequestGuidance { .. } => (0.0, false),
-                        crate::consciousness::gis_integration::EpistemicDecision::OutOfDomain { .. } => (0.0, false),
-                    };
-                    self.carryover.quality.last_epistemic_confidence = confidence;
-                    (confidence, approved)
-                } else {
-                    (self.carryover.quality.last_epistemic_confidence, true)
-                }
-            } else {
-                (0.5, true)
-            };
-        module_timings.epistemic_gate = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Low epistemic confidence reduces prediction confidence
-        if epistemic_gate_confidence < 0.3 && !epistemic_gate_approved {
-            self.prediction_confidence = (self.prediction_confidence - 0.03).max(0.0);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // PRIMITIVE VALIDATION: One-shot empirical Φ validation at cycle 500
-        // Runs StandardExperiments::tier1_mathematical() once to validate that
-        // primitives genuinely improve consciousness (Φ) vs baseline.
-        // Science: Popper (1959) — falsifiability, scientific method.
-        // ═══════════════════════════════════════════════════════════════════════
-        let (primitive_validation_phi_gain, primitive_validation_p_value) =
-            if self.primitive_validation_result.is_none()
-                && self.primitive_processor.is_some()
-                && self.stats.total_cycles == 500
-            {
-                let mut experiment = crate::consciousness::primitive_validation::StandardExperiments::tier1_mathematical();
-                match experiment.run() {
-                    Ok(results) => {
-                        let gain = results.statistics.mean_phi_gain;
-                        let p = results.statistics.p_value;
-                        self.primitive_validation_result = Some((gain, p));
-                        (gain, p)
-                    }
-                    Err(_) => (0.0, 1.0),
-                }
-            } else {
-                self.primitive_validation_result.unwrap_or((0.0, 1.0))
-            };
-
-        // FEEDBACK: Validated primitives boost LR; falsified primitives dampen it
-        // Science: Popper (1959) — if primitives don't improve Φ, reduce their influence
-        if let Some((phi_gain, p_value)) = self.primitive_validation_result {
-            if p_value < 0.05 && phi_gain > 0.0 {
-                // Significant positive effect → boost primitive subsystem LR
-                self.carryover.learning.subsystem_lr_factor *=
-                    1.0 + (phi_gain * 0.02).min(0.03) as f32;
-            } else if p_value < 0.05 && phi_gain < 0.0 {
-                // Significant negative effect → dampen primitive processing
-                self.carryover.learning.subsystem_lr_factor *= 0.98;
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // CROSS-MODULE FEEDBACK: Modules inform each other for emergent behavior
-        // Science: Varela (1991) — autopoietic coupling, Beer (2000) — circular
-        // causality in cognitive systems.
-        // ═══════════════════════════════════════════════════════════════════════
-
-        // 1. Consciousness state level modulates urgency: low consciousness → Critical
-        //    (run all subsystems to diagnose), high consciousness → can tolerate Cruise
-        if consciousness_state_level > 0.0 {
-            if consciousness_state_level < 0.3 && self.carryover.urgency.urgency != super::types::CycleUrgency::Critical {
-                self.carryover.urgency.urgency = super::types::CycleUrgency::Normal;
-            }
-        }
-
-        // 2. Gradient analysis → adaptive exploration: large gradients mean the system
-        //    has clear direction for improvement → focus rather than explore
-        if consciousness_gradient_magnitude > 1.0 {
-            // Strong gradient = clear optimization direction → reduce random exploration
-            self.curiosity_drive.boredom = (self.curiosity_drive.boredom - 0.05).max(0.0);
-        } else if consciousness_gradient_magnitude > 0.0 && consciousness_gradient_magnitude < 0.1 {
-            // Near-zero gradient = plateau → boost exploration to escape
-            self.curiosity_drive.boredom = (self.curiosity_drive.boredom + 0.03).min(1.0);
-        }
-
-        // 3. Holographic unity gates learning: high unity = coherent representation →
-        //    safe to learn aggressively. Low unity = fragmented → be conservative.
-        if holographic_unity > 0.8 {
-            self.carryover.learning.subsystem_lr_factor *= 1.02;
-            self.carryover.learning.subsystem_lr_factor = self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
-        } else if holographic_unity < 0.2 && holographic_unity > 0.0 {
-            self.carryover.learning.subsystem_lr_factor *= 0.98;
-            self.carryover.learning.subsystem_lr_factor = self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
-        }
-
-        // 4. Pipeline consciousness → epistemic gating: high pipeline consciousness
-        //    means the system has strong global workspace → relax epistemic threshold
-        if pipeline_consciousness > 0.7 {
-            self.carryover.quality.last_epistemic_confidence =
-                (self.carryover.quality.last_epistemic_confidence + 0.02).min(1.0);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // META-COGNITIVE REASONER: Self-reflective reasoning about reasoning
-        // Reflects on context detection confidence, strategy effectiveness, and
-        // learns meta-patterns across reasoning episodes.
-        // Amortized: every 47 cycles (heavy — creates CandidatePrimitives + chain, co-prime).
-        // Science: Flavell (1979), Nelson & Narens (1990) — metacognition hierarchy.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (meta_reasoning_confidence, meta_reasoning_insights) =
-            if let Some(ref mut reasoner) = self.meta_cognitive_reasoner {
-                if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
-                    // Build lightweight candidate primitives from active set
-                    let candidates: Vec<crate::consciousness::primitive_evolution::CandidatePrimitive> =
-                        active_primitive_names.iter().take(3).map(|name| {
-                            crate::consciousness::primitive_evolution::CandidatePrimitive {
-                                name: name.clone(),
-                                tier: symthaea_core::hdc::PrimitiveTier::NSM,
-                                definition: name.clone(),
-                                fitness: unified_psi,
-                                encoding: symthaea_core::hdc::BinaryHV::random(42),
-                                epistemic_coordinate: Default::default(),
-                                harmonic_alignment: 0.5,
-                            }
-                        }).collect();
-                    let mut chain = crate::consciousness::primitive_reasoning::ReasoningChain::new(
-                        hv16_cached,
-                    );
-                    match reasoner.meta_reason(input, candidates, &mut chain) {
-                        Ok(result) => (result.meta_confidence, result.meta_insights.len()),
-                        Err(_) => (0.5, 0),
-                    }
-                } else {
-                    (0.5, 0)
-                }
-            } else {
-                (0.5, 0)
-            };
-        module_timings.meta_cognitive_reasoning = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: High meta-cognitive confidence boosts learning rate
-        // The MetaCognitiveReasoner path is fully deterministic (ContextAwareOptimizer
-        // uses weighted selection, not RNG). Safe for genesis determinism.
-        // Science: Nelson & Narens (1990) — monitoring-control loop
-        if meta_reasoning_confidence > 0.7 {
-            let meta_boost = (meta_reasoning_confidence - 0.7) * 0.1;
-            self.fep_lr_boost = (self.fep_lr_boost + meta_boost as f32).clamp(1.0, 2.0);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // CODE PRIMITIVE ROUTER: Consciousness-aware code reasoning
-        // Selects optimal code-tier primitives when input looks code-related.
-        // Amortized: every 11 cycles (lightweight O(1) lookup, co-prime).
-        // Science: Plate (2003) — VSA for structured representations.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let code_primitives_selected =
-            if let Some(ref router) = self.code_primitive_router {
-                if self.stats.total_cycles % 11 == 0 {
-                    // Heuristic: detect code-related input
-                    let code_related = input.contains("code")
-                        || input.contains("function")
-                        || input.contains("debug")
-                        || input.contains("refactor")
-                        || input.contains("parse")
-                        || input.contains("compile");
-                    if code_related {
-                        let operation = if input.contains("debug") {
-                            crate::consciousness::code_primitives::CodeOperation::Debug
-                        } else if input.contains("refactor") {
-                            crate::consciousness::code_primitives::CodeOperation::Refactor
-                        } else if input.contains("parse") {
-                            crate::consciousness::code_primitives::CodeOperation::Parse
-                        } else {
-                            crate::consciousness::code_primitives::CodeOperation::Explain
-                        };
-                        router.select_primitives(operation).len()
-                    } else {
-                        0
-                    }
-                } else {
-                    0
-                }
-            } else {
-                0
-            };
-        module_timings.code_primitive_routing = _t.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // EMPATHIC UNIFICATION: Resonant empathy via user state inference
-        // Senses user emotional state from input, generates compassion response.
-        // Amortized: every 11 cycles (lightweight keyword + inference, co-prime).
-        // Science: Decety & Jackson (2004) — shared neural representations.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (empathic_compassion, empathic_tone_adj) =
-            if let Some(ref mut empathy) = self.empathic_unification {
-                if self.stats.total_cycles % 11 == 0 {
-                    let context = crate::user_state_inference::ContextKind::Task;
-                    let response = empathy.process(input, context);
-                    (response.compassion, response.patience_adjustment)
-                } else {
-                    (0.0, 0.0)
-                }
-            } else {
-                (0.0, 0.0)
-            };
-        module_timings.empathic_unification = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: High compassion slightly boosts LR (empathic learning bias)
-        // The EmpathicUnification path is deterministic (text-based emotion detection,
-        // ContextKind input). Instant::now() timestamps are internal only.
-        // Science: Decety & Jackson (2004) — shared representations enhance learning
-        if empathic_compassion > 0.7 {
-            self.carryover.learning.subsystem_lr_factor *= 1.0 + (empathic_compassion as f32 - 0.7) * 0.02;
-            self.carryover.learning.subsystem_lr_factor = self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // MULTI-OBJECTIVE EVOLUTION: Pareto-frontier consciousness optimization
-        // Very expensive — runs once every 1000 cycles. Evolves primitives across
-        // 5 dimensions (Φ, ∇Φ, Entropy, Complexity, Coherence).
-        // Science: Deb et al. (2002) — NSGA-II multi-objective optimization.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let multi_obj_frontier_size =
-            if let Some(ref mut moe) = self.multi_objective_evolution {
-                if self.stats.total_cycles % 997 == 0 && self.stats.total_cycles > 0 {
-                    match moe.evolve() {
-                        Ok(result) => result.frontier_size,
-                        Err(_) => 0,
-                    }
-                } else {
-                    0
-                }
-            } else {
-                0
-            };
-        module_timings.multi_objective_evolution = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH: add novel patterns to semantic codebook
@@ -3126,15 +1861,17 @@ impl CognitiveLoopService {
         // Science: competitive learning — low diversity signals representational collapse
         // Low diversity → boost exploration urge (seek novel inputs)
         // High diversity → allow exploitation (good codebook coverage)
+        let div_low = reflection_thresholds.diversity_low;
+        let div_high = reflection_thresholds.diversity_high;
         if codebook_diversity > 0.0 {
-            if codebook_diversity < 0.3 {
+            if codebook_diversity < div_low {
                 // Representational collapse risk — boost exploration
-                let diversity_boost = (0.3 - codebook_diversity) * 0.2;
+                let diversity_boost = (div_low - codebook_diversity) * 0.2;
                 self.curiosity_drive.exploration_urge =
                     (self.curiosity_drive.exploration_urge + diversity_boost).clamp(0.0, 1.0);
-            } else if codebook_diversity > 0.7 {
+            } else if codebook_diversity > div_high {
                 // Good coverage — allow exploitation, dampen exploration slightly
-                let exploit_dampen = (codebook_diversity - 0.7) * 0.1;
+                let exploit_dampen = (codebook_diversity - div_high) * 0.1;
                 self.curiosity_drive.exploration_urge =
                     (self.curiosity_drive.exploration_urge - exploit_dampen).clamp(0.0, 1.0);
             }
@@ -3214,6 +1951,38 @@ impl CognitiveLoopService {
                             avg_psi = result.average_psi,
                             "Episodic replay session completed"
                         );
+
+                        // Track 3g: Dream consolidation — resonator factorization of replayed episodes
+                        // Science: Stickgold (2005) — sleep replay extracts gist representations
+                        // After episodic replay, factorize top episodes through the resonator to
+                        // extract clean semantic components and strengthen codebook representations.
+                        if let Some(ref mut res_mem) = self.resonator_memory {
+                            if !res_mem.resonator.codebooks.is_empty() {
+                                let res_dim = res_mem.resonator.config.dim;
+                                let top_eps = replay.get_top_episodes(3);
+                                for ep in &top_eps {
+                                    // Project episode input down to resonator dim
+                                    let ep_vals = &ep.input.values;
+                                    if ep_vals.len() >= res_dim {
+                                        let projected: Vec<f32> =
+                                            ep_vals.iter().take(res_dim).copied().collect();
+                                        if let Ok(factors) = res_mem.resonator.factorize(&projected) {
+                                            // Each factor strengthens its codebook entry via re-exposure
+                                            // This is the "gist extraction" — dreaming distills episodes
+                                            // into their categorical components
+                                            for (label, _factor_hv) in &factors {
+                                                tracing::trace!(
+                                                    label,
+                                                    psi = ep.psi,
+                                                    "Dream factorized episode component"
+                                                );
+                                            }
+                                            let _ = factors.len(); // factorization itself updates resonator state
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -3494,9 +2263,38 @@ impl CognitiveLoopService {
                 }
 
                 // Graduate evicted items to episodic memory
+                // Track 3h: WM eviction → resonator routing pipeline
+                // Science: Frankland & Bontempi (2005) — systems consolidation routes
+                // memories through hippocampal replay for categorical integration
                 let graduates = pfc.drain_graduates();
                 if !graduates.is_empty() {
                     for grad in &graduates {
+                        // Route graduate through resonator for importance scoring
+                        let grad_importance = if let Some(ref mut res_mem) = self.resonator_memory {
+                            let res_dim = res_mem.resonator.config.dim;
+                            let grad_vals = &grad.embedding.values;
+                            if grad_vals.len() >= res_dim && !res_mem.episodes.is_empty() {
+                                // Project to resonator dim and find best episode match
+                                let projected: Vec<f32> =
+                                    grad_vals.iter().take(res_dim).copied().collect();
+                                let best_sim = res_mem.episodes.iter()
+                                    .map(|ep| {
+                                        ep.hv.iter().zip(projected.iter())
+                                            .map(|(a, b)| a * b).sum::<f32>()
+                                            / (ep.hv.iter().map(|x| x * x).sum::<f32>().sqrt()
+                                               * projected.iter().map(|x| x * x).sum::<f32>().sqrt())
+                                                .max(1e-8)
+                                    })
+                                    .fold(0.0f32, f32::max);
+                                // High resonator match → boost importance (consolidation-worthy)
+                                // Low match → novel content, still store but with base importance
+                                pp_phi + best_sim * 0.2
+                            } else {
+                                pp_phi
+                            }
+                        } else {
+                            pp_phi
+                        };
                         self.episodic_memory.encode(
                             &grad.id,
                             grad.embedding
@@ -3506,13 +2304,13 @@ impl CognitiveLoopService {
                                 .copied()
                                 .collect::<Vec<_>>(),
                             0.0,
-                            pp_phi,
+                            grad_importance,
                             self.stats.total_cycles,
                         );
                     }
                     tracing::debug!(
                         count = graduates.len(),
-                        "Prefrontal graduated items to episodic memory"
+                        "Prefrontal graduated items to episodic memory (resonator-routed)"
                     );
                 }
 
@@ -4528,6 +3326,23 @@ impl CognitiveLoopService {
         let sigma = self.carryover.consciousness.last_sigma;
         module_timings.spectral_mip = _t.elapsed().as_micros() as u64;
 
+        // ── W1.7: Σ (sigma) → learning rate + confidence modulation ──────
+        // Science: Tononi (2008) — high integration (Φ) indicates coherent processing;
+        // high Σ → stabilize learning (reduce LR boost), increase prediction confidence
+        if let Some(sig) = sigma {
+            if sig > 0.5 {
+                // High integration → consolidate (stabilize LR)
+                let sig_dampen = ((sig - 0.5) * 0.1).min(0.05) as f32;
+                self.fep_lr_boost = (self.fep_lr_boost * (1.0 - sig_dampen)).max(1.0);
+                self.prediction_confidence =
+                    (self.prediction_confidence + sig_dampen * 0.5).clamp(0.0, 1.0);
+            } else if sig < 0.2 {
+                // Low integration → boost learning (model needs updating)
+                let sig_boost = ((0.2 - sig) * 0.15).min(0.05) as f32;
+                self.fep_lr_boost = (self.fep_lr_boost * (1.0 + sig_boost)).clamp(1.0, 2.0);
+            }
+        }
+
         // Soul experience integration: feed cycle outcome back into value learning.
         let _t = Instant::now();
         // This closes the loop: Soul evaluates alignment (pre-cycle) → cognitive cycle
@@ -4677,6 +3492,7 @@ impl CognitiveLoopService {
             support_alert_fired,
             support_federation_graduated,
             support_efe,
+            soul_alignment,
             sigma,
             spectral_mip_phi,
             hierarchical_mip_phi: self.carryover.consciousness.last_hierarchical_mip_phi,
@@ -4723,7 +3539,7 @@ impl CognitiveLoopService {
         if codebook_diversity > 0.0 {
             self.stats.codebook_diversity = codebook_diversity;
         }
-        if fep_surprise > 0.8 {
+        if fep_surprise > surprise_thresh {
             self.stats.fep_surprise_replay_boosts += 1;
         }
 
