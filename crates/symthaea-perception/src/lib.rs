@@ -4,19 +4,26 @@
 #![allow(clippy::manual_is_multiple_of)]
 #![allow(clippy::unwrap_or_default)]
 
-//! Week 12: Perception & Tool Creation - Giving Sophia Senses
+//! # Perception Capabilities
 //!
-//! This module provides sensory capabilities for Sophia:
+//! Provides sensory capabilities for Sophia with graceful degradation.
 //!
-//! - Visual perception (images) - Basic feature extraction
-//! - Semantic vision - Deep semantic understanding with SigLIP & Moondream
-//! - OCR - Text extraction from images (rten + ocrs, Tesseract fallback)
-//! - Code perception (understanding source code)
-//! - Multi-modal integration - Unifying all senses in holographic space
-//! - Model Hub - HuggingFace model downloading and management
-//! - Enhanced proprioception (system state awareness)
+//! ## Capability Modes
 //!
-//! ## Model Stack (2025)
+//! Each capability operates in one of three modes depending on model availability:
+//!
+//! | Capability | Model | Full | Degraded | Stub (Fallback) |
+//! |-----------|-------|------|----------|-----------------|
+//! | OCR | rten + ocrs (~8MB) | Full text extraction | N/A | Empty `OcrResult` |
+//! | Image embedding | SigLIP-SO400M (ONNX) | 768D semantic vector | N/A | Hash-based 768D vector |
+//! | Image captioning | Moondream2 VQA | Natural language caption | N/A | Empty string |
+//! | Text embedding | Qwen3-Embedding-0.6B (ONNX) | 1024D semantic vector | N/A | Hash-based 768D vector |
+//!
+//! Stubs produce deterministic outputs seeded from the input hash, ensuring
+//! reproducibility without model files. Use `PerceptionHealth::capabilities()`
+//! to query availability at runtime.
+//!
+//! ## Model Stack
 //!
 //! | Component | Model | Dim | Purpose |
 //! |-----------|-------|-----|---------|

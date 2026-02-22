@@ -65,6 +65,10 @@ pub(crate) struct UrgencyState {
     pub(crate) consecutive_low_error: u32,
     /// Consecutive high-arousal cycles (Yerkes-Dodson trap detection)
     pub(crate) arousal_trap_counter: u32,
+    /// Consecutive cycles since last metacognitive anomaly (for recovery ramp)
+    pub(crate) anomaly_recovery_counter: u32,
+    /// Whether an anomaly was active in the previous cycle
+    pub(crate) anomaly_was_active: bool,
 }
 
 impl Default for UrgencyState {
@@ -73,6 +77,8 @@ impl Default for UrgencyState {
             urgency: CycleUrgency::Normal,
             consecutive_low_error: 0,
             arousal_trap_counter: 0,
+            anomaly_recovery_counter: 0,
+            anomaly_was_active: false,
         }
     }
 }
@@ -130,6 +136,16 @@ pub(crate) struct QualityMetrics {
     pub(crate) narrative_veto_active: bool,
     /// Cached prefrontal veto (reused on skip cycles when amortized)
     pub(crate) cached_prefrontal_veto: bool,
+    /// Smoothed coherence from previous cycle (for velocity computation)
+    pub(crate) last_coherence: f32,
+    /// Coherence velocity (rate of change, updated every 5 cycles)
+    pub(crate) coherence_velocity: f32,
+    /// Cached phi validation correlation (updated every 500 cycles)
+    pub(crate) phi_validation_correlation: f64,
+    /// Adjusted spectral weight for unified Psi (from phi validation)
+    pub(crate) phi_spectral_weight: f32,
+    /// Cached phenomenal binding strength (from late consciousness)
+    pub(crate) last_phenomenal_binding: f64,
 }
 
 impl Default for QualityMetrics {
@@ -148,6 +164,11 @@ impl Default for QualityMetrics {
             last_pipeline_consciousness: 0.0,
             narrative_veto_active: false,
             cached_prefrontal_veto: false,
+            last_coherence: 0.5,
+            coherence_velocity: 0.0,
+            phi_validation_correlation: 0.0,
+            phi_spectral_weight: 0.6,
+            last_phenomenal_binding: 0.5,
         }
     }
 }
@@ -770,6 +791,33 @@ pub struct CycleMetadata {
     pub input_memoized: bool,
     /// Guiding question subsystem priority category (empty when no question active).
     pub guiding_priority_category: String,
+    /// Total cycle wall-clock time in microseconds (same as CycleResult.cycle_time_us
+    /// but included in metadata for unified telemetry access).
+    pub cycle_duration_us: u64,
+    /// Predicted Phi gain from school curriculum recommendation (0.0 when school disabled).
+    pub school_predicted_phi_gain: f32,
+
+    // ── Phase 16: Quality-Aware Adaptive Processing ─────────────────
+    /// Whether epistemic gate confidence gated expensive modules this cycle.
+    pub epistemic_coherence_gated: bool,
+    /// Unified quality score (fusion of prediction coherence + agreement + anomaly).
+    pub unified_quality_score: f32,
+    /// Whether dissipative health gate dampened learning this cycle.
+    pub dissipative_health_gated: bool,
+    /// Dissipative health gate dampening factor applied (1.0 = no dampening).
+    pub dissipative_lr_factor: f32,
+    /// Phi validation correlation from most recent validation run (0.0 when not yet run).
+    pub phi_validation_cached: f64,
+    /// Adjusted spectral weight used in unified Psi computation.
+    pub phi_spectral_weight: f32,
+    /// Coherence velocity (rate of change, negative = dropping).
+    pub coherence_velocity: f32,
+    /// Whether temporal discontinuity triggered coherence gating this cycle.
+    pub coherence_velocity_gated: bool,
+    /// Metacognitive anomaly recovery progress (0.0–1.0, 1.0 = fully recovered).
+    pub anomaly_recovery_progress: f32,
+    /// Whether anomaly recovery is actively in progress.
+    pub anomaly_recovering: bool,
 }
 
 /// Compact subset of CycleMetadata with the most essential telemetry fields.

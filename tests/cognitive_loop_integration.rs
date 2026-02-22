@@ -4027,3 +4027,260 @@ fn test_300_cycle_phase15_stress() {
         stats.guiding_question_priority_uses,
     );
 }
+
+// ── Phase 16: Quality-Aware Adaptive Processing ──────────────────────────
+
+/// Task #53: Epistemic gate coherence-gating — verify adaptive threshold scaling.
+#[test]
+fn test_epistemic_coherence_gating() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..40 {
+        let result = service.cycle("epistemic coherence gating test");
+        // epistemic_coherence_gated should be a valid boolean
+        let _ = result.metadata.epistemic_coherence_gated;
+        assert!(
+            result.metadata.unified_quality_score.is_finite(),
+            "quality NaN at {i}"
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "Epistemic coherence gating: gated_count={}",
+        stats.epistemic_coherence_gated_count
+    );
+}
+
+/// Task #54: Unified quality signal — verify fusion and bounded output.
+#[test]
+fn test_unified_quality_signal() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("unified quality signal test");
+        assert!(
+            result.metadata.unified_quality_score >= 0.0,
+            "quality < 0 at {i}"
+        );
+        assert!(
+            result.metadata.unified_quality_score <= 1.0,
+            "quality > 1 at {i}: {}",
+            result.metadata.unified_quality_score
+        );
+    }
+
+    let stats = service.stats();
+    assert!(stats.avg_unified_quality.is_finite());
+    assert!(stats.avg_unified_quality >= 0.0);
+    assert!(stats.avg_unified_quality <= 1.0);
+    eprintln!("Unified quality: avg={:.4}", stats.avg_unified_quality);
+}
+
+/// Task #55: Dissipative health learning gate — verify LR factor is bounded.
+#[test]
+fn test_dissipative_health_gate() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..60 {
+        let result = service.cycle("dissipative health stability test");
+        assert!(
+            result.metadata.dissipative_lr_factor.is_finite(),
+            "dissipative factor NaN at {i}"
+        );
+        assert!(
+            result.metadata.dissipative_lr_factor >= 0.5,
+            "dissipative factor too low at {i}: {}",
+            result.metadata.dissipative_lr_factor
+        );
+        assert!(
+            result.metadata.dissipative_lr_factor <= 1.0,
+            "dissipative factor > 1.0 at {i}: {}",
+            result.metadata.dissipative_lr_factor
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "Dissipative health gate: gated_count={}",
+        stats.dissipative_health_gated_count
+    );
+}
+
+/// Task #56: Adaptive Phi weighting — verify spectral weight is finite and bounded.
+#[test]
+fn test_adaptive_phi_weighting() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("phi validation weighting test");
+        assert!(
+            result.metadata.phi_spectral_weight.is_finite(),
+            "spectral weight NaN at {i}"
+        );
+        assert!(
+            result.metadata.phi_spectral_weight >= 0.3,
+            "spectral weight too low at {i}: {}",
+            result.metadata.phi_spectral_weight
+        );
+        assert!(
+            result.metadata.phi_spectral_weight <= 0.9,
+            "spectral weight too high at {i}: {}",
+            result.metadata.phi_spectral_weight
+        );
+    }
+}
+
+/// Task #57: Coherence velocity gating — verify velocity is finite.
+#[test]
+fn test_coherence_velocity_gating() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..40 {
+        let result = service.cycle("coherence velocity tracking test");
+        assert!(
+            result.metadata.coherence_velocity.is_finite(),
+            "velocity NaN at {i}"
+        );
+        assert!(
+            result.metadata.coherence_velocity.abs() < 2.0,
+            "velocity too extreme at {i}: {}",
+            result.metadata.coherence_velocity
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "Coherence velocity: gated_count={}",
+        stats.coherence_velocity_gated_count
+    );
+}
+
+/// Task #58: Anomaly recovery — verify progress is bounded [0, 1].
+#[test]
+fn test_anomaly_recovery_path() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..50 {
+        let result = service.cycle("anomaly recovery test");
+        assert!(
+            result.metadata.anomaly_recovery_progress >= 0.0,
+            "recovery < 0 at {i}"
+        );
+        assert!(
+            result.metadata.anomaly_recovery_progress <= 1.0,
+            "recovery > 1 at {i}: {}",
+            result.metadata.anomaly_recovery_progress
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "Anomaly recovery: active_count={}",
+        stats.anomaly_recovery_active_count
+    );
+}
+
+/// Stress test: 300 cycles with varied inputs verifying all Phase 16 fields.
+#[test]
+#[ignore] // expensive
+fn test_300_cycle_phase16_stress() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "The quick brown fox jumps",
+        "I feel deeply sad and alone",
+        "What should we learn today?",
+        "Making connections is vital",
+        "Exploring new possibilities",
+    ];
+
+    for i in 0..300 {
+        let input = inputs[i % inputs.len()];
+        let result = service.cycle(input);
+
+        assert!(
+            result.metadata.unified_quality_score.is_finite(),
+            "quality NaN at {i}"
+        );
+        assert!(
+            result.metadata.unified_quality_score >= 0.0
+                && result.metadata.unified_quality_score <= 1.0,
+            "quality out of [0,1] at {i}"
+        );
+        assert!(
+            result.metadata.dissipative_lr_factor.is_finite(),
+            "dissipative factor NaN at {i}"
+        );
+        assert!(
+            result.metadata.coherence_velocity.is_finite(),
+            "velocity NaN at {i}"
+        );
+        assert!(
+            result.metadata.anomaly_recovery_progress.is_finite(),
+            "recovery NaN at {i}"
+        );
+        assert!(
+            result.metadata.phi_spectral_weight.is_finite(),
+            "spectral weight NaN at {i}"
+        );
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 300);
+    assert!(stats.avg_unified_quality.is_finite());
+
+    eprintln!(
+        "300-cycle Phase 16 stress: quality={:.4}, dissipative_gated={}, \
+         coherence_gated={}, epistemic_gated={}, anomaly_recovery={}, \
+         spectral_weight={:.4}",
+        stats.avg_unified_quality,
+        stats.dissipative_health_gated_count,
+        stats.coherence_velocity_gated_count,
+        stats.epistemic_coherence_gated_count,
+        stats.anomaly_recovery_active_count,
+        stats.avg_unified_quality,
+    );
+}

@@ -106,6 +106,89 @@ impl From<DatabaseError> for SymthaeaError {
 pub type SymthaeaResult<T> = Result<T, SymthaeaError>;
 
 // ---------------------------------------------------------------------------
+// Contextual error enrichment
+// ---------------------------------------------------------------------------
+
+/// Severity of an error — determines recovery strategy.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ErrorSeverity {
+    /// The subsystem can recover; skip or degrade gracefully.
+    #[default]
+    Recoverable,
+    /// The system cannot continue meaningfully.
+    Fatal,
+}
+
+/// Structured context attached to a [`SymthaeaError`].
+#[derive(Debug, Default, Clone)]
+pub struct ErrorContext {
+    /// Which subsystem produced this error (e.g., `"causal_explanation"`).
+    pub subsystem: Option<String>,
+    /// Cycle number when the error occurred.
+    pub cycle: Option<usize>,
+    /// Error severity.
+    pub severity: ErrorSeverity,
+}
+
+/// A [`SymthaeaError`] enriched with structured context.
+///
+/// Created via [`SymthaeaError::in_subsystem`] or [`SymthaeaError::with_context`].
+/// This is additive — existing code continues to use plain `SymthaeaError`.
+#[derive(Debug)]
+pub struct ContextualError {
+    /// The underlying error.
+    pub error: SymthaeaError,
+    /// Structured context describing where/when the error occurred.
+    pub context: ErrorContext,
+}
+
+impl SymthaeaError {
+    /// Wrap this error with a subsystem label.
+    pub fn in_subsystem(self, subsystem: &str) -> ContextualError {
+        ContextualError {
+            error: self,
+            context: ErrorContext {
+                subsystem: Some(subsystem.to_string()),
+                ..Default::default()
+            },
+        }
+    }
+
+    /// Wrap this error with full structured context.
+    pub fn with_context(self, ctx: ErrorContext) -> ContextualError {
+        ContextualError {
+            error: self,
+            context: ctx,
+        }
+    }
+}
+
+impl fmt::Display for ErrorSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ErrorSeverity::Recoverable => write!(f, "recoverable"),
+            ErrorSeverity::Fatal => write!(f, "fatal"),
+        }
+    }
+}
+
+impl fmt::Display for ContextualError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(ref sub) = self.context.subsystem {
+            write!(f, "[{sub}] {}", self.error)
+        } else {
+            write!(f, "{}", self.error)
+        }
+    }
+}
+
+impl std::error::Error for ContextualError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.error)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -199,5 +282,40 @@ mod tests {
 
         let err: SymthaeaResult<u32> = Err(SymthaeaError::Config("bad".into()));
         assert!(err.is_err());
+    }
+
+    #[test]
+    fn test_contextual_error_in_subsystem() {
+        let err = SymthaeaError::Consciousness("phi diverged".into());
+        let ctx_err = err.in_subsystem("causal_explanation");
+
+        assert_eq!(
+            ctx_err.to_string(),
+            "[causal_explanation] Consciousness error: phi diverged"
+        );
+        assert_eq!(
+            ctx_err.context.subsystem.as_deref(),
+            Some("causal_explanation")
+        );
+        assert_eq!(ctx_err.context.severity, ErrorSeverity::Recoverable);
+        assert!(ctx_err.context.cycle.is_none());
+    }
+
+    #[test]
+    fn test_contextual_error_with_context() {
+        let err = SymthaeaError::CognitiveLoop("timeout".into());
+        let ctx = ErrorContext {
+            subsystem: Some("moral_algebra".into()),
+            cycle: Some(42),
+            severity: ErrorSeverity::Fatal,
+        };
+        let ctx_err = err.with_context(ctx);
+
+        assert_eq!(
+            ctx_err.to_string(),
+            "[moral_algebra] Cognitive loop error: timeout"
+        );
+        assert_eq!(ctx_err.context.cycle, Some(42));
+        assert_eq!(ctx_err.context.severity, ErrorSeverity::Fatal);
     }
 }

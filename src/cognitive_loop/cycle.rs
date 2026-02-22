@@ -1428,6 +1428,16 @@ impl CognitiveLoopService {
         let attention_budget_exceeded = attention_budget_elapsed_us > attention_budget_us;
         if attention_budget_exceeded {
             self.stats.attention_budget_exceeded_count += 1;
+            if self.stats.attention_budget_exceeded_count > 3 {
+                tracing::warn!(
+                    elapsed_us = attention_budget_elapsed_us,
+                    consecutive = self.stats.attention_budget_exceeded_count,
+                    "Cycle budget exceeded for {} consecutive cycles",
+                    self.stats.attention_budget_exceeded_count,
+                );
+            }
+        } else {
+            self.stats.attention_budget_exceeded_count = 0;
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -1605,17 +1615,45 @@ impl CognitiveLoopService {
         // Anomalies (drops, plateaus, oscillations) indicate reasoning degradation
         // and dampen the learning rate to avoid consolidating bad patterns.
         let mut metacognitive_anomaly = false;
+        let mut anomaly_recovery_progress: f32 = 0.0;
+        let anomaly_recovering;
         if let Some(ref mut monitor) = self.metacognitive_monitor {
             if monitor.observe_phi(unified_psi) {
                 metacognitive_anomaly = true;
                 // Dampen learning rate when reasoning is degrading
                 reasoning_lr_factor *= 0.5;
+                // Reset recovery counter on new anomaly
+                self.carryover.urgency.anomaly_recovery_counter = 0;
+                self.carryover.urgency.anomaly_was_active = true;
                 tracing::debug!(
                     target: "cognitive_loop::metacognition",
                     unified_psi,
                     "Metacognitive anomaly detected — dampening learning rate"
                 );
             }
+        }
+
+        // ── Phase 16: Metacognitive anomaly recovery path ────────────────
+        // Science: Luria (1973) — executive recovery is gradual, not instantaneous.
+        // After anomaly clears, progressively restore LR over 20 cycles.
+        if !metacognitive_anomaly && self.carryover.urgency.anomaly_was_active {
+            self.carryover.urgency.anomaly_recovery_counter =
+                self.carryover.urgency.anomaly_recovery_counter.saturating_add(1);
+            let counter = self.carryover.urgency.anomaly_recovery_counter;
+            if counter <= 20 {
+                // Gradually recover: 0.5 → 1.0 over 20 cycles
+                let recovery = counter as f32 / 20.0;
+                reasoning_lr_factor *= 0.5 + recovery * 0.5;
+                anomaly_recovery_progress = recovery;
+                self.stats.anomaly_recovery_active_count += 1;
+            } else {
+                // Fully recovered — clear the flag
+                self.carryover.urgency.anomaly_was_active = false;
+                anomaly_recovery_progress = 1.0;
+            }
+            anomaly_recovering = counter <= 20;
+        } else {
+            anomaly_recovering = false;
         }
 
         // Compose effective LR from all modulation sources (flow, curiosity, FEP, MCE, subsystem)
@@ -1755,6 +1793,66 @@ impl CognitiveLoopService {
         self.stats.temporal_coherence = self.coherence_bridge.smoothed_coherence();
         self.stats.effective_learning_rate = effective_lr;
         self.stats.coherence_phi_contribution = self.coherence_bridge.phi_contribution();
+
+        // ── School curriculum recommendation (co-prime interval: every 53 cycles) ──
+        #[cfg(feature = "school_learning")]
+        let school_predicted_phi_gain = if self.stats.total_cycles % 53 == 0 {
+            if let Some(ref school) = self.school_bridge {
+                school
+                    .recommend_next()
+                    .ok()
+                    .filter(|r| r.predicted_phi_gain > 0.001)
+                    .map(|r| r.predicted_phi_gain)
+                    .unwrap_or(0.0)
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
+        #[cfg(not(feature = "school_learning"))]
+        let school_predicted_phi_gain = 0.0f32;
+
+        // ── Causal consciousness attention (co-prime interval: every 41 cycles) ──
+        let causal_attention_boost = if self.stats.total_cycles % 41 == 0 {
+            if let Some(ref mut cc) = self.causal_consciousness {
+                // Build variable observations from compressed state (chunk into 8D windows)
+                let vars: Vec<Vec<f64>> = compressed_state
+                    .chunks(8)
+                    .map(|chunk| chunk.iter().map(|&v| v as f64).collect())
+                    .collect();
+                if vars.len() >= 2 {
+                    let attention = cc.attention.compute_attention(&vars);
+                    // Top cause strength: max off-diagonal attention weight
+                    let top_strength = attention
+                        .iter()
+                        .enumerate()
+                        .flat_map(|(i, row)| {
+                            row.iter()
+                                .enumerate()
+                                .filter(move |&(j, _)| i != j)
+                                .map(|(_, &v)| v)
+                        })
+                        .fold(0.0f64, f64::max);
+                    if top_strength > 0.3 {
+                        top_strength as f32
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
+        // Modulate confidence from causal attention (subtle: max 5% boost)
+        if causal_attention_boost > 0.0 {
+            self.prediction_confidence =
+                (self.prediction_confidence + causal_attention_boost * 0.05).min(1.0);
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // PARALLEL POST-PROCESSING: Independent subsystem updates via rayon
@@ -1988,6 +2086,7 @@ impl CognitiveLoopService {
         // Science: Kruger & Dunning (1999) — epistemic humility gates downstream integration
         // When the gate rejects input (low confidence + not approved), dampen learning
         // and skip codebook growth. When approved, boost LR proportional to confidence.
+        let mut epistemic_coherence_gated = false;
         if !epistemic_gate_approved {
             // Gate rejects: dampen learning proportional to gate certainty
             // (high confidence in rejection → strong dampening)
@@ -2000,6 +2099,26 @@ impl CognitiveLoopService {
             self.carryover.learning.subsystem_lr_factor *= 1.0 + approval_boost;
             self.carryover.learning.subsystem_lr_factor =
                 self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.3);
+        }
+
+        // ── Phase 16: Epistemic gate confidence → coherence-gating spectrum ──
+        // Science: Fernandez-Duque & Johnson (2002) — metacognitive monitoring adjusts
+        // processing depth. Low gate confidence → raise coherence bar for expensive modules;
+        // High confidence → feed back into adaptive threshold (trust inputs more).
+        if epistemic_gate_confidence < 0.4 && epistemic_gate_confidence > 0.0 {
+            // Low confidence → raise coherence requirements (be cautious)
+            let caution_factor = (0.4 - epistemic_gate_confidence) * 0.3;
+            self.carryover.learning.adaptive_threshold_scale *= 1.0 + caution_factor;
+            self.carryover.learning.adaptive_threshold_scale =
+                self.carryover.learning.adaptive_threshold_scale.clamp(0.5, 2.0);
+            epistemic_coherence_gated = true;
+            self.stats.epistemic_coherence_gated_count += 1;
+        } else if epistemic_gate_confidence > 0.8 {
+            // High confidence → loosen threshold (trust inputs, learn faster)
+            let trust_factor = (epistemic_gate_confidence - 0.8) * 0.15;
+            self.carryover.learning.adaptive_threshold_scale *= 1.0 - trust_factor;
+            self.carryover.learning.adaptive_threshold_scale =
+                self.carryover.learning.adaptive_threshold_scale.clamp(0.5, 2.0);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -2211,6 +2330,78 @@ impl CognitiveLoopService {
         let consciousness_level = integration_result.consciousness_level;
 
         // ═══════════════════════════════════════════════════════════════════════
+        // PHASE 16: Quality-Aware Adaptive Processing
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // ── Task #55: Dissipative health + phenomenal binding → learning gate ──
+        // Science: Prigogine (1977) — dissipative structures require stability to consolidate.
+        // When the system's thermodynamic health is low OR phenomenal binding is fragmented,
+        // dampen learning to prevent cementing unstable patterns.
+        let dissipative_lr_factor;
+        let dissipative_health_gated;
+        {
+            let dh = self.carryover.quality.last_dissipative_health as f32;
+            let pb = self.carryover.quality.last_phenomenal_binding as f32;
+            if dh < 0.5 && pb < 0.6 && self.stats.total_cycles > 50 {
+                // Both unhealthy → strong dampening (up to -30%)
+                let dampening = (1.0 - dh) * (1.0 - pb) * 0.3;
+                dissipative_lr_factor = (1.0 - dampening).max(0.7);
+                self.carryover.learning.subsystem_lr_factor *= dissipative_lr_factor;
+                dissipative_health_gated = true;
+                self.stats.dissipative_health_gated_count += 1;
+            } else if dh < 0.5 || pb < 0.4 {
+                // One unhealthy → mild dampening (up to -15%)
+                let dampening = if dh < 0.5 {
+                    (0.5 - dh) * 0.15
+                } else {
+                    (0.4 - pb) * 0.15
+                };
+                dissipative_lr_factor = (1.0 - dampening).max(0.85);
+                self.carryover.learning.subsystem_lr_factor *= dissipative_lr_factor;
+                dissipative_health_gated = true;
+                self.stats.dissipative_health_gated_count += 1;
+            } else {
+                dissipative_lr_factor = 1.0;
+                dissipative_health_gated = false;
+            }
+            // Cache for next cycle
+            self.carryover.quality.last_dissipative_health = dissipative_health as f64;
+            self.carryover.quality.last_phenomenal_binding = phenomenal_binding_strength;
+        }
+
+        // ── Task #57: Coherence velocity → dynamic gating ─────────────────────
+        // Science: Kelso (1995) — phase transitions in coordination dynamics.
+        // Track rate of coherence change; rapid drops indicate instability.
+        let coherence_velocity;
+        let coherence_velocity_gated;
+        {
+            let prev_coh = self.carryover.quality.last_coherence;
+            coherence_velocity = coherence - prev_coh;
+            self.carryover.quality.coherence_velocity = coherence_velocity;
+            self.carryover.quality.last_coherence = coherence;
+
+            // If temporal discontinuity detected OR rapid coherence drop,
+            // raise confidence requirements and tighten exploration
+            if temporal_discontinuity || coherence_velocity < -0.15 {
+                let severity = if temporal_discontinuity {
+                    0.5 + (-coherence_velocity).max(0.0)
+                } else {
+                    (-coherence_velocity - 0.15).min(0.5)
+                };
+                // Dampen confidence proportional to severity
+                self.prediction_confidence *= 1.0 - severity * 0.1;
+                // Raise learning threshold (require higher error to trigger training)
+                self.carryover.learning.adaptive_threshold_scale *= 1.0 + severity * 0.2;
+                self.carryover.learning.adaptive_threshold_scale =
+                    self.carryover.learning.adaptive_threshold_scale.clamp(0.5, 2.0);
+                coherence_velocity_gated = true;
+                self.stats.coherence_velocity_gated_count += 1;
+            } else {
+                coherence_velocity_gated = false;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // END-OF-CYCLE HOMEOSTASIS: Prevent asymmetric drift and runaway spirals
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
@@ -2320,6 +2511,37 @@ impl CognitiveLoopService {
             }
         }
 
+        // ── Phase 16: Adaptive Phi weighting from validation ───────────────
+        // Science: Casali et al. (2013) — validated Phi measures are more reliable.
+        // Use cached phi_validation_correlation to scale sigma's influence on learning.
+        // High validation correlation → sigma is trustworthy → amplify its effect.
+        // Low correlation → sigma is noisy → attenuate its effect.
+        let phi_spectral_weight = self.carryover.quality.phi_spectral_weight;
+        let phi_validation_cached = self.carryover.quality.phi_validation_correlation;
+        if let Some(sig) = sigma {
+            if phi_validation_cached > 0.7 {
+                // Validated: amplify sigma's confidence contribution
+                let validation_boost = (phi_validation_cached - 0.7) as f32 * 0.1;
+                self.prediction_confidence =
+                    (self.prediction_confidence + sig as f32 * validation_boost).clamp(0.0, 1.0);
+            } else if phi_validation_cached > 0.0 && phi_validation_cached < 0.3 {
+                // Poorly validated: reduce sigma's influence (already applied above)
+                let attenuate = (0.3 - phi_validation_cached) as f32 * 0.05;
+                self.prediction_confidence *= 1.0 - attenuate;
+            }
+        }
+        // Also weight equation_v2 when it deviates from spectral MIP
+        if let (Some(sig), eq_v2) = (sigma, equation_v2_consciousness) {
+            let deviation = (sig - eq_v2).abs();
+            if deviation > 0.2 && phi_spectral_weight < 0.6 {
+                // Spectral weight reduced (validation says eq_v2 is more reliable)
+                // → trust eq_v2 for confidence modulation
+                let eq_v2_boost = (eq_v2 * (1.0 - phi_spectral_weight as f64) * 0.03) as f32;
+                self.prediction_confidence =
+                    (self.prediction_confidence + eq_v2_boost).clamp(0.0, 1.0);
+            }
+        }
+
         // Soul experience integration: feed cycle outcome back into value learning.
         let _t = Instant::now();
         // This closes the loop: Soul evaluates alignment (pre-cycle) → cognitive cycle
@@ -2390,6 +2612,32 @@ impl CognitiveLoopService {
         // EMA update for stats tracking
         self.stats.avg_cross_module_agreement =
             self.stats.avg_cross_module_agreement * 0.95 + cross_module_agreement * 0.05;
+
+        // ── Task #54: Unified quality signal fusion ───────────────────────────
+        // Science: Ernst & Banks (2002) — multi-cue integration via reliability weighting.
+        // Fuse prediction coherence + cross-module agreement + anomaly status into
+        // unified quality score for downstream gating.
+        let unified_quality_score;
+        {
+            let anomaly_factor = if metacognitive_anomaly { 0.0 } else { 1.0 };
+            unified_quality_score = 0.5 * prediction_coherence
+                + 0.3 * cross_module_agreement
+                + 0.2 * anomaly_factor;
+            self.stats.avg_unified_quality =
+                self.stats.avg_unified_quality * 0.9 + unified_quality_score * 0.1;
+
+            // High quality → boost learning rate (confident multi-system agreement)
+            if unified_quality_score > 0.8 {
+                let quality_boost = (unified_quality_score - 0.8) * 0.25;
+                self.carryover.learning.subsystem_lr_factor *= 1.0 + quality_boost;
+                self.carryover.learning.subsystem_lr_factor =
+                    self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.5);
+            }
+            // Low quality → dampen exploration (conflicting signals, don't wander)
+            if unified_quality_score < 0.3 && self.stats.total_cycles > 30 {
+                self.curiosity_drive.exploration_urge *= 0.9;
+            }
+        }
 
         // ── Track 4e: Thalamic depth → storage salience ──────────────────────
         // Science: Sherman & Guillery (2006) — thalamic relay modulates cortical encoding
@@ -2590,6 +2838,19 @@ impl CognitiveLoopService {
             input_similarity,
             input_memoized,
             guiding_priority_category,
+            cycle_duration_us: cycle_start.elapsed().as_micros() as u64,
+            school_predicted_phi_gain,
+            // Phase 16: Quality-Aware Adaptive Processing
+            epistemic_coherence_gated,
+            unified_quality_score,
+            dissipative_health_gated,
+            dissipative_lr_factor,
+            phi_validation_cached,
+            phi_spectral_weight,
+            coherence_velocity,
+            coherence_velocity_gated,
+            anomaly_recovery_progress,
+            anomaly_recovering,
         };
 
         // Update cumulative stats for resonator-memory loop diagnostics

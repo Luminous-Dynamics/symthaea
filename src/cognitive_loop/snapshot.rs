@@ -205,6 +205,15 @@ pub struct ConsciousnessSnapshot {
 
     /// Sigma (backward-compat alias for spectral MIP phi, used by memory coordinator).
     pub sigma: Option<f64>,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PERFORMANCE METRICS
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Average cycle time in microseconds (EMA).
+    pub avg_cycle_time_us: f32,
+
+    /// Current cycles per second (Hz).
+    pub cycles_per_second: f32,
 }
 
 impl ConsciousnessSnapshot {

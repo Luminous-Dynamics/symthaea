@@ -365,6 +365,24 @@ pub struct LoopStats {
     pub guiding_question_priority_uses: u64,
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // PHASE 16: QUALITY-AWARE ADAPTIVE PROCESSING
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Cycles where epistemic coherence-gating skipped expensive modules (cumulative).
+    pub epistemic_coherence_gated_count: u64,
+
+    /// Average unified quality score (EMA, alpha=0.1).
+    pub avg_unified_quality: f32,
+
+    /// Cycles where dissipative health gate dampened learning (cumulative).
+    pub dissipative_health_gated_count: u64,
+
+    /// Cycles where coherence velocity triggered gating (cumulative).
+    pub coherence_velocity_gated_count: u64,
+
+    /// Cycles where anomaly recovery was active (cumulative).
+    pub anomaly_recovery_active_count: u64,
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)
     // ═══════════════════════════════════════════════════════════════════════════
     /// Cached lattice height (0 = not yet computed)

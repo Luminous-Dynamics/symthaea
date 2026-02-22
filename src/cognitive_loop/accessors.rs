@@ -24,6 +24,7 @@ use super::{
     ResponseStrategy, SelfAssessment, SelfReflection, WorldModelBridge,
 };
 
+#[allow(dead_code)] // Accessor API surface — methods used by tests and future consumers
 impl CognitiveLoopService {
     /// Get current statistics
     pub fn stats(&self) -> &LoopStats {
@@ -232,7 +233,6 @@ impl CognitiveLoopService {
     }
 
     /// Get current flow state reference
-    #[allow(dead_code)]
     pub(crate) fn flow_state(&self) -> &FlowState {
         &self.flow_state
     }
@@ -260,7 +260,6 @@ impl CognitiveLoopService {
     }
 
     /// Get emotion contagion reference
-    #[allow(dead_code)]
     pub(crate) fn emotion_contagion(&self) -> &EmotionContagion {
         &self.emotion_contagion
     }
@@ -293,7 +292,6 @@ impl CognitiveLoopService {
     }
 
     /// Get curiosity drive reference
-    #[allow(dead_code)]
     pub(crate) fn curiosity_drive(&self) -> &CuriosityDrive {
         &self.curiosity_drive
     }
@@ -356,7 +354,6 @@ impl CognitiveLoopService {
     }
 
     /// Get self-reflection reference
-    #[allow(dead_code)]
     pub(crate) fn self_reflection(&self) -> &SelfReflection {
         &self.self_reflection
     }
@@ -447,6 +444,8 @@ impl CognitiveLoopService {
                 .map(|_| 0.0) // Compassion is per-cycle; snapshot shows lifetime average
                 .unwrap_or(0.0),
             sigma: self.carryover.consciousness.last_sigma,
+            avg_cycle_time_us: self.stats.avg_cycle_time_us,
+            cycles_per_second: self.stats.cycles_per_second,
         }
     }
 
@@ -561,7 +560,6 @@ impl CognitiveLoopService {
     }
 
     /// Get the conversation coherence tracker reference
-    #[allow(dead_code)] // Used by fep_temporal_benchmark
     pub(crate) fn coherence_tracker(&self) -> &ConversationCoherenceTracker {
         &self.coherence_tracker
     }
@@ -689,7 +687,6 @@ impl CognitiveLoopService {
     // ========== Adaptive Behavior Methods ==========
 
     /// Get current adaptive behavior
-    #[allow(dead_code)]
     pub(crate) fn adaptive_behavior(&self) -> &AdaptiveBehavior {
         &self.adaptive_behavior
     }
