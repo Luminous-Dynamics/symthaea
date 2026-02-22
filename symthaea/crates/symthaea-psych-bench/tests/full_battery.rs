@@ -31,8 +31,8 @@ use symthaea_psych_bench::benchmarks::{
     },
 };
 use symthaea_psych_bench::harness::{
-    BenchmarkConfig, BenchmarkReport, PsychBenchmark,
     snapshot::{RegressionReport, RegressionSnapshot},
+    BenchmarkConfig, BenchmarkReport, PsychBenchmark,
 };
 
 fn battery_config() -> BenchmarkConfig {
@@ -161,8 +161,8 @@ fn regression_against_baseline() {
         return;
     }
 
-    let baseline = RegressionSnapshot::load(baseline_path)
-        .expect("failed to load baseline snapshot");
+    let baseline =
+        RegressionSnapshot::load(baseline_path).expect("failed to load baseline snapshot");
 
     // Check staleness (warn if > 30 days old, but don't fail)
     if let Some(warning) = baseline.staleness_warning(30) {

@@ -8,7 +8,7 @@
 //! Gated behind `#[cfg(feature = "symthaea-backend")]`.
 
 use symthaea_fep::{
-    ActiveInferenceAgent, ActiveInferenceAgentConfig, ActionSelectionResult, Observation,
+    ActionSelectionResult, ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation,
 };
 
 /// Creates an FEP agent modeling a social character.

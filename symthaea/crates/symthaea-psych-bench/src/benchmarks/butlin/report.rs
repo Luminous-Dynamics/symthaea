@@ -56,9 +56,18 @@ pub struct ButlinIndicatorReport {
 impl ButlinIndicatorReport {
     /// Build from a list of indicator evaluations.
     pub fn from_indicators(indicators: Vec<IndicatorEvidence>) -> Self {
-        let present_count = indicators.iter().filter(|i| i.status == IndicatorStatus::Present).count();
-        let partial_count = indicators.iter().filter(|i| i.status == IndicatorStatus::Partial).count();
-        let absent_count = indicators.iter().filter(|i| i.status == IndicatorStatus::Absent).count();
+        let present_count = indicators
+            .iter()
+            .filter(|i| i.status == IndicatorStatus::Present)
+            .count();
+        let partial_count = indicators
+            .iter()
+            .filter(|i| i.status == IndicatorStatus::Partial)
+            .count();
+        let absent_count = indicators
+            .iter()
+            .filter(|i| i.status == IndicatorStatus::Absent)
+            .count();
         Self {
             indicators,
             present_count,

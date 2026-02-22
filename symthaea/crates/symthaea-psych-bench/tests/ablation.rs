@@ -16,10 +16,7 @@ fn ablation_full_vs_reduced_wm() {
         results[0].config_label.as_deref(),
         Some("Full Consciousness")
     );
-    assert_eq!(
-        results[1].config_label.as_deref(),
-        Some("Reduced WM (K=3)")
-    );
+    assert_eq!(results[1].config_label.as_deref(), Some("Reduced WM (K=3)"));
 
     // Both should produce metrics
     assert!(!results[0].metrics.is_empty());

@@ -114,7 +114,11 @@ fn extract_indicator_score(
         "AST-1" => {
             // Attention schema: attention_schema_focus with non-zero fallback
             let focus = metadata.attention_schema_focus as f64;
-            if focus > 0.0 { focus } else { 0.01 }
+            if focus > 0.0 {
+                focus
+            } else {
+                0.01
+            }
         }
         _ => 0.0,
     }
@@ -195,15 +199,20 @@ fn measure_indicator(
                 }
             }
             // Compute centroid for each input
-            let centroids: Vec<Vec<f64>> = input_outputs.iter().filter_map(|outputs| {
-                if outputs.is_empty() { return None; }
-                let dim = outputs[0].len();
-                let n = outputs.len() as f64;
-                let centroid: Vec<f64> = (0..dim)
-                    .map(|d| outputs.iter().map(|o| o[d] as f64).sum::<f64>() / n)
-                    .collect();
-                Some(centroid)
-            }).collect();
+            let centroids: Vec<Vec<f64>> = input_outputs
+                .iter()
+                .filter_map(|outputs| {
+                    if outputs.is_empty() {
+                        return None;
+                    }
+                    let dim = outputs[0].len();
+                    let n = outputs.len() as f64;
+                    let centroid: Vec<f64> = (0..dim)
+                        .map(|d| outputs.iter().map(|o| o[d] as f64).sum::<f64>() / n)
+                        .collect();
+                    Some(centroid)
+                })
+                .collect();
             // Average pairwise cosine distance between centroids
             if centroids.len() < 2 {
                 return 0.0;
@@ -211,13 +220,15 @@ fn measure_indicator(
             let mut total_dist = 0.0;
             let mut pair_count = 0u64;
             for i in 0..centroids.len() {
-                for j in (i+1)..centroids.len() {
+                for j in (i + 1)..centroids.len() {
                     let sim = cosine_similarity_f64(&centroids[i], &centroids[j]);
                     total_dist += 1.0 - sim; // distance = 1 - similarity
                     pair_count += 1;
                 }
             }
-            if pair_count == 0 { return 0.0; }
+            if pair_count == 0 {
+                return 0.0;
+            }
             let mean_dist = total_dist / pair_count as f64;
             // Normalize: typical distance 0.01-0.3 → scale to 0-1
             (mean_dist * 5.0).clamp(0.0, 1.0)
@@ -277,7 +288,11 @@ fn cosine_similarity_f64(a: &[f64], b: &[f64]) -> f64 {
         norm_b += y * y;
     }
     let denom = (norm_a * norm_b).sqrt();
-    if denom > 1e-10 { dot / denom } else { 0.0 }
+    if denom > 1e-10 {
+        dot / denom
+    } else {
+        0.0
+    }
 }
 
 /// Run the full ablation matrix.
@@ -436,9 +451,16 @@ fn run_downstream_benchmark(spec: &AblationSpec) -> (f64, f64) {
     // Extract the primary accuracy metric
     let extract_accuracy = |result: &crate::harness::report::BenchmarkResult| -> f64 {
         // Try common accuracy metric names
-        for key in &["nback_2::accuracy", "set_size_4::accuracy", "beta3_model_basedness",
-                     "reward_rate", "overall_accuracy", "categories_completed",
-                     "set_4::binding_accuracy", "spatial_4::accuracy"] {
+        for key in &[
+            "nback_2::accuracy",
+            "set_size_4::accuracy",
+            "beta3_model_basedness",
+            "reward_rate",
+            "overall_accuracy",
+            "categories_completed",
+            "set_4::binding_accuracy",
+            "spatial_4::accuracy",
+        ] {
             if let Some(val) = result.metrics.get(*key) {
                 return val.mean;
             }
@@ -451,7 +473,10 @@ fn run_downstream_benchmark(spec: &AblationSpec) -> (f64, f64) {
         sum / result.metrics.len() as f64
     };
 
-    (extract_accuracy(&baseline_result), extract_accuracy(&ablated_result))
+    (
+        extract_accuracy(&baseline_result),
+        extract_accuracy(&ablated_result),
+    )
 }
 
 #[cfg(test)]

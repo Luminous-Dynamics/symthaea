@@ -14,7 +14,6 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
 
-
 /// Faux-pas recognition benchmark.
 pub struct FauxPasBenchmark;
 
@@ -113,7 +112,8 @@ impl FauxPasBenchmark {
         let reaction_hv = adapter.encode(&Scenario::new(scenario.reaction), dim);
 
         let positive_marker = adapter.encode(&Scenario::new("happy pleased grateful smiles"), dim);
-        let negative_marker = adapter.encode(&Scenario::new("disappointed embarrassed hurt upset"), dim);
+        let negative_marker =
+            adapter.encode(&Scenario::new("disappointed embarrassed hurt upset"), dim);
 
         // Geometric signal: reaction vs emotional markers
         let reaction_neg = reaction_hv.similarity(&negative_marker);
@@ -127,26 +127,57 @@ impl FauxPasBenchmark {
         let reaction_lower = scenario.reaction.to_lowercase();
         let statement_lower = scenario.statement.to_lowercase();
         let negative_reaction = [
-            "disappointed", "embarrassed", "hurt", "upset", "uncomfortable",
-            "offended", "sad", "angry", "annoyed", "feels bad", "insulted",
-            "self-conscious", "excluded",
+            "disappointed",
+            "embarrassed",
+            "hurt",
+            "upset",
+            "uncomfortable",
+            "offended",
+            "sad",
+            "angry",
+            "annoyed",
+            "feels bad",
+            "insulted",
+            "self-conscious",
+            "excluded",
         ];
         let positive_reaction = [
-            "smiles", "thanks", "happy", "pleased", "nods", "confidently",
-            "grateful", "agrees", "laughs", "enjoys", "celebrates", "suggests",
+            "smiles",
+            "thanks",
+            "happy",
+            "pleased",
+            "nods",
+            "confidently",
+            "grateful",
+            "agrees",
+            "laughs",
+            "enjoys",
+            "celebrates",
+            "suggests",
         ];
         // Statement-side: backhanded compliments, comparisons, implicit criticism
         let critical_statement = [
-            "old", "better", "before", "child", "beginner", "still",
-            "didn't know", "actually", "only", "thought",
+            "old",
+            "better",
+            "before",
+            "child",
+            "beginner",
+            "still",
+            "didn't know",
+            "actually",
+            "only",
+            "thought",
         ];
-        let neg_hits: f64 = negative_reaction.iter()
+        let neg_hits: f64 = negative_reaction
+            .iter()
             .filter(|k| reaction_lower.contains(*k))
             .count() as f64;
-        let pos_hits: f64 = positive_reaction.iter()
+        let pos_hits: f64 = positive_reaction
+            .iter()
             .filter(|k| reaction_lower.contains(*k))
             .count() as f64;
-        let crit_hits: f64 = critical_statement.iter()
+        let crit_hits: f64 = critical_statement
+            .iter()
             .filter(|k| statement_lower.contains(*k))
             .count() as f64;
 
@@ -159,7 +190,11 @@ impl FauxPasBenchmark {
         let combined = geometric_divergence as f64 * 0.2 + keyword_signal * 0.8;
         let detected_faux_pas = combined > 0.0;
 
-        if detected_faux_pas == scenario.is_faux_pas { 1.0 } else { 0.0 }
+        if detected_faux_pas == scenario.is_faux_pas {
+            1.0
+        } else {
+            0.0
+        }
     }
 
     /// Full trial: FEP belief detection for faux pas recognition.
@@ -200,7 +235,11 @@ impl FauxPasBenchmark {
 
         // Detection: did the agent's belief shift toward blunder (state 1)?
         let detected_blunder = agent.belief.mean[1] > agent.belief.mean[0];
-        let accuracy = if detected_blunder == scenario.is_faux_pas { 1.0 } else { 0.0 };
+        let accuracy = if detected_blunder == scenario.is_faux_pas {
+            1.0
+        } else {
+            0.0
+        };
         let confidence = if scenario.is_faux_pas {
             agent.belief.mean[1] // confidence in blunder detection
         } else {

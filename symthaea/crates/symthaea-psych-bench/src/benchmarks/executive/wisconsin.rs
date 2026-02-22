@@ -16,10 +16,20 @@ use symthaea_core::hdc::ContinuousHV;
 
 /// Card features.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Color { Red, Blue, Green, Yellow }
+enum Color {
+    Red,
+    Blue,
+    Green,
+    Yellow,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Shape { Triangle, Circle, Square, Star }
+enum Shape {
+    Triangle,
+    Circle,
+    Square,
+    Star,
+}
 
 /// A stimulus card with 3 features.
 #[derive(Clone, Copy)]
@@ -31,7 +41,11 @@ struct Card {
 
 /// Sorting rule dimension.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Rule { Color, Shape, Number }
+enum Rule {
+    Color,
+    Shape,
+    Number,
+}
 
 impl Rule {
     fn cycle(self) -> Self {
@@ -70,10 +84,26 @@ impl WisconsinCardSortingBenchmark {
 
         // 4 target cards with unique feature combos
         let targets = [
-            Card { color: Color::Red, shape: Shape::Triangle, number: 1 },
-            Card { color: Color::Blue, shape: Shape::Circle, number: 2 },
-            Card { color: Color::Green, shape: Shape::Square, number: 3 },
-            Card { color: Color::Yellow, shape: Shape::Star, number: 4 },
+            Card {
+                color: Color::Red,
+                shape: Shape::Triangle,
+                number: 1,
+            },
+            Card {
+                color: Color::Blue,
+                shape: Shape::Circle,
+                number: 2,
+            },
+            Card {
+                color: Color::Green,
+                shape: Shape::Square,
+                number: 3,
+            },
+            Card {
+                color: Color::Yellow,
+                shape: Shape::Star,
+                number: 4,
+            },
         ];
 
         let encode_card = |card: &Card| -> ContinuousHV {
@@ -83,7 +113,7 @@ impl WisconsinCardSortingBenchmark {
             ContinuousHV::bundle(&[&c, &s, &n])
         };
 
-        let _target_hvs: Vec<ContinuousHV> = targets.iter().map(&encode_card).collect();
+        let _target_hvs: Vec<ContinuousHV> = targets.iter().map(encode_card).collect();
 
         // State tracking
         let mut current_rule = Rule::Color;
@@ -98,7 +128,7 @@ impl WisconsinCardSortingBenchmark {
         // Explicit hypothesis testing: 3 rule confidences [color, shape, number]
         let mut rule_confidence = [1.0f64, 0.0, 0.0]; // Start believing color
         let lr_correct = 0.2; // Moderate reinforcement (lower cap = less needed)
-        let lr_error = 0.8;   // Stronger error penalty for faster set-shifting
+        let lr_error = 0.8; // Stronger error penalty for faster set-shifting
 
         let all_colors = [Color::Red, Color::Blue, Color::Green, Color::Yellow];
         let all_shapes = [Shape::Triangle, Shape::Circle, Shape::Square, Shape::Star];
@@ -122,20 +152,39 @@ impl WisconsinCardSortingBenchmark {
             rng ^= rng >> 7;
             rng ^= rng << 17;
             let rn = (rng % 4) as u8 + 1;
-            let response_card = Card { color: rc, shape: rs, number: rn };
+            let response_card = Card {
+                color: rc,
+                shape: rs,
+                number: rn,
+            };
 
             // For each hypothesis, compute which target the response matches
-            let match_by_color = targets.iter().position(|t| t.color == response_card.color).unwrap_or(0);
-            let match_by_shape = targets.iter().position(|t| t.shape == response_card.shape).unwrap_or(0);
-            let match_by_number = targets.iter().position(|t| t.number == response_card.number).unwrap_or(0);
+            let match_by_color = targets
+                .iter()
+                .position(|t| t.color == response_card.color)
+                .unwrap_or(0);
+            let match_by_shape = targets
+                .iter()
+                .position(|t| t.shape == response_card.shape)
+                .unwrap_or(0);
+            let match_by_number = targets
+                .iter()
+                .position(|t| t.number == response_card.number)
+                .unwrap_or(0);
 
             // Pick action by highest-confidence rule; HDC similarity as tiebreaker
             let candidates = [match_by_color, match_by_shape, match_by_number];
             let _response_hv = encode_card(&response_card);
 
             // Softmax over rule confidences for stochastic selection
-            let max_conf = rule_confidence.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let exp_conf: Vec<f64> = rule_confidence.iter().map(|c| ((c - max_conf) * 1.5).exp()).collect();
+            let max_conf = rule_confidence
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max);
+            let exp_conf: Vec<f64> = rule_confidence
+                .iter()
+                .map(|c| ((c - max_conf) * 1.5).exp())
+                .collect();
             let exp_sum: f64 = exp_conf.iter().sum();
 
             rng ^= rng << 13;
@@ -267,11 +316,23 @@ impl PsychBenchmark for WisconsinCardSortingBenchmark {
             trials_first.push(r.trials_to_first as f64);
         }
 
-        result.insert("categories_completed", MetricValue::from_samples(&categories));
-        result.insert("perseverative_errors", MetricValue::from_samples(&perseverative));
-        result.insert("non_perseverative_errors", MetricValue::from_samples(&non_perseverative));
+        result.insert(
+            "categories_completed",
+            MetricValue::from_samples(&categories),
+        );
+        result.insert(
+            "perseverative_errors",
+            MetricValue::from_samples(&perseverative),
+        );
+        result.insert(
+            "non_perseverative_errors",
+            MetricValue::from_samples(&non_perseverative),
+        );
         result.insert("total_errors", MetricValue::from_samples(&total_errs));
-        result.insert("trials_to_first_category", MetricValue::from_samples(&trials_first));
+        result.insert(
+            "trials_to_first_category",
+            MetricValue::from_samples(&trials_first),
+        );
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

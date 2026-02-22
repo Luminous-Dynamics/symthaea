@@ -21,12 +21,7 @@ fn next_seed(state: &mut u64) -> u64 {
 }
 
 impl MoodCongruentRecallBenchmark {
-    fn run_trial(
-        &self,
-        mood: &str,
-        config: &BenchmarkConfig,
-        trial_idx: usize,
-    ) -> f64 {
+    fn run_trial(&self, mood: &str, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
         let dim = config.dimension;
         let seed = config.trial_seed("affect", &format!("mood_{}", mood), trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -46,11 +41,12 @@ impl MoodCongruentRecallBenchmark {
         for i in 0..10 {
             let is_positive = i < 5;
             let object_hv = ContinuousHV::random(dim, next_seed(&mut rng));
-            let valence_proto = if is_positive { &positive_proto } else { &negative_proto };
-            let item = ContinuousHV::weighted_bundle(
-                &[&object_hv, valence_proto],
-                &[0.6, 0.4],
-            );
+            let valence_proto = if is_positive {
+                &positive_proto
+            } else {
+                &negative_proto
+            };
+            let item = ContinuousHV::weighted_bundle(&[&object_hv, valence_proto], &[0.6, 0.4]);
             wm.perceive(item);
             wm.tick();
             item_valences.push(is_positive);
@@ -86,22 +82,25 @@ impl MoodCongruentRecallBenchmark {
         let recall_count = sims.len().min(5);
         let mood_is_positive = mood == "positive";
 
-        // For each recalled item, check if it's valence-congruent
-        // An item is congruent if its similarity to the matching prototype > other
+        // For each recalled item, check if it's valence-congruent.
+        // Compare similarity to BOTH prototypes: an item is congruent
+        // only if it's closer to the mood-matching prototype than to the
+        // opposite one (Blaney 1986 — mood congruence is about relative,
+        // not absolute similarity). This replaces the median threshold
+        // which was biased toward high congruence for top-k items.
+        let opposite_proto = if mood_is_positive {
+            &negative_proto
+        } else {
+            &positive_proto
+        };
         let mut congruent = 0;
-        for &(_, sim) in sims.iter().take(recall_count) {
-            // Items more similar to mood proto are mood-congruent
-            let pos_sim = sim; // similarity to mood proto
-            // A rough proxy: if sim > median, it's congruent
-            let median_sim = {
-                let mut all: Vec<f32> = sims.iter().map(|(_, s)| *s).collect();
-                all.sort_by(|a, b| a.total_cmp(b));
-                all[all.len() / 2]
-            };
-            if pos_sim > median_sim {
+        for &(idx, _) in sims.iter().take(recall_count) {
+            let item_hv = &contents[idx];
+            let mood_sim = item_hv.similarity(mood_proto);
+            let opposite_sim = item_hv.similarity(opposite_proto);
+            if mood_sim > opposite_sim {
                 congruent += 1;
             }
-            let _ = mood_is_positive; // used for clarity; congruence is via similarity
         }
 
         congruent as f64 / recall_count as f64
@@ -131,7 +130,11 @@ impl PsychBenchmark for MoodCongruentRecallBenchmark {
 
         // Overall congruence
         let all: Vec<f64> = result.metrics.values().map(|m| m.mean).collect();
-        let overall = if all.is_empty() { 0.0 } else { all.iter().sum::<f64>() / all.len() as f64 };
+        let overall = if all.is_empty() {
+            0.0
+        } else {
+            all.iter().sum::<f64>() / all.len() as f64
+        };
         result.insert("congruence_ratio", MetricValue::from_samples(&[overall]));
 
         result.conditions = 2;
@@ -154,8 +157,12 @@ mod tests {
         };
         let result = MoodCongruentRecallBenchmark.run(&config);
         assert!(result.metrics.contains_key("congruence_ratio"));
-        assert!(result.metrics.contains_key("positive_mood::congruence_ratio"));
-        assert!(result.metrics.contains_key("negative_mood::congruence_ratio"));
+        assert!(result
+            .metrics
+            .contains_key("positive_mood::congruence_ratio"));
+        assert!(result
+            .metrics
+            .contains_key("negative_mood::congruence_ratio"));
         for val in result.metrics.values() {
             assert!(val.mean.is_finite());
         }

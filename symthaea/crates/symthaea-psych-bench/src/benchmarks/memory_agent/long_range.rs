@@ -14,12 +14,7 @@ use crate::wm::{WmConfig, WorkingMemory};
 pub struct LongRangeBenchmark;
 
 impl LongRangeBenchmark {
-    fn run_trial(
-        &self,
-        delay_cycles: usize,
-        config: &BenchmarkConfig,
-        trial_idx: usize,
-    ) -> f64 {
+    fn run_trial(&self, delay_cycles: usize, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
         let dim = config.dimension;
         let adapter = ScenarioAdapter;
         let seed = config.trial_seed("memory_agent", &format!("long_{}", delay_cycles), trial_idx);
@@ -70,7 +65,11 @@ impl LongRangeBenchmark {
 
         // For long delays, the fact may have been evicted but should be
         // in episodic memory; here we test WM persistence directly
-        if max_sim > 0.2 { 1.0 } else { 0.0 }
+        if max_sim > 0.2 {
+            1.0
+        } else {
+            0.0
+        }
     }
 }
 

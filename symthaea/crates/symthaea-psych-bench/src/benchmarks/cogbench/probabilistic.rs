@@ -45,7 +45,8 @@ impl ProbabilisticReasoningBenchmark {
         let result = agent.perceive(&obs);
 
         // beta1 (prior weight): how much belief stayed near the prior
-        let prior_mean: f64 = belief_after_prior.iter().sum::<f64>() / belief_after_prior.len() as f64;
+        let prior_mean: f64 =
+            belief_after_prior.iter().sum::<f64>() / belief_after_prior.len() as f64;
         let new_mean: f64 = result.updated_belief.mean.iter().sum::<f64>()
             / result.updated_belief.mean.len() as f64;
 
@@ -88,7 +89,10 @@ impl PsychBenchmark for ProbabilisticReasoningBenchmark {
         }
 
         result.insert("beta1_prior_weight", MetricValue::from_samples(&beta1s));
-        result.insert("beta2_likelihood_weight", MetricValue::from_samples(&beta2s));
+        result.insert(
+            "beta2_likelihood_weight",
+            MetricValue::from_samples(&beta2s),
+        );
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

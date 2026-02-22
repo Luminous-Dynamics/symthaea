@@ -45,10 +45,8 @@ impl ValenceClassificationBenchmark {
                 let object_hv = ContinuousHV::random(dim, next_seed(&mut rng));
 
                 // Blend: 60% object + 40% valence prototype
-                let stimulus = ContinuousHV::weighted_bundle(
-                    &[&object_hv, protos[valence]],
-                    &[0.6, 0.4],
-                );
+                let stimulus =
+                    ContinuousHV::weighted_bundle(&[&object_hv, protos[valence]], &[0.6, 0.4]);
 
                 // Classify by max similarity to prototypes
                 let sims: Vec<f32> = protos.iter().map(|p| stimulus.similarity(p)).collect();
@@ -68,8 +66,8 @@ impl ValenceClassificationBenchmark {
         let pos_acc = correct[0] as f64 / total[0] as f64;
         let neg_acc = correct[1] as f64 / total[1] as f64;
         let neu_acc = correct[2] as f64 / total[2] as f64;
-        let overall = (correct[0] + correct[1] + correct[2]) as f64
-            / (total[0] + total[1] + total[2]) as f64;
+        let overall =
+            (correct[0] + correct[1] + correct[2]) as f64 / (total[0] + total[1] + total[2]) as f64;
 
         [overall, pos_acc, neg_acc, neu_acc]
     }

@@ -254,7 +254,11 @@ impl BenchmarkReport {
         if metric.std_dev.abs() < 1e-15 {
             None
         } else {
-            Some(super::analysis::cohens_d(metric.mean, baseline_value, metric.std_dev))
+            Some(super::analysis::cohens_d(
+                metric.mean,
+                baseline_value,
+                metric.std_dev,
+            ))
         }
     }
 
@@ -273,31 +277,83 @@ impl BenchmarkReport {
             ("nback_3::accuracy", "nback_3_accuracy", &bl.worm),
             ("set_size_4::accuracy", "change_detection_k4", &bl.worm),
             ("average_pumps", "bart_avg_pumps", &bl.cogbench),
-            ("horizon_6::directed_exploration", "directed_exploration", &bl.cogbench),
+            (
+                "horizon_6::directed_exploration",
+                "directed_exploration",
+                &bl.cogbench,
+            ),
             ("beta3_model_basedness", "model_basedness", &bl.cogbench),
             ("discounting_score_S", "discounting_score", &bl.cogbench),
-            ("false_belief_accuracy", "false_belief_accuracy", &bl.tombench),
+            (
+                "false_belief_accuracy",
+                "false_belief_accuracy",
+                &bl.tombench,
+            ),
             ("faux_pas_accuracy", "faux_pas_accuracy", &bl.tombench),
             ("hinting_accuracy", "hinting_accuracy", &bl.tombench),
-            ("overall_retrieval_accuracy", "accurate_retrieval", &bl.memory_agent),
-            ("correction_accuracy", "test_time_learning", &bl.memory_agent),
-            ("categories_completed", "wcst_categories_completed", &bl.executive),
-            ("trials_to_first_category", "wcst_trials_to_first", &bl.executive),
+            (
+                "overall_retrieval_accuracy",
+                "accurate_retrieval",
+                &bl.memory_agent,
+            ),
+            (
+                "correction_accuracy",
+                "test_time_learning",
+                &bl.memory_agent,
+            ),
+            (
+                "categories_completed",
+                "wcst_categories_completed",
+                &bl.executive,
+            ),
+            (
+                "trials_to_first_category",
+                "wcst_trials_to_first",
+                &bl.executive,
+            ),
             ("overall_net_score", "igt_overall_net_score", &bl.executive),
-            ("deck_preference_good", "igt_deck_preference_good", &bl.executive),
+            (
+                "deck_preference_good",
+                "igt_deck_preference_good",
+                &bl.executive,
+            ),
             ("stroop_effect", "stroop_effect", &bl.executive),
             ("flanker_effect", "flanker_effect", &bl.executive),
-            ("overall_optimal_rate", "tol_overall_optimal_rate", &bl.executive),
-            ("planning_efficiency", "tol_planning_efficiency", &bl.executive),
+            (
+                "overall_optimal_rate",
+                "tol_overall_optimal_rate",
+                &bl.executive,
+            ),
+            (
+                "planning_efficiency",
+                "tol_planning_efficiency",
+                &bl.executive,
+            ),
             ("forward_span", "digit_span_forward", &bl.worm),
             ("backward_span", "digit_span_backward", &bl.worm),
             ("win_stay_rate", "reversal_win_stay", &bl.cogbench),
             ("lose_shift_rate", "reversal_lose_shift", &bl.cogbench),
-            ("calibration_error_ece", "calibration_error_ece", &bl.metacognition),
-            ("discrimination_gamma", "discrimination_gamma", &bl.metacognition),
+            (
+                "calibration_error_ece",
+                "calibration_error_ece",
+                &bl.metacognition,
+            ),
+            (
+                "discrimination_gamma",
+                "discrimination_gamma",
+                &bl.metacognition,
+            ),
             ("persuasion_detection", "persuasion_detection", &bl.tombench),
-            ("delay_50::retention", "long_range_delay_50", &bl.memory_agent),
-            ("recency_preference", "conflict_recency_preference", &bl.memory_agent),
+            (
+                "delay_50::retention",
+                "long_range_delay_50",
+                &bl.memory_agent,
+            ),
+            (
+                "recency_preference",
+                "conflict_recency_preference",
+                &bl.memory_agent,
+            ),
             ("valence_accuracy", "valence_accuracy", &bl.affect),
             ("congruence_ratio", "congruence_ratio", &bl.affect),
             ("fluency", "aut_fluency", &bl.creativity),
@@ -308,20 +364,26 @@ impl BenchmarkReport {
         for (metric_key, baseline_key, baselines) in &mappings {
             if let Some(metric) = result.metrics.get(*metric_key) {
                 if let Some(baseline) = baselines.get(baseline_key) {
-                    comps.push((metric_key.to_string(), Self::make_comparison(metric, baseline)));
+                    comps.push((
+                        metric_key.to_string(),
+                        Self::make_comparison(metric, baseline),
+                    ));
                 }
             }
         }
 
         // Helper closure for benchmark-specific comparisons
-        let mut push_specific = |metric_key: &str, baseline_key: &str,
-                                  baselines: &super::baselines::BaselineMap| {
-            if let Some(metric) = result.metrics.get(metric_key) {
-                if let Some(baseline) = baselines.get(baseline_key) {
-                    comps.push((metric_key.to_string(), Self::make_comparison(metric, baseline)));
+        let mut push_specific =
+            |metric_key: &str, baseline_key: &str, baselines: &super::baselines::BaselineMap| {
+                if let Some(metric) = result.metrics.get(metric_key) {
+                    if let Some(baseline) = baselines.get(baseline_key) {
+                        comps.push((
+                            metric_key.to_string(),
+                            Self::make_comparison(metric, baseline),
+                        ));
+                    }
                 }
-            }
-        };
+            };
 
         // Benchmark-specific metrics (avoid cross-benchmark collisions)
         if benchmark.contains("Ravens") {
@@ -335,24 +397,52 @@ impl BenchmarkReport {
             push_specific("overall_accuracy", "strange_story_accuracy", &bl.tombench);
         }
         if benchmark.contains("Stroop") {
-            push_specific("congruent_accuracy", "stroop_congruent_accuracy", &bl.executive);
-            push_specific("incongruent_accuracy", "stroop_incongruent_accuracy", &bl.executive);
+            push_specific(
+                "congruent_accuracy",
+                "stroop_congruent_accuracy",
+                &bl.executive,
+            );
+            push_specific(
+                "incongruent_accuracy",
+                "stroop_incongruent_accuracy",
+                &bl.executive,
+            );
         }
         if benchmark.contains("Flanker") {
-            push_specific("congruent_accuracy", "flanker_congruent_accuracy", &bl.executive);
-            push_specific("incongruent_accuracy", "flanker_incongruent_accuracy", &bl.executive);
+            push_specific(
+                "congruent_accuracy",
+                "flanker_congruent_accuracy",
+                &bl.executive,
+            );
+            push_specific(
+                "incongruent_accuracy",
+                "flanker_incongruent_accuracy",
+                &bl.executive,
+            );
         }
         if benchmark.contains("Wisconsin") {
-            push_specific("perseverative_errors", "wcst_perseverative_errors", &bl.executive);
+            push_specific(
+                "perseverative_errors",
+                "wcst_perseverative_errors",
+                &bl.executive,
+            );
         }
         if benchmark.contains("Reversal") {
-            push_specific("perseverative_errors", "reversal_perseverative_errors", &bl.cogbench);
+            push_specific(
+                "perseverative_errors",
+                "reversal_perseverative_errors",
+                &bl.cogbench,
+            );
         }
         if benchmark.contains("RestlessBandit") {
             push_specific("overall_accuracy", "restless_bandit_accuracy", &bl.cogbench);
         }
         if benchmark.contains("Instrumental") {
-            push_specific("contingency_sensitivity", "instrumental_sensitivity", &bl.cogbench);
+            push_specific(
+                "contingency_sensitivity",
+                "instrumental_sensitivity",
+                &bl.cogbench,
+            );
         }
         if benchmark.contains("SpatialUpdating") {
             push_specific("overall_accuracy", "spatial_updating_accuracy", &bl.worm);
@@ -361,17 +451,29 @@ impl BenchmarkReport {
             push_specific("overall_binding_accuracy", "binding_accuracy", &bl.worm);
         }
         if benchmark.contains("SerialRecall") {
-            push_specific("list_7::primacy_index", "serial_primacy_advantage", &bl.worm);
+            push_specific(
+                "list_7::primacy_index",
+                "serial_primacy_advantage",
+                &bl.worm,
+            );
         }
         if benchmark.contains("Probabilistic") {
-            push_specific("beta2_likelihood_weight", "probabilistic_likelihood_weight", &bl.cogbench);
+            push_specific(
+                "beta2_likelihood_weight",
+                "probabilistic_likelihood_weight",
+                &bl.cogbench,
+            );
         }
 
         // Only return comparisons relevant to this benchmark
-        if benchmark.contains("WorM") || benchmark.contains("CogBench")
-            || benchmark.contains("ToM") || benchmark.contains("Memory")
-            || benchmark.contains("Executive") || benchmark.contains("Metacognition")
-            || benchmark.contains("Affect") || benchmark.contains("Creativity")
+        if benchmark.contains("WorM")
+            || benchmark.contains("CogBench")
+            || benchmark.contains("ToM")
+            || benchmark.contains("Memory")
+            || benchmark.contains("Executive")
+            || benchmark.contains("Metacognition")
+            || benchmark.contains("Affect")
+            || benchmark.contains("Creativity")
             || benchmark.contains("Butlin")
         {
             comps
@@ -381,7 +483,10 @@ impl BenchmarkReport {
     }
 
     /// Build a BaselineComparison from a metric and its baseline.
-    fn make_comparison(metric: &MetricValue, baseline: &super::baselines::Baseline) -> BaselineComparison {
+    fn make_comparison(
+        metric: &MetricValue,
+        baseline: &super::baselines::Baseline,
+    ) -> BaselineComparison {
         let ratio = if baseline.value.abs() > 1e-10 {
             metric.mean / baseline.value
         } else {
@@ -407,7 +512,16 @@ impl BenchmarkReport {
     /// Export all results as CSV.
     pub fn to_csv(&self) -> Result<String, csv::Error> {
         let mut wtr = csv::Writer::from_writer(Vec::new());
-        wtr.write_record(["benchmark", "config", "metric", "mean", "std_dev", "n", "ci_lower", "ci_upper"])?;
+        wtr.write_record([
+            "benchmark",
+            "config",
+            "metric",
+            "mean",
+            "std_dev",
+            "n",
+            "ci_lower",
+            "ci_upper",
+        ])?;
         for result in &self.results {
             let config = result.config_label.as_deref().unwrap_or("");
             for (key, val) in &result.metrics {
@@ -423,8 +537,11 @@ impl BenchmarkReport {
                 ])?;
             }
         }
-        Ok(String::from_utf8(wtr.into_inner().map_err(|e| csv::Error::from(e.into_error()))?)
-            .unwrap_or_default())
+        Ok(String::from_utf8(
+            wtr.into_inner()
+                .map_err(|e| csv::Error::from(e.into_error()))?,
+        )
+        .unwrap_or_default())
     }
 
     /// Serialize to JSON string.
@@ -448,8 +565,14 @@ impl BenchmarkReport {
         let bl = BaselineCollection::all();
 
         let mut lines = Vec::new();
-        lines.push("| Domain | Benchmark | Key Metric | Agent | Human | % Human | d | z | 95% CI |".to_string());
-        lines.push("|--------|-----------|------------|-------|-------|---------|---|---|--------|".to_string());
+        lines.push(
+            "| Domain | Benchmark | Key Metric | Agent | Human | % Human | d | z | 95% CI |"
+                .to_string(),
+        );
+        lines.push(
+            "|--------|-----------|------------|-------|-------|---------|---|---|--------|"
+                .to_string(),
+        );
 
         for result in &self.results {
             let domain = domain_of(&result.benchmark);
@@ -463,7 +586,12 @@ impl BenchmarkReport {
 
             let comp = comparisons.iter().find(|(k, _)| k == key);
             let (human_str, pct_str) = comp
-                .map(|(_, c)| (format!("{:.3}", c.human_value), format!("{:.1}%", c.ratio * 100.0)))
+                .map(|(_, c)| {
+                    (
+                        format!("{:.3}", c.human_value),
+                        format!("{:.1}%", c.ratio * 100.0),
+                    )
+                })
                 .unwrap_or_else(|| ("\u{2014}".to_string(), "\u{2014}".to_string()));
 
             let d_str = comp
@@ -481,7 +609,11 @@ impl BenchmarkReport {
             lines.push(format!(
                 "| {} | {} | {} | {:.3} | {} | {} | {} | {} | {} |",
                 domain,
-                result.benchmark.split("::").last().unwrap_or(&result.benchmark),
+                result
+                    .benchmark
+                    .split("::")
+                    .last()
+                    .unwrap_or(&result.benchmark),
                 key,
                 metric.mean,
                 human_str,
@@ -503,7 +635,8 @@ impl BenchmarkReport {
         let mut lines = vec![
             r"\begin{tabular}{lllllrrrrl}".to_string(),
             r"\toprule".to_string(),
-            r"Domain & Benchmark & Key Metric & Agent & Human & \% Human & $d$ & $z$ & 95\% CI \\".to_string(),
+            r"Domain & Benchmark & Key Metric & Agent & Human & \% Human & $d$ & $z$ & 95\% CI \\"
+                .to_string(),
             r"\midrule".to_string(),
         ];
 
@@ -519,7 +652,12 @@ impl BenchmarkReport {
 
             let comp = comparisons.iter().find(|(k, _)| k == key);
             let (human_str, pct_str) = comp
-                .map(|(_, c)| (format!("{:.3}", c.human_value), format!("{:.1}\\%", c.ratio * 100.0)))
+                .map(|(_, c)| {
+                    (
+                        format!("{:.3}", c.human_value),
+                        format!("{:.1}\\%", c.ratio * 100.0),
+                    )
+                })
                 .unwrap_or_else(|| ("---".to_string(), "---".to_string()));
 
             let d_str = comp
@@ -532,12 +670,24 @@ impl BenchmarkReport {
                 .map(|z| format!("{:+.2}", z))
                 .unwrap_or_else(|| "---".to_string());
 
-            let bench_name = result.benchmark.split("::").last().unwrap_or(&result.benchmark);
+            let bench_name = result
+                .benchmark
+                .split("::")
+                .last()
+                .unwrap_or(&result.benchmark);
 
             lines.push(format!(
                 "{} & {} & {} & {:.3} & {} & {} & {} & {} & [{:.3}, {:.3}] \\\\",
-                domain, bench_name, key, metric.mean, human_str, pct_str, d_str, z_str,
-                metric.ci_lower, metric.ci_upper,
+                domain,
+                bench_name,
+                key,
+                metric.mean,
+                human_str,
+                pct_str,
+                d_str,
+                z_str,
+                metric.ci_lower,
+                metric.ci_upper,
             ));
         }
 
@@ -634,7 +784,10 @@ impl BenchmarkReport {
                 } else {
                     comp.ratio.min(1.0)
                 };
-                domain_scores.entry(domain).or_default().push(score.max(0.0));
+                domain_scores
+                    .entry(domain)
+                    .or_default()
+                    .push(score.max(0.0));
             }
         }
 
@@ -661,11 +814,7 @@ impl BenchmarkReport {
             let filled = (score * bar_width as f64).round() as usize;
             let filled = filled.min(bar_width);
             let empty = bar_width - filled;
-            let bar = format!(
-                "{}{}",
-                "\u{2588}".repeat(filled),
-                "\u{2591}".repeat(empty),
-            );
+            let bar = format!("{}{}", "\u{2588}".repeat(filled), "\u{2591}".repeat(empty),);
             lines.push(format!("{:<14}{} {:.2}", domain, bar, score));
         }
 
@@ -698,9 +847,14 @@ impl BenchmarkReport {
                     // so positive always means "better than human"
                     let z_adj = if is_lower_better(key) { -z } else { z };
                     domain_z.entry(domain.clone()).or_default().push(z_adj);
-                    domain_benchmarks.entry(domain).or_default()
-                        .push(result.benchmark.split("::").last()
-                            .unwrap_or(&result.benchmark).to_string());
+                    domain_benchmarks.entry(domain).or_default().push(
+                        result
+                            .benchmark
+                            .split("::")
+                            .last()
+                            .unwrap_or(&result.benchmark)
+                            .to_string(),
+                    );
                 }
             }
         }
@@ -710,11 +864,14 @@ impl BenchmarkReport {
             .map(|(domain, zs)| {
                 let mean_z = zs.iter().sum::<f64>() / zs.len() as f64;
                 let benchmarks = domain_benchmarks.remove(&domain).unwrap_or_default();
-                (domain, CompositeScore {
-                    mean_z,
-                    n_benchmarks: zs.len(),
-                    benchmarks,
-                })
+                (
+                    domain,
+                    CompositeScore {
+                        mean_z,
+                        n_benchmarks: zs.len(),
+                        benchmarks,
+                    },
+                )
             })
             .collect()
     }
@@ -728,12 +885,18 @@ impl BenchmarkReport {
 
         let mut lines = Vec::new();
         lines.push("Domain Composite Scores (z-score: 0=human mean)".to_string());
-        lines.push(format!("{:<14} {:>6} {:>4}  {}", "Domain", "z", "n", "Benchmarks"));
-        lines.push(format!("{:<14} {:>6} {:>4}  {}", "------", "---", "--", "----------"));
+        lines.push(format!(
+            "{:<14} {:>6} {:>4}  {}",
+            "Domain", "z", "n", "Benchmarks"
+        ));
+        lines.push(format!(
+            "{:<14} {:>6} {:>4}  {}",
+            "------", "---", "--", "----------"
+        ));
 
         for (domain, cs) in &composites {
             let label = if cs.mean_z > 1.0 {
-                "***"  // well above human
+                "***" // well above human
             } else if cs.mean_z > 0.5 {
                 "**"
             } else if cs.mean_z > 0.0 {
@@ -741,11 +904,13 @@ impl BenchmarkReport {
             } else if cs.mean_z > -0.5 {
                 ""
             } else {
-                "(!)"  // notably below human
+                "(!)" // notably below human
             };
             lines.push(format!(
                 "{:<14} {:>+6.2} {:>4}  {} {}",
-                domain, cs.mean_z, cs.n_benchmarks,
+                domain,
+                cs.mean_z,
+                cs.n_benchmarks,
                 cs.benchmarks.join(", "),
                 label,
             ));
@@ -798,7 +963,8 @@ mod tests {
         assert!(
             t_width > z_width,
             "t-based CI ({:.4}) should be wider than z-based CI ({:.4}) for n=5",
-            t_width, z_width
+            t_width,
+            z_width
         );
     }
 
@@ -853,7 +1019,11 @@ mod tests {
         report.add(r);
         let profile = report.cognitive_profile();
         for (_, &score) in &profile {
-            assert!(score >= 0.0 && score <= 1.0, "Score out of range: {}", score);
+            assert!(
+                score >= 0.0 && score <= 1.0,
+                "Score out of range: {}",
+                score
+            );
         }
     }
 
@@ -885,10 +1055,16 @@ mod tests {
         let comparisons = report.find_comparisons(&report.results[0], &bl);
         assert!(!comparisons.is_empty());
         let (_, comp) = &comparisons[0];
-        assert!(comp.effect_size.is_some(), "effect_size should be populated");
+        assert!(
+            comp.effect_size.is_some(),
+            "effect_size should be populated"
+        );
         assert!(comp.effect_size.unwrap().is_finite());
         // N-back baseline has sd=0.10, so z-score should be populated
-        assert!(comp.z_score.is_some(), "z_score should be populated for nback");
+        assert!(
+            comp.z_score.is_some(),
+            "z_score should be populated for nback"
+        );
     }
 
     #[test]
@@ -896,16 +1072,16 @@ mod tests {
         let mut report = BenchmarkReport::new();
         // Agent scores 0.95, human mean 0.85 with SD 0.10 → z = +1.0
         let mut result = BenchmarkResult::new("WorM::N-back", None);
-        result.insert(
-            "nback_2::accuracy",
-            MetricValue::from_samples(&[0.95]),
-        );
+        result.insert("nback_2::accuracy", MetricValue::from_samples(&[0.95]));
         report.add(result);
 
         use crate::harness::baselines::BaselineCollection;
         let bl = BaselineCollection::all();
         let comparisons = report.find_comparisons(&report.results[0], &bl);
-        let (_, comp) = comparisons.iter().find(|(k, _)| k == "nback_2::accuracy").unwrap();
+        let (_, comp) = comparisons
+            .iter()
+            .find(|(k, _)| k == "nback_2::accuracy")
+            .unwrap();
         let z = comp.z_score.unwrap();
         assert!((z - 1.0).abs() < 0.01, "z should be ~+1.0, got {}", z);
     }
@@ -922,7 +1098,11 @@ mod tests {
         report.add(r2);
 
         let composites = report.composite_scores();
-        assert!(composites.contains_key("WorM"), "composites: {:?}", composites);
+        assert!(
+            composites.contains_key("WorM"),
+            "composites: {:?}",
+            composites
+        );
         let worm = &composites["WorM"];
         assert_eq!(worm.n_benchmarks, 2);
         assert!(worm.mean_z.is_finite());

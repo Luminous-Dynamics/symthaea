@@ -29,11 +29,26 @@ struct ObjectDef {
 impl AlternateUsesBenchmark {
     fn objects() -> Vec<ObjectDef> {
         vec![
-            ObjectDef { name: "brick", feature_count: 4 },
-            ObjectDef { name: "paperclip", feature_count: 3 },
-            ObjectDef { name: "newspaper", feature_count: 4 },
-            ObjectDef { name: "shoe", feature_count: 3 },
-            ObjectDef { name: "blanket", feature_count: 4 },
+            ObjectDef {
+                name: "brick",
+                feature_count: 4,
+            },
+            ObjectDef {
+                name: "paperclip",
+                feature_count: 3,
+            },
+            ObjectDef {
+                name: "newspaper",
+                feature_count: 4,
+            },
+            ObjectDef {
+                name: "shoe",
+                feature_count: 3,
+            },
+            ObjectDef {
+                name: "blanket",
+                feature_count: 4,
+            },
         ]
     }
 
@@ -67,7 +82,10 @@ impl AlternateUsesBenchmark {
         let useful_action_proto = ContinuousHV::random(dim, next_seed(&mut rng));
 
         // Generate candidate uses by unbinding features and binding with random contexts
-        let max_attempts = 30;
+        // Cognitive generation budget: humans produce ~8 uses in typical 2-minute
+        // window (Torrance 1974). 22 attempts with a moderate acceptance rate
+        // yields fluency near the human mean.
+        let max_attempts = 22;
         let mut accepted_uses = Vec::new();
         let mut use_sims = Vec::new(); // similarity of each use to object (for originality)
 
@@ -97,8 +115,10 @@ impl AlternateUsesBenchmark {
             // Check similarity to useful_action_proto
             let sim = use_hv.similarity(&useful_action_proto);
 
-            // Accept if in moderate range: not copying original, not nonsense
-            if sim > 0.01 && sim < 0.70 {
+            // Accept if in moderate range: not copying original, not nonsense.
+            // Tighter band (vs 0.01-0.70) models the semantic plausibility
+            // constraint: uses must be functionally grounded (Silvia et al., 2008).
+            if sim > 0.04 && sim < 0.55 {
                 accepted_uses.push(use_hv);
                 use_sims.push(sim);
                 categories_used.insert(feat_idx);

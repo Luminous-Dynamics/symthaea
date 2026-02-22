@@ -39,10 +39,10 @@ fn main() {
         BindingBenchmark, ChangeDetectionBenchmark, DigitSpanBenchmark, NBackBenchmark,
         SerialRecallBenchmark, SpatialUpdatingBenchmark,
     };
+    use symthaea_psych_bench::harness::report::domain_of;
     use symthaea_psych_bench::harness::{
         BenchmarkConfig, BenchmarkReport, PsychBenchmark, RegressionReport, RegressionSnapshot,
     };
-    use symthaea_psych_bench::harness::report::domain_of;
 
     let args: Vec<String> = std::env::args().collect();
     let baseline_path: PathBuf = args
@@ -108,8 +108,7 @@ fn main() {
 
     // Load baseline and compare
     if baseline_path.exists() {
-        let baseline =
-            RegressionSnapshot::load(&baseline_path).expect("failed to load baseline");
+        let baseline = RegressionSnapshot::load(&baseline_path).expect("failed to load baseline");
         let current = RegressionSnapshot::from_report(&report, "full-backend");
         let regression = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
 
@@ -117,7 +116,10 @@ fn main() {
 
         // Per-domain delta summary
         println!("\nPer-Domain Delta Summary");
-        println!("{:<16} {:>8} {:>8} {:>8}", "Domain", "Better", "Same", "Worse");
+        println!(
+            "{:<16} {:>8} {:>8} {:>8}",
+            "Domain", "Better", "Same", "Worse"
+        );
         println!("{}", "-".repeat(44));
 
         let mut domain_counts: std::collections::BTreeMap<String, (usize, usize, usize)> =

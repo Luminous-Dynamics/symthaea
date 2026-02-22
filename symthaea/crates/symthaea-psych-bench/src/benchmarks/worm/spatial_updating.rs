@@ -15,12 +15,7 @@ pub struct SpatialUpdatingBenchmark;
 
 impl SpatialUpdatingBenchmark {
     /// Run a single trial: start at a position, apply N moves, check final position.
-    fn run_trial(
-        &self,
-        num_updates: usize,
-        config: &BenchmarkConfig,
-        trial_idx: usize,
-    ) -> f64 {
+    fn run_trial(&self, num_updates: usize, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
         let dim = config.dimension;
         let seed = config.trial_seed("worm", &format!("spatial_{}", num_updates), trial_idx);
         let adapter = SpatialAdapter::default();
@@ -74,7 +69,11 @@ impl SpatialUpdatingBenchmark {
             .map(|wm_item| wm_item.similarity(&target_hv))
             .fold(0.0f32, f32::max);
 
-        if max_sim > 0.3 { 1.0 } else { 0.0 }
+        if max_sim > 0.3 {
+            1.0
+        } else {
+            0.0
+        }
     }
 }
 
@@ -108,10 +107,7 @@ impl PsychBenchmark for SpatialUpdatingBenchmark {
             .map(|m| m.mean)
             .collect();
         if !all_means.is_empty() {
-            result.insert(
-                "overall_accuracy",
-                MetricValue::from_samples(&all_means),
-            );
+            result.insert("overall_accuracy", MetricValue::from_samples(&all_means));
         }
 
         result.conditions = 4;

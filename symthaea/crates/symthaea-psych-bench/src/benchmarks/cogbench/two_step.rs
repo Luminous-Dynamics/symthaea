@@ -49,7 +49,7 @@ impl TwoStepBenchmark {
         // This enables model-based action selection alongside FEP.
         // transition_counts[action][state] = number of times action led to state.
         let mut transition_counts = [[1.0f64; 2]; 2]; // Laplace prior
-        // Reward model: EMA of rewards in each state
+                                                      // Reward model: EMA of rewards in each state
         let mut state_reward = [0.5f64; 2]; // prior: 0.5
         let reward_lr = 0.5;
 
@@ -60,17 +60,22 @@ impl TwoStepBenchmark {
             let fep_probs = &stage1_result.action_probabilities;
 
             // Model-based action values: E[reward | action] = Σ_s P(s|a) * V(s)
-            let mb_values: Vec<f64> = (0..2).map(|a| {
-                let total = transition_counts[a][0] + transition_counts[a][1];
-                let p0 = transition_counts[a][0] / total;
-                let p1 = transition_counts[a][1] / total;
-                p0 * state_reward[0] + p1 * state_reward[1]
-            }).collect();
+            let mb_values: Vec<f64> = (0..2)
+                .map(|a| {
+                    let total = transition_counts[a][0] + transition_counts[a][1];
+                    let p0 = transition_counts[a][0] / total;
+                    let p1 = transition_counts[a][1] / total;
+                    p0 * state_reward[0] + p1 * state_reward[1]
+                })
+                .collect();
 
             // Softmax over model-based values — low temp makes MB signal decisive
             let mb_temp = 0.1;
             let mb_max = mb_values[0].max(mb_values[1]);
-            let mb_exp: Vec<f64> = mb_values.iter().map(|v| ((v - mb_max) / mb_temp).exp()).collect();
+            let mb_exp: Vec<f64> = mb_values
+                .iter()
+                .map(|v| ((v - mb_max) / mb_temp).exp())
+                .collect();
             let mb_sum: f64 = mb_exp.iter().sum();
             let mb_probs: Vec<f64> = mb_exp.iter().map(|e| e / mb_sum).collect();
 
@@ -78,9 +83,9 @@ impl TwoStepBenchmark {
             // After ~20 episodes, the transition model has enough data (70+ observations).
             let progress = (ep as f64 / 20.0).min(1.0);
             let mb_weight = 0.2 + 0.7 * progress;
-            let blended_probs: Vec<f64> = (0..2).map(|a| {
-                (1.0 - mb_weight) * fep_probs[a] + mb_weight * mb_probs[a]
-            }).collect();
+            let blended_probs: Vec<f64> = (0..2)
+                .map(|a| (1.0 - mb_weight) * fep_probs[a] + mb_weight * mb_probs[a])
+                .collect();
             let prob_sum: f64 = blended_probs.iter().sum();
             let final_probs: Vec<f64> = blended_probs.iter().map(|p| p / prob_sum).collect();
 
@@ -116,8 +121,8 @@ impl TwoStepBenchmark {
             agent.perceive(&reward_obs);
 
             // Update reward model: EMA of rewards per state
-            state_reward[stage2_state] = (1.0 - reward_lr) * state_reward[stage2_state]
-                + reward_lr * reward_val;
+            state_reward[stage2_state] =
+                (1.0 - reward_lr) * state_reward[stage2_state] + reward_lr * reward_val;
 
             // Track stay/switch behavior relative to previous trial
             if let Some(prev_a) = prev_action {
@@ -125,19 +130,27 @@ impl TwoStepBenchmark {
                 match (prev_common, prev_rewarded) {
                     (true, true) => {
                         common_rewarded_total += 1;
-                        if stayed { common_rewarded_stay += 1; }
+                        if stayed {
+                            common_rewarded_stay += 1;
+                        }
                     }
                     (false, true) => {
                         rare_rewarded_total += 1;
-                        if stayed { rare_rewarded_stay += 1; }
+                        if stayed {
+                            rare_rewarded_stay += 1;
+                        }
                     }
                     (true, false) => {
                         common_unrewarded_total += 1;
-                        if stayed { common_unrewarded_stay += 1; }
+                        if stayed {
+                            common_unrewarded_stay += 1;
+                        }
                     }
                     (false, false) => {
                         rare_unrewarded_total += 1;
-                        if stayed { rare_unrewarded_stay += 1; }
+                        if stayed {
+                            rare_unrewarded_stay += 1;
+                        }
                     }
                 }
             }
@@ -168,7 +181,11 @@ impl TwoStepBenchmark {
 }
 
 fn safe_rate(num: u64, denom: u64) -> f64 {
-    if denom > 0 { num as f64 / denom as f64 } else { 0.5 }
+    if denom > 0 {
+        num as f64 / denom as f64
+    } else {
+        0.5
+    }
 }
 
 impl PsychBenchmark for TwoStepBenchmark {
@@ -189,7 +206,10 @@ impl PsychBenchmark for TwoStepBenchmark {
             reward_effects.push(re);
         }
 
-        result.insert("beta3_model_basedness", MetricValue::from_samples(&model_basedness));
+        result.insert(
+            "beta3_model_basedness",
+            MetricValue::from_samples(&model_basedness),
+        );
         result.insert("reward_effect", MetricValue::from_samples(&reward_effects));
 
         result.conditions = 1;

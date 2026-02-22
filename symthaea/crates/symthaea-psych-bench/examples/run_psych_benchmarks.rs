@@ -22,8 +22,8 @@ use symthaea_psych_bench::benchmarks::creativity::{
     AlternateUsesBenchmark, RemoteAssociatesBenchmark,
 };
 use symthaea_psych_bench::benchmarks::executive::{
-    FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark,
-    StroopBenchmark, TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
+    FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark, StroopBenchmark,
+    TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
 };
 use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
@@ -168,8 +168,7 @@ fn main() {
 
     // Compare against baseline if --compare was specified
     if let Some(ref path) = compare_path {
-        let baseline =
-            RegressionSnapshot::load(path).expect("failed to load baseline snapshot");
+        let baseline = RegressionSnapshot::load(path).expect("failed to load baseline snapshot");
         let current = RegressionSnapshot::from_report(&report, "current");
         let regression = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
         println!("\n{}", regression.format_summary());

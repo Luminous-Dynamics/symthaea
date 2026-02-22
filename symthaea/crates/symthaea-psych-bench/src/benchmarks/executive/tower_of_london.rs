@@ -320,15 +320,18 @@ impl TowerOfLondonBenchmark {
                             None => {
                                 // BFS failed (shouldn't happen for valid problems)
                                 // Fall back to HDC-guided random
-                                let scored: Vec<(usize, usize, f32)> = legal.iter()
+                                let scored: Vec<(usize, usize, f32)> = legal
+                                    .iter()
                                     .map(|&(f, t)| {
-                                        let sim = current.apply_move(f, t)
+                                        let sim = current
+                                            .apply_move(f, t)
                                             .encode(&disc_hvs, &peg_hvs, &height_hvs)
                                             .similarity(&goal_hv);
                                         (f, t, sim)
                                     })
                                     .collect();
-                                scored.into_iter()
+                                scored
+                                    .into_iter()
                                     .max_by(|a, b| a.2.total_cmp(&b.2))
                                     .map(|(f, t, _)| (f, t))
                                     .unwrap_or(legal[0])
@@ -337,9 +340,11 @@ impl TowerOfLondonBenchmark {
                     } else {
                         // Error: HDC-biased random move (not fully random —
                         // humans make "reasonable" errors, not wild ones)
-                        let mut scored: Vec<(usize, usize, f32)> = legal.iter()
+                        let mut scored: Vec<(usize, usize, f32)> = legal
+                            .iter()
                             .map(|&(f, t)| {
-                                let sim = current.apply_move(f, t)
+                                let sim = current
+                                    .apply_move(f, t)
                                     .encode(&disc_hvs, &peg_hvs, &height_hvs)
                                     .similarity(&goal_hv);
                                 (f, t, sim)
@@ -350,7 +355,8 @@ impl TowerOfLondonBenchmark {
                         // Softmax with moderate temperature for error moves
                         let temperature: f64 = 0.20;
                         let max_sim = scored[0].2 as f64;
-                        let exp_sims: Vec<f64> = scored.iter()
+                        let exp_sims: Vec<f64> = scored
+                            .iter()
                             .map(|(_, _, s)| ((*s as f64 - max_sim) / temperature).exp())
                             .collect();
                         let exp_sum: f64 = exp_sims.iter().sum();
@@ -423,8 +429,8 @@ impl TowerOfLondonBenchmark {
         let easy_rate = easy_optimal as f64 / easy_count;
         let medium_rate = medium_optimal as f64 / medium_count;
         let hard_rate = hard_optimal as f64 / hard_count;
-        let overall_rate = (easy_optimal + medium_optimal + hard_optimal) as f64
-            / total_problems.max(1) as f64;
+        let overall_rate =
+            (easy_optimal + medium_optimal + hard_optimal) as f64 / total_problems.max(1) as f64;
         let efficiency = if total_actual_moves > 0 {
             total_optimal_moves as f64 / total_actual_moves as f64
         } else {
@@ -486,7 +492,10 @@ impl PsychBenchmark for TowerOfLondonBenchmark {
         result.insert("medium_optimal_rate", MetricValue::from_samples(&medium));
         result.insert("hard_optimal_rate", MetricValue::from_samples(&hard));
         result.insert("overall_optimal_rate", MetricValue::from_samples(&overall));
-        result.insert("planning_efficiency", MetricValue::from_samples(&efficiency));
+        result.insert(
+            "planning_efficiency",
+            MetricValue::from_samples(&efficiency),
+        );
         result.insert("avg_excess_moves", MetricValue::from_samples(&excess));
         result.insert("difficulty_gradient", MetricValue::from_samples(&gradient));
 

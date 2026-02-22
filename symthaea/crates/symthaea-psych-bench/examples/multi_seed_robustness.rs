@@ -20,8 +20,8 @@ use symthaea_psych_bench::benchmarks::creativity::{
     AlternateUsesBenchmark, RemoteAssociatesBenchmark,
 };
 use symthaea_psych_bench::benchmarks::executive::{
-    FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark,
-    StroopBenchmark, TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
+    FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark, StroopBenchmark,
+    TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
 };
 use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
@@ -157,11 +157,7 @@ fn main() {
 
         eprintln!("mean={:.3}, cv={:.3}", mean, cv);
 
-        let short_name = bench
-            .name()
-            .split("::")
-            .last()
-            .unwrap_or(bench.name());
+        let short_name = bench.name().split("::").last().unwrap_or(bench.name());
         let short_key = if key.len() > 12 { &key[..12] } else { key };
 
         println!(

@@ -34,14 +34,19 @@ impl DigitSpanBenchmark {
         let mut fwd_accuracy_at_7 = 0.0f64;
 
         for span_len in 3..=10usize {
-            // Generate a random digit sequence (digits 0-9)
-            let sequence: Vec<SequenceItem> = (0..span_len)
-                .map(|_| {
-                    rng ^= rng << 13;
-                    rng ^= rng >> 7;
-                    rng ^= rng << 17;
-                    SequenceItem(rng % 10)
-                })
+            // Generate a unique digit sequence (no repeats) via Fisher-Yates shuffle.
+            // Standard digit span uses non-repeating sequences (Wechsler, 2008).
+            let mut digits: Vec<u64> = (0..10).collect();
+            for i in (1..10).rev() {
+                rng ^= rng << 13;
+                rng ^= rng >> 7;
+                rng ^= rng << 17;
+                let j = (rng % (i as u64 + 1)) as usize;
+                digits.swap(i, j);
+            }
+            let sequence: Vec<SequenceItem> = digits[..span_len]
+                .iter()
+                .map(|&d| SequenceItem(d))
                 .collect();
 
             // ── Forward recall ──
@@ -115,22 +120,28 @@ impl DigitSpanBenchmark {
             wm.tick();
         }
 
-        // Recall phase: for each expected position, check if the target
-        // digit is still retrievable from WM via similarity probe.
-        // Backward recall uses a higher threshold and incurs output
-        // interference (1 tick per retrieval) — re-ordering takes time.
-        let threshold = if is_backward { 0.65 } else { 0.5 };
+        // Recall phase: forward uses raw similarity (items are fresh);
+        // backward uses activation_weighted_similarity (Gathercole et al., 2004)
+        // — items presented early have decayed activation, making them harder
+        // to retrieve when probed last (reversed order). Output interference
+        // (1 tick per retrieval) further degrades earlier items.
         let mut correct = 0u32;
         for expected in expected_recall {
             let target_hv = adapter.encode(expected, dim);
 
-            let best_sim = wm
-                .contents()
-                .iter()
-                .map(|item| target_hv.similarity(item))
-                .fold(f32::NEG_INFINITY, f32::max);
+            let recall_score = if is_backward {
+                // Activation-weighted: early items have lower activation
+                wm.activation_weighted_similarity(&target_hv)
+            } else {
+                // Raw similarity: all items in capacity are fresh
+                wm.contents()
+                    .iter()
+                    .map(|item| target_hv.similarity(item))
+                    .fold(f32::NEG_INFINITY, f32::max)
+            };
 
-            if best_sim > threshold {
+            let threshold = if is_backward { 0.60 } else { 0.5 };
+            if recall_score > threshold {
                 correct += 1;
             }
 
@@ -172,7 +183,10 @@ impl PsychBenchmark for DigitSpanBenchmark {
 
         result.insert("forward_span", MetricValue::from_samples(&fwd_spans));
         result.insert("backward_span", MetricValue::from_samples(&bwd_spans));
-        result.insert("forward_accuracy_at_7", MetricValue::from_samples(&fwd_acc_7));
+        result.insert(
+            "forward_accuracy_at_7",
+            MetricValue::from_samples(&fwd_acc_7),
+        );
 
         result.conditions = 2; // forward + backward
         result.trials_per_condition = config.trials_per_condition;
@@ -226,7 +240,8 @@ mod tests {
         assert!(
             fwd >= bwd - 1.0,
             "forward span ({}) should be >= backward span ({}) - 1",
-            fwd, bwd
+            fwd,
+            bwd
         );
     }
 }

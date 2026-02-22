@@ -17,12 +17,7 @@ pub struct SerialRecallBenchmark;
 impl SerialRecallBenchmark {
     /// Run a single trial: present a list, then probe each position.
     /// Returns accuracy per serial position.
-    fn run_trial(
-        &self,
-        list_len: usize,
-        config: &BenchmarkConfig,
-        trial_idx: usize,
-    ) -> Vec<f64> {
+    fn run_trial(&self, list_len: usize, config: &BenchmarkConfig, trial_idx: usize) -> Vec<f64> {
         let dim = config.dimension;
         let seed = config.trial_seed("worm", &format!("serial_{}", list_len), trial_idx);
         let adapter = SequenceAdapter;
@@ -48,7 +43,7 @@ impl SerialRecallBenchmark {
         // the end — producing the classic U-shaped serial position curve.
         for (pos, item) in items.iter().enumerate() {
             let hv = adapter.encode(item, dim);
-            let pi_strength = 0.50 * (1.0 - (-0.8 * pos as f32).exp());
+            let pi_strength = 0.80 * (1.0 - (-0.42 * pos as f32).exp());
             let noisy_hv = if pi_strength > 0.01 {
                 let noise = ContinuousHV::random(dim, seed.wrapping_add(500 + pos as u64));
                 ContinuousHV::weighted_bundle(&[&hv, &noise], &[1.0 - pi_strength, pi_strength])

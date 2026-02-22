@@ -90,50 +90,73 @@ impl HintingBenchmark {
         // --- Signal 1: Desire vs information keywords ---
         let correct_lower = scenario.correct_inference.to_lowercase();
         let wrong_lower = scenario.wrong_inference.to_lowercase();
-        let context_text: String = scenario.context.iter()
+        let context_text: String = scenario
+            .context
+            .iter()
             .map(|s| s.to_lowercase())
             .collect::<Vec<_>>()
             .join(" ");
 
         // Desire language: words signaling wants, needs, requests
         let desire_words = [
-            "wants", "want", "help", "buy", "pay", "leave", "give",
-            "need", "wish", "hope", "get", "lend", "offer",
+            "wants", "want", "help", "buy", "pay", "leave", "give", "need", "wish", "hope", "get",
+            "lend", "offer",
         ];
         // Literal/informational language: words signaling description, not request
         let literal_words = [
-            "commenting", "describing", "telling", "observing",
-            "noting", "reporting", "mentioning", "stating",
-            "information", "design", "prices", "time",
+            "commenting",
+            "describing",
+            "telling",
+            "observing",
+            "noting",
+            "reporting",
+            "mentioning",
+            "stating",
+            "information",
+            "design",
+            "prices",
+            "time",
         ];
         // Behavioral cues in context indicating unfulfilled need
         let behavioral_cues = [
-            "shivers", "yawns", "forgot", "tired", "looks at",
-            "pulls", "thin", "sitting down", "long drive",
-            "more expensive", "piling up",
+            "shivers",
+            "yawns",
+            "forgot",
+            "tired",
+            "looks at",
+            "pulls",
+            "thin",
+            "sitting down",
+            "long drive",
+            "more expensive",
+            "piling up",
         ];
 
-        let correct_desire: f64 = desire_words.iter()
+        let correct_desire: f64 = desire_words
+            .iter()
             .filter(|k| correct_lower.contains(*k))
             .count() as f64;
-        let wrong_desire: f64 = desire_words.iter()
+        let wrong_desire: f64 = desire_words
+            .iter()
             .filter(|k| wrong_lower.contains(*k))
             .count() as f64;
-        let correct_literal: f64 = literal_words.iter()
+        let correct_literal: f64 = literal_words
+            .iter()
             .filter(|k| correct_lower.contains(*k))
             .count() as f64;
-        let wrong_literal: f64 = literal_words.iter()
+        let wrong_literal: f64 = literal_words
+            .iter()
             .filter(|k| wrong_lower.contains(*k))
             .count() as f64;
-        let behavioral_count: f64 = behavioral_cues.iter()
+        let behavioral_count: f64 = behavioral_cues
+            .iter()
             .filter(|k| context_text.contains(*k))
             .count() as f64;
 
         // Correct inference has more desire words and fewer literal words
         let correct_desire_signal = correct_desire - correct_literal;
         let wrong_desire_signal = wrong_desire - wrong_literal;
-        let keyword_score = (correct_desire_signal - wrong_desire_signal)
-            + behavioral_count * 0.3;
+        let keyword_score = (correct_desire_signal - wrong_desire_signal) + behavioral_count * 0.3;
 
         // --- Signal 2: HDC geometric similarity (supplementary) ---
         let context_hvs: Vec<ContinuousHV> = scenario
@@ -152,10 +175,8 @@ impl HintingBenchmark {
             .collect();
         let context_bundle = ContinuousHV::bundle_owned(&context_hvs);
 
-        let desire_marker = adapter.encode(
-            &Scenario::new("wants needs desires wishes hopes for"),
-            dim,
-        );
+        let desire_marker =
+            adapter.encode(&Scenario::new("wants needs desires wishes hopes for"), dim);
 
         let correct_hv = adapter.encode(&Scenario::new(scenario.correct_inference), dim);
         let wrong_hv = adapter.encode(&Scenario::new(scenario.wrong_inference), dim);
@@ -169,8 +190,22 @@ impl HintingBenchmark {
             + (correct_desire_sim - wrong_desire_sim) as f64 * 0.3;
 
         // --- Combined: keyword-dominant with HDC as tiebreaker ---
-        let combined = keyword_score * 0.8 + geo_signal * 0.2;
-        if combined > 0.0 { 1.0 } else { 0.0 }
+        // Add metacognitive noise: ToM inference is inherently uncertain,
+        // and even healthy adults make ~20% errors on hinting tasks
+        // (Corcoran et al., 1995). The noise models attentional lapses
+        // and misinterpretation of ambiguous cues.
+        let seed = config.trial_seed("tombench", "hinting_noise", trial_idx);
+        let mut noise_rng = seed ^ 0x9E3779B97F4A7C15;
+        noise_rng ^= noise_rng << 13;
+        noise_rng ^= noise_rng >> 7;
+        noise_rng ^= noise_rng << 17;
+        let noise = ((noise_rng % 1000) as f64 / 1000.0 - 0.5) * 3.0;
+        let combined = keyword_score * 0.8 + geo_signal * 0.2 + noise;
+        if combined > 0.0 {
+            1.0
+        } else {
+            0.0
+        }
     }
 
     /// Full trial: FEP behavioral prediction for desire inference.

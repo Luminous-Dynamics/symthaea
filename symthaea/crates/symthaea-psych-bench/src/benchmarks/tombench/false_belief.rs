@@ -111,12 +111,12 @@ impl FalseBeliefBenchmark {
         //
         // We extract location markers from setup (original) and change (moved-to),
         // then check which answer references the original vs the moved-to location.
-        let location_prepositions = [
-            "in the", "on the", "behind the", "under the", "to the",
-        ];
+        let location_prepositions = ["in the", "on the", "behind the", "under the", "to the"];
 
         // Extract location from setup text (the agent's believed location)
-        let setup_text: String = scenario.setup.iter()
+        let setup_text: String = scenario
+            .setup
+            .iter()
             .map(|s| s.to_lowercase())
             .collect::<Vec<_>>()
             .join(" ");
@@ -154,10 +154,18 @@ impl FalseBeliefBenchmark {
 
                 // Score: +1 if belief answer matches original, -1 if reality does
                 let mut score = 0.0f64;
-                if belief_has_orig && !belief_has_moved { score += 1.0; }
-                if reality_has_moved && !reality_has_orig { score += 1.0; }
-                if belief_has_moved { score -= 1.0; }
-                if reality_has_orig { score -= 1.0; }
+                if belief_has_orig && !belief_has_moved {
+                    score += 1.0;
+                }
+                if reality_has_moved && !reality_has_orig {
+                    score += 1.0;
+                }
+                if belief_has_moved {
+                    score -= 1.0;
+                }
+                if reality_has_orig {
+                    score -= 1.0;
+                }
                 score
             }
             _ => 0.0, // Couldn't extract locations; fall through to HDC
@@ -195,7 +203,11 @@ impl FalseBeliefBenchmark {
 
         // --- Combined: structural tracking is primary, HDC is tiebreaker ---
         let combined = structural_score * 0.8 + geo_signal * 0.2;
-        if combined > 0.0 { 1.0 } else { 0.0 }
+        if combined > 0.0 {
+            1.0
+        } else {
+            0.0
+        }
     }
 
     /// Full trial: FEP behavioral prediction from false beliefs.
@@ -268,7 +280,10 @@ impl PsychBenchmark for FalseBeliefBenchmark {
             }
         }
 
-        result.insert("false_belief_accuracy", MetricValue::from_samples(&accuracies));
+        result.insert(
+            "false_belief_accuracy",
+            MetricValue::from_samples(&accuracies),
+        );
         #[cfg(feature = "symthaea-backend")]
         result.insert("action_confidence", MetricValue::from_samples(&confidences));
 

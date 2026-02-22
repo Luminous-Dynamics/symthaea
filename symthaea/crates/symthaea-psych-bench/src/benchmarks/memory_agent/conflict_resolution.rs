@@ -119,8 +119,14 @@ impl PsychBenchmark for ConflictResolutionBenchmark {
             consistencies.push(con);
         }
 
-        result.insert("recency_preference", MetricValue::from_samples(&recency_accs));
-        result.insert("resolution_consistency", MetricValue::from_samples(&consistencies));
+        result.insert(
+            "recency_preference",
+            MetricValue::from_samples(&recency_accs),
+        );
+        result.insert(
+            "resolution_consistency",
+            MetricValue::from_samples(&consistencies),
+        );
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

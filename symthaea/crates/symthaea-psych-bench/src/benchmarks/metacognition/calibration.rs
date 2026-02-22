@@ -33,19 +33,35 @@ struct Difficulty {
 // The borderline cases (medium_low, medium_high) are critical for
 // generating trials where confidence and accuracy decouple.
 const DIFFICULTIES: [Difficulty; 5] = [
-    Difficulty { _name: "easy", num_items: 3, delay: 1 },
-    Difficulty { _name: "medium_low", num_items: 4, delay: 3 },
-    Difficulty { _name: "medium", num_items: 5, delay: 5 },
-    Difficulty { _name: "medium_high", num_items: 6, delay: 6 },
-    Difficulty { _name: "hard", num_items: 7, delay: 8 },
+    Difficulty {
+        _name: "easy",
+        num_items: 3,
+        delay: 1,
+    },
+    Difficulty {
+        _name: "medium_low",
+        num_items: 4,
+        delay: 3,
+    },
+    Difficulty {
+        _name: "medium",
+        num_items: 5,
+        delay: 5,
+    },
+    Difficulty {
+        _name: "medium_high",
+        num_items: 6,
+        delay: 6,
+    },
+    Difficulty {
+        _name: "hard",
+        num_items: 7,
+        delay: 8,
+    },
 ];
 
 impl MetacognitiveCalibrationBenchmark {
-    fn run_trial(
-        &self,
-        config: &BenchmarkConfig,
-        trial_idx: usize,
-    ) -> CalibrationResult {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> CalibrationResult {
         let dim = config.dimension;
         let seed = config.trial_seed("metacognition", "calibration", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -145,10 +161,7 @@ impl MetacognitiveCalibrationBenchmark {
                 }
 
                 // Compute similarity of query to ALL items in WM
-                let mut sims: Vec<f32> = contents
-                    .iter()
-                    .map(|hv| target.similarity(hv))
-                    .collect();
+                let mut sims: Vec<f32> = contents.iter().map(|hv| target.similarity(hv)).collect();
                 sims.sort_by(|a, b| b.total_cmp(a));
 
                 let best_sim = sims[0];
@@ -196,9 +209,13 @@ impl MetacognitiveCalibrationBenchmark {
                 // Gentle sigmoid — only large gaps drive confidence.
                 let gap_signal = 1.0 / (1.0 + (-((gap - 0.12) * 3.0)).exp());
 
-                // Raw cue combination: task demands (70%) + evidence (30%)
-                let raw =
-                    load_factor * 0.30 + delay_factor * 0.40 + gap_signal * 0.25 + familiarity * 0.05;
+                // Raw cue combination: task demands dominate (75%), evidence weaker (25%).
+                // Humans rely more on experience-based cues (Koriat 2007) than
+                // on direct retrieval-quality signals.
+                let raw = load_factor * 0.32
+                    + delay_factor * 0.43
+                    + gap_signal * 0.15
+                    + familiarity * 0.10;
 
                 // Logistic calibration (Platt 1999): maps raw cue value to
                 // approximate P(correct). The raw range (~0.2–0.7) is too
@@ -206,11 +223,13 @@ impl MetacognitiveCalibrationBenchmark {
                 // accuracy distribution across difficulty levels.
                 let raw_confidence = 1.0 / (1.0 + (-((raw - 0.35) * 5.0)).exp());
 
-                // Metacognitive noise: imperfect introspection (Maniscalco & Lau 2012)
+                // Metacognitive noise: imperfect introspection (Maniscalco & Lau 2012).
+                // Increased noise range models the substantial variability in human
+                // metacognitive judgments (Fleming et al., 2010; meta-d'/d' < 1.0).
                 rng ^= rng << 13;
                 rng ^= rng >> 7;
                 rng ^= rng << 17;
-                let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * 0.20;
+                let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * 0.40;
                 let confidence = (raw_confidence + noise).clamp(0.0, 1.0);
 
                 all_confidences.push(confidence);
@@ -308,7 +327,8 @@ fn compute_calibration_metrics(confidences: &[f64], accuracies: &[f64]) -> Calib
     for b in 0..num_bins {
         if bin_counts[b] > 0 {
             let bin_mean_acc = bin_acc_sums[b] / bin_counts[b] as f64;
-            resolution += (bin_counts[b] as f64 / n as f64) * (bin_mean_acc - overall_mean_acc).powi(2);
+            resolution +=
+                (bin_counts[b] as f64 / n as f64) * (bin_mean_acc - overall_mean_acc).powi(2);
         }
     }
 
@@ -399,7 +419,11 @@ mod tests {
         };
         let result = MetacognitiveCalibrationBenchmark.run(&config);
         let ece = result.metrics["calibration_error_ece"].mean;
-        assert!(ece >= 0.0 && ece <= 1.0, "ECE should be in [0, 1], got {}", ece);
+        assert!(
+            ece >= 0.0 && ece <= 1.0,
+            "ECE should be in [0, 1], got {}",
+            ece
+        );
     }
 
     #[test]
