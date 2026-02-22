@@ -315,3 +315,224 @@ impl CfCNetwork {
         Ok(mse)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ndarray::Array1;
+
+    #[test]
+    fn test_cfc_new_constructs_correct_dimensions() {
+        let net = CfCNetwork::new(32).unwrap();
+        assert_eq!(net.num_neurons, 32);
+        assert_eq!(net.input_size, 32);
+        assert_eq!(net.state.len(), 32);
+        assert_eq!(net.w_input.shape(), &[32, 32]);
+        assert_eq!(net.w_hidden.shape(), &[32, 32]);
+        assert_eq!(net.bias.len(), 32);
+    }
+
+    #[test]
+    fn test_cfc_new_with_input_dimensions() {
+        let net = CfCNetwork::new_with_input(16, 32).unwrap();
+        assert_eq!(net.input_size, 16);
+        assert_eq!(net.num_neurons, 32);
+        assert_eq!(net.w_input.shape(), &[32, 16]);
+        assert_eq!(net.w_hidden.shape(), &[32, 32]);
+    }
+
+    #[test]
+    fn test_cfc_initial_state_is_zero() {
+        let net = CfCNetwork::new(16).unwrap();
+        assert_eq!(net.elapsed_time, 0.0);
+        for &v in net.state.iter() {
+            assert_eq!(v, 0.0);
+        }
+    }
+
+    #[test]
+    fn test_cfc_reset_clears_state() {
+        let mut net = CfCNetwork::new(16).unwrap();
+        let input = vec![0.5; 16];
+        net.step(&input, 0.1).unwrap();
+        assert!(net.elapsed_time > 0.0);
+
+        net.reset();
+        assert_eq!(net.elapsed_time, 0.0);
+        for &v in net.state.iter() {
+            assert_eq!(v, 0.0);
+        }
+    }
+
+    #[test]
+    fn test_cfc_predict_forward_produces_finite_output() {
+        let net = CfCNetwork::new(16).unwrap();
+        let input = Array1::from_vec(vec![0.5; 16]);
+        let result = net.predict_forward(&input, 1.0).unwrap();
+        assert_eq!(result.len(), 16);
+        for &v in result.iter() {
+            assert!(v.is_finite(), "predict_forward produced non-finite value: {}", v);
+        }
+    }
+
+    #[test]
+    fn test_cfc_step_advances_time() {
+        let mut net = CfCNetwork::new(8).unwrap();
+        let input = vec![0.1; 8];
+        net.step(&input, 0.5).unwrap();
+        assert!((net.elapsed_time - 0.5).abs() < 1e-6);
+        net.step(&input, 0.3).unwrap();
+        assert!((net.elapsed_time - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_cfc_step_with_mismatched_input_size() {
+        let mut net = CfCNetwork::new_with_input(8, 16).unwrap();
+        let short_input = vec![0.5; 4];
+        net.step(&short_input, 0.1).unwrap();
+        for &v in net.state.iter() {
+            assert!(v.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_cfc_inject_scales_input() {
+        let mut net = CfCNetwork::new(8).unwrap();
+        let input = vec![1.0; 8];
+        net.inject(&input).unwrap();
+        for &v in net.state.iter() {
+            assert!((v - 0.1).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn test_cfc_consciousness_level_bounded() {
+        let mut net = CfCNetwork::new(32).unwrap();
+        let input = vec![0.5; 32];
+        for _ in 0..20 {
+            net.step(&input, 0.1).unwrap();
+        }
+        let level = net.consciousness_level();
+        assert!(level >= 0.0 && level <= 1.0,
+            "consciousness_level should be in [0, 1], got {}", level);
+    }
+
+    #[test]
+    fn test_cfc_consciousness_level_zero_neurons() {
+        let net = CfCNetwork {
+            num_neurons: 0,
+            input_size: 0,
+            state: Array1::zeros(0),
+            w_input: ndarray::Array2::zeros((0, 0)),
+            w_hidden: ndarray::Array2::zeros((0, 0)),
+            bias: Array1::zeros(0),
+            w_tau: ndarray::Array2::zeros((0, 0)),
+            b_tau: Array1::zeros(0),
+            w_head: ndarray::Array2::zeros((0, 0)),
+            b_head: Array1::zeros(0),
+            elapsed_time: 0.0,
+        };
+        assert_eq!(net.consciousness_level(), 0.0);
+    }
+
+    #[test]
+    fn test_cfc_read_state_bounded() {
+        let mut net = CfCNetwork::new(16).unwrap();
+        let input = vec![1.0; 16];
+        for _ in 0..50 {
+            net.step(&input, 0.2).unwrap();
+        }
+        let state = net.read_state().unwrap();
+        for &v in &state {
+            assert!(v >= 0.0 && v <= 1.0,
+                "read_state should be bounded to [0, 1], got {}", v);
+        }
+    }
+
+    #[test]
+    fn test_cfc_neuron_states_matches_read_state() {
+        let mut net = CfCNetwork::new(16).unwrap();
+        let input = vec![0.3; 16];
+        net.step(&input, 0.1).unwrap();
+        assert_eq!(net.neuron_states(), net.read_state().unwrap());
+    }
+
+    #[test]
+    fn test_cfc_activity_summary_bounded() {
+        let mut net = CfCNetwork::new(16).unwrap();
+        let input = vec![0.5; 16];
+        for _ in 0..10 {
+            net.step(&input, 0.1).unwrap();
+        }
+        let summary = net.activity_summary();
+        assert!(summary >= 0.0 && summary <= 1.0,
+            "activity_summary should be in [0, 1], got {}", summary);
+    }
+
+    #[test]
+    fn test_cfc_serialize_deserialize_roundtrip() {
+        let mut net = CfCNetwork::new(16).unwrap();
+        let input = vec![0.5; 16];
+        net.step(&input, 0.1).unwrap();
+
+        let bytes = net.serialize().unwrap();
+        let net2 = CfCNetwork::deserialize(&bytes).unwrap();
+
+        assert_eq!(net.num_neurons, net2.num_neurons);
+        assert_eq!(net.input_size, net2.input_size);
+        assert!((net.elapsed_time - net2.elapsed_time).abs() < 1e-6);
+        for (a, b) in net.state.iter().zip(net2.state.iter()) {
+            assert!((a - b).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn test_cfc_train_step_returns_finite_loss() {
+        let mut net = CfCNetwork::new(16).unwrap();
+        let input = Array1::from_vec(vec![0.5; 16]);
+        let target = Array1::from_vec(vec![0.3; 16]);
+        let loss = net.train_step(&input, &target, 1.0, 0.01).unwrap();
+        assert!(loss.is_finite(), "train_step loss should be finite, got {}", loss);
+        assert!(loss >= 0.0, "MSE loss should be non-negative, got {}", loss);
+    }
+
+    #[test]
+    fn test_cfc_train_step_loss_decreases() {
+        let mut net = CfCNetwork::new(8).unwrap();
+        let input = Array1::from_vec(vec![0.5; 8]);
+        let target = Array1::from_vec(vec![0.3; 8]);
+
+        let loss1 = net.train_step(&input, &target, 1.0, 0.01).unwrap();
+        for _ in 0..50 {
+            net.train_step(&input, &target, 1.0, 0.01).unwrap();
+        }
+        let loss2 = net.train_step(&input, &target, 1.0, 0.01).unwrap();
+        assert!(loss2 < loss1, "Loss should decrease after training: {} -> {}", loss1, loss2);
+    }
+
+    #[test]
+    fn test_cfc_predict_forward_different_delta_t() {
+        let net = CfCNetwork::new(8).unwrap();
+        let input = Array1::from_vec(vec![0.5; 8]);
+
+        let state_short = net.predict_forward(&input, 0.01).unwrap();
+        let state_long = net.predict_forward(&input, 10.0).unwrap();
+
+        let diff: f32 = state_short.iter().zip(state_long.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        assert!(diff > 0.0, "Different delta_t should produce different predictions");
+    }
+
+    #[test]
+    fn test_cfc_step_does_not_diverge_over_many_steps() {
+        let mut net = CfCNetwork::new(16).unwrap();
+        let input = vec![0.5; 16];
+        for _ in 0..1000 {
+            net.step(&input, 0.1).unwrap();
+        }
+        for &v in net.state.iter() {
+            assert!(v.is_finite(), "State should remain finite after 1000 steps");
+        }
+    }
+}

@@ -1429,4 +1429,219 @@ mod tests {
         assert!(desc_a.contains(&d));
         assert!(!desc_a.contains(&a));
     }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Additional DAG construction & property tests
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_dag_new_is_empty() {
+        let dag = CausalDAG::new();
+        assert_eq!(dag.num_nodes(), 0);
+        assert!(dag.edges.is_empty());
+        assert!(dag.adjacency.is_empty());
+    }
+
+    #[test]
+    fn test_dag_default_is_empty() {
+        let dag = CausalDAG::default();
+        assert_eq!(dag.num_nodes(), 0);
+        assert!(dag.edges.is_empty());
+    }
+
+    #[test]
+    fn test_dag_add_node_returns_sequential_ids() {
+        let mut dag = CausalDAG::new();
+        let a = dag.add_node("A", binary_values(), true);
+        let b = dag.add_node("B", binary_values(), false);
+        let c = dag.add_node("C", vec!["lo".into(), "mid".into(), "hi".into()], true);
+        assert_eq!(a, 0);
+        assert_eq!(b, 1);
+        assert_eq!(c, 2);
+        assert_eq!(dag.num_nodes(), 3);
+    }
+
+    #[test]
+    fn test_dag_node_properties_stored() {
+        let mut dag = CausalDAG::new();
+        let vals = vec!["off".into(), "on".into(), "high".into()];
+        let id = dag.add_node("sensor", vals.clone(), false);
+        assert_eq!(dag.nodes[id].name, "sensor");
+        assert_eq!(dag.nodes[id].values, vals);
+        assert!(!dag.nodes[id].is_observed);
+    }
+
+    #[test]
+    fn test_dag_duplicate_edge_not_added() {
+        let mut dag = CausalDAG::new();
+        let a = dag.add_node("A", binary_values(), true);
+        let b = dag.add_node("B", binary_values(), true);
+        dag.add_edge(a, b);
+        dag.add_edge(a, b); // duplicate
+        assert_eq!(dag.edges.len(), 1, "Duplicate edges should not be added");
+    }
+
+    #[test]
+    fn test_dag_parents_of_root_empty() {
+        let mut dag = CausalDAG::new();
+        let root = dag.add_node("root", binary_values(), true);
+        let child = dag.add_node("child", binary_values(), true);
+        dag.add_edge(root, child);
+        assert!(dag.parents(root).is_empty());
+    }
+
+    #[test]
+    fn test_dag_children_of_leaf_empty() {
+        let mut dag = CausalDAG::new();
+        let parent = dag.add_node("parent", binary_values(), true);
+        let leaf = dag.add_node("leaf", binary_values(), true);
+        dag.add_edge(parent, leaf);
+        assert!(dag.children(leaf).is_empty());
+    }
+
+    #[test]
+    fn test_dag_ancestors_of_root_empty() {
+        let mut dag = CausalDAG::new();
+        let root = dag.add_node("root", binary_values(), true);
+        let _child = dag.add_node("child", binary_values(), true);
+        dag.add_edge(root, _child);
+        assert!(dag.ancestors(root).is_empty());
+    }
+
+    #[test]
+    fn test_dag_descendants_of_leaf_empty() {
+        let mut dag = CausalDAG::new();
+        let parent = dag.add_node("parent", binary_values(), true);
+        let leaf = dag.add_node("leaf", binary_values(), true);
+        dag.add_edge(parent, leaf);
+        assert!(dag.descendants(leaf).is_empty());
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // d-Separation additional tests
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_d_separation_disconnected_nodes() {
+        // Two isolated nodes — always d-separated regardless of conditioning
+        let mut dag = CausalDAG::new();
+        let a = dag.add_node("A", binary_values(), true);
+        let b = dag.add_node("B", binary_values(), true);
+        let result = dag.d_separated(a, b, &HashSet::new());
+        assert!(result.separated, "Disconnected nodes should be d-separated");
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // SCM construction & observation tests
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_scm_new_has_empty_tables() {
+        let dag = CausalDAG::new();
+        let scm = StructuralCausalModel::new(dag);
+        assert!(scm.conditional_tables.is_empty());
+        assert!(scm.observations.is_empty());
+    }
+
+    #[test]
+    fn test_scm_observe_and_clear() {
+        let mut dag = CausalDAG::new();
+        let x = dag.add_node("X", binary_values(), true);
+        let mut scm = StructuralCausalModel::new(dag);
+        scm.observe(x, 1);
+        assert_eq!(scm.observations.get(&x), Some(&1));
+        scm.clear_observations();
+        assert!(scm.observations.is_empty());
+    }
+
+    #[test]
+    fn test_scm_default_conditional_prob_uniform() {
+        // Without an explicit table, get_conditional_prob should return uniform 1/n
+        let mut dag = CausalDAG::new();
+        let x = dag.add_node("X", vec!["a".into(), "b".into(), "c".into()], true);
+        let scm = StructuralCausalModel::new(dag);
+        let p = scm.get_conditional_prob(x, 0, 0);
+        assert!(
+            (p - 1.0 / 3.0).abs() < 1e-9,
+            "Default prob should be uniform 1/3, got {}",
+            p
+        );
+    }
+
+    #[test]
+    fn test_scm_set_conditional_table() {
+        let mut dag = CausalDAG::new();
+        let x = dag.add_node("X", binary_values(), true);
+        let mut scm = StructuralCausalModel::new(dag);
+        scm.set_conditional_table(x, vec![0.3, 0.7]);
+        let p0 = scm.get_conditional_prob(x, 0, 0);
+        let p1 = scm.get_conditional_prob(x, 1, 0);
+        assert!((p0 - 0.3).abs() < 1e-9);
+        assert!((p1 - 0.7).abs() < 1e-9);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Intervention result invariants
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_intervention_result_distribution_sums_to_one() {
+        let mut dag = CausalDAG::new();
+        let x = dag.add_node("X", binary_values(), true);
+        let y = dag.add_node("Y", binary_values(), true);
+        dag.add_edge(x, y);
+        let mut scm = StructuralCausalModel::new(dag);
+        scm.set_conditional_table(x, vec![0.5, 0.5]);
+        scm.set_conditional_table(y, vec![0.8, 0.2, 0.3, 0.7]);
+        let result = scm.intervene(x, 0, y).expect("identifiable");
+        let sum: f64 = result.distribution.iter().sum();
+        assert!(
+            (sum - 1.0).abs() < 1e-6,
+            "Distribution should sum to 1.0, got {}",
+            sum
+        );
+    }
+
+    #[test]
+    fn test_causal_effect_returns_none_for_single_value_node() {
+        let mut dag = CausalDAG::new();
+        // X has only one value — causal_effect should return None
+        let x = dag.add_node("X", vec!["only".into()], true);
+        let y = dag.add_node("Y", binary_values(), true);
+        dag.add_edge(x, y);
+        let scm = StructuralCausalModel::new(dag);
+        assert!(scm.causal_effect(x, y).is_none());
+    }
+
+    #[test]
+    fn test_backdoor_excludes_descendants_of_x() {
+        // X -> M -> Y, C -> X, C -> Y
+        // M is a descendant of X, so M should NOT appear in backdoor sets
+        let mut dag = CausalDAG::new();
+        let c = dag.add_node("C", binary_values(), true);
+        let x = dag.add_node("X", binary_values(), true);
+        let m = dag.add_node("M", binary_values(), true);
+        let y = dag.add_node("Y", binary_values(), true);
+        dag.add_edge(c, x);
+        dag.add_edge(c, y);
+        dag.add_edge(x, m);
+        dag.add_edge(m, y);
+        let scm = StructuralCausalModel::new(dag);
+        let sets = scm.find_backdoor_sets(x, y);
+        for set in &sets {
+            assert!(
+                !set.contains(&m),
+                "Backdoor sets must not include descendants of X; found M in {:?}",
+                set
+            );
+        }
+    }
+
+    #[test]
+    fn test_enumerate_configs_empty() {
+        let dag = CausalDAG::new();
+        let scm = StructuralCausalModel::new(dag);
+        let configs = scm.enumerate_configs(&[]);
+        assert_eq!(configs, vec![vec![]]);
+    }
 }

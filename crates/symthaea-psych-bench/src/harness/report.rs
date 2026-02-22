@@ -500,11 +500,12 @@ impl BenchmarkReport {
         use crate::harness::baselines::BaselineCollection;
         let bl = BaselineCollection::all();
 
-        let mut lines = Vec::new();
-        lines.push(r"\begin{tabular}{lllllrrrrl}".to_string());
-        lines.push(r"\toprule".to_string());
-        lines.push(r"Domain & Benchmark & Key Metric & Agent & Human & \% Human & $d$ & $z$ & 95\% CI \\".to_string());
-        lines.push(r"\midrule".to_string());
+        let mut lines = vec![
+            r"\begin{tabular}{lllllrrrrl}".to_string(),
+            r"\toprule".to_string(),
+            r"Domain & Benchmark & Key Metric & Agent & Human & \% Human & $d$ & $z$ & 95\% CI \\".to_string(),
+            r"\midrule".to_string(),
+        ];
 
         for result in &self.results {
             let domain = domain_of(&result.benchmark);

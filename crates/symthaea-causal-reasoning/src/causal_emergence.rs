@@ -622,4 +622,298 @@ mod tests {
             "Macro should be more deterministic"
         );
     }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Entropy edge-case tests
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_entropy_empty_distribution() {
+        assert_eq!(entropy(&[]), 0.0);
+    }
+
+    #[test]
+    fn test_entropy_single_certain_event() {
+        assert!(entropy(&[1.0]).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_entropy_binary_maximum() {
+        // Maximum entropy for binary variable = 1 bit
+        let h = entropy(&[0.5, 0.5]);
+        assert!(
+            (h - 1.0).abs() < 1e-10,
+            "Binary uniform entropy should be 1.0 bit, got {}",
+            h
+        );
+    }
+
+    #[test]
+    fn test_entropy_near_zero_probs_ignored() {
+        // Very small probabilities shouldn't produce NaN
+        let probs = vec![1e-15, 1.0 - 1e-15];
+        let h = entropy(&probs);
+        assert!(h.is_finite(), "Entropy should handle near-zero probs");
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Mutual information tests
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_mutual_information_independent() {
+        // Independent joint: P(X,Y) = P(X)*P(Y)
+        let joint = vec![vec![0.25, 0.25], vec![0.25, 0.25]];
+        let mi = mutual_information(&joint);
+        assert!(
+            mi.abs() < 1e-6,
+            "MI of independent variables should be 0, got {}",
+            mi
+        );
+    }
+
+    #[test]
+    fn test_mutual_information_perfectly_correlated() {
+        // Perfectly correlated: P(X=0,Y=0) = P(X=1,Y=1) = 0.5
+        let joint = vec![vec![0.5, 0.0], vec![0.0, 0.5]];
+        let mi = mutual_information(&joint);
+        assert!(
+            (mi - 1.0).abs() < 1e-6,
+            "MI of perfectly correlated binary vars should be 1 bit, got {}",
+            mi
+        );
+    }
+
+    #[test]
+    fn test_mutual_information_empty_joint() {
+        assert_eq!(mutual_information(&[]), 0.0);
+        let empty_cols: Vec<Vec<f64>> = vec![vec![]];
+        assert_eq!(mutual_information(&empty_cols), 0.0);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Effective information tests
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_effective_information_empty_tpm() {
+        assert_eq!(effective_information(&[]), 0.0);
+    }
+
+    #[test]
+    fn test_effective_information_identity_tpm() {
+        // Identity TPM: each state maps to itself
+        let identity = vec![
+            vec![1.0, 0.0, 0.0],
+            vec![0.0, 1.0, 0.0],
+            vec![0.0, 0.0, 1.0],
+        ];
+        let ei = effective_information(&identity);
+        // EI should equal log2(3) ≈ 1.585 for a perfectly deterministic 1-to-1 map
+        let expected = 3.0_f64.log2();
+        assert!(
+            (ei - expected).abs() < 0.01,
+            "Identity TPM should have EI = log2(3) ≈ {:.3}, got {:.3}",
+            expected,
+            ei
+        );
+    }
+
+    #[test]
+    fn test_effective_information_uniform_tpm_is_zero() {
+        let uniform = vec![
+            vec![0.5, 0.5],
+            vec![0.5, 0.5],
+        ];
+        let ei = effective_information(&uniform);
+        assert!(
+            ei.abs() < 1e-6,
+            "Uniform TPM should have EI = 0, got {}",
+            ei
+        );
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Determinism tests
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_determinism_empty_tpm() {
+        assert_eq!(determinism(&[]), 0.0);
+    }
+
+    #[test]
+    fn test_determinism_perfectly_deterministic() {
+        let tpm = vec![
+            vec![0.0, 1.0],
+            vec![1.0, 0.0],
+        ];
+        let d = determinism(&tpm);
+        assert!(
+            (d - 1.0).abs() < 1e-6,
+            "Perfectly deterministic TPM should have determinism 1.0, got {}",
+            d
+        );
+    }
+
+    #[test]
+    fn test_determinism_uniform_tpm() {
+        let tpm = vec![
+            vec![0.25, 0.25, 0.25, 0.25],
+            vec![0.25, 0.25, 0.25, 0.25],
+            vec![0.25, 0.25, 0.25, 0.25],
+            vec![0.25, 0.25, 0.25, 0.25],
+        ];
+        let d = determinism(&tpm);
+        assert!(
+            d.abs() < 1e-6,
+            "Uniform TPM should have determinism 0, got {}",
+            d
+        );
+    }
+
+    #[test]
+    fn test_determinism_bounded_zero_one() {
+        // Partially random TPM
+        let tpm = vec![
+            vec![0.6, 0.4],
+            vec![0.3, 0.7],
+        ];
+        let d = determinism(&tpm);
+        assert!(d >= 0.0 && d <= 1.0, "Determinism must be in [0,1], got {}", d);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Degeneracy tests
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_degeneracy_empty_tpm() {
+        assert_eq!(degeneracy(&[]), 0.0);
+    }
+
+    #[test]
+    fn test_degeneracy_single_row() {
+        // Single row means fewer than 2 states — degeneracy should be 0
+        let tpm = vec![vec![0.5, 0.5]];
+        assert_eq!(degeneracy(&tpm), 0.0);
+    }
+
+    #[test]
+    fn test_degeneracy_identical_rows() {
+        // All inputs lead to same output distribution = maximum degeneracy
+        let tpm = vec![
+            vec![0.3, 0.7],
+            vec![0.3, 0.7],
+            vec![0.3, 0.7],
+        ];
+        let d = degeneracy(&tpm);
+        assert!(
+            (d - 1.0).abs() < 1e-6,
+            "Identical rows should give degeneracy = 1.0, got {}",
+            d
+        );
+    }
+
+    #[test]
+    fn test_degeneracy_bounded_zero_one() {
+        let tpm = vec![
+            vec![0.8, 0.2],
+            vec![0.4, 0.6],
+        ];
+        let d = degeneracy(&tpm);
+        assert!(d >= 0.0 && d <= 1.0, "Degeneracy must be in [0,1], got {}", d);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // StateDiscretizer tests
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_state_discretizer_boundary_values() {
+        let disc = StateDiscretizer::new(4, 2);
+        // Micro: 4 states with thresholds at 0.25, 0.5, 0.75
+        assert_eq!(disc.to_micro(0.0), 0);
+        assert_eq!(disc.to_micro(0.24), 0);
+        assert_eq!(disc.to_micro(0.26), 1);
+        assert_eq!(disc.to_micro(0.99), 3);
+        assert_eq!(disc.to_micro(1.0), 3);
+        // Macro: 2 states with threshold at 0.5
+        assert_eq!(disc.to_macro(0.0), 0);
+        assert_eq!(disc.to_macro(0.49), 0);
+        assert_eq!(disc.to_macro(0.51), 1);
+        assert_eq!(disc.to_macro(1.0), 1);
+    }
+
+    #[test]
+    fn test_state_discretizer_clamps_out_of_range() {
+        let disc = StateDiscretizer::new(3, 3);
+        // Values outside [0, 1] should be clamped
+        assert_eq!(disc.to_micro(-1.0), 0);
+        assert_eq!(disc.to_micro(5.0), 2);
+        assert_eq!(disc.to_macro(-0.5), 0);
+        assert_eq!(disc.to_macro(2.0), 2);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Analyzer lifecycle tests
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_analyzer_default() {
+        let analyzer = CausalEmergenceAnalyzer::default();
+        assert_eq!(analyzer.num_observations(), 0);
+    }
+
+    #[test]
+    fn test_analyzer_reset() {
+        let mut analyzer = CausalEmergenceAnalyzer::new();
+        analyzer.observe(&[0.5, 0.3], 0.6);
+        analyzer.observe(&[0.2, 0.8], 0.4);
+        assert_eq!(analyzer.num_observations(), 2);
+        analyzer.reset();
+        assert_eq!(analyzer.num_observations(), 0);
+    }
+
+    #[test]
+    fn test_analyzer_no_observations_still_produces_result() {
+        let analyzer = CausalEmergenceAnalyzer::new();
+        let result = analyzer.analyze();
+        // With no observations, TPMs are built from empty transitions → uniform rows
+        assert!(result.micro_ei.is_finite());
+        assert!(result.macro_ei.is_finite());
+        assert!(!result.interpretation.is_empty());
+    }
+
+    #[test]
+    fn test_analyzer_single_observation_no_panic() {
+        let mut analyzer = CausalEmergenceAnalyzer::new();
+        analyzer.observe(&[0.5], 0.5);
+        let result = analyzer.analyze();
+        assert!(result.micro_ei.is_finite());
+    }
+
+    #[test]
+    fn test_causal_emergence_result_fields() {
+        let mut analyzer = CausalEmergenceAnalyzer::with_granularity(4, 2);
+        for i in 0..100 {
+            let micro = vec![
+                (i as f64 * 0.07).sin() * 0.5 + 0.5,
+                (i as f64 * 0.13).cos() * 0.5 + 0.5,
+            ];
+            let macro_state = (i as f64 * 0.05).sin() * 0.4 + 0.5;
+            analyzer.observe(&micro, macro_state);
+        }
+        let r = analyzer.analyze();
+        // All metric fields should be finite and bounded
+        assert!(r.micro_ei >= 0.0 && r.micro_ei.is_finite());
+        assert!(r.macro_ei >= 0.0 && r.macro_ei.is_finite());
+        assert!(r.emergence.is_finite());
+        assert!((0.0..=1.0).contains(&r.micro_determinism));
+        assert!((0.0..=1.0).contains(&r.macro_determinism));
+        assert!((0.0..=1.0).contains(&r.micro_degeneracy));
+        assert!((0.0..=1.0).contains(&r.macro_degeneracy));
+        // consciousness_emerges should match sign of emergence
+        assert_eq!(r.consciousness_emerges, r.emergence > 0.0);
+    }
 }

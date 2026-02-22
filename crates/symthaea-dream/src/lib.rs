@@ -542,4 +542,164 @@ mod tests {
         // Stats should reflect the session
         assert_eq!(engine.stats().dream_cycles, 3);
     }
+
+    #[test]
+    fn test_dream_engine_config_default_values() {
+        let config = DreamEngineConfig::default();
+        assert_eq!(config.surprise_threshold, 0.1);
+        assert_eq!(config.counterfactual_count, 5);
+        assert_eq!(config.wisdom_threshold, 0.05);
+        assert_eq!(config.max_memory_size, 1000);
+        assert_eq!(config.state_dim, 64);
+        assert_eq!(config.action_dim, 32);
+    }
+
+    #[test]
+    fn test_dream_engine_custom_config() {
+        let config = DreamEngineConfig {
+            surprise_threshold: 0.5,
+            counterfactual_count: 10,
+            max_memory_size: 50,
+            ..Default::default()
+        };
+        let engine = DreamEngine::new(config);
+        assert_eq!(engine.config().surprise_threshold, 0.5);
+        assert_eq!(engine.config().counterfactual_count, 10);
+        assert_eq!(engine.config().max_memory_size, 50);
+    }
+
+    #[test]
+    fn test_record_at_exact_threshold_rejected() {
+        let config = DreamEngineConfig { surprise_threshold: 0.5, ..Default::default() };
+        let mut engine = DreamEngine::new(config);
+        engine.record(&vec![0.5; 64], &vec![0.1; 32], &vec![0.3; 64], 0.5);
+        assert_eq!(engine.memory_size(), 0);
+        engine.record(&vec![0.5; 64], &vec![0.1; 32], &vec![0.3; 64], 0.501);
+        assert_eq!(engine.memory_size(), 1);
+    }
+
+    #[test]
+    fn test_record_with_timestamp() {
+        let mut engine = DreamEngine::with_defaults();
+        engine.record_with_timestamp(&vec![0.5; 64], &vec![0.1; 32], &vec![0.3; 64], 0.5, 12345);
+        assert_eq!(engine.memory_size(), 1);
+    }
+
+    #[test]
+    fn test_record_with_timestamp_below_threshold_rejected() {
+        let mut engine = DreamEngine::with_defaults();
+        engine.record_with_timestamp(&vec![0.5; 64], &vec![0.1; 32], &vec![0.3; 64], 0.05, 12345);
+        assert_eq!(engine.memory_size(), 0);
+        assert_eq!(engine.stats().events_rejected, 1);
+    }
+
+    #[test]
+    fn test_dream_empty_memory_returns_default() {
+        let mut engine = DreamEngine::with_defaults();
+        let result = engine.dream().unwrap();
+        assert_eq!(result.events_processed, 0);
+        assert_eq!(result.simulations_run, 0);
+        assert_eq!(result.insights, 0);
+    }
+
+    #[test]
+    fn test_clear_memory() {
+        let mut engine = DreamEngine::with_defaults();
+        for _ in 0..5 {
+            engine.record(&vec![0.5; 64], &vec![0.1; 32], &vec![0.3; 64], 0.8);
+        }
+        assert_eq!(engine.memory_size(), 5);
+        engine.clear_memory();
+        assert_eq!(engine.memory_size(), 0);
+    }
+
+    #[test]
+    fn test_phi_estimation_empty_input() {
+        assert_eq!(DreamEngine::estimate_phi(&[]), 0.0);
+    }
+
+    #[test]
+    fn test_phi_estimation_single_element() {
+        let phi = DreamEngine::estimate_phi(&[0.5]);
+        assert!(phi >= 0.0 && phi <= 1.0);
+    }
+
+    #[test]
+    fn test_phi_estimation_high_variance_higher() {
+        let low_var = vec![0.5; 64];
+        let high_var: Vec<f32> = (0..64).map(|i| if i % 2 == 0 { 0.9 } else { -0.9 }).collect();
+        let phi_low = DreamEngine::estimate_phi(&low_var);
+        let phi_high = DreamEngine::estimate_phi(&high_var);
+        assert!(phi_high > phi_low, "Higher variance should give higher phi");
+    }
+
+    #[test]
+    fn test_counterfactual_actions_deterministic_per_seed() {
+        let engine = DreamEngine::with_defaults();
+        let action = vec![0.5; 32];
+        let alt_a = engine.generate_counterfactual_action(&action, 42);
+        let alt_b = engine.generate_counterfactual_action(&action, 42);
+        assert_eq!(alt_a, alt_b, "Same seed should produce same counterfactual");
+    }
+
+    #[test]
+    fn test_counterfactual_actions_bounded() {
+        let engine = DreamEngine::with_defaults();
+        let action = vec![0.5; 32];
+        for seed in 0..10 {
+            let alt = engine.generate_counterfactual_action(&action, seed);
+            for &v in &alt {
+                assert!(v >= -1.0 && v <= 1.0, "Counterfactual should be in [-1, 1], got {}", v);
+            }
+        }
+    }
+
+    #[test]
+    fn test_simulate_outcome_bounded() {
+        let engine = DreamEngine::with_defaults();
+        let outcome = engine.simulate_outcome(&vec![0.8; 64], &vec![0.5; 32]);
+        assert_eq!(outcome.len(), 64);
+        for &v in &outcome {
+            assert!(v >= -1.0 && v <= 1.0, "Outcome should be in [-1, 1], got {}", v);
+        }
+    }
+
+    #[test]
+    fn test_dream_result_default() {
+        let result = DreamResult::default();
+        assert_eq!(result.insights, 0);
+        assert_eq!(result.events_processed, 0);
+        assert_eq!(result.simulations_run, 0);
+        assert_eq!(result.best_phi_improvement, 0.0);
+    }
+
+    #[test]
+    fn test_dream_processes_most_surprising_event() {
+        let mut engine = DreamEngine::with_defaults();
+        for i in 0..5 {
+            engine.record(&vec![(i as f32) / 5.0; 64], &vec![0.1; 32], &vec![0.3; 64], 0.2 + i as f32 * 0.15);
+        }
+        let result = engine.dream().unwrap();
+        assert_eq!(result.events_processed, 1);
+        assert_eq!(result.simulations_run, engine.config().counterfactual_count);
+    }
+
+    #[test]
+    fn test_wisdom_accumulates() {
+        let config = DreamEngineConfig {
+            counterfactual_count: 20,
+            wisdom_threshold: 0.001,
+            ..Default::default()
+        };
+        let mut engine = DreamEngine::new(config);
+        for i in 0..10 {
+            let state: Vec<f32> = (0..64).map(|j| ((i * 7 + j) as f32 / 100.0).sin()).collect();
+            let action: Vec<f32> = (0..32).map(|j| ((i * 3 + j) as f32 / 50.0).cos()).collect();
+            let outcome: Vec<f32> = (0..64).map(|j| ((i * 11 + j) as f32 / 80.0).sin().abs()).collect();
+            engine.record(&state, &action, &outcome, 0.3 + (i as f32) * 0.05);
+        }
+        engine.dream_session(5).unwrap();
+        assert_eq!(engine.stats().dream_cycles, 5);
+        assert!(engine.stats().total_simulations > 0);
+    }
 }
