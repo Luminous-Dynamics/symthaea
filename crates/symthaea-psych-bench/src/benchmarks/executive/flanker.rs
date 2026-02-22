@@ -55,7 +55,7 @@ impl FlankerBenchmark {
         // Attention leakage: how much flanker direction bleeds into the
         // response activation. In humans, spatial filtering is imperfect,
         // especially at close spacing (Eriksen & Eriksen, 1974).
-        let attention_leak: f32 = 0.5;
+        let attention_leak: f32 = 0.35;
 
         // Decision temperature: controls stochasticity of response selection.
         let temperature: f64 = 0.25;

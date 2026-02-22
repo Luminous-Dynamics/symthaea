@@ -401,6 +401,18 @@ impl BenchmarkReport {
         if benchmark.contains("Instrumental") {
             push_specific("contingency_sensitivity", "instrumental_sensitivity", cog_bl);
         }
+        if benchmark.contains("SpatialUpdating") {
+            push_specific("overall_accuracy", "spatial_updating_accuracy", worm_bl);
+        }
+        if benchmark.contains("Binding") {
+            push_specific("overall_binding_accuracy", "binding_accuracy", worm_bl);
+        }
+        if benchmark.contains("SerialRecall") {
+            push_specific("list_7::primacy_index", "serial_primacy_advantage", worm_bl);
+        }
+        if benchmark.contains("Probabilistic") {
+            push_specific("beta2_likelihood_weight", "probabilistic_likelihood_weight", cog_bl);
+        }
 
         // Only return comparisons relevant to this benchmark
         if benchmark.contains("WorM") || benchmark.contains("CogBench")
@@ -579,9 +591,9 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
     match benchmark {
         b if b.contains("NBack") || b.contains("N-back") => "nback_2::accuracy",
         b if b.contains("ChangeDetection") => "set_size_4::accuracy",
-        b if b.contains("SerialRecall") => "primacy_advantage",
+        b if b.contains("SerialRecall") => "list_7::primacy_index",
         b if b.contains("SpatialUpdating") => "overall_accuracy",
-        b if b.contains("Binding") => "overall_accuracy",
+        b if b.contains("Binding") => "overall_binding_accuracy",
         b if b.contains("DigitSpan") => "forward_span",
         b if b.contains("Stroop") && !b.contains("Strange") => "stroop_effect",
         b if b.contains("Flanker") => "flanker_effect",
@@ -589,10 +601,10 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("Iowa") || b.contains("IGT") => "overall_net_score",
         b if b.contains("Ravens") => "overall_accuracy",
         b if b.contains("TowerOfLondon") => "overall_optimal_rate",
-        b if b.contains("Probabilistic") => "correct_rate",
+        b if b.contains("Probabilistic") => "beta2_likelihood_weight",
         b if b.contains("Horizon") => "horizon_6::directed_exploration",
-        b if b.contains("RestlessBandit") => "restless_bandit_regret",
-        b if b.contains("Instrumental") => "instrumental_sensitivity",
+        b if b.contains("RestlessBandit") => "overall_accuracy",
+        b if b.contains("Instrumental") => "contingency_sensitivity",
         b if b.contains("TwoStep") => "beta3_model_basedness",
         b if b.contains("Temporal") => "discounting_score_S",
         b if b.contains("Bart") || b.contains("BART") => "average_pumps",
