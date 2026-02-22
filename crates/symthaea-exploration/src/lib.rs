@@ -935,7 +935,10 @@ mod tests {
 
     #[test]
     fn test_surprise_tracker_with_seed_deterministic() {
-        let config = SurpriseTrackerConfig { exploration_cooldown: 0, ..Default::default() };
+        let config = SurpriseTrackerConfig {
+            exploration_cooldown: 0,
+            ..Default::default()
+        };
         let mut t1 = SurpriseTracker::with_seed(config.clone(), 42);
         let mut t2 = SurpriseTracker::with_seed(config, 42);
         t1.record_surprise(0.8);
@@ -958,7 +961,11 @@ mod tests {
         let tracker = SurpriseTracker::new(SurpriseTrackerConfig::default());
         let v = vec![0.3, 0.5, 0.7, 0.9];
         let surprise = tracker.compute_surprise(&v, &v);
-        assert!(surprise < 1e-6, "Identical vectors should have ~0 surprise, got {}", surprise);
+        assert!(
+            surprise < 1e-6,
+            "Identical vectors should have ~0 surprise, got {}",
+            surprise
+        );
     }
 
     #[test]
@@ -996,18 +1003,28 @@ mod tests {
             ..Default::default()
         };
         let mut tracker = SurpriseTracker::new(config);
-        for _ in 0..5 { tracker.record_surprise(0.1); }
+        for _ in 0..5 {
+            tracker.record_surprise(0.1);
+        }
         tracker.record_surprise(0.9);
         let state = vec![0.5; 4];
         tracker.generate_exploration_action(&state);
-        assert!(!tracker.should_explore(1.0), "Should not explore during cooldown");
-        for _ in 0..5 { tracker.record_surprise(0.1); }
+        assert!(
+            !tracker.should_explore(1.0),
+            "Should not explore during cooldown"
+        );
+        for _ in 0..5 {
+            tracker.record_surprise(0.1);
+        }
         assert!(tracker.should_explore(1.0), "Should explore after cooldown");
     }
 
     #[test]
     fn test_generate_exploration_action_length_matches_state() {
-        let config = SurpriseTrackerConfig { exploration_cooldown: 0, ..Default::default() };
+        let config = SurpriseTrackerConfig {
+            exploration_cooldown: 0,
+            ..Default::default()
+        };
         let mut tracker = SurpriseTracker::new(config);
         tracker.record_surprise(0.8);
         let state = vec![0.5; 20];
@@ -1017,11 +1034,16 @@ mod tests {
 
     #[test]
     fn test_exploration_action_finite_values() {
-        let config = SurpriseTrackerConfig { exploration_cooldown: 0, ..Default::default() };
+        let config = SurpriseTrackerConfig {
+            exploration_cooldown: 0,
+            ..Default::default()
+        };
         let mut tracker = SurpriseTracker::new(config);
         tracker.record_surprise(0.8);
         let action = tracker.generate_exploration_action(&vec![0.5; 10]);
-        for &v in &action { assert!(v.is_finite()); }
+        for &v in &action {
+            assert!(v.is_finite());
+        }
     }
 
     #[test]
@@ -1043,25 +1065,41 @@ mod tests {
 
     #[test]
     fn test_high_surprise_streak_tracking() {
+        // Use threshold_sigma=2.0 with varied low values so the adaptive threshold
+        // (mean + 2*std) is clearly above all low values, avoiding FP boundary
+        // issues that arise when all values are identical and threshold_sigma=0.
         let config = SurpriseTrackerConfig {
-            initial_threshold: 0.3, threshold_sigma: 0.0, min_threshold: 0.1,
+            initial_threshold: 0.5,
+            threshold_sigma: 2.0,
+            min_threshold: 0.01,
             ..Default::default()
         };
         let mut tracker = SurpriseTracker::new(config);
-        for _ in 0..10 { tracker.record_surprise(0.2); }
+        // Low values 0.05..0.14: mean~0.095, std~0.030, threshold~0.156
+        for i in 0..10 {
+            tracker.record_surprise(0.05 + (i as f64) * 0.01);
+        }
+        assert_eq!(tracker.stats().high_surprise_streak, 0);
+        // 0.9 clearly exceeds threshold
         tracker.record_surprise(0.9);
         assert_eq!(tracker.stats().high_surprise_streak, 1);
         tracker.record_surprise(0.9);
         assert_eq!(tracker.stats().high_surprise_streak, 2);
-        tracker.record_surprise(0.1);
+        // Low value resets streak
+        tracker.record_surprise(0.01);
         assert_eq!(tracker.stats().high_surprise_streak, 0);
     }
 
     #[test]
     fn test_tracker_reset() {
-        let config = SurpriseTrackerConfig { exploration_cooldown: 0, ..Default::default() };
+        let config = SurpriseTrackerConfig {
+            exploration_cooldown: 0,
+            ..Default::default()
+        };
         let mut tracker = SurpriseTracker::new(config);
-        for _ in 0..20 { tracker.record_surprise(0.5); }
+        for _ in 0..20 {
+            tracker.record_surprise(0.5);
+        }
         tracker.generate_exploration_action(&vec![0.5; 4]);
         tracker.reset();
         assert_eq!(tracker.stats().count, 0);
@@ -1086,7 +1124,11 @@ mod tests {
 
     #[test]
     fn test_bridge_reset() {
-        let config = SurpriseTrackerConfig { exploration_cooldown: 0, threshold_sigma: 0.0, ..Default::default() };
+        let config = SurpriseTrackerConfig {
+            exploration_cooldown: 0,
+            threshold_sigma: 0.0,
+            ..Default::default()
+        };
         let mut bridge = SurpriseExplorationBridge::with_config(config);
         bridge.cycle(&vec![0.5; 4], &vec![1.5; 4], &vec![0.5; 4]);
         bridge.reset();
@@ -1096,7 +1138,10 @@ mod tests {
 
     #[test]
     fn test_kl_divergence_with_zero_distributions() {
-        let config = SurpriseTrackerConfig { use_kl_divergence: true, ..Default::default() };
+        let config = SurpriseTrackerConfig {
+            use_kl_divergence: true,
+            ..Default::default()
+        };
         let tracker = SurpriseTracker::new(config);
         let surprise = tracker.compute_surprise(&vec![0.0; 3], &vec![1.0; 3]);
         assert!(surprise.is_finite(), "KL with zero dist should be finite");
@@ -1105,7 +1150,10 @@ mod tests {
     #[test]
     fn test_adaptive_threshold_clamped_to_bounds() {
         let config = SurpriseTrackerConfig {
-            window_size: 5, threshold_sigma: 100.0, min_threshold: 0.1, max_threshold: 2.0,
+            window_size: 5,
+            threshold_sigma: 100.0,
+            min_threshold: 0.1,
+            max_threshold: 2.0,
             ..Default::default()
         };
         let mut tracker = SurpriseTracker::new(config);
@@ -1114,6 +1162,10 @@ mod tests {
         tracker.record_surprise(0.0);
         tracker.record_surprise(10.0);
         let threshold = tracker.threshold();
-        assert!(threshold <= 2.0 && threshold >= 0.1, "Threshold should be clamped: {}", threshold);
+        assert!(
+            threshold <= 2.0 && threshold >= 0.1,
+            "Threshold should be clamped: {}",
+            threshold
+        );
     }
 }
