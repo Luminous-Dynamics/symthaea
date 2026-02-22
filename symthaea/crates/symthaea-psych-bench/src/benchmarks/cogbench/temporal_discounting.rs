@@ -42,7 +42,7 @@ impl TemporalDiscountingBenchmark {
         let seed = config.trial_seed("cogbench", "discounting", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
 
-        for (_ci, choice) in choices.iter().enumerate() {
+        for choice in choices.iter() {
             let agent_config = ActiveInferenceAgentConfig {
                 state_dim: 4,
                 obs_dim: 4,

@@ -1531,7 +1531,9 @@ export interface DiscussionReadiness {
  */
 export interface RecordSnapshotInput {
   /** Consciousness level measurement (0.0-1.0) */
-  consciousnessLevel: number;
+  consciousnessLevel?: number;
+  /** @deprecated Use consciousnessLevel */
+  phi?: number;
   /** Meta-awareness score (0.0-1.0) */
   metaAwareness: number;
   /** Self-model accuracy (0.0-1.0) */
@@ -1581,6 +1583,10 @@ export interface GateVerificationResult {
   passed: boolean;
   consciousnessLevel: number;
   requiredConsciousness: number;
+  /** @deprecated Use consciousnessLevel */
+  phi: number;
+  /** @deprecated Use requiredConsciousness */
+  requiredPhi: number;
   actionType: GovernanceActionType;
   failureReason?: string;
   gateId: string;
@@ -1662,6 +1668,8 @@ export interface HolisticVotingWeight {
   reputation: number;
   reputationSquared: number;
   consciousnessLevel: number;
+  /** @deprecated Use consciousnessLevel */
+  phi: number;
   consciousnessMultiplier: number;
   harmonicAlignment: number;
   harmonicBonus: number;
@@ -1694,6 +1702,8 @@ export interface WeightedVoteResult {
   weightBreakdown: string;
   decision: VoteDecision;
   consciousnessAtVote: number;
+  /** @deprecated Use consciousnessAtVote */
+  phiAtVote: number;
   proposalType: BridgeProposalType;
   thresholdRequired: number;
 }
@@ -1707,6 +1717,8 @@ export interface AdaptiveThreshold {
   baseThreshold: number;
   /** Minimum consciousness level required for voters */
   minVoterConsciousness: number;
+  /** @deprecated Use minVoterConsciousness */
+  minVoterPhi: number;
   /** Minimum participation (number of voters) */
   minParticipation: number;
   /** Quorum percentage (minimum % of eligible voters) */

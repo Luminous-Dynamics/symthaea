@@ -65,7 +65,7 @@ impl CounterfactualUncertainty {
         Self::new(1.0, 1.0, 1.0)
     }
 
-    /// Total uncertainty (L2 norm, scaled to [0,1])
+    /// Total uncertainty (L2 norm, scaled to `[0,1]`)
     pub fn total(&self) -> f32 {
         let sum_sq = self.epistemic.powi(2) + self.aleatoric.powi(2) + self.structural.powi(2);
         (sum_sq.sqrt() / 3.0_f32.sqrt()).clamp(0.0, 1.0)

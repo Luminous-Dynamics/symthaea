@@ -129,7 +129,7 @@ impl BartBenchmark {
             let fep_pump_prob = action_result.action_probabilities
                 .first()
                 .copied()
-                .unwrap_or(0.5) as f64;
+                .unwrap_or(0.5);
 
             // FEP modulates target by +/- 20%
             let fep_adjustment = (fep_pump_prob - 0.5) * 0.4;

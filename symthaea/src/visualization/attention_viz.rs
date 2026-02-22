@@ -207,7 +207,7 @@ impl AttentionSnapshot {
             .attention_weights
             .iter()
             .map(|&w| {
-                let normalized = (w * scale * 8.0).min(8.0) as usize;
+                let normalized = (w * scale * 8.0).clamp(0.0, 8.0) as usize;
                 blocks[normalized]
             })
             .collect();

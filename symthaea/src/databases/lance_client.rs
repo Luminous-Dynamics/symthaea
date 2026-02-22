@@ -674,6 +674,8 @@ impl ConsciousnessDatabase for LanceMemory {
         // Memory type distribution
         let mut type_counts = Vec::new();
         for mt in &["episodic", "semantic", "procedural", "working"] {
+            // unwrap_or(0): Stats are non-critical observability data; a per-type
+            // count failure should not abort the entire stats() call.
             let count = table
                 .count_rows(Some(format!("memory_type = '{mt}'")))
                 .await
@@ -691,7 +693,10 @@ impl ConsciousnessDatabase for LanceMemory {
                 .await
                 .map_err(|e| DatabaseError::QueryFailed(format!("Stats scan failed: {e}")))?;
 
-            let batches: Vec<RecordBatch> = stream.try_collect().await.unwrap_or_default();
+            let batches: Vec<RecordBatch> = stream
+                .try_collect()
+                .await
+                .map_err(|e| DatabaseError::QueryFailed(format!("Stats batch collection failed: {e}")))?;
 
             let mut phi_sum = 0.0f64;
             let mut phi_count = 0usize;
@@ -737,6 +742,8 @@ impl ConsciousnessDatabase for LanceMemory {
             (0.0, 0, 0)
         };
 
+        // unwrap_or(0): Table version is metadata for the status string; a failure
+        // here should not abort the stats response.
         let version = table.version().await.unwrap_or(0);
         let database_size_bytes = dir_size(&self.path);
         let backend_status = format!("lance:v{version}");

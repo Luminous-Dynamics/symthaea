@@ -424,6 +424,14 @@ export class VotingClient extends ZomeClient {
     });
   }
 
+  // --- Phi backward-compat aliases ---
+
+  /** @deprecated Use castConsciousnessWeightedVote */
+  castPhiWeightedVote = this.castConsciousnessWeightedVote.bind(this);
+
+  /** @deprecated Use castDelegatedConsciousnessVote */
+  castDelegatedPhiVote = this.castDelegatedConsciousnessVote.bind(this);
+
   // ============================================================================
   // Quadratic Voting
   // ============================================================================

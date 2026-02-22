@@ -168,6 +168,18 @@ export interface Recipe {
 }
 
 // ============================================================================
+// Types — Seed Quality Rating (Phase 2)
+// ============================================================================
+
+export interface SeedQualityRating {
+  exchange_hash: Uint8Array;
+  grower: Uint8Array;
+  quality_score: number;
+  germination_success: boolean;
+  notes: string | null;
+}
+
+// ============================================================================
 // Types — Seed Exchange (Phase 2)
 // ============================================================================
 
@@ -719,6 +731,35 @@ export class FoodClient {
       zome_name: 'food_production',
       fn_name: 'remove_garden_member',
       payload: input,
+    });
+  }
+
+  // --- Seed Quality Ratings (Phase 2) ---
+
+  async rateSeedExchange(rating: SeedQualityRating): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_knowledge',
+      fn_name: 'rate_seed_exchange',
+      payload: rating,
+    });
+  }
+
+  async getExchangeRatings(exchangeHash: Uint8Array): Promise<unknown[]> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_knowledge',
+      fn_name: 'get_exchange_ratings',
+      payload: exchangeHash,
+    });
+  }
+
+  async getGrowerRatings(grower: Uint8Array): Promise<unknown[]> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_knowledge',
+      fn_name: 'get_grower_ratings',
+      payload: grower,
     });
   }
 

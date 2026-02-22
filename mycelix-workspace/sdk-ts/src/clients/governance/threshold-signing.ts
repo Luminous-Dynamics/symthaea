@@ -108,6 +108,7 @@ export interface FinalizeDkgInput {
 }
 
 export interface SubmitSignatureShareInput {
+  committeeId: string;
   signatureId: string;
   participantId: number;
   share: Uint8Array;
@@ -254,6 +255,7 @@ export class ThresholdSigningClient extends ZomeClient {
 
   async submitSignatureShare(input: SubmitSignatureShareInput): Promise<HolochainRecord> {
     return this.callZomeOnce<HolochainRecord>('submit_signature_share', {
+      committee_id: input.committeeId,
       signature_id: input.signatureId,
       participant_id: input.participantId,
       share: Array.from(input.share),
@@ -292,10 +294,7 @@ export class ThresholdSigningClient extends ZomeClient {
   // ============================================================================
 
   async rotateCommitteeKeys(input: RotateKeysInput): Promise<SigningCommittee> {
-    const record = await this.callZomeOnce<HolochainRecord>('rotate_committee_keys', {
-      committee_id: input.committeeId,
-      reason: input.reason,
-    });
+    const record = await this.callZomeOnce<HolochainRecord>('rotate_committee_keys', input.committeeId);
     return this.mapCommittee(record);
   }
 

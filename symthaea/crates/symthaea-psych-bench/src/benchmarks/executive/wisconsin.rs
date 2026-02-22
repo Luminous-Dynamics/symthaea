@@ -83,7 +83,7 @@ impl WisconsinCardSortingBenchmark {
             ContinuousHV::bundle(&[&c, &s, &n])
         };
 
-        let _target_hvs: Vec<ContinuousHV> = targets.iter().map(|t| encode_card(t)).collect();
+        let _target_hvs: Vec<ContinuousHV> = targets.iter().map(&encode_card).collect();
 
         // State tracking
         let mut current_rule = Rule::Color;

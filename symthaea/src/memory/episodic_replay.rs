@@ -349,7 +349,7 @@ impl EpisodicReplayConfig {
 #[derive(Debug, Clone)]
 pub struct EpisodicMemory {
     /// Configuration
-    config: EpisodicReplayConfig,
+    pub(crate) config: EpisodicReplayConfig,
 
     /// Episode storage (priority queue by Phi)
     episodes: BinaryHeap<PrioritizedEpisode>,

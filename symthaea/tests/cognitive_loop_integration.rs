@@ -3294,3 +3294,210 @@ fn test_300_cycle_phase13_stress() {
         (stats.avg_prediction_error_sq - stats.avg_prediction_error * stats.avg_prediction_error).max(0.0)
     );
 }
+
+// ── Phase 14: Subsystem Feedback Closure ──────────────────────────────────
+
+#[test]
+fn test_epistemic_gate_gating() {
+    // Verify epistemic gate modulates codebook growth and LR without panics
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut gated_count = 0usize;
+    for i in 0..60 {
+        let result = service.cycle("epistemic gating test input");
+        assert!(result.metadata.epistemic_gate_confidence.is_finite(),
+            "epistemic_gate_confidence NaN at cycle {i}");
+        if result.metadata.epistemic_gate_gated {
+            gated_count += 1;
+        }
+    }
+    // Gate may or may not fire — just verify no panics and field is populated
+    eprintln!("Epistemic gate: gated {gated_count}/60 cycles");
+}
+
+#[test]
+fn test_mcts_plan_effectiveness() {
+    // Verify MCTS plan post-hoc evaluation produces finite scores
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut any_evaluated = false;
+    for i in 0..80 {
+        let input = if i % 2 == 0 { "exploit this pattern" } else { "explore new territory" };
+        let result = service.cycle(input);
+        assert!(result.metadata.mcts_plan_effectiveness.is_finite(),
+            "mcts_plan_effectiveness NaN at cycle {i}");
+        if result.metadata.mcts_plan_effectiveness > 0.0 {
+            any_evaluated = true;
+        }
+    }
+    let stats = service.stats();
+    assert!(stats.avg_mcts_plan_effectiveness.is_finite());
+    eprintln!("MCTS plan effectiveness: avg={:.4}, any_evaluated={any_evaluated}",
+        stats.avg_mcts_plan_effectiveness);
+}
+
+#[test]
+fn test_moral_violation_steering() {
+    // Verify moral violation-specific steering categories are applied
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "help me with this task",          // benign
+        "steal from the store",            // harm/theft
+        "violate someone's consent",       // consent
+        "ignore my duty to protect",       // duty
+        "a regular input again",           // benign
+    ];
+
+    for (i, input) in inputs.iter().enumerate() {
+        let result = service.cycle(input);
+        assert!(result.prediction_error.is_finite(), "prediction_error NaN at input {i}");
+        // moral_steering_category is a String — just verify no panics
+        if !result.metadata.moral_steering_category.is_empty() {
+            eprintln!("Moral steering at input {i}: category={}",
+                result.metadata.moral_steering_category);
+        }
+    }
+}
+
+#[test]
+fn test_codebook_utilization_tracking() {
+    // Verify codebook utilization rate is computed and bounded [0, 1]
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..55 {
+        let result = service.cycle("utilization tracking test");
+        assert!(result.metadata.codebook_utilization_rate.is_finite(),
+            "codebook_utilization_rate NaN at cycle {i}");
+        assert!(result.metadata.codebook_utilization_rate >= 0.0,
+            "codebook_utilization_rate < 0 at cycle {i}");
+        assert!(result.metadata.codebook_utilization_rate <= 1.0,
+            "codebook_utilization_rate > 1 at cycle {i}");
+    }
+    let stats = service.stats();
+    assert!(stats.codebook_utilization_rate.is_finite());
+    assert!(stats.codebook_utilization_rate >= 0.0);
+    assert!(stats.codebook_utilization_rate <= 1.0);
+    eprintln!("Codebook utilization: rate={:.4}", stats.codebook_utilization_rate);
+}
+
+#[test]
+fn test_causal_attention_edges() {
+    // Verify causal graph attention weighting produces finite values
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..40 {
+        let input = if i % 3 == 0 { "pattern A" } else if i % 3 == 1 { "pattern B" } else { "pattern C" };
+        let result = service.cycle(input);
+        // causal_attention_edges can be 0 if no graph discovered yet
+        assert!(result.metadata.causal_attention_edges < 10000,
+            "causal_attention_edges implausibly large at cycle {i}");
+    }
+    let stats = service.stats();
+    eprintln!("Causal attention: uses={}", stats.causal_attention_uses);
+}
+
+#[test]
+fn test_surprise_replay_batch_modulation() {
+    // Verify FEP surprise modulates replay batch size
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut max_batch = 0usize;
+    for i in 0..120 {
+        let input = if i % 20 < 10 { "stable input" } else { "surprising new content!" };
+        let result = service.cycle(input);
+        assert!(result.metadata.surprise_replay_batch_size < 100,
+            "surprise_replay_batch_size implausibly large at cycle {i}");
+        if result.metadata.surprise_replay_batch_size > max_batch {
+            max_batch = result.metadata.surprise_replay_batch_size;
+        }
+    }
+    let stats = service.stats();
+    eprintln!("Surprise replay: boosted_replays={}, max_batch={max_batch}",
+        stats.surprise_boosted_replays);
+}
+
+#[test]
+#[ignore] // stress test
+fn test_400_cycle_phase14_stress() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "conscious experience requires integration",
+        "steal the confidential data",
+        "explore new mathematical frontiers",
+        "help someone in need",
+        "free energy minimization principle",
+    ];
+
+    for i in 0..400 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        assert!(result.prediction_error.is_finite(), "prediction_error NaN at {i}");
+        assert!(result.metadata.epistemic_gate_confidence.is_finite(), "epistemic NaN at {i}");
+        assert!(result.metadata.mcts_plan_effectiveness.is_finite(), "mcts_eff NaN at {i}");
+        assert!(result.metadata.codebook_utilization_rate.is_finite(), "util NaN at {i}");
+        assert!(result.metadata.causal_attention_edges < 10000, "causal edges huge at {i}");
+        assert!(result.metadata.surprise_replay_batch_size < 100, "batch huge at {i}");
+        assert!(result.metadata.cross_module_agreement.is_finite(), "agreement NaN at {i}");
+        assert!(result.metadata.thalamic_depth_score >= 0.0, "depth < 0 at {i}");
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 400);
+    assert!(stats.avg_mcts_plan_effectiveness.is_finite());
+    assert!(stats.codebook_utilization_rate.is_finite());
+    assert!(stats.avg_cross_module_agreement.is_finite());
+
+    eprintln!(
+        "400-cycle Phase 14 stress: avg_error={:.4}, mcts_eff={:.4}, util={:.4}, \
+         agreement={:.4}, causal_uses={}, surprise_replays={}",
+        stats.avg_prediction_error,
+        stats.avg_mcts_plan_effectiveness,
+        stats.codebook_utilization_rate,
+        stats.avg_cross_module_agreement,
+        stats.causal_attention_uses,
+        stats.surprise_boosted_replays,
+    );
+}

@@ -577,8 +577,9 @@ export class BridgeClient extends ZomeClient {
    * @returns The snapshot record
    */
   async recordConsciousnessSnapshot(input: RecordSnapshotInput): Promise<HolochainRecord> {
+    const level = input.phi ?? input.consciousnessLevel;
     return this.callZomeOnce<HolochainRecord>('record_consciousness_snapshot', {
-      consciousness_level: input.consciousnessLevel,
+      phi: level,
       meta_awareness: input.metaAwareness,
       self_model_accuracy: input.selfModelAccuracy,
       coherence: input.coherence,
@@ -599,10 +600,14 @@ export class BridgeClient extends ZomeClient {
       action_type: input.actionType,
       action_id: input.actionId ?? null,
     });
+    const level = result.consciousness_level ?? result.phi;
+    const required = result.required_consciousness ?? result.required_phi;
     return {
       passed: result.passed,
-      consciousnessLevel: result.consciousness_level,
-      requiredConsciousness: result.required_consciousness,
+      consciousnessLevel: level,
+      requiredConsciousness: required,
+      phi: level,
+      requiredPhi: required,
       actionType: result.action_type,
       failureReason: result.failure_reason ?? undefined,
       gateId: result.gate_id,
@@ -622,6 +627,16 @@ export class BridgeClient extends ZomeClient {
   async recordConsciousnessAttestation(input: RecordConsciousnessAttestationInput): Promise<HolochainRecord> {
     return this.callZomeOnce<HolochainRecord>('record_consciousness_attestation', {
       consciousness_level: input.consciousnessLevel,
+      cycle_id: input.cycleId,
+      captured_at_us: input.capturedAtUs,
+      signature: input.signature,
+    });
+  }
+
+  /** @deprecated Use recordConsciousnessAttestation */
+  async recordPhiAttestation(input: { phi: number; cycleId: number; capturedAtUs: number; signature: Uint8Array | number[] }): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('record_phi_attestation', {
+      phi: input.phi,
       cycle_id: input.cycleId,
       captured_at_us: input.capturedAtUs,
       signature: input.signature,
@@ -714,6 +729,9 @@ export class BridgeClient extends ZomeClient {
     };
   }
 
+  /** @deprecated Use getConsciousnessThresholds */
+  getPhiThresholds = this.getConsciousnessThresholds.bind(this);
+
   // ============================================================================
   // Weighted Consensus Voting
   // ============================================================================
@@ -739,10 +757,12 @@ export class BridgeClient extends ZomeClient {
     const result = await this.callZome<any>('calculate_holistic_vote_weight', {
       harmonic_alignment: input.harmonicAlignment ?? null,
     });
+    const level = result.consciousness_level ?? result.phi;
     return {
       reputation: result.reputation,
       reputationSquared: result.reputation_squared,
-      consciousnessLevel: result.consciousness_level,
+      consciousnessLevel: level,
+      phi: level,
       consciousnessMultiplier: result.consciousness_multiplier,
       harmonicAlignment: result.harmonic_alignment,
       harmonicBonus: result.harmonic_bonus,
@@ -774,6 +794,7 @@ export class BridgeClient extends ZomeClient {
       weightBreakdown: result.weight_breakdown,
       decision: result.decision,
       consciousnessAtVote: result.phi_at_vote,
+      phiAtVote: result.phi_at_vote,
       proposalType: result.proposal_type,
       thresholdRequired: result.threshold_required,
     };
@@ -787,9 +808,11 @@ export class BridgeClient extends ZomeClient {
    */
   async getAdaptiveThreshold(proposalType: BridgeProposalType): Promise<AdaptiveThreshold> {
     const result = await this.callZome<any>('get_adaptive_threshold', proposalType);
+    const minPhi = result.min_voter_consciousness ?? result.min_voter_phi;
     return {
       baseThreshold: result.base_threshold,
-      minVoterConsciousness: result.min_voter_consciousness,
+      minVoterConsciousness: minPhi,
+      minVoterPhi: minPhi,
       minParticipation: result.min_participation,
       quorum: result.quorum,
       maxExtensionSecs: result.max_extension_secs,
@@ -918,6 +941,9 @@ export class BridgeClient extends ZomeClient {
   async requestConsciousnessCredential(): Promise<unknown> {
     return this.callZome('request_phi_credential', null);
   }
+
+  /** @deprecated Use requestConsciousnessCredential */
+  requestPhiCredential = this.requestConsciousnessCredential.bind(this);
 
   /**
    * Request K-vector trust data from the personal cluster

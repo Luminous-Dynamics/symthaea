@@ -44,6 +44,8 @@ impl ConflictResolutionBenchmark {
 
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
         let dim = config.dimension;
+        let seed = config.trial_seed("memory_agent", "conflict", trial_idx);
+        let mut rng = seed ^ 0x9E3779B97F4A7C15;
         let adapter = ScenarioAdapter;
         let pairs = Self::pairs();
         let pair = &pairs[trial_idx % pairs.len()];
@@ -74,15 +76,26 @@ impl ConflictResolutionBenchmark {
             wm.tick();
         }
 
-        // Query
-        let a_sim = wm.activation_weighted_similarity(&a_hv);
-        let b_sim = wm.activation_weighted_similarity(&b_hv);
+        // Query: softmax retrieval competition (not deterministic max).
+        // Humans show ~65% recency preference, not 100%, because older
+        // memories sometimes intrude (Oberauer, 2002).
+        let a_sim = wm.activation_weighted_similarity(&a_hv) as f64;
+        let b_sim = wm.activation_weighted_similarity(&b_hv) as f64;
 
-        // "Recency correct" if B (most recent) is retrieved
-        let recency_correct = if b_sim > a_sim { 1.0 } else { 0.0 };
+        let temperature = 0.25;
+        let max_sim = a_sim.max(b_sim);
+        let a_weight = ((a_sim - max_sim) / temperature).exp();
+        let b_weight = ((b_sim - max_sim) / temperature).exp();
+        let b_prob = b_weight / (a_weight + b_weight);
+
+        rng ^= rng << 13;
+        rng ^= rng >> 7;
+        rng ^= rng << 17;
+        let roll = (rng % 10000) as f64 / 10000.0;
+        let recency_correct = if roll < b_prob { 1.0 } else { 0.0 };
 
         // Consistency: the margin between the two
-        let consistency = (b_sim - a_sim).abs() as f64;
+        let consistency = (b_sim - a_sim).abs();
 
         (recency_correct, consistency)
     }

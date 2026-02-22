@@ -131,7 +131,7 @@ impl FalseBeliefBenchmark {
                     let loc_start = pos + prep.len();
                     // Take the rest of the sentence or up to a comma/period
                     let rest = &text[loc_start..];
-                    let end = rest.find(|c: char| c == ',' || c == '.').unwrap_or(rest.len());
+                    let end = rest.find([',', '.']).unwrap_or(rest.len());
                     let location = rest[..end].trim().to_string();
                     if !location.is_empty() {
                         return Some(location);

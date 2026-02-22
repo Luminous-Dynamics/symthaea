@@ -225,7 +225,7 @@ fn generate_problems(seed: u64, min_moves: usize, count: usize) -> Vec<ToLProble
 
         // Check if optimal solution matches desired difficulty
         if let Some(opt) = bfs_optimal(&initial, &goal) {
-            if min_moves <= 3 && opt >= 2 && opt <= 3 {
+            if min_moves <= 3 && (2..=3).contains(&opt) {
                 problems.push(ToLProblem {
                     initial,
                     goal,
