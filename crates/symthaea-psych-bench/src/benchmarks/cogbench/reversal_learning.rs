@@ -37,14 +37,8 @@ impl ReversalLearningBenchmark {
 
         // Agent's learned association: weighted blend of stimulus with reward/no-reward
         // Starts at neutral (equal blend)
-        let mut assoc_a = ContinuousHV::weighted_bundle(
-            &[&reward_hv, &no_reward_hv],
-            &[0.5, 0.5],
-        );
-        let mut assoc_b = ContinuousHV::weighted_bundle(
-            &[&reward_hv, &no_reward_hv],
-            &[0.5, 0.5],
-        );
+        let mut assoc_a = ContinuousHV::weighted_bundle(&[&reward_hv, &no_reward_hv], &[0.5, 0.5]);
+        let mut assoc_b = ContinuousHV::weighted_bundle(&[&reward_hv, &no_reward_hv], &[0.5, 0.5]);
 
         let criterion = 8; // consecutive correct to trigger reversal
         let max_trials = 200;
@@ -142,29 +136,24 @@ impl ReversalLearningBenchmark {
 
             // Asymmetric learning: losses update much faster than wins
             // (Behrens et al. 2007 — loss-driven flexibility)
-            let lr = if rewarded { learning_rate } else { loss_learning_rate };
+            let lr = if rewarded {
+                learning_rate
+            } else {
+                loss_learning_rate
+            };
             if chose_a {
                 if rewarded {
-                    assoc_a = ContinuousHV::weighted_bundle(
-                        &[&assoc_a, &reward_hv],
-                        &[1.0 - lr, lr],
-                    );
+                    assoc_a =
+                        ContinuousHV::weighted_bundle(&[&assoc_a, &reward_hv], &[1.0 - lr, lr]);
                 } else {
-                    assoc_a = ContinuousHV::weighted_bundle(
-                        &[&assoc_a, &no_reward_hv],
-                        &[1.0 - lr, lr],
-                    );
+                    assoc_a =
+                        ContinuousHV::weighted_bundle(&[&assoc_a, &no_reward_hv], &[1.0 - lr, lr]);
                 }
             } else if rewarded {
-                assoc_b = ContinuousHV::weighted_bundle(
-                    &[&assoc_b, &reward_hv],
-                    &[1.0 - lr, lr],
-                );
+                assoc_b = ContinuousHV::weighted_bundle(&[&assoc_b, &reward_hv], &[1.0 - lr, lr]);
             } else {
-                assoc_b = ContinuousHV::weighted_bundle(
-                    &[&assoc_b, &no_reward_hv],
-                    &[1.0 - lr, lr],
-                );
+                assoc_b =
+                    ContinuousHV::weighted_bundle(&[&assoc_b, &no_reward_hv], &[1.0 - lr, lr]);
             }
 
             // Counterfactual learning: in a binary choice task, punishment
@@ -213,8 +202,7 @@ impl ReversalLearningBenchmark {
             0.0
         };
         let avg_reversal_trials = if !reversal_trial_counts.is_empty() {
-            reversal_trial_counts.iter().sum::<u32>() as f64
-                / reversal_trial_counts.len() as f64
+            reversal_trial_counts.iter().sum::<u32>() as f64 / reversal_trial_counts.len() as f64
         } else {
             max_trials as f64 // never reversed
         };
@@ -275,10 +263,16 @@ impl PsychBenchmark for ReversalLearningBenchmark {
             costs.push(r.reversal_cost);
         }
 
-        result.insert("initial_acquisition_trials", MetricValue::from_samples(&initials));
+        result.insert(
+            "initial_acquisition_trials",
+            MetricValue::from_samples(&initials),
+        );
         result.insert("avg_reversal_trials", MetricValue::from_samples(&reversals));
         result.insert("reversals_completed", MetricValue::from_samples(&completed));
-        result.insert("perseverative_errors", MetricValue::from_samples(&perseverative));
+        result.insert(
+            "perseverative_errors",
+            MetricValue::from_samples(&perseverative),
+        );
         result.insert("total_errors", MetricValue::from_samples(&total_errs));
         result.insert("win_stay_rate", MetricValue::from_samples(&win_stays));
         result.insert("lose_shift_rate", MetricValue::from_samples(&lose_shifts));
@@ -333,7 +327,11 @@ mod tests {
         let result = ReversalLearningBenchmark.run(&config);
         let reversals = result.metrics["reversals_completed"].mean;
         // With 200 trials and criterion 8, should complete at least 1 reversal
-        assert!(reversals >= 1.0, "should complete at least 1 reversal, got {}", reversals);
+        assert!(
+            reversals >= 1.0,
+            "should complete at least 1 reversal, got {}",
+            reversals
+        );
     }
 
     #[test]

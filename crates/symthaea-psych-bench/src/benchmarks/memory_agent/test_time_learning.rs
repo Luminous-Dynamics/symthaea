@@ -9,6 +9,7 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
 use crate::wm::{WmConfig, WorkingMemory};
+use symthaea_core::hdc::ContinuousHV;
 
 /// Test-time learning benchmark.
 pub struct TestTimeLearningBenchmark;
@@ -68,8 +69,21 @@ impl TestTimeLearningBenchmark {
         wm.perceive(corr_hv);
         wm.tick();
 
-        // Delay
-        for _ in 0..2 {
+        // Post-correction delay with distractor interference.
+        // Humans often encounter related but irrelevant information between
+        // learning and test, creating retroactive interference that degrades
+        // the correction trace (Anderson, 2003 — retrieval-induced forgetting).
+        let seed = config.trial_seed("memory", "ttl_distractor", trial_idx);
+        let distractor = adapter.encode(
+            &Scenario::new("there was a scheduling change announced today"),
+            dim,
+        );
+        wm.perceive(distractor);
+        wm.tick();
+        // Inject unrelated noise to fill WM
+        let noise_hv = ContinuousHV::random(dim, seed ^ 0x9E3779B97F4A7C15);
+        wm.perceive(noise_hv);
+        for _ in 0..3 {
             wm.tick();
         }
 
@@ -81,7 +95,11 @@ impl TestTimeLearningBenchmark {
         let corr_sim = wm.activation_weighted_similarity(&correction_hv);
 
         // Correct if correction is more accessible than original
-        if corr_sim > orig_sim { 1.0 } else { 0.0 }
+        if corr_sim > orig_sim {
+            1.0
+        } else {
+            0.0
+        }
     }
 }
 
@@ -99,7 +117,10 @@ impl PsychBenchmark for TestTimeLearningBenchmark {
             accuracies.push(self.run_trial(config, trial));
         }
 
-        result.insert("correction_accuracy", MetricValue::from_samples(&accuracies));
+        result.insert(
+            "correction_accuracy",
+            MetricValue::from_samples(&accuracies),
+        );
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

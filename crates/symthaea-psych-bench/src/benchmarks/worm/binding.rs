@@ -17,12 +17,7 @@ pub struct BindingBenchmark;
 impl BindingBenchmark {
     /// Run a single trial.
     /// Returns (binding_correct, feature_only_correct).
-    fn run_trial(
-        &self,
-        set_size: usize,
-        config: &BenchmarkConfig,
-        trial_idx: usize,
-    ) -> (f64, f64) {
+    fn run_trial(&self, set_size: usize, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
         let dim = config.dimension;
         let seed = config.trial_seed("worm", &format!("binding_{}", set_size), trial_idx);
         let adapter = VisualObjectAdapter::default();

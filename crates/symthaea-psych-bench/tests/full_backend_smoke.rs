@@ -22,8 +22,8 @@ use symthaea_psych_bench::benchmarks::worm::{
     BindingBenchmark, ChangeDetectionBenchmark, NBackBenchmark, SerialRecallBenchmark,
     SpatialUpdatingBenchmark,
 };
-use symthaea_psych_bench::harness::{BenchmarkConfig, PsychBenchmark};
 use symthaea_psych_bench::harness::report::BenchmarkResult;
+use symthaea_psych_bench::harness::{BenchmarkConfig, PsychBenchmark};
 
 fn smoke_config() -> BenchmarkConfig {
     BenchmarkConfig {
@@ -38,12 +38,16 @@ fn assert_metrics_finite(result: &BenchmarkResult) {
         assert!(
             val.mean.is_finite(),
             "{}: metric '{}' mean is not finite: {}",
-            result.benchmark, key, val.mean
+            result.benchmark,
+            key,
+            val.mean
         );
         assert!(
             val.std_dev.is_finite(),
             "{}: metric '{}' std_dev is not finite: {}",
-            result.benchmark, key, val.std_dev
+            result.benchmark,
+            key,
+            val.std_dev
         );
     }
 }
@@ -54,7 +58,11 @@ macro_rules! full_smoke_test {
         fn $name() {
             let config = smoke_config();
             let result = $bench.run(&config);
-            assert!(!result.metrics.is_empty(), "{} produced no metrics", result.benchmark);
+            assert!(
+                !result.metrics.is_empty(),
+                "{} produced no metrics",
+                result.benchmark
+            );
             assert_metrics_finite(&result);
         }
     };
@@ -68,7 +76,10 @@ full_smoke_test!(full_spatial_updating, SpatialUpdatingBenchmark);
 full_smoke_test!(full_binding, BindingBenchmark);
 
 // CogBench
-full_smoke_test!(full_probabilistic_reasoning, ProbabilisticReasoningBenchmark);
+full_smoke_test!(
+    full_probabilistic_reasoning,
+    ProbabilisticReasoningBenchmark
+);
 full_smoke_test!(full_horizon, HorizonBenchmark);
 full_smoke_test!(full_restless_bandit, RestlessBanditBenchmark);
 full_smoke_test!(full_instrumental, InstrumentalLearningBenchmark);

@@ -56,23 +56,16 @@ impl SemanticScenarioAdapter {
             // Solution HV: base + all 3 links at very low weight.
             // The signal is subtle — similar to real semantic associations.
             let base_sol = ContinuousHV::random(dim, advance());
-            let sol_refs: Vec<&ContinuousHV> = std::iter::once(&base_sol)
-                .chain(links.iter())
-                .collect();
-            let sol_hv = ContinuousHV::weighted_bundle(
-                &sol_refs,
-                &[0.79, 0.07, 0.07, 0.07],
-            );
+            let sol_refs: Vec<&ContinuousHV> =
+                std::iter::once(&base_sol).chain(links.iter()).collect();
+            let sol_hv = ContinuousHV::weighted_bundle(&sol_refs, &[0.79, 0.07, 0.07, 0.07]);
             word_hvs.insert(triad.solution.clone(), sol_hv);
 
             // Cue HVs: each shares one link with solution (moderate association)
             for (i, cue) in triad.cues.iter().enumerate() {
                 let base_cue = ContinuousHV::random(dim, advance());
                 let cue_refs: Vec<&ContinuousHV> = vec![&base_cue, &links[i]];
-                let cue_hv = ContinuousHV::weighted_bundle(
-                    &cue_refs,
-                    &[0.88, 0.12],
-                );
+                let cue_hv = ContinuousHV::weighted_bundle(&cue_refs, &[0.88, 0.12]);
                 word_hvs.insert(cue.clone(), cue_hv);
             }
 
@@ -86,10 +79,7 @@ impl SemanticScenarioAdapter {
                         // Near-miss: shares one link with cue[j%3]
                         let base_d = ContinuousHV::random(dim, advance());
                         let d_refs: Vec<&ContinuousHV> = vec![&base_d, &links[j % 3]];
-                        let d_hv = ContinuousHV::weighted_bundle(
-                            &d_refs,
-                            &[0.90, 0.10],
-                        );
+                        let d_hv = ContinuousHV::weighted_bundle(&d_refs, &[0.90, 0.10]);
                         word_hvs.insert(d.clone(), d_hv);
                     } else {
                         word_hvs.insert(d.clone(), ContinuousHV::random(dim, advance()));
@@ -114,10 +104,12 @@ impl StimulusAdapter for SemanticScenarioAdapter {
             hv.clone()
         } else {
             // Fallback: hash-based encoding for unknown words
-            let hash = stimulus.0.bytes().fold(
-                self.base_seed ^ 0x517CC1B727220A95,
-                |acc, b| acc.wrapping_mul(0x100000001B3).wrapping_add(b as u64),
-            );
+            let hash = stimulus
+                .0
+                .bytes()
+                .fold(self.base_seed ^ 0x517CC1B727220A95, |acc, b| {
+                    acc.wrapping_mul(0x100000001B3).wrapping_add(b as u64)
+                });
             ContinuousHV::random(dim.max(self.dim), hash)
         }
     }
@@ -135,11 +127,7 @@ mod tests {
                 "cake".to_string(),
             ],
             solution: "cheese".to_string(),
-            distractors: vec![
-                "bread".to_string(),
-                "milk".to_string(),
-                "house".to_string(),
-            ],
+            distractors: vec!["bread".to_string(), "milk".to_string(), "house".to_string()],
         }]
     }
 

@@ -98,11 +98,7 @@ impl PsychBenchmark for AccurateRetrievalBenchmark {
         }
 
         // Compute overall retrieval accuracy (mean of all condition accuracies)
-        let all_accuracies: Vec<f64> = result
-            .metrics
-            .values()
-            .map(|m| m.mean)
-            .collect();
+        let all_accuracies: Vec<f64> = result.metrics.values().map(|m| m.mean).collect();
         if !all_accuracies.is_empty() {
             let overall = all_accuracies.iter().sum::<f64>() / all_accuracies.len() as f64;
             result.insert(

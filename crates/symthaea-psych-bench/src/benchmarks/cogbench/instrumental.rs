@@ -14,11 +14,7 @@ use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation
 pub struct InstrumentalLearningBenchmark;
 
 impl InstrumentalLearningBenchmark {
-    fn run_trial(
-        &self,
-        config: &BenchmarkConfig,
-        trial_idx: usize,
-    ) -> (f64, f64, f64, f64) {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64, f64) {
         let seed = config.trial_seed("cogbench", "instrumental", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
 
@@ -49,15 +45,17 @@ impl InstrumentalLearningBenchmark {
             let fep_probs = &action_result.action_probabilities;
             let rv_temp = 0.15;
             let rv_max = action_reward[0].max(action_reward[1]);
-            let rv_exp: Vec<f64> = action_reward.iter()
-                .map(|v| ((v - rv_max) / rv_temp).exp()).collect();
+            let rv_exp: Vec<f64> = action_reward
+                .iter()
+                .map(|v| ((v - rv_max) / rv_temp).exp())
+                .collect();
             let rv_sum: f64 = rv_exp.iter().sum();
             let rv_probs: Vec<f64> = rv_exp.iter().map(|e| e / rv_sum).collect();
             let progress = (trial as f64 / 10.0).min(1.0);
             let rv_weight = 0.2 + 0.6 * progress;
-            let blended: Vec<f64> = (0..2).map(|a|
-                (1.0 - rv_weight) * fep_probs[a] + rv_weight * rv_probs[a]
-            ).collect();
+            let blended: Vec<f64> = (0..2)
+                .map(|a| (1.0 - rv_weight) * fep_probs[a] + rv_weight * rv_probs[a])
+                .collect();
             let bsum: f64 = blended.iter().sum();
             let final_probs: Vec<f64> = blended.iter().map(|p| p / bsum).collect();
 
@@ -73,8 +71,16 @@ impl InstrumentalLearningBenchmark {
             rng_state ^= rng_state << 17;
 
             let reward = if chosen == 0 {
-                if rng_state % 100 < 80 { 0.9 } else { 0.1 }
-            } else if rng_state % 100 < 20 { 0.9 } else { 0.1 };
+                if rng_state % 100 < 80 {
+                    0.9
+                } else {
+                    0.1
+                }
+            } else if rng_state % 100 < 20 {
+                0.9
+            } else {
+                0.1
+            };
 
             // Update action-value EMA
             action_reward[chosen] = (1.0 - reward_lr) * action_reward[chosen] + reward_lr * reward;
@@ -92,15 +98,17 @@ impl InstrumentalLearningBenchmark {
             let fep_probs = &action_result.action_probabilities;
             let rv_temp = 0.15;
             let rv_max = action_reward[0].max(action_reward[1]);
-            let rv_exp: Vec<f64> = action_reward.iter()
-                .map(|v| ((v - rv_max) / rv_temp).exp()).collect();
+            let rv_exp: Vec<f64> = action_reward
+                .iter()
+                .map(|v| ((v - rv_max) / rv_temp).exp())
+                .collect();
             let rv_sum: f64 = rv_exp.iter().sum();
             let rv_probs: Vec<f64> = rv_exp.iter().map(|e| e / rv_sum).collect();
             let progress = ((trial + 20) as f64 / 20.0).min(1.0);
             let rv_weight = 0.2 + 0.6 * progress;
-            let blended: Vec<f64> = (0..2).map(|a|
-                (1.0 - rv_weight) * fep_probs[a] + rv_weight * rv_probs[a]
-            ).collect();
+            let blended: Vec<f64> = (0..2)
+                .map(|a| (1.0 - rv_weight) * fep_probs[a] + rv_weight * rv_probs[a])
+                .collect();
             let bsum: f64 = blended.iter().sum();
             let final_probs: Vec<f64> = blended.iter().map(|p| p / bsum).collect();
 
@@ -111,8 +119,16 @@ impl InstrumentalLearningBenchmark {
             rng_state ^= rng_state << 17;
 
             let reward = if chosen == 0 {
-                if rng_state % 100 < 80 { 0.5 } else { 0.1 }
-            } else if rng_state % 100 < 20 { 0.5 } else { 0.1 };
+                if rng_state % 100 < 80 {
+                    0.5
+                } else {
+                    0.1
+                }
+            } else if rng_state % 100 < 20 {
+                0.5
+            } else {
+                0.1
+            };
 
             action_reward[chosen] = (1.0 - reward_lr) * action_reward[chosen] + reward_lr * reward;
 
@@ -143,7 +159,12 @@ impl InstrumentalLearningBenchmark {
         let optimism_bias = win_lr - loss_lr;
         let contingency_sensitivity = late_correct as f64 / 10.0;
 
-        (overall_lr, optimism_bias, agent.stats.exploration_rate, contingency_sensitivity)
+        (
+            overall_lr,
+            optimism_bias,
+            agent.stats.exploration_rate,
+            contingency_sensitivity,
+        )
     }
 }
 
@@ -171,8 +192,14 @@ impl PsychBenchmark for InstrumentalLearningBenchmark {
 
         result.insert("learning_rate", MetricValue::from_samples(&lrs));
         result.insert("optimism_bias", MetricValue::from_samples(&biases));
-        result.insert("exploration_rate", MetricValue::from_samples(&exploration_rates));
-        result.insert("contingency_sensitivity", MetricValue::from_samples(&sensitivities));
+        result.insert(
+            "exploration_rate",
+            MetricValue::from_samples(&exploration_rates),
+        );
+        result.insert(
+            "contingency_sensitivity",
+            MetricValue::from_samples(&sensitivities),
+        );
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;
@@ -195,11 +222,7 @@ pub struct InstrumentalLearningMindBenchmark;
 
 #[cfg(feature = "symthaea-backend")]
 impl InstrumentalLearningMindBenchmark {
-    fn run_trial(
-        &self,
-        config: &BenchmarkConfig,
-        trial_idx: usize,
-    ) -> (f64, f64, f64) {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64) {
         use super::mind_agent::CogBenchMindAgent;
 
         let seed = config.trial_seed("cogbench", "instrumental_mind", trial_idx);
@@ -224,9 +247,17 @@ impl InstrumentalLearningMindBenchmark {
             rng_state ^= rng_state << 17;
 
             let reward = if chosen == 0 {
-                if rng_state % 100 < 80 { 0.9 } else { 0.1 }
+                if rng_state % 100 < 80 {
+                    0.9
+                } else {
+                    0.1
+                }
             } else {
-                if rng_state % 100 < 20 { 0.9 } else { 0.1 }
+                if rng_state % 100 < 20 {
+                    0.9
+                } else {
+                    0.1
+                }
             };
 
             agent.perceive_reward(chosen, reward);
@@ -244,9 +275,17 @@ impl InstrumentalLearningMindBenchmark {
             rng_state ^= rng_state << 17;
 
             let reward = if chosen == 0 {
-                if rng_state % 100 < 80 { 0.5 } else { 0.1 }
+                if rng_state % 100 < 80 {
+                    0.5
+                } else {
+                    0.1
+                }
             } else {
-                if rng_state % 100 < 20 { 0.5 } else { 0.1 }
+                if rng_state % 100 < 20 {
+                    0.5
+                } else {
+                    0.1
+                }
             };
 
             agent.perceive_reward(chosen, reward);
@@ -257,7 +296,10 @@ impl InstrumentalLearningMindBenchmark {
         // Higher consciousness → better integration → faster learning
         let win_lr = if win_consciousness.len() >= 4 {
             let early: f64 = win_consciousness[..4].iter().sum::<f64>() / 4.0;
-            let late: f64 = win_consciousness[win_consciousness.len() - 4..].iter().sum::<f64>() / 4.0;
+            let late: f64 = win_consciousness[win_consciousness.len() - 4..]
+                .iter()
+                .sum::<f64>()
+                / 4.0;
             (late - early).abs()
         } else {
             0.0
@@ -265,7 +307,10 @@ impl InstrumentalLearningMindBenchmark {
 
         let loss_lr = if loss_consciousness.len() >= 4 {
             let early: f64 = loss_consciousness[..4].iter().sum::<f64>() / 4.0;
-            let late: f64 = loss_consciousness[loss_consciousness.len() - 4..].iter().sum::<f64>() / 4.0;
+            let late: f64 = loss_consciousness[loss_consciousness.len() - 4..]
+                .iter()
+                .sum::<f64>()
+                / 4.0;
             (late - early).abs()
         } else {
             0.0
@@ -302,7 +347,10 @@ impl PsychBenchmark for InstrumentalLearningMindBenchmark {
 
         result.insert("learning_rate", MetricValue::from_samples(&lrs));
         result.insert("optimism_bias", MetricValue::from_samples(&biases));
-        result.insert("final_consciousness_level", MetricValue::from_samples(&consciousness_levels));
+        result.insert(
+            "final_consciousness_level",
+            MetricValue::from_samples(&consciousness_levels),
+        );
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

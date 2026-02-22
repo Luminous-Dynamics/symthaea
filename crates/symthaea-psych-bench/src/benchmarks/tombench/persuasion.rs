@@ -110,6 +110,7 @@ impl PersuasionBenchmark {
     /// 1. Agent A has a desire/goal ("wants", "wants X to")
     /// 2. Agent A offers incentives or arguments ("bonus", "favorite", "promises")
     /// 3. Agent B shows initial resistance ("was too tired", "was planning to")
+    ///
     /// These three components together signal persuasion intent.
     #[cfg(not(feature = "symthaea-backend"))]
     fn run_trial_lightweight(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
@@ -140,7 +141,9 @@ impl PersuasionBenchmark {
         let geo_signal = (persuasion_sim - neutral_sim) as f64;
 
         // Structural pattern analysis
-        let text: String = scenario.setup.iter()
+        let text: String = scenario
+            .setup
+            .iter()
             .map(|s| s.to_lowercase())
             .collect::<Vec<_>>()
             .join(" ");
@@ -151,18 +154,30 @@ impl PersuasionBenchmark {
 
         // Component 2: Incentives/arguments
         let incentive_words = [
-            "bonus", "favorite", "promises", "discount", "features",
-            "everyone", "important", "limited time", "will make",
-            "points out", "offers", "grow tall",
+            "bonus",
+            "favorite",
+            "promises",
+            "discount",
+            "features",
+            "everyone",
+            "important",
+            "limited time",
+            "will make",
+            "points out",
+            "offers",
+            "grow tall",
         ];
-        let incentive_count: f64 = incentive_words.iter()
-            .filter(|k| text.contains(*k))
-            .count() as f64;
+        let incentive_count: f64 =
+            incentive_words.iter().filter(|k| text.contains(*k)).count() as f64;
 
         // Component 3: Resistance from target
         let resistance_words = [
-            "too tired", "was planning", "was looking at", "initially",
-            "does not like", "did not",
+            "too tired",
+            "was planning",
+            "was looking at",
+            "initially",
+            "does not like",
+            "did not",
         ];
         let has_resistance = resistance_words.iter().any(|k| text.contains(k));
 
@@ -177,7 +192,11 @@ impl PersuasionBenchmark {
         let combined = structure_score + geo_signal * 0.1;
         let detected_persuasion = combined > 0.3;
 
-        if detected_persuasion == scenario.has_persuasion { 1.0 } else { 0.0 }
+        if detected_persuasion == scenario.has_persuasion {
+            1.0
+        } else {
+            0.0
+        }
     }
 
     /// Full trial: FEP belief detection for persuasion recognition.
@@ -215,7 +234,11 @@ impl PersuasionBenchmark {
 
         // Detection: did the agent's belief shift toward persuaded (state 1)?
         let detected_persuasion = agent.belief.mean[1] > agent.belief.mean[0];
-        let accuracy = if detected_persuasion == scenario.has_persuasion { 1.0 } else { 0.0 };
+        let accuracy = if detected_persuasion == scenario.has_persuasion {
+            1.0
+        } else {
+            0.0
+        };
         let confidence = if scenario.has_persuasion {
             agent.belief.mean[1] // confidence in persuasion detection
         } else {
@@ -257,7 +280,10 @@ impl PsychBenchmark for PersuasionBenchmark {
             }
         }
 
-        result.insert("persuasion_detection", MetricValue::from_samples(&accuracies));
+        result.insert(
+            "persuasion_detection",
+            MetricValue::from_samples(&accuracies),
+        );
         #[cfg(feature = "symthaea-backend")]
         result.insert("action_confidence", MetricValue::from_samples(&confidences));
 

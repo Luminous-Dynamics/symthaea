@@ -91,11 +91,7 @@ fn main() {
 
                 let result = bench.run(&config);
                 let key = key_metric_for_benchmark(bench.name());
-                let val = result
-                    .metrics
-                    .get(key)
-                    .map(|m| m.mean)
-                    .unwrap_or(f64::NAN);
+                let val = result.metrics.get(key).map(|m| m.mean).unwrap_or(f64::NAN);
 
                 bench_values[bi].push(val);
                 print!(" {:>12.3} |", val);

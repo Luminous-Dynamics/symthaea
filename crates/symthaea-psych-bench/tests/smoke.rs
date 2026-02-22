@@ -1,10 +1,10 @@
 //! Smoke test: run each benchmark's simplest task with minimal trials.
 //! Verifies no panics and all metrics are finite.
 
-use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
 use symthaea_psych_bench::benchmarks::affect::{
     MoodCongruentRecallBenchmark, ValenceClassificationBenchmark,
 };
+use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
     ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
@@ -14,8 +14,8 @@ use symthaea_psych_bench::benchmarks::creativity::{
     AlternateUsesBenchmark, RemoteAssociatesBenchmark,
 };
 use symthaea_psych_bench::benchmarks::executive::{
-    FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark,
-    StroopBenchmark, TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
+    FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark, StroopBenchmark,
+    TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
 };
 use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,

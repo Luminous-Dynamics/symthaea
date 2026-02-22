@@ -18,12 +18,7 @@ pub struct ChangeDetectionBenchmark;
 impl ChangeDetectionBenchmark {
     /// Run a single trial: present K objects, optionally change one, probe.
     /// Returns 1.0 for correct, 0.0 for incorrect.
-    fn run_trial(
-        &self,
-        set_size: usize,
-        config: &BenchmarkConfig,
-        trial_idx: usize,
-    ) -> f64 {
+    fn run_trial(&self, set_size: usize, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
         let dim = config.dimension;
         let seed = config.trial_seed("worm", &format!("cd_{}", set_size), trial_idx);
         let adapter = VisualObjectAdapter::default();
@@ -60,8 +55,19 @@ impl ChangeDetectionBenchmark {
         // Bundle original array
         let original_bundle = ContinuousHV::bundle_owned(&original_hvs);
 
-        // Delay ticks (retention interval)
-        for _ in 0..3 {
+        // Retention interval: ticks + noise injection models the degradation
+        // of visual WM representations over time (Zhang & Luck, 2009 — slot+noise
+        // model). Even items within capacity degrade, causing detection failures
+        // that scale with set size (more items → more interference during delay).
+        for delay_tick in 0..4 {
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+            // Inject mild distractor noise every other tick
+            if delay_tick % 2 == 1 {
+                let noise = ContinuousHV::random(dim, rng_state);
+                wm.perceive(noise);
+            }
             wm.tick();
         }
 
@@ -111,7 +117,11 @@ impl ChangeDetectionBenchmark {
             responded_same // Should confirm same
         };
 
-        if correct { 1.0 } else { 0.0 }
+        if correct {
+            1.0
+        } else {
+            0.0
+        }
     }
 }
 

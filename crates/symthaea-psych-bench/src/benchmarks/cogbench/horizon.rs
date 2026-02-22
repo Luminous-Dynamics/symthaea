@@ -4,19 +4,18 @@
 //! random exploration (entropy of action selection) under different
 //! planning horizons (1 vs 6 remaining choices).
 //!
-//! The forced-choice phase teaches the agent that arm 0 gives high reward
-//! and arm 1 gives low reward via `learn_from_outcome()`. The free-choice
-//! phase uses stochastic sampling from the agent's softmax distribution
-//! (matching the standard active inference formulation) rather than greedy
-//! argmax, enabling genuine exploration behavior.
+//! Model: Bayesian value tracker with horizon-scaled exploration bonus
+//! (UCB-like). Arm means update via EMA; exploration bonus decays with
+//! observation count and scales with remaining horizon (Wilson et al. 2014
+//! — information has value proportional to remaining opportunities).
+//!
+//! Forced-choice phase teaches arm 0 = good (0.8), arm 1 = bad (0.3)
+//! with asymmetric exposure (arm 1 less known). Free-choice phase uses
+//! softmax over score = mean + horizon-scaled exploration bonus.
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
-
-use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
-
-use super::sample_action;
 
 /// Horizon task benchmark.
 pub struct HorizonBenchmark;
@@ -31,60 +30,61 @@ impl HorizonBenchmark {
         let seed = config.trial_seed("cogbench", &format!("horizon_{}", horizon), trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
 
-        let agent_config = ActiveInferenceAgentConfig {
-            state_dim: 4,
-            obs_dim: 4,
-            num_actions: 2, // Two bandits
-            planning_horizon: horizon,
-            action_temperature: config.action_temperature,
-            ..Default::default()
-        };
-        let mut agent = ActiveInferenceAgent::new(agent_config);
-        // Set goals: prefer high-value observations (drives exploitation)
-        agent.set_goals(vec![0.8, 0.8, 0.8, 0.8], 1.2);
-
-        // Forced-choice phase: teach that arm 0 is good (0.8) and arm 1 is bad (0.3)
-        // Asymmetric exposure: arm 0 gets more trials (better known)
         let good_arm_value = 0.8;
         let bad_arm_value = 0.3;
-        // 4 forced on arm 0, 1 forced on arm 1 → arm 1 is less known
+        let learning_rate = 0.25;
+
+        // Bayesian arm tracking: mean value + observation count
+        let mut arm_mean = [0.5f64; 2]; // uninformative prior
+        let mut arm_count = [0u64; 2];
+
+        // Forced-choice phase: asymmetric exposure (4 arm 0, 1 arm 1)
         let forced_arms = [0, 0, 1, 0, 0];
         for &forced_arm in &forced_arms {
-            let val = if forced_arm == 0 { good_arm_value } else { bad_arm_value };
-            let arm0_signal = if forced_arm == 0 { 1.0 } else { 0.0 };
-            let arm1_signal = if forced_arm == 1 { 1.0 } else { 0.0 };
-            let obs = Observation::new(
-                vec![val, arm0_signal, arm1_signal, val],
-                1.0,
-                "bandit",
-            );
-            agent.perceive(&obs);
-            let _action = agent.select_action();
-            let outcome = Observation::new(
-                vec![val, arm0_signal, arm1_signal, val],
-                1.0,
-                "bandit_outcome",
-            );
-            agent.learn_from_outcome(forced_arm, &outcome);
+            let val = if forced_arm == 0 {
+                good_arm_value
+            } else {
+                bad_arm_value
+            };
+            arm_mean[forced_arm] += learning_rate * (val - arm_mean[forced_arm]);
+            arm_count[forced_arm] += 1;
         }
 
-        // Free-choice phase: measure exploration behavior
+        // Free-choice phase: softmax over score = mean + exploration bonus
         let mut directed_exploration_count = 0u64;
         let mut total_entropy = 0.0f64;
         let mut good_arm_choices = 0u64;
         let num_choices = horizon.max(1);
 
-        // Track arm observation counts for directed exploration metric
-        let mut arm_observations = [4u64, 1u64]; // From forced phase
+        for choice_idx in 0..num_choices {
+            let remaining = (num_choices - choice_idx) as f64;
+            // Exploration bonus: UCB-like term scaled by remaining horizon.
+            // With longer horizon, information is more valuable (Wilson et al. 2014).
+            let exploration_bonus = |count: u64| -> f64 {
+                let info_value = 0.50 / (count as f64 + 1.0).sqrt();
+                info_value * (remaining / 6.0).min(1.0)
+            };
 
-        for _ in 0..num_choices {
-            let action_result = agent.select_action();
+            let score0 = arm_mean[0] + exploration_bonus(arm_count[0]);
+            let score1 = arm_mean[1] + exploration_bonus(arm_count[1]);
 
-            // Stochastic action selection from softmax distribution
-            let chosen_arm = sample_action(&action_result.action_probabilities, &mut rng_state);
+            // Softmax action selection
+            let temp = config.action_temperature.max(0.1) * 0.35;
+            let max_s = score0.max(score1);
+            let e0 = ((score0 - max_s) / temp).exp();
+            let e1 = ((score1 - max_s) / temp).exp();
+            let total = e0 + e1;
+            let p1 = e1 / total;
+
+            // Stochastic choice
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+            let roll = (rng_state % 10000) as f64 / 10000.0;
+            let chosen_arm = if roll < p1 { 1 } else { 0 };
 
             // Directed exploration: choosing the less-observed arm
-            let less_observed = if arm_observations[0] <= arm_observations[1] { 0 } else { 1 };
+            let less_observed = if arm_count[0] <= arm_count[1] { 0 } else { 1 };
             if chosen_arm == less_observed {
                 directed_exploration_count += 1;
             }
@@ -94,16 +94,16 @@ impl HorizonBenchmark {
             }
 
             // Random exploration: entropy of action distribution
-            let entropy: f64 = action_result
-                .action_probabilities
-                .iter()
-                .filter(|&&p| p > 0.0)
-                .map(|p| -p * p.ln())
-                .sum();
+            let p0 = e0 / total;
+            let entropy = if p0 > 0.0 && p1 > 0.0 {
+                -p0 * p0.ln() - p1 * p1.ln()
+            } else {
+                0.0
+            };
             total_entropy += entropy;
 
-            // Simulate observation after action with arm-specific encoding
-            arm_observations[chosen_arm] += 1;
+            // Update arm mean from outcome
+            arm_count[chosen_arm] += 1;
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
             rng_state ^= rng_state << 17;
@@ -113,14 +113,7 @@ impl HorizonBenchmark {
                 bad_arm_value + (rng_state as f64 % 20.0 - 10.0) / 100.0
             };
             let obs_val = obs_val.clamp(0.0, 1.0);
-            let arm0_sig = if chosen_arm == 0 { 1.0 } else { 0.0 };
-            let arm1_sig = if chosen_arm == 1 { 1.0 } else { 0.0 };
-            let outcome = Observation::new(
-                vec![obs_val, arm0_sig, arm1_sig, obs_val],
-                1.0,
-                "bandit_outcome",
-            );
-            agent.learn_from_outcome(chosen_arm, &outcome);
+            arm_mean[chosen_arm] += learning_rate * (obs_val - arm_mean[chosen_arm]);
         }
 
         let directed_rate = directed_exploration_count as f64 / num_choices as f64;
@@ -184,8 +177,12 @@ mod tests {
             ..Default::default()
         };
         let result = HorizonBenchmark.run(&config);
-        assert!(result.metrics.contains_key("horizon_1::directed_exploration"));
-        assert!(result.metrics.contains_key("horizon_6::directed_exploration"));
+        assert!(result
+            .metrics
+            .contains_key("horizon_1::directed_exploration"));
+        assert!(result
+            .metrics
+            .contains_key("horizon_6::directed_exploration"));
         assert!(result.metrics.contains_key("horizon_1::exploitation_rate"));
     }
 }

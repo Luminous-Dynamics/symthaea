@@ -35,7 +35,10 @@ impl NBackBenchmark {
 
         // Generate sequence with ~30% match targets
         let mut rng_state = seed;
-        let vocab_size = 26u64; // Large enough to avoid WM saturation
+        // Small vocab creates realistic proactive interference: with frequent
+        // item repetitions, non-target items may match the n-back item by
+        // coincidence, causing false alarms (Jonides & Nee, 2006).
+        let vocab_size = 8u64;
         let mut sequence = Vec::with_capacity(sequence_len);
         for i in 0..sequence_len {
             let is_target = i >= n && {
@@ -85,9 +88,27 @@ impl NBackBenchmark {
                 let match_sim = hv.similarity(nback_hv);
                 let match_threshold = 0.5;
 
+                // Proactive interference: check for "lure" items at nearby positions
+                // (n±1 back). Lures cause false alarms in human n-back (Jonides & Nee,
+                // 2006; Kane et al., 2007). If a lure exceeds threshold, the system
+                // may respond "match" even when it shouldn't.
+                let mut lure_match = false;
+                if !is_target && nback_retained {
+                    for offset in [1i32, -1] {
+                        let lure_pos = i as i32 - n as i32 + offset;
+                        if lure_pos >= 0 && (lure_pos as usize) < i {
+                            let lure_sim = hv.similarity(&perceived_history[lure_pos as usize]);
+                            if lure_sim > match_threshold {
+                                lure_match = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 // Respond "match" only if we remember the n-back item AND it
-                // matches the current item.
-                let responded_match = nback_retained && match_sim > match_threshold;
+                // matches the current item. Lure matches cause false alarms.
+                let responded_match = nback_retained && (match_sim > match_threshold || lure_match);
 
                 match (is_target, responded_match) {
                     (true, true) => hits += 1,

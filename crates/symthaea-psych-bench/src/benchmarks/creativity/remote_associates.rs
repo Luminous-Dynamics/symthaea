@@ -27,77 +27,109 @@ impl RemoteAssociatesBenchmark {
             RatTriad {
                 cues: ["cottage", "swiss", "cake"],
                 solution: "cheese",
-                distractors: ["bread", "milk", "house", "mountain", "sugar", "butter", "cream", "lake", "flour"],
+                distractors: [
+                    "bread", "milk", "house", "mountain", "sugar", "butter", "cream", "lake",
+                    "flour",
+                ],
             },
             RatTriad {
                 cues: ["cream", "skate", "water"],
                 solution: "ice",
-                distractors: ["snow", "cold", "lake", "rink", "fire", "glass", "stone", "wind", "rain"],
+                distractors: [
+                    "snow", "cold", "lake", "rink", "fire", "glass", "stone", "wind", "rain",
+                ],
             },
             RatTriad {
                 cues: ["show", "life", "row"],
                 solution: "boat",
-                distractors: ["car", "ship", "train", "road", "wave", "sail", "dock", "fish", "ocean"],
+                distractors: [
+                    "car", "ship", "train", "road", "wave", "sail", "dock", "fish", "ocean",
+                ],
             },
             RatTriad {
                 cues: ["night", "wrist", "stop"],
                 solution: "watch",
-                distractors: ["clock", "time", "guard", "tower", "light", "band", "hand", "bell", "ring"],
+                distractors: [
+                    "clock", "time", "guard", "tower", "light", "band", "hand", "bell", "ring",
+                ],
             },
             RatTriad {
                 cues: ["rocking", "wheel", "high"],
                 solution: "chair",
-                distractors: ["table", "seat", "bench", "stool", "desk", "sofa", "throne", "swing", "stand"],
+                distractors: [
+                    "table", "seat", "bench", "stool", "desk", "sofa", "throne", "swing", "stand",
+                ],
             },
             RatTriad {
                 cues: ["home", "sea", "bed"],
                 solution: "sick",
-                distractors: ["room", "sleep", "rest", "shore", "wave", "dream", "night", "sand", "warm"],
+                distractors: [
+                    "room", "sleep", "rest", "shore", "wave", "dream", "night", "sand", "warm",
+                ],
             },
             RatTriad {
                 cues: ["man", "glove", "life"],
                 solution: "love",
-                distractors: ["hand", "heart", "soul", "ring", "game", "fight", "care", "hope", "hate"],
+                distractors: [
+                    "hand", "heart", "soul", "ring", "game", "fight", "care", "hope", "hate",
+                ],
             },
             RatTriad {
                 cues: ["board", "magic", "death"],
                 solution: "black",
-                distractors: ["white", "dark", "night", "card", "game", "trick", "spell", "ghost", "skull"],
+                distractors: [
+                    "white", "dark", "night", "card", "game", "trick", "spell", "ghost", "skull",
+                ],
             },
             RatTriad {
                 cues: ["fish", "mine", "rush"],
                 solution: "gold",
-                distractors: ["silver", "copper", "iron", "coal", "river", "pan", "dig", "cave", "ore"],
+                distractors: [
+                    "silver", "copper", "iron", "coal", "river", "pan", "dig", "cave", "ore",
+                ],
             },
             RatTriad {
                 cues: ["measure", "worm", "video"],
                 solution: "tape",
-                distractors: ["film", "record", "disc", "reel", "wire", "glue", "string", "band", "roll"],
+                distractors: [
+                    "film", "record", "disc", "reel", "wire", "glue", "string", "band", "roll",
+                ],
             },
             RatTriad {
                 cues: ["cross", "rain", "tie"],
                 solution: "bow",
-                distractors: ["knot", "string", "arrow", "cloud", "wind", "silk", "loop", "ribbon", "lace"],
+                distractors: [
+                    "knot", "string", "arrow", "cloud", "wind", "silk", "loop", "ribbon", "lace",
+                ],
             },
             RatTriad {
                 cues: ["dream", "break", "light"],
                 solution: "day",
-                distractors: ["night", "sun", "moon", "star", "dawn", "dusk", "time", "dark", "glow"],
+                distractors: [
+                    "night", "sun", "moon", "star", "dawn", "dusk", "time", "dark", "glow",
+                ],
             },
             RatTriad {
                 cues: ["print", "berry", "bird"],
                 solution: "blue",
-                distractors: ["red", "green", "black", "white", "gold", "ink", "wing", "nest", "tree"],
+                distractors: [
+                    "red", "green", "black", "white", "gold", "ink", "wing", "nest", "tree",
+                ],
             },
             RatTriad {
                 cues: ["pine", "crab", "sauce"],
                 solution: "apple",
-                distractors: ["orange", "grape", "lemon", "fruit", "peach", "cherry", "plum", "mango", "berry"],
+                distractors: [
+                    "orange", "grape", "lemon", "fruit", "peach", "cherry", "plum", "mango",
+                    "berry",
+                ],
             },
             RatTriad {
                 cues: ["base", "snow", "dance"],
                 solution: "ball",
-                distractors: ["game", "play", "round", "field", "court", "bat", "goal", "net", "team"],
+                distractors: [
+                    "game", "play", "round", "field", "court", "bat", "goal", "net", "team",
+                ],
             },
         ]
     }
@@ -183,11 +215,7 @@ impl PsychBenchmark for RemoteAssociatesBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
         let triad_data = Self::build_triad_data();
-        let adapter = SemanticScenarioAdapter::for_rat(
-            &triad_data,
-            config.dimension,
-            config.seed,
-        );
+        let adapter = SemanticScenarioAdapter::for_rat(&triad_data, config.dimension, config.seed);
 
         let mut accuracies = Vec::new();
         let mut ranks = Vec::new();

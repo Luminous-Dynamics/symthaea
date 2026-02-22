@@ -112,16 +112,14 @@ impl RegressionSnapshot {
 
     /// Save snapshot to a file.
     pub fn save(&self, path: &std::path::Path) -> std::io::Result<()> {
-        let json = self
-            .to_json()
-            .map_err(|e| std::io::Error::other(e))?;
+        let json = self.to_json().map_err(std::io::Error::other)?;
         std::fs::write(path, json)
     }
 
     /// Load snapshot from a file.
     pub fn load(path: &std::path::Path) -> std::io::Result<Self> {
         let json = std::fs::read_to_string(path)?;
-        Self::from_json(&json).map_err(|e| std::io::Error::other(e))
+        Self::from_json(&json).map_err(std::io::Error::other)
     }
 
     /// Age of this snapshot in days (from timestamp to now).
@@ -381,35 +379,27 @@ mod tests {
     fn test_near_zero_baseline_passes() {
         let mut baseline = make_test_snapshot("baseline", 0.90);
         // Insert a near-zero metric
-        baseline
-            .metrics
-            .get_mut("TestBench")
-            .unwrap()
-            .insert(
-                "near_zero".to_string(),
-                MetricValue {
-                    mean: 0.0,
-                    std_dev: 0.0,
-                    n: 10,
-                    ci_lower: 0.0,
-                    ci_upper: 0.0,
-                },
-            );
+        baseline.metrics.get_mut("TestBench").unwrap().insert(
+            "near_zero".to_string(),
+            MetricValue {
+                mean: 0.0,
+                std_dev: 0.0,
+                n: 10,
+                ci_lower: 0.0,
+                ci_upper: 0.0,
+            },
+        );
         let mut current = make_test_snapshot("current", 0.90);
-        current
-            .metrics
-            .get_mut("TestBench")
-            .unwrap()
-            .insert(
-                "near_zero".to_string(),
-                MetricValue {
-                    mean: 0.5,
-                    std_dev: 0.1,
-                    n: 10,
-                    ci_lower: 0.4,
-                    ci_upper: 0.6,
-                },
-            );
+        current.metrics.get_mut("TestBench").unwrap().insert(
+            "near_zero".to_string(),
+            MetricValue {
+                mean: 0.5,
+                std_dev: 0.1,
+                n: 10,
+                ci_lower: 0.4,
+                ci_upper: 0.6,
+            },
+        );
         let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
         // Near-zero baseline should always pass (no div-by-zero)
         assert!(!report.has_regressions());
@@ -431,8 +421,7 @@ mod tests {
 
     #[test]
     fn test_with_git_hash() {
-        let snapshot = make_test_snapshot("tagged", 0.85)
-            .with_git_hash("abc123def".to_string());
+        let snapshot = make_test_snapshot("tagged", 0.85).with_git_hash("abc123def".to_string());
         assert_eq!(snapshot.git_hash.as_deref(), Some("abc123def"));
     }
 
@@ -457,7 +446,11 @@ mod tests {
         let mut s = snapshot;
         s.timestamp = chrono::Utc::now().to_rfc3339();
         let age = s.age_days().unwrap();
-        assert!(age <= 1, "Fresh snapshot should be ~0 days old, got {}", age);
+        assert!(
+            age <= 1,
+            "Fresh snapshot should be ~0 days old, got {}",
+            age
+        );
     }
 
     #[test]
@@ -474,7 +467,10 @@ mod tests {
     fn test_staleness_warning_fresh() {
         let mut s = make_test_snapshot("fresh", 0.90);
         s.timestamp = chrono::Utc::now().to_rfc3339();
-        assert!(s.staleness_warning(30).is_none(), "Fresh snapshot shouldn't warn");
+        assert!(
+            s.staleness_warning(30).is_none(),
+            "Fresh snapshot shouldn't warn"
+        );
     }
 
     #[test]

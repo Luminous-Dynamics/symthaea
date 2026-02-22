@@ -98,9 +98,7 @@ impl StroopBenchmark {
                 Condition::Neutral => {
                     // Word "XXX" in red ink: only ink activates color
                     // Small random noise from non-color word processing
-                    let noise = ContinuousHV::random(dim, seed.wrapping_add(
-                        1000 + trial as u64,
-                    ));
+                    let noise = ContinuousHV::random(dim, seed.wrapping_add(1000 + trial as u64));
                     let noise_act = noise.scale(reading_automaticity * 0.3);
                     ContinuousHV::bundle(&[&color_hvs[ink_idx], &noise_act])
                 }

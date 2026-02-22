@@ -4,7 +4,7 @@
 //! multiple seed runs. Supports construct validity checks (same-domain
 //! correlations should exceed 0.3).
 
-use super::report::{BenchmarkReport, key_metric_for_benchmark, domain_of};
+use super::report::{domain_of, key_metric_for_benchmark, BenchmarkReport};
 use std::collections::BTreeMap;
 
 /// Cross-benchmark analysis from multi-seed runs.
@@ -123,7 +123,10 @@ impl CrossBenchmarkAnalysis {
             let odd: Vec<f64> = vals.iter().skip(1).step_by(2).copied().collect();
             let min_len = even.len().min(odd.len());
             if min_len >= 3 {
-                result.insert(name.clone(), spearman_correlation(&even[..min_len], &odd[..min_len]));
+                result.insert(
+                    name.clone(),
+                    spearman_correlation(&even[..min_len], &odd[..min_len]),
+                );
             } else {
                 result.insert(name.clone(), 0.0);
             }
@@ -169,7 +172,11 @@ impl CrossBenchmarkAnalysis {
 
         // Header
         let header = std::iter::once("".to_string())
-            .chain(short_names.iter().map(|n| format!("{:>8}", &n[..n.len().min(8)])))
+            .chain(
+                short_names
+                    .iter()
+                    .map(|n| format!("{:>8}", &n[..n.len().min(8)])),
+            )
             .collect::<Vec<_>>()
             .join(" | ");
         lines.push(format!("| {} |", header));
@@ -247,24 +254,30 @@ pub fn icc_2_1(observations: &[Vec<f64>]) -> f64 {
         .collect();
 
     // Judge means (across subjects)
-    let judge_means: Vec<f64> = observations.iter()
+    let judge_means: Vec<f64> = observations
+        .iter()
         .map(|o| o.iter().sum::<f64>() / nf)
         .collect();
 
     // Between-subjects MS
-    let ss_subjects: f64 = subject_means.iter()
+    let ss_subjects: f64 = subject_means
+        .iter()
         .map(|&m| (m - grand_mean).powi(2))
-        .sum::<f64>() * kf;
+        .sum::<f64>()
+        * kf;
     let bms = ss_subjects / (nf - 1.0);
 
     // Between-judges MS
-    let ss_judges: f64 = judge_means.iter()
+    let ss_judges: f64 = judge_means
+        .iter()
         .map(|&m| (m - grand_mean).powi(2))
-        .sum::<f64>() * nf;
+        .sum::<f64>()
+        * nf;
     let jms = ss_judges / (kf - 1.0);
 
     // Error MS (residual)
-    let ss_total: f64 = observations.iter()
+    let ss_total: f64 = observations
+        .iter()
         .flat_map(|o| o.iter())
         .map(|&x| (x - grand_mean).powi(2))
         .sum();
@@ -418,30 +431,36 @@ mod tests {
             vec![1.0, 2.0, 3.0, 4.0, 5.0],
         ];
         let icc = icc_2_1(&obs);
-        assert!(icc > 0.99, "Perfect agreement should yield ICC~1.0, got {}", icc);
+        assert!(
+            icc > 0.99,
+            "Perfect agreement should yield ICC~1.0, got {}",
+            icc
+        );
     }
 
     #[test]
     fn test_icc_zero_agreement() {
         // Judges give unrelated scores — ICC should be near 0 or negative
-        let obs = vec![
-            vec![1.0, 2.0, 3.0, 4.0, 5.0],
-            vec![5.0, 4.0, 3.0, 2.0, 1.0],
-        ];
+        let obs = vec![vec![1.0, 2.0, 3.0, 4.0, 5.0], vec![5.0, 4.0, 3.0, 2.0, 1.0]];
         let icc = icc_2_1(&obs);
-        assert!(icc < 0.5, "Reversed judges should yield low ICC, got {}", icc);
+        assert!(
+            icc < 0.5,
+            "Reversed judges should yield low ICC, got {}",
+            icc
+        );
     }
 
     #[test]
     fn test_icc_known_value() {
         // Two judges with systematic offset but same ranking
-        let obs = vec![
-            vec![1.0, 2.0, 3.0, 4.0, 5.0],
-            vec![2.0, 3.0, 4.0, 5.0, 6.0],
-        ];
+        let obs = vec![vec![1.0, 2.0, 3.0, 4.0, 5.0], vec![2.0, 3.0, 4.0, 5.0, 6.0]];
         let icc = icc_2_1(&obs);
         // Should be high (same ranking, just shifted)
-        assert!(icc > 0.7, "Systematic offset should still yield decent ICC, got {}", icc);
+        assert!(
+            icc > 0.7,
+            "Systematic offset should still yield decent ICC, got {}",
+            icc
+        );
     }
 
     #[test]

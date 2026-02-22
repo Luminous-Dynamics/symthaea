@@ -13,11 +13,7 @@ use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation
 pub struct RestlessBanditBenchmark;
 
 impl RestlessBanditBenchmark {
-    fn run_trial(
-        &self,
-        config: &BenchmarkConfig,
-        trial_idx: usize,
-    ) -> (f64, f64) {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
         let seed = config.trial_seed("cogbench", "restless", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
         let num_arms = 4;
@@ -52,7 +48,7 @@ impl RestlessBanditBenchmark {
         // Higher alpha EMA tracks drift faster
         let mut arm_ema: Vec<f64> = vec![0.5; num_arms];
         let ema_alpha = 0.6; // High alpha = fast drift tracking
-        // Track pull count per arm (UCB-style exploration bonus)
+                             // Track pull count per arm (UCB-style exploration bonus)
         let mut arm_pulls: Vec<u64> = vec![0; num_arms];
 
         for trial in 0..num_trials {
@@ -76,7 +72,9 @@ impl RestlessBanditBenchmark {
                 // Phase 2: UCB1 — pick arm maximizing EMA + exploration bonus
                 let total_pulls: u64 = arm_pulls.iter().sum();
                 let ln_total = (total_pulls as f64).ln();
-                arm_ema.iter().enumerate()
+                arm_ema
+                    .iter()
+                    .enumerate()
                     .map(|(i, &ema)| {
                         let bonus = if arm_pulls[i] > 0 {
                             (2.0 * ln_total / arm_pulls[i] as f64).sqrt()
@@ -107,7 +105,9 @@ impl RestlessBanditBenchmark {
             // Confidence = margin between chosen arm's EMA and the best alternative
             // Large margin → agent chose a clearly dominant arm → should be more accurate
             let chosen_ema = arm_ema[chosen_arm];
-            let best_other_ema = arm_ema.iter().enumerate()
+            let best_other_ema = arm_ema
+                .iter()
+                .enumerate()
                 .filter(|(i, _)| *i != chosen_arm)
                 .map(|(_, v)| *v)
                 .fold(f64::NEG_INFINITY, f64::max);
@@ -118,10 +118,14 @@ impl RestlessBanditBenchmark {
             if trial >= 10 {
                 if confident {
                     confident_total += 1;
-                    if is_correct { confident_correct += 1; }
+                    if is_correct {
+                        confident_correct += 1;
+                    }
                 } else {
                     unconfident_total += 1;
-                    if is_correct { unconfident_correct += 1; }
+                    if is_correct {
+                        unconfident_correct += 1;
+                    }
                 }
             }
 
@@ -179,7 +183,10 @@ impl PsychBenchmark for RestlessBanditBenchmark {
             accuracies.push(acc);
         }
 
-        result.insert("qsr_metacognitive_sensitivity", MetricValue::from_samples(&qsrs));
+        result.insert(
+            "qsr_metacognitive_sensitivity",
+            MetricValue::from_samples(&qsrs),
+        );
         result.insert("overall_accuracy", MetricValue::from_samples(&accuracies));
 
         result.conditions = 1;
@@ -202,11 +209,7 @@ pub struct RestlessBanditMindBenchmark;
 
 #[cfg(feature = "symthaea-backend")]
 impl RestlessBanditMindBenchmark {
-    fn run_trial(
-        &self,
-        config: &BenchmarkConfig,
-        trial_idx: usize,
-    ) -> (f64, f64, f64) {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64) {
         use super::mind_agent::CogBenchMindAgent;
         use super::sample_action;
 
@@ -329,9 +332,15 @@ impl PsychBenchmark for RestlessBanditMindBenchmark {
             consciousness_levels.push(cl);
         }
 
-        result.insert("qsr_metacognitive_sensitivity", MetricValue::from_samples(&qsrs));
+        result.insert(
+            "qsr_metacognitive_sensitivity",
+            MetricValue::from_samples(&qsrs),
+        );
         result.insert("overall_accuracy", MetricValue::from_samples(&accuracies));
-        result.insert("avg_consciousness_level", MetricValue::from_samples(&consciousness_levels));
+        result.insert(
+            "avg_consciousness_level",
+            MetricValue::from_samples(&consciousness_levels),
+        );
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

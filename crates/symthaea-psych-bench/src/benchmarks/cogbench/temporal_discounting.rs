@@ -25,14 +25,54 @@ impl TemporalDiscountingBenchmark {
     /// Standard choice set (inspired by Kirby MCQ).
     fn choice_set() -> Vec<DiscountingChoice> {
         vec![
-            DiscountingChoice { small_amount: 0.54, small_delay: 1, large_amount: 0.55, large_delay: 4 },
-            DiscountingChoice { small_amount: 0.47, small_delay: 1, large_amount: 0.50, large_delay: 4 },
-            DiscountingChoice { small_amount: 0.34, small_delay: 1, large_amount: 0.50, large_delay: 6 },
-            DiscountingChoice { small_amount: 0.27, small_delay: 1, large_amount: 0.50, large_delay: 8 },
-            DiscountingChoice { small_amount: 0.20, small_delay: 1, large_amount: 0.50, large_delay: 10 },
-            DiscountingChoice { small_amount: 0.40, small_delay: 1, large_amount: 0.80, large_delay: 3 },
-            DiscountingChoice { small_amount: 0.30, small_delay: 1, large_amount: 0.80, large_delay: 6 },
-            DiscountingChoice { small_amount: 0.20, small_delay: 1, large_amount: 0.80, large_delay: 12 },
+            DiscountingChoice {
+                small_amount: 0.54,
+                small_delay: 1,
+                large_amount: 0.55,
+                large_delay: 4,
+            },
+            DiscountingChoice {
+                small_amount: 0.47,
+                small_delay: 1,
+                large_amount: 0.50,
+                large_delay: 4,
+            },
+            DiscountingChoice {
+                small_amount: 0.34,
+                small_delay: 1,
+                large_amount: 0.50,
+                large_delay: 6,
+            },
+            DiscountingChoice {
+                small_amount: 0.27,
+                small_delay: 1,
+                large_amount: 0.50,
+                large_delay: 8,
+            },
+            DiscountingChoice {
+                small_amount: 0.20,
+                small_delay: 1,
+                large_amount: 0.50,
+                large_delay: 10,
+            },
+            DiscountingChoice {
+                small_amount: 0.40,
+                small_delay: 1,
+                large_amount: 0.80,
+                large_delay: 3,
+            },
+            DiscountingChoice {
+                small_amount: 0.30,
+                small_delay: 1,
+                large_amount: 0.80,
+                large_delay: 6,
+            },
+            DiscountingChoice {
+                small_amount: 0.20,
+                small_delay: 1,
+                large_amount: 0.80,
+                large_delay: 12,
+            },
         ]
     }
 

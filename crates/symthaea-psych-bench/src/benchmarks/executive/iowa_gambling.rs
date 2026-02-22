@@ -24,10 +24,12 @@ pub struct IowaGamblingBenchmark;
 /// Deck D: +50 each, losses:  [0, 0, 0, 0, 0, 0, 0, 0, 0, -250] → net +250
 const DECK_GAINS: [f64; 4] = [100.0, 100.0, 50.0, 50.0];
 const DECK_LOSS_SCHEDULES: [[f64; 10]; 4] = [
-    [0.0, 0.0, -150.0, 0.0, -300.0, 0.0, -200.0, 0.0, -250.0, -350.0], // A
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1250.0],           // B
-    [0.0, 0.0, -25.0, 0.0, -75.0, 0.0, -25.0, 0.0, -50.0, -25.0],      // C
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -250.0],             // D
+    [
+        0.0, 0.0, -150.0, 0.0, -300.0, 0.0, -200.0, 0.0, -250.0, -350.0,
+    ], // A
+    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1250.0], // B
+    [0.0, 0.0, -25.0, 0.0, -75.0, 0.0, -25.0, 0.0, -50.0, -25.0], // C
+    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -250.0],  // D
 ];
 
 impl IowaGamblingBenchmark {
@@ -56,9 +58,7 @@ impl IowaGamblingBenchmark {
         );
 
         // Deck memory: exponentially weighted bundle of past outcomes (HDC path)
-        let mut deck_memory: Vec<ContinuousHV> = (0..4)
-            .map(|_| ContinuousHV::zero(dim))
-            .collect();
+        let mut deck_memory: Vec<ContinuousHV> = (0..4).map(|_| ContinuousHV::zero(dim)).collect();
 
         // Somatic markers: scalar EMA of net value per deck (gradual learning)
         // Calibrated to match human learning curves (slow early, convergent late)
@@ -86,21 +86,31 @@ impl IowaGamblingBenchmark {
                         combined.similarity(&desirable) as f64
                     };
                     // Somatic marker: S-curve saturation to 40%
-                    let somatic_weight = (deck_draw_count[i] as f64 / (deck_draw_count[i] as f64 + 8.0)).min(0.40);
-                    let blended = (1.0 - somatic_weight) * hdc_score + somatic_weight * deck_somatic[i];
+                    let somatic_weight =
+                        (deck_draw_count[i] as f64 / (deck_draw_count[i] as f64 + 8.0)).min(0.40);
+                    let blended =
+                        (1.0 - somatic_weight) * hdc_score + somatic_weight * deck_somatic[i];
                     blended as f32
                 })
                 .collect();
 
             // Softmax selection — warm enough for human-like exploration noise
             let temp = 0.55f32;
-            let max_score = deck_scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-            let exp_scores: Vec<f32> = deck_scores.iter().map(|s| ((s - max_score) / temp).exp()).collect();
+            let max_score = deck_scores
+                .iter()
+                .cloned()
+                .fold(f32::NEG_INFINITY, f32::max);
+            let exp_scores: Vec<f32> = deck_scores
+                .iter()
+                .map(|s| ((s - max_score) / temp).exp())
+                .collect();
             let exp_sum: f32 = exp_scores.iter().sum();
             let probs: Vec<f64> = exp_scores.iter().map(|e| (e / exp_sum) as f64).collect();
 
             // Sample deck choice
-            let mut rng = seed.wrapping_add(trial as u64).wrapping_mul(0x9E3779B97F4A7C15);
+            let mut rng = seed
+                .wrapping_add(trial as u64)
+                .wrapping_mul(0x9E3779B97F4A7C15);
             rng ^= rng << 13;
             rng ^= rng >> 7;
             rng ^= rng << 17;
@@ -138,10 +148,7 @@ impl IowaGamblingBenchmark {
             let gain_hv = gain_proto.scale(gain_norm);
             let loss_hv = loss_proto.scale(loss_norm * loss_aversion);
             let outcome_hv = ContinuousHV::weighted_bundle(
-                &[
-                    &role_gain.bind(&gain_hv),
-                    &role_loss.bind(&loss_hv),
-                ],
+                &[&role_gain.bind(&gain_hv), &role_loss.bind(&loss_hv)],
                 &[1.0, -1.0], // Loss subtracts from desirability
             );
 
@@ -154,8 +161,8 @@ impl IowaGamblingBenchmark {
             // Somatic marker update: net value normalized to [-1, 1]
             // Losses are amplified by loss_aversion factor
             let net_value = (gain - loss.abs() * loss_aversion as f64) / 200.0;
-            deck_somatic[chosen] = (1.0 - somatic_alpha) * deck_somatic[chosen]
-                + somatic_alpha * net_value;
+            deck_somatic[chosen] =
+                (1.0 - somatic_alpha) * deck_somatic[chosen] + somatic_alpha * net_value;
         }
 
         // Deck preference in last 40 trials
@@ -167,13 +174,19 @@ impl IowaGamblingBenchmark {
             let n = block_f.len() as f64;
             let x_mean = (n - 1.0) / 2.0;
             let y_mean = block_f.iter().sum::<f64>() / n;
-            let num: f64 = block_f.iter().enumerate()
+            let num: f64 = block_f
+                .iter()
+                .enumerate()
                 .map(|(i, y)| (i as f64 - x_mean) * (y - y_mean))
                 .sum();
             let den: f64 = (0..block_f.len())
                 .map(|i| (i as f64 - x_mean).powi(2))
                 .sum();
-            if den.abs() > 1e-10 { num / den } else { 0.0 }
+            if den.abs() > 1e-10 {
+                num / den
+            } else {
+                0.0
+            }
         } else {
             0.0
         };
@@ -216,10 +229,19 @@ impl PsychBenchmark for IowaGamblingBenchmark {
             preferences.push(r.deck_preference_good);
         }
 
-        result.insert("overall_net_score", MetricValue::from_samples(&overall_scores));
-        result.insert("block_5_net_score", MetricValue::from_samples(&block5_scores));
+        result.insert(
+            "overall_net_score",
+            MetricValue::from_samples(&overall_scores),
+        );
+        result.insert(
+            "block_5_net_score",
+            MetricValue::from_samples(&block5_scores),
+        );
         result.insert("learning_rate", MetricValue::from_samples(&rates));
-        result.insert("deck_preference_good", MetricValue::from_samples(&preferences));
+        result.insert(
+            "deck_preference_good",
+            MetricValue::from_samples(&preferences),
+        );
 
         result.conditions = 5; // 5 blocks
         result.trials_per_condition = config.trials_per_condition;

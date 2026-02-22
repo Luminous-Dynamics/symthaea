@@ -134,7 +134,11 @@ impl StrangeStoryBenchmark {
     /// 2. Deception markers: "actually", "wants to", "did not want"
     /// 3. HDC geometric similarity as a tiebreaker
     #[cfg(not(feature = "symthaea-backend"))]
-    fn run_trial_lightweight(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, &'static str) {
+    fn run_trial_lightweight(
+        &self,
+        config: &BenchmarkConfig,
+        trial_idx: usize,
+    ) -> (f64, &'static str) {
         let dim = config.dimension;
         let adapter = ScenarioAdapter;
         let scenarios = Self::scenarios();
@@ -156,33 +160,54 @@ impl StrangeStoryBenchmark {
         let geo_signal = (intended_sim - literal_sim) as f64;
 
         // Contradiction detection: situation vs statement divergence
-        let context_text: String = scenario.context.iter()
+        let context_text: String = scenario
+            .context
+            .iter()
             .map(|s| s.to_lowercase())
             .collect::<Vec<_>>()
             .join(" ");
 
         // Negative situation words (indicate problems, failures, bad outcomes)
         let negative_situation = [
-            "rain", "pouring", "lost", "dry", "tasteless", "crooked", "wobbles",
-            "uneven", "smudged", "stuck", "gridlocked", "terrible",
+            "rain",
+            "pouring",
+            "lost",
+            "dry",
+            "tasteless",
+            "crooked",
+            "wobbles",
+            "uneven",
+            "smudged",
+            "stuck",
+            "gridlocked",
+            "terrible",
         ];
         // Positive claim words (indicate praise, approval in the statement)
         let positive_claims = [
-            "lovely", "delicious", "beautiful", "wonderful", "best", "love",
-            "great", "amazing", "good", "fine",
+            "lovely",
+            "delicious",
+            "beautiful",
+            "wonderful",
+            "best",
+            "love",
+            "great",
+            "amazing",
+            "good",
+            "fine",
         ];
         // Deception markers (indicate hidden truth)
-        let deception_markers = [
-            "actually", "wants to", "did not want", "want", "instead",
-        ];
+        let deception_markers = ["actually", "wants to", "did not want", "want", "instead"];
 
-        let neg_count: f64 = negative_situation.iter()
+        let neg_count: f64 = negative_situation
+            .iter()
             .filter(|k| context_text.contains(*k))
             .count() as f64;
-        let pos_claim: f64 = positive_claims.iter()
+        let pos_claim: f64 = positive_claims
+            .iter()
             .filter(|k| context_text.contains(*k))
             .count() as f64;
-        let deception_count: f64 = deception_markers.iter()
+        let deception_count: f64 = deception_markers
+            .iter()
             .filter(|k| context_text.contains(*k))
             .count() as f64;
 

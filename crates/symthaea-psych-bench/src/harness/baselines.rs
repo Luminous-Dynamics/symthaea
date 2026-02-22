@@ -215,7 +215,8 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         Baseline {
             value: 0.25,
             sd: None,
-            source: "Speekenbrink & Konstantinidis (2015), Information & choice in a changing world",
+            source:
+                "Speekenbrink & Konstantinidis (2015), Information & choice in a changing world",
             population: "human adults",
         },
     );
@@ -247,7 +248,8 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         Baseline {
             value: 0.50,
             sd: None,
-            source: "Phillips & Edwards (1966); Grether (1980), conservatism in probability updating",
+            source:
+                "Phillips & Edwards (1966); Grether (1980), conservatism in probability updating",
             population: "human adults (Bayesian normative = 0.50 for symmetric evidence)",
         },
     );
@@ -280,7 +282,8 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         Baseline {
             value: 25.0,
             sd: None,
-            source: "Cools et al. (2002); Clark et al. (2004), binary reversal paradigm (200 trials)",
+            source:
+                "Cools et al. (2002); Clark et al. (2004), binary reversal paradigm (200 trials)",
             population: "human adults",
         },
     );

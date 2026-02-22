@@ -46,7 +46,13 @@ impl CogBenchMindAgent {
     /// - `wm_capacity`: working memory capacity
     /// - `temperature`: softmax temperature for action selection
     /// - `seed`: deterministic seed for arm prototype generation
-    pub fn new(num_arms: usize, dim: usize, wm_capacity: usize, temperature: f64, seed: u64) -> Self {
+    pub fn new(
+        num_arms: usize,
+        dim: usize,
+        wm_capacity: usize,
+        temperature: f64,
+        seed: u64,
+    ) -> Self {
         let mind_config = MindConfig {
             dimension: dim,
             working_memory_capacity: wm_capacity,
@@ -104,7 +110,10 @@ impl CogBenchMindAgent {
 
         // Softmax with temperature
         let max_sim = sims.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        let exps: Vec<f64> = sims.iter().map(|s| ((s - max_sim) / self.temperature).exp()).collect();
+        let exps: Vec<f64> = sims
+            .iter()
+            .map(|s| ((s - max_sim) / self.temperature).exp())
+            .collect();
         let sum: f64 = exps.iter().sum();
 
         let probs = if sum > 0.0 {
@@ -125,7 +134,9 @@ impl CogBenchMindAgent {
     /// in WM). Low/negative rewards produce dissimilar signals.
     pub fn perceive_reward(&mut self, arm: usize, reward: f64) {
         let outcome = RewardOutcome::new(arm as u32, reward as f32, self.trial_counter);
-        let hv = self.reward_adapter.encode(&outcome, self.mind.config().dimension);
+        let hv = self
+            .reward_adapter
+            .encode(&outcome, self.mind.config().dimension);
         self.mind.perceive(hv);
         let _ = self.mind.tick();
         self.trial_counter += 1;

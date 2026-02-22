@@ -40,7 +40,12 @@ impl BartBenchmark {
         for step in 0..15 {
             let reward_norm = (step as f64 * 0.1).min(1.0);
             let obs = Observation::new(
-                vec![step as f64 / 30.0, reward_norm, 1.0 - step as f64 / 30.0, 0.0],
+                vec![
+                    step as f64 / 30.0,
+                    reward_norm,
+                    1.0 - step as f64 / 30.0,
+                    0.0,
+                ],
                 1.0,
                 "bart_warmup",
             );
@@ -48,7 +53,12 @@ impl BartBenchmark {
             let _ = agent.select_action();
             let next_r = ((step + 1) as f64 * 0.1).min(1.0);
             let outcome = Observation::new(
-                vec![(step + 1) as f64 / 30.0, next_r, 1.0 - (step + 1) as f64 / 30.0, 0.0],
+                vec![
+                    (step + 1) as f64 / 30.0,
+                    next_r,
+                    1.0 - (step + 1) as f64 / 30.0,
+                    0.0,
+                ],
                 1.0,
                 "bart_warmup_outcome",
             );
@@ -64,7 +74,8 @@ impl BartBenchmark {
         let mut total_earnings = 0.0f64;
         let mut pops = 0u64;
 
-        #[allow(clippy::explicit_counter_loop)] // experienced_balloons tracks cumulative state across pops, not just loop iteration
+        #[allow(clippy::explicit_counter_loop)]
+        // experienced_balloons tracks cumulative state across pops, not just loop iteration
         for _ in 0..num_balloons {
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
@@ -120,14 +131,19 @@ impl BartBenchmark {
                 0.3
             };
             let obs = Observation::new(
-                vec![inflation_at_target, (target_pumps as f64 * reward_per_pump / 3.0).min(1.0),
-                     1.0 - inflation_at_target, pop_rate_so_far.min(1.0)],
+                vec![
+                    inflation_at_target,
+                    (target_pumps as f64 * reward_per_pump / 3.0).min(1.0),
+                    1.0 - inflation_at_target,
+                    pop_rate_so_far.min(1.0),
+                ],
                 1.0,
                 "bart",
             );
             agent.perceive(&obs);
             let action_result = agent.select_action();
-            let fep_pump_prob = action_result.action_probabilities
+            let fep_pump_prob = action_result
+                .action_probabilities
                 .first()
                 .copied()
                 .unwrap_or(0.5);
@@ -143,7 +159,9 @@ impl BartBenchmark {
             rng_state ^= rng_state >> 7;
             rng_state ^= rng_state << 17;
             let noise = (rng_state % 7) as i64 - 3;
-            let final_target = (adjusted_target as i64 + noise).max(1).min(max_pumps as i64) as usize;
+            let final_target = (adjusted_target as i64 + noise)
+                .max(1)
+                .min(max_pumps as i64) as usize;
 
             // Execute pumps to target (may pop before reaching it)
             let mut pumps = 0usize;
