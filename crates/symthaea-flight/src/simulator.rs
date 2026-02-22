@@ -24,15 +24,19 @@ pub trait PhysicsSimulator {
     fn apply_external_force(&mut self, force: [f64; 3]);
 }
 
-/// Simple ballistic physics model for pure-Rust testing.
+/// Simple physics model for pure-Rust testing.
 ///
-/// Simulates a rigid body with thrust and moments (no rotor dynamics).
+/// Simulates a rigid body with thrust, moments, and aerodynamic drag (no rotor dynamics).
 /// Good enough for verifying the multi-rate loop and training convergence.
 pub struct SimplePhysicsSimulator {
     state: FlightState,
     mass: f64,
     inertia: [f64; 3],
     external_force: [f64; 3],
+    /// Translational drag coefficient (N·s/m). Approximate for Crazyflie-size quad.
+    drag_coeff: f64,
+    /// Angular damping coefficient (1/s). Used as `exp(-c * dt)` per step.
+    angular_damping: f64,
 }
 
 impl SimplePhysicsSimulator {
@@ -43,6 +47,8 @@ impl SimplePhysicsSimulator {
             mass: 0.027,
             inertia: [1.4e-5, 1.4e-5, 2.2e-5],
             external_force: [0.0; 3],
+            drag_coeff: 0.01,     // N·s/m — empirical for Crazyflie-size
+            angular_damping: 5.0, // 1/s — moderate rotational damping
         }
     }
 }
@@ -70,12 +76,17 @@ impl PhysicsSimulator for SimplePhysicsSimulator {
         let ay = fy / self.mass;
         let az = fz / self.mass - g;
 
-        // Update linear velocity
+        // Translational drag: F_drag = -k * v (velocity-proportional)
+        let drag = self.drag_coeff / self.mass;
+        let ax = ax - drag * self.state.linear_velocity[0];
+        let ay = ay - drag * self.state.linear_velocity[1];
+        let az = az - drag * self.state.linear_velocity[2];
+
+        // Semi-implicit Euler: velocity from new acceleration, position from new velocity
         self.state.linear_velocity[0] += ax * dt;
         self.state.linear_velocity[1] += ay * dt;
         self.state.linear_velocity[2] += az * dt;
 
-        // Update position
         self.state.position[0] += self.state.linear_velocity[0] * dt;
         self.state.position[1] += self.state.linear_velocity[1] * dt;
         self.state.position[2] += self.state.linear_velocity[2] * dt;
@@ -96,9 +107,10 @@ impl PhysicsSimulator for SimplePhysicsSimulator {
         self.state.angular_velocity[1] += alpha_y * dt;
         self.state.angular_velocity[2] += alpha_z * dt;
 
-        // Simple angular damping
+        // Angular damping: exponential decay, dt-dependent for physical consistency
+        let ang_decay = (-self.angular_damping * dt).exp();
         for av in &mut self.state.angular_velocity {
-            *av *= 0.99;
+            *av *= ang_decay;
         }
 
         // Update quaternion from angular velocity
@@ -185,6 +197,60 @@ mod tests {
     }
 
     #[test]
+    fn test_drag_limits_velocity() {
+        let mut sim = SimplePhysicsSimulator::new();
+        let cmd = QuadrotorCommand::hover();
+
+        // Apply a lateral impulse
+        sim.apply_external_force([0.05, 0.0, 0.0]);
+        sim.step(&cmd, 0.002);
+        let v_after_impulse = sim.state().linear_velocity[0];
+
+        // Run for many steps with no external force — drag should decelerate
+        for _ in 0..500 {
+            sim.step(&cmd, 0.002);
+        }
+        let v_after_drag = sim.state().linear_velocity[0];
+
+        assert!(
+            v_after_drag.abs() < v_after_impulse.abs(),
+            "Drag should decelerate: impulse_v={v_after_impulse:.6}, final_v={v_after_drag:.6}"
+        );
+    }
+
+    #[test]
+    fn test_angular_damping_dt_dependent() {
+        // Two sims with different dt should produce similar angular decay over same wall-time.
+        let mut sim_fast = SimplePhysicsSimulator::new();
+        let mut sim_slow = SimplePhysicsSimulator::new();
+
+        // Give both an angular kick
+        sim_fast.state.angular_velocity = [1.0, 0.0, 0.0];
+        sim_slow.state.angular_velocity = [1.0, 0.0, 0.0];
+
+        let cmd = QuadrotorCommand::hover();
+        let _total_time = 0.1; // 100ms
+
+        // sim_fast: 50 steps at dt=0.002
+        for _ in 0..50 {
+            sim_fast.step(&cmd, 0.002);
+        }
+        // sim_slow: 10 steps at dt=0.01
+        for _ in 0..10 {
+            sim_slow.step(&cmd, 0.01);
+        }
+
+        let w_fast = sim_fast.state.angular_velocity[0];
+        let w_slow = sim_slow.state.angular_velocity[0];
+
+        // With dt-dependent damping, both should produce similar results
+        assert!(
+            (w_fast - w_slow).abs() < 0.05,
+            "dt-dependent damping should give consistent results: fast={w_fast:.4}, slow={w_slow:.4}"
+        );
+    }
+
+    #[test]
     fn test_external_force_displaces() {
         let mut sim = SimplePhysicsSimulator::new();
         let cmd = QuadrotorCommand::hover();
@@ -206,5 +272,57 @@ mod tests {
         sim.reset(0.5);
         assert!((sim.state().altitude() - 0.5).abs() < 1e-10);
         assert!(sim.state().speed() < 1e-10);
+    }
+
+    #[test]
+    fn test_long_horizon_hover_stability() {
+        // With drag, hover command should maintain altitude over 2000 steps (4s).
+        // This is the regression test that catches drag-less divergence.
+        let mut sim = SimplePhysicsSimulator::new();
+        let cmd = QuadrotorCommand::hover();
+
+        for step in 0..2000 {
+            sim.step(&cmd, 0.002);
+
+            // Position should remain bounded throughout
+            let pos_err = (sim.state().position[0].powi(2)
+                + sim.state().position[1].powi(2)
+                + (sim.state().position[2] - 0.1).powi(2))
+            .sqrt();
+
+            assert!(
+                pos_err < 0.10,
+                "Position error unbounded at step {step}: {pos_err:.4}m (drag should prevent this)"
+            );
+        }
+
+        // Final altitude should be close to initial
+        assert!(
+            (sim.state().altitude() - 0.1).abs() < 0.05,
+            "Long-horizon hover failed: final altitude = {:.4}m",
+            sim.state().altitude()
+        );
+    }
+
+    #[test]
+    fn test_drag_bounds_velocity_after_gust() {
+        // After a strong lateral gust, drag should bring velocity back toward zero
+        let mut sim = SimplePhysicsSimulator::new();
+        let cmd = QuadrotorCommand::hover();
+
+        // Strong lateral gust
+        sim.apply_external_force([0.1, 0.0, 0.0]);
+        sim.step(&cmd, 0.002);
+
+        // Run for 2 seconds — velocity should decay significantly
+        for _ in 0..1000 {
+            sim.step(&cmd, 0.002);
+        }
+
+        let vx = sim.state().linear_velocity[0];
+        assert!(
+            vx.abs() < 0.5,
+            "Drag should limit lateral velocity after gust: vx={vx:.4}"
+        );
     }
 }

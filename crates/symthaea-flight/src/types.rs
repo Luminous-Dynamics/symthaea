@@ -157,9 +157,15 @@ impl QuadrotorCommand {
     pub fn clamped(self) -> Self {
         Self {
             thrust: self.thrust.clamp(0.0, Self::MAX_THRUST),
-            roll_moment: self.roll_moment.clamp(-Self::MAX_MOMENT_RP, Self::MAX_MOMENT_RP),
-            pitch_moment: self.pitch_moment.clamp(-Self::MAX_MOMENT_RP, Self::MAX_MOMENT_RP),
-            yaw_moment: self.yaw_moment.clamp(-Self::MAX_MOMENT_YAW, Self::MAX_MOMENT_YAW),
+            roll_moment: self
+                .roll_moment
+                .clamp(-Self::MAX_MOMENT_RP, Self::MAX_MOMENT_RP),
+            pitch_moment: self
+                .pitch_moment
+                .clamp(-Self::MAX_MOMENT_RP, Self::MAX_MOMENT_RP),
+            yaw_moment: self
+                .yaw_moment
+                .clamp(-Self::MAX_MOMENT_YAW, Self::MAX_MOMENT_YAW),
         }
     }
 
@@ -289,6 +295,11 @@ pub struct FlightConfig {
     pub replay_buffer_size: usize,
     /// Number of replay samples per training step (default: 3).
     pub replay_count: usize,
+    /// Enable cosine annealing LR schedule across episodes (default: true).
+    pub enable_lr_schedule: bool,
+    /// Enable early termination on crash or divergence (default: true).
+    /// Terminates episode if position error > 5m or altitude < 0.
+    pub early_termination: bool,
 }
 
 impl Default for FlightConfig {
@@ -307,6 +318,8 @@ impl Default for FlightConfig {
             collect_telemetry: false,
             replay_buffer_size: 64,
             replay_count: 3,
+            enable_lr_schedule: true,
+            early_termination: true,
         }
     }
 }
@@ -357,7 +370,11 @@ impl Default for PdGains {
 ///
 /// This serves as the training target: the CfC network learns to imitate
 /// this PD controller, while the FEP layer modulates adaptation dynamics.
-pub fn pd_baseline(state: &FlightState, setpoint: &FlightSetpoint, gains: &PdGains) -> QuadrotorCommand {
+pub fn pd_baseline(
+    state: &FlightState,
+    setpoint: &FlightSetpoint,
+    gains: &PdGains,
+) -> QuadrotorCommand {
     // Position error → thrust adjustment
     let pos_err = setpoint.position_error(state);
     let z_err = pos_err[2];
@@ -371,10 +388,10 @@ pub fn pd_baseline(state: &FlightState, setpoint: &FlightSetpoint, gains: &PdGai
     let [wx, wy, wz] = state.angular_velocity;
 
     // Desired roll/pitch from lateral position error
-    let desired_pitch = (gains.kp_pos * pos_err[0] - gains.kd_pos * state.linear_velocity[0])
-        .clamp(-0.3, 0.3);
-    let desired_roll = -(gains.kp_pos * pos_err[1] - gains.kd_pos * state.linear_velocity[1])
-        .clamp(-0.3, 0.3);
+    let desired_pitch =
+        (gains.kp_pos * pos_err[0] - gains.kd_pos * state.linear_velocity[0]).clamp(-0.3, 0.3);
+    let desired_roll =
+        -(gains.kp_pos * pos_err[1] - gains.kd_pos * state.linear_velocity[1]).clamp(-0.3, 0.3);
 
     let roll_moment = gains.kp_att * (desired_roll - roll) - gains.kd_att * wx;
     let pitch_moment = gains.kp_att * (desired_pitch - pitch) - gains.kd_att * wy;

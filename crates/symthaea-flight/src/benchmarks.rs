@@ -2,6 +2,9 @@
 //!
 //! Compares flight performance with and without Active Inference modulation
 //! under wind disturbances injected via `PhysicsSimulator::apply_external_force`.
+//!
+//! Supports multiple physics backends (Simple, MuJoCo, MuJoCo+Noise) for
+//! sim-to-real transfer validation.
 
 use symthaea_core::genesis::GenesisSeed;
 
@@ -43,7 +46,7 @@ impl Default for WindBenchmarkConfig {
             },
             gusts: vec![
                 WindGust {
-                    force: [0.05, 0.0, 0.0],  // Lateral gust
+                    force: [0.05, 0.0, 0.0], // Lateral gust
                     start_time: 0.5,
                     duration: 0.2,
                 },
@@ -73,10 +76,61 @@ pub struct WindBenchmarkResult {
     pub baseline_max_deviation: f64,
 }
 
-/// Run the wind gust robustness benchmark.
+/// Physics backend selection for polymorphic benchmarks.
+#[derive(Debug, Clone)]
+pub enum PhysicsBackend {
+    /// Pure Rust simplified physics (default, no external deps).
+    Simple,
+    /// MuJoCo high-fidelity physics (requires `mujoco` feature).
+    #[cfg(feature = "mujoco")]
+    MuJoCo,
+    /// MuJoCo with sensory noise injection (requires `mujoco` feature).
+    #[cfg(feature = "mujoco")]
+    MuJoCoNoisy(crate::sensory_filter::SensoryFilterConfig),
+}
+
+/// Factory: create a physics simulator from a backend enum.
+fn create_simulator(backend: &PhysicsBackend) -> Box<dyn PhysicsSimulator> {
+    match backend {
+        PhysicsBackend::Simple => Box::new(SimplePhysicsSimulator::new()),
+        #[cfg(feature = "mujoco")]
+        PhysicsBackend::MuJoCo => Box::new(crate::mujoco_sim::MuJoCoSimulator::from_primitive()),
+        #[cfg(feature = "mujoco")]
+        PhysicsBackend::MuJoCoNoisy(noise_config) => {
+            let mut sim = crate::mujoco_sim::MuJoCoSimulator::from_primitive();
+            sim.enable_sensory_filter(noise_config.clone());
+            Box::new(sim)
+        }
+    }
+}
+
+/// Run the wind gust robustness benchmark with the default (Simple) backend.
 ///
 /// Compares a "frozen" baseline (no FEP modulation) against full Active Inference.
 pub fn run_wind_benchmark(config: &WindBenchmarkConfig) -> WindBenchmarkResult {
+    run_wind_benchmark_with_backend(config, &PhysicsBackend::Simple)
+}
+
+/// Run the wind gust robustness benchmark with MuJoCo backend.
+#[cfg(feature = "mujoco")]
+pub fn run_wind_benchmark_mujoco(config: &WindBenchmarkConfig) -> WindBenchmarkResult {
+    run_wind_benchmark_with_backend(config, &PhysicsBackend::MuJoCo)
+}
+
+/// Run the wind gust robustness benchmark with MuJoCo + sensory noise.
+#[cfg(feature = "mujoco")]
+pub fn run_wind_benchmark_mujoco_noisy(
+    config: &WindBenchmarkConfig,
+    noise_config: crate::sensory_filter::SensoryFilterConfig,
+) -> WindBenchmarkResult {
+    run_wind_benchmark_with_backend(config, &PhysicsBackend::MuJoCoNoisy(noise_config))
+}
+
+/// Run the wind gust robustness benchmark with a specified physics backend.
+pub fn run_wind_benchmark_with_backend(
+    config: &WindBenchmarkConfig,
+    backend: &PhysicsBackend,
+) -> WindBenchmarkResult {
     let genesis = GenesisSeed::from_phrase(&config.flight_config.genesis_phrase);
     let setpoint = FlightSetpoint::hover();
     let dt = config.flight_config.motor_dt();
@@ -92,7 +146,7 @@ pub fn run_wind_benchmark(config: &WindBenchmarkConfig) -> WindBenchmarkResult {
     for ep in 0..config.eval_episodes {
         // ── Baseline: frozen FEP agent (no modulation) ──
         {
-            let mut physics = SimplePhysicsSimulator::new();
+            let mut physics = create_simulator(backend);
             physics.reset(0.1);
             let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.flight_config.num_levels);
             let mut controller = FlightController::new(&genesis, &config.flight_config);
@@ -120,7 +174,8 @@ pub fn run_wind_benchmark(config: &WindBenchmarkConfig) -> WindBenchmarkResult {
                 // Training (still train, just no FEP modulation)
                 if step % config.flight_config.train_every == 0 {
                     let target = pd_baseline(&state, &setpoint, &pd_gains);
-                    let lr = config.flight_config.learning_rate * frozen_result.learning_rate_factor;
+                    let lr =
+                        config.flight_config.learning_rate * frozen_result.learning_rate_factor;
                     controller.train_step(&sensor_hv, &target, dt as f32, Some(lr));
                 }
             }
@@ -129,7 +184,7 @@ pub fn run_wind_benchmark(config: &WindBenchmarkConfig) -> WindBenchmarkResult {
 
         // ── FEP: full Active Inference modulation ──
         {
-            let mut physics = SimplePhysicsSimulator::new();
+            let mut physics = create_simulator(backend);
             physics.reset(0.1);
             let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.flight_config.num_levels);
             let mut controller = FlightController::new(&genesis, &config.flight_config);
@@ -208,6 +263,117 @@ pub fn run_wind_benchmark(config: &WindBenchmarkConfig) -> WindBenchmarkResult {
         recovery_steps,
         max_deviation: max_dev_fep,
         baseline_max_deviation: max_dev_baseline,
+    }
+}
+
+/// Run a perturbation benchmark with MuJoCo backend.
+///
+/// Tests FEP's survival reflex: mid-flight mass/rotor changes.
+#[cfg(feature = "mujoco")]
+pub fn run_perturbation_benchmark(
+    config: &FlightConfig,
+    schedule: &crate::perturbations::PerturbationSchedule,
+) -> crate::perturbations::PerturbationBenchmarkResult {
+    use crate::perturbations::PerturbationBenchmarkResult;
+
+    let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+    let setpoint = FlightSetpoint::hover();
+    let dt = config.motor_dt();
+    let pd_gains = PdGains::default();
+    let cognitive_interval = config.cognitive_interval();
+
+    let mut sim = crate::mujoco_sim::MuJoCoSimulator::from_primitive();
+    sim.reset(0.1);
+
+    let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.num_levels);
+    let mut controller = FlightController::new(&genesis, config);
+    let mut fep_agent = ActiveInferenceFlightAgent::new(FlightFepConfig::default());
+    let mut fep_result = fep_agent.initial_step(sim.state(), &setpoint);
+
+    // Find first perturbation step for pre/post comparison
+    let first_trigger = schedule
+        .perturbations()
+        .iter()
+        .map(|p| p.trigger_step())
+        .min()
+        .unwrap_or(config.steps_per_episode);
+
+    let mut pre_errors = Vec::new();
+    let mut peak_error = 0.0f64;
+    let mut min_tau = 1.0f32;
+    let mut recovery_step = None;
+    let mut crashed = false;
+
+    let mut fe_trace = Vec::with_capacity(config.steps_per_episode);
+    let mut error_trace = Vec::with_capacity(config.steps_per_episode);
+    let mut tau_trace = Vec::with_capacity(config.steps_per_episode);
+
+    for step in 0..config.steps_per_episode {
+        // Apply perturbations
+        schedule.apply(step, &mut sim);
+
+        let state = sim.state().clone();
+        let sensor_hv = encoder.encode(&state);
+        let mut command = controller.forward(&sensor_hv, dt as f32);
+
+        if let Some(noise) = &fep_result.exploration_noise {
+            command = command.with_noise(noise);
+        }
+
+        sim.step(&command, dt);
+
+        let err = setpoint.position_error_magnitude(&state);
+        error_trace.push(err);
+        fe_trace.push(fep_result.free_energy);
+        tau_trace.push(fep_result.tau_factor);
+
+        if step < first_trigger {
+            pre_errors.push(err);
+        } else {
+            peak_error = peak_error.max(err);
+            if recovery_step.is_none() && err < 0.05 && step > first_trigger + 10 {
+                recovery_step = Some(step - first_trigger);
+            }
+        }
+
+        if state.altitude() <= 0.0 {
+            crashed = true;
+        }
+
+        min_tau = min_tau.min(fep_result.tau_factor);
+
+        if step % config.train_every == 0 {
+            let target = pd_baseline(&state, &setpoint, &pd_gains);
+            let lr = config.learning_rate * fep_result.learning_rate_factor;
+            controller.train_step(&sensor_hv, &target, dt as f32, Some(lr));
+        }
+
+        if step % cognitive_interval == 0 {
+            fep_result = fep_agent.step(sim.state(), &setpoint);
+            if (fep_result.tau_factor - 1.0).abs() > 0.01 {
+                controller.modulate_tau(fep_result.tau_factor);
+            }
+        }
+    }
+
+    let pre_avg = if pre_errors.is_empty() {
+        0.0
+    } else {
+        pre_errors.iter().sum::<f64>() / pre_errors.len() as f64
+    };
+
+    let final_err = error_trace.last().cloned().unwrap_or(0.0);
+
+    PerturbationBenchmarkResult {
+        pre_perturbation_error: pre_avg,
+        peak_error,
+        recovery_steps: recovery_step.unwrap_or(config.steps_per_episode),
+        final_error: final_err,
+        min_tau: min_tau as f64,
+        crashed,
+        free_energy_trace: fe_trace,
+        error_trace,
+        tau_trace,
     }
 }
 
@@ -293,10 +459,9 @@ mod tests {
         let result = run_wind_benchmark(&config);
 
         // FEP average error should not be dramatically worse than baseline
-        let baseline_avg: f64 = result.baseline_metrics.iter().sum::<f64>()
-            / result.baseline_metrics.len() as f64;
-        let fep_avg: f64 = result.fep_metrics.iter().sum::<f64>()
-            / result.fep_metrics.len() as f64;
+        let baseline_avg: f64 =
+            result.baseline_metrics.iter().sum::<f64>() / result.baseline_metrics.len() as f64;
+        let fep_avg: f64 = result.fep_metrics.iter().sum::<f64>() / result.fep_metrics.len() as f64;
 
         assert!(
             fep_avg < baseline_avg * 1.5,
@@ -337,5 +502,25 @@ mod tests {
         for e in &result.fep_metrics {
             assert!(e.is_finite());
         }
+    }
+
+    #[test]
+    fn test_physics_backend_simple() {
+        // Ensure explicit Simple backend produces same results as default
+        let config = WindBenchmarkConfig {
+            flight_config: FlightConfig {
+                steps_per_episode: 100,
+                ..FlightConfig::default()
+            },
+            gusts: vec![WindGust {
+                force: [0.05, 0.0, 0.0],
+                start_time: 0.05,
+                duration: 0.05,
+            }],
+            eval_episodes: 1,
+        };
+        let result = run_wind_benchmark_with_backend(&config, &PhysicsBackend::Simple);
+        assert!(result.baseline_metrics[0].is_finite());
+        assert!(result.fep_metrics[0].is_finite());
     }
 }

@@ -1,7 +1,11 @@
-//! Interactive viewer for MuJoCo flight simulation (behind `mujoco` feature).
+//! Interactive viewer for MuJoCo flight simulation.
 //!
-//! Wraps the mujoco-rs visualizer for real-time rendering and debugging
-//! of quadrotor flight trajectories.
+//! Wraps the mujoco-rs passive viewer for real-time 3D rendering and debugging
+//! of quadrotor flight trajectories. Feature-gated behind `mujoco-viewer`.
+//!
+//! Two modes:
+//! - **Passive viewer**: renders in background, simulation runs in main thread
+//! - **Headless**: no viewer, just simulation (for benchmarks/CI)
 
 use crate::mujoco_sim::MuJoCoSimulator;
 
@@ -10,29 +14,68 @@ use crate::mujoco_sim::MuJoCoSimulator;
 /// Provides real-time 3D rendering of the quadrotor and its trajectory,
 /// with camera controls and telemetry overlay.
 pub struct FlightViewer {
-    // mujoco-rs Viewer would go here
+    #[cfg(feature = "mujoco-viewer")]
+    viewer: mujoco_rs::MjViewer,
     title: String,
     frame_count: u64,
+    #[cfg(not(feature = "mujoco-viewer"))]
+    _phantom: std::marker::PhantomData<()>,
 }
 
 impl FlightViewer {
     /// Create a new viewer for the given simulator.
+    ///
+    /// Launches a passive viewer window. The simulation runs in the calling
+    /// thread; the viewer renders asynchronously.
+    #[cfg(feature = "mujoco-viewer")]
     pub fn new(sim: &MuJoCoSimulator, title: &str) -> Self {
-        let _ = sim; // Would initialize from sim's model
+        let viewer = mujoco_rs::MjViewer::launch_passive(
+            &sim.model, 0, // window index
+        );
         Self {
+            viewer,
             title: title.to_string(),
             frame_count: 0,
         }
     }
 
-    /// Render one frame.
+    /// Create a stub viewer (no window) when mujoco-viewer feature is disabled.
+    #[cfg(not(feature = "mujoco-viewer"))]
+    pub fn new(_sim: &MuJoCoSimulator, title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            frame_count: 0,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    /// Render one frame. Returns false when the viewer window is closed.
     ///
-    /// In a real implementation, this would call the MuJoCo visualizer's
-    /// render loop and handle user input (camera, pause, etc.).
-    pub fn render(&mut self, sim: &MuJoCoSimulator) -> bool {
-        let _ = sim;
+    /// Call this after each simulation step (or every N steps for performance).
+    #[cfg(feature = "mujoco-viewer")]
+    pub fn render(&mut self, sim: &mut MuJoCoSimulator) -> bool {
         self.frame_count += 1;
-        true // Return false when window is closed
+        self.viewer.sync(&mut sim.data);
+        self.viewer.running()
+    }
+
+    /// Stub render (always returns true) when viewer is disabled.
+    #[cfg(not(feature = "mujoco-viewer"))]
+    pub fn render(&mut self, _sim: &mut MuJoCoSimulator) -> bool {
+        self.frame_count += 1;
+        true
+    }
+
+    /// Check if the viewer window is still open.
+    #[cfg(feature = "mujoco-viewer")]
+    pub fn is_running(&self) -> bool {
+        self.viewer.running()
+    }
+
+    /// Stub: always returns true.
+    #[cfg(not(feature = "mujoco-viewer"))]
+    pub fn is_running(&self) -> bool {
+        true
     }
 
     /// Get the window title.

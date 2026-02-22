@@ -8395,6 +8395,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "mujoco-rs"
+version = "2.3.3+mj-3.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3d8b6e53cbf859c02e10052d1f88fb2db5177ae8b0f2a0dc720d06b5e01b67a"
+dependencies = [
+ "bitflags 2.10.0",
+ "bytemuck",
+ "glutin",
+ "glutin-winit",
+ "paste",
+ "pkg-config",
+ "winit",
+]
+
+[[package]]
 name = "multimap"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12949,7 +12964,11 @@ name = "symthaea-flight"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "mujoco-rs",
+ "parking_lot",
  "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "rayon",
  "serde",
  "serde_json",
  "symthaea-core",

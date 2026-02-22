@@ -12,19 +12,8 @@ use crate::types::FlightState;
 
 /// Channel names for the 13 sensor dimensions.
 const CHANNEL_NAMES: [&str; 13] = [
-    "pos_x",
-    "pos_y",
-    "pos_z",
-    "quat_w",
-    "quat_x",
-    "quat_y",
-    "quat_z",
-    "vel_x",
-    "vel_y",
-    "vel_z",
-    "angvel_x",
-    "angvel_y",
-    "angvel_z",
+    "pos_x", "pos_y", "pos_z", "quat_w", "quat_x", "quat_y", "quat_z", "vel_x", "vel_y", "vel_z",
+    "angvel_x", "angvel_y", "angvel_z",
 ];
 
 /// Typical sensor ranges for normalization to [0, 1].
@@ -40,9 +29,9 @@ const CHANNEL_RANGES: [[f32; 2]; 13] = [
     [-5.0, 5.0],   // vel_x (m/s)
     [-5.0, 5.0],   // vel_y
     [-5.0, 5.0],   // vel_z
-    [-20.0, 20.0],  // angvel_x (rad/s)
-    [-20.0, 20.0],  // angvel_y
-    [-20.0, 20.0],  // angvel_z
+    [-20.0, 20.0], // angvel_x (rad/s)
+    [-20.0, 20.0], // angvel_y
+    [-20.0, 20.0], // angvel_z
 ];
 
 /// HDC encoder for quadrotor sensor state.
@@ -77,18 +66,18 @@ impl QuadrotorHdcEncoder {
         let base_vectors: Vec<ContinuousHV> = CHANNEL_NAMES
             .iter()
             .map(|name| {
-                ContinuousHV::from_genesis(genesis, &format!("flight::channel::{name}"), HDC_DIMENSION)
+                ContinuousHV::from_genesis(
+                    genesis,
+                    &format!("flight::channel::{name}"),
+                    HDC_DIMENSION,
+                )
             })
             .collect();
 
         // Generate level codebook
         let level_vectors: Vec<ContinuousHV> = (0..num_levels)
             .map(|i| {
-                ContinuousHV::from_genesis(
-                    genesis,
-                    &format!("flight::level::{i}"),
-                    HDC_DIMENSION,
-                )
+                ContinuousHV::from_genesis(genesis, &format!("flight::level::{i}"), HDC_DIMENSION)
             })
             .collect();
 
@@ -205,7 +194,10 @@ mod tests {
         let hv2 = enc2.encode(&state);
 
         assert_eq!(hv1.dim(), HDC_DIMENSION);
-        assert!((hv1.similarity(&hv2) - 1.0).abs() < 1e-5, "Same genesis → identical encoding");
+        assert!(
+            (hv1.similarity(&hv2) - 1.0).abs() < 1e-5,
+            "Same genesis → identical encoding"
+        );
     }
 
     #[test]
@@ -237,15 +229,9 @@ mod tests {
 
         // Dramatically different states should produce noticeably different HVs
         let sim = hv_hover.similarity(&hv_flying);
-        assert!(
-            sim < 0.95,
-            "Very different states should differ: sim={sim}"
-        );
+        assert!(sim < 0.95, "Very different states should differ: sim={sim}");
         // But should still not be orthogonal (they share structure)
-        assert!(
-            sim > 0.0,
-            "Should share some structure: sim={sim}"
-        );
+        assert!(sim > 0.0, "Should share some structure: sim={sim}");
     }
 
     #[test]
@@ -261,7 +247,10 @@ mod tests {
         let hv2 = enc.encode(&state2);
 
         let sim = hv1.similarity(&hv2);
-        assert!(sim > 0.8, "Similar states should have high similarity: sim={sim}");
+        assert!(
+            sim > 0.8,
+            "Similar states should have high similarity: sim={sim}"
+        );
     }
 
     #[test]
