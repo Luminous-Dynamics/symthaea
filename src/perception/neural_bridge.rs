@@ -316,7 +316,12 @@ fn parse_npy<R: Read>(reader: &mut R) -> Result<(Vec<usize>, Vec<f32>)> {
     // Read data (float32 little-endian)
     let mut data = vec![0.0f32; n_elements];
 
-    // Read as bytes and transmute (safe because we control the layout)
+    // SAFETY: `data` is a valid `Vec<f32>` of length `n_elements`, and `byte_count`
+    // equals `n_elements * 4` (checked above). `f32` has no padding bytes and is
+    // layout-compatible with `[u8; 4]`, so reinterpreting the backing allocation as
+    // `&mut [u8]` of length `byte_count` is sound. The pointer is properly aligned
+    // (Vec guarantees alignment) and the lifetime is bounded by `data`.
+    debug_assert_eq!(byte_count, n_elements * std::mem::size_of::<f32>());
     let data_bytes =
         unsafe { std::slice::from_raw_parts_mut(data.as_mut_ptr() as *mut u8, byte_count) };
     reader.read_exact(data_bytes)?;

@@ -36,7 +36,7 @@ impl AsyncTrainerHandle {
         let (sample_tx, sample_rx) = mpsc::sync_channel::<TrainingSample>(4);
         let (weights_tx, weights_rx) = mpsc::channel::<Vec<f32>>();
 
-        std::thread::Builder::new()
+        match std::thread::Builder::new()
             .name("symthaea-trainer".into())
             .spawn(move || {
                 let mut steps_since_publish: u32 = 0;
@@ -84,8 +84,12 @@ impl AsyncTrainerHandle {
                         steps_since_publish = 0;
                     }
                 }
-            })
-            .unwrap_or_else(|e| panic!("failed to spawn trainer thread: {e}"));
+            }) {
+            Ok(_) => {}
+            Err(e) => {
+                tracing::error!("failed to spawn trainer thread: {e} — training will be disabled");
+            }
+        }
 
         Self {
             sample_tx,

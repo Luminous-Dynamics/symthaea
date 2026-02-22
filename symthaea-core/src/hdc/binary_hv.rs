@@ -588,7 +588,12 @@ impl BinaryHV {
 
         // Convert to u64 words for efficient rotation
         // We have 2048 bytes = 256 u64 words
+        // SAFETY: `self.0` is `[u8; 2048]` which has the same size and compatible
+        // alignment as `[u64; 256]` (2048 bytes). The pointer is valid for reads
+        // over the entire array. `u64` has no invalid bit patterns.
         let words: &[u64; 256] = unsafe { &*(self.0.as_ptr() as *const [u64; 256]) };
+        // SAFETY: `result` is `[u8; 2048]`, same layout guarantees as above.
+        // The mutable reference is exclusive since `result` is a local variable.
         let result_words: &mut [u64; 256] =
             unsafe { &mut *(result.as_mut_ptr() as *mut [u64; 256]) };
 
