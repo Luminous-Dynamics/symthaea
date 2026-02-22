@@ -174,7 +174,7 @@ impl SparseProjector {
         }
     }
 
-    /// Project continuous features [0.0, 1.0] to a sparse binary HDC vector
+    /// Project continuous features `[0.0, 1.0]` to a sparse binary HDC vector
     pub fn project(&self, features: &[f32]) -> HV {
         let mut result = HV::zero();
 

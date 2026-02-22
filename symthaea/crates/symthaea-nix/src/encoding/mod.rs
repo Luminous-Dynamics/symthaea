@@ -3,7 +3,7 @@
 //! Transforms NixOS data (option paths, packages, configs, system state,
 //! user input) into hypervectors in a shared semantic space.
 //!
-//! All encoders share a [`NixCodebook`] to ensure vectors are comparable.
+//! All encoders share a `NixCodebook` to ensure vectors are comparable.
 
 pub mod codebook;
 pub mod config_encoder;

@@ -734,7 +734,8 @@ mod tests {
         let result = system.assess();
         assert!(result.phi_self.is_finite(), "Phi_self should be finite");
         assert!(result.phi_self >= 0.0, "Phi_self should be non-negative");
-        assert!(result.meta_depth >= 0, "Meta depth should be non-negative");
+        // meta_depth is usize, always non-negative; just assert it exists
+        assert!(result.meta_depth <= 100, "Meta depth should be bounded");
     }
 
     #[test]

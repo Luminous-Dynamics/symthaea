@@ -119,68 +119,11 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // PRIMITIVE LATTICE: Structural metrics from tier system
-        // Computed once at startup; just read height/width per cycle for telemetry.
-        // Science: Davey & Priestley (2002) — lattice theory for knowledge systems
+        // [extracted to compute_lattice_phase]
         // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
         let (lattice_height, lattice_width, lattice_join_concept) =
-            if let Some(ref lattice) = self.primitive_lattice {
-                // Properties (height/width/modularity) are O(n²–n³) on the lattice graph.
-                // The lattice is immutable after construction → compute once on first cycle,
-                // cache in stats, and reuse. This eliminates ~31ms/cycle overhead.
-                let (height, width) = if self.stats.lattice_height_cached == 0 {
-                    let props = lattice.properties();
-                    self.stats.lattice_height_cached = props.height;
-                    self.stats.lattice_width_cached = props.width;
-                    (props.height, props.width)
-                } else {
-                    (
-                        self.stats.lattice_height_cached,
-                        self.stats.lattice_width_cached,
-                    )
-                };
+            self.compute_lattice_phase(&active_primitive_names, module_timings);
 
-                // FEEDBACK: Lattice height (integration depth) → LR modulation (once)
-                if height > 5 && self.stats.total_cycles == 0 {
-                    let depth_factor = 1.0 - (height.min(9) as f32 - 5.0) * 0.01;
-                    self.carryover.learning.subsystem_lr_factor *= depth_factor;
-                }
-
-                // Track B: Lattice join for concept composition (every 7 cycles — join is O(1) via precomputed table)
-                let join_concept =
-                    if active_primitive_names.len() >= 2 && self.stats.total_cycles % 7 == 0 {
-                        let mut best_join: Option<usize> = None;
-                        for i in 0..active_primitive_names.len() {
-                            for j in (i + 1)..active_primitive_names.len() {
-                                if let (Some(a), Some(b)) = (
-                                    lattice.element_index_by_name(&active_primitive_names[i]),
-                                    lattice.element_index_by_name(&active_primitive_names[j]),
-                                ) {
-                                    if let Some(idx) = lattice.join(a, b) {
-                                        match best_join {
-                                            Some(prev)
-                                                if lattice.elements[idx].tier
-                                                    < lattice.elements[prev].tier =>
-                                            {
-                                                best_join = Some(idx)
-                                            }
-                                            None => best_join = Some(idx),
-                                            _ => {}
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        best_join.map(|idx| lattice.elements[idx].name.clone())
-                    } else {
-                        None
-                    };
-
-                (height, width, join_concept)
-            } else {
-                (0, 0, None)
-            };
-        module_timings.primitive_lattice = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // COMPOSITIONALITY ENGINE: Algebraic composition of primitives
@@ -198,38 +141,11 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // UNIFIED VALUE EVALUATOR: Seven Harmonies alignment scoring
-        // Evaluates current cognitive action against fiduciary harmonics.
-        // Amortized: every 19 cycles (lightweight keyword match + harmony check, co-prime).
-        // Science: Panksepp (1998) affective neuroscience + value alignment.
+        // [extracted to compute_value_evaluator_phase]
         // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
         let (value_evaluator_score, value_evaluator_decision) =
-            if let Some(ref mut evaluator) = self.value_evaluator {
-                if self.stats.total_cycles % 19 == 0 {
-                    let ctx = crate::consciousness::unified_value_evaluator::EvaluationContext {
-                        consciousness_level: unified_psi,
-                        ..Default::default()
-                    };
-                    let result = evaluator.evaluate("cognitive_cycle", ctx);
-                    let decision_str = match &result.decision {
-                        crate::consciousness::unified_value_evaluator::Decision::Allow => "Allow",
-                        crate::consciousness::unified_value_evaluator::Decision::Warn(_) => "Warn",
-                        crate::consciousness::unified_value_evaluator::Decision::Veto(_) => "Veto",
-                    };
-                    self.carryover.quality.last_value_score = result.overall_score;
-                    (result.overall_score, decision_str.to_string())
-                } else {
-                    (self.carryover.quality.last_value_score, String::new())
-                }
-            } else {
-                (0.0, String::new())
-            };
-        module_timings.value_evaluator = _t.elapsed().as_micros() as u64;
+            self.compute_value_evaluator_phase(unified_psi, module_timings);
 
-        // FEEDBACK: Value evaluator Veto → suppress learning for this cycle
-        if value_evaluator_decision == "Veto" {
-            self.carryover.learning.subsystem_lr_factor *= 0.1; // Drastically reduce LR on value violation
-        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // CONSCIOUSNESS PROFILE: Multi-dimensional consciousness assessment
@@ -380,61 +296,11 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // FIDUCIARY HARMONICS: Seven Harmonies field coherence + interference
-        // Tracks harmonic levels driven by consciousness metrics, detects tensions.
-        // Amortized: every 11 cycles (field update + interference scan, co-prime).
-        // Science: Whitehead (1929), Deci & Ryan (2000) — value coherence theory.
+        // [extracted to compute_fiduciary_harmonics_phase]
         // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
         let (harmonic_field_coherence, harmonic_love_resonance, harmonic_interferences) =
-            if let Some(ref mut field) = self.harmonic_field {
-                if self.stats.total_cycles % 11 == 0 {
-                    // Drive harmonic levels from consciousness metrics
-                    use crate::consciousness::harmonics::FiduciaryHarmonic;
-                    field.set_level(FiduciaryHarmonic::ResonantCoherence, coherence as f64);
-                    field.set_level(
-                        FiduciaryHarmonic::EvolutionaryProgression,
-                        (prediction_error as f64 * 2.0).clamp(0.0, 1.0),
-                    ); // high error = high evolution pressure
-                    field.set_level(
-                        FiduciaryHarmonic::IntegralWisdom,
-                        self.prediction_confidence as f64,
-                    );
-                    field.set_level(
-                        FiduciaryHarmonic::PanSentientFlourishing,
-                        unified_psi.clamp(0.0, 1.0),
-                    );
-                    field.detect_interferences();
-                    // Resolve interferences if any were detected
-                    if !field.interferences.is_empty() {
-                        if let Some(ref resolver) = self.harmonic_resolver {
-                            let _resolution = resolver.resolve(field);
-                        }
-                    }
-                    self.carryover.consciousness.last_harmonic_coherence = field.field_coherence;
-                    (
-                        field.field_coherence,
-                        field.infinite_love_resonance,
-                        field.interferences.len(),
-                    )
-                } else {
-                    (self.carryover.consciousness.last_harmonic_coherence, 0.0, 0)
-                }
-            } else {
-                (0.0, 0.0, 0)
-            };
-        module_timings.harmonics = _t.elapsed().as_micros() as u64;
+            self.compute_fiduciary_harmonics_phase(coherence, prediction_error, unified_psi, module_timings);
 
-        // FEEDBACK: Harmonic coherence → LR stability (coherent values = stable learning)
-        if harmonic_field_coherence > 0.6 {
-            let harmony_boost = 1.0 + ((harmonic_field_coherence - 0.6) * 0.05) as f32; // up to +2%
-            self.carryover.learning.subsystem_lr_factor *= harmony_boost;
-        }
-        // FEEDBACK: Harmonic interferences → reduce confidence (value tensions = uncertainty)
-        if harmonic_interferences > 0 {
-            let interference_penalty = (harmonic_interferences.min(3) as f32) * 0.01; // -1% per interference
-            self.prediction_confidence =
-                (self.prediction_confidence - interference_penalty).max(0.0);
-        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // PRIMITIVE REASONING: HDC-based analogical reasoning
@@ -463,60 +329,12 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
-        // CAUSAL SELF-EXPLANATION: Builds causal model of primitive→Φ effects.
-        // Learns which primitives cause which Φ changes and accumulates evidence.
-        // Amortized: every 23 cycles (matches primitive reasoning cadence, co-prime).
-        // Science: Pearl (2009) — causal inference, Woodward (2003) — interventionism.
+        // CAUSAL SELF-EXPLANATION: Pearl causal model of primitive→Phi effects
+        // [extracted to compute_causal_self_explanation_phase]
         // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (causal_relations_count, causal_avg_confidence) = if let Some(ref mut explainer) =
-            self.causal_explainer
-        {
-            if self.stats.total_cycles % 23 == 0
-                && self.stats.total_cycles > 0
-                && !active_primitive_names.is_empty()
-            {
-                // Construct PrimitiveExecution entries from active primitives
-                if let Some(ref mut processor) = self.primitive_processor {
-                    let timestamp = self.stats.total_cycles as f64 * 0.02;
-                    let state = processor.process_input(&hv16_cached, timestamp);
-                    let chain = {
-                        let mut c = crate::consciousness::primitive_reasoning::ReasoningChain::new(
-                            hv16_cached,
-                        );
-                        for ap in state.all_active().iter().take(4) {
-                            let exec = crate::consciousness::primitive_reasoning::PrimitiveExecution {
-                                    primitive: ap.primitive.clone(),
-                                    input: hv16_cached,
-                                    output: hv16_cached.bind(&crate::hdc::BinaryHV::random(
-                                        self.stats.total_cycles as u64,
-                                    )),
-                                    transformation: crate::consciousness::primitive_reasoning::TransformationType::Bind,
-                                    phi_contribution: primitive_psi * ap.activation,
-                                    timestamp,
-                                };
-                            c.executions.push(exec);
-                        }
-                        c
-                    };
-                    explainer.learn_from_chain(&chain, "cognitive_cycle");
-                }
-                // Only call summarize_understanding on learning cycles (expensive)
-                let summary = explainer.summarize_understanding();
-                self.carryover.history.last_causal_relations = summary.total_causal_relations;
-                self.carryover.history.last_causal_confidence = summary.average_confidence;
-                (summary.total_causal_relations, summary.average_confidence)
-            } else {
-                // Non-learning cycle: return cached summary (avoids ~880µs/cycle)
-                (
-                    self.carryover.history.last_causal_relations,
-                    self.carryover.history.last_causal_confidence,
-                )
-            }
-        } else {
-            (0, 0.0)
-        };
-        module_timings.causal_explanation = _t.elapsed().as_micros() as u64;
+        let (causal_relations_count, causal_avg_confidence) =
+            self.compute_causal_self_explanation_phase(hv16_cached, &active_primitive_names, primitive_psi, module_timings);
+
 
         // ═══════════════════════════════════════════════════════════════════════
         // ADAPTIVE REASONING: Q-learning-guided primitive selection
@@ -1022,4 +840,258 @@ impl CognitiveLoopService {
 
         equation_v2_consciousness
     }
+
+    /// Primitive Lattice: Structural metrics from the consciousness tier system.
+    ///
+    /// Reads height/width from the precomputed lattice (cached after first cycle).
+    /// Computes lattice join for active primitives every 7 cycles.
+    /// Applies feedback: deep lattice (height > 5) reduces LR on first cycle.
+    ///
+    /// Science: Davey & Priestley (2002) — lattice theory for knowledge systems.
+    fn compute_lattice_phase(
+        &mut self,
+        active_primitive_names: &[String],
+        module_timings: &mut super::ModuleTimings,
+    ) -> (usize, usize, Option<String>) {
+        let _t = Instant::now();
+        let (lattice_height, lattice_width, lattice_join_concept) =
+            if let Some(ref lattice) = self.primitive_lattice {
+                // Properties (height/width/modularity) are O(n²–n³) on the lattice graph.
+                // The lattice is immutable after construction → compute once on first cycle,
+                // cache in stats, and reuse. This eliminates ~31ms/cycle overhead.
+                let (height, width) = if self.stats.lattice_height_cached == 0 {
+                    let props = lattice.properties();
+                    self.stats.lattice_height_cached = props.height;
+                    self.stats.lattice_width_cached = props.width;
+                    (props.height, props.width)
+                } else {
+                    (
+                        self.stats.lattice_height_cached,
+                        self.stats.lattice_width_cached,
+                    )
+                };
+
+                // FEEDBACK: Lattice height (integration depth) → LR modulation (once)
+                if height > 5 && self.stats.total_cycles == 0 {
+                    let depth_factor = 1.0 - (height.min(9) as f32 - 5.0) * 0.01;
+                    self.carryover.learning.subsystem_lr_factor *= depth_factor;
+                }
+
+                // Track B: Lattice join for concept composition (every 7 cycles — join is O(1) via precomputed table)
+                let join_concept =
+                    if active_primitive_names.len() >= 2 && self.stats.total_cycles % 7 == 0 {
+                        let mut best_join: Option<usize> = None;
+                        for i in 0..active_primitive_names.len() {
+                            for j in (i + 1)..active_primitive_names.len() {
+                                if let (Some(a), Some(b)) = (
+                                    lattice.element_index_by_name(&active_primitive_names[i]),
+                                    lattice.element_index_by_name(&active_primitive_names[j]),
+                                ) {
+                                    if let Some(idx) = lattice.join(a, b) {
+                                        match best_join {
+                                            Some(prev)
+                                                if lattice.elements[idx].tier
+                                                    < lattice.elements[prev].tier =>
+                                            {
+                                                best_join = Some(idx)
+                                            }
+                                            None => best_join = Some(idx),
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        best_join.map(|idx| lattice.elements[idx].name.clone())
+                    } else {
+                        None
+                    };
+
+                (height, width, join_concept)
+            } else {
+                (0, 0, None)
+            };
+        module_timings.primitive_lattice = _t.elapsed().as_micros() as u64;
+
+        (lattice_height, lattice_width, lattice_join_concept)
+    }
+
+    /// Unified Value Evaluator: Seven Harmonies alignment scoring.
+    ///
+    /// Evaluates cognitive action against fiduciary harmonics every 19 cycles.
+    /// Applies feedback: Veto decision drastically reduces learning rate.
+    ///
+    /// Science: Panksepp (1998) affective neuroscience + value alignment.
+    fn compute_value_evaluator_phase(
+        &mut self,
+        unified_psi: f64,
+        module_timings: &mut super::ModuleTimings,
+    ) -> (f64, String) {
+        let _t = Instant::now();
+        let (value_evaluator_score, value_evaluator_decision) =
+            if let Some(ref mut evaluator) = self.value_evaluator {
+                if self.stats.total_cycles % 19 == 0 {
+                    let ctx = crate::consciousness::unified_value_evaluator::EvaluationContext {
+                        consciousness_level: unified_psi,
+                        ..Default::default()
+                    };
+                    let result = evaluator.evaluate("cognitive_cycle", ctx);
+                    let decision_str = match &result.decision {
+                        crate::consciousness::unified_value_evaluator::Decision::Allow => "Allow",
+                        crate::consciousness::unified_value_evaluator::Decision::Warn(_) => "Warn",
+                        crate::consciousness::unified_value_evaluator::Decision::Veto(_) => "Veto",
+                    };
+                    self.carryover.quality.last_value_score = result.overall_score;
+                    (result.overall_score, decision_str.to_string())
+                } else {
+                    (self.carryover.quality.last_value_score, String::new())
+                }
+            } else {
+                (0.0, String::new())
+            };
+        module_timings.value_evaluator = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: Value evaluator Veto → suppress learning for this cycle
+        if value_evaluator_decision == "Veto" {
+            self.carryover.learning.subsystem_lr_factor *= 0.1; // Drastically reduce LR on value violation
+        }
+
+        (value_evaluator_score, value_evaluator_decision)
+    }
+
+    /// Fiduciary Harmonics: Seven Harmonies field coherence + interference detection.
+    ///
+    /// Drives harmonic levels from consciousness metrics every 11 cycles, detects
+    /// and resolves value tensions. Applies feedback: high coherence boosts LR;
+    /// interferences reduce prediction confidence.
+    ///
+    /// Science: Whitehead (1929), Deci & Ryan (2000) — value coherence theory.
+    fn compute_fiduciary_harmonics_phase(
+        &mut self,
+        coherence: f32,
+        prediction_error: f32,
+        unified_psi: f64,
+        module_timings: &mut super::ModuleTimings,
+    ) -> (f64, f64, usize) {
+        let _t = Instant::now();
+        let (harmonic_field_coherence, harmonic_love_resonance, harmonic_interferences) =
+            if let Some(ref mut field) = self.harmonic_field {
+                if self.stats.total_cycles % 11 == 0 {
+                    // Drive harmonic levels from consciousness metrics
+                    use crate::consciousness::harmonics::FiduciaryHarmonic;
+                    field.set_level(FiduciaryHarmonic::ResonantCoherence, coherence as f64);
+                    field.set_level(
+                        FiduciaryHarmonic::EvolutionaryProgression,
+                        (prediction_error as f64 * 2.0).clamp(0.0, 1.0),
+                    ); // high error = high evolution pressure
+                    field.set_level(
+                        FiduciaryHarmonic::IntegralWisdom,
+                        self.prediction_confidence as f64,
+                    );
+                    field.set_level(
+                        FiduciaryHarmonic::PanSentientFlourishing,
+                        unified_psi.clamp(0.0, 1.0),
+                    );
+                    field.detect_interferences();
+                    // Resolve interferences if any were detected
+                    if !field.interferences.is_empty() {
+                        if let Some(ref resolver) = self.harmonic_resolver {
+                            let _resolution = resolver.resolve(field);
+                        }
+                    }
+                    self.carryover.consciousness.last_harmonic_coherence = field.field_coherence;
+                    (
+                        field.field_coherence,
+                        field.infinite_love_resonance,
+                        field.interferences.len(),
+                    )
+                } else {
+                    (self.carryover.consciousness.last_harmonic_coherence, 0.0, 0)
+                }
+            } else {
+                (0.0, 0.0, 0)
+            };
+        module_timings.harmonics = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: Harmonic coherence → LR stability (coherent values = stable learning)
+        if harmonic_field_coherence > 0.6 {
+            let harmony_boost = 1.0 + ((harmonic_field_coherence - 0.6) * 0.05) as f32; // up to +2%
+            self.carryover.learning.subsystem_lr_factor *= harmony_boost;
+        }
+        // FEEDBACK: Harmonic interferences → reduce confidence (value tensions = uncertainty)
+        if harmonic_interferences > 0 {
+            let interference_penalty = (harmonic_interferences.min(3) as f32) * 0.01; // -1% per interference
+            self.prediction_confidence =
+                (self.prediction_confidence - interference_penalty).max(0.0);
+        }
+
+        (harmonic_field_coherence, harmonic_love_resonance, harmonic_interferences)
+    }
+
+    /// Causal Self-Explanation: Pearl causal model of primitive→Phi effects.
+    ///
+    /// Learns which primitives cause which Phi changes every 23 cycles by constructing
+    /// reasoning chains from active primitives and feeding them to the causal explainer.
+    ///
+    /// Science: Pearl (2009) — causal inference, Woodward (2003) — interventionism.
+    fn compute_causal_self_explanation_phase(
+        &mut self,
+        hv16_cached: symthaea_core::hdc::BinaryHV,
+        active_primitive_names: &[String],
+        primitive_psi: f64,
+        module_timings: &mut super::ModuleTimings,
+    ) -> (usize, f64) {
+        let _t = Instant::now();
+        let (causal_relations_count, causal_avg_confidence) = if let Some(ref mut explainer) =
+            self.causal_explainer
+        {
+            if self.stats.total_cycles % 23 == 0
+                && self.stats.total_cycles > 0
+                && !active_primitive_names.is_empty()
+            {
+                // Construct PrimitiveExecution entries from active primitives
+                if let Some(ref mut processor) = self.primitive_processor {
+                    let timestamp = self.stats.total_cycles as f64 * 0.02;
+                    let state = processor.process_input(&hv16_cached, timestamp);
+                    let chain = {
+                        let mut c = crate::consciousness::primitive_reasoning::ReasoningChain::new(
+                            hv16_cached,
+                        );
+                        for ap in state.all_active().iter().take(4) {
+                            let exec = crate::consciousness::primitive_reasoning::PrimitiveExecution {
+                                    primitive: ap.primitive.clone(),
+                                    input: hv16_cached,
+                                    output: hv16_cached.bind(&crate::hdc::BinaryHV::random(
+                                        self.stats.total_cycles as u64,
+                                    )),
+                                    transformation: crate::consciousness::primitive_reasoning::TransformationType::Bind,
+                                    phi_contribution: primitive_psi * ap.activation,
+                                    timestamp,
+                                };
+                            c.executions.push(exec);
+                        }
+                        c
+                    };
+                    explainer.learn_from_chain(&chain, "cognitive_cycle");
+                }
+                // Only call summarize_understanding on learning cycles (expensive)
+                let summary = explainer.summarize_understanding();
+                self.carryover.history.last_causal_relations = summary.total_causal_relations;
+                self.carryover.history.last_causal_confidence = summary.average_confidence;
+                (summary.total_causal_relations, summary.average_confidence)
+            } else {
+                // Non-learning cycle: return cached summary (avoids ~880µs/cycle)
+                (
+                    self.carryover.history.last_causal_relations,
+                    self.carryover.history.last_causal_confidence,
+                )
+            }
+        } else {
+            (0, 0.0)
+        };
+        module_timings.causal_explanation = _t.elapsed().as_micros() as u64;
+
+        (causal_relations_count, causal_avg_confidence)
+    }
+
 }

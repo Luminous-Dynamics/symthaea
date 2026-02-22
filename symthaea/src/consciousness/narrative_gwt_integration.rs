@@ -2129,10 +2129,17 @@ mod tests {
 
         // Cross-modal is enabled by default
         let psi = integration.cross_modal_psi();
-        assert!(psi.is_some(), "Cross-modal psi should be available by default");
+        assert!(
+            psi.is_some(),
+            "Cross-modal psi should be available by default"
+        );
 
         let value = psi.unwrap();
-        assert!(value.is_finite(), "Cross-modal psi should be finite, got {}", value);
+        assert!(
+            value.is_finite(),
+            "Cross-modal psi should be finite, got {}",
+            value
+        );
     }
 
     #[test]
@@ -2184,7 +2191,11 @@ mod tests {
     fn test_self_phi_positive_initial() {
         let integration = NarrativeGWTIntegration::default_config();
         let phi = integration.self_phi();
-        assert!(phi > 0.0, "Initial Self-Phi should be positive, got {}", phi);
+        assert!(
+            phi > 0.0,
+            "Initial Self-Phi should be positive, got {}",
+            phi
+        );
         assert!(phi.is_finite(), "Self-Phi should be finite");
     }
 

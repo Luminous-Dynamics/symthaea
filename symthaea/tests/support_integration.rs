@@ -99,18 +99,33 @@ fn knowledge_lifecycle() {
     // Search and verify phi-ranked ordering
     let results = km.search("Firewall", 10);
     assert_eq!(results.len(), 3);
-    assert!((results[0].phi - 0.9).abs() < f64::EPSILON, "First should be phi=0.9");
-    assert!((results[1].phi - 0.7).abs() < f64::EPSILON, "Second should be phi=0.7");
-    assert!((results[2].phi - 0.4).abs() < f64::EPSILON, "Third should be phi=0.4");
+    assert!(
+        (results[0].phi - 0.9).abs() < f64::EPSILON,
+        "First should be phi=0.9"
+    );
+    assert!(
+        (results[1].phi - 0.7).abs() < f64::EPSILON,
+        "Second should be phi=0.7"
+    );
+    assert!(
+        (results[2].phi - 0.4).abs() < f64::EPSILON,
+        "Third should be phi=0.4"
+    );
 
     // Deprecate the top article
     let deprecated = km.deprecate("A1");
-    assert!(deprecated, "Deprecation should succeed for existing article");
+    assert!(
+        deprecated,
+        "Deprecation should succeed for existing article"
+    );
 
     // Verify it is excluded from future searches
     let after = km.search("Firewall", 10);
     assert_eq!(after.len(), 2, "Deprecated article should be excluded");
-    assert_eq!(after[0].article_id, "A3", "Highest remaining phi should be first");
+    assert_eq!(
+        after[0].article_id, "A3",
+        "Highest remaining phi should be first"
+    );
     assert_eq!(after[1].article_id, "A2");
 
     // Deprecating a non-existent article returns false
@@ -166,7 +181,10 @@ fn diagnostic_plan_then_action_proposal() {
         "Restart conductor based on HolochainHealth diagnostic".to_string(),
     );
     assert_eq!(proposed.action_type, ActionType::RestartService);
-    assert!(!proposed.rollback_steps.is_empty(), "Proposed action should have rollback steps");
+    assert!(
+        !proposed.rollback_steps.is_empty(),
+        "Proposed action should have rollback steps"
+    );
     assert!(proposed.confidence > 0.0);
 }
 
@@ -183,7 +201,10 @@ fn scrubber_then_cognitive_update() {
                      /home/tstoltz/.config/holochain is failing with key sk-ABCDEFGHIJKLMNOPQR";
     let scrub_result = scrubber.scrub(raw_text);
 
-    assert!(scrub_result.redaction_count >= 4, "Should redact IP, email, path, and key");
+    assert!(
+        scrub_result.redaction_count >= 4,
+        "Should redact IP, email, path, and key"
+    );
     assert!(!scrub_result.scrubbed_text.contains("admin@mycelix.net"));
     assert!(!scrub_result.scrubbed_text.contains("10.0.0.42"));
     assert!(!scrub_result.scrubbed_text.contains("/home/tstoltz"));
@@ -449,12 +470,30 @@ fn scrubber_complex_mixed_pii() {
     let result = scrubber.scrub(complex_text);
 
     // Verify all PII types are redacted
-    assert!(!result.scrubbed_text.contains("user@example.com"), "Email 1 not redacted");
-    assert!(!result.scrubbed_text.contains("admin@mycelix.net"), "Email 2 not redacted");
-    assert!(!result.scrubbed_text.contains("192.168.1.100"), "IP 1 not redacted");
-    assert!(!result.scrubbed_text.contains("10.0.0.1"), "IP 2 not redacted");
-    assert!(!result.scrubbed_text.contains("/home/tstoltz"), "Path 1 not redacted");
-    assert!(!result.scrubbed_text.contains("/home/admin"), "Path 2 not redacted");
+    assert!(
+        !result.scrubbed_text.contains("user@example.com"),
+        "Email 1 not redacted"
+    );
+    assert!(
+        !result.scrubbed_text.contains("admin@mycelix.net"),
+        "Email 2 not redacted"
+    );
+    assert!(
+        !result.scrubbed_text.contains("192.168.1.100"),
+        "IP 1 not redacted"
+    );
+    assert!(
+        !result.scrubbed_text.contains("10.0.0.1"),
+        "IP 2 not redacted"
+    );
+    assert!(
+        !result.scrubbed_text.contains("/home/tstoltz"),
+        "Path 1 not redacted"
+    );
+    assert!(
+        !result.scrubbed_text.contains("/home/admin"),
+        "Path 2 not redacted"
+    );
     assert!(
         !result.scrubbed_text.contains("api-ABCDEFGHIJKLMNOPQ"),
         "API key not redacted"
@@ -465,10 +504,25 @@ fn scrubber_complex_mixed_pii() {
     );
 
     // Verify redaction counts by type
-    assert_eq!(result.redaction_types.get("email").copied().unwrap_or(0), 2, "Should have 2 emails");
-    assert!(result.redaction_types.get("ip").copied().unwrap_or(0) >= 2, "Should have at least 2 IPs");
-    assert_eq!(result.redaction_types.get("path").copied().unwrap_or(0), 2, "Should have 2 paths");
-    assert_eq!(result.redaction_types.get("key").copied().unwrap_or(0), 2, "Should have 2 keys");
+    assert_eq!(
+        result.redaction_types.get("email").copied().unwrap_or(0),
+        2,
+        "Should have 2 emails"
+    );
+    assert!(
+        result.redaction_types.get("ip").copied().unwrap_or(0) >= 2,
+        "Should have at least 2 IPs"
+    );
+    assert_eq!(
+        result.redaction_types.get("path").copied().unwrap_or(0),
+        2,
+        "Should have 2 paths"
+    );
+    assert_eq!(
+        result.redaction_types.get("key").copied().unwrap_or(0),
+        2,
+        "Should have 2 keys"
+    );
 
     // Total redaction count should cover all
     assert!(

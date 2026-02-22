@@ -124,8 +124,12 @@ impl JLProjector {
     /// Project to binary/bipolar representation.
     ///
     /// Returns `Err` if input dimension mismatches.
-    pub fn project_to_bipolar(&self, input: &[f32]) -> Result<Vec<i8>, crate::errors::SymthaeaError> {
-        Ok(self.project(input)?
+    pub fn project_to_bipolar(
+        &self,
+        input: &[f32],
+    ) -> Result<Vec<i8>, crate::errors::SymthaeaError> {
+        Ok(self
+            .project(input)?
             .into_iter()
             .map(|v| if v > 0.0 { 1i8 } else { -1i8 })
             .collect())
@@ -134,8 +138,13 @@ impl JLProjector {
     /// Project to packed bipolar for efficient similarity.
     ///
     /// Returns `Err` if input dimension mismatches.
-    pub fn project_to_packed(&self, input: &[f32]) -> Result<PackedBipolar, crate::errors::SymthaeaError> {
-        Ok(PackedBipolar::from_bipolar(&self.project_to_bipolar(input)?))
+    pub fn project_to_packed(
+        &self,
+        input: &[f32],
+    ) -> Result<PackedBipolar, crate::errors::SymthaeaError> {
+        Ok(PackedBipolar::from_bipolar(
+            &self.project_to_bipolar(input)?,
+        ))
     }
 }
 
@@ -272,17 +281,17 @@ impl SemanticEncoder {
     /// (e.g., sentence transformers, CLIP, etc.)
     /// Falls back to n-gram encoding on dimension mismatch.
     pub fn encode_embedding(&self, embedding: &[f32]) -> Vec<i8> {
-        self.jl.project_to_bipolar(embedding).unwrap_or_else(|_| {
-            vec![-1i8; self.jl.output_dim()]
-        })
+        self.jl
+            .project_to_bipolar(embedding)
+            .unwrap_or_else(|_| vec![-1i8; self.jl.output_dim()])
     }
 
     /// Encode embedding to packed HDC.
     /// Falls back to zero-packed on dimension mismatch.
     pub fn encode_embedding_packed(&self, embedding: &[f32]) -> PackedBipolar {
-        self.jl.project_to_packed(embedding).unwrap_or_else(|_| {
-            PackedBipolar::from_bipolar(&vec![-1i8; self.jl.output_dim()])
-        })
+        self.jl
+            .project_to_packed(embedding)
+            .unwrap_or_else(|_| PackedBipolar::from_bipolar(&vec![-1i8; self.jl.output_dim()]))
     }
 
     /// Combine multiple encodings via bundling

@@ -72,7 +72,7 @@ pub struct NixWorldModel {
     system_state: ContinuousHV,
 
     /// Learned delta vectors per action category.
-    /// delta_vectors[action] ≈ average(state_after - state_before) for that action.
+    /// `delta_vectors[action]` ≈ average(state_after - state_before) for that action.
     delta_vectors: HashMap<ActionCategory, DeltaEntry>,
 
     /// Predictive hierarchy for multi-scale understanding.
@@ -113,7 +113,7 @@ impl NixWorldModel {
 
     /// Predict the next state after applying an action.
     ///
-    /// Uses delta vectors: predicted_next ≈ current_state + delta[action]
+    /// Uses delta vectors: `predicted_next ≈ current_state + delta[action]`
     pub fn predict_state(&self, action: &ActionCategory) -> ContinuousHV {
         if let Some(entry) = self.delta_vectors.get(action) {
             self.system_state.add(&entry.delta)

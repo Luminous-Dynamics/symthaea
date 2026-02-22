@@ -726,7 +726,9 @@ impl EpisodicMemory {
                 pe.episode.consolidation_strength =
                     (pe.episode.consolidation_strength + boost).min(5.0);
                 // Recalculate priority score with updated consolidation
-                pe.score = pe.episode.priority_score(self.current_cycle, self.config.recency_weight);
+                pe.score = pe
+                    .episode
+                    .priority_score(self.current_cycle, self.config.recency_weight);
             }
         }
         self.episodes.extend(all);
@@ -747,7 +749,9 @@ impl EpisodicMemory {
         for pe in all.iter_mut().take(3) {
             pe.episode.consolidation_strength =
                 (pe.episode.consolidation_strength + boost).min(5.0);
-            pe.score = pe.episode.priority_score(self.current_cycle, self.config.recency_weight);
+            pe.score = pe
+                .episode
+                .priority_score(self.current_cycle, self.config.recency_weight);
         }
         self.episodes.extend(all);
     }

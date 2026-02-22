@@ -600,8 +600,7 @@ impl ConsciousnessThermodynamicsAnalyzer {
                     .map(|s| s.entropy)
                     .collect();
                 // Safe: we took 5 elements, so first/last are guaranteed
-                entropies.first().copied().unwrap_or(0.0)
-                    - entropies.last().copied().unwrap_or(0.0)
+                entropies.first().copied().unwrap_or(0.0) - entropies.last().copied().unwrap_or(0.0)
             };
 
             if entropy_trend < -0.02 {

@@ -98,9 +98,7 @@ impl SynergisticIntegration {
         let n = self.config.num_components.min(dim);
         let stride = if n > 1 { dim / n } else { 1 };
 
-        let snapshot: Vec<f64> = (0..n)
-            .map(|i| state.values[i * stride] as f64)
-            .collect();
+        let snapshot: Vec<f64> = (0..n).map(|i| state.values[i * stride] as f64).collect();
 
         if self.window.len() >= self.config.window_size {
             self.window.pop_front();
@@ -268,8 +266,7 @@ impl SynergisticIntegration {
         let mut part_a: Vec<usize> = (0..n / 2).collect();
         let mut part_b: Vec<usize> = (n / 2..n).collect();
 
-        let mut best_mi =
-            self.partition_mi(cov, n, &part_a) + self.partition_mi(cov, n, &part_b);
+        let mut best_mi = self.partition_mi(cov, n, &part_a) + self.partition_mi(cov, n, &part_b);
 
         // Greedy swaps: move one element between partitions to minimize MI
         let mut improved = true;
@@ -283,8 +280,7 @@ impl SynergisticIntegration {
                 let elem = part_a[idx];
                 part_a.remove(idx);
                 part_b.push(elem);
-                let mi =
-                    self.partition_mi(cov, n, &part_a) + self.partition_mi(cov, n, &part_b);
+                let mi = self.partition_mi(cov, n, &part_a) + self.partition_mi(cov, n, &part_b);
                 if mi < best_mi - 1e-12 {
                     best_mi = mi;
                     improved = true;
@@ -304,8 +300,7 @@ impl SynergisticIntegration {
                 let elem = part_b[idx];
                 part_b.remove(idx);
                 part_a.push(elem);
-                let mi =
-                    self.partition_mi(cov, n, &part_a) + self.partition_mi(cov, n, &part_b);
+                let mi = self.partition_mi(cov, n, &part_a) + self.partition_mi(cov, n, &part_b);
                 if mi < best_mi - 1e-12 {
                     best_mi = mi;
                     improved = true;

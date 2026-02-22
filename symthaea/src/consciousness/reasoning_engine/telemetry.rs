@@ -81,6 +81,7 @@ impl From<std::io::Error> for TelemetryError {
 /// Each event is written as a single line of JSON, making it easy to
 /// process with standard tools like `jq`, `grep`, and streaming analytics.
 pub struct JsonLinesSink {
+    #[allow(dead_code)] // Retained for diagnostic/Display use
     path: PathBuf,
     writer: Mutex<BufWriter<File>>,
 }
@@ -127,6 +128,7 @@ impl TelemetrySink for JsonLinesSink {
 ///
 /// Useful for spreadsheet analysis and simple data pipelines.
 pub struct CsvSink {
+    #[allow(dead_code)] // Retained for diagnostic/Display use
     path: PathBuf,
     writer: Mutex<BufWriter<File>>,
     header_written: Mutex<bool>,

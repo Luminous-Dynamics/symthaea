@@ -2018,8 +2018,14 @@ mod tests {
         let interval = TemporalInterval::new("bounds", 1.0, 3.0).unwrap();
 
         // Exact boundaries should be contained
-        assert!(interval.contains_point(1.0), "Start point should be contained");
-        assert!(interval.contains_point(3.0), "End point should be contained");
+        assert!(
+            interval.contains_point(1.0),
+            "Start point should be contained"
+        );
+        assert!(
+            interval.contains_point(3.0),
+            "End point should be contained"
+        );
 
         // Just outside boundaries
         assert!(!interval.contains_point(0.999));
@@ -2149,13 +2155,17 @@ mod tests {
             assert!(
                 result.contains(&relation),
                 "Equals composed with {:?} should contain {:?}, got {:?}",
-                relation, relation, result,
+                relation,
+                relation,
+                result,
             );
             let result2 = reasoner.compose(relation, AllenRelation::Equals);
             assert!(
                 result2.contains(&relation),
                 "{:?} composed with Equals should contain {:?}, got {:?}",
-                relation, relation, result2,
+                relation,
+                relation,
+                result2,
             );
         }
     }
@@ -2184,9 +2194,9 @@ mod tests {
 
         // Create intervals with gaps
         let intervals_data = vec![
-            (0.0, 1.0),  // 1s duration
-            (2.0, 3.0),  // gap of 1s, then 1s duration
-            (5.0, 6.0),  // gap of 2s, then 1s duration
+            (0.0, 1.0), // 1s duration
+            (2.0, 3.0), // gap of 1s, then 1s duration
+            (5.0, 6.0), // gap of 2s, then 1s duration
         ];
 
         for (i, (start, end)) in intervals_data.iter().enumerate() {
@@ -2221,7 +2231,11 @@ mod tests {
     fn test_encode_sequence_empty() {
         let system = TemporalPrimitiveSystem::new();
         let empty = system.encode_sequence(&[]);
-        assert_eq!(empty.popcount(), 0, "Empty sequence should encode to zero HV");
+        assert_eq!(
+            empty.popcount(),
+            0,
+            "Empty sequence should encode to zero HV"
+        );
     }
 
     #[test]
@@ -2297,10 +2311,6 @@ mod tests {
         let r_xy = reasoner.get_relation("X", "Y").unwrap();
         let r_yx = reasoner.get_relation("Y", "X").unwrap();
 
-        assert_eq!(
-            r_xy.inverse(),
-            r_yx,
-            "Cached inverse should match",
-        );
+        assert_eq!(r_xy.inverse(), r_yx, "Cached inverse should match",);
     }
 }

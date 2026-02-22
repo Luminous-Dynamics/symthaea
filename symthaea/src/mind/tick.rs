@@ -277,11 +277,8 @@ impl ContinuousMind {
         if self.state.tick.is_multiple_of(10) {
             let beliefs = if self.working_memory.len() >= 2 {
                 // Bundle top-3 most recent perceptions as our belief state
-                let recent: Vec<ContinuousHV> = self.working_memory.iter()
-                    .rev()
-                    .take(3)
-                    .cloned()
-                    .collect();
+                let recent: Vec<ContinuousHV> =
+                    self.working_memory.iter().rev().take(3).cloned().collect();
                 ContinuousHV::bundle_owned(&recent)
             } else {
                 self.state.current_thought.clone()

@@ -173,7 +173,13 @@ pub fn to_real_hv(v: &[f64]) -> ContinuousHV {
 /// Compute the Euclidean dot product of two slices.
 #[inline]
 fn dot(a: &[f64], b: &[f64]) -> f64 {
-    assert_eq!(a.len(), b.len(), "dot: dimension mismatch {} vs {}", a.len(), b.len());
+    assert_eq!(
+        a.len(),
+        b.len(),
+        "dot: dimension mismatch {} vs {}",
+        a.len(),
+        b.len()
+    );
     a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
 }
 
@@ -230,7 +236,13 @@ impl HypersphereOps {
     /// # Returns
     /// The geodesic distance in radians, in [0, pi].
     pub fn geodesic_distance(u: &[f64], v: &[f64]) -> f64 {
-        assert_eq!(u.len(), v.len(), "geodesic_distance: dimension mismatch {} vs {}", u.len(), v.len());
+        assert_eq!(
+            u.len(),
+            v.len(),
+            "geodesic_distance: dimension mismatch {} vs {}",
+            u.len(),
+            v.len()
+        );
 
         let norm_u = norm(u);
         let norm_v = norm(v);
@@ -273,7 +285,13 @@ impl HypersphereOps {
     /// # Returns
     /// The interpolated point on the sphere.
     pub fn slerp(u: &[f64], v: &[f64], t: f64) -> Vec<f64> {
-        assert_eq!(u.len(), v.len(), "slerp: dimension mismatch {} vs {}", u.len(), v.len());
+        assert_eq!(
+            u.len(),
+            v.len(),
+            "slerp: dimension mismatch {} vs {}",
+            u.len(),
+            v.len()
+        );
 
         let u_hat = normalize(u);
         let v_hat = normalize(v);
@@ -329,7 +347,13 @@ impl HypersphereOps {
     /// # Returns
     /// The tangent vector Log_p(q) at the base point.
     pub fn log_map(base: &[f64], point: &[f64]) -> Vec<f64> {
-        assert_eq!(base.len(), point.len(), "log_map: dimension mismatch {} vs {}", base.len(), point.len());
+        assert_eq!(
+            base.len(),
+            point.len(),
+            "log_map: dimension mismatch {} vs {}",
+            base.len(),
+            point.len()
+        );
 
         let p = normalize(base);
         let q = normalize(point);
@@ -418,7 +442,13 @@ impl HypersphereOps {
     /// # Returns
     /// The transported tangent vector at q.
     pub fn parallel_transport(from: &[f64], to: &[f64], vector: &[f64]) -> Vec<f64> {
-        assert_eq!(from.len(), to.len(), "parallel_transport: dimension mismatch from={} to={}", from.len(), to.len());
+        assert_eq!(
+            from.len(),
+            to.len(),
+            "parallel_transport: dimension mismatch from={} to={}",
+            from.len(),
+            to.len()
+        );
         assert_eq!(
             from.len(),
             vector.len(),

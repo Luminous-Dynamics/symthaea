@@ -168,6 +168,7 @@ enum FixGenerator {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Variants constructed via pattern-matching rules; not all read yet
 enum NixType {
     Bool,
     String,

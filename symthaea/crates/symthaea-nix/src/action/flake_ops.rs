@@ -2,7 +2,7 @@
 //!
 //! Wraps `nix flake` subcommands for flake management:
 //! update inputs, lock specific inputs, check, show metadata,
-//! and init new flakes. Produces [`NixOSCommand`] values for
+//! and init new flakes. Produces `NixOSCommand` values for
 //! state-modifying operations; read-only queries run directly.
 
 use super::executor::{FlakeOperation, NixOSCommand, SafetyLevel};

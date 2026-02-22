@@ -1943,7 +1943,10 @@ mod tests {
         assert_eq!(r.metadata, r#"{"key":"value","num":42}"#);
         assert!((r.consolidation_strength - 0.35).abs() < 0.001);
         assert_eq!(r.retrieval_count, 7);
-        assert!(hv.similarity(&r.encoding) > 0.99, "Encoding must survive round-trip");
+        assert!(
+            hv.similarity(&r.encoding) > 0.99,
+            "Encoding must survive round-trip"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -1956,9 +1959,13 @@ mod tests {
 
         // Store 4 unrelated records
         for i in 0..4u64 {
-            db.store(make_record(&format!("unrel-{}", i), 1000 + i, MemoryType::Semantic))
-                .await
-                .unwrap();
+            db.store(make_record(
+                &format!("unrel-{}", i),
+                1000 + i,
+                MemoryType::Semantic,
+            ))
+            .await
+            .unwrap();
         }
 
         // Store the matching record with exact same seed
@@ -1991,7 +1998,10 @@ mod tests {
     async fn test_search_similar_empty_db_returns_empty() {
         let db = SqliteMemory::in_memory().unwrap();
         let results = db.search_similar(&BinaryHV::random(1), 10).await.unwrap();
-        assert!(results.is_empty(), "Empty database should return no search results");
+        assert!(
+            results.is_empty(),
+            "Empty database should return no search results"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2003,11 +2013,29 @@ mod tests {
         let shared_hv = BinaryHV::random(77);
 
         // Store episodic and semantic records with similar encodings
-        let mut ep = make_full_record("filt-ep", 77, MemoryType::Episodic, "Episodic", 0.9, 0.5, 0.5, 1_000);
+        let mut ep = make_full_record(
+            "filt-ep",
+            77,
+            MemoryType::Episodic,
+            "Episodic",
+            0.9,
+            0.5,
+            0.5,
+            1_000,
+        );
         ep.encoding = shared_hv;
         db.store(ep).await.unwrap();
 
-        let mut sem = make_full_record("filt-sem", 77, MemoryType::Semantic, "Semantic", 0.3, 0.5, 0.5, 2_000);
+        let mut sem = make_full_record(
+            "filt-sem",
+            77,
+            MemoryType::Semantic,
+            "Semantic",
+            0.3,
+            0.5,
+            0.5,
+            2_000,
+        );
         sem.encoding = shared_hv;
         db.store(sem).await.unwrap();
 
@@ -2027,14 +2055,36 @@ mod tests {
     async fn test_store_duplicate_id_overwrites() {
         let db = SqliteMemory::in_memory().unwrap();
 
-        db.store(make_full_record("dup-1", 10, MemoryType::Working, "v1", 0.1, 0.1, 0.1, 1_000))
-            .await
-            .unwrap();
-        db.store(make_full_record("dup-1", 20, MemoryType::Semantic, "v2", 0.9, 0.9, 0.9, 2_000))
-            .await
-            .unwrap();
+        db.store(make_full_record(
+            "dup-1",
+            10,
+            MemoryType::Working,
+            "v1",
+            0.1,
+            0.1,
+            0.1,
+            1_000,
+        ))
+        .await
+        .unwrap();
+        db.store(make_full_record(
+            "dup-1",
+            20,
+            MemoryType::Semantic,
+            "v2",
+            0.9,
+            0.9,
+            0.9,
+            2_000,
+        ))
+        .await
+        .unwrap();
 
-        assert_eq!(db.count().await.unwrap(), 1, "Duplicate ID should overwrite, not duplicate");
+        assert_eq!(
+            db.count().await.unwrap(),
+            1,
+            "Duplicate ID should overwrite, not duplicate"
+        );
         let r = db.get("dup-1").await.unwrap().unwrap();
         assert_eq!(r.content, "v2");
         assert_eq!(r.memory_type, MemoryType::Semantic);
@@ -2071,8 +2121,15 @@ mod tests {
 
         let retrieved = db.get("large-enc").await.unwrap().unwrap();
         let bytes = SqliteMemory::hv_to_bytes(&retrieved.encoding);
-        assert_eq!(bytes.len(), BinaryHV::BYTES, "Encoding should be full 2048 bytes");
-        assert!(hv.similarity(&retrieved.encoding) > 0.99, "Full encoding must survive");
+        assert_eq!(
+            bytes.len(),
+            BinaryHV::BYTES,
+            "Encoding should be full 2048 bytes"
+        );
+        assert!(
+            hv.similarity(&retrieved.encoding) > 0.99,
+            "Full encoding must survive"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2202,7 +2259,10 @@ mod tests {
         }
 
         let r = db.get("recon-multi").await.unwrap().unwrap();
-        assert_eq!(r.retrieval_count, 5, "5 searches should yield retrieval_count=5");
+        assert_eq!(
+            r.retrieval_count, 5,
+            "5 searches should yield retrieval_count=5"
+        );
         assert!(
             (r.consolidation_strength - 0.25).abs() < 0.001,
             "5 * 0.05 = 0.25 consolidation strength, got {}",
@@ -2219,9 +2279,18 @@ mod tests {
 
         // Store records with non-sequential timestamps
         for (id, ts) in [("la-c", 3000u64), ("la-a", 1000), ("la-b", 2000)] {
-            db.store(make_full_record(id, 1, MemoryType::Episodic, id, 0.5, 0.5, 0.5, ts))
-                .await
-                .unwrap();
+            db.store(make_full_record(
+                id,
+                1,
+                MemoryType::Episodic,
+                id,
+                0.5,
+                0.5,
+                0.5,
+                ts,
+            ))
+            .await
+            .unwrap();
         }
 
         let all = db.list_all().await.unwrap();
@@ -2264,7 +2333,10 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(lsh_count, 0, "LSH entries for deleted record should be gone");
+        assert_eq!(
+            lsh_count, 0,
+            "LSH entries for deleted record should be gone"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2510,16 +2582,24 @@ mod tests {
 
         // Store 3 records
         for i in 0..3u64 {
-            db.store(make_record(&format!("zr-{}", i), i + 100, MemoryType::Episodic))
-                .await
-                .unwrap();
+            db.store(make_record(
+                &format!("zr-{}", i),
+                i + 100,
+                MemoryType::Episodic,
+            ))
+            .await
+            .unwrap();
         }
 
         // Search with a random vector — should return results (brute-force path)
         // but the similarities should all be around ~0.5 (random baseline)
         let query = BinaryHV::random(999_999);
         let results = db.search_similar(&query, 10).await.unwrap();
-        assert_eq!(results.len(), 3, "Should return all 3 records (fewer than top_k)");
+        assert_eq!(
+            results.len(),
+            3,
+            "Should return all 3 records (fewer than top_k)"
+        );
 
         // Random vectors should have similarity near 0.5
         for r in &results {
@@ -2639,15 +2719,42 @@ mod tests {
         let db = SqliteMemory::in_memory().unwrap();
 
         // Store records with known psi values
-        db.store(make_full_record("s1", 1, MemoryType::Episodic, "a", 0.2, 0.0, 0.0, 1_000))
-            .await
-            .unwrap();
-        db.store(make_full_record("s2", 2, MemoryType::Episodic, "b", 0.4, 0.0, 0.0, 2_000))
-            .await
-            .unwrap();
-        db.store(make_full_record("s3", 3, MemoryType::Semantic, "c", 0.6, 0.0, 0.0, 3_000))
-            .await
-            .unwrap();
+        db.store(make_full_record(
+            "s1",
+            1,
+            MemoryType::Episodic,
+            "a",
+            0.2,
+            0.0,
+            0.0,
+            1_000,
+        ))
+        .await
+        .unwrap();
+        db.store(make_full_record(
+            "s2",
+            2,
+            MemoryType::Episodic,
+            "b",
+            0.4,
+            0.0,
+            0.0,
+            2_000,
+        ))
+        .await
+        .unwrap();
+        db.store(make_full_record(
+            "s3",
+            3,
+            MemoryType::Semantic,
+            "c",
+            0.6,
+            0.0,
+            0.0,
+            3_000,
+        ))
+        .await
+        .unwrap();
 
         let stats = db.stats().await.unwrap();
         assert_eq!(stats.total_records, 3);
@@ -2686,7 +2793,11 @@ mod tests {
         }
 
         let results = db.search_similar_filtered(&hv, 10, None).await.unwrap();
-        assert_eq!(results.len(), 3, "None filter should return all matching records");
+        assert_eq!(
+            results.len(),
+            3,
+            "None filter should return all matching records"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2704,7 +2815,11 @@ mod tests {
         }
 
         let results = db.search_similar_filtered(&hv, 10, Some("")).await.unwrap();
-        assert_eq!(results.len(), 2, "Empty string filter should return all records");
+        assert_eq!(
+            results.len(),
+            2,
+            "Empty string filter should return all records"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2714,7 +2829,11 @@ mod tests {
     fn test_bytes_to_hv_undersized_returns_zero() {
         let short_bytes = vec![0xFFu8; 100]; // Much smaller than BYTES=2048
         let hv = SqliteMemory::bytes_to_hv(&short_bytes);
-        assert_eq!(hv.0, [0u8; BinaryHV::BYTES], "Undersized input should produce zero vector");
+        assert_eq!(
+            hv.0,
+            [0u8; BinaryHV::BYTES],
+            "Undersized input should produce zero vector"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2741,7 +2860,11 @@ mod tests {
         ] {
             let s = SqliteMemory::memory_type_to_str(mt);
             let restored = SqliteMemory::str_to_memory_type(s);
-            assert_eq!(mt, restored, "MemoryType {:?} should survive string round-trip", mt);
+            assert_eq!(
+                mt, restored,
+                "MemoryType {:?} should survive string round-trip",
+                mt
+            );
         }
     }
 
@@ -2754,10 +2877,7 @@ mod tests {
             SqliteMemory::str_to_memory_type("unknown_garbage"),
             MemoryType::Episodic
         );
-        assert_eq!(
-            SqliteMemory::str_to_memory_type(""),
-            MemoryType::Episodic
-        );
+        assert_eq!(SqliteMemory::str_to_memory_type(""), MemoryType::Episodic);
     }
 
     // -----------------------------------------------------------------------

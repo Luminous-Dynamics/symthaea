@@ -1939,7 +1939,10 @@ mod tests {
             assert!(
                 window[0].value() < window[1].value(),
                 "{:?} value ({}) should be less than {:?} value ({})",
-                window[0], window[0].value(), window[1], window[1].value(),
+                window[0],
+                window[0].value(),
+                window[1],
+                window[1].value(),
             );
         }
     }
@@ -1965,11 +1968,7 @@ mod tests {
 
         for (a, b, label) in &pairs {
             let sim = a.similarity(b);
-            assert!(
-                sim < 0.5,
-                "{} too similar: {}",
-                label, sim,
-            );
+            assert!(sim < 0.5, "{} too similar: {}", label, sim,);
         }
     }
 
@@ -2002,36 +2001,23 @@ mod tests {
         let algebra = MoralAlgebra::default_dim();
 
         // Adjacent magnitudes (difference = 0.2) should be proportional
-        let adjacent = algebra.encode_proportionality(
-            "task",
-            Magnitude::Medium,
-            "pay",
-            Magnitude::Large,
-        );
+        let adjacent =
+            algebra.encode_proportionality("task", Magnitude::Medium, "pay", Magnitude::Large);
         assert!(
             adjacent.is_proportional,
             "Adjacent magnitudes (diff=0.2) should be proportional",
         );
 
         // Same magnitude (difference = 0.0) should be proportional
-        let same = algebra.encode_proportionality(
-            "task",
-            Magnitude::Large,
-            "pay",
-            Magnitude::Large,
-        );
+        let same =
+            algebra.encode_proportionality("task", Magnitude::Large, "pay", Magnitude::Large);
         assert!(
             same.is_proportional,
             "Same magnitudes should be proportional",
         );
 
         // Two-step gap (difference = 0.4) should NOT be proportional
-        let gap = algebra.encode_proportionality(
-            "task",
-            Magnitude::Tiny,
-            "pay",
-            Magnitude::Large,
-        );
+        let gap = algebra.encode_proportionality("task", Magnitude::Tiny, "pay", Magnitude::Large);
         assert!(
             !gap.is_proportional,
             "Large magnitude gap should NOT be proportional",
@@ -2042,12 +2028,8 @@ mod tests {
     fn test_justice_judgment_similarity_finite() {
         let algebra = MoralAlgebra::default_dim();
 
-        let prop = algebra.encode_proportionality(
-            "work",
-            Magnitude::Medium,
-            "reward",
-            Magnitude::Medium,
-        );
+        let prop =
+            algebra.encode_proportionality("work", Magnitude::Medium, "reward", Magnitude::Medium);
         let judgment = algebra.judge_proportionality(&prop);
 
         assert!(judgment.fair_similarity.is_finite());
@@ -2067,8 +2049,15 @@ mod tests {
             "Should detect at least 2 violations, got {}",
             result.violations.len(),
         );
-        assert_eq!(result.verdict, DeontologicalVerdict::WrongPerfectDutyViolated);
-        assert!(result.score < 0.0, "Score should be negative: {}", result.score);
+        assert_eq!(
+            result.verdict,
+            DeontologicalVerdict::WrongPerfectDutyViolated
+        );
+        assert!(
+            result.score < 0.0,
+            "Score should be negative: {}",
+            result.score
+        );
     }
 
     #[test]
@@ -2086,7 +2075,10 @@ mod tests {
             "Should detect at least one satisfaction",
         );
         // Perfect duty violation dominates
-        assert_eq!(result.verdict, DeontologicalVerdict::WrongPerfectDutyViolated);
+        assert_eq!(
+            result.verdict,
+            DeontologicalVerdict::WrongPerfectDutyViolated
+        );
     }
 
     #[test]
@@ -2122,7 +2114,11 @@ mod tests {
         let algebra = MoralAlgebra::default_dim();
 
         // Clearly good action should produce unanimous verdict
-        let result = algebra.judge_ensemble(None, MoralIntent::Good, "I helped my neighbor carry groceries");
+        let result = algebra.judge_ensemble(
+            None,
+            MoralIntent::Good,
+            "I helped my neighbor carry groceries",
+        );
         // If all signals agree on Good:
         if result.final_verdict == MoralVerdict::Good {
             // With no HDC and no learned classifier, is_unanimous checks intent and deonto
@@ -2199,7 +2195,10 @@ mod tests {
         };
 
         let resolution = algebra.resolve_dilemma(&tragic_dilemma);
-        assert_eq!(resolution.confidence, 0.3, "Tragic cases should have low confidence");
+        assert_eq!(
+            resolution.confidence, 0.3,
+            "Tragic cases should have low confidence"
+        );
         assert!(resolution.reasoning.contains("minimize harm"));
     }
 

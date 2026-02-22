@@ -68,7 +68,7 @@ impl IrohBridgeHandle {
 
         let actor = IrohBridgeActor {
             outbound_rx,
-            inbound_tx,
+            _inbound_tx: inbound_tx,
             alive,
         };
 
@@ -132,7 +132,8 @@ pub struct IrohBridgeActor {
     /// Receive outbound messages from Mind (sync → async).
     outbound_rx: mpsc::Receiver<SocialMessage>,
     /// Send inbound messages to Mind (async → sync).
-    inbound_tx: mpsc::Sender<SocialMessage>,
+    /// Kept alive to prevent the channel from closing; read via the handle.
+    _inbound_tx: mpsc::Sender<SocialMessage>,
     /// Shared health flag.
     alive: Arc<AtomicBool>,
 }
@@ -254,7 +255,6 @@ impl IrohBridgeActor {
             "Broadcast social message"
         );
     }
-
 }
 
 impl std::fmt::Debug for IrohBridgeActor {

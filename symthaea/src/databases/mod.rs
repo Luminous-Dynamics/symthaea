@@ -511,7 +511,10 @@ mod tests {
     #[test]
     fn test_default_database_config_is_valid() {
         let config = DatabaseConfig::default();
-        assert!(config.validate().is_ok(), "default DatabaseConfig must pass validation");
+        assert!(
+            config.validate().is_ok(),
+            "default DatabaseConfig must pass validation"
+        );
     }
 
     #[test]
@@ -539,7 +542,10 @@ mod tests {
             backend: DatabaseBackend::Sqlite,
             path: Some("   ".into()),
         };
-        assert!(config.validate().is_err(), "whitespace-only path should fail");
+        assert!(
+            config.validate().is_err(),
+            "whitespace-only path should fail"
+        );
     }
 
     #[test]
@@ -548,6 +554,9 @@ mod tests {
             backend: DatabaseBackend::Sqlite,
             path: None,
         };
-        assert!(config.validate().is_ok(), "None path (in-memory) should be valid");
+        assert!(
+            config.validate().is_ok(),
+            "None path (in-memory) should be valid"
+        );
     }
 }

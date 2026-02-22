@@ -1,7 +1,7 @@
 //! NixOS Generation Management
 //!
 //! Manages NixOS generations: list, switch, rollback, delete, and diff.
-//! Produces [`NixOSCommand`] values for anything that modifies state;
+//! Produces `NixOSCommand` values for anything that modifies state;
 //! read-only queries (list, diff) run directly.
 
 use super::executor::{NixOSCommand, SafetyLevel};

@@ -290,13 +290,9 @@ impl EdfFile {
         // Read signal headers (256 bytes per signal)
         let signal_header_size = 256 * num_signals;
         let mut signal_header = vec![0u8; signal_header_size];
-        reader
-            .read_exact(&mut signal_header)
-            .map_err(|e| {
-                crate::errors::SymthaeaError::Perception(format!(
-                    "Cannot read signal headers: {e}"
-                ))
-            })?;
+        reader.read_exact(&mut signal_header).map_err(|e| {
+            crate::errors::SymthaeaError::Perception(format!("Cannot read signal headers: {e}"))
+        })?;
 
         // Parse each signal's header fields
         // Fields are stored in sequence: all labels, then all transducers, etc.
@@ -442,7 +438,10 @@ impl EdfFile {
     }
 
     /// Load hypnogram annotations from EDF+ annotation file
-    pub fn load_hypnogram<P: AsRef<Path>>(&mut self, path: P) -> Result<(), crate::errors::SymthaeaError> {
+    pub fn load_hypnogram<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+    ) -> Result<(), crate::errors::SymthaeaError> {
         let file = File::open(path.as_ref()).map_err(|e| {
             crate::errors::SymthaeaError::Perception(format!("Cannot open hypnogram: {e}"))
         })?;

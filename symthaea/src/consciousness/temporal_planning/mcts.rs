@@ -164,7 +164,7 @@ impl MctsPlanner {
         state: &ForkedState,
         actions: &[PlannedAction],
         action_idx: usize,
-        max_depth: usize,
+        _max_depth: usize,
     ) -> f64 {
         let mut forked = state.fork();
         let action = &actions[action_idx];
@@ -189,9 +189,9 @@ impl MctsPlanner {
 
     /// Epistemic-only rollout: minimize uncertainty rather than maximize reward.
     pub fn epistemic_rollout(
-        state: &ForkedState,
+        _state: &ForkedState,
         actions: &[PlannedAction],
-        budget: &ReasoningBudget,
+        _budget: &ReasoningBudget,
     ) -> MctsResult {
         if actions.is_empty() {
             return MctsResult::no_plan();

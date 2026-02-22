@@ -224,9 +224,7 @@ impl CausalDiscoveryEngine {
             .map(|i| {
                 // Each thread gets its own RNG seeded differently
                 let mut rng = StdRng::seed_from_u64(seed.wrapping_add(i as u64));
-                let mut engine = ParallelPredictHelper {
-                    rng: &mut rng,
-                };
+                let mut engine = ParallelPredictHelper { rng: &mut rng };
                 if engine.predict_single(&x_arc, &y_arc) == CausalDirection::Forward {
                     1
                 } else {

@@ -710,7 +710,11 @@ mod tests {
 
     #[test]
     fn test_world_model_predict_finite_output() {
-        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let config = WorldModelConfig {
+            hdc_dim: 64,
+            hidden_dim: 16,
+            ..Default::default()
+        };
         let model = HierarchicalCfCWorldModel::new(config).unwrap();
         let state = vec![0.5; 64];
         let action = vec![0.1; 64];
@@ -723,19 +727,35 @@ mod tests {
 
     #[test]
     fn test_world_model_predict_and_update_changes_cfc_state() {
-        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let config = WorldModelConfig {
+            hdc_dim: 64,
+            hidden_dim: 16,
+            ..Default::default()
+        };
         let mut model = HierarchicalCfCWorldModel::new(config).unwrap();
         let initial_cfc = model.cfc_state.clone();
-        model.predict_and_update(&vec![0.5; 64], &vec![0.1; 64], 1.0).unwrap();
-        let changed = model.cfc_state.iter().zip(initial_cfc.iter()).any(|(a, b)| (a - b).abs() > 1e-10);
+        model
+            .predict_and_update(&vec![0.5; 64], &vec![0.1; 64], 1.0)
+            .unwrap();
+        let changed = model
+            .cfc_state
+            .iter()
+            .zip(initial_cfc.iter())
+            .any(|(a, b)| (a - b).abs() > 1e-10);
         assert!(changed, "predict_and_update should modify cfc_state");
     }
 
     #[test]
     fn test_world_model_reset_state() {
-        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let config = WorldModelConfig {
+            hdc_dim: 64,
+            hidden_dim: 16,
+            ..Default::default()
+        };
         let mut model = HierarchicalCfCWorldModel::new(config).unwrap();
-        model.predict_and_update(&vec![0.5; 64], &vec![0.1; 64], 1.0).unwrap();
+        model
+            .predict_and_update(&vec![0.5; 64], &vec![0.1; 64], 1.0)
+            .unwrap();
         model.reset_state();
         for &v in model.cfc_state.iter() {
             assert_eq!(v, 0.0);
@@ -744,7 +764,11 @@ mod tests {
 
     #[test]
     fn test_world_model_consciousness_starts_zero() {
-        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let config = WorldModelConfig {
+            hdc_dim: 64,
+            hidden_dim: 16,
+            ..Default::default()
+        };
         let model = HierarchicalCfCWorldModel::new(config).unwrap();
         assert_eq!(model.consciousness(), 0.0);
         assert_eq!(model.total_surprise(), 0.0);
@@ -752,17 +776,29 @@ mod tests {
 
     #[test]
     fn test_world_model_train_step_increments_steps() {
-        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let config = WorldModelConfig {
+            hdc_dim: 64,
+            hidden_dim: 16,
+            ..Default::default()
+        };
         let mut model = HierarchicalCfCWorldModel::new(config).unwrap();
-        model.train_step(&vec![0.5; 64], &vec![0.1; 64], &vec![0.6; 64], 1.0).unwrap();
+        model
+            .train_step(&vec![0.5; 64], &vec![0.1; 64], &vec![0.6; 64], 1.0)
+            .unwrap();
         assert_eq!(model.training_steps, 1);
-        model.train_step(&vec![0.5; 64], &vec![0.1; 64], &vec![0.6; 64], 1.0).unwrap();
+        model
+            .train_step(&vec![0.5; 64], &vec![0.1; 64], &vec![0.6; 64], 1.0)
+            .unwrap();
         assert_eq!(model.training_steps, 2);
     }
 
     #[test]
     fn test_world_model_train_batch() {
-        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let config = WorldModelConfig {
+            hdc_dim: 64,
+            hidden_dim: 16,
+            ..Default::default()
+        };
         let mut model = HierarchicalCfCWorldModel::new(config).unwrap();
         let experiences = vec![
             (vec![0.5; 64], vec![0.1; 64], vec![0.6; 64]),
@@ -775,7 +811,11 @@ mod tests {
 
     #[test]
     fn test_world_model_estimate_phi_bounded() {
-        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let config = WorldModelConfig {
+            hdc_dim: 64,
+            hidden_dim: 16,
+            ..Default::default()
+        };
         let model = HierarchicalCfCWorldModel::new(config).unwrap();
         let phi = model.estimate_phi(&vec![0.5; 64]);
         assert!(phi >= 0.0 && phi <= 1.0);
@@ -783,36 +823,58 @@ mod tests {
 
     #[test]
     fn test_world_model_expected_surprise_finite() {
-        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let config = WorldModelConfig {
+            hdc_dim: 64,
+            hidden_dim: 16,
+            ..Default::default()
+        };
         let model = HierarchicalCfCWorldModel::new(config).unwrap();
-        let surprise = model.expected_surprise(&vec![0.5; 64], &vec![0.1; 64], 1.0).unwrap();
+        let surprise = model
+            .expected_surprise(&vec![0.5; 64], &vec![0.1; 64], 1.0)
+            .unwrap();
         assert!(surprise.is_finite() && surprise >= 0.0);
     }
 
     #[test]
     fn test_world_model_action_value_finite() {
-        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let config = WorldModelConfig {
+            hdc_dim: 64,
+            hidden_dim: 16,
+            ..Default::default()
+        };
         let model = HierarchicalCfCWorldModel::new(config).unwrap();
-        let value = model.action_value(&vec![0.5; 64], &vec![0.1; 64], 1.0, 0.5).unwrap();
+        let value = model
+            .action_value(&vec![0.5; 64], &vec![0.1; 64], 1.0, 0.5)
+            .unwrap();
         assert!(value.is_finite());
     }
 
     #[test]
     fn test_world_model_imagine_trajectory_length() {
-        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let config = WorldModelConfig {
+            hdc_dim: 64,
+            hidden_dim: 16,
+            ..Default::default()
+        };
         let mut model = HierarchicalCfCWorldModel::new(config).unwrap();
         let actions = vec![vec![0.1; 64]; 5];
         let traj = model.imagine(&vec![0.5; 64], &actions, 1.0).unwrap();
         assert_eq!(traj.len(), 6);
         for state in &traj {
             assert_eq!(state.len(), 64);
-            for &v in state { assert!(v.is_finite()); }
+            for &v in state {
+                assert!(v.is_finite());
+            }
         }
     }
 
     #[test]
     fn test_world_model_serialize_deserialize_roundtrip() {
-        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let config = WorldModelConfig {
+            hdc_dim: 64,
+            hidden_dim: 16,
+            ..Default::default()
+        };
         let model = HierarchicalCfCWorldModel::new(config).unwrap();
         let bytes = model.serialize().unwrap();
         let model2 = HierarchicalCfCWorldModel::deserialize(&bytes).unwrap();
@@ -822,11 +884,17 @@ mod tests {
 
     #[test]
     fn test_world_model_dimension_mismatch_handled() {
-        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let config = WorldModelConfig {
+            hdc_dim: 64,
+            hidden_dim: 16,
+            ..Default::default()
+        };
         let model = HierarchicalCfCWorldModel::new(config).unwrap();
         let prediction = model.predict(&vec![0.5; 32], &vec![0.1; 32], 1.0).unwrap();
         assert_eq!(prediction.len(), 64);
-        for &v in &prediction { assert!(v.is_finite()); }
+        for &v in &prediction {
+            assert!(v.is_finite());
+        }
     }
 
     #[test]

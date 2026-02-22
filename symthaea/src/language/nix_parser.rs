@@ -242,7 +242,9 @@ impl NixParser {
                         if formal.kind() == "formal" {
                             // Extract identifier
                             if let Some(id) = formal.child_by_field_name("name") {
-                                config.module_args.push(safe_node_text(source, &id).to_string());
+                                config
+                                    .module_args
+                                    .push(safe_node_text(source, &id).to_string());
                             }
                         } else if formal.kind() == "identifier" {
                             config
@@ -285,7 +287,9 @@ impl NixParser {
     /// Extract paths from import list
     fn extract_import_paths(&self, node: &Node, source: &str, config: &mut NixConfig) {
         if node.kind() == "path_expression" || node.kind() == "path" {
-            config.imports.push(safe_node_text(source, node).to_string());
+            config
+                .imports
+                .push(safe_node_text(source, node).to_string());
         }
 
         let mut cursor = node.walk();

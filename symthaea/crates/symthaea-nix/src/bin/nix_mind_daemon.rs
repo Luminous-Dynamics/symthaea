@@ -4,7 +4,7 @@
 //! and updates the causal graph with any state transitions. High-surprise events
 //! (large prediction errors) are stored in episodic memory for future reference.
 //!
-//! The daemon writes a [`DaemonSnapshot`] to disk on every cycle for TUI consumption.
+//! The daemon writes a `DaemonSnapshot` to disk on every cycle for TUI consumption.
 //!
 //! Designed to run as a systemd service via the NixOS module.
 

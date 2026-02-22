@@ -963,7 +963,9 @@ impl StructuralCausalModel {
             .map(|&n| self.dag.nodes[n].values.len().max(1))
             .collect();
 
-        let total: usize = sizes.iter().try_fold(1usize, |acc, &s| acc.checked_mul(s))
+        let total: usize = sizes
+            .iter()
+            .try_fold(1usize, |acc, &s| acc.checked_mul(s))
             .expect("config enumeration overflow");
         let mut configs = Vec::with_capacity(total);
 

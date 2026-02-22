@@ -261,7 +261,7 @@ fn viterbi_decode(all_logits: &[Vec<f32>], penalty: f32, phonemes: &[String]) ->
 
 /// Bigram language model: log P(next_phone | prev_phone) matrix
 struct BigramLM {
-    /// log_probs[prev_idx][next_idx] = log P(phonemes[next_idx] | phonemes[prev_idx])
+    /// `log_probs[prev_idx][next_idx] = log P(phonemes[next_idx] | phonemes[prev_idx])`
     log_probs: Vec<Vec<f32>>,
     /// Unigram log probs for first-frame initialization
     unigram_log_probs: Vec<f32>,
@@ -452,7 +452,7 @@ fn viterbi_decode_bigram(
 }
 
 /// Collapse stress variants: maps each phoneme to its stress-stripped base
-/// Returns (collapsed_phonemes, mapping) where mapping[original_idx] = collapsed_idx
+/// Returns (collapsed_phonemes, mapping) where `mapping[original_idx]` = collapsed_idx
 fn build_stress_collapse_map(phonemes: &[String]) -> (Vec<String>, Vec<usize>) {
     let mut collapsed_phonemes: Vec<String> = Vec::new();
     let mut base_to_idx: HashMap<String, usize> = HashMap::new();

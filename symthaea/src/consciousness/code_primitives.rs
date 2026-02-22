@@ -643,14 +643,19 @@ mod tests {
         let real = hv16_to_real_hv(&hv);
 
         // BinaryHV is 2048 bytes = 16384 bits => ContinuousHV should have 16384 dims
-        assert_eq!(real.dim(), 16384, "converted HV should be 16384-dimensional");
+        assert_eq!(
+            real.dim(),
+            16384,
+            "converted HV should be 16384-dimensional"
+        );
 
         // Every value should be exactly -1.0 or +1.0 (bipolar encoding)
         for (i, &val) in real.as_slice().iter().enumerate() {
             assert!(
                 val == -1.0 || val == 1.0,
                 "dimension {} has value {} (expected -1.0 or 1.0)",
-                i, val,
+                i,
+                val,
             );
         }
     }
@@ -679,7 +684,8 @@ mod tests {
         // Empty primitives should return a random HV of the configured dimension
         let composed = router.compose_primitives(&[]);
         assert_eq!(
-            composed.dim(), 256,
+            composed.dim(),
+            256,
             "composing empty primitives should return HV with router dim"
         );
     }
@@ -725,9 +731,17 @@ mod tests {
             let result = executor.execute(op);
             assert!(result.success, "{:?} execution should succeed", op);
             assert!(result.phi.is_finite(), "{:?} phi should be finite", op);
-            assert!(result.phi >= 0.0 && result.phi <= 1.0,
-                "{:?} phi should be in [0, 1], got {}", op, result.phi);
-            assert!(!result.diagnostics.is_empty(), "{:?} should produce diagnostics", op);
+            assert!(
+                result.phi >= 0.0 && result.phi <= 1.0,
+                "{:?} phi should be in [0, 1], got {}",
+                op,
+                result.phi
+            );
+            assert!(
+                !result.diagnostics.is_empty(),
+                "{:?} should produce diagnostics",
+                op
+            );
         }
     }
 
@@ -739,9 +753,15 @@ mod tests {
         let result = executor.execute_with_consciousness(CodeOperation::Generate);
         assert!(result.code_phi.is_finite(), "code_phi should be finite");
         assert!(result.cross_phi.is_finite(), "cross_phi should be finite");
-        assert!(result.combined_phi.is_finite(), "combined_phi should be finite");
-        assert!(result.combined_phi >= 0.0 && result.combined_phi <= 1.0,
-            "combined_phi should be in [0, 1], got {}", result.combined_phi);
+        assert!(
+            result.combined_phi.is_finite(),
+            "combined_phi should be finite"
+        );
+        assert!(
+            result.combined_phi >= 0.0 && result.combined_phi <= 1.0,
+            "combined_phi should be in [0, 1], got {}",
+            result.combined_phi
+        );
 
         // Execute with metacognitive tier
         let meta_result = executor.execute_with_metacognitive(CodeOperation::Debug);

@@ -128,9 +128,8 @@ mod tests {
     #[test]
     fn scrub_counts_are_correct() {
         let scrubber = PrivacyScrubber::new();
-        let result = scrubber.scrub(
-            "IPs: 1.2.3.4 and 5.6.7.8, email: user@test.com, key: api-ABCDEFGHIJKLMNOP",
-        );
+        let result = scrubber
+            .scrub("IPs: 1.2.3.4 and 5.6.7.8, email: user@test.com, key: api-ABCDEFGHIJKLMNOP");
         assert_eq!(result.redaction_count, 4);
         assert_eq!(result.redaction_types["ip"], 2);
         assert_eq!(result.redaction_types["email"], 1);

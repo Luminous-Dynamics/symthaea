@@ -850,7 +850,10 @@ fn test_dream_replay_produces_insights() {
     // and that the metadata fields are always finite
     let final_result = service.cycle("final check");
     assert!(final_result.metadata.dream_phi_improvement.is_finite());
-    println!("Dream observed: {saw_dream}, wisdom_count: {}", final_result.metadata.dream_wisdom_count);
+    println!(
+        "Dream observed: {saw_dream}, wisdom_count: {}",
+        final_result.metadata.dream_wisdom_count
+    );
 }
 
 // ── Embodied Cognition Telemetry ────────────────────────────────
@@ -1001,7 +1004,10 @@ fn test_harmonics_and_consciousness_profile_wired() {
     );
     // Consciousness profile computed at cycle 10
     assert!(
-        last_result.metadata.consciousness_profile_composite.is_finite(),
+        last_result
+            .metadata
+            .consciousness_profile_composite
+            .is_finite(),
         "Consciousness profile composite should be finite"
     );
 }
@@ -1302,7 +1308,10 @@ fn test_holographic_and_affective_wired() {
         last_result.metadata.holographic_unity,
     );
     assert!(
-        last_result.metadata.affect_consciousness_valence.is_finite(),
+        last_result
+            .metadata
+            .affect_consciousness_valence
+            .is_finite(),
         "Affective consciousness valence should be finite, got: {}",
         last_result.metadata.affect_consciousness_valence,
     );
@@ -1490,71 +1499,129 @@ fn test_module_timing_profile() {
         if i == 0 {
             // Initialize
             timing_sums = vec![
-                ("affective_bridge", 0), ("predictive_processing", 0),
-                ("cross_modal_binding", 0), ("surprise_exploration", 0),
-                ("prefrontal", 0), ("meta_cognition", 0),
-                ("narrative_self", 0), ("gwt", 0),
-                ("virtual_body", 0), ("embodied_cognition", 0),
-                ("dream_replay", 0), ("moral_algebra", 0),
-                ("consciousness_resonance", 0), ("temporal_consciousness", 0),
-                ("attention_schema", 0), ("narrative_gwt", 0),
-                ("consciousness_thermodynamics", 0), ("phenomenal_binding", 0),
-                ("hierarchical_free_energy", 0), ("resonator_recall", 0),
-                ("support_intelligence", 0), ("temporal_analyzer", 0),
-                ("primitive_lattice", 0), ("compositionality", 0),
-                ("value_evaluator", 0), ("consciousness_profile", 0),
-                ("harmonics", 0), ("primitive_reasoning", 0),
-                ("causal_explanation", 0), ("adaptive_reasoning", 0),
-                ("epistemic_tiers", 0), ("phi_validation", 0),
-                ("dissipative_consciousness", 0), ("epistemic_conflict", 0),
-                ("consciousness_equation_v2", 0), ("hierarchical_ltc", 0),
-                ("primitive_evolution", 0), ("consciousness_holography", 0),
-                ("differentiable_consciousness", 0), ("affective_consciousness", 0),
-                ("unified_consciousness_pipeline", 0), ("multi_modal_integration", 0),
-                ("synthetic_grounding", 0), ("epistemic_gate", 0),
-                ("semantic_value_embedder", 0), ("composition_rules", 0),
-                ("harmonies_integration", 0), ("meta_cognitive_reasoning", 0),
-                ("code_primitive_routing", 0), ("empathic_unification", 0),
-                ("multi_objective_evolution", 0), ("stability_regime", 0),
+                ("affective_bridge", 0),
+                ("predictive_processing", 0),
+                ("cross_modal_binding", 0),
+                ("surprise_exploration", 0),
+                ("prefrontal", 0),
+                ("meta_cognition", 0),
+                ("narrative_self", 0),
+                ("gwt", 0),
+                ("virtual_body", 0),
+                ("embodied_cognition", 0),
+                ("dream_replay", 0),
+                ("moral_algebra", 0),
+                ("consciousness_resonance", 0),
+                ("temporal_consciousness", 0),
+                ("attention_schema", 0),
+                ("narrative_gwt", 0),
+                ("consciousness_thermodynamics", 0),
+                ("phenomenal_binding", 0),
+                ("hierarchical_free_energy", 0),
+                ("resonator_recall", 0),
+                ("support_intelligence", 0),
+                ("temporal_analyzer", 0),
+                ("primitive_lattice", 0),
+                ("compositionality", 0),
+                ("value_evaluator", 0),
+                ("consciousness_profile", 0),
+                ("harmonics", 0),
+                ("primitive_reasoning", 0),
+                ("causal_explanation", 0),
+                ("adaptive_reasoning", 0),
+                ("epistemic_tiers", 0),
+                ("phi_validation", 0),
+                ("dissipative_consciousness", 0),
+                ("epistemic_conflict", 0),
+                ("consciousness_equation_v2", 0),
+                ("hierarchical_ltc", 0),
+                ("primitive_evolution", 0),
+                ("consciousness_holography", 0),
+                ("differentiable_consciousness", 0),
+                ("affective_consciousness", 0),
+                ("unified_consciousness_pipeline", 0),
+                ("multi_modal_integration", 0),
+                ("synthetic_grounding", 0),
+                ("epistemic_gate", 0),
+                ("semantic_value_embedder", 0),
+                ("composition_rules", 0),
+                ("harmonies_integration", 0),
+                ("meta_cognitive_reasoning", 0),
+                ("code_primitive_routing", 0),
+                ("empathic_unification", 0),
+                ("multi_objective_evolution", 0),
+                ("stability_regime", 0),
                 // Core pipeline phases
-                ("CORE: hdc_encode", 0), ("CORE: compress", 0),
-                ("CORE: semantic_lookup", 0), ("CORE: cfc_step", 0),
-                ("CORE: predict", 0), ("CORE: training", 0),
+                ("CORE: hdc_encode", 0),
+                ("CORE: compress", 0),
+                ("CORE: semantic_lookup", 0),
+                ("CORE: cfc_step", 0),
+                ("CORE: predict", 0),
+                ("CORE: training", 0),
                 ("CORE: parallel_postprocess", 0),
             ];
         }
 
         let values = [
-            t.affective_bridge, t.predictive_processing,
-            t.cross_modal_binding, t.surprise_exploration,
-            t.prefrontal, t.meta_cognition,
-            t.narrative_self, t.gwt,
-            t.virtual_body, t.embodied_cognition,
-            t.dream_replay, t.moral_algebra,
-            t.consciousness_resonance, t.temporal_consciousness,
-            t.attention_schema, t.narrative_gwt,
-            t.consciousness_thermodynamics, t.phenomenal_binding,
-            t.hierarchical_free_energy, t.resonator_recall,
-            t.support_intelligence, t.temporal_analyzer,
-            t.primitive_lattice, t.compositionality,
-            t.value_evaluator, t.consciousness_profile,
-            t.harmonics, t.primitive_reasoning,
-            t.causal_explanation, t.adaptive_reasoning,
-            t.epistemic_tiers, t.phi_validation,
-            t.dissipative_consciousness, t.epistemic_conflict,
-            t.consciousness_equation_v2, t.hierarchical_ltc,
-            t.primitive_evolution, t.consciousness_holography,
-            t.differentiable_consciousness, t.affective_consciousness,
-            t.unified_consciousness_pipeline, t.multi_modal_integration,
-            t.synthetic_grounding, t.epistemic_gate,
-            t.semantic_value_embedder, t.composition_rules,
-            t.harmonies_integration, t.meta_cognitive_reasoning,
-            t.code_primitive_routing, t.empathic_unification,
-            t.multi_objective_evolution, t.stability_regime,
+            t.affective_bridge,
+            t.predictive_processing,
+            t.cross_modal_binding,
+            t.surprise_exploration,
+            t.prefrontal,
+            t.meta_cognition,
+            t.narrative_self,
+            t.gwt,
+            t.virtual_body,
+            t.embodied_cognition,
+            t.dream_replay,
+            t.moral_algebra,
+            t.consciousness_resonance,
+            t.temporal_consciousness,
+            t.attention_schema,
+            t.narrative_gwt,
+            t.consciousness_thermodynamics,
+            t.phenomenal_binding,
+            t.hierarchical_free_energy,
+            t.resonator_recall,
+            t.support_intelligence,
+            t.temporal_analyzer,
+            t.primitive_lattice,
+            t.compositionality,
+            t.value_evaluator,
+            t.consciousness_profile,
+            t.harmonics,
+            t.primitive_reasoning,
+            t.causal_explanation,
+            t.adaptive_reasoning,
+            t.epistemic_tiers,
+            t.phi_validation,
+            t.dissipative_consciousness,
+            t.epistemic_conflict,
+            t.consciousness_equation_v2,
+            t.hierarchical_ltc,
+            t.primitive_evolution,
+            t.consciousness_holography,
+            t.differentiable_consciousness,
+            t.affective_consciousness,
+            t.unified_consciousness_pipeline,
+            t.multi_modal_integration,
+            t.synthetic_grounding,
+            t.epistemic_gate,
+            t.semantic_value_embedder,
+            t.composition_rules,
+            t.harmonies_integration,
+            t.meta_cognitive_reasoning,
+            t.code_primitive_routing,
+            t.empathic_unification,
+            t.multi_objective_evolution,
+            t.stability_regime,
             // Core pipeline phases
-            t.core_hdc_encode, t.core_compress,
-            t.core_semantic_lookup, t.core_cfc_step,
-            t.core_predict, t.core_training,
+            t.core_hdc_encode,
+            t.core_compress,
+            t.core_semantic_lookup,
+            t.core_cfc_step,
+            t.core_predict,
+            t.core_training,
             t.core_parallel_postprocess,
         ];
 
@@ -1571,40 +1638,73 @@ fn test_module_timing_profile() {
     eprintln!("Total wall-clock: {:.1}ms", total_cycle_us as f64 / 1000.0);
     eprintln!("Avg cycle: {:.1}ms\n", total_cycle_us as f64 / 100_000.0);
     let instrumented_total: u64 = timing_sums.iter().map(|(_, t)| t).sum();
-    eprintln!("Instrumented total: {:.1}ms ({:.0}% of wall-clock)\n",
+    eprintln!(
+        "Instrumented total: {:.1}ms ({:.0}% of wall-clock)\n",
         instrumented_total as f64 / 1000.0,
-        instrumented_total as f64 / total_cycle_us as f64 * 100.0);
+        instrumented_total as f64 / total_cycle_us as f64 * 100.0
+    );
     // Separate core pipeline from module timings
-    let (core_timings, module_timings_sorted): (Vec<_>, Vec<_>) =
-        timing_sums.iter().partition(|(name, _)| name.starts_with("CORE:"));
+    let (core_timings, module_timings_sorted): (Vec<_>, Vec<_>) = timing_sums
+        .iter()
+        .partition(|(name, _)| name.starts_with("CORE:"));
     let core_total: u64 = core_timings.iter().map(|(_, t)| t).sum();
 
     eprintln!("── CORE PIPELINE ──");
-    eprintln!("{:<35} {:>10} {:>8} {:>6}", "Phase", "Total(µs)", "Avg(µs)", "%wall");
+    eprintln!(
+        "{:<35} {:>10} {:>8} {:>6}",
+        "Phase", "Total(µs)", "Avg(µs)", "%wall"
+    );
     eprintln!("{}", "-".repeat(65));
     for (name, total) in &core_timings {
         let pct = *total as f64 / total_cycle_us as f64 * 100.0;
-        eprintln!("{:<35} {:>10} {:>8} {:>5.1}%", name, total, total / 100, pct);
+        eprintln!(
+            "{:<35} {:>10} {:>8} {:>5.1}%",
+            name,
+            total,
+            total / 100,
+            pct
+        );
     }
-    eprintln!("Core subtotal: {:.1}ms ({:.1}% of wall-clock)\n",
-        core_total as f64 / 1000.0, core_total as f64 / total_cycle_us as f64 * 100.0);
+    eprintln!(
+        "Core subtotal: {:.1}ms ({:.1}% of wall-clock)\n",
+        core_total as f64 / 1000.0,
+        core_total as f64 / total_cycle_us as f64 * 100.0
+    );
 
     let module_total: u64 = module_timings_sorted.iter().map(|(_, t)| t).sum();
     eprintln!("── CONSCIOUSNESS MODULES ──");
-    eprintln!("{:<35} {:>10} {:>8} {:>6}", "Module", "Total(µs)", "Avg(µs)", "%mod");
+    eprintln!(
+        "{:<35} {:>10} {:>8} {:>6}",
+        "Module", "Total(µs)", "Avg(µs)", "%mod"
+    );
     eprintln!("{}", "-".repeat(65));
     for (name, total) in module_timings_sorted.iter().take(20) {
-        let pct = if module_total > 0 { *total as f64 / module_total as f64 * 100.0 } else { 0.0 };
-        eprintln!("{:<35} {:>10} {:>8} {:>5.1}%", name, total, total / 100, pct);
+        let pct = if module_total > 0 {
+            *total as f64 / module_total as f64 * 100.0
+        } else {
+            0.0
+        };
+        eprintln!(
+            "{:<35} {:>10} {:>8} {:>5.1}%",
+            name,
+            total,
+            total / 100,
+            pct
+        );
     }
-    eprintln!("Module subtotal: {:.1}ms ({:.1}% of wall-clock)\n",
-        module_total as f64 / 1000.0, module_total as f64 / total_cycle_us as f64 * 100.0);
+    eprintln!(
+        "Module subtotal: {:.1}ms ({:.1}% of wall-clock)\n",
+        module_total as f64 / 1000.0,
+        module_total as f64 / total_cycle_us as f64 * 100.0
+    );
 
     let accounted = core_total + module_total;
     let unaccounted = total_cycle_us.saturating_sub(accounted);
-    eprintln!("Unaccounted: {:.1}ms ({:.1}% of wall-clock)",
+    eprintln!(
+        "Unaccounted: {:.1}ms ({:.1}% of wall-clock)",
         unaccounted as f64 / 1000.0,
-        unaccounted as f64 / total_cycle_us as f64 * 100.0);
+        unaccounted as f64 / total_cycle_us as f64 * 100.0
+    );
 
     // Sanity: avg cycle time should be reasonable (<500ms in test profile)
     let avg_cycle_ms = total_cycle_us as f64 / 100_000.0;
@@ -1715,7 +1815,8 @@ fn test_coherence_bridge_tracks_temporal_dynamics() {
     // After 30 cycles, coherence should have a meaningful value
     assert!(
         stats.temporal_coherence >= 0.0,
-        "Temporal coherence should be non-negative: {}", stats.temporal_coherence
+        "Temporal coherence should be non-negative: {}",
+        stats.temporal_coherence
     );
 }
 
@@ -1794,7 +1895,9 @@ fn test_episodic_memory_encodes_significant_experiences() {
 
     // Run cycles — high prediction error early should trigger encoding
     for i in 0..30 {
-        service.cycle(&format!("varied input {i} with different content each time"));
+        service.cycle(&format!(
+            "varied input {i} with different content each time"
+        ));
     }
 
     let stats = service.stats();
@@ -1834,7 +1937,8 @@ fn test_world_model_tracks_prediction_error() {
     let stats = service.stats();
     assert!(
         stats.world_model_avg_error.is_finite(),
-        "World model error should be finite: {}", stats.world_model_avg_error
+        "World model error should be finite: {}",
+        stats.world_model_avg_error
     );
 }
 
@@ -1891,7 +1995,10 @@ fn test_stroop_interference_through_live_loop() {
         incongruent_errors.iter().sum::<f32>() / incongruent_errors.len() as f32;
 
     // Both should produce finite errors
-    assert!(congruent_avg.is_finite(), "Congruent errors should be finite");
+    assert!(
+        congruent_avg.is_finite(),
+        "Congruent errors should be finite"
+    );
     assert!(
         incongruent_avg.is_finite(),
         "Incongruent errors should be finite"
@@ -1987,9 +2094,7 @@ fn test_habituation_and_dishabituation() {
         "Novel stimulus error should be finite: {novel_error}"
     );
 
-    eprintln!(
-        "Habituation: early={early_avg:.4}, late={late_avg:.4}, novel={novel_error:.4}"
-    );
+    eprintln!("Habituation: early={early_avg:.4}, late={late_avg:.4}, novel={novel_error:.4}");
 }
 
 #[test]
@@ -2019,14 +2124,13 @@ fn test_cognitive_load_affects_processing() {
         let result = service.cycle(
             "complex multi-feature stimulus with color red shape triangle \
              orientation left motion upward texture smooth pattern striped \
-             semantic meaning abstract philosophical consciousness emergence"
+             semantic meaning abstract philosophical consciousness emergence",
         );
         high_load_times.push(result.cycle_time_us);
     }
 
     let low_avg: f64 = low_load_times.iter().sum::<u64>() as f64 / low_load_times.len() as f64;
-    let high_avg: f64 =
-        high_load_times.iter().sum::<u64>() as f64 / high_load_times.len() as f64;
+    let high_avg: f64 = high_load_times.iter().sum::<u64>() as f64 / high_load_times.len() as f64;
 
     // Both should complete successfully
     assert!(low_avg > 0.0, "Low load cycles should complete");
@@ -2080,10 +2184,8 @@ fn test_sustained_high_throughput() {
     }
 
     // Check cycle time stability: last 100 should not be >3x first 100
-    let first_100_avg: f64 =
-        cycle_times[..100].iter().sum::<u64>() as f64 / 100.0;
-    let last_100_avg: f64 =
-        cycle_times[400..].iter().sum::<u64>() as f64 / 100.0;
+    let first_100_avg: f64 = cycle_times[..100].iter().sum::<u64>() as f64 / 100.0;
+    let last_100_avg: f64 = cycle_times[400..].iter().sum::<u64>() as f64 / 100.0;
 
     eprintln!(
         "Sustained throughput (500 cycles): first_100_avg={first_100_avg:.0}µs, \
@@ -2246,7 +2348,10 @@ fn test_consciousness_metrics_bounded() {
 
     // Run many cycles with constantly changing input (high error)
     for i in 0..200 {
-        let input = format!("unique novel input number {i} with random content {}", i * 7919);
+        let input = format!(
+            "unique novel input number {i} with random content {}",
+            i * 7919
+        );
         let result = service.cycle(&input);
 
         // Core metrics must always be bounded
@@ -2286,9 +2391,7 @@ fn test_consciousness_metrics_bounded() {
     eprintln!(
         "Bounded metrics after 200 high-error cycles: avg_error={:.4}, \
          avg_loss={:.4}, attention_var={:.4}",
-        stats.avg_prediction_error,
-        stats.avg_training_loss,
-        stats.attention_variance
+        stats.avg_prediction_error, stats.avg_training_loss, stats.attention_variance
     );
 }
 
@@ -2554,9 +2657,7 @@ fn test_full_resonator_fep_loop_stability() {
         "Average error should be bounded over 150 cycles: got {avg_error:.4}"
     );
 
-    eprintln!(
-        "Full resonator-FEP stability: 150 cycles, avg_error={avg_error:.4}"
-    );
+    eprintln!("Full resonator-FEP stability: 150 cycles, avg_error={avg_error:.4}");
 }
 
 // ── Phase 10+11: Self-Regulating Resonator + Homeostatic Feedback Tests ────
@@ -2581,7 +2682,10 @@ fn test_codebook_pruning_at_capacity() {
             _ => "theta exploration mode",
         };
         let result = service.cycle(input);
-        assert!(result.prediction_error.is_finite(), "Error not finite at cycle {i}");
+        assert!(
+            result.prediction_error.is_finite(),
+            "Error not finite at cycle {i}"
+        );
         assert!(
             result.metadata.codebook_evictions <= 3,
             "Too many evictions at cycle {i}: {}",
@@ -2592,9 +2696,7 @@ fn test_codebook_pruning_at_capacity() {
     let stats = service.stats();
     eprintln!(
         "Codebook pruning: promotions={}, evictions={}, diversity={:.3}",
-        stats.resonator_promotions_total,
-        stats.codebook_evictions_total,
-        stats.codebook_diversity
+        stats.resonator_promotions_total, stats.codebook_evictions_total, stats.codebook_diversity
     );
 }
 
@@ -2635,9 +2737,18 @@ fn test_fep_adaptive_behavior_modulation() {
             "EXTREME NOVEL SHOCKING SURPRISE"
         };
         let result = service.cycle(input);
-        assert!(result.metadata.fep_surprise.is_finite(), "fep_surprise not finite at {i}");
-        assert!(result.metadata.fep_td_error.is_finite(), "fep_td_error not finite at {i}");
-        assert!(result.metadata.fep_pragmatic_value.is_finite(), "fep_pragmatic not finite at {i}");
+        assert!(
+            result.metadata.fep_surprise.is_finite(),
+            "fep_surprise not finite at {i}"
+        );
+        assert!(
+            result.metadata.fep_td_error.is_finite(),
+            "fep_td_error not finite at {i}"
+        );
+        assert!(
+            result.metadata.fep_pragmatic_value.is_finite(),
+            "fep_pragmatic not finite at {i}"
+        );
     }
 }
 
@@ -2666,8 +2777,7 @@ fn test_fep_surprise_replay_boost() {
     );
     eprintln!(
         "FEP surprise replay: boosts={}, avg_error={:.4}",
-        stats.fep_surprise_replay_boosts,
-        stats.avg_prediction_error
+        stats.fep_surprise_replay_boosts, stats.avg_prediction_error
     );
 }
 
@@ -2689,8 +2799,14 @@ fn test_codebook_diversity_metric() {
             _ => "diverse input delta",
         };
         let result = service.cycle(input);
-        assert!(result.metadata.codebook_diversity.is_finite(), "Diversity not finite at {i}");
-        assert!(result.metadata.codebook_diversity >= 0.0, "Diversity negative at {i}");
+        assert!(
+            result.metadata.codebook_diversity.is_finite(),
+            "Diversity not finite at {i}"
+        );
+        assert!(
+            result.metadata.codebook_diversity >= 0.0,
+            "Diversity negative at {i}"
+        );
         assert!(
             result.metadata.codebook_diversity <= 1.0,
             "Diversity > 1.0 at {i}: {}",
@@ -2723,7 +2839,10 @@ fn test_coherence_gating_and_tau_modulation() {
             result.metadata.resonator_best_sim.is_finite(),
             "best_sim not finite at cycle {i}"
         );
-        assert!(result.prediction_error.is_finite(), "Error not finite at {i}");
+        assert!(
+            result.prediction_error.is_finite(),
+            "Error not finite at {i}"
+        );
     }
 }
 
@@ -2744,7 +2863,10 @@ fn test_world_model_storage_bias() {
     // Novel input should cause higher WM error → higher storage importance
     for i in 0..20 {
         let result = service.cycle("completely novel world stimulus");
-        assert!(result.prediction_error.is_finite(), "Error not finite at novel cycle {i}");
+        assert!(
+            result.prediction_error.is_finite(),
+            "Error not finite at novel cycle {i}"
+        );
     }
 
     let stats = service.stats();
@@ -2774,13 +2896,19 @@ fn test_fep_reward_enrichment() {
             _ => "reward enrichment gamma",
         };
         let result = service.cycle(input);
-        assert!(result.prediction_error.is_finite(), "Error not finite at {i}");
+        assert!(
+            result.prediction_error.is_finite(),
+            "Error not finite at {i}"
+        );
     }
 
     let stats = service.stats();
     // last_total_fe should have been populated after first cycle
     // (it's updated inside compute_reward_signal)
-    assert!(stats.last_total_fe.is_finite(), "last_total_fe should be finite");
+    assert!(
+        stats.last_total_fe.is_finite(),
+        "last_total_fe should be finite"
+    );
 }
 
 #[test]
@@ -2809,15 +2937,41 @@ fn test_1000_cycle_all_tracks_stress() {
         let input = inputs[i % inputs.len()];
         let result = service.cycle(input);
 
-        assert!(result.prediction_error.is_finite(), "prediction_error NaN at {i}");
-        assert!(result.metadata.fep_accuracy.is_finite(), "fep_accuracy NaN at {i}");
-        assert!(result.metadata.fep_complexity.is_finite(), "fep_complexity NaN at {i}");
-        assert!(result.metadata.fep_surprise.is_finite(), "fep_surprise NaN at {i}");
-        assert!(result.metadata.fep_td_error.is_finite(), "fep_td_error NaN at {i}");
-        assert!(result.metadata.fep_pragmatic_value.is_finite(), "fep_pragmatic NaN at {i}");
-        assert!(result.metadata.codebook_diversity.is_finite(), "diversity NaN at {i}");
-        assert!(result.metadata.resonator_best_sim.is_finite(), "best_sim NaN at {i}");
-        assert!(result.metadata.codebook_diversity >= 0.0 && result.metadata.codebook_diversity <= 1.0);
+        assert!(
+            result.prediction_error.is_finite(),
+            "prediction_error NaN at {i}"
+        );
+        assert!(
+            result.metadata.fep_accuracy.is_finite(),
+            "fep_accuracy NaN at {i}"
+        );
+        assert!(
+            result.metadata.fep_complexity.is_finite(),
+            "fep_complexity NaN at {i}"
+        );
+        assert!(
+            result.metadata.fep_surprise.is_finite(),
+            "fep_surprise NaN at {i}"
+        );
+        assert!(
+            result.metadata.fep_td_error.is_finite(),
+            "fep_td_error NaN at {i}"
+        );
+        assert!(
+            result.metadata.fep_pragmatic_value.is_finite(),
+            "fep_pragmatic NaN at {i}"
+        );
+        assert!(
+            result.metadata.codebook_diversity.is_finite(),
+            "diversity NaN at {i}"
+        );
+        assert!(
+            result.metadata.resonator_best_sim.is_finite(),
+            "best_sim NaN at {i}"
+        );
+        assert!(
+            result.metadata.codebook_diversity >= 0.0 && result.metadata.codebook_diversity <= 1.0
+        );
         assert!(result.metadata.resonator_reconsolidated <= 3);
     }
 
@@ -2868,8 +3022,14 @@ fn test_pipeline_profiling() {
 
         let t = &result.metadata.module_timings_us;
         // Core pipeline timings should be populated
-        assert!(t.core_hdc_encode > 0, "HDC encode timing missing at cycle {i}");
-        assert!(t.core_cfc_step > 0 || i < 2, "CfC step timing missing at cycle {i}");
+        assert!(
+            t.core_hdc_encode > 0,
+            "HDC encode timing missing at cycle {i}"
+        );
+        assert!(
+            t.core_cfc_step > 0 || i < 2,
+            "CfC step timing missing at cycle {i}"
+        );
 
         // All timing fields should be finite (no overflow)
         assert!(result.cycle_time_us < 10_000_000, "Cycle took >10s at {i}");
@@ -2877,9 +3037,7 @@ fn test_pipeline_profiling() {
 
     let avg_us = cycle_times.iter().sum::<u64>() / cycle_times.len() as u64;
     let max_us = *cycle_times.iter().max().unwrap();
-    eprintln!(
-        "Pipeline profiling (10 cycles): avg={avg_us}µs, max={max_us}µs"
-    );
+    eprintln!("Pipeline profiling (10 cycles): avg={avg_us}µs, max={max_us}µs");
 
     // Sanity: avg cycle time should be under 500ms (50Hz target is 20ms but CI is slow)
     assert!(avg_us < 500_000, "Average cycle time too high: {avg_us}µs");
@@ -2921,16 +3079,15 @@ fn test_diversity_governor_modulates_exploration() {
     let stats_varied = service.stats().clone();
 
     // Diversity should have changed (either direction shows the metric is live)
-    let diversity_changed = (stats_varied.codebook_diversity - stats_mono.codebook_diversity).abs() > 0.001
+    let diversity_changed = (stats_varied.codebook_diversity - stats_mono.codebook_diversity).abs()
+        > 0.001
         || stats_varied.codebook_diversity > 0.0;
 
     // Not a hard assertion since codebook might not be populated in 90 cycles,
     // but at minimum the system shouldn't panic
     eprintln!(
         "Diversity governor: mono_div={:.4}, varied_div={:.4}, changed={}",
-        stats_mono.codebook_diversity,
-        stats_varied.codebook_diversity,
-        diversity_changed
+        stats_mono.codebook_diversity, stats_varied.codebook_diversity, diversity_changed
     );
 }
 
@@ -2959,14 +3116,16 @@ fn test_fep_surprise_triggers_replay_boosts() {
     ];
     for i in 0..30 {
         let result = service.cycle(surprises[i % surprises.len()]);
-        assert!(result.metadata.fep_surprise.is_finite(), "fep_surprise NaN at cycle {i}");
+        assert!(
+            result.metadata.fep_surprise.is_finite(),
+            "fep_surprise NaN at cycle {i}"
+        );
     }
 
     let stats = service.stats();
     eprintln!(
         "FEP surprise→replay: total_boosts={}, avg_error={:.4}",
-        stats.fep_surprise_replay_boosts,
-        stats.avg_prediction_error
+        stats.fep_surprise_replay_boosts, stats.avg_prediction_error
     );
     // The system should not panic regardless of surprise levels
 }
@@ -2986,13 +3145,19 @@ fn test_coherence_gate_warmup_bypass() {
     // First 10 cycles should bypass coherence gate (warmup)
     for i in 0..10 {
         let result = service.cycle("warmup input");
-        assert!(result.prediction_error.is_finite(), "NaN during warmup at cycle {i}");
+        assert!(
+            result.prediction_error.is_finite(),
+            "NaN during warmup at cycle {i}"
+        );
     }
 
     // After warmup, coherence gate may filter — system should still be stable
     for i in 10..50 {
         let result = service.cycle("post warmup stable input");
-        assert!(result.prediction_error.is_finite(), "NaN post-warmup at cycle {i}");
+        assert!(
+            result.prediction_error.is_finite(),
+            "NaN post-warmup at cycle {i}"
+        );
         assert!(result.metadata.resonator_best_sim >= -0.01);
     }
 }
@@ -3043,7 +3208,10 @@ fn test_sigma_lr_modulation_stable() {
 
     for i in 0..200 {
         let result = service.cycle(inputs[i % inputs.len()]);
-        assert!(result.prediction_error.is_finite(), "prediction_error NaN at cycle {i}");
+        assert!(
+            result.prediction_error.is_finite(),
+            "prediction_error NaN at cycle {i}"
+        );
         assert!(
             result.prediction_error <= 1.0,
             "prediction_error > 1.0 at cycle {i}: {}",
@@ -3055,8 +3223,7 @@ fn test_sigma_lr_modulation_stable() {
     assert_eq!(stats.total_cycles, 200);
     eprintln!(
         "Sigma modulation (200 cycles): avg_error={:.4}, diversity={:.4}",
-        stats.avg_prediction_error,
-        stats.codebook_diversity
+        stats.avg_prediction_error, stats.codebook_diversity
     );
 }
 
@@ -3094,8 +3261,7 @@ fn test_wm_eviction_resonator_routing() {
     assert_eq!(stats.total_cycles, 100);
     eprintln!(
         "WM routing (100 cycles): avg_error={:.4}, wm_primed={}",
-        stats.avg_prediction_error,
-        stats.resonator_wm_primed_count
+        stats.avg_prediction_error, stats.resonator_wm_primed_count
     );
 }
 
@@ -3183,7 +3349,10 @@ fn test_thalamic_depth_score_populated() {
     for i in 0..50 {
         let result = service.cycle(&format!("thalamic depth cycle {i}"));
         let score = result.metadata.thalamic_depth_score;
-        assert!(score >= 0.0 && score <= 1.0, "thalamic_depth_score out of bounds: {score}");
+        assert!(
+            score >= 0.0 && score <= 1.0,
+            "thalamic_depth_score out of bounds: {score}"
+        );
         // Track which scores we see (0.2, 0.5, or 1.0)
         seen_scores.insert((score * 10.0) as i32);
     }
@@ -3243,8 +3412,7 @@ fn test_adaptive_replay_scheduling() {
     assert!(stats.avg_prediction_error_sq.is_finite());
     eprintln!(
         "Adaptive replay (120 cycles): avg_err={:.4}, avg_err_sq={:.6}",
-        stats.avg_prediction_error,
-        stats.avg_prediction_error_sq
+        stats.avg_prediction_error, stats.avg_prediction_error_sq
     );
 }
 
@@ -3272,12 +3440,30 @@ fn test_300_cycle_phase13_stress() {
 
     for i in 0..300 {
         let result = service.cycle(inputs[i % inputs.len()]);
-        assert!(result.prediction_error.is_finite(), "prediction_error NaN at {i}");
-        assert!(result.metadata.resonator_prediction_error.is_finite(), "resonator_pred_err NaN at {i}");
-        assert!(result.metadata.cross_module_agreement.is_finite(), "agreement NaN at {i}");
-        assert!(result.metadata.thalamic_depth_score >= 0.0, "depth < 0 at {i}");
-        assert!(result.metadata.fep_accuracy.is_finite(), "fep_accuracy NaN at {i}");
-        assert!(result.metadata.codebook_diversity.is_finite(), "diversity NaN at {i}");
+        assert!(
+            result.prediction_error.is_finite(),
+            "prediction_error NaN at {i}"
+        );
+        assert!(
+            result.metadata.resonator_prediction_error.is_finite(),
+            "resonator_pred_err NaN at {i}"
+        );
+        assert!(
+            result.metadata.cross_module_agreement.is_finite(),
+            "agreement NaN at {i}"
+        );
+        assert!(
+            result.metadata.thalamic_depth_score >= 0.0,
+            "depth < 0 at {i}"
+        );
+        assert!(
+            result.metadata.fep_accuracy.is_finite(),
+            "fep_accuracy NaN at {i}"
+        );
+        assert!(
+            result.metadata.codebook_diversity.is_finite(),
+            "diversity NaN at {i}"
+        );
     }
 
     let stats = service.stats();
@@ -3291,7 +3477,8 @@ fn test_300_cycle_phase13_stress() {
         stats.avg_prediction_error,
         stats.avg_cross_module_agreement,
         stats.codebook_diversity,
-        (stats.avg_prediction_error_sq - stats.avg_prediction_error * stats.avg_prediction_error).max(0.0)
+        (stats.avg_prediction_error_sq - stats.avg_prediction_error * stats.avg_prediction_error)
+            .max(0.0)
     );
 }
 
@@ -3311,8 +3498,10 @@ fn test_epistemic_gate_gating() {
     let mut gated_count = 0usize;
     for i in 0..60 {
         let result = service.cycle("epistemic gating test input");
-        assert!(result.metadata.epistemic_gate_confidence.is_finite(),
-            "epistemic_gate_confidence NaN at cycle {i}");
+        assert!(
+            result.metadata.epistemic_gate_confidence.is_finite(),
+            "epistemic_gate_confidence NaN at cycle {i}"
+        );
         if result.metadata.epistemic_gate_gated {
             gated_count += 1;
         }
@@ -3334,18 +3523,26 @@ fn test_mcts_plan_effectiveness() {
 
     let mut any_evaluated = false;
     for i in 0..80 {
-        let input = if i % 2 == 0 { "exploit this pattern" } else { "explore new territory" };
+        let input = if i % 2 == 0 {
+            "exploit this pattern"
+        } else {
+            "explore new territory"
+        };
         let result = service.cycle(input);
-        assert!(result.metadata.mcts_plan_effectiveness.is_finite(),
-            "mcts_plan_effectiveness NaN at cycle {i}");
+        assert!(
+            result.metadata.mcts_plan_effectiveness.is_finite(),
+            "mcts_plan_effectiveness NaN at cycle {i}"
+        );
         if result.metadata.mcts_plan_effectiveness > 0.0 {
             any_evaluated = true;
         }
     }
     let stats = service.stats();
     assert!(stats.avg_mcts_plan_effectiveness.is_finite());
-    eprintln!("MCTS plan effectiveness: avg={:.4}, any_evaluated={any_evaluated}",
-        stats.avg_mcts_plan_effectiveness);
+    eprintln!(
+        "MCTS plan effectiveness: avg={:.4}, any_evaluated={any_evaluated}",
+        stats.avg_mcts_plan_effectiveness
+    );
 }
 
 #[test]
@@ -3360,20 +3557,25 @@ fn test_moral_violation_steering() {
     .unwrap();
 
     let inputs = [
-        "help me with this task",          // benign
-        "steal from the store",            // harm/theft
-        "violate someone's consent",       // consent
-        "ignore my duty to protect",       // duty
-        "a regular input again",           // benign
+        "help me with this task",    // benign
+        "steal from the store",      // harm/theft
+        "violate someone's consent", // consent
+        "ignore my duty to protect", // duty
+        "a regular input again",     // benign
     ];
 
     for (i, input) in inputs.iter().enumerate() {
         let result = service.cycle(input);
-        assert!(result.prediction_error.is_finite(), "prediction_error NaN at input {i}");
+        assert!(
+            result.prediction_error.is_finite(),
+            "prediction_error NaN at input {i}"
+        );
         // moral_steering_category is a String — just verify no panics
         if !result.metadata.moral_steering_category.is_empty() {
-            eprintln!("Moral steering at input {i}: category={}",
-                result.metadata.moral_steering_category);
+            eprintln!(
+                "Moral steering at input {i}: category={}",
+                result.metadata.moral_steering_category
+            );
         }
     }
 }
@@ -3391,18 +3593,27 @@ fn test_codebook_utilization_tracking() {
 
     for i in 0..55 {
         let result = service.cycle("utilization tracking test");
-        assert!(result.metadata.codebook_utilization_rate.is_finite(),
-            "codebook_utilization_rate NaN at cycle {i}");
-        assert!(result.metadata.codebook_utilization_rate >= 0.0,
-            "codebook_utilization_rate < 0 at cycle {i}");
-        assert!(result.metadata.codebook_utilization_rate <= 1.0,
-            "codebook_utilization_rate > 1 at cycle {i}");
+        assert!(
+            result.metadata.codebook_utilization_rate.is_finite(),
+            "codebook_utilization_rate NaN at cycle {i}"
+        );
+        assert!(
+            result.metadata.codebook_utilization_rate >= 0.0,
+            "codebook_utilization_rate < 0 at cycle {i}"
+        );
+        assert!(
+            result.metadata.codebook_utilization_rate <= 1.0,
+            "codebook_utilization_rate > 1 at cycle {i}"
+        );
     }
     let stats = service.stats();
     assert!(stats.codebook_utilization_rate.is_finite());
     assert!(stats.codebook_utilization_rate >= 0.0);
     assert!(stats.codebook_utilization_rate <= 1.0);
-    eprintln!("Codebook utilization: rate={:.4}", stats.codebook_utilization_rate);
+    eprintln!(
+        "Codebook utilization: rate={:.4}",
+        stats.codebook_utilization_rate
+    );
 }
 
 #[test]
@@ -3417,11 +3628,19 @@ fn test_causal_attention_edges() {
     .unwrap();
 
     for i in 0..40 {
-        let input = if i % 3 == 0 { "pattern A" } else if i % 3 == 1 { "pattern B" } else { "pattern C" };
+        let input = if i % 3 == 0 {
+            "pattern A"
+        } else if i % 3 == 1 {
+            "pattern B"
+        } else {
+            "pattern C"
+        };
         let result = service.cycle(input);
         // causal_attention_edges can be 0 if no graph discovered yet
-        assert!(result.metadata.causal_attention_edges < 10000,
-            "causal_attention_edges implausibly large at cycle {i}");
+        assert!(
+            result.metadata.causal_attention_edges < 10000,
+            "causal_attention_edges implausibly large at cycle {i}"
+        );
     }
     let stats = service.stats();
     eprintln!("Causal attention: uses={}", stats.causal_attention_uses);
@@ -3440,17 +3659,25 @@ fn test_surprise_replay_batch_modulation() {
 
     let mut max_batch = 0usize;
     for i in 0..120 {
-        let input = if i % 20 < 10 { "stable input" } else { "surprising new content!" };
+        let input = if i % 20 < 10 {
+            "stable input"
+        } else {
+            "surprising new content!"
+        };
         let result = service.cycle(input);
-        assert!(result.metadata.surprise_replay_batch_size < 100,
-            "surprise_replay_batch_size implausibly large at cycle {i}");
+        assert!(
+            result.metadata.surprise_replay_batch_size < 100,
+            "surprise_replay_batch_size implausibly large at cycle {i}"
+        );
         if result.metadata.surprise_replay_batch_size > max_batch {
             max_batch = result.metadata.surprise_replay_batch_size;
         }
     }
     let stats = service.stats();
-    eprintln!("Surprise replay: boosted_replays={}, max_batch={max_batch}",
-        stats.surprise_boosted_replays);
+    eprintln!(
+        "Surprise replay: boosted_replays={}, max_batch={max_batch}",
+        stats.surprise_boosted_replays
+    );
 }
 
 #[test]
@@ -3474,14 +3701,38 @@ fn test_400_cycle_phase14_stress() {
 
     for i in 0..400 {
         let result = service.cycle(inputs[i % inputs.len()]);
-        assert!(result.prediction_error.is_finite(), "prediction_error NaN at {i}");
-        assert!(result.metadata.epistemic_gate_confidence.is_finite(), "epistemic NaN at {i}");
-        assert!(result.metadata.mcts_plan_effectiveness.is_finite(), "mcts_eff NaN at {i}");
-        assert!(result.metadata.codebook_utilization_rate.is_finite(), "util NaN at {i}");
-        assert!(result.metadata.causal_attention_edges < 10000, "causal edges huge at {i}");
-        assert!(result.metadata.surprise_replay_batch_size < 100, "batch huge at {i}");
-        assert!(result.metadata.cross_module_agreement.is_finite(), "agreement NaN at {i}");
-        assert!(result.metadata.thalamic_depth_score >= 0.0, "depth < 0 at {i}");
+        assert!(
+            result.prediction_error.is_finite(),
+            "prediction_error NaN at {i}"
+        );
+        assert!(
+            result.metadata.epistemic_gate_confidence.is_finite(),
+            "epistemic NaN at {i}"
+        );
+        assert!(
+            result.metadata.mcts_plan_effectiveness.is_finite(),
+            "mcts_eff NaN at {i}"
+        );
+        assert!(
+            result.metadata.codebook_utilization_rate.is_finite(),
+            "util NaN at {i}"
+        );
+        assert!(
+            result.metadata.causal_attention_edges < 10000,
+            "causal edges huge at {i}"
+        );
+        assert!(
+            result.metadata.surprise_replay_batch_size < 100,
+            "batch huge at {i}"
+        );
+        assert!(
+            result.metadata.cross_module_agreement.is_finite(),
+            "agreement NaN at {i}"
+        );
+        assert!(
+            result.metadata.thalamic_depth_score >= 0.0,
+            "depth < 0 at {i}"
+        );
     }
 
     let stats = service.stats();

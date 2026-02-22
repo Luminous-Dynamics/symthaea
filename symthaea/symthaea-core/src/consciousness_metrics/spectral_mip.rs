@@ -203,9 +203,11 @@ impl SpectralMIPFinder {
         let n = self.config.num_components.min(dim);
 
         let snapshot: Vec<f64> = if let Some(ref indices) = self.active_dims {
-            indices.iter().take(n).map(|&i| {
-                state.values[i.min(dim - 1)] as f64
-            }).collect()
+            indices
+                .iter()
+                .take(n)
+                .map(|&i| state.values[i.min(dim - 1)] as f64)
+                .collect()
         } else {
             let stride = if n > 1 { dim / n } else { 1 };
             (0..n).map(|i| state.values[i * stride] as f64).collect()
@@ -351,7 +353,9 @@ impl SpectralMIPFinder {
         });
 
         // Fiedler-ordered full-space indices
-        let spectral_full: Vec<usize> = result.spectral_order.iter()
+        let spectral_full: Vec<usize> = result
+            .spectral_order
+            .iter()
             .map(|&i| current_dims[i.min(current_dims.len() - 1)])
             .collect();
 
@@ -386,7 +390,8 @@ impl SpectralMIPFinder {
         }
 
         // 3. Exploration: deterministic pseudo-random dims not already tracked
-        let mut rng_state = result.phi.to_bits() ^ (result.mip_bond as u64).wrapping_mul(0x9E3779B97F4A7C15);
+        let mut rng_state =
+            result.phi.to_bits() ^ (result.mip_bond as u64).wrapping_mul(0x9E3779B97F4A7C15);
         let mut attempts = 0u32;
         while new_dims.len() < n && attempts < n as u32 * 10 {
             rng_state ^= rng_state << 13;
@@ -496,13 +501,8 @@ impl SpectralMIPFinder {
 
                 // Build focused indices for next scale: 60% boundary, 40% coverage
                 if scale < n {
-                    let next_scale = scales
-                        .iter()
-                        .find(|&&s| s > scale)
-                        .copied()
-                        .unwrap_or(n);
-                    focused_indices =
-                        Some(focus_dims_for_next_level(n, next_scale, &result));
+                    let next_scale = scales.iter().find(|&&s| s > scale).copied().unwrap_or(n);
+                    focused_indices = Some(focus_dims_for_next_level(n, next_scale, &result));
                 }
 
                 levels.push(result);
@@ -594,11 +594,7 @@ fn build_mi_laplacian(cov: &[f64], n: usize) -> (Vec<f64>, Vec<f64>) {
 /// Only extracts the Fiedler vector (2nd eigenvector), not all eigenvalues.
 ///
 /// Returns (spectral_order, fiedler_zero_crossing).
-fn compute_fiedler_order(
-    laplacian: &[f64],
-    _mi_weights: &[f64],
-    n: usize,
-) -> (Vec<usize>, usize) {
+fn compute_fiedler_order(laplacian: &[f64], _mi_weights: &[f64], n: usize) -> (Vec<usize>, usize) {
     use nalgebra::{DMatrix, DVector};
 
     // Shift Laplacian to make it positive definite: M = L + σI
@@ -679,7 +675,9 @@ fn compute_fiedler_order_full(laplacian: &[f64], n: usize) -> (Vec<usize>, usize
     eigen_indices.sort_by(|&a, &b| eigenvalues[a].total_cmp(&eigenvalues[b]));
 
     let fiedler_idx = eigen_indices[1];
-    let fiedler_vec: Vec<f64> = (0..n).map(|i| eigen.eigenvectors[(i, fiedler_idx)]).collect();
+    let fiedler_vec: Vec<f64> = (0..n)
+        .map(|i| eigen.eigenvectors[(i, fiedler_idx)])
+        .collect();
 
     let mut order: Vec<usize> = (0..n).collect();
     order.sort_by(|&a, &b| fiedler_vec[a].total_cmp(&fiedler_vec[b]));
@@ -717,10 +715,8 @@ fn sweep_contiguous_cuts(cov: &[f64], n: usize) -> Vec<f64> {
     }
 
     // Left and right sweeps are independent — run in parallel.
-    let ((left_ln_det, left_sum_ln_var), (right_ln_det, right_sum_ln_var)) = rayon::join(
-        || sweep_left(cov, n),
-        || sweep_right(cov, n),
-    );
+    let ((left_ln_det, left_sum_ln_var), (right_ln_det, right_sum_ln_var)) =
+        rayon::join(|| sweep_left(cov, n), || sweep_right(cov, n));
 
     // ─── Combine: for cut at k, left = [0..=k], right = [k+1..n-1] ───
     let mut cut_mis = Vec::with_capacity(n - 1);
@@ -811,7 +807,12 @@ fn sweep_right(cov: &[f64], n: usize) -> (Vec<f64>, Vec<f64>) {
 ///   L' = [[L, 0], [x^T, l_new]]
 ///
 /// Forward substitution: L * x = col → O(k²)
-pub(crate) fn bordered_cholesky_step(factor: &[f64], k: usize, col: &[f64], diag: f64) -> (Vec<f64>, f64) {
+pub(crate) fn bordered_cholesky_step(
+    factor: &[f64],
+    k: usize,
+    col: &[f64],
+    diag: f64,
+) -> (Vec<f64>, f64) {
     let mut x = vec![0.0f64; k];
 
     // Forward substitution on packed lower-triangular factor

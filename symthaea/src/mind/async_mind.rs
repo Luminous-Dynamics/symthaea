@@ -165,7 +165,12 @@ impl AsyncMindHandle {
     /// Seed working memory with domain knowledge.
     pub async fn seed_memory(&self) -> super::SeedingResult {
         let (resp_tx, resp_rx) = oneshot::channel();
-        if self.tx.send(MindCommand::SeedMemory(resp_tx)).await.is_err() {
+        if self
+            .tx
+            .send(MindCommand::SeedMemory(resp_tx))
+            .await
+            .is_err()
+        {
             tracing::warn!("AsyncMind actor has stopped — seed_memory command dropped");
             return super::SeedingResult {
                 prototypes_seeded: 0,

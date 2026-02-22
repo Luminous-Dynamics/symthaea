@@ -570,7 +570,10 @@ mod tests {
 
     #[test]
     fn test_record_at_exact_threshold_rejected() {
-        let config = DreamEngineConfig { surprise_threshold: 0.5, ..Default::default() };
+        let config = DreamEngineConfig {
+            surprise_threshold: 0.5,
+            ..Default::default()
+        };
         let mut engine = DreamEngine::new(config);
         engine.record(&vec![0.5; 64], &vec![0.1; 32], &vec![0.3; 64], 0.5);
         assert_eq!(engine.memory_size(), 0);
@@ -627,7 +630,9 @@ mod tests {
     #[test]
     fn test_phi_estimation_high_variance_higher() {
         let low_var = vec![0.5; 64];
-        let high_var: Vec<f32> = (0..64).map(|i| if i % 2 == 0 { 0.9 } else { -0.9 }).collect();
+        let high_var: Vec<f32> = (0..64)
+            .map(|i| if i % 2 == 0 { 0.9 } else { -0.9 })
+            .collect();
         let phi_low = DreamEngine::estimate_phi(&low_var);
         let phi_high = DreamEngine::estimate_phi(&high_var);
         assert!(phi_high > phi_low, "Higher variance should give higher phi");
@@ -649,7 +654,11 @@ mod tests {
         for seed in 0..10 {
             let alt = engine.generate_counterfactual_action(&action, seed);
             for &v in &alt {
-                assert!(v >= -1.0 && v <= 1.0, "Counterfactual should be in [-1, 1], got {}", v);
+                assert!(
+                    v >= -1.0 && v <= 1.0,
+                    "Counterfactual should be in [-1, 1], got {}",
+                    v
+                );
             }
         }
     }
@@ -660,7 +669,11 @@ mod tests {
         let outcome = engine.simulate_outcome(&vec![0.8; 64], &vec![0.5; 32]);
         assert_eq!(outcome.len(), 64);
         for &v in &outcome {
-            assert!(v >= -1.0 && v <= 1.0, "Outcome should be in [-1, 1], got {}", v);
+            assert!(
+                v >= -1.0 && v <= 1.0,
+                "Outcome should be in [-1, 1], got {}",
+                v
+            );
         }
     }
 
@@ -677,7 +690,12 @@ mod tests {
     fn test_dream_processes_most_surprising_event() {
         let mut engine = DreamEngine::with_defaults();
         for i in 0..5 {
-            engine.record(&vec![(i as f32) / 5.0; 64], &vec![0.1; 32], &vec![0.3; 64], 0.2 + i as f32 * 0.15);
+            engine.record(
+                &vec![(i as f32) / 5.0; 64],
+                &vec![0.1; 32],
+                &vec![0.3; 64],
+                0.2 + i as f32 * 0.15,
+            );
         }
         let result = engine.dream().unwrap();
         assert_eq!(result.events_processed, 1);
@@ -693,9 +711,13 @@ mod tests {
         };
         let mut engine = DreamEngine::new(config);
         for i in 0..10 {
-            let state: Vec<f32> = (0..64).map(|j| ((i * 7 + j) as f32 / 100.0).sin()).collect();
+            let state: Vec<f32> = (0..64)
+                .map(|j| ((i * 7 + j) as f32 / 100.0).sin())
+                .collect();
             let action: Vec<f32> = (0..32).map(|j| ((i * 3 + j) as f32 / 50.0).cos()).collect();
-            let outcome: Vec<f32> = (0..64).map(|j| ((i * 11 + j) as f32 / 80.0).sin().abs()).collect();
+            let outcome: Vec<f32> = (0..64)
+                .map(|j| ((i * 11 + j) as f32 / 80.0).sin().abs())
+                .collect();
             engine.record(&state, &action, &outcome, 0.3 + (i as f32) * 0.05);
         }
         engine.dream_session(5).unwrap();

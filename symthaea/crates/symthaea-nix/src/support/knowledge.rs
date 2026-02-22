@@ -5,7 +5,7 @@
 //! an error, the knowledge base finds the most semantically similar articles
 //! and returns actionable solutions.
 //!
-//! Uses the existing [`NixCodebook`] for encoding and its built-in LSH index
+//! Uses the existing `NixCodebook` for encoding and its built-in LSH index
 //! for sub-linear search.
 
 use crate::encoding::codebook::NixCodebook;

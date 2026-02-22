@@ -165,10 +165,9 @@ mod tests {
         let serde_err = serde_json::from_str::<serde_json::Value>(bad_json).unwrap_err();
         let err: SymthaeaError = serde_err.into();
         match &err {
-            SymthaeaError::Runtime(msg) => assert!(
-                !msg.is_empty(),
-                "serde error message should not be empty"
-            ),
+            SymthaeaError::Runtime(msg) => {
+                assert!(!msg.is_empty(), "serde error message should not be empty")
+            }
             other => panic!("expected Runtime variant, got: {other:?}"),
         }
     }

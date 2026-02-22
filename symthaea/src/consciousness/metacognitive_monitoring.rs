@@ -152,7 +152,10 @@ impl MetacognitiveMonitor {
     /// Returns `true` if an anomaly was detected, `false` if healthy.
     pub fn observe_phi(&mut self, phi: f64) -> bool {
         self.phi_history.push(phi);
-        if let Some(_anomaly) = self.anomaly_detector.detect(&self.phi_history, self.phi_threshold) {
+        if let Some(_anomaly) = self
+            .anomaly_detector
+            .detect(&self.phi_history, self.phi_threshold)
+        {
             self.anomalies_detected += 1;
             true
         } else {

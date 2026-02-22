@@ -1,7 +1,7 @@
 //! Φ-Gated Action Execution
 //!
 //! All NixOS actions are routed through the consciousness-gated executor.
-//! Sub-modules produce [`NixOSCommand`] values; the executor checks Φ
+//! Sub-modules produce `NixOSCommand` values; the executor checks Φ
 //! thresholds, handles rollback, and records outcomes for episodic memory.
 
 pub mod config_writer;

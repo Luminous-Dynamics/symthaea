@@ -10,9 +10,7 @@ use crate::consciousness::epistemic_conflict::{
     ConflictKind, ConflictMatrix, MultiTheoryMetrics, TheoryId,
 };
 use crate::consciousness::temporal_planning::types::{BudgetTier, MctsResult, PlannedAction};
-use crate::consciousness::tool_gate::types::{
-    FallbackStrategy, GateDecision, GateResult, RiskLevel, ToolDescriptor,
-};
+use crate::consciousness::tool_gate::types::{GateResult, RiskLevel, ToolDescriptor};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Reasoning Context (input to reason())

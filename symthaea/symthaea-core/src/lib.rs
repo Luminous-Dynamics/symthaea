@@ -47,6 +47,9 @@
 // at crate level which cannot be suppressed locally.
 #![cfg_attr(test, allow(deprecated))]
 
+/// True IIT consciousness metrics: entropy estimation, MIP search, Phi* computation.
+#[allow(missing_docs)]
+pub mod consciousness_metrics;
 /// Core consciousness state types and configuration.
 #[allow(missing_docs)]
 pub mod core;
@@ -62,9 +65,6 @@ pub mod observability;
 /// Integrated Information (Phi) calculation engine.
 #[allow(missing_docs)]
 pub mod phi_engine;
-/// True IIT consciousness metrics: entropy estimation, MIP search, Phi* computation.
-#[allow(missing_docs)]
-pub mod consciousness_metrics;
 /// Physics-grounded modeling: periodic table, emergence, kinetics, and thermodynamics.
 #[allow(missing_docs)]
 pub mod physics;

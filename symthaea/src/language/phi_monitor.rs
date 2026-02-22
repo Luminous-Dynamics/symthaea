@@ -367,7 +367,11 @@ impl PhiMonitor {
     }
 
     /// Begin monitoring a generation operation
-    pub fn begin_operation(&mut self, operation_id: &str, current_phi: f32) -> Result<(), crate::errors::SymthaeaError> {
+    pub fn begin_operation(
+        &mut self,
+        operation_id: &str,
+        current_phi: f32,
+    ) -> Result<(), crate::errors::SymthaeaError> {
         // Check threshold
         let (should_proceed, reason) = self.should_generate(current_phi);
         if !should_proceed {

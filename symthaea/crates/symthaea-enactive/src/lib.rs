@@ -1768,7 +1768,10 @@ mod tests {
         };
         let meaning = engine.enact_meaning(ActionType::Observe, perception);
         assert_eq!(meaning.meaning.category, MeaningCategory::Threat);
-        assert!(meaning.meaning.valence < 0.0, "Threat should have negative valence");
+        assert!(
+            meaning.meaning.valence < 0.0,
+            "Threat should have negative valence"
+        );
     }
 
     #[test]
@@ -1776,7 +1779,7 @@ mod tests {
         let mut engine = SenseMakingEngine::new();
         let perception = PerceptionSummary {
             features: HashMap::new(), // No specific features
-            surprise: 0.9,           // Very surprising
+            surprise: 0.9,            // Very surprising
             affordances: vec![],
         };
         let meaning = engine.enact_meaning(ActionType::Explore, perception);
@@ -1810,7 +1813,10 @@ mod tests {
             affordances: vec![],
         };
         let meaning = engine.enact_meaning(ActionType::Execute, perception);
-        assert!(meaning.significance <= 1.0, "Significance should be bounded at 1.0");
+        assert!(
+            meaning.significance <= 1.0,
+            "Significance should be bounded at 1.0"
+        );
         assert!(meaning.significance >= 0.0);
     }
 
@@ -1828,7 +1834,10 @@ mod tests {
         };
         engine.enact_meaning(ActionType::Explore, perception);
         let rel = engine.get_relevance("new_feature");
-        assert!(rel > 0.0, "Relevance should increase after enacting meaning with feature");
+        assert!(
+            rel > 0.0,
+            "Relevance should increase after enacting meaning with feature"
+        );
     }
 
     #[test]
@@ -1850,7 +1859,10 @@ mod tests {
         }
 
         let recent = engine.recent_meanings(100);
-        assert!(recent.len() <= 5, "History should be bounded to history_size");
+        assert!(
+            recent.len() <= 5,
+            "History should be bounded to history_size"
+        );
     }
 
     #[test]
@@ -1865,7 +1877,10 @@ mod tests {
         let mut sim = EmbodiedSimulator::new();
         // Simulating with no schemas should reduce confidence
         let result = sim.simulate(&[ActionType::Explore], "unknown");
-        assert!(result.final_confidence < 0.5, "No schemas -> low confidence");
+        assert!(
+            result.final_confidence < 0.5,
+            "No schemas -> low confidence"
+        );
         assert!(!result.feasible);
     }
 
@@ -1882,7 +1897,11 @@ mod tests {
             sim.learn_schema(ActionType::Execute, &perception, "work_context");
         }
         // Only one schema should exist (updated in place)
-        assert_eq!(sim.schema_count(), 1, "Repeated learning should update existing schema");
+        assert_eq!(
+            sim.schema_count(),
+            1,
+            "Repeated learning should update existing schema"
+        );
     }
 
     #[test]
@@ -1977,7 +1996,11 @@ mod tests {
             MeaningCategory::Mystery,
         ];
         for cat in &categories {
-            assert!(groundings.contains_key(cat), "Missing grounding for {:?}", cat);
+            assert!(
+                groundings.contains_key(cat),
+                "Missing grounding for {:?}",
+                cat
+            );
         }
         assert_eq!(groundings.len(), 7);
     }
@@ -2035,6 +2058,10 @@ mod tests {
         let enactive = EnactiveCognition::new();
         let enc1 = enactive.enacted_encoding(ActionType::Explore, MeaningCategory::Opportunity);
         let enc2 = enactive.enacted_encoding(ActionType::Explore, MeaningCategory::Opportunity);
-        assert_eq!(enc1.similarity(&enc2), 1.0, "Same input should produce identical encoding");
+        assert_eq!(
+            enc1.similarity(&enc2),
+            1.0,
+            "Same input should produce identical encoding"
+        );
     }
 }

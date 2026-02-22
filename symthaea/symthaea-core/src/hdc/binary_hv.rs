@@ -957,7 +957,12 @@ impl BinaryHV {
     /// Get bit at position (0 or 1)
     #[inline]
     pub fn get_bit(&self, pos: usize) -> u8 {
-        assert!(pos < Self::DIM, "get_bit: position {} out of bounds (DIM={})", pos, Self::DIM);
+        assert!(
+            pos < Self::DIM,
+            "get_bit: position {} out of bounds (DIM={})",
+            pos,
+            Self::DIM
+        );
         let byte_idx = pos / 8;
         let bit_pos = pos % 8;
         (self.0[byte_idx] >> bit_pos) & 1
@@ -966,7 +971,12 @@ impl BinaryHV {
     /// Set bit at position
     #[inline]
     pub fn set_bit(&mut self, pos: usize, value: bool) {
-        assert!(pos < Self::DIM, "set_bit: position {} out of bounds (DIM={})", pos, Self::DIM);
+        assert!(
+            pos < Self::DIM,
+            "set_bit: position {} out of bounds (DIM={})",
+            pos,
+            Self::DIM
+        );
         let byte_idx = pos / 8;
         let bit_pos = pos % 8;
 

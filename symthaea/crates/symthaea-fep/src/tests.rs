@@ -855,7 +855,10 @@ fn test_hidden_state_mode_entropy_single_mode() {
     let state = HiddenState::new(4);
     // Single mode with prob=1.0 -> entropy should be 0
     let entropy = state.mode_entropy();
-    assert!(entropy.abs() < 1e-10, "Single mode should have zero entropy");
+    assert!(
+        entropy.abs() < 1e-10,
+        "Single mode should have zero entropy"
+    );
 }
 
 #[test]
@@ -932,13 +935,19 @@ fn test_motor_command_confidence_clamped() {
 #[test]
 fn test_motor_command_noop_low_intensity_not_meaningful() {
     let cmd = MotorCommand::new(MotorCommandType::NoOp, 0.3);
-    assert!(!cmd.is_meaningful(), "Low-intensity NoOp should not be meaningful");
+    assert!(
+        !cmd.is_meaningful(),
+        "Low-intensity NoOp should not be meaningful"
+    );
 }
 
 #[test]
 fn test_motor_command_noop_high_intensity_is_meaningful() {
     let cmd = MotorCommand::new(MotorCommandType::NoOp, 0.9);
-    assert!(cmd.is_meaningful(), "High-intensity NoOp should be meaningful");
+    assert!(
+        cmd.is_meaningful(),
+        "High-intensity NoOp should be meaningful"
+    );
 }
 
 #[test]
@@ -977,7 +986,10 @@ fn test_free_energy_history_bounded() {
         calc.compute(&state, &obs, &model);
     }
 
-    assert!(calc.history.len() <= 10, "History should be bounded by max_history");
+    assert!(
+        calc.history.len() <= 10,
+        "History should be bounded by max_history"
+    );
 }
 
 #[test]
@@ -997,12 +1009,18 @@ fn test_precision_estimator_action_update() {
     let mut precision = PrecisionEstimator::new();
     // Perfect prediction
     precision.update_from_action(0.7, 0.7, 1);
-    assert!(precision.action_precision > 0.9, "Perfect action prediction should give high precision");
+    assert!(
+        precision.action_precision > 0.9,
+        "Perfect action prediction should give high precision"
+    );
     // Bad prediction
     precision.update_from_action(0.0, 1.0, 2);
     // Action precision should decrease
     let current = precision.action_precision;
-    assert!(current < 1.5, "Bad prediction should reduce action precision, got {current}");
+    assert!(
+        current < 1.5,
+        "Bad prediction should reduce action precision, got {current}"
+    );
 }
 
 #[test]

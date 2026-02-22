@@ -30,18 +30,18 @@
 // - Model temperature as exploration parameter
 // - Identify critical points for consciousness transitions
 
+mod analyzer;
 mod config;
-mod state;
 mod critical;
 mod free_energy;
 mod grounding;
-mod analyzer;
+mod state;
 #[cfg(test)]
 mod tests;
 
+pub use analyzer::*;
 pub use config::*;
-pub use state::*;
 pub use critical::*;
 pub use free_energy::*;
 pub use grounding::*;
-pub use analyzer::*;
+pub use state::*;

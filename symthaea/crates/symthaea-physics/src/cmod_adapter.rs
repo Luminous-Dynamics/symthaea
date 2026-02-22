@@ -661,7 +661,8 @@ pub fn load_csv(path: &Path) -> Result<Vec<CModShot>> {
             .map(|s: &str| s == "1" || s.to_lowercase() == "true")
             .unwrap_or(false);
 
-        let disruption_time_ms: Option<f64> = record.get(11).and_then(|s: &str| s.parse::<f64>().ok());
+        let disruption_time_ms: Option<f64> =
+            record.get(11).and_then(|s: &str| s.parse::<f64>().ok());
 
         // Add to shot
         let shot = shots_map.entry(shot_id).or_insert_with(|| {

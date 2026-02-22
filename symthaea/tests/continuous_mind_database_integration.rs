@@ -221,10 +221,7 @@ fn test_continuous_mind_seeding() {
         "Should seed at least some prototypes"
     );
     assert!(mind.is_seeded(), "Mind should be marked as seeded");
-    assert!(
-        mind.seeded_count() > 0,
-        "Seeded count should be positive"
-    );
+    assert!(mind.seeded_count() > 0, "Seeded count should be positive");
 
     // Working memory should now have items
     assert!(
