@@ -310,7 +310,6 @@ impl TMazeEnvironment {
             TMazeLocation::LeftArm | TMazeLocation::RightArm => (true, false), // Already done
         }
     }
-
 }
 
 /// Results from the T-Maze benchmark.

@@ -7,8 +7,7 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::physics::{
-    CoupledPhysicsEngine, FusionReaction, OperatingConditions,
-    TrajectoryAnalysisEngine,
+    CoupledPhysicsEngine, FusionReaction, OperatingConditions, TrajectoryAnalysisEngine,
 };
 
 fn main() {

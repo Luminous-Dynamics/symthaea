@@ -278,8 +278,8 @@ impl SemanticMemory {
             self.stats.semantic_hits += 1;
 
             // Update average hit similarity
-            let avg_sim = similarities.iter().map(|(_, s)| s).sum::<f32>()
-                / similarities.len().max(1) as f32;
+            let avg_sim =
+                similarities.iter().map(|(_, s)| s).sum::<f32>() / similarities.len().max(1) as f32;
             let n = self.stats.semantic_hits as f32;
             self.stats.avg_hit_similarity =
                 self.stats.avg_hit_similarity * ((n - 1.0) / n) + avg_sim / n;

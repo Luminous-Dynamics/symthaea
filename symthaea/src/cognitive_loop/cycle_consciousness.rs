@@ -124,7 +124,6 @@ impl CognitiveLoopService {
         let (lattice_height, lattice_width, lattice_join_concept) =
             self.compute_lattice_phase(&active_primitive_names, module_timings);
 
-
         // ═══════════════════════════════════════════════════════════════════════
         // COMPOSITIONALITY ENGINE: Algebraic composition of primitives
         // Tracks composition stats; actual compositions are demand-driven.
@@ -145,7 +144,6 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let (value_evaluator_score, value_evaluator_decision) =
             self.compute_value_evaluator_phase(unified_psi, module_timings);
-
 
         // ═══════════════════════════════════════════════════════════════════════
         // CONSCIOUSNESS PROFILE: Multi-dimensional consciousness assessment
@@ -298,9 +296,13 @@ impl CognitiveLoopService {
         // FIDUCIARY HARMONICS: Seven Harmonies field coherence + interference
         // [extracted to compute_fiduciary_harmonics_phase]
         // ═══════════════════════════════════════════════════════════════════════
-        let (harmonic_field_coherence, harmonic_love_resonance, harmonic_interferences) =
-            self.compute_fiduciary_harmonics_phase(coherence, prediction_error, unified_psi, module_timings);
-
+        let (harmonic_field_coherence, harmonic_love_resonance, harmonic_interferences) = self
+            .compute_fiduciary_harmonics_phase(
+                coherence,
+                prediction_error,
+                unified_psi,
+                module_timings,
+            );
 
         // ═══════════════════════════════════════════════════════════════════════
         // PRIMITIVE REASONING: HDC-based analogical reasoning
@@ -332,9 +334,13 @@ impl CognitiveLoopService {
         // CAUSAL SELF-EXPLANATION: Pearl causal model of primitive→Phi effects
         // [extracted to compute_causal_self_explanation_phase]
         // ═══════════════════════════════════════════════════════════════════════
-        let (causal_relations_count, causal_avg_confidence) =
-            self.compute_causal_self_explanation_phase(hv16_cached, &active_primitive_names, primitive_psi, module_timings);
-
+        let (causal_relations_count, causal_avg_confidence) = self
+            .compute_causal_self_explanation_phase(
+                hv16_cached,
+                &active_primitive_names,
+                primitive_psi,
+                module_timings,
+            );
 
         // ═══════════════════════════════════════════════════════════════════════
         // ADAPTIVE REASONING: Q-learning-guided primitive selection
@@ -1025,7 +1031,11 @@ impl CognitiveLoopService {
                 (self.prediction_confidence - interference_penalty).max(0.0);
         }
 
-        (harmonic_field_coherence, harmonic_love_resonance, harmonic_interferences)
+        (
+            harmonic_field_coherence,
+            harmonic_love_resonance,
+            harmonic_interferences,
+        )
     }
 
     /// Causal Self-Explanation: Pearl causal model of primitive→Phi effects.
@@ -1093,5 +1103,4 @@ impl CognitiveLoopService {
 
         (causal_relations_count, causal_avg_confidence)
     }
-
 }

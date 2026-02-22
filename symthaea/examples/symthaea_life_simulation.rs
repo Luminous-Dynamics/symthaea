@@ -34,7 +34,10 @@ fn main() {
         "integration",
     ];
 
-    println!("\nInjecting {} stimuli as HDC perceptions...", stimuli.len());
+    println!(
+        "\nInjecting {} stimuli as HDC perceptions...",
+        stimuli.len()
+    );
     for (i, label) in stimuli.iter().enumerate() {
         let hv = ContinuousHV::random(1024, (i as u64 + 1) * 42);
         mind.perceive_text(label, hv);
@@ -52,7 +55,11 @@ fn main() {
 
     // 4. Show working memory state
     let wm = mind.working_memory();
-    println!("\nWorking Memory: {} items (capacity: {})", wm.len(), mind.config().working_memory_capacity);
+    println!(
+        "\nWorking Memory: {} items (capacity: {})",
+        wm.len(),
+        mind.config().working_memory_capacity
+    );
 
     // 5. Extract structured thought
     let thought = mind.extract_structured_thought();

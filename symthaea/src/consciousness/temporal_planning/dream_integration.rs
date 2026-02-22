@@ -7,7 +7,9 @@
 use super::types::PlannedAction;
 
 #[cfg(feature = "magi_loop")]
-use crate::consciousness::recursive_improvement::dream_feedback::{DreamFeedbackBridge, DreamInsight};
+use crate::consciousness::recursive_improvement::dream_feedback::{
+    DreamFeedbackBridge, DreamInsight,
+};
 
 /// Convert a dream feedback bridge's priors into MCTS action priors.
 ///

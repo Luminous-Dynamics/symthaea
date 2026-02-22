@@ -419,27 +419,26 @@ impl CognitiveLoopService {
         // primitives genuinely improve consciousness (Φ) vs baseline.
         // Science: Popper (1959) — falsifiability, scientific method.
         // ═══════════════════════════════════════════════════════════════════════
-        let (primitive_validation_phi_gain, primitive_validation_p_value) = if self
-            .primitive_validation_result
-            .is_none()
-            && self.primitive_processor.is_some()
-            && self.stats.total_cycles == 500
-        {
-            let mut experiment =
+        let (primitive_validation_phi_gain, primitive_validation_p_value) =
+            if self.primitive_validation_result.is_none()
+                && self.primitive_processor.is_some()
+                && self.stats.total_cycles == 500
+            {
+                let mut experiment =
                 crate::consciousness::primitive_validation::StandardExperiments::tier1_mathematical(
                 );
-            match experiment.run() {
-                Ok(results) => {
-                    let gain = results.statistics.mean_phi_gain;
-                    let p = results.statistics.p_value;
-                    self.primitive_validation_result = Some((gain, p));
-                    (gain, p)
+                match experiment.run() {
+                    Ok(results) => {
+                        let gain = results.statistics.mean_phi_gain;
+                        let p = results.statistics.p_value;
+                        self.primitive_validation_result = Some((gain, p));
+                        (gain, p)
+                    }
+                    Err(_) => (0.0, 1.0),
                 }
-                Err(_) => (0.0, 1.0),
-            }
-        } else {
-            self.primitive_validation_result.unwrap_or((0.0, 1.0))
-        };
+            } else {
+                self.primitive_validation_result.unwrap_or((0.0, 1.0))
+            };
 
         // FEEDBACK: Validated primitives boost LR; falsified primitives dampen it
         // Science: Popper (1959) — if primitives don't improve Φ, reduce their influence

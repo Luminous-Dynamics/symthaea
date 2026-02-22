@@ -84,9 +84,18 @@ impl FlightTrainer {
         physics: &mut dyn PhysicsSimulator,
         episode: usize,
     ) -> EpisodeMetrics {
-        let setpoint = FlightSetpoint::hover();
         let dt = self.config.motor_dt();
         let cognitive_interval = self.config.cognitive_interval();
+
+        // Setpoint variety: cycle through different targets across episodes.
+        // Early episodes use default hover; later episodes introduce position offsets.
+        let setpoint = match episode % 5 {
+            0 => FlightSetpoint::hover(), // z=0.1
+            1 => FlightSetpoint { position: [0.0, 0.0, 0.2], yaw: 0.0 },  // higher hover
+            2 => FlightSetpoint { position: [0.05, 0.0, 0.1], yaw: 0.0 }, // slight x offset
+            3 => FlightSetpoint { position: [0.0, 0.05, 0.15], yaw: 0.0 },// y + z offset
+            _ => FlightSetpoint::hover(), // back to default
+        };
 
         // Curriculum: perturbation grows across episodes
         let perturbation = if self.config.num_episodes > 1 {
@@ -95,7 +104,8 @@ impl FlightTrainer {
         } else {
             0.01
         };
-        physics.reset_with_perturbation(0.1, perturbation, episode as u64 + 42);
+        let reset_alt = setpoint.position[2];
+        physics.reset_with_perturbation(reset_alt, perturbation, episode as u64 + 42);
 
         // Reset components for new episode
         encoder.reset();
@@ -279,6 +289,24 @@ impl FlightTrainer {
         let mut encoder = QuadrotorHdcEncoder::new(&genesis, num_levels);
         let mut controller = FlightController::new(&genesis, &self.config);
         let mut fep_agent = ActiveInferenceFlightAgent::new(FlightFepConfig::default());
+
+        // Warmup: pre-train output projection on static hover samples.
+        // Generates (sensor_hv, PD_target) pairs from slightly perturbed hover states
+        // so the controller starts with a reasonable policy instead of random weights.
+        let warmup_samples: Vec<(ContinuousHV, QuadrotorCommand)> = (0..20)
+            .map(|i| {
+                let mut state = FlightState::hover(0.1);
+                // Small perturbations to give variety
+                let offset = (i as f64 - 10.0) * 0.005;
+                state.position[2] += offset;
+                state.linear_velocity[2] = offset * -2.0; // opposing velocity
+                let hv = encoder.encode(&state);
+                let target = pd_baseline(&state, &FlightSetpoint::hover(), &self.pd_gains);
+                (hv, target)
+            })
+            .collect();
+        controller.warmup(&warmup_samples, 100, self.config.learning_rate * 10.0);
+        encoder.reset();
 
         let mut all_metrics = Vec::with_capacity(self.config.num_episodes);
 
