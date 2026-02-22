@@ -91,11 +91,14 @@ pub fn dot_product_simd(a: &[f32], b: &[f32]) -> f32 {
     #[cfg(target_arch = "x86_64")]
     {
         if has_avx2() && has_fma() {
-            // Best path: AVX2 + FMA
+            // SAFETY: CPU feature detection above guarantees AVX2+FMA are available.
+            // Slices `a` and `b` are valid, same-length (asserted above), and read-only.
             unsafe { dot_product_avx2_fma(a, b) }
         } else if has_avx2() {
+            // SAFETY: AVX2 availability verified by runtime feature detection.
             unsafe { dot_product_avx2(a, b) }
         } else if has_sse41() {
+            // SAFETY: SSE4.1 availability verified by runtime feature detection.
             unsafe { dot_product_sse41(a, b) }
         } else {
             dot_product_scalar(a, b)
@@ -356,8 +359,11 @@ pub fn bind_simd(a: &[f32], b: &[f32]) -> Vec<f32> {
     #[cfg(target_arch = "x86_64")]
     {
         if has_avx2() {
+            // SAFETY: AVX2 availability verified by runtime feature detection.
+            // `a`, `b`, `result` are same-length slices (asserted/allocated above).
             unsafe { bind_avx2(a, b, &mut result) };
         } else if has_sse41() {
+            // SAFETY: SSE4.1 availability verified by runtime feature detection.
             unsafe { bind_sse41(a, b, &mut result) };
         } else {
             bind_scalar(a, b, &mut result);
@@ -510,10 +516,14 @@ pub fn bundle_simd(hvs: &[&[f32]], weights: &[f32]) -> Vec<f32> {
     #[cfg(target_arch = "x86_64")]
     {
         if has_avx2() && has_fma() {
+            // SAFETY: AVX2+FMA availability verified by runtime feature detection.
+            // All HVs have same dimension (asserted above), `result` is that size.
             unsafe { bundle_avx2_fma(hvs, weights, &mut result, inv_weight_sum) };
         } else if has_avx2() {
+            // SAFETY: AVX2 availability verified by runtime feature detection.
             unsafe { bundle_avx2(hvs, weights, &mut result, inv_weight_sum) };
         } else if has_sse41() {
+            // SAFETY: SSE4.1 availability verified by runtime feature detection.
             unsafe { bundle_sse41(hvs, weights, &mut result, inv_weight_sum) };
         } else {
             bundle_scalar(hvs, weights, &mut result, inv_weight_sum);
@@ -694,6 +704,8 @@ pub fn similarity_simd(a: &[f32], b: &[f32]) -> f32 {
     #[cfg(target_arch = "x86_64")]
     {
         if has_avx2() && has_fma() {
+            // SAFETY: AVX2+FMA availability verified by runtime feature detection.
+            // Slices `a` and `b` are valid, same-length (asserted above), and read-only.
             unsafe { similarity_avx2_fma(a, b) }
         } else if has_avx2() {
             similarity_scalar_optimized(a, b)

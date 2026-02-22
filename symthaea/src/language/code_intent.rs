@@ -270,8 +270,11 @@ pub struct CodeIntentClassifier {
 }
 
 impl CodeIntentClassifier {
-    /// Create a new classifier with the given dimension
+    /// Create a new classifier with the given dimension.
+    ///
+    /// `dim` must be at least 1 to avoid division-by-zero in modular hashing.
     pub fn new(dim: usize) -> Self {
+        let dim = dim.max(1);
         Self {
             dim,
             create_prototype: Self::encode_prototype(
