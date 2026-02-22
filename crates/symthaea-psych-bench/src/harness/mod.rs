@@ -7,7 +7,7 @@ pub mod report;
 pub mod snapshot;
 
 pub use config::{AblationConfig, AblationPreset, BenchmarkConfig};
-pub use report::{BaselineComparison, BenchmarkReport, BenchmarkResult, MetricValue};
+pub use report::{BaselineComparison, BenchmarkReport, BenchmarkResult, CompositeScore, MetricValue};
 pub use snapshot::{
     RegressionReport, RegressionResult, RegressionSeverity, RegressionSnapshot, RegressionSummary,
 };
