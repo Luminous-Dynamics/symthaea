@@ -91,9 +91,18 @@ impl FlightTrainer {
         // Early episodes use default hover; later episodes introduce position offsets.
         let setpoint = match episode % 5 {
             0 => FlightSetpoint::hover(), // z=0.1
-            1 => FlightSetpoint { position: [0.0, 0.0, 0.2], yaw: 0.0 },  // higher hover
-            2 => FlightSetpoint { position: [0.05, 0.0, 0.1], yaw: 0.0 }, // slight x offset
-            3 => FlightSetpoint { position: [0.0, 0.05, 0.15], yaw: 0.0 },// y + z offset
+            1 => FlightSetpoint {
+                position: [0.0, 0.0, 0.2],
+                yaw: 0.0,
+            }, // higher hover
+            2 => FlightSetpoint {
+                position: [0.05, 0.0, 0.1],
+                yaw: 0.0,
+            }, // slight x offset
+            3 => FlightSetpoint {
+                position: [0.0, 0.05, 0.15],
+                yaw: 0.0,
+            }, // y + z offset
             _ => FlightSetpoint::hover(), // back to default
         };
 

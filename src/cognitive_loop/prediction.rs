@@ -56,6 +56,53 @@ impl CognitiveLoopService {
         result
     }
 
+    /// Compute coherence between multi-horizon predictions (0.0 = divergent, 1.0 = identical).
+    ///
+    /// Science: Bar (2009) — predictions at multiple time horizons should cohere when the
+    /// model has captured genuine temporal structure (vs noise).
+    /// Computes average pairwise cosine similarity across prediction horizons.
+    pub(super) fn compute_prediction_coherence(&mut self, input: &Array1<f32>) -> f32 {
+        let horizons = &self.config.cfc_config.prediction_horizons;
+        if horizons.len() < 2 {
+            return 1.0; // single horizon is trivially coherent
+        }
+
+        let mut predictions: Vec<Vec<f32>> = Vec::with_capacity(horizons.len());
+        for &horizon in horizons {
+            if let Ok(pred) = self.temporal_network.predict_forward(input, horizon) {
+                predictions.push(pred.to_vec());
+            }
+        }
+
+        if predictions.len() < 2 {
+            return 1.0;
+        }
+
+        // Average pairwise cosine similarity
+        let mut total_sim = 0.0f32;
+        let mut pairs = 0u32;
+        for i in 0..predictions.len() {
+            for j in (i + 1)..predictions.len() {
+                let mut dot = 0.0f32;
+                let mut norm_a = 0.0f32;
+                let mut norm_b = 0.0f32;
+                for (a, b) in predictions[i].iter().zip(predictions[j].iter()) {
+                    dot += a * b;
+                    norm_a += a * a;
+                    norm_b += b * b;
+                }
+                let denom = (norm_a.sqrt() * norm_b.sqrt()).max(1e-10);
+                total_sim += (dot / denom).clamp(0.0, 1.0);
+                pairs += 1;
+            }
+        }
+        if pairs == 0 {
+            1.0
+        } else {
+            total_sim / pairs as f32
+        }
+    }
+
     /// Build a lightweight [`PrimitiveConsciousnessState`] from detected primitive names.
     ///
     /// Maps primitive names to their most likely tier using keyword heuristics,

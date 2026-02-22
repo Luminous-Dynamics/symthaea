@@ -344,6 +344,27 @@ pub struct LoopStats {
     pub surprise_boosted_replays: u64,
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // PHASE 15: ADAPTIVE ARCHITECTURE + EMOTIONAL HOMEOSTASIS
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Cycles where attention budget was exceeded (cumulative).
+    pub attention_budget_exceeded_count: u64,
+
+    /// Average multi-horizon prediction coherence (EMA, alpha=0.1).
+    pub avg_prediction_coherence: f32,
+
+    /// Average emotional valence homeostasis pull magnitude (EMA, alpha=0.05).
+    pub avg_valence_homeostasis: f32,
+
+    /// Cycles where arousal recovery mode was active (cumulative).
+    pub arousal_recovery_cycles: u64,
+
+    /// Cycles where input was memoized (cumulative).
+    pub input_memoization_hits: u64,
+
+    /// Cycles where guiding question influenced priority (cumulative).
+    pub guiding_question_priority_uses: u64,
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)
     // ═══════════════════════════════════════════════════════════════════════════
     /// Cached lattice height (0 = not yet computed)
