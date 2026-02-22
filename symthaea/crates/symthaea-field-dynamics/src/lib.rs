@@ -1238,4 +1238,269 @@ mod tests {
         // Should have interference events
         assert!(analyzer.stats.observations == 30);
     }
+
+    // ── FieldDynamicsConfig ─────────────────────────────────────────────
+
+    #[test]
+    fn test_config_default_values() {
+        let config = FieldDynamicsConfig::default();
+        assert!((config.wave_velocity - 1.0).abs() < f64::EPSILON);
+        assert!((config.damping_coefficient - 0.1).abs() < f64::EPSILON);
+        assert_eq!(config.history_size, 100);
+        assert_eq!(config.spatial_resolution, 7);
+        assert!((config.dt - 0.01).abs() < f64::EPSILON);
+    }
+
+    // ── FieldPoint ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_field_point_new() {
+        let pos = [0.5; 7];
+        let fp = FieldPoint::new(pos, 0.8);
+        assert!((fp.amplitude - 0.8).abs() < f64::EPSILON);
+        assert!((fp.velocity - 0.0).abs() < f64::EPSILON);
+        assert!((fp.acceleration - 0.0).abs() < f64::EPSILON);
+        assert!((fp.phase - 0.0).abs() < f64::EPSILON);
+        assert_eq!(fp.gradient, [0.0; 7]);
+    }
+
+    #[test]
+    fn test_field_point_kinetic_energy_zero_velocity() {
+        let fp = FieldPoint::new([0.5; 7], 0.8);
+        assert!((fp.kinetic_energy() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_field_point_potential_energy() {
+        let fp = FieldPoint::new([0.5; 7], 0.8);
+        // potential = 1.0 - min(0.8, 1.0) = 0.2
+        assert!((fp.potential_energy() - 0.2).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_field_point_total_energy_equals_sum() {
+        let mut fp = FieldPoint::new([0.5; 7], 0.6);
+        fp.velocity = 0.4;
+        let ke = fp.kinetic_energy();
+        let pe = fp.potential_energy();
+        assert!((fp.total_energy() - (ke + pe)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_field_point_gradient_magnitude_zero() {
+        let fp = FieldPoint::new([0.5; 7], 0.5);
+        assert!((fp.gradient_magnitude() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_field_point_gradient_magnitude_nonzero() {
+        let mut fp = FieldPoint::new([0.5; 7], 0.5);
+        fp.gradient = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        assert!((fp.gradient_magnitude() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_field_point_potential_clamped_high_amplitude() {
+        let fp = FieldPoint::new([0.5; 7], 2.0);
+        // potential = 1.0 - min(2.0, 1.0) = 0.0
+        assert!((fp.potential_energy() - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ── WavePacket ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_wave_packet_energy_positive() {
+        let packet = WavePacket {
+            center: [0.5; 7],
+            width: 0.3,
+            wave_number: 5.0,
+            frequency: 2.0,
+            amplitude: 1.0,
+            group_velocity: 0.5,
+            created_at: Instant::now(),
+        };
+        assert!(packet.energy() > 0.0);
+    }
+
+    #[test]
+    fn test_wave_packet_evaluate_finite() {
+        let packet = WavePacket {
+            center: [0.5; 7],
+            width: 0.3,
+            wave_number: 5.0,
+            frequency: 2.0,
+            amplitude: 1.0,
+            group_velocity: 0.5,
+            created_at: Instant::now(),
+        };
+        let val = packet.evaluate(&[0.5; 7], 0.0);
+        assert!(val.is_finite(), "Packet evaluation should be finite");
+    }
+
+    #[test]
+    fn test_wave_packet_decays_with_distance() {
+        let packet = WavePacket {
+            center: [0.0; 7],
+            width: 0.2,
+            wave_number: 0.0,
+            frequency: 0.0,
+            amplitude: 1.0,
+            group_velocity: 0.0,
+            created_at: Instant::now(),
+        };
+        let close = packet.evaluate(&[0.0; 7], 0.0).abs();
+        let far = packet.evaluate(&[5.0; 7], 0.0).abs();
+        assert!(close >= far, "Packet should decay away from center: close={}, far={}", close, far);
+    }
+
+    // ── StandingWave ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_standing_wave_energy_positive() {
+        let wave = StandingWave {
+            mode_numbers: [1, 0, 0, 0, 0, 0, 0],
+            frequency: 2.0,
+            amplitude: 0.5,
+            phase: 0.0,
+            stability: 0.8,
+            interpretation: "Test".to_string(),
+        };
+        assert!(wave.energy() > 0.0);
+    }
+
+    #[test]
+    fn test_standing_wave_total_mode_number() {
+        let wave = StandingWave {
+            mode_numbers: [1, 2, 3, 0, 0, 0, 0],
+            frequency: 1.0,
+            amplitude: 1.0,
+            phase: 0.0,
+            stability: 0.5,
+            interpretation: "Test".to_string(),
+        };
+        assert_eq!(wave.total_mode_number(), 6);
+    }
+
+    #[test]
+    fn test_standing_wave_evaluate_finite() {
+        let wave = StandingWave {
+            mode_numbers: [1, 0, 0, 0, 0, 0, 0],
+            frequency: 1.0,
+            amplitude: 1.0,
+            phase: 0.0,
+            stability: 0.8,
+            interpretation: "Test".to_string(),
+        };
+        let val = wave.evaluate(&[0.25; 7], 0.0);
+        assert!(val.is_finite());
+    }
+
+    // ── EnergyTracker ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_energy_tracker_new() {
+        let tracker = EnergyTracker::new();
+        assert!((tracker.current_energy - 0.0).abs() < f64::EPSILON);
+        assert!((tracker.total_input - 0.0).abs() < f64::EPSILON);
+        assert!((tracker.total_output - 0.0).abs() < f64::EPSILON);
+        assert_eq!(tracker.violations, 0);
+    }
+
+    #[test]
+    fn test_energy_tracker_conservation_at_zero() {
+        let tracker = EnergyTracker::new();
+        assert!(tracker.is_conserved(0.1));
+    }
+
+    #[test]
+    fn test_energy_tracker_balance() {
+        let mut tracker = EnergyTracker::new();
+        tracker.total_input = 10.0;
+        tracker.total_output = 3.0;
+        tracker.current_energy = 7.0;
+        assert!((tracker.balance() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_energy_tracker_default() {
+        let tracker = EnergyTracker::default();
+        assert_eq!(tracker.violations, 0);
+    }
+
+    // ── ConsciousnessFieldAnalyzer ──────────────────────────────────────
+
+    #[test]
+    fn test_analyzer_no_state_initially() {
+        let analyzer = ConsciousnessFieldAnalyzer::new(FieldDynamicsConfig::default());
+        assert!(analyzer.current_state().is_none());
+        assert_eq!(analyzer.wave_packet_count(), 0);
+        assert_eq!(analyzer.standing_wave_count(), 0);
+    }
+
+    #[test]
+    fn test_field_potential_no_observations() {
+        let analyzer = ConsciousnessFieldAnalyzer::new(FieldDynamicsConfig::default());
+        assert!((analyzer.field_potential() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_field_gradient_no_observations() {
+        let analyzer = ConsciousnessFieldAnalyzer::new(FieldDynamicsConfig::default());
+        assert_eq!(analyzer.field_gradient(), [0.0; 7]);
+    }
+
+    #[test]
+    fn test_evolve_empty_history() {
+        let mut analyzer = ConsciousnessFieldAnalyzer::new(FieldDynamicsConfig::default());
+        let trajectory = analyzer.evolve(10);
+        assert!(trajectory.is_empty(), "No evolution without observations");
+    }
+
+    #[test]
+    fn test_observe_updates_stats() {
+        let mut analyzer = ConsciousnessFieldAnalyzer::new(FieldDynamicsConfig::default());
+        analyzer.observe([0.5; 7]);
+        assert_eq!(analyzer.stats.observations, 1);
+        assert!(analyzer.stats.mean_amplitude > 0.0);
+        assert!(analyzer.stats.peak_amplitude > 0.0);
+    }
+
+    #[test]
+    fn test_zero_dimensions_amplitude() {
+        let analyzer = ConsciousnessFieldAnalyzer::new(FieldDynamicsConfig::default());
+        let amp = analyzer.compute_field_amplitude(&[0.0; 7]);
+        assert!((amp - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_amplitude_invariant_nonnegative() {
+        let mut analyzer = ConsciousnessFieldAnalyzer::new(FieldDynamicsConfig::default());
+        for _ in 0..20 {
+            analyzer.observe([0.1, 0.9, 0.2, 0.8, 0.3, 0.7, 0.4]);
+        }
+        let trajectory = analyzer.evolve(50);
+        for pt in &trajectory {
+            assert!(pt.amplitude >= 0.0, "Amplitude should be non-negative: {}", pt.amplitude);
+            assert!(pt.amplitude <= 1.0, "Amplitude should be <= 1.0: {}", pt.amplitude);
+        }
+    }
+
+    #[test]
+    fn test_identify_standing_waves_insufficient_history() {
+        let mut analyzer = ConsciousnessFieldAnalyzer::new(FieldDynamicsConfig::default());
+        for _ in 0..5 {
+            analyzer.observe([0.5; 7]);
+        }
+        let modes = analyzer.identify_standing_waves();
+        assert!(modes.is_empty(), "Too few observations for standing wave detection");
+    }
+
+    #[test]
+    fn test_resonance_report_no_waves() {
+        let analyzer = ConsciousnessFieldAnalyzer::new(FieldDynamicsConfig::default());
+        let report = analyzer.analyze_resonance();
+        assert!(!report.is_resonant);
+        assert!((report.resonance_strength - 0.0).abs() < f64::EPSILON);
+        assert!(report.dominant_mode.is_none());
+    }
 }

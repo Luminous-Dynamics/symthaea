@@ -436,13 +436,13 @@ impl MfdiBridge {
     }
 
     /// Sign an output
-    pub fn sign_output(&mut self, output: Vec<f32>) -> Result<SignedOutput, MfdiError> {
+    pub fn sign_output(&mut self, output: &[f32]) -> Result<SignedOutput, MfdiError> {
         let signing_key = self.signing_key.as_ref().ok_or(MfdiError::NoSigningKey)?;
         let agent_id = self.agent_id().ok_or(MfdiError::NoIdentity)?.to_string();
 
         self.cycle_counter += 1;
         Ok(SignedOutput::new(
-            output,
+            output.to_vec(),
             signing_key,
             agent_id,
             self.cycle_counter,
@@ -680,7 +680,7 @@ mod tests {
             MfdiBridge::with_signing_key(MfdiBridgeConfig::default(), signing_key.clone());
 
         let output = vec![1.0, 2.0, 3.0];
-        let signed = bridge.sign_output(output.clone()).unwrap();
+        let signed = bridge.sign_output(&output).unwrap();
 
         assert!(signed.verify(&signing_key.verifying_key()));
         assert_eq!(signed.cycle_id, 1);

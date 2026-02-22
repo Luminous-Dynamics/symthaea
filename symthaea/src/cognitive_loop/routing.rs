@@ -295,7 +295,7 @@ impl ThalamicRouter {
 
 /// Detected task type for primitive routing
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DetectedTaskType {
+pub(crate) enum DetectedTaskType {
     /// General conversation or reasoning
     General,
     /// Code understanding, generation, or manipulation
@@ -310,7 +310,7 @@ pub enum DetectedTaskType {
 ///
 /// Uses both keyword matching (fast path) and HDC similarity (accurate path).
 #[derive(Debug, Clone)]
-pub struct CodeTaskDetector {
+pub(crate) struct CodeTaskDetector {
     /// Keywords that strongly indicate code tasks
     code_keywords: Vec<&'static str>,
     /// Action verbs that indicate code manipulation
@@ -570,7 +570,7 @@ impl CodeTaskDetector {
 
 /// Detailed breakdown of code detection for debugging/analysis
 #[derive(Debug, Clone)]
-pub struct CodeDetectionBreakdown {
+pub(crate) struct CodeDetectionBreakdown {
     pub is_code: bool,
     pub confidence: f32,
     pub has_code_block: bool,
@@ -755,7 +755,7 @@ impl ActiveInferenceBridge {
 
 /// Statistics from the Active Inference bridge
 #[derive(Debug, Clone)]
-pub struct ActiveInferenceBridgeStats {
+pub(crate) struct ActiveInferenceBridgeStats {
     /// Total observations processed
     pub total_observations: usize,
     /// Current Modulation Index

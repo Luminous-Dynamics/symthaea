@@ -270,7 +270,7 @@ impl FlowState {
 
 /// Summary of flow state temporal statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlowTemporalSummary {
+pub(crate) struct FlowTemporalSummary {
     /// Total time spent in flow during this session (seconds)
     pub total_flow_time_secs: f32,
 
@@ -313,6 +313,19 @@ pub enum ResponseStrategy {
 }
 
 impl ResponseStrategy {
+    /// Return the strategy name as a static string, matching Debug output.
+    /// Avoids `format!("{:?}", strategy)` allocation on the hot path.
+    #[inline]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Detailed => "Detailed",
+            Self::Concise => "Concise",
+            Self::Clarifying => "Clarifying",
+            Self::Supportive => "Supportive",
+            Self::Exploratory => "Exploratory",
+        }
+    }
+
     /// Get the opposite strategy (for switching after negative feedback)
     pub fn opposite(self) -> Self {
         match self {

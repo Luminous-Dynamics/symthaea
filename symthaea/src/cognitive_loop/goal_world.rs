@@ -243,7 +243,7 @@ impl WorldModelBridge {
 
 /// Causal analysis result for a goal intervention.
 #[derive(Debug, Clone)]
-pub struct CausalGoalEffect {
+pub(crate) struct CausalGoalEffect {
     /// Goal ID that was analyzed
     pub goal_id: String,
     /// Observational correlation between goal priority and prediction error
@@ -259,7 +259,7 @@ pub struct CausalGoalEffect {
 /// Uses Pearl's do-calculus (via `causal_calculus`) to distinguish true causal
 /// effects from spurious correlations. This answers: "If I intervene on goal X
 /// (set its priority high), what is the expected effect on prediction error?"
-pub struct CausalGoalAnalyzer {
+pub(crate) struct CausalGoalAnalyzer {
     /// History of (goal_priority, attention_weight, prediction_error) tuples
     observations: Vec<(f64, f64, f64)>,
     max_observations: usize,

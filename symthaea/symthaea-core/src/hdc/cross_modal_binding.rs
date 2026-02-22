@@ -584,15 +584,9 @@ impl CrossModalBinder {
         }
     }
 
-    /// Softmax with temperature
+    /// Softmax with temperature (delegates to [`crate::math::softmax_with_temperature`]).
     fn softmax(&self, values: &[f32]) -> Vec<f32> {
-        let max_val = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-        let exp_vals: Vec<f32> = values
-            .iter()
-            .map(|v| ((v - max_val) / self.config.temperature).exp())
-            .collect();
-        let sum: f32 = exp_vals.iter().sum();
-        exp_vals.iter().map(|v| v / sum).collect()
+        crate::math::softmax_with_temperature(values, self.config.temperature)
     }
 
     /// Build hierarchical structure recursively

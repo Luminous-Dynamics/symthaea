@@ -159,11 +159,10 @@ pub use dream_feedback::{
 // declarations and re-exports to reduce dead code surface.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// DEAD CODE: world_model - Consciousness latent space model. Only callers are
-// orphaned brain bridge files (not in brain/mod.rs). Types collide with
-// dynamics::world_model::WorldModelConfig (the live version).
-// #[cfg(feature = "full_consciousness")]
-// pub mod world_model;
+// world_model: Consciousness latent space model.
+// Required by brain/affective_bridge.rs (ConsciousnessWorldModel, WorldModelStats).
+#[cfg(feature = "full_consciousness")]
+pub mod world_model;
 
 // DEAD CODE: routers - ConsciousnessRouter variants (Direct, Exploratory, etc.).
 // Only used by routing_hub.rs and benchmark_suite.rs (also dead).
@@ -242,12 +241,9 @@ pub use dream_feedback::{
 
 // ── Conditional re-exports DISABLED (all source modules commented out above) ──
 
-// DEAD CODE: world_model re-exports
-// #[cfg(feature = "full_consciousness")]
-// pub use world_model::{
-//     ActionType, ConsciousnessAction, ConsciousnessStateDelta, ConsciousnessTransition,
-//     ConsciousnessWorldModel, LatentConsciousnessState, WorldModelConfig, WorldModelStats,
-// };
+// world_model re-exports (used by brain/affective_bridge.rs)
+#[cfg(feature = "full_consciousness")]
+pub use world_model::{ConsciousnessWorldModel, WorldModelStats};
 
 // DEAD CODE: routers re-exports
 // #[cfg(feature = "full_consciousness")]

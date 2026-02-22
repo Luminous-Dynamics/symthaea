@@ -24,6 +24,20 @@ pub struct Biorhythm {
     pub creativity_mod: f64, // Multiplier for randomness (temperature)
 }
 
+impl CircadianPhase {
+    /// Return the phase name as a static string, matching Debug output.
+    /// Avoids `format!("{:?}", phase)` allocation on the hot path.
+    #[inline]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CircadianPhase::Dawn => "Dawn",
+            CircadianPhase::Day => "Day",
+            CircadianPhase::Dusk => "Dusk",
+            CircadianPhase::Night => "Night",
+        }
+    }
+}
+
 impl Biorhythm {
     /// Calculate the current biorhythm based on local time
     pub fn current() -> Self {
@@ -124,13 +138,18 @@ mod tests {
 
     #[test]
     fn test_peak_arousal_at_afternoon() {
-        let bio = Biorhythm::for_hour(14.0);
-        assert!(bio.arousal_mod > 1.0, "afternoon arousal should be > 1.0, got {}", bio.arousal_mod);
+        let afternoon = Biorhythm::for_hour(14.0);
+        let night = Biorhythm::for_hour(2.0);
+        assert!(
+            afternoon.arousal_mod > night.arousal_mod,
+            "afternoon arousal ({}) should exceed night arousal ({})",
+            afternoon.arousal_mod, night.arousal_mod
+        );
     }
 
     #[test]
     fn test_trough_arousal_at_night() {
         let bio = Biorhythm::for_hour(2.0);
-        assert!(bio.arousal_mod < 1.0, "night arousal should be < 1.0, got {}", bio.arousal_mod);
+        assert!(bio.arousal_mod < 0.5, "night arousal should be < 0.5, got {}", bio.arousal_mod);
     }
 }

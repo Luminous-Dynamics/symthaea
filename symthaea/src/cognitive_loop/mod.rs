@@ -105,6 +105,7 @@ pub use goal_world::*;
 
 pub mod types;
 pub use types::*;
+pub(crate) use types::CycleState;
 
 pub mod stats;
 pub use stats::*;
@@ -135,7 +136,7 @@ mod cycle_subsystems;
 mod helpers;
 mod moral;
 mod prediction;
-pub mod virtual_body;
+pub(crate) mod virtual_body;
 
 // ── Imports (only what the struct definitions below require) ─────────────────
 use crate::brain::affective_bridge::AffectiveBridge;

@@ -11,6 +11,6 @@
 pub mod phi_attention;
 
 pub use phi_attention::{
-    compute_attention_weights, softmax_with_temperature, PhiAttentionConfig, PhiAttentionGate,
+    compute_attention_weights, PhiAttentionConfig, PhiAttentionGate,
     PhiAttentionResult,
 };

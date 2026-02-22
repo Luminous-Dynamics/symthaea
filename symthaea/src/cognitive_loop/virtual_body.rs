@@ -27,7 +27,7 @@ use std::collections::VecDeque;
 
 /// Configuration for the virtual body adapter.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VirtualBodyConfig {
+pub(crate) struct VirtualBodyConfig {
     /// Smoothing factor for interoceptive signals (0-1, lower = smoother)
     pub smoothing: f32,
     /// How strongly body state modulates Phi (0-1)
@@ -53,7 +53,7 @@ impl Default for VirtualBodyConfig {
 ///
 /// Collected at specific points during the cycle and passed to
 /// `VirtualBody::update()` in one batch.
-pub struct CognitiveSignals {
+pub(crate) struct CognitiveSignals {
     pub prediction_error: f32,
     pub coherence: f32,
     pub prediction_confidence: f32,
@@ -69,7 +69,7 @@ pub struct CognitiveSignals {
 
 /// Summary of the virtual body's current state, for telemetry.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct VirtualBodyState {
+pub(crate) struct VirtualBodyState {
     /// Current interoceptive affect (VAD space)
     pub valence: f32,
     pub arousal: f32,
@@ -84,7 +84,7 @@ pub struct VirtualBodyState {
 ///
 /// Maintains a smoothed `InteroceptiveState` that updates each cycle,
 /// providing embodied grounding for the cognitive loop.
-pub struct VirtualBody {
+pub(crate) struct VirtualBody {
     config: VirtualBodyConfig,
     /// Current smoothed interoceptive state
     state: InteroceptiveState,

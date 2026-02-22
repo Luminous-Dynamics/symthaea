@@ -6,6 +6,7 @@
 use crate::consciousness::fep_active_inference::{MotorCommandType, Observation};
 use ndarray::Array1;
 use rayon::join as rayon_join;
+use std::borrow::Cow;
 use std::time::Instant;
 use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
 
@@ -175,7 +176,7 @@ impl CognitiveLoopService {
         let (moral_score, moral_concern_detected, moral_judgment) =
             self.run_moral_phase(input, input_negation_polarity);
         module_timings.moral_algebra = _t.elapsed().as_micros() as u64;
-        let mut moral_steering_category = String::new();
+        let mut moral_steering_category: &str = "";
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 0.5: Closed Learning Loop - Strategy Selection
@@ -390,9 +391,10 @@ impl CognitiveLoopService {
         // Falling error pattern → raise threshold (allow settling).
         let error_history_len = self.carryover.history.error_history.len();
         let pattern_mod = if error_history_len >= 4 {
-            let recent: Vec<f32> = self.carryover.history.error_history.iter()
-                .rev().take(4).copied().collect();
-            let slope = (recent[0] - recent[3]) / 3.0;
+            // Direct index: newest = len-1, 4th-newest = len-4 (avoids Vec alloc)
+            let newest = self.carryover.history.error_history[error_history_len - 1];
+            let oldest_4 = self.carryover.history.error_history[error_history_len - 4];
+            let slope = (newest - oldest_4) / 3.0;
             if slope > 0.02 { 0.9f32 } // Rising → easier to escalate
             else if slope < -0.02 { 1.1 } // Falling → easier to de-escalate
             else { 1.0 }
@@ -435,13 +437,18 @@ impl CognitiveLoopService {
 
         let (error_pattern, predicted_urgency) = if error_history.len() >= 4 {
             let len = error_history.len();
-            let recent_4: Vec<f32> = error_history.iter().rev().take(4).copied().collect();
+            // Direct index: newest = len-1, 4th-newest = len-4 (avoids Vec alloc)
+            let newest = error_history[len - 1];
+            let oldest_of_4 = error_history[len - 4];
             // Compute linear trend (simple slope)
-            let slope = (recent_4[0] - recent_4[3]) / 3.0; // newest - oldest, normalized
-            // Count sign changes for oscillation detection
+            let slope = (newest - oldest_of_4) / 3.0; // newest - oldest, normalized
+            // Count sign changes for oscillation detection (index pairs avoid collect→Vec)
             let mut sign_changes = 0u32;
-            for w in error_history.iter().collect::<Vec<_>>().windows(2) {
-                if (w[1] - w[0]).signum() != (w[0] - recent_4.last().copied().unwrap_or(0.0)).signum() {
+            let ref_val = oldest_of_4;
+            for i in 0..len.saturating_sub(1) {
+                let diff_cur = error_history[i + 1] - error_history[i];
+                let diff_ref = error_history[i] - ref_val;
+                if diff_cur.signum() != diff_ref.signum() {
                     sign_changes += 1;
                 }
             }
@@ -474,9 +481,9 @@ impl CognitiveLoopService {
                 }
                 _ => "Normal",
             };
-            (pattern.to_string(), predicted.to_string())
+            (pattern, predicted)
         } else {
-            ("Warmup".to_string(), "Normal".to_string())
+            ("Warmup", "Normal")
         };
 
         // ── Phase 17: Mode transition smoothing ──────────────────────────
@@ -861,10 +868,12 @@ impl CognitiveLoopService {
         // For CfC backend: use the compressed state as the semantic vector
 
         let _t_core = Instant::now();
-        let semantic_hdc = self
+        // Cow avoids cloning compressed_state (~1KB) on the CfC fallback path
+        let semantic_hdc: Cow<'_, [f32]> = self
             .temporal_network
             .project_to_hdc_vec(&compressed_state)
-            .unwrap_or_else(|| compressed_state.clone());
+            .map(Cow::Owned)
+            .unwrap_or(Cow::Borrowed(&compressed_state));
         // Phi-weighted learning rate: consciousness level modulates how aggressively
         // we adjust to prediction errors on similar past inputs.
         let current_phi_for_lr = pre_update_coherence as f64;
@@ -1014,10 +1023,13 @@ impl CognitiveLoopService {
         }
         module_timings.world_model = _t.elapsed().as_micros() as u64;
 
-        // 7. Send prediction to encoder for next cycle
-        self.encoder.set_prediction(prediction.clone());
+        // 7. Send prediction to encoder: deferred to after last &prediction use (line ~2436)
+        //    to avoid cloning ~1KB Vec<f32>. The encoder only stores it for next-cycle use,
+        //    so the timing doesn't affect correctness.
 
         // 8. Capture previous state BEFORE create_experience updates it
+        // Note: clone is required because create_experience() also takes self.last_state
+        // internally to build the experience record. The inner clone was removed (move instead).
         let previous_state = self.last_state.clone();
 
         // 9. Create experience and add to buffer (this updates last_state)
@@ -1313,12 +1325,12 @@ impl CognitiveLoopService {
                 // Consent is most severe — strongly dampen confidence + pause learning
                 self.prediction_confidence *= 0.7;
                 self.carryover.learning.subsystem_lr_factor *= 0.5;
-                moral_steering_category = "consent".to_string();
+                moral_steering_category = "consent";
             } else if moral_judgment.violations.iter().any(|v| v.contains("harm")) {
                 // Harm detected — strongly reduce exploration, shift to protective mode
                 self.curiosity_drive.exploration_urge *= 0.4;
                 self.prediction_confidence *= 0.85;
-                moral_steering_category = "harm".to_string();
+                moral_steering_category = "harm";
             } else if moral_judgment
                 .violations
                 .iter()
@@ -1327,11 +1339,11 @@ impl CognitiveLoopService {
                 // Deontological (perfect duty) — force reflection + consolidate constraint
                 self.self_reflection.force_reflection();
                 self.carryover.learning.subsystem_lr_factor *= 0.8;
-                moral_steering_category = "duty".to_string();
+                moral_steering_category = "duty";
             } else if !moral_judgment.violations.is_empty() {
                 // Other violations — moderate dampening
                 self.carryover.learning.subsystem_lr_factor *= 0.9;
-                moral_steering_category = "other".to_string();
+                moral_steering_category = "other";
             }
         } else if moral_score > MORAL_BENEFIT_THRESHOLD {
             // Positive moral alignment boosts confidence slightly
@@ -1527,8 +1539,8 @@ impl CognitiveLoopService {
         // Maps cycle values to 5 principled signals (Active Inference).
         // Science: Friston (2010) — principled signals drive behavior.
         // ═══════════════════════════════════════════════════════════════════════
-        let guiding_question: String;
-        let dominant_harmonic: String;
+        let guiding_question: &str;
+        let dominant_harmonic: &str;
         if let Some(ref mut bus) = self.experience_bus {
             bus.current_signals = crate::experience::PrincipledSignals {
                 prediction_error,
@@ -1540,11 +1552,11 @@ impl CognitiveLoopService {
             };
             bus.update_wisdom_from_signals();
             bus.kosmic_state.phi = unified_psi as f32;
-            guiding_question = bus.current_guiding_question().to_string();
-            dominant_harmonic = format!("{:?}", bus.dominant_harmonic());
+            guiding_question = bus.current_guiding_question();
+            dominant_harmonic = bus.dominant_harmonic().as_str();
         } else {
-            guiding_question = String::new();
-            dominant_harmonic = String::new();
+            guiding_question = "";
+            dominant_harmonic = "";
         }
 
         // ── Phase 15: Guiding question → subsystem priority ─────────────────
@@ -1574,9 +1586,9 @@ impl CognitiveLoopService {
                 "general"
             };
             self.stats.guiding_question_priority_uses += 1;
-            cat.to_string()
+            cat
         } else {
-            String::new()
+            ""
         };
 
         // ── Phase 15: Attention budget check ─────────────────────────────────
@@ -1845,9 +1857,10 @@ impl CognitiveLoopService {
                     effective_lr,
                 )
             } else {
-                // First cycle: bootstrap with self-prediction
-                let current_array: Array1<f32> = compressed_state.iter().copied().collect();
-                (current_array.clone(), current_array, effective_lr * 0.1)
+                // First cycle: bootstrap with self-prediction (build two arrays to avoid clone)
+                let train_input: Array1<f32> = compressed_state.iter().copied().collect();
+                let train_target: Array1<f32> = compressed_state.iter().copied().collect();
+                (train_input, train_target, effective_lr * 0.1)
             };
 
             // --- Async path: send sample to background thread (never blocks) ---
@@ -2099,7 +2112,7 @@ impl CognitiveLoopService {
                     helpers::parallel_semantic_causal(
                         semantic_memory,
                         causal_enhancer,
-                        semantic_hdc,
+                        semantic_hdc.into_owned(),
                         &compressed_state,
                         &output,
                         prediction_error,
@@ -2147,7 +2160,6 @@ impl CognitiveLoopService {
             hv16_cached: &hv16_cached,
             input,
             urgency,
-            total_cycles: self.stats.total_cycles,
         };
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -2426,6 +2438,10 @@ impl CognitiveLoopService {
             &prediction,
             &mut module_timings,
         );
+
+        // 7 (deferred). Send prediction to encoder for next cycle — moved here from step 7
+        // so we can move instead of clone (prediction is no longer referenced after this point).
+        self.encoder.set_prediction(prediction);
 
         // ═══════════════════════════════════════════════════════════════════════
         // LATE CONSCIOUSNESS MONITORS + INTEGRATION (extracted to cycle_late_consciousness.rs)
@@ -2815,8 +2831,8 @@ impl CognitiveLoopService {
 
         // Pre-compute values and formatted strings to avoid expensive ops inside struct literal
         let value_trend = self.value_feedback.recent_trend(50);
-        let circadian_phase_str = format!("{:?}", self.biorhythm.phase);
-        let selected_strategy_str = format!("{:?}", selected_strategy);
+        let circadian_phase_str = self.biorhythm.phase.as_str();
+        let selected_strategy_str = selected_strategy.as_str();
 
         // Build cycle metadata for observability
         let _t = Instant::now();
@@ -2932,7 +2948,7 @@ impl CognitiveLoopService {
             safety_category: None,
             negation_polarity: input_negation_polarity,
             moral_score,
-            selected_strategy: selected_strategy_str,
+            selected_strategy: selected_strategy_str.into(),
             actual_effective_lr: if learning_occurred { effective_lr } else { 0.0 },
             cycle_reward,
             fep_action: fep_action_idx,
@@ -2967,11 +2983,11 @@ impl CognitiveLoopService {
                 module_timings.metadata_assembly = _t.elapsed().as_micros() as u64;
                 module_timings
             },
-            circadian_phase: circadian_phase_str,
+            circadian_phase: circadian_phase_str.into(),
             circadian_plasticity: self.biorhythm.plasticity_mod as f32,
             phi_attention_weight,
-            guiding_question,
-            dominant_harmonic,
+            guiding_question: guiding_question.into(),
+            dominant_harmonic: dominant_harmonic.into(),
             resonator_wm_primed,
             resonator_reconsolidated,
             resonator_promotions,
@@ -2990,7 +3006,7 @@ impl CognitiveLoopService {
             epistemic_gate_gated: !epistemic_gate_approved,
             causal_attention_edges,
             mcts_plan_effectiveness,
-            moral_steering_category,
+            moral_steering_category: moral_steering_category.into(),
             codebook_utilization_rate,
             surprise_replay_batch_size,
             // Phase 15: Adaptive Architecture + Emotional Homeostasis
@@ -3003,7 +3019,7 @@ impl CognitiveLoopService {
             arousal_recovery_tau_factor,
             input_similarity,
             input_memoized,
-            guiding_priority_category,
+            guiding_priority_category: guiding_priority_category.into(),
             cycle_duration_us: cycle_start.elapsed().as_micros() as u64,
             school_predicted_phi_gain,
             // Phase 16: Quality-Aware Adaptive Processing
@@ -3018,13 +3034,13 @@ impl CognitiveLoopService {
             anomaly_recovery_progress,
             anomaly_recovering,
             // Phase 17: Predictive Self-Tuning
-            error_pattern,
+            error_pattern: error_pattern.into(),
             startup_suppressed,
             startup_warmup_progress,
             self_model_accuracy,
             mode_confidence: self.carryover.urgency.mode_confidence,
             mode_stability_counter: self.carryover.urgency.mode_stability_counter,
-            predicted_urgency,
+            predicted_urgency: predicted_urgency.into(),
         };
 
         // Update cumulative stats for resonator-memory loop diagnostics
@@ -3059,8 +3075,9 @@ impl CognitiveLoopService {
         }
 
         // Pre-compute identity fields before moving output
+        // sign_output accepts &[f32] — no need to clone output
         #[cfg(feature = "identity")]
-        let signed_output = self.mfdi_bridge.sign_output(output.clone()).ok();
+        let signed_output = self.mfdi_bridge.sign_output(&output).ok();
         #[cfg(feature = "identity")]
         let assurance_level = self.mfdi_bridge.assurance_level();
 

@@ -194,8 +194,8 @@ scraper = "0.25"
 # html2text removed: scraper is used for HTML parsing, html2text never imported
 
 # API server (optional)
-axum = { version = "0.7", optional = true }
-tower-http = { version = "0.5", features = ["cors"], optional = true }
+axum = { version = "0.7", features = ["ws"], optional = true }
+tower-http = { version = "0.5", features = ["cors", "fs"], optional = true }
 
 # Core async utilities
 async-trait = "0.1"
@@ -316,6 +316,7 @@ api_module = ["axum", "tower-http"]         # HTTP API binary + module
 voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + espeak-ng G2P
 voice-stt = ["symthaea-stt", "hound"]                 # STT with symthaea-stt crate (HDC + LTC + CfC)
 audio = ["voice-tts", "rodio"]                        # Full audio including playback
+vocal-tract = []                                      # LTC-driven articulatory synthesis pipeline (no external deps)
 
 # ── Perception & Embeddings ─────────────────────────────────────────
 embeddings = ["tokenizers", "ort", "hf-hub"]          # Qwen3/BGE text embeddings via ONNX
@@ -374,6 +375,7 @@ integration_module = []         # Integration module (cfg-gated in lib.rs)
 observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gated in gwt_integration + lib.rs)
 support = ["dep:symthaea-support"]                     # IT support intelligence (triage, diagnostics, knowledge, privacy, actions, prediction)
 web_research_module = []        # Web research epistemic verification (cfg-gated in lib.rs)
+unstable-examples = []          # Quarantine gate for examples with stale APIs (never enabled by default)
 
 
 [dev-dependencies]
@@ -421,6 +423,11 @@ path = "src/bin/symthaea-repl.rs"
 required-features = ["demo"]
 
 [[bin]]
+name = "symthaea-demo"
+path = "src/bin/symthaea-demo.rs"
+required-features = ["api_module"]
+
+[[bin]]
 name = "symthaea-story"
 path = "src/bin/symthaea-story.rs"
 
@@ -458,6 +465,14 @@ required-features = ["flight-swarm"]
 name = "kinetic_sacrifice"
 required-features = ["flight-mujoco"]
 
+[[test]]
+name = "humanoid_integration"
+required-features = ["humanoid"]
+
+[[example]]
+name = "dmc_humanoid_stand"
+required-features = ["humanoid"]
+
 [[example]]
 name = "demo_self_analysis"
 required-features = ["code_generation"]
@@ -472,21 +487,27 @@ required-features = ["benchmarks"]
 
 [[example]]
 name = "conscious_ollama_demo"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "core_minimal_consciousness_loop"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "cycle_aware_pattern_recognition"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "first_breath"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "hippocampus_integration"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "multi_day_narrative"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "multimodal_io_test"
@@ -501,9 +522,11 @@ required-features = ["school_learning"]
 
 [[example]]
 name = "semantic_consciousness"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "conscious_nixos_assistant"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "primitive_learning_cognitive"
@@ -519,6 +542,7 @@ required-features = ["benchmarks"]
 
 [[example]]
 name = "meta_conscious_ollama_demo"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "school_coherence_integration"
@@ -526,6 +550,7 @@ required-features = ["school_learning"]
 
 [[example]]
 name = "cfc_learning_lookahead_prototype"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "error_analysis"
@@ -533,12 +558,15 @@ required-features = ["benchmarks"]
 
 [[example]]
 name = "dual_metric_comparison"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "meta_consciousness_conversation"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "conscious_learning_demo"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "embodied_consciousness_learning"
@@ -546,9 +574,11 @@ required-features = ["school_learning"]
 
 [[example]]
 name = "primitive_decomposition_test"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "minimal_ai_assistant"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "phi_dyad_demo"
@@ -559,6 +589,7 @@ required-features = ["benchmarks"]
 
 [[example]]
 name = "toddler_test"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "phi_crossvalidation"
@@ -568,9 +599,11 @@ name = "symthaea_life_simulation"
 
 [[example]]
 name = "llm_integration_test"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "primitive_grounded_crystallization"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "cognitive_loop_validation"
@@ -586,6 +619,7 @@ required-features = ["benchmarks"]
 
 [[example]]
 name = "symthaea_awakens_demo"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "neuro_autopoietic_demo"
@@ -602,6 +636,7 @@ required-features = ["benchmarks"]
 
 [[example]]
 name = "pattern_differentiation"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "unified_causal_test"
@@ -609,6 +644,7 @@ required-features = ["benchmarks"]
 
 [[example]]
 name = "hdc_ltc_primitives_demo"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "magi_simulation"
@@ -646,7 +682,32 @@ name = "full_pipeline"
 
 # Neuroscience validation examples (no required features)
 [[example]]
+name = "comparative_scaling_benchmark"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "consciousness_advantage_benchmark"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "market_benchmark"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "ablation_baselines"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "market_scenarios"
+required-features = ["unstable-examples"]
+
+[[example]]
 name = "meditation_phi_analysis"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "paper_topology_table"
+required-features = ["unstable-examples"]
 
 # Neural-bridge examples (require candle/BGE-M3 layer extraction)
 [[example]]

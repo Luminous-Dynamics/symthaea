@@ -38,7 +38,7 @@ impl CognitiveLoopService {
     /// Sign a cycle output
     pub fn sign_output(&mut self, output: &[f32]) -> Result<crate::identity::SignedOutput> {
         self.mfdi_bridge
-            .sign_output(output.to_vec())
+            .sign_output(output)
             .map_err(|e| anyhow::anyhow!("MFDI signing failed: {:?}", e))
     }
 

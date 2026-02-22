@@ -49,6 +49,21 @@ pub enum ActiveHarmonic {
 }
 
 impl ActiveHarmonic {
+    /// Return the harmonic name as a static string, matching Debug output.
+    /// Avoids `format!("{:?}", harmonic)` allocation on the hot path.
+    #[inline]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Coherence => "Coherence",
+            Self::Flourishing => "Flourishing",
+            Self::Wisdom => "Wisdom",
+            Self::Play => "Play",
+            Self::Interconnect => "Interconnect",
+            Self::Reciprocity => "Reciprocity",
+            Self::Evolution => "Evolution",
+        }
+    }
+
     /// The core question this harmony asks
     pub fn question(&self) -> &'static str {
         match self {
@@ -430,5 +445,145 @@ mod tests {
         let questions = profile.active_questions(3);
         assert!(!questions.is_empty());
         assert_eq!(questions[0].harmonic, ActiveHarmonic::Wisdom);
+    }
+
+    // ── ActiveHarmonic enum ─────────────────────────────────────────────
+
+    #[test]
+    fn test_all_harmonics_returns_seven() {
+        assert_eq!(ActiveHarmonic::all().len(), 7);
+    }
+
+    #[test]
+    fn test_each_harmonic_has_distinct_question() {
+        let questions: Vec<&str> = ActiveHarmonic::all().iter().map(|h| h.question()).collect();
+        for i in 0..questions.len() {
+            for j in (i + 1)..questions.len() {
+                assert_ne!(questions[i], questions[j], "Questions should be unique");
+            }
+        }
+    }
+
+    #[test]
+    fn test_each_harmonic_has_distinct_bias() {
+        let biases: Vec<ReasoningBias> = ActiveHarmonic::all().iter().map(|h| h.bias()).collect();
+        for i in 0..biases.len() {
+            for j in (i + 1)..biases.len() {
+                assert_ne!(biases[i], biases[j], "Biases should be unique");
+            }
+        }
+    }
+
+    #[test]
+    fn test_full_name_nonempty() {
+        for h in ActiveHarmonic::all() {
+            assert!(!h.full_name().is_empty());
+        }
+    }
+
+    #[test]
+    fn test_display_impl() {
+        let s = format!("{}", ActiveHarmonic::Coherence);
+        assert_eq!(s, "Coherence");
+    }
+
+    // ── ReasoningBias ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_unknown_primitive_returns_neutral_weight() {
+        for h in ActiveHarmonic::all() {
+            let w = h.bias().primitive_weight_modifier("UNKNOWN_PRIMITIVE");
+            assert!((w - 1.0).abs() < f32::EPSILON, "Unknown primitive should get 1.0");
+        }
+    }
+
+    #[test]
+    fn test_all_biases_positive_weights() {
+        let primitives = ["INTEGRATE", "PROTECT", "QUESTION", "EXPLORE", "RELATE", "GIVE", "LEARN"];
+        for prim in &primitives {
+            for h in ActiveHarmonic::all() {
+                let w = h.bias().primitive_weight_modifier(prim);
+                assert!(w > 0.0, "Weight for {} under {:?} must be positive", prim, h);
+            }
+        }
+    }
+
+    // ── HarmonicMode ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_harmonic_mode_clamps_activation() {
+        let mode = HarmonicMode::new(ActiveHarmonic::Play, 5.0);
+        assert!((mode.activation - 1.0).abs() < f32::EPSILON);
+
+        let mode2 = HarmonicMode::new(ActiveHarmonic::Play, -1.0);
+        assert!((mode2.activation - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_weight_for_primitive_at_half_activation() {
+        let mode = HarmonicMode::new(ActiveHarmonic::Coherence, 0.5);
+        // At activation 0.5, scale = 0 so result = 1.0 (neutral)
+        let w = mode.weight_for_primitive("INTEGRATE");
+        assert!((w - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_weight_for_primitive_at_full_activation() {
+        let mode = HarmonicMode::new(ActiveHarmonic::Coherence, 1.0);
+        let w = mode.weight_for_primitive("INTEGRATE");
+        // At activation 1.0, full bias applies: 1.0 + (1.5 - 1.0)*1.0 = 1.5
+        assert!((w - 1.5).abs() < f32::EPSILON);
+    }
+
+    // ── HarmonicProfile ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_profile_set_clamps() {
+        let mut profile = HarmonicProfile::balanced();
+        profile.set(ActiveHarmonic::Wisdom, 2.0);
+        assert!((profile.get(ActiveHarmonic::Wisdom) - 1.0).abs() < f32::EPSILON);
+
+        profile.set(ActiveHarmonic::Wisdom, -1.0);
+        assert!((profile.get(ActiveHarmonic::Wisdom) - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_as_vector_round_trip() {
+        let original = HarmonicProfile::balanced();
+        let v = original.as_vector();
+        let restored = HarmonicProfile::from_vector(v);
+        assert_eq!(original.as_vector(), restored.as_vector());
+    }
+
+    #[test]
+    fn test_from_vector_clamps() {
+        let v = [2.0, -1.0, 0.5, 0.5, 0.5, 0.5, 0.5];
+        let profile = HarmonicProfile::from_vector(v);
+        assert!((profile.coherence - 1.0).abs() < f32::EPSILON);
+        assert!((profile.flourishing - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_active_questions_empty_when_all_at_baseline() {
+        let profile = HarmonicProfile::balanced();
+        // All at exactly 0.5 -- filter requires > 0.5
+        let questions = profile.active_questions(7);
+        assert!(questions.is_empty(), "No questions when all at baseline 0.5");
+    }
+
+    #[test]
+    fn test_harmonic_question_from_harmonic() {
+        let q = HarmonicQuestion::from_harmonic(ActiveHarmonic::Evolution, 0.9);
+        assert_eq!(q.harmonic, ActiveHarmonic::Evolution);
+        assert!((q.urgency - 0.9).abs() < f32::EPSILON);
+        assert_eq!(q.question, "How does this help us grow?");
+    }
+
+    #[test]
+    fn test_default_profile_is_balanced() {
+        let profile = HarmonicProfile::default();
+        for h in ActiveHarmonic::all() {
+            assert!((profile.get(h) - 0.5).abs() < f32::EPSILON);
+        }
     }
 }
