@@ -130,6 +130,7 @@ mod accessors;
 mod constructor;
 mod cycle;
 mod cycle_consciousness;
+mod cycle_late_consciousness;
 mod cycle_subsystems;
 mod helpers;
 mod moral;
