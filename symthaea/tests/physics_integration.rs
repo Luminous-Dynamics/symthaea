@@ -31,7 +31,10 @@ fn test_plasma_reading_creation_and_normalization() {
     assert_eq!(reading.sensor, PlasmaSensorType::PlasmaCurrent);
     assert!((reading.value - 1.25).abs() < f64::EPSILON);
     assert!((reading.timestamp - 0.0).abs() < f64::EPSILON);
-    assert!((reading.quality - 1.0).abs() < f64::EPSILON, "Default quality should be 1.0");
+    assert!(
+        (reading.quality - 1.0).abs() < f64::EPSILON,
+        "Default quality should be 1.0"
+    );
 
     // Normalized: (1.25 - 0.5) / (2.0 - 0.5) = 0.75 / 1.5 = 0.5
     let norm = reading.normalized();
@@ -68,21 +71,36 @@ fn test_plasma_reading_critical_detection() {
     assert!(!normal.is_critical(), "1.0 MA should not be critical");
 
     let low_critical = PlasmaReading::new(PlasmaSensorType::PlasmaCurrent, 0.2, 0.0);
-    assert!(low_critical.is_critical(), "0.2 MA should be critical (below 0.3)");
+    assert!(
+        low_critical.is_critical(),
+        "0.2 MA should be critical (below 0.3)"
+    );
 
     let high_critical = PlasmaReading::new(PlasmaSensorType::PlasmaCurrent, 3.0, 0.0);
-    assert!(high_critical.is_critical(), "3.0 MA should be critical (above 2.5)");
+    assert!(
+        high_critical.is_critical(),
+        "3.0 MA should be critical (above 2.5)"
+    );
 
     // SafetyFactor critical: < 2.0
     let q95_critical = PlasmaReading::new(PlasmaSensorType::SafetyFactor, 1.5, 0.0);
-    assert!(q95_critical.is_critical(), "q95 = 1.5 should be critical (below 2.0)");
+    assert!(
+        q95_critical.is_critical(),
+        "q95 = 1.5 should be critical (below 2.0)"
+    );
 
     let q95_normal = PlasmaReading::new(PlasmaSensorType::SafetyFactor, 3.5, 0.0);
-    assert!(!q95_normal.is_critical(), "q95 = 3.5 should not be critical");
+    assert!(
+        !q95_normal.is_critical(),
+        "q95 = 3.5 should not be critical"
+    );
 
     // ToroidalField has no critical thresholds
     let bt = PlasmaReading::new(PlasmaSensorType::ToroidalField, 100.0, 0.0);
-    assert!(!bt.is_critical(), "ToroidalField should never be critical (no thresholds)");
+    assert!(
+        !bt.is_critical(),
+        "ToroidalField should never be critical (no thresholds)"
+    );
 }
 
 // ============================================================================
@@ -99,7 +117,10 @@ fn test_encoder_deterministic_from_same_seed() {
     let hv1 = encoder1.encode_sample(&reading);
     let hv2 = encoder2.encode_sample(&reading);
 
-    assert_eq!(hv1, hv2, "Same seed should produce identical BinaryHV encodings");
+    assert_eq!(
+        hv1, hv2,
+        "Same seed should produce identical BinaryHV encodings"
+    );
 }
 
 #[test]
@@ -161,24 +182,30 @@ fn test_encoder_different_sensors_produce_different_hvs() {
 #[test]
 fn test_plasma_state_to_readings() {
     let state = PlasmaState::new(
-        1.0,  // timestamp
-        1.0,  // ip
-        1.5,  // ne
-        5.0,  // te
-        1.0,  // prad
-        1.0,  // vloop
-        5.0,  // bt
-        0.5,  // bp
-        3.5,  // q95
-        2.0,  // wmhd
-        2.0,  // beta
+        1.0, // timestamp
+        1.0, // ip
+        1.5, // ne
+        5.0, // te
+        1.0, // prad
+        1.0, // vloop
+        5.0, // bt
+        0.5, // bp
+        3.5, // q95
+        2.0, // wmhd
+        2.0, // beta
     );
 
     let readings = state.to_readings();
-    assert_eq!(readings.len(), 10, "PlasmaState should produce 10 sensor readings");
+    assert_eq!(
+        readings.len(),
+        10,
+        "PlasmaState should produce 10 sensor readings"
+    );
 
     // Verify a few specific readings
-    let ip_reading = readings.iter().find(|r| r.sensor == PlasmaSensorType::PlasmaCurrent);
+    let ip_reading = readings
+        .iter()
+        .find(|r| r.sensor == PlasmaSensorType::PlasmaCurrent);
     assert!(ip_reading.is_some());
     assert!((ip_reading.unwrap().value - 1.0).abs() < f64::EPSILON);
 
@@ -193,17 +220,16 @@ fn test_plasma_state_to_readings() {
 fn test_plasma_state_has_critical() {
     // A genuinely stable state (all values within normal operating range)
     let stable = PlasmaState::new(
-        0.0,
-        1.0,  // ip: within [0.5, 2.0], not critical (thresholds: <0.3 or >2.5)
-        1.5,  // ne: within [0.5, 3.0], not critical (threshold: >4.0)
-        5.0,  // te: within [1.0, 10.0], not critical (threshold: <0.5)
-        0.5,  // prad: within [0.1, 5.0], not critical (threshold: >0.8)
-        1.0,  // vloop: within [0.5, 3.0], not critical (threshold: >5.0)
-        5.0,  // bt: no critical thresholds
-        0.5,  // bp: no critical thresholds
-        3.5,  // q95: within [2.0, 5.0], not critical (threshold: <2.0)
-        2.0,  // wmhd: no critical thresholds
-        2.0,  // beta: within [0.5, 5.0], not critical (threshold: >3.5)
+        0.0, 1.0, // ip: within [0.5, 2.0], not critical (thresholds: <0.3 or >2.5)
+        1.5, // ne: within [0.5, 3.0], not critical (threshold: >4.0)
+        5.0, // te: within [1.0, 10.0], not critical (threshold: <0.5)
+        0.5, // prad: within [0.1, 5.0], not critical (threshold: >0.8)
+        1.0, // vloop: within [0.5, 3.0], not critical (threshold: >5.0)
+        5.0, // bt: no critical thresholds
+        0.5, // bp: no critical thresholds
+        3.5, // q95: within [2.0, 5.0], not critical (threshold: <2.0)
+        2.0, // wmhd: no critical thresholds
+        2.0, // beta: within [0.5, 5.0], not critical (threshold: >3.5)
     );
     assert!(
         !stable.has_critical(),
@@ -212,17 +238,16 @@ fn test_plasma_state_has_critical() {
 
     // Disruption-like state with several critical values
     let critical = PlasmaState::new(
-        0.0,
-        0.2,   // ip < 0.3 -> critical
-        4.5,   // ne > 4.0 -> critical
-        0.3,   // te < 0.5 -> critical
-        0.9,   // prad > 0.8 -> critical
-        6.0,   // vloop > 5.0 -> critical
-        5.0,   // bt (no thresholds)
-        0.5,   // bp (no thresholds)
-        1.5,   // q95 < 2.0 -> critical
-        0.1,   // wmhd (no thresholds)
-        4.0,   // beta > 3.5 -> critical
+        0.0, 0.2, // ip < 0.3 -> critical
+        4.5, // ne > 4.0 -> critical
+        0.3, // te < 0.5 -> critical
+        0.9, // prad > 0.8 -> critical
+        6.0, // vloop > 5.0 -> critical
+        5.0, // bt (no thresholds)
+        0.5, // bp (no thresholds)
+        1.5, // q95 < 2.0 -> critical
+        0.1, // wmhd (no thresholds)
+        4.0, // beta > 3.5 -> critical
     );
     assert!(
         critical.has_critical(),
@@ -261,7 +286,11 @@ fn test_cmod_sample_creation_and_feature_vector() {
 
     // Feature vector should contain NaN values for a fresh sample
     let features = sample.to_feature_vector();
-    assert_eq!(features.len(), 8, "Feature vector should have 8 sensor values");
+    assert_eq!(
+        features.len(),
+        8,
+        "Feature vector should have 8 sensor values"
+    );
     assert!(
         features.iter().all(|v| v.is_nan()),
         "All features should be NaN for a default sample"

@@ -226,10 +226,7 @@ fn test_holographic_binding_feedback_modulates_lr() {
 
     // LR should not be constant if binding feedback is active
     let min_lr = lr_values.iter().copied().fold(f32::INFINITY, f32::min);
-    let max_lr = lr_values
-        .iter()
-        .copied()
-        .fold(f32::NEG_INFINITY, f32::max);
+    let max_lr = lr_values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     assert!(
         max_lr > min_lr,
         "effective_learning_rate should vary across 50 cycles (min={min_lr}, max={max_lr})"
@@ -277,9 +274,7 @@ fn test_primitive_validation_feedback_modulates_lr() {
                 gain.is_finite(),
                 "primitive_validation_phi_gain should be finite at cycle 500: {gain}"
             );
-            println!(
-                "Primitive validation at cycle 500: phi_gain={gain:.6}, p_value={p:.6}"
-            );
+            println!("Primitive validation at cycle 500: phi_gain={gain:.6}, p_value={p:.6}");
         }
     }
 
@@ -675,10 +670,7 @@ fn test_graduation_mixed_acceptance_rejection() {
 
     // Items with steps 1 and 2 should be rejected (< min_wm_steps 3)
     // Items with steps 3, 5, 10 should be accepted
-    assert_eq!(
-        graduated, 3,
-        "Should graduate exactly 3 items (steps >= 3)"
-    );
+    assert_eq!(graduated, 3, "Should graduate exactly 3 items (steps >= 3)");
     assert_eq!(
         coordinator.stats.graduations_rejected, 2,
         "Should reject exactly 2 items (steps < 3)"
@@ -713,7 +705,11 @@ fn test_episodic_phi_priority_retention() {
         episodic.store_if_significant(episode);
     }
 
-    assert_eq!(episodic.stats().total_stored, 5, "Should have stored 5 episodes");
+    assert_eq!(
+        episodic.stats().total_stored,
+        5,
+        "Should have stored 5 episodes"
+    );
 
     // Store a 6th episode with high phi — should push out the lowest
     let high_phi_episode = Episode::with_metadata(
@@ -831,10 +827,7 @@ fn test_spectral_mip_and_primitives_coexist() {
         );
 
         let lr = service.stats().effective_learning_rate;
-        assert!(
-            lr.is_finite() && lr >= 0.0,
-            "LR invalid at cycle {i}: {lr}"
-        );
+        assert!(lr.is_finite() && lr >= 0.0, "LR invalid at cycle {i}: {lr}");
 
         assert!(
             result.prediction_error.is_finite(),
@@ -842,9 +835,7 @@ fn test_spectral_mip_and_primitives_coexist() {
         );
     }
 
-    println!(
-        "Coexistence: spectral_fires={spectral_fires}, primitive_fires={primitive_fires}"
-    );
+    println!("Coexistence: spectral_fires={spectral_fires}, primitive_fires={primitive_fires}");
 
     // Both systems should have fired at least once in 100 cycles
     assert!(

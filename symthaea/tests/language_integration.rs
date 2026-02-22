@@ -146,7 +146,10 @@ fn phi_setter_clamps_to_unit_interval() {
 
     // Above 1.0 clamps to 1.0
     core.set_phi(999.0);
-    assert!((core.phi() - 1.0).abs() < f64::EPSILON, "phi should clamp to 1.0");
+    assert!(
+        (core.phi() - 1.0).abs() < f64::EPSILON,
+        "phi should clamp to 1.0"
+    );
 
     // Below 0.0 clamps to 0.0
     core.set_phi(-42.0);
@@ -185,11 +188,15 @@ fn diagnose_missing_attribute_error() {
 fn diagnose_package_collision_as_unknown() {
     let diagnoser = NixErrorDiagnoser::new();
     // "collision between packages" does not match any built-in pattern
-    let diagnosis = diagnoser.diagnose("collision between packages /nix/store/aaa and /nix/store/bbb");
+    let diagnosis =
+        diagnoser.diagnose("collision between packages /nix/store/aaa and /nix/store/bbb");
 
     // This specific message is not in the pattern set, so it falls to Unknown
     assert_eq!(diagnosis.category, NixErrorCategory::Unknown);
-    assert!(diagnosis.confidence < 0.5, "unrecognised errors should have low confidence");
+    assert!(
+        diagnosis.confidence < 0.5,
+        "unrecognised errors should have low confidence"
+    );
 }
 
 #[test]
@@ -378,8 +385,20 @@ fn execution_strategy_constructors() {
     assert!(matches!(default, ExecutionStrategy::Curious { .. }));
 
     // ExecutionStrategyType conversion
-    assert_eq!(ExecutionStrategyType::from(&confident), ExecutionStrategyType::Confident);
-    assert_eq!(ExecutionStrategyType::from(&autopilot), ExecutionStrategyType::Autopilot);
-    assert_eq!(ExecutionStrategyType::from(&lost), ExecutionStrategyType::Lost);
-    assert_eq!(ExecutionStrategyType::from(&safe), ExecutionStrategyType::Curious);
+    assert_eq!(
+        ExecutionStrategyType::from(&confident),
+        ExecutionStrategyType::Confident
+    );
+    assert_eq!(
+        ExecutionStrategyType::from(&autopilot),
+        ExecutionStrategyType::Autopilot
+    );
+    assert_eq!(
+        ExecutionStrategyType::from(&lost),
+        ExecutionStrategyType::Lost
+    );
+    assert_eq!(
+        ExecutionStrategyType::from(&safe),
+        ExecutionStrategyType::Curious
+    );
 }

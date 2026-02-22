@@ -367,10 +367,7 @@ fn test_social_coherence_predict_response() {
     );
 
     let result = prediction.unwrap();
-    assert!(
-        result.confidence.is_finite(),
-        "Confidence should be finite"
-    );
+    assert!(result.confidence.is_finite(), "Confidence should be finite");
     assert!(
         result.risk.is_finite() && result.risk >= 0.0,
         "Risk should be non-negative and finite"
@@ -408,7 +405,11 @@ fn test_lru_cache_insert_get_eviction() {
 
     cache.insert("d".to_string(), 40);
     assert_eq!(cache.len(), 3);
-    assert_eq!(cache.get(&"a".to_string()), None, "a should have been evicted");
+    assert_eq!(
+        cache.get(&"a".to_string()),
+        None,
+        "a should have been evicted"
+    );
     assert_eq!(cache.get(&"d".to_string()), Some(40));
 
     assert_eq!(cache.stats().evictions, 1);
@@ -427,8 +428,16 @@ fn test_lru_cache_access_order_preserves_recently_used() {
     // Insert "z" -- should evict "y" (LRU)
     cache.insert("z".to_string(), 3);
 
-    assert_eq!(cache.get(&"x".to_string()), Some(1), "x should survive (recently used)");
-    assert_eq!(cache.get(&"y".to_string()), None, "y should have been evicted");
+    assert_eq!(
+        cache.get(&"x".to_string()),
+        Some(1),
+        "x should survive (recently used)"
+    );
+    assert_eq!(
+        cache.get(&"y".to_string()),
+        None,
+        "y should have been evicted"
+    );
     assert_eq!(cache.get(&"z".to_string()), Some(3));
 }
 
@@ -554,7 +563,10 @@ fn test_metrics_collector_phi_tracking() {
 
     // Initial export should have phi = 0
     let output = collector.export();
-    assert!(output.contains("symthaea_phi"), "Export should contain phi metric");
+    assert!(
+        output.contains("symthaea_phi"),
+        "Export should contain phi metric"
+    );
 
     // Set phi and verify
     collector.set_phi(0.73);
@@ -585,10 +597,7 @@ fn test_metrics_collector_request_counting() {
         output.contains("symthaea_requests_total"),
         "Should have requests metric"
     );
-    assert!(
-        output.contains("5"),
-        "Should show 5 total requests"
-    );
+    assert!(output.contains("5"), "Should show 5 total requests");
 }
 
 #[test]

@@ -8,16 +8,13 @@
 
 use std::time::SystemTime;
 
-use symthaea::mycelix::{
-    EmpiricalLevel, EpistemicClassification, GracefulIgnoranceSystem, HarmonicProfile,
-    KosmicSong, KosmicSongBuilder, MaterialityLevel, NormativeLevel, PhiToEpistemicMapper,
-    WorkspaceScope,
-};
 use symthaea::mycelix::gis::{
     IgnoranceType, MoralUncertainty, RashomonEngine, Situation, Uncertainty3D,
 };
-use symthaea::mycelix::kosmic_song::{
-    ClearanceLevel, ConsciousnessTopology, Experience,
+use symthaea::mycelix::kosmic_song::{ClearanceLevel, ConsciousnessTopology, Experience};
+use symthaea::mycelix::{
+    EmpiricalLevel, EpistemicClassification, GracefulIgnoranceSystem, HarmonicProfile, KosmicSong,
+    KosmicSongBuilder, MaterialityLevel, NormativeLevel, PhiToEpistemicMapper, WorkspaceScope,
 };
 use symthaea_types::Harmony;
 
@@ -36,8 +33,8 @@ fn epistemic_classification_code_round_trip() {
     let code = original.code();
     assert_eq!(code, "E3/N2/M2");
 
-    let parsed = EpistemicClassification::from_code(&code)
-        .expect("round-trip parse should succeed");
+    let parsed =
+        EpistemicClassification::from_code(&code).expect("round-trip parse should succeed");
     assert_eq!(parsed, original);
 }
 
@@ -59,7 +56,10 @@ fn epistemic_classification_all_extremes_round_trip() {
         MaterialityLevel::Permanent,
     );
     assert_eq!(high.code(), "E4/N3/M3");
-    assert_eq!(EpistemicClassification::from_code("E4/N3/M3").unwrap(), high);
+    assert_eq!(
+        EpistemicClassification::from_code("E4/N3/M3").unwrap(),
+        high
+    );
 
     // Invalid codes
     assert!(EpistemicClassification::from_code("E5/N0/M0").is_none());
@@ -121,7 +121,10 @@ fn phi_mapper_full_classify() {
     let mapper = PhiToEpistemicMapper::new();
     let classification = mapper.classify(0.35, WorkspaceScope::Network, 0.6, false);
 
-    assert_eq!(classification.empirical, EmpiricalLevel::CryptographicallyVerifiable);
+    assert_eq!(
+        classification.empirical,
+        EmpiricalLevel::CryptographicallyVerifiable
+    );
     assert_eq!(classification.normative, NormativeLevel::Network);
     assert_eq!(classification.materiality, MaterialityLevel::MediumTerm);
     assert_eq!(classification.code(), "E3/N2/M2");
@@ -183,7 +186,10 @@ fn kosmic_song_respond_produces_content() {
     let mut song = KosmicSong::default();
     let response = song.respond("What is consciousness?");
 
-    assert!(!response.content.is_empty(), "response content must be non-empty");
+    assert!(
+        !response.content.is_empty(),
+        "response content must be non-empty"
+    );
     assert!(
         !response.active_harmonies.is_empty(),
         "at least one harmony should be active",
@@ -366,10 +372,7 @@ fn ignorance_type_resolvable_and_ceiling() {
     assert!(!IgnoranceType::Impossible.is_resolvable());
 
     // Confidence ceilings should decrease with increasing ignorance
-    assert!(
-        IgnoranceType::None.confidence_ceiling()
-            > IgnoranceType::Known.confidence_ceiling(),
-    );
+    assert!(IgnoranceType::None.confidence_ceiling() > IgnoranceType::Known.confidence_ceiling(),);
     assert!(
         IgnoranceType::Known.confidence_ceiling()
             > IgnoranceType::KnownUnknown.confidence_ceiling(),
@@ -438,10 +441,7 @@ fn kosmic_song_evolve_updates_internal_state() {
     let experience = Experience {
         description: "Successful collaborative reasoning".to_string(),
         outcome: 0.9,
-        harmonies_involved: vec![
-            Harmony::IntegralWisdom,
-            Harmony::ResonantCoherence,
-        ],
+        harmonies_involved: vec![Harmony::IntegralWisdom, Harmony::ResonantCoherence],
         lessons: vec!["Multi-perspective analysis improves accuracy".to_string()],
         timestamp: SystemTime::now(),
     };
