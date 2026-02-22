@@ -67,7 +67,7 @@ impl AlternateUsesBenchmark {
         let useful_action_proto = ContinuousHV::random(dim, next_seed(&mut rng));
 
         // Generate candidate uses by unbinding features and binding with random contexts
-        let max_attempts = 20;
+        let max_attempts = 30;
         let mut accepted_uses = Vec::new();
         let mut use_sims = Vec::new(); // similarity of each use to object (for originality)
 
@@ -75,8 +75,12 @@ impl AlternateUsesBenchmark {
         let mut categories_used = std::collections::HashSet::new();
 
         for attempt in 0..max_attempts {
-            // Pick a feature to unbind
-            let feat_idx = (next_seed(&mut rng) as usize) % obj.feature_count;
+            // Cycle through features first (guarantees coverage), then random
+            let feat_idx = if attempt < obj.feature_count {
+                attempt % obj.feature_count
+            } else {
+                (next_seed(&mut rng) as usize) % obj.feature_count
+            };
 
             // Create a random context
             let context = ContinuousHV::random(dim, next_seed(&mut rng));
@@ -94,8 +98,7 @@ impl AlternateUsesBenchmark {
             let sim = use_hv.similarity(&useful_action_proto);
 
             // Accept if in moderate range: not copying original, not nonsense
-            // Range: 0.05 < sim < 0.50 (HDC similarities for random are ~0.0)
-            if sim > 0.02 && sim < 0.60 {
+            if sim > 0.01 && sim < 0.70 {
                 accepted_uses.push(use_hv);
                 use_sims.push(sim);
                 categories_used.insert(feat_idx);

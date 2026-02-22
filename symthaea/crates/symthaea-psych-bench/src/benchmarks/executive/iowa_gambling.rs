@@ -63,13 +63,13 @@ impl IowaGamblingBenchmark {
         // Somatic markers: scalar EMA of net value per deck (gradual learning)
         // Calibrated to match human learning curves (slow early, convergent late)
         let mut deck_somatic: [f64; 4] = [0.0; 4];
-        let somatic_alpha = 0.10; // Gradual learning — human-like acquisition curve
+        let somatic_alpha = 0.15; // Faster convergence to true deck values
+        let loss_aversion = 2.8f32; // Stronger loss sensitivity (K&T range)
 
         let mut deck_draw_count = [0u32; 4];
         let mut block_net_scores = [0i32; 5]; // (C+D) - (A+B) per block
         let mut total_net_score = 0i32;
         let ema_decay = 0.6f32; // Moderate HDC learning
-        let loss_aversion = 2.5f32; // Between K&T's 2.25 and amplified 3.0
 
         let num_trials = 100;
 
@@ -85,15 +85,15 @@ impl IowaGamblingBenchmark {
                         let combined = ContinuousHV::bundle(&[dhv, &deck_memory[i]]);
                         combined.similarity(&desirable) as f64
                     };
-                    // Somatic marker contributes gradually as experience accumulates
-                    let somatic_weight = (deck_draw_count[i] as f64 / 12.0).min(0.35);
+                    // Somatic marker: S-curve saturation to 50% (faster rise, higher cap)
+                    let somatic_weight = (deck_draw_count[i] as f64 / (deck_draw_count[i] as f64 + 6.0)).min(0.50);
                     let blended = (1.0 - somatic_weight) * hdc_score + somatic_weight * deck_somatic[i];
                     blended as f32
                 })
                 .collect();
 
-            // Softmax selection — warm temp for human-like exploration noise
-            let temp = 0.6f32;
+            // Adaptive temperature: explore early (warm), exploit late (cool)
+            let temp = 0.6f32 * (-(block as f32) / 2.5).exp();
             let max_score = deck_scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
             let exp_scores: Vec<f32> = deck_scores.iter().map(|s| ((s - max_score) / temp).exp()).collect();
             let exp_sum: f32 = exp_scores.iter().sum();

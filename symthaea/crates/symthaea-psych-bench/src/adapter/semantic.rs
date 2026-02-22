@@ -53,40 +53,42 @@ impl SemanticScenarioAdapter {
                 .map(|_| ContinuousHV::random(dim, advance()))
                 .collect();
 
-            // Solution HV: base + weak links (lower weight = harder to find)
+            // Solution HV: base + all 3 links at very low weight.
+            // The signal is subtle — similar to real semantic associations.
             let base_sol = ContinuousHV::random(dim, advance());
             let sol_refs: Vec<&ContinuousHV> = std::iter::once(&base_sol)
                 .chain(links.iter())
                 .collect();
             let sol_hv = ContinuousHV::weighted_bundle(
                 &sol_refs,
-                &[0.70, 0.10, 0.10, 0.10],
+                &[0.79, 0.07, 0.07, 0.07],
             );
             word_hvs.insert(triad.solution.clone(), sol_hv);
 
-            // Cue HVs: each shares one link with solution (also weaker)
+            // Cue HVs: each shares one link with solution (moderate association)
             for (i, cue) in triad.cues.iter().enumerate() {
                 let base_cue = ContinuousHV::random(dim, advance());
                 let cue_refs: Vec<&ContinuousHV> = vec![&base_cue, &links[i]];
                 let cue_hv = ContinuousHV::weighted_bundle(
                     &cue_refs,
-                    &[0.80, 0.20],
+                    &[0.88, 0.12],
                 );
                 word_hvs.insert(cue.clone(), cue_hv);
             }
 
-            // Distractor HVs: first 3 get a partial semantic link to one cue
-            // (simulates "near-miss" associations that make RAT hard for humans),
-            // remaining distractors are pure random.
+            // Distractor HVs: first 5 get a partial semantic link to one cue
+            // (simulates "near-miss" associations that make RAT hard for humans).
+            // Near-miss distractors share a link at similar weight to the solution,
+            // so bundled cue similarity is competitive.
             for (j, d) in triad.distractors.iter().enumerate() {
                 if !word_hvs.contains_key(d) {
-                    if j < 3 {
-                        // Near-miss: shares one link with cue[j], creating competition
+                    if j < 5 {
+                        // Near-miss: shares one link with cue[j%3]
                         let base_d = ContinuousHV::random(dim, advance());
                         let d_refs: Vec<&ContinuousHV> = vec![&base_d, &links[j % 3]];
                         let d_hv = ContinuousHV::weighted_bundle(
                             &d_refs,
-                            &[0.82, 0.18],
+                            &[0.90, 0.10],
                         );
                         word_hvs.insert(d.clone(), d_hv);
                     } else {
