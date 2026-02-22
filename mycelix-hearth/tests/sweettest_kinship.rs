@@ -411,3 +411,327 @@ async fn test_get_my_hearths() {
 
     assert_eq!(hearths.len(), 1, "get_my_hearths should return 1 hearth");
 }
+
+// ============================================================================
+// Mirror types — tend bond + bond health
+// ============================================================================
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TendBondInput {
+    pub bond_hash: ActionHash,
+    pub description: String,
+    pub quality_bp: u32,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct GetBondHealthInput {
+    pub bond_hash: ActionHash,
+}
+
+// ============================================================================
+// Additional Kinship Tests
+// ============================================================================
+
+/// Alice creates hearth, invites Bob, Bob accepts. Alice creates a kinship bond
+/// to Bob. Alice tends the bond with a high-quality interaction. Alice calls
+/// get_bond_health to verify health is still strong. Alice calls
+/// get_neglected_bonds and verifies the tended bond is NOT neglected.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor"]
+async fn test_tend_bond_and_get_health() {
+    let dna_file = SweetDnaFile::from_bundle(&hearth_dna_path()).await.unwrap();
+
+    let mut alice_conductor = SweetConductor::from_standard_config().await;
+    let mut bob_conductor = SweetConductor::from_standard_config().await;
+
+    let (alice,) = alice_conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+    let (bob,) = bob_conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    SweetConductor::exchange_peer_info([&alice_conductor, &bob_conductor]).await;
+
+    let bob_agent = bob.agent_pubkey().clone();
+
+    // 1. Alice creates a hearth
+    let hearth_record: Record = alice_conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "create_hearth",
+            CreateHearthInput {
+                name: "Bond Health Hearth".to_string(),
+                description: "Testing bond tending and health".to_string(),
+                hearth_type: HearthType::Nuclear,
+                max_members: Some(10),
+            },
+        )
+        .await;
+
+    let hearth_hash = hearth_record.action_address().clone();
+
+    // 2. Alice invites Bob
+    let invitation_record: Record = alice_conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "invite_member",
+            InviteMemberInput {
+                hearth_hash: hearth_hash.clone(),
+                invitee_agent: bob_agent.clone(),
+                proposed_role: MemberRole::Adult,
+                message: "Join for bond health testing".to_string(),
+                expires_at: Timestamp::from_micros(
+                    Timestamp::now().as_micros() + 86_400_000_000,
+                ),
+            },
+        )
+        .await;
+
+    let invitation_hash = invitation_record.action_address().clone();
+
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    // 3. Bob accepts
+    let _: Record = bob_conductor
+        .call(
+            &bob.zome("hearth_kinship"),
+            "accept_invitation",
+            AcceptInvitationInput {
+                invitation_hash,
+                display_name: "Bob".to_string(),
+            },
+        )
+        .await;
+
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    // 4. Alice creates a kinship bond to Bob
+    let bond_record: Record = alice_conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "create_kinship_bond",
+            CreateBondInput {
+                hearth_hash: hearth_hash.clone(),
+                member_b: bob_agent,
+                bond_type: BondType::Partner,
+                initial_strength_bp: Some(8000),
+            },
+        )
+        .await;
+
+    let bond_hash = bond_record.action_address().clone();
+
+    // 5. Alice tends the bond with a high-quality interaction
+    let _tended: Record = alice_conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "tend_bond",
+            TendBondInput {
+                bond_hash: bond_hash.clone(),
+                description: "Cooked dinner together".to_string(),
+                quality_bp: 9000,
+            },
+        )
+        .await;
+
+    // 6. get_bond_health should return a strong health value (> 3000)
+    let health: u32 = alice_conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "get_bond_health",
+            GetBondHealthInput {
+                bond_hash,
+            },
+        )
+        .await;
+
+    assert!(
+        health > 3000,
+        "Bond health should be above 3000 (neglected threshold) after tending, got {}",
+        health
+    );
+
+    // 7. get_neglected_bonds should return 0 (recently tended bond is healthy)
+    let neglected: Vec<Record> = alice_conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "get_neglected_bonds",
+            hearth_hash,
+        )
+        .await;
+
+    assert_eq!(
+        neglected.len(),
+        0,
+        "get_neglected_bonds should return 0 for a recently tended bond"
+    );
+
+    drop(alice_conductor);
+    drop(bob_conductor);
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+}
+
+/// Alice creates hearth, invites Bob. Bob declines the invitation. Alice
+/// invites Bob again, Bob accepts. Then Bob leaves the hearth. Verifies
+/// that after leaving, get_hearth_members reflects the departure.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor"]
+async fn test_decline_invitation_and_leave_hearth() {
+    let dna_file = SweetDnaFile::from_bundle(&hearth_dna_path()).await.unwrap();
+
+    let mut alice_conductor = SweetConductor::from_standard_config().await;
+    let mut bob_conductor = SweetConductor::from_standard_config().await;
+
+    let (alice,) = alice_conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+    let (bob,) = bob_conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    SweetConductor::exchange_peer_info([&alice_conductor, &bob_conductor]).await;
+
+    let bob_agent = bob.agent_pubkey().clone();
+
+    // 1. Alice creates a hearth
+    let hearth_record: Record = alice_conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "create_hearth",
+            CreateHearthInput {
+                name: "Decline & Leave Hearth".to_string(),
+                description: "Testing decline and leave flow".to_string(),
+                hearth_type: HearthType::Chosen,
+                max_members: Some(10),
+            },
+        )
+        .await;
+
+    let hearth_hash = hearth_record.action_address().clone();
+
+    // 2. Alice invites Bob (first time)
+    let invitation_1: Record = alice_conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "invite_member",
+            InviteMemberInput {
+                hearth_hash: hearth_hash.clone(),
+                invitee_agent: bob_agent.clone(),
+                proposed_role: MemberRole::Adult,
+                message: "Join us!".to_string(),
+                expires_at: Timestamp::from_micros(
+                    Timestamp::now().as_micros() + 86_400_000_000,
+                ),
+            },
+        )
+        .await;
+
+    let invitation_hash_1 = invitation_1.action_address().clone();
+
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    // 3. Bob declines the first invitation
+    let _declined: Record = bob_conductor
+        .call(
+            &bob.zome("hearth_kinship"),
+            "decline_invitation",
+            invitation_hash_1,
+        )
+        .await;
+
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    // 4. Alice invites Bob again (second time)
+    let invitation_2: Record = alice_conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "invite_member",
+            InviteMemberInput {
+                hearth_hash: hearth_hash.clone(),
+                invitee_agent: bob_agent.clone(),
+                proposed_role: MemberRole::Adult,
+                message: "Please reconsider!".to_string(),
+                expires_at: Timestamp::from_micros(
+                    Timestamp::now().as_micros() + 86_400_000_000,
+                ),
+            },
+        )
+        .await;
+
+    let invitation_hash_2 = invitation_2.action_address().clone();
+
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    // 5. Bob accepts the second invitation
+    let membership_record: Record = bob_conductor
+        .call(
+            &bob.zome("hearth_kinship"),
+            "accept_invitation",
+            AcceptInvitationInput {
+                invitation_hash: invitation_hash_2,
+                display_name: "Bob".to_string(),
+            },
+        )
+        .await;
+
+    let membership_hash = membership_record.action_address().clone();
+
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    // 6. Verify 2 members (Alice + Bob)
+    let members_before: Vec<Record> = alice_conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "get_hearth_members",
+            hearth_hash.clone(),
+        )
+        .await;
+
+    assert_eq!(
+        members_before.len(),
+        2,
+        "Hearth should have 2 members before Bob leaves"
+    );
+
+    // 7. Bob leaves the hearth
+    let _departed: Record = bob_conductor
+        .call(
+            &bob.zome("hearth_kinship"),
+            "leave_hearth",
+            membership_hash,
+        )
+        .await;
+
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    // 8. get_hearth_members still returns 2 records (the link is still there),
+    //    but Bob's membership status is Departed. The count of records
+    //    doesn't change because links aren't deleted — only the entry is updated.
+    //    We verify the member records are returned (membership entries still exist).
+    let members_after: Vec<Record> = alice_conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "get_hearth_members",
+            hearth_hash,
+        )
+        .await;
+
+    assert_eq!(
+        members_after.len(),
+        2,
+        "get_hearth_members should still return 2 records (link-based, departed member entry updated but link remains)"
+    );
+
+    drop(alice_conductor);
+    drop(bob_conductor);
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+}

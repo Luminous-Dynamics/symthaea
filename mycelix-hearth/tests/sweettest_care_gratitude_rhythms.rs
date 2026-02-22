@@ -76,10 +76,11 @@ pub struct AcceptInvitationInput {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum CareType {
-    Cooking,
-    Cleaning,
     Childcare,
-    Shopping,
+    Eldercare,
+    PetCare,
+    Chore,
+    MealPrep,
     Medical,
     Emotional,
     Custom(String),
@@ -89,7 +90,6 @@ pub enum CareType {
 pub enum Recurrence {
     Daily,
     Weekly,
-    Biweekly,
     Monthly,
     Custom(String),
 }
@@ -97,17 +97,24 @@ pub enum Recurrence {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateCareScheduleInput {
     pub hearth_hash: ActionHash,
-    pub title: String,
     pub care_type: CareType,
-    pub assignee: AgentPubKey,
+    pub title: String,
+    pub description: String,
+    pub assigned_to: AgentPubKey,
     pub recurrence: Recurrence,
-    pub starts_at: Timestamp,
+    pub notes: String,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CompleteTaskInput {
     pub schedule_hash: ActionHash,
-    pub notes: Option<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ProposeSwapInput {
+    pub hearth_hash: ActionHash,
+    pub original_schedule_hash: ActionHash,
+    pub swap_date: Timestamp,
 }
 
 // ============================================================================
@@ -117,17 +124,34 @@ pub struct CompleteTaskInput {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum GratitudeType {
     Appreciation,
-    Thanks,
-    Recognition,
+    Acknowledgment,
+    Celebration,
+    Blessing,
     Custom(String),
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum HearthVisibility {
+    AllMembers,
+    AdultsOnly,
+    GuardiansOnly,
+    Specified(Vec<AgentPubKey>),
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ExpressGratitudeInput {
     pub hearth_hash: ActionHash,
-    pub recipient: AgentPubKey,
-    pub gratitude_type: GratitudeType,
+    pub to_agent: AgentPubKey,
     pub message: String,
+    pub gratitude_type: GratitudeType,
+    pub visibility: HearthVisibility,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct StartCircleInput {
+    pub hearth_hash: ActionHash,
+    pub theme: String,
+    pub participants: Vec<AgentPubKey>,
 }
 
 // ============================================================================
@@ -136,10 +160,10 @@ pub struct ExpressGratitudeInput {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum RhythmType {
-    Meal,
-    Bedtime,
-    Gathering,
-    Celebration,
+    Morning,
+    Evening,
+    Weekly,
+    Seasonal,
     Custom(String),
 }
 
@@ -148,13 +172,37 @@ pub struct CreateRhythmInput {
     pub hearth_hash: ActionHash,
     pub name: String,
     pub rhythm_type: RhythmType,
-    pub recurrence: Recurrence,
+    pub schedule: String,
+    pub participants: Vec<AgentPubKey>,
+    pub description: String,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct LogOccurrenceInput {
     pub rhythm_hash: ActionHash,
-    pub notes: Option<String>,
+    pub participants_present: Vec<AgentPubKey>,
+    pub notes: String,
+    pub mood_bp: Option<u32>,
+}
+
+// ============================================================================
+// Mirror types — presence
+// ============================================================================
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SetPresenceInput {
+    pub hearth_hash: ActionHash,
+    pub status: PresenceStatusType,
+    pub expected_return: Option<Timestamp>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum PresenceStatusType {
+    Home,
+    Away,
+    Working,
+    Sleeping,
+    DoNotDisturb,
 }
 
 // ============================================================================
@@ -216,11 +264,12 @@ async fn test_care_create_and_complete() {
     // 2. Alice creates a care schedule
     let schedule_input = CreateCareScheduleInput {
         hearth_hash: hearth_hash.clone(),
+        care_type: CareType::MealPrep,
         title: "Cook dinner".to_string(),
-        care_type: CareType::Cooking,
-        assignee: alice.agent_pubkey().clone(),
+        description: "Prepare family dinner".to_string(),
+        assigned_to: alice.agent_pubkey().clone(),
         recurrence: Recurrence::Daily,
-        starts_at: Timestamp::now(),
+        notes: "Rotate recipes weekly".to_string(),
     };
 
     let schedule_record: Record = conductor
@@ -237,7 +286,6 @@ async fn test_care_create_and_complete() {
     // 3. Alice completes the task
     let complete_input = CompleteTaskInput {
         schedule_hash,
-        notes: Some("Made pasta tonight".to_string()),
     };
 
     let _completion: Record = conductor
@@ -349,9 +397,10 @@ async fn test_gratitude_express() {
     // 4. Alice expresses gratitude to Bob
     let gratitude_input = ExpressGratitudeInput {
         hearth_hash: hearth_hash.clone(),
-        recipient: bob_agent,
-        gratitude_type: GratitudeType::Appreciation,
+        to_agent: bob_agent,
         message: "Thank you for being part of this family".to_string(),
+        gratitude_type: GratitudeType::Appreciation,
+        visibility: HearthVisibility::AllMembers,
     };
 
     let gratitude_record: Record = alice_conductor
@@ -421,8 +470,10 @@ async fn test_rhythm_create_and_log() {
     let rhythm_input = CreateRhythmInput {
         hearth_hash: hearth_hash.clone(),
         name: "Sunday Family Dinner".to_string(),
-        rhythm_type: RhythmType::Meal,
-        recurrence: Recurrence::Weekly,
+        rhythm_type: RhythmType::Weekly,
+        schedule: "Every Sunday at 6pm".to_string(),
+        participants: vec![alice.agent_pubkey().clone()],
+        description: "Weekly family dinner tradition".to_string(),
     };
 
     let rhythm_record: Record = conductor
@@ -439,7 +490,9 @@ async fn test_rhythm_create_and_log() {
     // 3. Alice logs an occurrence
     let occurrence_input = LogOccurrenceInput {
         rhythm_hash: rhythm_hash.clone(),
-        notes: Some("Grandma's famous lasagna".to_string()),
+        participants_present: vec![alice.agent_pubkey().clone()],
+        notes: "Grandma's famous lasagna".to_string(),
+        mood_bp: Some(8500),
     };
 
     let _occurrence: Record = conductor
@@ -463,5 +516,322 @@ async fn test_rhythm_create_and_log() {
         occurrences.len(),
         1,
         "get_rhythm_occurrences should return exactly 1 occurrence"
+    );
+}
+
+// ============================================================================
+// Additional Care Tests
+// ============================================================================
+
+/// Alice creates hearth, creates a care schedule assigned to herself,
+/// proposes a swap on that schedule, then accepts the swap.
+/// Verifies the full swap lifecycle: propose -> accept.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor"]
+async fn test_care_swap_lifecycle() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&hearth_dna_path()).await.unwrap();
+    let (alice,) = conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    // 1. Alice creates a hearth
+    let hearth_record: Record = conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "create_hearth",
+            CreateHearthInput {
+                name: "Swap Test Hearth".to_string(),
+                description: "Testing care swap lifecycle".to_string(),
+                hearth_type: HearthType::Nuclear,
+                max_members: Some(8),
+            },
+        )
+        .await;
+
+    let hearth_hash = hearth_record.action_address().clone();
+
+    // 2. Alice creates a care schedule
+    let schedule_record: Record = conductor
+        .call(
+            &alice.zome("hearth_care"),
+            "create_care_schedule",
+            CreateCareScheduleInput {
+                hearth_hash: hearth_hash.clone(),
+                care_type: CareType::Childcare,
+                title: "Morning school run".to_string(),
+                description: "Drop kids at school".to_string(),
+                assigned_to: alice.agent_pubkey().clone(),
+                recurrence: Recurrence::Daily,
+                notes: "Leave by 7:45am".to_string(),
+            },
+        )
+        .await;
+
+    let schedule_hash = schedule_record.action_address().clone();
+
+    // 3. Alice proposes a swap on that schedule
+    let swap_record: Record = conductor
+        .call(
+            &alice.zome("hearth_care"),
+            "propose_swap",
+            ProposeSwapInput {
+                hearth_hash: hearth_hash.clone(),
+                original_schedule_hash: schedule_hash,
+                swap_date: Timestamp::from_micros(
+                    Timestamp::now().as_micros() + 86_400_000_000,
+                ),
+            },
+        )
+        .await;
+
+    let swap_hash = swap_record.action_address().clone();
+    assert!(swap_record.action().author() == alice.agent_pubkey());
+
+    // 4. Alice accepts the swap (as the schedule's assignee/responder)
+    let _accepted: Record = conductor
+        .call(
+            &alice.zome("hearth_care"),
+            "accept_swap",
+            swap_hash,
+        )
+        .await;
+}
+
+// ============================================================================
+// Additional Gratitude Tests
+// ============================================================================
+
+/// Alice creates hearth, starts an appreciation circle, joins it (as a
+/// second action to verify join works -- she is already a participant from
+/// start), completes the circle, and verifies get_hearth_circles returns 1.
+///
+/// Note: Since start_appreciation_circle already includes Alice in participants,
+/// we use a second conductor (Bob) to test join_circle, then Alice completes.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor"]
+async fn test_appreciation_circle_lifecycle() {
+    let dna_file = SweetDnaFile::from_bundle(&hearth_dna_path()).await.unwrap();
+
+    let mut alice_conductor = SweetConductor::from_standard_config().await;
+    let mut bob_conductor = SweetConductor::from_standard_config().await;
+
+    let (alice,) = alice_conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+    let (bob,) = bob_conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    SweetConductor::exchange_peer_info([&alice_conductor, &bob_conductor]).await;
+
+    let bob_agent = bob.agent_pubkey().clone();
+
+    // 1. Alice creates a hearth
+    let hearth_record: Record = alice_conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "create_hearth",
+            CreateHearthInput {
+                name: "Circle Test Hearth".to_string(),
+                description: "Testing appreciation circles".to_string(),
+                hearth_type: HearthType::Chosen,
+                max_members: Some(10),
+            },
+        )
+        .await;
+
+    let hearth_hash = hearth_record.action_address().clone();
+
+    // 2. Alice invites Bob
+    let invitation_record: Record = alice_conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "invite_member",
+            InviteMemberInput {
+                hearth_hash: hearth_hash.clone(),
+                invitee_agent: bob_agent.clone(),
+                proposed_role: MemberRole::Adult,
+                message: "Join for circle testing".to_string(),
+                expires_at: Timestamp::from_micros(
+                    Timestamp::now().as_micros() + 86_400_000_000,
+                ),
+            },
+        )
+        .await;
+
+    let invitation_hash = invitation_record.action_address().clone();
+
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    // 3. Bob accepts
+    let _: Record = bob_conductor
+        .call(
+            &bob.zome("hearth_kinship"),
+            "accept_invitation",
+            AcceptInvitationInput {
+                invitation_hash,
+                display_name: "Bob".to_string(),
+            },
+        )
+        .await;
+
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    // 4. Alice starts an appreciation circle (with only herself as initial participant)
+    let circle_record: Record = alice_conductor
+        .call(
+            &alice.zome("hearth_gratitude"),
+            "start_appreciation_circle",
+            StartCircleInput {
+                hearth_hash: hearth_hash.clone(),
+                theme: "Weekly gratitude sharing".to_string(),
+                participants: vec![alice.agent_pubkey().clone()],
+            },
+        )
+        .await;
+
+    let circle_hash = circle_record.action_address().clone();
+
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    // 5. Bob joins the circle
+    let _joined: Record = bob_conductor
+        .call(
+            &bob.zome("hearth_gratitude"),
+            "join_circle",
+            circle_hash.clone(),
+        )
+        .await;
+
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    // 6. Alice completes the circle
+    let _completed: Record = alice_conductor
+        .call(
+            &alice.zome("hearth_gratitude"),
+            "complete_circle",
+            circle_hash,
+        )
+        .await;
+
+    // 7. get_hearth_circles should return 1 circle
+    let circles: Vec<Record> = alice_conductor
+        .call(
+            &alice.zome("hearth_gratitude"),
+            "get_hearth_circles",
+            hearth_hash,
+        )
+        .await;
+
+    assert_eq!(
+        circles.len(),
+        1,
+        "get_hearth_circles should return 1 circle"
+    );
+
+    drop(alice_conductor);
+    drop(bob_conductor);
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+}
+
+// ============================================================================
+// Additional Rhythm + Presence Tests
+// ============================================================================
+
+/// Alice creates hearth, creates a rhythm, verifies get_hearth_rhythms returns 1,
+/// sets her presence to Away, then verifies get_hearth_presence returns 1 entry.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor"]
+async fn test_presence_and_rhythm_queries() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&hearth_dna_path()).await.unwrap();
+    let (alice,) = conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    // 1. Alice creates a hearth
+    let hearth_record: Record = conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "create_hearth",
+            CreateHearthInput {
+                name: "Presence Test Hearth".to_string(),
+                description: "Testing presence and rhythm queries".to_string(),
+                hearth_type: HearthType::Nuclear,
+                max_members: Some(8),
+            },
+        )
+        .await;
+
+    let hearth_hash = hearth_record.action_address().clone();
+
+    // 2. Alice creates a rhythm
+    let _rhythm_record: Record = conductor
+        .call(
+            &alice.zome("hearth_rhythms"),
+            "create_rhythm",
+            CreateRhythmInput {
+                hearth_hash: hearth_hash.clone(),
+                name: "Evening Prayer".to_string(),
+                rhythm_type: RhythmType::Evening,
+                schedule: "Every evening at 9pm".to_string(),
+                participants: vec![alice.agent_pubkey().clone()],
+                description: "Nightly reflection and prayer".to_string(),
+            },
+        )
+        .await;
+
+    // 3. get_hearth_rhythms should return 1
+    let rhythms: Vec<Record> = conductor
+        .call(
+            &alice.zome("hearth_rhythms"),
+            "get_hearth_rhythms",
+            hearth_hash.clone(),
+        )
+        .await;
+
+    assert_eq!(
+        rhythms.len(),
+        1,
+        "get_hearth_rhythms should return exactly 1 rhythm"
+    );
+
+    // 4. Alice sets her presence to Away
+    let _presence: Record = conductor
+        .call(
+            &alice.zome("hearth_rhythms"),
+            "set_presence",
+            SetPresenceInput {
+                hearth_hash: hearth_hash.clone(),
+                status: PresenceStatusType::Away,
+                expected_return: Some(Timestamp::from_micros(
+                    Timestamp::now().as_micros() + 3_600_000_000,
+                )),
+            },
+        )
+        .await;
+
+    // 5. get_hearth_presence should return 1 entry
+    let presence: Vec<Record> = conductor
+        .call(
+            &alice.zome("hearth_rhythms"),
+            "get_hearth_presence",
+            hearth_hash,
+        )
+        .await;
+
+    assert_eq!(
+        presence.len(),
+        1,
+        "get_hearth_presence should return exactly 1 presence entry"
     );
 }

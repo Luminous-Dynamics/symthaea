@@ -1072,6 +1072,66 @@ export const ZOME_SIGNAL_MAP: Record<string, readonly HearthSignalType[]> = {
 } as const;
 
 // ============================================================================
+// Record Decoding Helpers
+// ============================================================================
+
+import type { Record as HolochainRecord, RecordEntry } from '@holochain/client';
+
+/**
+ * Extract and cast the entry from a Holochain Record.
+ *
+ * @throws {HearthError} if the entry is not present
+ *
+ * @example
+ * ```typescript
+ * const record = await hearth.kinship.createHearth(input);
+ * const hearth = decodeRecord<Hearth>(record);
+ * console.log(hearth.name);
+ * ```
+ */
+export function decodeRecord<T>(record: HolochainRecord): T {
+  const entry = record.entry as RecordEntry;
+  if (!entry || !('Present' in entry)) {
+    throw new HearthError('NOT_FOUND', 'Record entry is not present');
+  }
+  return (entry as { Present: T }).Present;
+}
+
+/**
+ * Extract and cast entries from an array of Holochain Records.
+ * Records without present entries are silently skipped.
+ *
+ * @example
+ * ```typescript
+ * const records = await hearth.care.getHearthSchedule(hearthHash);
+ * const schedules = decodeRecords<CareSchedule>(records);
+ * ```
+ */
+export function decodeRecords<T>(records: HolochainRecord[]): T[] {
+  const results: T[] = [];
+  for (const record of records) {
+    const entry = record.entry as RecordEntry;
+    if (entry && 'Present' in entry) {
+      results.push((entry as { Present: T }).Present);
+    }
+  }
+  return results;
+}
+
+/**
+ * Extract the ActionHash from a Record's signed action.
+ *
+ * @example
+ * ```typescript
+ * const record = await hearth.kinship.createHearth(input);
+ * const hearthHash = getRecordActionHash(record);
+ * ```
+ */
+export function getRecordActionHash(record: HolochainRecord): Uint8Array {
+  return record.signed_action.hashed.hash;
+}
+
+// ============================================================================
 // Error Types
 // ============================================================================
 
