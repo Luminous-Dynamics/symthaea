@@ -832,6 +832,18 @@ pub struct CognitiveLoopService {
     /// Experience integration bus for principled signal tracking and harmonic reasoning.
     /// Bridges cognitive loop signals to Seven Harmonies wisdom system.
     experience_bus: Option<crate::experience::ExperienceBus>,
+
+    /// School bridge for curriculum-aware learning recommendations.
+    /// When present (and `school_learning` feature enabled), recommends objectives
+    /// with predicted Phi gain from CfC-powered O(1) lookahead.
+    /// Co-gated with `school_learning` feature.
+    #[cfg(feature = "school_learning")]
+    school_bridge: Option<crate::school::School>,
+
+    /// Causal consciousness: HSIC-based causal attention weighting.
+    /// Provides causal-strength attention maps for encoding interpretation.
+    /// Richer than CausalLoopEnhancer — uses HSIC independence testing.
+    causal_consciousness: Option<crate::intelligence::CausalConsciousness>,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

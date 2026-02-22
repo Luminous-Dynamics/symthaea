@@ -407,12 +407,26 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let phi_validation_correlation = if let Some(ref mut validator) = self.phi_validation {
-            if self.stats.total_cycles == 500 {
-                // Run once at cycle 500 (enough history, one-shot validation)
-                let results = validator.run_validation_study(10); // small sample for speed
-                results.pearson_r
+            if self.stats.total_cycles % 499 == 0 && self.stats.total_cycles >= 499 {
+                // Phase 16: Run every 499 cycles (co-prime, repeating validation)
+                // Science: Casali et al. (2013) — empirical Phi validation should be ongoing.
+                let results = validator.run_validation_study(10);
+                let r = results.pearson_r;
+                // Cache for adaptive weighting
+                self.carryover.quality.phi_validation_correlation = r;
+                // Adjust spectral weight based on validation quality:
+                // High correlation → trust spectral MIP more (boost weight)
+                // Low correlation → reduce spectral weight (trust eq_v2 more)
+                if r > 0.7 {
+                    self.carryover.quality.phi_spectral_weight =
+                        (0.6 + (r - 0.7) as f32 * 0.67).clamp(0.4, 0.8);
+                } else if r < 0.3 && r > 0.0 {
+                    self.carryover.quality.phi_spectral_weight =
+                        (0.6 - (0.3 - r) as f32 * 0.67).clamp(0.4, 0.8);
+                }
+                r
             } else {
-                0.0
+                self.carryover.quality.phi_validation_correlation
             }
         } else {
             0.0

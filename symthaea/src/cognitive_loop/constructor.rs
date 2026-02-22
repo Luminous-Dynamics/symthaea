@@ -895,6 +895,9 @@ impl CognitiveLoopService {
             phi_attention_gate: Some(crate::attention::PhiAttentionGate::default_gate()),
             metrics_collector: Some(crate::infrastructure::MetricsCollector::new()),
             experience_bus: Some(crate::experience::ExperienceBus::with_defaults()),
+            #[cfg(feature = "school_learning")]
+            school_bridge: None,
+            causal_consciousness: None,
         })
     }
 

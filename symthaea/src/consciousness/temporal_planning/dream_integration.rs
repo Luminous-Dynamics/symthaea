@@ -7,9 +7,7 @@
 use super::types::PlannedAction;
 
 #[cfg(feature = "magi_loop")]
-use crate::consciousness::recursive_improvement::dream_feedback::{
-    DreamFeedbackBridge, DreamInsight,
-};
+use crate::consciousness::recursive_improvement::dream_feedback::DreamFeedbackBridge;
 
 /// Convert a dream feedback bridge's priors into MCTS action priors.
 ///
@@ -72,6 +70,8 @@ pub fn uniform_priors(actions: &mut [PlannedAction]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "magi_loop")]
+    use crate::consciousness::recursive_improvement::dream_feedback::DreamInsight;
 
     #[test]
     fn test_cosine_similarity_identical() {
