@@ -83,8 +83,7 @@ impl CognitiveLoopService {
             .map(|arr| arr.to_vec())
             .unwrap_or_else(|_| vec![0.0; self.config.cfc_config.num_neurons]);
 
-        // 7. Feed prediction back to encoder for next cycle
-        self.encoder.set_prediction(prediction.clone());
+        // 7. Feed prediction back to encoder: deferred to after last &prediction use
 
         // 8. Compute prediction error against previous prediction
         let prediction_error = if let Some(ref prev) = self.last_prediction {
@@ -106,6 +105,9 @@ impl CognitiveLoopService {
         // 9. Store experience
         self.create_experience(&compressed_state, &prediction, prediction_error);
 
+        // 7 (deferred). Move prediction to encoder (no clone needed)
+        self.encoder.set_prediction(prediction);
+
         // 10. Learning step: consolidate periodically
         let mut learning_occurred = false;
         let mut training_loss = None;
@@ -126,8 +128,14 @@ impl CognitiveLoopService {
         self.stats.avg_prediction_error =
             self.error_history.iter().sum::<f32>() / self.error_history.len().max(1) as f32;
 
+        // Pre-compute identity fields before moving output
+        #[cfg(feature = "identity")]
+        let signed_output = self.mfdi_bridge.sign_output(&output).ok();
+        #[cfg(feature = "identity")]
+        let assurance_level = self.mfdi_bridge.assurance_level();
+
         Ok(CycleResult {
-            output: output.clone(),
+            output,
             prediction_error,
             peak_attention: 0.0, // No text-based attention for embedding input
             detected_primitives: Vec::new(), // No text primitives for embedding input
@@ -136,9 +144,9 @@ impl CognitiveLoopService {
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             metadata: super::CycleMetadata::default(),
             #[cfg(feature = "identity")]
-            signed_output: self.mfdi_bridge.sign_output(output.clone()).ok(),
+            signed_output,
             #[cfg(feature = "identity")]
-            assurance_level: self.mfdi_bridge.assurance_level(),
+            assurance_level,
         })
     }
 
@@ -179,8 +187,7 @@ impl CognitiveLoopService {
             .map(|arr| arr.to_vec())
             .unwrap_or_else(|_| vec![0.0; self.config.cfc_config.num_neurons]);
 
-        // 5. Feed prediction back to encoder for next cycle
-        self.encoder.set_prediction(prediction.clone());
+        // 5. Feed prediction back to encoder: deferred to after last &prediction use
 
         // 6. Compute prediction error against previous prediction
         let prediction_error = if let Some(ref prev) = self.last_prediction {
@@ -202,6 +209,9 @@ impl CognitiveLoopService {
         // 7. Store experience
         self.create_experience(&compressed_state, &prediction, prediction_error);
 
+        // 5 (deferred). Move prediction to encoder (no clone needed)
+        self.encoder.set_prediction(prediction);
+
         // 8. Update coherence bridge with current tau values
         let tau_owned: Vec<ndarray::Array1<f32>> = self.temporal_network.all_tau_owned();
         let tau_refs: Vec<&ndarray::Array1<f32>> = tau_owned.iter().collect();
@@ -215,9 +225,10 @@ impl CognitiveLoopService {
         // 9. Learn if error is significant
         let (learning_occurred, training_loss) = if prediction_error > effective_threshold {
             self.stats.learning_cycles += 1;
-            if let Some(ref prev_state) = self.last_state.clone() {
-                let train_input = Array1::from_vec(prev_state.clone());
-                let train_target = Array1::from_vec(compressed_state.clone());
+            if let Some(ref prev_state) = self.last_state {
+                // Build arrays from iterators — avoids 3 unnecessary Vec clones
+                let train_input: Array1<f32> = prev_state.iter().copied().collect();
+                let train_target: Array1<f32> = compressed_state.iter().copied().collect();
                 let lr = self.config.cfc_config.learning_rate;
                 match self.temporal_network.train_step_bptt(
                     &train_input,
@@ -343,13 +354,14 @@ impl CognitiveLoopService {
 
     pub(super) fn create_experience(&mut self, state: &[f32], prediction: &[f32], error: f32) {
         // Update last experience with next_state
-        if let Some(ref last_state) = self.last_state.take() {
+        // Own the taken value (not `ref`) so we can move it into Experience without cloning
+        if let Some(last_state) = self.last_state.take() {
             if let Some(last_pred) = self.last_prediction.take() {
                 // Calculate importance based on error
                 let importance = error + 0.1; // Base importance
 
                 let exp = Experience {
-                    state: last_state.clone(),
+                    state: last_state, // move, not clone
                     prediction: last_pred,
                     next_state: Some(state.to_vec()),
                     error,

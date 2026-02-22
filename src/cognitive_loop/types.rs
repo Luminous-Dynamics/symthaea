@@ -294,7 +294,7 @@ pub(crate) struct CycleCarryover {
 /// - Self models (meta-cognition, narrative, predictive mind/self): C=1, N=2, Cr=4
 /// - Workspace (attention schema, GWT, cross-modal, narrative-GWT): C=1, N=2, Cr=4
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum CycleUrgency {
+pub(crate) enum CycleUrgency {
     /// High prediction error or surprise — run all subsystems
     Critical,
     /// Standard processing
@@ -311,7 +311,7 @@ impl CycleUrgency {
     /// - `learning_threshold`: config threshold for "significant" error
     /// - `surprise_triggered`: whether the surprise bridge triggered this cycle
     /// - `consecutive_low_error`: how many consecutive cycles have had error < threshold
-    pub fn from_state(
+    pub(crate) fn from_state(
         prediction_error: f32,
         learning_threshold: f32,
         surprise_triggered: bool,
@@ -329,7 +329,7 @@ impl CycleUrgency {
     /// Whether this urgency level should run a subsystem at the given cycle interval.
     /// Returns true if the subsystem should run this cycle.
     #[inline]
-    pub fn should_run(
+    pub(crate) fn should_run(
         &self,
         cycle: usize,
         critical_interval: usize,
@@ -346,7 +346,7 @@ impl CycleUrgency {
 
     /// Whether to run expensive consciousness monitors (resonance, quantum, temporal).
     #[inline]
-    pub fn run_consciousness_monitors(&self) -> bool {
+    pub(crate) fn run_consciousness_monitors(&self) -> bool {
         matches!(self, CycleUrgency::Critical | CycleUrgency::Normal)
     }
 }
@@ -364,7 +364,6 @@ pub(crate) struct CycleState<'a> {
     pub hv16_cached: &'a symthaea_core::hdc::BinaryHV,
     pub input: &'a str,
     pub urgency: CycleUrgency,
-    pub total_cycles: usize,
 }
 
 /// Metadata about internal decision-making during a cycle.
@@ -882,30 +881,30 @@ pub struct CycleMetadata {
 /// Useful for lightweight logging, streaming telemetry, or consumers that only
 /// need high-level consciousness state rather than per-subsystem detail.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct CycleMetadataCompact {
-    pub surprise_triggered: bool,
-    pub prefrontal_veto: bool,
-    pub reasoning_confidence: f32,
-    pub consciousness_level: f64,
-    pub gwt_broadcast: bool,
-    pub urgency: CycleUrgency,
-    pub body_phi_modulation: f64,
-    pub meta_cognitive_accuracy: f32,
-    pub narrative_self_psi: f64,
-    pub affective_valence: f32,
-    pub affective_arousal: f32,
-    pub prediction_error_trend: f32,
+pub(crate) struct CycleMetadataCompact {
+    pub(crate) surprise_triggered: bool,
+    pub(crate) prefrontal_veto: bool,
+    pub(crate) reasoning_confidence: f32,
+    pub(crate) consciousness_level: f64,
+    pub(crate) gwt_broadcast: bool,
+    pub(crate) urgency: CycleUrgency,
+    pub(crate) body_phi_modulation: f64,
+    pub(crate) meta_cognitive_accuracy: f32,
+    pub(crate) narrative_self_psi: f64,
+    pub(crate) affective_valence: f32,
+    pub(crate) affective_arousal: f32,
+    pub(crate) prediction_error_trend: f32,
     /// FEP TD error magnitude (0.0 when not computed).
-    pub fep_td_error: f64,
+    pub(crate) fep_td_error: f64,
     /// FEP pragmatic value for selected action (0.0 when not computed).
-    pub fep_pragmatic_value: f64,
+    pub(crate) fep_pragmatic_value: f64,
     /// Codebook diversity: average pairwise cosine distance (0.0–1.0).
-    pub codebook_diversity: f32,
+    pub(crate) codebook_diversity: f32,
 }
 
 impl CycleMetadata {
     /// Extract a compact subset of the most essential telemetry fields.
-    pub fn compact(&self) -> CycleMetadataCompact {
+    pub(crate) fn compact(&self) -> CycleMetadataCompact {
         CycleMetadataCompact {
             surprise_triggered: self.surprise_triggered,
             prefrontal_veto: self.prefrontal_veto,
@@ -1038,7 +1037,7 @@ pub struct ModuleTimings {
 /// This is a lightweight struct with no external dependencies — the bridge crate
 /// converts it to the Holochain-compatible `PsiAttestationData` format.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PsiAttestationRecord {
+pub(crate) struct PsiAttestationRecord {
     /// Ψ — Consciousness estimate from this cycle (clamped to [0.0, 1.0])
     pub psi: f64,
 
@@ -1063,7 +1062,7 @@ impl PsiAttestationRecord {
     /// bridge's reconstruction format in `record_psi_attestation`. This precision
     /// (~0.000001) is sufficient for IIT Phi and ensures signature verification
     /// succeeds across Symthaea → bridge → governance without floating-point drift.
-    pub fn sign_message(&self, agent_did: &str) -> Vec<u8> {
+    pub(crate) fn sign_message(&self, agent_did: &str) -> Vec<u8> {
         format!(
             "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
             agent_did, self.psi, self.cycle_id, self.captured_at_us,
@@ -1115,7 +1114,7 @@ pub struct CycleResult {
 
 /// Summary of moral evaluation for an action or input
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MoralJudgmentSummary {
+pub(crate) struct MoralJudgmentSummary {
     /// The input text that was evaluated
     pub input: String,
 
@@ -1165,7 +1164,7 @@ impl Default for MoralJudgmentSummary {
 /// These parameters allow the system to self-regulate based on its
 /// current consciousness pattern, creating a truly self-aware loop.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdaptiveBehavior {
+pub(crate) struct AdaptiveBehavior {
     /// Learning rate multiplier (0.1 to 2.0)
     /// Higher when focused/confident, lower when uncertain
     pub learning_rate_multiplier: f32,
@@ -1199,7 +1198,7 @@ pub struct AdaptiveBehavior {
 
 /// Recommended action based on consciousness state
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ActionHint {
+pub(crate) enum ActionHint {
     /// Continue normally
     Continue,
     /// Slow down, be more deliberate
@@ -1231,7 +1230,7 @@ impl Default for AdaptiveBehavior {
 
 impl AdaptiveBehavior {
     /// Compute adaptive behavior from consciousness pattern and metrics
-    pub fn from_consciousness_state(
+    pub(crate) fn from_consciousness_state(
         pattern: crate::dynamics::temporal_signatures::ConsciousnessPattern,
         pattern_confidence: f32,
         coherence: f32,
@@ -1324,7 +1323,7 @@ impl AdaptiveBehavior {
     }
 
     /// Get effective learning rate with all modulations
-    pub fn effective_learning_rate(&self, base_rate: f32) -> f32 {
+    pub(crate) fn effective_learning_rate(&self, base_rate: f32) -> f32 {
         if self.pause_learning {
             0.0
         } else {
@@ -1333,17 +1332,17 @@ impl AdaptiveBehavior {
     }
 
     /// Check if the system should seek more input/clarification
-    pub fn should_seek_input(&self) -> bool {
+    pub(crate) fn should_seek_input(&self) -> bool {
         self.action_hint == ActionHint::SeekInput || self.confidence < 0.3
     }
 
     /// Check if the system is in a confident state
-    pub fn is_confident(&self) -> bool {
+    pub(crate) fn is_confident(&self) -> bool {
         self.confidence > 0.6 && !self.pause_learning
     }
 
     /// Get a human-readable description of current state
-    pub fn description(&self) -> &'static str {
+    pub(crate) fn description(&self) -> &'static str {
         match self.action_hint {
             ActionHint::Continue => "Operating normally",
             ActionHint::SlowDown => "Deliberating carefully",

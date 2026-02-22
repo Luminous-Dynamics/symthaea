@@ -600,7 +600,7 @@ impl ConsciousnessProbeV2 {
 
     /// Load with custom probe weights path
     pub fn load_with_probe<P: AsRef<Path>>(probe_path: P) -> Result<Self> {
-        use super::neural_bridge_v2::{NeuralBridgeV2Builder, NeuralBridgeV2Config};
+        use super::neural_bridge_v2::NeuralBridgeV2Builder;
 
         let path_str = probe_path
             .as_ref()

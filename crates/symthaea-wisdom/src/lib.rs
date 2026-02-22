@@ -167,4 +167,99 @@ mod tests {
         let final_val = wisdom.harmonics.get(ActiveHarmonic::Coherence);
         assert!(final_val > initial);
     }
+
+    #[test]
+    fn test_wisdom_state_default() {
+        let wisdom = WisdomState::default();
+        assert!(wisdom.operational);
+        assert!(wisdom.is_self_maintaining());
+        assert_eq!(wisdom.harmonics.get(ActiveHarmonic::Coherence), 0.5);
+    }
+
+    #[test]
+    fn test_wisdom_state_new_equals_default() {
+        let a = WisdomState::new();
+        let b = WisdomState::default();
+        assert_eq!(a.harmonics.as_vector(), b.harmonics.as_vector());
+        assert_eq!(a.operational, b.operational);
+    }
+
+    #[test]
+    fn test_dominant_mode_starts_balanced() {
+        let wisdom = init_wisdom();
+        // When balanced, dominant returns Coherence (first in iteration)
+        let _ = wisdom.dominant_mode();
+        // Should not panic and should be a valid harmonic
+    }
+
+    #[test]
+    fn test_current_question_returns_valid_string() {
+        let wisdom = init_wisdom();
+        let question = wisdom.current_question();
+        assert!(!question.is_empty());
+        assert!(question.ends_with('?'));
+    }
+
+    #[test]
+    fn test_self_model_accuracy_initial() {
+        let wisdom = init_wisdom();
+        let accuracy = wisdom.self_model_accuracy();
+        assert!((accuracy - 0.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_high_uncertainty_boosts_play() {
+        let mut wisdom = init_wisdom();
+        let initial_play = wisdom.harmonics.get(ActiveHarmonic::Play);
+
+        wisdom.update_from_experience(0.3, 0.8, 0.7); // High uncertainty
+
+        let final_play = wisdom.harmonics.get(ActiveHarmonic::Play);
+        assert!(final_play > initial_play);
+    }
+
+    #[test]
+    fn test_multiple_updates_remain_bounded() {
+        let mut wisdom = init_wisdom();
+        for _ in 0..100 {
+            wisdom.update_from_experience(0.9, 0.9, 0.1);
+        }
+        // All harmonics should stay in [0, 1]
+        for h in ActiveHarmonic::all() {
+            let val = wisdom.harmonics.get(h);
+            assert!(val >= 0.0 && val <= 1.0, "Harmonic {:?} = {} out of bounds", h, val);
+        }
+    }
+
+    #[test]
+    fn test_no_triggers_decays_toward_balance() {
+        let mut wisdom = init_wisdom();
+        // Boost wisdom manually
+        wisdom.harmonics.boost(ActiveHarmonic::Wisdom, 0.3);
+        let boosted = wisdom.harmonics.get(ActiveHarmonic::Wisdom);
+        assert!(boosted > 0.5);
+
+        // Update with no triggers (low error, low uncertainty, high coherence)
+        for _ in 0..50 {
+            wisdom.update_from_experience(0.1, 0.1, 0.9);
+        }
+        let after = wisdom.harmonics.get(ActiveHarmonic::Wisdom);
+        assert!(after < boosted, "Should decay toward 0.5: was {}, now {}", boosted, after);
+    }
+
+    #[test]
+    fn test_harmonic_questions_constant_has_seven_entries() {
+        assert_eq!(HARMONIC_QUESTIONS.len(), 7);
+        for q in &HARMONIC_QUESTIONS {
+            assert!(q.ends_with('?'));
+        }
+    }
+
+    #[test]
+    fn test_init_wisdom_equals_new() {
+        let a = init_wisdom();
+        let b = WisdomState::new();
+        assert_eq!(a.harmonics.as_vector(), b.harmonics.as_vector());
+        assert_eq!(a.operational, b.operational);
+    }
 }

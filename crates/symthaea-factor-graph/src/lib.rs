@@ -1133,4 +1133,220 @@ mod tests {
         assert!((result.beliefs[0][0] - 0.4).abs() < 1e-6);
         assert!((result.beliefs[0][1] - 0.6).abs() < 1e-6);
     }
+
+    // ── Construction ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_empty_graph() {
+        let fg = FactorGraph::new();
+        assert!(fg.variables.is_empty());
+        assert!(fg.factors.is_empty());
+        assert!(fg.messages.is_empty());
+    }
+
+    #[test]
+    fn test_add_variable_returns_sequential_ids() {
+        let mut fg = FactorGraph::new();
+        let a = fg.add_variable("A", 2);
+        let b = fg.add_variable("B", 3);
+        let c = fg.add_variable("C", 4);
+        assert_eq!(a, 0);
+        assert_eq!(b, 1);
+        assert_eq!(c, 2);
+        assert_eq!(fg.variables[a].cardinality, 2);
+        assert_eq!(fg.variables[b].cardinality, 3);
+        assert_eq!(fg.variables[c].cardinality, 4);
+    }
+
+    #[test]
+    fn test_variable_initial_belief_uniform() {
+        let mut fg = FactorGraph::new();
+        let a = fg.add_variable("X", 4);
+        for &b in &fg.variables[a].belief {
+            assert!((b - 0.25).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn test_add_factor_creates_adjacency() {
+        let mut fg = FactorGraph::new();
+        let a = fg.add_variable("A", 2);
+        let b = fg.add_variable("B", 2);
+        fg.add_factor(&[a, b], vec![1.0; 4]);
+        assert!(fg.variables[a].neighbors.contains(&0));
+        assert!(fg.variables[b].neighbors.contains(&0));
+    }
+
+    #[test]
+    #[should_panic(expected = "does not match")]
+    fn test_add_factor_wrong_table_size_panics() {
+        let mut fg = FactorGraph::new();
+        let a = fg.add_variable("A", 2);
+        let b = fg.add_variable("B", 3);
+        fg.add_factor(&[a, b], vec![1.0; 5]); // Should be 6
+    }
+
+    #[test]
+    #[should_panic(expected = "out of bounds")]
+    fn test_add_factor_invalid_variable_panics() {
+        let mut fg = FactorGraph::new();
+        fg.add_variable("A", 2);
+        fg.add_factor(&[0, 99], vec![1.0; 4]);
+    }
+
+    // ── BPConfig ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_bp_config_default() {
+        let config = BPConfig::default();
+        assert_eq!(config.max_iterations, 100);
+        assert!((config.damping - 1.0).abs() < f64::EPSILON);
+        assert_eq!(config.schedule, MessageSchedule::Parallel);
+    }
+
+    // ── Beliefs sum to 1 ────────────────────────────────────────────────
+
+    #[test]
+    fn test_beliefs_sum_to_one() {
+        let mut fg = two_node_chain();
+        let result = fg.run_bp(&BPConfig::default());
+        for (v, belief) in result.beliefs.iter().enumerate() {
+            let sum: f64 = belief.iter().sum();
+            assert!(
+                (sum - 1.0).abs() < 1e-6,
+                "Beliefs for variable {} sum to {} instead of 1.0",
+                v,
+                sum
+            );
+        }
+    }
+
+    #[test]
+    fn test_map_beliefs_sum_to_one() {
+        let mut fg = two_node_chain();
+        fg.run_map(&BPConfig::default());
+        // After MAP, variable beliefs should still sum to 1
+        for v in &fg.variables {
+            let sum: f64 = v.belief.iter().sum();
+            assert!((sum - 1.0).abs() < 1e-6, "MAP beliefs should sum to 1.0");
+        }
+    }
+
+    // ── Deterministic factor ────────────────────────────────────────────
+
+    #[test]
+    fn test_deterministic_factor() {
+        let mut fg = FactorGraph::new();
+        let a = fg.add_variable("A", 2);
+        // Deterministic: A = 1 with probability 1
+        fg.add_factor(&[a], vec![0.0, 1.0]);
+
+        let result = fg.run_bp(&BPConfig::default());
+        assert!(result.converged);
+        assert!((result.beliefs[0][0] - 0.0).abs() < 1e-6);
+        assert!((result.beliefs[0][1] - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_map_on_deterministic() {
+        let mut fg = FactorGraph::new();
+        let a = fg.add_variable("A", 3);
+        fg.add_factor(&[a], vec![0.0, 0.0, 1.0]);
+
+        let result = fg.run_map(&BPConfig::default());
+        assert_eq!(result.assignment[0], 2);
+    }
+
+    // ── Edge cases ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_single_variable_no_factor() {
+        let mut fg = FactorGraph::new();
+        fg.add_variable("A", 3);
+        let result = fg.run_bp(&BPConfig::default());
+        assert!(result.converged);
+        // No factors => belief stays uniform
+        for &b in &result.beliefs[0] {
+            assert!((b - 1.0 / 3.0).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn test_bethe_free_energy_finite() {
+        let mut fg = two_node_chain();
+        fg.run_bp(&BPConfig::default());
+        let fe = fg.bethe_free_energy();
+        assert!(fe.is_finite(), "Bethe free energy should be finite, got {}", fe);
+    }
+
+    #[test]
+    fn test_multiple_factors_on_same_variable() {
+        let mut fg = FactorGraph::new();
+        let a = fg.add_variable("A", 2);
+        // Two unary factors: both prefer state 0
+        fg.add_factor(&[a], vec![0.8, 0.2]);
+        fg.add_factor(&[a], vec![0.7, 0.3]);
+
+        let result = fg.run_bp(&BPConfig::default());
+        assert!(result.converged);
+        // State 0 should be strongly preferred
+        assert!(result.beliefs[0][0] > result.beliefs[0][1]);
+    }
+
+    #[test]
+    fn test_ternary_factor() {
+        let mut fg = FactorGraph::new();
+        let a = fg.add_variable("A", 2);
+        let b = fg.add_variable("B", 2);
+        let c = fg.add_variable("C", 2);
+        // 3-variable factor: 2*2*2 = 8 entries
+        fg.add_factor(&[a, b, c], vec![0.5, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.5]);
+
+        let result = fg.run_bp(&BPConfig::default());
+        assert!(result.converged);
+        // Beliefs should sum to 1
+        for belief in &result.beliefs {
+            let sum: f64 = belief.iter().sum();
+            assert!((sum - 1.0).abs() < 1e-6);
+        }
+    }
+
+    // ── Unflatten helper ────────────────────────────────────────────────
+
+    #[test]
+    fn test_unflatten_basic() {
+        let config = unflatten(0, &[2, 3]);
+        assert_eq!(config, vec![0, 0]);
+
+        let config = unflatten(5, &[2, 3]);
+        assert_eq!(config, vec![1, 2]);
+    }
+
+    #[test]
+    fn test_unflatten_single_dim() {
+        let config = unflatten(2, &[5]);
+        assert_eq!(config, vec![2]);
+    }
+
+    #[test]
+    fn test_unflatten_three_dims() {
+        let config = unflatten(7, &[2, 2, 2]);
+        assert_eq!(config, vec![1, 1, 1]);
+    }
+
+    // ── BPResult fields ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_bp_result_iterations_positive() {
+        let mut fg = two_node_chain();
+        let result = fg.run_bp(&BPConfig::default());
+        assert!(result.iterations > 0);
+    }
+
+    #[test]
+    fn test_map_result_log_probability_finite() {
+        let mut fg = two_node_chain();
+        let result = fg.run_map(&BPConfig::default());
+        assert!(result.log_probability.is_finite());
+    }
 }

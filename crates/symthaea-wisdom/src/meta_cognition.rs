@@ -354,4 +354,131 @@ mod tests {
         let summary = meta.accuracy_summary();
         assert!(summary.predictions_made >= 10);
     }
+
+    // ── MetaCognitiveLayer construction ─────────────────────────────────
+
+    #[test]
+    fn test_default_equals_new() {
+        let a = MetaCognitiveLayer::new();
+        let b = MetaCognitiveLayer::default();
+        assert_eq!(a.accuracy(), b.accuracy());
+        assert_eq!(a.depth(), b.depth());
+    }
+
+    #[test]
+    fn test_predict_own_error_initial() {
+        let meta = MetaCognitiveLayer::new();
+        let prediction = meta.predict_own_error(0.5);
+        assert!(prediction.is_finite());
+        // Initial prediction should be the prior (0.3)
+        assert!((prediction - 0.3).abs() < f32::EPSILON);
+    }
+
+    // ── update_self_model ───────────────────────────────────────────────
+
+    #[test]
+    fn test_accuracy_bounded_zero_to_one() {
+        let mut meta = MetaCognitiveLayer::new();
+        for _ in 0..50 {
+            meta.update_self_model(0.99);
+        }
+        assert!(meta.accuracy() >= 0.0 && meta.accuracy() <= 1.0);
+    }
+
+    #[test]
+    fn test_accuracy_improves_with_zero_error() {
+        let mut meta = MetaCognitiveLayer::new();
+        // Always zero error, so the model should converge
+        for _ in 0..30 {
+            meta.update_self_model(0.0);
+        }
+        // With consistently 0 error, model should predict ~0 and accuracy should be high
+        assert!(meta.accuracy() > 0.7, "Accuracy = {}", meta.accuracy());
+    }
+
+    #[test]
+    fn test_predictions_capped_at_max() {
+        let mut meta = MetaCognitiveLayer::new();
+        for _ in 0..100 {
+            meta.update_self_model(0.5);
+        }
+        let summary = meta.accuracy_summary();
+        // MAX_PREDICTIONS is 50, so predictions_made should be capped
+        assert!(summary.predictions_made <= 50);
+    }
+
+    // ── deepen_recursion ────────────────────────────────────────────────
+
+    #[test]
+    fn test_recursion_depth_capped_at_three() {
+        let mut meta = MetaCognitiveLayer::new();
+        meta.accuracy = 0.9;
+        assert!(meta.deepen_recursion()); // 1 -> 2
+        assert!(meta.deepen_recursion()); // 2 -> 3
+        assert!(!meta.deepen_recursion()); // 3 -> blocked
+        assert_eq!(meta.depth(), 3);
+    }
+
+    // ── RecursiveModel ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_recursive_model_depth_zero() {
+        let model = RecursiveModel {
+            depth: 0,
+            accuracy_at_depth: vec![],
+            can_model_deeper: false,
+        };
+        assert_eq!(model.describe(), "No self-model (purely reactive)");
+    }
+
+    #[test]
+    fn test_recursive_model_all_depths() {
+        let descriptions = [
+            "No self-model (purely reactive)",
+            "Basic self-model (I know what I tend to do)",
+            "Meta-self-model (I know how I model myself)",
+            "Deep recursion (I model my modeling of my modeling)",
+            "Profound recursion (deep self-reference)",
+        ];
+        for (depth, expected) in descriptions.iter().enumerate() {
+            let model = RecursiveModel {
+                depth: depth as u8,
+                accuracy_at_depth: vec![],
+                can_model_deeper: false,
+            };
+            assert_eq!(model.describe(), *expected, "Depth {} mismatch", depth);
+        }
+    }
+
+    // ── AccuracyTrend ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_insufficient_trend_with_few_data_points() {
+        let mut meta = MetaCognitiveLayer::new();
+        meta.update_self_model(0.3);
+        meta.update_self_model(0.3);
+        let summary = meta.accuracy_summary();
+        assert_eq!(summary.trend, AccuracyTrend::Insufficient);
+    }
+
+    #[test]
+    fn test_accuracy_summary_fields() {
+        let meta = MetaCognitiveLayer::new();
+        let summary = meta.accuracy_summary();
+        assert_eq!(summary.current_accuracy, 0.5);
+        assert_eq!(summary.recursion_depth, 1);
+        assert_eq!(summary.predictions_made, 0);
+    }
+
+    #[test]
+    fn test_recursive_model_can_model_deeper() {
+        let mut meta = MetaCognitiveLayer::new();
+        meta.accuracy = 0.8;
+        let model = meta.recursive_model();
+        assert!(model.can_model_deeper, "High accuracy should allow deeper modeling");
+
+        meta.accuracy = 0.3;
+        let model = meta.recursive_model();
+        assert!(!model.can_model_deeper, "Low accuracy should not allow deeper modeling");
+    }
 }

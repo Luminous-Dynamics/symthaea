@@ -392,7 +392,7 @@ impl AutobiographicalSelf {
         // Update self-concept by integrating significant episodes
         if significance > 0.5 {
             self.self_concept =
-                BinaryHV::bundle(&[self.self_concept, self.life_story.last().unwrap().encoding]);
+                BinaryHV::bundle(&[self.self_concept, self.life_story.last().expect("just pushed").encoding]);
         }
 
         // Update narrative coherence
@@ -1354,5 +1354,181 @@ mod tests {
 
         autobio.add_episode("extreme negative", -5.0, 0.5);
         assert!((autobio.life_story[1].valence - (-1.0)).abs() < f64::EPSILON);
+    }
+
+    // ── NarrativeSelfConfig ─────────────────────────────────────────────
+
+    #[test]
+    fn test_config_default_weights_sum_to_one() {
+        let config = NarrativeSelfConfig::default();
+        let sum = config.proto_weight + config.core_weight + config.autobio_weight;
+        assert!((sum - 1.0).abs() < f64::EPSILON, "Weights should sum to 1.0, got {}", sum);
+    }
+
+    #[test]
+    fn test_config_thresholds_in_valid_range() {
+        let config = NarrativeSelfConfig::default();
+        assert!(config.coherence_threshold >= 0.0 && config.coherence_threshold <= 1.0);
+        assert!(config.episode_threshold >= 0.0 && config.episode_threshold <= 1.0);
+        assert!(config.binding_window_secs > 0.0);
+    }
+
+    // ── NarrativeSelfStats ──────────────────────────────────────────────
+
+    #[test]
+    fn test_stats_default() {
+        let stats = NarrativeSelfStats::default();
+        assert_eq!(stats.total_updates, 0);
+        assert_eq!(stats.episodes_recorded, 0);
+        assert_eq!(stats.goals_completed, 0);
+        assert!((stats.avg_coherence - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ── ProtoSelf coherence ─────────────────────────────────────────────
+
+    #[test]
+    fn test_proto_self_coherence_finite() {
+        let proto = ProtoSelf::new();
+        let coh = proto.coherence();
+        assert!(coh.is_finite(), "Proto-self coherence should be finite");
+    }
+
+    #[test]
+    fn test_proto_self_update_failure_negative_valence() {
+        let mut proto = ProtoSelf::new();
+        let input = BinaryHV::random(10);
+        proto.update(&input, false, 0.3);
+        assert!(proto.valence < 0.0, "Failed task should produce negative valence");
+    }
+
+    // ── CoreSelf goals ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_core_self_goals_sorted_by_priority() {
+        let mut core = CoreSelf::new();
+        core.add_goal("Low priority", 0.2);
+        core.add_goal("High priority", 0.9);
+        core.add_goal("Medium priority", 0.5);
+
+        // Goals sorted descending by priority
+        assert!((core.goals[0].priority - 0.9).abs() < f64::EPSILON);
+        assert!((core.goals[1].priority - 0.5).abs() < f64::EPSILON);
+        assert!((core.goals[2].priority - 0.2).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_core_self_focus_attention() {
+        let mut core = CoreSelf::new();
+        assert!(core.attention_focus.is_none());
+
+        let target = BinaryHV::random(42);
+        core.focus_attention(target);
+        assert!(core.attention_focus.is_some());
+        assert_eq!(core.attention_focus.unwrap(), target);
+    }
+
+    #[test]
+    fn test_core_self_update_goal_progress() {
+        let mut core = CoreSelf::new();
+        core.add_goal("Test goal", 0.5);
+        core.update_goal_progress(0, 0.7);
+        assert!((core.goals[0].progress - 0.7).abs() < f64::EPSILON);
+        // Efficacy should shift toward progress
+        assert!(core.efficacy != 0.5);
+    }
+
+    #[test]
+    fn test_core_self_update_goal_progress_out_of_bounds() {
+        let mut core = CoreSelf::new();
+        core.add_goal("Test goal", 0.5);
+        // Out of bounds index should be a no-op
+        core.update_goal_progress(99, 0.7);
+        assert!((core.goals[0].progress - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_core_self_progress_clamps() {
+        let mut core = CoreSelf::new();
+        core.add_goal("Test goal", 0.5);
+        core.update_goal_progress(0, 5.0);
+        assert!((core.goals[0].progress - 1.0).abs() < f64::EPSILON);
+
+        core.update_goal_progress(0, -1.0);
+        assert!((core.goals[0].progress - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ── AutobiographicalSelf ────────────────────────────────────────────
+
+    #[test]
+    fn test_autobiographical_new_defaults() {
+        let autobio = AutobiographicalSelf::new();
+        assert!(autobio.life_story.is_empty());
+        assert!(autobio.traits.is_empty());
+        assert!(autobio.values.is_empty());
+        assert!((autobio.identity_stability - 1.0).abs() < f64::EPSILON);
+        assert!((autobio.narrative_coherence - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_autobiographical_coherence_empty() {
+        let autobio = AutobiographicalSelf::new();
+        let coh = autobio.coherence();
+        // With no traits/values: trait_coherence=0.5, value_coherence=0.5
+        // identity_stability=1.0, narrative_coherence=1.0
+        let expected = (1.0 + 1.0 + 0.5 + 0.5) / 4.0;
+        assert!((coh - expected).abs() < f64::EPSILON, "coh={}, expected={}", coh, expected);
+    }
+
+    #[test]
+    fn test_autobiographical_add_value() {
+        let mut autobio = AutobiographicalSelf::new();
+        autobio.add_value("compassion", 0.85);
+        assert_eq!(autobio.values.len(), 1);
+        assert_eq!(autobio.values[0].name, "compassion");
+        assert!((autobio.values[0].importance - 0.85).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_autobiographical_significance_clamp() {
+        let mut autobio = AutobiographicalSelf::new();
+        autobio.add_episode("extreme", 0.5, 5.0);
+        assert!((autobio.life_story[0].significance - 1.0).abs() < f64::EPSILON);
+    }
+
+    // ── NarrativeSelfModel integration ──────────────────────────────────
+
+    #[test]
+    fn test_model_initial_self_phi_finite() {
+        let model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+        let phi = model.self_phi();
+        assert!(phi.is_finite());
+        assert!(phi >= 0.0 && phi <= 1.0);
+    }
+
+    #[test]
+    fn test_model_multiple_experiences_coherence_finite() {
+        let mut model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+        for i in 0..20 {
+            let input = BinaryHV::random(i * 7);
+            model.process_experience(&input, &format!("Exp {}", i), i % 2 == 0, 0.5, 0.5);
+        }
+        let coh = model.coherence();
+        assert!(coh.is_finite(), "Coherence should be finite after many experiences");
+    }
+
+    #[test]
+    fn test_model_low_significance_not_recorded() {
+        let mut model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+        let input = BinaryHV::random(42);
+        // Significance 0.3 is below default threshold 0.6
+        model.process_experience(&input, "Minor event", true, 0.2, 0.3);
+        assert_eq!(model.stats().episodes_recorded, 0);
+    }
+
+    #[test]
+    fn test_model_project_future_returns_nonzero() {
+        let mut model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
+        let future = *model.project_future(60.0);
+        assert_ne!(future, BinaryHV::zero());
     }
 }

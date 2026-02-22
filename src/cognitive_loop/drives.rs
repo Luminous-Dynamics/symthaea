@@ -15,7 +15,7 @@ use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 /// - Negative emotions → Contemplative
 /// - Neutral → no influence
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmotionContagion {
+pub(crate) struct EmotionContagion {
     /// Current emotional valence (-1.0 to 1.0)
     pub valence: f32,
 
@@ -238,7 +238,7 @@ impl EmotionContagion {
 /// When predictions become too accurate/predictable, curiosity triggers
 /// exploration mode to discover new patterns and prevent cognitive stagnation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CuriosityDrive {
+pub(crate) struct CuriosityDrive {
     /// Recent prediction errors (rolling window).
     /// Capacity bound: HISTORY_SIZE (50) elements — evict before push via pop_front.
     error_history: std::collections::VecDeque<f32>,
@@ -388,7 +388,7 @@ impl CuriosityDrive {
 /// internal thresholds to optimize behavior. This enables the system
 /// to learn about itself and improve over time.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SelfReflection {
+pub(crate) struct SelfReflection {
     // ===== Adaptive Thresholds =====
     /// Flow entry error threshold (adjusted based on flow frequency)
     pub flow_error_threshold: f32,
@@ -479,7 +479,7 @@ pub enum SelfAssessment {
 
 /// Recommendation from self-reflection
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Recommendation {
+pub(crate) struct Recommendation {
     /// What to adjust
     pub target: RecommendationTarget,
     /// Direction of adjustment
@@ -492,7 +492,7 @@ pub struct Recommendation {
 
 /// What the recommendation targets
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RecommendationTarget {
+pub(crate) enum RecommendationTarget {
     FlowThreshold,
     BoredomThreshold,
     TrustThreshold,
@@ -505,7 +505,7 @@ pub enum RecommendationTarget {
 
 /// Direction of adjustment
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum AdjustmentDirection {
+pub(crate) enum AdjustmentDirection {
     Increase,
     Decrease,
     NoChange,
@@ -914,7 +914,7 @@ impl SelfReflection {
 
 /// Thresholds from self-reflection for use by other components
 #[derive(Debug, Clone, Copy)]
-pub struct ReflectionThresholds {
+pub(crate) struct ReflectionThresholds {
     pub flow_error: f32,
     pub flow_coherence: f32,
     pub boredom: f32,
@@ -927,7 +927,7 @@ pub struct ReflectionThresholds {
 
 /// Summary of self-reflection state
 #[derive(Debug, Clone)]
-pub struct ReflectionSummary {
+pub(crate) struct ReflectionSummary {
     pub assessment: SelfAssessment,
     pub reflection_count: u64,
     pub adjustments_made: u32,

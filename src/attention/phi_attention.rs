@@ -40,6 +40,7 @@
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
+use symthaea_core::math::softmax_with_temperature;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -513,43 +514,6 @@ pub fn compute_attention_weights(
     }
 
     weights
-}
-
-/// Softmax with temperature scaling
-///
-/// Lower temperature produces sharper (more concentrated) distributions.
-/// Higher temperature produces flatter (more uniform) distributions.
-///
-/// # Arguments
-/// * `values` - Input values
-/// * `temperature` - Temperature parameter (> 0)
-///
-/// # Returns
-/// Probabilities that sum to 1.0
-pub fn softmax_with_temperature(values: &[f32], temperature: f32) -> Vec<f32> {
-    if values.is_empty() {
-        return vec![];
-    }
-
-    let temp = temperature.max(1e-10); // Prevent division by zero
-
-    // Numerical stability: subtract max before exp
-    let max_val = values.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-
-    let exp_values: Vec<f32> = values
-        .iter()
-        .map(|&v| ((v - max_val) / temp).exp())
-        .collect();
-
-    let sum: f32 = exp_values.iter().sum();
-
-    if sum < 1e-10 {
-        // Uniform distribution fallback
-        let n = values.len() as f32;
-        return vec![1.0 / n; values.len()];
-    }
-
-    exp_values.iter().map(|&e| e / sum).collect()
 }
 
 /// Compute entropy of a probability distribution

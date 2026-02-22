@@ -65,6 +65,8 @@ pub mod observability;
 /// Integrated Information (Phi) calculation engine.
 #[allow(missing_docs)]
 pub mod phi_engine;
+/// Shared mathematical utilities: softmax, numerical helpers.
+pub mod math;
 /// Physics-grounded modeling: periodic table, emergence, kinetics, and thermodynamics.
 #[allow(missing_docs)]
 pub mod physics;

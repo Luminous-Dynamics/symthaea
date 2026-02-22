@@ -315,4 +315,176 @@ mod tests {
         assert!(closure.is_maintaining());
         assert!(closure.diagnostic().contains("Healthy"));
     }
+
+    // ── AutopoieticMonitor construction ─────────────────────────────────
+
+    #[test]
+    fn test_default_equals_new() {
+        let a = AutopoieticMonitor::new();
+        let b = AutopoieticMonitor::default();
+        assert_eq!(a.closure(), b.closure());
+        assert_eq!(a.is_healthy(), b.is_healthy());
+    }
+
+    #[test]
+    fn test_initial_closure_is_one() {
+        let monitor = AutopoieticMonitor::new();
+        assert!((monitor.closure() - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_initial_metrics() {
+        let monitor = AutopoieticMonitor::new();
+        let metrics = monitor.metrics();
+        assert_eq!(metrics.total_cycles, 0);
+        assert_eq!(metrics.boundary_violations, 0);
+        assert!(metrics.healthy);
+        assert!((metrics.violation_rate() - 0.0).abs() < f32::EPSILON);
+    }
+
+    // ── record_cycle ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_production_cycles_increment() {
+        let mut monitor = AutopoieticMonitor::new();
+        for i in 0..5 {
+            monitor.record_cycle(0.2, 0.8);
+            assert_eq!(monitor.metrics().total_cycles, i + 1);
+        }
+    }
+
+    #[test]
+    fn test_history_bounded_at_max() {
+        let mut monitor = AutopoieticMonitor::new();
+        for _ in 0..200 {
+            monitor.record_cycle(0.1, 0.9);
+        }
+        // Internal history should not exceed MAX_HISTORY (100)
+        let metrics = monitor.metrics();
+        assert_eq!(metrics.total_cycles, 200);
+        // closure should remain healthy with good cycles
+        assert!(monitor.closure_maintained());
+    }
+
+    // ── boundary_violation ──────────────────────────────────────────────
+
+    #[test]
+    fn test_single_boundary_violation_reduces_closure() {
+        let mut monitor = AutopoieticMonitor::new();
+        let before = monitor.closure();
+        monitor.record_boundary_violation();
+        let after = monitor.closure();
+        assert!(after < before, "Violation should reduce closure: {} -> {}", before, after);
+    }
+
+    #[test]
+    fn test_many_violations_make_unhealthy() {
+        let mut monitor = AutopoieticMonitor::new();
+        for _ in 0..50 {
+            monitor.record_boundary_violation();
+        }
+        assert!(!monitor.is_healthy());
+        assert!(!monitor.closure_maintained());
+    }
+
+    // ── operational_closure ─────────────────────────────────────────────
+
+    #[test]
+    fn test_operational_closure_initial() {
+        let monitor = AutopoieticMonitor::new();
+        let oc = monitor.operational_closure();
+        assert!(oc.is_maintaining());
+        assert!((oc.model_world_alignment - 1.0).abs() < f32::EPSILON);
+        assert!((oc.boundary_integrity - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_operational_closure_after_bad_cycles() {
+        let mut monitor = AutopoieticMonitor::new();
+        for _ in 0..20 {
+            monitor.record_cycle(0.95, 0.1);
+        }
+        let oc = monitor.operational_closure();
+        assert!(oc.model_world_alignment < 0.2);
+        assert!(oc.internal_consistency < 0.2);
+    }
+
+    // ── OperationalClosure diagnostics ──────────────────────────────────
+
+    #[test]
+    fn test_moderate_diagnostic() {
+        let closure = OperationalClosure {
+            closure_level: 0.6,
+            model_world_alignment: 0.5,
+            internal_consistency: 0.6,
+            boundary_integrity: 0.7,
+            self_production_rate: 0.5,
+        };
+        assert!(closure.diagnostic().contains("Moderate"));
+    }
+
+    #[test]
+    fn test_weak_diagnostic() {
+        let closure = OperationalClosure {
+            closure_level: 0.35,
+            model_world_alignment: 0.3,
+            internal_consistency: 0.3,
+            boundary_integrity: 0.4,
+            self_production_rate: 0.3,
+        };
+        assert!(closure.diagnostic().contains("Weak"));
+    }
+
+    #[test]
+    fn test_crisis_diagnostic() {
+        let closure = OperationalClosure {
+            closure_level: 0.1,
+            model_world_alignment: 0.1,
+            internal_consistency: 0.1,
+            boundary_integrity: 0.1,
+            self_production_rate: 0.1,
+        };
+        assert!(closure.diagnostic().contains("crisis"));
+    }
+
+    // ── SelfProductionMetrics ───────────────────────────────────────────
+
+    #[test]
+    fn test_violation_rate_zero_cycles() {
+        let metrics = SelfProductionMetrics {
+            total_cycles: 0,
+            boundary_violations: 0,
+            closure_estimate: 1.0,
+            average_prediction_error: 0.0,
+            average_coherence: 1.0,
+            healthy: true,
+        };
+        assert!((metrics.violation_rate() - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_violation_rate_with_violations() {
+        let metrics = SelfProductionMetrics {
+            total_cycles: 100,
+            boundary_violations: 10,
+            closure_estimate: 0.7,
+            average_prediction_error: 0.3,
+            average_coherence: 0.8,
+            healthy: true,
+        };
+        assert!((metrics.violation_rate() - 10.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_self_production_rate_grows() {
+        let mut monitor = AutopoieticMonitor::new();
+        let initial_rate = monitor.operational_closure().self_production_rate;
+        assert!((initial_rate - 0.0).abs() < f32::EPSILON);
+
+        for _ in 0..50 {
+            monitor.record_cycle(0.2, 0.8);
+        }
+        let after_rate = monitor.operational_closure().self_production_rate;
+        assert!(after_rate > 0.0, "Production rate should grow with cycles");
+    }
 }

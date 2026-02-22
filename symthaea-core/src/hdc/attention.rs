@@ -148,7 +148,7 @@ impl HdcAttention {
             .collect();
 
         // Softmax normalization with temperature
-        let weights = softmax(&raw_scores, self.config.temperature);
+        let weights = crate::math::softmax_with_temperature(&raw_scores, self.config.temperature);
 
         // Transform values and compute weighted bundle
         let values: Vec<ContinuousHV> = memory.iter()
@@ -201,7 +201,7 @@ impl HdcAttention {
             })
             .collect();
 
-        let weights = softmax(&raw_scores, self.config.temperature);
+        let weights = crate::math::softmax_with_temperature(&raw_scores, self.config.temperature);
 
         // Transform values and bundle
         let values: Vec<ContinuousHV> = memory.iter()
@@ -388,7 +388,7 @@ impl CrossAttention {
             .map(|k| q.similarity(k))
             .collect();
 
-        let weights = softmax(&raw_scores, self.attention.config.temperature);
+        let weights = crate::math::softmax_with_temperature(&raw_scores, self.attention.config.temperature);
 
         // Weighted bundle of cached values
         let value_refs: Vec<&ContinuousHV> = cache.values.iter().collect();
@@ -488,36 +488,6 @@ impl MultiHeadAttentionResult {
             })
             .collect()
     }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// UTILITY FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Softmax with temperature
-fn softmax(scores: &[f32], temperature: f32) -> Vec<f32> {
-    if scores.is_empty() {
-        return vec![];
-    }
-
-    // Numerical stability: subtract max
-    let max_score = scores.iter()
-        .cloned()
-        .fold(f32::NEG_INFINITY, f32::max);
-
-    let exp_scores: Vec<f32> = scores.iter()
-        .map(|&s| ((s - max_score) / temperature).exp())
-        .collect();
-
-    let sum: f32 = exp_scores.iter().sum();
-
-    if sum < 1e-10 {
-        // Uniform distribution as fallback
-        let n = scores.len() as f32;
-        return vec![1.0 / n; scores.len()];
-    }
-
-    exp_scores.iter().map(|e| e / sum).collect()
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -715,8 +685,10 @@ mod tests {
 
     #[test]
     fn test_softmax() {
+        use crate::math::softmax_with_temperature;
+
         let scores = vec![1.0, 2.0, 3.0];
-        let weights = softmax(&scores, 1.0);
+        let weights = softmax_with_temperature(&scores, 1.0);
 
         // Check sum to 1
         let sum: f32 = weights.iter().sum();
@@ -729,10 +701,12 @@ mod tests {
 
     #[test]
     fn test_softmax_temperature() {
+        use crate::math::softmax_with_temperature;
+
         let scores = vec![1.0, 2.0, 3.0];
 
-        let cold_weights = softmax(&scores, 0.1);  // Sharp
-        let hot_weights = softmax(&scores, 10.0);  // Diffuse
+        let cold_weights = softmax_with_temperature(&scores, 0.1);  // Sharp
+        let hot_weights = softmax_with_temperature(&scores, 10.0);  // Diffuse
 
         // Cold should be more peaked
         let cold_max = cold_weights.iter().cloned().fold(0.0, f32::max);

@@ -312,7 +312,10 @@ impl LearnedArticulatoryDetector {
         output
     }
 
-    /// Softmax normalization
+    /// Softmax normalization.
+    ///
+    /// NOTE: The canonical implementation lives in `symthaea_core::math::softmax`.
+    /// This crate does not depend on `symthaea-core`, so we keep a local copy.
     fn softmax(logits: &[f32]) -> Vec<f32> {
         let max = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
         let exp: Vec<f32> = logits.iter().map(|x| (x - max).exp()).collect();
@@ -466,9 +469,12 @@ impl LearnedArticulatoryDetector {
             .unwrap_or(0)
     }
 
-    /// Softmax with temperature scaling
-    /// Temperature > 1 flattens the distribution (more uniform)
-    /// Temperature < 1 sharpens it (more confident)
+    /// Softmax with temperature scaling.
+    /// Temperature > 1 flattens the distribution (more uniform).
+    /// Temperature < 1 sharpens it (more confident).
+    ///
+    /// NOTE: The canonical implementation lives in `symthaea_core::math::softmax_with_temperature`.
+    /// This crate does not depend on `symthaea-core`, so we keep a local copy.
     fn softmax_temperature(logits: &[f32], temperature: f32) -> Vec<f32> {
         let scaled: Vec<f32> = logits.iter().map(|x| x / temperature).collect();
         Self::softmax(&scaled)
