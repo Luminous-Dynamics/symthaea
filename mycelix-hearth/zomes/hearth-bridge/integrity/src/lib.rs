@@ -58,10 +58,18 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::BridgeEvent(event) => validate_event(&event),
             EntryTypes::CachedCredential(cred) => validate_credential_cache(&cred),
         },
-        FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
-            EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-            EntryTypes::BridgeQuery(query) => validate_query(&query),
-            EntryTypes::BridgeEvent(event) => validate_event(&event),
+        FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, original_action_hash, .. }) => match app_entry {
+            EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Invalid(
+                "Anchor cannot be updated once created".into(),
+            )),
+            EntryTypes::BridgeQuery(query) => {
+                validate_query(&query)?;
+                validate_query_immutable_fields(&query, &original_action_hash)
+            }
+            EntryTypes::BridgeEvent(event) => {
+                validate_event(&event)?;
+                validate_event_immutable_fields(&event, &original_action_hash)
+            }
             EntryTypes::CachedCredential(cred) => validate_credential_cache(&cred),
         },
         FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
@@ -94,6 +102,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             Ok(ValidateCallbackResult::Valid)
         }
+        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Invalid(
+            "Bridge entries cannot be deleted once created".into(),
+        )),
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -148,6 +159,74 @@ fn validate_event(event: &BridgeEventEntry) -> ExternResult<ValidateCallbackResu
             "Invalid domain '{}'. Must be one of: {:?}",
             event.domain, VALID_DOMAINS
         )));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_query_immutable_fields(
+    new: &BridgeQueryEntry,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: BridgeQueryEntry = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original BridgeQuery: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original BridgeQuery entry is missing".into()
+        )))?;
+    if new.domain != original.domain {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change domain on a BridgeQuery".into(),
+        ));
+    }
+    if new.query_type != original.query_type {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change query_type on a BridgeQuery".into(),
+        ));
+    }
+    if new.requester != original.requester {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change requester on a BridgeQuery".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_event_immutable_fields(
+    new: &BridgeEventEntry,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: BridgeEventEntry = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original BridgeEvent: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original BridgeEvent entry is missing".into()
+        )))?;
+    if new.domain != original.domain {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change domain on a BridgeEvent".into(),
+        ));
+    }
+    if new.event_type != original.event_type {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change event_type on a BridgeEvent".into(),
+        ));
+    }
+    if new.source_agent != original.source_agent {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change source_agent on a BridgeEvent".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -376,5 +455,67 @@ mod tests {
         let a = Anchor("hearth_queries".to_string());
         let b = a.clone();
         assert_eq!(a, b);
+    }
+
+    // ---- Immutable Field Pure Equality Tests ----
+
+    #[test]
+    fn query_immutable_field_domain_difference_detected() {
+        let a = make_query("kinship", "{}");
+        let mut b = a.clone();
+        b.domain = "care".into();
+        assert_ne!(a.domain, b.domain);
+    }
+
+    #[test]
+    fn query_immutable_field_query_type_difference_detected() {
+        let a = make_query("kinship", "{}");
+        let mut b = a.clone();
+        b.query_type = "different_query".into();
+        assert_ne!(a.query_type, b.query_type);
+    }
+
+    #[test]
+    fn query_immutable_field_requester_difference_detected() {
+        let a = make_query("kinship", "{}");
+        let mut b = a.clone();
+        b.requester = AgentPubKey::from_raw_36(vec![99u8; 36]);
+        assert_ne!(a.requester, b.requester);
+    }
+
+    #[test]
+    fn event_immutable_field_domain_difference_detected() {
+        let a = make_event("care", "{}");
+        let mut b = a.clone();
+        b.domain = "emergency".into();
+        assert_ne!(a.domain, b.domain);
+    }
+
+    #[test]
+    fn event_immutable_field_event_type_difference_detected() {
+        let a = make_event("care", "{}");
+        let mut b = a.clone();
+        b.event_type = "different_event".into();
+        assert_ne!(a.event_type, b.event_type);
+    }
+
+    #[test]
+    fn event_immutable_field_source_agent_difference_detected() {
+        let a = make_event("care", "{}");
+        let mut b = a.clone();
+        b.source_agent = AgentPubKey::from_raw_36(vec![99u8; 36]);
+        assert_ne!(a.source_agent, b.source_agent);
+    }
+
+    #[test]
+    fn anchor_update_rejected_message() {
+        let msg = "Anchor cannot be updated once created";
+        assert!(msg.contains("cannot be updated"));
+    }
+
+    #[test]
+    fn delete_guard_message_content() {
+        let msg = "Bridge entries cannot be deleted once created";
+        assert!(msg.contains("cannot be deleted"));
     }
 }

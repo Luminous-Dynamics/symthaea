@@ -231,6 +231,16 @@ fn validate_milestone_immutable_fields(
     Ok(ValidateCallbackResult::Valid)
 }
 
+/// Returns a numeric rank for a TransitionPhase to enforce forward-only progression.
+fn phase_rank(phase: &TransitionPhase) -> u8 {
+    match phase {
+        TransitionPhase::PreLiminal => 0,
+        TransitionPhase::Liminal => 1,
+        TransitionPhase::PostLiminal => 2,
+        TransitionPhase::Integrated => 3,
+    }
+}
+
 fn validate_transition_immutable_fields(
     new: &LifeTransition,
     original_action_hash: &ActionHash,
@@ -265,6 +275,12 @@ fn validate_transition_immutable_fields(
     if new.started_at != original.started_at {
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot change started_at on a LifeTransition".into(),
+        ));
+    }
+    // Forward-only phase progression
+    if phase_rank(&new.current_phase) < phase_rank(&original.current_phase) {
+        return Ok(ValidateCallbackResult::Invalid(
+            "LifeTransition phase cannot regress (must progress forward only)".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -609,5 +625,49 @@ mod tests {
         let mut b = a.clone();
         b.started_at = Timestamp::from_micros(9_000_000);
         assert_ne!(a.started_at, b.started_at);
+    }
+
+    // ---- Phase Rank Ordering Tests ----
+
+    #[test]
+    fn phase_rank_ordering() {
+        assert!(phase_rank(&TransitionPhase::PreLiminal) < phase_rank(&TransitionPhase::Liminal));
+        assert!(phase_rank(&TransitionPhase::Liminal) < phase_rank(&TransitionPhase::PostLiminal));
+        assert!(phase_rank(&TransitionPhase::PostLiminal) < phase_rank(&TransitionPhase::Integrated));
+    }
+
+    #[test]
+    fn phase_rank_prelim_is_zero() {
+        assert_eq!(phase_rank(&TransitionPhase::PreLiminal), 0);
+    }
+
+    #[test]
+    fn phase_rank_integrated_is_max() {
+        assert_eq!(phase_rank(&TransitionPhase::Integrated), 3);
+    }
+
+    #[test]
+    fn transition_phase_same_value_allowed() {
+        let a = make_transition(1);
+        let b = a.clone();
+        // Same phase should be allowed (no regression)
+        assert_eq!(phase_rank(&a.current_phase), phase_rank(&b.current_phase));
+    }
+
+    #[test]
+    fn transition_phase_forward_difference_detected() {
+        let a = make_transition(1); // PreLiminal
+        let mut b = a.clone();
+        b.current_phase = TransitionPhase::Liminal;
+        assert!(phase_rank(&b.current_phase) > phase_rank(&a.current_phase));
+    }
+
+    #[test]
+    fn transition_phase_backward_difference_detected() {
+        let mut a = make_transition(1);
+        a.current_phase = TransitionPhase::PostLiminal;
+        let mut b = a.clone();
+        b.current_phase = TransitionPhase::PreLiminal;
+        assert!(phase_rank(&b.current_phase) < phase_rank(&a.current_phase));
     }
 }

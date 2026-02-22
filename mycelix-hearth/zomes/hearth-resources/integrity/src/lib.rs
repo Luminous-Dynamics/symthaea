@@ -103,7 +103,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             action: _,
         }) => match app_entry {
             EntryTypes::SharedResource(resource) => validate_resource(&resource),
-            EntryTypes::ResourceLoan(loan) => validate_loan(&loan),
+            EntryTypes::ResourceLoan(loan) => validate_loan_create(&loan),
             EntryTypes::BudgetCategory(budget) => validate_budget(&budget),
         },
         FlatOp::StoreEntry(OpEntry::UpdateEntry {
@@ -116,7 +116,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 validate_resource_immutable_fields(&resource, &original_action_hash)
             }
             EntryTypes::ResourceLoan(loan) => {
-                validate_loan(&loan)?;
+                validate_loan_fields(&loan)?;
                 validate_loan_immutable_fields(&loan, &original_action_hash)
             }
             EntryTypes::BudgetCategory(budget) => {
@@ -191,10 +191,23 @@ pub fn validate_resource(resource: &SharedResource) -> ExternResult<ValidateCall
     Ok(ValidateCallbackResult::Valid)
 }
 
-pub fn validate_loan(loan: &ResourceLoan) -> ExternResult<ValidateCallbackResult> {
-    // Basic structural validation
+pub fn validate_loan_fields(loan: &ResourceLoan) -> ExternResult<ValidateCallbackResult> {
+    // Structural validation shared by create and update
     match loan.status {
         LoanStatus::Active | LoanStatus::Returned | LoanStatus::Overdue => {}
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+pub fn validate_loan_create(loan: &ResourceLoan) -> ExternResult<ValidateCallbackResult> {
+    validate_loan_fields(loan)?;
+    match loan.status {
+        LoanStatus::Active => {}
+        LoanStatus::Returned | LoanStatus::Overdue => {
+            return Ok(ValidateCallbackResult::Invalid(
+                "ResourceLoan cannot be created with terminal status".into(),
+            ));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -491,13 +504,13 @@ mod tests {
     fn valid_loan_passes() {
         let l = make_loan(LoanStatus::Active);
         assert!(matches!(
-            validate_loan(&l).unwrap(),
+            validate_loan_fields(&l).unwrap(),
             ValidateCallbackResult::Valid
         ));
     }
 
     #[test]
-    fn loan_all_statuses_valid() {
+    fn loan_all_statuses_valid_for_fields() {
         let statuses = vec![
             LoanStatus::Active,
             LoanStatus::Returned,
@@ -506,10 +519,55 @@ mod tests {
         for status in statuses {
             let l = make_loan(status);
             assert!(matches!(
-                validate_loan(&l).unwrap(),
+                validate_loan_fields(&l).unwrap(),
                 ValidateCallbackResult::Valid
             ));
         }
+    }
+
+    #[test]
+    fn loan_create_active_status_passes() {
+        let loan = make_loan(LoanStatus::Active);
+        assert!(matches!(
+            validate_loan_create(&loan).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
+    }
+
+    #[test]
+    fn loan_create_returned_status_rejected() {
+        let loan = make_loan(LoanStatus::Returned);
+        match validate_loan_create(&loan).unwrap() {
+            ValidateCallbackResult::Invalid(msg) => assert!(msg.contains("terminal status")),
+            other => panic!("expected Invalid, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn loan_create_overdue_status_rejected() {
+        let loan = make_loan(LoanStatus::Overdue);
+        match validate_loan_create(&loan).unwrap() {
+            ValidateCallbackResult::Invalid(msg) => assert!(msg.contains("terminal status")),
+            other => panic!("expected Invalid, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn loan_update_returned_status_passes() {
+        let loan = make_loan(LoanStatus::Returned);
+        assert!(matches!(
+            validate_loan_fields(&loan).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
+    }
+
+    #[test]
+    fn loan_update_overdue_status_passes() {
+        let loan = make_loan(LoanStatus::Overdue);
+        assert!(matches!(
+            validate_loan_fields(&loan).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
     }
 
     // ---- BudgetCategory Validation ----

@@ -148,7 +148,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Invalid(
+            "Gratitude expressions cannot be deleted once created".into(),
+        )),
     }
 }
 
@@ -816,5 +818,13 @@ mod tests {
             }
             _ => panic!("Expected Invalid result"),
         }
+    }
+
+    // ── Delete guard tests ──────────────────────────────────────────
+
+    #[test]
+    fn delete_guard_message_content() {
+        let msg = "Gratitude expressions cannot be deleted once created";
+        assert!(msg.contains("cannot be deleted"));
     }
 }

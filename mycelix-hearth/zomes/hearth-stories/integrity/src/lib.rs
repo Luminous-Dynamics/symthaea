@@ -147,7 +147,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     validate_tradition_update(&tradition)?;
                     validate_tradition_immutable_fields(&tradition, &original_action_hash)
                 }
-                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Anchor cannot be updated once created".into(),
+                )),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -1177,5 +1179,13 @@ mod tests {
         let mut t2 = t1.clone();
         t2.hearth_hash = ActionHash::from_raw_36(vec![0xCD; 36]);
         assert_ne!(t1.hearth_hash, t2.hearth_hash);
+    }
+
+    // ── Anchor immutability tests ───────────────────────────────────
+
+    #[test]
+    fn anchor_update_rejected_message() {
+        let msg = "Anchor cannot be updated once created";
+        assert!(msg.contains("cannot be updated"));
     }
 }

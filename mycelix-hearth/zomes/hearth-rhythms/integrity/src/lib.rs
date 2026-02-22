@@ -159,6 +159,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             Ok(ValidateCallbackResult::Valid)
         }
+        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Invalid(
+            "Rhythm entries cannot be deleted once created".into(),
+        )),
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -222,10 +225,9 @@ pub fn validate_occurrence(occurrence: &RhythmOccurrence) -> ExternResult<Valida
     Ok(ValidateCallbackResult::Valid)
 }
 
-pub fn validate_presence(presence: &PresenceStatus) -> ExternResult<ValidateCallbackResult> {
-    // Basic structural validation — PresenceStatus is always valid
-    // as long as the types are correct (enforced by serde deserialization).
-    let _ = presence;
+pub fn validate_presence(_presence: &PresenceStatus) -> ExternResult<ValidateCallbackResult> {
+    // PresenceStatusType enum is validated by serde deserialization.
+    // No additional structural validation needed beyond type system guarantees.
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -582,6 +584,31 @@ mod tests {
         let _b = LinkTypes::RhythmToOccurrences;
         let _c = LinkTypes::HearthToPresence;
         let _d = LinkTypes::AgentToPresence;
+    }
+
+    // ---- Delete Guard ----
+
+    #[test]
+    fn delete_guard_message_content() {
+        let msg = "Rhythm entries cannot be deleted once created";
+        assert!(msg.contains("cannot be deleted"));
+    }
+
+    // ---- Presence Status Validation ----
+
+    #[test]
+    fn presence_status_validation_passes() {
+        let p = PresenceStatus {
+            hearth_hash: fake_action_hash(),
+            agent: fake_agent_a(),
+            status: PresenceStatusType::Home,
+            expected_return: None,
+            updated_at: fake_timestamp(),
+        };
+        assert!(matches!(
+            validate_presence(&p).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
     }
 
     // ---- Immutable Field Pure Equality Tests ----

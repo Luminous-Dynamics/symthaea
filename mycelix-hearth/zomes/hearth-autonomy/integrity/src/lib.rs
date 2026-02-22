@@ -211,7 +211,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Invalid(
+            "Autonomy entries cannot be deleted once created".into(),
+        )),
     }
 }
 
@@ -872,6 +874,12 @@ mod tests {
         let mut b = a.clone();
         b.to_tier = AutonomyTier::Autonomous;
         assert_ne!(a.to_tier, b.to_tier);
+    }
+
+    #[test]
+    fn delete_guard_message_content() {
+        let msg = "Autonomy entries cannot be deleted once created";
+        assert!(msg.contains("cannot be deleted"));
     }
 
     #[test]

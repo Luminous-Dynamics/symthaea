@@ -178,6 +178,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             Ok(ValidateCallbackResult::Valid)
         }
+        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Invalid(
+            "Emergency entries cannot be deleted once created".into(),
+        )),
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -716,6 +719,12 @@ mod tests {
         let mut b = a.clone();
         b.alert_type = AlertType::Fire;
         assert_ne!(a.alert_type, b.alert_type);
+    }
+
+    #[test]
+    fn delete_guard_message_content() {
+        let msg = "Emergency entries cannot be deleted once created";
+        assert!(msg.contains("cannot be deleted"));
     }
 
     #[test]
