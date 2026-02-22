@@ -713,14 +713,32 @@ fn test_cycle_metadata_compact() {
     let compact = result.metadata.compact();
 
     // Core fields should match
-    assert_eq!(compact.surprise_triggered, result.metadata.surprise_triggered);
+    assert_eq!(
+        compact.surprise_triggered,
+        result.metadata.surprise_triggered
+    );
     assert_eq!(compact.prefrontal_veto, result.metadata.prefrontal_veto);
-    assert_eq!(compact.reasoning_confidence, result.metadata.reasoning_confidence);
-    assert_eq!(compact.consciousness_level, result.metadata.consciousness_level);
+    assert_eq!(
+        compact.reasoning_confidence,
+        result.metadata.reasoning_confidence
+    );
+    assert_eq!(
+        compact.consciousness_level,
+        result.metadata.consciousness_level
+    );
     assert_eq!(compact.gwt_broadcast, result.metadata.gwt_broadcast);
-    assert_eq!(compact.body_phi_modulation, result.metadata.body_phi_modulation);
-    assert_eq!(compact.meta_cognitive_accuracy, result.metadata.meta_cognitive_accuracy);
-    assert_eq!(compact.narrative_self_psi, result.metadata.narrative_self_psi);
+    assert_eq!(
+        compact.body_phi_modulation,
+        result.metadata.body_phi_modulation
+    );
+    assert_eq!(
+        compact.meta_cognitive_accuracy,
+        result.metadata.meta_cognitive_accuracy
+    );
+    assert_eq!(
+        compact.narrative_self_psi,
+        result.metadata.narrative_self_psi
+    );
     assert_eq!(compact.affective_valence, result.metadata.affective_valence);
     assert_eq!(compact.affective_arousal, result.metadata.affective_arousal);
 
@@ -732,7 +750,10 @@ fn test_cycle_metadata_compact() {
 fn test_config_validate_default_clean() {
     let config = CognitiveLoopConfig::default();
     let warnings = config.validate_dependencies();
-    assert!(warnings.is_empty(), "default config should have no warnings: {warnings:?}");
+    assert!(
+        warnings.is_empty(),
+        "default config should have no warnings: {warnings:?}"
+    );
 }
 
 #[test]
@@ -802,7 +823,10 @@ fn test_config_validate_no_false_positives() {
         ..Default::default()
     };
     let warnings = config.validate_dependencies();
-    assert!(warnings.is_empty(), "fully-satisfied config should have no warnings: {warnings:?}");
+    assert!(
+        warnings.is_empty(),
+        "fully-satisfied config should have no warnings: {warnings:?}"
+    );
 }
 
 // ─── Config range validation tests ───────────────────────────────────
@@ -810,13 +834,19 @@ fn test_config_validate_no_false_positives() {
 #[test]
 fn test_default_config_is_valid() {
     let config = CognitiveLoopConfig::default();
-    assert!(config.validate().is_ok(), "default CognitiveLoopConfig must pass range validation");
+    assert!(
+        config.validate().is_ok(),
+        "default CognitiveLoopConfig must pass range validation"
+    );
 }
 
 #[test]
 fn test_cfc_default_config_is_valid() {
     let config = CfCConfig::default();
-    assert!(config.validate().is_ok(), "default CfCConfig must pass validation");
+    assert!(
+        config.validate().is_ok(),
+        "default CfCConfig must pass validation"
+    );
 }
 
 #[test]
@@ -825,28 +855,42 @@ fn test_invalid_learning_rate_rejected() {
     let mut config = CognitiveLoopConfig::default();
     config.cfc_config.learning_rate = 0.0;
     let err = config.validate().unwrap_err();
-    assert!(err.contains("learning_rate"), "error should mention learning_rate: {err}");
+    assert!(
+        err.contains("learning_rate"),
+        "error should mention learning_rate: {err}"
+    );
 
     // CfC learning_rate > 1.0
     config.cfc_config.learning_rate = 1.5;
     let err = config.validate().unwrap_err();
-    assert!(err.contains("learning_rate"), "error should mention learning_rate: {err}");
+    assert!(
+        err.contains("learning_rate"),
+        "error should mention learning_rate: {err}"
+    );
 
     // CfC learning_rate = NaN
     config.cfc_config.learning_rate = f32::NAN;
     let err = config.validate().unwrap_err();
-    assert!(err.contains("learning_rate") || err.contains("finite"),
-        "error should mention learning_rate or finite: {err}");
+    assert!(
+        err.contains("learning_rate") || err.contains("finite"),
+        "error should mention learning_rate or finite: {err}"
+    );
 
     // learning_threshold out of range
     let mut config = CognitiveLoopConfig::default();
     config.learning_threshold = -0.1;
     let err = config.validate().unwrap_err();
-    assert!(err.contains("learning_threshold"), "error should mention learning_threshold: {err}");
+    assert!(
+        err.contains("learning_threshold"),
+        "error should mention learning_threshold: {err}"
+    );
 
     config.learning_threshold = 1.5;
     let err = config.validate().unwrap_err();
-    assert!(err.contains("learning_threshold"), "error should mention learning_threshold: {err}");
+    assert!(
+        err.contains("learning_threshold"),
+        "error should mention learning_threshold: {err}"
+    );
 }
 
 #[test]
@@ -854,12 +898,18 @@ fn test_invalid_dimension_rejected() {
     let mut config = CognitiveLoopConfig::default();
     config.cfc_config.num_neurons = 0;
     let err = config.validate().unwrap_err();
-    assert!(err.contains("num_neurons"), "error should mention num_neurons: {err}");
+    assert!(
+        err.contains("num_neurons"),
+        "error should mention num_neurons: {err}"
+    );
 
     let mut config = CognitiveLoopConfig::default();
     config.cfc_config.input_dim = 0;
     let err = config.validate().unwrap_err();
-    assert!(err.contains("input_dim"), "error should mention input_dim: {err}");
+    assert!(
+        err.contains("input_dim"),
+        "error should mention input_dim: {err}"
+    );
 }
 
 #[test]
@@ -867,20 +917,32 @@ fn test_invalid_buffer_size_rejected() {
     let mut config = CognitiveLoopConfig::default();
     config.buffer_size = 0;
     let err = config.validate().unwrap_err();
-    assert!(err.contains("buffer_size"), "error should mention buffer_size: {err}");
+    assert!(
+        err.contains("buffer_size"),
+        "error should mention buffer_size: {err}"
+    );
 }
 
 #[test]
 fn test_invalid_target_frequency_rejected() {
     let mut config = CognitiveLoopConfig::default();
     config.target_frequency = 0.0;
-    assert!(config.validate().is_err(), "target_frequency=0.0 should fail");
+    assert!(
+        config.validate().is_err(),
+        "target_frequency=0.0 should fail"
+    );
 
     config.target_frequency = -10.0;
-    assert!(config.validate().is_err(), "negative target_frequency should fail");
+    assert!(
+        config.validate().is_err(),
+        "negative target_frequency should fail"
+    );
 
     config.target_frequency = f32::INFINITY;
-    assert!(config.validate().is_err(), "infinite target_frequency should fail");
+    assert!(
+        config.validate().is_err(),
+        "infinite target_frequency should fail"
+    );
 }
 
 #[test]
@@ -888,28 +950,43 @@ fn test_invalid_causal_discovery_interval_rejected() {
     let mut config = CognitiveLoopConfig::default();
     config.causal_discovery_interval = 0;
     let err = config.validate().unwrap_err();
-    assert!(err.contains("causal_discovery_interval"), "error should mention causal_discovery_interval: {err}");
+    assert!(
+        err.contains("causal_discovery_interval"),
+        "error should mention causal_discovery_interval: {err}"
+    );
 }
 
 #[test]
 fn test_invalid_resonator_params_rejected() {
     let mut config = CognitiveLoopConfig::default();
     config.resonator_novelty_threshold = 0.0;
-    assert!(config.validate().is_err(), "resonator_novelty_threshold=0.0 should fail");
+    assert!(
+        config.validate().is_err(),
+        "resonator_novelty_threshold=0.0 should fail"
+    );
 
     config.resonator_novelty_threshold = 1.1;
-    assert!(config.validate().is_err(), "resonator_novelty_threshold=1.1 should fail");
+    assert!(
+        config.validate().is_err(),
+        "resonator_novelty_threshold=1.1 should fail"
+    );
 
     let mut config = CognitiveLoopConfig::default();
     config.resonator_max_symbols = 0;
-    assert!(config.validate().is_err(), "resonator_max_symbols=0 should fail");
+    assert!(
+        config.validate().is_err(),
+        "resonator_max_symbols=0 should fail"
+    );
 }
 
 #[test]
 fn test_invalid_attestation_buffer_capacity_rejected() {
     let mut config = CognitiveLoopConfig::default();
     config.attestation_buffer_capacity = 0;
-    assert!(config.validate().is_err(), "attestation_buffer_capacity=0 should fail");
+    assert!(
+        config.validate().is_err(),
+        "attestation_buffer_capacity=0 should fail"
+    );
 }
 
 #[test]
@@ -917,7 +994,10 @@ fn test_cfc_empty_prediction_horizons_rejected() {
     let mut config = CognitiveLoopConfig::default();
     config.cfc_config.prediction_horizons = vec![];
     let err = config.validate().unwrap_err();
-    assert!(err.contains("prediction_horizons"), "error should mention prediction_horizons: {err}");
+    assert!(
+        err.contains("prediction_horizons"),
+        "error should mention prediction_horizons: {err}"
+    );
 }
 
 #[test]
@@ -925,7 +1005,10 @@ fn test_cfc_negative_prediction_horizon_rejected() {
     let mut config = CognitiveLoopConfig::default();
     config.cfc_config.prediction_horizons = vec![0.02, -0.1, 0.2];
     let err = config.validate().unwrap_err();
-    assert!(err.contains("prediction_horizons"), "error should mention prediction_horizons: {err}");
+    assert!(
+        err.contains("prediction_horizons"),
+        "error should mention prediction_horizons: {err}"
+    );
 }
 
 #[test]

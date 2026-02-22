@@ -61,7 +61,11 @@ impl CognitiveLoopService {
     ///
     /// Returns `Some(CycleResult)` with a safe default response if the safety
     /// gateway blocks the input, or `None` if the input is allowed.
-    pub(in crate::cognitive_loop) fn safety_precheck(&mut self, input: &str, cycle_start: Instant) -> Option<CycleResult> {
+    pub(in crate::cognitive_loop) fn safety_precheck(
+        &mut self,
+        input: &str,
+        cycle_start: Instant,
+    ) -> Option<CycleResult> {
         let gateway = self.safety_gateway.as_mut()?;
         let decision = gateway.check(crate::safety::SafetyCheck::Query(input));
         if decision.allowed {
@@ -113,7 +117,8 @@ impl CognitiveLoopService {
     /// Science: Wason (1959) — negation processing in human reasoning.
     pub(in crate::cognitive_loop) fn detect_negation_polarity(&self, input: &str) -> f32 {
         if let Some(ref detector) = self.negation_detector {
-            detector.get_polarity(input, "harmful")
+            detector
+                .get_polarity(input, "harmful")
                 .max(detector.get_polarity(input, "dangerous"))
                 .max(detector.get_polarity(input, "unethical"))
         } else {
@@ -251,9 +256,11 @@ impl CognitiveLoopService {
     /// Returns the memory context boost (confidence contribution from recalled
     /// memories). Side effects: biases emotional valence and prediction confidence
     /// from recalled episode metadata (Damasio 1999).
-    pub(in crate::cognitive_loop) fn recall_episodic_context(&mut self, compressed_state: &[f32]) -> f32 {
-        let hdv_sample: Vec<f32> =
-            compressed_state[..64.min(compressed_state.len())].to_vec();
+    pub(in crate::cognitive_loop) fn recall_episodic_context(
+        &mut self,
+        compressed_state: &[f32],
+    ) -> f32 {
+        let hdv_sample: Vec<f32> = compressed_state[..64.min(compressed_state.len())].to_vec();
         let recalled_memories = self.episodic_memory.recall(
             &hdv_sample,
             MEMORY_RECALL_TOP_K,
@@ -261,10 +268,7 @@ impl CognitiveLoopService {
         );
 
         let memory_context_boost = if !recalled_memories.is_empty() {
-            recalled_memories
-                .iter()
-                .map(|(_, sim)| sim)
-                .sum::<f32>()
+            recalled_memories.iter().map(|(_, sim)| sim).sum::<f32>()
                 / recalled_memories.len().max(1) as f32
                 * MEMORY_CONTEXT_BOOST_SCALE
         } else {
@@ -275,10 +279,16 @@ impl CognitiveLoopService {
         // Science: Damasio (1999) — emotional re-experiencing from recalled episodes
         if !recalled_memories.is_empty() {
             let n = recalled_memories.len() as f32;
-            let memory_valence_avg: f32 =
-                recalled_memories.iter().map(|(m, _)| m.valence).sum::<f32>() / n;
-            let memory_phi_avg: f32 =
-                recalled_memories.iter().map(|(m, _)| m.phi_at_encoding).sum::<f32>() / n;
+            let memory_valence_avg: f32 = recalled_memories
+                .iter()
+                .map(|(m, _)| m.valence)
+                .sum::<f32>()
+                / n;
+            let memory_phi_avg: f32 = recalled_memories
+                .iter()
+                .map(|(m, _)| m.phi_at_encoding)
+                .sum::<f32>()
+                / n;
 
             // Memory valence biases current emotional state (emotional re-experiencing)
             if memory_valence_avg.abs() > 0.1 {
@@ -312,8 +322,7 @@ impl CognitiveLoopService {
             let actual_len = predicted.len().max(1).min(compressed_state.len());
             let actual = &compressed_state[..actual_len];
             let current_state = self.last_state.as_deref().unwrap_or(compressed_state);
-            let (surprise, should_explore, action) =
-                bridge.cycle(predicted, actual, current_state);
+            let (surprise, should_explore, action) = bridge.cycle(predicted, actual, current_state);
 
             if should_explore {
                 surprise_triggered = true;
@@ -434,7 +443,10 @@ impl CognitiveLoopService {
     ///
     /// Sets exploration factor, attention sensitivity, speech rate, or pause
     /// multiplier based on the selected response strategy.
-    pub(in crate::cognitive_loop) fn apply_strategy_modulation(&mut self, strategy: ResponseStrategy) {
+    pub(in crate::cognitive_loop) fn apply_strategy_modulation(
+        &mut self,
+        strategy: ResponseStrategy,
+    ) {
         match strategy {
             ResponseStrategy::Exploratory => {
                 self.adaptive_behavior.exploration_factor = STRATEGY_EXPLORATORY_FACTOR;
@@ -459,11 +471,16 @@ impl CognitiveLoopService {
     /// Uses max/min/multiply to merge strategy with consciousness state,
     /// preserving the stronger signal. Called after `from_consciousness_state()`
     /// resets adaptive behavior.
-    pub(in crate::cognitive_loop) fn reapply_strategy_modulation(&mut self, strategy: ResponseStrategy) {
+    pub(in crate::cognitive_loop) fn reapply_strategy_modulation(
+        &mut self,
+        strategy: ResponseStrategy,
+    ) {
         match strategy {
             ResponseStrategy::Exploratory => {
-                self.adaptive_behavior.exploration_factor =
-                    self.adaptive_behavior.exploration_factor.max(STRATEGY_EXPLORATORY_FACTOR);
+                self.adaptive_behavior.exploration_factor = self
+                    .adaptive_behavior
+                    .exploration_factor
+                    .max(STRATEGY_EXPLORATORY_FACTOR);
             }
             ResponseStrategy::Detailed => {
                 self.adaptive_behavior.attention_sensitivity *= STRATEGY_DETAILED_SENSITIVITY;
@@ -475,12 +492,16 @@ impl CognitiveLoopService {
                     .max(STRATEGY_CONCISE_SPEECH_RATE);
             }
             ResponseStrategy::Clarifying => {
-                self.adaptive_behavior.exploration_factor =
-                    self.adaptive_behavior.exploration_factor.min(STRATEGY_CLARIFYING_FACTOR);
+                self.adaptive_behavior.exploration_factor = self
+                    .adaptive_behavior
+                    .exploration_factor
+                    .min(STRATEGY_CLARIFYING_FACTOR);
             }
             ResponseStrategy::Supportive => {
-                self.adaptive_behavior.pause_multiplier =
-                    self.adaptive_behavior.pause_multiplier.max(STRATEGY_SUPPORTIVE_PAUSE);
+                self.adaptive_behavior.pause_multiplier = self
+                    .adaptive_behavior
+                    .pause_multiplier
+                    .max(STRATEGY_SUPPORTIVE_PAUSE);
             }
         }
     }
@@ -548,7 +569,12 @@ impl CognitiveLoopService {
             _ => {}
         }
 
-        (fep_action_idx, fep_action_probs, is_surprised, action_result.pragmatic_value)
+        (
+            fep_action_idx,
+            fep_action_probs,
+            is_surprised,
+            action_result.pragmatic_value,
+        )
     }
 
     /// Cross-modal binding: bind HDC encodings across linguistic and affective modalities.
@@ -578,8 +604,7 @@ impl CognitiveLoopService {
                 binder.add_representation(linguistic_repr);
                 if self.affective_bridge.is_some() {
                     let affect_seed = (affective_valence * 1000.0) as u64;
-                    let affective_hv =
-                        symthaea_core::hdc::binary_hv::BinaryHV::random(affect_seed);
+                    let affective_hv = symthaea_core::hdc::binary_hv::BinaryHV::random(affect_seed);
                     binder.update_modality(Modality::Affective, affective_hv);
                 }
                 let strength = binder.bind().map(|r| r.strength).unwrap_or(0.0);

@@ -712,9 +712,14 @@ impl CognitiveLoopConfig {
     /// - `attestation_buffer_capacity` > 0
     pub fn validate(&self) -> Result<(), String> {
         // Validate nested CfC config
-        self.cfc_config.validate().map_err(|e| format!("CognitiveLoopConfig: {e}"))?;
+        self.cfc_config
+            .validate()
+            .map_err(|e| format!("CognitiveLoopConfig: {e}"))?;
 
-        if self.learning_threshold < 0.0 || self.learning_threshold > 1.0 || !self.learning_threshold.is_finite() {
+        if self.learning_threshold < 0.0
+            || self.learning_threshold > 1.0
+            || !self.learning_threshold.is_finite()
+        {
             return Err(format!(
                 "CognitiveLoopConfig: learning_threshold must be in [0.0, 1.0], got {}",
                 self.learning_threshold

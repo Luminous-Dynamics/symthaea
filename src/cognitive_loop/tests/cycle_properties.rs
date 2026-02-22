@@ -41,18 +41,12 @@ fn learning_service() -> CognitiveLoopService {
 
 /// Assert that a float value is finite (not NaN, not Inf).
 fn assert_finite(val: f64, name: &str) {
-    assert!(
-        val.is_finite(),
-        "{name} is not finite: {val}"
-    );
+    assert!(val.is_finite(), "{name} is not finite: {val}");
 }
 
 /// Assert that an f32 value is finite.
 fn assert_finite_f32(val: f32, name: &str) {
-    assert!(
-        val.is_finite(),
-        "{name} is not finite: {val}"
-    );
+    assert!(val.is_finite(), "{name} is not finite: {val}");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -179,19 +173,28 @@ fn test_cycle_metadata_floats_finite() {
         assert_finite(m.living_mind_coherence, "living_mind_coherence");
         assert_finite(m.predictive_free_energy, "predictive_free_energy");
         assert_finite(m.predictive_phi_modulation, "predictive_phi_modulation");
-        assert_finite_f32(m.cross_modal_binding_strength, "cross_modal_binding_strength");
+        assert_finite_f32(
+            m.cross_modal_binding_strength,
+            "cross_modal_binding_strength",
+        );
         assert_finite(m.cross_modal_psi, "cross_modal_psi");
         assert_finite_f32(m.affective_valence, "affective_valence");
         assert_finite_f32(m.affective_arousal, "affective_arousal");
         assert_finite(m.thermodynamic_entropy, "thermodynamic_entropy");
         assert_finite(m.thermodynamic_free_energy, "thermodynamic_free_energy");
         assert_finite(m.phenomenal_binding_strength, "phenomenal_binding_strength");
-        assert_finite(m.hierarchical_total_free_energy, "hierarchical_total_free_energy");
+        assert_finite(
+            m.hierarchical_total_free_energy,
+            "hierarchical_total_free_energy",
+        );
         assert_finite_f32(m.psi_attention_avg, "psi_attention_avg");
         assert_finite(m.primitive_psi, "primitive_psi");
         assert_finite(m.value_evaluator_score, "value_evaluator_score");
         assert_finite_f32(m.harmonies_alignment, "harmonies_alignment");
-        assert_finite(m.consciousness_profile_composite, "consciousness_profile_composite");
+        assert_finite(
+            m.consciousness_profile_composite,
+            "consciousness_profile_composite",
+        );
         assert_finite(m.synergy_enhanced_composite, "synergy_enhanced_composite");
         assert_finite(m.harmonic_field_coherence, "harmonic_field_coherence");
         assert_finite(m.harmonic_love_resonance, "harmonic_love_resonance");
@@ -209,15 +212,30 @@ fn test_cycle_metadata_floats_finite() {
         assert_finite_f32(m.hierarchical_ltc_phi, "hierarchical_ltc_phi");
         assert_finite(m.holographic_unity, "holographic_unity");
         assert_finite(m.holographic_binding, "holographic_binding");
-        assert_finite(m.consciousness_gradient_magnitude, "consciousness_gradient_magnitude");
-        assert_finite_f32(m.affect_consciousness_valence, "affect_consciousness_valence");
-        assert_finite_f32(m.affect_consciousness_arousal, "affect_consciousness_arousal");
+        assert_finite(
+            m.consciousness_gradient_magnitude,
+            "consciousness_gradient_magnitude",
+        );
+        assert_finite_f32(
+            m.affect_consciousness_valence,
+            "affect_consciousness_valence",
+        );
+        assert_finite_f32(
+            m.affect_consciousness_arousal,
+            "affect_consciousness_arousal",
+        );
         assert_finite(m.pipeline_consciousness, "pipeline_consciousness");
         assert_finite(m.multimodal_integrated_phi, "multimodal_integrated_phi");
         assert_finite(m.consciousness_state_level, "consciousness_state_level");
         assert_finite_f32(m.epistemic_gate_confidence, "epistemic_gate_confidence");
-        assert_finite(m.primitive_validation_phi_gain, "primitive_validation_phi_gain");
-        assert_finite(m.primitive_validation_p_value, "primitive_validation_p_value");
+        assert_finite(
+            m.primitive_validation_phi_gain,
+            "primitive_validation_phi_gain",
+        );
+        assert_finite(
+            m.primitive_validation_p_value,
+            "primitive_validation_p_value",
+        );
         assert_finite(m.meta_reasoning_confidence, "meta_reasoning_confidence");
         assert_finite_f32(m.negation_polarity, "negation_polarity");
         assert_finite_f32(m.moral_score, "moral_score");
@@ -252,7 +270,8 @@ fn test_cycle_counter_monotonic() {
     for expected in 1..=30 {
         service.cycle("counter test");
         assert_eq!(
-            service.stats().total_cycles, expected,
+            service.stats().total_cycles,
+            expected,
             "Cycle counter should be {expected}, got {}",
             service.stats().total_cycles
         );
@@ -377,10 +396,7 @@ fn test_confidence_never_exceeds_one_with_positive_feedback() {
     for i in 0..100 {
         service.cycle("consistent stable predictable focused pattern");
         let conf = service.prediction_confidence();
-        assert!(
-            conf <= 1.0,
-            "Confidence exceeded 1.0 at cycle {i}: {conf}"
-        );
+        assert!(conf <= 1.0, "Confidence exceeded 1.0 at cycle {i}: {conf}");
     }
 }
 
@@ -610,10 +626,7 @@ fn test_100_cycles_stable() {
         );
 
         let lr = service.stats().adaptive_learning_rate;
-        assert!(
-            lr.is_finite() && lr >= 0.0,
-            "LR invalid at cycle {i}: {lr}"
-        );
+        assert!(lr.is_finite() && lr >= 0.0, "LR invalid at cycle {i}: {lr}");
 
         assert!(
             result.prediction_error.is_finite() && result.prediction_error >= 0.0,
@@ -691,16 +704,9 @@ fn test_genesis_determinism_single_cycle() {
     );
 
     // Output vectors should match
-    assert_eq!(
-        ra.output.len(),
-        rb.output.len(),
-        "Output lengths differ"
-    );
+    assert_eq!(ra.output.len(), rb.output.len(), "Output lengths differ");
     for (i, (va, vb)) in ra.output.iter().zip(rb.output.iter()).enumerate() {
-        assert!(
-            (va - vb).abs() < 1e-5,
-            "Output[{i}] diverged: {va} vs {vb}"
-        );
+        assert!((va - vb).abs() < 1e-5, "Output[{i}] diverged: {va} vs {vb}");
     }
 }
 

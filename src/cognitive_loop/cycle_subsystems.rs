@@ -63,21 +63,26 @@ impl CognitiveLoopService {
         // Science: Hasani et al. (2021), Dehaene et al. (2003).
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let hierarchical_ltc_phi =
-            if let Some(ref mut hltc) = self.hierarchical_ltc {
-                if self.stats.total_cycles % 11 == 0 {
-                    let input_vec: Vec<f32> = (0..64).map(|i| {
-                        if hv16_cached.get_bit(i) != 0 { 1.0f32 } else { -1.0f32 }
-                    }).collect();
-                    hltc.inject_distributed(&input_vec);
-                    let _ = hltc.step();
-                    hltc.estimate_phi()
-                } else {
-                    0.0
-                }
+        let hierarchical_ltc_phi = if let Some(ref mut hltc) = self.hierarchical_ltc {
+            if self.stats.total_cycles % 11 == 0 {
+                let input_vec: Vec<f32> = (0..64)
+                    .map(|i| {
+                        if hv16_cached.get_bit(i) != 0 {
+                            1.0f32
+                        } else {
+                            -1.0f32
+                        }
+                    })
+                    .collect();
+                hltc.inject_distributed(&input_vec);
+                let _ = hltc.step();
+                hltc.estimate_phi()
             } else {
                 0.0
-            };
+            }
+        } else {
+            0.0
+        };
         module_timings.hierarchical_ltc = _t.elapsed().as_micros() as u64;
 
         // FEEDBACK: Hierarchical LTC Phi cross-validates spectral MIP
@@ -141,9 +146,15 @@ impl CognitiveLoopService {
         let (holographic_unity, holographic_binding) =
             if let Some(ref mut ha) = self.holographic_analyzer {
                 if self.stats.total_cycles % 19 == 0 {
-                    let content: Vec<f64> = (0..64).map(|i| {
-                        if hv16_cached.get_bit(i) != 0 { 1.0 } else { -1.0 }
-                    }).collect();
+                    let content: Vec<f64> = (0..64)
+                        .map(|i| {
+                            if hv16_cached.get_bit(i) != 0 {
+                                1.0
+                            } else {
+                                -1.0
+                            }
+                        })
+                        .collect();
                     ha.encode_experience(&content, &format!("cycle_{}", self.stats.total_cycles));
                     let analysis = ha.analyze();
                     self.carryover.consciousness.last_holographic_unity = analysis.unity_score;
@@ -160,7 +171,8 @@ impl CognitiveLoopService {
         // Science: Pribram (1991) — holographic encoding enables stable predictions
         if holographic_unity > 0.7 {
             let unity_boost = (holographic_unity - 0.7) * 0.03;
-            self.prediction_confidence = (self.prediction_confidence + unity_boost as f32).clamp(0.0, 1.0);
+            self.prediction_confidence =
+                (self.prediction_confidence + unity_boost as f32).clamp(0.0, 1.0);
         }
         // FEEDBACK: Binding strength modulates learning rate
         // Strong binding = coherent representations → safe to learn faster
@@ -180,7 +192,9 @@ impl CognitiveLoopService {
         let (consciousness_gradient_magnitude, consciousness_limiting_component) =
             if let Some(ref dc) = self.differentiable_consciousness {
                 if self.stats.total_cycles % 23 == 0 && self.stats.total_cycles > 0 {
-                    use crate::consciousness::consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent};
+                    use crate::consciousness::consciousness_equation_v2::{
+                        ConsciousnessStateV2, CoreComponent,
+                    };
                     use std::collections::HashMap;
                     let mut core_values = HashMap::new();
                     core_values.insert(CoreComponent::Integration, unified_psi.clamp(0.0, 1.0));
@@ -189,7 +203,10 @@ impl CognitiveLoopService {
                     core_values.insert(CoreComponent::Attention, phi_attention_weight as f64);
                     core_values.insert(CoreComponent::Recursion, 0.5);
                     core_values.insert(CoreComponent::Efficacy, 1.0 - prediction_error as f64);
-                    core_values.insert(CoreComponent::Knowledge, self.carryover.quality.last_epistemic_quality);
+                    core_values.insert(
+                        CoreComponent::Knowledge,
+                        self.carryover.quality.last_epistemic_quality,
+                    );
                     let state = ConsciousnessStateV2 {
                         core_values,
                         extended_values: HashMap::new(),
@@ -203,7 +220,10 @@ impl CognitiveLoopService {
                     self.carryover.quality.last_gradient_magnitude = gradient.magnitude;
                     (gradient.magnitude, format!("{:?}", component))
                 } else {
-                    (self.carryover.quality.last_gradient_magnitude, String::new())
+                    (
+                        self.carryover.quality.last_gradient_magnitude,
+                        String::new(),
+                    )
                 }
             } else {
                 (0.0, String::new())
@@ -253,7 +273,8 @@ impl CognitiveLoopService {
         if let Some(ref ac) = self.affective_consciousness {
             let affect = ac.current_affect();
             if affect.valence < -0.3 {
-                self.prediction_confidence = (self.prediction_confidence + affect.valence * 0.02).max(0.0);
+                self.prediction_confidence =
+                    (self.prediction_confidence + affect.valence * 0.02).max(0.0);
             }
         }
 
@@ -263,25 +284,32 @@ impl CognitiveLoopService {
         // Science: Dehaene (2011), Tononi (2004), Hasani et al. (2021).
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let pipeline_consciousness =
-            if let Some(ref mut pipeline) = self.unified_consciousness_pipeline {
-                if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
-                    let sensory: Vec<f64> = (0..64).map(|i| {
-                        if hv16_cached.get_bit(i) != 0 { 1.0 } else { -1.0 }
-                    }).collect();
-                    match pipeline.process(&sensory) {
-                        Ok(moment) => {
-                            self.carryover.quality.last_pipeline_consciousness = moment.consciousness;
-                            moment.consciousness
+        let pipeline_consciousness = if let Some(ref mut pipeline) =
+            self.unified_consciousness_pipeline
+        {
+            if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
+                let sensory: Vec<f64> = (0..64)
+                    .map(|i| {
+                        if hv16_cached.get_bit(i) != 0 {
+                            1.0
+                        } else {
+                            -1.0
                         }
-                        Err(_) => self.carryover.quality.last_pipeline_consciousness,
+                    })
+                    .collect();
+                match pipeline.process(&sensory) {
+                    Ok(moment) => {
+                        self.carryover.quality.last_pipeline_consciousness = moment.consciousness;
+                        moment.consciousness
                     }
-                } else {
-                    self.carryover.quality.last_pipeline_consciousness
+                    Err(_) => self.carryover.quality.last_pipeline_consciousness,
                 }
             } else {
-                0.0
-            };
+                self.carryover.quality.last_pipeline_consciousness
+            }
+        } else {
+            0.0
+        };
         module_timings.unified_consciousness_pipeline = _t.elapsed().as_micros() as u64;
 
         // FEEDBACK: High pipeline consciousness strengthens learning toward coherence
@@ -296,39 +324,33 @@ impl CognitiveLoopService {
         // Science: Damasio (1994), Mesulam (1998), Ghazanfar & Schroeder (2006).
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let multimodal_integrated_phi =
-            if let Some(ref mut mmi) = self.multi_modal_integrator {
-                if self.stats.total_cycles % 13 == 0 && self.stats.total_cycles > 0 {
-                    use crate::consciousness::multi_modal_integration::ModalInput;
-                    let visual_input = ModalInput::new(
-                        Modality::Visual,
-                        hv16_cached,
-                        coherence as f64,
-                    );
-                    let temporal_input = ModalInput::new(
-                        Modality::Temporal,
-                        hv16_cached,
-                        unified_psi.clamp(0.0, 1.0),
-                    );
-                    let result = mmi.integrate(&[visual_input, temporal_input]);
-                    self.carryover.consciousness.last_multimodal_phi = result.integrated_phi;
-                    result.integrated_phi
-                } else {
-                    self.carryover.consciousness.last_multimodal_phi
-                }
+        let multimodal_integrated_phi = if let Some(ref mut mmi) = self.multi_modal_integrator {
+            if self.stats.total_cycles % 13 == 0 && self.stats.total_cycles > 0 {
+                use crate::consciousness::multi_modal_integration::ModalInput;
+                let visual_input = ModalInput::new(Modality::Visual, hv16_cached, coherence as f64);
+                let temporal_input =
+                    ModalInput::new(Modality::Temporal, hv16_cached, unified_psi.clamp(0.0, 1.0));
+                let result = mmi.integrate(&[visual_input, temporal_input]);
+                self.carryover.consciousness.last_multimodal_phi = result.integrated_phi;
+                result.integrated_phi
             } else {
-                0.0
-            };
+                self.carryover.consciousness.last_multimodal_phi
+            }
+        } else {
+            0.0
+        };
         module_timings.multi_modal_integration = _t.elapsed().as_micros() as u64;
 
         // FEEDBACK: Strong multimodal integration improves learning precision
         // Science: Ghazanfar & Schroeder (2006) — cross-modal binding enables precise learning
         if multimodal_integrated_phi > 0.5 {
             let phi_confidence = (multimodal_integrated_phi - 0.5) * 0.04;
-            self.prediction_confidence = (self.prediction_confidence + phi_confidence as f32).clamp(0.0, 1.0);
+            self.prediction_confidence =
+                (self.prediction_confidence + phi_confidence as f32).clamp(0.0, 1.0);
             let phi_subsystem_lr = 1.0 + (multimodal_integrated_phi - 0.5) * 0.4;
             self.carryover.learning.subsystem_lr_factor *= phi_subsystem_lr as f32;
-            self.carryover.learning.subsystem_lr_factor = self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
+            self.carryover.learning.subsystem_lr_factor =
+                self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -363,26 +385,27 @@ impl CognitiveLoopService {
         // Science: Kruger & Dunning (1999), Schwartz (2004) — epistemic humility.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let (epistemic_gate_confidence, epistemic_gate_approved) =
-            if let Some(ref mut gate) = self.epistemic_gate {
-                if self.stats.total_cycles % 7 == 0 {
-                    let action_risk = (1.0 - self.prediction_confidence).clamp(0.0, 1.0);
-                    let decision = gate.evaluate(input, action_risk);
-                    let (confidence, approved) = match &decision {
+        let (epistemic_gate_confidence, epistemic_gate_approved) = if let Some(ref mut gate) =
+            self.epistemic_gate
+        {
+            if self.stats.total_cycles % 7 == 0 {
+                let action_risk = (1.0 - self.prediction_confidence).clamp(0.0, 1.0);
+                let decision = gate.evaluate(input, action_risk);
+                let (confidence, approved) = match &decision {
                         crate::consciousness::gis_integration::EpistemicDecision::Proceed { confidence } => (*confidence, true),
                         crate::consciousness::gis_integration::EpistemicDecision::ProceedWithCaveat { confidence, .. } => (*confidence, true),
                         crate::consciousness::gis_integration::EpistemicDecision::Defer { .. } => (0.0, false),
                         crate::consciousness::gis_integration::EpistemicDecision::RequestGuidance { .. } => (0.0, false),
                         crate::consciousness::gis_integration::EpistemicDecision::OutOfDomain { .. } => (0.0, false),
                     };
-                    self.carryover.quality.last_epistemic_confidence = confidence;
-                    (confidence, approved)
-                } else {
-                    (self.carryover.quality.last_epistemic_confidence, true)
-                }
+                self.carryover.quality.last_epistemic_confidence = confidence;
+                (confidence, approved)
             } else {
-                (0.5, true)
-            };
+                (self.carryover.quality.last_epistemic_confidence, true)
+            }
+        } else {
+            (0.5, true)
+        };
         module_timings.epistemic_gate = _t.elapsed().as_micros() as u64;
 
         // FEEDBACK: Low epistemic confidence reduces prediction confidence
@@ -396,24 +419,27 @@ impl CognitiveLoopService {
         // primitives genuinely improve consciousness (Φ) vs baseline.
         // Science: Popper (1959) — falsifiability, scientific method.
         // ═══════════════════════════════════════════════════════════════════════
-        let (primitive_validation_phi_gain, primitive_validation_p_value) =
-            if self.primitive_validation_result.is_none()
-                && self.primitive_processor.is_some()
-                && self.stats.total_cycles == 500
-            {
-                let mut experiment = crate::consciousness::primitive_validation::StandardExperiments::tier1_mathematical();
-                match experiment.run() {
-                    Ok(results) => {
-                        let gain = results.statistics.mean_phi_gain;
-                        let p = results.statistics.p_value;
-                        self.primitive_validation_result = Some((gain, p));
-                        (gain, p)
-                    }
-                    Err(_) => (0.0, 1.0),
+        let (primitive_validation_phi_gain, primitive_validation_p_value) = if self
+            .primitive_validation_result
+            .is_none()
+            && self.primitive_processor.is_some()
+            && self.stats.total_cycles == 500
+        {
+            let mut experiment =
+                crate::consciousness::primitive_validation::StandardExperiments::tier1_mathematical(
+                );
+            match experiment.run() {
+                Ok(results) => {
+                    let gain = results.statistics.mean_phi_gain;
+                    let p = results.statistics.p_value;
+                    self.primitive_validation_result = Some((gain, p));
+                    (gain, p)
                 }
-            } else {
-                self.primitive_validation_result.unwrap_or((0.0, 1.0))
-            };
+                Err(_) => (0.0, 1.0),
+            }
+        } else {
+            self.primitive_validation_result.unwrap_or((0.0, 1.0))
+        };
 
         // FEEDBACK: Validated primitives boost LR; falsified primitives dampen it
         // Science: Popper (1959) — if primitives don't improve Φ, reduce their influence
@@ -437,7 +463,9 @@ impl CognitiveLoopService {
         // 1. Consciousness state level modulates urgency: low consciousness → Critical
         //    (run all subsystems to diagnose), high consciousness → can tolerate Cruise
         if consciousness_state_level_val > 0.0 {
-            if consciousness_state_level_val < 0.3 && self.carryover.urgency.urgency != super::types::CycleUrgency::Critical {
+            if consciousness_state_level_val < 0.3
+                && self.carryover.urgency.urgency != super::types::CycleUrgency::Critical
+            {
                 self.carryover.urgency.urgency = super::types::CycleUrgency::Normal;
             }
         }
@@ -456,10 +484,12 @@ impl CognitiveLoopService {
         //    safe to learn aggressively. Low unity = fragmented → be conservative.
         if holographic_unity > 0.8 {
             self.carryover.learning.subsystem_lr_factor *= 1.02;
-            self.carryover.learning.subsystem_lr_factor = self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
+            self.carryover.learning.subsystem_lr_factor =
+                self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
         } else if holographic_unity < 0.2 && holographic_unity > 0.0 {
             self.carryover.learning.subsystem_lr_factor *= 0.98;
-            self.carryover.learning.subsystem_lr_factor = self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
+            self.carryover.learning.subsystem_lr_factor =
+                self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
         }
 
         // 4. Pipeline consciousness → epistemic gating: high pipeline consciousness
@@ -477,13 +507,17 @@ impl CognitiveLoopService {
         // Science: Flavell (1979), Nelson & Narens (1990) — metacognition hierarchy.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let (meta_reasoning_confidence, meta_reasoning_insights) =
-            if let Some(ref mut reasoner) = self.meta_cognitive_reasoner {
-                if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
-                    // Build lightweight candidate primitives from active set
-                    let candidates: Vec<crate::consciousness::primitive_evolution::CandidatePrimitive> =
-                        active_primitive_names.iter().take(3).map(|name| {
-                            crate::consciousness::primitive_evolution::CandidatePrimitive {
+        let (meta_reasoning_confidence, meta_reasoning_insights) = if let Some(ref mut reasoner) =
+            self.meta_cognitive_reasoner
+        {
+            if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
+                // Build lightweight candidate primitives from active set
+                let candidates: Vec<crate::consciousness::primitive_evolution::CandidatePrimitive> =
+                    active_primitive_names
+                        .iter()
+                        .take(3)
+                        .map(
+                            |name| crate::consciousness::primitive_evolution::CandidatePrimitive {
                                 name: name.clone(),
                                 tier: symthaea_core::hdc::PrimitiveTier::NSM,
                                 definition: name.clone(),
@@ -491,21 +525,21 @@ impl CognitiveLoopService {
                                 encoding: symthaea_core::hdc::BinaryHV::random(42),
                                 epistemic_coordinate: Default::default(),
                                 harmonic_alignment: 0.5,
-                            }
-                        }).collect();
-                    let mut chain = crate::consciousness::primitive_reasoning::ReasoningChain::new(
-                        hv16_cached,
-                    );
-                    match reasoner.meta_reason(input, candidates, &mut chain) {
-                        Ok(result) => (result.meta_confidence, result.meta_insights.len()),
-                        Err(_) => (0.5, 0),
-                    }
-                } else {
-                    (0.5, 0)
+                            },
+                        )
+                        .collect();
+                let mut chain =
+                    crate::consciousness::primitive_reasoning::ReasoningChain::new(hv16_cached);
+                match reasoner.meta_reason(input, candidates, &mut chain) {
+                    Ok(result) => (result.meta_confidence, result.meta_insights.len()),
+                    Err(_) => (0.5, 0),
                 }
             } else {
                 (0.5, 0)
-            };
+            }
+        } else {
+            (0.5, 0)
+        };
         module_timings.meta_cognitive_reasoning = _t.elapsed().as_micros() as u64;
 
         // FEEDBACK: High meta-cognitive confidence boosts learning rate
@@ -524,36 +558,35 @@ impl CognitiveLoopService {
         // Science: Plate (2003) — VSA for structured representations.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let code_primitives_selected =
-            if let Some(ref router) = self.code_primitive_router {
-                if self.stats.total_cycles % 11 == 0 {
-                    // Heuristic: detect code-related input
-                    let code_related = input.contains("code")
-                        || input.contains("function")
-                        || input.contains("debug")
-                        || input.contains("refactor")
-                        || input.contains("parse")
-                        || input.contains("compile");
-                    if code_related {
-                        let operation = if input.contains("debug") {
-                            crate::consciousness::code_primitives::CodeOperation::Debug
-                        } else if input.contains("refactor") {
-                            crate::consciousness::code_primitives::CodeOperation::Refactor
-                        } else if input.contains("parse") {
-                            crate::consciousness::code_primitives::CodeOperation::Parse
-                        } else {
-                            crate::consciousness::code_primitives::CodeOperation::Explain
-                        };
-                        router.select_primitives(operation).len()
+        let code_primitives_selected = if let Some(ref router) = self.code_primitive_router {
+            if self.stats.total_cycles % 11 == 0 {
+                // Heuristic: detect code-related input
+                let code_related = input.contains("code")
+                    || input.contains("function")
+                    || input.contains("debug")
+                    || input.contains("refactor")
+                    || input.contains("parse")
+                    || input.contains("compile");
+                if code_related {
+                    let operation = if input.contains("debug") {
+                        crate::consciousness::code_primitives::CodeOperation::Debug
+                    } else if input.contains("refactor") {
+                        crate::consciousness::code_primitives::CodeOperation::Refactor
+                    } else if input.contains("parse") {
+                        crate::consciousness::code_primitives::CodeOperation::Parse
                     } else {
-                        0
-                    }
+                        crate::consciousness::code_primitives::CodeOperation::Explain
+                    };
+                    router.select_primitives(operation).len()
                 } else {
                     0
                 }
             } else {
                 0
-            };
+            }
+        } else {
+            0
+        };
         module_timings.code_primitive_routing = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -582,8 +615,10 @@ impl CognitiveLoopService {
         // ContextKind input). Instant::now() timestamps are internal only.
         // Science: Decety & Jackson (2004) — shared representations enhance learning
         if empathic_compassion > 0.7 {
-            self.carryover.learning.subsystem_lr_factor *= 1.0 + (empathic_compassion as f32 - 0.7) * 0.02;
-            self.carryover.learning.subsystem_lr_factor = self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
+            self.carryover.learning.subsystem_lr_factor *=
+                1.0 + (empathic_compassion as f32 - 0.7) * 0.02;
+            self.carryover.learning.subsystem_lr_factor =
+                self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -593,19 +628,18 @@ impl CognitiveLoopService {
         // Science: Deb et al. (2002) — NSGA-II multi-objective optimization.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let multi_obj_frontier_size =
-            if let Some(ref mut moe) = self.multi_objective_evolution {
-                if self.stats.total_cycles % 997 == 0 && self.stats.total_cycles > 0 {
-                    match moe.evolve() {
-                        Ok(result) => result.frontier_size,
-                        Err(_) => 0,
-                    }
-                } else {
-                    0
+        let multi_obj_frontier_size = if let Some(ref mut moe) = self.multi_objective_evolution {
+            if self.stats.total_cycles % 997 == 0 && self.stats.total_cycles > 0 {
+                match moe.evolve() {
+                    Ok(result) => result.frontier_size,
+                    Err(_) => 0,
                 }
             } else {
                 0
-            };
+            }
+        } else {
+            0
+        };
         module_timings.multi_objective_evolution = _t.elapsed().as_micros() as u64;
 
         SubsystemMetrics {

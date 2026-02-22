@@ -27,9 +27,9 @@ use anyhow::Result;
 use ndarray::Array1;
 use std::time::{Duration, Instant};
 
-use super::{ActionHint, AdaptiveBehavior, CognitiveLoopService, Experience, LoopStats};
 #[cfg(feature = "neural-bridge")]
 use super::CycleResult;
+use super::{ActionHint, AdaptiveBehavior, CognitiveLoopService, Experience, LoopStats};
 
 impl CognitiveLoopService {
     /// Process a pre-computed text embedding through the neural bridge and
@@ -209,31 +209,30 @@ impl CognitiveLoopService {
             self.config.learning_threshold * self.carryover.learning.adaptive_threshold_scale;
 
         // 9. Learn if error is significant
-        let (learning_occurred, training_loss) =
-            if prediction_error > effective_threshold {
-                self.stats.learning_cycles += 1;
-                if let Some(ref prev_state) = self.last_state.clone() {
-                    let train_input = Array1::from_vec(prev_state.clone());
-                    let train_target = Array1::from_vec(compressed_state.clone());
-                    let lr = self.config.cfc_config.learning_rate;
-                    match self.temporal_network.train_step_bptt(
-                        &train_input,
-                        &train_target,
-                        delta_t,
-                        lr,
-                    ) {
-                        Ok(loss) => {
-                            self.update_loss_stats(loss);
-                            (true, Some(loss))
-                        }
-                        Err(_) => (false, None),
+        let (learning_occurred, training_loss) = if prediction_error > effective_threshold {
+            self.stats.learning_cycles += 1;
+            if let Some(ref prev_state) = self.last_state.clone() {
+                let train_input = Array1::from_vec(prev_state.clone());
+                let train_target = Array1::from_vec(compressed_state.clone());
+                let lr = self.config.cfc_config.learning_rate;
+                match self.temporal_network.train_step_bptt(
+                    &train_input,
+                    &train_target,
+                    delta_t,
+                    lr,
+                ) {
+                    Ok(loss) => {
+                        self.update_loss_stats(loss);
+                        (true, Some(loss))
                     }
-                } else {
-                    (false, None)
+                    Err(_) => (false, None),
                 }
             } else {
                 (false, None)
-            };
+            }
+        } else {
+            (false, None)
+        };
 
         // 10. Update statistics
         self.update_stats(prediction_error, cycle_start.elapsed());
@@ -639,7 +638,9 @@ impl CognitiveLoopService {
             *nd = crate::consciousness::negation_detector::NegationDetector::new();
         }
         if let Some(ref mut pp) = self.primitive_processor {
-            *pp = crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor::new();
+            *pp =
+                crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor::new(
+                );
         }
         // Note: predictive_phi_modulation and cross_modal_psi already reset
         // via self.carryover = CycleCarryover::default() above.

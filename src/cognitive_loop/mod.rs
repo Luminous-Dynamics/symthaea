@@ -149,8 +149,6 @@ use crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynam
 use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
 use crate::consciousness::cross_modal_binding::CrossModalBinder;
 use crate::consciousness::dream::DreamEngine;
-#[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
-use crate::consciousness::recursive_improvement::DreamFeedbackBridge;
 use crate::consciousness::embodied_cognition::EmbodiedConsciousnessAnalyzer;
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::enactive_cognition::EnactiveCognition;
@@ -167,6 +165,8 @@ use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
 use crate::consciousness::primitive_consciousness::PrimitiveConsciousnessState;
 use crate::consciousness::primitive_discovery::PrimitiveDiscoveryService;
 use crate::consciousness::quantum_coherence::QuantumCoherenceAnalyzer;
+#[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
+use crate::consciousness::recursive_improvement::DreamFeedbackBridge;
 use crate::consciousness::stability_regime::StabilityRegimeProcessor;
 use crate::consciousness::temporal_consciousness::TemporalConsciousnessAnalyzer;
 #[cfg(feature = "full_consciousness")]
@@ -401,7 +401,8 @@ pub struct CognitiveLoopService {
     /// Metacognitive monitor for Phi trajectory anomaly detection.
     /// When enabled, observes Phi after each reasoning step and detects
     /// drops, plateaus, and oscillations that indicate reasoning degradation.
-    metacognitive_monitor: Option<crate::consciousness::metacognitive_monitoring::MetacognitiveMonitor>,
+    metacognitive_monitor:
+        Option<crate::consciousness::metacognitive_monitoring::MetacognitiveMonitor>,
 
     /// Safety gateway for pre-cognitive safety veto.
     /// When enabled, scans input before expensive HDC encoding and short-circuits
@@ -534,12 +535,14 @@ pub struct CognitiveLoopService {
     negation_detector: Option<crate::consciousness::negation_detector::NegationDetector>,
 
     /// Primitive consciousness decomposition for explainable consciousness.
-    primitive_processor: Option<crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor>,
+    primitive_processor:
+        Option<crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor>,
 
     /// Temporal consciousness analyzer using Allen's Interval Algebra.
     /// Records conscious intervals each cycle; detects causal chains and continuity gaps.
     /// Co-gated with `enable_primitive_consciousness`.
-    temporal_analyzer: Option<crate::consciousness::temporal_primitives::ConsciousnessTemporalAnalyzer>,
+    temporal_analyzer:
+        Option<crate::consciousness::temporal_primitives::ConsciousnessTemporalAnalyzer>,
 
     /// Lattice structure over the 9-tier primitive system.
     /// Computed once at startup; provides O(1) join/meet and structural metrics.
@@ -595,12 +598,14 @@ pub struct CognitiveLoopService {
     /// Semantic value embedder: value-aligned embeddings grounded in primitive tiers.
     /// Maps input embeddings to harmony-scored value-aware representations.
     /// Co-gated with `enable_primitive_consciousness`.
-    semantic_value_embedder: Option<crate::consciousness::semantic_value_embedder::SemanticValueEmbedder>,
+    semantic_value_embedder:
+        Option<crate::consciousness::semantic_value_embedder::SemanticValueEmbedder>,
 
     /// Dissipative consciousness: Prigogine thermodynamic model for consciousness.
     /// Tracks entropy production, order parameters, and criticality distance.
     /// Co-gated with `enable_primitive_consciousness`.
-    dissipative_consciousness: Option<crate::consciousness::dissipative_consciousness::DissipativeConsciousness>,
+    dissipative_consciousness:
+        Option<crate::consciousness::dissipative_consciousness::DissipativeConsciousness>,
 
     /// Epistemic conflict detector: multi-theory conflict analysis (IIT vs GWT vs AST vs PP vs RPT vs 4E).
     /// Co-gated with `enable_primitive_consciousness`.
@@ -612,7 +617,8 @@ pub struct CognitiveLoopService {
 
     /// Master Consciousness Equation v2: unified 7-theory consciousness formula C(t).
     /// Co-gated with `enable_primitive_consciousness`.
-    consciousness_equation_v2: Option<crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2>,
+    consciousness_equation_v2:
+        Option<crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2>,
 
     /// Hierarchical LTC: local circuits + global integrator for distributed temporal processing.
     /// Co-gated with `enable_primitive_consciousness`.
@@ -620,37 +626,44 @@ pub struct CognitiveLoopService {
 
     /// Holographic consciousness analyzer: interference-based binding and holographic recall.
     /// Co-gated with `enable_primitive_consciousness`.
-    holographic_analyzer: Option<crate::consciousness::consciousness_holography::HolographicConsciousnessAnalyzer>,
+    holographic_analyzer:
+        Option<crate::consciousness::consciousness_holography::HolographicConsciousnessAnalyzer>,
 
     /// Differentiable consciousness: gradient-based optimization of consciousness components.
     /// Provides ∂C/∂component gradients for identifying bottlenecks.
     /// Co-gated with `enable_primitive_consciousness`.
-    differentiable_consciousness: Option<crate::consciousness::differentiable::DifferentiableConsciousness>,
+    differentiable_consciousness:
+        Option<crate::consciousness::differentiable::DifferentiableConsciousness>,
 
     /// Affective consciousness analyzer: valence-arousal-dominance affect tracking.
     /// Processes stimuli into core affect, decays over time, learns affective markers.
     /// Co-gated with `enable_primitive_consciousness`.
-    affective_consciousness: Option<crate::consciousness::affective_consciousness::AffectiveConsciousnessAnalyzer>,
+    affective_consciousness:
+        Option<crate::consciousness::affective_consciousness::AffectiveConsciousnessAnalyzer>,
 
     /// Unified consciousness pipeline: end-to-end sensory→consciousness pipeline.
     /// Combines HDC encoding, hierarchical LTC, binding, and master equation.
     /// Co-gated with `enable_primitive_consciousness`.
-    unified_consciousness_pipeline: Option<crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline>,
+    unified_consciousness_pipeline:
+        Option<crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline>,
 
     /// Multi-modal integration: phi-guided cross-modal binding with convergence zones.
     /// Co-gated with `enable_primitive_consciousness`.
-    multi_modal_integrator: Option<crate::consciousness::multi_modal_integration::MultiModalIntegrator>,
+    multi_modal_integrator:
+        Option<crate::consciousness::multi_modal_integration::MultiModalIntegrator>,
 
     /// Primitive composition rules: domain-specific HDC binding operators.
     /// Selects TemporalPhysical, Mathematical, Consciousness, or CrossTier rule
     /// based on operand tiers, yielding semantically structured bindings.
     /// Co-gated with `enable_primitive_consciousness`.
-    composition_rule_engine: Option<crate::consciousness::primitive_composition_rules::CompositionRuleEngine>,
+    composition_rule_engine:
+        Option<crate::consciousness::primitive_composition_rules::CompositionRuleEngine>,
 
     /// Synthetic states NSM grounding: maps current BinaryHV to consciousness states
     /// (Deep Anesthesia → Alert/Focused) via Natural Semantic Metalanguage primitives.
     /// Co-gated with `enable_primitive_consciousness`.
-    synthetic_grounding: Option<crate::consciousness::synthetic_states::SyntheticStatesNSMGrounding>,
+    synthetic_grounding:
+        Option<crate::consciousness::synthetic_states::SyntheticStatesNSMGrounding>,
 
     /// Epistemic decision gate: evaluates input through Graceful Ignorance System
     /// to determine confidence vs uncertainty before acting.
@@ -677,7 +690,8 @@ pub struct CognitiveLoopService {
     /// Evolves primitives across 5 consciousness dimensions (Φ, ∇Φ, Entropy,
     /// Complexity, Coherence) using NSGA-II-inspired selection.
     /// Co-gated with `enable_primitive_consciousness`. Very expensive — runs rarely.
-    multi_objective_evolution: Option<crate::consciousness::multi_objective_evolution::MultiObjectiveEvolution>,
+    multi_objective_evolution:
+        Option<crate::consciousness::multi_objective_evolution::MultiObjectiveEvolution>,
 
     /// Cached primitive validation results (one-shot at cycle 500).
     /// Validates whether mathematical primitives actually improve Φ.

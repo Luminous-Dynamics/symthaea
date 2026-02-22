@@ -105,14 +105,17 @@ fn test_run_moral_phase_throttling() {
     let evals_before = service.stats.moral_evaluations;
     let _ = service.run_moral_phase("hello", 0.0);
     let evals_after_first = service.stats.moral_evaluations;
-    assert_eq!(evals_after_first, evals_before + 1, "First call should evaluate");
+    assert_eq!(
+        evals_after_first,
+        evals_before + 1,
+        "First call should evaluate"
+    );
 
     // Same input, non-evaluation cycle — should reuse cached judgment
     service.stats.total_cycles = 3; // 3 % 7 != 1
     let _ = service.run_moral_phase("hello", 0.0);
     assert_eq!(
-        service.stats.moral_evaluations,
-        evals_after_first,
+        service.stats.moral_evaluations, evals_after_first,
         "Throttled call should NOT re-evaluate"
     );
 }
@@ -123,10 +126,16 @@ fn test_run_moral_phase_updates_stats() {
     service.stats.total_cycles = 1;
     let _ = service.run_moral_phase("hello", 0.0);
     // Stats should be populated
-    assert!(service.stats.moral_evaluations > 0, "moral_evaluations should increment");
+    assert!(
+        service.stats.moral_evaluations > 0,
+        "moral_evaluations should increment"
+    );
     // moral_score should have been written
     // (we just check it's finite — the actual value depends on the evaluator)
-    assert!(service.stats.moral_score.is_finite(), "moral_score not finite");
+    assert!(
+        service.stats.moral_score.is_finite(),
+        "moral_score not finite"
+    );
 }
 
 #[test]
@@ -212,7 +221,10 @@ fn test_compute_reward_signal_low_error() {
     service.prediction_confidence = 0.8;
     // Low prediction error (below threshold) → positive reward
     let reward = service.compute_reward_signal(0.01, 0.3);
-    assert!(reward > 0.0, "Low-error reward should be positive, got {reward}");
+    assert!(
+        reward > 0.0,
+        "Low-error reward should be positive, got {reward}"
+    );
     assert!(reward <= 1.0, "Reward above 1: {reward}");
 }
 
@@ -221,7 +233,10 @@ fn test_compute_reward_signal_high_error() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // High prediction error (above 0.5) → negative reward
     let reward = service.compute_reward_signal(0.8, 0.3);
-    assert!(reward < 0.0, "High-error reward should be negative, got {reward}");
+    assert!(
+        reward < 0.0,
+        "High-error reward should be negative, got {reward}"
+    );
     assert!(reward >= -1.0, "Reward below -1: {reward}");
 }
 
@@ -230,7 +245,10 @@ fn test_compute_reward_signal_clamped() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Extreme values should still clamp to [-1, 1]
     let reward = service.compute_reward_signal(10.0, 0.3);
-    assert!(reward >= -1.0 && reward <= 1.0, "Reward not clamped: {reward}");
+    assert!(
+        reward >= -1.0 && reward <= 1.0,
+        "Reward not clamped: {reward}"
+    );
 }
 
 #[test]
@@ -302,7 +320,10 @@ fn test_step_fep_active_inference_returns_valid_action() {
         "Action probs don't sum to 1: {prob_sum}"
     );
     // Pragmatic value should be finite
-    assert!(pragmatic.is_finite(), "Pragmatic value not finite: {pragmatic}");
+    assert!(
+        pragmatic.is_finite(),
+        "Pragmatic value not finite: {pragmatic}"
+    );
 }
 
 #[test]
@@ -327,8 +348,14 @@ fn test_update_cross_modal_binding_without_binder() {
     // Default config has no cross-modal binder
     let hv = symthaea_core::hdc::binary_hv::BinaryHV::random(42);
     let (strength, psi) = service.update_cross_modal_binding(&hv, 0.5, 0.3);
-    assert!((strength - 0.0).abs() < f32::EPSILON, "Expected 0 strength without binder");
-    assert!((psi - 0.0).abs() < f64::EPSILON, "Expected 0 psi without binder");
+    assert!(
+        (strength - 0.0).abs() < f32::EPSILON,
+        "Expected 0 strength without binder"
+    );
+    assert!(
+        (psi - 0.0).abs() < f64::EPSILON,
+        "Expected 0 psi without binder"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -337,10 +364,10 @@ fn test_update_cross_modal_binding_without_binder() {
 
 #[test]
 fn test_run_stability_regime_returns_timing() {
-    let mut regime =
-        crate::consciousness::stability_regime::StabilityRegimeProcessor::new();
-    let mut discovery =
-        crate::consciousness::primitive_discovery::PrimitiveDiscoveryService::new(Default::default());
+    let mut regime = crate::consciousness::stability_regime::StabilityRegimeProcessor::new();
+    let mut discovery = crate::consciousness::primitive_discovery::PrimitiveDiscoveryService::new(
+        Default::default(),
+    );
     let hv = symthaea_core::hdc::binary_hv::BinaryHV::random(99);
     let timing = super::super::helpers::run_stability_regime(
         &mut regime,
@@ -356,10 +383,10 @@ fn test_run_stability_regime_returns_timing() {
 
 #[test]
 fn test_run_stability_regime_skips_in_cruise() {
-    let mut regime =
-        crate::consciousness::stability_regime::StabilityRegimeProcessor::new();
-    let mut discovery =
-        crate::consciousness::primitive_discovery::PrimitiveDiscoveryService::new(Default::default());
+    let mut regime = crate::consciousness::stability_regime::StabilityRegimeProcessor::new();
+    let mut discovery = crate::consciousness::primitive_discovery::PrimitiveDiscoveryService::new(
+        Default::default(),
+    );
     let hv = symthaea_core::hdc::binary_hv::BinaryHV::random(99);
     // Cruise urgency with should_run(cycle=1, ..., cruise_every=20) should skip
     let timing = super::super::helpers::run_stability_regime(
