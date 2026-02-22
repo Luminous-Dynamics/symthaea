@@ -63,8 +63,8 @@ impl IowaGamblingBenchmark {
         // Somatic markers: scalar EMA of net value per deck (gradual learning)
         // Calibrated to match human learning curves (slow early, convergent late)
         let mut deck_somatic: [f64; 4] = [0.0; 4];
-        let somatic_alpha = 0.15; // Faster convergence to true deck values
-        let loss_aversion = 2.8f32; // Stronger loss sensitivity (K&T range)
+        let somatic_alpha = 0.12; // Slightly faster than default (0.10)
+        let loss_aversion = 2.6f32; // Slightly above K&T's 2.25
 
         let mut deck_draw_count = [0u32; 4];
         let mut block_net_scores = [0i32; 5]; // (C+D) - (A+B) per block
@@ -85,15 +85,15 @@ impl IowaGamblingBenchmark {
                         let combined = ContinuousHV::bundle(&[dhv, &deck_memory[i]]);
                         combined.similarity(&desirable) as f64
                     };
-                    // Somatic marker: S-curve saturation to 50% (faster rise, higher cap)
-                    let somatic_weight = (deck_draw_count[i] as f64 / (deck_draw_count[i] as f64 + 6.0)).min(0.50);
+                    // Somatic marker: S-curve saturation to 40%
+                    let somatic_weight = (deck_draw_count[i] as f64 / (deck_draw_count[i] as f64 + 8.0)).min(0.40);
                     let blended = (1.0 - somatic_weight) * hdc_score + somatic_weight * deck_somatic[i];
                     blended as f32
                 })
                 .collect();
 
-            // Adaptive temperature: explore early (warm), exploit late (cool)
-            let temp = 0.6f32 * (-(block as f32) / 2.5).exp();
+            // Softmax selection — warm enough for human-like exploration noise
+            let temp = 0.55f32;
             let max_score = deck_scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
             let exp_scores: Vec<f32> = deck_scores.iter().map(|s| ((s - max_score) / temp).exp()).collect();
             let exp_sum: f32 = exp_scores.iter().sum();

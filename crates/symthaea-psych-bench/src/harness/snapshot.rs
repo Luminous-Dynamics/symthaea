@@ -123,6 +123,30 @@ impl RegressionSnapshot {
         let json = std::fs::read_to_string(path)?;
         Self::from_json(&json).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
+
+    /// Age of this snapshot in days (from timestamp to now).
+    ///
+    /// Returns `None` if the timestamp cannot be parsed.
+    pub fn age_days(&self) -> Option<i64> {
+        let ts = chrono::DateTime::parse_from_rfc3339(&self.timestamp).ok()?;
+        let now = chrono::Utc::now();
+        Some((now - ts.with_timezone(&chrono::Utc)).num_days())
+    }
+
+    /// Returns a staleness warning if the snapshot is older than `max_days`.
+    ///
+    /// Returns `None` if fresh or if the timestamp can't be parsed.
+    pub fn staleness_warning(&self, max_days: i64) -> Option<String> {
+        let age = self.age_days()?;
+        if age > max_days {
+            Some(format!(
+                "Baseline \"{}\" is {} days old (generated {}). Consider regenerating.",
+                self.name, age, self.timestamp
+            ))
+        } else {
+            None
+        }
+    }
 }
 
 impl RegressionReport {
@@ -423,5 +447,43 @@ mod tests {
         assert_eq!(snapshot.name, "from-report");
         assert!(snapshot.metrics.contains_key("MyBench"));
         assert!(snapshot.metrics["MyBench"].contains_key("score"));
+    }
+
+    #[test]
+    fn test_age_days_fresh() {
+        let snapshot = make_test_snapshot("fresh", 0.90);
+        // Snapshot was just created with chrono::Utc::now() in from_report path,
+        // but our test helper uses a hardcoded timestamp. Override it.
+        let mut s = snapshot;
+        s.timestamp = chrono::Utc::now().to_rfc3339();
+        let age = s.age_days().unwrap();
+        assert!(age <= 1, "Fresh snapshot should be ~0 days old, got {}", age);
+    }
+
+    #[test]
+    fn test_age_days_old() {
+        let mut s = make_test_snapshot("old", 0.85);
+        // Set timestamp to 60 days ago
+        let old = chrono::Utc::now() - chrono::Duration::days(60);
+        s.timestamp = old.to_rfc3339();
+        let age = s.age_days().unwrap();
+        assert!((age - 60).abs() <= 1, "Should be ~60 days old, got {}", age);
+    }
+
+    #[test]
+    fn test_staleness_warning_fresh() {
+        let mut s = make_test_snapshot("fresh", 0.90);
+        s.timestamp = chrono::Utc::now().to_rfc3339();
+        assert!(s.staleness_warning(30).is_none(), "Fresh snapshot shouldn't warn");
+    }
+
+    #[test]
+    fn test_staleness_warning_stale() {
+        let mut s = make_test_snapshot("stale", 0.85);
+        let old = chrono::Utc::now() - chrono::Duration::days(45);
+        s.timestamp = old.to_rfc3339();
+        let warning = s.staleness_warning(30);
+        assert!(warning.is_some(), "Stale snapshot should warn");
+        assert!(warning.unwrap().contains("45 days old"));
     }
 }
