@@ -151,6 +151,19 @@ impl PsychBenchmark for BindingBenchmark {
             );
         }
 
+        // Aggregate: mean binding accuracy across all set sizes
+        let all_binding: Vec<f64> = [2, 4, 6]
+            .iter()
+            .filter_map(|k| result.metrics.get(&format!("set_{}::binding_accuracy", k)))
+            .map(|m| m.mean)
+            .collect();
+        if !all_binding.is_empty() {
+            result.insert(
+                "overall_binding_accuracy",
+                MetricValue::from_samples(&all_binding),
+            );
+        }
+
         result.conditions = 3;
         result.trials_per_condition = config.trials_per_condition;
         result.elapsed_ms = start.elapsed().as_millis() as u64;

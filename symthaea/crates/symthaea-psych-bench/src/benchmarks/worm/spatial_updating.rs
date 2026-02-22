@@ -101,6 +101,19 @@ impl PsychBenchmark for SpatialUpdatingBenchmark {
             );
         }
 
+        // Aggregate: mean accuracy across all update conditions
+        let all_means: Vec<f64> = [3, 5, 7, 10]
+            .iter()
+            .filter_map(|n| result.metrics.get(&format!("updates_{}::accuracy", n)))
+            .map(|m| m.mean)
+            .collect();
+        if !all_means.is_empty() {
+            result.insert(
+                "overall_accuracy",
+                MetricValue::from_samples(&all_means),
+            );
+        }
+
         result.conditions = 4;
         result.trials_per_condition = config.trials_per_condition;
         result.elapsed_ms = start.elapsed().as_millis() as u64;

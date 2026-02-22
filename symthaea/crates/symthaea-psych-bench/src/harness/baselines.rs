@@ -60,6 +60,26 @@ pub fn worm_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    // Spatial updating accuracy (mean across 3-10 updates)
+    m.insert(
+        "spatial_updating_accuracy",
+        Baseline {
+            value: 0.85,
+            source: "Oberauer et al. (2003); Ecker et al. (2010), spatial updating paradigm",
+            population: "human adults",
+        },
+    );
+
+    // Binding accuracy (mean across set sizes 2-6)
+    m.insert(
+        "binding_accuracy",
+        Baseline {
+            value: 0.75,
+            source: "Luck & Vogel (1997); Wheeler & Treisman (2002), feature binding in VWM",
+            population: "human adults",
+        },
+    );
+
     // Serial recall primacy advantage
     m.insert(
         "serial_primacy_advantage",
@@ -163,6 +183,16 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
             value: 0.70,
             source: "Dickinson (1985), Actions and habits",
             population: "human adults (estimated from instrumental learning literature)",
+        },
+    );
+
+    // Probabilistic reasoning: likelihood weight (Bayesian updating)
+    m.insert(
+        "probabilistic_likelihood_weight",
+        Baseline {
+            value: 0.50,
+            source: "Phillips & Edwards (1966); Grether (1980), conservatism in probability updating",
+            population: "human adults (Bayesian normative = 0.50 for symmetric evidence)",
         },
     );
 
