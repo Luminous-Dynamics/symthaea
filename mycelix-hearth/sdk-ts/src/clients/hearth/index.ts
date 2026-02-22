@@ -22,4 +22,6 @@ export { RhythmsClient } from './rhythms';
 export type { RhythmsSignalHandler } from './rhythms';
 export { BridgeClient } from './bridge';
 export type { BridgeSignalHandler } from './bridge';
+export { ConsciousnessGateError, withGateRetry } from './consciousness-gate';
+export type { ConsciousnessGateRejection } from './consciousness-gate';
 export { HearthClient } from './hearth-client';

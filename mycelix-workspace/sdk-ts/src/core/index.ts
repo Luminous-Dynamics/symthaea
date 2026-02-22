@@ -103,6 +103,37 @@ export {
 } from './retry.js';
 
 // =============================================================================
+// Consciousness Gate Middleware
+// =============================================================================
+
+export {
+  // Error types
+  ConsciousnessGateError,
+
+  // Pre-flight check
+  canPerform,
+  combinedScore,
+  tierFromScore,
+
+  // Retry middleware
+  withGateRetry,
+
+  // Governance audit query
+  queryGovernanceAudit,
+
+  // Types
+  type ConsciousnessTier,
+  type ConsciousnessProfile,
+  type ConsciousnessCredential,
+  type ConsciousnessGateRejection,
+  type GateEligibility,
+  type GateAuditEntry,
+  type GovernanceAuditFilter,
+  type GovernanceAuditResult,
+  type ZomeCallable,
+} from './consciousness-gate.js';
+
+// =============================================================================
 // Zome Client Base
 // =============================================================================
 

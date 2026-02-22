@@ -111,6 +111,49 @@ export type {
 } from './civic/index.js';
 
 // ============================================================================
+// Community Support Integration
+// ============================================================================
+
+export { SupportClient, createSupportClient, SUPPORT_ZOMES } from './support/index.js';
+
+export type {
+  SupportCategory,
+  TicketPriority,
+  TicketStatus,
+  AutonomyLevel,
+  ActionType,
+  SharingTier,
+  DiagnosticType,
+  DiagnosticSeverity,
+  DifficultyLevel,
+  ArticleSource,
+  FlagReason,
+  EscalationLevel,
+  EpistemicStatus,
+  LinkReason,
+  KnowledgeArticle,
+  UpdateArticleInput,
+  DeprecateInput,
+  ArticleFlag,
+  Resolution as SupportResolution,
+  LinkArticleInput,
+  SupportTicket,
+  UpdateTicketInput,
+  TicketComment,
+  AutonomousAction,
+  UndoAction,
+  PreemptiveAlert,
+  PromoteAlertInput,
+  EscalateInput,
+  SatisfactionSurvey,
+  DiagnosticResult,
+  PrivacyPreference,
+  HelperProfile,
+  UpdateAvailInput,
+  CognitiveUpdate,
+} from './support/index.js';
+
+// ============================================================================
 // Food Sovereignty Integration
 // ============================================================================
 
@@ -143,6 +186,26 @@ export type {
   SeedVariety,
   TraditionalPractice,
   Recipe,
+  // Seed exchange (Phase 2)
+  SeedStock,
+  SeedRequestStatus,
+  FoodSeedRequest,
+  MatchSeedInput,
+  // Nutrient tracking (Phase 2)
+  NutrientProfile,
+  // Allergen search (Phase 2)
+  AllergenSearchInput,
+  // Garden membership (Phase 2)
+  GardenRole,
+  GardenMembership,
+  AddMemberInput,
+  RemoveMemberInput,
+  // Listing status (Phase 2)
+  ListingStatus,
+  // Update inputs (Phase 2)
+  UpdateSeedVarietyInput,
+  UpdateTraditionalPracticeInput,
+  UpdateRecipeInput,
 } from './food/index.js';
 
 // ============================================================================
@@ -156,7 +219,7 @@ export type {
   VehicleType,
   VehicleStatus,
   Vehicle,
-  RouteMode,
+  TransportMode,
   Waypoint,
   Route,
   StopType,
@@ -165,6 +228,8 @@ export type {
   RideOfferStatus,
   RideRequestStatus,
   RideMatchStatus,
+  MatchStatus,
+  UpdateMatchStatusInput,
   RideOffer,
   RideRequest,
   RideMatch,
@@ -177,6 +242,18 @@ export type {
   EmissionsCalcInput,
   EmissionsCalcResult,
   CommunityImpactSummary,
+  // Maintenance (Phase 3)
+  MaintenanceType,
+  MaintenanceRecord,
+  VehicleFeatures,
+  // Reviews (Phase 2)
+  ReviewerRole,
+  RideReview,
+  FindNearbyInput,
+  // Carbon redemption (Phase 2)
+  RedeemInput,
+  CreditRedemption,
+  CarbonBalance,
 } from './transport/index.js';
 
 // ============================================================================

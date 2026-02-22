@@ -3,6 +3,18 @@
 
 use hdk::prelude::*;
 use emergency_resources_integrity::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal,
+    requirement_for_voting,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("civic_bridge", requirement, action_name)
+}
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -13,6 +25,7 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Register a new emergency resource
 #[hdk_extern]
 pub fn register_resource(input: RegisterResourceInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "register_resource")?;
     if input.name.is_empty() || input.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Name must be 1-256 characters".into()
@@ -102,6 +115,7 @@ pub struct RegisterResourceInput {
 /// Deploy a resource to a disaster
 #[hdk_extern]
 pub fn deploy_resource(input: DeployResourceInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_voting(), "deploy_resource")?;
     let current_record = get(input.resource_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Resource not found".into())),
     )?;
@@ -165,6 +179,7 @@ pub struct DeployResourceInput {
 /// Request resources for a disaster
 #[hdk_extern]
 pub fn request_resource(input: RequestResourceInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "request_resource")?;
     if input.quantity_needed == 0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Quantity needed must be greater than 0".into()
@@ -219,6 +234,7 @@ pub struct RequestResourceInput {
 /// Fulfill a resource request
 #[hdk_extern]
 pub fn fulfill_request(input: FulfillRequestInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "fulfill_request")?;
     let current_record = get(input.request_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Request not found".into())),
     )?;

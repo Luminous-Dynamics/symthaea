@@ -6,6 +6,10 @@
 use hdk::prelude::*;
 use mutualaid_common::*;
 use mutualaid_resources_integrity::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
 
 /// Result of crediting timebank hours after resource usage
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -76,6 +80,13 @@ pub struct SearchResourcesInput {
     pub limit: Option<u32>,
 }
 
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
+
 // =============================================================================
 // RESOURCE MANAGEMENT
 // =============================================================================
@@ -83,6 +94,7 @@ pub struct SearchResourcesInput {
 /// Create a new shared resource
 #[hdk_extern]
 pub fn create_resource(input: CreateResourceInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "create_resource")?;
     let owner = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -229,6 +241,7 @@ pub struct SetResourceAvailabilityInput {
 
 #[hdk_extern]
 pub fn set_resource_availability(input: SetResourceAvailabilityInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "set_resource_availability")?;
     let hash = input.hash;
     let available = input.available;
     let record = get(hash.clone(), GetOptions::default())?
@@ -265,6 +278,7 @@ pub fn set_resource_availability(input: SetResourceAvailabilityInput) -> ExternR
 /// Create a new booking
 #[hdk_extern]
 pub fn create_booking(input: CreateBookingInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "create_booking")?;
     let booker = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -400,6 +414,7 @@ pub fn get_my_bookings(_: ()) -> ExternResult<Vec<Record>> {
 /// Confirm a booking (owner only)
 #[hdk_extern]
 pub fn confirm_booking(booking_hash: ActionHash) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "confirm_booking")?;
     let record = get(booking_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())))?;
 
@@ -438,6 +453,7 @@ pub fn confirm_booking(booking_hash: ActionHash) -> ExternResult<Record> {
 /// Cancel a booking
 #[hdk_extern]
 pub fn cancel_booking(booking_hash: ActionHash) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "cancel_booking")?;
     let record = get(booking_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())))?;
 
@@ -482,6 +498,7 @@ pub fn cancel_booking(booking_hash: ActionHash) -> ExternResult<Record> {
 /// Record start of resource usage
 #[hdk_extern]
 pub fn start_usage(input: RecordUsageInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "start_usage")?;
     let now = sys_time()?;
 
     let usage = Usage {
@@ -529,6 +546,7 @@ pub fn start_usage(input: RecordUsageInput) -> ExternResult<Record> {
 /// Complete resource usage
 #[hdk_extern]
 pub fn complete_usage(input: CompleteUsageInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "complete_usage")?;
     let now = sys_time()?;
 
     // Find the usage record for this booking
@@ -627,6 +645,7 @@ pub struct CompleteUsageWithTimebankInput {
 /// entry so the resource owner earns time credits for sharing.
 #[hdk_extern]
 pub fn complete_usage_with_timebank(input: CompleteUsageWithTimebankInput) -> ExternResult<TimebankCreditResult> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "complete_usage_with_timebank")?;
     // First, get the booking to find resource owner and booker
     let booking_record = get(input.booking_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())))?;
@@ -709,6 +728,7 @@ pub fn complete_usage_with_timebank(input: CompleteUsageWithTimebankInput) -> Ex
 /// Record maintenance on a resource
 #[hdk_extern]
 pub fn record_maintenance(input: RecordMaintenanceInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "record_maintenance")?;
     let maintainer = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 

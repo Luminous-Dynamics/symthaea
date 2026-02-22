@@ -3,6 +3,10 @@
 
 use emergency_coordination_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
 
 /// Summary of a single active disaster
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -28,9 +32,17 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("civic_bridge", requirement, action_name)
+}
+
 /// Form a new response team
 #[hdk_extern]
 pub fn form_team(input: FormTeamInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "form_team")?;
     if input.name.is_empty() || input.name.len() > 128 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Team name must be 1-128 characters".into()
@@ -105,6 +117,7 @@ pub struct FormTeamInput {
 /// Assign a team to an operational zone
 #[hdk_extern]
 pub fn assign_to_zone(input: AssignToZoneInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "assign_to_zone")?;
     if input.objective.is_empty() || input.objective.len() > 1024 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Objective must be 1-1024 characters".into()
@@ -181,6 +194,7 @@ pub struct AssignToZoneInput {
 /// Submit a situation report from the field
 #[hdk_extern]
 pub fn submit_sitrep(input: SubmitSitrepInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "submit_sitrep")?;
     if input.conditions.is_empty() || input.conditions.len() > 4096 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Conditions must be 1-4096 characters".into()
@@ -232,6 +246,7 @@ pub struct SubmitSitrepInput {
 /// Agent location check-in
 #[hdk_extern]
 pub fn checkin(input: CheckinInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "checkin")?;
     if input.lat < -90.0 || input.lat > 90.0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Latitude must be between -90 and 90".into()

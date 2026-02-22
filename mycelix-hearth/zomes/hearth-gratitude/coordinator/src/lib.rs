@@ -6,6 +6,21 @@ use hdk::prelude::*;
 use hearth_coordinator_common::{records_from_links, require_membership};
 use hearth_gratitude_integrity::*;
 use hearth_types::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+// ============================================================================
+// Consciousness Gating
+// ============================================================================
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("hearth_bridge", requirement, action_name)
+}
 
 // ============================================================================
 // Input Types
@@ -38,6 +53,7 @@ pub struct StartCircleInput {
 /// and emits a HearthSignal::GratitudeExpressed signal.
 #[hdk_extern]
 pub fn express_gratitude(input: ExpressGratitudeInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "express_gratitude")?;
     require_membership(&input.hearth_hash)?;
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
@@ -95,6 +111,7 @@ pub fn express_gratitude(input: ExpressGratitudeInput) -> ExternResult<Record> {
 /// Start a new appreciation circle with a theme and initial participants.
 #[hdk_extern]
 pub fn start_appreciation_circle(input: StartCircleInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "start_appreciation_circle")?;
     require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
 
@@ -135,6 +152,7 @@ pub fn start_appreciation_circle(input: StartCircleInput) -> ExternResult<Record
 /// Join an existing appreciation circle by adding the calling agent to participants.
 #[hdk_extern]
 pub fn join_circle(circle_hash: ActionHash) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "join_circle")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     let record = get(circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
@@ -181,6 +199,7 @@ pub fn join_circle(circle_hash: ActionHash) -> ExternResult<Record> {
 /// Only the circle creator (action author) can complete it.
 #[hdk_extern]
 pub fn complete_circle(circle_hash: ActionHash) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "complete_circle")?;
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 

@@ -3,6 +3,17 @@
 
 use care_plans_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -30,6 +41,7 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 /// Create a new care plan
 #[hdk_extern]
 pub fn create_care_plan(plan: CarePlan) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "create_care_plan")?;
     let action_hash = create_entry(&EntryTypes::CarePlan(plan.clone()))?;
 
     // Link to all plans
@@ -68,6 +80,7 @@ pub fn create_care_plan(plan: CarePlan) -> ExternResult<Record> {
 /// Log a care session against a plan
 #[hdk_extern]
 pub fn log_session(session: CareSession) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "log_session")?;
     // Verify the plan exists
     let _plan_record = get(session.plan_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Care plan not found".into())),
@@ -141,6 +154,7 @@ pub struct UpdatePlanStatusInput {
 /// Update the status of a care plan
 #[hdk_extern]
 pub fn update_plan_status(input: UpdatePlanStatusInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_plan_status")?;
     let record = get(input.plan_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Care plan not found".into())
     ))?;

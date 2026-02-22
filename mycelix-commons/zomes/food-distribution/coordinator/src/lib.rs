@@ -3,6 +3,10 @@
 
 use food_distribution_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
 
 // ============================================================================
 // BRIDGE SIGNAL (for cross-domain UI notification)
@@ -13,6 +17,13 @@ pub struct BridgeEventSignal {
     pub event_type: String,
     pub source_zome: String,
     pub payload: String,
+}
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
 }
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -38,6 +49,7 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn create_market(market: Market) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "create_market")?;
     let action_hash = create_entry(&EntryTypes::Market(market.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_markets".to_string())))?;
@@ -62,6 +74,7 @@ pub fn get_all_markets(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn list_product(listing: Listing) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "list_product")?;
     let _market = get(listing.market_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Market not found".into())))?;
 
@@ -98,6 +111,7 @@ pub fn get_producer_listings(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn place_order(order: Order) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "place_order")?;
     let listing_record = get(order.listing_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Listing not found".into())))?;
 
@@ -172,6 +186,7 @@ pub struct UpdateOrderStatusInput {
 
 #[hdk_extern]
 pub fn fulfill_order(input: UpdateOrderStatusInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "fulfill_order")?;
     let record = get(input.order_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Order not found".into())))?;
     let mut order: Order = record.entry()
@@ -187,6 +202,7 @@ pub fn fulfill_order(input: UpdateOrderStatusInput) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn cancel_order(order_hash: ActionHash) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "cancel_order")?;
     let record = get(order_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Order not found".into())))?;
     let mut order: Order = record.entry()

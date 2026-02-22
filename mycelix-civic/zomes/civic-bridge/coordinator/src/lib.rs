@@ -24,6 +24,8 @@ use mycelix_bridge_common::{
     RATE_LIMIT_WINDOW_SECS, check_rate_limit_count,
     BridgeDomain, resolve_civic_zome,
     ConsciousnessCredential, ConsciousnessTier,
+    needs_refresh,
+    GateAuditInput, GovernanceAuditFilter, GovernanceAuditResult,
 };
 
 // ============================================================================
@@ -254,6 +256,73 @@ pub fn broadcast_event(event: CivicEventEntry) -> ExternResult<Record> {
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created event".into()
     )))
+}
+
+// ============================================================================
+// Governance Gate Audit
+// ============================================================================
+
+/// Log a governance gate decision as an auditable event.
+///
+/// Called fire-and-forget by each coordinator's `require_consciousness()`.
+/// Stores the decision as a `CivicEventEntry` with `domain: "governance_gate"`.
+#[hdk_extern]
+pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let event = CivicEventEntry {
+        domain: "governance_gate".to_string(),
+        event_type: input.action_name.clone(),
+        source_agent: agent,
+        payload: serde_json::to_string(&input).unwrap_or_default(),
+        created_at: sys_time()?,
+        related_hashes: vec![],
+    };
+    let action_hash = create_entry(&EntryTypes::Event(event))?;
+    let domain_anchor = ensure_anchor("domain_events:governance_gate")?;
+    create_link(domain_anchor, action_hash, LinkTypes::DomainToEvent, ())?;
+    Ok(())
+}
+
+/// Query governance gate audit events with filtering.
+#[hdk_extern]
+pub fn get_governance_audit_trail(filter: GovernanceAuditFilter) -> ExternResult<GovernanceAuditResult> {
+    let domain_anchor = anchor_hash("domain_events:governance_gate")?;
+    let links = get_links(
+        LinkQuery::try_new(domain_anchor, LinkTypes::DomainToEvent)?,
+        GetStrategy::default(),
+    )?;
+    let records = bridge::records_from_links(links)?;
+    let mut entries = Vec::new();
+    for record in &records {
+        if let Some(_entry) = record.entry().as_option() {
+            if let Ok(event) = record.entry().to_app_option::<CivicEventEntry>() {
+                if let Some(event) = event {
+                    if let Ok(audit) = serde_json::from_str::<GateAuditInput>(&event.payload) {
+                        if let Some(ref action) = filter.action_name {
+                            if &audit.action_name != action { continue; }
+                        }
+                        if let Some(ref zome) = filter.zome_name {
+                            if &audit.zome_name != zome { continue; }
+                        }
+                        if let Some(eligible) = filter.eligible {
+                            if audit.eligible != eligible { continue; }
+                        }
+                        if let Some(from_us) = filter.from_us {
+                            let event_us = event.created_at.as_micros();
+                            if event_us < from_us { continue; }
+                        }
+                        if let Some(to_us) = filter.to_us {
+                            let event_us = event.created_at.as_micros();
+                            if event_us > to_us { continue; }
+                        }
+                        entries.push(audit);
+                    }
+                }
+            }
+        }
+    }
+    let total = entries.len() as u32;
+    Ok(GovernanceAuditResult { entries, total_matched: total })
 }
 
 // ============================================================================
@@ -1074,6 +1143,19 @@ fn cache_credential(credential: &ConsciousnessCredential) -> ExternResult<()> {
 pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCredential> {
     // 1. Check cache first (avoids cross-cluster call if recent)
     if let Some(cached) = get_cached_credential(&did)? {
+        // Proactive refresh — serve cached credential but queue re-issue for next call
+        let now_us = sys_time()?.as_micros() as u64;
+        if needs_refresh(&cached, now_us) {
+            // Best-effort background refresh — don't block the current call
+            debug!("Credential nearing expiry, queuing proactive refresh for {}", cached.did);
+            let _ = call(
+                CallTargetCell::OtherRole(IDENTITY_ROLE.into()),
+                ZomeName::new("identity_bridge"),
+                FunctionName::new("refresh_consciousness_credential"),
+                None,
+                cached.did.clone(),
+            );
+        }
         return Ok(cached);
     }
 
@@ -1119,6 +1201,19 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
 
     // 5. Cache the result for subsequent calls
     let _ = cache_credential(&credential);
+
+    // Proactive refresh check (covers edge case: identity issued a short-lived credential)
+    let now_us = sys_time()?.as_micros() as u64;
+    if needs_refresh(&credential, now_us) {
+        debug!("Freshly-issued credential nearing expiry, queuing proactive refresh for {}", credential.did);
+        let _ = call(
+            CallTargetCell::OtherRole(IDENTITY_ROLE.into()),
+            ZomeName::new("identity_bridge"),
+            FunctionName::new("refresh_consciousness_credential"),
+            None,
+            credential.did.clone(),
+        );
+    }
 
     Ok(credential)
 }

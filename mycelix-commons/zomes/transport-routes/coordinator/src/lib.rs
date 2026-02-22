@@ -3,6 +3,17 @@
 
 use transport_routes_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -27,6 +38,7 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn register_vehicle(vehicle: Vehicle) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "register_vehicle")?;
     let action_hash = create_entry(&EntryTypes::Vehicle(vehicle.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_vehicles".to_string())))?;
@@ -60,6 +72,7 @@ pub struct UpdateVehicleStatusInput {
 
 #[hdk_extern]
 pub fn update_vehicle_status(input: UpdateVehicleStatusInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "update_vehicle_status")?;
     let record = get(input.vehicle_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Vehicle not found".into())))?;
     let mut vehicle: Vehicle = record.entry()
@@ -84,6 +97,7 @@ pub fn update_vehicle_status(input: UpdateVehicleStatusInput) -> ExternResult<Re
 
 #[hdk_extern]
 pub fn create_route(route: Route) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "create_route")?;
     let action_hash = create_entry(&EntryTypes::Route(route.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_routes".to_string())))?;
@@ -108,6 +122,7 @@ pub fn get_all_routes(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn add_stop(stop: Stop) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "add_stop")?;
     let _route = get(stop.route_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Route not found".into())))?;
 
@@ -133,6 +148,7 @@ pub fn get_route_stops(route_hash: ActionHash) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn log_maintenance(record_entry: MaintenanceRecord) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "log_maintenance")?;
     let action_hash = create_entry(&EntryTypes::MaintenanceRecord(record_entry.clone()))?;
 
     create_link(
@@ -157,6 +173,7 @@ pub fn get_vehicle_maintenance(vehicle_hash: ActionHash) -> ExternResult<Vec<Rec
 
 #[hdk_extern]
 pub fn set_vehicle_features(features: VehicleFeatures) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "set_vehicle_features")?;
     let action_hash = create_entry(&EntryTypes::VehicleFeatures(features.clone()))?;
 
     create_link(

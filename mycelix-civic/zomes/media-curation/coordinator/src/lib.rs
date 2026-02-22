@@ -1,6 +1,18 @@
 //! Curation Coordinator Zome
 use hdk::prelude::*;
 use media_curation_integrity::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal,
+    requirement_for_voting,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("civic_bridge", requirement, action_name)
+}
 
 /// Helper function to create an anchor entry and return its hash
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
@@ -11,6 +23,7 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn endorse(input: EndorseInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "endorse")?;
     let now = sys_time()?;
     let endorsement = Endorsement {
         id: format!("endorse:{}:{}:{}", input.publication_id, input.endorser_did, now.as_micros()),
@@ -37,6 +50,7 @@ pub struct EndorseInput {
 
 #[hdk_extern]
 pub fn create_collection(input: CreateCollectionInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "create_collection")?;
     let now = sys_time()?;
     let collection = Collection {
         id: format!("collection:{}:{}", input.curator_did, now.as_micros()),
@@ -96,6 +110,7 @@ pub fn calculate_quality_score(publication_id: String) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn feature_content(input: FeatureInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_voting(), "feature_content")?;
     let now = sys_time()?;
     let featured = FeaturedContent {
         id: format!("featured:{}:{}", input.publication_id, now.as_micros()),
@@ -189,6 +204,7 @@ pub fn get_collection(collection_id: String) -> ExternResult<Option<Record>> {
 /// Add publication to collection
 #[hdk_extern]
 pub fn add_to_collection(input: AddToCollectionInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "add_to_collection")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Collection)?))
         .include_entries(true);
@@ -233,6 +249,7 @@ pub struct AddToCollectionInput {
 /// Remove publication from collection
 #[hdk_extern]
 pub fn remove_from_collection(input: RemoveFromCollectionInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "remove_from_collection")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Collection)?))
         .include_entries(true);
@@ -273,6 +290,7 @@ pub struct RemoveFromCollectionInput {
 /// Update collection metadata
 #[hdk_extern]
 pub fn update_collection(input: UpdateCollectionInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "update_collection")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Collection)?))
         .include_entries(true);
@@ -344,6 +362,7 @@ pub struct UpdateQualityScoreInput {
 /// Remove endorsement
 #[hdk_extern]
 pub fn remove_endorsement(input: RemoveEndorsementInput) -> ExternResult<()> {
+    require_consciousness(&requirement_for_basic(), "remove_endorsement")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Endorsement)?))
         .include_entries(true);
@@ -372,6 +391,7 @@ pub struct RemoveEndorsementInput {
 /// Unfeature content
 #[hdk_extern]
 pub fn unfeature_content(input: UnfeatureInput) -> ExternResult<()> {
+    require_consciousness(&requirement_for_voting(), "unfeature_content")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::FeaturedContent)?))
         .include_entries(true);

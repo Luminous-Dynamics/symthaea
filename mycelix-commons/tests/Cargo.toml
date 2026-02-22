@@ -38,3 +38,7 @@ path = "sweettest_dispatch_support.rs"
 [[test]]
 name = "cross_domain_sweettest"
 path = "cross_domain_sweettest.rs"
+
+[[test]]
+name = "sweettest_consciousness_gating"
+path = "sweettest_consciousness_gating.rs"

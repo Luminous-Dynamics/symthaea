@@ -8,6 +8,10 @@ use mutualaid_requests_integrity::{
     Anchor as RequestsAnchor, AidOffer, AidRequest, EntryTypes, LinkTypes,
     OfferStatus, RequestStatus, RequestType, Urgency,
 };
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
 
 /// Input for creating a new aid request
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -148,9 +152,17 @@ fn get_offerer_anchor(did: &str) -> ExternResult<EntryHash> {
     Ok(entry_hash)
 }
 
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
+
 /// Create a new aid request
 #[hdk_extern]
 pub fn create_request(input: CreateRequestInput) -> ExternResult<RequestWithHash> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "create_request")?;
     let now = sys_time()?;
     let id = generate_id("req")?;
 
@@ -244,6 +256,7 @@ pub fn get_request(action_hash: ActionHash) -> ExternResult<Option<RequestWithHa
 /// Update a request's status
 #[hdk_extern]
 pub fn update_request_status(input: UpdateRequestStatusInput) -> ExternResult<RequestWithHash> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_request_status")?;
     // Get the current request
     let record = get(input.request_hash.clone(), GetOptions::default())?
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Request not found".to_string())))?;
@@ -398,6 +411,7 @@ pub fn get_requests_by_requester(requester_did: String) -> ExternResult<Vec<Requ
 /// Create a new aid offer
 #[hdk_extern]
 pub fn create_offer(input: CreateOfferInput) -> ExternResult<OfferWithHash> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "create_offer")?;
     let now = sys_time()?;
     let id = generate_id("off")?;
 
@@ -460,6 +474,7 @@ pub fn get_offer(action_hash: ActionHash) -> ExternResult<Option<OfferWithHash>>
 /// Update an offer's status
 #[hdk_extern]
 pub fn update_offer_status(input: UpdateOfferStatusInput) -> ExternResult<OfferWithHash> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_offer_status")?;
     // Get the current offer
     let record = get(input.offer_hash.clone(), GetOptions::default())?
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Offer not found".to_string())))?;
@@ -533,6 +548,7 @@ pub fn get_offers_by_offerer(offerer_did: String) -> ExternResult<Vec<OfferWithH
 /// Cancel an aid request (only by the requester)
 #[hdk_extern]
 pub fn cancel_request(request_hash: ActionHash) -> ExternResult<RequestWithHash> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "cancel_request")?;
     update_request_status(UpdateRequestStatusInput {
         request_hash,
         status: RequestStatus::Cancelled,
@@ -543,6 +559,7 @@ pub fn cancel_request(request_hash: ActionHash) -> ExternResult<RequestWithHash>
 /// Withdraw an aid offer (only by the offerer)
 #[hdk_extern]
 pub fn withdraw_offer(offer_hash: ActionHash) -> ExternResult<OfferWithHash> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "withdraw_offer")?;
     update_offer_status(UpdateOfferStatusInput {
         offer_hash,
         status: OfferStatus::Withdrawn,

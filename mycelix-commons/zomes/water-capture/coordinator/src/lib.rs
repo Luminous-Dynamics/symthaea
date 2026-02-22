@@ -3,6 +3,10 @@
 
 use water_capture_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -21,6 +25,13 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
     Ok(records)
 }
 
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
+
 // ============================================================================
 // HARVEST SYSTEMS
 // ============================================================================
@@ -28,6 +39,7 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 /// Register a new water harvesting system
 #[hdk_extern]
 pub fn register_harvest_system(system: HarvestSystem) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "register_harvest_system")?;
     if system.id.is_empty() || system.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "System ID must be 1-256 characters".into()
@@ -101,6 +113,7 @@ pub fn get_all_systems(_: ()) -> ExternResult<Vec<Record>> {
 /// Register a new storage tank
 #[hdk_extern]
 pub fn register_tank(tank: StorageTank) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "register_tank")?;
     if tank.id.is_empty() || tank.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Tank ID must be 1-256 characters".into()
@@ -149,6 +162,7 @@ pub fn register_tank(tank: StorageTank) -> ExternResult<Record> {
 /// Update the current water level in a tank
 #[hdk_extern]
 pub fn update_tank_level(input: UpdateTankLevelInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_tank_level")?;
     let agent_info = agent_info()?;
     let record = get(input.tank_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Tank not found".into())))?;
@@ -197,6 +211,7 @@ pub struct UpdateTankLevelInput {
 /// Record a water harvest from a system
 #[hdk_extern]
 pub fn record_harvest(harvest: HarvestRecord) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "record_harvest")?;
     let action_hash = create_entry(&EntryTypes::HarvestRecord(harvest.clone()))?;
 
     // Link system to harvest record
@@ -239,6 +254,7 @@ pub fn get_harvest_history(system_hash: ActionHash) -> ExternResult<Vec<Record>>
 /// Register a new aquifer recharge project
 #[hdk_extern]
 pub fn register_recharge_project(project: RechargeProject) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "register_recharge_project")?;
     if project.id.is_empty() || project.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Project ID must be 1-256 characters".into()

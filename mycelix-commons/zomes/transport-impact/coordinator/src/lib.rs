@@ -3,6 +3,10 @@
 
 use transport_impact_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic,
+};
 
 // ============================================================================
 // BRIDGE SIGNAL (for cross-domain UI notification)
@@ -13,6 +17,13 @@ pub struct BridgeEventSignal {
     pub event_type: String,
     pub source_zome: String,
     pub payload: String,
+}
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
 }
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -55,6 +66,7 @@ fn emissions_factor(mode: &TripMode) -> f64 {
 
 #[hdk_extern]
 pub fn log_trip(mut trip: TripLog) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "log_trip")?;
     let agent = agent_info()?.agent_initial_pubkey;
 
     // Auto-calculate emissions if not provided (zero means calculate)
@@ -182,6 +194,7 @@ pub struct RedeemInput {
 
 #[hdk_extern]
 pub fn redeem_credits(input: RedeemInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "redeem_credits")?;
     let agent = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?.as_micros() / 1_000_000;
 

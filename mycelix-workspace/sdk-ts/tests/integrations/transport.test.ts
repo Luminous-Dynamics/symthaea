@@ -20,7 +20,7 @@ import {
   type VehicleType,
   type VehicleStatus,
   type Route,
-  type RouteMode,
+  type TransportMode,
   type Waypoint,
   type Stop,
   type StopType,
@@ -38,6 +38,15 @@ import {
   type EmissionsCalcInput,
   type EmissionsCalcResult,
   type CommunityImpactSummary,
+  type MaintenanceType,
+  type MaintenanceRecord,
+  type VehicleFeatures,
+  type ReviewerRole,
+  type RideReview,
+  type FindNearbyInput,
+  type RedeemInput,
+  type CreditRedemption,
+  type CarbonBalance,
 } from '../../src/integrations/transport/index.js';
 
 // ============================================================================
@@ -79,9 +88,9 @@ function makeRoute(overrides: Partial<Route> = {}): Route {
     id: 'route-001',
     name: 'Downtown Loop',
     waypoints: [
-      { lat: 32.95, lon: -96.75, name: 'Central Station' },
-      { lat: 32.96, lon: -96.76, name: 'Market Square' },
-      { lat: 32.97, lon: -96.74, name: 'City Park' },
+      { lat: 32.95, lon: -96.75, label: 'Central Station' },
+      { lat: 32.96, lon: -96.76, label: 'Market Square' },
+      { lat: 32.97, lon: -96.74, label: 'City Park' },
     ],
     distance_km: 8.5,
     estimated_minutes: 25,
@@ -189,7 +198,11 @@ describe('Transport Types', () => {
     });
 
     it('should accept all VehicleType variants', () => {
-      const types: VehicleType[] = ['Car', 'Van', 'Bike', 'Bus', 'Cargo'];
+      const types: VehicleType[] = [
+        'Car', 'Van', 'Bike', 'Bus', 'Cargo', 'ElectricScooter', 'Helicopter',
+        'EVTOL', 'AirTaxi', 'Ferry', 'Boat', 'Train', 'Tram', 'Skateboard',
+        'Wheelchair', 'Segway', 'AutonomousVehicle', 'Drone',
+      ];
       types.forEach((t) => {
         const v = makeVehicle({ vehicle_type: t });
         expect(v.vehicle_type).toBe(t);
@@ -215,8 +228,11 @@ describe('Transport Types', () => {
       expect(route.mode).toBe('Driving');
     });
 
-    it('should accept all RouteMode variants', () => {
-      const modes: RouteMode[] = ['Driving', 'Transit', 'Cycling', 'Walking', 'Mixed'];
+    it('should accept all TransportMode variants', () => {
+      const modes: TransportMode[] = [
+        'Driving', 'Cycling', 'Walking', 'Transit', 'Mixed',
+        'Flying', 'Water', 'Rail', 'Micromobility', 'Autonomous',
+      ];
       modes.forEach((m) => {
         const r = makeRoute({ mode: m });
         expect(r.mode).toBe(m);
@@ -268,7 +284,7 @@ describe('Transport Types', () => {
     });
 
     it('should accept all RideRequestStatus variants', () => {
-      const statuses: RideRequestStatus[] = ['Open', 'Matched', 'Completed', 'Cancelled'];
+      const statuses: RideRequestStatus[] = ['Open', 'Matched', 'Cancelled'];
       statuses.forEach((s) => {
         const r = makeRideRequest({ status: s });
         expect(r.status).toBe(s);
@@ -321,7 +337,10 @@ describe('Transport Types', () => {
     });
 
     it('should accept all TripMode variants', () => {
-      const modes: TripMode[] = ['Driving', 'ElectricVehicle', 'Transit', 'Carpool', 'Cycling', 'Walking'];
+      const modes: TripMode[] = [
+        'Driving', 'Cycling', 'Walking', 'Transit', 'Carpool',
+        'ElectricVehicle', 'Flying', 'Water', 'Rail', 'Micromobility', 'Autonomous',
+      ];
       modes.forEach((m) => {
         const t = makeTripLog({ mode: m });
         expect(t.mode).toBe(m);
@@ -428,7 +447,7 @@ describe('TransportClient', () => {
         const result = await transport.registerVehicle(vehicle);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_routes',
           fn_name: 'register_vehicle',
           payload: vehicle,
@@ -437,7 +456,11 @@ describe('TransportClient', () => {
       });
 
       it('should pass all vehicle types through to the zome', async () => {
-        const types: VehicleType[] = ['Car', 'Van', 'Bike', 'Bus', 'Cargo'];
+        const types: VehicleType[] = [
+          'Car', 'Van', 'Bike', 'Bus', 'Cargo', 'ElectricScooter', 'Helicopter',
+          'EVTOL', 'AirTaxi', 'Ferry', 'Boat', 'Train', 'Tram', 'Skateboard',
+          'Wheelchair', 'Segway', 'AutonomousVehicle', 'Drone',
+        ];
         for (const vt of types) {
           const vehicle = makeVehicle({ vehicle_type: vt });
           await transport.registerVehicle(vehicle);
@@ -456,7 +479,7 @@ describe('TransportClient', () => {
         const result = await transport.getVehicle(hash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_routes',
           fn_name: 'get_vehicle',
           payload: hash,
@@ -473,7 +496,7 @@ describe('TransportClient', () => {
         const result = await transport.getMyVehicles();
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_routes',
           fn_name: 'get_my_vehicles',
           payload: null,
@@ -491,7 +514,7 @@ describe('TransportClient', () => {
         const result = await transport.createRoute(route);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_routes',
           fn_name: 'create_route',
           payload: route,
@@ -501,15 +524,15 @@ describe('TransportClient', () => {
 
       it('should pass waypoints array through', async () => {
         const waypoints: Waypoint[] = [
-          { lat: 32.90, lon: -96.70, name: 'A' },
-          { lat: 32.91, lon: -96.71, name: 'B' },
+          { lat: 32.90, lon: -96.70, label: 'A' },
+          { lat: 32.91, lon: -96.71, label: 'B' },
         ];
         const route = makeRoute({ waypoints });
         await transport.createRoute(route);
 
         const lastCall = client.callZome.mock.calls[0][0];
         expect(lastCall.payload.waypoints).toHaveLength(2);
-        expect(lastCall.payload.waypoints[0].name).toBe('A');
+        expect(lastCall.payload.waypoints[0].label).toBe('A');
       });
     });
 
@@ -521,7 +544,7 @@ describe('TransportClient', () => {
         await transport.addStop(stop);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_routes',
           fn_name: 'add_stop',
           payload: stop,
@@ -548,7 +571,7 @@ describe('TransportClient', () => {
         const result = await transport.getRouteStops(routeHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_routes',
           fn_name: 'get_route_stops',
           payload: routeHash,
@@ -565,7 +588,7 @@ describe('TransportClient', () => {
         const result = await transport.getAllRoutes();
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_routes',
           fn_name: 'get_all_routes',
           payload: null,
@@ -582,7 +605,7 @@ describe('TransportClient', () => {
         await transport.updateVehicleStatus(vehicleHash, 'Maintenance');
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_routes',
           fn_name: 'update_vehicle_status',
           payload: { vehicle_hash: vehicleHash, new_status: 'Maintenance' },
@@ -613,7 +636,7 @@ describe('TransportClient', () => {
         await transport.postRideOffer(offer);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_sharing',
           fn_name: 'post_ride_offer',
           payload: offer,
@@ -638,7 +661,7 @@ describe('TransportClient', () => {
         await transport.requestRide(request);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_sharing',
           fn_name: 'request_ride',
           payload: request,
@@ -669,7 +692,7 @@ describe('TransportClient', () => {
         const result = await transport.matchRide(offerHash, requestHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_sharing',
           fn_name: 'match_ride',
           payload: { offer_hash: offerHash, request_hash: requestHash },
@@ -679,17 +702,17 @@ describe('TransportClient', () => {
     });
 
     describe('confirmMatch', () => {
-      it('should call transport_sharing.confirm_match with match hash', async () => {
+      it('should call transport_sharing.confirm_match with UpdateMatchStatusInput', async () => {
         const matchHash = fakeActionHash();
         client.callZome.mockResolvedValue({});
 
         await transport.confirmMatch(matchHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_sharing',
           fn_name: 'confirm_match',
-          payload: matchHash,
+          payload: { match_hash: matchHash, new_status: 'Confirmed' },
         });
       });
     });
@@ -702,7 +725,7 @@ describe('TransportClient', () => {
         await transport.completeRide(matchHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_sharing',
           fn_name: 'complete_ride',
           payload: matchHash,
@@ -718,7 +741,7 @@ describe('TransportClient', () => {
         await transport.cancelRide(matchHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_sharing',
           fn_name: 'cancel_ride',
           payload: matchHash,
@@ -734,7 +757,7 @@ describe('TransportClient', () => {
         await transport.postCargoOffer(cargo);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_sharing',
           fn_name: 'post_cargo_offer',
           payload: cargo,
@@ -759,7 +782,7 @@ describe('TransportClient', () => {
         const result = await transport.getAvailableRides();
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_sharing',
           fn_name: 'get_available_rides',
           payload: null,
@@ -775,7 +798,7 @@ describe('TransportClient', () => {
         const result = await transport.getMyRides();
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_sharing',
           fn_name: 'get_my_rides',
           payload: null,
@@ -798,7 +821,7 @@ describe('TransportClient', () => {
         await transport.logTrip(trip);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_impact',
           fn_name: 'log_trip',
           payload: trip,
@@ -806,7 +829,10 @@ describe('TransportClient', () => {
       });
 
       it('should pass all trip modes through', async () => {
-        const modes: TripMode[] = ['Driving', 'ElectricVehicle', 'Transit', 'Carpool', 'Cycling', 'Walking'];
+        const modes: TripMode[] = [
+          'Driving', 'Cycling', 'Walking', 'Transit', 'Carpool',
+          'ElectricVehicle', 'Flying', 'Water', 'Rail', 'Micromobility', 'Autonomous',
+        ];
         for (const m of modes) {
           const trip = makeTripLog({ mode: m });
           await transport.logTrip(trip);
@@ -833,7 +859,7 @@ describe('TransportClient', () => {
         const result = await transport.getMyTrips();
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_impact',
           fn_name: 'get_my_trips',
           payload: null,
@@ -853,7 +879,7 @@ describe('TransportClient', () => {
         const result = await transport.getMyCarbonCredits();
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_impact',
           fn_name: 'get_my_carbon_credits',
           payload: null,
@@ -879,7 +905,7 @@ describe('TransportClient', () => {
         const result = await transport.calculateEmissions(input);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_impact',
           fn_name: 'calculate_emissions',
           payload: input,
@@ -910,7 +936,7 @@ describe('TransportClient', () => {
         const result = await transport.getVehicleTripHistory(vehicleHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_impact',
           fn_name: 'get_vehicle_trip_history',
           payload: vehicleHash,
@@ -932,7 +958,7 @@ describe('TransportClient', () => {
         const result = await transport.getCommunityImpactSummary();
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_care',
           zome_name: 'transport_impact',
           fn_name: 'get_community_impact_summary',
           payload: null,
@@ -1007,7 +1033,7 @@ describe('TransportClient', () => {
       await transport.cancelRide(matchHash);
 
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_care',
         zome_name: 'transport_sharing',
         fn_name: 'cancel_ride',
         payload: matchHash,
@@ -1026,7 +1052,7 @@ describe('TransportClient', () => {
       await transport.getAllRoutes();
 
       for (const call of client.callZome.mock.calls) {
-        expect((call[0] as { role_name: string }).role_name).toBe('commons');
+        expect((call[0] as { role_name: string }).role_name).toBe('commons_care');
         expect((call[0] as { zome_name: string }).zome_name).toBe('transport_routes');
       }
     });
@@ -1038,7 +1064,7 @@ describe('TransportClient', () => {
       await transport.getMyRides();
 
       for (const call of client.callZome.mock.calls) {
-        expect((call[0] as { role_name: string }).role_name).toBe('commons');
+        expect((call[0] as { role_name: string }).role_name).toBe('commons_care');
         expect((call[0] as { zome_name: string }).zome_name).toBe('transport_sharing');
       }
     });
@@ -1052,7 +1078,7 @@ describe('TransportClient', () => {
       await transport.getCommunityImpactSummary();
 
       for (const call of client.callZome.mock.calls) {
-        expect((call[0] as { role_name: string }).role_name).toBe('commons');
+        expect((call[0] as { role_name: string }).role_name).toBe('commons_care');
         expect((call[0] as { zome_name: string }).zome_name).toBe('transport_impact');
       }
     });
@@ -1088,6 +1114,489 @@ describe('TransportClient', () => {
     it('should propagate zome call errors for getCommunityImpactSummary', async () => {
       client.callZome.mockRejectedValue(new Error('Network error'));
       await expect(transport.getCommunityImpactSummary()).rejects.toThrow('Network error');
+    });
+  });
+
+  // ==========================================================================
+  // Maintenance (Phase 3)
+  // ==========================================================================
+
+  describe('Maintenance (transport_routes)', () => {
+    describe('logMaintenance', () => {
+      it('should call transport_routes.log_maintenance with record data', async () => {
+        const record: MaintenanceRecord = {
+          id: 'maint-001',
+          vehicle_hash: fakeActionHash(),
+          maintenance_type: 'Scheduled',
+          description: 'Oil change and tire rotation',
+          cost: 85.0,
+          completed_at: Date.now(),
+          next_due: Date.now() + 90 * 24 * 3600_000,
+          mechanic_notes: 'All fluids topped off',
+        };
+        client.callZome.mockResolvedValue(fakeActionHash());
+
+        await transport.logMaintenance(record);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_care',
+          zome_name: 'transport_routes',
+          fn_name: 'log_maintenance',
+          payload: record,
+        });
+      });
+
+      it('should accept all MaintenanceType variants', async () => {
+        const types: MaintenanceType[] = ['Scheduled', 'Repair', 'Inspection'];
+        for (const mt of types) {
+          const record: MaintenanceRecord = {
+            id: `maint-${mt}`,
+            vehicle_hash: fakeActionHash(),
+            maintenance_type: mt,
+            description: `${mt} service`,
+            cost: 50,
+            completed_at: Date.now(),
+            next_due: null,
+            mechanic_notes: '',
+          };
+          await transport.logMaintenance(record);
+          const lastCall = client.callZome.mock.calls[client.callZome.mock.calls.length - 1][0];
+          expect(lastCall.payload.maintenance_type).toBe(mt);
+        }
+      });
+
+      it('should handle nullable next_due', async () => {
+        const record: MaintenanceRecord = {
+          id: 'maint-002',
+          vehicle_hash: fakeActionHash(),
+          maintenance_type: 'Repair',
+          description: 'Flat tire replacement',
+          cost: 120,
+          completed_at: Date.now(),
+          next_due: null,
+          mechanic_notes: 'Replaced front-left tire',
+        };
+        await transport.logMaintenance(record);
+
+        const lastCall = client.callZome.mock.calls[0][0];
+        expect(lastCall.payload.next_due).toBeNull();
+      });
+    });
+
+    describe('getVehicleMaintenance', () => {
+      it('should call transport_routes.get_vehicle_maintenance with vehicle hash', async () => {
+        const vehicleHash = fakeActionHash();
+        client.callZome.mockResolvedValue([]);
+
+        const result = await transport.getVehicleMaintenance(vehicleHash);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_care',
+          zome_name: 'transport_routes',
+          fn_name: 'get_vehicle_maintenance',
+          payload: vehicleHash,
+        });
+        expect(result).toEqual([]);
+      });
+    });
+
+    describe('setVehicleFeatures', () => {
+      it('should call transport_routes.set_vehicle_features with features data', async () => {
+        const features: VehicleFeatures = {
+          vehicle_hash: fakeActionHash(),
+          wheelchair_accessible: true,
+          child_seat: false,
+          pet_friendly: true,
+          air_conditioning: true,
+          bike_rack: true,
+          luggage_capacity_liters: 400,
+        };
+        client.callZome.mockResolvedValue({});
+
+        await transport.setVehicleFeatures(features);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_care',
+          zome_name: 'transport_routes',
+          fn_name: 'set_vehicle_features',
+          payload: features,
+        });
+      });
+
+      it('should pass all boolean feature flags through', async () => {
+        const features: VehicleFeatures = {
+          vehicle_hash: fakeActionHash(),
+          wheelchair_accessible: false,
+          child_seat: true,
+          pet_friendly: false,
+          air_conditioning: false,
+          bike_rack: false,
+          luggage_capacity_liters: 0,
+        };
+        await transport.setVehicleFeatures(features);
+
+        const lastCall = client.callZome.mock.calls[0][0];
+        expect(lastCall.payload.wheelchair_accessible).toBe(false);
+        expect(lastCall.payload.child_seat).toBe(true);
+        expect(lastCall.payload.luggage_capacity_liters).toBe(0);
+      });
+    });
+
+    describe('getAccessibleVehicles', () => {
+      it('should call transport_routes.get_accessible_vehicles with null payload', async () => {
+        client.callZome.mockResolvedValue([]);
+
+        const result = await transport.getAccessibleVehicles();
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_care',
+          zome_name: 'transport_routes',
+          fn_name: 'get_accessible_vehicles',
+          payload: null,
+        });
+        expect(result).toEqual([]);
+      });
+    });
+
+    describe('getVehiclesNeedingMaintenance', () => {
+      it('should call transport_routes.get_vehicles_needing_maintenance with currentTime', async () => {
+        client.callZome.mockResolvedValue([]);
+        const now = Date.now();
+
+        const result = await transport.getVehiclesNeedingMaintenance(now);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_care',
+          zome_name: 'transport_routes',
+          fn_name: 'get_vehicles_needing_maintenance',
+          payload: now,
+        });
+        expect(result).toEqual([]);
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Reviews (Phase 2)
+  // ==========================================================================
+
+  describe('Reviews (transport_sharing)', () => {
+    describe('reviewRide', () => {
+      it('should call transport_sharing.review_ride with review data', async () => {
+        const review: RideReview = {
+          match_hash: fakeActionHash(),
+          reviewer: fakeAgentKey(),
+          role: 'Passenger',
+          rating: 5,
+          comment: 'Great ride, very safe driver',
+          safety_concern: false,
+          created_at: Date.now(),
+        };
+        client.callZome.mockResolvedValue(fakeActionHash());
+
+        await transport.reviewRide(review);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_care',
+          zome_name: 'transport_sharing',
+          fn_name: 'review_ride',
+          payload: review,
+        });
+      });
+
+      it('should accept all ReviewerRole variants', async () => {
+        const roles: ReviewerRole[] = ['Driver', 'Passenger'];
+        for (const role of roles) {
+          const review: RideReview = {
+            match_hash: fakeActionHash(),
+            reviewer: fakeAgentKey(),
+            role,
+            rating: 4,
+            comment: 'Good experience',
+            safety_concern: false,
+            created_at: Date.now(),
+          };
+          await transport.reviewRide(review);
+          const lastCall = client.callZome.mock.calls[client.callZome.mock.calls.length - 1][0];
+          expect(lastCall.payload.role).toBe(role);
+        }
+      });
+
+      it('should flag safety concerns', async () => {
+        const review: RideReview = {
+          match_hash: fakeActionHash(),
+          reviewer: fakeAgentKey(),
+          role: 'Passenger',
+          rating: 1,
+          comment: 'Reckless driving',
+          safety_concern: true,
+          created_at: Date.now(),
+        };
+        await transport.reviewRide(review);
+
+        const lastCall = client.callZome.mock.calls[0][0];
+        expect(lastCall.payload.safety_concern).toBe(true);
+        expect(lastCall.payload.rating).toBe(1);
+      });
+    });
+
+    describe('getRideReviews', () => {
+      it('should call transport_sharing.get_ride_reviews with match hash', async () => {
+        const matchHash = fakeActionHash();
+        client.callZome.mockResolvedValue([]);
+
+        const result = await transport.getRideReviews(matchHash);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_care',
+          zome_name: 'transport_sharing',
+          fn_name: 'get_ride_reviews',
+          payload: matchHash,
+        });
+        expect(result).toEqual([]);
+      });
+    });
+
+    describe('getDriverRating', () => {
+      it('should call transport_sharing.get_driver_rating with driver key', async () => {
+        const driver = fakeAgentKey();
+        client.callZome.mockResolvedValue({ average: 4.5, count: 12 });
+
+        const result = await transport.getDriverRating(driver);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_care',
+          zome_name: 'transport_sharing',
+          fn_name: 'get_driver_rating',
+          payload: driver,
+        });
+        expect(result).toEqual({ average: 4.5, count: 12 });
+      });
+    });
+
+    describe('findNearbyRides', () => {
+      it('should call transport_sharing.find_nearby_rides with location input', async () => {
+        const input: FindNearbyInput = {
+          origin_lat: 32.95,
+          origin_lon: -96.75,
+          radius_km: 10,
+        };
+        client.callZome.mockResolvedValue([]);
+
+        const result = await transport.findNearbyRides(input);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_care',
+          zome_name: 'transport_sharing',
+          fn_name: 'find_nearby_rides',
+          payload: input,
+        });
+        expect(result).toEqual([]);
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Carbon Redemption (Phase 2)
+  // ==========================================================================
+
+  describe('Carbon Redemption (transport_impact)', () => {
+    describe('redeemCredits', () => {
+      it('should call transport_impact.redeem_credits with input data', async () => {
+        const input: RedeemInput = {
+          credits_redeemed: 5.0,
+          redeemed_for: 'Community garden compost',
+        };
+        client.callZome.mockResolvedValue(fakeActionHash());
+
+        await transport.redeemCredits(input);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_care',
+          zome_name: 'transport_impact',
+          fn_name: 'redeem_credits',
+          payload: input,
+        });
+      });
+    });
+
+    describe('getMyRedemptions', () => {
+      it('should call transport_impact.get_my_redemptions with null payload', async () => {
+        const mockRedemptions: CreditRedemption[] = [
+          {
+            holder: fakeAgentKey(),
+            credits_redeemed: 3.0,
+            redeemed_for: 'Tree planting',
+            redeemed_at: Date.now(),
+          },
+        ];
+        client.callZome.mockResolvedValue(mockRedemptions);
+
+        const result = await transport.getMyRedemptions();
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_care',
+          zome_name: 'transport_impact',
+          fn_name: 'get_my_redemptions',
+          payload: null,
+        });
+        expect(result).toHaveLength(1);
+      });
+    });
+
+    describe('getAgentCarbonBalance', () => {
+      it('should call transport_impact.get_agent_carbon_balance with agent key', async () => {
+        const agent = fakeAgentKey();
+        const mockBalance: CarbonBalance = {
+          total_earned: 25.0,
+          total_redeemed: 10.0,
+          balance: 15.0,
+        };
+        client.callZome.mockResolvedValue(mockBalance);
+
+        const result = await transport.getAgentCarbonBalance(agent);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_care',
+          zome_name: 'transport_impact',
+          fn_name: 'get_agent_carbon_balance',
+          payload: agent,
+        });
+        expect(result.total_earned).toBe(25.0);
+        expect(result.total_redeemed).toBe(10.0);
+        expect(result.balance).toBe(15.0);
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Phase 2-3 Type Construction
+  // ==========================================================================
+
+  describe('Phase 2-3 Types', () => {
+    describe('MaintenanceRecord', () => {
+      it('should construct a valid MaintenanceRecord', () => {
+        const record: MaintenanceRecord = {
+          id: 'maint-001',
+          vehicle_hash: fakeActionHash(),
+          maintenance_type: 'Inspection',
+          description: 'Annual safety inspection',
+          cost: 50,
+          completed_at: Date.now(),
+          next_due: Date.now() + 365 * 24 * 3600_000,
+          mechanic_notes: 'All systems check out',
+        };
+        expect(record.id).toBe('maint-001');
+        expect(record.maintenance_type).toBe('Inspection');
+        expect(record.vehicle_hash).toBeInstanceOf(Uint8Array);
+      });
+    });
+
+    describe('VehicleFeatures', () => {
+      it('should construct with all boolean flags', () => {
+        const features: VehicleFeatures = {
+          vehicle_hash: fakeActionHash(),
+          wheelchair_accessible: true,
+          child_seat: true,
+          pet_friendly: true,
+          air_conditioning: true,
+          bike_rack: true,
+          luggage_capacity_liters: 500,
+        };
+        expect(features.wheelchair_accessible).toBe(true);
+        expect(features.luggage_capacity_liters).toBe(500);
+      });
+    });
+
+    describe('RideReview', () => {
+      it('should construct with all fields including safety_concern', () => {
+        const review: RideReview = {
+          match_hash: fakeActionHash(),
+          reviewer: fakeAgentKey(),
+          role: 'Driver',
+          rating: 5,
+          comment: 'Polite passenger',
+          safety_concern: false,
+          created_at: Date.now(),
+        };
+        expect(review.role).toBe('Driver');
+        expect(review.safety_concern).toBe(false);
+        expect(review.rating).toBe(5);
+      });
+    });
+
+    describe('CarbonBalance', () => {
+      it('should construct with earned, redeemed, and balance', () => {
+        const balance: CarbonBalance = {
+          total_earned: 100,
+          total_redeemed: 40,
+          balance: 60,
+        };
+        expect(balance.balance).toBe(60);
+        expect(balance.total_earned - balance.total_redeemed).toBe(balance.balance);
+      });
+    });
+
+    describe('CreditRedemption', () => {
+      it('should construct a valid CreditRedemption', () => {
+        const redemption: CreditRedemption = {
+          holder: fakeAgentKey(),
+          credits_redeemed: 10,
+          redeemed_for: 'Solar panel discount',
+          redeemed_at: Date.now(),
+        };
+        expect(redemption.credits_redeemed).toBe(10);
+        expect(redemption.holder).toBeInstanceOf(Uint8Array);
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Phase 2-3 error propagation
+  // ==========================================================================
+
+  describe('Phase 2-3 error propagation', () => {
+    it('should propagate errors for logMaintenance', async () => {
+      client.callZome.mockRejectedValue(new Error('Vehicle not found'));
+      const record: MaintenanceRecord = {
+        id: 'maint-err',
+        vehicle_hash: fakeActionHash(),
+        maintenance_type: 'Repair',
+        description: 'test',
+        cost: 0,
+        completed_at: Date.now(),
+        next_due: null,
+        mechanic_notes: '',
+      };
+      await expect(transport.logMaintenance(record)).rejects.toThrow('Vehicle not found');
+    });
+
+    it('should propagate errors for reviewRide', async () => {
+      client.callZome.mockRejectedValue(new Error('Match not found'));
+      const review: RideReview = {
+        match_hash: fakeActionHash(),
+        reviewer: fakeAgentKey(),
+        role: 'Passenger',
+        rating: 3,
+        comment: '',
+        safety_concern: false,
+        created_at: Date.now(),
+      };
+      await expect(transport.reviewRide(review)).rejects.toThrow('Match not found');
+    });
+
+    it('should propagate errors for redeemCredits', async () => {
+      client.callZome.mockRejectedValue(new Error('Insufficient credits'));
+      await expect(
+        transport.redeemCredits({ credits_redeemed: 999, redeemed_for: 'test' }),
+      ).rejects.toThrow('Insufficient credits');
+    });
+
+    it('should propagate errors for getAgentCarbonBalance', async () => {
+      client.callZome.mockRejectedValue(new Error('Agent not found'));
+      await expect(transport.getAgentCarbonBalance(fakeAgentKey())).rejects.toThrow(
+        'Agent not found',
+      );
     });
   });
 });

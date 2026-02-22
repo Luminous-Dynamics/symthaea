@@ -39,6 +39,16 @@ import {
   type TraditionalPractice,
   type PracticeCategory,
   type Recipe,
+  type SeedStock,
+  type FoodSeedRequest,
+  type SeedRequestStatus,
+  type MatchSeedInput,
+  type NutrientProfile,
+  type AllergenSearchInput,
+  type GardenRole,
+  type GardenMembership,
+  type AddMemberInput,
+  type RemoveMemberInput,
 } from '../../src/integrations/food/index.js';
 
 // ============================================================================
@@ -85,6 +95,8 @@ function makeCrop(overrides: Partial<Crop> = {}): Crop {
     planted_at: Date.now(),
     expected_harvest: Date.now() + 90 * 24 * 3600_000,
     status: 'Planted',
+    allergen_flags: [],
+    organic_certified: false,
     ...overrides,
   };
 }
@@ -93,7 +105,7 @@ function makeYieldRecord(overrides: Partial<YieldRecord> = {}): YieldRecord {
   return {
     crop_hash: fakeActionHash(),
     quantity_kg: 25.5,
-    quality_grade: 'A',
+    quality_grade: 'Premium',
     harvested_at: Date.now(),
     notes: 'Excellent harvest',
     ...overrides,
@@ -132,7 +144,10 @@ function makeListing(overrides: Partial<Listing> = {}): Listing {
     quantity_kg: 50,
     price_per_kg: 4.5,
     available_from: Date.now(),
-    status: 'available',
+    status: 'Available',
+    allergen_flags: [],
+    organic: false,
+    cultural_markers: [],
     ...overrides,
   };
 }
@@ -253,7 +268,7 @@ describe('Food Types', () => {
     });
 
     it('should accept all PlotStatus variants', () => {
-      const statuses: PlotStatus[] = ['Active', 'Fallow', 'Preparing'];
+      const statuses: PlotStatus[] = ['Active', 'Fallow', 'Preparing', 'Retired'];
       statuses.forEach((s) => {
         const p = makePlot({ status: s });
         expect(p.status).toBe(s);
@@ -271,7 +286,7 @@ describe('Food Types', () => {
     });
 
     it('should accept all CropStatus variants', () => {
-      const statuses: CropStatus[] = ['Planted', 'Growing', 'Ready', 'Harvested', 'Failed'];
+      const statuses: CropStatus[] = ['Planned', 'Planted', 'Growing', 'Ready', 'Harvested', 'Failed'];
       statuses.forEach((s) => {
         const c = makeCrop({ status: s });
         expect(c.status).toBe(s);
@@ -283,12 +298,12 @@ describe('Food Types', () => {
     it('should construct a valid YieldRecord', () => {
       const y = makeYieldRecord();
       expect(y.quantity_kg).toBe(25.5);
-      expect(y.quality_grade).toBe('A');
+      expect(y.quality_grade).toBe('Premium');
       expect(y.crop_hash).toBeInstanceOf(Uint8Array);
     });
 
     it('should accept all QualityGrade variants', () => {
-      const grades: QualityGrade[] = ['A', 'B', 'C'];
+      const grades: QualityGrade[] = ['Premium', 'Standard', 'Processing', 'Compost'];
       grades.forEach((g) => {
         const y = makeYieldRecord({ quality_grade: g });
         expect(y.quality_grade).toBe(g);
@@ -466,7 +481,7 @@ describe('FoodClient', () => {
         const result = await food.registerPlot(plot);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_production',
           fn_name: 'register_plot',
           payload: plot,
@@ -475,7 +490,7 @@ describe('FoodClient', () => {
       });
 
       it('should pass all plot statuses through to the zome', async () => {
-        const statuses: PlotStatus[] = ['Active', 'Fallow', 'Preparing'];
+        const statuses: PlotStatus[] = ['Active', 'Fallow', 'Preparing', 'Retired'];
         for (const s of statuses) {
           const plot = makePlot({ status: s });
           await food.registerPlot(plot);
@@ -494,7 +509,7 @@ describe('FoodClient', () => {
         const result = await food.getPlot(hash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_production',
           fn_name: 'get_plot',
           payload: hash,
@@ -511,7 +526,7 @@ describe('FoodClient', () => {
         const result = await food.getAllPlots();
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_production',
           fn_name: 'get_all_plots',
           payload: null,
@@ -529,7 +544,7 @@ describe('FoodClient', () => {
         const result = await food.plantCrop(crop);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_production',
           fn_name: 'plant_crop',
           payload: crop,
@@ -538,7 +553,7 @@ describe('FoodClient', () => {
       });
 
       it('should pass all crop statuses through', async () => {
-        const statuses: CropStatus[] = ['Planted', 'Growing', 'Ready', 'Harvested', 'Failed'];
+        const statuses: CropStatus[] = ['Planned', 'Planted', 'Growing', 'Ready', 'Harvested', 'Failed'];
         for (const s of statuses) {
           const crop = makeCrop({ status: s });
           await food.plantCrop(crop);
@@ -556,7 +571,7 @@ describe('FoodClient', () => {
         await food.recordHarvest(yieldRecord);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_production',
           fn_name: 'record_harvest',
           payload: yieldRecord,
@@ -564,7 +579,7 @@ describe('FoodClient', () => {
       });
 
       it('should pass all quality grades through', async () => {
-        const grades: QualityGrade[] = ['A', 'B', 'C'];
+        const grades: QualityGrade[] = ['Premium', 'Standard', 'Processing', 'Compost'];
         for (const g of grades) {
           const y = makeYieldRecord({ quality_grade: g });
           await food.recordHarvest(y);
@@ -583,7 +598,7 @@ describe('FoodClient', () => {
         const result = await food.getPlotCrops(plotHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_production',
           fn_name: 'get_plot_crops',
           payload: plotHash,
@@ -601,7 +616,7 @@ describe('FoodClient', () => {
         const result = await food.getCropYields(cropHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_production',
           fn_name: 'get_crop_yields',
           payload: cropHash,
@@ -618,7 +633,7 @@ describe('FoodClient', () => {
         await food.createSeasonPlan(plan);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_production',
           fn_name: 'create_season_plan',
           payload: plan,
@@ -644,7 +659,7 @@ describe('FoodClient', () => {
         const result = await food.getSeasonPlans(plotHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_production',
           fn_name: 'get_season_plans',
           payload: plotHash,
@@ -667,7 +682,7 @@ describe('FoodClient', () => {
         await food.createMarket(market);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_distribution',
           fn_name: 'create_market',
           payload: market,
@@ -693,7 +708,7 @@ describe('FoodClient', () => {
         const result = await food.getAllMarkets();
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_distribution',
           fn_name: 'get_all_markets',
           payload: null,
@@ -710,7 +725,7 @@ describe('FoodClient', () => {
         await food.listProduct(listing);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_distribution',
           fn_name: 'list_product',
           payload: listing,
@@ -736,7 +751,7 @@ describe('FoodClient', () => {
         const result = await food.getMarketListings(marketHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_distribution',
           fn_name: 'get_market_listings',
           payload: marketHash,
@@ -752,7 +767,7 @@ describe('FoodClient', () => {
         const result = await food.getProducerListings();
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_distribution',
           fn_name: 'get_producer_listings',
           payload: null,
@@ -769,7 +784,7 @@ describe('FoodClient', () => {
         await food.placeOrder(order);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_distribution',
           fn_name: 'place_order',
           payload: order,
@@ -785,7 +800,7 @@ describe('FoodClient', () => {
         await food.fulfillOrder(orderHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_distribution',
           fn_name: 'fulfill_order',
           payload: { order_hash: orderHash, new_status: 'Fulfilled' },
@@ -801,7 +816,7 @@ describe('FoodClient', () => {
         await food.cancelOrder(orderHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_distribution',
           fn_name: 'cancel_order',
           payload: orderHash,
@@ -817,7 +832,7 @@ describe('FoodClient', () => {
         const result = await food.getMyOrders();
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_distribution',
           fn_name: 'get_my_orders',
           payload: null,
@@ -840,7 +855,7 @@ describe('FoodClient', () => {
         await food.startBatch(batch);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_preservation',
           fn_name: 'start_batch',
           payload: batch,
@@ -864,7 +879,7 @@ describe('FoodClient', () => {
         await food.completeBatch(batchHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_preservation',
           fn_name: 'complete_batch',
           payload: batchHash,
@@ -881,7 +896,7 @@ describe('FoodClient', () => {
         const result = await food.getBatch(batchHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_preservation',
           fn_name: 'get_batch',
           payload: batchHash,
@@ -898,7 +913,7 @@ describe('FoodClient', () => {
         await food.registerMethod(method);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_preservation',
           fn_name: 'register_method',
           payload: method,
@@ -924,7 +939,7 @@ describe('FoodClient', () => {
         const result = await food.getAllMethods();
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_preservation',
           fn_name: 'get_all_methods',
           payload: null,
@@ -941,7 +956,7 @@ describe('FoodClient', () => {
         await food.registerStorage(unit);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_preservation',
           fn_name: 'register_storage',
           payload: unit,
@@ -967,7 +982,7 @@ describe('FoodClient', () => {
         const result = await food.getStorageInventory(storageHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_preservation',
           fn_name: 'get_storage_inventory',
           payload: storageHash,
@@ -984,7 +999,7 @@ describe('FoodClient', () => {
         const result = await food.getAgentBatches();
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_preservation',
           fn_name: 'get_agent_batches',
           payload: null,
@@ -1007,7 +1022,7 @@ describe('FoodClient', () => {
         await food.catalogSeed(seed);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_knowledge',
           fn_name: 'catalog_seed',
           payload: seed,
@@ -1036,7 +1051,7 @@ describe('FoodClient', () => {
         const result = await food.getSeed(seedHash);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_knowledge',
           fn_name: 'get_seed',
           payload: seedHash,
@@ -1054,7 +1069,7 @@ describe('FoodClient', () => {
         const result = await food.getSeedsBySpecies(species);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_knowledge',
           fn_name: 'get_seeds_by_species',
           payload: species,
@@ -1071,7 +1086,7 @@ describe('FoodClient', () => {
         await food.sharePractice(practice);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_knowledge',
           fn_name: 'share_practice',
           payload: practice,
@@ -1097,7 +1112,7 @@ describe('FoodClient', () => {
         const result = await food.getPracticesByCategory('Planting');
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_knowledge',
           fn_name: 'get_practices_by_category',
           payload: 'Planting',
@@ -1114,7 +1129,7 @@ describe('FoodClient', () => {
         await food.shareRecipe(recipe);
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_knowledge',
           fn_name: 'share_recipe',
           payload: recipe,
@@ -1142,7 +1157,7 @@ describe('FoodClient', () => {
         const result = await food.getRecipesByTag('salsa');
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_knowledge',
           fn_name: 'get_recipes_by_tag',
           payload: 'salsa',
@@ -1158,7 +1173,7 @@ describe('FoodClient', () => {
         const result = await food.searchKnowledge('companion planting');
 
         expect(client.callZome).toHaveBeenCalledWith({
-          role_name: 'commons',
+          role_name: 'commons_land',
           zome_name: 'food_knowledge',
           fn_name: 'search_knowledge',
           payload: 'companion planting',
@@ -1255,7 +1270,7 @@ describe('FoodClient', () => {
       await food.cancelOrder(orderHash);
 
       expect(client.callZome).toHaveBeenCalledWith({
-        role_name: 'commons',
+        role_name: 'commons_land',
         zome_name: 'food_distribution',
         fn_name: 'cancel_order',
         payload: orderHash,
@@ -1274,7 +1289,7 @@ describe('FoodClient', () => {
       await food.getAllPlots();
 
       for (const call of client.callZome.mock.calls) {
-        expect((call[0] as { role_name: string }).role_name).toBe('commons');
+        expect((call[0] as { role_name: string }).role_name).toBe('commons_land');
         expect((call[0] as { zome_name: string }).zome_name).toBe('food_production');
       }
     });
@@ -1286,7 +1301,7 @@ describe('FoodClient', () => {
       await food.getMyOrders();
 
       for (const call of client.callZome.mock.calls) {
-        expect((call[0] as { role_name: string }).role_name).toBe('commons');
+        expect((call[0] as { role_name: string }).role_name).toBe('commons_land');
         expect((call[0] as { zome_name: string }).zome_name).toBe('food_distribution');
       }
     });
@@ -1297,7 +1312,7 @@ describe('FoodClient', () => {
       await food.getAgentBatches();
 
       for (const call of client.callZome.mock.calls) {
-        expect((call[0] as { role_name: string }).role_name).toBe('commons');
+        expect((call[0] as { role_name: string }).role_name).toBe('commons_land');
         expect((call[0] as { zome_name: string }).zome_name).toBe('food_preservation');
       }
     });
@@ -1309,7 +1324,7 @@ describe('FoodClient', () => {
       await food.searchKnowledge('tomato');
 
       for (const call of client.callZome.mock.calls) {
-        expect((call[0] as { role_name: string }).role_name).toBe('commons');
+        expect((call[0] as { role_name: string }).role_name).toBe('commons_land');
         expect((call[0] as { zome_name: string }).zome_name).toBe('food_knowledge');
       }
     });
@@ -1343,6 +1358,406 @@ describe('FoodClient', () => {
     it('should propagate zome call errors for searchKnowledge', async () => {
       client.callZome.mockRejectedValue(new Error('Network error'));
       await expect(food.searchKnowledge('query')).rejects.toThrow('Network error');
+    });
+  });
+
+  // ==========================================================================
+  // Seed Exchange (Phase 2)
+  // ==========================================================================
+
+  describe('Seed Exchange (food_knowledge)', () => {
+    describe('offerSeeds', () => {
+      it('should call food_knowledge.offer_seeds with stock data', async () => {
+        const stock: SeedStock = {
+          variety_hash: fakeActionHash(),
+          grower: fakeAgentKey(),
+          quantity_grams: 250,
+          location: 'Richardson, TX',
+          germination_rate_pct: 92.5,
+          available_for_exchange: true,
+          notes: 'Saved from 2025 harvest',
+        };
+        client.callZome.mockResolvedValue(fakeActionHash());
+
+        await food.offerSeeds(stock);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_land',
+          zome_name: 'food_knowledge',
+          fn_name: 'offer_seeds',
+          payload: stock,
+        });
+      });
+
+      it('should handle nullable germination_rate_pct and notes', async () => {
+        const stock: SeedStock = {
+          variety_hash: fakeActionHash(),
+          grower: fakeAgentKey(),
+          quantity_grams: 100,
+          location: 'Dallas, TX',
+          germination_rate_pct: null,
+          available_for_exchange: true,
+          notes: null,
+        };
+        await food.offerSeeds(stock);
+
+        const lastCall = client.callZome.mock.calls[0][0];
+        expect(lastCall.payload.germination_rate_pct).toBeNull();
+        expect(lastCall.payload.notes).toBeNull();
+      });
+    });
+
+    describe('requestSeeds', () => {
+      it('should call food_knowledge.request_seeds with request data', async () => {
+        const request: FoodSeedRequest = {
+          wanted_variety: 'Cherokee Purple',
+          quantity_grams: 50,
+          requester: fakeAgentKey(),
+          status: 'Open',
+          deadline: Date.now() + 30 * 24 * 3600_000,
+        };
+        client.callZome.mockResolvedValue(fakeActionHash());
+
+        await food.requestSeeds(request);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_land',
+          zome_name: 'food_knowledge',
+          fn_name: 'request_seeds',
+          payload: request,
+        });
+      });
+
+      it('should accept all SeedRequestStatus variants', async () => {
+        const statuses: SeedRequestStatus[] = ['Open', 'Matched', 'Fulfilled'];
+        for (const s of statuses) {
+          const request: FoodSeedRequest = {
+            wanted_variety: 'Brandywine',
+            quantity_grams: 25,
+            requester: fakeAgentKey(),
+            status: s,
+            deadline: null,
+          };
+          await food.requestSeeds(request);
+          const lastCall = client.callZome.mock.calls[client.callZome.mock.calls.length - 1][0];
+          expect(lastCall.payload.status).toBe(s);
+        }
+      });
+    });
+
+    describe('getAvailableSeeds', () => {
+      it('should call food_knowledge.get_available_seeds with variety hash', async () => {
+        const varietyHash = fakeActionHash();
+        client.callZome.mockResolvedValue([]);
+
+        const result = await food.getAvailableSeeds(varietyHash);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_land',
+          zome_name: 'food_knowledge',
+          fn_name: 'get_available_seeds',
+          payload: varietyHash,
+        });
+        expect(result).toEqual([]);
+      });
+    });
+
+    describe('getOpenSeedRequests', () => {
+      it('should call food_knowledge.get_open_seed_requests with null payload', async () => {
+        client.callZome.mockResolvedValue([]);
+
+        const result = await food.getOpenSeedRequests();
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_land',
+          zome_name: 'food_knowledge',
+          fn_name: 'get_open_seed_requests',
+          payload: null,
+        });
+        expect(result).toEqual([]);
+      });
+    });
+
+    describe('matchSeedRequest', () => {
+      it('should call food_knowledge.match_seed_request with input data', async () => {
+        const input: MatchSeedInput = {
+          request_hash: new Uint8Array(39).fill(0x01),
+          stock_hash: new Uint8Array(39).fill(0x02),
+        };
+        client.callZome.mockResolvedValue({});
+
+        await food.matchSeedRequest(input);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_land',
+          zome_name: 'food_knowledge',
+          fn_name: 'match_seed_request',
+          payload: input,
+        });
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Nutrient Tracking (Phase 2)
+  // ==========================================================================
+
+  describe('Nutrient Tracking (food_knowledge)', () => {
+    describe('addNutrientProfile', () => {
+      it('should call food_knowledge.add_nutrient_profile with profile data', async () => {
+        const profile: NutrientProfile = {
+          crop_name: 'Cherokee Purple Tomato',
+          calories_per_100g: 18,
+          protein_g: 0.9,
+          carbs_g: 3.9,
+          fat_g: 0.2,
+          fiber_g: 1.2,
+          key_vitamins: ['C', 'K', 'A'],
+          key_minerals: ['Potassium', 'Manganese'],
+        };
+        client.callZome.mockResolvedValue(fakeActionHash());
+
+        await food.addNutrientProfile(profile);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_land',
+          zome_name: 'food_knowledge',
+          fn_name: 'add_nutrient_profile',
+          payload: profile,
+        });
+      });
+
+      it('should pass vitamin and mineral arrays through', async () => {
+        const profile: NutrientProfile = {
+          crop_name: 'Kale',
+          calories_per_100g: 49,
+          protein_g: 4.3,
+          carbs_g: 8.8,
+          fat_g: 0.9,
+          fiber_g: 3.6,
+          key_vitamins: ['K', 'A', 'C', 'B6'],
+          key_minerals: ['Calcium', 'Iron', 'Magnesium'],
+        };
+        await food.addNutrientProfile(profile);
+
+        const lastCall = client.callZome.mock.calls[0][0];
+        expect(lastCall.payload.key_vitamins).toHaveLength(4);
+        expect(lastCall.payload.key_minerals).toHaveLength(3);
+      });
+    });
+
+    describe('getNutrientProfile', () => {
+      it('should call food_knowledge.get_nutrient_profile with crop name', async () => {
+        client.callZome.mockResolvedValue({});
+
+        await food.getNutrientProfile('Cherokee Purple Tomato');
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_land',
+          zome_name: 'food_knowledge',
+          fn_name: 'get_nutrient_profile',
+          payload: 'Cherokee Purple Tomato',
+        });
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Allergen Search (Phase 2)
+  // ==========================================================================
+
+  describe('Allergen Search (food_distribution)', () => {
+    describe('searchAllergenSafe', () => {
+      it('should call food_distribution.search_allergen_safe with input', async () => {
+        const input: AllergenSearchInput = {
+          market_hash: fakeActionHash(),
+          exclude_allergens: ['peanuts', 'gluten', 'dairy'],
+        };
+        client.callZome.mockResolvedValue([]);
+
+        const result = await food.searchAllergenSafe(input);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_land',
+          zome_name: 'food_distribution',
+          fn_name: 'search_allergen_safe',
+          payload: input,
+        });
+        expect(result).toEqual([]);
+      });
+
+      it('should pass empty allergen list through', async () => {
+        const input: AllergenSearchInput = {
+          market_hash: fakeActionHash(),
+          exclude_allergens: [],
+        };
+        await food.searchAllergenSafe(input);
+
+        const lastCall = client.callZome.mock.calls[0][0];
+        expect(lastCall.payload.exclude_allergens).toHaveLength(0);
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Garden Membership (Phase 2)
+  // ==========================================================================
+
+  describe('Garden Membership (food_production)', () => {
+    describe('addGardenMember', () => {
+      it('should call food_production.add_garden_member with AddMemberInput', async () => {
+        const input: AddMemberInput = {
+          plot_hash: fakeActionHash(),
+          member: fakeAgentKey(),
+          role: 'Volunteer',
+        };
+        client.callZome.mockResolvedValue(fakeActionHash());
+
+        await food.addGardenMember(input);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_land',
+          zome_name: 'food_production',
+          fn_name: 'add_garden_member',
+          payload: input,
+        });
+      });
+
+      it('should accept all GardenRole variants', async () => {
+        const roles: GardenRole[] = ['Steward', 'Volunteer', 'Member'];
+        for (const r of roles) {
+          const input: AddMemberInput = {
+            plot_hash: fakeActionHash(),
+            member: fakeAgentKey(),
+            role: r,
+          };
+          await food.addGardenMember(input);
+          const lastCall = client.callZome.mock.calls[client.callZome.mock.calls.length - 1][0];
+          expect(lastCall.payload.role).toBe(r);
+        }
+      });
+    });
+
+    describe('getPlotMembers', () => {
+      it('should call food_production.get_plot_members with plot hash', async () => {
+        const plotHash = fakeActionHash();
+        client.callZome.mockResolvedValue([]);
+
+        const result = await food.getPlotMembers(plotHash);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_land',
+          zome_name: 'food_production',
+          fn_name: 'get_plot_members',
+          payload: plotHash,
+        });
+        expect(result).toEqual([]);
+      });
+    });
+
+    describe('removeGardenMember', () => {
+      it('should call food_production.remove_garden_member with input', async () => {
+        const input: RemoveMemberInput = {
+          membership_hash: fakeActionHash(),
+        };
+        client.callZome.mockResolvedValue({});
+
+        await food.removeGardenMember(input);
+
+        expect(client.callZome).toHaveBeenCalledWith({
+          role_name: 'commons_land',
+          zome_name: 'food_production',
+          fn_name: 'remove_garden_member',
+          payload: input,
+        });
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Seed Exchange Lifecycle
+  // ==========================================================================
+
+  describe('Seed Exchange Lifecycle', () => {
+    it('should support the full seed exchange flow through mock calls', async () => {
+      const stockHash = new Uint8Array(39).fill(0x01);
+      const requestHash = new Uint8Array(39).fill(0x02);
+
+      // Step 1: Offer seeds
+      client.callZome.mockResolvedValueOnce(stockHash);
+      const stock: SeedStock = {
+        variety_hash: fakeActionHash(),
+        grower: fakeAgentKey(),
+        quantity_grams: 200,
+        location: 'Richardson, TX',
+        germination_rate_pct: 95.0,
+        available_for_exchange: true,
+        notes: null,
+      };
+      await food.offerSeeds(stock);
+
+      // Step 2: Request seeds
+      client.callZome.mockResolvedValueOnce(requestHash);
+      const request: FoodSeedRequest = {
+        wanted_variety: 'Cherokee Purple',
+        quantity_grams: 50,
+        requester: fakeAgentKey(),
+        status: 'Open',
+        deadline: null,
+      };
+      await food.requestSeeds(request);
+
+      // Step 3: Match request to stock
+      client.callZome.mockResolvedValueOnce({});
+      const matchInput: MatchSeedInput = {
+        request_hash: requestHash,
+        stock_hash: stockHash,
+      };
+      await food.matchSeedRequest(matchInput);
+
+      expect(client.callZome).toHaveBeenCalledTimes(3);
+
+      const fnNames = client.callZome.mock.calls.map(
+        (c: unknown[]) => (c[0] as { fn_name: string }).fn_name,
+      );
+      expect(fnNames).toEqual(['offer_seeds', 'request_seeds', 'match_seed_request']);
+    });
+  });
+
+  // ==========================================================================
+  // Phase 2 error propagation
+  // ==========================================================================
+
+  describe('Phase 2 error propagation', () => {
+    it('should propagate errors for offerSeeds', async () => {
+      client.callZome.mockRejectedValue(new Error('Validation failed'));
+      const stock: SeedStock = {
+        variety_hash: fakeActionHash(),
+        grower: fakeAgentKey(),
+        quantity_grams: 100,
+        location: 'test',
+        germination_rate_pct: null,
+        available_for_exchange: true,
+        notes: null,
+      };
+      await expect(food.offerSeeds(stock)).rejects.toThrow('Validation failed');
+    });
+
+    it('should propagate errors for searchAllergenSafe', async () => {
+      client.callZome.mockRejectedValue(new Error('Market not found'));
+      await expect(
+        food.searchAllergenSafe({ market_hash: fakeActionHash(), exclude_allergens: [] }),
+      ).rejects.toThrow('Market not found');
+    });
+
+    it('should propagate errors for addGardenMember', async () => {
+      client.callZome.mockRejectedValue(new Error('Not authorized'));
+      const input: AddMemberInput = {
+        plot_hash: fakeActionHash(),
+        member: fakeAgentKey(),
+        role: 'Member',
+      };
+      await expect(food.addGardenMember(input)).rejects.toThrow('Not authorized');
     });
   });
 });

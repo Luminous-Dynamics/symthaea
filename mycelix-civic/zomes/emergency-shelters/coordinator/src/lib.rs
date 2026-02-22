@@ -3,6 +3,10 @@
 
 use hdk::prelude::*;
 use emergency_shelters_integrity::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -10,9 +14,17 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("civic_bridge", requirement, action_name)
+}
+
 /// Register a new emergency shelter
 #[hdk_extern]
 pub fn register_shelter(input: RegisterShelterInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "register_shelter")?;
     if input.name.is_empty() || input.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Name must be 1-256 characters".into()
@@ -100,6 +112,7 @@ pub struct RegisterShelterInput {
 /// Update shelter status
 #[hdk_extern]
 pub fn update_shelter_status(input: UpdateShelterStatusInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "update_shelter_status")?;
     let current_record = get(input.shelter_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Shelter not found".into())),
     )?;
@@ -156,6 +169,7 @@ pub struct UpdateShelterStatusInput {
 /// Update a shelter entry (general update)
 #[hdk_extern]
 pub fn update_shelter(input: UpdateShelterInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_proposal(), "update_shelter")?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::Shelter(input.updated_entry),
@@ -172,6 +186,7 @@ pub struct UpdateShelterInput {
 /// Check in a person or party to a shelter
 #[hdk_extern]
 pub fn check_in_person(input: CheckInPersonInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "check_in_person")?;
     if input.person_name.is_empty() || input.person_name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Person name must be 1-256 characters".into()
@@ -289,6 +304,7 @@ pub struct CheckInPersonInput {
 /// Check out a person from a shelter
 #[hdk_extern]
 pub fn check_out_person(input: CheckOutPersonInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "check_out_person")?;
     let current_record = get(input.registration_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Registration not found".into())),
     )?;

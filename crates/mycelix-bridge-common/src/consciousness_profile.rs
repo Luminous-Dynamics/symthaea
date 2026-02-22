@@ -17,6 +17,7 @@
 //! then evaluate it with `evaluate_governance()` — a pure function with no
 //! HDK dependency.
 
+use hdk::prelude::*;
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -244,16 +245,63 @@ pub struct GateAuditInput {
     pub required_tier: String,
     /// Progressive vote weight in basis points (0–10000).
     pub weight_bp: u32,
+    /// Optional correlation ID for cross-cluster audit trail linkage.
+    /// Format: "<agent_hex_prefix>:<timestamp_us>" — generated at action entry points.
+    #[serde(default)]
+    pub correlation_id: Option<String>,
 }
 
 // ============================================================================
 // Evaluation (pure functions — no HDK dependency)
 // ============================================================================
 
+/// Grace period for recently-expired credentials: 30 minutes in microseconds.
+///
+/// During the grace period, basic/read operations (Participant tier or below)
+/// are still allowed — giving the system time to proactively refresh.
+pub const GRACE_PERIOD_US: u64 = 1_800_000_000;
+
+/// Refresh window: proactively refresh credentials within 2 hours of expiry.
+pub const REFRESH_WINDOW_US: u64 = 7_200_000_000;
+
+/// Determine whether a gate decision should be logged to the audit trail.
+///
+/// Strategy: always log rejections and high-tier actions; sample 10% of
+/// basic/proposal approvals to reduce DHT write load.
+pub fn should_audit(
+    requirement: &GovernanceRequirement,
+    eligible: bool,
+    agent_hash: &[u8],
+) -> bool {
+    // Always log rejections
+    if !eligible {
+        return true;
+    }
+    match requirement.min_tier {
+        // Always log constitutional and voting actions
+        ConsciousnessTier::Steward | ConsciousnessTier::Guardian => true,
+        ConsciousnessTier::Citizen => true,
+        // Sample ~10% of basic/proposal approvals using agent hash for determinism
+        _ => {
+            let sample_byte = agent_hash.last().copied().unwrap_or(0);
+            sample_byte < 26 // ~10% of 256
+        }
+    }
+}
+
+/// Check if a credential is within the refresh window (nearing expiry).
+pub fn needs_refresh(credential: &ConsciousnessCredential, now_us: u64) -> bool {
+    !credential.is_expired(now_us)
+        && credential.expires_at > now_us
+        && credential.expires_at - now_us < REFRESH_WINDOW_US
+}
+
 /// Evaluate a consciousness credential against a governance requirement.
 ///
 /// This is the core gating function. It checks credential expiry first,
 /// then evaluates the embedded profile against tier/dimension requirements.
+/// Supports a 30-minute grace period for recently-expired credentials on
+/// basic (Participant-tier) operations only.
 /// Pure — no HDK calls, no side effects.
 pub fn evaluate_governance(
     credential: &ConsciousnessCredential,
@@ -261,6 +309,55 @@ pub fn evaluate_governance(
     now_us: u64,
 ) -> GovernanceEligibility {
     if credential.is_expired(now_us) {
+        // Check grace period: allow basic/read operations for 30 min after expiry
+        let in_grace = now_us < credential.expires_at.saturating_add(GRACE_PERIOD_US);
+        if in_grace && requirement.min_tier <= ConsciousnessTier::Participant {
+            // Grace period — evaluate normally but add warning
+            let clamped = credential.profile.clamped();
+            let tier = clamped.tier();
+            let mut reasons = Vec::new();
+
+            if tier < requirement.min_tier {
+                reasons.push(format!(
+                    "Tier {:?} below required {:?} (score {:.3}, need >= {:.3})",
+                    tier,
+                    requirement.min_tier,
+                    clamped.combined_score(),
+                    requirement.min_tier.min_score(),
+                ));
+            }
+            if let Some(min_id) = requirement.min_identity {
+                if clamped.identity < min_id {
+                    reasons.push(format!(
+                        "Identity {:.3} below required {:.3}",
+                        clamped.identity, min_id
+                    ));
+                }
+            }
+            if let Some(min_comm) = requirement.min_community {
+                if clamped.community < min_comm {
+                    reasons.push(format!(
+                        "Community {:.3} below required {:.3}",
+                        clamped.community, min_comm
+                    ));
+                }
+            }
+
+            let eligible = reasons.is_empty();
+            let weight_bp = if eligible { tier.vote_weight_bp() } else { 0 };
+
+            // Always add the grace period warning
+            reasons.push("Credential in grace period — refresh recommended".into());
+
+            return GovernanceEligibility {
+                eligible,
+                weight_bp,
+                tier,
+                profile: clamped,
+                reasons,
+            };
+        }
+
         return GovernanceEligibility {
             eligible: false,
             weight_bp: 0,
@@ -365,6 +462,124 @@ pub fn requirement_for_constitutional() -> GovernanceRequirement {
         min_identity: Some(0.5),
         min_community: Some(0.3),
     }
+}
+
+// ============================================================================
+// Shared consciousness gate (HDK-dependent)
+// ============================================================================
+
+/// Fetch the calling agent's consciousness credential via the specified bridge
+/// zome and evaluate it against a governance requirement.
+///
+/// This is the shared implementation of `require_consciousness()` — every
+/// coordinator keeps a thin 3-line wrapper that passes its cluster's bridge
+/// zome name (e.g., `"commons_bridge"`, `"civic_bridge"`, `"hearth_bridge"`).
+///
+/// Steps:
+/// 1. `agent_info()` → derive DID
+/// 2. Cross-zome call to `<bridge_zome>::get_consciousness_credential`
+/// 3. `evaluate_governance()` (pure)
+/// 4. `should_audit()` → best-effort `log_governance_gate` if sampled
+/// 5. Reject with `WasmError` if ineligible
+pub fn gate_consciousness(
+    bridge_zome: &str,
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new(bridge_zome),
+        FunctionName::new("get_consciousness_credential"),
+        None,
+        did,
+    )?;
+
+    let credential: ConsciousnessCredential = match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode consciousness credential: {}", e
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Consciousness credential call failed: {:?}", other
+            ))));
+        }
+    };
+
+    let now_us = sys_time()?.as_micros() as u64;
+    let eligibility = evaluate_governance(&credential, requirement, now_us);
+
+    // Fire audit log (best-effort, rate-limited via should_audit)
+    if should_audit(requirement, eligibility.eligible, agent.as_ref()) {
+        let audit = GateAuditInput {
+            action_name: action_name.to_string(),
+            zome_name: zome_info()?.name.to_string(),
+            eligible: eligibility.eligible,
+            actual_tier: format!("{:?}", eligibility.tier),
+            required_tier: format!("{:?}", requirement.min_tier),
+            weight_bp: eligibility.weight_bp,
+            correlation_id: None,
+        };
+        match call(
+            CallTargetCell::Local,
+            ZomeName::new(bridge_zome),
+            FunctionName::new("log_governance_gate"),
+            None,
+            audit,
+        ) {
+            Ok(_) => {}
+            Err(e) => {
+                debug!("Audit log failed ({}): {:?}", bridge_zome, e);
+            }
+        }
+    }
+
+    if !eligibility.eligible {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Consciousness gate: tier {:?} insufficient. Reasons: {}",
+            eligibility.tier,
+            eligibility.reasons.join(", ")
+        ))));
+    }
+
+    Ok(eligibility)
+}
+
+// ============================================================================
+// Governance audit query types
+// ============================================================================
+
+/// Filter for querying governance gate audit events.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct GovernanceAuditFilter {
+    /// Filter by the gated action name (e.g., "register_property").
+    #[serde(default)]
+    pub action_name: Option<String>,
+    /// Filter by the zome that performed the check.
+    #[serde(default)]
+    pub zome_name: Option<String>,
+    /// Filter by eligibility outcome.
+    #[serde(default)]
+    pub eligible: Option<bool>,
+    /// Start of time range (inclusive), microseconds since epoch.
+    #[serde(default)]
+    pub from_us: Option<i64>,
+    /// End of time range (inclusive), microseconds since epoch.
+    #[serde(default)]
+    pub to_us: Option<i64>,
+}
+
+/// Result of a governance audit query.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GovernanceAuditResult {
+    /// Matched audit entries (deserialized from BridgeEventEntry payloads).
+    pub entries: Vec<GateAuditInput>,
+    /// Number of entries that matched the filter.
+    pub total_matched: u32,
 }
 
 // ============================================================================
@@ -1028,7 +1243,7 @@ mod tests {
     // -- evaluate_governance expiry integration --
 
     #[test]
-    fn evaluate_governance_rejects_expired_credential() {
+    fn evaluate_governance_rejects_expired_credential_past_grace() {
         let profile = ConsciousnessProfile {
             identity: 1.0,
             reputation: 1.0,
@@ -1036,8 +1251,25 @@ mod tests {
             engagement: 1.0,
         };
         let mut cred = fresh_credential(profile);
-        cred.expires_at = NOW - 1; // expired
+        // Expired well past the 30-min grace period
+        cred.expires_at = NOW - GRACE_PERIOD_US - 1;
         let result = evaluate_governance(&cred, &requirement_for_basic(), NOW);
+        assert!(!result.eligible);
+        assert!(result.reasons[0].contains("expired"));
+    }
+
+    #[test]
+    fn evaluate_governance_rejects_expired_credential_for_voting() {
+        let profile = ConsciousnessProfile {
+            identity: 1.0,
+            reputation: 1.0,
+            community: 1.0,
+            engagement: 1.0,
+        };
+        let mut cred = fresh_credential(profile);
+        cred.expires_at = NOW - 1; // recently expired
+        // Grace period does NOT apply to voting-tier operations
+        let result = evaluate_governance(&cred, &requirement_for_voting(), NOW);
         assert!(!result.eligible);
         assert!(result.reasons[0].contains("expired"));
     }
@@ -1056,7 +1288,7 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_governance_rejects_at_expiry_boundary() {
+    fn evaluate_governance_rejects_at_expiry_boundary_for_voting() {
         let profile = ConsciousnessProfile {
             identity: 1.0,
             reputation: 1.0,
@@ -1065,7 +1297,8 @@ mod tests {
         };
         let mut cred = fresh_credential(profile);
         cred.expires_at = NOW; // expires exactly at NOW
-        let result = evaluate_governance(&cred, &requirement_for_basic(), NOW);
+        // Grace period does NOT apply to voting-tier operations
+        let result = evaluate_governance(&cred, &requirement_for_voting(), NOW);
         assert!(!result.eligible);
         assert!(result.reasons[0].contains("expired"));
     }
@@ -1140,5 +1373,155 @@ mod tests {
     fn tier_from_score_above_one_is_guardian() {
         assert_eq!(ConsciousnessTier::from_score(1.5), ConsciousnessTier::Guardian);
         assert_eq!(ConsciousnessTier::from_score(100.0), ConsciousnessTier::Guardian);
+    }
+
+    // -- Grace period --
+
+    #[test]
+    fn grace_period_allows_basic_operations() {
+        let profile = ConsciousnessProfile {
+            identity: 0.3,
+            reputation: 0.3,
+            community: 0.3,
+            engagement: 0.3,
+        };
+        let mut cred = fresh_credential(profile);
+        // Expired 10 minutes ago (within 30-min grace)
+        cred.expires_at = NOW - 600_000_000;
+        let result = evaluate_governance(&cred, &requirement_for_basic(), NOW);
+        assert!(result.eligible);
+        assert!(result.reasons.iter().any(|r| r.contains("grace period")));
+    }
+
+    #[test]
+    fn grace_period_rejects_voting_operations() {
+        let profile = ConsciousnessProfile {
+            identity: 0.5,
+            reputation: 0.5,
+            community: 0.4,
+            engagement: 0.2,
+        };
+        let mut cred = fresh_credential(profile);
+        cred.expires_at = NOW - 600_000_000; // within grace
+        let result = evaluate_governance(&cred, &requirement_for_voting(), NOW);
+        assert!(!result.eligible);
+        assert!(result.reasons[0].contains("expired"));
+    }
+
+    #[test]
+    fn grace_period_expired_past_window() {
+        let profile = ConsciousnessProfile {
+            identity: 0.3,
+            reputation: 0.3,
+            community: 0.3,
+            engagement: 0.3,
+        };
+        let mut cred = fresh_credential(profile);
+        // Expired 2 hours ago (past 30-min grace)
+        cred.expires_at = NOW - 7_200_000_000;
+        let result = evaluate_governance(&cred, &requirement_for_basic(), NOW);
+        assert!(!result.eligible);
+    }
+
+    // -- should_audit --
+
+    #[test]
+    fn should_audit_always_logs_rejections() {
+        assert!(should_audit(&requirement_for_basic(), false, &[0u8]));
+        assert!(should_audit(&requirement_for_basic(), false, &[255u8]));
+    }
+
+    #[test]
+    fn should_audit_always_logs_constitutional() {
+        assert!(should_audit(&requirement_for_constitutional(), true, &[0u8]));
+        assert!(should_audit(
+            &requirement_for_constitutional(),
+            true,
+            &[255u8]
+        ));
+    }
+
+    #[test]
+    fn should_audit_always_logs_voting() {
+        assert!(should_audit(&requirement_for_voting(), true, &[0u8]));
+        assert!(should_audit(&requirement_for_voting(), true, &[255u8]));
+    }
+
+    #[test]
+    fn should_audit_samples_basic_approvals() {
+        // Agent hash ending in 0 → 0 < 26 → sampled
+        assert!(should_audit(&requirement_for_basic(), true, &[0u8]));
+        // Agent hash ending in 25 → 25 < 26 → sampled
+        assert!(should_audit(&requirement_for_basic(), true, &[25u8]));
+        // Agent hash ending in 26 → 26 >= 26 → NOT sampled
+        assert!(!should_audit(&requirement_for_basic(), true, &[26u8]));
+        // Agent hash ending in 255 → NOT sampled
+        assert!(!should_audit(&requirement_for_basic(), true, &[255u8]));
+    }
+
+    // -- needs_refresh --
+
+    #[test]
+    fn needs_refresh_within_window() {
+        let profile = ConsciousnessProfile {
+            identity: 0.5,
+            reputation: 0.5,
+            community: 0.5,
+            engagement: 0.5,
+        };
+        let mut cred = fresh_credential(profile);
+        // Expires in 1 hour (within 2-hour window)
+        cred.expires_at = NOW + 3_600_000_000;
+        assert!(needs_refresh(&cred, NOW));
+    }
+
+    #[test]
+    fn needs_refresh_not_within_window() {
+        let profile = ConsciousnessProfile {
+            identity: 0.5,
+            reputation: 0.5,
+            community: 0.5,
+            engagement: 0.5,
+        };
+        let cred = fresh_credential(profile);
+        // Expires in 24 hours (outside 2-hour window)
+        assert!(!needs_refresh(&cred, NOW));
+    }
+
+    #[test]
+    fn needs_refresh_expired_credential() {
+        let profile = ConsciousnessProfile::zero();
+        let mut cred = fresh_credential(profile);
+        cred.expires_at = NOW - 1;
+        assert!(!needs_refresh(&cred, NOW));
+    }
+
+    // -- GateAuditInput with correlation_id --
+
+    #[test]
+    fn gate_audit_input_serde_with_correlation_id() {
+        let audit = GateAuditInput {
+            action_name: "test".into(),
+            zome_name: "test_zome".into(),
+            eligible: true,
+            actual_tier: "Citizen".into(),
+            required_tier: "Participant".into(),
+            weight_bp: 7500,
+            correlation_id: Some("abcdef01:1700000000000000".into()),
+        };
+        let json = serde_json::to_string(&audit).unwrap();
+        let a2: GateAuditInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            a2.correlation_id,
+            Some("abcdef01:1700000000000000".into())
+        );
+    }
+
+    #[test]
+    fn gate_audit_input_serde_without_correlation_id() {
+        // Backward compat: old audit inputs without correlation_id
+        let json = r#"{"action_name":"test","zome_name":"z","eligible":true,"actual_tier":"Citizen","required_tier":"Participant","weight_bp":7500}"#;
+        let audit: GateAuditInput = serde_json::from_str(json).unwrap();
+        assert_eq!(audit.correlation_id, None);
     }
 }

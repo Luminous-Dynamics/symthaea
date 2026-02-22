@@ -16,7 +16,7 @@
 // Types — Food Production
 // ============================================================================
 
-export type PlotStatus = 'Active' | 'Fallow' | 'Preparing';
+export type PlotStatus = 'Active' | 'Fallow' | 'Preparing' | 'Retired';
 
 export interface Plot {
   id: string;
@@ -29,7 +29,7 @@ export interface Plot {
   status: PlotStatus;
 }
 
-export type CropStatus = 'Planted' | 'Growing' | 'Ready' | 'Harvested' | 'Failed';
+export type CropStatus = 'Planned' | 'Planted' | 'Growing' | 'Ready' | 'Harvested' | 'Failed';
 
 export interface Crop {
   plot_hash: Uint8Array;
@@ -38,16 +38,18 @@ export interface Crop {
   planted_at: number;
   expected_harvest: number;
   status: CropStatus;
+  allergen_flags: string[];
+  organic_certified: boolean;
 }
 
-export type QualityGrade = 'A' | 'B' | 'C';
+export type QualityGrade = 'Premium' | 'Standard' | 'Processing' | 'Compost';
 
 export interface YieldRecord {
   crop_hash: Uint8Array;
   quantity_kg: number;
   quality_grade: QualityGrade;
   harvested_at: number;
-  notes: string;
+  notes: string | null;
 }
 
 export interface SeasonPlan {
@@ -63,6 +65,7 @@ export interface SeasonPlan {
 // ============================================================================
 
 export type MarketType = 'Farmers' | 'CSA' | 'FoodBank' | 'CoOp';
+export type ListingStatus = 'Available' | 'Reserved' | 'Sold' | 'Expired';
 export type OrderStatus = 'Pending' | 'Confirmed' | 'Fulfilled' | 'Cancelled';
 
 export interface Market {
@@ -82,7 +85,10 @@ export interface Listing {
   quantity_kg: number;
   price_per_kg: number;
   available_from: number;
-  status: string;
+  status: ListingStatus;
+  allergen_flags: string[];
+  organic: boolean;
+  cultural_markers: string[];
 }
 
 export interface Order {
@@ -136,18 +142,18 @@ export type PracticeCategory = 'Planting' | 'Harvest' | 'Soil' | 'Pest' | 'Water
 export interface SeedVariety {
   name: string;
   species: string;
-  origin: string;
+  origin: string | null;
   days_to_maturity: number;
   companion_plants: string[];
   avoid_plants: string[];
-  seed_saving_notes: string;
+  seed_saving_notes: string | null;
 }
 
 export interface TraditionalPractice {
   name: string;
   description: string;
-  region: string;
-  season: string;
+  region: string | null;
+  season: string | null;
   category: PracticeCategory;
 }
 
@@ -158,7 +164,102 @@ export interface Recipe {
   servings: number;
   prep_time_min: number;
   tags: string[];
-  source_attribution: string;
+  source_attribution: string | null;
+}
+
+// ============================================================================
+// Types — Seed Exchange (Phase 2)
+// ============================================================================
+
+export interface SeedStock {
+  variety_hash: Uint8Array;
+  grower: Uint8Array;
+  quantity_grams: number;
+  location: string;
+  germination_rate_pct: number | null;
+  available_for_exchange: boolean;
+  notes: string | null;
+}
+
+export type SeedRequestStatus = 'Open' | 'Matched' | 'Fulfilled';
+
+export interface FoodSeedRequest {
+  wanted_variety: string;
+  quantity_grams: number;
+  requester: Uint8Array;
+  status: SeedRequestStatus;
+  deadline: number | null;
+}
+
+export interface MatchSeedInput {
+  request_hash: Uint8Array;
+  stock_hash: Uint8Array;
+}
+
+// ============================================================================
+// Types — Nutrient Tracking (Phase 2)
+// ============================================================================
+
+export interface NutrientProfile {
+  crop_name: string;
+  calories_per_100g: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+  key_vitamins: string[];
+  key_minerals: string[];
+}
+
+// ============================================================================
+// Types — Allergen Search (Phase 2)
+// ============================================================================
+
+export interface AllergenSearchInput {
+  market_hash: Uint8Array;
+  exclude_allergens: string[];
+}
+
+// ============================================================================
+// Types — Garden Membership (Phase 2)
+// ============================================================================
+
+export type GardenRole = 'Steward' | 'Volunteer' | 'Member';
+
+export interface GardenMembership {
+  plot_hash: Uint8Array;
+  member: Uint8Array;
+  role: GardenRole;
+  joined_at: number;
+}
+
+export interface AddMemberInput {
+  plot_hash: Uint8Array;
+  member: Uint8Array;
+  role: GardenRole;
+}
+
+export interface RemoveMemberInput {
+  membership_hash: Uint8Array;
+}
+
+// ============================================================================
+// Types — Update Inputs (Phase 2)
+// ============================================================================
+
+export interface UpdateSeedVarietyInput {
+  original_action_hash: Uint8Array;
+  updated_entry: SeedVariety;
+}
+
+export interface UpdateTraditionalPracticeInput {
+  original_action_hash: Uint8Array;
+  updated_entry: TraditionalPractice;
+}
+
+export interface UpdateRecipeInput {
+  original_action_hash: Uint8Array;
+  updated_entry: Recipe;
 }
 
 // ============================================================================
@@ -178,7 +279,7 @@ interface ZomeCallable {
 // Constants
 // ============================================================================
 
-const COMMONS_ROLE = 'commons';
+const COMMONS_ROLE = 'commons_land';
 
 export const FOOD_ZOMES = [
   'food_production',
@@ -511,6 +612,142 @@ export class FoodClient {
       zome_name: 'food_knowledge',
       fn_name: 'search_knowledge',
       payload: query,
+    });
+  }
+
+  // --- Seed Exchange (Phase 2) ---
+
+  async offerSeeds(stock: SeedStock): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_knowledge',
+      fn_name: 'offer_seeds',
+      payload: stock,
+    });
+  }
+
+  async requestSeeds(request: FoodSeedRequest): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_knowledge',
+      fn_name: 'request_seeds',
+      payload: request,
+    });
+  }
+
+  async getAvailableSeeds(varietyHash: Uint8Array): Promise<unknown[]> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_knowledge',
+      fn_name: 'get_available_seeds',
+      payload: varietyHash,
+    });
+  }
+
+  async getOpenSeedRequests(): Promise<unknown[]> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_knowledge',
+      fn_name: 'get_open_seed_requests',
+      payload: null,
+    });
+  }
+
+  async matchSeedRequest(input: MatchSeedInput): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_knowledge',
+      fn_name: 'match_seed_request',
+      payload: input,
+    });
+  }
+
+  // --- Nutrient Tracking (Phase 2) ---
+
+  async addNutrientProfile(profile: NutrientProfile): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_knowledge',
+      fn_name: 'add_nutrient_profile',
+      payload: profile,
+    });
+  }
+
+  async getNutrientProfile(cropName: string): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_knowledge',
+      fn_name: 'get_nutrient_profile',
+      payload: cropName,
+    });
+  }
+
+  // --- Allergen Search (Phase 2) ---
+
+  async searchAllergenSafe(input: AllergenSearchInput): Promise<unknown[]> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_distribution',
+      fn_name: 'search_allergen_safe',
+      payload: input,
+    });
+  }
+
+  // --- Garden Membership (Phase 2) ---
+
+  async addGardenMember(input: AddMemberInput): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_production',
+      fn_name: 'add_garden_member',
+      payload: input,
+    });
+  }
+
+  async getPlotMembers(plotHash: Uint8Array): Promise<unknown[]> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_production',
+      fn_name: 'get_plot_members',
+      payload: plotHash,
+    });
+  }
+
+  async removeGardenMember(input: RemoveMemberInput): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_production',
+      fn_name: 'remove_garden_member',
+      payload: input,
+    });
+  }
+
+  // --- Update Methods (Phase 2) ---
+
+  async updateSeedVariety(input: UpdateSeedVarietyInput): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_knowledge',
+      fn_name: 'update_seed_variety',
+      payload: input,
+    });
+  }
+
+  async updateTraditionalPractice(input: UpdateTraditionalPracticeInput): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_knowledge',
+      fn_name: 'update_traditional_practice',
+      payload: input,
+    });
+  }
+
+  async updateRecipe(input: UpdateRecipeInput): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'food_knowledge',
+      fn_name: 'update_recipe',
+      payload: input,
     });
   }
 }

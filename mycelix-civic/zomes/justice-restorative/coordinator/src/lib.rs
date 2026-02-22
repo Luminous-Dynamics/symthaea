@@ -5,10 +5,22 @@
 
 use hdk::prelude::*;
 use justice_restorative_integrity::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("civic_bridge", requirement, action_name)
+}
 
 /// Create a restorative circle
 #[hdk_extern]
 pub fn create_circle(circle: RestorativeCircle) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "create_circle")?;
     let action_hash = create_entry(&EntryTypes::RestorativeCircle(circle.clone()))?;
     let record = get(action_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created circle".into())))?;
@@ -64,6 +76,7 @@ pub fn get_case_circle(case_id: String) -> ExternResult<Option<Record>> {
 /// Record participant consent
 #[hdk_extern]
 pub fn record_consent(input: ConsentInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "record_consent")?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Circle not found".into())))?;
 
@@ -100,6 +113,7 @@ pub struct ConsentInput {
 /// Record a circle session
 #[hdk_extern]
 pub fn record_session(input: RecordSessionInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "record_session")?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Circle not found".into())))?;
 
@@ -137,6 +151,7 @@ pub struct RecordSessionInput {
 /// Add an agreement to the circle
 #[hdk_extern]
 pub fn add_agreement(input: AddAgreementInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "add_agreement")?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Circle not found".into())))?;
 
@@ -162,6 +177,7 @@ pub struct AddAgreementInput {
 /// Update circle status
 #[hdk_extern]
 pub fn update_circle_status(input: UpdateCircleStatusInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "update_circle_status")?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Circle not found".into())))?;
 
@@ -187,6 +203,7 @@ pub struct UpdateCircleStatusInput {
 /// Complete the circle
 #[hdk_extern]
 pub fn complete_circle(input: CompleteCircleInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "complete_circle")?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Circle not found".into())))?;
 

@@ -3,6 +3,17 @@
 
 use transport_sharing_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -27,6 +38,7 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn post_ride_offer(offer: RideOffer) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "post_ride_offer")?;
     let action_hash = create_entry(&EntryTypes::RideOffer(offer.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_offers".to_string())))?;
@@ -52,6 +64,7 @@ pub fn get_available_rides(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn request_ride(request: RideRequest) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "request_ride")?;
     let action_hash = create_entry(&EntryTypes::RideRequest(request.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_requests".to_string())))?;
@@ -68,6 +81,7 @@ pub fn request_ride(request: RideRequest) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn match_ride(ride_match: RideMatch) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "match_ride")?;
     let _offer = get(ride_match.offer_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Offer not found".into())))?;
     let _request = get(ride_match.request_hash.clone(), GetOptions::default())?
@@ -89,6 +103,7 @@ pub struct UpdateMatchStatusInput {
 
 #[hdk_extern]
 pub fn confirm_match(input: UpdateMatchStatusInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "confirm_match")?;
     let now = sys_time()?.as_micros() / 1_000_000;
     let record = get(input.match_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
@@ -106,6 +121,7 @@ pub fn confirm_match(input: UpdateMatchStatusInput) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn complete_ride(match_hash: ActionHash) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "complete_ride")?;
     let record = get(match_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
     let mut ride_match: RideMatch = record.entry()
@@ -121,6 +137,7 @@ pub fn complete_ride(match_hash: ActionHash) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn cancel_ride(match_hash: ActionHash) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "cancel_ride")?;
     let record = get(match_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
     let mut ride_match: RideMatch = record.entry()
@@ -140,6 +157,7 @@ pub fn cancel_ride(match_hash: ActionHash) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn post_cargo_offer(cargo: CargoOffer) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "post_cargo_offer")?;
     let _vehicle = get(cargo.vehicle_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Vehicle not found".into())))?;
 
@@ -158,6 +176,7 @@ pub fn post_cargo_offer(cargo: CargoOffer) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn review_ride(review: RideReview) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "review_ride")?;
     let action_hash = create_entry(&EntryTypes::RideReview(review.clone()))?;
 
     create_link(review.match_hash, action_hash.clone(), LinkTypes::MatchToReviews, ())?;

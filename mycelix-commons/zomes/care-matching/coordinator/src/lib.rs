@@ -3,6 +3,10 @@
 
 use hdk::prelude::*;
 use care_matching_integrity::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
 
 // holochain_serialized_bytes is a dependency needed by the SerializedBytes derive macro
 // on the local ServiceOffer/ServiceRequest structs below.
@@ -70,6 +74,13 @@ pub struct ServiceRequest {
     pub urgency: UrgencyLevel,
     pub open: bool,
     pub created_at: Timestamp,
+}
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
 }
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -220,6 +231,7 @@ pub fn find_matches_for_request(input: FindMatchesInput) -> ExternResult<Vec<Rec
 /// Suggest a specific match (manual matching by an organizer or system)
 #[hdk_extern]
 pub fn suggest_match(care_match: CareMatch) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "suggest_match")?;
     let action_hash = create_entry(&EntryTypes::CareMatch(care_match.clone()))?;
 
     let req_anchor = ensure_anchor(&format!("request_matches:{}", care_match.request_hash))?;
@@ -270,12 +282,14 @@ pub fn suggest_match(care_match: CareMatch) -> ExternResult<Record> {
 /// Accept a suggested match
 #[hdk_extern]
 pub fn accept_match(match_hash: ActionHash) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "accept_match")?;
     update_match_status(match_hash, MatchStatus::Accepted)
 }
 
 /// Decline a suggested match
 #[hdk_extern]
 pub fn decline_match(match_hash: ActionHash) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "decline_match")?;
     update_match_status(match_hash, MatchStatus::Declined)
 }
 

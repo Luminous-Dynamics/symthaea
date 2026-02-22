@@ -3,6 +3,17 @@
 
 use hdk::prelude::*;
 use housing_units_integrity::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_proposal, requirement_for_voting,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -12,6 +23,7 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Register a new building in the cooperative
 #[hdk_extern]
 pub fn register_building(building: Building) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "register_building")?;
     if building.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Building name must be at most 256 characters".into()
@@ -47,6 +59,7 @@ pub fn register_building(building: Building) -> ExternResult<Record> {
 /// Register a new unit within a building
 #[hdk_extern]
 pub fn register_unit(unit: Unit) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "register_unit")?;
     if unit.unit_number.len() > 64 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Unit number must be at most 64 characters".into()
@@ -88,6 +101,7 @@ pub struct UpdateUnitStatusInput {
 /// Update the status of a unit
 #[hdk_extern]
 pub fn update_unit_status(input: UpdateUnitStatusInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_unit_status")?;
     let record = get(input.unit_action_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Unit not found".into())))?;
 
@@ -187,6 +201,7 @@ pub struct AssignOccupantInput {
 /// Assign an occupant to a unit
 #[hdk_extern]
 pub fn assign_occupant(input: AssignOccupantInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_voting(), "assign_occupant")?;
     let record = get(input.unit_action_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Unit not found".into())))?;
 
@@ -242,6 +257,7 @@ pub fn assign_occupant(input: AssignOccupantInput) -> ExternResult<Record> {
 /// Vacate a unit, removing the occupant
 #[hdk_extern]
 pub fn vacate_unit(unit_action_hash: ActionHash) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "vacate_unit")?;
     let record = get(unit_action_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Unit not found".into())))?;
 

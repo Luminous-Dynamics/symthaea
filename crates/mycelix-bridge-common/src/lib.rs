@@ -18,10 +18,11 @@ pub use consciousness_thresholds::{ConsciousnessThresholds, PhiThresholds};
 
 pub mod consciousness_profile;
 pub use consciousness_profile::{
-    ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier,
-    GateAuditInput, GovernanceEligibility, GovernanceRequirement,
-    evaluate_governance, requirement_for_basic, requirement_for_constitutional,
-    requirement_for_proposal, requirement_for_voting,
+    ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier, GateAuditInput,
+    GovernanceAuditFilter, GovernanceAuditResult, GovernanceEligibility, GovernanceRequirement,
+    evaluate_governance, gate_consciousness, needs_refresh,
+    requirement_for_basic, requirement_for_constitutional, requirement_for_proposal,
+    requirement_for_voting, should_audit, GRACE_PERIOD_US, REFRESH_WINDOW_US,
 };
 
 pub mod routing;
@@ -176,6 +177,24 @@ pub struct CrossClusterDispatchInput {
     pub fn_name: String,
     /// MessagePack-serialized input payload.
     pub payload: Vec<u8>,
+}
+
+/// Wrapper for cross-cluster dispatch with audit correlation.
+///
+/// When a coordinator initiates a cross-cluster action, it generates a
+/// correlation ID and wraps the dispatch so both sides can log the same
+/// ID in their audit trail.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CorrelatedDispatch {
+    /// Unique correlation ID linking audit events across clusters.
+    /// Format: "<agent_hex_prefix>:<timestamp_us>"
+    pub correlation_id: String,
+    /// Target zome in the other cluster.
+    pub target_zome: String,
+    /// Target function name.
+    pub target_fn: String,
+    /// JSON-serialized payload.
+    pub payload: String,
 }
 
 /// Dispatch a synchronous call to a zome in another DNA, with allowlist

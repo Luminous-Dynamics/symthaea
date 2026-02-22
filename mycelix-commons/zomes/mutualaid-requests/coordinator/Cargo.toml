@@ -14,3 +14,4 @@ serde_json = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 mutualaid_requests_integrity = { path = "../integrity" }
 mutualaid-common = { workspace = true }
+mycelix-bridge-common = { workspace = true }

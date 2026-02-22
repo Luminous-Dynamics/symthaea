@@ -2,66 +2,15 @@
 use hdk::prelude::*;
 use media_publication_integrity::*;
 use mycelix_bridge_common::{
-    ConsciousnessCredential, GateAuditInput, GovernanceEligibility, GovernanceRequirement,
-    evaluate_governance, requirement_for_proposal,
+    GovernanceEligibility, GovernanceRequirement,
+    gate_consciousness, requirement_for_proposal,
 };
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    let agent = agent_info()?.agent_initial_pubkey;
-    let did = format!("did:mycelix:{}", agent);
-    let response = call(
-        CallTargetCell::Local,
-        ZomeName::new("civic_bridge"),
-        FunctionName::new("get_consciousness_credential"),
-        None,
-        did,
-    )?;
-    let credential: ConsciousnessCredential = match response {
-        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "Failed to decode consciousness credential: {}", e
-            )))
-        })?,
-        other => {
-            return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Consciousness credential call failed: {:?}", other
-            ))));
-        }
-    };
-    let now_us = sys_time()?.as_micros() as u64;
-    let eligibility = evaluate_governance(&credential, requirement, now_us);
-
-    // Fire audit log (best-effort)
-    let audit = GateAuditInput {
-        action_name: action_name.to_string(),
-        zome_name: zome_info()?.name.to_string(),
-        eligible: eligibility.eligible,
-        actual_tier: format!("{:?}", eligibility.tier),
-        required_tier: format!("{:?}", requirement.min_tier),
-        weight_bp: eligibility.weight_bp,
-    };
-    match call(
-        CallTargetCell::Local,
-        ZomeName::new("civic_bridge"),
-        FunctionName::new("log_governance_gate"),
-        None,
-        audit,
-    ) {
-        Ok(_) => {},
-        Err(e) => { debug!("Audit log failed: {:?}", e); },
-    }
-
-    if !eligibility.eligible {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Consciousness gate: tier {:?} insufficient. Reasons: {}",
-            eligibility.tier,
-            eligibility.reasons.join(", ")
-        ))));
-    }
-    Ok(eligibility)
+    gate_consciousness("civic_bridge", requirement, action_name)
 }
 
 /// Helper function to create an anchor entry and return its hash

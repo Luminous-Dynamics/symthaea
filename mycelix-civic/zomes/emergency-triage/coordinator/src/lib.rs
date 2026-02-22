@@ -3,6 +3,10 @@
 
 use hdk::prelude::*;
 use emergency_triage_integrity::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -10,9 +14,17 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("civic_bridge", requirement, action_name)
+}
+
 /// Triage a patient
 #[hdk_extern]
 pub fn triage_patient(input: TriagePatientInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "triage_patient")?;
     if input.patient_id.is_empty() || input.patient_id.len() > 128 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Patient ID must be 1-128 characters".into()
@@ -104,6 +116,7 @@ pub struct TriagePatientInput {
 /// Update a triage assessment (re-triage)
 #[hdk_extern]
 pub fn update_triage(input: UpdateTriageInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "update_triage")?;
     let current_record = get(input.original_triage_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Triage record not found".into())),
     )?;

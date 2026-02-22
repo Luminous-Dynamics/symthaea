@@ -16,7 +16,26 @@
 // Types — Transport Routes
 // ============================================================================
 
-export type VehicleType = 'Car' | 'Van' | 'Bike' | 'Bus' | 'Cargo';
+export type VehicleType =
+  | 'Car'
+  | 'Van'
+  | 'Bike'
+  | 'Bus'
+  | 'Cargo'
+  | 'ElectricScooter'
+  | 'Helicopter'
+  | 'EVTOL'
+  | 'AirTaxi'
+  | 'Ferry'
+  | 'Boat'
+  | 'Train'
+  | 'Tram'
+  | 'Skateboard'
+  | 'Wheelchair'
+  | 'Segway'
+  | 'AutonomousVehicle'
+  | 'Drone';
+
 export type VehicleStatus = 'Available' | 'InUse' | 'Maintenance' | 'Retired';
 
 export interface Vehicle {
@@ -28,12 +47,22 @@ export interface Vehicle {
   status: VehicleStatus;
 }
 
-export type RouteMode = 'Driving' | 'Transit' | 'Cycling' | 'Walking' | 'Mixed';
+export type TransportMode =
+  | 'Driving'
+  | 'Cycling'
+  | 'Walking'
+  | 'Transit'
+  | 'Mixed'
+  | 'Flying'
+  | 'Water'
+  | 'Rail'
+  | 'Micromobility'
+  | 'Autonomous';
 
 export interface Waypoint {
   lat: number;
   lon: number;
-  name: string;
+  label: string | null;
 }
 
 export interface Route {
@@ -42,7 +71,7 @@ export interface Route {
   waypoints: Waypoint[];
   distance_km: number;
   estimated_minutes: number;
-  mode: RouteMode;
+  mode: TransportMode;
 }
 
 export type StopType = 'Pickup' | 'Dropoff' | 'Transfer';
@@ -52,7 +81,7 @@ export interface Stop {
   name: string;
   location_lat: number;
   location_lon: number;
-  scheduled_time: number;
+  scheduled_time: number | null;
   stop_type: StopType;
 }
 
@@ -61,8 +90,14 @@ export interface Stop {
 // ============================================================================
 
 export type RideOfferStatus = 'Open' | 'Full' | 'InProgress' | 'Completed' | 'Cancelled';
-export type RideRequestStatus = 'Open' | 'Matched' | 'Completed' | 'Cancelled';
+export type RideRequestStatus = 'Open' | 'Matched' | 'Cancelled';
 export type RideMatchStatus = 'Pending' | 'Confirmed' | 'InProgress' | 'Completed' | 'Cancelled';
+export type MatchStatus = 'Pending' | 'Confirmed' | 'InProgress' | 'Completed' | 'Cancelled';
+
+export interface UpdateMatchStatusInput {
+  match_hash: Uint8Array;
+  new_status: MatchStatus;
+}
 
 export interface RideOffer {
   vehicle_hash: Uint8Array;
@@ -107,7 +142,19 @@ export interface CargoOffer {
 // Types — Transport Impact
 // ============================================================================
 
-export type TripMode = 'Driving' | 'ElectricVehicle' | 'Transit' | 'Carpool' | 'Cycling' | 'Walking';
+export type TripMode =
+  | 'Driving'
+  | 'Cycling'
+  | 'Walking'
+  | 'Transit'
+  | 'Carpool'
+  | 'ElectricVehicle'
+  | 'Flying'
+  | 'Water'
+  | 'Rail'
+  | 'Micromobility'
+  | 'Autonomous';
+
 export type CreditSource = 'Cycling' | 'Walking' | 'Transit' | 'Carpool' | 'ElectricVehicle';
 
 export interface TripLog {
@@ -148,6 +195,77 @@ export interface CommunityImpactSummary {
 }
 
 // ============================================================================
+// Types — Maintenance (Phase 3)
+// ============================================================================
+
+export type MaintenanceType = 'Scheduled' | 'Repair' | 'Inspection';
+
+export interface MaintenanceRecord {
+  id: string;
+  vehicle_hash: Uint8Array;
+  maintenance_type: MaintenanceType;
+  description: string;
+  cost: number;
+  completed_at: number;
+  next_due: number | null;
+  mechanic_notes: string;
+}
+
+export interface VehicleFeatures {
+  vehicle_hash: Uint8Array;
+  wheelchair_accessible: boolean;
+  child_seat: boolean;
+  pet_friendly: boolean;
+  air_conditioning: boolean;
+  bike_rack: boolean;
+  luggage_capacity_liters: number;
+}
+
+// ============================================================================
+// Types — Reviews (Phase 2)
+// ============================================================================
+
+export type ReviewerRole = 'Driver' | 'Passenger';
+
+export interface RideReview {
+  match_hash: Uint8Array;
+  reviewer: Uint8Array;
+  role: ReviewerRole;
+  rating: number;
+  comment: string;
+  safety_concern: boolean;
+  created_at: number;
+}
+
+export interface FindNearbyInput {
+  origin_lat: number;
+  origin_lon: number;
+  radius_km: number;
+}
+
+// ============================================================================
+// Types — Carbon Redemption (Phase 2)
+// ============================================================================
+
+export interface RedeemInput {
+  credits_redeemed: number;
+  redeemed_for: string;
+}
+
+export interface CreditRedemption {
+  holder: Uint8Array;
+  credits_redeemed: number;
+  redeemed_for: string;
+  redeemed_at: number;
+}
+
+export interface CarbonBalance {
+  total_earned: number;
+  total_redeemed: number;
+  balance: number;
+}
+
+// ============================================================================
 // Holochain ZomeCallable interface (minimal)
 // ============================================================================
 
@@ -164,7 +282,7 @@ interface ZomeCallable {
 // Constants
 // ============================================================================
 
-const COMMONS_ROLE = 'commons';
+const COMMONS_ROLE = 'commons_care';
 
 export const TRANSPORT_ZOMES = [
   'transport_routes',
@@ -292,7 +410,7 @@ export class TransportClient {
       role_name: COMMONS_ROLE,
       zome_name: 'transport_sharing',
       fn_name: 'confirm_match',
-      payload: matchHash,
+      payload: { match_hash: matchHash, new_status: 'Confirmed' } as UpdateMatchStatusInput,
     });
   }
 
@@ -394,6 +512,120 @@ export class TransportClient {
       zome_name: 'transport_impact',
       fn_name: 'get_community_impact_summary',
       payload: null,
+    });
+  }
+
+  // --- Maintenance (Phase 3) ---
+
+  async logMaintenance(record: MaintenanceRecord): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'transport_routes',
+      fn_name: 'log_maintenance',
+      payload: record,
+    });
+  }
+
+  async getVehicleMaintenance(vehicleHash: Uint8Array): Promise<unknown[]> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'transport_routes',
+      fn_name: 'get_vehicle_maintenance',
+      payload: vehicleHash,
+    });
+  }
+
+  async setVehicleFeatures(features: VehicleFeatures): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'transport_routes',
+      fn_name: 'set_vehicle_features',
+      payload: features,
+    });
+  }
+
+  async getAccessibleVehicles(): Promise<unknown[]> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'transport_routes',
+      fn_name: 'get_accessible_vehicles',
+      payload: null,
+    });
+  }
+
+  async getVehiclesNeedingMaintenance(currentTime: number): Promise<unknown[]> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'transport_routes',
+      fn_name: 'get_vehicles_needing_maintenance',
+      payload: currentTime,
+    });
+  }
+
+  // --- Reviews (Phase 2) ---
+
+  async reviewRide(review: RideReview): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'transport_sharing',
+      fn_name: 'review_ride',
+      payload: review,
+    });
+  }
+
+  async getRideReviews(matchHash: Uint8Array): Promise<unknown[]> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'transport_sharing',
+      fn_name: 'get_ride_reviews',
+      payload: matchHash,
+    });
+  }
+
+  async getDriverRating(driver: Uint8Array): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'transport_sharing',
+      fn_name: 'get_driver_rating',
+      payload: driver,
+    });
+  }
+
+  async findNearbyRides(input: FindNearbyInput): Promise<unknown[]> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'transport_sharing',
+      fn_name: 'find_nearby_rides',
+      payload: input,
+    });
+  }
+
+  // --- Carbon Redemption (Phase 2) ---
+
+  async redeemCredits(input: RedeemInput): Promise<unknown> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'transport_impact',
+      fn_name: 'redeem_credits',
+      payload: input,
+    });
+  }
+
+  async getMyRedemptions(): Promise<unknown[]> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'transport_impact',
+      fn_name: 'get_my_redemptions',
+      payload: null,
+    });
+  }
+
+  async getAgentCarbonBalance(agent: Uint8Array): Promise<CarbonBalance> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: 'transport_impact',
+      fn_name: 'get_agent_carbon_balance',
+      payload: agent,
     });
   }
 }

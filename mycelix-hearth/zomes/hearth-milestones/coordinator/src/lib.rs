@@ -7,6 +7,21 @@ use hdk::prelude::*;
 use hearth_coordinator_common::{records_from_links, require_guardian, require_membership};
 use hearth_milestones_integrity::*;
 use hearth_types::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+// ============================================================================
+// Consciousness Gating
+// ============================================================================
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("hearth_bridge", requirement, action_name)
+}
 
 // ============================================================================
 // Input Types
@@ -41,6 +56,7 @@ pub struct BeginTransitionInput {
 /// Creates the Milestone entry and links it to both the hearth and the member.
 #[hdk_extern]
 pub fn record_milestone(input: RecordMilestoneInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "record_milestone")?;
     require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
 
@@ -89,6 +105,7 @@ pub fn record_milestone(input: RecordMilestoneInput) -> ExternResult<Record> {
 /// Starts in the PreLiminal phase with recategorization blocked.
 #[hdk_extern]
 pub fn begin_transition(input: BeginTransitionInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "begin_transition")?;
     require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
 
@@ -134,6 +151,7 @@ pub fn begin_transition(input: BeginTransitionInput) -> ExternResult<Record> {
 /// Only guardians (Founder, Elder, Adult) can advance transitions.
 #[hdk_extern]
 pub fn advance_transition(transition_hash: ActionHash) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "advance_transition")?;
     let record = get(transition_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Transition not found".into())
     ))?;
@@ -176,6 +194,7 @@ pub fn advance_transition(transition_hash: ActionHash) -> ExternResult<Record> {
 /// completed first). Only guardians can complete transitions.
 #[hdk_extern]
 pub fn complete_transition(transition_hash: ActionHash) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "complete_transition")?;
     let now = sys_time()?;
 
     let record = get(transition_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(

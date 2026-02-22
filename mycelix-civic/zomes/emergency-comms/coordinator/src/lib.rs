@@ -3,6 +3,10 @@
 
 use emergency_comms_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -10,9 +14,17 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("civic_bridge", requirement, action_name)
+}
+
 /// Send an emergency message (works offline - stored locally, synced later)
 #[hdk_extern]
 pub fn send_message(input: SendMessageInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "send_message")?;
     if input.content.is_empty() || input.content.len() > 4096 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Content must be 1-4096 characters".into()
@@ -86,6 +98,7 @@ pub struct SendMessageInput {
 /// Create an emergency communication channel
 #[hdk_extern]
 pub fn create_channel(input: CreateChannelInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "create_channel")?;
     if input.name.is_empty() || input.name.len() > 128 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Channel name must be 1-128 characters".into()
@@ -134,6 +147,7 @@ pub struct CreateChannelInput {
 /// Issue an emergency broadcast
 #[hdk_extern]
 pub fn broadcast(input: BroadcastInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "broadcast")?;
     if input.content.is_empty() || input.content.len() > 2048 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Broadcast content must be 1-2048 characters".into()
@@ -188,6 +202,7 @@ pub struct BroadcastInput {
 /// Update an emergency message
 #[hdk_extern]
 pub fn update_message(input: UpdateMessageInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_proposal(), "update_message")?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::EmergencyMessage(input.updated_entry),
@@ -204,6 +219,7 @@ pub struct UpdateMessageInput {
 /// Update an emergency channel
 #[hdk_extern]
 pub fn update_channel(input: UpdateChannelInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_proposal(), "update_channel")?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::EmergencyChannel(input.updated_entry),
@@ -220,6 +236,7 @@ pub struct UpdateChannelInput {
 /// Update a broadcast
 #[hdk_extern]
 pub fn update_broadcast(input: UpdateBroadcastInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_proposal(), "update_broadcast")?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::Broadcast(input.updated_entry),
@@ -317,6 +334,7 @@ pub fn get_unsynced_messages(_: ()) -> ExternResult<Vec<Record>> {
 /// Mark a message as synced (remove from unsynced list)
 #[hdk_extern]
 pub fn mark_synced(message_hash: ActionHash) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "mark_synced")?;
     // Get and update the message
     let current_record = get(message_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Message not found".into())

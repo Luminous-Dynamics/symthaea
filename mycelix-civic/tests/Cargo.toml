@@ -30,3 +30,7 @@ path = "sweettest_bridge_media.rs"
 [[test]]
 name = "sweettest_justice_emergency"
 path = "sweettest_justice_emergency.rs"
+
+[[test]]
+name = "sweettest_consciousness_gating"
+path = "sweettest_consciousness_gating.rs"

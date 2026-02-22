@@ -3,6 +3,17 @@
 
 use water_flow_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -30,6 +41,7 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 /// Register a new water source
 #[hdk_extern]
 pub fn register_source(source: WaterSource) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "register_source")?;
     if source.id.is_empty() || source.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Source ID must be 1-256 characters".into()
@@ -110,6 +122,7 @@ pub fn get_source_status(action_hash: ActionHash) -> ExternResult<SourceStatus> 
 /// Update source status (steward only)
 #[hdk_extern]
 pub fn update_source_status(input: UpdateSourceStatusInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "update_source_status")?;
     let agent_info = agent_info()?;
     let record = get(input.source_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Source not found".into())
@@ -152,6 +165,7 @@ pub struct UpdateSourceStatusInput {
 /// Allocate a water share from a source to a holder
 #[hdk_extern]
 pub fn allocate_shares(share: WaterShare) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "allocate_shares")?;
     let agent_info = agent_info()?;
 
     // Verify caller is steward of the source
@@ -257,6 +271,7 @@ pub fn get_my_balance(_: ()) -> ExternResult<H2OCredit> {
 /// Transfer H2O credits to another agent
 #[hdk_extern]
 pub fn transfer_credits(input: TransferCreditsInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "transfer_credits")?;
     let agent_info = agent_info()?;
     let from_agent = agent_info.agent_initial_pubkey.clone();
 
@@ -331,6 +346,7 @@ pub struct TransferCreditsInput {
 /// Record water usage against a source
 #[hdk_extern]
 pub fn record_usage(input: RecordUsageInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "record_usage")?;
     let agent_info = agent_info()?;
     let agent_key = agent_info.agent_initial_pubkey.clone();
     let now = sys_time()?;

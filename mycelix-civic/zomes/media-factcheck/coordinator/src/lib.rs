@@ -1,6 +1,17 @@
 //! Fact-Check Coordinator Zome
 use hdk::prelude::*;
 use media_factcheck_integrity::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_proposal,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("civic_bridge", requirement, action_name)
+}
 
 /// Helper function to create an anchor entry and return its hash
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
@@ -11,6 +22,7 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn submit_fact_check(input: SubmitFactCheckInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "submit_fact_check")?;
     let now = sys_time()?;
     let check = FactCheck {
         id: format!("factcheck:{}:{}", input.publication_id, now.as_micros()),
@@ -71,6 +83,7 @@ pub fn search_fact_checks_for_claim(claim_text: String) -> ExternResult<Vec<Reco
 
 #[hdk_extern]
 pub fn update_source_credibility(input: UpdateCredibilityInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "update_source_credibility")?;
     let now = sys_time()?;
     let source = SourceCredibility {
         source_id: input.source_id,
@@ -145,6 +158,7 @@ pub fn get_fact_checks_by_verdict(verdict: FactCheckVerdict) -> ExternResult<Vec
 /// Dispute a fact check
 #[hdk_extern]
 pub fn dispute_fact_check(input: DisputeFactCheckInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "dispute_fact_check")?;
     let now = sys_time()?;
     let dispute = FactCheckDispute {
         id: format!("dispute:{}:{}", input.fact_check_id, now.as_micros()),
@@ -173,6 +187,7 @@ pub struct DisputeFactCheckInput {
 /// Resolve a fact check dispute
 #[hdk_extern]
 pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "resolve_dispute")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::FactCheckDispute)?))
         .include_entries(true);
@@ -316,6 +331,7 @@ pub fn aggregate_checker_stats(checker_did: String, verdicts: &[FactCheckVerdict
 /// Add additional evidence to fact check
 #[hdk_extern]
 pub fn add_evidence(input: AddEvidenceInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "add_evidence")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::FactCheck)?))
         .include_entries(true);
@@ -350,6 +366,7 @@ pub struct AddEvidenceInput {
 /// Update fact check verdict
 #[hdk_extern]
 pub fn update_verdict(input: UpdateVerdictInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "update_verdict")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::FactCheck)?))
         .include_entries(true);

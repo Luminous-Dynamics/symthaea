@@ -3,6 +3,10 @@
 
 use hdk::prelude::*;
 use water_purity_integrity::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -21,6 +25,13 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
     Ok(records)
 }
 
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
+
 // ============================================================================
 // QUALITY READINGS
 // ============================================================================
@@ -28,6 +39,7 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 /// Submit a new water quality reading
 #[hdk_extern]
 pub fn submit_reading(reading: QualityReading) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "submit_reading")?;
     let action_hash = create_entry(&EntryTypes::QualityReading(reading.clone()))?;
 
     // Link source to reading
@@ -156,6 +168,7 @@ pub struct PotabilityResult {
 /// Raise a contamination alert for a water source
 #[hdk_extern]
 pub fn raise_alert(alert: ContaminationAlert) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "raise_alert")?;
     if alert.contaminant.is_empty() || alert.contaminant.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Contaminant name must be 1-256 characters".into()
@@ -214,6 +227,7 @@ pub fn get_active_alerts(_: ()) -> ExternResult<Vec<Record>> {
 /// Resolve an alert by marking it with a resolution timestamp
 #[hdk_extern]
 pub fn resolve_alert(input: ResolveAlertInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "resolve_alert")?;
     let record = get(input.alert_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Alert not found".into())))?;
     let mut alert: ContaminationAlert = record
@@ -257,6 +271,7 @@ pub struct ResolveAlertInput {
 /// Start a remediation action for a contamination alert
 #[hdk_extern]
 pub fn start_remediation(remediation: Remediation) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "start_remediation")?;
     if remediation.method.is_empty() || remediation.method.len() > 1024 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Remediation method must be 1-1024 characters".into()
@@ -281,6 +296,7 @@ pub fn start_remediation(remediation: Remediation) -> ExternResult<Record> {
 /// Complete a remediation with verification
 #[hdk_extern]
 pub fn complete_remediation(input: CompleteRemediationInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "complete_remediation")?;
     let agent_info = agent_info()?;
     let record = get(input.remediation_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Remediation not found".into())
