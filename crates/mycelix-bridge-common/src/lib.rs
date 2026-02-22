@@ -21,8 +21,9 @@ pub use consciousness_profile::{
     ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier, GateAuditInput,
     GovernanceAuditFilter, GovernanceAuditResult, GovernanceEligibility, GovernanceRequirement,
     evaluate_governance, gate_consciousness, needs_refresh,
-    requirement_for_basic, requirement_for_constitutional, requirement_for_proposal,
-    requirement_for_voting, should_audit, GRACE_PERIOD_US, REFRESH_WINDOW_US,
+    requirement_for_basic, requirement_for_constitutional, requirement_for_guardian,
+    requirement_for_proposal, requirement_for_voting, should_audit, GRACE_PERIOD_US,
+    REFRESH_WINDOW_US,
 };
 
 pub mod routing;

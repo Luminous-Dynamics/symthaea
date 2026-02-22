@@ -9,6 +9,7 @@
 
 import { SdkError, SdkErrorCode, ZomeCallError } from './errors.js';
 import { withRetryAndTimeout, type RetryConfig } from './retry.js';
+import { ConsciousnessGateError, withGateRetry } from './consciousness-gate.js';
 
 import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
@@ -27,6 +28,13 @@ export interface ZomeClientConfig {
 
   /** Retry configuration for failed calls */
   retry?: Partial<RetryConfig>;
+
+  /**
+   * Optional callback to refresh the consciousness credential.
+   * When provided, write calls (callZomeOnce) automatically retry once
+   * on expired credential errors via withGateRetry.
+   */
+  gateRefreshFn?: () => Promise<void>;
 }
 
 /**
@@ -79,11 +87,15 @@ export abstract class ZomeClient {
   /** Retry configuration */
   protected readonly retryConfig: Partial<RetryConfig>;
 
+  /** Optional consciousness gate credential refresh callback */
+  protected readonly gateRefreshFn?: () => Promise<void>;
+
   constructor(client: AppClient, config: Partial<ZomeClientConfig>) {
     this.client = client;
     this.roleName = config.roleName ?? 'mycelix';
     this.timeout = config.timeout ?? DEFAULT_ZOME_CONFIG.timeout!;
     this.retryConfig = config.retry ?? DEFAULT_ZOME_CONFIG.retry!;
+    this.gateRefreshFn = config.gateRefreshFn;
   }
 
   /**
@@ -129,18 +141,27 @@ export abstract class ZomeClient {
    * @throws ZomeCallError if the call fails
    */
   protected async callZomeOnce<T>(fnName: string, payload: unknown): Promise<T> {
-    try {
-      const result = await this.client.callZome({
-        role_name: this.roleName,
-        zome_name: this.zomeName,
-        fn_name: fnName,
-        payload,
-      });
+    const doCall = async (): Promise<T> => {
+      try {
+        const result = await this.client.callZome({
+          role_name: this.roleName,
+          zome_name: this.zomeName,
+          fn_name: fnName,
+          payload,
+        });
 
-      return result as T;
-    } catch (error) {
-      throw this.wrapZomeError(fnName, payload, error);
+        return result as T;
+      } catch (error) {
+        throw this.wrapZomeError(fnName, payload, error);
+      }
+    };
+
+    // When gateRefreshFn is configured, wrap writes with automatic
+    // retry on expired consciousness credentials
+    if (this.gateRefreshFn) {
+      return withGateRetry(doCall, this.gateRefreshFn);
     }
+    return doCall();
   }
 
   /**

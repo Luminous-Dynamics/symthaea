@@ -510,6 +510,8 @@ fn resolve_food(qt: &str) -> CommonsZome {
         || qt.contains("market")
         || qt.contains("order")
         || qt.contains("allergen")
+        || qt.contains("product")
+        || qt.contains("listing")
     {
         CommonsZome::FoodDistribution
     } else if qt.contains("preservation") || qt.contains("batch") || qt.contains("storage") {
@@ -519,6 +521,7 @@ fn resolve_food(qt: &str) -> CommonsZome {
         || qt.contains("recipe")
         || qt.contains("nutrient")
         || qt.contains("rating")
+        || qt.contains("practice")
     {
         CommonsZome::FoodKnowledge
     } else {
@@ -535,6 +538,7 @@ fn resolve_transport(qt: &str) -> CommonsZome {
         || qt.contains("redeem")
         || qt.contains("balance")
         || qt.contains("redemption")
+        || qt.contains("trip")
     {
         CommonsZome::TransportImpact
     } else {
@@ -549,6 +553,8 @@ fn resolve_support(qt: &str) -> CommonsZome {
         || qt.contains("satisfaction")
         || qt.contains("undo")
         || qt.contains("escalat")
+        || qt.contains("comment")
+        || qt.contains("action")
     {
         CommonsZome::SupportTickets
     } else if qt.contains("diagnostic")
@@ -1735,5 +1741,149 @@ mod tests {
     fn domain_from_str_loose_unicode_not_matched() {
         assert_eq!(BridgeDomain::from_str_loose("próperty"), None);
         assert_eq!(BridgeDomain::from_str_loose("justíce"), None);
+    }
+
+    // -- New keyword routing (post-enrichment) --
+
+    #[test]
+    fn food_practice_routes_to_knowledge() {
+        let d = BridgeDomain::Food;
+        assert_eq!(resolve_commons_zome(d, "share_practice"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "get_practices_by_category"), Some(CommonsZome::FoodKnowledge));
+    }
+
+    #[test]
+    fn food_product_listing_routes_to_distribution() {
+        let d = BridgeDomain::Food;
+        assert_eq!(resolve_commons_zome(d, "list_product"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(resolve_commons_zome(d, "get_market_listings"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(resolve_commons_zome(d, "get_producer_listings"), Some(CommonsZome::FoodDistribution));
+    }
+
+    #[test]
+    fn transport_trip_routes_to_impact() {
+        let d = BridgeDomain::Transport;
+        assert_eq!(resolve_commons_zome(d, "create_trip"), Some(CommonsZome::TransportImpact));
+        assert_eq!(resolve_commons_zome(d, "get_trip_carbon"), Some(CommonsZome::TransportImpact));
+    }
+
+    #[test]
+    fn support_comment_action_routes_to_tickets() {
+        let d = BridgeDomain::Support;
+        assert_eq!(resolve_commons_zome(d, "add_comment"), Some(CommonsZome::SupportTickets));
+        assert_eq!(resolve_commons_zome(d, "get_ticket_comments"), Some(CommonsZome::SupportTickets));
+        assert_eq!(resolve_commons_zome(d, "take_action"), Some(CommonsZome::SupportTickets));
+        assert_eq!(resolve_commons_zome(d, "list_actions"), Some(CommonsZome::SupportTickets));
+    }
+
+    // -- Exhaustive SDK function name dispatch coverage --
+
+    #[test]
+    fn food_client_all_function_names_dispatch_correctly() {
+        let d = BridgeDomain::Food;
+        // Production (default)
+        assert_eq!(resolve_commons_zome(d, "register_plot"), Some(CommonsZome::FoodProduction));
+        assert_eq!(resolve_commons_zome(d, "get_plot"), Some(CommonsZome::FoodProduction));
+        assert_eq!(resolve_commons_zome(d, "get_all_plots"), Some(CommonsZome::FoodProduction));
+        assert_eq!(resolve_commons_zome(d, "plant_crop"), Some(CommonsZome::FoodProduction));
+        assert_eq!(resolve_commons_zome(d, "record_harvest"), Some(CommonsZome::FoodProduction));
+        assert_eq!(resolve_commons_zome(d, "get_plot_crops"), Some(CommonsZome::FoodProduction));
+        assert_eq!(resolve_commons_zome(d, "get_crop_yields"), Some(CommonsZome::FoodProduction));
+        assert_eq!(resolve_commons_zome(d, "create_season_plan"), Some(CommonsZome::FoodProduction));
+        assert_eq!(resolve_commons_zome(d, "get_season_plans"), Some(CommonsZome::FoodProduction));
+        assert_eq!(resolve_commons_zome(d, "add_garden_member"), Some(CommonsZome::FoodProduction));
+        assert_eq!(resolve_commons_zome(d, "get_plot_members"), Some(CommonsZome::FoodProduction));
+        assert_eq!(resolve_commons_zome(d, "remove_garden_member"), Some(CommonsZome::FoodProduction));
+        // Distribution
+        assert_eq!(resolve_commons_zome(d, "create_market"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(resolve_commons_zome(d, "get_all_markets"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(resolve_commons_zome(d, "list_product"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(resolve_commons_zome(d, "get_market_listings"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(resolve_commons_zome(d, "get_producer_listings"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(resolve_commons_zome(d, "place_order"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(resolve_commons_zome(d, "fulfill_order"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(resolve_commons_zome(d, "cancel_order"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(resolve_commons_zome(d, "get_my_orders"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(resolve_commons_zome(d, "search_allergen_safe"), Some(CommonsZome::FoodDistribution));
+        // Preservation
+        assert_eq!(resolve_commons_zome(d, "start_batch"), Some(CommonsZome::FoodPreservation));
+        assert_eq!(resolve_commons_zome(d, "complete_batch"), Some(CommonsZome::FoodPreservation));
+        assert_eq!(resolve_commons_zome(d, "get_batch"), Some(CommonsZome::FoodPreservation));
+        assert_eq!(resolve_commons_zome(d, "register_storage"), Some(CommonsZome::FoodPreservation));
+        assert_eq!(resolve_commons_zome(d, "get_storage_inventory"), Some(CommonsZome::FoodPreservation));
+        assert_eq!(resolve_commons_zome(d, "get_agent_batches"), Some(CommonsZome::FoodPreservation));
+        // Knowledge
+        assert_eq!(resolve_commons_zome(d, "catalog_seed"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "get_seed"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "get_seeds_by_species"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "share_practice"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "get_practices_by_category"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "share_recipe"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "get_recipes_by_tag"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "search_knowledge"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "offer_seeds"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "request_seeds"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "get_available_seeds"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "get_open_seed_requests"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "match_seed_request"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "rate_seed_exchange"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "get_exchange_ratings"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "get_grower_ratings"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "add_nutrient_profile"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "get_nutrient_profile"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "update_seed_variety"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "update_traditional_practice"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "update_recipe"), Some(CommonsZome::FoodKnowledge));
+    }
+
+    #[test]
+    fn transport_client_all_function_names_dispatch_correctly() {
+        let d = BridgeDomain::Transport;
+        // Routes (default)
+        assert_eq!(resolve_commons_zome(d, "create_route"), Some(CommonsZome::TransportRoutes));
+        assert_eq!(resolve_commons_zome(d, "get_route"), Some(CommonsZome::TransportRoutes));
+        assert_eq!(resolve_commons_zome(d, "log_maintenance"), Some(CommonsZome::TransportRoutes));
+        assert_eq!(resolve_commons_zome(d, "get_vehicle_maintenance"), Some(CommonsZome::TransportRoutes));
+        assert_eq!(resolve_commons_zome(d, "set_vehicle_features"), Some(CommonsZome::TransportRoutes));
+        assert_eq!(resolve_commons_zome(d, "get_accessible_vehicles"), Some(CommonsZome::TransportRoutes));
+        assert_eq!(resolve_commons_zome(d, "get_driver_rating"), Some(CommonsZome::TransportRoutes));
+        // Sharing
+        assert_eq!(resolve_commons_zome(d, "offer_ride"), Some(CommonsZome::TransportSharing));
+        assert_eq!(resolve_commons_zome(d, "find_nearby_rides"), Some(CommonsZome::TransportSharing));
+        assert_eq!(resolve_commons_zome(d, "review_ride"), Some(CommonsZome::TransportSharing));
+        assert_eq!(resolve_commons_zome(d, "get_ride_reviews"), Some(CommonsZome::TransportSharing));
+        assert_eq!(resolve_commons_zome(d, "share_vehicle"), Some(CommonsZome::TransportSharing));
+        assert_eq!(resolve_commons_zome(d, "offer_cargo_space"), Some(CommonsZome::TransportSharing));
+        // Impact
+        assert_eq!(resolve_commons_zome(d, "log_trip"), Some(CommonsZome::TransportImpact));
+        assert_eq!(resolve_commons_zome(d, "get_trip_carbon"), Some(CommonsZome::TransportImpact));
+        assert_eq!(resolve_commons_zome(d, "record_emission"), Some(CommonsZome::TransportImpact));
+        assert_eq!(resolve_commons_zome(d, "get_carbon_balance"), Some(CommonsZome::TransportImpact));
+        assert_eq!(resolve_commons_zome(d, "redeem_credits"), Some(CommonsZome::TransportImpact));
+        assert_eq!(resolve_commons_zome(d, "get_my_redemptions"), Some(CommonsZome::TransportImpact));
+    }
+
+    #[test]
+    fn support_client_all_function_names_dispatch_correctly() {
+        let d = BridgeDomain::Support;
+        // Knowledge (default)
+        assert_eq!(resolve_commons_zome(d, "create_article"), Some(CommonsZome::SupportKnowledge));
+        assert_eq!(resolve_commons_zome(d, "search_by_category"), Some(CommonsZome::SupportKnowledge));
+        assert_eq!(resolve_commons_zome(d, "create_resolution"), Some(CommonsZome::SupportKnowledge));
+        // Tickets
+        assert_eq!(resolve_commons_zome(d, "create_ticket"), Some(CommonsZome::SupportTickets));
+        assert_eq!(resolve_commons_zome(d, "escalate_ticket"), Some(CommonsZome::SupportTickets));
+        assert_eq!(resolve_commons_zome(d, "create_preemptive_alert"), Some(CommonsZome::SupportTickets));
+        assert_eq!(resolve_commons_zome(d, "submit_satisfaction"), Some(CommonsZome::SupportTickets));
+        assert_eq!(resolve_commons_zome(d, "create_undo"), Some(CommonsZome::SupportTickets));
+        assert_eq!(resolve_commons_zome(d, "add_comment"), Some(CommonsZome::SupportTickets));
+        assert_eq!(resolve_commons_zome(d, "get_ticket_comments"), Some(CommonsZome::SupportTickets));
+        assert_eq!(resolve_commons_zome(d, "take_action"), Some(CommonsZome::SupportTickets));
+        // Diagnostics
+        assert_eq!(resolve_commons_zome(d, "run_diagnostic"), Some(CommonsZome::SupportDiagnostics));
+        assert_eq!(resolve_commons_zome(d, "register_helper"), Some(CommonsZome::SupportDiagnostics));
+        assert_eq!(resolve_commons_zome(d, "update_availability"), Some(CommonsZome::SupportDiagnostics));
+        assert_eq!(resolve_commons_zome(d, "publish_cognitive_update"), Some(CommonsZome::SupportDiagnostics));
+        assert_eq!(resolve_commons_zome(d, "set_privacy_preference"), Some(CommonsZome::SupportDiagnostics));
     }
 }

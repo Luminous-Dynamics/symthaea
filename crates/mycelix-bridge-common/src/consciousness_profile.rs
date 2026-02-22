@@ -464,6 +464,17 @@ pub fn requirement_for_constitutional() -> GovernanceRequirement {
     }
 }
 
+/// Requirement for guardian-level operations (system administration, etc.).
+///
+/// Guardian tier + identity >= 0.7 + community >= 0.5.
+pub fn requirement_for_guardian() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Guardian,
+        min_identity: Some(0.7),
+        min_community: Some(0.5),
+    }
+}
+
 // ============================================================================
 // Shared consciousness gate (HDK-dependent)
 // ============================================================================

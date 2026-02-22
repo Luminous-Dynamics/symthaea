@@ -861,18 +861,23 @@ fn cache_credential(credential: &ConsciousnessCredential) -> ExternResult<()> {
 pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCredential> {
     // 1. Check cache first (avoids cross-cluster call if recent)
     if let Some(cached) = get_cached_credential(&did)? {
-        // Proactive refresh — serve cached credential but queue re-issue for next call
+        // Proactive refresh — attempt inline refresh, fall back to cached if it fails
         let now_us = sys_time()?.as_micros() as u64;
         if needs_refresh(&cached, now_us) {
-            // Best-effort background refresh — don't block the current call
-            debug!("Credential nearing expiry, queuing proactive refresh for {}", cached.did);
-            let _ = call(
+            debug!("Credential nearing expiry, attempting proactive refresh for {}", cached.did);
+            if let Ok(ZomeCallResponse::Ok(response)) = call(
                 CallTargetCell::OtherRole(IDENTITY_ROLE.into()),
                 ZomeName::new("identity_bridge"),
                 FunctionName::new("refresh_consciousness_credential"),
                 None,
                 cached.did.clone(),
-            );
+            ) {
+                if let Ok(refreshed) = response.decode::<ConsciousnessCredential>() {
+                    let _ = cache_credential(&refreshed);
+                    return Ok(refreshed);
+                }
+            }
+            // Refresh failed — serve cached credential (still valid, just nearing expiry)
         }
         return Ok(cached);
     }
@@ -923,14 +928,19 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
     // Proactive refresh check (covers edge case: identity issued a short-lived credential)
     let now_us = sys_time()?.as_micros() as u64;
     if needs_refresh(&credential, now_us) {
-        debug!("Freshly-issued credential nearing expiry, queuing proactive refresh for {}", credential.did);
-        let _ = call(
+        debug!("Freshly-issued credential nearing expiry, attempting proactive refresh for {}", credential.did);
+        if let Ok(ZomeCallResponse::Ok(response)) = call(
             CallTargetCell::OtherRole(IDENTITY_ROLE.into()),
             ZomeName::new("identity_bridge"),
             FunctionName::new("refresh_consciousness_credential"),
             None,
             credential.did.clone(),
-        );
+        ) {
+            if let Ok(refreshed) = response.decode::<ConsciousnessCredential>() {
+                let _ = cache_credential(&refreshed);
+                return Ok(refreshed);
+            }
+        }
     }
 
     Ok(credential)
