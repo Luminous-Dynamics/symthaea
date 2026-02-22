@@ -122,7 +122,7 @@ fn predict_impact_time(obj_pos: [f64; 3], obj_vel: [f64; 3], target_pos: [f64; 3
     let b = -vz; // make positive since vz is negative
     let c = -dz;
 
-    let disc = b * b + 4.0 * a * c;
+    let disc = b * b - 4.0 * a * c;
     if disc < 0.0 {
         return f64::INFINITY;
     }
@@ -151,12 +151,12 @@ fn compute_human_danger(beam_pos: [f64; 3], beam_vel: [f64; 3], human_pos: [f64;
 
     let tti = predict_impact_time(beam_pos, beam_vel, human_pos);
 
-    if tti > 2.0 || tti == f64::INFINITY {
+    if tti > 3.0 || tti == f64::INFINITY {
         return 0.0;
     }
 
     // Danger increases as time-to-impact decreases and horizontal alignment improves
-    let time_danger = (1.0 - tti / 2.0).clamp(0.0, 1.0);
+    let time_danger = (1.0 - tti / 3.0).clamp(0.0, 1.0);
     let alignment = (1.0 - horiz_dist / 1.0).clamp(0.0, 1.0);
 
     (time_danger * alignment).clamp(0.0, 1.0)
@@ -223,8 +223,8 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
         .sqrt();
         let mission_progress = (1.0 - mission_dist / 5.0).clamp(0.0, 1.0);
 
-        // Dynamic setpoint: if human_danger is high, redirect toward beam intercept
-        if human_danger > 0.3 && abort_step.is_none() {
+        // Dynamic setpoint: if human_danger is detected, redirect toward beam intercept
+        if human_danger > 0.1 && abort_step.is_none() {
             // Abort mission — redirect to beam intercept point
             abort_step = Some(step);
             events.push(SacrificeEvent {
@@ -237,7 +237,7 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
             });
         }
 
-        if human_danger > 0.3 {
+        if human_danger > 0.1 {
             // Setpoint shifts toward the beam's predicted impact point
             setpoint.position = [
                 beam_pos[0],
@@ -326,9 +326,9 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
                 fep_agent.step_extended(sim.state(), &setpoint, human_danger, mission_progress);
 
             // The tau modulation from danger is amplified
-            let danger_boost = if human_danger > 0.5 {
+            let danger_boost = if human_danger > 0.3 {
                 0.5 // Extreme tau drop — maximum reactivity
-            } else if human_danger > 0.2 {
+            } else if human_danger > 0.1 {
                 0.7
             } else {
                 fep_result.tau_factor

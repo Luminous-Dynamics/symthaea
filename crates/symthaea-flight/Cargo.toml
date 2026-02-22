@@ -40,3 +40,7 @@ swarm = ["mujoco", "dep:rayon", "dep:parking_lot"]
 [[example]]
 name = "mujoco_survival_reflex"
 required-features = ["mujoco"]
+
+[[example]]
+name = "mujoco_kinetic_sacrifice"
+required-features = ["mujoco"]

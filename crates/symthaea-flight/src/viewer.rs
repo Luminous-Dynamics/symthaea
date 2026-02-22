@@ -4,42 +4,81 @@
 //! of quadrotor flight trajectories. Feature-gated behind `mujoco-viewer`.
 //!
 //! Two modes:
-//! - **Passive viewer**: renders in background, simulation runs in main thread
-//! - **Headless**: no viewer, just simulation (for benchmarks/CI)
+//! - **Passive viewer** (`mujoco-viewer` feature): real 3D rendering via MjViewer
+//! - **Headless** (default): no viewer, just simulation (for benchmarks/CI)
 
 use crate::mujoco_sim::MuJoCoSimulator;
 
 /// Interactive flight viewer wrapping the MuJoCo visualizer.
 ///
-/// Provides real-time 3D rendering of the quadrotor and its trajectory,
-/// with camera controls and telemetry overlay.
+/// With `mujoco-viewer` feature: opens a window with real-time 3D rendering,
+/// camera controls, and physics visualization. Without it: a no-op stub that
+/// always reports "running" (for headless benchmarks/CI).
 pub struct FlightViewer {
     title: String,
     frame_count: u64,
-    // The mujoco-viewer feature is not yet wired — this is a stub.
-    // When enabled, it would hold an MjViewer instance that renders
-    // passively in a separate thread.
+    #[cfg(feature = "mujoco-viewer")]
+    viewer: Option<mujoco_rs::viewer::MjViewer<std::sync::Arc<mujoco_rs::prelude::MjModel>>>,
 }
 
 impl FlightViewer {
     /// Create a new viewer for the given simulator.
     ///
-    /// Without the `mujoco-viewer` feature, this is a no-op stub.
-    pub fn new(_sim: &MuJoCoSimulator, title: &str) -> Self {
-        Self {
-            title: title.to_string(),
-            frame_count: 0,
+    /// With `mujoco-viewer`: opens a passive viewer window.
+    /// Without: returns a headless stub.
+    pub fn new(sim: &MuJoCoSimulator, title: &str) -> Self {
+        #[cfg(feature = "mujoco-viewer")]
+        {
+            let viewer = match mujoco_rs::viewer::MjViewer::launch_passive(
+                sim.model_arc().clone(),
+                0,
+            ) {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    eprintln!("[FlightViewer] Failed to launch viewer: {e:?} — running headless");
+                    None
+                }
+            };
+            Self {
+                title: title.to_string(),
+                frame_count: 0,
+                viewer,
+            }
+        }
+        #[cfg(not(feature = "mujoco-viewer"))]
+        {
+            let _ = sim;
+            Self {
+                title: title.to_string(),
+                frame_count: 0,
+            }
         }
     }
 
-    /// Render one frame. Returns true (viewer stub always "runs").
-    pub fn render(&mut self, _sim: &mut MuJoCoSimulator) -> bool {
+    /// Render one frame. Syncs simulation state to the viewer and renders.
+    /// Returns true if the viewer window is still open (always true for headless).
+    pub fn render(&mut self, sim: &mut MuJoCoSimulator) -> bool {
         self.frame_count += 1;
+        #[cfg(feature = "mujoco-viewer")]
+        {
+            if let Some(ref mut viewer) = self.viewer {
+                viewer.sync_data(sim.data_mut());
+                viewer.render();
+                return viewer.running();
+            }
+        }
+        let _ = sim;
         true
     }
 
     /// Check if the viewer window is still open.
     pub fn is_running(&self) -> bool {
+        #[cfg(feature = "mujoco-viewer")]
+        {
+            if let Some(ref viewer) = self.viewer {
+                return viewer.running();
+            }
+        }
         true
     }
 
