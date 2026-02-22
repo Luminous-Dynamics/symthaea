@@ -3,6 +3,14 @@
 
 use hdk::prelude::*;
 use water_wisdom_integrity::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(requirement: &GovernanceRequirement, action_name: &str) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -28,6 +36,7 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 /// Record a traditional water management practice
 #[hdk_extern]
 pub fn record_practice(practice: TraditionalPractice) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "record_practice")?;
     if practice.title.is_empty() || practice.title.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Title must be 1-256 characters".into()
@@ -122,6 +131,7 @@ pub fn get_all_practices(_: ()) -> ExternResult<Vec<Record>> {
 /// Share a conservation method
 #[hdk_extern]
 pub fn share_conservation_method(method: ConservationMethod) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "share_conservation_method")?;
     if method.title.is_empty() || method.title.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Title must be 1-256 characters".into()
@@ -181,6 +191,7 @@ pub fn get_conservation_methods(_: ()) -> ExternResult<Vec<Record>> {
 /// Record an observed climate-water pattern
 #[hdk_extern]
 pub fn record_climate_pattern(pattern: ClimateWaterPattern) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "record_climate_pattern")?;
     if pattern.region.is_empty() || pattern.region.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Region must be 1-256 characters".into()
@@ -264,6 +275,7 @@ pub struct UpdateTraditionalPracticeInput {
 /// Update a traditional water management practice
 #[hdk_extern]
 pub fn update_practice(input: UpdateTraditionalPracticeInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_proposal(), "update_practice")?;
     update_entry(input.original_action_hash, &EntryTypes::TraditionalPractice(input.updated_entry))
 }
 
@@ -276,6 +288,7 @@ pub struct UpdateConservationMethodInput {
 /// Update a conservation method
 #[hdk_extern]
 pub fn update_conservation_method(input: UpdateConservationMethodInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_proposal(), "update_conservation_method")?;
     update_entry(input.original_action_hash, &EntryTypes::ConservationMethod(input.updated_entry))
 }
 
@@ -288,6 +301,7 @@ pub struct UpdateClimateWaterPatternInput {
 /// Update an observed climate-water pattern
 #[hdk_extern]
 pub fn update_climate_pattern(input: UpdateClimateWaterPatternInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_proposal(), "update_climate_pattern")?;
     update_entry(input.original_action_hash, &EntryTypes::ClimateWaterPattern(input.updated_entry))
 }
 

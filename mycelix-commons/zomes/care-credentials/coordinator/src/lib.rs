@@ -3,6 +3,17 @@
 
 use care_credentials_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -30,6 +41,7 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 /// Issue a new credential to a holder
 #[hdk_extern]
 pub fn issue_credential(credential: CareCredential) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "issue_credential")?;
     let action_hash = create_entry(&EntryTypes::CareCredential(credential.clone()))?;
 
     // Link holder to credential
@@ -78,6 +90,7 @@ pub struct VerifyCredentialInput {
 /// Mark a credential as verified
 #[hdk_extern]
 pub fn verify_credential(input: VerifyCredentialInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "verify_credential")?;
     let record = get(input.credential_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Credential not found".into())
     ))?;
@@ -120,6 +133,7 @@ pub fn verify_credential(input: VerifyCredentialInput) -> ExternResult<Record> {
 /// Add a reference for a care provider
 #[hdk_extern]
 pub fn add_reference(reference: CareReference) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "add_reference")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     // Verify caller is the one giving the reference

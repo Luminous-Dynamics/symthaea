@@ -36,6 +36,17 @@ pub enum PlotStatus {
     Retired,
 }
 
+/// Type of growing plot
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum PlotType {
+    Garden,
+    FoodForest,
+    Orchard,
+    Greenhouse,
+    Raised,
+    Rooftop,
+}
+
 /// A registered growing plot
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -44,6 +55,7 @@ pub struct Plot {
     pub name: String,
     pub area_sqm: f64,
     pub soil_type: SoilType,
+    pub plot_type: PlotType,
     pub location_lat: f64,
     pub location_lon: f64,
     pub steward: AgentPubKey,
@@ -373,6 +385,7 @@ mod tests {
             name: "Community Garden".into(),
             area_sqm: 100.0,
             soil_type: SoilType::Loam,
+            plot_type: PlotType::Garden,
             location_lat: 32.95,
             location_lon: -96.73,
             steward: fake_agent(),
@@ -458,6 +471,19 @@ mod tests {
         for t in &types {
             let json = serde_json::to_string(t).unwrap();
             let back: SoilType = serde_json::from_str(&json).unwrap();
+            assert_eq!(&back, t);
+        }
+    }
+
+    #[test]
+    fn serde_roundtrip_plot_type() {
+        let types = vec![
+            PlotType::Garden, PlotType::FoodForest, PlotType::Orchard,
+            PlotType::Greenhouse, PlotType::Raised, PlotType::Rooftop,
+        ];
+        for t in &types {
+            let json = serde_json::to_string(t).unwrap();
+            let back: PlotType = serde_json::from_str(&json).unwrap();
             assert_eq!(&back, t);
         }
     }
@@ -675,6 +701,16 @@ mod tests {
                     SoilType::Silt, SoilType::Peat, SoilType::Chalk, SoilType::Mixed] {
             let mut p = valid_plot();
             p.soil_type = st;
+            assert_valid(validate_plot(p));
+        }
+    }
+
+    #[test]
+    fn plot_all_plot_types_valid() {
+        for pt in [PlotType::Garden, PlotType::FoodForest, PlotType::Orchard,
+                    PlotType::Greenhouse, PlotType::Raised, PlotType::Rooftop] {
+            let mut p = valid_plot();
+            p.plot_type = pt;
             assert_valid(validate_plot(p));
         }
     }

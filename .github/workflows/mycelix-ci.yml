@@ -1,6 +1,7 @@
 name: Mycelix CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -899,6 +900,73 @@ jobs:
         working-directory: mycelix-workspace/tests/sweettest
 
   # ============================================================================
+  # Consciousness Gating Sweettests (manual trigger only)
+  # ============================================================================
+  sweettest-consciousness:
+    name: Consciousness Gating Sweettests
+    runs-on: ubuntu-latest
+    needs: [holochain-zomes]
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: '--cfg getrandom_backend="custom"'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Holochain cache
+        run: |
+          nix-env -iA cachix -f https://cachix.org/api/v1/install
+          cachix use holochain-ci
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-consciousness-sweettest-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build WASM for all clusters
+        run: |
+          cd mycelix-commons && cargo build --release --target wasm32-unknown-unknown && cd ..
+          cd mycelix-civic && cargo build --release --target wasm32-unknown-unknown && cd ..
+          cd mycelix-hearth && cargo build --release --target wasm32-unknown-unknown && cd ..
+
+      - name: Run consciousness gating sweettests (Commons)
+        run: |
+          cargo test --release --test sweettest_consciousness_gating -- --ignored --test-threads=2
+        working-directory: mycelix-commons
+        continue-on-error: true
+
+      - name: Run consciousness gating sweettests (Civic)
+        run: |
+          cargo test --release --test sweettest_consciousness_gating -- --ignored --test-threads=2
+        working-directory: mycelix-civic
+        continue-on-error: true
+
+      - name: Run consciousness gating sweettests (Hearth)
+        run: |
+          cargo test --release --test sweettest_consciousness_gating -- --ignored --test-threads=2
+        working-directory: mycelix-hearth
+        continue-on-error: true
+
+  # ============================================================================
   # Governance Zome Tests
   # ============================================================================
   governance-tests:
@@ -1104,7 +1172,7 @@ jobs:
       - name: Check all jobs passed
         uses: re-actors/alls-green@release/v1
         with:
-          allowed-skips: smoke-tests, e2e-tests, sdk-eth, sweettest, fl-feature-matrix
+          allowed-skips: smoke-tests, e2e-tests, sdk-eth, sweettest, sweettest-consciousness, fl-feature-matrix
           jobs: ${{ toJSON(needs) }}
 
       - name: Summary

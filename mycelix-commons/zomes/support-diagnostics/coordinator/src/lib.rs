@@ -5,6 +5,14 @@
 use hdk::prelude::*;
 use support_diagnostics_integrity::*;
 use support_types::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(requirement: &GovernanceRequirement, action_name: &str) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 // ============================================================================
 // SIGNAL
@@ -49,6 +57,7 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 /// index, the agent, and optionally the originating ticket.
 #[hdk_extern]
 pub fn run_diagnostic(diag: DiagnosticResult) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "run_diagnostic")?;
     let action_hash = create_entry(&EntryTypes::DiagnosticResult(diag.clone()))?;
 
     // Time-sharded diagnostics link
@@ -116,6 +125,7 @@ pub fn list_diagnostics(_: ()) -> ExternResult<Vec<Record>> {
 /// Set (or update) the calling agent's privacy preferences.
 #[hdk_extern]
 pub fn set_privacy_preference(pref: PrivacyPreference) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "set_privacy_preference")?;
     let action_hash = create_entry(&EntryTypes::PrivacyPreference(pref.clone()))?;
 
     create_link(
@@ -231,6 +241,7 @@ pub struct HelperWorkload {
 /// Register a new helper profile, linking it to the "all_helpers" anchor.
 #[hdk_extern]
 pub fn register_helper(profile: HelperProfile) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "register_helper")?;
     let action_hash = create_entry(&EntryTypes::HelperProfile(profile))?;
     create_entry(&EntryTypes::Anchor(Anchor("all_helpers".to_string())))?;
     create_link(
@@ -246,6 +257,7 @@ pub fn register_helper(profile: HelperProfile) -> ExternResult<Record> {
 /// Update a helper's availability status.
 #[hdk_extern]
 pub fn update_availability(input: UpdateAvailInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "update_availability")?;
     let record = get(input.helper_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Helper profile not found".into())))?;
     let mut profile: HelperProfile = record.entry()
@@ -295,6 +307,7 @@ pub fn get_available_helpers(category: Option<SupportCategory>) -> ExternResult<
 /// then emits a BridgeEventSignal for the Symthaea bridge.
 #[hdk_extern]
 pub fn publish_cognitive_update(update: CognitiveUpdate) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "publish_cognitive_update")?;
     let action_hash = create_entry(&EntryTypes::CognitiveUpdate(update.clone()))?;
 
     // Category-specific time-sharded link

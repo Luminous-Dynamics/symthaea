@@ -3,6 +3,17 @@
 
 use food_knowledge_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -27,6 +38,7 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn catalog_seed(seed: SeedVariety) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "catalog_seed")?;
     let action_hash = create_entry(&EntryTypes::SeedVariety(seed.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_seeds".to_string())))?;
@@ -61,6 +73,7 @@ pub fn get_seeds_by_species(species: String) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn share_practice(practice: TraditionalPractice) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "share_practice")?;
     let action_hash = create_entry(&EntryTypes::TraditionalPractice(practice.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_practices".to_string())))?;
@@ -90,6 +103,7 @@ pub fn get_practices_by_category(category: String) -> ExternResult<Vec<Record>> 
 
 #[hdk_extern]
 pub fn share_recipe(recipe: Recipe) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "share_recipe")?;
     let agent = agent_info()?.agent_initial_pubkey;
     let action_hash = create_entry(&EntryTypes::Recipe(recipe.clone()))?;
 
@@ -129,6 +143,7 @@ pub struct MatchSeedInput {
 
 #[hdk_extern]
 pub fn offer_seeds(stock: SeedStock) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "offer_seeds")?;
     let action_hash = create_entry(&EntryTypes::SeedStock(stock.clone()))?;
     create_link(stock.variety_hash, action_hash.clone(), LinkTypes::VarietyToStocks, ())?;
     get(action_hash, GetOptions::default())?
@@ -137,6 +152,7 @@ pub fn offer_seeds(stock: SeedStock) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn request_seeds(request: SeedRequest) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "request_seeds")?;
     let action_hash = create_entry(&EntryTypes::SeedRequest(request))?;
     create_entry(&EntryTypes::Anchor(Anchor("all_seed_requests".to_string())))?;
     create_link(anchor_hash("all_seed_requests")?, action_hash.clone(), LinkTypes::AllSeedRequests, ())?;
@@ -164,6 +180,7 @@ pub fn get_open_seed_requests(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn match_seed_request(input: MatchSeedInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "match_seed_request")?;
     let record = get(input.request_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Seed request not found".into())))?;
     let mut request: SeedRequest = record.entry()
@@ -182,6 +199,7 @@ pub fn match_seed_request(input: MatchSeedInput) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn add_nutrient_profile(profile: NutrientProfile) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "add_nutrient_profile")?;
     let action_hash = create_entry(&EntryTypes::NutrientProfile(profile.clone()))?;
     let crop_anchor = format!("nutrients:{}", profile.crop_name.to_lowercase());
     create_entry(&EntryTypes::Anchor(Anchor(crop_anchor.clone())))?;
@@ -207,6 +225,45 @@ pub fn get_nutrient_profile(crop_name: String) -> ExternResult<Option<Record>> {
 }
 
 // ============================================================================
+// SEED QUALITY RATINGS
+// ============================================================================
+
+#[hdk_extern]
+pub fn rate_seed_exchange(rating: SeedQualityRating) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "rate_seed_exchange")?;
+    let action_hash = create_entry(&EntryTypes::SeedQualityRating(rating.clone()))?;
+
+    // Link from exchange → rating (for finding all ratings on an exchange)
+    create_link(rating.exchange_hash, action_hash.clone(), LinkTypes::ExchangeToRatings, ())?;
+
+    // Link from grower agent → rating (for reputation aggregation)
+    // The grower is found by looking up the SeedStock from the exchange
+    // For now, link from rater to track their ratings
+    create_link(rating.rater, action_hash.clone(), LinkTypes::GrowerToRatings, ())?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created rating".into())))
+}
+
+#[hdk_extern]
+pub fn get_exchange_ratings(exchange_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(exchange_hash, LinkTypes::ExchangeToRatings)?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn get_grower_ratings(grower: AgentPubKey) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(grower, LinkTypes::GrowerToRatings)?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
+// ============================================================================
 // UPDATE FUNCTIONS
 // ============================================================================
 
@@ -218,6 +275,7 @@ pub struct UpdateSeedVarietyInput {
 
 #[hdk_extern]
 pub fn update_seed_variety(input: UpdateSeedVarietyInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_proposal(), "update_seed_variety")?;
     update_entry(input.original_action_hash, &EntryTypes::SeedVariety(input.updated_entry))
 }
 
@@ -229,6 +287,7 @@ pub struct UpdateTraditionalPracticeInput {
 
 #[hdk_extern]
 pub fn update_traditional_practice(input: UpdateTraditionalPracticeInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_proposal(), "update_traditional_practice")?;
     update_entry(input.original_action_hash, &EntryTypes::TraditionalPractice(input.updated_entry))
 }
 
@@ -240,6 +299,7 @@ pub struct UpdateRecipeInput {
 
 #[hdk_extern]
 pub fn update_recipe(input: UpdateRecipeInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_proposal(), "update_recipe")?;
     update_entry(input.original_action_hash, &EntryTypes::Recipe(input.updated_entry))
 }
 
@@ -1001,6 +1061,62 @@ mod tests {
         assert_eq!(decoded.fiber_g, 3.6);
         assert_eq!(decoded.key_vitamins.len(), 3);
         assert_eq!(decoded.key_minerals.len(), 2);
+    }
+
+    // ========================================================================
+    // SeedQualityRating coordinator serde tests
+    // ========================================================================
+
+    #[test]
+    fn seed_quality_rating_coordinator_serde_roundtrip() {
+        let rating = SeedQualityRating {
+            exchange_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            rater: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            rating: 5,
+            germination_observed_pct: Some(95.0),
+            comment: Some("Outstanding seeds, great germination".to_string()),
+            rated_at: 1700000000,
+        };
+        let json = serde_json::to_string(&rating).unwrap();
+        let decoded: SeedQualityRating = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.rating, 5);
+        assert_eq!(decoded.germination_observed_pct, Some(95.0));
+        assert_eq!(decoded.comment, Some("Outstanding seeds, great germination".to_string()));
+        assert_eq!(decoded.rated_at, 1700000000);
+    }
+
+    #[test]
+    fn seed_quality_rating_coordinator_minimal_serde_roundtrip() {
+        let rating = SeedQualityRating {
+            exchange_hash: ActionHash::from_raw_36(vec![0xaa; 36]),
+            rater: AgentPubKey::from_raw_36(vec![0xbb; 36]),
+            rating: 1,
+            germination_observed_pct: None,
+            comment: None,
+            rated_at: 1,
+        };
+        let json = serde_json::to_string(&rating).unwrap();
+        let decoded: SeedQualityRating = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.rating, 1);
+        assert_eq!(decoded.germination_observed_pct, None);
+        assert_eq!(decoded.comment, None);
+    }
+
+    #[test]
+    fn seed_quality_rating_coordinator_all_ratings_serde() {
+        for r in 1..=5 {
+            let rating = SeedQualityRating {
+                exchange_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+                rater: AgentPubKey::from_raw_36(vec![0xab; 36]),
+                rating: r,
+                germination_observed_pct: None,
+                comment: None,
+                rated_at: 1700000000,
+            };
+            let json = serde_json::to_string(&rating).unwrap();
+            let decoded: SeedQualityRating = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.rating, r);
+        }
     }
 
     #[test]

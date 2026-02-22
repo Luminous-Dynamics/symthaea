@@ -3,6 +3,17 @@
 
 use food_preservation_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -27,6 +38,7 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn start_batch(batch: PreservationBatch) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "start_batch")?;
     let agent = agent_info()?.agent_initial_pubkey;
     let action_hash = create_entry(&EntryTypes::PreservationBatch(batch.clone()))?;
 
@@ -40,6 +52,7 @@ pub fn start_batch(batch: PreservationBatch) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn complete_batch(batch_hash: ActionHash) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "complete_batch")?;
     let record = get(batch_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Batch not found".into())))?;
     let mut batch: PreservationBatch = record.entry()
@@ -74,6 +87,7 @@ pub fn get_agent_batches(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn register_method(method: PreservationMethod) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "register_method")?;
     let action_hash = create_entry(&EntryTypes::PreservationMethod(method))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_methods".to_string())))?;
@@ -98,6 +112,7 @@ pub fn get_all_methods(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn register_storage(storage: StorageUnit) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "register_storage")?;
     let action_hash = create_entry(&EntryTypes::StorageUnit(storage))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_storage".to_string())))?;
@@ -174,6 +189,7 @@ mod tests {
             StorageType::Dehydrator,
             StorageType::Fermenter,
             StorageType::Pantry,
+            StorageType::Composter,
         ];
         for variant in variants {
             let json = serde_json::to_string(&variant).unwrap();
@@ -429,6 +445,7 @@ mod tests {
             StorageType::Dehydrator,
             StorageType::Fermenter,
             StorageType::Pantry,
+            StorageType::Composter,
         ] {
             let unit = StorageUnit {
                 id: "s".to_string(),

@@ -1,6 +1,17 @@
 //! Commons Management Coordinator Zome
 use hdk::prelude::*;
 use property_commons_integrity::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 /// Get or create an anchor entry and return its EntryHash for use as link base
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
@@ -11,6 +22,7 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn create_common_resource(input: CreateResourceInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "create_common_resource")?;
     let now = sys_time()?;
     let resource = CommonResource {
         id: format!("commons:{}:{}", input.name.replace(' ', "_"), now.as_micros()),
@@ -42,6 +54,7 @@ pub struct CreateResourceInput {
 
 #[hdk_extern]
 pub fn grant_usage_right(input: GrantRightInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "grant_usage_right")?;
     let now = sys_time()?;
     let right = UsageRight {
         id: format!("right:{}:{}:{}", input.resource_id, input.holder_did, now.as_micros()),
@@ -71,6 +84,7 @@ pub struct GrantRightInput {
 
 #[hdk_extern]
 pub fn log_usage(input: LogUsageInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "log_usage")?;
     let now = sys_time()?;
     let log = UsageLog {
         id: format!("usage:{}:{}:{}", input.resource_id, input.user_did, now.as_micros()),
@@ -188,6 +202,7 @@ pub fn get_resource_rights(resource_id: String) -> ExternResult<Vec<Record>> {
 /// Revoke a usage right
 #[hdk_extern]
 pub fn revoke_usage_right(input: RevokeRightInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "revoke_usage_right")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::UsageRight)?))
         .include_entries(true);
@@ -223,6 +238,7 @@ pub struct RevokeRightInput {
 /// Add a steward to a resource
 #[hdk_extern]
 pub fn add_steward(input: AddStewardInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "add_steward")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CommonResource)?))
         .include_entries(true);
@@ -262,6 +278,7 @@ pub struct AddStewardInput {
 /// Remove a steward from a resource (cannot remove last steward)
 #[hdk_extern]
 pub fn remove_steward(input: RemoveStewardInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "remove_steward")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CommonResource)?))
         .include_entries(true);
@@ -318,6 +335,7 @@ pub fn get_holder_rights(holder_did: String) -> ExternResult<Vec<Record>> {
 /// Update governance rules for a resource
 #[hdk_extern]
 pub fn update_governance_rules(input: UpdateGovernanceInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_governance_rules")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CommonResource)?))
         .include_entries(true);
@@ -405,6 +423,7 @@ pub struct UserUsageInput {
 /// Update usage right quota
 #[hdk_extern]
 pub fn update_right_quota(input: UpdateQuotaInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_right_quota")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::UsageRight)?))
         .include_entries(true);

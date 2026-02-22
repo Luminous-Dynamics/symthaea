@@ -196,6 +196,15 @@ pub struct RedeemInput {
 pub fn redeem_credits(input: RedeemInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "redeem_credits")?;
     let agent = agent_info()?.agent_initial_pubkey;
+
+    // Verify sufficient balance before redeeming
+    let balance = get_agent_carbon_balance(agent.clone())?;
+    if input.credits_redeemed > balance.balance {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Insufficient carbon credits: requested {}, available {}", input.credits_redeemed, balance.balance)
+        )));
+    }
+
     let now = sys_time()?.as_micros() / 1_000_000;
 
     let redemption = CreditRedemption {

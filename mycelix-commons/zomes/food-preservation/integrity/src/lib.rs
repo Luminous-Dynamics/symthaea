@@ -66,6 +66,7 @@ pub enum StorageType {
     Dehydrator,
     Fermenter,
     Pantry,
+    Composter,
 }
 
 #[hdk_entry_helper]
@@ -342,6 +343,7 @@ mod tests {
         let types = vec![
             StorageType::RootCellar, StorageType::Cellar, StorageType::Freezer,
             StorageType::Dehydrator, StorageType::Fermenter, StorageType::Pantry,
+            StorageType::Composter,
         ];
         for t in &types {
             let json = serde_json::to_string(t).unwrap();
@@ -645,7 +647,8 @@ mod tests {
     #[test]
     fn all_storage_types_valid() {
         for st in [StorageType::RootCellar, StorageType::Cellar, StorageType::Freezer,
-                    StorageType::Dehydrator, StorageType::Fermenter, StorageType::Pantry] {
+                    StorageType::Dehydrator, StorageType::Fermenter, StorageType::Pantry,
+                    StorageType::Composter] {
             let mut s = valid_storage();
             s.storage_type = st;
             assert_valid(validate_storage(s));

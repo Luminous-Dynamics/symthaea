@@ -518,6 +518,7 @@ fn resolve_food(qt: &str) -> CommonsZome {
         || qt.contains("seed")
         || qt.contains("recipe")
         || qt.contains("nutrient")
+        || qt.contains("rating")
     {
         CommonsZome::FoodKnowledge
     } else {
@@ -1675,6 +1676,10 @@ mod tests {
         assert_eq!(resolve_commons_zome(d, "get_available_seeds"), Some(CommonsZome::FoodKnowledge));
         assert_eq!(resolve_commons_zome(d, "get_open_seed_requests"), Some(CommonsZome::FoodKnowledge));
         assert_eq!(resolve_commons_zome(d, "match_seed_request"), Some(CommonsZome::FoodKnowledge));
+        // Seed quality ratings → FoodKnowledge (contains "rating" or "seed")
+        assert_eq!(resolve_commons_zome(d, "rate_seed_exchange"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "get_exchange_ratings"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(resolve_commons_zome(d, "get_grower_ratings"), Some(CommonsZome::FoodKnowledge));
         // Garden membership → FoodProduction (default)
         assert_eq!(resolve_commons_zome(d, "add_garden_member"), Some(CommonsZome::FoodProduction));
         assert_eq!(resolve_commons_zome(d, "get_plot_members"), Some(CommonsZome::FoodProduction));

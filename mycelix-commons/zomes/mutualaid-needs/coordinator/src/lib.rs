@@ -6,6 +6,17 @@
 use hdk::prelude::*;
 use mutualaid_common::*;
 use mutualaid_needs_integrity::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 // =============================================================================
 // INPUT TYPES
@@ -77,6 +88,7 @@ pub struct SearchOffersInput {
 /// Create a new need
 #[hdk_extern]
 pub fn create_need(input: CreateNeedInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "create_need")?;
     let requester = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -234,6 +246,7 @@ pub fn get_emergency_needs(_: ()) -> ExternResult<Vec<Record>> {
 /// Withdraw a need
 #[hdk_extern]
 pub fn withdraw_need(hash: ActionHash) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "withdraw_need")?;
     let record = get(hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Need not found".to_string())))?;
 
@@ -267,6 +280,7 @@ pub fn withdraw_need(hash: ActionHash) -> ExternResult<Record> {
 /// Create a new offer
 #[hdk_extern]
 pub fn create_offer(input: CreateOfferInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "create_offer")?;
     let offerer = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -391,6 +405,7 @@ pub fn search_offers(input: SearchOffersInput) -> ExternResult<Vec<Record>> {
 /// Withdraw an offer
 #[hdk_extern]
 pub fn withdraw_offer(hash: ActionHash) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "withdraw_offer")?;
     let record = get(hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Offer not found".to_string())))?;
 
@@ -424,6 +439,7 @@ pub fn withdraw_offer(hash: ActionHash) -> ExternResult<Record> {
 /// Propose a match between a need and an offer
 #[hdk_extern]
 pub fn propose_match(input: ProposeMatchInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "propose_match")?;
     let now = sys_time()?;
 
     // Get need
@@ -481,6 +497,7 @@ pub fn propose_match(input: ProposeMatchInput) -> ExternResult<Record> {
 /// Accept a match
 #[hdk_extern]
 pub fn accept_match(match_hash: ActionHash) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "accept_match")?;
     let record = get(match_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".to_string())))?;
 
@@ -517,6 +534,7 @@ pub struct ScheduleHandoffInput {
 
 #[hdk_extern]
 pub fn schedule_handoff(input: ScheduleHandoffInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "schedule_handoff")?;
     let match_hash = input.match_hash;
     let scheduled_time = input.scheduled_time;
     let location = input.location;
@@ -595,6 +613,7 @@ pub fn get_offer_matches(offer_hash: ActionHash) -> ExternResult<Vec<Record>> {
 /// Record fulfillment of a match
 #[hdk_extern]
 pub fn fulfill_match(input: FulfillMatchInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "fulfill_match")?;
     let now = sys_time()?;
 
     // Get match
@@ -665,6 +684,7 @@ pub fn fulfill_match(input: FulfillMatchInput) -> ExternResult<Record> {
 /// Confirm fulfillment (the other party confirms)
 #[hdk_extern]
 pub fn confirm_fulfillment(fulfillment_hash: ActionHash) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "confirm_fulfillment")?;
     let record = get(fulfillment_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Fulfillment not found".to_string())))?;
 

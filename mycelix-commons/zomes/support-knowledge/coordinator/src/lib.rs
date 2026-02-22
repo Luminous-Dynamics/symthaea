@@ -4,6 +4,14 @@
 use support_knowledge_integrity::*;
 use support_types::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(requirement: &GovernanceRequirement, action_name: &str) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 // ============================================================================
 // BRIDGE SIGNAL (for cross-domain UI notification)
@@ -78,6 +86,7 @@ fn extract_article(record: &Record) -> ExternResult<KnowledgeArticle> {
 
 #[hdk_extern]
 pub fn create_article(article: KnowledgeArticle) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "create_article")?;
     let action_hash = create_entry(&EntryTypes::KnowledgeArticle(article.clone()))?;
 
     // Hash-sharded anchor for all_articles
@@ -117,6 +126,7 @@ pub fn create_article(article: KnowledgeArticle) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn update_article(input: UpdateArticleInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "update_article")?;
     let _original = get(input.original_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Original article not found".into())))?;
 
@@ -128,6 +138,7 @@ pub fn update_article(input: UpdateArticleInput) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn deprecate_article(input: DeprecateInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "deprecate_article")?;
     let original = get(input.article_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Article not found".into())))?;
 
@@ -184,6 +195,7 @@ pub fn list_recent_articles(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn upvote_article(action_hash: ActionHash) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "upvote_article")?;
     let original = get(action_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Article not found".into())))?;
 
@@ -198,6 +210,7 @@ pub fn upvote_article(action_hash: ActionHash) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn verify_article(action_hash: ActionHash) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "verify_article")?;
     let original = get(action_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Article not found".into())))?;
 
@@ -216,6 +229,7 @@ pub fn verify_article(action_hash: ActionHash) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn create_resolution(resolution: Resolution) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "create_resolution")?;
     let action_hash = create_entry(&EntryTypes::Resolution(resolution.clone()))?;
     create_link(
         resolution.ticket_hash,
@@ -234,6 +248,7 @@ pub fn create_resolution(resolution: Resolution) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn flag_article(flag: ArticleFlag) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "flag_article")?;
     let action_hash = create_entry(&EntryTypes::ArticleFlag(flag.clone()))?;
     create_link(
         flag.article_hash,
@@ -274,6 +289,7 @@ pub fn get_agent_reputation(agent: AgentPubKey) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn link_article_to_ticket(input: LinkArticleInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "link_article_to_ticket")?;
     let agent = agent_info()?.agent_initial_pubkey;
     let link = ArticleTicketLink {
         article_hash: input.article_hash.clone(),

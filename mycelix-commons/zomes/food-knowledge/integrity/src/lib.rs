@@ -113,6 +113,21 @@ pub struct NutrientProfile {
 }
 
 // ============================================================================
+// SEED QUALITY RATING
+// ============================================================================
+
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct SeedQualityRating {
+    pub exchange_hash: ActionHash,
+    pub rater: AgentPubKey,
+    pub rating: u8,
+    pub germination_observed_pct: Option<f64>,
+    pub comment: Option<String>,
+    pub rated_at: u64,
+}
+
+// ============================================================================
 // ENTRY & LINK TYPE REGISTRATION
 // ============================================================================
 
@@ -126,6 +141,7 @@ pub enum EntryTypes {
     SeedStock(SeedStock),
     SeedRequest(SeedRequest),
     NutrientProfile(NutrientProfile),
+    SeedQualityRating(SeedQualityRating),
 }
 
 #[hdk_link_types]
@@ -140,6 +156,8 @@ pub enum LinkTypes {
     VarietyToStocks,
     AllSeedRequests,
     CropToNutrients,
+    ExchangeToRatings,
+    GrowerToRatings,
 }
 
 // ============================================================================
@@ -158,6 +176,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::SeedStock(s) => validate_seed_stock(s),
                 EntryTypes::SeedRequest(r) => validate_seed_request(r),
                 EntryTypes::NutrientProfile(n) => validate_nutrient_profile(n),
+                EntryTypes::SeedQualityRating(r) => validate_seed_quality_rating(r),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
@@ -167,6 +186,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::SeedStock(s) => validate_seed_stock(s),
                 EntryTypes::SeedRequest(r) => validate_seed_request(r),
                 EntryTypes::NutrientProfile(n) => validate_nutrient_profile(n),
+                EntryTypes::SeedQualityRating(r) => validate_seed_quality_rating(r),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -252,6 +272,22 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
+                LinkTypes::ExchangeToRatings => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "ExchangeToRatings link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::GrowerToRatings => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "GrowerToRatings link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
@@ -333,6 +369,26 @@ fn validate_seed_request(r: SeedRequest) -> ExternResult<ValidateCallbackResult>
     }
     if r.quantity_grams <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("SeedRequest quantity must be positive".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_seed_quality_rating(r: SeedQualityRating) -> ExternResult<ValidateCallbackResult> {
+    if r.rating < 1 || r.rating > 5 {
+        return Ok(ValidateCallbackResult::Invalid("Rating must be between 1 and 5".into()));
+    }
+    if r.rated_at == 0 {
+        return Ok(ValidateCallbackResult::Invalid("SeedQualityRating rated_at cannot be zero".into()));
+    }
+    if let Some(pct) = r.germination_observed_pct {
+        if pct < 0.0 || pct > 100.0 {
+            return Ok(ValidateCallbackResult::Invalid("Observed germination rate must be between 0 and 100".into()));
+        }
+    }
+    if let Some(ref comment) = r.comment {
+        if comment.len() > 2048 {
+            return Ok(ValidateCallbackResult::Invalid("Rating comment too long (max 2048 chars)".into()));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -927,7 +983,9 @@ mod tests {
             | LinkTypes::AgentToRecipe
             | LinkTypes::VarietyToStocks
             | LinkTypes::AllSeedRequests
-            | LinkTypes::CropToNutrients => 256,
+            | LinkTypes::CropToNutrients
+            | LinkTypes::ExchangeToRatings
+            | LinkTypes::GrowerToRatings => 256,
             LinkTypes::TagToRecipe => 512,
         };
         let name = match link_type {
@@ -941,6 +999,8 @@ mod tests {
             LinkTypes::VarietyToStocks => "VarietyToStocks",
             LinkTypes::AllSeedRequests => "AllSeedRequests",
             LinkTypes::CropToNutrients => "CropToNutrients",
+            LinkTypes::ExchangeToRatings => "ExchangeToRatings",
+            LinkTypes::GrowerToRatings => "GrowerToRatings",
         };
         if tag.0.len() > max {
             ValidateCallbackResult::Invalid(
@@ -1483,5 +1543,174 @@ mod tests {
     fn test_link_crop_to_nutrients_tag_over_max_rejected() {
         let result = validate_link_tag(&LinkTypes::CropToNutrients, 257);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_exchange_to_ratings_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::ExchangeToRatings, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_exchange_to_ratings_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::ExchangeToRatings, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_grower_to_ratings_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::GrowerToRatings, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_grower_to_ratings_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::GrowerToRatings, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── SeedQualityRating helpers ────────────────────────────────────────
+
+    fn valid_seed_quality_rating() -> SeedQualityRating {
+        SeedQualityRating {
+            exchange_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            rater: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            rating: 4,
+            germination_observed_pct: Some(90.0),
+            comment: Some("Excellent germination rate".into()),
+            rated_at: 1700000000,
+        }
+    }
+
+    // ── Serde roundtrip: SeedQualityRating ──────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_seed_quality_rating() {
+        let r = valid_seed_quality_rating();
+        let json = serde_json::to_string(&r).unwrap();
+        let back: SeedQualityRating = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, r);
+    }
+
+    #[test]
+    fn serde_roundtrip_seed_quality_rating_minimal() {
+        let r = SeedQualityRating {
+            exchange_hash: ActionHash::from_raw_36(vec![0xaa; 36]),
+            rater: AgentPubKey::from_raw_36(vec![0xbb; 36]),
+            rating: 1,
+            germination_observed_pct: None,
+            comment: None,
+            rated_at: 1,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let back: SeedQualityRating = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, r);
+    }
+
+    // ── validate_seed_quality_rating ────────────────────────────────────
+
+    #[test]
+    fn valid_seed_quality_rating_passes() {
+        assert_valid(validate_seed_quality_rating(valid_seed_quality_rating()));
+    }
+
+    #[test]
+    fn seed_quality_rating_zero_rejected() {
+        let mut r = valid_seed_quality_rating();
+        r.rating = 0;
+        assert_invalid(validate_seed_quality_rating(r), "Rating must be between 1 and 5");
+    }
+
+    #[test]
+    fn seed_quality_rating_six_rejected() {
+        let mut r = valid_seed_quality_rating();
+        r.rating = 6;
+        assert_invalid(validate_seed_quality_rating(r), "Rating must be between 1 and 5");
+    }
+
+    #[test]
+    fn seed_quality_rating_one_valid() {
+        let mut r = valid_seed_quality_rating();
+        r.rating = 1;
+        assert_valid(validate_seed_quality_rating(r));
+    }
+
+    #[test]
+    fn seed_quality_rating_five_valid() {
+        let mut r = valid_seed_quality_rating();
+        r.rating = 5;
+        assert_valid(validate_seed_quality_rating(r));
+    }
+
+    #[test]
+    fn seed_quality_rating_zero_rated_at_rejected() {
+        let mut r = valid_seed_quality_rating();
+        r.rated_at = 0;
+        assert_invalid(validate_seed_quality_rating(r), "SeedQualityRating rated_at cannot be zero");
+    }
+
+    #[test]
+    fn seed_quality_rating_negative_germination_rejected() {
+        let mut r = valid_seed_quality_rating();
+        r.germination_observed_pct = Some(-0.1);
+        assert_invalid(validate_seed_quality_rating(r), "Observed germination rate must be between 0 and 100");
+    }
+
+    #[test]
+    fn seed_quality_rating_germination_over_100_rejected() {
+        let mut r = valid_seed_quality_rating();
+        r.germination_observed_pct = Some(100.1);
+        assert_invalid(validate_seed_quality_rating(r), "Observed germination rate must be between 0 and 100");
+    }
+
+    #[test]
+    fn seed_quality_rating_germination_zero_valid() {
+        let mut r = valid_seed_quality_rating();
+        r.germination_observed_pct = Some(0.0);
+        assert_valid(validate_seed_quality_rating(r));
+    }
+
+    #[test]
+    fn seed_quality_rating_germination_100_valid() {
+        let mut r = valid_seed_quality_rating();
+        r.germination_observed_pct = Some(100.0);
+        assert_valid(validate_seed_quality_rating(r));
+    }
+
+    #[test]
+    fn seed_quality_rating_germination_none_valid() {
+        let mut r = valid_seed_quality_rating();
+        r.germination_observed_pct = None;
+        assert_valid(validate_seed_quality_rating(r));
+    }
+
+    #[test]
+    fn seed_quality_rating_comment_too_long_rejected() {
+        let mut r = valid_seed_quality_rating();
+        r.comment = Some("x".repeat(2049));
+        assert_invalid(validate_seed_quality_rating(r), "Rating comment too long (max 2048 chars)");
+    }
+
+    #[test]
+    fn seed_quality_rating_comment_at_max_valid() {
+        let mut r = valid_seed_quality_rating();
+        r.comment = Some("x".repeat(2048));
+        assert_valid(validate_seed_quality_rating(r));
+    }
+
+    #[test]
+    fn seed_quality_rating_comment_none_valid() {
+        let mut r = valid_seed_quality_rating();
+        r.comment = None;
+        assert_valid(validate_seed_quality_rating(r));
+    }
+
+    #[test]
+    fn seed_quality_rating_all_ratings_valid() {
+        for rating in 1..=5 {
+            let mut r = valid_seed_quality_rating();
+            r.rating = rating;
+            assert_valid(validate_seed_quality_rating(r));
+        }
     }
 }

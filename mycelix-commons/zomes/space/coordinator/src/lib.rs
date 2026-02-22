@@ -9,6 +9,14 @@
 
 use hdk::prelude::*;
 use space_integrity::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(requirement: &GovernanceRequirement, action_name: &str) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -21,6 +29,7 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// The caller becomes the first admin member automatically.
 #[hdk_extern]
 pub fn create_space(input: CreateSpaceInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "create_space")?;
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
 
@@ -116,6 +125,7 @@ pub struct CreateSpaceInput {
 /// invitation is automatically approved and membership is created.
 #[hdk_extern]
 pub fn invite_member(input: InviteMemberInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "invite_member")?;
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
 
@@ -188,6 +198,7 @@ pub struct InviteMemberInput {
 /// to call specific functions within the space context.
 #[hdk_extern]
 pub fn grant_access(input: GrantAccessInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "grant_access")?;
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
 
@@ -232,6 +243,7 @@ pub struct GrantAccessInput {
 /// Deactivates the membership and marks any capabilities as revoked.
 #[hdk_extern]
 pub fn revoke_access(input: RevokeAccessInput) -> ExternResult<bool> {
+    require_consciousness(&requirement_for_proposal(), "revoke_access")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     // Only admins can revoke access
@@ -402,6 +414,7 @@ pub fn get_space(space_id: String) -> ExternResult<Option<Record>> {
 /// Increments the approval count. If threshold is met, auto-creates membership.
 #[hdk_extern]
 pub fn approve_invitation(input: ApproveInvitationInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "approve_invitation")?;
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
 
@@ -476,6 +489,7 @@ pub struct ApproveInvitationInput {
 /// Reject a pending invitation
 #[hdk_extern]
 pub fn reject_invitation(invitation_hash: ActionHash) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "reject_invitation")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     let record = get(invitation_hash.clone(), GetOptions::default())?
@@ -514,6 +528,7 @@ pub fn reject_invitation(invitation_hash: ActionHash) -> ExternResult<Record> {
 /// Book a shared resource within a space
 #[hdk_extern]
 pub fn book_resource(input: BookResourceInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "book_resource")?;
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
 
@@ -570,6 +585,7 @@ pub struct BookResourceInput {
 /// Cancel a resource booking
 #[hdk_extern]
 pub fn cancel_booking(booking_hash: ActionHash) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "cancel_booking")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     let record = get(booking_hash.clone(), GetOptions::default())?
@@ -632,6 +648,7 @@ pub fn get_space_bookings(space_id: String) -> ExternResult<Vec<Record>> {
 /// Create a recurring schedule/event for a space
 #[hdk_extern]
 pub fn create_schedule(input: CreateScheduleInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "create_schedule")?;
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
 

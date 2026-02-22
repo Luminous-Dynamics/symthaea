@@ -4,6 +4,17 @@
 
 use housing_clt_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    requirement_for_basic, requirement_for_proposal,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_consciousness("commons_bridge", requirement, action_name)
+}
 
 /// Input for verifying a property before creating a CLT lease
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -29,6 +40,7 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Create a new community land trust
 #[hdk_extern]
 pub fn create_land_trust(trust: LandTrust) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "create_land_trust")?;
     if trust.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Trust name must be at most 256 characters".into()
@@ -63,6 +75,7 @@ pub struct UpdateLandTrustInput {
 /// Update a land trust entry (general-purpose update replacing the whole entry)
 #[hdk_extern]
 pub fn update_land_trust(input: UpdateLandTrustInput) -> ExternResult<ActionHash> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_land_trust")?;
     update_entry(input.original_action_hash, &EntryTypes::LandTrust(input.updated_entry))
 }
 
@@ -75,6 +88,7 @@ pub struct UpdateGroundLeaseInput {
 /// Update a ground lease entry (general-purpose update replacing the whole entry)
 #[hdk_extern]
 pub fn update_ground_lease(input: UpdateGroundLeaseInput) -> ExternResult<ActionHash> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_ground_lease")?;
     update_entry(input.original_action_hash, &EntryTypes::GroundLease(input.updated_entry))
 }
 
@@ -180,6 +194,7 @@ pub fn verify_property_for_lease(input: VerifyPropertyForLeaseInput) -> ExternRe
 /// Issue a ground lease for a unit under the trust
 #[hdk_extern]
 pub fn issue_ground_lease(lease: GroundLease) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "issue_ground_lease")?;
     let action_hash = create_entry(&EntryTypes::GroundLease(lease.clone()))?;
 
     // Link trust to lease
@@ -230,6 +245,7 @@ pub struct CalculateResaleInput {
 /// - Hybrid: min(appreciation_cap_result, ami_result)
 #[hdk_extern]
 pub fn calculate_max_resale_price(input: CalculateResaleInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "calculate_max_resale_price")?;
     let lease_record = get(input.lease_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Lease not found".into())))?;
 
@@ -323,6 +339,7 @@ pub struct TransferLeaseInput {
 /// Transfer a ground lease to a new leaseholder
 #[hdk_extern]
 pub fn transfer_lease(input: TransferLeaseInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "transfer_lease")?;
     let record = get(input.lease_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Lease not found".into())))?;
 
@@ -378,6 +395,7 @@ pub struct GenerateAffordabilityInput {
 /// Generate an affordability report for a trust
 #[hdk_extern]
 pub fn generate_affordability_report(input: GenerateAffordabilityInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "generate_affordability_report")?;
     let now = sys_time()?;
 
     // Affordability ratio = (average monthly cost * 12) / median annual income
@@ -442,6 +460,7 @@ pub struct UpdateTrustBoardInput {
 /// Update the stewardship board of a land trust
 #[hdk_extern]
 pub fn update_trust_board(input: UpdateTrustBoardInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_trust_board")?;
     if input.new_board.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Board must have at least one member".into()
