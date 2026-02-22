@@ -62,11 +62,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
-use crate::consciousness::fep_active_inference::{
+use symthaea_fep::{
     ActiveInferenceAgent, ActiveInferenceAgentConfig, MotorCommandType, Observation,
     TemporalDifferenceLearningConfig,
 };
-use crate::language::phi_monitor::{PhiMonitor, PhiTrend};
 
 // =============================================================================
 // CONFIGURATION
@@ -187,17 +186,8 @@ pub enum TrendDirection {
     RapidFall,
 }
 
-impl From<PhiTrend> for TrendDirection {
-    fn from(trend: PhiTrend) -> Self {
-        match trend {
-            PhiTrend::Rising => TrendDirection::Rising,
-            PhiTrend::Stable => TrendDirection::Stable,
-            PhiTrend::Declining => TrendDirection::Falling,
-            PhiTrend::Unstable => TrendDirection::RapidFall,
-            PhiTrend::Insufficient => TrendDirection::Stable,
-        }
-    }
-}
+// TrendDirection was previously convertible from PhiTrend (language::phi_monitor).
+// Now that physics is extracted, TrendDirection is used directly.
 
 // =============================================================================
 // PLASMA CONTROL ACTION
@@ -509,9 +499,6 @@ pub struct PlasmaControlLoop {
     /// Configuration
     config: PlasmaControlConfig,
 
-    /// Phi monitor for tracking consciousness levels (reserved for future use)
-    _phi_monitor: PhiMonitor,
-
     /// FEP active inference agent for learning optimal control
     fep_agent: Option<ActiveInferenceAgent>,
 
@@ -581,7 +568,7 @@ pub struct PlasmaControlStats {
 
 impl PlasmaControlLoop {
     /// Create a new plasma control loop
-    pub fn new(config: PlasmaControlConfig, _phi_monitor: PhiMonitor) -> Self {
+    pub fn new(config: PlasmaControlConfig) -> Self {
         let fep_agent = if config.enable_td_learning {
             let fep_config = ActiveInferenceAgentConfig {
                 state_dim: 8,
@@ -603,7 +590,6 @@ impl PlasmaControlLoop {
 
         Self {
             config,
-            _phi_monitor,
             fep_agent,
             phi_history: VecDeque::with_capacity(1000),
             current_assessment: None,
@@ -1191,8 +1177,7 @@ mod tests {
     #[test]
     fn test_action_selection_stable() {
         let config = PlasmaControlConfig::default();
-        let phi_monitor = PhiMonitor::new();
-        let mut control_loop = PlasmaControlLoop::new(config, phi_monitor);
+        let mut control_loop = PlasmaControlLoop::new(config);
 
         // Stable state
         let state = PlasmaControlState::new(0.7, 0);
@@ -1208,8 +1193,7 @@ mod tests {
     #[test]
     fn test_action_selection_warning() {
         let config = PlasmaControlConfig::default();
-        let phi_monitor = PhiMonitor::new();
-        let mut control_loop = PlasmaControlLoop::new(config, phi_monitor);
+        let mut control_loop = PlasmaControlLoop::new(config);
 
         // Warning state
         let state = PlasmaControlState::new(0.45, 0);
@@ -1223,8 +1207,7 @@ mod tests {
     #[test]
     fn test_action_selection_critical() {
         let config = PlasmaControlConfig::default();
-        let phi_monitor = PhiMonitor::new();
-        let mut control_loop = PlasmaControlLoop::new(config, phi_monitor);
+        let mut control_loop = PlasmaControlLoop::new(config);
 
         // Critical state
         let state = PlasmaControlState::new(0.28, 0);
@@ -1238,8 +1221,7 @@ mod tests {
     #[test]
     fn test_action_selection_emergency() {
         let config = PlasmaControlConfig::default();
-        let phi_monitor = PhiMonitor::new();
-        let mut control_loop = PlasmaControlLoop::new(config, phi_monitor);
+        let mut control_loop = PlasmaControlLoop::new(config);
 
         // Emergency state
         let state = PlasmaControlState::new(0.1, 0);
@@ -1256,8 +1238,7 @@ mod tests {
     #[test]
     fn test_regime_transitions() {
         let config = PlasmaControlConfig::default();
-        let phi_monitor = PhiMonitor::new();
-        let mut control_loop = PlasmaControlLoop::new(config, phi_monitor);
+        let mut control_loop = PlasmaControlLoop::new(config);
 
         // Start stable
         let mut phi = 0.7;
@@ -1289,8 +1270,7 @@ mod tests {
             control_latency_ms: 10,
             ..Default::default()
         };
-        let phi_monitor = PhiMonitor::new();
-        let mut control_loop = PlasmaControlLoop::new(config, phi_monitor);
+        let mut control_loop = PlasmaControlLoop::new(config);
 
         let start = Instant::now();
 
@@ -1314,8 +1294,7 @@ mod tests {
     #[test]
     fn test_soft_landing_activation() {
         let config = PlasmaControlConfig::default();
-        let phi_monitor = PhiMonitor::new();
-        let mut control_loop = PlasmaControlLoop::new(config, phi_monitor);
+        let mut control_loop = PlasmaControlLoop::new(config);
 
         // Build up history with falling trend
         for i in 0..15 {
@@ -1430,8 +1409,7 @@ mod tests {
     #[test]
     fn test_statistics_tracking() {
         let config = PlasmaControlConfig::default();
-        let phi_monitor = PhiMonitor::new();
-        let mut control_loop = PlasmaControlLoop::new(config, phi_monitor);
+        let mut control_loop = PlasmaControlLoop::new(config);
 
         // Run various scenarios
         for phi in [0.7, 0.5, 0.3, 0.1] {
@@ -1448,8 +1426,7 @@ mod tests {
     #[test]
     fn test_integrated_control_simulation() {
         let config = PlasmaControlConfig::default();
-        let phi_monitor = PhiMonitor::new();
-        let mut control_loop = PlasmaControlLoop::new(config, phi_monitor);
+        let mut control_loop = PlasmaControlLoop::new(config);
 
         let mut sim = PlasmaSimulator::new(12345)
             .with_timestep_ns(1_000_000)

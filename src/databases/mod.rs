@@ -462,6 +462,21 @@ pub struct DatabaseConfig {
     pub path: Option<String>,
 }
 
+impl DatabaseConfig {
+    /// Validate database configuration parameters.
+    ///
+    /// Checks that:
+    /// - If a path is specified, it is not empty or whitespace-only
+    pub fn validate(&self) -> Result<(), String> {
+        if let Some(ref path) = self.path {
+            if path.trim().is_empty() {
+                return Err("DatabaseConfig: path must not be empty or whitespace-only".into());
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Create a database instance from configuration.
 pub async fn create_database(config: &DatabaseConfig) -> DbResult<Box<dyn ConsciousnessDatabase>> {
     match &config.backend {
@@ -488,3 +503,51 @@ pub use sqlite_client::SqliteMemory;
 
 #[cfg(feature = "lancedb-backend")]
 pub use lance_client::LanceMemory;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_database_config_is_valid() {
+        let config = DatabaseConfig::default();
+        assert!(config.validate().is_ok(), "default DatabaseConfig must pass validation");
+    }
+
+    #[test]
+    fn test_database_config_with_valid_path() {
+        let config = DatabaseConfig {
+            backend: DatabaseBackend::Sqlite,
+            path: Some("/tmp/test.db".into()),
+        };
+        assert!(config.validate().is_ok(), "valid path should pass");
+    }
+
+    #[test]
+    fn test_database_config_empty_path_rejected() {
+        let config = DatabaseConfig {
+            backend: DatabaseBackend::Sqlite,
+            path: Some("".into()),
+        };
+        let err = config.validate().unwrap_err();
+        assert!(err.contains("path"), "error should mention path: {err}");
+    }
+
+    #[test]
+    fn test_database_config_whitespace_path_rejected() {
+        let config = DatabaseConfig {
+            backend: DatabaseBackend::Sqlite,
+            path: Some("   ".into()),
+        };
+        assert!(config.validate().is_err(), "whitespace-only path should fail");
+    }
+
+    #[test]
+    fn test_database_config_none_path_valid() {
+        let config = DatabaseConfig {
+            backend: DatabaseBackend::Sqlite,
+            path: None,
+        };
+        assert!(config.validate().is_ok(), "None path (in-memory) should be valid");
+    }
+}

@@ -193,15 +193,6 @@ impl PrimitiveEvolver {
         }
     }
 
-    /// Generate a random f64, using the genesis RNG if available.
-    #[allow(dead_code)]
-    fn rand_f64(&mut self) -> f64 {
-        match &mut self.rng {
-            Some(rng) => rng.gen::<f64>(),
-            None => rand::random::<f64>(),
-        }
-    }
-
     /// Add a concept to the population
     pub fn add_concept(&mut self, mut concept: EvolvingConcept) -> u64 {
         let id = self.next_id;

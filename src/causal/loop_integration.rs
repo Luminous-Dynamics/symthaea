@@ -680,22 +680,6 @@ mod tests {
     use super::*;
     use rand::{Rng, SeedableRng};
 
-    /// Generate synthetic causal data: X causes Y (utility for future tests)
-    #[allow(dead_code)]
-    fn generate_causal_data(n_samples: usize, seed: u64) -> (Vec<f64>, Vec<f64>) {
-        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
-
-        let x: Vec<f64> = (0..n_samples).map(|_| rng.gen_range(-1.0..1.0)).collect();
-
-        // Y = 0.8 * X + noise
-        let y: Vec<f64> = x
-            .iter()
-            .map(|&xi| 0.8 * xi + rng.gen_range(-0.2..0.2))
-            .collect();
-
-        (x, y)
-    }
-
     #[test]
     fn test_causal_structure_discovery_on_synthetic_data() {
         let mut enhancer = CausalLoopEnhancer::new(42);

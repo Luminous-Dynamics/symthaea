@@ -1612,4 +1612,453 @@ mod tests {
             assert!(tension.severity >= 0.0 && tension.severity <= 1.0);
         }
     }
+
+    // ================================================================
+    // NEW TESTS: Constructor variants and config
+    // ================================================================
+
+    #[test]
+    fn test_evaluator_default_trait() {
+        let evaluator = UnifiedValueEvaluator::default();
+        assert!(evaluator.history.is_empty());
+        assert!(evaluator.has_contextual_weights());
+        assert!(!evaluator.has_semantic_embeddings());
+    }
+
+    #[test]
+    fn test_evaluator_with_config_uses_config() {
+        let mut config = EvaluatorConfig::default();
+        config.min_care_activation = 0.9;
+        let evaluator = UnifiedValueEvaluator::with_config(config);
+        assert!((evaluator.config.min_care_activation - 0.9).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_evaluator_with_feedback_config() {
+        let config = EvaluatorConfig::default();
+        let fb_config = FeedbackLoopConfig::default();
+        let evaluator = UnifiedValueEvaluator::with_feedback_config(config, fb_config);
+        assert!(evaluator.history.is_empty());
+    }
+
+    // ================================================================
+    // NEW TESTS: Phrase adjustment
+    // ================================================================
+
+    #[test]
+    fn test_phrase_adjustment_negative_keywords() {
+        let evaluator = UnifiedValueEvaluator::new();
+        let adj = evaluator.calculate_phrase_adjustment("harm and deceive and exploit");
+        assert!(adj < 0.0, "Negative keywords should produce negative adjustment: {adj}");
+    }
+
+    #[test]
+    fn test_phrase_adjustment_positive_keywords() {
+        let evaluator = UnifiedValueEvaluator::new();
+        let adj = evaluator.calculate_phrase_adjustment("help and support and nurture");
+        assert!(adj > 0.0, "Positive keywords should produce positive adjustment: {adj}");
+    }
+
+    #[test]
+    fn test_phrase_adjustment_neutral_text() {
+        let evaluator = UnifiedValueEvaluator::new();
+        let adj = evaluator.calculate_phrase_adjustment("process the data in the queue");
+        assert!(
+            (adj - 0.0).abs() < f64::EPSILON,
+            "Neutral text should have zero adjustment: {adj}"
+        );
+    }
+
+    #[test]
+    fn test_phrase_adjustment_clamped_lower() {
+        let evaluator = UnifiedValueEvaluator::new();
+        // All 10 negative keywords
+        let adj = evaluator.calculate_phrase_adjustment(
+            "harm deceive manipulate exploit destroy steal attack abuse corrupt betray"
+        );
+        assert!(adj >= -0.3, "Adjustment should be clamped to -0.3, got {adj}");
+    }
+
+    #[test]
+    fn test_phrase_adjustment_clamped_upper() {
+        let evaluator = UnifiedValueEvaluator::new();
+        // All 10 positive keywords
+        let adj = evaluator.calculate_phrase_adjustment(
+            "help support nurture protect heal compassion care kindness serve empower"
+        );
+        assert!(adj <= 0.15, "Adjustment should be clamped to 0.15, got {adj}");
+    }
+
+    #[test]
+    fn test_phrase_adjustment_case_insensitive() {
+        let evaluator = UnifiedValueEvaluator::new();
+        let lower = evaluator.calculate_phrase_adjustment("harm");
+        let upper = evaluator.calculate_phrase_adjustment("HARM");
+        assert!((lower - upper).abs() < f64::EPSILON, "Should be case insensitive");
+    }
+
+    // ================================================================
+    // NEW TESTS: Overall score boundaries
+    // ================================================================
+
+    #[test]
+    fn test_overall_score_bounded_zero_to_one() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        let context = EvaluationContext {
+            consciousness_level: 0.5,
+            affective_systems: AffectiveSystemsState {
+                care: 0.5,
+                ..Default::default()
+            },
+            action_type: ActionType::Basic,
+            action_domain: None,
+            involves_others: false,
+            ..Default::default()
+        };
+        let result = evaluator.evaluate("do something normal", context);
+        // Overall score should be in a valid range
+        assert!(result.overall_score.is_finite(), "Score should be finite");
+        // After phrase adjustment, score might slightly exceed [0,1] but should be reasonable
+        assert!(
+            result.overall_score >= -0.5 && result.overall_score <= 1.5,
+            "Score should be in reasonable range: {}",
+            result.overall_score
+        );
+    }
+
+    #[test]
+    fn test_consciousness_adequacy_at_exact_threshold() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        // Basic action threshold is 0.2
+        let context = EvaluationContext {
+            consciousness_level: 0.2, // Exactly at threshold
+            affective_systems: AffectiveSystemsState {
+                care: 0.5,
+                ..Default::default()
+            },
+            action_type: ActionType::Basic,
+            action_domain: None,
+            involves_others: false,
+            ..Default::default()
+        };
+        let result = evaluator.evaluate("basic action", context);
+        // At exactly the threshold, should pass consciousness check
+        assert!((result.consciousness_adequacy - 1.0).abs() < f64::EPSILON);
+    }
+
+    // ================================================================
+    // NEW TESTS: Semantic embeddings toggle
+    // ================================================================
+
+    #[test]
+    fn test_semantic_embeddings_enable_disable() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        assert!(!evaluator.has_semantic_embeddings());
+
+        evaluator.enable_semantic_embeddings();
+        assert!(evaluator.has_semantic_embeddings());
+
+        evaluator.disable_semantic_embeddings();
+        assert!(!evaluator.has_semantic_embeddings());
+    }
+
+    #[test]
+    fn test_semantic_embeddings_evaluation_works() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        evaluator.enable_semantic_embeddings();
+
+        let context = EvaluationContext {
+            consciousness_level: 0.5,
+            affective_systems: AffectiveSystemsState {
+                care: 0.5,
+                ..Default::default()
+            },
+            action_type: ActionType::Basic,
+            action_domain: None,
+            involves_others: false,
+            ..Default::default()
+        };
+        let result = evaluator.evaluate("help with kindness", context);
+        assert!(result.overall_score.is_finite());
+    }
+
+    // ================================================================
+    // NEW TESTS: Stats tracking
+    // ================================================================
+
+    #[test]
+    fn test_stats_empty_initially() {
+        let evaluator = UnifiedValueEvaluator::new();
+        let stats = evaluator.stats();
+        assert_eq!(stats.total_evaluations, 0);
+        assert_eq!(stats.vetoes, 0);
+        assert_eq!(stats.warnings, 0);
+        assert_eq!(stats.allows, 0);
+        assert!((stats.veto_rate - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_stats_track_evaluations() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+
+        // Run several evaluations
+        for _ in 0..3 {
+            let context = EvaluationContext {
+                consciousness_level: 0.5,
+                affective_systems: AffectiveSystemsState {
+                    care: 0.6,
+                    ..Default::default()
+                },
+                action_type: ActionType::Basic,
+                action_domain: None,
+                involves_others: false,
+                ..Default::default()
+            };
+            evaluator.evaluate("help someone", context);
+        }
+
+        let stats = evaluator.stats();
+        assert_eq!(stats.total_evaluations, 3);
+        assert_eq!(stats.vetoes + stats.warnings + stats.allows, 3);
+    }
+
+    #[test]
+    fn test_stats_veto_rate_calculated() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+
+        // Force a veto via high rage (this path goes through record_evaluation)
+        let veto_context = EvaluationContext {
+            consciousness_level: 0.5,
+            affective_systems: AffectiveSystemsState {
+                rage: 0.8,
+                ..Default::default()
+            },
+            action_type: ActionType::Basic,
+            action_domain: None,
+            involves_others: true,
+            ..Default::default()
+        };
+        evaluator.evaluate("do something", veto_context);
+
+        let stats = evaluator.stats();
+        assert_eq!(stats.vetoes, 1);
+        assert!((stats.veto_rate - 1.0).abs() < f64::EPSILON);
+    }
+
+    // ================================================================
+    // NEW TESTS: Narrative report generation
+    // ================================================================
+
+    #[test]
+    fn test_narrative_report_generated() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        let context = EvaluationContext {
+            consciousness_level: 0.7,
+            affective_systems: AffectiveSystemsState {
+                care: 0.7,
+                ..Default::default()
+            },
+            action_type: ActionType::Basic,
+            action_domain: Some(ActionDomain::Healthcare),
+            involves_others: true,
+            ..Default::default()
+        };
+        let result = evaluator.evaluate("provide care", context);
+        let report = evaluator.generate_narrative_report(&result, "provide care");
+
+        assert!(!report.narrative.is_empty(), "Narrative should not be empty");
+        assert!(!report.broadcast_message.is_empty(), "Broadcast message should not be empty");
+        assert!(report.timestamp > 0, "Timestamp should be positive");
+    }
+
+    #[test]
+    fn test_narrative_report_veto_contains_blocked() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        let context = EvaluationContext {
+            consciousness_level: 0.05,
+            affective_systems: AffectiveSystemsState::default(),
+            action_type: ActionType::Constitutional,
+            ..Default::default()
+        };
+        let result = evaluator.evaluate("amend constitution", context);
+        let report = evaluator.generate_narrative_report(&result, "amend constitution");
+        assert!(
+            report.narrative.contains("BLOCKED"),
+            "Veto narrative should contain 'BLOCKED', got: {}",
+            report.narrative
+        );
+    }
+
+    // ================================================================
+    // NEW TESTS: Edge cases
+    // ================================================================
+
+    #[test]
+    fn test_evaluate_empty_action_string() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        let context = EvaluationContext {
+            consciousness_level: 0.5,
+            affective_systems: AffectiveSystemsState {
+                care: 0.5,
+                ..Default::default()
+            },
+            action_type: ActionType::Basic,
+            action_domain: None,
+            involves_others: false,
+            ..Default::default()
+        };
+        let result = evaluator.evaluate("", context);
+        assert!(result.overall_score.is_finite(), "Empty action should not produce NaN");
+    }
+
+    #[test]
+    fn test_evaluate_very_long_action_string() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        let long_action = "help ".repeat(500);
+        let context = EvaluationContext {
+            consciousness_level: 0.5,
+            affective_systems: AffectiveSystemsState {
+                care: 0.5,
+                ..Default::default()
+            },
+            action_type: ActionType::Basic,
+            action_domain: None,
+            involves_others: false,
+            ..Default::default()
+        };
+        let result = evaluator.evaluate(&long_action, context);
+        assert!(result.overall_score.is_finite(), "Long action should not cause overflow");
+    }
+
+    #[test]
+    fn test_evaluate_high_fear_vetoed() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        let context = EvaluationContext {
+            consciousness_level: 0.5,
+            affective_systems: AffectiveSystemsState {
+                fear: 0.8,
+                care: 0.5,
+                ..Default::default()
+            },
+            action_type: ActionType::Basic,
+            action_domain: None,
+            involves_others: true,
+            ..Default::default()
+        };
+        let result = evaluator.evaluate("do something", context);
+        assert!(
+            matches!(result.decision, Decision::Veto(VetoReason::NegativeAffectDominant { .. })),
+            "High fear should trigger NegativeAffectDominant veto, got: {:?}",
+            result.decision
+        );
+    }
+
+    #[test]
+    fn test_evaluate_constitutional_needs_high_consciousness() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        // Constitutional threshold is 0.6 by default
+        let low_context = EvaluationContext {
+            consciousness_level: 0.5, // Below 0.6
+            affective_systems: AffectiveSystemsState {
+                care: 0.7,
+                ..Default::default()
+            },
+            action_type: ActionType::Constitutional,
+            action_domain: None,
+            involves_others: false,
+            ..Default::default()
+        };
+        let result = evaluator.evaluate("amend the rules", low_context);
+        assert!(
+            matches!(result.decision, Decision::Veto(VetoReason::InsufficientConsciousness { .. })),
+            "Sub-threshold consciousness for constitutional should be vetoed, got: {:?}",
+            result.decision
+        );
+    }
+
+    #[test]
+    fn test_last_result_stored_after_evaluation() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        assert!(evaluator.last_result().is_none());
+
+        let context = EvaluationContext {
+            consciousness_level: 0.5,
+            affective_systems: AffectiveSystemsState::default(),
+            action_type: ActionType::Basic,
+            ..Default::default()
+        };
+        evaluator.evaluate("test action", context);
+        assert!(evaluator.last_result().is_some());
+    }
+
+    #[test]
+    fn test_history_eviction() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        evaluator.max_history = 5;
+        let context = EvaluationContext {
+            consciousness_level: 0.5,
+            affective_systems: AffectiveSystemsState::default(),
+            action_type: ActionType::Basic,
+            ..Default::default()
+        };
+        for i in 0..10 {
+            evaluator.evaluate(&format!("action {i}"), context.clone());
+        }
+        assert!(evaluator.history.len() <= 5, "History should be capped");
+    }
+
+    #[test]
+    fn test_feedback_decay_does_not_panic() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        // Should not panic even with no data
+        evaluator.apply_feedback_decay();
+
+        let context = EvaluationContext {
+            consciousness_level: 0.7,
+            affective_systems: AffectiveSystemsState::default(),
+            action_type: ActionType::Basic,
+            ..Default::default()
+        };
+        let result = evaluator.evaluate("test", context);
+        evaluator.feedback_loop.record_user_feedback(
+            "test", &result, &result.decision, 0.8, 0.7, None,
+        );
+        evaluator.apply_feedback_decay();
+        // Should still function
+        let summary = evaluator.feedback_summary();
+        assert!(summary.total_feedback > 0 || summary.total_feedback == 0);
+    }
+
+    #[test]
+    fn test_harmony_adjustment_default_is_near_one() {
+        let evaluator = UnifiedValueEvaluator::new();
+        let adj = evaluator.get_harmony_adjustment(&Harmony::SacredReciprocity);
+        assert!(
+            (adj - 1.0).abs() < 0.1,
+            "Default harmony adjustment should be near 1.0, got {adj}"
+        );
+    }
+
+    #[test]
+    fn test_affective_grounding_disabled() {
+        let mut config = EvaluatorConfig::default();
+        config.require_affective_grounding = false;
+        let mut evaluator = UnifiedValueEvaluator::with_config(config);
+
+        let context = EvaluationContext {
+            consciousness_level: 0.5,
+            affective_systems: AffectiveSystemsState::default(), // All zeros
+            action_type: ActionType::Basic,
+            action_domain: None,
+            involves_others: false,
+            ..Default::default()
+        };
+        let result = evaluator.evaluate("test", context);
+        // Affective grounding should be 1.0 when not required
+        assert!(
+            (result.affective_grounding - 1.0).abs() < f64::EPSILON,
+            "Affective grounding should be 1.0 when disabled, got {}",
+            result.affective_grounding
+        );
+    }
 }

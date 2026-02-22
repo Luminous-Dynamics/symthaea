@@ -285,6 +285,10 @@ pub struct FlightConfig {
     pub genesis_phrase: String,
     /// Whether to collect per-step telemetry during episodes (default: false).
     pub collect_telemetry: bool,
+    /// Experience replay buffer size (default: 64). Set to 0 to disable replay.
+    pub replay_buffer_size: usize,
+    /// Number of replay samples per training step (default: 3).
+    pub replay_count: usize,
 }
 
 impl Default for FlightConfig {
@@ -301,6 +305,8 @@ impl Default for FlightConfig {
             train_every: 4,          // 125Hz training
             genesis_phrase: "symthaea-flight-quadrotor".to_string(),
             collect_telemetry: false,
+            replay_buffer_size: 64,
+            replay_count: 3,
         }
     }
 }

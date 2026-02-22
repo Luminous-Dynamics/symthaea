@@ -2002,4 +2002,305 @@ mod tests {
         assert!(display.contains("NSM_BEFORE"));
         assert!(display.contains("NSM_TOUCH"));
     }
+
+    // ========================================================================
+    // Additional coverage: edge cases, scale invariance, algebraic properties
+    // ========================================================================
+
+    #[test]
+    fn test_interval_invalid_equal_start_end() {
+        // Start == end should be invalid (zero-length interval)
+        assert!(TemporalInterval::new("zero_len", 5.0, 5.0).is_err());
+    }
+
+    #[test]
+    fn test_interval_contains_point_boundaries() {
+        let interval = TemporalInterval::new("bounds", 1.0, 3.0).unwrap();
+
+        // Exact boundaries should be contained
+        assert!(interval.contains_point(1.0), "Start point should be contained");
+        assert!(interval.contains_point(3.0), "End point should be contained");
+
+        // Just outside boundaries
+        assert!(!interval.contains_point(0.999));
+        assert!(!interval.contains_point(3.001));
+    }
+
+    #[test]
+    fn test_interval_with_state() {
+        let interval = TemporalInterval::with_state("s1", 0.0, 1.0, "state_A", 0.75).unwrap();
+
+        assert_eq!(interval.state_id.as_deref(), Some("state_A"));
+        assert_eq!(interval.phi, Some(0.75));
+        assert_eq!(interval.duration(), 1.0);
+    }
+
+    #[test]
+    fn test_interval_with_state_invalid() {
+        // Should still reject invalid intervals
+        assert!(TemporalInterval::with_state("bad", 5.0, 2.0, "state", 0.5).is_err());
+    }
+
+    #[test]
+    fn test_allen_relation_all_returns_13() {
+        let all = AllenRelation::all();
+        assert_eq!(all.len(), 13, "Allen's algebra has exactly 13 relations");
+    }
+
+    #[test]
+    fn test_allen_relation_double_inverse() {
+        // Inverse of inverse should be identity for all relations
+        for relation in AllenRelation::all() {
+            assert_eq!(
+                relation.inverse().inverse(),
+                relation,
+                "Double inverse of {:?} should be itself",
+                relation,
+            );
+        }
+    }
+
+    #[test]
+    fn test_allen_equals_self_inverse() {
+        assert_eq!(
+            AllenRelation::Equals.inverse(),
+            AllenRelation::Equals,
+            "Equals should be its own inverse",
+        );
+    }
+
+    #[test]
+    fn test_allen_short_names_unique() {
+        let all = AllenRelation::all();
+        let names: Vec<&str> = all.iter().map(|r| r.short_name()).collect();
+        let unique: std::collections::HashSet<&str> = names.iter().copied().collect();
+        assert_eq!(
+            names.len(),
+            unique.len(),
+            "All short names should be unique",
+        );
+    }
+
+    #[test]
+    fn test_compute_relation_starts_and_finishes() {
+        let reasoner = TemporalReasoner::default();
+
+        // A starts B: same start, A ends first
+        let a = TemporalInterval::new("A", 0.0, 1.0).unwrap();
+        let b = TemporalInterval::new("B", 0.0, 2.0).unwrap();
+        assert_eq!(reasoner.compute_relation(&a, &b), AllenRelation::Starts);
+
+        // A finishes B: same end, A starts later
+        let a = TemporalInterval::new("A", 1.0, 3.0).unwrap();
+        let b = TemporalInterval::new("B", 0.0, 3.0).unwrap();
+        assert_eq!(reasoner.compute_relation(&a, &b), AllenRelation::Finishes);
+    }
+
+    #[test]
+    fn test_compute_relation_inverse_pairs() {
+        let reasoner = TemporalReasoner::default();
+
+        let a = TemporalInterval::new("A", 0.0, 1.0).unwrap();
+        let b = TemporalInterval::new("B", 2.0, 3.0).unwrap();
+
+        let r_ab = reasoner.compute_relation(&a, &b);
+        let r_ba = reasoner.compute_relation(&b, &a);
+
+        assert_eq!(
+            r_ab.inverse(),
+            r_ba,
+            "compute_relation(A,B).inverse() should equal compute_relation(B,A): {:?} vs {:?}",
+            r_ab.inverse(),
+            r_ba,
+        );
+    }
+
+    #[test]
+    fn test_compute_relation_overlapped_by() {
+        let reasoner = TemporalReasoner::default();
+
+        // OverlappedBy: B starts before A, B ends during A
+        let a = TemporalInterval::new("A", 1.0, 3.0).unwrap();
+        let b = TemporalInterval::new("B", 0.0, 2.0).unwrap();
+        assert_eq!(
+            reasoner.compute_relation(&a, &b),
+            AllenRelation::OverlappedBy,
+        );
+    }
+
+    #[test]
+    fn test_temporal_config_default_values() {
+        let config = TemporalConfig::default();
+
+        assert!(config.epsilon > 0.0, "Epsilon should be positive");
+        assert!(config.meet_tolerance > 0.0);
+        assert!(config.min_overlap > 0.0);
+        assert!(config.soft_matching);
+        assert_eq!(config.binding_window_ms, 25.0);
+    }
+
+    #[test]
+    fn test_composition_equals_identity() {
+        let reasoner = TemporalReasoner::default();
+
+        // Composing any relation with Equals should return that relation
+        for relation in AllenRelation::all() {
+            let result = reasoner.compose(AllenRelation::Equals, relation);
+            assert!(
+                result.contains(&relation),
+                "Equals composed with {:?} should contain {:?}, got {:?}",
+                relation, relation, result,
+            );
+            let result2 = reasoner.compose(relation, AllenRelation::Equals);
+            assert!(
+                result2.contains(&relation),
+                "{:?} composed with Equals should contain {:?}, got {:?}",
+                relation, relation, result2,
+            );
+        }
+    }
+
+    #[test]
+    fn test_conscious_interval_scoring_zero() {
+        let interval = TemporalInterval::new("zero", 0.0, 1.0).unwrap();
+        let conscious = ConsciousInterval::new(interval, 0.0, 0.0, 0.0);
+
+        assert_eq!(conscious.consciousness_score(), 0.0);
+        assert!(!conscious.is_conscious(0.01));
+        assert!(!conscious.is_causally_efficacious(0.01));
+    }
+
+    #[test]
+    fn test_conscious_interval_phi_trend_default() {
+        let interval = TemporalInterval::new("trend", 0.0, 1.0).unwrap();
+        let conscious = ConsciousInterval::new(interval, 0.5, 0.5, 0.5);
+        assert_eq!(conscious.phi_trend, PhiTrend::Stable);
+        assert!(conscious.content.is_none());
+    }
+
+    #[test]
+    fn test_continuity_analysis_with_gaps() {
+        let mut analyzer = ConsciousnessTemporalAnalyzer::new(0.5);
+
+        // Create intervals with gaps
+        let intervals_data = vec![
+            (0.0, 1.0),  // 1s duration
+            (2.0, 3.0),  // gap of 1s, then 1s duration
+            (5.0, 6.0),  // gap of 2s, then 1s duration
+        ];
+
+        for (i, (start, end)) in intervals_data.iter().enumerate() {
+            let interval = TemporalInterval::new(format!("s{}", i), *start, *end).unwrap();
+            let conscious = ConsciousInterval::new(interval, 0.8, 0.7, 0.6);
+            analyzer.add_interval(conscious);
+        }
+
+        let analysis = analyzer.analyze_continuity();
+        assert_eq!(analysis.total_conscious_time, 3.0);
+        assert_eq!(analysis.gap_count, 2);
+        assert!(analysis.total_gap_time > 0.0);
+        assert_eq!(analysis.max_gap, 2.0);
+        assert!(
+            analysis.continuity_score < 1.0,
+            "Continuity score should be < 1 with gaps: {}",
+            analysis.continuity_score,
+        );
+    }
+
+    #[test]
+    fn test_continuity_analysis_empty() {
+        let mut analyzer = ConsciousnessTemporalAnalyzer::new(0.5);
+        let analysis = analyzer.analyze_continuity();
+
+        assert_eq!(analysis.total_conscious_time, 0.0);
+        assert_eq!(analysis.gap_count, 0);
+        assert_eq!(analysis.continuity_score, 1.0);
+    }
+
+    #[test]
+    fn test_encode_sequence_empty() {
+        let system = TemporalPrimitiveSystem::new();
+        let empty = system.encode_sequence(&[]);
+        assert_eq!(empty.popcount(), 0, "Empty sequence should encode to zero HV");
+    }
+
+    #[test]
+    fn test_encode_sequence_single_element() {
+        let system = TemporalPrimitiveSystem::new();
+
+        let single = system.encode_sequence(&[AllenRelation::Precedes]);
+        let direct = system.encode(AllenRelation::Precedes);
+
+        // Single-element sequence should be the same as direct encoding
+        let sim = single.similarity(&direct);
+        assert!(
+            (sim - 1.0).abs() < 1e-6,
+            "Single-element sequence should match direct encode, sim = {}",
+            sim,
+        );
+    }
+
+    #[test]
+    fn test_causal_relations_only_three() {
+        let causal: Vec<AllenRelation> = AllenRelation::all()
+            .into_iter()
+            .filter(|r| r.is_causal_relation())
+            .collect();
+
+        assert_eq!(causal.len(), 3);
+        assert!(causal.contains(&AllenRelation::Precedes));
+        assert!(causal.contains(&AllenRelation::Meets));
+        assert!(causal.contains(&AllenRelation::Overlaps));
+    }
+
+    #[test]
+    fn test_genuine_chain_cycle_numbers() {
+        let mut analyzer = ConsciousnessTemporalAnalyzer::new(0.3);
+
+        // Add intervals with c{N} naming convention
+        for i in 0..5 {
+            let start = i as f64 * 2.0;
+            let end = start + 1.0;
+            let interval = TemporalInterval::new(format!("c{}", i), start, end).unwrap();
+            let conscious = ConsciousInterval::new(interval, 0.8, 0.7, 0.6);
+            analyzer.add_interval(conscious);
+        }
+
+        let chains = analyzer.detect_causal_chains(2);
+        assert!(!chains.is_empty(), "Should detect at least one chain");
+
+        let cycle_numbers = analyzer.genuine_chain_cycle_numbers();
+        // All cycle numbers should be valid u64 values
+        for num in &cycle_numbers {
+            assert!(*num < 5, "Cycle number should be < 5, got {}", num);
+        }
+    }
+
+    #[test]
+    fn test_binding_candidates_none_in_range() {
+        let mut reasoner = TemporalReasoner::default();
+        reasoner.create_interval("far", 100.0, 101.0).unwrap();
+
+        let candidates = reasoner.find_binding_candidates(0.0);
+        assert!(
+            candidates.is_empty(),
+            "No candidates expected far from reference time",
+        );
+    }
+
+    #[test]
+    fn test_get_relation_caches_both_directions() {
+        let mut reasoner = TemporalReasoner::default();
+        reasoner.create_interval("X", 0.0, 1.0).unwrap();
+        reasoner.create_interval("Y", 2.0, 3.0).unwrap();
+
+        let r_xy = reasoner.get_relation("X", "Y").unwrap();
+        let r_yx = reasoner.get_relation("Y", "X").unwrap();
+
+        assert_eq!(
+            r_xy.inverse(),
+            r_yx,
+            "Cached inverse should match",
+        );
+    }
 }

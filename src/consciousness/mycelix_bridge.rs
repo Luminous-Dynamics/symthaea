@@ -52,7 +52,7 @@ const GOV_CONSTITUTIONAL: f64 = 0.6;
 
 // Reputation thresholds — intentionally higher than consciousness thresholds
 // because they combine consciousness (60%) + hApp reputation (40%).
-#[allow(dead_code)]
+#[allow(dead_code)] // Used by EnhancedMycelixBridge (currently unwired)
 const REP_BASIC: f64 = 0.3;
 #[allow(dead_code)]
 const REP_GOVERNANCE: f64 = 0.5;

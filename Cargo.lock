@@ -12797,6 +12797,7 @@ dependencies = [
  "symthaea-nix",
  "symthaea-observability",
  "symthaea-phi-search",
+ "symthaea-physics",
  "symthaea-sensorimotor",
  "symthaea-sentinel",
  "symthaea-seven-harmonies",
@@ -13034,6 +13035,20 @@ dependencies = [
  "serde",
  "symthaea-consciousness-topology",
  "symthaea-core",
+]
+
+[[package]]
+name = "symthaea-physics"
+version = "0.5.0"
+dependencies = [
+ "anyhow",
+ "csv",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-fep",
 ]
 
 [[package]]

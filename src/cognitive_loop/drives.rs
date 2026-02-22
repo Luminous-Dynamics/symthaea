@@ -402,6 +402,19 @@ pub struct SelfReflection {
     /// Confidence threshold for trusting predictions
     pub trust_threshold: f32,
 
+    // ===== Adaptive Integration Thresholds (Phase 11) =====
+    /// Coherence gate threshold for resonator recall (default 0.3)
+    pub coherence_gate_threshold: f32,
+
+    /// Diversity lower bound for exploration governor (default 0.3)
+    pub diversity_low_threshold: f32,
+
+    /// Diversity upper bound for exploitation governor (default 0.7)
+    pub diversity_high_threshold: f32,
+
+    /// FEP surprise threshold for replay boost + exploration (default 0.8)
+    pub surprise_threshold: f32,
+
     // ===== Meta-Statistics =====
     /// Total reflection cycles performed
     pub reflection_count: u64,
@@ -486,6 +499,8 @@ pub enum RecommendationTarget {
     LearningRate,
     ExplorationFactor,
     ReflectionInterval,
+    CoherenceGateThreshold,
+    SurpriseThreshold,
 }
 
 /// Direction of adjustment
@@ -504,6 +519,12 @@ impl Default for SelfReflection {
             flow_coherence_threshold: 0.6,
             boredom_threshold: 0.1,
             trust_threshold: 0.4,
+
+            // Adaptive integration thresholds
+            coherence_gate_threshold: 0.3,
+            diversity_low_threshold: 0.3,
+            diversity_high_threshold: 0.7,
+            surprise_threshold: 0.8,
 
             // Meta-statistics
             reflection_count: 0,
@@ -765,6 +786,34 @@ impl SelfReflection {
                     }
                     self.adjustments_made += 1;
                 }
+                RecommendationTarget::CoherenceGateThreshold => {
+                    match rec.direction {
+                        AdjustmentDirection::Increase => {
+                            self.coherence_gate_threshold =
+                                (self.coherence_gate_threshold + Self::ADJUSTMENT_STEP).min(0.6);
+                        }
+                        AdjustmentDirection::Decrease => {
+                            self.coherence_gate_threshold =
+                                (self.coherence_gate_threshold - Self::ADJUSTMENT_STEP).max(0.1);
+                        }
+                        AdjustmentDirection::NoChange => {}
+                    }
+                    self.adjustments_made += 1;
+                }
+                RecommendationTarget::SurpriseThreshold => {
+                    match rec.direction {
+                        AdjustmentDirection::Increase => {
+                            self.surprise_threshold =
+                                (self.surprise_threshold + Self::ADJUSTMENT_STEP).min(0.95);
+                        }
+                        AdjustmentDirection::Decrease => {
+                            self.surprise_threshold =
+                                (self.surprise_threshold - Self::ADJUSTMENT_STEP).max(0.5);
+                        }
+                        AdjustmentDirection::NoChange => {}
+                    }
+                    self.adjustments_made += 1;
+                }
                 _ => {} // Other targets handled externally
             }
         }
@@ -794,6 +843,10 @@ impl SelfReflection {
             flow_coherence: self.flow_coherence_threshold,
             boredom: self.boredom_threshold,
             trust: self.trust_threshold,
+            coherence_gate: self.coherence_gate_threshold,
+            diversity_low: self.diversity_low_threshold,
+            diversity_high: self.diversity_high_threshold,
+            surprise: self.surprise_threshold,
         }
     }
 
@@ -866,6 +919,10 @@ pub struct ReflectionThresholds {
     pub flow_coherence: f32,
     pub boredom: f32,
     pub trust: f32,
+    pub coherence_gate: f32,
+    pub diversity_low: f32,
+    pub diversity_high: f32,
+    pub surprise: f32,
 }
 
 /// Summary of self-reflection state

@@ -45,13 +45,13 @@ impl Default for FlightFepResult {
 /// 6 cognitive actions the FEP agent can select.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlightAction {
-    /// Multiply τ by 0.7 — faster adaptation (wind gust, rotor loss).
+    /// Multiply τ by 0.85 — faster adaptation (wind gust, rotor loss).
     DropTau = 0,
-    /// Multiply τ by 1.3 — more stable (low surprise hover).
+    /// Multiply τ by 1.15 — more stable (low surprise hover).
     RaiseTau = 1,
-    /// LR × 3.0 — high epistemic uncertainty, model outdated.
+    /// LR × 1.5 — high epistemic uncertainty, model outdated.
     BoostLearningRate = 2,
-    /// LR × 0.3 — low error, consolidate patterns.
+    /// LR × 0.6 — low error, consolidate patterns.
     ReduceLearningRate = 3,
     /// Weight position vs attitude errors differently.
     ShiftAttention = 4,
@@ -91,6 +91,9 @@ pub struct FlightFepConfig {
     pub td_discount: f64,
     /// TD eligibility trace λ (default: 0.8).
     pub td_lambda: f64,
+    /// Use rule-based policy instead of softmax action selection (default: true).
+    /// Rules use observation channels directly for reliable modulation.
+    pub use_rule_based_policy: bool,
 }
 
 impl Default for FlightFepConfig {
@@ -99,11 +102,12 @@ impl Default for FlightFepConfig {
             inference_iterations: 5,
             action_temperature: 0.5,
             exploration_fe_threshold: 2.0,
-            exploration_patience: 10,
-            exploration_magnitude: 0.1,
+            exploration_patience: 20,    // Wait longer before injecting noise
+            exploration_magnitude: 0.02, // Subtle noise — avoid destabilizing hover
             enable_td_learning: true,
             td_discount: 0.99,
             td_lambda: 0.8,
+            use_rule_based_policy: true,
         }
     }
 }
@@ -206,6 +210,35 @@ impl ActiveInferenceFlightAgent {
         ]
     }
 
+    /// Rule-based action selection from observation channels.
+    ///
+    /// Uses direct thresholds on the 8D observation vector:
+    /// - `obs[0]` = norm_pos (position error, 0=perfect, 1=bad)
+    /// - `obs[3]` = pe_trend (>0.5 = getting worse, <0.5 = improving)
+    /// - `obs[5]` = surprise_rate (>0.5 = FE rising, <0.5 = FE falling)
+    fn rule_based_action(&self, obs: &[f64]) -> FlightAction {
+        let norm_pos = obs[0];
+        let pe_trend = obs[3];
+        let surprise_rate = obs[5];
+
+        if pe_trend > 0.6 && norm_pos > 0.1 {
+            // Error growing and significant → speed up adaptation
+            FlightAction::DropTau
+        } else if pe_trend < 0.4 && norm_pos < 0.05 {
+            // Error shrinking and small → consolidate, slow down
+            FlightAction::RaiseTau
+        } else if surprise_rate > 0.65 {
+            // Free energy rising → model outdated, boost learning
+            FlightAction::BoostLearningRate
+        } else if surprise_rate < 0.35 && norm_pos < 0.1 {
+            // FE falling and low error → reduce learning, stabilize
+            FlightAction::ReduceLearningRate
+        } else {
+            // Neutral — no modulation
+            FlightAction::ShiftAttention
+        }
+    }
+
     /// Perform a cognitive tick: observe errors, update beliefs, select action.
     ///
     /// Called at 25Hz (every 20th motor step).
@@ -217,7 +250,7 @@ impl ActiveInferenceFlightAgent {
         let obs_values = self.build_observation(state, setpoint);
 
         let obs = Observation::new(
-            obs_values,
+            obs_values.clone(),
             1.0, // Full precision
             "flight",
         );
@@ -227,10 +260,18 @@ impl ActiveInferenceFlightAgent {
         let free_energy = perception.free_energy.total;
         let prediction_error = perception.free_energy.prediction_error;
 
-        // Select action and register it for TD transitions
-        let action_result = self.agent.select_action();
-        self.agent.act(action_result.action);
-        let action = FlightAction::from_index(action_result.action);
+        // Select action: rule-based policy or softmax
+        let action = if self.config.use_rule_based_policy {
+            self.rule_based_action(&obs_values)
+        } else {
+            let action_result = self.agent.select_action();
+            self.agent.act(action_result.action);
+            // Learn from the transition if we have previous state
+            if self.prev_prediction_error > 0.0 {
+                self.agent.learn_from_outcome(action_result.action, &obs);
+            }
+            FlightAction::from_index(action_result.action)
+        };
 
         // Build result based on selected action
         let mut result = FlightFepResult {
@@ -242,25 +283,22 @@ impl ActiveInferenceFlightAgent {
 
         match action {
             FlightAction::DropTau => {
-                result.tau_factor = 0.7;
+                result.tau_factor = 0.85;
             }
             FlightAction::RaiseTau => {
-                result.tau_factor = 1.3;
+                result.tau_factor = 1.15;
             }
             FlightAction::BoostLearningRate => {
-                result.learning_rate_factor = 3.0;
+                result.learning_rate_factor = 1.5;
             }
             FlightAction::ReduceLearningRate => {
-                result.learning_rate_factor = 0.3;
+                result.learning_rate_factor = 0.6;
             }
             FlightAction::ShiftAttention => {
-                // Shift attention: boost the dominant error channel's precision
-                // This doesn't directly change tau/LR but signals to the trainer
                 result.tau_factor = 1.0;
                 result.learning_rate_factor = 1.0;
             }
             FlightAction::ExplorationBurst => {
-                // Bounded noise proportional to configuration
                 let mag = self.config.exploration_magnitude;
                 result.exploration_noise = Some(QuadrotorCommand {
                     thrust: mag * QuadrotorCommand::MAX_THRUST * 0.1,
@@ -287,11 +325,6 @@ impl ActiveInferenceFlightAgent {
             }
         } else {
             self.high_fe_ticks = 0;
-        }
-
-        // Learn from the transition if we have previous state
-        if self.prev_prediction_error > 0.0 {
-            self.agent.learn_from_outcome(action_result.action, &obs);
         }
 
         // Update tracking state

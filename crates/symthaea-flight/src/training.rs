@@ -9,6 +9,7 @@
 //! allowing different backends (simple ballistic, MuJoCo, etc.).
 
 use symthaea_core::genesis::GenesisSeed;
+use symthaea_core::hdc::ContinuousHV;
 
 use crate::controller::FlightController;
 use crate::encoder::QuadrotorHdcEncoder;
@@ -118,6 +119,14 @@ impl FlightTrainer {
         let mut current_tau_factor = fep_result.tau_factor;
         let mut current_fe = fep_result.free_energy;
 
+        // Experience replay buffer: ring buffer of (sensor_hv, pd_target) pairs.
+        // Replaying past experiences prevents catastrophic forgetting as state drifts.
+        let replay_cap = self.config.replay_buffer_size;
+        let replay_count = self.config.replay_count;
+        let mut replay_buf: Vec<(ContinuousHV, QuadrotorCommand)> = Vec::with_capacity(replay_cap);
+        let mut replay_idx = 0usize; // next write position (ring buffer)
+        let mut replay_rng = episode as u64 + 7919; // simple hash for replay sampling
+
         for step in 0..self.config.steps_per_episode {
             // ── MOTOR REFLEX (every step, 500Hz) ──
             let state = physics.state().clone();
@@ -163,7 +172,31 @@ impl FlightTrainer {
             if step % self.config.train_every == 0 {
                 let target = pd_baseline(&state, &setpoint, &self.pd_gains);
                 let lr = self.config.learning_rate * fep_result.learning_rate_factor;
+
+                // Train on current observation
                 controller.train_step(&sensor_hv, &target, dt as f32, Some(lr));
+
+                // Store in replay buffer
+                if replay_cap > 0 {
+                    if replay_buf.len() < replay_cap {
+                        replay_buf.push((sensor_hv.clone(), target.clone()));
+                    } else {
+                        replay_buf[replay_idx % replay_cap] = (sensor_hv.clone(), target.clone());
+                    }
+                    replay_idx += 1;
+
+                    // Replay past experiences
+                    let buf_len = replay_buf.len();
+                    if buf_len > 1 {
+                        for _ in 0..replay_count.min(buf_len) {
+                            // Simple LCG for deterministic pseudo-random sampling
+                            replay_rng = replay_rng.wrapping_mul(6364136223846793005).wrapping_add(1);
+                            let idx = (replay_rng >> 33) as usize % buf_len;
+                            let (ref replay_hv, ref replay_target) = replay_buf[idx];
+                            controller.train_step(replay_hv, replay_target, dt as f32, Some(lr));
+                        }
+                    }
+                }
             }
 
             // ── COGNITIVE TICK (every cognitive_interval steps, 25Hz) ──
@@ -389,6 +422,48 @@ mod tests {
         let mut trainer = FlightTrainer::new(config);
         let metrics = trainer.train();
         assert!(metrics.len() == 5);
+    }
+
+    #[test]
+    fn test_multi_episode_convergence() {
+        // Train across 6 episodes with curriculum (perturbation 1% → 10%).
+        // The controller accumulates learning across episodes (weights persist).
+        // Despite increasing difficulty, performance should not catastrophically degrade.
+        let config = FlightConfig {
+            num_episodes: 6,
+            steps_per_episode: 300,
+            ..FlightConfig::default()
+        };
+        let mut trainer = FlightTrainer::new(config);
+        let metrics = trainer.train();
+
+        assert_eq!(metrics.len(), 6);
+
+        // All episodes should produce finite, bounded errors
+        for m in &metrics {
+            assert!(m.avg_position_error.is_finite());
+            assert!(m.final_position_error.is_finite());
+            assert!(m.avg_position_error < 10.0, "Error should be bounded: {}", m.avg_position_error);
+        }
+
+        // Key convergence check: the average error across the last 3 episodes
+        // should not be dramatically worse than the first 3, despite harder curriculum.
+        // This proves the network is compensating for increasing perturbation.
+        let first_half: f64 = metrics[..3].iter().map(|m| m.avg_position_error).sum::<f64>() / 3.0;
+        let second_half: f64 = metrics[3..].iter().map(|m| m.avg_position_error).sum::<f64>() / 3.0;
+
+        assert!(
+            second_half < first_half * 3.0,
+            "Training should prevent catastrophic degradation under curriculum: \
+             first_half_avg={first_half:.6}, second_half_avg={second_half:.6}"
+        );
+
+        // Stronger: final position error of last episode should be reasonable
+        assert!(
+            metrics[5].final_position_error < 2.0,
+            "Final episode should end with reasonable error: {}",
+            metrics[5].final_position_error
+        );
     }
 
     #[test]

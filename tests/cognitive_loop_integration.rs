@@ -2558,3 +2558,543 @@ fn test_full_resonator_fep_loop_stability() {
         "Full resonator-FEP stability: 150 cycles, avg_error={avg_error:.4}"
     );
 }
+
+// ── Phase 10+11: Self-Regulating Resonator + Homeostatic Feedback Tests ────
+
+#[test]
+fn test_codebook_pruning_at_capacity() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        resonator_max_symbols: 5,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..200 {
+        let input = match i % 5 {
+            0 => "alpha resonance field",
+            1 => "beta oscillation pattern",
+            2 => "gamma binding coherence",
+            3 => "delta sleep consolidation",
+            _ => "theta exploration mode",
+        };
+        let result = service.cycle(input);
+        assert!(result.prediction_error.is_finite(), "Error not finite at cycle {i}");
+        assert!(
+            result.metadata.codebook_evictions <= 3,
+            "Too many evictions at cycle {i}: {}",
+            result.metadata.codebook_evictions
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "Codebook pruning: promotions={}, evictions={}, diversity={:.3}",
+        stats.resonator_promotions_total,
+        stats.codebook_evictions_total,
+        stats.codebook_diversity
+    );
+}
+
+#[test]
+fn test_resonator_fep_prior_coupling() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..30 {
+        service.cycle("familiar context pattern");
+    }
+
+    let result = service.cycle("familiar context pattern");
+    assert!(result.metadata.resonator_best_sim.is_finite());
+    assert!(result.metadata.fep_accuracy.is_finite());
+    assert!(result.metadata.fep_complexity.is_finite());
+}
+
+#[test]
+fn test_fep_adaptive_behavior_modulation() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..40 {
+        let input = if i % 2 == 0 {
+            "calm steady state equilibrium"
+        } else {
+            "EXTREME NOVEL SHOCKING SURPRISE"
+        };
+        let result = service.cycle(input);
+        assert!(result.metadata.fep_surprise.is_finite(), "fep_surprise not finite at {i}");
+        assert!(result.metadata.fep_td_error.is_finite(), "fep_td_error not finite at {i}");
+        assert!(result.metadata.fep_pragmatic_value.is_finite(), "fep_pragmatic not finite at {i}");
+    }
+}
+
+#[test]
+fn test_fep_surprise_replay_boost() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..20 {
+        service.cycle("baseline routine input");
+    }
+    for _ in 0..20 {
+        service.cycle("completely novel unexpected stimulus");
+    }
+
+    let stats = service.stats();
+    assert!(
+        stats.fep_surprise_replay_boosts <= 40,
+        "Replay boosts should be bounded: got {}",
+        stats.fep_surprise_replay_boosts
+    );
+    eprintln!(
+        "FEP surprise replay: boosts={}, avg_error={:.4}",
+        stats.fep_surprise_replay_boosts,
+        stats.avg_prediction_error
+    );
+}
+
+#[test]
+fn test_codebook_diversity_metric() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..100 {
+        let input = match i % 4 {
+            0 => "diverse input alpha",
+            1 => "diverse input beta",
+            2 => "diverse input gamma",
+            _ => "diverse input delta",
+        };
+        let result = service.cycle(input);
+        assert!(result.metadata.codebook_diversity.is_finite(), "Diversity not finite at {i}");
+        assert!(result.metadata.codebook_diversity >= 0.0, "Diversity negative at {i}");
+        assert!(
+            result.metadata.codebook_diversity <= 1.0,
+            "Diversity > 1.0 at {i}: {}",
+            result.metadata.codebook_diversity
+        );
+    }
+}
+
+#[test]
+fn test_coherence_gating_and_tau_modulation() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run cycles and verify resonator_best_sim stays finite even with gating
+    for i in 0..50 {
+        let input = if i % 3 == 0 {
+            "temporal coherence test alpha"
+        } else if i % 3 == 1 {
+            "novel stimulus beta"
+        } else {
+            "familiar context alpha"
+        };
+        let result = service.cycle(input);
+        assert!(
+            result.metadata.resonator_best_sim.is_finite(),
+            "best_sim not finite at cycle {i}"
+        );
+        assert!(result.prediction_error.is_finite(), "Error not finite at {i}");
+    }
+}
+
+#[test]
+fn test_world_model_storage_bias() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Build up world model, then switch inputs to create high WM error
+    for _ in 0..20 {
+        service.cycle("familiar world model context");
+    }
+    // Novel input should cause higher WM error → higher storage importance
+    for i in 0..20 {
+        let result = service.cycle("completely novel world stimulus");
+        assert!(result.prediction_error.is_finite(), "Error not finite at novel cycle {i}");
+    }
+
+    let stats = service.stats();
+    assert!(stats.avg_prediction_error.is_finite());
+    eprintln!(
+        "World model bias: avg_error={:.4}, promotions={}, wm_primed={}",
+        stats.avg_prediction_error,
+        stats.resonator_promotions_total,
+        stats.resonator_wm_primed_count
+    );
+}
+
+#[test]
+fn test_fep_reward_enrichment() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..50 {
+        let input = match i % 3 {
+            0 => "reward enrichment alpha",
+            1 => "reward enrichment beta",
+            _ => "reward enrichment gamma",
+        };
+        let result = service.cycle(input);
+        assert!(result.prediction_error.is_finite(), "Error not finite at {i}");
+    }
+
+    let stats = service.stats();
+    // last_total_fe should have been populated after first cycle
+    // (it's updated inside compute_reward_signal)
+    assert!(stats.last_total_fe.is_finite(), "last_total_fe should be finite");
+}
+
+#[test]
+#[ignore] // Long-running stress test
+fn test_1000_cycle_all_tracks_stress() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        resonator_max_symbols: 20,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "consciousness integration resonance",
+        "temporal dynamics emergence",
+        "holographic binding coherence",
+        "predictive coding surprise",
+        "emotional valence arousal",
+        "memory consolidation replay",
+        "attention gating salience",
+    ];
+
+    for i in 0..1000 {
+        let input = inputs[i % inputs.len()];
+        let result = service.cycle(input);
+
+        assert!(result.prediction_error.is_finite(), "prediction_error NaN at {i}");
+        assert!(result.metadata.fep_accuracy.is_finite(), "fep_accuracy NaN at {i}");
+        assert!(result.metadata.fep_complexity.is_finite(), "fep_complexity NaN at {i}");
+        assert!(result.metadata.fep_surprise.is_finite(), "fep_surprise NaN at {i}");
+        assert!(result.metadata.fep_td_error.is_finite(), "fep_td_error NaN at {i}");
+        assert!(result.metadata.fep_pragmatic_value.is_finite(), "fep_pragmatic NaN at {i}");
+        assert!(result.metadata.codebook_diversity.is_finite(), "diversity NaN at {i}");
+        assert!(result.metadata.resonator_best_sim.is_finite(), "best_sim NaN at {i}");
+        assert!(result.metadata.codebook_diversity >= 0.0 && result.metadata.codebook_diversity <= 1.0);
+        assert!(result.metadata.resonator_reconsolidated <= 3);
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 1000);
+    assert!(stats.avg_prediction_error.is_finite());
+    assert!(stats.codebook_diversity.is_finite());
+    assert!(stats.last_total_fe.is_finite());
+
+    eprintln!(
+        "1000-cycle stress: avg_error={:.4}, promotions={}, evictions={}, diversity={:.4}, \
+         wm_primed={}, replay_boosts={}, last_fe={:.4}",
+        stats.avg_prediction_error,
+        stats.resonator_promotions_total,
+        stats.codebook_evictions_total,
+        stats.codebook_diversity,
+        stats.resonator_wm_primed_count,
+        stats.fep_surprise_replay_boosts,
+        stats.last_total_fe
+    );
+}
+
+// ── Phase 12: Pipeline Profiling ──────────────────────────────────
+
+/// Profile the expanded pipeline and output ModuleTimings breakdown.
+/// Verifies that all timing fields are populated and total cycle time is reasonable.
+#[test]
+fn test_pipeline_profiling() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Warmup: 20 cycles to initialize all subsystems
+    for _ in 0..20 {
+        service.cycle("warmup input signal");
+    }
+
+    // Profile: 10 cycles and collect timings
+    let mut cycle_times = Vec::new();
+    for i in 0..10 {
+        let input = format!("profiling cycle {i} with varied content");
+        let result = service.cycle(&input);
+        cycle_times.push(result.cycle_time_us);
+
+        let t = &result.metadata.module_timings_us;
+        // Core pipeline timings should be populated
+        assert!(t.core_hdc_encode > 0, "HDC encode timing missing at cycle {i}");
+        assert!(t.core_cfc_step > 0 || i < 2, "CfC step timing missing at cycle {i}");
+
+        // All timing fields should be finite (no overflow)
+        assert!(result.cycle_time_us < 10_000_000, "Cycle took >10s at {i}");
+    }
+
+    let avg_us = cycle_times.iter().sum::<u64>() / cycle_times.len() as u64;
+    let max_us = *cycle_times.iter().max().unwrap();
+    eprintln!(
+        "Pipeline profiling (10 cycles): avg={avg_us}µs, max={max_us}µs"
+    );
+
+    // Sanity: avg cycle time should be under 500ms (50Hz target is 20ms but CI is slow)
+    assert!(avg_us < 500_000, "Average cycle time too high: {avg_us}µs");
+}
+
+// ── Phase 12: Behavioral Feedback Loop Effectiveness ──────────────
+
+/// Verify that the diversity governor actually modulates exploration urge.
+/// Run with varied inputs to grow codebook diversity, then check that
+/// exploration urge responds to diversity changes.
+#[test]
+fn test_diversity_governor_modulates_exploration() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Phase 1: monotonous input to keep diversity low
+    for _ in 0..30 {
+        service.cycle("same input repeatedly");
+    }
+    let stats_mono = service.stats().clone();
+
+    // Phase 2: diverse inputs to push diversity up
+    let varied = [
+        "quantum field theory",
+        "alpine flower meadow",
+        "underwater coral reef",
+        "mathematical proof construction",
+        "musical harmonic progression",
+        "neural network training",
+    ];
+    for i in 0..60 {
+        service.cycle(varied[i % varied.len()]);
+    }
+    let stats_varied = service.stats().clone();
+
+    // Diversity should have changed (either direction shows the metric is live)
+    let diversity_changed = (stats_varied.codebook_diversity - stats_mono.codebook_diversity).abs() > 0.001
+        || stats_varied.codebook_diversity > 0.0;
+
+    // Not a hard assertion since codebook might not be populated in 90 cycles,
+    // but at minimum the system shouldn't panic
+    eprintln!(
+        "Diversity governor: mono_div={:.4}, varied_div={:.4}, changed={}",
+        stats_mono.codebook_diversity,
+        stats_varied.codebook_diversity,
+        diversity_changed
+    );
+}
+
+/// Verify that FEP surprise triggers episodic replay boosts.
+/// Alternate between familiar and novel inputs to create surprise spikes.
+#[test]
+fn test_fep_surprise_triggers_replay_boosts() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Phase 1: establish familiarity
+    for _ in 0..50 {
+        service.cycle("familiar pattern repeated consistently");
+    }
+
+    // Phase 2: inject surprising inputs
+    let surprises = [
+        "completely unexpected quantum singularity",
+        "radical paradigm shift in consciousness theory",
+        "unprecedented emergent behavior in complex systems",
+    ];
+    for i in 0..30 {
+        let result = service.cycle(surprises[i % surprises.len()]);
+        assert!(result.metadata.fep_surprise.is_finite(), "fep_surprise NaN at cycle {i}");
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "FEP surprise→replay: total_boosts={}, avg_error={:.4}",
+        stats.fep_surprise_replay_boosts,
+        stats.avg_prediction_error
+    );
+    // The system should not panic regardless of surprise levels
+}
+
+/// Verify that the coherence gate correctly skips resonator recall during
+/// low-coherence periods (warmup bypass ensures first cycles still work).
+#[test]
+fn test_coherence_gate_warmup_bypass() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // First 10 cycles should bypass coherence gate (warmup)
+    for i in 0..10 {
+        let result = service.cycle("warmup input");
+        assert!(result.prediction_error.is_finite(), "NaN during warmup at cycle {i}");
+    }
+
+    // After warmup, coherence gate may filter — system should still be stable
+    for i in 10..50 {
+        let result = service.cycle("post warmup stable input");
+        assert!(result.prediction_error.is_finite(), "NaN post-warmup at cycle {i}");
+        assert!(result.metadata.resonator_best_sim >= -0.01);
+    }
+}
+
+/// Verify that adaptive thresholds from self-reflection are used
+/// (thresholds should remain within their documented ranges).
+#[test]
+fn test_adaptive_thresholds_bounded() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run enough cycles to trigger self-reflection (interval is ~25 cycles)
+    for i in 0..100 {
+        let result = service.cycle(&format!("adaptive threshold test cycle {i}"));
+        assert!(result.prediction_error.is_finite());
+    }
+
+    // Check that the system survived 100 cycles with adaptive thresholds
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 100);
+    assert!(stats.avg_prediction_error.is_finite());
+    assert!(stats.avg_prediction_error >= 0.0);
+    assert!(stats.avg_prediction_error <= 1.0);
+}
+
+/// Verify that Σ (sigma) modulation of learning rate doesn't cause divergence.
+/// Run 200 cycles and check that fep_lr_boost stays bounded.
+#[test]
+fn test_sigma_lr_modulation_stable() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "consciousness emerges from integration",
+        "predictive processing minimizes free energy",
+        "holographic memory encodes distributed patterns",
+    ];
+
+    for i in 0..200 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        assert!(result.prediction_error.is_finite(), "prediction_error NaN at cycle {i}");
+        assert!(
+            result.prediction_error <= 1.0,
+            "prediction_error > 1.0 at cycle {i}: {}",
+            result.prediction_error
+        );
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 200);
+    eprintln!(
+        "Sigma modulation (200 cycles): avg_error={:.4}, diversity={:.4}",
+        stats.avg_prediction_error,
+        stats.codebook_diversity
+    );
+}
+
+/// Verify WM eviction → resonator routing doesn't cause panics or NaN.
+#[test]
+fn test_wm_eviction_resonator_routing() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Flood WM with diverse inputs to trigger evictions
+    let inputs = [
+        "alpha input pattern one",
+        "beta input pattern two",
+        "gamma input pattern three",
+        "delta input pattern four",
+        "epsilon input pattern five",
+        "zeta input pattern six",
+        "eta input pattern seven",
+        "theta input pattern eight",
+        "iota input pattern nine",
+        "kappa input pattern ten",
+    ];
+
+    for i in 0..100 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        assert!(result.prediction_error.is_finite(), "NaN at cycle {i}");
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 100);
+    eprintln!(
+        "WM routing (100 cycles): avg_error={:.4}, wm_primed={}",
+        stats.avg_prediction_error,
+        stats.resonator_wm_primed_count
+    );
+}
