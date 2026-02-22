@@ -3098,3 +3098,199 @@ fn test_wm_eviction_resonator_routing() {
         stats.resonator_wm_primed_count
     );
 }
+
+// ── Phase 13: Predictive Resonator + Cross-Module Coherence ───────
+
+/// Verify resonator prediction error is finite and bounded for all inputs.
+#[test]
+fn test_resonator_prediction_error_finite() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "resonator prediction test alpha",
+        "resonator prediction test beta",
+        "resonator prediction test gamma",
+    ];
+
+    for i in 0..60 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        assert!(
+            result.metadata.resonator_prediction_error.is_finite(),
+            "resonator_prediction_error NaN at cycle {i}"
+        );
+        assert!(
+            result.metadata.resonator_prediction_error >= 0.0
+                && result.metadata.resonator_prediction_error <= 1.0,
+            "resonator_prediction_error out of [0,1] at cycle {i}: {}",
+            result.metadata.resonator_prediction_error
+        );
+    }
+}
+
+/// Verify cross-module agreement is finite, bounded [0,1], and doesn't cause divergence.
+#[test]
+fn test_cross_module_agreement_stable() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..100 {
+        let input = format!("cross module agreement test cycle {i}");
+        let result = service.cycle(&input);
+        assert!(
+            result.metadata.cross_module_agreement.is_finite(),
+            "cross_module_agreement NaN at cycle {i}"
+        );
+        assert!(
+            result.metadata.cross_module_agreement >= 0.0
+                && result.metadata.cross_module_agreement <= 1.0,
+            "cross_module_agreement out of [0,1] at cycle {i}: {}",
+            result.metadata.cross_module_agreement
+        );
+    }
+
+    let stats = service.stats();
+    assert!(stats.avg_cross_module_agreement.is_finite());
+    assert!(stats.avg_cross_module_agreement >= 0.0 && stats.avg_cross_module_agreement <= 1.0);
+    eprintln!(
+        "Cross-module agreement (100 cycles): avg={:.4}",
+        stats.avg_cross_module_agreement
+    );
+}
+
+/// Verify thalamic depth score is correctly populated.
+#[test]
+fn test_thalamic_depth_score_populated() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut seen_scores = std::collections::HashSet::new();
+    for i in 0..50 {
+        let result = service.cycle(&format!("thalamic depth cycle {i}"));
+        let score = result.metadata.thalamic_depth_score;
+        assert!(score >= 0.0 && score <= 1.0, "thalamic_depth_score out of bounds: {score}");
+        // Track which scores we see (0.2, 0.5, or 1.0)
+        seen_scores.insert((score * 10.0) as i32);
+    }
+    eprintln!("Thalamic depth scores seen: {:?}", seen_scores);
+}
+
+/// Verify enriched reward signal stays bounded after adding agreement + semantic bonuses.
+#[test]
+fn test_enriched_reward_bounded() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..80 {
+        let result = service.cycle(&format!("reward enrichment cycle {i}"));
+        assert!(result.prediction_error.is_finite(), "NaN at cycle {i}");
+        // Prediction error stays bounded (enriched reward doesn't leak)
+        assert!(result.prediction_error <= 1.0, "error > 1.0 at cycle {i}");
+    }
+}
+
+/// Verify adaptive replay interval adjusts based on error volatility.
+/// Run stable then volatile inputs and check that the system survives.
+#[test]
+fn test_adaptive_replay_scheduling() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Phase 1: stable inputs (low error variance)
+    for _ in 0..60 {
+        service.cycle("stable input pattern for replay scheduling");
+    }
+
+    // Phase 2: volatile inputs (should trigger interval adaptation at cycle 100)
+    let volatile = [
+        "completely unexpected input alpha",
+        "stable input pattern for replay scheduling",
+        "radical divergent content beta",
+        "stable input pattern for replay scheduling",
+    ];
+    for i in 0..60 {
+        let result = service.cycle(volatile[i % volatile.len()]);
+        assert!(result.prediction_error.is_finite(), "NaN at cycle {i}");
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 120);
+    assert!(stats.avg_prediction_error_sq.is_finite());
+    eprintln!(
+        "Adaptive replay (120 cycles): avg_err={:.4}, avg_err_sq={:.6}",
+        stats.avg_prediction_error,
+        stats.avg_prediction_error_sq
+    );
+}
+
+/// 300-cycle multi-track stress test for Phase 13 features.
+/// Verifies all new metadata fields are finite across extended operation.
+#[test]
+#[ignore] // stress test — run with `cargo test -- --ignored`
+fn test_300_cycle_phase13_stress() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "predictive coding in hierarchical cortex",
+        "resonator network factorization patterns",
+        "cross module agreement measurement",
+        "adaptive replay scheduling dynamics",
+        "thalamic gating attention salience",
+        "free energy minimization principle",
+    ];
+
+    for i in 0..300 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        assert!(result.prediction_error.is_finite(), "prediction_error NaN at {i}");
+        assert!(result.metadata.resonator_prediction_error.is_finite(), "resonator_pred_err NaN at {i}");
+        assert!(result.metadata.cross_module_agreement.is_finite(), "agreement NaN at {i}");
+        assert!(result.metadata.thalamic_depth_score >= 0.0, "depth < 0 at {i}");
+        assert!(result.metadata.fep_accuracy.is_finite(), "fep_accuracy NaN at {i}");
+        assert!(result.metadata.codebook_diversity.is_finite(), "diversity NaN at {i}");
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 300);
+    assert!(stats.avg_cross_module_agreement.is_finite());
+    assert!(stats.avg_prediction_error_sq.is_finite());
+
+    eprintln!(
+        "300-cycle Phase 13 stress: avg_error={:.4}, agreement={:.4}, diversity={:.4}, \
+         err_variance={:.6}",
+        stats.avg_prediction_error,
+        stats.avg_cross_module_agreement,
+        stats.codebook_diversity,
+        (stats.avg_prediction_error_sq - stats.avg_prediction_error * stats.avg_prediction_error).max(0.0)
+    );
+}

@@ -267,7 +267,7 @@ impl CoherenceLendingProtocol {
         amount: f32,
         duration: Duration,
         _current_coherence: f32,
-    ) -> Result<CoherenceLoan, String> {
+    ) -> Result<CoherenceLoan, crate::errors::SymthaeaError> {
         let to_peer = to_peer.into();
         let loan = CoherenceLoan::new(&self.instance_id, &to_peer, amount, duration);
 

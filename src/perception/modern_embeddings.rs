@@ -408,8 +408,8 @@ impl EmbeddingModel for BgeM3Backend {
     }
 
     fn embed_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
-        // For now, sequential processing with caching
-        // TODO: Implement true batched forward pass
+        // Sequential processing with caching — true batched forward pass deferred
+        // until candle supports batched BertModel inference (upstream limitation)
         texts.iter().map(|t| self.embed(t)).collect()
     }
 

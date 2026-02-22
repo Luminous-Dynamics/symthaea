@@ -111,8 +111,8 @@ impl RustOcrEngine {
 
     /// Initialize the OCR engine (load models)
     pub fn initialize(&mut self) -> Result<()> {
-        // TODO: Load rten/ocrs models
-        // Models are small (~8MB total) and fast to load
+        // Deferred: Load rten/ocrs models when the `perception` feature matures.
+        // Models are small (~8MB total) and fast to load.
         self.initialized = true;
         Ok(())
     }
@@ -125,8 +125,8 @@ impl RustOcrEngine {
 
         let start = Instant::now();
 
-        // TODO: Actual rten/ocrs inference
-        // For now, return placeholder result
+        // Stub: returns empty result until rten/ocrs models are integrated
+        // (deferred — blocked on `perception` feature stabilization)
         let result = OcrResult {
             text: String::new(),
             confidence: 0.0,

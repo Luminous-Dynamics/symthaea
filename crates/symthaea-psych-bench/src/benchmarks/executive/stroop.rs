@@ -53,7 +53,7 @@ impl StroopBenchmark {
 
         // Reading automaticity: how strongly the word activates its color.
         // In humans, reading is highly automatic (Stroop, 1935).
-        let reading_automaticity: f32 = 0.5;
+        let reading_automaticity: f32 = 0.43;
 
         // Decision temperature: controls stochasticity of response selection.
         // Lower = more deterministic. Tuned to produce human-like error rates.

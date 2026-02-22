@@ -14,6 +14,7 @@ use symthaea_flight::{
 };
 
 #[test]
+#[ignore] // ~30s: run manually with `cargo test -p symthaea-flight -- --ignored --nocapture`
 fn diagnostic_training_curve() {
     println!("\n{}", "=".repeat(80));
     println!("=== DIAGNOSTIC 1: Training Curve (10 episodes x 500 steps) ===");
@@ -49,8 +50,8 @@ fn diagnostic_training_curve() {
     // Summary statistics
     let first_3_avg: f64 = metrics[..3].iter().map(|m| m.avg_position_error).sum::<f64>() / 3.0;
     let last_3_avg: f64 = metrics[7..].iter().map(|m| m.avg_position_error).sum::<f64>() / 3.0;
-    let best_ep = metrics.iter().min_by(|a, b| a.avg_position_error.partial_cmp(&b.avg_position_error).unwrap()).unwrap();
-    let worst_ep = metrics.iter().max_by(|a, b| a.avg_position_error.partial_cmp(&b.avg_position_error).unwrap()).unwrap();
+    let best_ep = metrics.iter().min_by(|a, b| a.avg_position_error.total_cmp(&b.avg_position_error)).unwrap();
+    let worst_ep = metrics.iter().max_by(|a, b| a.avg_position_error.total_cmp(&b.avg_position_error)).unwrap();
 
     println!("\n--- Summary ---");
     println!("First 3 episodes avg error:  {:.6}", first_3_avg);
@@ -65,6 +66,7 @@ fn diagnostic_training_curve() {
 }
 
 #[test]
+#[ignore] // ~30s: run manually with `cargo test -p symthaea-flight -- --ignored --nocapture`
 fn diagnostic_wind_benchmark() {
     println!("\n{}", "=".repeat(80));
     println!("=== DIAGNOSTIC 2: Wind Benchmark (3 episodes x 1000 steps) ===");
@@ -124,6 +126,7 @@ fn diagnostic_wind_benchmark() {
 }
 
 #[test]
+#[ignore] // ~30s: run manually with `cargo test -p symthaea-flight -- --ignored --nocapture`
 fn diagnostic_within_episode_learning_curve() {
     println!("\n{}", "=".repeat(80));
     println!("=== DIAGNOSTIC 3: Within-Episode Learning Curve (1 episode x 1000 steps) ===");

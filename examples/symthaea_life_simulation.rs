@@ -41,22 +41,22 @@ fn main() {
     // 3. Run simulation loop to observe dynamics
     println!("\nObserving Consciousness Dynamics (10 cycles)...");
     println!(
-        "{:<8} | {:<8} | {:<8} | {:<8} | {:<20}",
-        "Cycle", "Phi", "PAC Mod", "Entropy", "Dominant Band"
+        "{:<8} | {:<8} | {:<8} | {:<8} | {:<8}",
+        "Cycle", "Psi", "CogLoad", "Valence", "Arousal"
     );
-    println!("{}", "-".repeat(70));
+    println!("{}", "-".repeat(60));
 
     for i in 0..10 {
         thread::sleep(Duration::from_millis(100));
         let snapshot = mind.snapshot();
 
         println!(
-            "{:<8} | {:.4}   | {:.4}   | {:.4}   | {}",
+            "{:<8} | {:.4}   | {:.4}   | {:.4}   | {:.4}",
             i,
-            snapshot.phi,
-            snapshot.phase_coherence, // Proxy for binding synchrony
-            snapshot.free_energy,
-            snapshot.dominant_band
+            snapshot.psi,
+            snapshot.cognitive_load,
+            snapshot.emotional_valence,
+            snapshot.arousal
         );
     }
 

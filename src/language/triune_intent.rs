@@ -542,10 +542,11 @@ impl LLMIntentParser {
         Self {}
     }
 
-    /// Parse input to structured intent
+    /// Parse input to structured intent.
     ///
-    /// TODO: In production, this calls the LLMOrgan with a structured prompt
-    /// For now, we use keyword-based heuristics as a placeholder
+    /// Currently uses keyword-based heuristics as a placeholder.
+    /// In production, this would call the LLMOrgan with a structured prompt
+    /// (deferred — requires `reasoning_engine` + LLM integration).
     pub fn parse_to_struct(&self, input: &str) -> SymbolicIntent {
         let input_lower = input.to_lowercase();
 

@@ -605,11 +605,13 @@ impl CoherenceField {
         &self,
         hormones: &HormoneState,
         current_task: Option<TaskComplexity>,
-    ) -> Result<super::super::social_coherence::CoherenceBeacon, String> {
+    ) -> Result<super::super::social_coherence::CoherenceBeacon, crate::errors::SymthaeaError> {
         if let Some(ref social_field) = self.social_field {
             Ok(social_field.broadcast_state(&self.state(), hormones, current_task))
         } else {
-            Err("Social mode not enabled".to_string())
+            Err(crate::errors::SymthaeaError::Physiology(
+                "Social mode not enabled".into(),
+            ))
         }
     }
 
@@ -653,17 +655,21 @@ impl CoherenceField {
     ///
     /// When scattered, borrow coherence from high-coherence peers.
     /// Both lender and borrower gain from the generous resonance!
-    pub fn request_coherence_loan(&mut self, _amount: f32) -> Result<(), String> {
+    pub fn request_coherence_loan(&mut self, _amount: f32) -> Result<(), crate::errors::SymthaeaError> {
         if let Some(ref mut _lending) = self.lending_protocol {
             // In real implementation, this would negotiate with peers
             // For now, we just check if we're eligible
             if self.coherence < 0.3 {
                 Ok(())
             } else {
-                Err("Coherence sufficient, no loan needed".to_string())
+                Err(crate::errors::SymthaeaError::Physiology(
+                    "Coherence sufficient, no loan needed".into(),
+                ))
             }
         } else {
-            Err("Social mode not enabled".to_string())
+            Err(crate::errors::SymthaeaError::Physiology(
+                "Social mode not enabled".into(),
+            ))
         }
     }
 
@@ -676,7 +682,7 @@ impl CoherenceField {
         to_peer: String,
         amount: f32,
         duration: Duration,
-    ) -> Result<super::super::social_coherence::CoherenceLoan, String> {
+    ) -> Result<super::super::social_coherence::CoherenceLoan, crate::errors::SymthaeaError> {
         if let Some(ref mut lending) = self.lending_protocol {
             if lending.can_lend(amount, self.coherence) {
                 let loan = lending.grant_loan(to_peer, amount, duration, self.coherence)?;
@@ -694,10 +700,14 @@ impl CoherenceField {
 
                 Ok(loan)
             } else {
-                Err("Cannot lend: insufficient coherence or capacity".to_string())
+                Err(crate::errors::SymthaeaError::Physiology(
+                    "Cannot lend: insufficient coherence or capacity".into(),
+                ))
             }
         } else {
-            Err("Social mode not enabled".to_string())
+            Err(crate::errors::SymthaeaError::Physiology(
+                "Social mode not enabled".into(),
+            ))
         }
     }
 

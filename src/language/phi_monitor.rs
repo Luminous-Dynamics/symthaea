@@ -367,12 +367,14 @@ impl PhiMonitor {
     }
 
     /// Begin monitoring a generation operation
-    pub fn begin_operation(&mut self, operation_id: &str, current_phi: f32) -> Result<(), String> {
+    pub fn begin_operation(&mut self, operation_id: &str, current_phi: f32) -> Result<(), crate::errors::SymthaeaError> {
         // Check threshold
         let (should_proceed, reason) = self.should_generate(current_phi);
         if !should_proceed {
             self.stats.blocked_generations += 1;
-            return Err(reason.unwrap_or_else(|| "Φ too low".to_string()));
+            return Err(crate::errors::SymthaeaError::Language(
+                reason.unwrap_or_else(|| "Φ too low".to_string()),
+            ));
         }
 
         // Record pre-generation measurement

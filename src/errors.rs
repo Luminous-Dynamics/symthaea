@@ -34,6 +34,16 @@ pub enum SymthaeaError {
     Network(String),
     /// General runtime errors (I/O, serialization, etc.).
     Runtime(String),
+    /// Cognitive loop errors (cycle execution, panic recovery).
+    CognitiveLoop(String),
+    /// Language subsystem errors (LLM backends, domain plugins, Phi monitor).
+    Language(String),
+    /// Perception subsystem errors (encoding, projection, physiological data).
+    Perception(String),
+    /// Pipeline integration errors (conscious pipeline, session management).
+    Pipeline(String),
+    /// Physiology subsystem errors (coherence, social coordination).
+    Physiology(String),
 }
 
 impl fmt::Display for SymthaeaError {
@@ -45,6 +55,11 @@ impl fmt::Display for SymthaeaError {
             Self::Config(msg) => write!(f, "Config error: {msg}"),
             Self::Network(msg) => write!(f, "Network error: {msg}"),
             Self::Runtime(msg) => write!(f, "Runtime error: {msg}"),
+            Self::CognitiveLoop(msg) => write!(f, "Cognitive loop error: {msg}"),
+            Self::Language(msg) => write!(f, "Language error: {msg}"),
+            Self::Perception(msg) => write!(f, "Perception error: {msg}"),
+            Self::Pipeline(msg) => write!(f, "Pipeline error: {msg}"),
+            Self::Physiology(msg) => write!(f, "Physiology error: {msg}"),
         }
     }
 }
@@ -64,6 +79,12 @@ impl From<std::io::Error> for SymthaeaError {
 impl From<serde_json::Error> for SymthaeaError {
     fn from(err: serde_json::Error) -> Self {
         Self::Runtime(err.to_string())
+    }
+}
+
+impl From<String> for SymthaeaError {
+    fn from(msg: String) -> Self {
+        Self::Runtime(msg)
     }
 }
 

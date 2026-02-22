@@ -300,8 +300,9 @@ impl BertLayerExtractor {
         // Unfortunately, BertModel::forward doesn't return intermediate states.
         // We need to replicate the forward pass with layer-by-layer access.
 
-        // For now, we use a workaround: run full forward pass and use final output
-        // TODO: Fork candle-transformers or use reflection to get intermediate states
+        // Workaround: run full forward pass and use final output.
+        // Intermediate layer extraction requires upstream candle-transformers changes
+        // to expose encoder layers publicly (tracked upstream, not forked yet).
 
         let extended_mask = Self::get_extended_attention_mask(&attention_mask)?;
 

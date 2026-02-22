@@ -375,7 +375,7 @@ impl ConsciousDarkSpotNetwork {
     /// Detect ignorance and optionally publish to network
     ///
     /// Only publishes if EIG is above threshold (worth sharing)
-    pub fn detect_and_maybe_share(&mut self, query: &str) -> Result<IgnoranceDetection, String> {
+    pub fn detect_and_maybe_share(&mut self, query: &str) -> Result<IgnoranceDetection, crate::errors::SymthaeaError> {
         let detection = self.gis.detect_ignorance(query);
 
         // Only share high-EIG ignorance

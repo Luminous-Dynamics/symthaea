@@ -20,7 +20,7 @@ use super::snapshot::ConsciousnessSnapshot;
 use super::{
     ActionHint, AdaptiveBehavior, CognitiveDepth, CognitiveGoal, CognitiveLoopConfig,
     CognitiveLoopService, CouplingQuality, CuriosityDrive, CycleLearningResult, EmotionContagion,
-    EpisodicMemory, EpisodicMemoryBridge, FlowState, LoopStats, Recommendation, ReflectionSummary,
+    EpisodicMemory, FlowState, LoopStats, Recommendation, ReflectionSummary,
     ReflectionThresholds, ResponseStrategy, SelfAssessment, SelfReflection, WorldModelBridge,
 };
 
@@ -616,12 +616,6 @@ impl CognitiveLoopService {
     // ═══════════════════════════════════════════════════════════════════════
     // MEMORY SYSTEM: Accessor Methods
     // ═══════════════════════════════════════════════════════════════════════
-
-    /// Get the episodic memory bridge reference
-    #[allow(dead_code)]
-    pub(crate) fn episodic_memory(&self) -> &EpisodicMemoryBridge {
-        &self.episodic_memory
-    }
 
     /// Get memory counts (short_term, long_term)
     pub fn memory_counts(&self) -> (usize, usize) {
