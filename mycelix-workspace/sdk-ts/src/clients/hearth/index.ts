@@ -32,7 +32,13 @@ import { ResourcesClient } from './resources';
 import { MilestonesClient } from './milestones';
 import { RhythmsClient } from './rhythms';
 import { BridgeClient } from './bridge';
-import { HearthError } from './types';
+import {
+  HearthError,
+  getSignalType,
+  type HearthSignal,
+  type HearthSignalType,
+  type BridgeEventSignal,
+} from './types';
 
 // ============================================================================
 // Client Configuration
@@ -176,6 +182,94 @@ export class HearthClient {
     } catch {
       return false;
     }
+  }
+
+  // ============================================================================
+  // Signal Handling
+  // ============================================================================
+
+  /**
+   * Subscribe to HearthSignal events from all hearth zomes.
+   *
+   * @param callback - Invoked for each matching signal
+   * @param filter - Optional set of signal types to listen for.
+   *                 If omitted, all 27 HearthSignal types are received.
+   * @returns Unsubscribe function
+   *
+   * @example
+   * ```typescript
+   * // Listen to all signals
+   * const unsub = hearth.onSignal((signal) => {
+   *   console.log('Signal:', getSignalType(signal), signal);
+   * });
+   *
+   * // Listen to specific signal types only
+   * const unsub2 = hearth.onSignal(
+   *   (signal) => console.log('Emergency!', signal),
+   *   ['EmergencyAlert', 'MemberDeparted'],
+   * );
+   *
+   * // Later: unsubscribe
+   * unsub();
+   * ```
+   */
+  onSignal(
+    callback: (signal: HearthSignal) => void,
+    filter?: HearthSignalType[],
+  ): () => void {
+    const filterSet = filter ? new Set<string>(filter) : null;
+    const debug = this._config.debug;
+
+    const wsClient = this._client as AppWebsocket;
+    return wsClient.on('signal', (appSignal: unknown) => {
+      const sig = appSignal as { zome_name?: string; payload?: unknown };
+      if (!sig.payload || typeof sig.payload !== 'object') return;
+
+      // Only process signals from hearth zomes
+      const zomeName = sig.zome_name ?? '';
+      if (!zomeName.startsWith('hearth_')) return;
+
+      const payload = sig.payload as HearthSignal;
+      const signalType = getSignalType(payload);
+
+      if (filterSet && !filterSet.has(signalType)) return;
+
+      if (debug) {
+        console.log(`[hearth-sdk] Signal: ${signalType} from ${zomeName}`);
+      }
+
+      callback(payload);
+    });
+  }
+
+  /**
+   * Subscribe to BridgeEventSignal events from the bridge zome.
+   *
+   * Bridge signals use a separate struct (not part of HearthSignal enum)
+   * for cross-domain event broadcasting.
+   *
+   * @param callback - Invoked for each bridge event signal
+   * @returns Unsubscribe function
+   */
+  onBridgeSignal(callback: (signal: BridgeEventSignal) => void): () => void {
+    const debug = this._config.debug;
+
+    const wsClient = this._client as AppWebsocket;
+    return wsClient.on('signal', (appSignal: unknown) => {
+      const sig = appSignal as { zome_name?: string; payload?: unknown };
+      if (!sig.payload || typeof sig.payload !== 'object') return;
+
+      if (sig.zome_name !== 'hearth_bridge') return;
+
+      const payload = sig.payload as Record<string, unknown>;
+      if (!('signal_type' in payload)) return;
+
+      if (debug) {
+        console.log(`[hearth-sdk] Bridge signal: ${payload.signal_type}`);
+      }
+
+      callback(payload as unknown as BridgeEventSignal);
+    });
   }
 }
 

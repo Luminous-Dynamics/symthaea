@@ -258,11 +258,24 @@ await hearth.decisions.castVote({
   reasoning: 'I agree with option A',
 });
 
-// Subscribe to signals
-const unsub = hearth.decisions.onSignal((signal) => {
-  if (signal.type === 'VoteCast') console.log('Vote!', signal.choice);
-  if (signal.type === 'DecisionFinalized') console.log('Decided:', signal.chosen_option);
+// Subscribe to all signals
+const unsub = hearth.onSignal((signal) => {
+  console.log('Signal:', getSignalType(signal), signal);
 });
+
+// Subscribe to specific signal types only
+const unsub2 = hearth.onSignal(
+  (signal) => console.log('Emergency!', signal),
+  ['EmergencyAlert', 'MemberDeparted'],
+);
+
+// Subscribe to bridge event signals (separate struct)
+const unsub3 = hearth.onBridgeSignal((signal) => {
+  console.log('Bridge:', signal.signal_type, signal.domain);
+});
+
+// Unsubscribe when done
+unsub(); unsub2(); unsub3();
 ```
 
 ### SDK Client Summary
@@ -272,24 +285,49 @@ const unsub = hearth.decisions.onSignal((signal) => {
 | kinship.ts | KinshipClient | 19 | MemberJoined, MemberDeparted, BondTended |
 | decisions.ts | DecisionsClient | 12 | VoteCast, VoteAmended, DecisionClosed, DecisionFinalized |
 | gratitude.ts | GratitudeClient | 8 | GratitudeExpressed |
-| stories.ts | StoriesClient | 11 | -- |
-| care.ts | CareClient | 10 | CareTaskCompleted |
-| autonomy.ts | AutonomyClient | 10 | -- |
+| stories.ts | StoriesClient | 11 | StoryCreated, StoryUpdated, TraditionObserved |
+| care.ts | HearthCareClient | 10 | CareTaskCompleted, SwapAccepted, SwapDeclined |
+| autonomy.ts | AutonomyClient | 10 | TierAdvanced, CapabilityApproved, CapabilityDenied |
 | emergency.ts | EmergencyClient | 8 | EmergencyAlert |
-| resources.ts | ResourcesClient | 8 | -- |
-| milestones.ts | MilestonesClient | 7 | -- |
+| resources.ts | ResourcesClient | 8 | ResourceLent, ResourceReturned, ExpenseLogged |
+| milestones.ts | MilestonesClient | 7 | MilestoneRecorded, TransitionAdvanced |
 | rhythms.ts | RhythmsClient | 7 | RhythmOccurred, PresenceChanged |
 | bridge.ts | BridgeClient | 19 | CrossZomeCallFailed |
-| hearth-client.ts | HearthClient | (composite) | (all above) |
+| index.ts | HearthClient | (composite) | All 27 signal types via `onSignal()` |
 
-## Integration Tests
+Signal handling is centralized on `HearthClient.onSignal(callback, filter?)` rather than individual zome clients, since signals arrive via the WebSocket connection. The optional `filter` parameter accepts an array of `HearthSignalType` strings to listen for specific events. Bridge events use a separate `onBridgeSignal()` method.
+
+## Tests
+
+**Unit tests (1,023):** Run from the workspace root.
+
+```bash
+cargo test --lib
+```
+
+**Sweettest integration tests (36 across 12 files):** Require a running Holochain conductor.
 
 ```bash
 cd tests
 cargo test --release -- --ignored --test-threads=2
 ```
 
-Tests require a running Holochain conductor. They are marked `#[ignore]` and expected to fail in CI (no conductor available).
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| sweettest_kinship | 4 | Create hearth, invite/accept, bonds, my_hearths |
+| sweettest_decisions_kinship | 1 | Full decision lifecycle with cross-zome role check |
+| sweettest_bridge | 2 | Health check, dispatch to kinship |
+| sweettest_digest_sync | 1 | Weekly digest assembly across zomes |
+| sweettest_care_gratitude_rhythms | 3 | Care schedule, gratitude, rhythm logging |
+| sweettest_emergency | 1 | Emergency plan/alert/check-in/resolve |
+| sweettest_autonomy | 1 | Guardian-youth capability flow |
+| sweettest_multi_hearth | 1 | Cross-hearth data isolation |
+| sweettest_resources | 4 | Register, lend/return, budget, membership auth |
+| sweettest_milestones | 4 | Record, advance transition, guardian auth, complete |
+| sweettest_stories | 5 | Create, update, collection, tradition, membership auth |
+| sweettest_consciousness_gating | 9 | Gate enforcement, cache, audit, cross-zome, constitutional |
+
+Integration tests are marked `#[ignore]` and expected to fail in CI (no conductor available).
 
 ## Cross-Cluster Bridge Patterns
 

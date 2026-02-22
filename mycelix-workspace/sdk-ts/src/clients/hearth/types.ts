@@ -754,6 +754,281 @@ export interface ConsciousnessCredential {
 }
 
 // ============================================================================
+// Signal Types (match Rust HearthSignal enum in hearth-types)
+// ============================================================================
+
+/** Gratitude expressed between members */
+export interface GratitudeExpressedSignal {
+  from_agent: AgentPubKey;
+  to_agent: AgentPubKey;
+  message: string;
+  gratitude_type: GratitudeType;
+}
+
+/** Care task completed by assignee */
+export interface CareTaskCompletedSignal {
+  assignee: AgentPubKey;
+  schedule_hash: ActionHash;
+  care_type: CareType;
+}
+
+/** Care swap accepted by responder */
+export interface SwapAcceptedSignal {
+  swap_hash: ActionHash;
+  hearth_hash: ActionHash;
+}
+
+/** Care swap declined by responder */
+export interface SwapDeclinedSignal {
+  swap_hash: ActionHash;
+  hearth_hash: ActionHash;
+}
+
+/** Rhythm occurrence logged */
+export interface RhythmOccurredSignal {
+  rhythm_hash: ActionHash;
+  participants: AgentPubKey[];
+}
+
+/** Presence status changed */
+export interface PresenceChangedSignal {
+  agent: AgentPubKey;
+  status: PresenceStatusType;
+}
+
+/** Emergency alert raised */
+export interface EmergencyAlertSignal {
+  alert_hash: ActionHash;
+  severity: AlertSeverity;
+  message: string;
+}
+
+/** Member joined a hearth */
+export interface MemberJoinedSignal {
+  hearth_hash: ActionHash;
+  agent: AgentPubKey;
+  role: MemberRole;
+}
+
+/** Member departed a hearth */
+export interface MemberDepartedSignal {
+  hearth_hash: ActionHash;
+  agent: AgentPubKey;
+}
+
+/** Kinship bond tended */
+export interface BondTendedSignal {
+  member_a: AgentPubKey;
+  member_b: AgentPubKey;
+  quality_bp: number;
+}
+
+/** Cross-zome call failed (observability, non-blocking) */
+export interface CrossZomeCallFailedSignal {
+  zome: string;
+  function: string;
+  error: string;
+}
+
+/** Vote cast on a decision */
+export interface VoteCastSignal {
+  decision_hash: ActionHash;
+  voter: AgentPubKey;
+  choice: number;
+}
+
+/** Vote amended (old replaced with new) */
+export interface VoteAmendedSignal {
+  decision_hash: ActionHash;
+  voter: AgentPubKey;
+  old_choice: number;
+  new_choice: number;
+}
+
+/** Decision manually closed before deadline */
+export interface DecisionClosedSignal {
+  decision_hash: ActionHash;
+  closed_by: AgentPubKey;
+}
+
+/** Decision finalized with a winning option */
+export interface DecisionFinalizedSignal {
+  decision_hash: ActionHash;
+  chosen_option: number;
+  participation_rate_bp: number;
+}
+
+/** Family story created */
+export interface StoryCreatedSignal {
+  hearth_hash: ActionHash;
+  story_hash: ActionHash;
+  storyteller: AgentPubKey;
+  story_type: StoryType;
+}
+
+/** Story updated by storyteller */
+export interface StoryUpdatedSignal {
+  story_hash: ActionHash;
+  updated_by: AgentPubKey;
+}
+
+/** Family tradition observed */
+export interface TraditionObservedSignal {
+  tradition_hash: ActionHash;
+  observed_by: AgentPubKey;
+}
+
+/** Shared resource lent to member */
+export interface ResourceLentSignal {
+  resource_hash: ActionHash;
+  borrower: AgentPubKey;
+  due_date: Timestamp;
+}
+
+/** Borrowed resource returned */
+export interface ResourceReturnedSignal {
+  loan_hash: ActionHash;
+  borrower: AgentPubKey;
+}
+
+/** Expense logged against budget */
+export interface ExpenseLoggedSignal {
+  budget_hash: ActionHash;
+  amount_cents: number;
+}
+
+/** Milestone recorded in family timeline */
+export interface MilestoneRecordedSignal {
+  hearth_hash: ActionHash;
+  milestone_hash: ActionHash;
+  milestone_type: MilestoneType;
+}
+
+/** Life transition advanced to new phase */
+export interface TransitionAdvancedSignal {
+  transition_hash: ActionHash;
+  new_phase: TransitionPhase;
+}
+
+/** Autonomy tier advanced (guardian action) */
+export interface TierAdvancedSignal {
+  profile_hash: ActionHash;
+  from_tier: AutonomyTier;
+  to_tier: AutonomyTier;
+}
+
+/** Capability request approved */
+export interface CapabilityApprovedSignal {
+  request_hash: ActionHash;
+  capability: string;
+}
+
+/** Capability request denied */
+export interface CapabilityDeniedSignal {
+  request_hash: ActionHash;
+  capability: string;
+}
+
+/** Tier transition progressed to next phase */
+export interface TransitionProgressedSignal {
+  transition_hash: ActionHash;
+  new_phase: TransitionPhase;
+}
+
+/** Bridge event signal (separate from HearthSignal enum) */
+export interface BridgeEventSignal {
+  signal_type: string;
+  domain: string;
+  event_type: string;
+  payload: string;
+  action_hash: ActionHash;
+}
+
+/**
+ * Discriminated union of all HearthSignal variants.
+ *
+ * Matches Rust's serde externally-tagged enum representation:
+ * `{ "VariantName": { field1: ..., field2: ... } }`
+ */
+export type HearthSignal =
+  | { GratitudeExpressed: GratitudeExpressedSignal }
+  | { CareTaskCompleted: CareTaskCompletedSignal }
+  | { SwapAccepted: SwapAcceptedSignal }
+  | { SwapDeclined: SwapDeclinedSignal }
+  | { RhythmOccurred: RhythmOccurredSignal }
+  | { PresenceChanged: PresenceChangedSignal }
+  | { EmergencyAlert: EmergencyAlertSignal }
+  | { MemberJoined: MemberJoinedSignal }
+  | { MemberDeparted: MemberDepartedSignal }
+  | { BondTended: BondTendedSignal }
+  | { CrossZomeCallFailed: CrossZomeCallFailedSignal }
+  | { VoteCast: VoteCastSignal }
+  | { VoteAmended: VoteAmendedSignal }
+  | { DecisionClosed: DecisionClosedSignal }
+  | { DecisionFinalized: DecisionFinalizedSignal }
+  | { StoryCreated: StoryCreatedSignal }
+  | { StoryUpdated: StoryUpdatedSignal }
+  | { TraditionObserved: TraditionObservedSignal }
+  | { ResourceLent: ResourceLentSignal }
+  | { ResourceReturned: ResourceReturnedSignal }
+  | { ExpenseLogged: ExpenseLoggedSignal }
+  | { MilestoneRecorded: MilestoneRecordedSignal }
+  | { TransitionAdvanced: TransitionAdvancedSignal }
+  | { TierAdvanced: TierAdvancedSignal }
+  | { CapabilityApproved: CapabilityApprovedSignal }
+  | { CapabilityDenied: CapabilityDeniedSignal }
+  | { TransitionProgressed: TransitionProgressedSignal };
+
+/** All possible HearthSignal variant names */
+export type HearthSignalType =
+  | 'GratitudeExpressed'
+  | 'CareTaskCompleted'
+  | 'SwapAccepted'
+  | 'SwapDeclined'
+  | 'RhythmOccurred'
+  | 'PresenceChanged'
+  | 'EmergencyAlert'
+  | 'MemberJoined'
+  | 'MemberDeparted'
+  | 'BondTended'
+  | 'CrossZomeCallFailed'
+  | 'VoteCast'
+  | 'VoteAmended'
+  | 'DecisionClosed'
+  | 'DecisionFinalized'
+  | 'StoryCreated'
+  | 'StoryUpdated'
+  | 'TraditionObserved'
+  | 'ResourceLent'
+  | 'ResourceReturned'
+  | 'ExpenseLogged'
+  | 'MilestoneRecorded'
+  | 'TransitionAdvanced'
+  | 'TierAdvanced'
+  | 'CapabilityApproved'
+  | 'CapabilityDenied'
+  | 'TransitionProgressed';
+
+/** Extract the variant name from a HearthSignal */
+export function getSignalType(signal: HearthSignal): HearthSignalType {
+  return Object.keys(signal)[0] as HearthSignalType;
+}
+
+/** Signal types emitted by each zome */
+export const ZOME_SIGNAL_MAP: Record<string, readonly HearthSignalType[]> = {
+  hearth_kinship: ['MemberJoined', 'MemberDeparted', 'BondTended', 'CrossZomeCallFailed'],
+  hearth_gratitude: ['GratitudeExpressed'],
+  hearth_stories: ['StoryCreated', 'StoryUpdated', 'TraditionObserved'],
+  hearth_care: ['CareTaskCompleted', 'SwapAccepted', 'SwapDeclined'],
+  hearth_autonomy: ['TierAdvanced', 'CapabilityApproved', 'CapabilityDenied', 'TransitionProgressed', 'CrossZomeCallFailed'],
+  hearth_emergency: ['EmergencyAlert'],
+  hearth_decisions: ['VoteCast', 'VoteAmended', 'DecisionClosed', 'DecisionFinalized'],
+  hearth_resources: ['ResourceLent', 'ResourceReturned', 'ExpenseLogged'],
+  hearth_milestones: ['MilestoneRecorded', 'TransitionAdvanced'],
+  hearth_rhythms: ['RhythmOccurred', 'PresenceChanged'],
+} as const;
+
+// ============================================================================
 // Error Types
 // ============================================================================
 
