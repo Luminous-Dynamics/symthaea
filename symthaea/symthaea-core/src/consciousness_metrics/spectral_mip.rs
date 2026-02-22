@@ -72,14 +72,14 @@ impl SpectralMIPConfig {
     /// Validate spectral MIP configuration parameters.
     ///
     /// Checks that:
-    /// - `num_components` >= 4 (minimum for meaningful MIP computation)
+    /// - `num_components` >= 2 (minimum for a bipartition; >= 4 recommended for meaningful MIP)
     /// - `window_size` >= `min_samples` (window must fit minimum required samples)
     /// - `min_samples` >= 2 (need at least 2 samples for covariance)
     /// - `regularization` is positive and finite
     pub fn validate(&self) -> Result<(), String> {
-        if self.num_components < 4 {
+        if self.num_components < 2 {
             return Err(format!(
-                "SpectralMIPConfig: num_components must be >= 4, got {}",
+                "SpectralMIPConfig: num_components must be >= 2, got {}",
                 self.num_components
             ));
         }

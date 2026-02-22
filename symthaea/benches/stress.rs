@@ -40,7 +40,7 @@ fn bench_memory_stress(c: &mut Criterion) {
                     let results: Vec<_> = (0..n)
                         .map(|i| {
                             let topo = ConsciousnessTopology::random(8, HDC_DIMENSION, i as u64);
-                            calc.compute(&topo.node_representations)
+                            calc.algebraic_connectivity(&topo.node_representations)
                         })
                         .collect();
                     black_box(results)
@@ -69,7 +69,7 @@ fn bench_large_topology(c: &mut Criterion) {
             |b, &n| {
                 b.iter(|| {
                     let topo = ConsciousnessTopology::ring(n, HDC_DIMENSION, 42);
-                    let result = calc.compute(&topo.node_representations);
+                    let result = calc.algebraic_connectivity(&topo.node_representations);
                     black_box(result)
                 })
             },
@@ -149,7 +149,7 @@ fn bench_parallel_stress(c: &mut Criterion) {
                 b.iter(|| {
                     let results: Vec<_> = topologies
                         .par_iter()
-                        .map(|topo| calc.compute(&topo.node_representations))
+                        .map(|topo| calc.algebraic_connectivity(&topo.node_representations))
                         .collect();
                     black_box(results)
                 })
@@ -179,7 +179,7 @@ fn bench_dimension_scaling(c: &mut Criterion) {
             group.bench_with_input(BenchmarkId::new("hypercube_dim", dim), &dim, |b, &d| {
                 b.iter(|| {
                     let topo = ConsciousnessTopology::hypercube(d, HDC_DIMENSION, 42);
-                    let result = calc.compute(&topo.node_representations);
+                    let result = calc.algebraic_connectivity(&topo.node_representations);
                     black_box(result)
                 })
             });
@@ -239,7 +239,7 @@ fn bench_all_topologies(c: &mut Criterion) {
     for (name, topo) in topologies {
         group.bench_with_input(BenchmarkId::new("topology", name), &topo, |b, t| {
             b.iter(|| {
-                let result = calc.compute(&t.node_representations);
+                let result = calc.algebraic_connectivity(&t.node_representations);
                 black_box(result)
             })
         });

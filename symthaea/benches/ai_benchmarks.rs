@@ -126,7 +126,7 @@ fn bench_consciousness_correlation(c: &mut Criterion) {
             &topology,
             |b, topo| {
                 let calc = ConnectivityCalculator::new();
-                b.iter(|| calc.compute(&topo.node_representations))
+                b.iter(|| calc.algebraic_connectivity(&topo.node_representations))
             },
         );
     }

@@ -102,7 +102,7 @@ fn bench_standard_topologies(c: &mut Criterion) {
 
     for (name, topo) in topologies {
         group.bench_function(name, |b| {
-            b.iter(|| black_box(calc.compute(&topo.node_representations)))
+            b.iter(|| black_box(calc.algebraic_connectivity(&topo.node_representations)))
         });
     }
 
@@ -176,7 +176,7 @@ fn bench_hypercube_scaling(c: &mut Criterion) {
             &dim,
             |b, &d| {
                 let topo = ConsciousnessTopology::hypercube(d, HDC_DIMENSION, 42);
-                b.iter(|| black_box(calc.compute(&topo.node_representations)))
+                b.iter(|| black_box(calc.algebraic_connectivity(&topo.node_representations)))
             },
         );
     }

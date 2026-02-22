@@ -40,7 +40,7 @@ fn bench_full_pipeline(c: &mut Criterion) {
             let processed = &topo.node_representations;
 
             // 4. Φ Calculation: Compute integrated information
-            let phi_result = calc.compute(processed);
+            let phi_result = calc.algebraic_connectivity(processed);
 
             // 5. Output: Return result
             black_box((input, phi_result))
@@ -76,7 +76,7 @@ fn bench_concurrent_phi(c: &mut Criterion) {
                     // Compute Φ for all topologies
                     let results: Vec<_> = topologies
                         .iter()
-                        .map(|topo| calc.compute(&topo.node_representations))
+                        .map(|topo| calc.algebraic_connectivity(&topo.node_representations))
                         .collect();
                     black_box(results)
                 })
@@ -114,7 +114,7 @@ fn bench_latency_breakdown(c: &mut Criterion) {
         let calc = ConnectivityCalculator::new();
         let topo = ConsciousnessTopology::ring(8, HDC_DIMENSION, 42);
         b.iter(|| {
-            let result = calc.compute(&topo.node_representations);
+            let result = calc.algebraic_connectivity(&topo.node_representations);
             black_box(result)
         })
     });
@@ -123,7 +123,7 @@ fn bench_latency_breakdown(c: &mut Criterion) {
         let calc = ConnectivityCalculator::new();
         let topo = ConsciousnessTopology::ring(16, HDC_DIMENSION, 42);
         b.iter(|| {
-            let result = calc.compute(&topo.node_representations);
+            let result = calc.algebraic_connectivity(&topo.node_representations);
             black_box(result)
         })
     });

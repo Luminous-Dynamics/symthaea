@@ -1805,7 +1805,7 @@ impl CognitiveLoopService {
         // Compute average pairwise cosine distance (every 50 cycles to amortize cost)
         let codebook_diversity: f32 = if self.stats.total_cycles % 50 == 0 {
             if let Some(ref res_mem) = self.resonator_memory {
-                if let Some(ref semantic_cb) = res_mem.resonator.codebooks.first() {
+                if let Some(semantic_cb) = res_mem.resonator.codebooks.first() {
                     let n = semantic_cb.symbols.len();
                     if n >= 2 {
                         let mut total_dist = 0.0f32;

@@ -873,12 +873,12 @@ fn test_spectral_mip_invalid_dimension_rejected() {
     let err = config.validate().unwrap_err();
     assert!(err.contains("num_components"), "error should mention num_components: {err}");
 
-    // Also test below minimum (< 4)
+    // Also test below minimum (< 2)
     let config = SpectralMIPConfig {
-        num_components: 3,
+        num_components: 1,
         ..Default::default()
     };
-    assert!(config.validate().is_err(), "num_components=3 should fail (minimum is 4)");
+    assert!(config.validate().is_err(), "num_components=1 should fail (minimum is 2)");
 }
 
 #[test]

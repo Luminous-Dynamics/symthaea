@@ -107,7 +107,7 @@ fn bench_topology_19(c: &mut Criterion) {
     for (name, topo) in topologies {
         group.throughput(Throughput::Elements(topo.node_representations.len() as u64));
         group.bench_function(name, |b| {
-            b.iter(|| black_box(calc.compute(&topo.node_representations)))
+            b.iter(|| black_box(calc.algebraic_connectivity(&topo.node_representations)))
         });
     }
 
@@ -134,7 +134,7 @@ fn bench_dimensional_sweep(c: &mut Criterion) {
             &dim,
             |b, &d| {
                 let topo = ConsciousnessTopology::hypercube(d, HDC_DIMENSION, 42);
-                b.iter(|| black_box(calc.compute(&topo.node_representations)))
+                b.iter(|| black_box(calc.algebraic_connectivity(&topo.node_representations)))
             },
         );
     }
@@ -157,10 +157,10 @@ fn bench_phi_methods(c: &mut Criterion) {
     // RealPhi (algebraic connectivity)
     let real_calc = ConnectivityCalculator::new();
     group.bench_function("RealPhi_Ring", |b| {
-        b.iter(|| black_box(real_calc.compute(&ring.node_representations)))
+        b.iter(|| black_box(real_calc.algebraic_connectivity(&ring.node_representations)))
     });
     group.bench_function("RealPhi_Star", |b| {
-        b.iter(|| black_box(real_calc.compute(&star.node_representations)))
+        b.iter(|| black_box(real_calc.algebraic_connectivity(&star.node_representations)))
     });
 
     // ResonantPhi (SIMD optimized)
@@ -221,7 +221,7 @@ fn bench_phi_accuracy(c: &mut Criterion) {
             let phis: Vec<f64> = (0..10)
                 .map(|seed| {
                     let topo = ConsciousnessTopology::ring(8, HDC_DIMENSION, seed);
-                    calc.compute(&topo.node_representations)
+                    calc.algebraic_connectivity(&topo.node_representations)
                 })
                 .collect();
             black_box(phis)
@@ -233,7 +233,7 @@ fn bench_phi_accuracy(c: &mut Criterion) {
             let phis: Vec<f64> = (0..10)
                 .map(|seed| {
                     let topo = ConsciousnessTopology::hypercube(4, HDC_DIMENSION, seed);
-                    calc.compute(&topo.node_representations)
+                    calc.algebraic_connectivity(&topo.node_representations)
                 })
                 .collect();
             black_box(phis)
@@ -256,24 +256,24 @@ fn bench_non_orientability(c: &mut Criterion) {
     // 1D non-orientable (Möbius) - catastrophic failure expected
     group.bench_function("Mobius_8", |b| {
         let topo = ConsciousnessTopology::mobius_strip(8, HDC_DIMENSION, 42);
-        b.iter(|| black_box(calc.compute(&topo.node_representations)))
+        b.iter(|| black_box(calc.algebraic_connectivity(&topo.node_representations)))
     });
 
     // 2D non-orientable (Klein Bottle) - preserved Φ expected
     group.bench_function("KleinBottle_3x3", |b| {
         let topo = ConsciousnessTopology::klein_bottle(3, 3, HDC_DIMENSION, 42);
-        b.iter(|| black_box(calc.compute(&topo.node_representations)))
+        b.iter(|| black_box(calc.algebraic_connectivity(&topo.node_representations)))
     });
 
     // Orientable controls
     group.bench_function("Ring_8", |b| {
         let topo = ConsciousnessTopology::ring(8, HDC_DIMENSION, 42);
-        b.iter(|| black_box(calc.compute(&topo.node_representations)))
+        b.iter(|| black_box(calc.algebraic_connectivity(&topo.node_representations)))
     });
 
     group.bench_function("Torus_3x3", |b| {
         let topo = ConsciousnessTopology::torus(3, 3, HDC_DIMENSION, 42);
-        b.iter(|| black_box(calc.compute(&topo.node_representations)))
+        b.iter(|| black_box(calc.algebraic_connectivity(&topo.node_representations)))
     });
 
     group.finish();

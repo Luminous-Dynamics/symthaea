@@ -26,7 +26,7 @@ fn make_record(id: &str, seed: u64) -> MemoryRecord {
         timestamp_ms: 1700000000 + seed,
         valence: 0.5,
         arousal: 0.3,
-        phi: 0.65,
+        psi: 0.65,
         topics: vec!["bench".to_string()],
         metadata: "{}".to_string(),
         consolidation_strength: 0.0,
