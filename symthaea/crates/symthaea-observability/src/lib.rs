@@ -778,21 +778,24 @@ mod tests {
     #[test]
     fn test_noop_record_workspace_ignition() {
         let mut obs = NoOpObserver::new();
-        obs.record_workspace_ignition(workspace_event("w1")).unwrap();
+        obs.record_workspace_ignition(workspace_event("w1"))
+            .unwrap();
         assert_eq!(obs.stats().total_events, 1);
     }
 
     #[test]
     fn test_noop_record_primitive_activation() {
         let mut obs = NoOpObserver::new();
-        obs.record_primitive_activation(primitive_event("pa1")).unwrap();
+        obs.record_primitive_activation(primitive_event("pa1"))
+            .unwrap();
         assert_eq!(obs.stats().total_events, 1);
     }
 
     #[test]
     fn test_noop_record_response_generated() {
         let mut obs = NoOpObserver::new();
-        obs.record_response_generated(response_event("rg1")).unwrap();
+        obs.record_response_generated(response_event("rg1"))
+            .unwrap();
         assert_eq!(obs.stats().total_events, 1);
     }
 
@@ -863,17 +866,15 @@ mod tests {
         obs.record_phi_measurement(phi_event("p1")).unwrap();
         obs.record_router_selection(router_event("r1")).unwrap();
         obs.record_error(error_event("e1")).unwrap();
-        obs.record_workspace_ignition(workspace_event("w1")).unwrap();
+        obs.record_workspace_ignition(workspace_event("w1"))
+            .unwrap();
         obs.record_broca_pipeline(broca_event("bp1")).unwrap();
         obs.record_broca_pipeline(broca_event("bp2")).unwrap();
 
         let stats = obs.stats();
         assert_eq!(stats.total_events, 6);
         // broca_pipeline is the only type tracked by NoOpObserver
-        assert_eq!(
-            *stats.events_by_type.get("broca_pipeline").unwrap_or(&0),
-            2
-        );
+        assert_eq!(*stats.events_by_type.get("broca_pipeline").unwrap_or(&0), 2);
     }
 
     // ── Flush is no-op but succeeds ─────────────────────────────────────
@@ -895,10 +896,7 @@ mod tests {
         let meta = ctx.create_event_metadata();
         assert_eq!(meta.correlation_id, "ctx-1");
         assert_eq!(meta.tags.get("env").map(|s| s.as_str()), Some("test"));
-        assert_eq!(
-            meta.tags.get("region").map(|s| s.as_str()),
-            Some("us-east")
-        );
+        assert_eq!(meta.tags.get("region").map(|s| s.as_str()), Some("us-east"));
         assert!(meta.parent_id.is_none()); // no parents pushed
         assert!(meta.timestamp > 0);
     }

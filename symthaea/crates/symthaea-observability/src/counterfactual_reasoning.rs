@@ -940,7 +940,11 @@ mod tests {
         let mut engine2 = CounterfactualEngine::default();
         engine2.add_node(CausalNode::new("A", "A"));
         engine2.add_node(CausalNode::new("B", "B"));
-        engine2.add_link(CausalLink::new("A", "B", 0.8).with_noise(0.1).with_confidence(0.9));
+        engine2.add_link(
+            CausalLink::new("A", "B", 0.8)
+                .with_noise(0.1)
+                .with_confidence(0.9),
+        );
 
         let r2 = engine2.query_counterfactual("B", "A", 1.0).unwrap();
 
@@ -948,9 +952,21 @@ mod tests {
         for name in &["A", "B", "C", "D"] {
             engine4.add_node(CausalNode::new(*name, *name));
         }
-        engine4.add_link(CausalLink::new("A", "B", 0.8).with_noise(0.1).with_confidence(0.9));
-        engine4.add_link(CausalLink::new("B", "C", 0.8).with_noise(0.1).with_confidence(0.9));
-        engine4.add_link(CausalLink::new("C", "D", 0.8).with_noise(0.1).with_confidence(0.9));
+        engine4.add_link(
+            CausalLink::new("A", "B", 0.8)
+                .with_noise(0.1)
+                .with_confidence(0.9),
+        );
+        engine4.add_link(
+            CausalLink::new("B", "C", 0.8)
+                .with_noise(0.1)
+                .with_confidence(0.9),
+        );
+        engine4.add_link(
+            CausalLink::new("C", "D", 0.8)
+                .with_noise(0.1)
+                .with_confidence(0.9),
+        );
 
         let r4 = engine4.query_counterfactual("D", "A", 1.0).unwrap();
 
