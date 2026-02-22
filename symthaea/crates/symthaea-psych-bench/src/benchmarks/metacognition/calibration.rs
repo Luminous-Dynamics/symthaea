@@ -206,15 +206,16 @@ impl MetacognitiveCalibrationBenchmark {
                 let delay_factor = 1.0 - (diff.delay as f64 / 10.0).min(1.0);
 
                 // Evidence cue: similarity gap modulates within-difficulty variation.
-                // Gentle sigmoid — only large gaps drive confidence.
-                let gap_signal = 1.0 / (1.0 + (-((gap - 0.12) * 3.0)).exp());
+                // Weak sigmoid — humans poorly track retrieval-quality signals
+                // (Koriat 2007 — experience-based cues dominate over evidence).
+                let gap_signal = 1.0 / (1.0 + (-((gap - 0.15) * 2.0)).exp());
 
-                // Raw cue combination: task demands dominate (75%), evidence weaker (25%).
-                // Humans rely more on experience-based cues (Koriat 2007) than
-                // on direct retrieval-quality signals.
-                let raw = load_factor * 0.32
-                    + delay_factor * 0.43
-                    + gap_signal * 0.15
+                // Raw cue combination: task demands dominate (82%), evidence minimal (18%).
+                // Humans rely heavily on experience-based cues (Koriat 2007) over
+                // direct retrieval-quality signals, producing moderate discrimination.
+                let raw = load_factor * 0.35
+                    + delay_factor * 0.47
+                    + gap_signal * 0.08
                     + familiarity * 0.10;
 
                 // Logistic calibration (Platt 1999): maps raw cue value to
