@@ -51,7 +51,7 @@ impl TwoStepBenchmark {
         let mut transition_counts = [[1.0f64; 2]; 2]; // Laplace prior
         // Reward model: EMA of rewards in each state
         let mut state_reward = [0.5f64; 2]; // prior: 0.5
-        let reward_lr = 0.3;
+        let reward_lr = 0.5;
 
         for ep in 0..num_episodes {
             // Stage 1: blend FEP action selection with model-based values.
@@ -67,15 +67,17 @@ impl TwoStepBenchmark {
                 p0 * state_reward[0] + p1 * state_reward[1]
             }).collect();
 
-            // Softmax over model-based values
-            let mb_temp = 0.3;
+            // Softmax over model-based values — low temp makes MB signal decisive
+            let mb_temp = 0.1;
             let mb_max = mb_values[0].max(mb_values[1]);
             let mb_exp: Vec<f64> = mb_values.iter().map(|v| ((v - mb_max) / mb_temp).exp()).collect();
             let mb_sum: f64 = mb_exp.iter().sum();
             let mb_probs: Vec<f64> = mb_exp.iter().map(|e| e / mb_sum).collect();
 
-            // Blend: ramp model-based weight from 0.1 to 0.5 as episodes progress
-            let mb_weight = 0.1 + 0.4 * (ep as f64 / num_episodes as f64);
+            // Blend: ramp model-based weight rapidly, saturating by episode 20.
+            // After ~20 episodes, the transition model has enough data (70+ observations).
+            let progress = (ep as f64 / 20.0).min(1.0);
+            let mb_weight = 0.2 + 0.7 * progress;
             let blended_probs: Vec<f64> = (0..2).map(|a| {
                 (1.0 - mb_weight) * fep_probs[a] + mb_weight * mb_probs[a]
             }).collect();

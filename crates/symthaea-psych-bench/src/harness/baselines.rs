@@ -147,6 +147,15 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    m.insert(
+        "restless_bandit_accuracy",
+        Baseline {
+            value: 0.75,
+            source: "Speekenbrink & Konstantinidis (2015), 1 - normalized regret",
+            population: "human adults",
+        },
+    );
+
     // Instrumental conditioning: contingency sensitivity
     m.insert(
         "instrumental_sensitivity",

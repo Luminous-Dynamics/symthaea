@@ -340,6 +340,12 @@ impl BenchmarkReport {
         if benchmark.contains("Reversal") {
             push_specific("perseverative_errors", "reversal_perseverative_errors", cog_bl);
         }
+        if benchmark.contains("RestlessBandit") {
+            push_specific("overall_accuracy", "restless_bandit_accuracy", cog_bl);
+        }
+        if benchmark.contains("Instrumental") {
+            push_specific("contingency_sensitivity", "instrumental_sensitivity", cog_bl);
+        }
 
         // Only return comparisons relevant to this benchmark
         if benchmark.contains("WorM") || benchmark.contains("CogBench")
