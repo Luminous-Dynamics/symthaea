@@ -43,12 +43,12 @@ use crate::consciousness::counterfactual::{
     CausalDAG, CausalQuery, CausalQueryOutcome, CounterfactualReasoner,
 };
 use crate::consciousness::epistemic_conflict::{
-    phi_integration::{compute_phi_eff, effective_phi, thresholds},
-    ConflictDetector, MultiTheoryMetrics, TheoryCalibrator,
+    phi_integration::{effective_phi, thresholds},
+    ConflictDetector, TheoryCalibrator,
 };
 use crate::consciousness::temporal_planning::{
     mcts::{evs, MctsPlanner},
-    types::{BudgetTier, ForkedState, MctsConfig, PlannedAction, ReasoningBudget},
+    types::{BudgetTier, ForkedState, MctsConfig, ReasoningBudget},
 };
 use crate::consciousness::tool_gate::classifier;
 
@@ -425,6 +425,8 @@ use crate::consciousness::temporal_planning::types::MctsResult;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::consciousness::epistemic_conflict::MultiTheoryMetrics;
+    use crate::consciousness::temporal_planning::types::PlannedAction;
 
     fn make_metrics(phi: f64, consensus: f64) -> MultiTheoryMetrics {
         MultiTheoryMetrics {

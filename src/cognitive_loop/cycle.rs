@@ -2871,8 +2871,7 @@ impl CognitiveLoopService {
 
             let input_hv =
                 symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(compressed_state.to_vec());
-            let output_hv =
-                symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(output.to_vec());
+            let output_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(output.to_vec());
 
             let episode = crate::memory::episodic_replay::Episode::with_metadata(
                 input_hv,
