@@ -1,6 +1,6 @@
 {
   "name": "baseline",
-  "timestamp": "2026-02-22T03:46:07.845180062+00:00",
+  "timestamp": "2026-02-22T03:30:30.549080706+00:00",
   "git_hash": "2d64b6565",
   "config_summary": "dim=512, trials=10, seed=42",
   "metrics": {

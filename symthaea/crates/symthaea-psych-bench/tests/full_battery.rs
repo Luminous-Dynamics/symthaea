@@ -30,7 +30,10 @@ use symthaea_psych_bench::benchmarks::{
         SerialRecallBenchmark, SpatialUpdatingBenchmark,
     },
 };
-use symthaea_psych_bench::harness::{BenchmarkConfig, BenchmarkReport, PsychBenchmark};
+use symthaea_psych_bench::harness::{
+    BenchmarkConfig, BenchmarkReport, PsychBenchmark,
+    snapshot::{RegressionReport, RegressionSnapshot},
+};
 
 fn battery_config() -> BenchmarkConfig {
     BenchmarkConfig {
@@ -134,6 +137,88 @@ fn full_battery_report() {
     assert!(
         summary.contains("Baseline Comparisons"),
         "Report should contain at least one baseline comparison"
+    );
+}
+
+/// Regression guard: compare current results against committed baseline snapshot.
+///
+/// Fails on >10% degradation (critical) on any metric. Warns at >5%.
+/// To regenerate the baseline after intentional changes:
+///   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --snapshot baselines/v0.5.2.json
+#[test]
+fn regression_against_baseline() {
+    let baseline_path = std::path::Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/baselines/v0.5.2.json"
+    ));
+
+    // Skip gracefully if no baseline snapshot exists yet
+    if !baseline_path.exists() {
+        eprintln!(
+            "WARNING: No baseline snapshot at {}. Skipping regression test.",
+            baseline_path.display()
+        );
+        return;
+    }
+
+    let baseline = RegressionSnapshot::load(baseline_path)
+        .expect("failed to load baseline snapshot");
+
+    // Check staleness (warn if > 30 days old, but don't fail)
+    if let Some(warning) = baseline.staleness_warning(30) {
+        eprintln!("WARNING: {}", warning);
+    }
+
+    // Run the full battery with same config as baseline
+    let config = battery_config();
+    let mut report = BenchmarkReport::new();
+
+    report.add(NBackBenchmark.run(&config));
+    report.add(ChangeDetectionBenchmark.run(&config));
+    report.add(SerialRecallBenchmark.run(&config));
+    report.add(SpatialUpdatingBenchmark.run(&config));
+    report.add(BindingBenchmark.run(&config));
+    report.add(DigitSpanBenchmark.run(&config));
+    report.add(StroopBenchmark.run(&config));
+    report.add(FlankerBenchmark.run(&config));
+    report.add(WisconsinCardSortingBenchmark.run(&config));
+    report.add(IowaGamblingBenchmark.run(&config));
+    report.add(RavensProgressiveMatricesBenchmark.run(&config));
+    report.add(TowerOfLondonBenchmark.run(&config));
+    report.add(ProbabilisticReasoningBenchmark.run(&config));
+    report.add(HorizonBenchmark.run(&config));
+    report.add(RestlessBanditBenchmark.run(&config));
+    report.add(InstrumentalLearningBenchmark.run(&config));
+    report.add(TwoStepBenchmark.run(&config));
+    report.add(TemporalDiscountingBenchmark.run(&config));
+    report.add(BartBenchmark.run(&config));
+    report.add(ReversalLearningBenchmark.run(&config));
+    report.add(FalseBeliefBenchmark.run(&config));
+    report.add(FauxPasBenchmark.run(&config));
+    report.add(HintingBenchmark.run(&config));
+    report.add(PersuasionBenchmark.run(&config));
+    report.add(StrangeStoryBenchmark.run(&config));
+    report.add(AccurateRetrievalBenchmark.run(&config));
+    report.add(TestTimeLearningBenchmark.run(&config));
+    report.add(LongRangeBenchmark.run(&config));
+    report.add(ConflictResolutionBenchmark.run(&config));
+    report.add(MetacognitiveCalibrationBenchmark.run(&config));
+    report.add(ValenceClassificationBenchmark.run(&config));
+    report.add(MoodCongruentRecallBenchmark.run(&config));
+    report.add(RemoteAssociatesBenchmark.run(&config));
+    report.add(AlternateUsesBenchmark.run(&config));
+    report.add(ButlinIndicatorSuite.run(&config));
+
+    let current = RegressionSnapshot::from_report(&report, "current");
+    let regression = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+
+    eprintln!("\n{}\n", regression.format_summary());
+
+    assert!(
+        !regression.has_critical(),
+        "Critical performance regression detected ({} critical)!\n{}",
+        regression.summary.critical,
+        regression.format_summary()
     );
 }
 

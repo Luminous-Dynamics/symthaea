@@ -8,12 +8,51 @@ use std::collections::BTreeMap;
 /// A reference baseline value with source citation.
 #[derive(Debug, Clone)]
 pub struct Baseline {
-    /// The reference value.
+    /// The reference value (mean).
     pub value: f64,
+    /// Standard deviation of the reference population (if available).
+    ///
+    /// Used for z-score computation: `z = (agent - value) / sd`.
+    pub sd: Option<f64>,
     /// Source description (e.g., "Cowan (2001), Table 2").
     pub source: &'static str,
     /// Population (e.g., "human adults", "GPT-4").
     pub population: &'static str,
+}
+
+/// Type alias for a baseline map.
+pub type BaselineMap = BTreeMap<&'static str, Baseline>;
+
+/// All baseline collections in a single struct.
+///
+/// Eliminates the need to pass 9+ separate maps to comparison functions.
+pub struct BaselineCollection {
+    pub worm: BaselineMap,
+    pub cogbench: BaselineMap,
+    pub tombench: BaselineMap,
+    pub memory_agent: BaselineMap,
+    pub executive: BaselineMap,
+    pub metacognition: BaselineMap,
+    pub affect: BaselineMap,
+    pub creativity: BaselineMap,
+    pub butlin: BaselineMap,
+}
+
+impl BaselineCollection {
+    /// Load all baseline collections.
+    pub fn all() -> Self {
+        Self {
+            worm: worm_baselines(),
+            cogbench: cogbench_baselines(),
+            tombench: tombench_baselines(),
+            memory_agent: memory_agent_baselines(),
+            executive: executive_baselines(),
+            metacognition: metacognition_baselines(),
+            affect: affect_baselines(),
+            creativity: creativity_baselines(),
+            butlin: butlin_baselines(),
+        }
+    }
 }
 
 /// Get all WorM baselines.
@@ -25,6 +64,7 @@ pub fn worm_baselines() -> BTreeMap<&'static str, Baseline> {
         "cowan_k",
         Baseline {
             value: 4.0,
+            sd: Some(1.0),
             source: "Cowan (2001), The magical number 4",
             population: "human adults",
         },
@@ -35,6 +75,7 @@ pub fn worm_baselines() -> BTreeMap<&'static str, Baseline> {
         "nback_2_accuracy",
         Baseline {
             value: 0.85,
+            sd: Some(0.10),
             source: "Jaeggi et al. (2010), meta-analysis",
             population: "human adults",
         },
@@ -45,6 +86,7 @@ pub fn worm_baselines() -> BTreeMap<&'static str, Baseline> {
         "nback_3_accuracy",
         Baseline {
             value: 0.70,
+            sd: Some(0.12),
             source: "Jaeggi et al. (2010), meta-analysis",
             population: "human adults",
         },
@@ -55,6 +97,7 @@ pub fn worm_baselines() -> BTreeMap<&'static str, Baseline> {
         "change_detection_k4",
         Baseline {
             value: 0.75,
+            sd: None,
             source: "Luck & Vogel (1997)",
             population: "human adults",
         },
@@ -65,6 +108,7 @@ pub fn worm_baselines() -> BTreeMap<&'static str, Baseline> {
         "spatial_updating_accuracy",
         Baseline {
             value: 0.85,
+            sd: None,
             source: "Oberauer et al. (2003); Ecker et al. (2010), spatial updating paradigm",
             population: "human adults",
         },
@@ -75,6 +119,7 @@ pub fn worm_baselines() -> BTreeMap<&'static str, Baseline> {
         "binding_accuracy",
         Baseline {
             value: 0.75,
+            sd: None,
             source: "Luck & Vogel (1997); Wheeler & Treisman (2002), feature binding in VWM",
             population: "human adults",
         },
@@ -85,6 +130,7 @@ pub fn worm_baselines() -> BTreeMap<&'static str, Baseline> {
         "serial_primacy_advantage",
         Baseline {
             value: 0.15,
+            sd: None,
             source: "Murdock (1962), serial position curve",
             population: "human adults",
         },
@@ -95,6 +141,7 @@ pub fn worm_baselines() -> BTreeMap<&'static str, Baseline> {
         "digit_span_forward",
         Baseline {
             value: 6.8,
+            sd: Some(1.1),
             source: "Wechsler (2008); Woods et al. (2011), WAIS-IV norms",
             population: "human adults",
         },
@@ -105,6 +152,7 @@ pub fn worm_baselines() -> BTreeMap<&'static str, Baseline> {
         "digit_span_backward",
         Baseline {
             value: 5.1,
+            sd: Some(1.2),
             source: "Wechsler (2008); Woods et al. (2011), WAIS-IV norms",
             population: "human adults",
         },
@@ -122,6 +170,7 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         "directed_exploration",
         Baseline {
             value: 0.35,
+            sd: None,
             source: "Wilson et al. (2014), Horizon task",
             population: "human adults",
         },
@@ -132,6 +181,7 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         "model_basedness",
         Baseline {
             value: 0.60,
+            sd: None,
             source: "Daw et al. (2011), Two-step task",
             population: "human adults",
         },
@@ -142,6 +192,7 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         "discounting_score",
         Baseline {
             value: 0.50,
+            sd: None,
             source: "Kirby et al. (1999), MCQ",
             population: "human adults",
         },
@@ -152,6 +203,7 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         "bart_avg_pumps",
         Baseline {
             value: 30.0,
+            sd: Some(12.0),
             source: "Lejuez et al. (2002), BART",
             population: "human adults",
         },
@@ -162,6 +214,7 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         "restless_bandit_regret",
         Baseline {
             value: 0.25,
+            sd: None,
             source: "Speekenbrink & Konstantinidis (2015), Information & choice in a changing world",
             population: "human adults",
         },
@@ -171,6 +224,7 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         "restless_bandit_accuracy",
         Baseline {
             value: 0.75,
+            sd: None,
             source: "Speekenbrink & Konstantinidis (2015), 1 - normalized regret",
             population: "human adults",
         },
@@ -181,6 +235,7 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         "instrumental_sensitivity",
         Baseline {
             value: 0.70,
+            sd: None,
             source: "Dickinson (1985), Actions and habits",
             population: "human adults (estimated from instrumental learning literature)",
         },
@@ -191,6 +246,7 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         "probabilistic_likelihood_weight",
         Baseline {
             value: 0.50,
+            sd: None,
             source: "Phillips & Edwards (1966); Grether (1980), conservatism in probability updating",
             population: "human adults (Bayesian normative = 0.50 for symmetric evidence)",
         },
@@ -201,6 +257,7 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         "reversal_win_stay",
         Baseline {
             value: 0.85,
+            sd: None,
             source: "Cools et al. (2002), Defining the neural mechanisms of probabilistic reversal learning",
             population: "human adults",
         },
@@ -209,6 +266,7 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         "reversal_lose_shift",
         Baseline {
             value: 0.70,
+            sd: None,
             source: "Cools et al. (2002), Defining the neural mechanisms of probabilistic reversal learning",
             population: "human adults",
         },
@@ -221,6 +279,7 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         "reversal_perseverative_errors",
         Baseline {
             value: 25.0,
+            sd: None,
             source: "Cools et al. (2002); Clark et al. (2004), binary reversal paradigm (200 trials)",
             population: "human adults",
         },
@@ -238,6 +297,7 @@ pub fn tombench_baselines() -> BTreeMap<&'static str, Baseline> {
         "false_belief_accuracy",
         Baseline {
             value: 0.90,
+            sd: None,
             source: "Baron-Cohen et al. (1985), Sally-Anne",
             population: "human adults",
         },
@@ -248,6 +308,7 @@ pub fn tombench_baselines() -> BTreeMap<&'static str, Baseline> {
         "faux_pas_accuracy",
         Baseline {
             value: 0.85,
+            sd: None,
             source: "Baron-Cohen et al. (1999), Faux Pas test",
             population: "human adults",
         },
@@ -258,6 +319,7 @@ pub fn tombench_baselines() -> BTreeMap<&'static str, Baseline> {
         "hinting_accuracy",
         Baseline {
             value: 0.80,
+            sd: None,
             source: "Corcoran et al. (1995), Hinting Task",
             population: "human adults",
         },
@@ -268,6 +330,7 @@ pub fn tombench_baselines() -> BTreeMap<&'static str, Baseline> {
         "persuasion_detection",
         Baseline {
             value: 0.85,
+            sd: None,
             source: "Happé (1994), An advanced test of theory of mind",
             population: "human adults",
         },
@@ -278,6 +341,7 @@ pub fn tombench_baselines() -> BTreeMap<&'static str, Baseline> {
         "strange_story_accuracy",
         Baseline {
             value: 0.85,
+            sd: None,
             source: "Happé (1994), An advanced test of theory of mind",
             population: "human adults",
         },
@@ -295,6 +359,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "wcst_categories_completed",
         Baseline {
             value: 5.62,
+            sd: Some(1.13),
             source: "Kohli & Kaur (2006), WCST norms",
             population: "human adults",
         },
@@ -303,6 +368,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "wcst_perseverative_errors",
         Baseline {
             value: 8.29,
+            sd: Some(5.91),
             source: "Kohli & Kaur (2006), WCST norms",
             population: "human adults",
         },
@@ -311,6 +377,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "wcst_trials_to_first",
         Baseline {
             value: 12.17,
+            sd: Some(4.5),
             source: "Kohli & Kaur (2006), WCST norms",
             population: "human adults",
         },
@@ -321,6 +388,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "igt_overall_net_score",
         Baseline {
             value: 17.5,
+            sd: Some(20.0),
             source: "Bechara et al. (1994); Steingroever et al. (2015), midpoint of +10 to +25",
             population: "human adults",
         },
@@ -329,6 +397,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "igt_deck_preference_good",
         Baseline {
             value: 0.65,
+            sd: None,
             source: "Steingroever et al. (2015), last 40 trials",
             population: "human adults",
         },
@@ -339,6 +408,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "ravens_overall_accuracy",
         Baseline {
             value: 0.78,
+            sd: Some(0.12),
             source: "Raven (1938); Murphy et al. (2023), SPM ~47/60",
             population: "human adults",
         },
@@ -347,6 +417,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "ravens_easy_accuracy",
         Baseline {
             value: 0.95,
+            sd: None,
             source: "Raven (1938), Set A-B",
             population: "human adults",
         },
@@ -357,6 +428,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "stroop_congruent_accuracy",
         Baseline {
             value: 0.98,
+            sd: None,
             source: "MacLeod (1991), Half a century of research on the Stroop effect",
             population: "human adults",
         },
@@ -365,6 +437,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "stroop_incongruent_accuracy",
         Baseline {
             value: 0.88,
+            sd: None,
             source: "MacLeod (1991), Half a century of research on the Stroop effect",
             population: "human adults",
         },
@@ -373,6 +446,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "stroop_effect",
         Baseline {
             value: 0.10,
+            sd: Some(0.05),
             source: "MacLeod (1991), accuracy-based Stroop effect",
             population: "human adults",
         },
@@ -383,6 +457,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "flanker_congruent_accuracy",
         Baseline {
             value: 0.97,
+            sd: None,
             source: "Eriksen & Eriksen (1974); Ridderinkhof et al. (2021)",
             population: "human adults",
         },
@@ -391,6 +466,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "flanker_incongruent_accuracy",
         Baseline {
             value: 0.90,
+            sd: None,
             source: "Eriksen & Eriksen (1974); Ridderinkhof et al. (2021)",
             population: "human adults",
         },
@@ -399,6 +475,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "flanker_effect",
         Baseline {
             value: 0.07,
+            sd: Some(0.04),
             source: "Eriksen & Eriksen (1974), accuracy-based flanker effect",
             population: "human adults",
         },
@@ -409,6 +486,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "tol_overall_optimal_rate",
         Baseline {
             value: 0.63,
+            sd: None,
             source: "Kaller et al. (2016), TOL-F norms",
             population: "human adults",
         },
@@ -417,6 +495,7 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         "tol_planning_efficiency",
         Baseline {
             value: 0.82,
+            sd: None,
             source: "Kaller et al. (2016), optimal/actual moves ratio",
             population: "human adults",
         },
@@ -433,6 +512,7 @@ pub fn metacognition_baselines() -> BTreeMap<&'static str, Baseline> {
         "calibration_error_ece",
         Baseline {
             value: 0.15,
+            sd: Some(0.05),
             source: "Fleming & Lau (2014), midpoint of 0.10-0.20",
             population: "human adults",
         },
@@ -441,6 +521,7 @@ pub fn metacognition_baselines() -> BTreeMap<&'static str, Baseline> {
         "discrimination_gamma",
         Baseline {
             value: 0.50,
+            sd: None,
             source: "Fleming & Lau (2014), midpoint of 0.40-0.60",
             population: "human adults",
         },
@@ -457,6 +538,7 @@ pub fn memory_agent_baselines() -> BTreeMap<&'static str, Baseline> {
         "accurate_retrieval",
         Baseline {
             value: 0.85,
+            sd: None,
             source: "Tulving (1985), Memory and consciousness; Roediger & McDermott (1995), DRM paradigm false recall ~15%",
             population: "human adults",
         },
@@ -466,6 +548,7 @@ pub fn memory_agent_baselines() -> BTreeMap<&'static str, Baseline> {
         "test_time_learning",
         Baseline {
             value: 0.75,
+            sd: None,
             source: "Karpicke & Roediger (2008), The critical importance of retrieval for learning",
             population: "human adults",
         },
@@ -476,6 +559,7 @@ pub fn memory_agent_baselines() -> BTreeMap<&'static str, Baseline> {
         "long_range_delay_50",
         Baseline {
             value: 0.70,
+            sd: None,
             source: "Baddeley (1997), Human Memory: Theory and Practice",
             population: "human adults",
         },
@@ -486,6 +570,7 @@ pub fn memory_agent_baselines() -> BTreeMap<&'static str, Baseline> {
         "conflict_recency_preference",
         Baseline {
             value: 0.65,
+            sd: None,
             source: "Oberauer (2002), Access to information in working memory",
             population: "human adults",
         },
@@ -503,6 +588,7 @@ pub fn affect_baselines() -> BTreeMap<&'static str, Baseline> {
         "valence_accuracy",
         Baseline {
             value: 0.90,
+            sd: None,
             source: "Bradley & Lang (1999), IAPS affective ratings",
             population: "human adults",
         },
@@ -513,6 +599,7 @@ pub fn affect_baselines() -> BTreeMap<&'static str, Baseline> {
         "congruence_ratio",
         Baseline {
             value: 0.60,
+            sd: None,
             source: "Blaney (1986), Affect and memory: a review",
             population: "human adults",
         },
@@ -534,6 +621,7 @@ pub fn butlin_baselines() -> BTreeMap<&'static str, Baseline> {
         "present_count",
         Baseline {
             value: 14.0,
+            sd: None,
             source: "Butlin et al. (2023), Consciousness in Artificial Intelligence: Insights from the Science of Consciousness",
             population: "human adults (all indicators present by definition)",
         },
@@ -543,6 +631,7 @@ pub fn butlin_baselines() -> BTreeMap<&'static str, Baseline> {
         "presence_ratio",
         Baseline {
             value: 1.0,
+            sd: None,
             source: "Butlin et al. (2023), 14/14 indicators present in neurotypical adults",
             population: "human adults",
         },
@@ -560,6 +649,7 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
         "rat_overall_accuracy",
         Baseline {
             value: 0.50,
+            sd: None,
             source: "Bowden & Jung-Beeman (2003), Normative data for 144 compound remote associate problems",
             population: "human adults",
         },
@@ -570,6 +660,7 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
         "aut_fluency",
         Baseline {
             value: 8.0,
+            sd: None,
             source: "Torrance (1974), Torrance Tests of Creative Thinking",
             population: "human adults",
         },
