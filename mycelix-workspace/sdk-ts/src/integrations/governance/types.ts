@@ -639,6 +639,19 @@ export interface GateVerificationResult {
   gate_id: string;
 }
 
+/** Enhanced gate verification with provenance tracking */
+export interface GateVerificationResultV2 {
+  passed: boolean;
+  consciousness_level: number | null;
+  required_consciousness: number;
+  provenance: ConsciousnessProvenance;
+  action_type: GovernanceActionType;
+  failure_reason?: string;
+}
+
+/** Source of consciousness measurement */
+export type ConsciousnessProvenance = 'Attested' | 'Snapshot' | 'Unavailable';
+
 /** Governance action types that require Φ thresholds */
 export type GovernanceActionType =
   | 'Basic'
@@ -652,6 +665,340 @@ export interface PhiThresholds {
   proposal_submission: number;
   voting: number;
   constitutional: number;
+}
+
+/** Input for querying agent consciousness snapshots */
+export interface GetAgentSnapshotsInput {
+  agent_did: string;
+  limit?: number;
+}
+
+/** Input for assessing value alignment with Seven Harmonies */
+export interface AssessValueAlignmentInput {
+  proposal_id: string;
+  proposal_content: string;
+}
+
+// --- Phi Attestation ---
+
+/** Multi-dimensional consciousness vector entry */
+export interface ConsciousnessVectorEntry {
+  spectral_connectivity?: number;
+  true_phi?: number;
+  phi_fast?: number;
+  entropy?: number;
+  coherence?: number;
+  epistemic_confidence?: number;
+}
+
+/** Input for recording a signed Φ attestation from Symthaea */
+export interface RecordPhiAttestationInput {
+  consciousness_level: number;
+  cycle_id: number;
+  captured_at_us: number;
+  signature: number[];
+  consciousness_vector?: ConsciousnessVectorEntry;
+}
+
+/** Consciousness attestation history entry */
+export interface AttestationHistoryEntry {
+  agent_did: string;
+  consciousness_level: number;
+  cycle_id: number;
+  captured_at: number;
+  signature: number[];
+  source: string;
+  consciousness_vector?: ConsciousnessVectorEntry;
+}
+
+/** Input for querying attestation history */
+export interface GetAttestationHistoryInput {
+  limit?: number;
+}
+
+/** Input for pruning stale attestations */
+export interface PruneStaleAttestationsInput {
+  keep_count: number;
+}
+
+// --- Consciousness-Aware Consensus ---
+
+/** Input for registering as a consensus participant */
+export interface RegisterConsensusParticipantInput {
+  agent_did: string;
+  k_vector_id: string;
+  federated_rep_id?: string;
+  reputation: number;
+  matl_score: number;
+  phi: number;
+  federated_score: number;
+}
+
+/** Vote decision in consensus rounds */
+export type VoteDecision = 'Approve' | 'Reject' | 'Abstain';
+
+/** Input for casting a consciousness-weighted vote */
+export interface CastWeightedVoteInput {
+  proposal_id: string;
+  proposal_type: ProposalType;
+  round: number;
+  decision: VoteDecision;
+  harmonic_alignment?: number;
+  reason?: string;
+}
+
+/** Input for calculating holistic vote weight */
+export interface CalculateHolisticWeightInput {
+  harmonic_alignment?: number;
+}
+
+/** Detailed holistic voting weight breakdown */
+export interface HolisticVotingWeight {
+  reputation: number;
+  reputation_squared: number;
+  consciousness_level: number;
+  consciousness_multiplier: number;
+  harmonic_alignment: number;
+  harmonic_bonus: number;
+  final_weight: number;
+  was_capped: boolean;
+  uncapped_weight: number;
+  calculation_breakdown: string;
+}
+
+/** Query for votes in a consensus round */
+export interface RoundVotesQuery {
+  proposal_id: string;
+  round: number;
+}
+
+/** Result of tallying a consensus round */
+export interface RoundResult {
+  proposal_id: string;
+  round: number;
+  proposal_type: ProposalType;
+  total_weight: number;
+  weighted_approvals: number;
+  weighted_rejections: number;
+  vote_count: number;
+  required_threshold: number;
+  approval_percentage: number;
+  quorum_met: boolean;
+  consensus_reached: boolean;
+  rejected: boolean;
+  result: string;
+}
+
+/** Consensus participant status with reputation and activity */
+export interface ConsensusParticipantStatus {
+  agent_did: string;
+  is_active: boolean;
+  base_reputation: number;
+  effective_reputation: number;
+  streak_count: number;
+  streak_bonus: number;
+  in_cooldown: boolean;
+  current_phi: number;
+  federated_score: number;
+  rounds_participated: number;
+  successful_votes: number;
+  success_rate: number;
+  slashing_events: number;
+  can_vote_standard: boolean;
+  can_vote_emergency: boolean;
+  can_vote_constitutional: boolean;
+}
+
+// --- Reputation & Trust ---
+
+/** 8-dimensional K-Vector trust model */
+export interface KVector {
+  agent_did: string;
+  /** Reliability weight (0.25) */
+  k_r: number;
+  /** Accuracy weight (0.15) */
+  k_a: number;
+  /** Integrity weight (0.20) */
+  k_i: number;
+  /** Participation weight (0.15) */
+  k_p: number;
+  /** Mentorship weight (0.05) */
+  k_m: number;
+  /** Stewardship weight (0.10) */
+  k_s: number;
+  /** Harmony weight (0.05) */
+  k_h: number;
+  /** Topology weight (0.05) */
+  k_topo: number;
+  updated_at: number;
+}
+
+/** MATL trust score with component breakdown */
+export interface MatlTrustScore {
+  agent_did: string;
+  pogq_score: number;
+  tcdm_score: number;
+  entropy_score: number;
+  matl_score: number;
+  k_vector_score: number;
+  phi: number;
+  calculated_at: number;
+}
+
+/** Input for updating multi-domain federated reputation */
+export interface UpdateFederatedReputationInput {
+  identity_verification?: number;
+  credential_count?: number;
+  credential_quality?: number;
+  epistemic_contributions?: number;
+  factcheck_accuracy?: number;
+  dark_spots_resolved?: number;
+  stake_weight?: number;
+  payment_reliability?: number;
+  escrow_completion_rate?: number;
+  pogq_score?: number;
+  fl_contributions?: number;
+  byzantine_clean_rate?: number;
+  voting_participation?: number;
+  proposal_success_rate?: number;
+  consensus_alignment?: number;
+}
+
+// --- Cross-hApp Integration ---
+
+/** Governance query types for cross-hApp integration */
+export type GovernanceQueryType =
+  | 'ActiveProposals'
+  | 'ProposalById'
+  | 'VotingStatus'
+  | 'VotingEligibility'
+  | 'ConstitutionalRules';
+
+/** Input for querying governance from another hApp */
+export interface QueryGovernanceInput {
+  source_happ: string;
+  query_type: GovernanceQueryType;
+  parameters: unknown;
+}
+
+/** Input for requesting cross-hApp execution */
+export interface RequestExecutionInput {
+  proposal_id: string;
+  target_happ: string;
+  action: string;
+  parameters: unknown;
+}
+
+/** Execution status for cross-hApp actions */
+export type ExecutionStatus =
+  | 'Pending'
+  | 'InProgress'
+  | 'Completed'
+  | 'Failed'
+  | 'Reverted';
+
+/** Input for acknowledging execution completion or failure */
+export interface AcknowledgeExecutionInput {
+  execution_id: string;
+  status: ExecutionStatus;
+  result?: string;
+}
+
+/** Bridge-level governance event types (distinct from SDK GovernanceEventType) */
+export type BridgeGovernanceEventType =
+  | 'ProposalCreated'
+  | 'VotingStarted'
+  | 'VoteReceived'
+  | 'VotingEnded'
+  | 'ProposalPassed'
+  | 'ProposalFailed'
+  | 'ProposalExecuted'
+  | 'ConstitutionAmended';
+
+/** Input for broadcasting a governance event */
+export interface BroadcastGovernanceEventInput {
+  event_type: BridgeGovernanceEventType;
+  proposal_id?: string;
+  subject: string;
+  payload: string;
+}
+
+// --- Cross-Cluster Dispatch ---
+
+/** Input for dispatching a call to the personal cluster */
+export interface DispatchPersonalCallInput {
+  zome_name: string;
+  fn_name: string;
+  payload: Uint8Array;
+}
+
+/** Input for dispatching a call to the identity cluster */
+export interface DispatchIdentityCallInput {
+  zome_name: string;
+  fn_name: string;
+  payload: Uint8Array;
+}
+
+/** Input for dispatching a call to the commons cluster */
+export interface DispatchCommonsCallInput {
+  zome_name: string;
+  fn_name: string;
+  payload: Uint8Array;
+}
+
+/** Input for dispatching a call to the civic cluster */
+export interface DispatchCivicCallInput {
+  zome_name: string;
+  fn_name: string;
+  payload: Uint8Array;
+}
+
+/** Input for enhanced voter trust check */
+export interface CheckVoterTrustInput {
+  did: string;
+  min_reputation: number;
+  require_mfa: boolean;
+  min_assurance_level?: number;
+}
+
+// --- Phi Configuration ---
+
+/** Dynamic Φ threshold configuration */
+export interface GovernancePhiConfig {
+  consciousness_gate_basic: number;
+  consciousness_gate_proposal: number;
+  consciousness_gate_voting: number;
+  consciousness_gate_constitutional: number;
+  min_voter_consciousness_standard: number;
+  min_voter_consciousness_emergency: number;
+  min_voter_consciousness_constitutional: number;
+  max_voting_weight: number;
+  min_true_phi_constitutional?: number;
+  min_coherence_voting?: number;
+  updated_at: number;
+  changed_by_proposal?: string;
+}
+
+/** Input for updating Φ configuration */
+export interface UpdatePhiConfigInput {
+  proposal_id: string;
+  consciousness_gate_basic?: number;
+  consciousness_gate_proposal?: number;
+  consciousness_gate_voting?: number;
+  consciousness_gate_constitutional?: number;
+  min_voter_consciousness_standard?: number;
+  min_voter_consciousness_emergency?: number;
+  min_voter_consciousness_constitutional?: number;
+  max_voting_weight?: number;
+}
+
+/** Adaptive Φ threshold for a proposal type */
+export interface AdaptiveThreshold {
+  base_threshold: number;
+  min_voter_consciousness: number;
+  min_participation: number;
+  quorum: number;
+  max_extension_secs: number;
 }
 
 // --- Execution & Timelock ---

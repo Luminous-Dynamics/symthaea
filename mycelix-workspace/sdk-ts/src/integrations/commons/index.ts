@@ -205,9 +205,6 @@ interface ZomeCallable {
 // Constants
 // ============================================================================
 
-/** @deprecated Use COMMONS_LAND_ROLE or COMMONS_CARE_ROLE instead */
-const COMMONS_ROLE = 'commons_land';
-
 /** hApp role for the commons-land DNA (property, housing, water, food) */
 const COMMONS_LAND_ROLE = 'commons_land';
 
@@ -241,9 +238,6 @@ export const COMMONS_ZOMES = [...COMMONS_LAND_ZOMES, ...COMMONS_CARE_ZOMES] as c
 
 /** Domains that belong to the commons-land DNA */
 const LAND_DOMAINS = new Set(['property', 'housing', 'water', 'food']);
-
-/** Domains that belong to the commons-care DNA */
-const CARE_DOMAINS = new Set(['care', 'mutualaid', 'transport', 'support', 'space']);
 
 /** Zomes that belong to the commons-land DNA (for dispatch routing) */
 const LAND_ZOME_SET = new Set<string>(COMMONS_LAND_ZOMES);

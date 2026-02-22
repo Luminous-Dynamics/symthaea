@@ -208,6 +208,8 @@ All zomes share the `hearth-types` crate for enums, DTOs, and fixed-point math. 
 | `get_weekly_digests` | query | Delegates to kinship |
 | `health_check` | query | Bridge health status |
 | `get_consciousness_credential` | query | Consciousness credential for governance |
+| `log_governance_gate` | mutation | Record a governance gate audit entry |
+| `get_governance_audit_trail` | query | Query governance gate audit trail |
 
 ## Getting Started
 
@@ -282,7 +284,7 @@ unsub(); unsub2(); unsub3();
 
 | Client | Class | Methods | Key Signals |
 |--------|-------|---------|-------------|
-| kinship.ts | KinshipClient | 19 | MemberJoined, MemberDeparted, BondTended |
+| kinship.ts | KinshipClient | 20 | MemberJoined, MemberDeparted, BondTended |
 | decisions.ts | DecisionsClient | 12 | VoteCast, VoteAmended, DecisionClosed, DecisionFinalized |
 | gratitude.ts | GratitudeClient | 8 | GratitudeExpressed |
 | stories.ts | StoriesClient | 11 | StoryCreated, StoryUpdated, TraditionObserved |
@@ -292,20 +294,27 @@ unsub(); unsub2(); unsub3();
 | resources.ts | ResourcesClient | 8 | ResourceLent, ResourceReturned, ExpenseLogged |
 | milestones.ts | MilestonesClient | 7 | MilestoneRecorded, TransitionAdvanced |
 | rhythms.ts | RhythmsClient | 7 | RhythmOccurred, PresenceChanged |
-| bridge.ts | BridgeClient | 19 | CrossZomeCallFailed |
+| bridge.ts | BridgeClient | 22 | CrossZomeCallFailed |
 | index.ts | HearthClient | (composite) | All 27 signal types via `onSignal()` |
 
 Signal handling is centralized on `HearthClient.onSignal(callback, filter?)` rather than individual zome clients, since signals arrive via the WebSocket connection. The optional `filter` parameter accepts an array of `HearthSignalType` strings to listen for specific events. Bridge events use a separate `onBridgeSignal()` method.
 
 ## Tests
 
-**Unit tests (1,023):** Run from the workspace root.
+**Rust unit tests (929):** Run from the workspace root.
 
 ```bash
-cargo test --lib
+cargo test --workspace
 ```
 
-**Sweettest integration tests (36 across 12 files):** Require a running Holochain conductor.
+**TypeScript SDK unit tests (134):** Run from the sdk-ts directory.
+
+```bash
+cd mycelix-workspace/sdk-ts
+npx vitest run tests/hearth.test.ts
+```
+
+**Sweettest integration tests (18 across 12 files):** Require a running Holochain conductor.
 
 ```bash
 cd tests
@@ -314,13 +323,13 @@ cargo test --release -- --ignored --test-threads=2
 
 | Test File | Tests | Coverage |
 |-----------|-------|----------|
-| sweettest_kinship | 4 | Create hearth, invite/accept, bonds, my_hearths |
-| sweettest_decisions_kinship | 1 | Full decision lifecycle with cross-zome role check |
+| sweettest_kinship | 6 | Create hearth, invite/accept, bonds, my_hearths, departure, bond queries |
+| sweettest_decisions_kinship | 3 | Decision lifecycle, cross-zome role check, decision amendment, governance |
 | sweettest_bridge | 2 | Health check, dispatch to kinship |
 | sweettest_digest_sync | 1 | Weekly digest assembly across zomes |
-| sweettest_care_gratitude_rhythms | 3 | Care schedule, gratitude, rhythm logging |
+| sweettest_care_gratitude_rhythms | 6 | Care schedule, swap lifecycle, gratitude, circles, rhythm logging, occurrences |
 | sweettest_emergency | 1 | Emergency plan/alert/check-in/resolve |
-| sweettest_autonomy | 1 | Guardian-youth capability flow |
+| sweettest_autonomy | 3 | Guardian-youth capability flow, tier advancement, capability denial |
 | sweettest_multi_hearth | 1 | Cross-hearth data isolation |
 | sweettest_resources | 4 | Register, lend/return, budget, membership auth |
 | sweettest_milestones | 4 | Record, advance transition, guardian auth, complete |

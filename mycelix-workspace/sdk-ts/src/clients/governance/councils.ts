@@ -314,7 +314,7 @@ export class CouncilsClient extends ZomeClient {
       purpose: entry.purpose,
       councilType: entry.council_type,
       parentCouncilId: entry.parent_council_id,
-      phiThreshold: entry.phi_threshold,
+      consciousnessThreshold: entry.phi_threshold,
       quorum: entry.quorum,
       supermajority: entry.supermajority,
       canSpawnChildren: entry.can_spawn_children,
