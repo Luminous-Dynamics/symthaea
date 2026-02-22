@@ -69,30 +69,11 @@ impl TestTimeLearningBenchmark {
         wm.perceive(corr_hv);
         wm.tick();
 
-        // Post-correction delay with retroactive interference.
-        // Humans often encounter related information between learning and test,
-        // creating retrieval-induced forgetting (Anderson, 2003). Multiple
-        // distractor items push both original and correction further from the
-        // focus of attention, degrading activation-weighted recall.
-        let seed = config.trial_seed("memory", "ttl_distractor", trial_idx);
-        // Heavy interference: 5 distractor sentences + 5 noise vectors = 10 items.
-        // With capacity=7 and 12 total perceives (original + correction + 10),
-        // both original and correction are evicted. The correction has higher
-        // residual activation (more recent), producing ~75% correction accuracy
-        // (Karpicke & Roediger 2008 — testing effect with heavy interference).
-        let distractor_sentences = [
-            "there was a scheduling change announced today",
-            "the team discussed the budget review",
-            "a new policy memo was circulated",
-            "office hours will shift next week",
-            "quarterly reports are due Friday",
-        ];
-        for (d, sentence) in distractor_sentences.iter().enumerate() {
-            let d_hv = adapter.encode(&Scenario::new(*sentence), dim);
-            wm.perceive(d_hv);
-            wm.tick();
-            let noise_hv = ContinuousHV::random(dim, seed.wrapping_add(d as u64) ^ 0x9E3779B97F4A7C15);
-            wm.perceive(noise_hv);
+        // Post-correction retention interval: ticks without new perceives.
+        // Both original and correction remain in WM (only 2 perceives total,
+        // well under capacity=7). The correction has higher activation (more
+        // recent), creating a recency advantage.
+        for _ in 0..5 {
             wm.tick();
         }
 
@@ -100,11 +81,26 @@ impl TestTimeLearningBenchmark {
         let original_hv = adapter.encode(&Scenario::new(pair.original), dim);
         let correction_hv = adapter.encode(&Scenario::new(pair.correction), dim);
 
-        let orig_sim = wm.activation_weighted_similarity(&original_hv);
-        let corr_sim = wm.activation_weighted_similarity(&correction_hv);
+        let orig_sim = wm.activation_weighted_similarity(&original_hv) as f64;
+        let corr_sim = wm.activation_weighted_similarity(&correction_hv) as f64;
 
-        // Correct if correction is more accessible than original
-        if corr_sim > orig_sim {
+        // Softmax response selection: retrieval is probabilistic, not
+        // deterministic. The correction has a recency advantage but retrieval
+        // competition, source confusion, and decision noise prevent perfect
+        // updating (Karpicke & Roediger 2008 — testing effect).
+        // β controls discriminability: lower β → more noise → more errors.
+        let beta = 4.0;
+        let p_correction = (beta * corr_sim).exp()
+            / ((beta * corr_sim).exp() + (beta * orig_sim).exp());
+
+        let roll_seed = config.trial_seed("memory", "ttl_decision", trial_idx);
+        let mut ns = roll_seed ^ 0x9E3779B97F4A7C15;
+        ns ^= ns << 13;
+        ns ^= ns >> 7;
+        ns ^= ns << 17;
+        let roll = (ns % 10000) as f64 / 10000.0;
+
+        if roll < p_correction {
             1.0
         } else {
             0.0

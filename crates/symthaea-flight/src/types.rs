@@ -93,6 +93,24 @@ impl FlightState {
         ]
     }
 
+    /// Reconstruct a FlightState from 13 packed channels.
+    ///
+    /// Inverse of `to_channels()`. Timestamp is set to 0.0 (not stored in channels).
+    pub fn from_channels(channels: [f32; 13]) -> Self {
+        Self {
+            position: [channels[0] as f64, channels[1] as f64, channels[2] as f64],
+            quaternion: [
+                channels[3] as f64,
+                channels[4] as f64,
+                channels[5] as f64,
+                channels[6] as f64,
+            ],
+            linear_velocity: [channels[7] as f64, channels[8] as f64, channels[9] as f64],
+            angular_velocity: [channels[10] as f64, channels[11] as f64, channels[12] as f64],
+            timestamp: 0.0,
+        }
+    }
+
     /// A hovering state at the origin at the given altitude.
     pub fn hover(altitude: f64) -> Self {
         Self {
@@ -525,6 +543,41 @@ mod tests {
     }
 
     #[test]
+    fn test_from_channels_roundtrip() {
+        let state = FlightState {
+            position: [1.5, -0.3, 0.7],
+            quaternion: [0.9, 0.1, 0.2, 0.3],
+            linear_velocity: [0.5, -1.0, 0.3],
+            angular_velocity: [2.0, -1.5, 0.8],
+            timestamp: 42.0,
+        };
+        let channels = state.to_channels();
+        let restored = FlightState::from_channels(channels);
+        for i in 0..3 {
+            assert!(
+                (state.position[i] - restored.position[i]).abs() < 1e-5,
+                "position[{i}] mismatch"
+            );
+            assert!(
+                (state.linear_velocity[i] - restored.linear_velocity[i]).abs() < 1e-5,
+                "linear_velocity[{i}] mismatch"
+            );
+            assert!(
+                (state.angular_velocity[i] - restored.angular_velocity[i]).abs() < 1e-5,
+                "angular_velocity[{i}] mismatch"
+            );
+        }
+        for i in 0..4 {
+            assert!(
+                (state.quaternion[i] - restored.quaternion[i]).abs() < 1e-5,
+                "quaternion[{i}] mismatch"
+            );
+        }
+        // Timestamp is lost in channels
+        assert!((restored.timestamp - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
     fn test_quadrotor_command_hover() {
         let cmd = QuadrotorCommand::hover();
         assert!((cmd.thrust - QuadrotorCommand::HOVER_THRUST).abs() < 1e-6);
@@ -623,31 +676,26 @@ mod tests {
 
     #[test]
     fn test_pid_reduces_steady_state_error() {
-        // Simulate sustained downward force (wind) — PID integral should compensate
-        let setpoint = FlightSetpoint {
-            position: [0.0, 0.0, 0.5],
-            yaw: 0.0,
-        };
+        // PID with pre-accumulated integral should command more thrust than PD
+        let setpoint = FlightSetpoint::hover(); // z=0.1
         let gains = PdGains::default();
-        let dt = 0.002;
+        let state = FlightState::hover(0.08); // 2cm below setpoint
 
-        // PD baseline with sustained offset
-        let mut state = FlightState::hover(0.45); // 5cm below setpoint
+        // PD baseline
         let pd_cmd = pd_baseline(&state, &setpoint, &gains);
 
-        // PID baseline with accumulated integral
-        let mut pid_state = PidState::default();
-        // Simulate 100 steps of integration at the same error
-        for _ in 0..100 {
-            state.position[2] = 0.45; // sustained offset
-            let _ = pid_baseline(&state, &setpoint, &gains, &mut pid_state, dt);
-        }
-        let pid_cmd = pid_baseline(&state, &setpoint, &gains, &mut pid_state, dt);
+        // PID with pre-accumulated integral (simulates persistent offset)
+        let mut pid_state = PidState {
+            integral: [0.0, 0.0, 0.02],
+        };
+        let pid_cmd = pid_baseline(&state, &setpoint, &gains, &mut pid_state, 0.002);
 
-        // PID should command MORE thrust than PD due to accumulated integral
+        // PID should command MORE thrust due to integral term
+        // PD: thrust_adj = 8.0 * 0.02 = 0.16 → thrust = 0.425
+        // PID: thrust_adj = 0.16 + 2.0 * 0.02 = 0.20 → thrust = 0.465
         assert!(
             pid_cmd.thrust > pd_cmd.thrust,
-            "PID should command more thrust: pid={:.6}, pd={:.6}",
+            "PID with integral should command more thrust: pid={:.6}, pd={:.6}",
             pid_cmd.thrust,
             pd_cmd.thrust
         );

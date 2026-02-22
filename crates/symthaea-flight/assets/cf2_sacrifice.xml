@@ -46,7 +46,7 @@
     <!-- The Falling Beam (initially at height, released at step 300) -->
     <body name="beam" pos="2.0 0 4.0">
       <freejoint name="beam_joint"/>
-      <inertial pos="0 0 0" mass="2.0" diaginertia="0.01 0.01 0.001"/>
+      <inertial pos="0 0 0" mass="0.3" diaginertia="0.0015 0.0015 0.00015"/>
       <geom type="box" size="0.02 0.02 0.3" rgba="0.6 0.2 0.1 1" name="steel_beam"
             condim="4" friction="0.8 0.005 0.0001"/>
     </body>

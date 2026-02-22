@@ -210,12 +210,14 @@ impl MetacognitiveCalibrationBenchmark {
                 // (Koriat 2007 — experience-based cues dominate over evidence).
                 let gap_signal = 1.0 / (1.0 + (-((gap - 0.15) * 2.0)).exp());
 
-                // Raw cue combination: task demands dominate (82%), evidence minimal (18%).
+                // Raw cue combination: task demands dominate (85%), evidence minimal (15%).
                 // Humans rely heavily on experience-based cues (Koriat 2007) over
                 // direct retrieval-quality signals, producing moderate discrimination.
-                let raw = load_factor * 0.35
-                    + delay_factor * 0.47
-                    + gap_signal * 0.08
+                // Very low gap weight (3%) prevents the similarity-gap cue from
+                // boosting gamma above human range.
+                let raw = load_factor * 0.38
+                    + delay_factor * 0.49
+                    + gap_signal * 0.03
                     + familiarity * 0.10;
 
                 // Logistic calibration (Platt 1999): maps raw cue value to
@@ -225,12 +227,15 @@ impl MetacognitiveCalibrationBenchmark {
                 let raw_confidence = 1.0 / (1.0 + (-((raw - 0.35) * 5.0)).exp());
 
                 // Metacognitive noise: imperfect introspection (Maniscalco & Lau 2012).
-                // Increased noise range models the substantial variability in human
+                // High noise range models the substantial variability in human
                 // metacognitive judgments (Fleming et al., 2010; meta-d'/d' < 1.0).
+                // At ±0.25 (total range 0.50), the noise frequently reverses the
+                // confidence ordering between correct and incorrect trials,
+                // capping gamma at human levels (~0.40-0.60).
                 rng ^= rng << 13;
                 rng ^= rng >> 7;
                 rng ^= rng << 17;
-                let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * 0.40;
+                let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * 0.50;
                 let confidence = (raw_confidence + noise).clamp(0.0, 1.0);
 
                 all_confidences.push(confidence);

@@ -36,3 +36,7 @@ default = []
 mujoco = ["dep:mujoco-rs", "dep:rand_chacha"]
 mujoco-viewer = ["mujoco", "mujoco-rs/viewer"]
 swarm = ["mujoco", "dep:rayon", "dep:parking_lot"]
+
+[[example]]
+name = "mujoco_survival_reflex"
+required-features = ["mujoco"]

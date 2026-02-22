@@ -274,7 +274,11 @@ mod tests {
         };
         let dir = grad.direction();
         let norm: f64 = dir.iter().map(|x| x * x).sum::<f64>().sqrt();
-        assert!((norm - 1.0).abs() < 1e-9, "direction should be unit vector, got norm={}", norm);
+        assert!(
+            (norm - 1.0).abs() < 1e-9,
+            "direction should be unit vector, got norm={}",
+            norm
+        );
         assert!((dir[0] - 0.6).abs() < 1e-9); // 3/5
         assert!((dir[1] - 0.8).abs() < 1e-9); // 4/5
     }
@@ -309,7 +313,11 @@ mod tests {
             magnitude: (1.0 + 4.0 + 9.0 + 16.0 + 25.0 + 36.0f64).sqrt(),
         };
         let sim = g.cosine_similarity(&g);
-        assert!((sim - 1.0).abs() < 1e-9, "self-similarity should be 1.0, got {}", sim);
+        assert!(
+            (sim - 1.0).abs() < 1e-9,
+            "self-similarity should be 1.0, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -333,7 +341,11 @@ mod tests {
             magnitude: 1.0,
         };
         let sim = g1.cosine_similarity(&g2);
-        assert!((sim + 1.0).abs() < 1e-9, "opposite gradients should have sim=-1.0, got {}", sim);
+        assert!(
+            (sim + 1.0).abs() < 1e-9,
+            "opposite gradients should have sim=-1.0, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -357,7 +369,11 @@ mod tests {
             magnitude: 1.0,
         };
         let sim = g1.cosine_similarity(&g2);
-        assert!(sim.abs() < 1e-9, "orthogonal gradients should have sim=0.0, got {}", sim);
+        assert!(
+            sim.abs() < 1e-9,
+            "orthogonal gradients should have sim=0.0, got {}",
+            sim
+        );
     }
 
     #[test]

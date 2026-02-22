@@ -626,7 +626,10 @@ mod tests {
         // Ring: each node connects to its neighbor; n edges total (undirected)
         let stats = arch.stats();
         assert_eq!(stats.num_edges, n, "Ring should have n edges");
-        assert!((stats.avg_degree - 2.0).abs() < 0.1, "Ring avg degree should be 2");
+        assert!(
+            (stats.avg_degree - 2.0).abs() < 0.1,
+            "Ring avg degree should be 2"
+        );
     }
 
     #[test]
@@ -674,13 +677,30 @@ mod tests {
             let n = genome.num_nodes;
 
             // Adjacency should have exactly n entries
-            assert_eq!(arch.adjacency.len(), n, "Topology {:?}: wrong adjacency len", topology);
+            assert_eq!(
+                arch.adjacency.len(),
+                n,
+                "Topology {:?}: wrong adjacency len",
+                topology
+            );
 
             // All neighbor indices should be in range [0, n)
             for (i, neighbors) in arch.adjacency.iter().enumerate() {
                 for (j, w) in neighbors {
-                    assert!(*j < n, "Topology {:?}: node {} neighbor {} out of range", topology, i, j);
-                    assert!(w.is_finite(), "Topology {:?}: node {} weight to {} is not finite", topology, i, j);
+                    assert!(
+                        *j < n,
+                        "Topology {:?}: node {} neighbor {} out of range",
+                        topology,
+                        i,
+                        j
+                    );
+                    assert!(
+                        w.is_finite(),
+                        "Topology {:?}: node {} weight to {} is not finite",
+                        topology,
+                        i,
+                        j
+                    );
                 }
             }
         }

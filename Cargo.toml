@@ -29,6 +29,7 @@ members = [
     "crates/symthaea-support",
     "crates/symthaea-psych-bench",
     "crates/symthaea-flight",
+    "crates/symthaea-humanoid",
     "crates/symthaea-physics",
 ]
 
@@ -129,6 +130,9 @@ symthaea-sentinel = { path = "crates/symthaea-sentinel", optional = true }
 
 # Symthaea Flight - HDC-LTC + FEP Active Inference quadrotor flight control
 symthaea-flight = { path = "crates/symthaea-flight", optional = true }
+
+# Symthaea Humanoid - HDC-LTC + FEP Active Inference DMC Humanoid bipedal control
+symthaea-humanoid = { path = "crates/symthaea-humanoid", optional = true }
 
 # Symthaea Physics - Tokamak plasma HDC encoding, C-Mod adapter, Phi-based control
 symthaea-physics = { path = "crates/symthaea-physics", optional = true }
@@ -340,6 +344,9 @@ physics = ["dep:symthaea-physics"]           # Tokamak plasma encoding, C-Mod ad
 flight = ["dep:symthaea-flight"]            # HDC-LTC quadrotor flight control via FEP Active Inference
 flight-mujoco = ["flight", "symthaea-flight/mujoco"]   # Flight control with MuJoCo physics
 flight-swarm = ["flight", "symthaea-flight/swarm"]     # Parallel swarm training via MuJoCo + rayon
+humanoid = ["dep:symthaea-humanoid"]       # HDC-LTC bipedal humanoid control via FEP Active Inference (DMC benchmark)
+humanoid-mujoco = ["humanoid", "symthaea-humanoid/mujoco"]  # Humanoid with MuJoCo physics
+humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid with MuJoCo viewer
 
 # ── Database backends ───────────────────────────────────────────────
 # DuckDB is an unconditional dep. Others deferred:
