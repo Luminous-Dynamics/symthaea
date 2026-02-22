@@ -80,6 +80,51 @@ impl Default for CfCConfig {
     }
 }
 
+impl CfCConfig {
+    /// Validate CfC configuration parameters.
+    ///
+    /// Checks that all numeric parameters are within valid ranges:
+    /// - `num_neurons` must be positive
+    /// - `input_dim` must be positive
+    /// - `learning_rate` must be in (0.0, 1.0]
+    /// - `delta_t` must be positive
+    /// - `prediction_horizons` must be non-empty with all positive values
+    pub fn validate(&self) -> Result<(), String> {
+        if self.num_neurons == 0 {
+            return Err("CfCConfig: num_neurons must be > 0".into());
+        }
+        if self.input_dim == 0 {
+            return Err("CfCConfig: input_dim must be > 0".into());
+        }
+        if self.learning_rate <= 0.0 || self.learning_rate > 1.0 {
+            return Err(format!(
+                "CfCConfig: learning_rate must be in (0.0, 1.0], got {}",
+                self.learning_rate
+            ));
+        }
+        if !self.learning_rate.is_finite() {
+            return Err("CfCConfig: learning_rate must be finite".into());
+        }
+        if self.delta_t <= 0.0 || !self.delta_t.is_finite() {
+            return Err(format!(
+                "CfCConfig: delta_t must be positive and finite, got {}",
+                self.delta_t
+            ));
+        }
+        if self.prediction_horizons.is_empty() {
+            return Err("CfCConfig: prediction_horizons must be non-empty".into());
+        }
+        for (i, &h) in self.prediction_horizons.iter().enumerate() {
+            if h <= 0.0 || !h.is_finite() {
+                return Err(format!(
+                    "CfCConfig: prediction_horizons[{i}] must be positive and finite, got {h}"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Configuration for the cognitive loop service
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CognitiveLoopConfig {
@@ -553,7 +598,7 @@ impl CognitiveLoopConfig {
     ///
     /// All dependencies are handled gracefully at runtime (None checks), so
     /// these are warnings, not hard errors.
-    pub fn validate(&self) -> Vec<String> {
+    pub fn validate_dependencies(&self) -> Vec<String> {
         let mut warnings = Vec::new();
 
         // temporal_consciousness passes narrative_self.as_ref() and predictive_self.as_ref()
@@ -647,5 +692,64 @@ impl CognitiveLoopConfig {
         }
 
         warnings
+    }
+
+    /// Validate configuration parameter ranges.
+    ///
+    /// Returns `Err` if any parameter is out of its valid range. This catches
+    /// hard errors (invalid values that would cause panics or incorrect behavior),
+    /// unlike [`validate_dependencies`] which returns soft warnings.
+    ///
+    /// Checks performed:
+    /// - CfC sub-config validation (dimensions, learning rate, delta_t)
+    /// - `learning_threshold` in [0.0, 1.0]
+    /// - `buffer_size` > 0
+    /// - `target_frequency` positive and finite
+    /// - `max_cycles_before_reset` > 0
+    /// - `causal_discovery_interval` > 0
+    /// - `resonator_novelty_threshold` in (0.0, 1.0]
+    /// - `resonator_max_symbols` > 0
+    /// - `attestation_buffer_capacity` > 0
+    pub fn validate(&self) -> Result<(), String> {
+        // Validate nested CfC config
+        self.cfc_config.validate().map_err(|e| format!("CognitiveLoopConfig: {e}"))?;
+
+        if self.learning_threshold < 0.0 || self.learning_threshold > 1.0 || !self.learning_threshold.is_finite() {
+            return Err(format!(
+                "CognitiveLoopConfig: learning_threshold must be in [0.0, 1.0], got {}",
+                self.learning_threshold
+            ));
+        }
+        if self.buffer_size == 0 {
+            return Err("CognitiveLoopConfig: buffer_size must be > 0".into());
+        }
+        if self.target_frequency <= 0.0 || !self.target_frequency.is_finite() {
+            return Err(format!(
+                "CognitiveLoopConfig: target_frequency must be positive and finite, got {}",
+                self.target_frequency
+            ));
+        }
+        if self.max_cycles_before_reset == 0 {
+            return Err("CognitiveLoopConfig: max_cycles_before_reset must be > 0".into());
+        }
+        if self.causal_discovery_interval == 0 {
+            return Err("CognitiveLoopConfig: causal_discovery_interval must be > 0".into());
+        }
+        if self.resonator_novelty_threshold <= 0.0
+            || self.resonator_novelty_threshold > 1.0
+            || !self.resonator_novelty_threshold.is_finite()
+        {
+            return Err(format!(
+                "CognitiveLoopConfig: resonator_novelty_threshold must be in (0.0, 1.0], got {}",
+                self.resonator_novelty_threshold
+            ));
+        }
+        if self.resonator_max_symbols == 0 {
+            return Err("CognitiveLoopConfig: resonator_max_symbols must be > 0".into());
+        }
+        if self.attestation_buffer_capacity == 0 {
+            return Err("CognitiveLoopConfig: attestation_buffer_capacity must be > 0".into());
+        }
+        Ok(())
     }
 }

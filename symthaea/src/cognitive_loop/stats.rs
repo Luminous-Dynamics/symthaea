@@ -316,6 +316,9 @@ pub struct LoopStats {
     /// Total FEP surprise → episodic replay boosts (cumulative).
     pub fep_surprise_replay_boosts: u64,
 
+    /// Previous cycle's total free energy (for FE reduction reward computation).
+    pub last_total_fe: f64,
+
     // ═══════════════════════════════════════════════════════════════════════════
     // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)
     // ═══════════════════════════════════════════════════════════════════════════

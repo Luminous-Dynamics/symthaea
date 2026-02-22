@@ -165,7 +165,8 @@ pub(crate) struct CycleHistory {
     /// Last MCE consciousness level for learning gating
     pub(crate) consciousness_level: f64,
     /// Recent BinaryHV ring buffer for multi-component consciousness profile.
-    pub(crate) recent_hvs: Vec<crate::hdc::BinaryHV>,
+    /// Capacity bound: 4 elements (evict-before-push via pop_front).
+    pub(crate) recent_hvs: std::collections::VecDeque<crate::hdc::BinaryHV>,
     /// Cached causal relations count (avoids calling summarize_understanding every cycle).
     pub(crate) last_causal_relations: usize,
     /// Cached causal average confidence (avoids calling summarize_understanding every cycle).
@@ -185,7 +186,7 @@ impl Default for CycleHistory {
             body_arousal: 0.5,
             resonance_frequency: 0.0,
             consciousness_level: 0.0,
-            recent_hvs: Vec::with_capacity(4),
+            recent_hvs: std::collections::VecDeque::with_capacity(4),
             last_causal_relations: 0,
             last_causal_confidence: 0.0,
             last_profile_composite: 0.0,

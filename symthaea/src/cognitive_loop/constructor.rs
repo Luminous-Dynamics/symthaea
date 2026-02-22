@@ -63,9 +63,12 @@ use super::{
 
 impl CognitiveLoopService {
     /// Create a new cognitive loop service
-    pub fn new(config: CognitiveLoopConfig) -> Result<Self> {
-        // Validate configuration and log any dependency warnings
-        let warnings = config.validate();
+    pub fn new(mut config: CognitiveLoopConfig) -> Result<Self> {
+        // Validate hard constraints (range errors)
+        config.validate().map_err(|e| anyhow::anyhow!("{e}"))?;
+
+        // Validate soft constraints (dependency warnings)
+        let warnings = config.validate_dependencies();
         for w in &warnings {
             tracing::warn!(target: "cognitive_loop::config", "{w}");
         }
@@ -257,8 +260,10 @@ impl CognitiveLoopService {
             None
         };
 
-        // Capture attestation buffer capacity before config is moved into struct
-        let attestation_buf_cap = config.attestation_buffer_capacity.min(256);
+        // Clamp attestation buffer capacity to hard max of 256 to prevent unbounded growth.
+        // This ensures both pre-allocation and eviction use the same bounded value.
+        config.attestation_buffer_capacity = config.attestation_buffer_capacity.min(256);
+        let attestation_buf_cap = config.attestation_buffer_capacity;
 
         // Build optional dream engine for counterfactual learning
         let dream_engine = if config.enable_dream_replay {

@@ -139,11 +139,11 @@ impl CognitiveLoopService {
             }
         }
 
-        // 11. Update error history
-        self.error_history.push_back(prediction_error);
-        if self.error_history.len() > 100 {
+        // 11. Update error history — capacity bound: 100 elements, evict before push
+        if self.error_history.len() >= 100 {
             self.error_history.pop_front();
         }
+        self.error_history.push_back(prediction_error);
         self.stats.avg_prediction_error =
             self.error_history.iter().sum::<f32>() / self.error_history.len().max(1) as f32;
 
@@ -280,10 +280,11 @@ impl CognitiveLoopService {
                 prediction_error,
                 urgency,
             };
-            self.psi_attestation_buffer.push_back(record);
-            while self.psi_attestation_buffer.len() > self.config.attestation_buffer_capacity {
+            // Capacity bound: attestation_buffer_capacity (max 256) — evict before push
+            while self.psi_attestation_buffer.len() >= self.config.attestation_buffer_capacity {
                 let _ = self.psi_attestation_buffer.pop_front();
             }
+            self.psi_attestation_buffer.push_back(record);
         }
 
         super::CycleResult {
@@ -395,11 +396,11 @@ impl CognitiveLoopService {
         self.stats.avg_prediction_error =
             self.stats.avg_prediction_error * (1.0 - alpha) + error * alpha;
 
-        // Error trend
-        self.error_history.push_back(error);
-        if self.error_history.len() > 100 {
+        // Error trend — capacity bound: 100 elements, evict before push
+        if self.error_history.len() >= 100 {
             self.error_history.pop_front();
         }
+        self.error_history.push_back(error);
         self.stats.error_trend = self.compute_error_trend();
 
         // Attention stats from encoder
@@ -1011,13 +1012,35 @@ impl CognitiveLoopService {
         } else {
             REWARD_MID_BASE + REWARD_MID_SCALE * prediction_error
         };
+
+        // FEP free energy reduction enrichment
+        // Science: Friston (2010) — free energy minimization as the objective
+        // Reward FE reduction (prev > current = improving model)
+        let fep_bonus = if let Some(ref fe) = self.fep_agent.last_fe_components {
+            let current_fe = fe.total;
+            let prev_fe = self.stats.last_total_fe;
+            // Update cached value for next cycle
+            self.stats.last_total_fe = current_fe;
+            if prev_fe > 0.0 {
+                // FE reduction: positive when improving (prev > current)
+                let fe_reduction = (prev_fe - current_fe).clamp(-1.0, 1.0);
+                (fe_reduction * 0.15) as f32 // 15% weight for FEP signal
+            } else {
+                0.0 // first cycle — no previous FE
+            }
+        } else {
+            0.0
+        };
+
+        let enriched_reward = internal_reward + fep_bonus;
+
         let cycle_reward = if self.external_reward.abs() > f32::EPSILON {
-            let blended = internal_reward * REWARD_EXTERNAL_BLEND
+            let blended = enriched_reward * REWARD_EXTERNAL_BLEND
                 + self.external_reward * REWARD_EXTERNAL_BLEND;
             self.external_reward = 0.0; // consume
             blended
         } else {
-            internal_reward
+            enriched_reward
         };
         cycle_reward.clamp(-1.0, 1.0)
     }

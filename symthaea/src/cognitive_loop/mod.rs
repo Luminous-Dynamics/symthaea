@@ -237,7 +237,8 @@ pub struct CognitiveLoopService {
     /// Statistics
     stats: LoopStats,
 
-    /// Error history for trend detection
+    /// Error history for trend detection.
+    /// Capacity bound: 100 elements — evict before push via pop_front.
     error_history: VecDeque<f32>,
 
     /// Last compressed state (for creating experience)
@@ -764,10 +765,12 @@ pub struct CognitiveLoopService {
 
     /// Buffer of PsiAttestationRecords ready for governance bridge consumption.
     /// Populated when `config.enable_psi_attestation` is true.
+    /// Capacity bound: attestation_buffer_capacity (max 256) — evict before push.
     psi_attestation_buffer: VecDeque<PsiAttestationRecord>,
 
     /// Sliding window of FEP↔MCTS policy agreement for adaptive temperature control.
     /// Science: Friston & Parr (2020) — policy agreement modulates exploration/exploitation.
+    /// Capacity bound: POLICY_WINDOW_SIZE (20) — evict before push.
     policy_agreement_window: VecDeque<bool>,
 
     /// Master Consciousness Equation (MCE) — comprehensive consciousness metric.
