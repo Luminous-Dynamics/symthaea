@@ -65,7 +65,6 @@ use symthaea::swarm::FederatedNetworkConfig;
 // Visualization
 use symthaea::visualization::attention_viz::{AttentionHistory, AttentionSnapshot};
 
-
 // ==================================================================================
 // CONSTANTS
 // ==================================================================================

@@ -672,15 +672,15 @@ pub fn compute_burst_density(onset_history: &[f32], control_rate: f32) -> f32 {
 /// Measures the regularity of rhythm by computing the coefficient of variation
 /// of intervals between onset peaks.
 ///
-/// Returns a value normalized to [0, 1] where:
+/// Returns a value normalized to `[0, 1]` where:
 /// - 0.0-0.2: Very regular/mechanical (clock ticks, metronome)
 /// - 0.2-0.4: Moderately regular (rhythmic music)
 /// - 0.4-0.6: Mixed regularity (speech, some birdsong)
 /// - 0.6-0.8: Irregular (dog barking, random events)
 /// - 0.8-1.0: Highly irregular/chaotic (noise, unpredictable)
 ///
-/// Key insight: Clock ticks at t=0,1,2,3 have intervals [1,1,1] → variance ≈ 0
-///              Dog barks at t=0,0.2,0.9,1.5 have intervals [0.2,0.7,0.6] → variance >> 0
+/// Key insight: Clock ticks at t=0,1,2,3 have intervals `[1,1,1]` → variance ≈ 0.
+///              Dog barks at t=0,0.2,0.9,1.5 have intervals `[0.2,0.7,0.6]` → variance >> 0.
 pub fn compute_ioi_variance(onset_history: &[f32], _control_rate: f32) -> f32 {
     if onset_history.len() < 20 {
         return 0.5; // Default for insufficient data

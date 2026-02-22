@@ -60,8 +60,14 @@ mod causal_calculus_tests {
         dag.add_edge(b, d);
         dag.add_edge(c, d);
 
-        assert_eq!(dag.ancestors(d), [a, b, c].into_iter().collect::<HashSet<_>>());
-        assert_eq!(dag.descendants(a), [b, c, d].into_iter().collect::<HashSet<_>>());
+        assert_eq!(
+            dag.ancestors(d),
+            [a, b, c].into_iter().collect::<HashSet<_>>()
+        );
+        assert_eq!(
+            dag.descendants(a),
+            [b, c, d].into_iter().collect::<HashSet<_>>()
+        );
         assert!(dag.ancestors(a).is_empty());
         assert!(dag.descendants(d).is_empty());
     }
@@ -166,14 +172,14 @@ mod causal_calculus_tests {
 
         let empty: HashSet<usize> = HashSet::new();
         let res = dag.d_separated(x, y, &empty);
-        assert!(res.separated, "X⊥Y with no conditioning in M-bias structure");
+        assert!(
+            res.separated,
+            "X⊥Y with no conditioning in M-bias structure"
+        );
 
         let z3_set: HashSet<usize> = [z3].into_iter().collect();
         let res = dag.d_separated(x, y, &z3_set);
-        assert!(
-            !res.separated,
-            "Conditioning on collider Z3 opens the path"
-        );
+        assert!(!res.separated, "Conditioning on collider Z3 opens the path");
     }
 }
 
@@ -271,23 +277,13 @@ mod causal_emergence_tests {
     #[test]
     fn effective_information_empty_tpm() {
         let ei = effective_information(&[]);
-        assert!(
-            ei.abs() < 1e-10,
-            "Empty TPM should have 0 EI, got {}",
-            ei
-        );
+        assert!(ei.abs() < 1e-10, "Empty TPM should have 0 EI, got {}", ei);
     }
 
     #[test]
     fn ei_deterministic_greater_than_random() {
-        let det_tpm = vec![
-            vec![0.0, 1.0],
-            vec![1.0, 0.0],
-        ];
-        let rand_tpm = vec![
-            vec![0.5, 0.5],
-            vec![0.5, 0.5],
-        ];
+        let det_tpm = vec![vec![0.0, 1.0], vec![1.0, 0.0]];
+        let rand_tpm = vec![vec![0.5, 0.5], vec![0.5, 0.5]];
         let ei_det = effective_information(&det_tpm);
         let ei_rand = effective_information(&rand_tpm);
         assert!(
@@ -385,14 +381,8 @@ mod counterfactual_tests {
             !mutilated.edges.contains(&(0, 1)),
             "A → B should be removed"
         );
-        assert!(
-            mutilated.edges.contains(&(1, 2)),
-            "B → C should remain"
-        );
-        assert!(
-            mutilated.edges.contains(&(0, 2)),
-            "A → C should remain"
-        );
+        assert!(mutilated.edges.contains(&(1, 2)), "B → C should remain");
+        assert!(mutilated.edges.contains(&(0, 2)), "A → C should remain");
     }
 
     #[test]
@@ -404,10 +394,7 @@ mod counterfactual_tests {
 
         // Remove outgoing edges from B (i.e., B → C)
         let mutilated = dag.remove_outgoing(&[1]);
-        assert!(
-            mutilated.edges.contains(&(0, 1)),
-            "A → B should remain"
-        );
+        assert!(mutilated.edges.contains(&(0, 1)), "A → B should remain");
         assert!(
             !mutilated.edges.contains(&(1, 2)),
             "B → C should be removed"

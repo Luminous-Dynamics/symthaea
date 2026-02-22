@@ -903,7 +903,10 @@ mod tests {
         );
 
         // Direction should be preserved
-        assert!(gradient[1].abs() > 1e-10, "gradient[1] too close to zero for ratio test");
+        assert!(
+            gradient[1].abs() > 1e-10,
+            "gradient[1] too close to zero for ratio test"
+        );
         let ratio = gradient[0] / gradient[1];
         assert!((ratio - 0.75).abs() < 1e-6, "Direction should be preserved");
     }

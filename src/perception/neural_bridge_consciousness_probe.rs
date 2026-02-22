@@ -607,9 +607,7 @@ impl ConsciousnessProbeV2 {
             .to_str()
             .ok_or_else(|| anyhow::anyhow!("probe path contains non-UTF8 characters"))?;
 
-        let bridge = NeuralBridgeV2Builder::new()
-            .probe_path(path_str)
-            .build()?;
+        let bridge = NeuralBridgeV2Builder::new().probe_path(path_str).build()?;
 
         Ok(Self {
             bridge,

@@ -318,8 +318,7 @@ impl Symthaea {
         input_dim: usize,
         output_dim: usize,
     ) -> &crate::inference::StreamingInference {
-        self.streaming_inference =
-            Some(crate::inference::default_streaming(input_dim, output_dim));
+        self.streaming_inference = Some(crate::inference::default_streaming(input_dim, output_dim));
         // SAFETY: We just assigned Some(...) above, so this is always Some
         self.streaming_inference
             .as_ref()
@@ -829,8 +828,7 @@ impl Symthaea {
             user_state.trust_in_sophia = thought.trust as f64;
 
             // High arousal + low coherence → user appears rushed
-            user_state.is_rushed = thought.emotional_tone.arousal > 0.7
-                && thought.coherence < 0.4;
+            user_state.is_rushed = thought.emotional_tone.arousal > 0.7 && thought.coherence < 0.4;
 
             // Epistemic status → learning mode (uncertain/unknown = still learning)
             user_state.is_learning = matches!(

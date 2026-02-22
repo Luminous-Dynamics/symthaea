@@ -107,7 +107,7 @@ impl Watchdog {
     /// * `pre_gen` — the NixOS generation number before the rebuild (used for rollback)
     ///
     /// # Returns
-    /// A [`WatchdogVerdict`] indicating whether the system stabilized, degraded,
+    /// A `WatchdogVerdict` indicating whether the system stabilized, degraded,
     /// or was reverted.
     pub fn monitor(
         &self,

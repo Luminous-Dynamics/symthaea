@@ -595,7 +595,8 @@ mod tests {
             error_threshold: 0.0, // Always update
             attention_lr: 0.5,    // High learning rate for test
             ..Default::default()
-        }).unwrap();
+        })
+        .unwrap();
 
         // Encode several times with high error
         for _ in 0..10 {

@@ -178,7 +178,7 @@ impl NixCodebook {
 
     /// Encode a single path segment at a given hierarchy level.
     ///
-    /// Result = segment_basis ⊗ level_marker[level]
+    /// Result = `segment_basis ⊗ level_marker[level]`
     ///
     /// This preserves which level the segment appears at, so
     /// `services` at level 0 differs from `services` at level 2.

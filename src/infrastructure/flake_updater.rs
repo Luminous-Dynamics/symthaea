@@ -134,11 +134,7 @@ impl FlakeUpdater {
 
                 let url = original
                     .and_then(|o| o.get("url"))
-                    .or_else(|| {
-                        original
-                            .and_then(|o| o.get("owner"))
-                            .and(original)
-                    })
+                    .or_else(|| original.and_then(|o| o.get("owner")).and(original))
                     .map(|v| {
                         if let Some(owner) = original
                             .and_then(|o| o.get("owner"))

@@ -147,7 +147,10 @@ impl HarmoniesIntegrator {
             Harmony::SacredReciprocity,
             Harmony::EvolutionaryProgression,
         ] {
-            harmony_embeddings.insert(harmony, ContinuousHV::random(config.dimension, harmony as u64 + 42));
+            harmony_embeddings.insert(
+                harmony,
+                ContinuousHV::random(config.dimension, harmony as u64 + 42),
+            );
         }
 
         Self {

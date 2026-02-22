@@ -14,10 +14,10 @@ use crate::types::SystemTelemetry;
 pub fn collect_telemetry() -> SystemTelemetry {
     SystemTelemetry {
         conductor_memory_mb: get_process_rss_mb(),
-        gossip_peers: 0,                          // stub — needs conductor API
+        gossip_peers: 0, // stub — needs conductor API
         disk_free_pct: get_disk_free_pct(),
         network_latency_ms: measure_network_latency(),
-        error_rate_per_min: 0.0,                   // stub — needs error counter
+        error_rate_per_min: 0.0, // stub — needs error counter
     }
 }
 
@@ -135,10 +135,19 @@ mod tests {
     #[test]
     fn test_collect_telemetry_returns_finite() {
         let t = collect_telemetry();
-        assert!(t.conductor_memory_mb.is_finite(), "conductor_memory_mb must be finite");
+        assert!(
+            t.conductor_memory_mb.is_finite(),
+            "conductor_memory_mb must be finite"
+        );
         assert!(t.disk_free_pct.is_finite(), "disk_free_pct must be finite");
-        assert!(t.network_latency_ms.is_finite(), "network_latency_ms must be finite");
-        assert!(t.error_rate_per_min.is_finite(), "error_rate_per_min must be finite");
+        assert!(
+            t.network_latency_ms.is_finite(),
+            "network_latency_ms must be finite"
+        );
+        assert!(
+            t.error_rate_per_min.is_finite(),
+            "error_rate_per_min must be finite"
+        );
     }
 
     #[test]
@@ -151,6 +160,9 @@ mod tests {
     #[test]
     fn test_network_latency_non_negative() {
         let latency = measure_network_latency();
-        assert!(latency >= 0.0, "network_latency_ms must be >= 0.0, got {latency}");
+        assert!(
+            latency >= 0.0,
+            "network_latency_ms must be >= 0.0, got {latency}"
+        );
     }
 }

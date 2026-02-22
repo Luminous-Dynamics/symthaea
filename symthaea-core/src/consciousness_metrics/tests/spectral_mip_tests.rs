@@ -14,12 +14,7 @@ fn identity_cov(n: usize) -> Vec<f64> {
 }
 
 /// Create a block-diagonal covariance: two correlated blocks with weak inter-block coupling.
-fn block_diagonal_cov(
-    n_a: usize,
-    n_b: usize,
-    intra_corr: f64,
-    inter_corr: f64,
-) -> Vec<f64> {
+fn block_diagonal_cov(n_a: usize, n_b: usize, intra_corr: f64, inter_corr: f64) -> Vec<f64> {
     let n = n_a + n_b;
     let mut cov = vec![0.0; n * n];
     for i in 0..n {
@@ -96,7 +91,8 @@ fn test_bordered_cholesky_correctness() {
     }
 
     // Compute ln_det from scratch
-    let ln_det_full = crate::consciousness_metrics::spectral_mip::ln_determinant_cholesky(&reg_cov, n);
+    let ln_det_full =
+        crate::consciousness_metrics::spectral_mip::ln_determinant_cholesky(&reg_cov, n);
 
     // Compute incrementally via bordered Cholesky
     let mut factor: Vec<f64> = Vec::new();
@@ -108,7 +104,9 @@ fn test_bordered_cholesky_correctness() {
     for k in 1..n {
         let col: Vec<f64> = (0..k).map(|i| reg_cov[i * n + k]).collect();
         let diag = reg_cov[k * n + k];
-        let (x, l_new) = crate::consciousness_metrics::spectral_mip::bordered_cholesky_step(&factor, k, &col, diag);
+        let (x, l_new) = crate::consciousness_metrics::spectral_mip::bordered_cholesky_step(
+            &factor, k, &col, diag,
+        );
         factor.extend_from_slice(&x);
         factor.push(l_new);
         ln_det_inc += 2.0 * l_new.max(1e-300).ln();
@@ -148,7 +146,11 @@ fn test_block_diagonal_mip_at_boundary() {
     let result = finder.compute_from_covariance(&cov, n, 50).unwrap();
 
     // Phi should be positive (system is integrated within blocks)
-    assert!(result.phi > 0.0, "Block diagonal should have positive Phi, got {}", result.phi);
+    assert!(
+        result.phi > 0.0,
+        "Block diagonal should have positive Phi, got {}",
+        result.phi
+    );
     assert!(result.phi.is_finite());
 
     // MIP should split close to the block boundary
@@ -196,8 +198,18 @@ fn test_three_block_mip_at_weakest_boundary() {
     // The weakest boundary is between {A,B} and {C}
     // Check that C indices are mostly on one side
     let c_indices: Vec<usize> = (n_a + n_b..n).collect();
-    let c_in_a = result.mip.part_a.iter().filter(|i| c_indices.contains(i)).count();
-    let c_in_b = result.mip.part_b.iter().filter(|i| c_indices.contains(i)).count();
+    let c_in_a = result
+        .mip
+        .part_a
+        .iter()
+        .filter(|i| c_indices.contains(i))
+        .count();
+    let c_in_b = result
+        .mip
+        .part_b
+        .iter()
+        .filter(|i| c_indices.contains(i))
+        .count();
     // All C indices should be on the same side
     let c_together = c_in_a.max(c_in_b);
     assert!(
@@ -402,7 +414,10 @@ fn test_numerical_stability_near_singular() {
     let finder = SpectralMIPFinder::with_defaults();
     let result = finder.compute_from_covariance(&cov, n, 50).unwrap();
 
-    assert!(result.phi.is_finite(), "Phi should be finite for near-singular cov");
+    assert!(
+        result.phi.is_finite(),
+        "Phi should be finite for near-singular cov"
+    );
     assert!(!result.phi.is_nan());
     assert!(result.total_mi.is_finite());
     assert!(result.mip_mi.is_finite());
@@ -504,7 +519,9 @@ fn test_adapt_produces_valid_dims() {
     // Simulate a full HDC state space of 1024 dimensions
     let full_dim = 1024;
     for i in 0..10 {
-        let values: Vec<f32> = (0..full_dim).map(|j| ((i * 7 + j * 3) % 100) as f32 / 50.0 - 1.0).collect();
+        let values: Vec<f32> = (0..full_dim)
+            .map(|j| ((i * 7 + j * 3) % 100) as f32 / 50.0 - 1.0)
+            .collect();
         let hv = ContinuousHV::from_slice(&values);
         finder.push(&hv);
     }
@@ -550,17 +567,19 @@ fn test_adapt_concentrates_near_mip() {
     // Use block-diagonal structure: dims 0..16 correlated, 16..32 correlated
     let full_dim = 2048;
     for i in 0..15 {
-        let values: Vec<f32> = (0..full_dim).map(|j| {
-            let block_signal = if j < full_dim / 2 { 1.0 } else { -1.0 };
-            let noise = ((i * 13 + j * 7 + 42) % 200) as f32 / 200.0 - 0.5;
-            block_signal * 0.5 + noise * 0.3
-        }).collect();
+        let values: Vec<f32> = (0..full_dim)
+            .map(|j| {
+                let block_signal = if j < full_dim / 2 { 1.0 } else { -1.0 };
+                let noise = ((i * 13 + j * 7 + 42) % 200) as f32 / 200.0 - 0.5;
+                block_signal * 0.5 + noise * 0.3
+            })
+            .collect();
         let hv = ContinuousHV::from_slice(&values);
         finder.push(&hv);
     }
 
     let result = finder.compute().expect("should compute");
-    let mip_bond = result.mip_bond;
+    let _mip_bond = result.mip_bond;
 
     finder.adapt(&result);
     let dims = finder.active_dim_indices().unwrap();
@@ -572,15 +591,21 @@ fn test_adapt_concentrates_near_mip() {
     // check that the dims are NOT evenly spaced anymore.
     let stride = full_dim / 32;
     let evenly_spaced: Vec<usize> = (0..32).map(|i| i * stride).collect();
-    assert_ne!(dims, &evenly_spaced[..], "adapted dims should differ from evenly-spaced");
+    assert_ne!(
+        dims,
+        &evenly_spaced[..],
+        "adapted dims should differ from evenly-spaced"
+    );
 
     // The adaptation result should be usable for a new compute cycle
     for i in 0..15 {
-        let values: Vec<f32> = (0..full_dim).map(|j| {
-            let block_signal = if j < full_dim / 2 { 1.0 } else { -1.0 };
-            let noise = ((i * 17 + j * 11 + 99) % 200) as f32 / 200.0 - 0.5;
-            block_signal * 0.5 + noise * 0.3
-        }).collect();
+        let values: Vec<f32> = (0..full_dim)
+            .map(|j| {
+                let block_signal = if j < full_dim / 2 { 1.0 } else { -1.0 };
+                let noise = ((i * 17 + j * 11 + 99) % 200) as f32 / 200.0 - 0.5;
+                block_signal * 0.5 + noise * 0.3
+            })
+            .collect();
         let hv = ContinuousHV::from_slice(&values);
         finder.push(&hv);
     }
@@ -642,7 +667,9 @@ fn test_hierarchical_block_diagonal() {
         finder.push(&ContinuousHV::from_slice(&values));
     }
 
-    let result = finder.compute_hierarchical().expect("should compute hierarchical");
+    let result = finder
+        .compute_hierarchical()
+        .expect("should compute hierarchical");
     assert!(result.phi.is_finite(), "phi should be finite");
     assert!(!result.levels.is_empty(), "should have at least one level");
     assert!(!result.scales.is_empty(), "should have at least one scale");
@@ -670,9 +697,7 @@ fn test_hierarchical_single_scale() {
     let mut finder = SpectralMIPFinder::new(config);
 
     for i in 0..10 {
-        let values: Vec<f32> = (0..64)
-            .map(|j| ((i + j) as f32 * 0.1).sin())
-            .collect();
+        let values: Vec<f32> = (0..64).map(|j| ((i + j) as f32 * 0.1).sin()).collect();
         finder.push(&ContinuousHV::from_slice(&values));
     }
 
@@ -711,12 +736,25 @@ fn test_hierarchical_phi_monotonic_refinement() {
     }
 
     let result = finder.compute_hierarchical().expect("should compute");
-    assert!(result.scales.len() >= 2, "should have at least 2 scales: {:?}", result.scales);
+    assert!(
+        result.scales.len() >= 2,
+        "should have at least 2 scales: {:?}",
+        result.scales
+    );
 
     for (i, level) in result.levels.iter().enumerate() {
-        assert!(level.phi >= 0.0, "level {} phi should be non-negative: {}", i, level.phi);
+        assert!(
+            level.phi >= 0.0,
+            "level {} phi should be non-negative: {}",
+            i,
+            level.phi
+        );
         assert!(level.phi.is_finite(), "level {} phi should be finite", i);
-        assert!(level.total_mi.is_finite(), "level {} total_mi should be finite", i);
+        assert!(
+            level.total_mi.is_finite(),
+            "level {} total_mi should be finite",
+            i
+        );
     }
 }
 
@@ -861,7 +899,10 @@ mod proptests {
 #[test]
 fn test_spectral_mip_default_config_is_valid() {
     let config = SpectralMIPConfig::default();
-    assert!(config.validate().is_ok(), "default SpectralMIPConfig must be valid");
+    assert!(
+        config.validate().is_ok(),
+        "default SpectralMIPConfig must be valid"
+    );
 }
 
 #[test]
@@ -871,14 +912,20 @@ fn test_spectral_mip_invalid_dimension_rejected() {
         ..Default::default()
     };
     let err = config.validate().unwrap_err();
-    assert!(err.contains("num_components"), "error should mention num_components: {err}");
+    assert!(
+        err.contains("num_components"),
+        "error should mention num_components: {err}"
+    );
 
     // Also test below minimum (< 2)
     let config = SpectralMIPConfig {
         num_components: 1,
         ..Default::default()
     };
-    assert!(config.validate().is_err(), "num_components=1 should fail (minimum is 2)");
+    assert!(
+        config.validate().is_err(),
+        "num_components=1 should fail (minimum is 2)"
+    );
 }
 
 #[test]
@@ -889,8 +936,14 @@ fn test_spectral_mip_window_size_must_exceed_min_samples() {
         ..Default::default()
     };
     let err = config.validate().unwrap_err();
-    assert!(err.contains("window_size"), "error should mention window_size: {err}");
-    assert!(err.contains("min_samples"), "error should mention min_samples: {err}");
+    assert!(
+        err.contains("window_size"),
+        "error should mention window_size: {err}"
+    );
+    assert!(
+        err.contains("min_samples"),
+        "error should mention min_samples: {err}"
+    );
 }
 
 #[test]
@@ -899,7 +952,10 @@ fn test_spectral_mip_min_samples_at_least_two() {
         min_samples: 1,
         ..Default::default()
     };
-    assert!(config.validate().is_err(), "min_samples=1 should fail (need >= 2 for covariance)");
+    assert!(
+        config.validate().is_err(),
+        "min_samples=1 should fail (need >= 2 for covariance)"
+    );
 
     let config = SpectralMIPConfig {
         min_samples: 0,
@@ -920,7 +976,10 @@ fn test_spectral_mip_invalid_regularization_rejected() {
         regularization: -1e-6,
         ..Default::default()
     };
-    assert!(config.validate().is_err(), "negative regularization should fail");
+    assert!(
+        config.validate().is_err(),
+        "negative regularization should fail"
+    );
 
     let config = SpectralMIPConfig {
         regularization: f64::NAN,
@@ -932,7 +991,10 @@ fn test_spectral_mip_invalid_regularization_rejected() {
         regularization: f64::INFINITY,
         ..Default::default()
     };
-    assert!(config.validate().is_err(), "infinite regularization should fail");
+    assert!(
+        config.validate().is_err(),
+        "infinite regularization should fail"
+    );
 }
 
 #[test]

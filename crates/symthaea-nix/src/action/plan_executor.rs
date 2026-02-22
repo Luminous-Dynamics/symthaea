@@ -1,6 +1,6 @@
 //! Multi-Step Plan Executor with Rollback
 //!
-//! Chains [`ActionPlan`] steps with intermediate state verification.
+//! Chains `ActionPlan` steps with intermediate state verification.
 //! If step N fails, rolls back steps 0..N-1 using generation snapshots.
 
 use super::executor::{ExecutionResult, NixOSCommand, NixOSExecutor, SafetyLevel};

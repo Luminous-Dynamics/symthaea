@@ -371,7 +371,11 @@ mod tests {
         let result = net.predict_forward(&input, 1.0).unwrap();
         assert_eq!(result.len(), 16);
         for &v in result.iter() {
-            assert!(v.is_finite(), "predict_forward produced non-finite value: {}", v);
+            assert!(
+                v.is_finite(),
+                "predict_forward produced non-finite value: {}",
+                v
+            );
         }
     }
 
@@ -413,8 +417,11 @@ mod tests {
             net.step(&input, 0.1).unwrap();
         }
         let level = net.consciousness_level();
-        assert!(level >= 0.0 && level <= 1.0,
-            "consciousness_level should be in [0, 1], got {}", level);
+        assert!(
+            level >= 0.0 && level <= 1.0,
+            "consciousness_level should be in [0, 1], got {}",
+            level
+        );
     }
 
     #[test]
@@ -444,8 +451,11 @@ mod tests {
         }
         let state = net.read_state().unwrap();
         for &v in &state {
-            assert!(v >= 0.0 && v <= 1.0,
-                "read_state should be bounded to [0, 1], got {}", v);
+            assert!(
+                v >= 0.0 && v <= 1.0,
+                "read_state should be bounded to [0, 1], got {}",
+                v
+            );
         }
     }
 
@@ -465,8 +475,11 @@ mod tests {
             net.step(&input, 0.1).unwrap();
         }
         let summary = net.activity_summary();
-        assert!(summary >= 0.0 && summary <= 1.0,
-            "activity_summary should be in [0, 1], got {}", summary);
+        assert!(
+            summary >= 0.0 && summary <= 1.0,
+            "activity_summary should be in [0, 1], got {}",
+            summary
+        );
     }
 
     #[test]
@@ -492,7 +505,11 @@ mod tests {
         let input = Array1::from_vec(vec![0.5; 16]);
         let target = Array1::from_vec(vec![0.3; 16]);
         let loss = net.train_step(&input, &target, 1.0, 0.01).unwrap();
-        assert!(loss.is_finite(), "train_step loss should be finite, got {}", loss);
+        assert!(
+            loss.is_finite(),
+            "train_step loss should be finite, got {}",
+            loss
+        );
         assert!(loss >= 0.0, "MSE loss should be non-negative, got {}", loss);
     }
 
@@ -507,7 +524,12 @@ mod tests {
             net.train_step(&input, &target, 1.0, 0.01).unwrap();
         }
         let loss2 = net.train_step(&input, &target, 1.0, 0.01).unwrap();
-        assert!(loss2 < loss1, "Loss should decrease after training: {} -> {}", loss1, loss2);
+        assert!(
+            loss2 < loss1,
+            "Loss should decrease after training: {} -> {}",
+            loss1,
+            loss2
+        );
     }
 
     #[test]
@@ -518,10 +540,15 @@ mod tests {
         let state_short = net.predict_forward(&input, 0.01).unwrap();
         let state_long = net.predict_forward(&input, 10.0).unwrap();
 
-        let diff: f32 = state_short.iter().zip(state_long.iter())
+        let diff: f32 = state_short
+            .iter()
+            .zip(state_long.iter())
             .map(|(a, b)| (a - b).abs())
             .sum();
-        assert!(diff > 0.0, "Different delta_t should produce different predictions");
+        assert!(
+            diff > 0.0,
+            "Different delta_t should produce different predictions"
+        );
     }
 
     #[test]

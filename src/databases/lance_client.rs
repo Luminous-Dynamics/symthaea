@@ -693,10 +693,9 @@ impl ConsciousnessDatabase for LanceMemory {
                 .await
                 .map_err(|e| DatabaseError::QueryFailed(format!("Stats scan failed: {e}")))?;
 
-            let batches: Vec<RecordBatch> = stream
-                .try_collect()
-                .await
-                .map_err(|e| DatabaseError::QueryFailed(format!("Stats batch collection failed: {e}")))?;
+            let batches: Vec<RecordBatch> = stream.try_collect().await.map_err(|e| {
+                DatabaseError::QueryFailed(format!("Stats batch collection failed: {e}"))
+            })?;
 
             let mut phi_sum = 0.0f64;
             let mut phi_count = 0usize;

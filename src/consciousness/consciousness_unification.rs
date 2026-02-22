@@ -1886,14 +1886,22 @@ mod tests {
         let emotion = UnifiedEmotion::from_vad(1.0, 1.0, 1.0);
         let (v, _a, _d) = emotion.to_vad();
         // An extreme positive VAD should map to a positive-valence emotion
-        assert!(v > 0.0, "Extreme positive VAD should map to positive emotion, got {:?}", emotion);
+        assert!(
+            v > 0.0,
+            "Extreme positive VAD should map to positive emotion, got {:?}",
+            emotion
+        );
     }
 
     #[test]
     fn test_from_vad_extreme_negative_yields_negative_emotion() {
         let emotion = UnifiedEmotion::from_vad(-1.0, 1.0, -1.0);
         let (v, _a, _d) = emotion.to_vad();
-        assert!(v < 0.0, "Extreme negative VAD should map to negative emotion, got {:?}", emotion);
+        assert!(
+            v < 0.0,
+            "Extreme negative VAD should map to negative emotion, got {:?}",
+            emotion
+        );
     }
 
     // ================================================================
@@ -1933,7 +1941,10 @@ mod tests {
         for i in 0..110 {
             state.update(i as f64 * 0.01, 0.1);
         }
-        assert!(state.trajectory.len() <= 100, "Trajectory should be capped at 100");
+        assert!(
+            state.trajectory.len() <= 100,
+            "Trajectory should be capped at 100"
+        );
     }
 
     #[test]
@@ -1943,8 +1954,14 @@ mod tests {
         state.update(1.0, 1.0);
         // Mood should barely change (0.95 momentum):
         // baseline_valence = 0.0 * 0.95 + 1.0 * 0.05 = 0.05
-        assert!(state.mood.baseline_valence < 0.1, "Mood should change slowly");
-        assert!(state.mood.baseline_arousal < 0.1, "Mood arousal should change slowly");
+        assert!(
+            state.mood.baseline_valence < 0.1,
+            "Mood should change slowly"
+        );
+        assert!(
+            state.mood.baseline_arousal < 0.1,
+            "Mood arousal should change slowly"
+        );
     }
 
     #[test]
@@ -2006,7 +2023,8 @@ mod tests {
         // or Escalating if arousal also moved
         assert!(
             pattern == EmotionalPattern::Volatile || pattern == EmotionalPattern::Escalating,
-            "Expected Volatile or Escalating, got {:?}", pattern
+            "Expected Volatile or Escalating, got {:?}",
+            pattern
         );
     }
 
@@ -2051,14 +2069,20 @@ mod tests {
         let mut bridge = EmotionalBridge::new();
         bridge.update_from_emotional_core(0.6, 0.3, "gratitude");
         assert!(bridge.state().sources.has_emotional_core);
-        assert_eq!(bridge.state().discrete_emotion, Some(UnifiedEmotion::Gratitude));
+        assert_eq!(
+            bridge.state().discrete_emotion,
+            Some(UnifiedEmotion::Gratitude)
+        );
     }
 
     #[test]
     fn test_emotional_bridge_unknown_emotion_maps_to_neutral() {
         let mut bridge = EmotionalBridge::new();
         bridge.update_from_emotional_depth("unknown_emotion", 0.5, vec![]);
-        assert_eq!(bridge.state().discrete_emotion, Some(UnifiedEmotion::Neutral));
+        assert_eq!(
+            bridge.state().discrete_emotion,
+            Some(UnifiedEmotion::Neutral)
+        );
     }
 
     // ================================================================
@@ -2083,7 +2107,9 @@ mod tests {
     fn test_causal_reasoning_comprehensive_uses_all_sources() {
         let mut causal = UnifiedCausalReasoning::new();
         let result = causal.reason(
-            CausalQuery::WhatCaused { effect: "X".to_string() },
+            CausalQuery::WhatCaused {
+                effect: "X".to_string(),
+            },
             CausalDetail::Comprehensive,
         );
         assert!(result.sources.used_pearl_scm);
@@ -2096,7 +2122,9 @@ mod tests {
     fn test_causal_reasoning_why_did_uses_uce() {
         let mut causal = UnifiedCausalReasoning::new();
         let result = causal.reason(
-            CausalQuery::WhyDid { event: "failure".to_string() },
+            CausalQuery::WhyDid {
+                event: "failure".to_string(),
+            },
             CausalDetail::Fast,
         );
         assert!(result.sources.used_uce);
@@ -2107,7 +2135,9 @@ mod tests {
         let mut causal = UnifiedCausalReasoning::new();
         for i in 0..5 {
             causal.reason(
-                CausalQuery::WhyDid { event: format!("event_{i}") },
+                CausalQuery::WhyDid {
+                    event: format!("event_{i}"),
+                },
                 CausalDetail::Fast,
             );
         }
@@ -2120,11 +2150,16 @@ mod tests {
         // Fill past capacity (100)
         for i in 0..105 {
             causal.reason(
-                CausalQuery::WhyDid { event: format!("event_{i}") },
+                CausalQuery::WhyDid {
+                    event: format!("event_{i}"),
+                },
                 CausalDetail::Fast,
             );
         }
-        assert!(causal.query_cache.len() <= 100, "Cache should be capped at 100");
+        assert!(
+            causal.query_cache.len() <= 100,
+            "Cache should be capped at 100"
+        );
     }
 
     // ================================================================
@@ -2326,7 +2361,9 @@ mod tests {
     fn test_causal_reasoning_default_fallback() {
         let mut causal = UnifiedCausalReasoning::new();
         let result = causal.reason(
-            CausalQuery::WhatWillCause { cause: "X".to_string() },
+            CausalQuery::WhatWillCause {
+                cause: "X".to_string(),
+            },
             CausalDetail::Fast,
         );
         // Falls into the default match arm

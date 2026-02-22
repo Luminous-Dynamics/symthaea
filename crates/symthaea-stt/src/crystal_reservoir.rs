@@ -244,7 +244,7 @@ fn generate_gabor_bank(
 
 /// Expand a mel-only filter to the full feature dimension
 ///
-/// The input is a [context_frames × n_mels] patch.
+/// The input is a `[context_frames × n_mels]` patch.
 /// We replicate it for delta and delta-delta channels with appropriate signs.
 fn expand_to_full_features(
     mel_patch: &[f32],

@@ -1038,12 +1038,10 @@ pub mod onnx {
     impl SemanticEncoder for OnnxSemanticEncoder {
         fn encode(&self, text: &str) -> ContinuousHV {
             match self.encode_to_embedding(text) {
-                Ok(embedding) => {
-                    match self.projection.project(&embedding) {
-                        Ok(projected) => ContinuousHV::from_values(projected).normalize(),
-                        Err(_) => CharNgramEncoder::new(42).encode(text),
-                    }
-                }
+                Ok(embedding) => match self.projection.project(&embedding) {
+                    Ok(projected) => ContinuousHV::from_values(projected).normalize(),
+                    Err(_) => CharNgramEncoder::new(42).encode(text),
+                },
                 Err(_e) => {
                     // Fall back to char n-gram on error
                     CharNgramEncoder::new(42).encode(text)

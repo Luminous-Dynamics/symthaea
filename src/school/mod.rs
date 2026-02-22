@@ -105,8 +105,8 @@ mod curriculum_loader;
 mod objective;
 mod reality_check;
 
-mod lookahead;
 mod coherence_bridge;
+mod lookahead;
 
 pub use assessment::{
     AssessmentStats, AssessmentTracker, CurriculumProgress, MasteryDistribution, MasteryLevel,

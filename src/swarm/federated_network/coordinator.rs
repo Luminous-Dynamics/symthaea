@@ -241,7 +241,11 @@ impl FederatedCoordinator {
 
             // Also remove from backend routing
             if let Err(e) = self.backend.unregister_node(node_id).await {
-                tracing::warn!("Failed to unregister node {}: {}", hex::encode(&node_id[..8]), e);
+                tracing::warn!(
+                    "Failed to unregister node {}: {}",
+                    hex::encode(&node_id[..8]),
+                    e
+                );
             }
 
             let _ = self.event_tx.send(CoordinatorEvent::NodeLeft {

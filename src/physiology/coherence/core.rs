@@ -655,7 +655,10 @@ impl CoherenceField {
     ///
     /// When scattered, borrow coherence from high-coherence peers.
     /// Both lender and borrower gain from the generous resonance!
-    pub fn request_coherence_loan(&mut self, _amount: f32) -> Result<(), crate::errors::SymthaeaError> {
+    pub fn request_coherence_loan(
+        &mut self,
+        _amount: f32,
+    ) -> Result<(), crate::errors::SymthaeaError> {
         if let Some(ref mut _lending) = self.lending_protocol {
             // In real implementation, this would negotiate with peers
             // For now, we just check if we're eligible

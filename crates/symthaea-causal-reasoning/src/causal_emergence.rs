@@ -721,10 +721,7 @@ mod tests {
 
     #[test]
     fn test_effective_information_uniform_tpm_is_zero() {
-        let uniform = vec![
-            vec![0.5, 0.5],
-            vec![0.5, 0.5],
-        ];
+        let uniform = vec![vec![0.5, 0.5], vec![0.5, 0.5]];
         let ei = effective_information(&uniform);
         assert!(
             ei.abs() < 1e-6,
@@ -744,10 +741,7 @@ mod tests {
 
     #[test]
     fn test_determinism_perfectly_deterministic() {
-        let tpm = vec![
-            vec![0.0, 1.0],
-            vec![1.0, 0.0],
-        ];
+        let tpm = vec![vec![0.0, 1.0], vec![1.0, 0.0]];
         let d = determinism(&tpm);
         assert!(
             (d - 1.0).abs() < 1e-6,
@@ -775,12 +769,13 @@ mod tests {
     #[test]
     fn test_determinism_bounded_zero_one() {
         // Partially random TPM
-        let tpm = vec![
-            vec![0.6, 0.4],
-            vec![0.3, 0.7],
-        ];
+        let tpm = vec![vec![0.6, 0.4], vec![0.3, 0.7]];
         let d = determinism(&tpm);
-        assert!(d >= 0.0 && d <= 1.0, "Determinism must be in [0,1], got {}", d);
+        assert!(
+            d >= 0.0 && d <= 1.0,
+            "Determinism must be in [0,1], got {}",
+            d
+        );
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -802,11 +797,7 @@ mod tests {
     #[test]
     fn test_degeneracy_identical_rows() {
         // All inputs lead to same output distribution = maximum degeneracy
-        let tpm = vec![
-            vec![0.3, 0.7],
-            vec![0.3, 0.7],
-            vec![0.3, 0.7],
-        ];
+        let tpm = vec![vec![0.3, 0.7], vec![0.3, 0.7], vec![0.3, 0.7]];
         let d = degeneracy(&tpm);
         assert!(
             (d - 1.0).abs() < 1e-6,
@@ -817,12 +808,13 @@ mod tests {
 
     #[test]
     fn test_degeneracy_bounded_zero_one() {
-        let tpm = vec![
-            vec![0.8, 0.2],
-            vec![0.4, 0.6],
-        ];
+        let tpm = vec![vec![0.8, 0.2], vec![0.4, 0.6]];
         let d = degeneracy(&tpm);
-        assert!(d >= 0.0 && d <= 1.0, "Degeneracy must be in [0,1], got {}", d);
+        assert!(
+            d >= 0.0 && d <= 1.0,
+            "Degeneracy must be in [0,1], got {}",
+            d
+        );
     }
 
     // ────────────────────────────────────────────────────────────────────────

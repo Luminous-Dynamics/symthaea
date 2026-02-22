@@ -1307,7 +1307,7 @@ mod tests {
     fn test_add_simplex_with_duplicates_deduped() {
         let mut complex = SimplicialComplex::new();
         complex.add_simplex(vec![0, 0, 1]); // Duplicate vertex
-        // After dedup: [0, 1] which is an edge
+                                            // After dedup: [0, 1] which is an edge
         assert_eq!(complex.count(1), 1);
         assert_eq!(complex.count(0), 2);
     }
@@ -1326,7 +1326,11 @@ mod tests {
     fn test_count_out_of_range() {
         let mut complex = SimplicialComplex::new();
         complex.add_simplex(vec![0, 1]);
-        assert_eq!(complex.count(5), 0, "Out of range dimension should return 0");
+        assert_eq!(
+            complex.count(5),
+            0,
+            "Out of range dimension should return 0"
+        );
     }
 
     #[test]
@@ -1335,7 +1339,11 @@ mod tests {
         complex.add_simplex(vec![0, 1]);
         let hodge = HodgeLaplacian::new(complex);
         let betti = hodge.betti_numbers();
-        assert_eq!(betti.get(10), 0, "Out of range betti number should return 0");
+        assert_eq!(
+            betti.get(10),
+            0,
+            "Out of range betti number should return 0"
+        );
     }
 
     #[test]
@@ -1417,7 +1425,9 @@ mod tests {
         let n_edges = hodge.complex.count(1);
         let signal: Vec<f64> = (0..n_edges).map(|i| (i as f64 + 1.0) * 0.3).collect();
 
-        let decomp = hodge.hodge_decompose(1, &signal).expect("decomposition should work");
+        let decomp = hodge
+            .hodge_decompose(1, &signal)
+            .expect("decomposition should work");
 
         for i in 0..signal.len() {
             let reconstructed = decomp.exact[i] + decomp.coexact[i] + decomp.harmonic[i];
@@ -1437,7 +1447,9 @@ mod tests {
         let hodge = HodgeLaplacian::new(complex);
 
         let signal = vec![1.0, 0.0, -1.0];
-        let decomp = hodge.hodge_decompose(0, &signal).expect("vertex decomposition should work");
+        let decomp = hodge
+            .hodge_decompose(0, &signal)
+            .expect("vertex decomposition should work");
 
         // Reconstruction check
         for i in 0..signal.len() {
@@ -1464,7 +1476,10 @@ mod tests {
         let hodge = HodgeLaplacian::new(complex);
         let spec = hodge.spectrum(0).unwrap();
         assert_eq!(spec.len(), 1);
-        assert!(approx_eq(spec[0], 0.0, 1e-10), "Single isolated vertex has L_0 = [0]");
+        assert!(
+            approx_eq(spec[0], 0.0, 1e-10),
+            "Single isolated vertex has L_0 = [0]"
+        );
     }
 
     #[test]
@@ -1568,7 +1583,10 @@ mod tests {
         let hodge = HodgeLaplacian::new(complex);
         let spec = hodge.full_spectrum();
 
-        assert!(spec.spectral_gaps[0] > 0.0, "Connected: L_0 spectral gap > 0");
+        assert!(
+            spec.spectral_gaps[0] > 0.0,
+            "Connected: L_0 spectral gap > 0"
+        );
     }
 
     #[test]

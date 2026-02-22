@@ -46,10 +46,7 @@
 //!          result.coherence_after * 100.0);
 //! ```
 
-use super::{
-    Curriculum, LearningObjective, LearningResult, Recommendation, School,
-    SchoolStats,
-};
+use super::{Curriculum, LearningObjective, LearningResult, Recommendation, School, SchoolStats};
 use crate::physiology::coherence::{
     CoherenceError, CoherenceField, CoherenceState, TaskComplexity,
 };

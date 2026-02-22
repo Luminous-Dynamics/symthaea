@@ -1,7 +1,7 @@
 //! Threshold-Based Health Assessment
 //!
-//! Aggregates data from existing observers ([`SystemObserver`], [`HardwareObserver`],
-//! [`StoreObserver`]) into actionable health verdicts with recommendations.
+//! Aggregates data from existing observers (`SystemObserver`, `HardwareObserver`,
+//! `StoreObserver`) into actionable health verdicts with recommendations.
 //!
 //! The existing observers collect raw data; this module interprets it against
 //! configurable thresholds and produces a prioritized list of health checks.

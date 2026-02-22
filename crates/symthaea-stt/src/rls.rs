@@ -87,7 +87,7 @@ impl RlsClassifier {
     /// 4. P = (P - k * x^T * P) / λ      (covariance update)
     ///
     /// # Arguments
-    /// * `features` - Input feature vector [feature_dim]
+    /// * `features` - Input feature vector `[feature_dim]`
     /// * `class_idx` - Target class index
     pub fn update(&mut self, features: &[f32], class_idx: usize) {
         if features.len() != self.feature_dim || class_idx >= self.n_classes {

@@ -471,8 +471,10 @@ mod tests {
         use std::io::Cursor;
 
         // Build a minimal .npy v1.0 with shape that overflows usize on multiply
-        let header_content =
-            format!("{{'descr': '<f4', 'fortran_order': False, 'shape': ({}, 2), }}", usize::MAX);
+        let header_content = format!(
+            "{{'descr': '<f4', 'fortran_order': False, 'shape': ({}, 2), }}",
+            usize::MAX
+        );
 
         // Pad to align (npy spec: header_len + magic(6) + version(2) + len_field(2) = multiple of 64)
         let preamble_len = 6 + 2 + 2; // magic + version + header_len field
@@ -506,8 +508,7 @@ mod tests {
         use std::io::Cursor;
 
         // Shape that doesn't overflow but exceeds the 100M element sanity cap
-        let header_content =
-            "{'descr': '<f4', 'fortran_order': False, 'shape': (200000000, 1), }";
+        let header_content = "{'descr': '<f4', 'fortran_order': False, 'shape': (200000000, 1), }";
 
         let preamble_len = 6 + 2 + 2;
         let total_unpadded = preamble_len + header_content.len() + 1;

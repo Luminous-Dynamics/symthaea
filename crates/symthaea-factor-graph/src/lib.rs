@@ -388,7 +388,9 @@ impl FactorGraph {
             .expect("target_var not in factor");
 
         // Enumerate all configurations of x_{da}.
-        let total: usize = cards.iter().try_fold(1usize, |acc, &c| acc.checked_mul(c))
+        let total: usize = cards
+            .iter()
+            .try_fold(1usize, |acc, &c| acc.checked_mul(c))
             .expect("factor cardinality overflow");
         for flat_idx in 0..total {
             let config = unflatten(flat_idx, &cards);
@@ -445,7 +447,9 @@ impl FactorGraph {
             .position(|&v| v == target_var)
             .expect("target_var not in factor");
 
-        let total: usize = cards.iter().try_fold(1usize, |acc, &c| acc.checked_mul(c))
+        let total: usize = cards
+            .iter()
+            .try_fold(1usize, |acc, &c| acc.checked_mul(c))
             .expect("factor cardinality overflow");
         for flat_idx in 0..total {
             let config = unflatten(flat_idx, &cards);
@@ -692,7 +696,9 @@ impl FactorGraph {
                 .iter()
                 .map(|&v| self.variables[v].cardinality)
                 .collect();
-            let total: usize = cards.iter().try_fold(1usize, |acc, &c| acc.checked_mul(c))
+            let total: usize = cards
+                .iter()
+                .try_fold(1usize, |acc, &c| acc.checked_mul(c))
                 .expect("factor cardinality overflow");
 
             for flat_idx in 0..total {

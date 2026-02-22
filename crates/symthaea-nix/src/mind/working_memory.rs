@@ -57,7 +57,7 @@ pub struct WorkingMemory {
     /// Current time step (increments with each operation).
     step: u64,
     /// Last item evicted by push(), available until next push().
-    /// Callers can use [`take_evicted`] to retrieve it for graduation
+    /// Callers can use [`take_evicted`](Self::take_evicted) to retrieve it for graduation
     /// to episodic memory.
     last_evicted: Option<MemoryItem>,
 }
@@ -129,7 +129,7 @@ impl WorkingMemory {
 
     /// Take the last evicted item, if any.
     ///
-    /// Returns the item that was evicted by the most recent [`push`] call.
+    /// Returns the item that was evicted by the most recent [`push`](Self::push) call.
     /// This item is a candidate for graduation to episodic memory if its
     /// `steps_survived` exceeds the minimum threshold.
     ///

@@ -4,7 +4,7 @@
 //! by parsing the output of system commands (`systemctl`, `nix-env`, `journalctl`,
 //! etc.). Each sub-module handles a specific domain of observation.
 //!
-//! The composite [`SystemObserver`] ties all observers together and produces a
+//! The composite `SystemObserver` ties all observers together and produces a
 //! [`SystemStateSnapshot`](crate::encoding::SystemStateSnapshot) suitable for
 //! encoding into the HDC world model.
 

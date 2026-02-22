@@ -102,18 +102,14 @@ mod tests {
     #[test]
     fn propose_action_includes_rollback_steps() {
         let engine = ActionEngine::new();
-        let proposed = engine.propose_action(
-            ActionType::RestartService,
-            "Restart conductor".to_string(),
-        );
+        let proposed =
+            engine.propose_action(ActionType::RestartService, "Restart conductor".to_string());
         assert_eq!(proposed.action_type, ActionType::RestartService);
         assert!(!proposed.rollback_steps.is_empty());
         assert_eq!(proposed.rollback_steps.len(), 2);
 
-        let diag = engine.propose_action(
-            ActionType::RunDiagnostic,
-            "Run network check".to_string(),
-        );
+        let diag =
+            engine.propose_action(ActionType::RunDiagnostic, "Run network check".to_string());
         assert_eq!(diag.rollback_steps.len(), 1);
         assert!(diag.rollback_steps[0].contains("No rollback"));
     }

@@ -32,7 +32,10 @@ impl PrivacyManager {
 
     /// Check if cognitive updates can be shared.
     pub fn can_share_cognitive(&self) -> bool {
-        matches!(self.sharing_tier, SharingTier::Anonymized | SharingTier::Full)
+        matches!(
+            self.sharing_tier,
+            SharingTier::Anonymized | SharingTier::Full
+        )
     }
 }
 

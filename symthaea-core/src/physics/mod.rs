@@ -155,6 +155,7 @@ pub use trajectory_analysis::*;
 pub use uncertainty::*;
 
 // HDC Scientific Knowledge Expansion exports
+pub use crate::consciousness_metrics::*;
 pub use antimatter::*;
 pub use astrophysics::*;
 pub use emergence_chain::*;
@@ -165,7 +166,6 @@ pub use phase_transitions::*;
 pub use qft::*;
 pub use quantum_gravity::*;
 pub use thermodynamics::*;
-pub use crate::consciousness_metrics::*;
 
 // Phase 2: exports (non-conflicting only; access others via physics::module_name)
 pub use cosmology::*;

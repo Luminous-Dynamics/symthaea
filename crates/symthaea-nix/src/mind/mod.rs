@@ -6,13 +6,13 @@
 //!
 //! ## Modules
 //!
-//! - [`world_model`]: Generative model with HDC delta vector transitions
-//! - [`active_inference`]: Action selection via expected free energy minimization
-//! - [`goal_inference`]: User input → desired system state in HDC space
-//! - [`predictive_hierarchy`]: 4-level prediction stack (sensory → goals)
-//! - [`working_memory`]: 7-item capacity-limited context with activation decay
-//! - [`episodic_memory`]: Φ-gated system event consolidation
-//! - [`causal_graph`]: Causal relationships between NixOS options
+//! - `world_model`: Generative model with HDC delta vector transitions
+//! - `active_inference`: Action selection via expected free energy minimization
+//! - `goal_inference`: User input → desired system state in HDC space
+//! - `predictive_hierarchy`: 4-level prediction stack (sensory → goals)
+//! - `working_memory`: 7-item capacity-limited context with activation decay
+//! - `episodic_memory`: Φ-gated system event consolidation
+//! - `causal_graph`: Causal relationships between NixOS options
 
 pub mod active_inference;
 pub mod causal_graph;

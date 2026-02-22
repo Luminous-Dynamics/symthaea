@@ -285,17 +285,31 @@ fn test_understanding_result_completeness() {
 
     // Strategy should match one of the variants
     match &result.execution_strategy {
-        ExecutionStrategy::Confident { execute_immediately, .. } => {
+        ExecutionStrategy::Confident {
+            execute_immediately,
+            ..
+        } => {
             let _ = execute_immediately;
         }
-        ExecutionStrategy::Curious { explore_first, targeted_questions, .. } => {
+        ExecutionStrategy::Curious {
+            explore_first,
+            targeted_questions,
+            ..
+        } => {
             let _ = explore_first;
             let _ = targeted_questions.len();
         }
-        ExecutionStrategy::Autopilot { execute_efficiently, .. } => {
+        ExecutionStrategy::Autopilot {
+            execute_efficiently,
+            ..
+        } => {
             let _ = execute_efficiently;
         }
-        ExecutionStrategy::Lost { request_help, generic_questions, .. } => {
+        ExecutionStrategy::Lost {
+            request_help,
+            generic_questions,
+            ..
+        } => {
             let _ = request_help;
             let _ = generic_questions.len();
         }

@@ -40,8 +40,8 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 use crate::mycelix::gis::{
-    DarkSpotDHT, GracefulIgnoranceSystem, GracefulResponse, IgnoranceDetection,
-    IgnoranceType, KnowledgeMatch, Uncertainty3D,
+    DarkSpotDHT, GracefulIgnoranceSystem, GracefulResponse, IgnoranceDetection, IgnoranceType,
+    KnowledgeMatch, Uncertainty3D,
 };
 
 // ============================================================================
@@ -375,7 +375,10 @@ impl ConsciousDarkSpotNetwork {
     /// Detect ignorance and optionally publish to network
     ///
     /// Only publishes if EIG is above threshold (worth sharing)
-    pub fn detect_and_maybe_share(&mut self, query: &str) -> Result<IgnoranceDetection, crate::errors::SymthaeaError> {
+    pub fn detect_and_maybe_share(
+        &mut self,
+        query: &str,
+    ) -> Result<IgnoranceDetection, crate::errors::SymthaeaError> {
         let detection = self.gis.detect_ignorance(query);
 
         // Only share high-EIG ignorance
@@ -673,9 +676,14 @@ mod tests {
             detected_at: SystemTime::now(),
         };
         let state_none = ConsciousUncertaintyState::from_phi_and_detection(0.9, &detection_none);
-        assert!((state_none.effective_consciousness() - 0.9).abs() < 1e-5,
-            "zero uncertainty should give effective == phi");
-        assert!(state_none.is_grounded, "zero uncertainty + IgnoranceType::None should be grounded");
+        assert!(
+            (state_none.effective_consciousness() - 0.9).abs() < 1e-5,
+            "zero uncertainty should give effective == phi"
+        );
+        assert!(
+            state_none.is_grounded,
+            "zero uncertainty + IgnoranceType::None should be grounded"
+        );
 
         // High uncertainty => effective << phi
         let detection_high = IgnoranceDetection {
@@ -687,9 +695,14 @@ mod tests {
             detected_at: SystemTime::now(),
         };
         let state_high = ConsciousUncertaintyState::from_phi_and_detection(0.9, &detection_high);
-        assert!(state_high.effective_consciousness() < 0.5,
-            "high uncertainty should significantly reduce effective consciousness");
-        assert!(!state_high.is_grounded, "high uncertainty + Unknown should not be grounded");
+        assert!(
+            state_high.effective_consciousness() < 0.5,
+            "high uncertainty should significantly reduce effective consciousness"
+        );
+        assert!(
+            !state_high.is_grounded,
+            "high uncertainty + Unknown should not be grounded"
+        );
     }
 
     #[test]
@@ -706,13 +719,22 @@ mod tests {
         let conf = state.epistemic_confidence;
 
         // Should proceed when action risk is below confidence
-        assert!(state.should_proceed(conf - 0.1), "should proceed when risk < confidence");
+        assert!(
+            state.should_proceed(conf - 0.1),
+            "should proceed when risk < confidence"
+        );
 
         // Should not proceed when action risk is above confidence
-        assert!(!state.should_proceed(conf + 0.1), "should not proceed when risk > confidence");
+        assert!(
+            !state.should_proceed(conf + 0.1),
+            "should not proceed when risk > confidence"
+        );
 
         // Edge: exactly equal
-        assert!(state.should_proceed(conf), "should proceed when risk == confidence");
+        assert!(
+            state.should_proceed(conf),
+            "should proceed when risk == confidence"
+        );
     }
 
     #[test]
@@ -721,15 +743,19 @@ mod tests {
         let mut permissive = EpistemicDecisionGate::with_thresholds(0.1, 0.01);
         let d1 = permissive.evaluate("anything at all", 0.0);
         // With near-zero thresholds, should not defer
-        assert!(!matches!(d1, EpistemicDecision::Defer { .. }),
-            "permissive gate with zero-risk should not defer");
+        assert!(
+            !matches!(d1, EpistemicDecision::Defer { .. }),
+            "permissive gate with zero-risk should not defer"
+        );
 
         // Very strict gate
         let mut strict = EpistemicDecisionGate::with_thresholds(0.99, 0.95);
         let d2 = strict.evaluate("anything at all", 0.99);
         // With near-one thresholds and high risk, should not Proceed without caveat
-        assert!(!matches!(d2, EpistemicDecision::Proceed { .. }),
-            "strict gate with high-risk should not cleanly proceed");
+        assert!(
+            !matches!(d2, EpistemicDecision::Proceed { .. }),
+            "strict gate with high-risk should not cleanly proceed"
+        );
     }
 
     #[test]
@@ -756,7 +782,9 @@ mod tests {
             assert!(
                 (context.attention_modifier() - expected_modifier).abs() < 1e-5,
                 "{:?} should give modifier {}, got {}",
-                ignorance_type, expected_modifier, context.attention_modifier(),
+                ignorance_type,
+                expected_modifier,
+                context.attention_modifier(),
             );
         }
     }

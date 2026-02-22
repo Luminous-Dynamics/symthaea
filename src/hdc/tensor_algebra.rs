@@ -68,7 +68,9 @@ impl Tensor {
             shape.iter().all(|&d| d > 0),
             "All tensor dimensions must be positive"
         );
-        let total: usize = shape.iter().try_fold(1usize, |acc, &d| acc.checked_mul(d))
+        let total: usize = shape
+            .iter()
+            .try_fold(1usize, |acc, &d| acc.checked_mul(d))
             .expect("tensor shape overflow");
         assert!(total <= 100_000_000, "tensor too large: {} elements", total);
         Self {
@@ -83,7 +85,9 @@ impl Tensor {
     ///
     /// Panics if the product of `shape` does not equal `data.len()`.
     pub fn from_data(data: Vec<f64>, shape: Vec<usize>) -> Self {
-        let total: usize = shape.iter().try_fold(1usize, |acc, &d| acc.checked_mul(d))
+        let total: usize = shape
+            .iter()
+            .try_fold(1usize, |acc, &d| acc.checked_mul(d))
             .expect("tensor shape overflow");
         assert!(total <= 100_000_000, "tensor too large: {} elements", total);
         assert_eq!(
@@ -256,9 +260,15 @@ impl Tensor {
         let out_strides = result.strides();
 
         // Iterate over all output indices
-        let out_total: usize = out_shape.iter().try_fold(1usize, |acc, &d| acc.checked_mul(d))
+        let out_total: usize = out_shape
+            .iter()
+            .try_fold(1usize, |acc, &d| acc.checked_mul(d))
             .expect("tensor shape overflow");
-        assert!(out_total <= 100_000_000, "tensor too large: {} elements", out_total);
+        assert!(
+            out_total <= 100_000_000,
+            "tensor too large: {} elements",
+            out_total
+        );
         for flat_out in 0..out_total {
             // Decompose flat_out into multi-index
             let mut out_idx = vec![0usize; out_shape.len()];
@@ -311,9 +321,15 @@ impl Tensor {
     ///
     /// Panics if the new shape has a different total size.
     pub fn reshape(&self, new_shape: Vec<usize>) -> Self {
-        let new_total: usize = new_shape.iter().try_fold(1usize, |acc, &d| acc.checked_mul(d))
+        let new_total: usize = new_shape
+            .iter()
+            .try_fold(1usize, |acc, &d| acc.checked_mul(d))
             .expect("tensor shape overflow");
-        assert!(new_total <= 100_000_000, "tensor too large: {} elements", new_total);
+        assert!(
+            new_total <= 100_000_000,
+            "tensor too large: {} elements",
+            new_total
+        );
         assert_eq!(
             self.data.len(),
             new_total,

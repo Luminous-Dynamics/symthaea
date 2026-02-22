@@ -88,7 +88,7 @@ impl PhonemeTargets {
 /// Readout matrix that maps reservoir state to HV space
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReadoutMatrix {
-    /// Weight matrix: [hv_dim x reservoir_size]
+    /// Weight matrix: `[hv_dim x reservoir_size]`
     /// Each row maps reservoir state to one dimension of the output
     weights: Vec<Vec<f32>>,
     /// Output dimension (HDC_DIM = 2048)
@@ -147,9 +147,9 @@ impl ReadoutMatrix {
 
 /// Ridge Regression accumulator for training the readout
 pub struct RidgeAccumulator {
-    /// X^T X matrix: [input_dim x input_dim]
+    /// X^T X matrix: `[input_dim x input_dim]`
     xtx: Vec<Vec<f64>>,
-    /// X^T Y matrix: [input_dim x output_dim]
+    /// X^T Y matrix: `[input_dim x output_dim]`
     xty: Vec<Vec<f64>>,
     /// Input dimension
     input_dim: usize,
@@ -434,9 +434,9 @@ pub enum RFActivation {
 /// Maps input x → activation(W*x + b) where W and b are fixed random matrices
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RandomProjection {
-    /// Random weight matrix: [output_dim × input_dim]
+    /// Random weight matrix: `[output_dim × input_dim]`
     pub weights: Vec<Vec<f32>>,
-    /// Random bias: [output_dim]
+    /// Random bias: `[output_dim]`
     pub bias: Vec<f32>,
     pub input_dim: usize,
     pub output_dim: usize,
@@ -533,9 +533,9 @@ pub struct DirectClassifier {
     pub config: DirectClassifierConfig,
     /// Phoneme labels (index → label)
     pub phonemes: Vec<String>,
-    /// Weight matrix: [n_phonemes × reservoir_size]
+    /// Weight matrix: `[n_phonemes × reservoir_size]`
     pub weights: Vec<Vec<f32>>,
-    /// Bias vector: [n_phonemes]
+    /// Bias vector: `[n_phonemes]`
     pub bias: Vec<f32>,
     /// Log prior probabilities for each class (for Bayesian debiasing)
     #[serde(default)]
@@ -691,9 +691,9 @@ impl DirectClassifier {
 /// Uses Ridge Regression with one-hot phoneme targets
 /// Supports class-balanced normalization to prevent frequency bias
 pub struct DirectAccumulator {
-    /// X^T X: flat row-major [input_dim × input_dim]
+    /// X^T X: flat row-major `[input_dim × input_dim]`
     xtx: Vec<f64>,
-    /// X^T Y: flat row-major [input_dim × n_classes]
+    /// X^T Y: flat row-major `[input_dim × n_classes]`
     xty: Vec<f64>,
     /// Per-class sample counts for balancing
     class_counts: Vec<usize>,
@@ -748,7 +748,7 @@ impl DirectAccumulator {
     }
 
     /// Add a batch of samples using cache-tiled dgemm for X^TX accumulation.
-    /// features_f64: row-major [batch_size × input_dim] pre-cast to f64
+    /// features_f64: row-major `[batch_size × input_dim]` pre-cast to f64
     /// targets: phoneme indices for each sample in the batch
     pub fn add_batch(&mut self, features_f64: &[f64], targets: &[usize], batch_size: usize) {
         let d = self.input_dim;
@@ -790,7 +790,7 @@ impl DirectAccumulator {
 
     /// Solve W = (X^T X + λI)^{-1} X^T Y
     /// Standard Ridge Regression (no class balancing - use prior correction at inference)
-    /// Returns [n_classes × input_dim] weight matrix
+    /// Returns `[n_classes × input_dim]` weight matrix
     pub fn solve(&self, lambda: f32) -> Vec<Vec<f32>> {
         let n = self.input_dim;
 

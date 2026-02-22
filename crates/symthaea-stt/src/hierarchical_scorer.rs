@@ -30,7 +30,7 @@
 //!
 //! Instead of: score = similarity(context, global_grammar)
 //!
-//! We use: score = similarity(context, grammar[manner_class])
+//! We use: `score = similarity(context, grammar[manner_class])`
 //!
 //! The acoustic model already predicts Manner class → use it to route!
 

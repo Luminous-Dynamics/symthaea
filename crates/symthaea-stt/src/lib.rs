@@ -49,10 +49,8 @@
 //! decoder.load_prototypes(&prototypes.as_pairs());
 //! ```
 
-// TODO: Add comprehensive documentation before 1.0 release
 #![allow(missing_docs)]
 #![allow(rustdoc::missing_crate_level_docs)]
-#![allow(rustdoc::broken_intra_doc_links)]
 #![allow(rustdoc::invalid_html_tags)]
 #![allow(rustdoc::bare_urls)]
 

@@ -21,16 +21,25 @@ fn main() {
     println!("  Motor rate:    {:.0} Hz", config.motor_hz);
     println!("  Cognitive rate: {:.0} Hz", config.cognitive_hz);
     println!("  Episodes:      {}", config.num_episodes);
-    println!("  Steps/episode: {} ({:.1}s)", config.steps_per_episode, config.steps_per_episode as f64 / config.motor_hz);
-    println!("  Network:       {}x{} neurons (16384D each)", config.network_layers, config.neurons_per_layer);
+    println!(
+        "  Steps/episode: {} ({:.1}s)",
+        config.steps_per_episode,
+        config.steps_per_episode as f64 / config.motor_hz
+    );
+    println!(
+        "  Network:       {}x{} neurons (16384D each)",
+        config.network_layers, config.neurons_per_layer
+    );
     println!("  Learning rate: {}", config.learning_rate);
     println!();
 
     let mut trainer = FlightTrainer::new(config);
     let metrics = trainer.train();
 
-    println!("{:<5} {:>10} {:>10} {:>10} {:>8} {:>6}",
-        "Ep", "Pos Err", "Att Err", "Free E", "Hover%", "Expl");
+    println!(
+        "{:<5} {:>10} {:>10} {:>10} {:>8} {:>6}",
+        "Ep", "Pos Err", "Att Err", "Free E", "Hover%", "Expl"
+    );
     println!("{}", "-".repeat(55));
 
     for m in &metrics {

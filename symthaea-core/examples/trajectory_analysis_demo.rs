@@ -7,7 +7,7 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::physics::{
-    compare_trajectories, CoupledPhysicsEngine, FusionReaction, OperatingConditions,
+    CoupledPhysicsEngine, FusionReaction, OperatingConditions,
     TrajectoryAnalysisEngine,
 };
 

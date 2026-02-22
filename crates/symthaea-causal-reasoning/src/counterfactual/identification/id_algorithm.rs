@@ -512,10 +512,12 @@ impl IDAlgorithm {
                     // x.len() == 1 and s.len() == 1 guaranteed by x_only_in_c_prime check above
                     let (&x_node, &s_node) = match (x.iter().next(), s.iter().next()) {
                         (Some(xn), Some(sn)) => (xn, sn),
-                        _ => return Ok(CausalExpression::Probability {
-                            outcome: s.iter().copied().collect(),
-                            conditioning: Vec::new(),
-                        }),
+                        _ => {
+                            return Ok(CausalExpression::Probability {
+                                outcome: s.iter().copied().collect(),
+                                conditioning: Vec::new(),
+                            })
+                        }
                     };
                     let direct_edge = graph
                         .directed

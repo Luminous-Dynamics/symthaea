@@ -192,8 +192,7 @@ impl CoreSelf {
             duration_secs: 0.0,
         });
         // Keep goals sorted by priority
-        self.goals
-            .sort_by(|a, b| b.priority.total_cmp(&a.priority));
+        self.goals.sort_by(|a, b| b.priority.total_cmp(&a.priority));
     }
 
     /// Update context with new information

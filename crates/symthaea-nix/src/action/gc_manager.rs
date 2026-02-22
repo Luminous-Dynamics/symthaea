@@ -4,7 +4,7 @@
 //! Reports how much space will be freed, what roots are holding paths,
 //! and recommends retention policies.
 //!
-//! All destructive operations produce [`NixOSCommand`] values routed
+//! All destructive operations produce `NixOSCommand` values routed
 //! through the Φ-gated executor.
 
 use super::executor::NixOSCommand;

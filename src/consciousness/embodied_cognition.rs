@@ -1651,7 +1651,11 @@ mod tests {
     fn test_body_schema_all_parts_have_default_positions() {
         let body = BodySchema::new();
         for part in BodyPart::all() {
-            assert!(body.parts.contains_key(part), "Missing body part: {:?}", part);
+            assert!(
+                body.parts.contains_key(part),
+                "Missing body part: {:?}",
+                part
+            );
             let state = &body.parts[part];
             assert!(state.position.z.is_finite());
         }
@@ -1693,7 +1697,9 @@ mod tests {
                 assert!(
                     connected.connected_to().contains(part),
                     "{:?} connects to {:?} but {:?} does not connect back",
-                    part, connected, connected
+                    part,
+                    connected,
+                    connected
                 );
             }
         }
@@ -1708,7 +1714,10 @@ mod tests {
         let intero = InteroceptiveState::default();
         // All zeros => deviation = (0+0+0+0+0.3)/5 = 0.06 (heart_rate=0, default offset)
         let dev = intero.homeostatic_deviation();
-        assert!(dev < 0.2, "Default homeostatic deviation should be low, got {dev}");
+        assert!(
+            dev < 0.2,
+            "Default homeostatic deviation should be low, got {dev}"
+        );
     }
 
     #[test]
@@ -1728,7 +1737,10 @@ mod tests {
             ..Default::default()
         };
         let load = intero.allostatic_load();
-        assert!(load > 0.2, "Stressed state should have significant allostatic load, got {load}");
+        assert!(
+            load > 0.2,
+            "Stressed state should have significant allostatic load, got {load}"
+        );
     }
 
     #[test]
@@ -1811,7 +1823,10 @@ mod tests {
         engine.learn(action.clone(), sensation.clone(), None);
         // Confidence should increase
         let contingency = &engine.contingencies[0];
-        assert!(contingency.confidence > 0.5, "Confidence should increase after repeated learning");
+        assert!(
+            contingency.confidence > 0.5,
+            "Confidence should increase after repeated learning"
+        );
         assert_eq!(contingency.experience_count, 2);
     }
 
@@ -1835,7 +1850,10 @@ mod tests {
             };
             engine.learn(action, sensation, None);
         }
-        assert!(engine.contingencies.len() <= 3, "Should be capped at max_contingencies=3");
+        assert!(
+            engine.contingencies.len() <= 3,
+            "Should be capped at max_contingencies=3"
+        );
     }
 
     #[test]
@@ -1967,13 +1985,15 @@ mod tests {
         env.objects.push(EnvironmentObject {
             id: 1,
             position: Position3D::new(0.3, 0.3, 1.0), // Within reach
-            graspable: false, // Not graspable
+            graspable: false,                         // Not graspable
             saliency: 1.0,
             value: 1.0,
         });
         detector.detect(&body, &env);
         // Should not detect grasp affordance for non-graspable object
-        let grasp_affordances: Vec<_> = detector.current_affordances.iter()
+        let grasp_affordances: Vec<_> = detector
+            .current_affordances
+            .iter()
             .filter(|a| a.action_type == MovementType::Grasp)
             .collect();
         assert!(grasp_affordances.is_empty());
@@ -1991,10 +2011,15 @@ mod tests {
             slope: 0.0,
         });
         detector.detect(&body, &env);
-        let walk_affordances: Vec<_> = detector.current_affordances.iter()
+        let walk_affordances: Vec<_> = detector
+            .current_affordances
+            .iter()
             .filter(|a| a.action_type == MovementType::Walk)
             .collect();
-        assert!(!walk_affordances.is_empty(), "Should detect walkable surface");
+        assert!(
+            !walk_affordances.is_empty(),
+            "Should detect walkable surface"
+        );
     }
 
     #[test]
@@ -2037,7 +2062,10 @@ mod tests {
         let mut analyzer = EmbodiedConsciousnessAnalyzer::new(config);
         let response = analyzer.process();
         assert!(response.phi_modulation.is_finite());
-        assert!(response.phi_modulation > 0.0, "Phi modulation should be positive");
+        assert!(
+            response.phi_modulation > 0.0,
+            "Phi modulation should be positive"
+        );
     }
 
     #[test]
@@ -2072,7 +2100,10 @@ mod tests {
         analyzer.perform_action(action);
 
         let final_tension = analyzer.body.parts[&BodyPart::RightHand].tension;
-        assert!(final_tension > initial_tension, "Action should increase tension");
+        assert!(
+            final_tension > initial_tension,
+            "Action should increase tension"
+        );
     }
 
     #[test]
@@ -2093,7 +2124,10 @@ mod tests {
             analyzer.perform_action(action);
         }
         // Agency should remain high or improve with consistent predictions
-        assert!(analyzer.agency > 0.5, "Agency should remain reasonable after consistent actions");
+        assert!(
+            analyzer.agency > 0.5,
+            "Agency should remain reasonable after consistent actions"
+        );
     }
 
     #[test]
@@ -2161,13 +2195,22 @@ mod tests {
         // Left and right arms should be symmetric about x=0
         let left_arm = &body.parts[&BodyPart::LeftArm].position;
         let right_arm = &body.parts[&BodyPart::RightArm].position;
-        assert!((left_arm.x + right_arm.x).abs() < 0.01, "Arms should be symmetric about x=0");
-        assert!((left_arm.z - right_arm.z).abs() < 0.01, "Arms should be at same height");
+        assert!(
+            (left_arm.x + right_arm.x).abs() < 0.01,
+            "Arms should be symmetric about x=0"
+        );
+        assert!(
+            (left_arm.z - right_arm.z).abs() < 0.01,
+            "Arms should be at same height"
+        );
 
         // Left and right legs
         let left_leg = &body.parts[&BodyPart::LeftLeg].position;
         let right_leg = &body.parts[&BodyPart::RightLeg].position;
-        assert!((left_leg.x + right_leg.x).abs() < 0.01, "Legs should be symmetric about x=0");
+        assert!(
+            (left_leg.x + right_leg.x).abs() < 0.01,
+            "Legs should be symmetric about x=0"
+        );
     }
 
     #[test]
@@ -2179,7 +2222,9 @@ mod tests {
                 assert!(
                     head_z >= state.position.z,
                     "Head should be highest, but {:?} at z={} vs head z={}",
-                    part, state.position.z, head_z
+                    part,
+                    state.position.z,
+                    head_z
                 );
             }
         }

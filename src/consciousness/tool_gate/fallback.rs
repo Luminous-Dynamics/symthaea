@@ -3,7 +3,7 @@
 //! When the tool gate blocks an action, this module selects the
 //! best alternative strategy based on the current state.
 
-use super::super::epistemic_conflict::{AnchorKind, ConflictMatrix, EpistemicAction};
+use super::super::epistemic_conflict::ConflictMatrix;
 use super::types::*;
 
 /// Select the best fallback strategy based on conflict state and gate result.

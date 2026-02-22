@@ -1,6 +1,6 @@
 //! Daemon ↔ TUI inter-process communication via shared state file.
 //!
-//! The daemon periodically writes a [`DaemonSnapshot`] to disk (JSON).
+//! The daemon periodically writes a [`DaemonSnapshot`](crate::ipc::DaemonSnapshot) to disk (JSON).
 //! The TUI reads this file on startup and during refresh cycles to display
 //! the daemon's live world model, episodic history, and active concerns.
 //!

@@ -11,27 +11,70 @@ impl TriageEngine {
     pub fn new() -> Self {
         Self {
             category_keywords: vec![
-                (SupportCategory::Network, vec![
-                    "network", "wifi", "dns", "firewall", "port", "connectivity", "ping", "latency",
-                ]),
-                (SupportCategory::Hardware, vec![
-                    "hardware", "disk", "memory", "cpu", "gpu", "device", "driver", "usb",
-                ]),
-                (SupportCategory::Software, vec![
-                    "software", "install", "update", "crash", "bug", "error", "version",
-                ]),
-                (SupportCategory::Holochain, vec![
-                    "holochain", "conductor", "dht", "gossip", "zome", "happ", "agent",
-                ]),
-                (SupportCategory::Mycelix, vec![
-                    "mycelix", "bridge", "commons", "civic", "governance", "federation",
-                ]),
-                (SupportCategory::Security, vec![
-                    "security", "password", "encryption", "key", "certificate", "auth", "permission",
-                ]),
-                (SupportCategory::General, vec![
-                    "help", "question", "how", "what", "support",
-                ]),
+                (
+                    SupportCategory::Network,
+                    vec![
+                        "network",
+                        "wifi",
+                        "dns",
+                        "firewall",
+                        "port",
+                        "connectivity",
+                        "ping",
+                        "latency",
+                    ],
+                ),
+                (
+                    SupportCategory::Hardware,
+                    vec![
+                        "hardware", "disk", "memory", "cpu", "gpu", "device", "driver", "usb",
+                    ],
+                ),
+                (
+                    SupportCategory::Software,
+                    vec![
+                        "software", "install", "update", "crash", "bug", "error", "version",
+                    ],
+                ),
+                (
+                    SupportCategory::Holochain,
+                    vec![
+                        "holochain",
+                        "conductor",
+                        "dht",
+                        "gossip",
+                        "zome",
+                        "happ",
+                        "agent",
+                    ],
+                ),
+                (
+                    SupportCategory::Mycelix,
+                    vec![
+                        "mycelix",
+                        "bridge",
+                        "commons",
+                        "civic",
+                        "governance",
+                        "federation",
+                    ],
+                ),
+                (
+                    SupportCategory::Security,
+                    vec![
+                        "security",
+                        "password",
+                        "encryption",
+                        "key",
+                        "certificate",
+                        "auth",
+                        "permission",
+                    ],
+                ),
+                (
+                    SupportCategory::General,
+                    vec!["help", "question", "how", "what", "support"],
+                ),
             ],
         }
     }
@@ -111,7 +154,10 @@ mod tests {
     #[test]
     fn triage_network_issue() {
         let engine = TriageEngine::new();
-        let result = engine.triage("Cannot connect to network", "WiFi keeps dropping, DNS resolution fails");
+        let result = engine.triage(
+            "Cannot connect to network",
+            "WiFi keeps dropping, DNS resolution fails",
+        );
         assert_eq!(result.suggested_category, SupportCategory::Network);
     }
 
@@ -125,7 +171,10 @@ mod tests {
     #[test]
     fn triage_holochain_issue() {
         let engine = TriageEngine::new();
-        let result = engine.triage("Conductor error", "Holochain conductor fails to start, DHT not syncing");
+        let result = engine.triage(
+            "Conductor error",
+            "Holochain conductor fails to start, DHT not syncing",
+        );
         assert_eq!(result.suggested_category, SupportCategory::Holochain);
     }
 
@@ -146,7 +195,10 @@ mod tests {
     #[test]
     fn triage_confidence_scales_with_matches() {
         let engine = TriageEngine::new();
-        let high = engine.triage("Network DNS firewall port", "connectivity ping latency issues");
+        let high = engine.triage(
+            "Network DNS firewall port",
+            "connectivity ping latency issues",
+        );
         let low = engine.triage("Problem", "Something is wrong");
         assert!(high.confidence > low.confidence);
     }

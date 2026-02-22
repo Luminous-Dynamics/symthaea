@@ -1,7 +1,7 @@
 //! Systemd Service Management Actions
 //!
 //! Wraps `systemctl` commands for service lifecycle management.
-//! All operations produce [`NixOSCommand`] values routed through
+//! All operations produce `NixOSCommand` values routed through
 //! the Φ-gated executor — the service manager itself does NOT
 //! execute commands directly.
 

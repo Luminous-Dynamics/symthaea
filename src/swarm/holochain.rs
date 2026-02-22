@@ -422,7 +422,9 @@ impl HolochainCortex {
     /// depend on burn. This method validates the URL and logs the connection attempt.
     async fn connect_real(&mut self) -> Result<(), CortexError> {
         // Validate the conductor URL (basic check — full URL parsing in bridge crate)
-        if !self.config.conductor_url.starts_with("ws://") && !self.config.conductor_url.starts_with("wss://") {
+        if !self.config.conductor_url.starts_with("ws://")
+            && !self.config.conductor_url.starts_with("wss://")
+        {
             return Err(CortexError::ConnectionError(format!(
                 "Invalid conductor URL (expected ws:// or wss://): {}",
                 self.config.conductor_url

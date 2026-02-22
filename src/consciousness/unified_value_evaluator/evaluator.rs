@@ -1649,14 +1649,20 @@ mod tests {
     fn test_phrase_adjustment_negative_keywords() {
         let evaluator = UnifiedValueEvaluator::new();
         let adj = evaluator.calculate_phrase_adjustment("harm and deceive and exploit");
-        assert!(adj < 0.0, "Negative keywords should produce negative adjustment: {adj}");
+        assert!(
+            adj < 0.0,
+            "Negative keywords should produce negative adjustment: {adj}"
+        );
     }
 
     #[test]
     fn test_phrase_adjustment_positive_keywords() {
         let evaluator = UnifiedValueEvaluator::new();
         let adj = evaluator.calculate_phrase_adjustment("help and support and nurture");
-        assert!(adj > 0.0, "Positive keywords should produce positive adjustment: {adj}");
+        assert!(
+            adj > 0.0,
+            "Positive keywords should produce positive adjustment: {adj}"
+        );
     }
 
     #[test]
@@ -1674,9 +1680,12 @@ mod tests {
         let evaluator = UnifiedValueEvaluator::new();
         // All 10 negative keywords
         let adj = evaluator.calculate_phrase_adjustment(
-            "harm deceive manipulate exploit destroy steal attack abuse corrupt betray"
+            "harm deceive manipulate exploit destroy steal attack abuse corrupt betray",
         );
-        assert!(adj >= -0.3, "Adjustment should be clamped to -0.3, got {adj}");
+        assert!(
+            adj >= -0.3,
+            "Adjustment should be clamped to -0.3, got {adj}"
+        );
     }
 
     #[test]
@@ -1684,9 +1693,12 @@ mod tests {
         let evaluator = UnifiedValueEvaluator::new();
         // All 10 positive keywords
         let adj = evaluator.calculate_phrase_adjustment(
-            "help support nurture protect heal compassion care kindness serve empower"
+            "help support nurture protect heal compassion care kindness serve empower",
         );
-        assert!(adj <= 0.15, "Adjustment should be clamped to 0.15, got {adj}");
+        assert!(
+            adj <= 0.15,
+            "Adjustment should be clamped to 0.15, got {adj}"
+        );
     }
 
     #[test]
@@ -1694,7 +1706,10 @@ mod tests {
         let evaluator = UnifiedValueEvaluator::new();
         let lower = evaluator.calculate_phrase_adjustment("harm");
         let upper = evaluator.calculate_phrase_adjustment("HARM");
-        assert!((lower - upper).abs() < f64::EPSILON, "Should be case insensitive");
+        assert!(
+            (lower - upper).abs() < f64::EPSILON,
+            "Should be case insensitive"
+        );
     }
 
     // ================================================================
@@ -1866,8 +1881,14 @@ mod tests {
         let result = evaluator.evaluate("provide care", context);
         let report = evaluator.generate_narrative_report(&result, "provide care");
 
-        assert!(!report.narrative.is_empty(), "Narrative should not be empty");
-        assert!(!report.broadcast_message.is_empty(), "Broadcast message should not be empty");
+        assert!(
+            !report.narrative.is_empty(),
+            "Narrative should not be empty"
+        );
+        assert!(
+            !report.broadcast_message.is_empty(),
+            "Broadcast message should not be empty"
+        );
         assert!(report.timestamp > 0, "Timestamp should be positive");
     }
 
@@ -1908,7 +1929,10 @@ mod tests {
             ..Default::default()
         };
         let result = evaluator.evaluate("", context);
-        assert!(result.overall_score.is_finite(), "Empty action should not produce NaN");
+        assert!(
+            result.overall_score.is_finite(),
+            "Empty action should not produce NaN"
+        );
     }
 
     #[test]
@@ -1927,7 +1951,10 @@ mod tests {
             ..Default::default()
         };
         let result = evaluator.evaluate(&long_action, context);
-        assert!(result.overall_score.is_finite(), "Long action should not cause overflow");
+        assert!(
+            result.overall_score.is_finite(),
+            "Long action should not cause overflow"
+        );
     }
 
     #[test]
@@ -1947,7 +1974,10 @@ mod tests {
         };
         let result = evaluator.evaluate("do something", context);
         assert!(
-            matches!(result.decision, Decision::Veto(VetoReason::NegativeAffectDominant { .. })),
+            matches!(
+                result.decision,
+                Decision::Veto(VetoReason::NegativeAffectDominant { .. })
+            ),
             "High fear should trigger NegativeAffectDominant veto, got: {:?}",
             result.decision
         );
@@ -1970,7 +2000,10 @@ mod tests {
         };
         let result = evaluator.evaluate("amend the rules", low_context);
         assert!(
-            matches!(result.decision, Decision::Veto(VetoReason::InsufficientConsciousness { .. })),
+            matches!(
+                result.decision,
+                Decision::Veto(VetoReason::InsufficientConsciousness { .. })
+            ),
             "Sub-threshold consciousness for constitutional should be vetoed, got: {:?}",
             result.decision
         );
@@ -2021,7 +2054,12 @@ mod tests {
         };
         let result = evaluator.evaluate("test", context);
         evaluator.feedback_loop.record_user_feedback(
-            "test", &result, &result.decision, 0.8, 0.7, None,
+            "test",
+            &result,
+            &result.decision,
+            0.8,
+            0.7,
+            None,
         );
         evaluator.apply_feedback_decay();
         // Should still function

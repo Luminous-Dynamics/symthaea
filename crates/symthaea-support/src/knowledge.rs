@@ -38,9 +38,7 @@ impl KnowledgeManager {
         } else if phi > 0.3 || retrieval_count >= 2 {
             GraduationDecision::Defer("Needs more evidence before graduation".to_string())
         } else {
-            GraduationDecision::Reject(
-                "Insufficient quality or usage for graduation".to_string(),
-            )
+            GraduationDecision::Reject("Insufficient quality or usage for graduation".to_string())
         }
     }
 
@@ -98,13 +96,7 @@ impl KnowledgeManager {
     }
 
     /// Add an article to the knowledge store.
-    pub fn add_article(
-        &mut self,
-        id: String,
-        title: String,
-        category: SupportCategory,
-        phi: f64,
-    ) {
+    pub fn add_article(&mut self, id: String, title: String, category: SupportCategory, phi: f64) {
         self.articles.push(StoredArticle {
             id,
             title,
@@ -202,9 +194,24 @@ mod tests {
     #[test]
     fn search_returns_results_sorted_by_phi() {
         let mut km = KnowledgeManager::new();
-        km.add_article("1".to_string(), "DNS Troubleshooting".to_string(), SupportCategory::Network, 0.3);
-        km.add_article("2".to_string(), "DNS Configuration".to_string(), SupportCategory::Network, 0.8);
-        km.add_article("3".to_string(), "DNS Caching".to_string(), SupportCategory::Network, 0.5);
+        km.add_article(
+            "1".to_string(),
+            "DNS Troubleshooting".to_string(),
+            SupportCategory::Network,
+            0.3,
+        );
+        km.add_article(
+            "2".to_string(),
+            "DNS Configuration".to_string(),
+            SupportCategory::Network,
+            0.8,
+        );
+        km.add_article(
+            "3".to_string(),
+            "DNS Caching".to_string(),
+            SupportCategory::Network,
+            0.5,
+        );
 
         let results = km.search("DNS", 10);
         assert_eq!(results.len(), 3);
@@ -216,8 +223,18 @@ mod tests {
     #[test]
     fn deprecated_articles_excluded_from_search() {
         let mut km = KnowledgeManager::new();
-        km.add_article("1".to_string(), "Old DNS Guide".to_string(), SupportCategory::Network, 0.5);
-        km.add_article("2".to_string(), "New DNS Guide".to_string(), SupportCategory::Network, 0.7);
+        km.add_article(
+            "1".to_string(),
+            "Old DNS Guide".to_string(),
+            SupportCategory::Network,
+            0.5,
+        );
+        km.add_article(
+            "2".to_string(),
+            "New DNS Guide".to_string(),
+            SupportCategory::Network,
+            0.7,
+        );
         km.deprecate("1");
 
         let results = km.search("DNS", 10);
@@ -228,8 +245,18 @@ mod tests {
     #[test]
     fn search_filtered_excludes_local_only_when_sharing() {
         let mut km = KnowledgeManager::new();
-        km.add_article("1".to_string(), "DNS Public Guide".to_string(), SupportCategory::Network, 0.7);
-        km.add_article_local_only("2".to_string(), "DNS Local Notes".to_string(), SupportCategory::Network, 0.8);
+        km.add_article(
+            "1".to_string(),
+            "DNS Public Guide".to_string(),
+            SupportCategory::Network,
+            0.7,
+        );
+        km.add_article_local_only(
+            "2".to_string(),
+            "DNS Local Notes".to_string(),
+            SupportCategory::Network,
+            0.8,
+        );
 
         // When can_share=true, local-only articles are excluded
         let shared = km.search_filtered("DNS", 10, true);
@@ -258,7 +285,12 @@ mod tests {
     #[test]
     fn absorption_detects_existing_category() {
         let mut km = KnowledgeManager::new();
-        km.add_article("1".to_string(), "Existing".to_string(), SupportCategory::Network, 0.5);
+        km.add_article(
+            "1".to_string(),
+            "Existing".to_string(),
+            SupportCategory::Network,
+            0.5,
+        );
 
         let update = CognitiveUpdateData {
             category: SupportCategory::Network,
