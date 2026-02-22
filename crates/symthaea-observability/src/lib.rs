@@ -588,6 +588,149 @@ pub struct PhiComponents {
 mod tests {
     use super::*;
 
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    fn default_meta() -> EventMetadata {
+        EventMetadata::default()
+    }
+
+    fn phi_event(id: &str) -> PhiMeasurementEvent {
+        PhiMeasurementEvent {
+            id: id.to_string(),
+            phi: 0.5,
+            method: "IIT".to_string(),
+            system_size: 10,
+            duration_us: 100,
+            metadata: default_meta(),
+        }
+    }
+
+    fn router_event(id: &str) -> RouterSelectionEvent {
+        RouterSelectionEvent {
+            id: id.to_string(),
+            router: "thalamic".to_string(),
+            input_summary: "test".to_string(),
+            scores: HashMap::new(),
+            metadata: default_meta(),
+        }
+    }
+
+    fn workspace_event(id: &str) -> WorkspaceIgnitionEvent {
+        WorkspaceIgnitionEvent {
+            id: id.to_string(),
+            workspace: "default".to_string(),
+            components: vec!["core".to_string()],
+            duration_us: 50,
+            success: true,
+            metadata: default_meta(),
+        }
+    }
+
+    fn primitive_event(id: &str) -> PrimitiveActivationEvent {
+        PrimitiveActivationEvent {
+            id: id.to_string(),
+            primitive_id: "prim_1".to_string(),
+            activation: 0.75,
+            input_hash: "abc123".to_string(),
+            metadata: default_meta(),
+        }
+    }
+
+    fn response_event(id: &str) -> ResponseGeneratedEvent {
+        ResponseGeneratedEvent {
+            id: id.to_string(),
+            response_type: "text".to_string(),
+            token_count: 42,
+            duration_us: 200,
+            quality_score: 0.9,
+            metadata: default_meta(),
+        }
+    }
+
+    fn security_event(id: &str) -> SecurityCheckEvent {
+        SecurityCheckEvent {
+            id: id.to_string(),
+            check_type: "sandbox".to_string(),
+            passed: true,
+            details: "all clear".to_string(),
+            metadata: default_meta(),
+        }
+    }
+
+    fn error_event(id: &str) -> ErrorEvent {
+        ErrorEvent {
+            id: id.to_string(),
+            code: "E001".to_string(),
+            message: "test error".to_string(),
+            stack_trace: None,
+            severity: ErrorSeverity::Error,
+            metadata: default_meta(),
+        }
+    }
+
+    fn language_event(id: &str) -> LanguageStepEvent {
+        LanguageStepEvent {
+            id: id.to_string(),
+            step: "tokenize".to_string(),
+            input_hash: "hash1".to_string(),
+            duration_us: 30,
+            output_summary: "tokenized ok".to_string(),
+            metadata: default_meta(),
+        }
+    }
+
+    fn narrative_event(id: &str) -> NarrativeSelfEvent {
+        NarrativeSelfEvent {
+            id: id.to_string(),
+            component: "autobiography".to_string(),
+            coherence: 0.85,
+            update_type: "append".to_string(),
+            metadata: default_meta(),
+        }
+    }
+
+    fn cross_modal_event(id: &str) -> CrossModalBindingEvent {
+        CrossModalBindingEvent {
+            id: id.to_string(),
+            modalities: vec!["visual".to_string(), "auditory".to_string()],
+            strength: 0.7,
+            integration_phi: 0.4,
+            metadata: default_meta(),
+        }
+    }
+
+    fn gwt_event(id: &str) -> GWTIntegrationEvent {
+        GWTIntegrationEvent {
+            id: id.to_string(),
+            broadcast: "alert".to_string(),
+            modules: vec!["prefrontal".to_string(), "hippocampal".to_string()],
+            activation: 0.6,
+            metadata: default_meta(),
+        }
+    }
+
+    fn broca_event(id: &str) -> BrocaPipelineEvent {
+        BrocaPipelineEvent {
+            id: id.to_string(),
+            correlation_id: "broca_corr".to_string(),
+            phase: BrocaPhase::Perception,
+            input_hash: "input_hash".to_string(),
+            duration_us: 120,
+            epistemic_status: "known".to_string(),
+            semantic_intent: "query".to_string(),
+            familiarity: 0.8,
+            novelty: 0.2,
+            phi: 0.45,
+            fidelity_verified: true,
+            response_type: "answer".to_string(),
+            relationship_stage: "trust".to_string(),
+            trust: 0.9,
+            metadata: default_meta(),
+        }
+    }
+
+    // ── Existing tests (preserved) ──────────────────────────────────────
+
     #[test]
     fn test_correlation_context() {
         let mut ctx = CorrelationContext::new("test-correlation");
@@ -614,5 +757,247 @@ mod tests {
         };
         obs.record_phi_measurement(event).unwrap();
         assert_eq!(obs.stats().total_events, 1);
+    }
+
+    // ── NoOpObserver: each event type increments total_events ────────────
+
+    #[test]
+    fn test_noop_record_phi_measurement() {
+        let mut obs = NoOpObserver::new();
+        obs.record_phi_measurement(phi_event("p1")).unwrap();
+        assert_eq!(obs.stats().total_events, 1);
+    }
+
+    #[test]
+    fn test_noop_record_router_selection() {
+        let mut obs = NoOpObserver::new();
+        obs.record_router_selection(router_event("r1")).unwrap();
+        assert_eq!(obs.stats().total_events, 1);
+    }
+
+    #[test]
+    fn test_noop_record_workspace_ignition() {
+        let mut obs = NoOpObserver::new();
+        obs.record_workspace_ignition(workspace_event("w1")).unwrap();
+        assert_eq!(obs.stats().total_events, 1);
+    }
+
+    #[test]
+    fn test_noop_record_primitive_activation() {
+        let mut obs = NoOpObserver::new();
+        obs.record_primitive_activation(primitive_event("pa1")).unwrap();
+        assert_eq!(obs.stats().total_events, 1);
+    }
+
+    #[test]
+    fn test_noop_record_response_generated() {
+        let mut obs = NoOpObserver::new();
+        obs.record_response_generated(response_event("rg1")).unwrap();
+        assert_eq!(obs.stats().total_events, 1);
+    }
+
+    #[test]
+    fn test_noop_record_security_check() {
+        let mut obs = NoOpObserver::new();
+        obs.record_security_check(security_event("sc1")).unwrap();
+        assert_eq!(obs.stats().total_events, 1);
+    }
+
+    #[test]
+    fn test_noop_record_error() {
+        let mut obs = NoOpObserver::new();
+        obs.record_error(error_event("e1")).unwrap();
+        assert_eq!(obs.stats().total_events, 1);
+    }
+
+    #[test]
+    fn test_noop_record_language_step() {
+        let mut obs = NoOpObserver::new();
+        obs.record_language_step(language_event("ls1")).unwrap();
+        assert_eq!(obs.stats().total_events, 1);
+    }
+
+    #[test]
+    fn test_noop_record_narrative_self() {
+        let mut obs = NoOpObserver::new();
+        obs.record_narrative_self(narrative_event("ns1")).unwrap();
+        assert_eq!(obs.stats().total_events, 1);
+    }
+
+    #[test]
+    fn test_noop_record_cross_modal_binding() {
+        let mut obs = NoOpObserver::new();
+        obs.record_cross_modal_binding(cross_modal_event("cm1"))
+            .unwrap();
+        assert_eq!(obs.stats().total_events, 1);
+    }
+
+    #[test]
+    fn test_noop_record_gwt_integration() {
+        let mut obs = NoOpObserver::new();
+        obs.record_gwt_integration(gwt_event("g1")).unwrap();
+        assert_eq!(obs.stats().total_events, 1);
+    }
+
+    #[test]
+    fn test_noop_record_broca_pipeline() {
+        let mut obs = NoOpObserver::new();
+        obs.record_broca_pipeline(broca_event("bp1")).unwrap();
+        assert_eq!(obs.stats().total_events, 1);
+        // broca_pipeline also tracks by-type
+        assert_eq!(
+            *obs.stats()
+                .events_by_type
+                .get("broca_pipeline")
+                .unwrap_or(&0),
+            1
+        );
+    }
+
+    // ── Stats accumulation across many observe() calls ──────────────────
+
+    #[test]
+    fn test_stats_accumulation_across_mixed_events() {
+        let mut obs = NoOpObserver::new();
+
+        obs.record_phi_measurement(phi_event("p1")).unwrap();
+        obs.record_router_selection(router_event("r1")).unwrap();
+        obs.record_error(error_event("e1")).unwrap();
+        obs.record_workspace_ignition(workspace_event("w1")).unwrap();
+        obs.record_broca_pipeline(broca_event("bp1")).unwrap();
+        obs.record_broca_pipeline(broca_event("bp2")).unwrap();
+
+        let stats = obs.stats();
+        assert_eq!(stats.total_events, 6);
+        // broca_pipeline is the only type tracked by NoOpObserver
+        assert_eq!(
+            *stats.events_by_type.get("broca_pipeline").unwrap_or(&0),
+            2
+        );
+    }
+
+    // ── Flush is no-op but succeeds ─────────────────────────────────────
+
+    #[test]
+    fn test_noop_flush() {
+        let mut obs = NoOpObserver::new();
+        assert!(obs.flush().is_ok());
+    }
+
+    // ── EventMetadata tag operations and parent stack ────────────────────
+
+    #[test]
+    fn test_event_metadata_from_context_with_tags() {
+        let mut ctx = CorrelationContext::new("ctx-1");
+        ctx.add_tag("env", "test");
+        ctx.add_tag("region", "us-east");
+
+        let meta = ctx.create_event_metadata();
+        assert_eq!(meta.correlation_id, "ctx-1");
+        assert_eq!(meta.tags.get("env").map(|s| s.as_str()), Some("test"));
+        assert_eq!(
+            meta.tags.get("region").map(|s| s.as_str()),
+            Some("us-east")
+        );
+        assert!(meta.parent_id.is_none()); // no parents pushed
+        assert!(meta.timestamp > 0);
+    }
+
+    #[test]
+    fn test_event_metadata_parent_from_stack() {
+        let mut ctx = CorrelationContext::new("ctx-2");
+        ctx.push_parent("scope-a");
+        ctx.push_parent("scope-b");
+
+        let meta = ctx.create_event_metadata();
+        // parent_id should be the top of the stack
+        assert_eq!(meta.parent_id, Some("scope-b".to_string()));
+    }
+
+    #[test]
+    fn test_correlation_context_pop_empty_returns_none() {
+        let mut ctx = CorrelationContext::new("empty");
+        assert!(ctx.pop_parent().is_none());
+        assert!(ctx.current_parent().is_none());
+    }
+
+    #[test]
+    fn test_correlation_context_tag_overwrite() {
+        let mut ctx = CorrelationContext::new("ctx-3");
+        ctx.add_tag("key", "value1");
+        ctx.add_tag("key", "value2");
+        assert_eq!(ctx.tags.get("key").map(|s| s.as_str()), Some("value2"));
+    }
+
+    // ── SharedObserver / no_op_observer ──────────────────────────────────
+
+    #[test]
+    fn test_shared_no_op_observer() {
+        let shared = no_op_observer();
+        {
+            let mut obs = shared.write().unwrap();
+            obs.record_phi_measurement(phi_event("shared_p1")).unwrap();
+            obs.record_error(error_event("shared_e1")).unwrap();
+        }
+        let stats = shared.read().unwrap().stats();
+        assert_eq!(stats.total_events, 2);
+    }
+
+    // ── PhiComponents default ───────────────────────────────────────────
+
+    #[test]
+    fn test_phi_components_default() {
+        let pc = PhiComponents::default();
+        assert_eq!(pc.phi, 0.0);
+        assert_eq!(pc.integrated_info, 0.0);
+        assert_eq!(pc.entropy, 0.0);
+        assert_eq!(pc.element_count, 0);
+    }
+
+    // ── BrocaPhase Display ──────────────────────────────────────────────
+
+    #[test]
+    fn test_broca_phase_display() {
+        assert_eq!(format!("{}", BrocaPhase::Perception), "perception");
+        assert_eq!(format!("{}", BrocaPhase::Cognition), "cognition");
+        assert_eq!(format!("{}", BrocaPhase::Extraction), "extraction");
+        assert_eq!(
+            format!("{}", BrocaPhase::RelationalEnrichment),
+            "relational_enrichment"
+        );
+        assert_eq!(format!("{}", BrocaPhase::Translation), "translation");
+        assert_eq!(
+            format!("{}", BrocaPhase::FidelityVerification),
+            "fidelity_verification"
+        );
+        assert_eq!(
+            format!("{}", BrocaPhase::PartnershipUpdate),
+            "partnership_update"
+        );
+        assert_eq!(format!("{}", BrocaPhase::Complete), "complete");
+    }
+
+    // ── ErrorSeverity variants ──────────────────────────────────────────
+
+    #[test]
+    fn test_error_severity_equality() {
+        assert_eq!(ErrorSeverity::Info, ErrorSeverity::Info);
+        assert_eq!(ErrorSeverity::Warning, ErrorSeverity::Warning);
+        assert_eq!(ErrorSeverity::Error, ErrorSeverity::Error);
+        assert_eq!(ErrorSeverity::Critical, ErrorSeverity::Critical);
+        assert_ne!(ErrorSeverity::Info, ErrorSeverity::Critical);
+    }
+
+    // ── ObserverStats default ───────────────────────────────────────────
+
+    #[test]
+    fn test_observer_stats_default() {
+        let stats = ObserverStats::default();
+        assert_eq!(stats.total_events, 0);
+        assert!(stats.events_by_type.is_empty());
+        assert_eq!(stats.bytes_written, 0);
+        assert_eq!(stats.avg_latency_us, 0.0);
+        assert_eq!(stats.error_count, 0);
+        assert!(stats.last_event_time.is_none());
     }
 }

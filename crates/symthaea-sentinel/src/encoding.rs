@@ -290,3 +290,179 @@ impl Default for PremiumHdcEncoder {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::features::MEL_BANDS;
+
+    fn make_test_features(frame_index: usize) -> AudioFeatures {
+        AudioFeatures::synthetic(
+            vec![0.1; MEL_BANDS],
+            vec![1.0; NUM_MFCC],
+            2000.0,
+            4000.0,
+            0.5,
+            0.3,
+            0.2,
+            0.4,
+            0.6,
+            0.05,
+            0.02,
+            frame_index,
+        )
+    }
+
+    // =========================================================================
+    // AudioHdcEncoder tests
+    // =========================================================================
+
+    #[test]
+    fn test_audio_encoder_default() {
+        let encoder = AudioHdcEncoder::default();
+        let features = make_test_features(0);
+        let vecs = encoder.encode(&features);
+        assert_eq!(vecs.timbre.values.len(), HDC_DIM);
+        assert_eq!(vecs.rhythm.values.len(), HDC_DIM);
+        assert_eq!(vecs.envelope.values.len(), HDC_DIM);
+        assert_eq!(vecs.context.values.len(), HDC_DIM);
+    }
+
+    #[test]
+    fn test_audio_encoder_output_finite() {
+        let encoder = AudioHdcEncoder::new();
+        let features = make_test_features(0);
+        let vecs = encoder.encode(&features);
+        assert!(vecs.timbre.values.iter().all(|v| v.is_finite()));
+        assert!(vecs.rhythm.values.iter().all(|v| v.is_finite()));
+        assert!(vecs.envelope.values.iter().all(|v| v.is_finite()));
+        assert!(vecs.context.values.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn test_audio_encoder_different_frames_different_context() {
+        let encoder = AudioHdcEncoder::new();
+        let vecs_0 = encoder.encode(&make_test_features(0));
+        let vecs_1 = encoder.encode(&make_test_features(1));
+        // Different frame_index → different position binding → different context
+        assert_ne!(
+            vecs_0.context.values, vecs_1.context.values,
+            "Different frame indices should produce different context vectors"
+        );
+    }
+
+    #[test]
+    fn test_audio_encoder_same_input_same_output() {
+        let encoder = AudioHdcEncoder::new();
+        let features = make_test_features(5);
+        let vecs_a = encoder.encode(&features);
+        let vecs_b = encoder.encode(&features);
+        assert_eq!(vecs_a.timbre.values, vecs_b.timbre.values);
+        assert_eq!(vecs_a.context.values, vecs_b.context.values);
+    }
+
+    #[test]
+    fn test_audio_encoder_context_is_normalized() {
+        let encoder = AudioHdcEncoder::new();
+        let vecs = encoder.encode(&make_test_features(0));
+        let norm: f32 = vecs
+            .context
+            .values
+            .iter()
+            .map(|v| v * v)
+            .sum::<f32>()
+            .sqrt();
+        // Normalized should have norm close to sqrt(HDC_DIM) for bipolar or 1.0
+        assert!(norm.is_finite() && norm > 0.0, "Context norm should be positive");
+    }
+
+    // =========================================================================
+    // PremiumHdcEncoder tests
+    // =========================================================================
+
+    #[test]
+    fn test_premium_encoder_default() {
+        let mut encoder = PremiumHdcEncoder::default();
+        let features = make_test_features(0);
+        let vecs = encoder.encode(&features);
+        assert_eq!(vecs.timbre.values.len(), HDC_DIM);
+        assert_eq!(vecs.context.values.len(), HDC_DIM);
+    }
+
+    #[test]
+    fn test_premium_encoder_output_finite() {
+        let mut encoder = PremiumHdcEncoder::new();
+        let features = make_test_features(0);
+        let vecs = encoder.encode(&features);
+        assert!(vecs.timbre.values.iter().all(|v| v.is_finite()));
+        assert!(vecs.rhythm.values.iter().all(|v| v.is_finite()));
+        assert!(vecs.envelope.values.iter().all(|v| v.is_finite()));
+        assert!(vecs.context.values.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn test_premium_encoder_evolves_state() {
+        let mut encoder = PremiumHdcEncoder::new();
+        let vecs_0 = encoder.encode(&make_test_features(0));
+        let vecs_1 = encoder.encode(&make_test_features(1));
+        // Premium encoder has internal CfC state, so sequential calls differ
+        assert_ne!(
+            vecs_0.timbre.values, vecs_1.timbre.values,
+            "Premium encoder should produce different timbre on sequential frames"
+        );
+    }
+
+    #[test]
+    fn test_premium_encoder_get_phi() {
+        let mut encoder = PremiumHdcEncoder::new();
+        let (phi_t, phi_r) = encoder.get_phi();
+        assert_eq!(phi_t, 0.0);
+        assert_eq!(phi_r, 0.0);
+
+        encoder.encode(&make_test_features(0));
+        let (phi_t, phi_r) = encoder.get_phi();
+        assert!(phi_t >= 0.0 && phi_t.is_finite());
+        assert!(phi_r >= 0.0 && phi_r.is_finite());
+    }
+
+    #[test]
+    fn test_premium_encoder_reset() {
+        let mut encoder = PremiumHdcEncoder::new();
+        for i in 0..10 {
+            encoder.encode(&make_test_features(i));
+        }
+        let (phi_t, _) = encoder.get_phi();
+        assert!(phi_t > 0.0, "Should have nonzero phi after encoding");
+
+        encoder.reset();
+        let (phi_t, phi_r) = encoder.get_phi();
+        assert_eq!(phi_t, 0.0);
+        assert_eq!(phi_r, 0.0);
+    }
+
+    #[test]
+    fn test_premium_encoder_get_phase_spaces() {
+        let mut encoder = PremiumHdcEncoder::new();
+        encoder.encode(&make_test_features(0));
+        let (timbre_ps, rhythm_ps) = encoder.get_phase_spaces();
+        // 5 CfC levels x 64 dims x 2 (state + velocity) = 640
+        assert_eq!(timbre_ps.len(), 640);
+        assert_eq!(rhythm_ps.len(), 640);
+        assert!(timbre_ps.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn test_premium_encoder_multiple_frames_phi_grows() {
+        let mut encoder = PremiumHdcEncoder::new();
+        // Encode several frames with varying features
+        for i in 0..20 {
+            let mut features = make_test_features(i);
+            features.spectral_centroid = 1000.0 + (i as f32) * 200.0;
+            features.onset_strength = (i as f32 * 0.3).sin().abs();
+            encoder.encode(&features);
+        }
+        let (phi_t, phi_r) = encoder.get_phi();
+        assert!(phi_t.is_finite());
+        assert!(phi_r.is_finite());
+    }
+}

@@ -452,4 +452,241 @@ mod tests {
         let song = SevenHarmonies::kosmic_song();
         assert!(song.contains("Infinite Love"));
     }
+
+    // =========================================================================
+    // HarmonyAlignment extended tests
+    // =========================================================================
+
+    #[test]
+    fn test_alignment_score_clamped() {
+        let a = HarmonyAlignment::new(Harmony::IntegralWisdom, 5.0, 2.0);
+        assert_eq!(a.score, 1.0, "Score should clamp to 1.0");
+        assert_eq!(a.confidence, 1.0, "Confidence should clamp to 1.0");
+
+        let b = HarmonyAlignment::new(Harmony::IntegralWisdom, -5.0, -1.0);
+        assert_eq!(b.score, -1.0, "Score should clamp to -1.0");
+        assert_eq!(b.confidence, 0.0, "Confidence should clamp to 0.0");
+    }
+
+    #[test]
+    fn test_alignment_misaligned() {
+        let a = HarmonyAlignment::new(Harmony::InfinitePlay, -0.3, 0.8);
+        assert!(a.is_misaligned());
+        assert!(!a.is_aligned());
+        assert!(!a.is_strongly_aligned());
+    }
+
+    #[test]
+    fn test_alignment_f32_accessor() {
+        let a = HarmonyAlignment::new(Harmony::SacredReciprocity, 0.75, 0.9);
+        assert!((a.alignment() - 0.75).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_alignment_with_explanation_and_evidence() {
+        let a = HarmonyAlignment::new(Harmony::ResonantCoherence, 0.5, 0.8)
+            .with_explanation("Integrates well")
+            .with_evidence(vec!["Evidence A".into(), "Evidence B".into()]);
+        assert_eq!(a.explanation.as_deref(), Some("Integrates well"));
+        assert_eq!(a.evidence.len(), 2);
+    }
+
+    // =========================================================================
+    // AlignmentResult extended tests
+    // =========================================================================
+
+    #[test]
+    fn test_alignment_result_most_aligned() {
+        let alignments = vec![
+            HarmonyAlignment::new(Harmony::ResonantCoherence, 0.3, 0.8),
+            HarmonyAlignment::new(Harmony::PanSentientFlourishing, 0.9, 0.8),
+            HarmonyAlignment::new(Harmony::IntegralWisdom, -0.2, 0.8),
+        ];
+        let result = AlignmentResult::from_alignments(alignments);
+        let (_, best) = result.most_aligned().unwrap();
+        assert!((best.score - 0.9).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_alignment_result_least_aligned() {
+        let alignments = vec![
+            HarmonyAlignment::new(Harmony::ResonantCoherence, 0.3, 0.8),
+            HarmonyAlignment::new(Harmony::PanSentientFlourishing, 0.9, 0.8),
+            HarmonyAlignment::new(Harmony::IntegralWisdom, -0.5, 0.8),
+        ];
+        let result = AlignmentResult::from_alignments(alignments);
+        let (_, worst) = result.least_aligned().unwrap();
+        assert!((worst.score - (-0.5)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_alignment_result_has_violations() {
+        let positive = AlignmentResult::from_alignments(vec![
+            HarmonyAlignment::new(Harmony::ResonantCoherence, 0.5, 0.8),
+        ]);
+        assert!(!positive.has_violations());
+
+        let negative = AlignmentResult::from_alignments(vec![
+            HarmonyAlignment::new(Harmony::ResonantCoherence, -0.1, 0.8),
+        ]);
+        assert!(negative.has_violations());
+    }
+
+    #[test]
+    fn test_alignment_result_should_veto() {
+        let mild = AlignmentResult::from_alignments(vec![
+            HarmonyAlignment::new(Harmony::ResonantCoherence, -0.3, 0.8),
+        ]);
+        assert!(!mild.should_veto(), "Mild negative should not veto");
+
+        let severe = AlignmentResult::from_alignments(vec![
+            HarmonyAlignment::new(Harmony::ResonantCoherence, -0.8, 0.8),
+        ]);
+        assert!(severe.should_veto(), "Score < -0.7 should veto");
+    }
+
+    #[test]
+    fn test_alignment_result_best_alignment() {
+        let alignments = vec![
+            HarmonyAlignment::new(Harmony::InfinitePlay, 0.2, 0.5),
+            HarmonyAlignment::new(Harmony::SacredReciprocity, 0.8, 0.5),
+        ];
+        let result = AlignmentResult::from_alignments(alignments);
+        let best = result.best_alignment().unwrap();
+        assert!((best.score - 0.8).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_alignment_result_get_specific_harmony() {
+        let alignments = vec![
+            HarmonyAlignment::new(Harmony::IntegralWisdom, 0.6, 0.9),
+        ];
+        let result = AlignmentResult::from_alignments(alignments);
+        assert!(result.get(Harmony::IntegralWisdom).is_some());
+        assert!(result.get(Harmony::InfinitePlay).is_none());
+    }
+
+    #[test]
+    fn test_alignment_result_harmonies_iterator() {
+        let alignments = vec![
+            HarmonyAlignment::new(Harmony::ResonantCoherence, 0.5, 0.8),
+            HarmonyAlignment::new(Harmony::PanSentientFlourishing, 0.7, 0.9),
+        ];
+        let result = AlignmentResult::from_alignments(alignments);
+        let count = result.harmonies().count();
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_alignment_result_summary_messages() {
+        let strong = AlignmentResult::from_alignments(vec![
+            HarmonyAlignment::new(Harmony::ResonantCoherence, 0.9, 0.9),
+        ]);
+        assert!(strong.summary.contains("strongly"));
+
+        let weak = AlignmentResult::from_alignments(vec![
+            HarmonyAlignment::new(Harmony::ResonantCoherence, 0.1, 0.5),
+        ]);
+        assert!(weak.summary.contains("generally"));
+
+        let bad = AlignmentResult::from_alignments(vec![
+            HarmonyAlignment::new(Harmony::ResonantCoherence, -0.8, 0.9),
+        ]);
+        assert!(bad.summary.contains("conflicts"));
+    }
+
+    #[test]
+    fn test_alignment_result_empty_zero_confidence() {
+        let result = AlignmentResult::from_alignments(vec![]);
+        assert_eq!(result.overall_score, 0.0);
+        assert_eq!(result.overall_confidence, 0.0);
+    }
+
+    // =========================================================================
+    // SevenHarmonies extended tests
+    // =========================================================================
+
+    #[test]
+    fn test_set_weight_affects_evaluator() {
+        let mut harmonies = SevenHarmonies::new();
+        harmonies.set_weight(Harmony::ResonantCoherence, 10.0);
+        // The weight should be stored
+        assert_eq!(*harmonies.weights.get(&Harmony::ResonantCoherence).unwrap(), 10.0);
+    }
+
+    #[test]
+    fn test_set_weight_clamps_negative() {
+        let mut harmonies = SevenHarmonies::new();
+        harmonies.set_weight(Harmony::InfinitePlay, -5.0);
+        assert_eq!(*harmonies.weights.get(&Harmony::InfinitePlay).unwrap(), 0.0);
+    }
+
+    #[test]
+    fn test_evaluate_action_is_alias() {
+        let mut harmonies = SevenHarmonies::new();
+        let result = harmonies.evaluate_action("help the community grow and share");
+        assert!(result.overall_score.is_finite());
+        assert!(result.overall_confidence > 0.0);
+    }
+
+    #[test]
+    fn test_stats_accumulate() {
+        let mut harmonies = SevenHarmonies::new();
+        assert_eq!(harmonies.stats().total_evaluations, 0);
+
+        harmonies.evaluate("help");
+        assert_eq!(harmonies.stats().total_evaluations, 1);
+
+        harmonies.evaluate("destroy");
+        assert_eq!(harmonies.stats().total_evaluations, 2);
+        assert_eq!(harmonies.stats().passed + harmonies.stats().failed, 2);
+    }
+
+    #[test]
+    fn test_stats_avg_score() {
+        let mut harmonies = SevenHarmonies::new();
+        harmonies.evaluate("help the community");
+        harmonies.evaluate("share knowledge and grow");
+        let avg = harmonies.stats().avg_score;
+        assert!(avg.is_finite());
+    }
+
+    #[test]
+    fn test_neutral_text_low_confidence() {
+        let mut harmonies = SevenHarmonies::new();
+        let result = harmonies.evaluate("install firefox");
+        // Neutral text should have low confidence (0.3 default)
+        assert!(result.overall_confidence <= 0.5, "Neutral text should have low confidence");
+    }
+
+    #[test]
+    fn test_get_returns_none() {
+        let harmonies = SevenHarmonies::new();
+        // get() always returns None (placeholder for HDC encoding)
+        assert!(harmonies.get(Harmony::ResonantCoherence).is_none());
+    }
+
+    #[test]
+    fn test_evaluate_positive_text() {
+        let mut harmonies = SevenHarmonies::new();
+        let result = harmonies.evaluate("help the community grow and share knowledge together");
+        assert!(
+            result.overall_score > 0.0,
+            "Positive text should score positive: {}",
+            result.overall_score
+        );
+        assert!(result.recommended);
+    }
+
+    #[test]
+    fn test_evaluate_negative_text() {
+        let mut harmonies = SevenHarmonies::new();
+        let result = harmonies.evaluate("destroy harm exploit and isolate");
+        assert!(
+            result.overall_score < 0.0,
+            "Negative text should score negative: {}",
+            result.overall_score
+        );
+        assert!(!result.recommended);
+    }
 }

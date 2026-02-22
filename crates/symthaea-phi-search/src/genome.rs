@@ -554,3 +554,323 @@ impl ArchitectureGenome {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_genome_values() {
+        let g = ArchitectureGenome::default();
+        assert_eq!(g.num_nodes, 16);
+        assert_eq!(g.hierarchy_depth, 4);
+        assert!((g.base_tau - 1000.0).abs() < f32::EPSILON);
+        assert!((g.tau_ratio - 1.0 / 3.0).abs() < 1e-6);
+        assert!((g.connection_density - 0.4).abs() < f32::EPSILON);
+        assert!((g.modularity - 0.5).abs() < f32::EPSILON);
+        assert_eq!(g.num_modules, 4);
+        assert!((g.bridge_ratio - 0.3).abs() < f32::EPSILON);
+        assert_eq!(g.topology_type, TopologyGene::Modular);
+        assert!((g.binding_strength - 0.8).abs() < f32::EPSILON);
+        assert_eq!(g.bundling_mode, BundlingGene::WeightedAverage);
+        assert!((g.recurrence - 0.3).abs() < f32::EPSILON);
+        assert!((g.skip_connection_prob - 0.1).abs() < f32::EPSILON);
+        assert!(!g.use_attention);
+        assert_eq!(g.hdc_dim, HDC_DIMENSION);
+        assert_eq!(g.seed, 42);
+    }
+
+    #[test]
+    fn test_random_genome_deterministic() {
+        let g1 = ArchitectureGenome::random(99);
+        let g2 = ArchitectureGenome::random(99);
+        // Same seed must produce identical genomes
+        assert_eq!(g1.num_nodes, g2.num_nodes);
+        assert_eq!(g1.hierarchy_depth, g2.hierarchy_depth);
+        assert!((g1.base_tau - g2.base_tau).abs() < f32::EPSILON);
+        assert_eq!(g1.topology_type, g2.topology_type);
+        assert_eq!(g1.bundling_mode, g2.bundling_mode);
+    }
+
+    #[test]
+    fn test_random_genome_bounds() {
+        // Test several seeds to check range constraints
+        for seed in 0..20u64 {
+            let g = ArchitectureGenome::random(seed + 1);
+            assert!(g.num_nodes >= 8 && g.num_nodes <= 64, "num_nodes out of range: {}", g.num_nodes);
+            assert!(g.hierarchy_depth >= 2 && g.hierarchy_depth <= 7);
+            assert!(g.base_tau >= 100.0 && g.base_tau <= 2000.0);
+            assert!(g.tau_ratio >= 0.2 && g.tau_ratio <= 0.8);
+            assert!(g.connection_density >= 0.1 && g.connection_density <= 0.8);
+            assert!(g.modularity >= 0.0 && g.modularity <= 1.0);
+            assert!(g.num_modules >= 2 && g.num_modules <= 8);
+            assert!(g.bridge_ratio >= 0.05 && g.bridge_ratio <= 0.55);
+            assert!(g.binding_strength >= 0.3 && g.binding_strength <= 1.0);
+            assert!(g.recurrence >= 0.0 && g.recurrence <= 1.0);
+            assert!(g.skip_connection_prob >= 0.0 && g.skip_connection_prob <= 0.3);
+            assert_eq!(g.hdc_dim, HDC_DIMENSION);
+        }
+    }
+
+    #[test]
+    fn test_mutate_respects_bounds() {
+        let mut g = ArchitectureGenome::default();
+        // Apply many rounds of high-rate mutation and verify bounds hold
+        for i in 0..50u64 {
+            g.mutate(1.0, i * 7 + 13);
+        }
+        assert!(g.num_nodes >= 4 && g.num_nodes <= 128);
+        assert!(g.hierarchy_depth >= 1 && g.hierarchy_depth <= 10);
+        assert!(g.base_tau >= 10.0 && g.base_tau <= 5000.0);
+        assert!(g.tau_ratio >= 0.1 && g.tau_ratio <= 0.9);
+        assert!(g.connection_density >= 0.05 && g.connection_density <= 0.95);
+        assert!(g.modularity >= 0.0 && g.modularity <= 1.0);
+        assert!(g.num_modules >= 1 && g.num_modules <= 16);
+        assert!(g.bridge_ratio >= 0.0 && g.bridge_ratio <= 0.8);
+        assert!(g.binding_strength >= 0.1 && g.binding_strength <= 1.0);
+        assert!(g.recurrence >= 0.0 && g.recurrence <= 1.0);
+        assert!(g.skip_connection_prob >= 0.0 && g.skip_connection_prob <= 0.5);
+    }
+
+    #[test]
+    fn test_mutate_zero_rate_preserves_genome() {
+        let original = ArchitectureGenome::default();
+        let mut g = original.clone();
+        g.mutate(0.0, 42);
+        // With mutation_rate 0.0, no gene should mutate
+        assert_eq!(g.num_nodes, original.num_nodes);
+        assert!((g.connection_density - original.connection_density).abs() < f32::EPSILON);
+        assert!((g.modularity - original.modularity).abs() < f32::EPSILON);
+        assert!((g.base_tau - original.base_tau).abs() < f32::EPSILON);
+        assert!((g.tau_ratio - original.tau_ratio).abs() < f32::EPSILON);
+        assert!((g.bridge_ratio - original.bridge_ratio).abs() < f32::EPSILON);
+        assert!((g.binding_strength - original.binding_strength).abs() < f32::EPSILON);
+        assert!((g.recurrence - original.recurrence).abs() < f32::EPSILON);
+        assert!((g.skip_connection_prob - original.skip_connection_prob).abs() < f32::EPSILON);
+        assert_eq!(g.use_attention, original.use_attention);
+    }
+
+    #[test]
+    fn test_crossover_inherits_from_parents() {
+        let p1 = ArchitectureGenome {
+            num_nodes: 10,
+            hierarchy_depth: 2,
+            base_tau: 500.0,
+            connection_density: 0.2,
+            modularity: 0.1,
+            num_modules: 2,
+            topology_type: TopologyGene::Ring,
+            bundling_mode: BundlingGene::Average,
+            use_attention: false,
+            ..Default::default()
+        };
+        let p2 = ArchitectureGenome {
+            num_nodes: 50,
+            hierarchy_depth: 7,
+            base_tau: 1800.0,
+            connection_density: 0.9,
+            modularity: 0.9,
+            num_modules: 8,
+            topology_type: TopologyGene::Star,
+            bundling_mode: BundlingGene::MajorityVote,
+            use_attention: true,
+            ..Default::default()
+        };
+
+        let child = p1.crossover(&p2, 77);
+        // Each gene comes from one parent
+        assert!(child.num_nodes == p1.num_nodes || child.num_nodes == p2.num_nodes);
+        assert!(child.hierarchy_depth == p1.hierarchy_depth || child.hierarchy_depth == p2.hierarchy_depth);
+        assert!(
+            (child.base_tau - p1.base_tau).abs() < f32::EPSILON
+                || (child.base_tau - p2.base_tau).abs() < f32::EPSILON
+        );
+        assert!(
+            (child.connection_density - p1.connection_density).abs() < f32::EPSILON
+                || (child.connection_density - p2.connection_density).abs() < f32::EPSILON
+        );
+        assert!(child.topology_type == p1.topology_type || child.topology_type == p2.topology_type);
+        assert!(child.bundling_mode == p1.bundling_mode || child.bundling_mode == p2.bundling_mode);
+        assert!(child.use_attention == p1.use_attention || child.use_attention == p2.use_attention);
+        // hdc_dim always comes from first parent
+        assert_eq!(child.hdc_dim, p1.hdc_dim);
+    }
+
+    #[test]
+    fn test_crossover_seed_produces_child_seed() {
+        let p1 = ArchitectureGenome::default();
+        let p2 = ArchitectureGenome::random(100);
+        let child = p1.crossover(&p2, 555);
+        assert_eq!(child.seed, 555);
+    }
+
+    #[test]
+    fn test_topology_gene_all_contains_all_variants() {
+        let all = TopologyGene::all();
+        assert_eq!(all.len(), 10);
+        // Verify all variants are present
+        assert!(all.contains(&TopologyGene::Random));
+        assert!(all.contains(&TopologyGene::Ring));
+        assert!(all.contains(&TopologyGene::Star));
+        assert!(all.contains(&TopologyGene::HierarchicalTree));
+        assert!(all.contains(&TopologyGene::Modular));
+        assert!(all.contains(&TopologyGene::ScaleFree));
+        assert!(all.contains(&TopologyGene::SmallWorld));
+        assert!(all.contains(&TopologyGene::Lattice));
+        assert!(all.contains(&TopologyGene::CorePeriphery));
+        assert!(all.contains(&TopologyGene::Attention));
+    }
+
+    #[test]
+    fn test_topology_gene_random_deterministic() {
+        let t1 = TopologyGene::random(42);
+        let t2 = TopologyGene::random(42);
+        assert_eq!(t1, t2);
+    }
+
+    #[test]
+    fn test_bundling_gene_all_contains_all_variants() {
+        let all = BundlingGene::all();
+        assert_eq!(all.len(), 5);
+        assert!(all.contains(&BundlingGene::Average));
+        assert!(all.contains(&BundlingGene::WeightedAverage));
+        assert!(all.contains(&BundlingGene::MajorityVote));
+        assert!(all.contains(&BundlingGene::PermutationSequence));
+        assert!(all.contains(&BundlingGene::ResonatorCleanup));
+    }
+
+    #[test]
+    fn test_bundling_gene_random_deterministic() {
+        let b1 = BundlingGene::random(77);
+        let b2 = BundlingGene::random(77);
+        assert_eq!(b1, b2);
+    }
+
+    #[test]
+    fn test_mutate_with_gradient_moves_in_gradient_direction() {
+        let mut g = ArchitectureGenome {
+            connection_density: 0.5,
+            modularity: 0.5,
+            bridge_ratio: 0.4,
+            tau_ratio: 0.5,
+            binding_strength: 0.5,
+            recurrence: 0.5,
+            ..Default::default()
+        };
+
+        let gradient = PhiGradient {
+            d_density: 1.0,
+            d_modularity: -1.0,
+            d_bridge_ratio: 0.0,
+            d_tau_ratio: 0.0,
+            d_binding_strength: 0.0,
+            d_recurrence: 0.0,
+            magnitude: (2.0f64).sqrt(),
+        };
+
+        let orig_density = g.connection_density;
+        let orig_mod = g.modularity;
+
+        // Large step, no noise
+        g.mutate_with_gradient(&gradient, 0.1, 0.0, 42);
+
+        // Density should increase (positive gradient)
+        assert!(g.connection_density > orig_density - 0.01);
+        // Modularity should decrease (negative gradient)
+        assert!(g.modularity < orig_mod + 0.01);
+    }
+
+    #[test]
+    fn test_mutate_natural_gradient_adaptive_lr() {
+        // Steep gradient => smaller effective step
+        let mut g_steep = ArchitectureGenome {
+            connection_density: 0.5,
+            ..Default::default()
+        };
+        let steep = PhiGradient {
+            d_density: 1.0,
+            d_modularity: 0.0,
+            d_bridge_ratio: 0.0,
+            d_tau_ratio: 0.0,
+            d_binding_strength: 0.0,
+            d_recurrence: 0.0,
+            magnitude: 10.0,
+        };
+        g_steep.mutate_natural_gradient(&steep, 1.0, 42);
+        let steep_delta = (g_steep.connection_density - 0.5).abs();
+
+        // Flat gradient => larger effective step
+        let mut g_flat = ArchitectureGenome {
+            connection_density: 0.5,
+            ..Default::default()
+        };
+        let flat = PhiGradient {
+            d_density: 1.0,
+            d_modularity: 0.0,
+            d_bridge_ratio: 0.0,
+            d_tau_ratio: 0.0,
+            d_binding_strength: 0.0,
+            d_recurrence: 0.0,
+            magnitude: 0.01,
+        };
+        g_flat.mutate_natural_gradient(&flat, 1.0, 42);
+        let flat_delta = (g_flat.connection_density - 0.5).abs();
+
+        // Flat region should produce a larger step
+        assert!(
+            flat_delta > steep_delta,
+            "flat_delta={} should be > steep_delta={}",
+            flat_delta,
+            steep_delta
+        );
+    }
+
+    #[test]
+    fn test_mutate_with_momentum_accumulates_velocity() {
+        let mut g = ArchitectureGenome {
+            connection_density: 0.5,
+            modularity: 0.5,
+            bridge_ratio: 0.4,
+            tau_ratio: 0.5,
+            binding_strength: 0.5,
+            recurrence: 0.5,
+            ..Default::default()
+        };
+
+        let gradient = PhiGradient {
+            d_density: 1.0,
+            d_modularity: 0.0,
+            d_bridge_ratio: 0.0,
+            d_tau_ratio: 0.0,
+            d_binding_strength: 0.0,
+            d_recurrence: 0.0,
+            magnitude: 1.0,
+        };
+
+        let mut velocity = GradientVelocity::new();
+        assert!(velocity.magnitude() < 1e-9);
+
+        // First step
+        g.mutate_with_momentum(&gradient, &mut velocity, 0.9, 0.1);
+        let v1 = velocity.v_density;
+        assert!(v1 > 0.0, "velocity should be positive after positive gradient");
+
+        // Second step: momentum should carry forward
+        g.mutate_with_momentum(&gradient, &mut velocity, 0.9, 0.1);
+        let v2 = velocity.v_density;
+        assert!(v2 > v1, "velocity should accumulate with momentum: v2={} > v1={}", v2, v1);
+    }
+
+    #[test]
+    fn test_genome_clone_equals_original() {
+        let g = ArchitectureGenome::random(42);
+        let g2 = g.clone();
+        assert_eq!(g.num_nodes, g2.num_nodes);
+        assert!((g.base_tau - g2.base_tau).abs() < f32::EPSILON);
+        assert_eq!(g.topology_type, g2.topology_type);
+        assert_eq!(g.bundling_mode, g2.bundling_mode);
+        assert_eq!(g.seed, g2.seed);
+        assert_eq!(g.hdc_dim, g2.hdc_dim);
+        assert!((g.connection_density - g2.connection_density).abs() < f32::EPSILON);
+    }
+}

@@ -581,6 +581,8 @@ impl Default for CounterfactualEngine {
 mod tests {
     use super::*;
 
+    // ── Existing tests (preserved) ──────────────────────────────────────
+
     #[test]
     fn test_uncertainty_propagation() {
         let u = CounterfactualUncertainty::new(0.2, 0.1, 0.15);
@@ -707,5 +709,311 @@ mod tests {
 
         assert!(u.epistemic < initial_epistemic);
         // Aleatoric shouldn't change
+    }
+
+    // ── New tests ───────────────────────────────────────────────────────
+
+    // -- Uncertainty edge cases --
+
+    #[test]
+    fn test_uncertainty_certain() {
+        let u = CounterfactualUncertainty::certain();
+        assert_eq!(u.epistemic, 0.0);
+        assert_eq!(u.aleatoric, 0.0);
+        assert_eq!(u.structural, 0.0);
+        assert_eq!(u.total(), 0.0);
+        assert_eq!(u.confidence(), 1.0);
+    }
+
+    #[test]
+    fn test_uncertainty_maximum() {
+        let u = CounterfactualUncertainty::maximum();
+        assert_eq!(u.epistemic, 1.0);
+        assert_eq!(u.aleatoric, 1.0);
+        assert_eq!(u.structural, 1.0);
+        assert_eq!(u.total(), 1.0);
+        assert_eq!(u.confidence(), 0.0);
+    }
+
+    #[test]
+    fn test_uncertainty_clamping() {
+        // Values above 1.0 should be clamped
+        let u = CounterfactualUncertainty::new(5.0, -1.0, 2.0);
+        assert_eq!(u.epistemic, 1.0);
+        assert_eq!(u.aleatoric, 0.0);
+        assert_eq!(u.structural, 1.0);
+    }
+
+    #[test]
+    fn test_uncertainty_combine_empty() {
+        let combined = CounterfactualUncertainty::combine(&[]);
+        assert_eq!(combined.epistemic, 0.0);
+        assert_eq!(combined.aleatoric, 0.0);
+        assert_eq!(combined.structural, 0.0);
+    }
+
+    #[test]
+    fn test_uncertainty_combine_single() {
+        let u = CounterfactualUncertainty::new(0.4, 0.3, 0.2);
+        let combined = CounterfactualUncertainty::combine(&[u]);
+        assert!((combined.epistemic - 0.4).abs() < 1e-6);
+        assert!((combined.aleatoric - 0.3).abs() < 1e-6);
+        assert!((combined.structural - 0.2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_reduce_epistemic_preserves_aleatoric_and_structural() {
+        let u = CounterfactualUncertainty::new(0.5, 0.3, 0.4);
+        let reduced = u.reduce_epistemic(0.5);
+        assert!((reduced.epistemic - 0.25).abs() < 1e-6);
+        assert_eq!(reduced.aleatoric, u.aleatoric);
+        assert_eq!(reduced.structural, u.structural);
+    }
+
+    #[test]
+    fn test_reduce_structural_preserves_epistemic_and_aleatoric() {
+        let u = CounterfactualUncertainty::new(0.5, 0.3, 0.4);
+        let reduced = u.reduce_structural(0.5);
+        assert_eq!(reduced.epistemic, u.epistemic);
+        assert_eq!(reduced.aleatoric, u.aleatoric);
+        assert!((reduced.structural - 0.2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_reduce_epistemic_factor_clamped() {
+        let u = CounterfactualUncertainty::new(0.5, 0.3, 0.4);
+        // Factor > 1.0 should be clamped to 1.0 → epistemic becomes 0
+        let reduced = u.reduce_epistemic(2.0);
+        assert_eq!(reduced.epistemic, 0.0);
+        // Factor < 0.0 should be clamped to 0.0 → epistemic unchanged
+        let unchanged = u.reduce_epistemic(-1.0);
+        assert!((unchanged.epistemic - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_uncertainty_propagate_weak_link() {
+        let u = CounterfactualUncertainty::new(0.2, 0.1, 0.1);
+        // Very weak link (strength=0.1) → high epistemic amplification
+        let weak = u.propagate(0.1, 0.0);
+        // epistemic_factor = 1.0 + (1.0 - 0.1)*0.5 = 1.45
+        let expected_epistemic = (0.2 * 1.45_f32).clamp(0.0, 1.0);
+        assert!((weak.epistemic - expected_epistemic).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_uncertainty_default() {
+        let u = CounterfactualUncertainty::default();
+        assert!((u.epistemic - 0.3).abs() < 1e-6);
+        assert!((u.aleatoric - 0.2).abs() < 1e-6);
+        assert!((u.structural - 0.2).abs() < 1e-6);
+    }
+
+    // -- CausalNode edge cases --
+
+    #[test]
+    fn test_node_observe_reduces_epistemic() {
+        let mut node = CausalNode::new("n", "Node");
+        let before = node.uncertainty.epistemic;
+        node.observe(1.0);
+        assert!(node.uncertainty.epistemic < before);
+        assert_eq!(node.observed_value, Some(1.0));
+        assert!(!node.intervened);
+    }
+
+    #[test]
+    fn test_node_intervene_zeroes_epistemic_and_structural() {
+        let mut node = CausalNode::new("n", "Node");
+        let original_aleatoric = node.uncertainty.aleatoric;
+        node.intervene(42.0);
+        assert_eq!(node.uncertainty.epistemic, 0.0);
+        assert_eq!(node.uncertainty.structural, 0.0);
+        assert_eq!(node.uncertainty.aleatoric, original_aleatoric);
+        assert!(node.intervened);
+        assert_eq!(node.counterfactual_value, Some(42.0));
+    }
+
+    // -- CausalLink builder --
+
+    #[test]
+    fn test_causal_link_strength_clamped() {
+        let link = CausalLink::new("a", "b", 5.0);
+        assert_eq!(link.strength, 1.0);
+
+        let neg = CausalLink::new("a", "b", -3.0);
+        assert_eq!(neg.strength, -1.0);
+    }
+
+    #[test]
+    fn test_causal_link_with_noise_clamped() {
+        let link = CausalLink::new("a", "b", 0.5).with_noise(2.0);
+        assert_eq!(link.noise, 1.0);
+
+        let link2 = CausalLink::new("a", "b", 0.5).with_noise(-0.5);
+        assert_eq!(link2.noise, 0.0);
+    }
+
+    #[test]
+    fn test_causal_link_with_confidence_clamped() {
+        let link = CausalLink::new("a", "b", 0.5).with_confidence(3.0);
+        assert_eq!(link.confidence, 1.0);
+    }
+
+    // -- Engine error paths --
+
+    #[test]
+    fn test_observe_nonexistent_node_errors() {
+        let mut engine = CounterfactualEngine::default();
+        let result = engine.observe("ghost", 1.0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_intervene_nonexistent_node_errors() {
+        let mut engine = CounterfactualEngine::default();
+        let result = engine.intervene("ghost", 1.0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_query_nonexistent_target_errors() {
+        let mut engine = CounterfactualEngine::default();
+        engine.add_node(CausalNode::new("X", "X"));
+        let result = engine.query_counterfactual("MISSING", "X", 1.0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_query_nonexistent_intervention_errors() {
+        let mut engine = CounterfactualEngine::default();
+        engine.add_node(CausalNode::new("Y", "Y"));
+        let result = engine.query_counterfactual("Y", "MISSING", 1.0);
+        assert!(result.is_err());
+    }
+
+    // -- Interventional distribution edge cases --
+
+    #[test]
+    fn test_intervention_same_node() {
+        // do(X = 3) asking about X itself — path = [X]
+        let mut engine = CounterfactualEngine::default();
+        engine.add_node(CausalNode::new("X", "X"));
+        engine.observe("X", 0.0).unwrap();
+
+        let result = engine.query_counterfactual("X", "X", 3.0).unwrap();
+        // Path is just [X]; propagate_counterfactual with single-element path
+        // returns (initial_value, certain)
+        assert!((result.counterfactual_value - 3.0).abs() < 1e-6);
+        assert_eq!(result.causal_path, vec!["X"]);
+        assert_eq!(result.uncertainty.total(), 0.0);
+    }
+
+    #[test]
+    fn test_negative_causal_strength() {
+        // X --(-0.5)--> Y : increasing X should decrease Y
+        let mut engine = CounterfactualEngine::default();
+        engine.add_node(CausalNode::new("X", "X"));
+        engine.add_node(CausalNode::new("Y", "Y"));
+        engine.add_link(CausalLink::new("X", "Y", -0.5).with_noise(0.0));
+
+        let result = engine.query_counterfactual("Y", "X", 1.0).unwrap();
+        // mechanism_effect = -0.5 * 1.0 = -0.5, noise_contribution small
+        assert!(result.counterfactual_value < 0.0);
+    }
+
+    #[test]
+    fn test_zero_intervention_value() {
+        // do(X = 0) should propagate zero through the graph
+        let mut engine = CounterfactualEngine::default();
+        engine.add_node(CausalNode::new("X", "X"));
+        engine.add_node(CausalNode::new("Y", "Y"));
+        engine.add_link(CausalLink::new("X", "Y", 0.9).with_noise(0.0));
+
+        let result = engine.query_counterfactual("Y", "X", 0.0).unwrap();
+        // mechanism_effect = 0.9*0.0 = 0.0, noise_contribution = 0.0 * (0+0.1) * 0.1
+        // The result should be very close to 0
+        assert!(result.counterfactual_value.abs() < 0.02);
+    }
+
+    #[test]
+    fn test_chain_uncertainty_increases_with_length() {
+        // Compare 2-link chain vs 4-link chain
+        let mut engine2 = CounterfactualEngine::default();
+        engine2.add_node(CausalNode::new("A", "A"));
+        engine2.add_node(CausalNode::new("B", "B"));
+        engine2.add_link(CausalLink::new("A", "B", 0.8).with_noise(0.1).with_confidence(0.9));
+
+        let r2 = engine2.query_counterfactual("B", "A", 1.0).unwrap();
+
+        let mut engine4 = CounterfactualEngine::default();
+        for name in &["A", "B", "C", "D"] {
+            engine4.add_node(CausalNode::new(*name, *name));
+        }
+        engine4.add_link(CausalLink::new("A", "B", 0.8).with_noise(0.1).with_confidence(0.9));
+        engine4.add_link(CausalLink::new("B", "C", 0.8).with_noise(0.1).with_confidence(0.9));
+        engine4.add_link(CausalLink::new("C", "D", 0.8).with_noise(0.1).with_confidence(0.9));
+
+        let r4 = engine4.query_counterfactual("D", "A", 1.0).unwrap();
+
+        // Longer chain should have higher total uncertainty
+        assert!(
+            r4.uncertainty.total() > r2.uncertainty.total(),
+            "4-link chain uncertainty {} should exceed 2-link {}",
+            r4.uncertainty.total(),
+            r2.uncertainty.total()
+        );
+    }
+
+    #[test]
+    fn test_clear_interventions() {
+        let mut engine = CounterfactualEngine::default();
+        engine.add_node(CausalNode::new("X", "X"));
+        engine.add_node(CausalNode::new("Y", "Y"));
+        engine.add_link(CausalLink::new("X", "Y", 0.5));
+
+        engine.intervene("X", 1.0).unwrap();
+        assert!(engine.get_node("X").unwrap().intervened);
+
+        engine.clear_interventions();
+        assert!(!engine.get_node("X").unwrap().intervened);
+        assert!(engine.get_node("X").unwrap().counterfactual_value.is_none());
+    }
+
+    #[test]
+    fn test_low_confidence_link_adds_structural_uncertainty() {
+        let mut engine = CounterfactualEngine::default();
+        engine.add_node(CausalNode::new("A", "A"));
+        engine.add_node(CausalNode::new("B", "B"));
+        // confidence < 0.8 triggers extra structural uncertainty
+        engine.add_link(CausalLink::new("A", "B", 0.9).with_confidence(0.5));
+
+        let result = engine.query_counterfactual("B", "A", 1.0).unwrap();
+        // Structural uncertainty should be non-trivial due to low-confidence link
+        assert!(
+            result.uncertainty.structural > 0.05,
+            "structural uncertainty {} should be elevated for low-confidence link",
+            result.uncertainty.structural
+        );
+    }
+
+    #[test]
+    fn test_engine_accessor_methods() {
+        let mut engine = CounterfactualEngine::default();
+        engine.add_node(CausalNode::new("A", "Node A"));
+        engine.add_node(CausalNode::new("B", "Node B"));
+        engine.add_link(CausalLink::new("A", "B", 0.5));
+
+        assert!(engine.get_node("A").is_some());
+        assert!(engine.get_node("MISSING").is_none());
+        assert_eq!(engine.nodes().count(), 2);
+        assert_eq!(engine.links().len(), 1);
+    }
+
+    #[test]
+    fn test_counterfactual_config_default() {
+        let cfg = CounterfactualConfig::default();
+        assert_eq!(cfg.max_iterations, 100);
+        assert!((cfg.convergence_threshold - 1e-6).abs() < 1e-12);
+        assert!(cfg.track_uncertainty);
+        assert!((cfg.min_confidence - 0.3).abs() < 1e-6);
     }
 }
