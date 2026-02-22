@@ -87,7 +87,7 @@ use super::{
     ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, CycleResult,
     ResponseStrategy, TrainingMethod,
 };
-use crate::consciousness::cross_modal_binding::{ModalRepresentation, Modality};
+use crate::consciousness::cross_modal_binding::Modality;
 
 impl CognitiveLoopService {
     /// Run one cognitive cycle (the core loop)
@@ -711,53 +711,8 @@ impl CognitiveLoopService {
         // 10d.6 FEP Active Inference: Full perception-action loop
         // ═══════════════════════════════════════════════════════════════════════
         let effective_lr = self.stats.adaptive_learning_rate;
-        let fep_obs = Observation::from_consciousness_state(
-            prediction_error as f64,
-            coherence as f64,
-            self.prediction_confidence as f64,
-            effective_lr as f64,
-        );
-        let _perception = self.fep_agent.perceive(&fep_obs);
-        let action_result = self.fep_agent.select_action();
-        let _outcome = self.fep_agent.act(action_result.action);
-
-        // Save FEP action index and probabilities for later KL-divergence policy gate
-        let fep_action_idx = action_result.action;
-        let fep_action_probs = action_result.action_probabilities.clone();
-
-        // Apply FEP-selected action to modulate cognitive parameters
-        let is_surprised = self.fep_agent.is_surprised();
-        match action_result.action {
-            0 => {
-                // Boost learning rate when free energy is high
-                if let Some(ref fe) = self.fep_agent.last_fe_components {
-                    let fe_boost = (fe.total.abs() as f32 / 2.0).clamp(0.0, 1.5);
-                    self.fep_lr_boost =
-                        (self.fep_lr_boost * (1.0 + fe_boost * 0.5)).clamp(1.0, 2.0);
-                }
-            }
-            1 => {
-                // Reset sensory precision toward 1.0 to trust new observations after shift
-                let current = self.fep_agent.precision.sensory_precision;
-                self.fep_agent.precision.sensory_precision = current * 0.7 + 1.0 * 0.3;
-            }
-            2 => {
-                // Boost exploration -- stronger nudge when surprised
-                let nudge = if is_surprised { 0.15 } else { 0.05 };
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + nudge).clamp(0.0, 1.0);
-            }
-            3 => {
-                // Tighten trust via precision
-                if let Some(ref fe) = self.fep_agent.last_fe_components {
-                    let precision_mod = (1.0 - fe.prediction_error).clamp(0.0, 1.0) as f32;
-                    self.self_reflection.trust_threshold =
-                        (self.self_reflection.trust_threshold * 0.9 + precision_mod * 0.1)
-                            .clamp(0.1, 0.9);
-                }
-            }
-            _ => {}
-        }
+        let (fep_action_idx, fep_action_probs, is_surprised, fep_pragmatic_value_raw) =
+            self.step_fep_active_inference(prediction_error, coherence);
 
         // ── Apply previous cycle's MCTS plan at reduced weight ──────────────
         // Science: MCTS plans (deliberative) complement FEP actions (habitual).
@@ -765,7 +720,7 @@ impl CognitiveLoopService {
         // (confidence > 0.7), apply its effect at 40% strength alongside the
         // current FEP action — "dual process" theory (Kahneman 2011).
         if let Some((plan_action, plan_confidence)) = self.carryover.history.mcts_plan.take() {
-            if plan_confidence > 0.7 && plan_action != action_result.action {
+            if plan_confidence > 0.7 && plan_action != fep_action_idx {
                 let plan_weight = plan_confidence * 0.4;
                 match plan_action {
                     0 => {
@@ -818,7 +773,7 @@ impl CognitiveLoopService {
 
         // ── FEP Pragmatic value → consolidation vs exploration balance ───
         // Science: Friston (2015) — pragmatic value drives goal-directed behavior
-        let fep_pragmatic_value = action_result.pragmatic_value;
+        let fep_pragmatic_value = fep_pragmatic_value_raw;
         if fep_pragmatic_value > 0.7 {
             // High pragmatic: exploit — reduce exploration
             self.curiosity_drive.exploration_urge *=
@@ -882,7 +837,7 @@ impl CognitiveLoopService {
                 effective_lr as f64,
             );
             self.fep_agent
-                .learn_from_outcome(action_result.action, &outcome_obs);
+                .learn_from_outcome(fep_action_idx, &outcome_obs);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -4009,54 +3964,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (cross_modal_binding_strength, cross_modal_psi) =
-            if let Some(ref mut binder) = self.cross_modal_binder {
-                use symthaea_core::hdc::unified_hv::ContinuousHV;
-                // Clear stale representations from previous cycle
-                binder.clear();
-                // Use hv16_cached (BinaryHV→bipolar) for consistent 16,384 dims
-                let linguistic_repr = ModalRepresentation::new(
-                    Modality::Linguistic,
-                    ContinuousHV::from_vec(hv16_cached.to_bipolar()),
-                    0.8,
-                    "encoder",
-                );
-                binder.add_representation(linguistic_repr);
-                if self.affective_bridge.is_some() {
-                    let affect_seed = (affective_valence * 1000.0) as u64;
-                    let affective_hv = symthaea_core::hdc::binary_hv::BinaryHV::random(affect_seed);
-                    binder.update_modality(Modality::Affective, affective_hv);
-                }
-                let strength = binder.bind().map(|r| r.strength).unwrap_or(0.0);
-                let phi = binder.cross_modal_psi();
-                self.carryover.consciousness.cross_modal_psi = phi;
-                (strength, phi)
-            } else {
-                (0.0, 0.0)
-            };
-
-        // FEEDBACK: High cross-modal Phi boosts confidence (binding integration)
-        // Science: Treisman (1996) — coherent binding → confident perception
-        if cross_modal_psi > 0.3 {
-            let boost = ((cross_modal_psi - 0.3) * 0.05) as f32; // up to ~3.5%
-            self.prediction_confidence = (self.prediction_confidence + boost).clamp(0.0, 1.0);
-        }
-
-        // FEEDBACK: Predictive ↔ Cross-Modal bidirectional coupling (Talsma 2015)
-        // High binding strength → increase precision (confident multi-modal alignment)
-        // High free energy → decrease binding attention (uncertain states need looser integration)
-        if let Some(ref mut mind) = self.predictive_mind {
-            if cross_modal_binding_strength > 0.5 {
-                let precision_boost = (cross_modal_binding_strength - 0.5) as f64 * 0.1;
-                mind.precision.boost_precision(precision_boost);
-            }
-        }
-        if let Some(ref mut binder) = self.cross_modal_binder {
-            if predictive_free_energy > 0.6 {
-                // High uncertainty → reduce attention weight (looser binding)
-                let dampen = (1.0 - (predictive_free_energy - 0.6) * 0.3).max(0.5) as f32;
-                binder.set_attention_weight(dampen);
-            }
-        }
+            self.update_cross_modal_binding(&hv16_cached, affective_valence, predictive_free_energy);
 
         module_timings.cross_modal_binding = _t.elapsed().as_micros() as u64;
 
