@@ -64,6 +64,7 @@ impl BartBenchmark {
         let mut total_earnings = 0.0f64;
         let mut pops = 0u64;
 
+        #[allow(clippy::explicit_counter_loop)] // experienced_balloons tracks cumulative state across pops, not just loop iteration
         for _ in 0..num_balloons {
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;

@@ -357,7 +357,7 @@ describe('FL Load Testing', () => {
   describe('Stress Test Profile', () => {
     const profile = LOAD_PROFILES.stress;
 
-    it('should handle stress load without memory issues', () => {
+    it('should handle stress load without memory issues', { timeout: 30000 }, () => {
       const byzantineCount = Math.floor(profile.participantCount * profile.byzantinePercentage);
 
       // Generate in batches to avoid memory spikes

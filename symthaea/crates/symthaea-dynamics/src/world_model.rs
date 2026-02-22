@@ -698,4 +698,150 @@ mod tests {
         let batch = buffer.sample(5);
         assert_eq!(batch.len(), 5);
     }
+
+    #[test]
+    fn test_world_model_config_default() {
+        let config = WorldModelConfig::default();
+        assert_eq!(config.hdc_dim, 16_384);
+        assert_eq!(config.hidden_dim, 256);
+        assert!(config.learning_rate > 0.0);
+        assert!(config.momentum > 0.0 && config.momentum < 1.0);
+    }
+
+    #[test]
+    fn test_world_model_predict_finite_output() {
+        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let model = HierarchicalCfCWorldModel::new(config).unwrap();
+        let state = vec![0.5; 64];
+        let action = vec![0.1; 64];
+        let prediction = model.predict(&state, &action, 1.0).unwrap();
+        assert_eq!(prediction.len(), 64);
+        for &v in &prediction {
+            assert!(v.is_finite(), "Prediction should be finite, got {}", v);
+        }
+    }
+
+    #[test]
+    fn test_world_model_predict_and_update_changes_cfc_state() {
+        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let mut model = HierarchicalCfCWorldModel::new(config).unwrap();
+        let initial_cfc = model.cfc_state.clone();
+        model.predict_and_update(&vec![0.5; 64], &vec![0.1; 64], 1.0).unwrap();
+        let changed = model.cfc_state.iter().zip(initial_cfc.iter()).any(|(a, b)| (a - b).abs() > 1e-10);
+        assert!(changed, "predict_and_update should modify cfc_state");
+    }
+
+    #[test]
+    fn test_world_model_reset_state() {
+        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let mut model = HierarchicalCfCWorldModel::new(config).unwrap();
+        model.predict_and_update(&vec![0.5; 64], &vec![0.1; 64], 1.0).unwrap();
+        model.reset_state();
+        for &v in model.cfc_state.iter() {
+            assert_eq!(v, 0.0);
+        }
+    }
+
+    #[test]
+    fn test_world_model_consciousness_starts_zero() {
+        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let model = HierarchicalCfCWorldModel::new(config).unwrap();
+        assert_eq!(model.consciousness(), 0.0);
+        assert_eq!(model.total_surprise(), 0.0);
+    }
+
+    #[test]
+    fn test_world_model_train_step_increments_steps() {
+        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let mut model = HierarchicalCfCWorldModel::new(config).unwrap();
+        model.train_step(&vec![0.5; 64], &vec![0.1; 64], &vec![0.6; 64], 1.0).unwrap();
+        assert_eq!(model.training_steps, 1);
+        model.train_step(&vec![0.5; 64], &vec![0.1; 64], &vec![0.6; 64], 1.0).unwrap();
+        assert_eq!(model.training_steps, 2);
+    }
+
+    #[test]
+    fn test_world_model_train_batch() {
+        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let mut model = HierarchicalCfCWorldModel::new(config).unwrap();
+        let experiences = vec![
+            (vec![0.5; 64], vec![0.1; 64], vec![0.6; 64]),
+            (vec![0.3; 64], vec![0.2; 64], vec![0.4; 64]),
+        ];
+        let avg_loss = model.train_batch(&experiences, 1.0).unwrap();
+        assert!(avg_loss.is_finite() && avg_loss >= 0.0);
+        assert_eq!(model.training_steps, 2);
+    }
+
+    #[test]
+    fn test_world_model_estimate_phi_bounded() {
+        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let model = HierarchicalCfCWorldModel::new(config).unwrap();
+        let phi = model.estimate_phi(&vec![0.5; 64]);
+        assert!(phi >= 0.0 && phi <= 1.0);
+    }
+
+    #[test]
+    fn test_world_model_expected_surprise_finite() {
+        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let model = HierarchicalCfCWorldModel::new(config).unwrap();
+        let surprise = model.expected_surprise(&vec![0.5; 64], &vec![0.1; 64], 1.0).unwrap();
+        assert!(surprise.is_finite() && surprise >= 0.0);
+    }
+
+    #[test]
+    fn test_world_model_action_value_finite() {
+        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let model = HierarchicalCfCWorldModel::new(config).unwrap();
+        let value = model.action_value(&vec![0.5; 64], &vec![0.1; 64], 1.0, 0.5).unwrap();
+        assert!(value.is_finite());
+    }
+
+    #[test]
+    fn test_world_model_imagine_trajectory_length() {
+        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let mut model = HierarchicalCfCWorldModel::new(config).unwrap();
+        let actions = vec![vec![0.1; 64]; 5];
+        let traj = model.imagine(&vec![0.5; 64], &actions, 1.0).unwrap();
+        assert_eq!(traj.len(), 6);
+        for state in &traj {
+            assert_eq!(state.len(), 64);
+            for &v in state { assert!(v.is_finite()); }
+        }
+    }
+
+    #[test]
+    fn test_world_model_serialize_deserialize_roundtrip() {
+        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let model = HierarchicalCfCWorldModel::new(config).unwrap();
+        let bytes = model.serialize().unwrap();
+        let model2 = HierarchicalCfCWorldModel::deserialize(&bytes).unwrap();
+        assert_eq!(model.config.hdc_dim, model2.config.hdc_dim);
+        assert_eq!(model.training_steps, model2.training_steps);
+    }
+
+    #[test]
+    fn test_world_model_dimension_mismatch_handled() {
+        let config = WorldModelConfig { hdc_dim: 64, hidden_dim: 16, ..Default::default() };
+        let model = HierarchicalCfCWorldModel::new(config).unwrap();
+        let prediction = model.predict(&vec![0.5; 32], &vec![0.1; 32], 1.0).unwrap();
+        assert_eq!(prediction.len(), 64);
+        for &v in &prediction { assert!(v.is_finite()); }
+    }
+
+    #[test]
+    fn test_experience_buffer_empty() {
+        let buffer = ExperienceBuffer::new(10);
+        assert!(buffer.is_empty());
+        assert_eq!(buffer.len(), 0);
+        assert!(buffer.sample(5).is_empty());
+    }
+
+    #[test]
+    fn test_experience_buffer_all() {
+        let mut buffer = ExperienceBuffer::new(10);
+        buffer.push(vec![1.0], vec![2.0], vec![3.0]);
+        buffer.push(vec![4.0], vec![5.0], vec![6.0]);
+        assert_eq!(buffer.all().len(), 2);
+    }
 }

@@ -148,19 +148,19 @@ fn generate_item(seed: u64, difficulty: usize) -> RpmItem {
 
     // Generate 5 distractors (different from answer)
     let mut distractors = [Cell { shape: 0, size: 0, color: 0 }; 5];
-    for d in 0..5 {
+    for distractor in &mut distractors {
         xor_shift(&mut rng);
-        distractors[d] = Cell {
+        *distractor = Cell {
             shape: ((answer.shape + 1 + (rng % 2) as usize) % 3),
             size: ((answer.size + ((rng >> 4) % 3) as usize) % 3),
             color: ((answer.color + ((rng >> 8) % 3) as usize) % 3),
         };
         // Ensure distractor differs from answer in at least one feature
-        if distractors[d].shape == answer.shape
-            && distractors[d].size == answer.size
-            && distractors[d].color == answer.color
+        if distractor.shape == answer.shape
+            && distractor.size == answer.size
+            && distractor.color == answer.color
         {
-            distractors[d].shape = (answer.shape + 1) % 3;
+            distractor.shape = (answer.shape + 1) % 3;
         }
     }
 

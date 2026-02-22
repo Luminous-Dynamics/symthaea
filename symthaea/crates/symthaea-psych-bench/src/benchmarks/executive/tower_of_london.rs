@@ -52,11 +52,11 @@ impl ToLState {
             if self.pegs[from].is_empty() {
                 continue;
             }
-            for to in 0..3 {
+            for (to, &capacity) in PEG_CAPACITY.iter().enumerate() {
                 if from == to {
                     continue;
                 }
-                if self.pegs[to].len() < PEG_CAPACITY[to] {
+                if self.pegs[to].len() < capacity {
                     moves.push((from, to));
                 }
             }
@@ -225,13 +225,12 @@ fn generate_problems(seed: u64, min_moves: usize, count: usize) -> Vec<ToLProble
 
         // Check if optimal solution matches desired difficulty
         if let Some(opt) = bfs_optimal(&initial, &goal) {
-            if min_moves <= 3 && (2..=3).contains(&opt) {
-                problems.push(ToLProblem {
-                    initial,
-                    goal,
-                    optimal_moves: opt,
-                });
-            } else if opt == min_moves {
+            let accept = if min_moves <= 3 {
+                (2..=3).contains(&opt)
+            } else {
+                opt == min_moves
+            };
+            if accept {
                 problems.push(ToLProblem {
                     initial,
                     goal,

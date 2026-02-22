@@ -923,4 +923,197 @@ mod tests {
             "Different distributions should have higher KL"
         );
     }
+
+    #[test]
+    fn test_surprise_tracker_config_default() {
+        let config = SurpriseTrackerConfig::default();
+        assert_eq!(config.window_size, 100);
+        assert_eq!(config.initial_threshold, 0.5);
+        assert!(!config.use_kl_divergence);
+        assert_eq!(config.exploration_cooldown, 5);
+    }
+
+    #[test]
+    fn test_surprise_tracker_with_seed_deterministic() {
+        let config = SurpriseTrackerConfig { exploration_cooldown: 0, ..Default::default() };
+        let mut t1 = SurpriseTracker::with_seed(config.clone(), 42);
+        let mut t2 = SurpriseTracker::with_seed(config, 42);
+        t1.record_surprise(0.8);
+        t2.record_surprise(0.8);
+        let state = vec![0.5; 10];
+        let a1 = t1.generate_exploration_action(&state);
+        let a2 = t2.generate_exploration_action(&state);
+        assert_eq!(a1, a2, "Same seed should produce same exploration action");
+    }
+
+    #[test]
+    fn test_compute_surprise_empty_inputs() {
+        let tracker = SurpriseTracker::new(SurpriseTrackerConfig::default());
+        assert_eq!(tracker.compute_surprise(&[], &[]), 0.0);
+        assert_eq!(tracker.compute_surprise(&[1.0], &[]), 0.0);
+    }
+
+    #[test]
+    fn test_compute_surprise_identical_vectors_zero() {
+        let tracker = SurpriseTracker::new(SurpriseTrackerConfig::default());
+        let v = vec![0.3, 0.5, 0.7, 0.9];
+        let surprise = tracker.compute_surprise(&v, &v);
+        assert!(surprise < 1e-6, "Identical vectors should have ~0 surprise, got {}", surprise);
+    }
+
+    #[test]
+    fn test_compute_surprise_different_lengths() {
+        let tracker = SurpriseTracker::new(SurpriseTrackerConfig::default());
+        let short = vec![1.0, 2.0];
+        let long = vec![1.0, 2.0, 3.0, 4.0];
+        assert!(tracker.compute_surprise(&short, &long).is_finite());
+    }
+
+    #[test]
+    fn test_record_surprise_updates_stats() {
+        let mut tracker = SurpriseTracker::new(SurpriseTrackerConfig::default());
+        assert_eq!(tracker.stats().count, 0);
+        tracker.record_surprise(0.5);
+        assert_eq!(tracker.stats().count, 1);
+        assert!((tracker.stats().mean - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_record_surprise_max_min_tracking() {
+        let mut tracker = SurpriseTracker::new(SurpriseTrackerConfig::default());
+        tracker.record_surprise(0.3);
+        tracker.record_surprise(0.8);
+        tracker.record_surprise(0.5);
+        assert!((tracker.stats().max_surprise - 0.8).abs() < 1e-10);
+        assert!((tracker.stats().min_surprise - 0.3).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_should_explore_respects_cooldown() {
+        let config = SurpriseTrackerConfig {
+            initial_threshold: 0.3,
+            exploration_cooldown: 5,
+            ..Default::default()
+        };
+        let mut tracker = SurpriseTracker::new(config);
+        for _ in 0..5 { tracker.record_surprise(0.1); }
+        tracker.record_surprise(0.9);
+        let state = vec![0.5; 4];
+        tracker.generate_exploration_action(&state);
+        assert!(!tracker.should_explore(1.0), "Should not explore during cooldown");
+        for _ in 0..5 { tracker.record_surprise(0.1); }
+        assert!(tracker.should_explore(1.0), "Should explore after cooldown");
+    }
+
+    #[test]
+    fn test_generate_exploration_action_length_matches_state() {
+        let config = SurpriseTrackerConfig { exploration_cooldown: 0, ..Default::default() };
+        let mut tracker = SurpriseTracker::new(config);
+        tracker.record_surprise(0.8);
+        let state = vec![0.5; 20];
+        let action = tracker.generate_exploration_action(&state);
+        assert_eq!(action.len(), 20);
+    }
+
+    #[test]
+    fn test_exploration_action_finite_values() {
+        let config = SurpriseTrackerConfig { exploration_cooldown: 0, ..Default::default() };
+        let mut tracker = SurpriseTracker::new(config);
+        tracker.record_surprise(0.8);
+        let action = tracker.generate_exploration_action(&vec![0.5; 10]);
+        for &v in &action { assert!(v.is_finite()); }
+    }
+
+    #[test]
+    fn test_apply_exploration_produces_perturbed_state() {
+        let tracker = SurpriseTracker::new(SurpriseTrackerConfig::default());
+        let state = vec![0.5, 0.5, 0.5];
+        let action = vec![0.1, -0.1, 0.05];
+        let result = tracker.apply_exploration(&state, &action);
+        assert!((result[0] - 0.6).abs() < 1e-6);
+        assert!((result[1] - 0.4).abs() < 1e-6);
+        assert!((result[2] - 0.55).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_exploration_success_rate_no_explorations() {
+        let tracker = SurpriseTracker::new(SurpriseTrackerConfig::default());
+        assert_eq!(tracker.exploration_success_rate(), 0.0);
+    }
+
+    #[test]
+    fn test_high_surprise_streak_tracking() {
+        let config = SurpriseTrackerConfig {
+            initial_threshold: 0.3, threshold_sigma: 0.0, min_threshold: 0.1,
+            ..Default::default()
+        };
+        let mut tracker = SurpriseTracker::new(config);
+        for _ in 0..10 { tracker.record_surprise(0.2); }
+        tracker.record_surprise(0.9);
+        assert_eq!(tracker.stats().high_surprise_streak, 1);
+        tracker.record_surprise(0.9);
+        assert_eq!(tracker.stats().high_surprise_streak, 2);
+        tracker.record_surprise(0.1);
+        assert_eq!(tracker.stats().high_surprise_streak, 0);
+    }
+
+    #[test]
+    fn test_tracker_reset() {
+        let config = SurpriseTrackerConfig { exploration_cooldown: 0, ..Default::default() };
+        let mut tracker = SurpriseTracker::new(config);
+        for _ in 0..20 { tracker.record_surprise(0.5); }
+        tracker.generate_exploration_action(&vec![0.5; 4]);
+        tracker.reset();
+        assert_eq!(tracker.stats().count, 0);
+        assert_eq!(tracker.stats().exploration_triggers, 0);
+    }
+
+    #[test]
+    fn test_summary_fields() {
+        let mut tracker = SurpriseTracker::new(SurpriseTrackerConfig::default());
+        tracker.record_surprise(0.5);
+        let summary = tracker.summary();
+        assert_eq!(summary.cycle_count, 1);
+        assert!(summary.mean_surprise > 0.0);
+    }
+
+    #[test]
+    fn test_bridge_default_state() {
+        let bridge = SurpriseExplorationBridge::new();
+        assert!(!bridge.exploring);
+        assert_eq!(bridge.exploration_factor, 0.0);
+    }
+
+    #[test]
+    fn test_bridge_reset() {
+        let config = SurpriseTrackerConfig { exploration_cooldown: 0, threshold_sigma: 0.0, ..Default::default() };
+        let mut bridge = SurpriseExplorationBridge::with_config(config);
+        bridge.cycle(&vec![0.5; 4], &vec![1.5; 4], &vec![0.5; 4]);
+        bridge.reset();
+        assert!(!bridge.exploring);
+        assert_eq!(bridge.exploration_factor, 0.0);
+    }
+
+    #[test]
+    fn test_kl_divergence_with_zero_distributions() {
+        let config = SurpriseTrackerConfig { use_kl_divergence: true, ..Default::default() };
+        let tracker = SurpriseTracker::new(config);
+        let surprise = tracker.compute_surprise(&vec![0.0; 3], &vec![1.0; 3]);
+        assert!(surprise.is_finite(), "KL with zero dist should be finite");
+    }
+
+    #[test]
+    fn test_adaptive_threshold_clamped_to_bounds() {
+        let config = SurpriseTrackerConfig {
+            window_size: 5, threshold_sigma: 100.0, min_threshold: 0.1, max_threshold: 2.0,
+            ..Default::default()
+        };
+        let mut tracker = SurpriseTracker::new(config);
+        tracker.record_surprise(0.0);
+        tracker.record_surprise(10.0);
+        tracker.record_surprise(0.0);
+        tracker.record_surprise(10.0);
+        let threshold = tracker.threshold();
+        assert!(threshold <= 2.0 && threshold >= 0.1, "Threshold should be clamped: {}", threshold);
+    }
 }
