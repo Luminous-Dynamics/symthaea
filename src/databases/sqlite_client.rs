@@ -270,12 +270,16 @@ impl SqliteMemory {
         )
         .map_err(|e| DatabaseError::QueryFailed(format!("LSH schema creation failed: {e}")))?;
 
-        // Backfill LSH index for any existing records
+        // Backfill LSH index for any existing records.
+        // unwrap_or(0): If the count query fails (e.g., table just created), treat
+        // as empty and skip backfill. This is best-effort migration logic.
         let record_count: i64 = conn
             .query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0))
             .unwrap_or(0);
 
         if record_count > 0 {
+            // unwrap_or(0): Same rationale — if LSH table is inaccessible, assume
+            // zero indexed records so backfill runs unconditionally.
             let lsh_count: i64 = conn
                 .query_row(
                     "SELECT COUNT(DISTINCT memory_id) FROM vector_lsh",
@@ -454,6 +458,8 @@ impl SqliteMemory {
             psi: row.get::<_, f64>(7)?,
             topics,
             metadata: row.get(9)?,
+            // unwrap_or: These columns were added by migration; they may not exist in
+            // older databases. Default to zero when missing for backward compatibility.
             consolidation_strength: row.get::<_, f64>(10).unwrap_or(0.0),
             retrieval_count: row.get::<_, i64>(11).unwrap_or(0) as u32,
         })
@@ -586,7 +592,9 @@ impl ConsciousnessDatabase for SqliteMemory {
     async fn search_similar(&self, query: &BinaryHV, top_k: usize) -> DbResult<Vec<SearchResult>> {
         let query = *query;
         self.with_connection(move |conn| {
-            // Check total record count to decide LSH vs brute-force
+            // Check total record count to decide LSH vs brute-force.
+            // unwrap_or(0): If the count query fails, fall back to brute-force path
+            // (total < LSH_MIN_RECORDS), which is always correct, just slower.
             let total: i64 = conn
                 .query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0))
                 .unwrap_or(0);
@@ -817,7 +825,10 @@ impl ConsciousnessDatabase for SqliteMemory {
                 |row| row.get(0)
             ).map_err(|e| DatabaseError::QueryFailed(format!("Count query failed: {e}")))?;
 
-            // Get SQLite pragma values for database metrics
+            // Get SQLite pragma values for database metrics.
+            // All PRAGMA/aggregate queries below use unwrap_or(safe_default) because
+            // stats are non-critical observability data: a failure here must not
+            // prevent the system from operating. Defaults are sensible zero-values.
             let page_size: i64 = conn.query_row(
                 "PRAGMA page_size",
                 [],

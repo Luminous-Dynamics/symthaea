@@ -52,7 +52,7 @@ pub struct CsrMatrix {
     /// Column indices for each value (length = nnz)
     pub col_indices: Vec<usize>,
     /// Row pointers (length = rows + 1)
-    /// row_ptrs[i]..row_ptrs[i+1] gives the range of values/col_indices for row i
+    /// `row_ptrs[i]..row_ptrs[i+1]` gives the range of values/col_indices for row i
     pub row_ptrs: Vec<usize>,
 }
 

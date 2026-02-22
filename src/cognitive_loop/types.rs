@@ -176,6 +176,8 @@ pub(crate) struct CycleHistory {
     pub(crate) last_synergy_composite: f64,
     /// Cached emergent properties count.
     pub(crate) last_emergent_count: usize,
+    /// Whether an MCTS plan was applied this cycle (for post-hoc evaluation next cycle).
+    pub(crate) mcts_plan_applied: Option<(usize, f32, f32)>, // (action, confidence, prediction_error_at_time)
 }
 
 impl Default for CycleHistory {
@@ -191,6 +193,7 @@ impl Default for CycleHistory {
             last_profile_composite: 0.0,
             last_synergy_composite: 0.0,
             last_emergent_count: 0,
+            mcts_plan_applied: None,
         }
     }
 }
@@ -722,6 +725,20 @@ pub struct CycleMetadata {
     pub cross_module_agreement: f32,
     /// Thalamic depth score used for storage salience modulation.
     pub thalamic_depth_score: f32,
+
+    // ── Phase 14: Subsystem Feedback Closure ──────────────────────────
+    /// Whether epistemic gate gated codebook growth this cycle.
+    pub epistemic_gate_gated: bool,
+    /// Number of causal edges used for attention weighting this cycle.
+    pub causal_attention_edges: usize,
+    /// MCTS plan effectiveness score from post-hoc evaluation (0.0 when not evaluated).
+    pub mcts_plan_effectiveness: f32,
+    /// Moral violation category that triggered specific steering (empty when none).
+    pub moral_steering_category: String,
+    /// Codebook utilization rate (fraction of symbols retrieved recently, 0.0–1.0).
+    pub codebook_utilization_rate: f32,
+    /// FEP surprise-modulated replay batch size (0 when replay not triggered).
+    pub surprise_replay_batch_size: usize,
 }
 
 /// Compact subset of CycleMetadata with the most essential telemetry fields.

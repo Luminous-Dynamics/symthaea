@@ -155,6 +155,8 @@ impl CognitiveLoopService {
         let (moral_score, moral_concern_detected, moral_judgment) =
             self.run_moral_phase(input, input_negation_polarity);
         module_timings.moral_algebra = _t.elapsed().as_micros() as u64;
+        let mut moral_steering_category = String::new();
+        let mut surprise_replay_batch_size: usize = 0;
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 0.5: Closed Learning Loop - Strategy Selection
@@ -763,6 +765,39 @@ impl CognitiveLoopService {
         let (fep_action_idx, fep_action_probs, is_surprised, fep_pragmatic_value_raw) =
             self.step_fep_active_inference(prediction_error, coherence);
 
+        // ── Track 5b: MCTS plan post-hoc evaluation ─────────────────────────
+        // Science: Botvinick & Toussaint (2012) — planning effectiveness requires
+        // retrospective evaluation to close the deliberation loop
+        let mcts_plan_effectiveness: f32 = if let Some((_prev_action, _prev_confidence, prev_error))
+            = self.carryover.history.mcts_plan_applied.take()
+        {
+            // Compare: did prediction error improve after applying the plan?
+            let error_reduction = prev_error - prediction_error;
+            // Effectiveness = normalized improvement weighted by plan confidence
+            let raw_effectiveness = if prev_error > 0.0 {
+                (error_reduction / prev_error).clamp(-1.0, 1.0)
+            } else {
+                0.0
+            };
+            let effectiveness = (raw_effectiveness * 0.5 + 0.5).clamp(0.0, 1.0); // map [-1,1] → [0,1]
+            // Feedback: effective plans → boost confidence in deliberative system
+            if effectiveness > 0.6 {
+                self.prediction_confidence =
+                    (self.prediction_confidence + (effectiveness - 0.6) * 0.03).clamp(0.0, 1.0);
+            } else if effectiveness < 0.3 {
+                // Poor plan → slightly boost exploration to find better strategies
+                self.curiosity_drive.exploration_urge =
+                    (self.curiosity_drive.exploration_urge + (0.3 - effectiveness) * 0.02)
+                        .clamp(0.0, 1.0);
+            }
+            // EMA update
+            self.stats.avg_mcts_plan_effectiveness =
+                self.stats.avg_mcts_plan_effectiveness * 0.9 + effectiveness * 0.1;
+            effectiveness
+        } else {
+            0.0
+        };
+
         // ── Apply previous cycle's MCTS plan at reduced weight ──────────────
         // Science: MCTS plans (deliberative) complement FEP actions (habitual).
         // When the prior cycle's deliberative system produced a confident plan
@@ -770,6 +805,9 @@ impl CognitiveLoopService {
         // current FEP action — "dual process" theory (Kahneman 2011).
         if let Some((plan_action, plan_confidence)) = self.carryover.history.mcts_plan.take() {
             if plan_confidence > 0.7 && plan_action != fep_action_idx {
+                // Record for next-cycle post-hoc evaluation
+                self.carryover.history.mcts_plan_applied =
+                    Some((plan_action, plan_confidence, prediction_error));
                 let plan_weight = plan_confidence * 0.4;
                 match plan_action {
                     0 => {
@@ -839,10 +877,42 @@ impl CognitiveLoopService {
         if fep_td_error.abs() > 0.5 {
             if let Some(ref mut enhancer) = self.causal_enhancer {
                 if enhancer.should_discover() {
-                    let _graph = enhancer.run_discovery();
+                    let _ = enhancer.run_discovery();
                 }
             }
         }
+
+        // ── Track 5e: Causal graph → attention weighting ─────────────────
+        // Science: Pearl (2009) — causal parents are the minimal sufficient set for prediction
+        // Use discovered causal structure to modulate confidence and exploration:
+        // Dense causal graph → good understanding → stabilize; sparse → explore
+        let causal_attention_edges: usize = if let Some(ref enhancer) = self.causal_enhancer {
+            let graph = enhancer.current_graph();
+            let edge_count = graph.edges.len();
+            if edge_count > 0 {
+                // Causal structure discovered — weight by average edge confidence
+                let avg_confidence = if edge_count > 0 {
+                    graph.edges.iter().map(|e| e.confidence).sum::<f64>() / edge_count as f64
+                } else {
+                    0.0
+                };
+                // Dense, confident graph → stabilize (good causal model)
+                if edge_count > 5 && avg_confidence > 0.5 {
+                    self.prediction_confidence =
+                        (self.prediction_confidence + (avg_confidence as f32 - 0.5) * 0.03)
+                            .clamp(0.0, 1.0);
+                }
+                // Sparse graph after many cycles → poor understanding → boost exploration
+                if edge_count < 2 && self.stats.total_cycles > 200 {
+                    self.curiosity_drive.exploration_urge =
+                        (self.curiosity_drive.exploration_urge + 0.02).clamp(0.0, 1.0);
+                }
+                self.stats.causal_attention_uses += 1;
+            }
+            edge_count
+        } else {
+            0
+        };
 
         // ── FEP decomposition → adaptive behavior modulation ─────────────
         // Science: Friston (2010) — free energy components shape behavioral policy
@@ -917,6 +987,29 @@ impl CognitiveLoopService {
                     .any(|v| v.contains("perfect") || v.contains("harm"))
             {
                 self.stats.moral_review_needed = true;
+            }
+
+            // ── Track 5c: Violation-type-specific steering ───────────────────
+            // Science: Greene (2013) — distinct moral processes for different violation types
+            if moral_judgment.consent_violation {
+                // Consent is most severe — strongly dampen confidence + pause learning
+                self.prediction_confidence *= 0.7;
+                self.carryover.learning.subsystem_lr_factor *= 0.5;
+                moral_steering_category = "consent".to_string();
+            } else if moral_judgment.violations.iter().any(|v| v.contains("harm")) {
+                // Harm detected — strongly reduce exploration, shift to protective mode
+                self.curiosity_drive.exploration_urge *= 0.4;
+                self.prediction_confidence *= 0.85;
+                moral_steering_category = "harm".to_string();
+            } else if moral_judgment.violations.iter().any(|v| v.contains("perfect") || v.contains("duty")) {
+                // Deontological (perfect duty) — force reflection + consolidate constraint
+                self.self_reflection.force_reflection();
+                self.carryover.learning.subsystem_lr_factor *= 0.8;
+                moral_steering_category = "duty".to_string();
+            } else if !moral_judgment.violations.is_empty() {
+                // Other violations — moderate dampening
+                self.carryover.learning.subsystem_lr_factor *= 0.9;
+                moral_steering_category = "other".to_string();
             }
         } else if moral_score > MORAL_BENEFIT_THRESHOLD {
             // Positive moral alignment boosts confidence slightly
@@ -1674,11 +1767,30 @@ impl CognitiveLoopService {
         // (Inline code for HIERARCHICAL LTC through MULTI-OBJECTIVE EVOLUTION
         //  removed — now in run_advanced_subsystems() in cycle_subsystems.rs)
 
+        // ── Track 5a: Epistemic gate → actual information gating ─────────────
+        // Science: Kruger & Dunning (1999) — epistemic humility gates downstream integration
+        // When the gate rejects input (low confidence + not approved), dampen learning
+        // and skip codebook growth. When approved, boost LR proportional to confidence.
+        if !epistemic_gate_approved {
+            // Gate rejects: dampen learning proportional to gate certainty
+            // (high confidence in rejection → strong dampening)
+            let rejection_strength = (1.0 - epistemic_gate_confidence).clamp(0.0, 0.5);
+            self.carryover.learning.subsystem_lr_factor *= 1.0 - rejection_strength * 0.3;
+            self.prediction_confidence *= 1.0 - rejection_strength * 0.15;
+        } else if epistemic_gate_confidence > 0.6 {
+            // Gate approves with high confidence → modest LR boost
+            let approval_boost = (epistemic_gate_confidence - 0.6) * 0.08;
+            self.carryover.learning.subsystem_lr_factor *= 1.0 + approval_boost;
+            self.carryover.learning.subsystem_lr_factor =
+                self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.3);
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH: add novel patterns to semantic codebook
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
+        // Gate codebook growth on epistemic approval — don't learn from rejected inputs
+        if epistemic_gate_approved {
         if let Some(ref mut res_mem) = self.resonator_memory {
             let res_dim_ok = compressed_state.len() == res_mem.resonator.config.dim;
             if res_dim_ok && self.stats.total_cycles % self.config.resonator_growth_interval == 0 {
@@ -1743,6 +1855,7 @@ impl CognitiveLoopService {
                 }
             }
         }
+        } // end epistemic_gate_approved guard for codebook growth
 
         module_timings.resonator_codebook = _t.elapsed().as_micros() as u64;
 
@@ -1894,6 +2007,52 @@ impl CognitiveLoopService {
             self.stats.codebook_diversity // carry forward cached value
         };
 
+        // ── Track 5d: Codebook utilization rate ─────────────────────────────
+        // Science: Kohonen (1982) — self-organizing maps need active symbol usage
+        // Compute fraction of codebook symbols that match recent input (similarity > 0.2).
+        // Low utilization → too many dead symbols → slow codebook growth.
+        let codebook_utilization_rate: f32 = if self.stats.total_cycles % 50 == 0 {
+            if let Some(ref res_mem) = self.resonator_memory {
+                if let Some(semantic_cb) = res_mem.resonator.codebooks.first() {
+                    let n = semantic_cb.symbols.len();
+                    if n > 0 && compressed_state.len() == res_mem.resonator.config.dim {
+                        let utilized = semantic_cb.symbols.iter()
+                            .filter(|(_, hv)| {
+                                let dot: f32 = compressed_state.iter().zip(hv.iter())
+                                    .map(|(a, b)| a * b).sum();
+                                let na: f32 = compressed_state.iter().map(|x| x * x).sum::<f32>().sqrt();
+                                let nb: f32 = hv.iter().map(|x| x * x).sum::<f32>().sqrt();
+                                let sim = if na > 0.0 && nb > 0.0 { dot / (na * nb) } else { 0.0 };
+                                sim > 0.2
+                            })
+                            .count();
+                        let rate = utilized as f32 / n as f32;
+                        // EMA update
+                        self.stats.codebook_utilization_rate =
+                            self.stats.codebook_utilization_rate * 0.8 + rate * 0.2;
+                        // Low utilization → increase novelty threshold (harder to add)
+                        if rate < 0.2 && self.config.resonator_novelty_threshold < 0.9 {
+                            self.config.resonator_novelty_threshold =
+                                (self.config.resonator_novelty_threshold + 0.02).min(0.9);
+                        } else if rate > 0.6 && self.config.resonator_novelty_threshold > 0.3 {
+                            // High utilization → lower novelty threshold (easier to add)
+                            self.config.resonator_novelty_threshold =
+                                (self.config.resonator_novelty_threshold - 0.01).max(0.3);
+                        }
+                        rate
+                    } else {
+                        self.stats.codebook_utilization_rate
+                    }
+                } else {
+                    self.stats.codebook_utilization_rate
+                }
+            } else {
+                0.0
+            }
+        } else {
+            self.stats.codebook_utilization_rate
+        };
+
         // Track 3f: Codebook diversity → exploration governor
         // Science: competitive learning — low diversity signals representational collapse
         // Low diversity → boost exploration urge (seek novel inputs)
@@ -1977,6 +2136,24 @@ impl CognitiveLoopService {
             }
 
             if replay.should_replay() {
+                // ── Track 5f: FEP surprise → replay batch size modulation ────────
+                // Science: Mnih et al. (2015) — prioritized experience replay:
+                // high surprise = high learning potential → replay more episodes
+                let base_batch = replay.config.batch_size;
+                let surprise_batch_boost = if fep_surprise > surprise_thresh {
+                    // High surprise → up to 2x batch size
+                    let boost_factor = ((fep_surprise - surprise_thresh) / surprise_thresh)
+                        .min(1.0) as f32;
+                    (base_batch as f32 * boost_factor).round() as usize
+                } else {
+                    0
+                };
+                let boosted_batch = base_batch + surprise_batch_boost;
+                // Temporarily set boosted batch size for this replay session
+                let original_batch = replay.config.batch_size;
+                replay.config.batch_size = boosted_batch;
+                surprise_replay_batch_size = boosted_batch;
+
                 if let TemporalNetwork::CfC(ref mut cfc) = self.temporal_network {
                     let learning_rate = self.config.cfc_config.learning_rate;
                     let result = replay.replay_session(cfc, learning_rate);
@@ -2021,6 +2198,11 @@ impl CognitiveLoopService {
                             }
                         }
                     }
+                }
+                // Restore original batch size after replay session
+                replay.config.batch_size = original_batch;
+                if surprise_batch_boost > 0 {
+                    self.stats.surprise_boosted_replays += 1;
                 }
             }
         }
@@ -3623,6 +3805,13 @@ impl CognitiveLoopService {
             resonator_prediction_error,
             cross_module_agreement,
             thalamic_depth_score,
+            // Phase 14: Subsystem Feedback Closure
+            epistemic_gate_gated: !epistemic_gate_approved,
+            causal_attention_edges,
+            mcts_plan_effectiveness,
+            moral_steering_category,
+            codebook_utilization_rate,
+            surprise_replay_batch_size,
         };
 
         // Update cumulative stats for resonator-memory loop diagnostics

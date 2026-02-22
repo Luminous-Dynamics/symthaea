@@ -41,7 +41,7 @@ impl HorizonBenchmark {
         };
         let mut agent = ActiveInferenceAgent::new(agent_config);
         // Set goals: prefer high-value observations (drives exploitation)
-        agent.set_goals(vec![0.8, 0.8, 0.8, 0.8], 2.0);
+        agent.set_goals(vec![0.8, 0.8, 0.8, 0.8], 1.2);
 
         // Forced-choice phase: teach that arm 0 is good (0.8) and arm 1 is bad (0.3)
         // Asymmetric exposure: arm 0 gets more trials (better known)

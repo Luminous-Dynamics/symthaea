@@ -114,14 +114,14 @@ impl RegressionSnapshot {
     pub fn save(&self, path: &std::path::Path) -> std::io::Result<()> {
         let json = self
             .to_json()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            .map_err(|e| std::io::Error::other(e))?;
         std::fs::write(path, json)
     }
 
     /// Load snapshot from a file.
     pub fn load(path: &std::path::Path) -> std::io::Result<Self> {
         let json = std::fs::read_to_string(path)?;
-        Self::from_json(&json).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        Self::from_json(&json).map_err(|e| std::io::Error::other(e))
     }
 
     /// Age of this snapshot in days (from timestamp to now).

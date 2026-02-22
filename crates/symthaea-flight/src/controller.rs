@@ -163,12 +163,25 @@ impl FlightController {
 
         // Backprop through activations to get raw gradients
         let s0 = sigmoid(raw[0]);
-        let d_raw = [
+        let mut d_raw = [
             errors[0] * s0 * (1.0 - s0) * QuadrotorCommand::MAX_THRUST,
             errors[1] * (1.0 - fast_tanh(raw[1]).powi(2)) * QuadrotorCommand::MAX_MOMENT_RP,
             errors[2] * (1.0 - fast_tanh(raw[2]).powi(2)) * QuadrotorCommand::MAX_MOMENT_RP,
             errors[3] * (1.0 - fast_tanh(raw[3]).powi(2)) * QuadrotorCommand::MAX_MOMENT_YAW,
         ];
+
+        // Gradient clipping: cap per-channel gradient to prevent overcorrection feedback loops.
+        const GRAD_CLIP: f32 = 1.0;
+        for g in &mut d_raw {
+            *g = g.clamp(-GRAD_CLIP, GRAD_CLIP);
+        }
+
+        // Weight decay: pull output weights toward zero to prevent unbounded drift.
+        const WEIGHT_DECAY: f32 = 1e-4;
+        let decay = 1.0 - WEIGHT_DECAY;
+        for w in self.output_weights.iter_mut() {
+            *w *= decay;
+        }
 
         // Update output weights: dW[i][j] = -output_lr * d_raw[i] * hv[j]
         // output_lr = lr * √D compensates for gradient dilution across 16,384 weights.

@@ -411,7 +411,7 @@ impl BenchmarkReport {
         for result in &self.results {
             let config = result.config_label.as_deref().unwrap_or("");
             for (key, val) in &result.metrics {
-                wtr.write_record(&[
+                wtr.write_record([
                     &result.benchmark,
                     config,
                     key.as_str(),

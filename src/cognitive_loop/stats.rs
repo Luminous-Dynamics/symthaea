@@ -329,6 +329,21 @@ pub struct LoopStats {
     pub avg_cross_module_agreement: f32,
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // PHASE 14: SUBSYSTEM FEEDBACK CLOSURE STATS
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// MCTS plan effectiveness running average (EMA, alpha=0.1).
+    pub avg_mcts_plan_effectiveness: f32,
+
+    /// Causal attention applications (cumulative).
+    pub causal_attention_uses: u64,
+
+    /// Codebook utilization rate (EMA-smoothed).
+    pub codebook_utilization_rate: f32,
+
+    /// FEP surprise-boosted replay sessions (cumulative).
+    pub surprise_boosted_replays: u64,
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)
     // ═══════════════════════════════════════════════════════════════════════════
     /// Cached lattice height (0 = not yet computed)

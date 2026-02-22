@@ -8,7 +8,7 @@
 //! ## Motivation: Factor Graphs for Active Inference
 //!
 //! Factor graphs are the natural computational substrate for generative models
-//! in Active Inference (see [`fep_active_inference`]). Where the FEP module
+//! in Active Inference (see `fep_active_inference`). Where the FEP module
 //! represents `p(o,s)` as dense matrices, factor graphs decompose the joint
 //! distribution into a product of local factors:
 //!
@@ -69,7 +69,7 @@
 //!
 //! ## Integration with Symthaea
 //!
-//! Factor graphs complement the existing [`fep_active_inference::GenerativeModel`]
+//! Factor graphs complement the existing `fep_active_inference::GenerativeModel`
 //! by providing a *structured* representation of the generative model. In future
 //! work the FEP bridge can construct a factor graph whose factors correspond to
 //! the likelihood `p(o|s)` and transition `p(s'|s,a)` terms, enabling message-

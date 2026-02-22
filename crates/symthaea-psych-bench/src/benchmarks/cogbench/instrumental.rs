@@ -74,9 +74,7 @@ impl InstrumentalLearningBenchmark {
 
             let reward = if chosen == 0 {
                 if rng_state % 100 < 80 { 0.9 } else { 0.1 }
-            } else {
-                if rng_state % 100 < 20 { 0.9 } else { 0.1 }
-            };
+            } else if rng_state % 100 < 20 { 0.9 } else { 0.1 };
 
             // Update action-value EMA
             action_reward[chosen] = (1.0 - reward_lr) * action_reward[chosen] + reward_lr * reward;
@@ -114,9 +112,7 @@ impl InstrumentalLearningBenchmark {
 
             let reward = if chosen == 0 {
                 if rng_state % 100 < 80 { 0.5 } else { 0.1 }
-            } else {
-                if rng_state % 100 < 20 { 0.5 } else { 0.1 }
-            };
+            } else if rng_state % 100 < 20 { 0.5 } else { 0.1 };
 
             action_reward[chosen] = (1.0 - reward_lr) * action_reward[chosen] + reward_lr * reward;
 

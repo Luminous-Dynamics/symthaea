@@ -51,15 +51,17 @@ impl DigitSpanBenchmark {
                 dim,
                 config.working_memory_capacity,
                 &adapter,
+                false, // not backward
             );
-            let fwd_acc = fwd_correct as f64 / span_len as f64;
 
-            if fwd_acc > 0.5 {
+            // Digit span criterion: ALL items must be correctly recalled
+            // (standard Wechsler administration; Woods et al., 2011)
+            if fwd_correct == span_len as u32 {
                 forward_span = span_len as u32;
             }
 
             if span_len == 7 {
-                fwd_accuracy_at_7 = fwd_acc;
+                fwd_accuracy_at_7 = fwd_correct as f64 / span_len as f64;
             }
 
             // ── Backward recall ──
@@ -70,10 +72,10 @@ impl DigitSpanBenchmark {
                 dim,
                 config.working_memory_capacity,
                 &adapter,
+                true, // backward: adds output interference
             );
-            let bwd_acc = bwd_correct as f64 / span_len as f64;
 
-            if bwd_acc > 0.5 {
+            if bwd_correct == span_len as u32 {
                 backward_span = span_len as u32;
             }
         }
@@ -87,6 +89,10 @@ impl DigitSpanBenchmark {
 
     /// Present a sequence to WM, then test recall of expected items.
     /// Returns count of correctly recalled positions.
+    ///
+    /// For backward recall, each retrieval incurs a tick (output interference)
+    /// and requires higher similarity, modeling the cognitive cost of
+    /// maintaining reversed order (Gathercole et al., 2004).
     fn test_recall(
         &self,
         presentation: &[SequenceItem],
@@ -94,6 +100,7 @@ impl DigitSpanBenchmark {
         dim: usize,
         capacity: usize,
         adapter: &SequenceAdapter,
+        is_backward: bool,
     ) -> u32 {
         let mut wm = WorkingMemory::new(WmConfig {
             dimension: dim,
@@ -102,29 +109,34 @@ impl DigitSpanBenchmark {
         });
 
         // Encode and present each digit to WM
-        let mut presented_hvs = Vec::with_capacity(presentation.len());
         for item in presentation {
             let hv = adapter.encode(item, dim);
-            wm.perceive(hv.clone());
+            wm.perceive(hv);
             wm.tick();
-            presented_hvs.push(hv);
         }
 
         // Recall phase: for each expected position, check if the target
         // digit is still retrievable from WM via similarity probe.
+        // Backward recall uses a higher threshold and incurs output
+        // interference (1 tick per retrieval) — re-ordering takes time.
+        let threshold = if is_backward { 0.65 } else { 0.5 };
         let mut correct = 0u32;
         for expected in expected_recall {
             let target_hv = adapter.encode(expected, dim);
 
-            // Probe WM: check if the target has high similarity to any item in WM
             let best_sim = wm
                 .contents()
                 .iter()
                 .map(|item| target_hv.similarity(item))
                 .fold(f32::NEG_INFINITY, f32::max);
 
-            if best_sim > 0.5 {
+            if best_sim > threshold {
                 correct += 1;
+            }
+
+            // Output interference: backward recall takes time per item
+            if is_backward {
+                wm.tick();
             }
         }
 

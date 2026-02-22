@@ -80,7 +80,7 @@ impl ReversalLearningBenchmark {
 
             // Softmax action selection — wider temperature allows more exploration
             // post-reversal, reducing perseveration
-            let temp = config.action_temperature.max(0.1) as f64 * 0.08;
+            let temp = config.action_temperature.max(0.1) * 0.08;
             let max_score = score_a.max(score_b);
             let exp_a = ((score_a - max_score) / temp).exp();
             let exp_b = ((score_b - max_score) / temp).exp();
@@ -119,7 +119,7 @@ impl ReversalLearningBenchmark {
                 if in_reversal {
                     // Perseverative = choosing the previously-rewarded stimulus
                     // after reversal (first few errors post-reversal)
-                    if trials_since_event <= criterion as u32 {
+                    if trials_since_event <= criterion {
                         perseverative_errors += 1;
                     }
                 }
