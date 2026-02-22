@@ -317,6 +317,37 @@ impl CognitiveLoopService {
 
         module_timings.surprise_exploration = _t.elapsed().as_micros() as u64;
 
+        // ── Phase 15: Input similarity memoization ───────────────────────────
+        // Science: Priming (Tulving & Schacter 1990) — repeated stimuli can reuse
+        // prior processing results. If input cosine similarity > 0.95, flag for
+        // downstream subsystem skipping (amortize expensive modules).
+        let (input_similarity, input_memoized) =
+            if let Some(ref prev) = self.carryover.history.last_compressed_state {
+                if prev.len() == compressed_state.len() {
+                    let mut dot = 0.0f32;
+                    let mut norm_a = 0.0f32;
+                    let mut norm_b = 0.0f32;
+                    for (a, b) in compressed_state.iter().zip(prev.iter()) {
+                        dot += a * b;
+                        norm_a += a * a;
+                        norm_b += b * b;
+                    }
+                    let denom = (norm_a.sqrt() * norm_b.sqrt()).max(1e-10);
+                    let sim = (dot / denom).clamp(0.0, 1.0);
+                    let memoized = sim > 0.95;
+                    if memoized {
+                        self.stats.input_memoization_hits += 1;
+                    }
+                    (sim, memoized)
+                } else {
+                    (0.0, false)
+                }
+            } else {
+                (0.0, false)
+            };
+        // Store current compressed_state for next cycle comparison
+        self.carryover.history.last_compressed_state = Some(compressed_state.clone());
+
         // ═══════════════════════════════════════════════════════════════════════
         // 1.2 Adaptive Learning Threshold + Urgency
         // ═══════════════════════════════════════════════════════════════════════
@@ -602,6 +633,36 @@ impl CognitiveLoopService {
         // 1b. Analyze emotional content for simple contagion (keyword-based)
         self.emotion_contagion.analyze(input);
 
+        // ── Phase 15: Emotional homeostasis — opponent-process return-to-baseline ──
+        // Science: Solomon & Corbit (1974) — opponent-process theory: emotional states
+        // trigger an opposing process that returns affect to baseline. Prevents emotional
+        // runaway from cumulative contagion nudges.
+        let valence_homeostasis_pull;
+        let arousal_homeostasis_pull;
+        {
+            let prev_v = self.carryover.history.last_emotion_valence;
+            let prev_a = self.carryover.history.last_emotion_arousal;
+            let curr_v = self.emotion_contagion.valence;
+            let curr_a = self.emotion_contagion.prosody_arousal();
+
+            // Opponent pull: 5% toward neutral (0.0 for valence, 0.3 for arousal)
+            let v_pull = -curr_v * 0.05;
+            let a_pull = (0.3 - curr_a) * 0.05;
+            self.emotion_contagion.valence = (curr_v + v_pull).clamp(-1.0, 1.0);
+
+            valence_homeostasis_pull = v_pull;
+            arousal_homeostasis_pull = a_pull;
+
+            // Track EMA of homeostasis pull magnitude
+            self.stats.avg_valence_homeostasis =
+                self.stats.avg_valence_homeostasis * 0.95 + v_pull.abs() * 0.05;
+
+            // Stash for next cycle
+            self.carryover.history.last_emotion_valence = self.emotion_contagion.valence;
+            let _ = (prev_v, prev_a); // suppress unused warnings
+            self.carryover.history.last_emotion_arousal = curr_a;
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // 1c. Update Unified Emotional Bridge (VAD-based, richer than simple contagion)
         // ═══════════════════════════════════════════════════════════════════════
@@ -700,6 +761,30 @@ impl CognitiveLoopService {
         // This is the key advantage: instant prediction at any future time
         let _t_core = Instant::now();
         let prediction = self.get_multi_scale_prediction(&input_array);
+
+        // ── Phase 15: Multi-horizon prediction coherence ─────────────────────
+        // Science: Bar (2009) — temporal prediction consistency signals model quality.
+        // Low coherence → predictions at different horizons disagree → model uncertain.
+        // Computed every 11 cycles (co-prime amortization, lightweight: 3 predict_forward calls).
+        let prediction_coherence = if self.stats.total_cycles % 11 == 0 {
+            let coh = self.compute_prediction_coherence(&input_array);
+            self.stats.avg_prediction_coherence =
+                self.stats.avg_prediction_coherence * 0.9 + coh * 0.1;
+            // Low coherence → dampen confidence (predictions unreliable)
+            if coh < 0.5 {
+                let coh_dampen = (0.5 - coh) * 0.04;
+                self.prediction_confidence *= 1.0 - coh_dampen;
+            }
+            // High coherence → slight confidence boost (temporal model is consistent)
+            if coh > 0.8 {
+                let coh_boost = (coh - 0.8) * 0.02;
+                self.prediction_confidence =
+                    (self.prediction_confidence + coh_boost).clamp(0.0, 1.0);
+            }
+            coh
+        } else {
+            self.stats.avg_prediction_coherence
+        };
 
         // 6. Get current CfC state as output
         let output = self

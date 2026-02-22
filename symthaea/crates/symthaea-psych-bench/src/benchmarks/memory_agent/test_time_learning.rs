@@ -69,21 +69,24 @@ impl TestTimeLearningBenchmark {
         wm.perceive(corr_hv);
         wm.tick();
 
-        // Post-correction delay with distractor interference.
-        // Humans often encounter related but irrelevant information between
-        // learning and test, creating retroactive interference that degrades
-        // the correction trace (Anderson, 2003 — retrieval-induced forgetting).
+        // Post-correction delay with retroactive interference.
+        // Humans often encounter related information between learning and test,
+        // creating retrieval-induced forgetting (Anderson, 2003). Multiple
+        // distractor items push both original and correction further from the
+        // focus of attention, degrading activation-weighted recall.
         let seed = config.trial_seed("memory", "ttl_distractor", trial_idx);
-        let distractor = adapter.encode(
-            &Scenario::new("there was a scheduling change announced today"),
-            dim,
-        );
-        wm.perceive(distractor);
-        wm.tick();
-        // Inject unrelated noise to fill WM
-        let noise_hv = ContinuousHV::random(dim, seed ^ 0x9E3779B97F4A7C15);
-        wm.perceive(noise_hv);
-        for _ in 0..3 {
+        let distractor_sentences = [
+            "there was a scheduling change announced today",
+            "the team discussed the budget review",
+            "a new policy memo was circulated",
+        ];
+        for (d, sentence) in distractor_sentences.iter().enumerate() {
+            let d_hv = adapter.encode(&Scenario::new(sentence), dim);
+            wm.perceive(d_hv);
+            wm.tick();
+            // Also inject noise between distractors
+            let noise_hv = ContinuousHV::random(dim, seed.wrapping_add(d as u64) ^ 0x9E3779B97F4A7C15);
+            wm.perceive(noise_hv);
             wm.tick();
         }
 

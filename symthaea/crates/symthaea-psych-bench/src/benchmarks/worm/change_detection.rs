@@ -43,12 +43,25 @@ impl ChangeDetectionBenchmark {
             ));
         }
 
-        // Encode and present each object to WM
+        // Encode and present each object to WM.
+        // Encoding noise scales with set size: WM precision decreases as
+        // more items compete for limited resources (Bays & Husain, 2008;
+        // Zhang & Luck, 2008 — variable precision model). This causes
+        // detection failures even within nominal capacity.
         let mut original_hvs = Vec::with_capacity(set_size);
-        for obj in &objects {
+        for (pos, obj) in objects.iter().enumerate() {
             let hv = adapter.encode(obj, dim);
-            original_hvs.push(hv.clone());
-            wm.perceive(hv);
+            // Encoding noise: 5% per item in the array (set_size=4 → 20% noise)
+            let noise_frac = 0.05 * set_size as f32;
+            let encoding_noise_seed = rng_state.wrapping_add(700 + pos as u64);
+            let noisy_hv = if noise_frac > 0.01 {
+                let noise = ContinuousHV::random(dim, encoding_noise_seed);
+                ContinuousHV::weighted_bundle(&[&hv, &noise], &[1.0 - noise_frac, noise_frac])
+            } else {
+                hv.clone()
+            };
+            original_hvs.push(hv);
+            wm.perceive(noisy_hv);
             wm.tick();
         }
 

@@ -342,6 +342,29 @@ impl CognitiveLoopService {
                     .arousal_trap_counter
                     .saturating_add(1);
             }
+            // ── Phase 15: Active arousal recovery mode ────────────────────
+            // Science: Porges (2011) — polyvagal theory: recovery from high arousal
+            // requires active parasympathetic engagement, not just waiting. After 5+
+            // consecutive high-arousal cycles, slow CfC processing (increase tau) to
+            // give the system time to stabilize before the hard reset at counter > 10.
+            if self.carryover.urgency.arousal_trap_counter > 5
+                && self.carryover.urgency.arousal_trap_counter <= 10
+            {
+                let recovery_intensity =
+                    (self.carryover.urgency.arousal_trap_counter - 5) as f32 / 5.0;
+                // Gradual LR dampening: up to 20% reduced learning during recovery
+                self.fep_lr_boost = (self.fep_lr_boost * (1.0 - recovery_intensity * 0.2)).max(1.0);
+                // Slight exploration boost to help escape
+                self.curiosity_drive.exploration_urge =
+                    (self.curiosity_drive.exploration_urge + recovery_intensity * 0.05).clamp(0.0, 1.0);
+                self.stats.arousal_recovery_cycles += 1;
+                tracing::debug!(
+                    cycle = self.stats.total_cycles,
+                    counter = self.carryover.urgency.arousal_trap_counter,
+                    recovery_intensity,
+                    "Arousal recovery mode: dampening LR, boosting exploration"
+                );
+            }
             if self.carryover.urgency.arousal_trap_counter > 10 {
                 self.curiosity_drive.exploration_urge = 1.0; // forced escape attempt
                 self.prediction_confidence *= 0.9; // reset confidence to allow re-learning

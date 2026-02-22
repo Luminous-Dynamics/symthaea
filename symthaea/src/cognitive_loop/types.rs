@@ -178,6 +178,12 @@ pub(crate) struct CycleHistory {
     pub(crate) last_emergent_count: usize,
     /// Whether an MCTS plan was applied this cycle (for post-hoc evaluation next cycle).
     pub(crate) mcts_plan_applied: Option<(usize, f32, f32)>, // (action, confidence, prediction_error_at_time)
+    /// Previous cycle's compressed_state for input similarity memoization.
+    pub(crate) last_compressed_state: Option<Vec<f32>>,
+    /// Previous cycle's emotion_contagion valence (for homeostasis return-to-baseline).
+    pub(crate) last_emotion_valence: f32,
+    /// Previous cycle's emotion_contagion arousal (for homeostasis return-to-baseline).
+    pub(crate) last_emotion_arousal: f32,
 }
 
 impl Default for CycleHistory {
@@ -194,6 +200,9 @@ impl Default for CycleHistory {
             last_synergy_composite: 0.0,
             last_emergent_count: 0,
             mcts_plan_applied: None,
+            last_compressed_state: None,
+            last_emotion_valence: 0.0,
+            last_emotion_arousal: 0.0,
         }
     }
 }
@@ -739,6 +748,28 @@ pub struct CycleMetadata {
     pub codebook_utilization_rate: f32,
     /// FEP surprise-modulated replay batch size (0 when replay not triggered).
     pub surprise_replay_batch_size: usize,
+
+    // ── Phase 15: Adaptive Architecture + Emotional Homeostasis ──────
+    /// Whether attention budget was exceeded this cycle (subsystems skipped).
+    pub attention_budget_exceeded: bool,
+    /// Total cycle elapsed at budget check point (microseconds).
+    pub attention_budget_elapsed_us: u64,
+    /// Multi-horizon prediction coherence (0.0 = divergent, 1.0 = identical).
+    pub prediction_coherence: f32,
+    /// Emotional valence homeostasis pull (amount returned toward baseline).
+    pub valence_homeostasis_pull: f32,
+    /// Emotional arousal homeostasis pull (amount returned toward baseline).
+    pub arousal_homeostasis_pull: f32,
+    /// Whether arousal recovery mode is active (tau slowdown engaged).
+    pub arousal_recovery_active: bool,
+    /// CfC tau factor from arousal recovery (1.0 = no change, <1.0 = slowdown).
+    pub arousal_recovery_tau_factor: f32,
+    /// Input similarity to previous cycle (cosine, 0.0–1.0).
+    pub input_similarity: f32,
+    /// Whether input memoization was used (skipped re-encoding).
+    pub input_memoized: bool,
+    /// Guiding question subsystem priority category (empty when no question active).
+    pub guiding_priority_category: String,
 }
 
 /// Compact subset of CycleMetadata with the most essential telemetry fields.
