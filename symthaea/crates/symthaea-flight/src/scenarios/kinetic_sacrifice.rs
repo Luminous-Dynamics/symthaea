@@ -18,6 +18,7 @@ use crate::controller::FlightController;
 use crate::encoder::QuadrotorHdcEncoder;
 use crate::fep_agent::{ActiveInferenceFlightAgent, FlightFepConfig};
 use crate::mujoco_sim::MuJoCoSimulator;
+use crate::simulator::PhysicsSimulator;
 use crate::types::*;
 
 /// Configuration for the Kinetic Sacrifice scenario.

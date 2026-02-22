@@ -7,8 +7,8 @@
 
 use symthaea::flight::formation::{FormationController, FormationShape};
 use symthaea::flight::{
-    ActiveInferenceFlightAgent, FlightConfig, FlightController, FlightTrainer, PhysicsSimulator,
-    QuadrotorHdcEncoder, SimplePhysicsSimulator,
+    FlightConfig, FlightController, FlightTrainer, PhysicsSimulator, QuadrotorHdcEncoder,
+    SimplePhysicsSimulator,
 };
 use symthaea::symthaea_core::genesis::GenesisSeed;
 

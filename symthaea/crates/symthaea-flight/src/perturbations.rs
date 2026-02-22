@@ -6,6 +6,7 @@
 //! re-stabilizes WITHOUT retraining — a biological survival reflex.
 
 use crate::mujoco_sim::MuJoCoSimulator;
+use crate::simulator::PhysicsSimulator;
 use crate::types::QuadrotorCommand;
 
 /// A physical perturbation applied to the MuJoCo simulation mid-flight.
