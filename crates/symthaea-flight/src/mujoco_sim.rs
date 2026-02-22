@@ -6,6 +6,8 @@
 //! The MJCF model uses `gear=1` for all actuators, so `QuadrotorCommand::to_ctrl()`
 //! maps directly to `mjData.ctrl` with ZERO conversion.
 
+use std::sync::Arc;
+
 use mujoco_rs::prelude::*;
 
 use crate::simulator::PhysicsSimulator;
@@ -15,25 +17,27 @@ use crate::types::{FlightState, QuadrotorCommand};
 ///
 /// Loads an MJCF model and provides step-accurate simulation with full
 /// contact physics, rotor dynamics, and aerodynamic effects.
+///
+/// `MjData` requires `M: Deref<Target = MjModel>`, so we use `Arc<MjModel>`
+/// to share ownership between the struct and `MjData`.
 pub struct MuJoCoSimulator {
-    model: MjModel,
-    data: MjData,
+    model: Arc<MjModel>,
+    data: MjData<Arc<MjModel>>,
     cached_state: FlightState,
     external_force: [f64; 3],
     body_id: usize,
-    #[cfg(feature = "mujoco")]
     sensory_filter: Option<crate::sensory_filter::SensoryFilter>,
 }
 
 impl MuJoCoSimulator {
     /// Create a new MuJoCo simulator from an MJCF XML path.
     pub fn new(model_path: &str) -> Self {
-        let model = MjModel::from_xml(model_path)
-            .unwrap_or_else(|e| panic!("Failed to load MJCF model '{}': {:?}", model_path, e));
-        let data = MjData::new(&model);
-
-        // Find the cf2 body index
+        let model = Arc::new(
+            MjModel::from_xml(model_path)
+                .unwrap_or_else(|e| panic!("Failed to load MJCF model '{}': {:?}", model_path, e)),
+        );
         let body_id = Self::find_body_id(&model, "cf2");
+        let data = MjData::new(Arc::clone(&model));
 
         let mut sim = Self {
             model,
@@ -41,7 +45,6 @@ impl MuJoCoSimulator {
             cached_state: FlightState::hover(0.1),
             external_force: [0.0; 3],
             body_id,
-            #[cfg(feature = "mujoco")]
             sensory_filter: None,
         };
         sim.extract_state();
@@ -50,10 +53,12 @@ impl MuJoCoSimulator {
 
     /// Create a MuJoCo simulator from an XML string.
     pub fn from_xml_string(xml: &str) -> Self {
-        let model = MjModel::from_xml_string(xml)
-            .unwrap_or_else(|e| panic!("Failed to parse MJCF XML: {:?}", e));
-        let data = MjData::new(&model);
+        let model = Arc::new(
+            MjModel::from_xml_string(xml)
+                .unwrap_or_else(|e| panic!("Failed to parse MJCF XML: {:?}", e)),
+        );
         let body_id = Self::find_body_id(&model, "cf2");
+        let data = MjData::new(Arc::clone(&model));
 
         let mut sim = Self {
             model,
@@ -61,7 +66,6 @@ impl MuJoCoSimulator {
             cached_state: FlightState::hover(0.1),
             external_force: [0.0; 3],
             body_id,
-            #[cfg(feature = "mujoco")]
             sensory_filter: None,
         };
         sim.extract_state();
@@ -92,40 +96,31 @@ impl MuJoCoSimulator {
 
     /// Get current body mass.
     pub fn body_mass(&self) -> f64 {
-        // Access via FFI: model.body_mass[body_id]
         let ffi = self.model.ffi();
         unsafe { *ffi.body_mass.add(self.body_id) }
     }
 
     /// Dynamically change body mass (recomputes derived inertial quantities).
     pub fn set_body_mass(&mut self, new_mass: f64) {
-        let ffi = self.model.ffi_mut();
         unsafe {
-            *ffi.body_mass.add(self.body_id) = new_mass;
-        }
-        // Recompute derived quantities (inertia, etc.)
-        unsafe {
-            mujoco_rs::mujoco_c::mj_setConst(
-                self.model.ffi_mut() as *mut _,
-                self.data.ffi_mut() as *mut _,
-            );
+            let model_ffi = self.model.ffi() as *const _ as *mut mujoco_rs::mujoco_c::mjModel;
+            (*model_ffi).body_mass.add(self.body_id).write(new_mass);
+            mujoco_rs::mujoco_c::mj_setConst(model_ffi, self.data.ffi_mut());
         }
     }
 
     /// Dynamically limit thrust actuator range.
     /// Modifies the upper bound of actuator 0 (body_thrust).
     pub fn set_thrust_limit(&mut self, max_thrust: f64) {
-        let ffi = self.model.ffi_mut();
-        // actuator_ctrlrange is [nActuator x 2] — [lower, upper] for each
         unsafe {
-            // Actuator 0 = body_thrust, index 0*2+1 = upper bound
-            *ffi.actuator_ctrlrange.add(1) = max_thrust;
+            let model_ffi = self.model.ffi() as *const _ as *mut mujoco_rs::mujoco_c::mjModel;
+            (*model_ffi).actuator_ctrlrange.add(1).write(max_thrust);
         }
     }
 
     /// Get position of a named body.
     pub fn body_position(&self, name: &str) -> [f64; 3] {
-        let bid = Self::find_body_id(&self.model, name);
+        let bid = Self::find_body_id(self.data.model(), name);
         let ffi = self.data.ffi();
         unsafe {
             let ptr = ffi.xpos.add(bid * 3);
@@ -135,7 +130,7 @@ impl MuJoCoSimulator {
 
     /// Get linear velocity of a named body (from subtree linear velocity).
     pub fn body_velocity(&self, name: &str) -> [f64; 3] {
-        let bid = Self::find_body_id(&self.model, name);
+        let bid = Self::find_body_id(self.data.model(), name);
         let ffi = self.data.ffi();
         unsafe {
             let ptr = ffi.cvel.add(bid * 6 + 3); // cvel is [nBody x 6]: [angular(3), linear(3)]
@@ -144,13 +139,11 @@ impl MuJoCoSimulator {
     }
 
     /// Enable sensory noise filter for sim-to-real transfer validation.
-    #[cfg(feature = "mujoco")]
     pub fn enable_sensory_filter(&mut self, config: crate::sensory_filter::SensoryFilterConfig) {
         self.sensory_filter = Some(crate::sensory_filter::SensoryFilter::new(config, 42));
     }
 
     /// Disable sensory filter.
-    #[cfg(feature = "mujoco")]
     pub fn disable_sensory_filter(&mut self) {
         self.sensory_filter = None;
     }
@@ -158,9 +151,9 @@ impl MuJoCoSimulator {
     /// Write a QuadrotorCommand into MuJoCo ctrl array.
     fn write_ctrl(&mut self, cmd: &QuadrotorCommand) {
         let ctrl = cmd.to_ctrl();
-        let ffi = self.data.ffi_mut();
-        for i in 0..4 {
-            unsafe {
+        unsafe {
+            let ffi = self.data.ffi_mut();
+            for i in 0..4 {
                 *ffi.ctrl.add(i) = ctrl[i];
             }
         }
@@ -172,9 +165,9 @@ impl MuJoCoSimulator {
             || self.external_force[1].abs() > 1e-15
             || self.external_force[2].abs() > 1e-15
         {
-            let ffi = self.data.ffi_mut();
             let base = self.body_id * 6;
             unsafe {
+                let ffi = self.data.ffi_mut();
                 // xfrc_applied is [nBody x 6]: [force(3), torque(3)]
                 *ffi.xfrc_applied.add(base) = self.external_force[0];
                 *ffi.xfrc_applied.add(base + 1) = self.external_force[1];
@@ -185,9 +178,9 @@ impl MuJoCoSimulator {
 
     /// Clear external forces from xfrc_applied.
     fn clear_xfrc(&mut self) {
-        let ffi = self.data.ffi_mut();
         let base = self.body_id * 6;
         unsafe {
+            let ffi = self.data.ffi_mut();
             for i in 0..6 {
                 *ffi.xfrc_applied.add(base + i) = 0.0;
             }
@@ -198,48 +191,35 @@ impl MuJoCoSimulator {
     /// Extract FlightState from MuJoCo qpos/qvel.
     fn extract_state(&mut self) {
         let ffi = self.data.ffi();
-        let t = unsafe { ffi.time };
+        let t = ffi.time;
 
         // Free joint: qpos[0..7] = pos(3) + quat(4), qvel[0..6] = lin_vel(3) + ang_vel(3)
-        let joint_info = self
-            .data
-            .joint("root")
-            .expect("MJCF model must have a joint named 'root'");
-        let view = joint_info.view(&self.data);
-
-        let qpos = &view.qpos;
-        let qvel = &view.qvel;
-
-        let perfect_state = FlightState {
-            position: [qpos[0], qpos[1], qpos[2]],
-            quaternion: [qpos[3], qpos[4], qpos[5], qpos[6]],
-            linear_velocity: [qvel[0], qvel[1], qvel[2]],
-            angular_velocity: [qvel[3], qvel[4], qvel[5]],
-            timestamp: t,
+        let perfect_state = unsafe {
+            let qpos = std::slice::from_raw_parts(ffi.qpos, 7);
+            let qvel = std::slice::from_raw_parts(ffi.qvel, 6);
+            FlightState {
+                position: [qpos[0], qpos[1], qpos[2]],
+                quaternion: [qpos[3], qpos[4], qpos[5], qpos[6]],
+                linear_velocity: [qvel[0], qvel[1], qvel[2]],
+                angular_velocity: [qvel[3], qvel[4], qvel[5]],
+                timestamp: t,
+            }
         };
 
         // Apply sensory filter if configured
-        #[cfg(feature = "mujoco")]
-        {
-            self.cached_state = match &mut self.sensory_filter {
-                Some(filter) => filter.filter(&perfect_state),
-                None => perfect_state,
-            };
-        }
-        #[cfg(not(feature = "mujoco"))]
-        {
-            self.cached_state = perfect_state;
-        }
+        self.cached_state = match &mut self.sensory_filter {
+            Some(filter) => filter.filter(&perfect_state),
+            None => perfect_state,
+        };
     }
 
     /// Find body ID by name. Panics if not found.
     fn find_body_id(model: &MjModel, name: &str) -> usize {
-        // Use FFI to search for the body by name
         let c_name = std::ffi::CString::new(name).expect("Body name contains null byte");
         let id = unsafe {
             mujoco_rs::mujoco_c::mj_name2id(
-                model.ffi() as *const _,
-                mujoco_rs::mujoco_c::mjtObj_mjOBJ_BODY as i32,
+                model.ffi(),
+                MjtObj::mjOBJ_BODY as i32,
                 c_name.as_ptr(),
             )
         };
@@ -249,16 +229,16 @@ impl MuJoCoSimulator {
 
     /// Hold a body's velocity to zero (for freezing the beam before release).
     pub fn freeze_body(&mut self, body_name: &str) {
-        let bid = Self::find_body_id(&self.model, body_name);
-        // Find the joint associated with this body and zero its qvel
-        let ffi = self.data.ffi_mut();
-        // For a free joint body, the joint dof starts at body_jntadr
-        let jnt_adr = unsafe { *self.model.ffi().body_jntadr.add(bid) };
-        if jnt_adr >= 0 {
-            let dof_adr = unsafe { *self.model.ffi().jnt_dofadr.add(jnt_adr as usize) };
-            // Free joint has 6 DOF
-            for i in 0..6 {
-                unsafe {
+        let bid = Self::find_body_id(self.data.model(), body_name);
+        unsafe {
+            // For a free joint body, the joint dof starts at body_jntadr
+            let model_ffi = self.data.model().ffi();
+            let jnt_adr = *model_ffi.body_jntadr.add(bid);
+            if jnt_adr >= 0 {
+                let dof_adr = *model_ffi.jnt_dofadr.add(jnt_adr as usize);
+                let ffi = self.data.ffi_mut();
+                // Free joint has 6 DOF
+                for i in 0..6 {
                     *ffi.qvel.add((dof_adr as usize) + i) = 0.0;
                 }
             }
@@ -289,43 +269,28 @@ impl PhysicsSimulator for MuJoCoSimulator {
 
     fn reset(&mut self, altitude: f64) {
         // Reset MuJoCo data to initial state
-        unsafe {
-            mujoco_rs::mujoco_c::mj_resetData(
-                self.model.ffi() as *const _ as *mut _,
-                self.data.ffi_mut() as *mut _,
-            );
-        }
+        self.data.reset();
 
-        // Set initial position
-        let joint_info = self
-            .data
-            .joint("root")
-            .expect("MJCF model must have a joint named 'root'");
-        {
-            let mut view = joint_info.view_mut(&mut self.data);
-            view.qpos[0] = 0.0;
-            view.qpos[1] = 0.0;
-            view.qpos[2] = altitude;
-            view.qpos[3] = 1.0; // w
-            view.qpos[4] = 0.0; // x
-            view.qpos[5] = 0.0; // y
-            view.qpos[6] = 0.0; // z
-            for v in view.qvel.iter_mut() {
-                *v = 0.0;
+        // Set initial position via direct qpos/qvel access
+        unsafe {
+            let ffi = self.data.ffi_mut();
+            *ffi.qpos.add(0) = 0.0;
+            *ffi.qpos.add(1) = 0.0;
+            *ffi.qpos.add(2) = altitude;
+            *ffi.qpos.add(3) = 1.0; // w
+            *ffi.qpos.add(4) = 0.0; // x
+            *ffi.qpos.add(5) = 0.0; // y
+            *ffi.qpos.add(6) = 0.0; // z
+            for i in 0..6 {
+                *ffi.qvel.add(i) = 0.0;
             }
         }
 
         // Forward kinematics to update derived quantities
-        unsafe {
-            mujoco_rs::mujoco_c::mj_forward(
-                self.model.ffi() as *const _ as *mut _,
-                self.data.ffi_mut() as *mut _,
-            );
-        }
+        self.data.forward();
 
         self.external_force = [0.0; 3];
 
-        #[cfg(feature = "mujoco")]
         if let Some(ref mut filter) = self.sensory_filter {
             filter.reset();
         }
@@ -345,33 +310,23 @@ impl PhysicsSimulator for MuJoCoSimulator {
             (rng as f64 / u64::MAX as f64) * 2.0 - 1.0
         };
 
-        let joint_info = self
-            .data
-            .joint("root")
-            .expect("MJCF model must have a joint named 'root'");
-        {
-            let mut view = joint_info.view_mut(&mut self.data);
-            view.qpos[0] += perturbation * next_f64() * 0.1;
-            view.qpos[1] += perturbation * next_f64() * 0.1;
-            view.qpos[2] += perturbation * next_f64() * 0.05;
+        unsafe {
+            let ffi = self.data.ffi_mut();
+            *ffi.qpos.add(0) += perturbation * next_f64() * 0.1;
+            *ffi.qpos.add(1) += perturbation * next_f64() * 0.1;
+            *ffi.qpos.add(2) += perturbation * next_f64() * 0.05;
 
             // Small quaternion perturbation
             let tilt = perturbation * next_f64() * 0.1;
             let q = [1.0, tilt, tilt * 0.5, 0.0];
             let norm = (q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]).sqrt();
-            view.qpos[3] = q[0] / norm;
-            view.qpos[4] = q[1] / norm;
-            view.qpos[5] = q[2] / norm;
-            view.qpos[6] = q[3] / norm;
+            *ffi.qpos.add(3) = q[0] / norm;
+            *ffi.qpos.add(4) = q[1] / norm;
+            *ffi.qpos.add(5) = q[2] / norm;
+            *ffi.qpos.add(6) = q[3] / norm;
         }
 
-        unsafe {
-            mujoco_rs::mujoco_c::mj_forward(
-                self.model.ffi() as *const _ as *mut _,
-                self.data.ffi_mut() as *mut _,
-            );
-        }
-
+        self.data.forward();
         self.extract_state();
     }
 
