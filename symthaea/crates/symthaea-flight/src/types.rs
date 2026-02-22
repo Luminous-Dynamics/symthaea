@@ -325,6 +325,9 @@ pub struct FlightConfig {
     /// Custom curriculum of setpoints cycled across episodes.
     /// Empty (default) uses the built-in 5-setpoint cycle.
     pub curriculum: Vec<FlightSetpoint>,
+    /// Use PID baseline (with integral term) instead of PD for training targets.
+    /// When true, `pid_baseline()` generates targets; when false (default), `pd_baseline()`.
+    pub use_pid: bool,
 }
 
 impl Default for FlightConfig {
@@ -346,6 +349,7 @@ impl Default for FlightConfig {
             enable_lr_schedule: true,
             early_termination: true,
             curriculum: Vec::new(),
+            use_pid: false,
         }
     }
 }

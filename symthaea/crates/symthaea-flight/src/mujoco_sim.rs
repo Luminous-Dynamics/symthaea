@@ -227,6 +227,16 @@ impl MuJoCoSimulator {
         id as usize
     }
 
+    /// Get a reference to the shared model Arc (for viewer initialization).
+    pub fn model_arc(&self) -> &Arc<MjModel> {
+        &self.model
+    }
+
+    /// Get mutable access to the simulation data (for viewer sync).
+    pub fn data_mut(&mut self) -> &mut MjData<Arc<MjModel>> {
+        &mut self.data
+    }
+
     /// Hold a body's velocity to zero (for freezing the beam before release).
     pub fn freeze_body(&mut self, body_name: &str) {
         let bid = Self::find_body_id(self.data.model(), body_name);

@@ -78,7 +78,14 @@ impl FlightController {
     ///
     /// - `sensor_hv`: 16,384D ContinuousHV from the encoder
     /// - `dt`: timestep in seconds (typically 0.002 for 500Hz)
+    ///
+    /// Non-finite values (NaN, Inf) in `sensor_hv` are replaced with 0.0 to prevent
+    /// a single bad sensor reading from permanently corrupting network state.
     pub fn forward(&mut self, sensor_hv: &ContinuousHV, dt: f32) -> QuadrotorCommand {
+        // Sanitize input: replace NaN/Inf with 0.0
+        let clean_hv = sanitize_hv(sensor_hv);
+        let sensor_hv = &clean_hv;
+
         // 1. Evolve network dynamics
         self.network.evolve_closed_form(dt, sensor_hv);
 
@@ -382,6 +389,23 @@ impl FlightController {
     }
 }
 
+/// Replace NaN/Inf values in a ContinuousHV with 0.0.
+///
+/// A single corrupted sensor reading (e.g., division by zero in encoder) could
+/// permanently corrupt network hidden state. This guard ensures the network
+/// only ever sees finite inputs.
+fn sanitize_hv(hv: &ContinuousHV) -> ContinuousHV {
+    let values = hv.as_slice();
+    if values.iter().all(|v| v.is_finite()) {
+        return hv.clone();
+    }
+    let clean: Vec<f32> = values
+        .iter()
+        .map(|&v| if v.is_finite() { v } else { 0.0 })
+        .collect();
+    ContinuousHV::from_vec(clean)
+}
+
 /// Fast sigmoid activation.
 fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + (-x).exp())
@@ -628,5 +652,165 @@ mod tests {
         assert!(fast_tanh(0.0).abs() < 1e-6);
         assert!((fast_tanh(10.0) - 1.0).abs() < 0.01);
         assert!((fast_tanh(-10.0) + 1.0).abs() < 0.01);
+    }
+
+    // ── Item 2: Controller Stress Tests ──
+
+    #[test]
+    fn test_controller_nan_resilience() {
+        let genesis = test_genesis();
+        let config = FlightConfig::default();
+        let mut ctrl = FlightController::new(&genesis, &config);
+
+        // Create a sensor HV with NaN and Inf values
+        let mut nan_values = vec![0.0f32; HDC_DIMENSION];
+        nan_values[0] = f32::NAN;
+        nan_values[100] = f32::NAN;
+        nan_values[1000] = f32::INFINITY;
+        nan_values[2000] = f32::NEG_INFINITY;
+        let nan_hv = ContinuousHV::from_vec(nan_values);
+
+        let cmd = ctrl.forward(&nan_hv, 0.002);
+
+        // With sanitize guard, output must be finite
+        assert!(
+            cmd.thrust.is_finite(),
+            "Thrust should be finite after NaN guard: {}",
+            cmd.thrust
+        );
+        assert!(
+            cmd.roll_moment.is_finite(),
+            "Roll moment should be finite after NaN guard: {}",
+            cmd.roll_moment
+        );
+        assert!(
+            cmd.pitch_moment.is_finite(),
+            "Pitch moment should be finite after NaN guard: {}",
+            cmd.pitch_moment
+        );
+        assert!(
+            cmd.yaw_moment.is_finite(),
+            "Yaw moment should be finite after NaN guard: {}",
+            cmd.yaw_moment
+        );
+
+        // Multiple NaN inputs in a row should not corrupt state
+        for _ in 0..10 {
+            let cmd = ctrl.forward(&nan_hv, 0.002);
+            assert!(cmd.thrust.is_finite(), "Repeated NaN input should stay safe");
+        }
+    }
+
+    #[test]
+    fn test_controller_extreme_input_stability() {
+        let genesis = test_genesis();
+        let config = FlightConfig::default();
+        let mut ctrl = FlightController::new(&genesis, &config);
+
+        // Feed HV with all values at +1.0 or -1.0 extremes
+        let extreme_pos = ContinuousHV::from_vec(vec![1.0f32; HDC_DIMENSION]);
+        let extreme_neg = ContinuousHV::from_vec(vec![-1.0f32; HDC_DIMENSION]);
+
+        for step in 0..100 {
+            let hv = if step % 2 == 0 {
+                &extreme_pos
+            } else {
+                &extreme_neg
+            };
+            let cmd = ctrl.forward(hv, 0.002);
+
+            assert!(
+                cmd.thrust.is_finite(),
+                "Thrust should be finite at step {step}: {}",
+                cmd.thrust
+            );
+            assert!(
+                cmd.thrust >= 0.0 && cmd.thrust <= QuadrotorCommand::MAX_THRUST,
+                "Thrust out of range at step {step}: {}",
+                cmd.thrust
+            );
+            assert!(
+                cmd.roll_moment.abs() <= QuadrotorCommand::MAX_MOMENT_RP,
+                "Roll moment out of range at step {step}: {}",
+                cmd.roll_moment
+            );
+            assert!(
+                cmd.pitch_moment.abs() <= QuadrotorCommand::MAX_MOMENT_RP,
+                "Pitch moment out of range at step {step}: {}",
+                cmd.pitch_moment
+            );
+            assert!(
+                cmd.yaw_moment.abs() <= QuadrotorCommand::MAX_MOMENT_YAW,
+                "Yaw moment out of range at step {step}: {}",
+                cmd.yaw_moment
+            );
+        }
+    }
+
+    #[test]
+    fn test_controller_rapid_tau_modulation() {
+        let genesis = test_genesis();
+        let config = FlightConfig::default();
+        let mut ctrl = FlightController::new(&genesis, &config);
+
+        let sensor = ContinuousHV::random(HDC_DIMENSION, 42);
+
+        for step in 0..50 {
+            // Alternate between minimum and maximum tau modulation every step
+            if step % 2 == 0 {
+                ctrl.modulate_tau(0.3);
+            } else {
+                ctrl.modulate_tau(3.0);
+            }
+
+            let cmd = ctrl.forward(&sensor, 0.002);
+            assert!(
+                cmd.thrust.is_finite(),
+                "Output should stay finite under rapid tau modulation at step {step}"
+            );
+            assert!(
+                cmd.roll_moment.is_finite(),
+                "Roll moment not finite at step {step}"
+            );
+            assert!(
+                cmd.pitch_moment.is_finite(),
+                "Pitch moment not finite at step {step}"
+            );
+            assert!(
+                cmd.yaw_moment.is_finite(),
+                "Yaw moment not finite at step {step}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_controller_1000_step_convergence() {
+        let genesis = test_genesis();
+        let config = FlightConfig::default();
+        let mut ctrl = FlightController::new(&genesis, &config);
+
+        let target = QuadrotorCommand::hover();
+
+        // Measure loss over 1000 steps with varying inputs
+        let mut losses = Vec::with_capacity(1000);
+        for step in 0..1000 {
+            let sensor = ContinuousHV::random(HDC_DIMENSION, 500 + step);
+            let cmd = ctrl.forward(&sensor, 0.002);
+            let loss = (cmd.thrust - target.thrust).powi(2)
+                + (cmd.roll_moment - target.roll_moment).powi(2)
+                + (cmd.pitch_moment - target.pitch_moment).powi(2)
+                + (cmd.yaw_moment - target.yaw_moment).powi(2);
+            losses.push(loss);
+            ctrl.train_step(&sensor, &target, 0.002, Some(0.01));
+        }
+
+        // Average loss of last 100 steps should be lower than first 100
+        let first_100: f32 = losses[..100].iter().sum::<f32>() / 100.0;
+        let last_100: f32 = losses[900..].iter().sum::<f32>() / 100.0;
+
+        assert!(
+            last_100 < first_100,
+            "1000-step training should reduce loss: first_100={first_100:.6}, last_100={last_100:.6}"
+        );
     }
 }

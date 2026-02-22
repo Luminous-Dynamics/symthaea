@@ -394,5 +394,33 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_replay_produces_state_specific_encodings() {
+        // Verify the fixed replay path: different states should produce
+        // different encodings, meaning the controller gets state-specific
+        // training signal (not just output targets against current hidden state).
+        use crate::encoder::QuadrotorHdcEncoder;
+        use crate::types::FlightState;
+        use symthaea_core::genesis::GenesisSeed;
+
+        let genesis = GenesisSeed::from_phrase("swarm-replay-test");
+        let encoder = QuadrotorHdcEncoder::new(&genesis, 32);
+
+        let state_a = FlightState::hover(0.1);
+        let mut state_b_channels = state_a.to_channels();
+        state_b_channels[0] = 5.0; // Very different x position
+        let state_b = FlightState::from_channels(state_b_channels);
+
+        let hv_a = encoder.encode_stateless(&state_a);
+        let hv_b = encoder.encode_stateless(&state_b);
+
+        // Different states must produce different encodings
+        let sim = hv_a.similarity(&hv_b);
+        assert!(
+            sim < 0.95,
+            "Different states should produce distinct encodings: sim={sim:.4}"
+        );
+    }
+
     // Note: train_swarm() requires MuJoCo library — tested via examples only
 }

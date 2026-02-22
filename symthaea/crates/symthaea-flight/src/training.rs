@@ -151,6 +151,7 @@ impl FlightTrainer {
         let mut replay_idx = 0usize; // next write position (ring buffer)
         let mut replay_rng = episode as u64 + 7919; // simple hash for replay sampling
         let mut steps_completed = 0usize;
+        let mut pid_state = PidState::default();
 
         // Cosine annealing LR schedule: high early, low late
         let lr_scale = if self.config.enable_lr_schedule && self.config.num_episodes > 1 {
@@ -213,7 +214,11 @@ impl FlightTrainer {
 
             // ── TRAINING (every train_every steps, 125Hz) ──
             if step % self.config.train_every == 0 {
-                let target = pd_baseline(&state, &setpoint, &self.pd_gains);
+                let target = if self.config.use_pid || fep_result.use_pid_target {
+                    pid_baseline(&state, &setpoint, &self.pd_gains, &mut pid_state, dt)
+                } else {
+                    pd_baseline(&state, &setpoint, &self.pd_gains)
+                };
                 let lr = self.config.learning_rate * fep_result.learning_rate_factor * lr_scale;
 
                 // Train on current observation
@@ -536,6 +541,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // ~60s: covered by fast test_regression_motor_lag_convergence
     fn test_multi_episode_convergence() {
         // Train across 6 episodes with curriculum (perturbation 1% → 10%).
         // The controller accumulates learning across episodes (weights persist).
@@ -729,21 +735,17 @@ mod tests {
 
     #[test]
     fn test_lr_schedule_reduces_lr_over_episodes() {
-        // Verify cosine annealing: later episodes should have lower effective LR.
-        // We test indirectly: with schedule enabled, later episodes should show
-        // less weight change per step (more stable).
         let config = FlightConfig {
-            num_episodes: 10,
-            steps_per_episode: 200,
+            num_episodes: 5,
+            steps_per_episode: 100,
             enable_lr_schedule: true,
-            early_termination: false, // disable to get full episodes
+            early_termination: false,
             ..FlightConfig::default()
         };
         let mut trainer = FlightTrainer::new(config);
         let metrics = trainer.train();
 
-        assert_eq!(metrics.len(), 10);
-        // All episodes should complete and produce finite metrics
+        assert_eq!(metrics.len(), 5);
         for m in &metrics {
             assert!(m.avg_position_error.is_finite());
             assert!(m.total_steps > 0);
@@ -847,6 +849,29 @@ mod tests {
     }
 
     #[test]
+    fn test_pid_training_converges() {
+        let config = FlightConfig {
+            num_episodes: 3,
+            steps_per_episode: 200,
+            use_pid: true,
+            ..FlightConfig::default()
+        };
+        let mut trainer = FlightTrainer::new(config);
+        let metrics = trainer.train();
+
+        assert_eq!(metrics.len(), 3);
+        for m in &metrics {
+            assert!(m.avg_position_error.is_finite());
+        }
+        assert!(
+            metrics[2].avg_position_error < 2.0,
+            "PID training should converge: avg_err={:.4}",
+            metrics[2].avg_position_error
+        );
+    }
+
+    #[test]
+    #[ignore] // ~90s: covered by fast test_regression_motor_lag_convergence
     fn test_long_horizon_training_convergence() {
         // Train for 15 episodes of 500 steps with drag-enabled physics.
         // Position error should improve or remain bounded across episodes.

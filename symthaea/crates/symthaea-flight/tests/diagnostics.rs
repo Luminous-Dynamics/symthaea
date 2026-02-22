@@ -407,3 +407,120 @@ fn diagnostic_pid_vs_pd_wind_baseline() {
     println!("PASS: PID baseline validated.");
     println!();
 }
+
+// ── Item 4: Diagnostic Regression Hardening (fast, NOT #[ignore]) ──
+
+#[test]
+fn test_regression_motor_lag_convergence() {
+    // Fast regression test: 3 episodes x 200 steps.
+    // Verifies training converges despite motor lag filter.
+    let config = FlightConfig {
+        num_episodes: 3,
+        steps_per_episode: 200,
+        ..FlightConfig::default()
+    };
+    let mut trainer = FlightTrainer::new(config);
+    let metrics = trainer.train();
+
+    assert_eq!(metrics.len(), 3);
+    // Last episode should have reasonable error despite motor lag
+    assert!(
+        metrics[2].avg_position_error < 2.0,
+        "Motor lag should not prevent convergence: last_episode_err={:.4}",
+        metrics[2].avg_position_error
+    );
+}
+
+#[test]
+fn test_regression_pid_vs_pd() {
+    // Fast regression: 1000 steps PD vs 1000 steps PID under sustained wind.
+    // PID should not dramatically degrade compared to PD.
+    let setpoint = FlightSetpoint {
+        position: [0.0, 0.0, 0.1],
+        yaw: 0.0,
+    };
+    let gains = PdGains::default();
+    let dt = 0.002;
+    let wind = [0.02, 0.0, 0.0];
+
+    // PD under wind
+    let mut sim_pd = SimplePhysicsSimulator::new();
+    sim_pd.set_motor_lag(false);
+    sim_pd.reset(0.1);
+    for _ in 0..1000 {
+        let state = sim_pd.state().clone();
+        let cmd = pd_baseline(&state, &setpoint, &gains);
+        sim_pd.apply_external_force(wind);
+        sim_pd.step(&cmd, dt);
+    }
+    let pd_final_err = setpoint.position_error_magnitude(sim_pd.state());
+
+    // PID under same wind
+    let mut sim_pid = SimplePhysicsSimulator::new();
+    sim_pid.set_motor_lag(false);
+    sim_pid.reset(0.1);
+    let mut pid_state = PidState::default();
+    for _ in 0..1000 {
+        let state = sim_pid.state().clone();
+        let cmd = pid_baseline(&state, &setpoint, &gains, &mut pid_state, dt);
+        sim_pid.apply_external_force(wind);
+        sim_pid.step(&cmd, dt);
+    }
+    let pid_final_err = setpoint.position_error_magnitude(sim_pid.state());
+
+    assert!(
+        pid_final_err < pd_final_err * 1.5,
+        "PID should not dramatically degrade vs PD: pid={pid_final_err:.6}, pd={pd_final_err:.6}"
+    );
+}
+
+// ── MuJoCo-gated diagnostic: Kinetic Sacrifice ──
+
+#[cfg(feature = "mujoco")]
+#[test]
+#[ignore] // Requires MuJoCo library: cargo test -p symthaea-flight --features mujoco -- --ignored --nocapture diagnostic_kinetic_sacrifice
+fn diagnostic_kinetic_sacrifice() {
+    use symthaea_flight::scenarios::kinetic_sacrifice::{run_kinetic_sacrifice, KineticSacrificeConfig};
+
+    println!("\n{}", "=".repeat(80));
+    println!("=== DIAGNOSTIC: Kinetic Sacrifice (FEP moral reasoning) ===");
+    println!("{}\n", "=".repeat(80));
+
+    let config = KineticSacrificeConfig::default();
+    let result = run_kinetic_sacrifice(&config);
+
+    println!("Events:");
+    for event in &result.events {
+        println!(
+            "  [step {:>3}] {} (FE={:.3}, tau={:.3}, danger={:.3})",
+            event.step, event.description, event.free_energy, event.tau_factor, event.human_danger
+        );
+    }
+    println!("\nResults:");
+    println!("  Beam hit human:    {}", result.beam_hit_human);
+    println!("  Drone intercepted: {}", result.drone_intercepted);
+    println!("  Max free energy:   {:.4}", result.max_free_energy);
+    println!("  Min tau factor:    {:.4}", result.min_tau);
+    if let Some(step) = result.abort_step {
+        println!("  Mission aborted:   step {step}");
+    }
+
+    // The scenario MUST trigger danger detection (mission abort)
+    assert!(
+        result.abort_step.is_some(),
+        "Kinetic sacrifice should trigger mission abort (danger detection)"
+    );
+
+    // Min tau should drop below 1.0 (survival reflex activated)
+    assert!(
+        result.min_tau < 0.9,
+        "FEP should drop tau below 0.9 in response to human danger, got {:.4}",
+        result.min_tau
+    );
+
+    // Beam should NOT hit human (either deflected or fell away)
+    assert!(
+        !result.beam_hit_human,
+        "Beam should not hit human in the scenario"
+    );
+}
