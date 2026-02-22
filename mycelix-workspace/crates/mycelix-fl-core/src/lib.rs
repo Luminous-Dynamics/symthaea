@@ -19,8 +19,8 @@
 //! - Up to 45% when reputation disparity is sufficient (hybrid BFT)
 //! - 45% does NOT converge when all nodes have equal reputation
 
-pub mod aggregation;
 pub mod adaptive_defense;
+pub mod aggregation;
 pub mod byzantine;
 pub mod consciousness_plugin;
 pub mod convert;
@@ -46,8 +46,8 @@ pub mod compression;
 #[cfg(feature = "holochain")]
 pub mod holochain_bridge;
 
-pub use aggregation::*;
 pub use adaptive_defense::*;
+pub use aggregation::*;
 pub use byzantine::*;
 pub use consciousness_plugin::*;
 pub use convert::*;

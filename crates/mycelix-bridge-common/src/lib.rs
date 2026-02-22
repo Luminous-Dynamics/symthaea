@@ -18,19 +18,17 @@ pub use consciousness_thresholds::{ConsciousnessThresholds, PhiThresholds};
 
 pub mod consciousness_profile;
 pub use consciousness_profile::{
-    ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier, GateAuditInput,
-    GovernanceAuditFilter, GovernanceAuditResult, GovernanceEligibility, GovernanceRequirement,
-    evaluate_governance, gate_consciousness, needs_refresh,
-    requirement_for_basic, requirement_for_constitutional, requirement_for_guardian,
-    requirement_for_proposal, requirement_for_voting, should_audit, GRACE_PERIOD_US,
-    REFRESH_WINDOW_US,
+    evaluate_governance, gate_consciousness, needs_refresh, requirement_for_basic,
+    requirement_for_constitutional, requirement_for_guardian, requirement_for_proposal,
+    requirement_for_voting, should_audit, ConsciousnessCredential, ConsciousnessProfile,
+    ConsciousnessTier, GateAuditInput, GovernanceAuditFilter, GovernanceAuditResult,
+    GovernanceEligibility, GovernanceRequirement, GRACE_PERIOD_US, REFRESH_WINDOW_US,
 };
 
 pub mod routing;
 pub use routing::{
-    BridgeDomain, CivicZome, CommonsZome, CrossClusterRole,
-    resolve_civic_zome, resolve_commons_zome,
-    CIVIC_DOMAINS, COMMONS_DOMAINS,
+    resolve_civic_zome, resolve_commons_zome, BridgeDomain, CivicZome, CommonsZome,
+    CrossClusterRole, CIVIC_DOMAINS, COMMONS_DOMAINS,
 };
 
 use hdk::prelude::*;

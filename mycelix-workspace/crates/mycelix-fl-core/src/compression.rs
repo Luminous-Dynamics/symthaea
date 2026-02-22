@@ -102,9 +102,11 @@ impl GradientCompressor {
         // Apply error feedback if enabled
         let effective: Vec<f32> = if self.config.error_feedback {
             match &self.error_accumulator {
-                Some(err) if err.len() == dim => {
-                    gradient.iter().zip(err.iter()).map(|(g, e)| g + e).collect()
-                }
+                Some(err) if err.len() == dim => gradient
+                    .iter()
+                    .zip(err.iter())
+                    .map(|(g, e)| g + e)
+                    .collect(),
                 _ => gradient.to_vec(),
             }
         } else {
@@ -116,7 +118,8 @@ impl GradientCompressor {
         let k = k.max(1).min(dim);
 
         // Select Top-k by absolute value
-        let mut indexed: Vec<(usize, f32)> = effective.iter().enumerate().map(|(i, &v)| (i, v)).collect();
+        let mut indexed: Vec<(usize, f32)> =
+            effective.iter().enumerate().map(|(i, &v)| (i, v)).collect();
         indexed.sort_by(|(_, a), (_, b)| b.abs().total_cmp(&a.abs()));
 
         let top_k: Vec<(usize, f32)> = indexed.into_iter().take(k).collect();
@@ -128,7 +131,11 @@ impl GradientCompressor {
             .max_by(|a, b| a.total_cmp(b))
             .unwrap_or(1.0);
 
-        let scale = if max_abs > 1e-10 { max_abs / 127.0 } else { 1.0 };
+        let scale = if max_abs > 1e-10 {
+            max_abs / 127.0
+        } else {
+            1.0
+        };
 
         // Quantize
         let indices: Vec<u32> = top_k.iter().map(|(i, _)| *i as u32).collect();

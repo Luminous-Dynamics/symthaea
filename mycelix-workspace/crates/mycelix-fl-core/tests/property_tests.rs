@@ -52,7 +52,11 @@ fn identical_updates_strategy(
             (0..count)
                 .map(|i| {
                     GradientUpdate::new(
-                        format!("node-{}", i), 1, gradients.clone(), batch_size, loss,
+                        format!("node-{}", i),
+                        1,
+                        gradients.clone(),
+                        batch_size,
+                        loss,
                     )
                 })
                 .collect()
@@ -68,9 +72,21 @@ fn assert_all_finite(name: &str, vals: &[f32]) -> Result<(), TestCaseError> {
 }
 
 /// Helper: assert output matches expected within tolerance.
-fn assert_close(name: &str, result: &[f32], expected: &[f32], tol: f32) -> Result<(), TestCaseError> {
+fn assert_close(
+    name: &str,
+    result: &[f32],
+    expected: &[f32],
+    tol: f32,
+) -> Result<(), TestCaseError> {
     for (i, (r, e)) in result.iter().zip(expected.iter()).enumerate() {
-        prop_assert!((r - e).abs() < tol, "{} mismatch at [{}]: {} vs {}", name, i, r, e);
+        prop_assert!(
+            (r - e).abs() < tol,
+            "{} mismatch at [{}]: {} vs {}",
+            name,
+            i,
+            r,
+            e
+        );
     }
     Ok(())
 }
@@ -222,14 +238,16 @@ proptest! {
 #[cfg(feature = "shapley")]
 mod shapley_tests {
     use super::*;
-    use std::collections::HashMap;
     use mycelix_fl_core::shapley::{ShapleyCalculator, ShapleyConfig};
+    use std::collections::HashMap;
 
     fn mean_gradient(gradients: &HashMap<String, Vec<f32>>, dim: usize) -> Vec<f32> {
         let n = gradients.len() as f32;
         let mut avg = vec![0.0f32; dim];
         for g in gradients.values() {
-            for (j, v) in g.iter().enumerate() { avg[j] += v / n; }
+            for (j, v) in g.iter().enumerate() {
+                avg[j] += v / n;
+            }
         }
         avg
     }
@@ -494,7 +512,7 @@ proptest! {
 mod byzantine_property_tests {
     use super::*;
     use mycelix_fl_core::byzantine::{
-        EarlyByzantineDetector, MultiSignalByzantineDetector, cosine_similarity,
+        cosine_similarity, EarlyByzantineDetector, MultiSignalByzantineDetector,
     };
 
     proptest! {
@@ -588,7 +606,7 @@ mod byzantine_property_tests {
 mod hybrid_bft_property_tests {
     use super::*;
     use mycelix_fl_core::hybrid_bft::{
-        HybridBftConfig, ReputationGradient, hybrid_trimmed_mean, effective_byzantine_fraction,
+        effective_byzantine_fraction, hybrid_trimmed_mean, HybridBftConfig, ReputationGradient,
     };
 
     fn rep_gradient_strategy(
@@ -603,12 +621,14 @@ mod hybrid_bft_property_tests {
             count..=count,
         )
         .prop_map(|entries| {
-            entries.into_iter().enumerate().map(|(i, (gradients, rep))| {
-                ReputationGradient {
+            entries
+                .into_iter()
+                .enumerate()
+                .map(|(i, (gradients, rep))| ReputationGradient {
                     update: GradientUpdate::new(format!("node-{}", i), 1, gradients, 100, 0.5),
                     reputation: rep,
-                }
-            }).collect()
+                })
+                .collect()
         })
     }
 

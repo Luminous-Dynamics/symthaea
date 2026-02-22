@@ -240,10 +240,7 @@ impl EnsembleDefense {
     }
 
     /// Run the ensemble aggregation.
-    pub fn aggregate(
-        &self,
-        updates: &[GradientUpdate],
-    ) -> Result<EnsembleResult, EnsembleError> {
+    pub fn aggregate(&self, updates: &[GradientUpdate]) -> Result<EnsembleResult, EnsembleError> {
         if updates.is_empty() {
             return Err(EnsembleError::NoUpdates);
         }
@@ -272,12 +269,10 @@ impl EnsembleDefense {
         let agreement = self.calculate_agreement(&results);
 
         // Byzantine detection by comparing each update against each defense's result
-        let (flagged_nodes, consensus_byzantine) =
-            self.detect_byzantine(updates, &results);
+        let (flagged_nodes, consensus_byzantine) = self.detect_byzantine(updates, &results);
 
         // Combine results
-        let aggregated =
-            self.combine_results(&results, &successful_indices)?;
+        let aggregated = self.combine_results(&results, &successful_indices)?;
 
         Ok(EnsembleResult {
             aggregated,
@@ -300,9 +295,7 @@ impl EnsembleDefense {
             AggregationMethod::Median => aggregation::coordinate_median(updates),
             AggregationMethod::Krum => aggregation::krum(updates, 1),
             AggregationMethod::MultiKrum => aggregation::multi_krum(updates, 1, 3),
-            AggregationMethod::GeometricMedian => {
-                aggregation::geometric_median(updates, 100, 1e-6)
-            }
+            AggregationMethod::GeometricMedian => aggregation::geometric_median(updates, 100, 1e-6),
             AggregationMethod::TrustWeighted => aggregation::fedavg(updates),
         }
     }
@@ -551,8 +544,7 @@ impl EnsembleDefense {
             }
 
             let accuracy = perf.accuracy();
-            perf.ema_performance =
-                ema_alpha * accuracy + (1.0 - ema_alpha) * perf.ema_performance;
+            perf.ema_performance = ema_alpha * accuracy + (1.0 - ema_alpha) * perf.ema_performance;
         }
 
         if self.config.voting_strategy == VotingStrategy::Adaptive {
@@ -778,7 +770,11 @@ mod tests {
         let updates = updates_with_byzantine();
 
         let result = ensemble.aggregate(&updates).unwrap();
-        let confidence = result.flagged_nodes.get("byzantine").copied().unwrap_or(0.0);
+        let confidence = result
+            .flagged_nodes
+            .get("byzantine")
+            .copied()
+            .unwrap_or(0.0);
         assert!(
             confidence > 0.0,
             "Byzantine node should be flagged, got confidence {}",
@@ -833,7 +829,11 @@ mod tests {
         ensemble.record_feedback(true);
 
         let sum: f32 = ensemble.weights().iter().sum();
-        assert!((sum - 1.0).abs() < 0.01, "Weights should sum to ~1.0, got {}", sum);
+        assert!(
+            (sum - 1.0).abs() < 0.01,
+            "Weights should sum to ~1.0, got {}",
+            sum
+        );
     }
 
     #[test]

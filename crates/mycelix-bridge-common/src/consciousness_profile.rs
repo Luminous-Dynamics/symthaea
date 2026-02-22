@@ -511,12 +511,14 @@ pub fn gate_consciousness(
     let credential: ConsciousnessCredential = match response {
         ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
             wasm_error!(WasmErrorInner::Guest(format!(
-                "Failed to decode consciousness credential: {}", e
+                "Failed to decode consciousness credential: {}",
+                e
             )))
         })?,
         other => {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Consciousness credential call failed: {:?}", other
+                "Consciousness credential call failed: {:?}",
+                other
             ))));
         }
     };
@@ -725,23 +727,56 @@ mod tests {
 
     #[test]
     fn default_is_zero() {
-        assert_eq!(ConsciousnessProfile::default(), ConsciousnessProfile::zero());
+        assert_eq!(
+            ConsciousnessProfile::default(),
+            ConsciousnessProfile::zero()
+        );
     }
 
     // -- ConsciousnessTier --
 
     #[test]
     fn tier_from_score_boundaries() {
-        assert_eq!(ConsciousnessTier::from_score(0.0), ConsciousnessTier::Observer);
-        assert_eq!(ConsciousnessTier::from_score(0.29), ConsciousnessTier::Observer);
-        assert_eq!(ConsciousnessTier::from_score(0.3), ConsciousnessTier::Participant);
-        assert_eq!(ConsciousnessTier::from_score(0.39), ConsciousnessTier::Participant);
-        assert_eq!(ConsciousnessTier::from_score(0.4), ConsciousnessTier::Citizen);
-        assert_eq!(ConsciousnessTier::from_score(0.59), ConsciousnessTier::Citizen);
-        assert_eq!(ConsciousnessTier::from_score(0.6), ConsciousnessTier::Steward);
-        assert_eq!(ConsciousnessTier::from_score(0.79), ConsciousnessTier::Steward);
-        assert_eq!(ConsciousnessTier::from_score(0.8), ConsciousnessTier::Guardian);
-        assert_eq!(ConsciousnessTier::from_score(1.0), ConsciousnessTier::Guardian);
+        assert_eq!(
+            ConsciousnessTier::from_score(0.0),
+            ConsciousnessTier::Observer
+        );
+        assert_eq!(
+            ConsciousnessTier::from_score(0.29),
+            ConsciousnessTier::Observer
+        );
+        assert_eq!(
+            ConsciousnessTier::from_score(0.3),
+            ConsciousnessTier::Participant
+        );
+        assert_eq!(
+            ConsciousnessTier::from_score(0.39),
+            ConsciousnessTier::Participant
+        );
+        assert_eq!(
+            ConsciousnessTier::from_score(0.4),
+            ConsciousnessTier::Citizen
+        );
+        assert_eq!(
+            ConsciousnessTier::from_score(0.59),
+            ConsciousnessTier::Citizen
+        );
+        assert_eq!(
+            ConsciousnessTier::from_score(0.6),
+            ConsciousnessTier::Steward
+        );
+        assert_eq!(
+            ConsciousnessTier::from_score(0.79),
+            ConsciousnessTier::Steward
+        );
+        assert_eq!(
+            ConsciousnessTier::from_score(0.8),
+            ConsciousnessTier::Guardian
+        );
+        assert_eq!(
+            ConsciousnessTier::from_score(1.0),
+            ConsciousnessTier::Guardian
+        );
     }
 
     #[test]
@@ -837,7 +872,11 @@ mod tests {
     #[test]
     fn evaluate_observer_rejected_for_basic() {
         let profile = ConsciousnessProfile::zero();
-        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_basic(), NOW);
+        let result = evaluate_governance(
+            &fresh_credential(profile.clone()),
+            &requirement_for_basic(),
+            NOW,
+        );
         assert!(!result.eligible);
         assert_eq!(result.weight_bp, 0);
         assert_eq!(result.tier, ConsciousnessTier::Observer);
@@ -852,7 +891,11 @@ mod tests {
             community: 0.3,
             engagement: 0.3,
         };
-        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_basic(), NOW);
+        let result = evaluate_governance(
+            &fresh_credential(profile.clone()),
+            &requirement_for_basic(),
+            NOW,
+        );
         assert!(result.eligible);
         assert_eq!(result.weight_bp, 5000);
         assert_eq!(result.tier, ConsciousnessTier::Participant);
@@ -867,7 +910,11 @@ mod tests {
             community: 0.3,
             engagement: 0.3,
         };
-        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_voting(), NOW);
+        let result = evaluate_governance(
+            &fresh_credential(profile.clone()),
+            &requirement_for_voting(),
+            NOW,
+        );
         assert!(!result.eligible);
         assert!(!result.reasons.is_empty());
     }
@@ -880,7 +927,11 @@ mod tests {
             community: 0.4,
             engagement: 0.2,
         };
-        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_voting(), NOW);
+        let result = evaluate_governance(
+            &fresh_credential(profile.clone()),
+            &requirement_for_voting(),
+            NOW,
+        );
         assert!(result.eligible);
         assert_eq!(result.weight_bp, 7500); // Citizen weight
         assert_eq!(result.tier, ConsciousnessTier::Citizen);
@@ -895,7 +946,11 @@ mod tests {
             community: 0.5,
             engagement: 0.5,
         };
-        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_proposal(), NOW);
+        let result = evaluate_governance(
+            &fresh_credential(profile.clone()),
+            &requirement_for_proposal(),
+            NOW,
+        );
         assert!(!result.eligible);
         assert!(result.reasons.iter().any(|r| r.contains("Identity")));
     }
@@ -909,7 +964,11 @@ mod tests {
             community: 0.8,
             engagement: 0.8,
         };
-        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_constitutional(), NOW);
+        let result = evaluate_governance(
+            &fresh_credential(profile.clone()),
+            &requirement_for_constitutional(),
+            NOW,
+        );
         assert!(!result.eligible);
         assert!(result.reasons.iter().any(|r| r.contains("Identity")));
     }
@@ -924,10 +983,17 @@ mod tests {
             engagement: 0.8,
         };
         // combined = 0.1875+0.175+0.03+0.16 = 0.5525 → Citizen (not Steward!)
-        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_constitutional(), NOW);
+        let result = evaluate_governance(
+            &fresh_credential(profile.clone()),
+            &requirement_for_constitutional(),
+            NOW,
+        );
         assert!(!result.eligible);
         // Should fail on tier AND community
-        assert!(result.reasons.iter().any(|r| r.contains("Community") || r.contains("Tier")));
+        assert!(result
+            .reasons
+            .iter()
+            .any(|r| r.contains("Community") || r.contains("Tier")));
     }
 
     #[test]
@@ -938,7 +1004,11 @@ mod tests {
             community: 0.8,
             engagement: 0.7,
         };
-        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_constitutional(), NOW);
+        let result = evaluate_governance(
+            &fresh_credential(profile.clone()),
+            &requirement_for_constitutional(),
+            NOW,
+        );
         assert!(result.eligible);
         assert_eq!(result.weight_bp, 10000);
         assert_eq!(result.tier, ConsciousnessTier::Guardian);
@@ -952,7 +1022,11 @@ mod tests {
             community: 2.0,
             engagement: 2.0,
         };
-        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_constitutional(), NOW);
+        let result = evaluate_governance(
+            &fresh_credential(profile.clone()),
+            &requirement_for_constitutional(),
+            NOW,
+        );
         assert!(result.eligible);
         // Clamped to 1.0 each → combined = 1.0 → Guardian
         assert_eq!(result.tier, ConsciousnessTier::Guardian);
@@ -962,10 +1036,18 @@ mod tests {
     #[test]
     fn evaluate_multiple_failure_reasons() {
         let profile = ConsciousnessProfile::zero();
-        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_constitutional(), NOW);
+        let result = evaluate_governance(
+            &fresh_credential(profile.clone()),
+            &requirement_for_constitutional(),
+            NOW,
+        );
         assert!(!result.eligible);
         // Should fail on tier, identity, and community
-        assert!(result.reasons.len() >= 3, "Expected 3+ reasons, got: {:?}", result.reasons);
+        assert!(
+            result.reasons.len() >= 3,
+            "Expected 3+ reasons, got: {:?}",
+            result.reasons
+        );
     }
 
     // -- Progressive weight composition --
@@ -975,7 +1057,7 @@ mod tests {
         // Simulates hearth-decisions: final_weight = role_bp * consciousness_bp / 10000
         let citizen_bp: u64 = ConsciousnessTier::Citizen.vote_weight_bp() as u64;
         let adult_role_bp: u64 = 10000; // Adult
-        let youth_role_bp: u64 = 5000;  // Youth
+        let youth_role_bp: u64 = 5000; // Youth
 
         let adult_final = (adult_role_bp * citizen_bp / 10000) as u32;
         let youth_final = (youth_role_bp * citizen_bp / 10000) as u32;
@@ -1090,7 +1172,11 @@ mod tests {
             community: 0.4,
             engagement: 0.2,
         };
-        let eligibility = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_voting(), NOW);
+        let eligibility = evaluate_governance(
+            &fresh_credential(profile.clone()),
+            &requirement_for_voting(),
+            NOW,
+        );
         let json = serde_json::to_string(&eligibility).unwrap();
         let e2: GovernanceEligibility = serde_json::from_str(&json).unwrap();
         assert_eq!(e2.eligible, eligibility.eligible);
@@ -1108,7 +1194,11 @@ mod tests {
             community: -0.1,
             engagement: -999.0,
         };
-        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_basic(), NOW);
+        let result = evaluate_governance(
+            &fresh_credential(profile.clone()),
+            &requirement_for_basic(),
+            NOW,
+        );
         assert!(!result.eligible);
         assert_eq!(result.profile.identity, 0.0);
         assert_eq!(result.profile.reputation, 0.0);
@@ -1126,7 +1216,11 @@ mod tests {
             engagement: 0.3,
         };
         assert_eq!(profile.tier(), ConsciousnessTier::Participant);
-        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_basic(), NOW);
+        let result = evaluate_governance(
+            &fresh_credential(profile.clone()),
+            &requirement_for_basic(),
+            NOW,
+        );
         assert!(result.eligible);
     }
 
@@ -1141,7 +1235,11 @@ mod tests {
         };
         // 0.29 * (0.25+0.25+0.30+0.20) = 0.29 * 1.0 = 0.29
         assert_eq!(profile.tier(), ConsciousnessTier::Observer);
-        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_basic(), NOW);
+        let result = evaluate_governance(
+            &fresh_credential(profile.clone()),
+            &requirement_for_basic(),
+            NOW,
+        );
         assert!(!result.eligible);
     }
 
@@ -1279,7 +1377,7 @@ mod tests {
         };
         let mut cred = fresh_credential(profile);
         cred.expires_at = NOW - 1; // recently expired
-        // Grace period does NOT apply to voting-tier operations
+                                   // Grace period does NOT apply to voting-tier operations
         let result = evaluate_governance(&cred, &requirement_for_voting(), NOW);
         assert!(!result.eligible);
         assert!(result.reasons[0].contains("expired"));
@@ -1308,7 +1406,7 @@ mod tests {
         };
         let mut cred = fresh_credential(profile);
         cred.expires_at = NOW; // expires exactly at NOW
-        // Grace period does NOT apply to voting-tier operations
+                               // Grace period does NOT apply to voting-tier operations
         let result = evaluate_governance(&cred, &requirement_for_voting(), NOW);
         assert!(!result.eligible);
         assert!(result.reasons[0].contains("expired"));
@@ -1376,14 +1474,26 @@ mod tests {
 
     #[test]
     fn tier_from_score_negative_is_observer() {
-        assert_eq!(ConsciousnessTier::from_score(-1.0), ConsciousnessTier::Observer);
-        assert_eq!(ConsciousnessTier::from_score(-0.001), ConsciousnessTier::Observer);
+        assert_eq!(
+            ConsciousnessTier::from_score(-1.0),
+            ConsciousnessTier::Observer
+        );
+        assert_eq!(
+            ConsciousnessTier::from_score(-0.001),
+            ConsciousnessTier::Observer
+        );
     }
 
     #[test]
     fn tier_from_score_above_one_is_guardian() {
-        assert_eq!(ConsciousnessTier::from_score(1.5), ConsciousnessTier::Guardian);
-        assert_eq!(ConsciousnessTier::from_score(100.0), ConsciousnessTier::Guardian);
+        assert_eq!(
+            ConsciousnessTier::from_score(1.5),
+            ConsciousnessTier::Guardian
+        );
+        assert_eq!(
+            ConsciousnessTier::from_score(100.0),
+            ConsciousnessTier::Guardian
+        );
     }
 
     // -- Grace period --
@@ -1444,7 +1554,11 @@ mod tests {
 
     #[test]
     fn should_audit_always_logs_constitutional() {
-        assert!(should_audit(&requirement_for_constitutional(), true, &[0u8]));
+        assert!(should_audit(
+            &requirement_for_constitutional(),
+            true,
+            &[0u8]
+        ));
         assert!(should_audit(
             &requirement_for_constitutional(),
             true,
@@ -1522,10 +1636,7 @@ mod tests {
         };
         let json = serde_json::to_string(&audit).unwrap();
         let a2: GateAuditInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(
-            a2.correlation_id,
-            Some("abcdef01:1700000000000000".into())
-        );
+        assert_eq!(a2.correlation_id, Some("abcdef01:1700000000000000".into()));
     }
 
     #[test]

@@ -644,34 +644,94 @@ mod tests {
 
     #[test]
     fn domain_from_str_loose_lowercase() {
-        assert_eq!(BridgeDomain::from_str_loose("property"), Some(BridgeDomain::Property));
-        assert_eq!(BridgeDomain::from_str_loose("housing"), Some(BridgeDomain::Housing));
-        assert_eq!(BridgeDomain::from_str_loose("care"), Some(BridgeDomain::Care));
-        assert_eq!(BridgeDomain::from_str_loose("mutualaid"), Some(BridgeDomain::Mutualaid));
-        assert_eq!(BridgeDomain::from_str_loose("water"), Some(BridgeDomain::Water));
-        assert_eq!(BridgeDomain::from_str_loose("food"), Some(BridgeDomain::Food));
-        assert_eq!(BridgeDomain::from_str_loose("transport"), Some(BridgeDomain::Transport));
-        assert_eq!(BridgeDomain::from_str_loose("support"), Some(BridgeDomain::Support));
-        assert_eq!(BridgeDomain::from_str_loose("space"), Some(BridgeDomain::Space));
-        assert_eq!(BridgeDomain::from_str_loose("justice"), Some(BridgeDomain::Justice));
-        assert_eq!(BridgeDomain::from_str_loose("emergency"), Some(BridgeDomain::Emergency));
-        assert_eq!(BridgeDomain::from_str_loose("media"), Some(BridgeDomain::Media));
+        assert_eq!(
+            BridgeDomain::from_str_loose("property"),
+            Some(BridgeDomain::Property)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("housing"),
+            Some(BridgeDomain::Housing)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("care"),
+            Some(BridgeDomain::Care)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("mutualaid"),
+            Some(BridgeDomain::Mutualaid)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("water"),
+            Some(BridgeDomain::Water)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("food"),
+            Some(BridgeDomain::Food)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("transport"),
+            Some(BridgeDomain::Transport)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("support"),
+            Some(BridgeDomain::Support)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("space"),
+            Some(BridgeDomain::Space)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("justice"),
+            Some(BridgeDomain::Justice)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("emergency"),
+            Some(BridgeDomain::Emergency)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("media"),
+            Some(BridgeDomain::Media)
+        );
     }
 
     #[test]
     fn domain_from_str_case_insensitive() {
-        assert_eq!(BridgeDomain::from_str_loose("Property"), Some(BridgeDomain::Property));
-        assert_eq!(BridgeDomain::from_str_loose("HOUSING"), Some(BridgeDomain::Housing));
-        assert_eq!(BridgeDomain::from_str_loose("Justice"), Some(BridgeDomain::Justice));
-        assert_eq!(BridgeDomain::from_str_loose("eMeRgEnCy"), Some(BridgeDomain::Emergency));
+        assert_eq!(
+            BridgeDomain::from_str_loose("Property"),
+            Some(BridgeDomain::Property)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("HOUSING"),
+            Some(BridgeDomain::Housing)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("Justice"),
+            Some(BridgeDomain::Justice)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("eMeRgEnCy"),
+            Some(BridgeDomain::Emergency)
+        );
     }
 
     #[test]
     fn domain_from_str_mutualaid_aliases() {
-        assert_eq!(BridgeDomain::from_str_loose("mutualaid"), Some(BridgeDomain::Mutualaid));
-        assert_eq!(BridgeDomain::from_str_loose("mutual_aid"), Some(BridgeDomain::Mutualaid));
-        assert_eq!(BridgeDomain::from_str_loose("mutual-aid"), Some(BridgeDomain::Mutualaid));
-        assert_eq!(BridgeDomain::from_str_loose("Mutual_Aid"), Some(BridgeDomain::Mutualaid));
+        assert_eq!(
+            BridgeDomain::from_str_loose("mutualaid"),
+            Some(BridgeDomain::Mutualaid)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("mutual_aid"),
+            Some(BridgeDomain::Mutualaid)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("mutual-aid"),
+            Some(BridgeDomain::Mutualaid)
+        );
+        assert_eq!(
+            BridgeDomain::from_str_loose("Mutual_Aid"),
+            Some(BridgeDomain::Mutualaid)
+        );
     }
 
     #[test]
@@ -866,7 +926,11 @@ mod tests {
 
     #[test]
     fn cross_cluster_role_serde_roundtrip() {
-        let roles = [CrossClusterRole::Commons, CrossClusterRole::Civic, CrossClusterRole::Identity];
+        let roles = [
+            CrossClusterRole::Commons,
+            CrossClusterRole::Civic,
+            CrossClusterRole::Identity,
+        ];
         for r in &roles {
             let json = serde_json::to_string(r).unwrap();
             let r2: CrossClusterRole = serde_json::from_str(&json).unwrap();
@@ -886,9 +950,18 @@ mod tests {
     #[test]
     fn property_transfer_keywords() {
         let d = BridgeDomain::Property;
-        assert_eq!(resolve_commons_zome(d, "transfer"), Some(CommonsZome::PropertyTransfer));
-        assert_eq!(resolve_commons_zome(d, "ownership"), Some(CommonsZome::PropertyTransfer));
-        assert_eq!(resolve_commons_zome(d, "ownership_transfer"), Some(CommonsZome::PropertyTransfer));
+        assert_eq!(
+            resolve_commons_zome(d, "transfer"),
+            Some(CommonsZome::PropertyTransfer)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "ownership"),
+            Some(CommonsZome::PropertyTransfer)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "ownership_transfer"),
+            Some(CommonsZome::PropertyTransfer)
+        );
     }
 
     #[test]
@@ -906,8 +979,14 @@ mod tests {
     #[test]
     fn property_registry_keywords() {
         let d = BridgeDomain::Property;
-        assert_eq!(resolve_commons_zome(d, "encumbrance"), Some(CommonsZome::PropertyRegistry));
-        assert_eq!(resolve_commons_zome(d, "title"), Some(CommonsZome::PropertyRegistry));
+        assert_eq!(
+            resolve_commons_zome(d, "encumbrance"),
+            Some(CommonsZome::PropertyRegistry)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "title"),
+            Some(CommonsZome::PropertyRegistry)
+        );
     }
 
     #[test]
@@ -923,9 +1002,18 @@ mod tests {
     #[test]
     fn housing_clt_keywords() {
         let d = BridgeDomain::Housing;
-        assert_eq!(resolve_commons_zome(d, "clt"), Some(CommonsZome::HousingClt));
-        assert_eq!(resolve_commons_zome(d, "lease"), Some(CommonsZome::HousingClt));
-        assert_eq!(resolve_commons_zome(d, "resale"), Some(CommonsZome::HousingClt));
+        assert_eq!(
+            resolve_commons_zome(d, "clt"),
+            Some(CommonsZome::HousingClt)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "lease"),
+            Some(CommonsZome::HousingClt)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "resale"),
+            Some(CommonsZome::HousingClt)
+        );
     }
 
     #[test]
@@ -939,22 +1027,40 @@ mod tests {
     #[test]
     fn housing_finances_keywords() {
         let d = BridgeDomain::Housing;
-        assert_eq!(resolve_commons_zome(d, "finance"), Some(CommonsZome::HousingFinances));
-        assert_eq!(resolve_commons_zome(d, "fee_schedule"), Some(CommonsZome::HousingFinances));
+        assert_eq!(
+            resolve_commons_zome(d, "finance"),
+            Some(CommonsZome::HousingFinances)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "fee_schedule"),
+            Some(CommonsZome::HousingFinances)
+        );
     }
 
     #[test]
     fn housing_maintenance_keywords() {
         let d = BridgeDomain::Housing;
-        assert_eq!(resolve_commons_zome(d, "maintenance"), Some(CommonsZome::HousingMaintenance));
-        assert_eq!(resolve_commons_zome(d, "repair_request"), Some(CommonsZome::HousingMaintenance));
+        assert_eq!(
+            resolve_commons_zome(d, "maintenance"),
+            Some(CommonsZome::HousingMaintenance)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "repair_request"),
+            Some(CommonsZome::HousingMaintenance)
+        );
     }
 
     #[test]
     fn housing_governance_keywords() {
         let d = BridgeDomain::Housing;
-        assert_eq!(resolve_commons_zome(d, "governance"), Some(CommonsZome::HousingGovernance));
-        assert_eq!(resolve_commons_zome(d, "proposal"), Some(CommonsZome::HousingGovernance));
+        assert_eq!(
+            resolve_commons_zome(d, "governance"),
+            Some(CommonsZome::HousingGovernance)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "proposal"),
+            Some(CommonsZome::HousingGovernance)
+        );
     }
 
     #[test]
@@ -1012,15 +1118,27 @@ mod tests {
     #[test]
     fn mutualaid_resources_keywords() {
         let d = BridgeDomain::Mutualaid;
-        assert_eq!(resolve_commons_zome(d, "resource"), Some(CommonsZome::MutualaidResources));
-        assert_eq!(resolve_commons_zome(d, "booking"), Some(CommonsZome::MutualaidResources));
+        assert_eq!(
+            resolve_commons_zome(d, "resource"),
+            Some(CommonsZome::MutualaidResources)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "booking"),
+            Some(CommonsZome::MutualaidResources)
+        );
     }
 
     #[test]
     fn mutualaid_needs_keywords() {
         let d = BridgeDomain::Mutualaid;
-        assert_eq!(resolve_commons_zome(d, "need"), Some(CommonsZome::MutualaidNeeds));
-        assert_eq!(resolve_commons_zome(d, "handoff"), Some(CommonsZome::MutualaidNeeds));
+        assert_eq!(
+            resolve_commons_zome(d, "need"),
+            Some(CommonsZome::MutualaidNeeds)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "handoff"),
+            Some(CommonsZome::MutualaidNeeds)
+        );
     }
 
     #[test]
@@ -1050,8 +1168,14 @@ mod tests {
     #[test]
     fn mutualaid_governance_keywords() {
         let d = BridgeDomain::Mutualaid;
-        assert_eq!(resolve_commons_zome(d, "governance"), Some(CommonsZome::MutualaidGovernance));
-        assert_eq!(resolve_commons_zome(d, "proposal"), Some(CommonsZome::MutualaidGovernance));
+        assert_eq!(
+            resolve_commons_zome(d, "governance"),
+            Some(CommonsZome::MutualaidGovernance)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "proposal"),
+            Some(CommonsZome::MutualaidGovernance)
+        );
     }
 
     #[test]
@@ -1067,29 +1191,53 @@ mod tests {
     #[test]
     fn water_purity_keywords() {
         let d = BridgeDomain::Water;
-        assert_eq!(resolve_commons_zome(d, "purity"), Some(CommonsZome::WaterPurity));
-        assert_eq!(resolve_commons_zome(d, "quality"), Some(CommonsZome::WaterPurity));
+        assert_eq!(
+            resolve_commons_zome(d, "purity"),
+            Some(CommonsZome::WaterPurity)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "quality"),
+            Some(CommonsZome::WaterPurity)
+        );
     }
 
     #[test]
     fn water_capture_keywords() {
         let d = BridgeDomain::Water;
-        assert_eq!(resolve_commons_zome(d, "capture"), Some(CommonsZome::WaterCapture));
-        assert_eq!(resolve_commons_zome(d, "harvest"), Some(CommonsZome::WaterCapture));
+        assert_eq!(
+            resolve_commons_zome(d, "capture"),
+            Some(CommonsZome::WaterCapture)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "harvest"),
+            Some(CommonsZome::WaterCapture)
+        );
     }
 
     #[test]
     fn water_steward_keywords() {
         let d = BridgeDomain::Water;
-        assert_eq!(resolve_commons_zome(d, "steward"), Some(CommonsZome::WaterSteward));
-        assert_eq!(resolve_commons_zome(d, "guardian"), Some(CommonsZome::WaterSteward));
+        assert_eq!(
+            resolve_commons_zome(d, "steward"),
+            Some(CommonsZome::WaterSteward)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "guardian"),
+            Some(CommonsZome::WaterSteward)
+        );
     }
 
     #[test]
     fn water_wisdom_keywords() {
         let d = BridgeDomain::Water;
-        assert_eq!(resolve_commons_zome(d, "wisdom"), Some(CommonsZome::WaterWisdom));
-        assert_eq!(resolve_commons_zome(d, "knowledge"), Some(CommonsZome::WaterWisdom));
+        assert_eq!(
+            resolve_commons_zome(d, "wisdom"),
+            Some(CommonsZome::WaterWisdom)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "knowledge"),
+            Some(CommonsZome::WaterWisdom)
+        );
     }
 
     #[test]
@@ -1105,25 +1253,52 @@ mod tests {
     #[test]
     fn food_distribution_keywords() {
         let d = BridgeDomain::Food;
-        assert_eq!(resolve_commons_zome(d, "distribution"), Some(CommonsZome::FoodDistribution));
-        assert_eq!(resolve_commons_zome(d, "market"), Some(CommonsZome::FoodDistribution));
-        assert_eq!(resolve_commons_zome(d, "order"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(
+            resolve_commons_zome(d, "distribution"),
+            Some(CommonsZome::FoodDistribution)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "market"),
+            Some(CommonsZome::FoodDistribution)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "order"),
+            Some(CommonsZome::FoodDistribution)
+        );
     }
 
     #[test]
     fn food_preservation_keywords() {
         let d = BridgeDomain::Food;
-        assert_eq!(resolve_commons_zome(d, "preservation"), Some(CommonsZome::FoodPreservation));
-        assert_eq!(resolve_commons_zome(d, "batch"), Some(CommonsZome::FoodPreservation));
-        assert_eq!(resolve_commons_zome(d, "storage"), Some(CommonsZome::FoodPreservation));
+        assert_eq!(
+            resolve_commons_zome(d, "preservation"),
+            Some(CommonsZome::FoodPreservation)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "batch"),
+            Some(CommonsZome::FoodPreservation)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "storage"),
+            Some(CommonsZome::FoodPreservation)
+        );
     }
 
     #[test]
     fn food_knowledge_keywords() {
         let d = BridgeDomain::Food;
-        assert_eq!(resolve_commons_zome(d, "knowledge"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "seed"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "recipe"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(
+            resolve_commons_zome(d, "knowledge"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "seed"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "recipe"),
+            Some(CommonsZome::FoodKnowledge)
+        );
     }
 
     #[test]
@@ -1139,17 +1314,35 @@ mod tests {
     #[test]
     fn transport_sharing_keywords() {
         let d = BridgeDomain::Transport;
-        assert_eq!(resolve_commons_zome(d, "share"), Some(CommonsZome::TransportSharing));
-        assert_eq!(resolve_commons_zome(d, "ride"), Some(CommonsZome::TransportSharing));
-        assert_eq!(resolve_commons_zome(d, "cargo"), Some(CommonsZome::TransportSharing));
+        assert_eq!(
+            resolve_commons_zome(d, "share"),
+            Some(CommonsZome::TransportSharing)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "ride"),
+            Some(CommonsZome::TransportSharing)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "cargo"),
+            Some(CommonsZome::TransportSharing)
+        );
     }
 
     #[test]
     fn transport_impact_keywords() {
         let d = BridgeDomain::Transport;
-        assert_eq!(resolve_commons_zome(d, "impact"), Some(CommonsZome::TransportImpact));
-        assert_eq!(resolve_commons_zome(d, "carbon"), Some(CommonsZome::TransportImpact));
-        assert_eq!(resolve_commons_zome(d, "emission"), Some(CommonsZome::TransportImpact));
+        assert_eq!(
+            resolve_commons_zome(d, "impact"),
+            Some(CommonsZome::TransportImpact)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "carbon"),
+            Some(CommonsZome::TransportImpact)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "emission"),
+            Some(CommonsZome::TransportImpact)
+        );
     }
 
     #[test]
@@ -1201,8 +1394,14 @@ mod tests {
     #[test]
     fn commons_routing_none_for_civic_domains() {
         assert_eq!(resolve_commons_zome(BridgeDomain::Justice, "cases"), None);
-        assert_eq!(resolve_commons_zome(BridgeDomain::Emergency, "incidents"), None);
-        assert_eq!(resolve_commons_zome(BridgeDomain::Media, "publication"), None);
+        assert_eq!(
+            resolve_commons_zome(BridgeDomain::Emergency, "incidents"),
+            None
+        );
+        assert_eq!(
+            resolve_commons_zome(BridgeDomain::Media, "publication"),
+            None
+        );
     }
 
     // -- resolve_commons_zome: Case insensitivity --
@@ -1249,15 +1448,27 @@ mod tests {
     #[test]
     fn justice_restorative_keywords() {
         let d = BridgeDomain::Justice;
-        assert_eq!(resolve_civic_zome(d, "restorative"), Some(CivicZome::JusticeRestorative));
-        assert_eq!(resolve_civic_zome(d, "mediation"), Some(CivicZome::JusticeRestorative));
+        assert_eq!(
+            resolve_civic_zome(d, "restorative"),
+            Some(CivicZome::JusticeRestorative)
+        );
+        assert_eq!(
+            resolve_civic_zome(d, "mediation"),
+            Some(CivicZome::JusticeRestorative)
+        );
     }
 
     #[test]
     fn justice_enforcement_keywords() {
         let d = BridgeDomain::Justice;
-        assert_eq!(resolve_civic_zome(d, "enforce"), Some(CivicZome::JusticeEnforcement));
-        assert_eq!(resolve_civic_zome(d, "sanction"), Some(CivicZome::JusticeEnforcement));
+        assert_eq!(
+            resolve_civic_zome(d, "enforce"),
+            Some(CivicZome::JusticeEnforcement)
+        );
+        assert_eq!(
+            resolve_civic_zome(d, "sanction"),
+            Some(CivicZome::JusticeEnforcement)
+        );
     }
 
     #[test]
@@ -1273,15 +1484,27 @@ mod tests {
     #[test]
     fn emergency_triage_keywords() {
         let d = BridgeDomain::Emergency;
-        assert_eq!(resolve_civic_zome(d, "triage"), Some(CivicZome::EmergencyTriage));
-        assert_eq!(resolve_civic_zome(d, "priority_assessment"), Some(CivicZome::EmergencyTriage));
+        assert_eq!(
+            resolve_civic_zome(d, "triage"),
+            Some(CivicZome::EmergencyTriage)
+        );
+        assert_eq!(
+            resolve_civic_zome(d, "priority_assessment"),
+            Some(CivicZome::EmergencyTriage)
+        );
     }
 
     #[test]
     fn emergency_resources_keywords() {
         let d = BridgeDomain::Emergency;
-        assert_eq!(resolve_civic_zome(d, "resource"), Some(CivicZome::EmergencyResources));
-        assert_eq!(resolve_civic_zome(d, "supply_status"), Some(CivicZome::EmergencyResources));
+        assert_eq!(
+            resolve_civic_zome(d, "resource"),
+            Some(CivicZome::EmergencyResources)
+        );
+        assert_eq!(
+            resolve_civic_zome(d, "supply_status"),
+            Some(CivicZome::EmergencyResources)
+        );
     }
 
     #[test]
@@ -1303,8 +1526,14 @@ mod tests {
     #[test]
     fn emergency_comms_keywords() {
         let d = BridgeDomain::Emergency;
-        assert_eq!(resolve_civic_zome(d, "comm"), Some(CivicZome::EmergencyComms));
-        assert_eq!(resolve_civic_zome(d, "alert"), Some(CivicZome::EmergencyComms));
+        assert_eq!(
+            resolve_civic_zome(d, "comm"),
+            Some(CivicZome::EmergencyComms)
+        );
+        assert_eq!(
+            resolve_civic_zome(d, "alert"),
+            Some(CivicZome::EmergencyComms)
+        );
     }
 
     #[test]
@@ -1320,23 +1549,44 @@ mod tests {
     #[test]
     fn media_attribution_keywords() {
         let d = BridgeDomain::Media;
-        assert_eq!(resolve_civic_zome(d, "attribution"), Some(CivicZome::MediaAttribution));
-        assert_eq!(resolve_civic_zome(d, "source_check"), Some(CivicZome::MediaAttribution));
+        assert_eq!(
+            resolve_civic_zome(d, "attribution"),
+            Some(CivicZome::MediaAttribution)
+        );
+        assert_eq!(
+            resolve_civic_zome(d, "source_check"),
+            Some(CivicZome::MediaAttribution)
+        );
     }
 
     #[test]
     fn media_factcheck_keywords() {
         let d = BridgeDomain::Media;
-        assert_eq!(resolve_civic_zome(d, "factcheck"), Some(CivicZome::MediaFactcheck));
-        assert_eq!(resolve_civic_zome(d, "check_claim"), Some(CivicZome::MediaFactcheck));
-        assert_eq!(resolve_civic_zome(d, "verify"), Some(CivicZome::MediaFactcheck));
+        assert_eq!(
+            resolve_civic_zome(d, "factcheck"),
+            Some(CivicZome::MediaFactcheck)
+        );
+        assert_eq!(
+            resolve_civic_zome(d, "check_claim"),
+            Some(CivicZome::MediaFactcheck)
+        );
+        assert_eq!(
+            resolve_civic_zome(d, "verify"),
+            Some(CivicZome::MediaFactcheck)
+        );
     }
 
     #[test]
     fn media_curation_keywords() {
         let d = BridgeDomain::Media;
-        assert_eq!(resolve_civic_zome(d, "curation"), Some(CivicZome::MediaCuration));
-        assert_eq!(resolve_civic_zome(d, "recommend"), Some(CivicZome::MediaCuration));
+        assert_eq!(
+            resolve_civic_zome(d, "curation"),
+            Some(CivicZome::MediaCuration)
+        );
+        assert_eq!(
+            resolve_civic_zome(d, "recommend"),
+            Some(CivicZome::MediaCuration)
+        );
     }
 
     #[test]
@@ -1553,21 +1803,51 @@ mod tests {
     fn unknown_keywords_fall_through_to_default() {
         // Every domain should route unknown keywords to its default zome
         let cases = [
-            (BridgeDomain::Property, "xyzzy", CommonsZome::PropertyRegistry),
-            (BridgeDomain::Housing, "nonexistent_query", CommonsZome::HousingUnits),
-            (BridgeDomain::Care, "404_not_found", CommonsZome::CareTimebank),
-            (BridgeDomain::Mutualaid, "random_gibberish", CommonsZome::MutualaidTimebank),
+            (
+                BridgeDomain::Property,
+                "xyzzy",
+                CommonsZome::PropertyRegistry,
+            ),
+            (
+                BridgeDomain::Housing,
+                "nonexistent_query",
+                CommonsZome::HousingUnits,
+            ),
+            (
+                BridgeDomain::Care,
+                "404_not_found",
+                CommonsZome::CareTimebank,
+            ),
+            (
+                BridgeDomain::Mutualaid,
+                "random_gibberish",
+                CommonsZome::MutualaidTimebank,
+            ),
             (BridgeDomain::Water, "unicorn_data", CommonsZome::WaterFlow),
-            (BridgeDomain::Food, "quantum_soup", CommonsZome::FoodProduction),
-            (BridgeDomain::Transport, "teleportation", CommonsZome::TransportRoutes),
-            (BridgeDomain::Support, "astrology", CommonsZome::SupportKnowledge),
+            (
+                BridgeDomain::Food,
+                "quantum_soup",
+                CommonsZome::FoodProduction,
+            ),
+            (
+                BridgeDomain::Transport,
+                "teleportation",
+                CommonsZome::TransportRoutes,
+            ),
+            (
+                BridgeDomain::Support,
+                "astrology",
+                CommonsZome::SupportKnowledge,
+            ),
         ];
         for (domain, keyword, expected) in &cases {
             assert_eq!(
                 resolve_commons_zome(*domain, keyword),
                 Some(*expected),
                 "Unknown keyword '{}' for {:?} should return default {:?}",
-                keyword, domain, expected
+                keyword,
+                domain,
+                expected
             );
         }
     }
@@ -1576,15 +1856,25 @@ mod tests {
     fn unknown_keywords_civic_fall_through_to_default() {
         let cases = [
             (BridgeDomain::Justice, "xyzzy", CivicZome::JusticeCases),
-            (BridgeDomain::Emergency, "nonexistent", CivicZome::EmergencyIncidents),
-            (BridgeDomain::Media, "gibberish", CivicZome::MediaPublication),
+            (
+                BridgeDomain::Emergency,
+                "nonexistent",
+                CivicZome::EmergencyIncidents,
+            ),
+            (
+                BridgeDomain::Media,
+                "gibberish",
+                CivicZome::MediaPublication,
+            ),
         ];
         for (domain, keyword, expected) in &cases {
             assert_eq!(
                 resolve_civic_zome(*domain, keyword),
                 Some(*expected),
                 "Unknown keyword '{}' for {:?} should return default {:?}",
-                keyword, domain, expected
+                keyword,
+                domain,
+                expected
             );
         }
     }
@@ -1630,45 +1920,102 @@ mod tests {
     #[test]
     fn transport_impact_redeem_keywords() {
         let d = BridgeDomain::Transport;
-        assert_eq!(resolve_commons_zome(d, "redeem_credits"), Some(CommonsZome::TransportImpact));
-        assert_eq!(resolve_commons_zome(d, "get_agent_carbon_balance"), Some(CommonsZome::TransportImpact));
-        assert_eq!(resolve_commons_zome(d, "get_my_redemptions"), Some(CommonsZome::TransportImpact));
-        assert_eq!(resolve_commons_zome(d, "redemption_history"), Some(CommonsZome::TransportImpact));
+        assert_eq!(
+            resolve_commons_zome(d, "redeem_credits"),
+            Some(CommonsZome::TransportImpact)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_agent_carbon_balance"),
+            Some(CommonsZome::TransportImpact)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_my_redemptions"),
+            Some(CommonsZome::TransportImpact)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "redemption_history"),
+            Some(CommonsZome::TransportImpact)
+        );
     }
 
     #[test]
     fn food_nutrient_keyword() {
         let d = BridgeDomain::Food;
-        assert_eq!(resolve_commons_zome(d, "add_nutrient_profile"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_nutrient_profile"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(
+            resolve_commons_zome(d, "add_nutrient_profile"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_nutrient_profile"),
+            Some(CommonsZome::FoodKnowledge)
+        );
     }
 
     #[test]
     fn food_allergen_keyword() {
         let d = BridgeDomain::Food;
-        assert_eq!(resolve_commons_zome(d, "search_allergen_safe"), Some(CommonsZome::FoodDistribution));
-        assert_eq!(resolve_commons_zome(d, "allergen_check"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(
+            resolve_commons_zome(d, "search_allergen_safe"),
+            Some(CommonsZome::FoodDistribution)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "allergen_check"),
+            Some(CommonsZome::FoodDistribution)
+        );
     }
 
     #[test]
     fn support_diagnostics_helper_keywords() {
         let d = BridgeDomain::Support;
-        assert_eq!(resolve_commons_zome(d, "register_helper"), Some(CommonsZome::SupportDiagnostics));
-        assert_eq!(resolve_commons_zome(d, "update_availability"), Some(CommonsZome::SupportDiagnostics));
-        assert_eq!(resolve_commons_zome(d, "get_available_helpers"), Some(CommonsZome::SupportDiagnostics));
-        assert_eq!(resolve_commons_zome(d, "publish_cognitive_update"), Some(CommonsZome::SupportDiagnostics));
-        assert_eq!(resolve_commons_zome(d, "set_privacy_preference"), Some(CommonsZome::SupportDiagnostics));
+        assert_eq!(
+            resolve_commons_zome(d, "register_helper"),
+            Some(CommonsZome::SupportDiagnostics)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "update_availability"),
+            Some(CommonsZome::SupportDiagnostics)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_available_helpers"),
+            Some(CommonsZome::SupportDiagnostics)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "publish_cognitive_update"),
+            Some(CommonsZome::SupportDiagnostics)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "set_privacy_preference"),
+            Some(CommonsZome::SupportDiagnostics)
+        );
     }
 
     #[test]
     fn support_tickets_escalation_keywords() {
         let d = BridgeDomain::Support;
-        assert_eq!(resolve_commons_zome(d, "create_preemptive_alert"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "list_preemptive_alerts"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "promote_alert_to_ticket"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "escalate_ticket"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "submit_satisfaction"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "create_undo"), Some(CommonsZome::SupportTickets));
+        assert_eq!(
+            resolve_commons_zome(d, "create_preemptive_alert"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "list_preemptive_alerts"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "promote_alert_to_ticket"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "escalate_ticket"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "submit_satisfaction"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "create_undo"),
+            Some(CommonsZome::SupportTickets)
+        );
     }
 
     // -- Phase 2-4 full function name dispatch coverage --
@@ -1677,55 +2024,154 @@ mod tests {
     fn phase2_food_function_names_dispatch_correctly() {
         let d = BridgeDomain::Food;
         // Seed exchange → FoodKnowledge (contains "seed")
-        assert_eq!(resolve_commons_zome(d, "offer_seeds"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "request_seeds"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_available_seeds"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_open_seed_requests"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "match_seed_request"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(
+            resolve_commons_zome(d, "offer_seeds"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "request_seeds"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_available_seeds"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_open_seed_requests"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "match_seed_request"),
+            Some(CommonsZome::FoodKnowledge)
+        );
         // Seed quality ratings → FoodKnowledge (contains "rating" or "seed")
-        assert_eq!(resolve_commons_zome(d, "rate_seed_exchange"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_exchange_ratings"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_grower_ratings"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(
+            resolve_commons_zome(d, "rate_seed_exchange"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_exchange_ratings"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_grower_ratings"),
+            Some(CommonsZome::FoodKnowledge)
+        );
         // Garden membership → FoodProduction (default)
-        assert_eq!(resolve_commons_zome(d, "add_garden_member"), Some(CommonsZome::FoodProduction));
-        assert_eq!(resolve_commons_zome(d, "get_plot_members"), Some(CommonsZome::FoodProduction));
-        assert_eq!(resolve_commons_zome(d, "remove_garden_member"), Some(CommonsZome::FoodProduction));
+        assert_eq!(
+            resolve_commons_zome(d, "add_garden_member"),
+            Some(CommonsZome::FoodProduction)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_plot_members"),
+            Some(CommonsZome::FoodProduction)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "remove_garden_member"),
+            Some(CommonsZome::FoodProduction)
+        );
     }
 
     #[test]
     fn phase2_transport_function_names_dispatch_correctly() {
         let d = BridgeDomain::Transport;
-        assert_eq!(resolve_commons_zome(d, "review_ride"), Some(CommonsZome::TransportSharing));
-        assert_eq!(resolve_commons_zome(d, "get_ride_reviews"), Some(CommonsZome::TransportSharing));
-        assert_eq!(resolve_commons_zome(d, "find_nearby_rides"), Some(CommonsZome::TransportSharing));
-        assert_eq!(resolve_commons_zome(d, "redeem_credits"), Some(CommonsZome::TransportImpact));
-        assert_eq!(resolve_commons_zome(d, "get_my_redemptions"), Some(CommonsZome::TransportImpact));
-        assert_eq!(resolve_commons_zome(d, "get_agent_carbon_balance"), Some(CommonsZome::TransportImpact));
+        assert_eq!(
+            resolve_commons_zome(d, "review_ride"),
+            Some(CommonsZome::TransportSharing)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_ride_reviews"),
+            Some(CommonsZome::TransportSharing)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "find_nearby_rides"),
+            Some(CommonsZome::TransportSharing)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "redeem_credits"),
+            Some(CommonsZome::TransportImpact)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_my_redemptions"),
+            Some(CommonsZome::TransportImpact)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_agent_carbon_balance"),
+            Some(CommonsZome::TransportImpact)
+        );
         // Maintenance/features → TransportRoutes (default)
-        assert_eq!(resolve_commons_zome(d, "log_maintenance"), Some(CommonsZome::TransportRoutes));
-        assert_eq!(resolve_commons_zome(d, "get_vehicle_maintenance"), Some(CommonsZome::TransportRoutes));
-        assert_eq!(resolve_commons_zome(d, "set_vehicle_features"), Some(CommonsZome::TransportRoutes));
-        assert_eq!(resolve_commons_zome(d, "get_accessible_vehicles"), Some(CommonsZome::TransportRoutes));
-        assert_eq!(resolve_commons_zome(d, "get_driver_rating"), Some(CommonsZome::TransportRoutes));
+        assert_eq!(
+            resolve_commons_zome(d, "log_maintenance"),
+            Some(CommonsZome::TransportRoutes)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_vehicle_maintenance"),
+            Some(CommonsZome::TransportRoutes)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "set_vehicle_features"),
+            Some(CommonsZome::TransportRoutes)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_accessible_vehicles"),
+            Some(CommonsZome::TransportRoutes)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_driver_rating"),
+            Some(CommonsZome::TransportRoutes)
+        );
     }
 
     #[test]
     fn phase2_support_function_names_dispatch_correctly() {
         let d = BridgeDomain::Support;
         // Diagnostics
-        assert_eq!(resolve_commons_zome(d, "run_diagnostic"), Some(CommonsZome::SupportDiagnostics));
-        assert_eq!(resolve_commons_zome(d, "register_helper"), Some(CommonsZome::SupportDiagnostics));
-        assert_eq!(resolve_commons_zome(d, "publish_cognitive_update"), Some(CommonsZome::SupportDiagnostics));
+        assert_eq!(
+            resolve_commons_zome(d, "run_diagnostic"),
+            Some(CommonsZome::SupportDiagnostics)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "register_helper"),
+            Some(CommonsZome::SupportDiagnostics)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "publish_cognitive_update"),
+            Some(CommonsZome::SupportDiagnostics)
+        );
         // Tickets
-        assert_eq!(resolve_commons_zome(d, "create_ticket"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "escalate_ticket"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "create_preemptive_alert"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "submit_satisfaction"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "create_undo"), Some(CommonsZome::SupportTickets));
+        assert_eq!(
+            resolve_commons_zome(d, "create_ticket"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "escalate_ticket"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "create_preemptive_alert"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "submit_satisfaction"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "create_undo"),
+            Some(CommonsZome::SupportTickets)
+        );
         // Knowledge (default)
-        assert_eq!(resolve_commons_zome(d, "create_article"), Some(CommonsZome::SupportKnowledge));
-        assert_eq!(resolve_commons_zome(d, "search_by_category"), Some(CommonsZome::SupportKnowledge));
-        assert_eq!(resolve_commons_zome(d, "create_resolution"), Some(CommonsZome::SupportKnowledge));
+        assert_eq!(
+            resolve_commons_zome(d, "create_article"),
+            Some(CommonsZome::SupportKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "search_by_category"),
+            Some(CommonsZome::SupportKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "create_resolution"),
+            Some(CommonsZome::SupportKnowledge)
+        );
     }
 
     // -- Domain from_str_loose edge cases --
@@ -1748,32 +2194,65 @@ mod tests {
     #[test]
     fn food_practice_routes_to_knowledge() {
         let d = BridgeDomain::Food;
-        assert_eq!(resolve_commons_zome(d, "share_practice"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_practices_by_category"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(
+            resolve_commons_zome(d, "share_practice"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_practices_by_category"),
+            Some(CommonsZome::FoodKnowledge)
+        );
     }
 
     #[test]
     fn food_product_listing_routes_to_distribution() {
         let d = BridgeDomain::Food;
-        assert_eq!(resolve_commons_zome(d, "list_product"), Some(CommonsZome::FoodDistribution));
-        assert_eq!(resolve_commons_zome(d, "get_market_listings"), Some(CommonsZome::FoodDistribution));
-        assert_eq!(resolve_commons_zome(d, "get_producer_listings"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(
+            resolve_commons_zome(d, "list_product"),
+            Some(CommonsZome::FoodDistribution)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_market_listings"),
+            Some(CommonsZome::FoodDistribution)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_producer_listings"),
+            Some(CommonsZome::FoodDistribution)
+        );
     }
 
     #[test]
     fn transport_trip_routes_to_impact() {
         let d = BridgeDomain::Transport;
-        assert_eq!(resolve_commons_zome(d, "create_trip"), Some(CommonsZome::TransportImpact));
-        assert_eq!(resolve_commons_zome(d, "get_trip_carbon"), Some(CommonsZome::TransportImpact));
+        assert_eq!(
+            resolve_commons_zome(d, "create_trip"),
+            Some(CommonsZome::TransportImpact)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_trip_carbon"),
+            Some(CommonsZome::TransportImpact)
+        );
     }
 
     #[test]
     fn support_comment_action_routes_to_tickets() {
         let d = BridgeDomain::Support;
-        assert_eq!(resolve_commons_zome(d, "add_comment"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "get_ticket_comments"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "take_action"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "list_actions"), Some(CommonsZome::SupportTickets));
+        assert_eq!(
+            resolve_commons_zome(d, "add_comment"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_ticket_comments"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "take_action"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "list_actions"),
+            Some(CommonsZome::SupportTickets)
+        );
     }
 
     // -- Exhaustive SDK function name dispatch coverage --
@@ -1782,108 +2261,360 @@ mod tests {
     fn food_client_all_function_names_dispatch_correctly() {
         let d = BridgeDomain::Food;
         // Production (default)
-        assert_eq!(resolve_commons_zome(d, "register_plot"), Some(CommonsZome::FoodProduction));
-        assert_eq!(resolve_commons_zome(d, "get_plot"), Some(CommonsZome::FoodProduction));
-        assert_eq!(resolve_commons_zome(d, "get_all_plots"), Some(CommonsZome::FoodProduction));
-        assert_eq!(resolve_commons_zome(d, "plant_crop"), Some(CommonsZome::FoodProduction));
-        assert_eq!(resolve_commons_zome(d, "record_harvest"), Some(CommonsZome::FoodProduction));
-        assert_eq!(resolve_commons_zome(d, "get_plot_crops"), Some(CommonsZome::FoodProduction));
-        assert_eq!(resolve_commons_zome(d, "get_crop_yields"), Some(CommonsZome::FoodProduction));
-        assert_eq!(resolve_commons_zome(d, "create_season_plan"), Some(CommonsZome::FoodProduction));
-        assert_eq!(resolve_commons_zome(d, "get_season_plans"), Some(CommonsZome::FoodProduction));
-        assert_eq!(resolve_commons_zome(d, "add_garden_member"), Some(CommonsZome::FoodProduction));
-        assert_eq!(resolve_commons_zome(d, "get_plot_members"), Some(CommonsZome::FoodProduction));
-        assert_eq!(resolve_commons_zome(d, "remove_garden_member"), Some(CommonsZome::FoodProduction));
+        assert_eq!(
+            resolve_commons_zome(d, "register_plot"),
+            Some(CommonsZome::FoodProduction)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_plot"),
+            Some(CommonsZome::FoodProduction)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_all_plots"),
+            Some(CommonsZome::FoodProduction)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "plant_crop"),
+            Some(CommonsZome::FoodProduction)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "record_harvest"),
+            Some(CommonsZome::FoodProduction)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_plot_crops"),
+            Some(CommonsZome::FoodProduction)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_crop_yields"),
+            Some(CommonsZome::FoodProduction)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "create_season_plan"),
+            Some(CommonsZome::FoodProduction)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_season_plans"),
+            Some(CommonsZome::FoodProduction)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "add_garden_member"),
+            Some(CommonsZome::FoodProduction)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_plot_members"),
+            Some(CommonsZome::FoodProduction)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "remove_garden_member"),
+            Some(CommonsZome::FoodProduction)
+        );
         // Distribution
-        assert_eq!(resolve_commons_zome(d, "create_market"), Some(CommonsZome::FoodDistribution));
-        assert_eq!(resolve_commons_zome(d, "get_all_markets"), Some(CommonsZome::FoodDistribution));
-        assert_eq!(resolve_commons_zome(d, "list_product"), Some(CommonsZome::FoodDistribution));
-        assert_eq!(resolve_commons_zome(d, "get_market_listings"), Some(CommonsZome::FoodDistribution));
-        assert_eq!(resolve_commons_zome(d, "get_producer_listings"), Some(CommonsZome::FoodDistribution));
-        assert_eq!(resolve_commons_zome(d, "place_order"), Some(CommonsZome::FoodDistribution));
-        assert_eq!(resolve_commons_zome(d, "fulfill_order"), Some(CommonsZome::FoodDistribution));
-        assert_eq!(resolve_commons_zome(d, "cancel_order"), Some(CommonsZome::FoodDistribution));
-        assert_eq!(resolve_commons_zome(d, "get_my_orders"), Some(CommonsZome::FoodDistribution));
-        assert_eq!(resolve_commons_zome(d, "search_allergen_safe"), Some(CommonsZome::FoodDistribution));
+        assert_eq!(
+            resolve_commons_zome(d, "create_market"),
+            Some(CommonsZome::FoodDistribution)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_all_markets"),
+            Some(CommonsZome::FoodDistribution)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "list_product"),
+            Some(CommonsZome::FoodDistribution)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_market_listings"),
+            Some(CommonsZome::FoodDistribution)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_producer_listings"),
+            Some(CommonsZome::FoodDistribution)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "place_order"),
+            Some(CommonsZome::FoodDistribution)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "fulfill_order"),
+            Some(CommonsZome::FoodDistribution)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "cancel_order"),
+            Some(CommonsZome::FoodDistribution)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_my_orders"),
+            Some(CommonsZome::FoodDistribution)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "search_allergen_safe"),
+            Some(CommonsZome::FoodDistribution)
+        );
         // Preservation
-        assert_eq!(resolve_commons_zome(d, "start_batch"), Some(CommonsZome::FoodPreservation));
-        assert_eq!(resolve_commons_zome(d, "complete_batch"), Some(CommonsZome::FoodPreservation));
-        assert_eq!(resolve_commons_zome(d, "get_batch"), Some(CommonsZome::FoodPreservation));
-        assert_eq!(resolve_commons_zome(d, "register_storage"), Some(CommonsZome::FoodPreservation));
-        assert_eq!(resolve_commons_zome(d, "get_storage_inventory"), Some(CommonsZome::FoodPreservation));
-        assert_eq!(resolve_commons_zome(d, "get_agent_batches"), Some(CommonsZome::FoodPreservation));
+        assert_eq!(
+            resolve_commons_zome(d, "start_batch"),
+            Some(CommonsZome::FoodPreservation)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "complete_batch"),
+            Some(CommonsZome::FoodPreservation)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_batch"),
+            Some(CommonsZome::FoodPreservation)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "register_storage"),
+            Some(CommonsZome::FoodPreservation)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_storage_inventory"),
+            Some(CommonsZome::FoodPreservation)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_agent_batches"),
+            Some(CommonsZome::FoodPreservation)
+        );
         // Knowledge
-        assert_eq!(resolve_commons_zome(d, "catalog_seed"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_seed"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_seeds_by_species"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "share_practice"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_practices_by_category"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "share_recipe"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_recipes_by_tag"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "search_knowledge"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "offer_seeds"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "request_seeds"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_available_seeds"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_open_seed_requests"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "match_seed_request"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "rate_seed_exchange"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_exchange_ratings"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_grower_ratings"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "add_nutrient_profile"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "get_nutrient_profile"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "update_seed_variety"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "update_traditional_practice"), Some(CommonsZome::FoodKnowledge));
-        assert_eq!(resolve_commons_zome(d, "update_recipe"), Some(CommonsZome::FoodKnowledge));
+        assert_eq!(
+            resolve_commons_zome(d, "catalog_seed"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_seed"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_seeds_by_species"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "share_practice"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_practices_by_category"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "share_recipe"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_recipes_by_tag"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "search_knowledge"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "offer_seeds"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "request_seeds"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_available_seeds"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_open_seed_requests"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "match_seed_request"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "rate_seed_exchange"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_exchange_ratings"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_grower_ratings"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "add_nutrient_profile"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_nutrient_profile"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "update_seed_variety"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "update_traditional_practice"),
+            Some(CommonsZome::FoodKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "update_recipe"),
+            Some(CommonsZome::FoodKnowledge)
+        );
     }
 
     #[test]
     fn transport_client_all_function_names_dispatch_correctly() {
         let d = BridgeDomain::Transport;
         // Routes (default)
-        assert_eq!(resolve_commons_zome(d, "create_route"), Some(CommonsZome::TransportRoutes));
-        assert_eq!(resolve_commons_zome(d, "get_route"), Some(CommonsZome::TransportRoutes));
-        assert_eq!(resolve_commons_zome(d, "log_maintenance"), Some(CommonsZome::TransportRoutes));
-        assert_eq!(resolve_commons_zome(d, "get_vehicle_maintenance"), Some(CommonsZome::TransportRoutes));
-        assert_eq!(resolve_commons_zome(d, "set_vehicle_features"), Some(CommonsZome::TransportRoutes));
-        assert_eq!(resolve_commons_zome(d, "get_accessible_vehicles"), Some(CommonsZome::TransportRoutes));
-        assert_eq!(resolve_commons_zome(d, "get_driver_rating"), Some(CommonsZome::TransportRoutes));
+        assert_eq!(
+            resolve_commons_zome(d, "create_route"),
+            Some(CommonsZome::TransportRoutes)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_route"),
+            Some(CommonsZome::TransportRoutes)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "log_maintenance"),
+            Some(CommonsZome::TransportRoutes)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_vehicle_maintenance"),
+            Some(CommonsZome::TransportRoutes)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "set_vehicle_features"),
+            Some(CommonsZome::TransportRoutes)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_accessible_vehicles"),
+            Some(CommonsZome::TransportRoutes)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_driver_rating"),
+            Some(CommonsZome::TransportRoutes)
+        );
         // Sharing
-        assert_eq!(resolve_commons_zome(d, "offer_ride"), Some(CommonsZome::TransportSharing));
-        assert_eq!(resolve_commons_zome(d, "find_nearby_rides"), Some(CommonsZome::TransportSharing));
-        assert_eq!(resolve_commons_zome(d, "review_ride"), Some(CommonsZome::TransportSharing));
-        assert_eq!(resolve_commons_zome(d, "get_ride_reviews"), Some(CommonsZome::TransportSharing));
-        assert_eq!(resolve_commons_zome(d, "share_vehicle"), Some(CommonsZome::TransportSharing));
-        assert_eq!(resolve_commons_zome(d, "offer_cargo_space"), Some(CommonsZome::TransportSharing));
+        assert_eq!(
+            resolve_commons_zome(d, "offer_ride"),
+            Some(CommonsZome::TransportSharing)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "find_nearby_rides"),
+            Some(CommonsZome::TransportSharing)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "review_ride"),
+            Some(CommonsZome::TransportSharing)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_ride_reviews"),
+            Some(CommonsZome::TransportSharing)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "share_vehicle"),
+            Some(CommonsZome::TransportSharing)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "offer_cargo_space"),
+            Some(CommonsZome::TransportSharing)
+        );
         // Impact
-        assert_eq!(resolve_commons_zome(d, "log_trip"), Some(CommonsZome::TransportImpact));
-        assert_eq!(resolve_commons_zome(d, "get_trip_carbon"), Some(CommonsZome::TransportImpact));
-        assert_eq!(resolve_commons_zome(d, "record_emission"), Some(CommonsZome::TransportImpact));
-        assert_eq!(resolve_commons_zome(d, "get_carbon_balance"), Some(CommonsZome::TransportImpact));
-        assert_eq!(resolve_commons_zome(d, "redeem_credits"), Some(CommonsZome::TransportImpact));
-        assert_eq!(resolve_commons_zome(d, "get_my_redemptions"), Some(CommonsZome::TransportImpact));
+        assert_eq!(
+            resolve_commons_zome(d, "log_trip"),
+            Some(CommonsZome::TransportImpact)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_trip_carbon"),
+            Some(CommonsZome::TransportImpact)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "record_emission"),
+            Some(CommonsZome::TransportImpact)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_carbon_balance"),
+            Some(CommonsZome::TransportImpact)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "redeem_credits"),
+            Some(CommonsZome::TransportImpact)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_my_redemptions"),
+            Some(CommonsZome::TransportImpact)
+        );
     }
 
     #[test]
     fn support_client_all_function_names_dispatch_correctly() {
         let d = BridgeDomain::Support;
         // Knowledge (default)
-        assert_eq!(resolve_commons_zome(d, "create_article"), Some(CommonsZome::SupportKnowledge));
-        assert_eq!(resolve_commons_zome(d, "search_by_category"), Some(CommonsZome::SupportKnowledge));
-        assert_eq!(resolve_commons_zome(d, "create_resolution"), Some(CommonsZome::SupportKnowledge));
+        assert_eq!(
+            resolve_commons_zome(d, "create_article"),
+            Some(CommonsZome::SupportKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "search_by_category"),
+            Some(CommonsZome::SupportKnowledge)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "create_resolution"),
+            Some(CommonsZome::SupportKnowledge)
+        );
         // Tickets
-        assert_eq!(resolve_commons_zome(d, "create_ticket"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "escalate_ticket"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "create_preemptive_alert"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "submit_satisfaction"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "create_undo"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "add_comment"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "get_ticket_comments"), Some(CommonsZome::SupportTickets));
-        assert_eq!(resolve_commons_zome(d, "take_action"), Some(CommonsZome::SupportTickets));
+        assert_eq!(
+            resolve_commons_zome(d, "create_ticket"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "escalate_ticket"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "create_preemptive_alert"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "submit_satisfaction"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "create_undo"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "add_comment"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "get_ticket_comments"),
+            Some(CommonsZome::SupportTickets)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "take_action"),
+            Some(CommonsZome::SupportTickets)
+        );
         // Diagnostics
-        assert_eq!(resolve_commons_zome(d, "run_diagnostic"), Some(CommonsZome::SupportDiagnostics));
-        assert_eq!(resolve_commons_zome(d, "register_helper"), Some(CommonsZome::SupportDiagnostics));
-        assert_eq!(resolve_commons_zome(d, "update_availability"), Some(CommonsZome::SupportDiagnostics));
-        assert_eq!(resolve_commons_zome(d, "publish_cognitive_update"), Some(CommonsZome::SupportDiagnostics));
-        assert_eq!(resolve_commons_zome(d, "set_privacy_preference"), Some(CommonsZome::SupportDiagnostics));
+        assert_eq!(
+            resolve_commons_zome(d, "run_diagnostic"),
+            Some(CommonsZome::SupportDiagnostics)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "register_helper"),
+            Some(CommonsZome::SupportDiagnostics)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "update_availability"),
+            Some(CommonsZome::SupportDiagnostics)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "publish_cognitive_update"),
+            Some(CommonsZome::SupportDiagnostics)
+        );
+        assert_eq!(
+            resolve_commons_zome(d, "set_privacy_preference"),
+            Some(CommonsZome::SupportDiagnostics)
+        );
     }
 }

@@ -154,11 +154,9 @@ impl ShapleyConfig {
             }
         } else {
             match &self.sampling_method {
-                SamplingMethod::Permutation { permutations } => {
-                    SamplingMethod::Permutation {
-                        permutations: *permutations,
-                    }
-                }
+                SamplingMethod::Permutation { permutations } => SamplingMethod::Permutation {
+                    permutations: *permutations,
+                },
                 _ => SamplingMethod::Permutation { permutations: 500 },
             }
         }
@@ -375,12 +373,7 @@ impl ShapleyCalculator {
         }
     }
 
-    fn coalition_value(
-        &self,
-        coalition: &[&[f32]],
-        aggregated: &[f32],
-        baseline: &[f32],
-    ) -> f32 {
+    fn coalition_value(&self, coalition: &[&[f32]], aggregated: &[f32], baseline: &[f32]) -> f32 {
         if coalition.is_empty() {
             return 0.0;
         }
@@ -588,11 +581,7 @@ pub fn verify_efficiency(result: &ShapleyResult, tolerance: f32) -> bool {
 }
 
 /// Check if symmetric players have equal values.
-pub fn verify_symmetry(
-    result: &ShapleyResult,
-    symmetric_nodes: &[String],
-    tolerance: f32,
-) -> bool {
+pub fn verify_symmetry(result: &ShapleyResult, symmetric_nodes: &[String], tolerance: f32) -> bool {
     if symmetric_nodes.len() < 2 {
         return true;
     }
@@ -602,21 +591,20 @@ pub fn verify_symmetry(
         None => return false,
     };
 
-    symmetric_nodes.iter().skip(1).all(|node| {
-        match result.values.get(node) {
+    symmetric_nodes
+        .iter()
+        .skip(1)
+        .all(|node| match result.values.get(node) {
             Some(v) => (v - first_value).abs() <= tolerance,
             None => false,
-        }
-    })
+        })
 }
 
 /// Check if null players get zero value.
 pub fn verify_null_player(result: &ShapleyResult, null_nodes: &[String], tolerance: f32) -> bool {
-    null_nodes.iter().all(|node| {
-        match result.values.get(node) {
-            Some(v) => v.abs() <= tolerance,
-            None => true,
-        }
+    null_nodes.iter().all(|node| match result.values.get(node) {
+        Some(v) => v.abs() <= tolerance,
+        None => true,
     })
 }
 
@@ -635,7 +623,10 @@ mod tests {
     #[test]
     fn test_shapley_config_default() {
         let config = ShapleyConfig::default();
-        assert!(matches!(config.sampling_method, SamplingMethod::MonteCarlo { .. }));
+        assert!(matches!(
+            config.sampling_method,
+            SamplingMethod::MonteCarlo { .. }
+        ));
         assert_eq!(config.baseline, Baseline::ZeroGradient);
         assert_eq!(config.value_function, ValueFunction::CosineSimilarity);
     }
@@ -644,8 +635,14 @@ mod tests {
     fn test_auto_method_selection() {
         let config = ShapleyConfig::default();
         assert_eq!(config.auto_select_method(5), SamplingMethod::Exact);
-        assert!(matches!(config.auto_select_method(50), SamplingMethod::MonteCarlo { .. }));
-        assert!(matches!(config.auto_select_method(150), SamplingMethod::Permutation { .. }));
+        assert!(matches!(
+            config.auto_select_method(50),
+            SamplingMethod::MonteCarlo { .. }
+        ));
+        assert!(matches!(
+            config.auto_select_method(150),
+            SamplingMethod::Permutation { .. }
+        ));
     }
 
     #[test]
@@ -694,7 +691,10 @@ mod tests {
 
         let v1 = result.values.get("node1").unwrap();
         let v2 = result.values.get("node2").unwrap();
-        assert!((v1 - v2).abs() < 0.01, "Symmetric nodes should get equal values");
+        assert!(
+            (v1 - v2).abs() < 0.01,
+            "Symmetric nodes should get equal values"
+        );
     }
 
     #[test]
@@ -734,7 +734,10 @@ mod tests {
     fn test_monte_carlo_approximation() {
         let mut gradients = HashMap::new();
         for i in 0..15 {
-            gradients.insert(format!("node{}", i), vec![i as f32, (i + 1) as f32, (i + 2) as f32]);
+            gradients.insert(
+                format!("node{}", i),
+                vec![i as f32, (i + 1) as f32, (i + 2) as f32],
+            );
         }
         let aggregated = vec![7.0, 8.0, 9.0];
 
@@ -743,7 +746,10 @@ mod tests {
 
         let result = calculator.calculate_values(&gradients, &aggregated);
 
-        assert!(matches!(result.method_used, SamplingMethod::MonteCarlo { .. }));
+        assert!(matches!(
+            result.method_used,
+            SamplingMethod::MonteCarlo { .. }
+        ));
         assert_eq!(result.values.len(), 15);
     }
 
@@ -760,7 +766,10 @@ mod tests {
 
         let result = calculator.calculate_values(&gradients, &aggregated);
 
-        assert!(matches!(result.method_used, SamplingMethod::Permutation { .. }));
+        assert!(matches!(
+            result.method_used,
+            SamplingMethod::Permutation { .. }
+        ));
         assert_eq!(result.values.len(), 120);
     }
 
@@ -782,7 +791,10 @@ mod tests {
             assert!(
                 diff < 0.1,
                 "Node {} differs: exact={}, mc={}, diff={}",
-                node, exact_val, mc_val, diff
+                node,
+                exact_val,
+                mc_val,
+                diff
             );
         }
     }
@@ -894,7 +906,11 @@ mod tests {
 
         let result = calculator.calculate_values(&gradients, &aggregated);
         let sum: f32 = result.values.values().sum();
-        assert!((sum - 1.0).abs() < 0.01, "Normalized values should sum to ~1.0, got {}", sum);
+        assert!(
+            (sum - 1.0).abs() < 0.01,
+            "Normalized values should sum to ~1.0, got {}",
+            sum
+        );
     }
 
     #[test]
@@ -996,7 +1012,10 @@ mod tests {
         for node in gradients.keys() {
             let v1 = result1.values.get(node).unwrap();
             let v2 = result2.values.get(node).unwrap();
-            assert!((v1 - v2).abs() < 1e-6, "Same seed should produce same results");
+            assert!(
+                (v1 - v2).abs() < 1e-6,
+                "Same seed should produce same results"
+            );
         }
     }
 

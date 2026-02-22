@@ -564,10 +564,7 @@ impl ReplayDetector {
         self.hash_to_round
             .insert(fingerprint.hash, (node_id.to_string(), round));
 
-        let history = self
-            .node_history
-            .entry(node_id.to_string())
-            .or_default();
+        let history = self.node_history.entry(node_id.to_string()).or_default();
 
         history.push_back(HistoryEntry {
             node_id: node_id.to_string(),
@@ -893,7 +890,11 @@ mod tests {
             }
         }
 
-        assert!(false_positives < 5, "Too many false positives: {}", false_positives);
+        assert!(
+            false_positives < 5,
+            "Too many false positives: {}",
+            false_positives
+        );
     }
 
     #[test]
@@ -943,7 +944,11 @@ mod tests {
         for i in 0..10 {
             let gradient: Vec<f32> = (0..100).map(|j| ((i * 100 + j) as f32) * 0.01).collect();
             let result = detector.process_submission(&format!("node_{}", i), &gradient, 1);
-            assert!(!result.is_replay, "Node {} should not be flagged in first batch", i);
+            assert!(
+                !result.is_replay,
+                "Node {} should not be flagged in first batch",
+                i
+            );
         }
 
         // Second batch: same gradients, should detect replays

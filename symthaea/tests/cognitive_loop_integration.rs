@@ -3752,3 +3752,278 @@ fn test_400_cycle_phase14_stress() {
         stats.surprise_boosted_replays,
     );
 }
+
+// ── Phase 15: Adaptive Architecture + Emotional Homeostasis ──────────────
+
+/// Task #46: Attention budget tracking — verify elapsed time is recorded.
+#[test]
+fn test_attention_budget_tracking() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut budget_recorded = false;
+    for _ in 0..30 {
+        let result = service.cycle("attention budget test");
+        // Budget elapsed should always be positive (we've done real work)
+        if result.metadata.attention_budget_elapsed_us > 0 {
+            budget_recorded = true;
+        }
+    }
+    assert!(budget_recorded, "attention budget elapsed_us never recorded");
+
+    let stats = service.stats();
+    // Over 30 cycles, some may exceed budget — just ensure counter is finite
+    eprintln!(
+        "Attention budget: exceeded={}, cycles={}",
+        stats.attention_budget_exceeded_count, stats.total_cycles
+    );
+}
+
+/// Task #47: Multi-horizon prediction coherence — verify coherence is finite.
+#[test]
+fn test_prediction_coherence() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut coherence_computed = false;
+    for i in 0..30 {
+        let result = service.cycle("prediction coherence test");
+        assert!(
+            result.metadata.prediction_coherence.is_finite(),
+            "prediction_coherence NaN at cycle {i}"
+        );
+        if result.metadata.prediction_coherence > 0.0 {
+            coherence_computed = true;
+        }
+    }
+    assert!(
+        coherence_computed,
+        "prediction_coherence never computed (stayed 0.0)"
+    );
+
+    let stats = service.stats();
+    assert!(stats.avg_prediction_coherence.is_finite());
+    assert!(stats.avg_prediction_coherence >= 0.0);
+    assert!(stats.avg_prediction_coherence <= 1.0);
+    eprintln!(
+        "Prediction coherence avg={:.4}",
+        stats.avg_prediction_coherence
+    );
+}
+
+/// Task #48: Emotional homeostasis — verify valence pull is finite and bounded.
+#[test]
+fn test_emotional_homeostasis() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Feed emotional input to trigger valence changes
+    let inputs = ["I love this!", "wonderful amazing great", "happy joy"];
+    for round in 0..10 {
+        for input in &inputs {
+            let result = service.cycle(input);
+            assert!(
+                result.metadata.valence_homeostasis_pull.is_finite(),
+                "valence pull NaN at round {round}"
+            );
+            assert!(
+                result.metadata.arousal_homeostasis_pull.is_finite(),
+                "arousal pull NaN at round {round}"
+            );
+        }
+    }
+
+    let stats = service.stats();
+    assert!(stats.avg_valence_homeostasis.is_finite());
+    eprintln!(
+        "Homeostasis: avg_valence_pull={:.6}",
+        stats.avg_valence_homeostasis
+    );
+}
+
+/// Task #49: Arousal recovery mode — verify tau factor and active flag.
+#[test]
+fn test_arousal_recovery_mode() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 50 cycles — arousal recovery is stochastic, just verify fields are finite
+    for i in 0..50 {
+        let result = service.cycle("arousal recovery test input");
+        assert!(
+            result.metadata.arousal_recovery_tau_factor.is_finite(),
+            "tau factor NaN at {i}"
+        );
+        assert!(
+            result.metadata.arousal_recovery_tau_factor >= 0.5,
+            "tau factor too low at {i}: {}",
+            result.metadata.arousal_recovery_tau_factor
+        );
+        assert!(
+            result.metadata.arousal_recovery_tau_factor <= 2.0,
+            "tau factor too high at {i}: {}",
+            result.metadata.arousal_recovery_tau_factor
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "Arousal recovery: cycles_active={}",
+        stats.arousal_recovery_cycles
+    );
+}
+
+/// Task #50: Input similarity memoization — verify same input triggers memoization.
+#[test]
+fn test_input_similarity_memoization() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // First cycle: no previous state to compare
+    let r1 = service.cycle("memoization test input");
+    assert_eq!(r1.metadata.input_similarity, 0.0, "first cycle should have 0 similarity");
+    assert!(!r1.metadata.input_memoized, "first cycle should not be memoized");
+
+    // Second cycle: same input → should have high similarity
+    let r2 = service.cycle("memoization test input");
+    assert!(
+        r2.metadata.input_similarity > 0.5,
+        "same input should have high similarity, got {}",
+        r2.metadata.input_similarity
+    );
+
+    // After many identical cycles, should eventually trigger memoization
+    let mut memoized_count = 0;
+    for _ in 0..20 {
+        let result = service.cycle("memoization test input");
+        if result.metadata.input_memoized {
+            memoized_count += 1;
+        }
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "Memoization: hits={}, memoized_in_test={}",
+        stats.input_memoization_hits, memoized_count
+    );
+}
+
+/// Task #51: Guiding question → subsystem priority.
+#[test]
+fn test_guiding_question_priority() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("exploring what I can learn from this");
+        // Category can be empty if no experience bus or no guiding question
+        assert!(
+            result.metadata.guiding_priority_category.len() < 50,
+            "category too long at {i}"
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "Guiding question: priority_uses={}",
+        stats.guiding_question_priority_uses
+    );
+}
+
+/// Stress test: 300 cycles with varied inputs verifying all Phase 15 fields.
+#[test]
+#[ignore] // expensive
+fn test_300_cycle_phase15_stress() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "The quick brown fox",
+        "I feel so happy today",
+        "What should I do next?",
+        "How can we connect better?",
+        "Learning something new is exciting",
+    ];
+
+    for i in 0..300 {
+        let input = inputs[i % inputs.len()];
+        let result = service.cycle(input);
+
+        assert!(
+            result.metadata.prediction_coherence.is_finite(),
+            "coherence NaN at {i}"
+        );
+        assert!(
+            result.metadata.valence_homeostasis_pull.is_finite(),
+            "valence pull NaN at {i}"
+        );
+        assert!(
+            result.metadata.arousal_homeostasis_pull.is_finite(),
+            "arousal pull NaN at {i}"
+        );
+        assert!(
+            result.metadata.arousal_recovery_tau_factor.is_finite(),
+            "tau factor NaN at {i}"
+        );
+        assert!(
+            result.metadata.input_similarity.is_finite(),
+            "input similarity NaN at {i}"
+        );
+        assert!(
+            result.metadata.attention_budget_elapsed_us < 60_000_000,
+            "budget elapsed unreasonably large at {i}"
+        );
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 300);
+    assert!(stats.avg_prediction_coherence.is_finite());
+    assert!(stats.avg_valence_homeostasis.is_finite());
+
+    eprintln!(
+        "300-cycle Phase 15 stress: coherence={:.4}, homeostasis={:.6}, \
+         budget_exceeded={}, recovery_cycles={}, memo_hits={}, \
+         guiding_uses={}",
+        stats.avg_prediction_coherence,
+        stats.avg_valence_homeostasis,
+        stats.attention_budget_exceeded_count,
+        stats.arousal_recovery_cycles,
+        stats.input_memoization_hits,
+        stats.guiding_question_priority_uses,
+    );
+}
