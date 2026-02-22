@@ -322,12 +322,8 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
         if step % cognitive_interval == 0 {
             // Temporarily increase FEP sensitivity when danger is detected
             // This is the "safety prior" — human_danger creates overwhelming prediction error
-            fep_result = fep_agent.step_extended(
-                sim.state(),
-                &setpoint,
-                human_danger,
-                mission_progress,
-            );
+            fep_result =
+                fep_agent.step_extended(sim.state(), &setpoint, human_danger, mission_progress);
 
             // The tau modulation from danger is amplified
             let danger_boost = if human_danger > 0.5 {

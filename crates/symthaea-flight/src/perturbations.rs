@@ -296,11 +296,10 @@ mod tests {
 
     #[test]
     fn test_triggered_at_mass_change() {
-        let schedule = PerturbationSchedule::new()
-            .with(FlightPerturbation::MassChange {
-                factor: 1.3,
-                at_step: 100,
-            });
+        let schedule = PerturbationSchedule::new().with(FlightPerturbation::MassChange {
+            factor: 1.3,
+            at_step: 100,
+        });
         assert!(schedule.triggered_at(99).is_empty());
         assert_eq!(schedule.triggered_at(100).len(), 1);
         assert!(schedule.triggered_at(101).is_empty());
@@ -308,12 +307,11 @@ mod tests {
 
     #[test]
     fn test_triggered_at_wind_burst_duration() {
-        let schedule = PerturbationSchedule::new()
-            .with(FlightPerturbation::WindBurst {
-                force: [0.1, 0.0, 0.0],
-                at_step: 50,
-                duration_steps: 20,
-            });
+        let schedule = PerturbationSchedule::new().with(FlightPerturbation::WindBurst {
+            force: [0.1, 0.0, 0.0],
+            at_step: 50,
+            duration_steps: 20,
+        });
         // Before window
         assert!(schedule.triggered_at(49).is_empty());
         // During window

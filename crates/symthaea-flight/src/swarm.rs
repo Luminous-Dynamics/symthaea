@@ -245,7 +245,12 @@ pub fn train_swarm(config: &SwarmConfig) -> SwarmResult {
                         for (channels, replay_target) in &swarm_experiences {
                             let replay_state = FlightState::from_channels(*channels);
                             let replay_hv = encoder.encode_stateless(&replay_state);
-                            controller.train_step(&replay_hv, replay_target, dt as f32, Some(lr * 0.5));
+                            controller.train_step(
+                                &replay_hv,
+                                replay_target,
+                                dt as f32,
+                                Some(lr * 0.5),
+                            );
                         }
                     }
 

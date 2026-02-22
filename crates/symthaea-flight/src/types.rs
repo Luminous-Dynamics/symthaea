@@ -106,7 +106,11 @@ impl FlightState {
                 channels[6] as f64,
             ],
             linear_velocity: [channels[7] as f64, channels[8] as f64, channels[9] as f64],
-            angular_velocity: [channels[10] as f64, channels[11] as f64, channels[12] as f64],
+            angular_velocity: [
+                channels[10] as f64,
+                channels[11] as f64,
+                channels[12] as f64,
+            ],
             timestamp: 0.0,
         }
     }

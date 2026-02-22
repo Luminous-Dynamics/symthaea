@@ -8,12 +8,12 @@
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_flight::benchmarks::{run_wind_benchmark, WindBenchmarkConfig, WindGust};
 use symthaea_flight::fep_agent::FlightFepConfig;
+use symthaea_flight::simulator::PhysicsSimulator;
 use symthaea_flight::training::FlightTrainer;
 use symthaea_flight::{
-    ActiveInferenceFlightAgent, FlightConfig, FlightController, PdGains, PidState, QuadrotorHdcEncoder,
-    SimplePhysicsSimulator, FlightSetpoint, pid_baseline, pd_baseline,
+    pd_baseline, pid_baseline, ActiveInferenceFlightAgent, FlightConfig, FlightController,
+    FlightSetpoint, PdGains, PidState, QuadrotorHdcEncoder, SimplePhysicsSimulator,
 };
-use symthaea_flight::simulator::PhysicsSimulator;
 
 #[test]
 #[ignore] // ~30s: run manually with `cargo test -p symthaea-flight -- --ignored --nocapture`
