@@ -1270,10 +1270,15 @@ impl HdcLtcUnifiedNeuron {
             * (-dt / (tau * tau))
             * decay;
 
+        // Gradient w.r.t. the actual input vector (for inter-layer BPTT):
+        // U⊗u is element-wise multiply, so ∂(U⊗u)/∂u = U
+        let d_input = dz.bind(&self.input_mask);
+
         HdcLtcGradients {
             dw,
             du,
             dtau_scalar,
+            d_input,
         }
     }
 
@@ -1361,6 +1366,9 @@ pub struct HdcLtcGradients {
     pub du: ContinuousHV,
     /// Scalar gradient for tau (applied to `tau_modulator`)
     pub dtau_scalar: f32,
+    /// Gradient w.r.t. the input vector (for inter-layer backpropagation).
+    /// Represents ∂L/∂u, allowing proper gradient flow to the previous layer.
+    pub d_input: ContinuousHV,
 }
 
 /// Statistics for unified neuron
@@ -2080,7 +2088,10 @@ mod tests {
         // Now apply extreme dt — should not produce NaN/Inf
         neuron.evolve_closed_form(100.0, &input);
         let state = neuron.state();
-        assert!(state.norm().is_finite(), "State norm must be finite after extreme dt");
+        assert!(
+            state.norm().is_finite(),
+            "State norm must be finite after extreme dt"
+        );
 
         // Also test the iterative path
         neuron.evolve_closed_form_iterative(100.0, &input);
@@ -2093,6 +2104,10 @@ mod tests {
         // Verify decay > 0 invariant: with tau=0.01 and sub_dt as small as possible,
         // the clamped exponent (-87.0) gives exp(-87) ≈ 1.6e-38 > 0
         let decay = (-100.0_f32 / 0.01).max(-87.0).exp();
-        assert!(decay > 0.0, "Decay must be strictly positive, got {}", decay);
+        assert!(
+            decay > 0.0,
+            "Decay must be strictly positive, got {}",
+            decay
+        );
     }
 }
