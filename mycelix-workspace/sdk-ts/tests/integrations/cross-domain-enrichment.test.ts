@@ -13,12 +13,19 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   FoodClient,
   type SeedStock,
+  type SeedQualityRating,
   type FoodSeedRequest,
   type MatchSeedInput,
   type NutrientProfile,
   type AllergenSearchInput,
   type AddMemberInput,
   type RemoveMemberInput,
+  type Plot,
+  type Crop,
+  type YieldRecord,
+  type Market,
+  type Listing,
+  type Order,
 } from '../../src/integrations/food/index.js';
 
 import {
@@ -578,7 +585,7 @@ describe('Support helper and cognitive lifecycle', () => {
     );
   });
 
-  it('should handle satisfaction and escalation history', async () => {
+  it('should handle satisfaction, escalation history, and undo', async () => {
     const survey: SatisfactionSurvey = {
       ticket_hash: fakeActionHash(),
       respondent: fakeAgentKey(),
@@ -642,6 +649,185 @@ describe('Support helper and cognitive lifecycle', () => {
     });
     expect(mockClient.callZome).toHaveBeenCalledWith(
       expect.objectContaining({ fn_name: 'promote_alert_to_ticket' }),
+    );
+  });
+});
+
+// ============================================================================
+// Seed Quality Rating lifecycle
+// ============================================================================
+
+describe('Seed Quality Rating lifecycle', () => {
+  let mockClient: ReturnType<typeof createMockClient>;
+  let food: FoodClient;
+
+  beforeEach(() => {
+    mockClient = createMockClient();
+    food = new FoodClient(mockClient);
+  });
+
+  it('should rate a seed exchange', async () => {
+    const rating: SeedQualityRating = {
+      exchange_hash: fakeActionHash(),
+      grower: fakeAgentKey(),
+      quality_score: 4,
+      germination_success: true,
+      notes: 'Excellent germination, strong seedlings',
+    };
+    await food.rateSeedExchange(rating);
+    expect(mockClient.callZome).toHaveBeenCalledWith(
+      expect.objectContaining({
+        zome_name: 'food_knowledge',
+        fn_name: 'rate_seed_exchange',
+        payload: rating,
+      }),
+    );
+  });
+
+  it('should get ratings for a specific exchange', async () => {
+    mockClient.callZome.mockResolvedValueOnce([
+      { quality_score: 5, germination_success: true },
+      { quality_score: 3, germination_success: false },
+    ]);
+    const ratings = await food.getExchangeRatings(fakeActionHash());
+    expect(mockClient.callZome).toHaveBeenCalledWith(
+      expect.objectContaining({
+        zome_name: 'food_knowledge',
+        fn_name: 'get_exchange_ratings',
+        payload: fakeActionHash(),
+      }),
+    );
+    expect(ratings).toHaveLength(2);
+  });
+
+  it('should get all ratings for a grower', async () => {
+    mockClient.callZome.mockResolvedValueOnce([]);
+    const ratings = await food.getGrowerRatings(fakeAgentKey());
+    expect(mockClient.callZome).toHaveBeenCalledWith(
+      expect.objectContaining({
+        zome_name: 'food_knowledge',
+        fn_name: 'get_grower_ratings',
+        payload: fakeAgentKey(),
+      }),
+    );
+    expect(ratings).toHaveLength(0);
+  });
+});
+
+// ============================================================================
+// Full lifecycle: plot → crop → harvest → market → order → delivery → carbon
+// ============================================================================
+
+describe('Full Food-Transport lifecycle', () => {
+  let mockClient: ReturnType<typeof createMockClient>;
+  let food: FoodClient;
+  let transport: TransportClient;
+
+  beforeEach(() => {
+    mockClient = createMockClient();
+    food = new FoodClient(mockClient);
+    transport = new TransportClient(mockClient);
+  });
+
+  it('should complete farm-to-table with carbon offset', async () => {
+    // 1. Register a plot
+    const plot: Plot = {
+      id: 'plot-001',
+      name: 'Community Garden A',
+      area_sqm: 500,
+      soil_type: 'Loam',
+      location_lat: 32.95,
+      location_lon: -96.75,
+      steward: fakeAgentKey(),
+      status: 'Active',
+    };
+    await food.registerPlot(plot);
+    expect(mockClient.callZome).toHaveBeenCalledWith(
+      expect.objectContaining({ fn_name: 'register_plot' }),
+    );
+
+    // 2. Plant a crop
+    mockClient.callZome.mockClear();
+    const crop: Crop = {
+      plot_hash: fakeActionHash(),
+      name: 'Tomato',
+      variety: 'Cherokee Purple',
+      planted_at: Date.now() * 1000,
+      expected_harvest: (Date.now() + 75 * 86400000) * 1000,
+      status: 'Planted',
+      allergen_flags: [],
+      organic_certified: true,
+    };
+    await food.plantCrop(crop);
+    expect(mockClient.callZome).toHaveBeenCalledWith(
+      expect.objectContaining({ fn_name: 'plant_crop' }),
+    );
+
+    // 3. Record harvest
+    mockClient.callZome.mockClear();
+    const harvest: YieldRecord = {
+      crop_hash: fakeActionHash(),
+      quantity_kg: 45.5,
+      quality_grade: 'Premium',
+      harvested_at: Date.now() * 1000,
+      notes: 'Excellent yield, minimal pest damage',
+    };
+    await food.recordHarvest(harvest);
+    expect(mockClient.callZome).toHaveBeenCalledWith(
+      expect.objectContaining({ fn_name: 'record_harvest' }),
+    );
+
+    // 4. List at market
+    mockClient.callZome.mockClear();
+    const listing: Listing = {
+      market_hash: fakeActionHash(),
+      producer: fakeAgentKey(),
+      product_name: 'Cherokee Purple Tomatoes',
+      quantity_kg: 40,
+      price_per_kg: 4.50,
+      available_from: Date.now() * 1000,
+      status: 'Available',
+      allergen_flags: [],
+      organic: true,
+      cultural_markers: ['heirloom'],
+    };
+    await food.listProduct(listing);
+    expect(mockClient.callZome).toHaveBeenCalledWith(
+      expect.objectContaining({ fn_name: 'list_product' }),
+    );
+
+    // 5. Place order
+    mockClient.callZome.mockClear();
+    const order: Order = {
+      listing_hash: fakeActionHash(),
+      buyer: fakeAgentKey(),
+      quantity_kg: 5,
+      status: 'Pending',
+    };
+    await food.placeOrder(order);
+    expect(mockClient.callZome).toHaveBeenCalledWith(
+      expect.objectContaining({ fn_name: 'place_order' }),
+    );
+
+    // 6. Find nearby ride for delivery
+    mockClient.callZome.mockClear();
+    await transport.findNearbyRides({ origin_lat: 32.95, origin_lon: -96.75, radius_km: 5 });
+    expect(mockClient.callZome).toHaveBeenCalledWith(
+      expect.objectContaining({ fn_name: 'find_nearby_rides' }),
+    );
+
+    // 7. Fulfill order
+    mockClient.callZome.mockClear();
+    await food.fulfillOrder(fakeActionHash());
+    expect(mockClient.callZome).toHaveBeenCalledWith(
+      expect.objectContaining({ fn_name: 'fulfill_order' }),
+    );
+
+    // 8. Redeem carbon credits from the delivery trip
+    mockClient.callZome.mockClear();
+    await transport.redeemCredits({ credits_redeemed: 2.5, redeemed_for: 'Local produce delivery' });
+    expect(mockClient.callZome).toHaveBeenCalledWith(
+      expect.objectContaining({ fn_name: 'redeem_credits' }),
     );
   });
 });
