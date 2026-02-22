@@ -460,6 +460,29 @@ impl EpisodicMemory {
         self.demand_replay_count += 1;
     }
 
+    /// Adapt replay interval based on environmental volatility.
+    ///
+    /// High error variance → shorter interval (more frequent replay to track changes).
+    /// Low error variance → longer interval (stable environment, conserve resources).
+    /// Bounded to [25, 200] cycles.
+    ///
+    /// Science: McClelland et al. (1995) — complementary learning systems theory:
+    /// fast-changing environments require more frequent hippocampal replay.
+    pub fn adapt_replay_interval(&mut self, error_variance: f32) {
+        let base = 100.0f32;
+        // High variance (>0.1) → halve interval; low variance (<0.01) → double it
+        let factor = if error_variance > 0.1 {
+            0.5
+        } else if error_variance > 0.05 {
+            0.75
+        } else if error_variance < 0.01 {
+            2.0
+        } else {
+            1.0
+        };
+        self.config.replay_interval = (base * factor).clamp(25.0, 200.0) as usize;
+    }
+
     /// Sample a batch of episodes for replay, prioritized by Phi
     ///
     /// Uses either Phi-weighted sampling or uniform sampling based on config.

@@ -500,12 +500,14 @@ impl PluginRegistry {
     }
 
     /// Set the default plugin
-    pub fn set_default(&mut self, name: &str) -> Result<(), String> {
+    pub fn set_default(&mut self, name: &str) -> Result<(), crate::errors::SymthaeaError> {
         if self.plugins.contains_key(name) {
             self.default_plugin = name.to_string();
             Ok(())
         } else {
-            Err(format!("Plugin '{name}' not found"))
+            Err(crate::errors::SymthaeaError::Language(format!(
+                "Plugin '{name}' not found"
+            )))
         }
     }
 

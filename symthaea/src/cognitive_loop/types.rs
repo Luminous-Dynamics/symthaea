@@ -712,6 +712,16 @@ pub struct CycleMetadata {
     pub codebook_evictions: usize,
     /// Codebook diversity: average pairwise cosine distance (0.0–1.0).
     pub codebook_diversity: f32,
+
+    // ── Phase 13: Predictive Resonator + Cross-Module Coherence ──────
+    /// Resonator prediction error: cosine distance between last cycle's best match
+    /// and this cycle's compressed state (0.0 = perfect prediction, 1.0 = orthogonal).
+    pub resonator_prediction_error: f32,
+    /// Cross-module agreement score (0.0–1.0): alignment between FEP, MCTS,
+    /// resonator confidence, and moral judgment.
+    pub cross_module_agreement: f32,
+    /// Thalamic depth score used for storage salience modulation.
+    pub thalamic_depth_score: f32,
 }
 
 /// Compact subset of CycleMetadata with the most essential telemetry fields.

@@ -1582,4 +1582,278 @@ mod tests {
         let d = SensoryChange::new(SensoryModality::Auditory).with_vector(vec![1.0, 0.0, 0.0, 0.0]);
         assert!((a.distance(&d) - 1.0).abs() < 0.001);
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // NEW TESTS: Construction, Edge Cases, Invariants, Round-trips
+    // ════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_contingency_hv_self_similarity_is_one() {
+        let hv = ContingencyHV::random(42);
+        assert!((hv.similarity(&hv) - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_contingency_hv_bind_involution() {
+        // XOR is its own inverse: (a ^ b) ^ b = a
+        let a = ContingencyHV::random(1234);
+        let b = ContingencyHV::random(5678);
+        let bound = a.bind(&b);
+        let recovered = bound.bind(&b);
+        assert!((a.similarity(&recovered) - 1.0).abs() < 0.001, "Bind should be involutive");
+    }
+
+    #[test]
+    fn test_contingency_hv_permute_zero_is_identity() {
+        let hv = ContingencyHV::random(99);
+        let perm = hv.permute(0);
+        assert!((hv.similarity(&perm) - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_contingency_hv_permute_256_is_identity() {
+        let hv = ContingencyHV::random(99);
+        let perm = hv.permute(256);
+        assert!((hv.similarity(&perm) - 1.0).abs() < 0.001, "Permute by 256 should be identity (mod 256)");
+    }
+
+    #[test]
+    fn test_contingency_hv_bundle_single() {
+        let hv = ContingencyHV::random(42);
+        let bundled = ContingencyHV::bundle(&[hv.clone()]);
+        assert!((hv.similarity(&bundled) - 1.0).abs() < 0.001, "Bundle of one should return the same vector");
+    }
+
+    #[test]
+    fn test_contingency_hv_bundle_majority() {
+        let a = ContingencyHV::random(1);
+        let b = ContingencyHV::random(2);
+        // Bundle of 3 copies of a and 1 of b should be very similar to a
+        let bundled = ContingencyHV::bundle(&[a.clone(), a.clone(), a.clone(), b.clone()]);
+        assert!(a.similarity(&bundled) > 0.7, "Majority of a should dominate bundle");
+    }
+
+    #[test]
+    fn test_contingency_hv_from_id_deterministic() {
+        let a = ContingencyHV::from_id("test_action");
+        let b = ContingencyHV::from_id("test_action");
+        assert!((a.similarity(&b) - 1.0).abs() < 0.001, "Same ID should produce same HV");
+    }
+
+    #[test]
+    fn test_contingency_hv_different_ids_dissimilar() {
+        let a = ContingencyHV::from_id("action_reach");
+        let b = ContingencyHV::from_id("action_push");
+        assert!(a.similarity(&b) < 0.7, "Different IDs should produce dissimilar HVs");
+    }
+
+    #[test]
+    fn test_sensory_change_default_magnitude() {
+        let change = SensoryChange::new(SensoryModality::Visual);
+        assert_eq!(change.magnitude, 0.0);
+        assert_eq!(change.change_vector.len(), 4);
+    }
+
+    #[test]
+    fn test_sensory_change_with_vector_updates_magnitude() {
+        let change = SensoryChange::new(SensoryModality::Visual)
+            .with_vector(vec![3.0, 4.0]);
+        assert!((change.magnitude - 5.0).abs() < 0.001, "Magnitude should be sqrt(9+16)=5");
+    }
+
+    #[test]
+    fn test_sensory_change_update_toward() {
+        let mut a = SensoryChange::new(SensoryModality::Visual).with_vector(vec![0.0, 0.0]);
+        let b = SensoryChange::new(SensoryModality::Visual).with_vector(vec![1.0, 1.0]);
+        a.update_toward(&b, 0.5);
+        assert!((a.change_vector[0] - 0.5).abs() < 0.01);
+        assert!((a.change_vector[1] - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_sensory_change_distance_symmetric() {
+        let a = SensoryChange::new(SensoryModality::Visual).with_vector(vec![0.1, 0.2, 0.3, 0.4]);
+        let b = SensoryChange::new(SensoryModality::Visual).with_vector(vec![0.5, 0.6, 0.7, 0.8]);
+        assert!((a.distance(&b) - b.distance(&a)).abs() < 1e-10, "Distance should be symmetric");
+    }
+
+    #[test]
+    fn test_sensory_change_distance_empty_vectors() {
+        let a = SensoryChange {
+            modality: SensoryModality::Visual,
+            change_vector: vec![],
+            magnitude: 0.5,
+            onset_delay_ms: 0,
+            duration_ms: 0,
+            description: String::new(),
+        };
+        let b = SensoryChange {
+            modality: SensoryModality::Visual,
+            change_vector: vec![],
+            magnitude: 0.8,
+            onset_delay_ms: 0,
+            duration_ms: 0,
+            description: String::new(),
+        };
+        // With empty vectors, distance should fall back to magnitude difference
+        let dist = a.distance(&b);
+        assert!((dist - 0.3).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_action_descriptor_builder() {
+        let action = ActionDescriptor::new(ActionType::Reach)
+            .with_parameter("distance", 0.5)
+            .with_parameter("speed", 0.8)
+            .with_effector("right_hand");
+        assert_eq!(action.action_type, ActionType::Reach);
+        assert_eq!(action.parameters.len(), 2);
+        assert_eq!(action.effectors.len(), 1);
+        assert_eq!(action.duration_ms, 100);
+    }
+
+    #[test]
+    fn test_context_descriptor_builder() {
+        let ctx = ContextDescriptor::new("test_ctx", SensoryModality::Visual)
+            .with_feature("brightness", 0.9)
+            .with_object("cup");
+        assert_eq!(ctx.id, "test_ctx");
+        assert_eq!(ctx.features.len(), 1);
+        assert_eq!(ctx.objects.len(), 1);
+        assert_eq!(ctx.modality, SensoryModality::Visual);
+    }
+
+    #[test]
+    fn test_context_descriptor_self_similarity() {
+        let ctx = ContextDescriptor::new("scene_a", SensoryModality::Visual)
+            .with_feature("light", 0.5);
+        let sim = ctx.similarity(&ctx);
+        // Feature sim = 1.0 (identical), hdc sim = 1.0
+        assert!(sim > 0.95, "Self-similarity should be ~1.0, got {sim}");
+    }
+
+    #[test]
+    fn test_contingency_learner_default_state() {
+        let learner = ContingencyLearner::new();
+        assert_eq!(learner.contingency_count(), 0);
+        assert_eq!(learner.prediction_accuracy(), 0.5); // Default when no predictions
+        assert_eq!(learner.current_surprise(), 0.0);
+    }
+
+    #[test]
+    fn test_contingency_learner_prediction_before_learning() {
+        let learner = ContingencyLearner::new();
+        let action = ActionDescriptor::new(ActionType::Push);
+        let context = ContextDescriptor::new("test", SensoryModality::Tactile);
+        let prediction = learner.predict(&action, &context);
+        assert!(prediction.is_none(), "Should have no prediction before learning");
+    }
+
+    #[test]
+    fn test_contingency_learner_experience_count() {
+        let mut learner = ContingencyLearner::new();
+        let action = ActionDescriptor::new(ActionType::Touch);
+        let context = ContextDescriptor::new("test", SensoryModality::Tactile);
+        let outcome = SensoryChange::new(SensoryModality::Tactile).with_vector(vec![0.5, 0.0, 0.0, 0.0]);
+
+        for _ in 0..5 {
+            learner.learn(action.clone(), context.clone(), outcome.clone());
+        }
+        assert_eq!(learner.stats().total_experiences, 5);
+    }
+
+    #[test]
+    fn test_enactivist_perception_default() {
+        let perception = EnactivistPerception::new();
+        assert_eq!(perception.stats().total_cycles, 0);
+        // mastery starts at 0.0 (from PerceptionStats::default), not 0.5
+        assert_eq!(perception.mastery(), 0.0);
+    }
+
+    #[test]
+    fn test_enactivist_perception_cycle_increments() {
+        let mut perception = EnactivistPerception::new();
+        let action = ActionDescriptor::new(ActionType::Fixate);
+        let context = ContextDescriptor::new("scene", SensoryModality::Visual);
+        let outcome = SensoryChange::new(SensoryModality::Visual).with_vector(vec![0.1, 0.0, 0.0, 0.0]);
+        perception.perceive_through_action(action, context, outcome);
+        assert_eq!(perception.stats().total_cycles, 1);
+    }
+
+    #[test]
+    fn test_affordance_attractiveness_computed_correctly() {
+        let affordance = ActionAffordance {
+            action: ActionType::Grasp,
+            source: "cup".to_string(),
+            salience: 0.8,
+            predicted_outcome: None,
+            confidence: 0.9,
+            reachable: true,
+            effort: 0.2,
+            risk: 0.1,
+        };
+        let attr = affordance.attractiveness();
+        // value = 0.8 * 0.9 = 0.72, cost = 0.2*0.3 + 0.1*0.5 = 0.11, reachability = 1.0
+        // attractiveness = (0.72 - 0.11) * 1.0 = 0.61
+        assert!((attr - 0.61).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_affordance_unreachable_penalized() {
+        let reachable = ActionAffordance {
+            action: ActionType::Grasp,
+            source: "near".to_string(),
+            salience: 0.8,
+            predicted_outcome: None,
+            confidence: 0.9,
+            reachable: true,
+            effort: 0.2,
+            risk: 0.1,
+        };
+        let unreachable = ActionAffordance {
+            action: ActionType::Grasp,
+            source: "far".to_string(),
+            salience: 0.8,
+            predicted_outcome: None,
+            confidence: 0.9,
+            reachable: false,
+            effort: 0.2,
+            risk: 0.1,
+        };
+        assert!(reachable.attractiveness() > unreachable.attractiveness());
+    }
+
+    #[test]
+    fn test_affordance_detector_default() {
+        let detector = AffordanceDetector::new();
+        assert!(detector.most_attractive().is_none());
+        assert!(detector.affordances().is_empty());
+    }
+
+    #[test]
+    fn test_consciousness_contribution_zero_when_untrained() {
+        let detector = AffordanceDetector::new();
+        let context = ContextDescriptor::new("test", SensoryModality::Visual);
+        let contribution = ContingencyConsciousnessContribution::from_detector(&detector, &context);
+        assert_eq!(contribution.contingency_count, 0);
+        // Prediction error should be the default surprise value
+        let pe = contribution.prediction_error();
+        assert!(pe.is_finite());
+    }
+
+    #[test]
+    fn test_consciousness_contribution_bounded() {
+        let mut detector = AffordanceDetector::new();
+        let action = ActionDescriptor::new(ActionType::Touch);
+        let context = ContextDescriptor::new("test", SensoryModality::Tactile);
+        let outcome = SensoryChange::new(SensoryModality::Tactile).with_vector(vec![0.5, 0.0, 0.0, 0.0]);
+
+        for _ in 0..30 {
+            detector.process_action(action.clone(), context.clone(), outcome.clone());
+        }
+
+        let contribution = ContingencyConsciousnessContribution::from_detector(&detector, &context);
+        let cc = contribution.consciousness_contribution();
+        assert!(cc >= 0.0 && cc <= 1.0, "Consciousness contribution should be in [0,1], got {cc}");
+    }
 }

@@ -809,3 +809,277 @@ fn test_enhanced_fep_bridge_end_episode() {
     assert!(bridge.action_outcome_history.is_empty());
     assert!(bridge.motor.last_command.is_none());
 }
+
+// =========================================================================
+// NEW TESTS: Construction, Edge Cases, Invariants, Round-trips
+// =========================================================================
+
+#[test]
+fn test_observation_new_constructor() {
+    let obs = Observation::new(vec![0.1, 0.2, 0.3], 0.9, "visual");
+    assert_eq!(obs.dim(), 3);
+    assert_eq!(obs.precision, 0.9);
+    assert_eq!(obs.modality, "visual");
+    assert_eq!(obs.timestamp, 0);
+}
+
+#[test]
+fn test_observation_empty_values() {
+    let obs = Observation::new(vec![], 1.0, "empty");
+    assert_eq!(obs.dim(), 0);
+}
+
+#[test]
+fn test_hidden_state_with_modes() {
+    let state = HiddenState::with_modes(4, 5);
+    assert_eq!(state.mean.len(), 4);
+    assert_eq!(state.mode_probs.len(), 5);
+    // Mode probs should be uniform and sum to 1
+    let sum: f64 = state.mode_probs.iter().sum();
+    assert!((sum - 1.0).abs() < 1e-10, "mode_probs should sum to 1.0");
+    assert_eq!(state.current_mode, 0);
+}
+
+#[test]
+fn test_hidden_state_variance_inverse_of_precision() {
+    let state = HiddenState::new(4);
+    let variance = state.variance();
+    // Default precision is 1.0, so variance should be 1.0
+    for v in &variance {
+        assert!((*v - 1.0).abs() < 0.01);
+    }
+}
+
+#[test]
+fn test_hidden_state_mode_entropy_single_mode() {
+    let state = HiddenState::new(4);
+    // Single mode with prob=1.0 -> entropy should be 0
+    let entropy = state.mode_entropy();
+    assert!(entropy.abs() < 1e-10, "Single mode should have zero entropy");
+}
+
+#[test]
+fn test_hidden_state_mode_entropy_uniform() {
+    let state = HiddenState::with_modes(4, 4);
+    // Uniform over 4 modes -> entropy = ln(4)
+    let entropy = state.mode_entropy();
+    let expected = (4.0_f64).ln();
+    assert!(
+        (entropy - expected).abs() < 0.01,
+        "Uniform 4-mode entropy should be ln(4)={expected}, got {entropy}"
+    );
+}
+
+#[test]
+fn test_hidden_state_total_uncertainty_finite() {
+    let state = HiddenState::with_modes(8, 3);
+    let uncertainty = state.total_uncertainty();
+    assert!(uncertainty.is_finite());
+    assert!(uncertainty > 0.0, "Uncertainty should be positive");
+}
+
+#[test]
+fn test_hidden_state_confidence_bounded() {
+    let state = HiddenState::new(4);
+    let confidence = state.confidence();
+    assert!(confidence >= 0.0 && confidence <= 1.0);
+}
+
+#[test]
+fn test_motor_command_type_overflow_is_noop() {
+    // Action indices >= 7 should all map to NoOp
+    let cmd = MotorCommandType::from_action_index(100);
+    assert_eq!(cmd, MotorCommandType::NoOp);
+    let cmd = MotorCommandType::from_action_index(7);
+    assert_eq!(cmd, MotorCommandType::NoOp);
+}
+
+#[test]
+fn test_motor_command_type_round_trip_all() {
+    // Every valid command type should round-trip through index conversion
+    let types = [
+        MotorCommandType::AttentionShift,
+        MotorCommandType::LearningRateAdjust,
+        MotorCommandType::ExplorationTrigger,
+        MotorCommandType::ReflectionInitiate,
+        MotorCommandType::MemoryConsolidate,
+        MotorCommandType::ExpectationReset,
+        MotorCommandType::MotorOutput,
+        MotorCommandType::NoOp,
+    ];
+    for t in &types {
+        let idx = t.to_action_index();
+        let recovered = MotorCommandType::from_action_index(idx);
+        assert_eq!(*t, recovered);
+    }
+}
+
+#[test]
+fn test_motor_command_intensity_clamped() {
+    let cmd = MotorCommand::new(MotorCommandType::AttentionShift, 5.0);
+    assert_eq!(cmd.intensity, 1.0, "Intensity should be clamped to 1.0");
+
+    let cmd = MotorCommand::new(MotorCommandType::AttentionShift, -1.0);
+    assert_eq!(cmd.intensity, 0.0, "Intensity should be clamped to 0.0");
+}
+
+#[test]
+fn test_motor_command_confidence_clamped() {
+    let cmd = MotorCommand::new(MotorCommandType::NoOp, 0.5).with_confidence(2.0);
+    assert_eq!(cmd.confidence, 1.0);
+}
+
+#[test]
+fn test_motor_command_noop_low_intensity_not_meaningful() {
+    let cmd = MotorCommand::new(MotorCommandType::NoOp, 0.3);
+    assert!(!cmd.is_meaningful(), "Low-intensity NoOp should not be meaningful");
+}
+
+#[test]
+fn test_motor_command_noop_high_intensity_is_meaningful() {
+    let cmd = MotorCommand::new(MotorCommandType::NoOp, 0.9);
+    assert!(cmd.is_meaningful(), "High-intensity NoOp should be meaningful");
+}
+
+#[test]
+fn test_generative_model_transition_rows_sum_to_one() {
+    let model = GenerativeModel::new(4, 4, 3);
+    for action_idx in 0..3 {
+        for row in &model.transition_matrices[action_idx] {
+            let sum: f64 = row.iter().sum();
+            assert!(
+                (sum - 1.0).abs() < 0.1,
+                "Transition row should approximately sum to 1.0, got {sum}"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_generative_model_prediction_finite() {
+    let model = GenerativeModel::new(8, 4, 6);
+    let state = HiddenState::new(8);
+    let obs = model.predict_observation(&state);
+    for val in &obs {
+        assert!(val.is_finite(), "Prediction values should be finite");
+    }
+}
+
+#[test]
+fn test_free_energy_history_bounded() {
+    let model = GenerativeModel::new(4, 4, 4);
+    let state = HiddenState::new(4);
+    let mut calc = FreeEnergyCalculator::new(10);
+
+    // Overflow the history
+    for _ in 0..20 {
+        let obs = Observation::from_consciousness_state(0.5, 0.5, 0.5, 0.5);
+        calc.compute(&state, &obs, &model);
+    }
+
+    assert!(calc.history.len() <= 10, "History should be bounded by max_history");
+}
+
+#[test]
+fn test_precision_estimator_all_precisions_bounded() {
+    let mut precision = PrecisionEstimator::new();
+    for i in 0..100 {
+        precision.update_from_error(if i % 2 == 0 { 0.9 } else { 0.05 }, i);
+    }
+    // All precisions should stay within bounds
+    assert!(precision.sensory_precision >= 0.5 && precision.sensory_precision <= 5.0);
+    assert!(precision.prior_precision >= 0.1 && precision.prior_precision <= 5.0);
+    assert!(precision.action_precision >= 0.1 && precision.action_precision <= 5.0);
+}
+
+#[test]
+fn test_precision_estimator_action_update() {
+    let mut precision = PrecisionEstimator::new();
+    // Perfect prediction
+    precision.update_from_action(0.7, 0.7, 1);
+    assert!(precision.action_precision > 0.9, "Perfect action prediction should give high precision");
+    // Bad prediction
+    precision.update_from_action(0.0, 1.0, 2);
+    // Action precision should decrease
+    let current = precision.action_precision;
+    assert!(current < 1.5, "Bad prediction should reduce action precision, got {current}");
+}
+
+#[test]
+fn test_precision_estimator_perceptual_precision() {
+    let precision = PrecisionEstimator::new();
+    let perc = precision.perceptual_precision();
+    // (sensory + prior) / 2 = (1.0 + 1.0) / 2 = 1.0
+    assert!((perc - 1.0).abs() < 0.01);
+}
+
+#[test]
+fn test_eligibility_traces_reset_zeroes_all() {
+    let mut traces = EligibilityTraces::new(2, 4, 4, 0.8, 0.99);
+    traces.transition_traces[0][0][0] = 5.0;
+    traces.likelihood_traces[0][0] = 3.0;
+    traces.reset();
+    for action_traces in &traces.transition_traces {
+        for from_traces in action_traces {
+            for &val in from_traces {
+                assert_eq!(val, 0.0);
+            }
+        }
+    }
+    for state_traces in &traces.likelihood_traces {
+        for &val in state_traces {
+            assert_eq!(val, 0.0);
+        }
+    }
+}
+
+#[test]
+fn test_model_confidence_tracker_decay_respects_minimum() {
+    let mut tracker = ModelConfidenceTracker::new(2, 4, 4, 0.5, 0.1);
+    // Start with some observations
+    tracker.update_transition(0, 0, 1);
+    tracker.update_transition(0, 0, 1);
+
+    // Decay many times
+    for _ in 0..100 {
+        tracker.decay();
+    }
+
+    // All confidences should be at or above minimum
+    for action_conf in &tracker.transition_confidence {
+        for from_conf in action_conf {
+            for &conf in from_conf {
+                assert!(
+                    conf >= 0.1 - 1e-10,
+                    "Confidence should not go below minimum, got {conf}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_td_learner_without_eligibility_traces() {
+    let mut config = TemporalDifferenceLearningConfig::default();
+    config.use_eligibility_traces = false;
+
+    let learner = TemporalDifferenceLearner::new(config, 4, 8, 4);
+    assert!(learner.eligibility_traces.is_none());
+}
+
+#[test]
+fn test_agent_observe_transition_without_td() {
+    let config = ActiveInferenceAgentConfig {
+        enable_td_learning: false,
+        ..Default::default()
+    };
+    let mut agent = ActiveInferenceAgent::new(config);
+
+    let old_state = HiddenState::new(8);
+    let new_state = HiddenState::new(8);
+    let obs = Observation::from_consciousness_state(0.5, 0.5, 0.5, 0.5);
+
+    // Without TD learning, observe_transition falls back to direct model learning
+    let result = agent.observe_transition(&old_state, 0, &new_state, &obs);
+    assert!(result.is_none(), "Without TD learning, should return None");
+}

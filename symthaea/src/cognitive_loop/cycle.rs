@@ -378,6 +378,22 @@ impl CognitiveLoopService {
         let mut resonator_wm_primed = false;
         let mut resonator_reconsolidated: usize = 0;
         let mut resonator_best_sim: f32 = 0.0;
+
+        // Track 4a: Predictive resonator — compare last cycle's best match with current input
+        // Science: Bar (2007) — proactive brain generates predictions from analogies
+        let resonator_prediction_error: f32 = if let Some(ref prev_pred) = self.stats.last_resonator_prediction {
+            if prev_pred.len() == compressed_state.len() {
+                let dot: f32 = prev_pred.iter().zip(compressed_state.iter()).map(|(a, b)| a * b).sum();
+                let na: f32 = prev_pred.iter().map(|x| x * x).sum::<f32>().sqrt();
+                let nb: f32 = compressed_state.iter().map(|x| x * x).sum::<f32>().sqrt();
+                let sim = if na > 0.0 && nb > 0.0 { dot / (na * nb) } else { 0.0 };
+                (1.0 - sim).clamp(0.0, 1.0) // cosine distance
+            } else {
+                0.0
+            }
+        } else {
+            0.0 // no prediction yet (first cycle)
+        };
         // Coherence gate: skip resonator recall during unstable CfC dynamics
         // Science: noisy priors during turbulent dynamics can destabilize predictions
         // Uses previous cycle's smoothed coherence (updated at line ~646)
@@ -414,6 +430,20 @@ impl CognitiveLoopService {
                         .map(|m| m.timestamp)
                         .collect();
                     resonator_best_sim = best_match_sim;
+
+                    // Track 4a: Cache best match HV as next-cycle prediction
+                    // Science: Bar (2007) — proactive brain uses analogy for anticipation
+                    if best_match_sim > 0.3 {
+                        let best_ep = top_matches.iter()
+                            .max_by(|a, b| {
+                                let sa: f32 = compressed_state.iter().zip(a.hv.iter()).map(|(x, y)| x * y).sum();
+                                let sb: f32 = compressed_state.iter().zip(b.hv.iter()).map(|(x, y)| x * y).sum();
+                                sa.partial_cmp(&sb).unwrap_or(std::cmp::Ordering::Equal)
+                            });
+                        if let Some(ep) = best_ep {
+                            self.stats.last_resonator_prediction = Some(ep.hv.clone());
+                        }
+                    }
 
                     // Pre-compute bundled vector while we still hold episode references
                     let bundled = if top_matches.len() >= 2 {
@@ -1453,6 +1483,13 @@ impl CognitiveLoopService {
         // World model error → resonator storage importance bias
         // Science: Rescorla-Wagner (1972) — surprising events deserve higher encoding priority
         let pp_wm_importance_boost = self.world_model.avg_error.clamp(0.0, 1.0) * 0.3;
+        // Track 4e: Thalamic depth → storage salience
+        // Science: Sherman & Guillery (2006) — deep processing warrants durable encoding
+        let pp_thalamic_salience = match self.cognitive_depth {
+            super::CognitiveDepth::DeepThought => 0.2f32,  // priority storage
+            super::CognitiveDepth::Cortical => 0.0,        // neutral
+            super::CognitiveDepth::Reflex => -0.1,         // lower priority
+        };
         let pp_learning_threshold = self.config.learning_threshold;
 
         // Compute cycle reward before parallel section (reads prediction_confidence, flow_state)
@@ -1498,7 +1535,7 @@ impl CognitiveLoopService {
                 smoothed_coh: pp_smoothed_coh,
                 detected_primitives: &encoding_result.detected_primitives,
                 memory_context_boost,
-                wm_importance_boost: pp_wm_importance_boost,
+                wm_importance_boost: pp_wm_importance_boost + pp_thalamic_salience,
             };
 
             rayon_join(
@@ -1985,6 +2022,18 @@ impl CognitiveLoopService {
                         }
                     }
                 }
+            }
+        }
+
+        // Track 4d: Adaptive replay scheduling — modulate interval based on error volatility
+        // Science: McClelland et al. (1995) — fast-changing environments need more replay
+        if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 50 {
+            if let Some(ref mut replay) = self.phi_episodic_replay {
+                // Variance = E[X²] - E[X]² (from EMA-tracked moments)
+                let error_variance = (self.stats.avg_prediction_error_sq
+                    - self.stats.avg_prediction_error * self.stats.avg_prediction_error)
+                    .max(0.0);
+                replay.adapt_replay_interval(error_variance);
             }
         }
 
@@ -3364,6 +3413,49 @@ impl CognitiveLoopService {
         }
         module_timings.soul_experience = _t.elapsed().as_micros() as u64;
 
+        // ── Track 4b: Cross-module agreement metric ─────────────────────────
+        // Science: Dehaene & Naccache (2001) — global workspace coherence requires
+        // multiple module agreement for conscious access
+        // Components: (1) FEP confidence (low surprise), (2) resonator match,
+        // (3) moral alignment, (4) MCTS plan confidence (cached from this cycle)
+        let fep_confidence = (1.0 - fep_surprise.min(1.0)).max(0.0) as f32;
+        let resonator_confidence = resonator_best_sim;
+        let moral_confidence = self.last_moral_judgment.as_ref()
+            .map(|j| (j.moral_score + 1.0) / 2.0) // normalize [-1,1] → [0,1]
+            .unwrap_or(0.5);
+        let mcts_confidence = self.carryover.history.mcts_plan.as_ref()
+            .map(|&(_, c)| c)
+            .unwrap_or(0.5);
+        // Agreement = 1 - variance of normalized confidence signals
+        let signals = [fep_confidence, resonator_confidence, moral_confidence, mcts_confidence];
+        let mean_signal: f32 = signals.iter().sum::<f32>() / signals.len() as f32;
+        let variance: f32 = signals.iter().map(|s| (s - mean_signal).powi(2)).sum::<f32>()
+            / signals.len() as f32;
+        let cross_module_agreement = (1.0 - (variance * 4.0).sqrt()).clamp(0.0, 1.0);
+        // Agreement modulates confidence and exploration
+        if cross_module_agreement > 0.8 {
+            // High agreement → amplify shared signal
+            self.prediction_confidence =
+                (self.prediction_confidence + (cross_module_agreement - 0.8) * 0.05).clamp(0.0, 1.0);
+        } else if cross_module_agreement < 0.3 {
+            // Low agreement → modules conflict, dampen confidence, boost exploration
+            self.prediction_confidence *= 1.0 - (0.3 - cross_module_agreement) * 0.1;
+            self.curiosity_drive.exploration_urge =
+                (self.curiosity_drive.exploration_urge + (0.3 - cross_module_agreement) * 0.15)
+                    .clamp(0.0, 1.0);
+        }
+        // EMA update for stats tracking
+        self.stats.avg_cross_module_agreement =
+            self.stats.avg_cross_module_agreement * 0.95 + cross_module_agreement * 0.05;
+
+        // ── Track 4e: Thalamic depth → storage salience ──────────────────────
+        // Science: Sherman & Guillery (2006) — thalamic relay modulates cortical encoding
+        let thalamic_depth_score = match self.cognitive_depth {
+            super::CognitiveDepth::DeepThought => 1.0f32,
+            super::CognitiveDepth::Cortical => 0.5,
+            super::CognitiveDepth::Reflex => 0.2,
+        };
+
         // Pre-compute values and formatted strings to avoid expensive ops inside struct literal
         let value_trend = self.value_feedback.recent_trend(50);
         let circadian_phase_str = format!("{:?}", self.biorhythm.phase);
@@ -3528,6 +3620,9 @@ impl CognitiveLoopService {
             resonator_best_sim,
             codebook_evictions,
             codebook_diversity,
+            resonator_prediction_error,
+            cross_module_agreement,
+            thalamic_depth_score,
         };
 
         // Update cumulative stats for resonator-memory loop diagnostics
@@ -3588,13 +3683,15 @@ impl CognitiveLoopService {
     /// Use this in production code paths where a panic must not propagate (e.g., actor loops,
     /// async bridges). Returns `Err` with the panic message if any subsystem panics during
     /// the cycle.
-    pub fn try_cycle(&mut self, input: &str) -> Result<CycleResult, String> {
+    pub fn try_cycle(&mut self, input: &str) -> Result<CycleResult, crate::errors::SymthaeaError> {
         // SAFETY: CognitiveLoopService is not UnwindSafe by default because it contains
         // mutable state. We use AssertUnwindSafe because a panic mid-cycle leaves the
         // service in a potentially inconsistent state, but callers should reset() after
         // an error rather than continuing.
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.cycle(input)));
-        result.map_err(format_panic_payload)
+        result.map_err(|payload| {
+            crate::errors::SymthaeaError::CognitiveLoop(format_panic_payload(payload))
+        })
     }
 }
 

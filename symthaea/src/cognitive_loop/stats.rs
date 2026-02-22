@@ -14,6 +14,9 @@ pub struct LoopStats {
     /// Average prediction error (EMA)
     pub avg_prediction_error: f32,
 
+    /// Average squared prediction error (EMA, for variance computation)
+    pub avg_prediction_error_sq: f32,
+
     /// Learning cycles (error > threshold)
     pub learning_cycles: usize,
 
@@ -318,6 +321,12 @@ pub struct LoopStats {
 
     /// Previous cycle's total free energy (for FE reduction reward computation).
     pub last_total_fe: f64,
+
+    /// Resonator prediction: last cycle's best-matching episode HV (for next-cycle comparison).
+    pub last_resonator_prediction: Option<Vec<f32>>,
+
+    /// Running average of cross-module agreement score (EMA, alpha=0.05).
+    pub avg_cross_module_agreement: f32,
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)

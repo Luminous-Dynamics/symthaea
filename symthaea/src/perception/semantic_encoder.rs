@@ -98,13 +98,13 @@ impl JLProjector {
     /// Project dense vector to output dimension.
     ///
     /// Returns `Err` if `input.len()` does not match the configured `input_dim`.
-    pub fn project(&self, input: &[f32]) -> Result<Vec<f32>, String> {
+    pub fn project(&self, input: &[f32]) -> Result<Vec<f32>, crate::errors::SymthaeaError> {
         if input.len() != self.input_dim {
-            return Err(format!(
+            return Err(crate::errors::SymthaeaError::Perception(format!(
                 "JLProjector input dimension mismatch: expected {}, got {}",
                 self.input_dim,
                 input.len()
-            ));
+            )));
         }
 
         let mut output = vec![0.0f32; self.output_dim];
@@ -124,7 +124,7 @@ impl JLProjector {
     /// Project to binary/bipolar representation.
     ///
     /// Returns `Err` if input dimension mismatches.
-    pub fn project_to_bipolar(&self, input: &[f32]) -> Result<Vec<i8>, String> {
+    pub fn project_to_bipolar(&self, input: &[f32]) -> Result<Vec<i8>, crate::errors::SymthaeaError> {
         Ok(self.project(input)?
             .into_iter()
             .map(|v| if v > 0.0 { 1i8 } else { -1i8 })
@@ -134,7 +134,7 @@ impl JLProjector {
     /// Project to packed bipolar for efficient similarity.
     ///
     /// Returns `Err` if input dimension mismatches.
-    pub fn project_to_packed(&self, input: &[f32]) -> Result<PackedBipolar, String> {
+    pub fn project_to_packed(&self, input: &[f32]) -> Result<PackedBipolar, crate::errors::SymthaeaError> {
         Ok(PackedBipolar::from_bipolar(&self.project_to_bipolar(input)?))
     }
 }

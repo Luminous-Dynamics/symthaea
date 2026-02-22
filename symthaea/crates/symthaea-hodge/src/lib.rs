@@ -1261,4 +1261,333 @@ mod tests {
         assert_eq!(betti.get(1), 0, "sphere: beta_1 = 0");
         assert_eq!(betti.get(2), 1, "sphere: beta_2 = 1 (one void)");
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // NEW TESTS: Construction, Edge Cases, Invariants, Round-trips
+    // ════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_empty_complex() {
+        let complex = SimplicialComplex::new();
+        assert_eq!(complex.count(0), 0);
+        assert_eq!(complex.max_dim, 0);
+        assert!(complex.vertices.is_empty());
+    }
+
+    #[test]
+    fn test_single_vertex() {
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0]);
+        assert_eq!(complex.count(0), 1);
+        assert_eq!(complex.max_dim, 0);
+
+        let hodge = HodgeLaplacian::new(complex);
+        let betti = hodge.betti_numbers();
+        assert_eq!(betti.get(0), 1, "Single vertex: beta_0 = 1");
+    }
+
+    #[test]
+    fn test_add_duplicate_simplex() {
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1]);
+        complex.add_simplex(vec![0, 1]); // Duplicate
+        complex.add_simplex(vec![1, 0]); // Same edge reversed
+        assert_eq!(complex.count(1), 1, "Duplicate edges should not be counted");
+        assert_eq!(complex.count(0), 2);
+    }
+
+    #[test]
+    fn test_add_simplex_empty_is_noop() {
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![]);
+        assert_eq!(complex.count(0), 0, "Empty simplex should be ignored");
+    }
+
+    #[test]
+    fn test_add_simplex_with_duplicates_deduped() {
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 0, 1]); // Duplicate vertex
+        // After dedup: [0, 1] which is an edge
+        assert_eq!(complex.count(1), 1);
+        assert_eq!(complex.count(0), 2);
+    }
+
+    #[test]
+    fn test_closure_property() {
+        // Adding a triangle should also add its 3 edges and 3 vertices
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1, 2]);
+        assert_eq!(complex.count(0), 3, "Triangle should have 3 vertices");
+        assert_eq!(complex.count(1), 3, "Triangle should have 3 edges");
+        assert_eq!(complex.count(2), 1, "Triangle should have 1 face");
+    }
+
+    #[test]
+    fn test_count_out_of_range() {
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1]);
+        assert_eq!(complex.count(5), 0, "Out of range dimension should return 0");
+    }
+
+    #[test]
+    fn test_betti_out_of_range() {
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1]);
+        let hodge = HodgeLaplacian::new(complex);
+        let betti = hodge.betti_numbers();
+        assert_eq!(betti.get(10), 0, "Out of range betti number should return 0");
+    }
+
+    #[test]
+    fn test_boundary_matrix_k0_is_none() {
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1]);
+        let hodge = HodgeLaplacian::new(complex);
+        assert!(hodge.boundary_matrix(0).is_none(), "B_0 should not exist");
+    }
+
+    #[test]
+    fn test_boundary_matrix_out_of_range_is_none() {
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1]);
+        let hodge = HodgeLaplacian::new(complex);
+        assert!(hodge.boundary_matrix(5).is_none());
+    }
+
+    #[test]
+    fn test_laplacian_out_of_range_is_none() {
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1]);
+        let hodge = HodgeLaplacian::new(complex);
+        assert!(hodge.laplacian(5).is_none());
+    }
+
+    #[test]
+    fn test_laplacian_symmetry() {
+        // Hodge Laplacians should always be symmetric
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1, 2]);
+        complex.add_simplex(vec![2, 3]);
+        let hodge = HodgeLaplacian::new(complex);
+
+        for k in 0..=hodge.complex.max_dim {
+            let lk = hodge.laplacian(k).unwrap();
+            let n = lk.len();
+            for i in 0..n {
+                for j in 0..n {
+                    assert!(
+                        approx_eq(lk[i][j], lk[j][i], 1e-12),
+                        "L_{k} should be symmetric: L[{i}][{j}]={} != L[{j}][{i}]={}",
+                        lk[i][j],
+                        lk[j][i]
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_hodge_decompose_invalid_dimension() {
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1]);
+        let hodge = HodgeLaplacian::new(complex);
+        assert!(hodge.hodge_decompose(5, &[1.0]).is_none());
+    }
+
+    #[test]
+    fn test_hodge_decompose_wrong_signal_length() {
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1]);
+        complex.add_simplex(vec![1, 2]);
+        let hodge = HodgeLaplacian::new(complex);
+        // We have 2 edges, but pass signal of length 3
+        assert!(hodge.hodge_decompose(1, &[1.0, 2.0, 3.0]).is_none());
+    }
+
+    #[test]
+    fn test_hodge_decompose_reconstruction() {
+        // For any signal: exact + coexact + harmonic = signal
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1, 2]); // Filled triangle
+        complex.add_simplex(vec![2, 3]);
+
+        let hodge = HodgeLaplacian::new(complex);
+
+        // Edge signal (5 edges)
+        let n_edges = hodge.complex.count(1);
+        let signal: Vec<f64> = (0..n_edges).map(|i| (i as f64 + 1.0) * 0.3).collect();
+
+        let decomp = hodge.hodge_decompose(1, &signal).expect("decomposition should work");
+
+        for i in 0..signal.len() {
+            let reconstructed = decomp.exact[i] + decomp.coexact[i] + decomp.harmonic[i];
+            assert!(
+                approx_eq(reconstructed, signal[i], 1e-6),
+                "Reconstruction failed at index {i}: {reconstructed} != {}",
+                signal[i]
+            );
+        }
+    }
+
+    #[test]
+    fn test_hodge_decompose_vertex_signal() {
+        // Vertex signals (k=0) should decompose too
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1, 2]);
+        let hodge = HodgeLaplacian::new(complex);
+
+        let signal = vec![1.0, 0.0, -1.0];
+        let decomp = hodge.hodge_decompose(0, &signal).expect("vertex decomposition should work");
+
+        // Reconstruction check
+        for i in 0..signal.len() {
+            let reconstructed = decomp.exact[i] + decomp.coexact[i] + decomp.harmonic[i];
+            assert!(
+                approx_eq(reconstructed, signal[i], 1e-6),
+                "Vertex signal reconstruction failed at {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_spectrum_out_of_range() {
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1]);
+        let hodge = HodgeLaplacian::new(complex);
+        assert!(hodge.spectrum(5).is_none());
+    }
+
+    #[test]
+    fn test_spectrum_single_vertex() {
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0]);
+        let hodge = HodgeLaplacian::new(complex);
+        let spec = hodge.spectrum(0).unwrap();
+        assert_eq!(spec.len(), 1);
+        assert!(approx_eq(spec[0], 0.0, 1e-10), "Single isolated vertex has L_0 = [0]");
+    }
+
+    #[test]
+    fn test_spectrum_sorted_ascending() {
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1]);
+        complex.add_simplex(vec![1, 2]);
+        complex.add_simplex(vec![0, 2]);
+        let hodge = HodgeLaplacian::new(complex);
+
+        for k in 0..=hodge.complex.max_dim {
+            let spec = hodge.spectrum(k).unwrap();
+            for i in 1..spec.len() {
+                assert!(
+                    spec[i] >= spec[i - 1] - 1e-10,
+                    "Spectrum should be sorted ascending at dim {k}: {} > {}",
+                    spec[i - 1],
+                    spec[i]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_two_disconnected_edges() {
+        // Two disconnected edges: {0,1} and {2,3}
+        // beta_0 = 2 (two components), beta_1 = 0
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1]);
+        complex.add_simplex(vec![2, 3]);
+
+        assert_eq!(complex.count(0), 4);
+        assert_eq!(complex.count(1), 2);
+
+        let hodge = HodgeLaplacian::new(complex);
+        let betti = hodge.betti_numbers();
+
+        assert_eq!(betti.get(0), 2, "Two disconnected edges: beta_0 = 2");
+        assert_eq!(betti.get(1), 0, "No loops");
+    }
+
+    #[test]
+    fn test_square_boundary_has_loop() {
+        // Square boundary (4 vertices, 4 edges, no faces)
+        // 0-1, 1-2, 2-3, 3-0 forms a cycle
+        // beta_0 = 1, beta_1 = 1
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1]);
+        complex.add_simplex(vec![1, 2]);
+        complex.add_simplex(vec![2, 3]);
+        complex.add_simplex(vec![0, 3]);
+
+        let hodge = HodgeLaplacian::new(complex);
+        let betti = hodge.betti_numbers();
+
+        assert_eq!(betti.get(0), 1, "Square is connected");
+        assert_eq!(betti.get(1), 1, "Square boundary has one loop");
+    }
+
+    #[test]
+    fn test_euler_characteristic_two_triangles_sharing_edge() {
+        // Two filled triangles sharing edge {1,2}:
+        // [0,1,2] and [1,2,3]
+        // 4 vertices, 5 edges, 2 triangles
+        // chi = V - E + F = 4 - 5 + 2 = 1
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1, 2]);
+        complex.add_simplex(vec![1, 2, 3]);
+
+        let hodge = HodgeLaplacian::new(complex);
+        let betti = hodge.betti_numbers();
+
+        assert_eq!(betti.euler_characteristic(), 1);
+        assert_eq!(betti.get(0), 1, "Connected");
+        assert_eq!(betti.get(1), 0, "No loops (faces fill them)");
+    }
+
+    #[test]
+    fn test_from_graph_disconnected() {
+        // 4 nodes, no edges
+        let adjacency = vec![
+            vec![false, false, false, false],
+            vec![false, false, false, false],
+            vec![false, false, false, false],
+            vec![false, false, false, false],
+        ];
+        let complex = SimplicialComplex::from_graph(&adjacency);
+        assert_eq!(complex.count(0), 4);
+        assert_eq!(complex.count(1), 0);
+
+        let hodge = HodgeLaplacian::new(complex);
+        let betti = hodge.betti_numbers();
+        assert_eq!(betti.get(0), 4, "4 isolated vertices: beta_0 = 4");
+    }
+
+    #[test]
+    fn test_full_spectrum_spectral_gap() {
+        // Connected graph should have positive spectral gap for L_0
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1, 2]);
+        let hodge = HodgeLaplacian::new(complex);
+        let spec = hodge.full_spectrum();
+
+        assert!(spec.spectral_gaps[0] > 0.0, "Connected: L_0 spectral gap > 0");
+    }
+
+    #[test]
+    fn test_laplacian_diagonal_nonnegative() {
+        // Diagonal entries of Hodge Laplacian should be non-negative (degrees)
+        let mut complex = SimplicialComplex::new();
+        complex.add_simplex(vec![0, 1, 2]);
+        complex.add_simplex(vec![2, 3]);
+        let hodge = HodgeLaplacian::new(complex);
+
+        for k in 0..=hodge.complex.max_dim {
+            let lk = hodge.laplacian(k).unwrap();
+            for i in 0..lk.len() {
+                assert!(
+                    lk[i][i] >= -1e-10,
+                    "L_{k}[{i}][{i}] = {} should be non-negative",
+                    lk[i][i]
+                );
+            }
+        }
+    }
 }

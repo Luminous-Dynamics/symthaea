@@ -88,9 +88,14 @@ impl FlakeContext {
     }
 
     /// Load and parse flake.nix from a specific path
-    pub fn load_from_path(&mut self, path: &Path) -> Result<(), String> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+    pub fn load_from_path(&mut self, path: &Path) -> Result<(), crate::errors::SymthaeaError> {
+        let content = std::fs::read_to_string(path).map_err(|e| {
+            crate::errors::SymthaeaError::Runtime(format!(
+                "Failed to read {}: {}",
+                path.display(),
+                e
+            ))
+        })?;
 
         let modified = std::fs::metadata(path).ok().and_then(|m| m.modified().ok());
 
@@ -114,7 +119,7 @@ impl FlakeContext {
 
         if current_modified != self.last_modified {
             if let Err(e) = self.load_from_path(path) {
-                self.parse_errors.push(e);
+                self.parse_errors.push(e.to_string());
                 return false;
             }
             return true;
@@ -124,18 +129,23 @@ impl FlakeContext {
     }
 
     /// Parse Nix content and extract context
-    fn parse_nix_content(&mut self, content: &str) -> Result<(), String> {
+    fn parse_nix_content(&mut self, content: &str) -> Result<(), crate::errors::SymthaeaError> {
         let mut parser = NixParser::new();
 
         // Set up tree-sitter language
         parser
             .parser
             .set_language(&tree_sitter_nix::LANGUAGE.into())
-            .map_err(|e| format!("Failed to set language: {e}"))?;
+            .map_err(|e| {
+                crate::errors::SymthaeaError::Runtime(format!("Failed to set language: {e}"))
+            })?;
 
-        let config = parser
-            .parse(content)
-            .map_err(|e| format!("Parse error at {}:{}: {}", e.line, e.column, e.message))?;
+        let config = parser.parse(content).map_err(|e| {
+            crate::errors::SymthaeaError::Runtime(format!(
+                "Parse error at {}:{}: {}",
+                e.line, e.column, e.message
+            ))
+        })?;
 
         // Clear previous context
         self.installed_packages.clear();

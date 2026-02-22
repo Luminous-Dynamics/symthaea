@@ -170,7 +170,7 @@ impl ReversalLearningBenchmark {
             // Counterfactual learning: in a binary choice task, punishment
             // for one stimulus implies reward for the other (Li & Daw, 2011).
             // Boost the unchosen stimulus's reward association after a loss.
-            let cf_lr = 0.3f32;
+            let cf_lr = 0.10f32;
             if !rewarded {
                 if chose_a {
                     assoc_b = ContinuousHV::weighted_bundle(

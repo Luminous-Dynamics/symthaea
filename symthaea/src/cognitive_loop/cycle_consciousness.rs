@@ -769,7 +769,7 @@ impl CognitiveLoopService {
                     core_values.insert(CoreComponent::Binding, coherence as f64);
                     core_values.insert(CoreComponent::Workspace, coherence as f64 * 0.8); // GWT proxy
                     core_values.insert(CoreComponent::Attention, phi_attention_weight as f64);
-                    core_values.insert(CoreComponent::Recursion, 0.5); // TODO: wire HOT depth
+                    core_values.insert(CoreComponent::Recursion, 0.5); // Placeholder: HOT depth requires higher-order thought tracking (deferred — see W2-A in consolidation plan)
                     core_values.insert(CoreComponent::Efficacy, 1.0 - prediction_error as f64);
                     core_values.insert(CoreComponent::Knowledge, self.carryover.quality.last_epistemic_quality);
                     let state = ConsciousnessStateV2 {

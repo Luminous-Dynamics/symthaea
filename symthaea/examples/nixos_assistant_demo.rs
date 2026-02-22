@@ -386,35 +386,17 @@ fn show_status(pipeline: &ConsciousPipeline) {
     println!("   Failed executions: {}", stats.failed_executions);
 }
 
-/// Show the consciousness journey from last result
+/// Show consciousness state from last result
 fn show_journey(result: &PipelineResult) {
-    let journey = &result.consciousness_understanding.journey;
+    let cu = &result.consciousness_understanding;
 
-    println!("\n🌊 Consciousness Journey:");
-    println!("   {}", journey.narrative());
-    println!();
-
-    if journey.snapshots.is_empty() {
-        println!("   No snapshots recorded.");
-        return;
-    }
-
-    println!("   Snapshots:");
-    for (i, snap) in journey.snapshots.iter().enumerate() {
-        println!(
-            "   {}. Φ={:.3} Conf={:.3} [{:?}] - {}",
-            i + 1,
-            snap.phi,
-            snap.confidence,
-            snap.quadrant,
-            snap.trigger
-        );
-    }
-
-    println!();
-    println!("   Transitions: {}", journey.transitions);
-    println!("   Gained confidence: {}", journey.gained_confidence);
-    println!("   Deepened integration: {}", journey.deepened_integration);
+    println!("\nConsciousness State:");
+    println!("   Phi (integration):   {:.4}", cu.consciousness_phi);
+    println!("   Confidence:          {:.4}", cu.confidence);
+    println!("   Epistemic conf:      {:.4}", cu.epistemic_confidence);
+    println!("   State:               {:?}", cu.consciousness_state);
+    println!("   Quadrant:            {:?}", cu.quadrant);
+    println!("   Active quadrants:    {:?}", cu.active_quadrants);
 }
 
 /// Format a quadrant indicator for the prompt

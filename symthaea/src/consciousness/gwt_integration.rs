@@ -80,9 +80,9 @@ pub struct UnifiedGlobalWorkspace {
 
     /// Observer for tracing workspace ignition events
     ///
-    /// TODO(future): Connect observer to emit tracing events on workspace ignition.
-    /// This enables real-time monitoring of consciousness dynamics via the
-    /// observability infrastructure - useful for debugging and visualization.
+    /// Deferred: connect observer to emit tracing events on workspace ignition.
+    /// This would enable real-time monitoring of consciousness dynamics via the
+    /// observability infrastructure — useful for debugging and visualization.
     #[cfg(feature = "observability_module")]
     #[allow(dead_code)]
     observer: Option<SharedObserver<dyn SymthaeaObserver>>,

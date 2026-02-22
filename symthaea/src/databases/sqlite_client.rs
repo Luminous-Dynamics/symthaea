@@ -1864,4 +1864,923 @@ mod tests {
         assert_eq!(stats.oldest_timestamp_ms, 1000000000);
         assert_eq!(stats.newest_timestamp_ms, 1000004000);
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // COMPREHENSIVE SQLITE PERSISTENCE TESTS (21+)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Helper: create a MemoryRecord with full field control
+    fn make_full_record(
+        id: &str,
+        seed: u64,
+        memory_type: MemoryType,
+        content: &str,
+        psi: f64,
+        valence: f32,
+        arousal: f32,
+        timestamp_ms: u64,
+    ) -> MemoryRecord {
+        MemoryRecord {
+            id: id.to_string(),
+            encoding: BinaryHV::random(seed),
+            timestamp_ms,
+            memory_type,
+            content: content.to_string(),
+            valence,
+            arousal,
+            psi,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 1. Store + retrieve round-trip: verify all fields survive
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_store_retrieve_roundtrip_all_fields() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        let hv = BinaryHV::random(314);
+        let record = MemoryRecord {
+            id: "rt-all-fields".to_string(),
+            encoding: hv,
+            timestamp_ms: 1_700_000_123_456,
+            memory_type: MemoryType::Procedural,
+            content: "Round-trip test with all fields".to_string(),
+            valence: -0.42,
+            arousal: 0.77,
+            psi: 0.912,
+            topics: vec!["alpha".into(), "beta".into(), "gamma".into()],
+            metadata: r#"{"key":"value","num":42}"#.to_string(),
+            consolidation_strength: 0.35,
+            retrieval_count: 7,
+        };
+        db.store(record).await.unwrap();
+
+        let r = db.get("rt-all-fields").await.unwrap().unwrap();
+        assert_eq!(r.id, "rt-all-fields");
+        assert_eq!(r.memory_type, MemoryType::Procedural);
+        assert_eq!(r.content, "Round-trip test with all fields");
+        assert_eq!(r.timestamp_ms, 1_700_000_123_456);
+        assert!((r.valence - (-0.42)).abs() < 0.01);
+        assert!((r.arousal - 0.77).abs() < 0.01);
+        assert!((r.psi - 0.912).abs() < 0.001);
+        assert_eq!(r.topics, vec!["alpha", "beta", "gamma"]);
+        assert_eq!(r.metadata, r#"{"key":"value","num":42}"#);
+        assert!((r.consolidation_strength - 0.35).abs() < 0.001);
+        assert_eq!(r.retrieval_count, 7);
+        assert!(hv.similarity(&r.encoding) > 0.99, "Encoding must survive round-trip");
+    }
+
+    // -----------------------------------------------------------------------
+    // 2. Search similar finds matching records (store 5, search, verify top)
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_search_similar_finds_best_match_among_five() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let target = BinaryHV::random(500);
+
+        // Store 4 unrelated records
+        for i in 0..4u64 {
+            db.store(make_record(&format!("unrel-{}", i), 1000 + i, MemoryType::Semantic))
+                .await
+                .unwrap();
+        }
+
+        // Store the matching record with exact same seed
+        let matching = MemoryRecord {
+            id: "the-match".to_string(),
+            encoding: target,
+            timestamp_ms: 2_000_000,
+            memory_type: MemoryType::Episodic,
+            content: "This should be found".to_string(),
+            valence: 0.5,
+            arousal: 0.5,
+            psi: 0.8,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        db.store(matching).await.unwrap();
+
+        let results = db.search_similar(&target, 5).await.unwrap();
+        assert_eq!(results.len(), 5);
+        assert_eq!(results[0].record.id, "the-match");
+        assert!(results[0].similarity > 0.99);
+    }
+
+    // -----------------------------------------------------------------------
+    // 3. Search similar with empty database returns empty
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_search_similar_empty_db_returns_empty() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let results = db.search_similar(&BinaryHV::random(1), 10).await.unwrap();
+        assert!(results.is_empty(), "Empty database should return no search results");
+    }
+
+    // -----------------------------------------------------------------------
+    // 4. Search similar filtered with WHERE clause
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_search_similar_filtered_where_clause() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let shared_hv = BinaryHV::random(77);
+
+        // Store episodic and semantic records with similar encodings
+        let mut ep = make_full_record("filt-ep", 77, MemoryType::Episodic, "Episodic", 0.9, 0.5, 0.5, 1_000);
+        ep.encoding = shared_hv;
+        db.store(ep).await.unwrap();
+
+        let mut sem = make_full_record("filt-sem", 77, MemoryType::Semantic, "Semantic", 0.3, 0.5, 0.5, 2_000);
+        sem.encoding = shared_hv;
+        db.store(sem).await.unwrap();
+
+        // Filter to episodic only
+        let results = db
+            .search_similar_filtered(&shared_hv, 10, Some("memory_type = 'episodic'"))
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].record.id, "filt-ep");
+    }
+
+    // -----------------------------------------------------------------------
+    // 5. Store duplicate ID overwrites gracefully
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_store_duplicate_id_overwrites() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        db.store(make_full_record("dup-1", 10, MemoryType::Working, "v1", 0.1, 0.1, 0.1, 1_000))
+            .await
+            .unwrap();
+        db.store(make_full_record("dup-1", 20, MemoryType::Semantic, "v2", 0.9, 0.9, 0.9, 2_000))
+            .await
+            .unwrap();
+
+        assert_eq!(db.count().await.unwrap(), 1, "Duplicate ID should overwrite, not duplicate");
+        let r = db.get("dup-1").await.unwrap().unwrap();
+        assert_eq!(r.content, "v2");
+        assert_eq!(r.memory_type, MemoryType::Semantic);
+        assert_eq!(r.timestamp_ms, 2_000);
+    }
+
+    // -----------------------------------------------------------------------
+    // 6. Large encoding (16,384 bytes = full BinaryHV) stores and retrieves
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_large_encoding_roundtrip() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        // BinaryHV is always 2048 bytes (16,384 bits). Verify this is the max size.
+        let hv = BinaryHV::random(999);
+        assert_eq!(SqliteMemory::hv_to_bytes(&hv).len(), BinaryHV::BYTES);
+        assert_eq!(BinaryHV::BYTES, 2048);
+
+        let record = MemoryRecord {
+            id: "large-enc".to_string(),
+            encoding: hv,
+            timestamp_ms: 1_000,
+            memory_type: MemoryType::Episodic,
+            content: "Large encoding test".to_string(),
+            valence: 0.0,
+            arousal: 0.0,
+            psi: 0.0,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        db.store(record).await.unwrap();
+
+        let retrieved = db.get("large-enc").await.unwrap().unwrap();
+        let bytes = SqliteMemory::hv_to_bytes(&retrieved.encoding);
+        assert_eq!(bytes.len(), BinaryHV::BYTES, "Encoding should be full 2048 bytes");
+        assert!(hv.similarity(&retrieved.encoding) > 0.99, "Full encoding must survive");
+    }
+
+    // -----------------------------------------------------------------------
+    // 7. LSH cache auto-build at threshold (500+ records)
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_lsh_cache_auto_build_at_threshold() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        // Store exactly LSH_MIN_RECORDS records
+        for i in 0..LSH_MIN_RECORDS {
+            db.store(make_record(
+                &format!("lsh-auto-{}", i),
+                i as u64 + 3000,
+                MemoryType::Episodic,
+            ))
+            .await
+            .unwrap();
+        }
+
+        // All records should have LSH entries
+        let conn = db.conn.lock().unwrap();
+        let distinct_ids: i64 = conn
+            .query_row(
+                "SELECT COUNT(DISTINCT memory_id) FROM vector_lsh",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            distinct_ids, LSH_MIN_RECORDS as i64,
+            "All {} records should have LSH entries",
+            LSH_MIN_RECORDS
+        );
+
+        let total_entries: i64 = conn
+            .query_row("SELECT COUNT(*) FROM vector_lsh", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(
+            total_entries,
+            (LSH_MIN_RECORDS * LSH_NUM_BANDS) as i64,
+            "Each record should have {} LSH band entries",
+            LSH_NUM_BANDS
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 8. LSH cache invalidation on write (new record gets LSH entries)
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_lsh_cache_invalidation_new_record_indexed() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        // Store one record
+        let hv = BinaryHV::random(42);
+        db.store(make_record("lsh-inval-1", 42, MemoryType::Episodic))
+            .await
+            .unwrap();
+
+        // Verify LSH entries exist
+        let conn = db.conn.lock().unwrap();
+        let count_before: i64 = conn
+            .query_row("SELECT COUNT(*) FROM vector_lsh", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count_before, LSH_NUM_BANDS as i64);
+        drop(conn);
+
+        // Overwrite with a different encoding
+        let new_hv = BinaryHV::random(99);
+        let mut updated = make_record("lsh-inval-1", 99, MemoryType::Episodic);
+        updated.encoding = new_hv;
+        db.store(updated).await.unwrap();
+
+        // LSH entries should be updated (INSERT OR REPLACE)
+        let conn = db.conn.lock().unwrap();
+        let count_after: i64 = conn
+            .query_row("SELECT COUNT(*) FROM vector_lsh", [], |row| row.get(0))
+            .unwrap();
+        // Should still be exactly LSH_NUM_BANDS (replaced, not doubled)
+        assert_eq!(count_after, LSH_NUM_BANDS as i64);
+
+        // Verify the hashes correspond to the new encoding
+        let expected_hashes = SqliteMemory::lsh_band_hashes(&new_hv);
+        for band in 0..LSH_NUM_BANDS {
+            let stored_hash: i64 = conn
+                .query_row(
+                    "SELECT band_hash FROM vector_lsh WHERE memory_id = 'lsh-inval-1' AND band_idx = ?1",
+                    [band as i64],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(
+                stored_hash, expected_hashes[band],
+                "Band {} hash should match new encoding",
+                band
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 9. Reconsolidation: search bumps retrieval_count and consolidation_strength
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_reconsolidation_multiple_searches() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        let hv = BinaryHV::random(55);
+        db.store(MemoryRecord {
+            id: "recon-multi".to_string(),
+            encoding: hv,
+            timestamp_ms: 1_000,
+            memory_type: MemoryType::Episodic,
+            content: "Reconsolidation multi-search test".to_string(),
+            valence: 0.0,
+            arousal: 0.0,
+            psi: 0.5,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        })
+        .await
+        .unwrap();
+
+        // Perform 5 searches
+        for _ in 0..5 {
+            let _ = db.search_similar(&hv, 1).await.unwrap();
+        }
+
+        let r = db.get("recon-multi").await.unwrap().unwrap();
+        assert_eq!(r.retrieval_count, 5, "5 searches should yield retrieval_count=5");
+        assert!(
+            (r.consolidation_strength - 0.25).abs() < 0.001,
+            "5 * 0.05 = 0.25 consolidation strength, got {}",
+            r.consolidation_strength
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 10. List all records
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_list_all_records_ordered_by_timestamp() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        // Store records with non-sequential timestamps
+        for (id, ts) in [("la-c", 3000u64), ("la-a", 1000), ("la-b", 2000)] {
+            db.store(make_full_record(id, 1, MemoryType::Episodic, id, 0.5, 0.5, 0.5, ts))
+                .await
+                .unwrap();
+        }
+
+        let all = db.list_all().await.unwrap();
+        assert_eq!(all.len(), 3);
+        // list_all orders by timestamp_ms ASC
+        assert_eq!(all[0].id, "la-a");
+        assert_eq!(all[1].id, "la-b");
+        assert_eq!(all[2].id, "la-c");
+    }
+
+    // -----------------------------------------------------------------------
+    // 11. Delete record
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_delete_record_removes_from_db_and_lsh() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        db.store(make_record("del-target", 42, MemoryType::Episodic))
+            .await
+            .unwrap();
+        db.store(make_record("del-keep", 43, MemoryType::Episodic))
+            .await
+            .unwrap();
+
+        assert_eq!(db.count().await.unwrap(), 2);
+
+        let deleted = db.delete("del-target").await.unwrap();
+        assert!(deleted, "Delete should return true for existing record");
+
+        assert_eq!(db.count().await.unwrap(), 1);
+        assert!(db.get("del-target").await.unwrap().is_none());
+        assert!(db.get("del-keep").await.unwrap().is_some());
+
+        // LSH entries should also be removed
+        let conn = db.conn.lock().unwrap();
+        let lsh_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM vector_lsh WHERE memory_id = 'del-target'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(lsh_count, 0, "LSH entries for deleted record should be gone");
+    }
+
+    // -----------------------------------------------------------------------
+    // 12. Store with metadata (phi, valence, arousal, memory_type)
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_store_with_rich_metadata() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        let record = MemoryRecord {
+            id: "rich-meta".to_string(),
+            encoding: BinaryHV::random(1),
+            timestamp_ms: 1_700_000_000_000,
+            memory_type: MemoryType::Procedural,
+            content: "Rich metadata record".to_string(),
+            valence: -0.9,
+            arousal: 0.95,
+            psi: 0.999,
+            topics: vec!["topic-a".into(), "topic-b".into()],
+            metadata: r#"{"session":"xyz","step":42,"nested":{"a":1}}"#.to_string(),
+            consolidation_strength: 0.75,
+            retrieval_count: 10,
+        };
+        db.store(record).await.unwrap();
+
+        let r = db.get("rich-meta").await.unwrap().unwrap();
+        assert!((r.valence - (-0.9)).abs() < 0.01);
+        assert!((r.arousal - 0.95).abs() < 0.01);
+        assert!((r.psi - 0.999).abs() < 0.001);
+        assert_eq!(r.memory_type, MemoryType::Procedural);
+        assert!(r.metadata.contains("nested"));
+        assert!(r.metadata.contains(r#""a":1"#));
+    }
+
+    // -----------------------------------------------------------------------
+    // 13. Filtered search by memory_type
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_filtered_search_by_memory_type() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let hv = BinaryHV::random(33);
+
+        for (id, mt) in [
+            ("fs-ep1", MemoryType::Episodic),
+            ("fs-ep2", MemoryType::Episodic),
+            ("fs-sem1", MemoryType::Semantic),
+            ("fs-proc1", MemoryType::Procedural),
+        ] {
+            let mut rec = make_record(id, 33, mt);
+            rec.encoding = hv; // Same encoding so all are similar
+            db.store(rec).await.unwrap();
+        }
+
+        // Filter for semantic only
+        let results = db
+            .search_similar_filtered(&hv, 10, Some("memory_type = 'semantic'"))
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].record.id, "fs-sem1");
+        assert_eq!(results[0].record.memory_type, MemoryType::Semantic);
+    }
+
+    // -----------------------------------------------------------------------
+    // 14. Filtered search by phi range
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_filtered_search_by_phi_range() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let hv = BinaryHV::random(44);
+
+        for (id, psi) in [("phi-lo", 0.1), ("phi-mid", 0.5), ("phi-hi", 0.9)] {
+            let mut rec = make_full_record(id, 44, MemoryType::Episodic, id, psi, 0.0, 0.0, 1_000);
+            rec.encoding = hv;
+            db.store(rec).await.unwrap();
+        }
+
+        // Filter phi > 0.4
+        let results = db
+            .search_similar_filtered(&hv, 10, Some("phi > 0.4"))
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 2, "phi > 0.4 should match mid and hi");
+        let ids: Vec<&str> = results.iter().map(|r| r.record.id.as_str()).collect();
+        assert!(ids.contains(&"phi-mid"));
+        assert!(ids.contains(&"phi-hi"));
+    }
+
+    // -----------------------------------------------------------------------
+    // 15. Filtered search by timestamp range
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_filtered_search_by_timestamp_range() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let hv = BinaryHV::random(55);
+
+        for (id, ts) in [("ts-early", 1000u64), ("ts-mid", 5000), ("ts-late", 9000)] {
+            let mut rec = make_full_record(id, 55, MemoryType::Episodic, id, 0.5, 0.0, 0.0, ts);
+            rec.encoding = hv;
+            db.store(rec).await.unwrap();
+        }
+
+        // Filter by timestamp range
+        let results = db
+            .search_similar_filtered(&hv, 10, Some("timestamp_ms >= 3000"))
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 2, "ts >= 3000 should match mid and late");
+        let ids: Vec<&str> = results.iter().map(|r| r.record.id.as_str()).collect();
+        assert!(ids.contains(&"ts-mid"));
+        assert!(ids.contains(&"ts-late"));
+    }
+
+    // -----------------------------------------------------------------------
+    // 16. Multiple sequential stores (verify no corruption)
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_multiple_sequential_stores_no_corruption() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        let n = 50;
+        for i in 0..n {
+            db.store(make_full_record(
+                &format!("seq-{}", i),
+                i as u64,
+                if i % 3 == 0 {
+                    MemoryType::Episodic
+                } else if i % 3 == 1 {
+                    MemoryType::Semantic
+                } else {
+                    MemoryType::Procedural
+                },
+                &format!("Sequential record {}", i),
+                i as f64 / 100.0,
+                0.5,
+                0.5,
+                1_000 + i as u64,
+            ))
+            .await
+            .unwrap();
+        }
+
+        assert_eq!(db.count().await.unwrap(), n);
+
+        // Verify every record can be retrieved without corruption
+        for i in 0..n {
+            let id = format!("seq-{}", i);
+            let r = db.get(&id).await.unwrap();
+            assert!(r.is_some(), "Record {} should exist", id);
+            let r = r.unwrap();
+            assert_eq!(r.content, format!("Sequential record {}", i));
+            assert_eq!(r.timestamp_ms, 1_000 + i as u64);
+        }
+
+        // List all should also return them in timestamp order
+        let all = db.list_all().await.unwrap();
+        assert_eq!(all.len(), n);
+        for pair in all.windows(2) {
+            assert!(
+                pair[0].timestamp_ms <= pair[1].timestamp_ms,
+                "list_all should be ordered by timestamp ascending"
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 17. Empty encoding edge case
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_empty_encoding_zero_vector() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        let zero_hv = BinaryHV::zero();
+        let record = MemoryRecord {
+            id: "zero-enc".to_string(),
+            encoding: zero_hv,
+            timestamp_ms: 1_000,
+            memory_type: MemoryType::Working,
+            content: "Zero encoding".to_string(),
+            valence: 0.0,
+            arousal: 0.0,
+            psi: 0.0,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        db.store(record).await.unwrap();
+
+        let r = db.get("zero-enc").await.unwrap().unwrap();
+        // Zero vector should round-trip correctly
+        assert_eq!(r.encoding.0, [0u8; BinaryHV::BYTES]);
+
+        // Similarity of zero vector to itself should be well-defined
+        let results = db.search_similar(&zero_hv, 1).await.unwrap();
+        assert_eq!(results.len(), 1);
+        // All bits match (all 0s match all 0s) => similarity should be 0.0 in bipolar
+        // but we just check it does not panic
+        assert!(results[0].similarity.is_finite());
+    }
+
+    // -----------------------------------------------------------------------
+    // 18. Very long label/text fields
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_very_long_text_fields() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        let long_content = "x".repeat(100_000);
+        let long_metadata = format!(r#"{{"data":"{}"}}"#, "y".repeat(50_000));
+        let many_topics: Vec<String> = (0..200).map(|i| format!("topic-{}", i)).collect();
+
+        let record = MemoryRecord {
+            id: "long-text".to_string(),
+            encoding: BinaryHV::random(1),
+            timestamp_ms: 1_000,
+            memory_type: MemoryType::Semantic,
+            content: long_content.clone(),
+            valence: 0.0,
+            arousal: 0.0,
+            psi: 0.0,
+            topics: many_topics.clone(),
+            metadata: long_metadata.clone(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        db.store(record).await.unwrap();
+
+        let r = db.get("long-text").await.unwrap().unwrap();
+        assert_eq!(r.content.len(), 100_000);
+        assert_eq!(r.content, long_content);
+        assert_eq!(r.topics.len(), 200);
+        assert_eq!(r.topics[199], "topic-199");
+        assert!(r.metadata.len() > 50_000);
+    }
+
+    // -----------------------------------------------------------------------
+    // 19. Search with zero results (dissimilar query)
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_search_zero_results_top_k_respected() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        // Store 3 records
+        for i in 0..3u64 {
+            db.store(make_record(&format!("zr-{}", i), i + 100, MemoryType::Episodic))
+                .await
+                .unwrap();
+        }
+
+        // Search with a random vector — should return results (brute-force path)
+        // but the similarities should all be around ~0.5 (random baseline)
+        let query = BinaryHV::random(999_999);
+        let results = db.search_similar(&query, 10).await.unwrap();
+        assert_eq!(results.len(), 3, "Should return all 3 records (fewer than top_k)");
+
+        // Random vectors should have similarity near 0.5
+        for r in &results {
+            assert!(
+                r.similarity > 0.3 && r.similarity < 0.7,
+                "Random BinaryHV similarity should be near 0.5, got {}",
+                r.similarity
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 20. DatabaseConfig validation + in-memory creation
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_database_config_and_in_memory_creation() {
+        // Validate that SqliteMemory::in_memory() creates a working database
+        // (this is the code path exercised by create_database with None path)
+        let db = SqliteMemory::in_memory().unwrap();
+
+        // Should start empty
+        assert_eq!(db.count().await.unwrap(), 0);
+
+        // Health check should pass
+        assert!(db.health_check().await.unwrap());
+
+        // Stats should show empty db with in_memory backend
+        let stats = db.stats().await.unwrap();
+        assert_eq!(stats.total_records, 0);
+        assert_eq!(stats.backend_status, "in_memory");
+        assert!(stats.page_size > 0);
+        assert_eq!(stats.avg_psi, 0.0);
+        assert_eq!(stats.oldest_timestamp_ms, 0);
+        assert_eq!(stats.newest_timestamp_ms, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // 21. Store 100 records, search accuracy (top-3 includes exact match)
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_search_accuracy_100_records_exact_in_top3() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        let target_hv = BinaryHV::random(42);
+
+        // Store 99 unrelated records
+        for i in 0..99u64 {
+            db.store(make_record(
+                &format!("acc-{}", i),
+                i + 5000,
+                MemoryType::Episodic,
+            ))
+            .await
+            .unwrap();
+        }
+
+        // Store the exact target
+        let target = MemoryRecord {
+            id: "acc-target".to_string(),
+            encoding: target_hv,
+            timestamp_ms: 99_999,
+            memory_type: MemoryType::Semantic,
+            content: "The needle in the haystack".to_string(),
+            valence: 0.0,
+            arousal: 0.0,
+            psi: 0.0,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        db.store(target).await.unwrap();
+
+        assert_eq!(db.count().await.unwrap(), 100);
+
+        let results = db.search_similar(&target_hv, 3).await.unwrap();
+        assert_eq!(results.len(), 3);
+
+        let top_ids: Vec<&str> = results.iter().map(|r| r.record.id.as_str()).collect();
+        assert!(
+            top_ids.contains(&"acc-target"),
+            "Top-3 must contain the exact match; got {:?}",
+            top_ids
+        );
+        // The exact match should be first
+        assert_eq!(results[0].record.id, "acc-target");
+        assert!(results[0].similarity > 0.99);
+    }
+
+    // -----------------------------------------------------------------------
+    // 22. Filtered search rejects disallowed columns
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_filtered_search_rejects_disallowed_column() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        db.store(make_record("sec-1", 1, MemoryType::Episodic))
+            .await
+            .unwrap();
+
+        // Attempt SQL injection via disallowed column
+        let result = db
+            .search_similar_filtered(
+                &BinaryHV::random(1),
+                10,
+                Some("content = 'x'; DROP TABLE memories; --"),
+            )
+            .await;
+        assert!(result.is_err(), "Disallowed column should be rejected");
+    }
+
+    // -----------------------------------------------------------------------
+    // 23. Stats report correct avg_psi and type distribution
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_stats_avg_psi_and_type_distribution() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        // Store records with known psi values
+        db.store(make_full_record("s1", 1, MemoryType::Episodic, "a", 0.2, 0.0, 0.0, 1_000))
+            .await
+            .unwrap();
+        db.store(make_full_record("s2", 2, MemoryType::Episodic, "b", 0.4, 0.0, 0.0, 2_000))
+            .await
+            .unwrap();
+        db.store(make_full_record("s3", 3, MemoryType::Semantic, "c", 0.6, 0.0, 0.0, 3_000))
+            .await
+            .unwrap();
+
+        let stats = db.stats().await.unwrap();
+        assert_eq!(stats.total_records, 3);
+        // avg_psi = (0.2 + 0.4 + 0.6) / 3 = 0.4
+        assert!((stats.avg_psi - 0.4).abs() < 0.01);
+
+        // Type distribution
+        let ep_count = stats
+            .memory_type_counts
+            .iter()
+            .find(|(t, _)| t == "episodic")
+            .map(|(_, c)| *c)
+            .unwrap_or(0);
+        let sem_count = stats
+            .memory_type_counts
+            .iter()
+            .find(|(t, _)| t == "semantic")
+            .map(|(_, c)| *c)
+            .unwrap_or(0);
+        assert_eq!(ep_count, 2);
+        assert_eq!(sem_count, 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // 24. Filtered search with None filter falls back to full search
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_filtered_search_none_filter_returns_all() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let hv = BinaryHV::random(88);
+
+        for i in 0..3u64 {
+            let mut rec = make_record(&format!("fn-{}", i), 88, MemoryType::Episodic);
+            rec.encoding = hv;
+            db.store(rec).await.unwrap();
+        }
+
+        let results = db.search_similar_filtered(&hv, 10, None).await.unwrap();
+        assert_eq!(results.len(), 3, "None filter should return all matching records");
+    }
+
+    // -----------------------------------------------------------------------
+    // 25. Filtered search with empty string filter falls back to full search
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_filtered_search_empty_string_returns_all() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let hv = BinaryHV::random(89);
+
+        for i in 0..2u64 {
+            let mut rec = make_record(&format!("fe-{}", i), 89, MemoryType::Semantic);
+            rec.encoding = hv;
+            db.store(rec).await.unwrap();
+        }
+
+        let results = db.search_similar_filtered(&hv, 10, Some("")).await.unwrap();
+        assert_eq!(results.len(), 2, "Empty string filter should return all records");
+    }
+
+    // -----------------------------------------------------------------------
+    // 26. bytes_to_hv with undersized input returns zero vector
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_bytes_to_hv_undersized_returns_zero() {
+        let short_bytes = vec![0xFFu8; 100]; // Much smaller than BYTES=2048
+        let hv = SqliteMemory::bytes_to_hv(&short_bytes);
+        assert_eq!(hv.0, [0u8; BinaryHV::BYTES], "Undersized input should produce zero vector");
+    }
+
+    // -----------------------------------------------------------------------
+    // 27. hv_to_bytes / bytes_to_hv symmetry
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_hv_bytes_roundtrip_symmetry() {
+        let original = BinaryHV::random(12345);
+        let bytes = SqliteMemory::hv_to_bytes(&original);
+        let restored = SqliteMemory::bytes_to_hv(&bytes);
+        assert_eq!(original.0, restored.0, "HV -> bytes -> HV must be identity");
+    }
+
+    // -----------------------------------------------------------------------
+    // 28. memory_type string conversion round-trip
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_memory_type_string_roundtrip() {
+        for mt in [
+            MemoryType::Episodic,
+            MemoryType::Semantic,
+            MemoryType::Procedural,
+            MemoryType::Working,
+        ] {
+            let s = SqliteMemory::memory_type_to_str(mt);
+            let restored = SqliteMemory::str_to_memory_type(s);
+            assert_eq!(mt, restored, "MemoryType {:?} should survive string round-trip", mt);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 29. Unknown memory_type string defaults to Episodic
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_unknown_memory_type_defaults_to_episodic() {
+        assert_eq!(
+            SqliteMemory::str_to_memory_type("unknown_garbage"),
+            MemoryType::Episodic
+        );
+        assert_eq!(
+            SqliteMemory::str_to_memory_type(""),
+            MemoryType::Episodic
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 30. Filtered search by consolidation_strength
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_filtered_search_by_consolidation_strength() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let hv = BinaryHV::random(66);
+
+        for (id, cs) in [("cs-lo", 0.1f64), ("cs-mid", 0.5), ("cs-hi", 0.9)] {
+            let mut rec = make_full_record(id, 66, MemoryType::Episodic, id, 0.5, 0.0, 0.0, 1_000);
+            rec.encoding = hv;
+            rec.consolidation_strength = cs;
+            db.store(rec).await.unwrap();
+        }
+
+        let results = db
+            .search_similar_filtered(&hv, 10, Some("consolidation_strength >= 0.5"))
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 2);
+        let ids: Vec<&str> = results.iter().map(|r| r.record.id.as_str()).collect();
+        assert!(ids.contains(&"cs-mid"));
+        assert!(ids.contains(&"cs-hi"));
+    }
+
+    // -----------------------------------------------------------------------
+    // 31. Count on empty database returns 0
+    // -----------------------------------------------------------------------
+    #[tokio::test]
+    async fn test_count_empty_database() {
+        let db = SqliteMemory::in_memory().unwrap();
+        assert_eq!(db.count().await.unwrap(), 0);
+    }
 }

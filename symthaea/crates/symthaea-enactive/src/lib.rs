@@ -1732,4 +1732,309 @@ mod tests {
         assert!(!primitives.is_empty());
         assert!(primitives.contains(&"NSM_NOT".to_string())); // NOT KNOW
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // NEW TESTS: Construction, Edge Cases, Invariants, Round-trips
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_sense_making_engine_default_concerns() {
+        let engine = SenseMakingEngine::new();
+        // Should have 3 default concerns: coherence, growth, connection
+        let satisfaction = engine.concern_satisfaction();
+        assert!(satisfaction.is_finite());
+        assert!(satisfaction >= -1.0 && satisfaction <= 1.0);
+    }
+
+    #[test]
+    fn test_sense_making_engine_custom_config() {
+        let config = SenseMakingConfig {
+            relevance_decay: 0.5,
+            significance_threshold: 0.1,
+            history_size: 10,
+            concern_weight: 0.8,
+        };
+        let engine = SenseMakingEngine::with_config(config);
+        assert_eq!(engine.stats().total_meanings, 0);
+    }
+
+    #[test]
+    fn test_sense_making_threat_categorization() {
+        let mut engine = SenseMakingEngine::new();
+        let perception = PerceptionSummary {
+            features: [("threat".to_string(), 0.9)].into_iter().collect(),
+            surprise: 0.5,
+            affordances: vec![],
+        };
+        let meaning = engine.enact_meaning(ActionType::Observe, perception);
+        assert_eq!(meaning.meaning.category, MeaningCategory::Threat);
+        assert!(meaning.meaning.valence < 0.0, "Threat should have negative valence");
+    }
+
+    #[test]
+    fn test_sense_making_mystery_from_high_surprise() {
+        let mut engine = SenseMakingEngine::new();
+        let perception = PerceptionSummary {
+            features: HashMap::new(), // No specific features
+            surprise: 0.9,           // Very surprising
+            affordances: vec![],
+        };
+        let meaning = engine.enact_meaning(ActionType::Explore, perception);
+        assert_eq!(meaning.meaning.category, MeaningCategory::Mystery);
+    }
+
+    #[test]
+    fn test_sense_making_challenge_from_affordance() {
+        let mut engine = SenseMakingEngine::new();
+        let perception = PerceptionSummary {
+            features: HashMap::new(),
+            surprise: 0.3,
+            affordances: vec!["challenge_detected".to_string()],
+        };
+        let meaning = engine.enact_meaning(ActionType::Reflect, perception);
+        assert_eq!(meaning.meaning.category, MeaningCategory::Challenge);
+    }
+
+    #[test]
+    fn test_sense_making_significance_bounded() {
+        let mut engine = SenseMakingEngine::new();
+        let perception = PerceptionSummary {
+            features: [
+                ("coherence".to_string(), 1.0),
+                ("threat".to_string(), 1.0),
+                ("opportunity".to_string(), 1.0),
+            ]
+            .into_iter()
+            .collect(),
+            surprise: 1.0,
+            affordances: vec![],
+        };
+        let meaning = engine.enact_meaning(ActionType::Execute, perception);
+        assert!(meaning.significance <= 1.0, "Significance should be bounded at 1.0");
+        assert!(meaning.significance >= 0.0);
+    }
+
+    #[test]
+    fn test_sense_making_relevance_getter() {
+        let mut engine = SenseMakingEngine::new();
+        // Before any meaning is enacted, relevance should be 0
+        assert_eq!(engine.get_relevance("unknown_feature"), 0.0);
+
+        // After enacting a meaning with a feature, relevance should increase
+        let perception = PerceptionSummary {
+            features: [("new_feature".to_string(), 0.8)].into_iter().collect(),
+            surprise: 0.5,
+            affordances: vec![],
+        };
+        engine.enact_meaning(ActionType::Explore, perception);
+        let rel = engine.get_relevance("new_feature");
+        assert!(rel > 0.0, "Relevance should increase after enacting meaning with feature");
+    }
+
+    #[test]
+    fn test_sense_making_history_bounded() {
+        let config = SenseMakingConfig {
+            history_size: 5,
+            significance_threshold: 0.0, // Accept all meanings
+            ..Default::default()
+        };
+        let mut engine = SenseMakingEngine::with_config(config);
+
+        for i in 0..20 {
+            let perception = PerceptionSummary {
+                features: [(format!("feature_{i}"), 0.5)].into_iter().collect(),
+                surprise: 0.5,
+                affordances: vec![],
+            };
+            engine.enact_meaning(ActionType::Explore, perception);
+        }
+
+        let recent = engine.recent_meanings(100);
+        assert!(recent.len() <= 5, "History should be bounded to history_size");
+    }
+
+    #[test]
+    fn test_embodied_simulator_default() {
+        let sim = EmbodiedSimulator::new();
+        assert_eq!(sim.schema_count(), 0);
+        assert_eq!(sim.stats().total_simulations, 0);
+    }
+
+    #[test]
+    fn test_embodied_simulator_no_schema_simulation() {
+        let mut sim = EmbodiedSimulator::new();
+        // Simulating with no schemas should reduce confidence
+        let result = sim.simulate(&[ActionType::Explore], "unknown");
+        assert!(result.final_confidence < 0.5, "No schemas -> low confidence");
+        assert!(!result.feasible);
+    }
+
+    #[test]
+    fn test_embodied_simulator_schema_reuse() {
+        let mut sim = EmbodiedSimulator::new();
+        let perception = PerceptionSummary {
+            features: [("result".to_string(), 0.8)].into_iter().collect(),
+            surprise: 0.1,
+            affordances: vec![],
+        };
+        // Learn schema multiple times - should update existing
+        for _ in 0..10 {
+            sim.learn_schema(ActionType::Execute, &perception, "work_context");
+        }
+        // Only one schema should exist (updated in place)
+        assert_eq!(sim.schema_count(), 1, "Repeated learning should update existing schema");
+    }
+
+    #[test]
+    fn test_embodied_simulator_max_depth() {
+        let config = SimulatorConfig {
+            max_depth: 2,
+            min_reliability: 0.0, // Accept any reliability
+            confidence_decay: 0.1,
+        };
+        let mut sim = EmbodiedSimulator::with_config(config);
+
+        // Learn schemas
+        let perception = PerceptionSummary {
+            features: [("r".to_string(), 0.7)].into_iter().collect(),
+            surprise: 0.1,
+            affordances: vec![],
+        };
+        sim.learn_schema(ActionType::Explore, &perception, "ctx");
+
+        // Try to simulate 5 steps but max_depth is 2
+        let result = sim.simulate(
+            &[
+                ActionType::Explore,
+                ActionType::Explore,
+                ActionType::Explore,
+                ActionType::Explore,
+                ActionType::Explore,
+            ],
+            "ctx",
+        );
+        assert!(result.depth <= 2, "Should be bounded by max_depth");
+    }
+
+    #[test]
+    fn test_enactive_cognition_default_state() {
+        let enactive = EnactiveCognition::new();
+        let state = enactive.state();
+        assert_eq!(state.engagement, 0.5);
+        assert_eq!(state.action_tendency, ActionType::Observe);
+        assert_eq!(state.openness, 0.7);
+        assert_eq!(state.integration, 0.5);
+    }
+
+    #[test]
+    fn test_enactive_cognition_engagement_increases_with_significance() {
+        let mut enactive = EnactiveCognition::new();
+        let initial_engagement = enactive.state().engagement;
+
+        // Create a highly significant perception
+        let perception = PerceptionSummary {
+            features: [
+                ("coherence".to_string(), 0.9),
+                ("opportunity".to_string(), 0.9),
+            ]
+            .into_iter()
+            .collect(),
+            surprise: 0.8,
+            affordances: vec!["growth".to_string()],
+        };
+        enactive.cycle(ActionType::Explore, perception, "ctx");
+        assert!(
+            enactive.state().engagement >= initial_engagement,
+            "High significance should maintain or increase engagement"
+        );
+    }
+
+    #[test]
+    fn test_enactive_cognition_current_state_alias() {
+        let enactive = EnactiveCognition::new();
+        let s1 = enactive.state().clone();
+        let s2 = enactive.current_state();
+        assert_eq!(s1.engagement, s2.engagement);
+        assert_eq!(s1.openness, s2.openness);
+    }
+
+    #[test]
+    fn test_action_type_all_returns_six() {
+        let all = ActionType::all();
+        assert_eq!(all.len(), 6);
+    }
+
+    #[test]
+    fn test_all_meaning_groundings_cover_all_categories() {
+        let groundings = MeaningPrimitiveGrounding::all_meaning_groundings();
+        let categories = [
+            MeaningCategory::Opportunity,
+            MeaningCategory::Threat,
+            MeaningCategory::Information,
+            MeaningCategory::Connection,
+            MeaningCategory::Achievement,
+            MeaningCategory::Challenge,
+            MeaningCategory::Mystery,
+        ];
+        for cat in &categories {
+            assert!(groundings.contains_key(cat), "Missing grounding for {:?}", cat);
+        }
+        assert_eq!(groundings.len(), 7);
+    }
+
+    #[test]
+    fn test_meaning_self_similarity() {
+        let sim = MeaningPrimitiveGrounding::meaning_similarity(
+            MeaningCategory::Opportunity,
+            MeaningCategory::Opportunity,
+        );
+        assert!(
+            (sim - 1.0).abs() < 0.01,
+            "Self-similarity should be ~1.0, got {sim}"
+        );
+    }
+
+    #[test]
+    fn test_meaning_valence_signs() {
+        // Opportunity should have positive valence
+        let opp = MeaningPrimitiveGrounding::for_category(MeaningCategory::Opportunity);
+        assert!(opp.valence > 0.0);
+
+        // Threat should have negative valence
+        let threat = MeaningPrimitiveGrounding::for_category(MeaningCategory::Threat);
+        assert!(threat.valence < 0.0);
+    }
+
+    #[test]
+    fn test_action_agency_levels() {
+        // Manipulate and Execute should have full agency
+        let manip = ActionPrimitiveGrounding::for_action(ActionType::Manipulate);
+        assert_eq!(manip.agency, 1.0);
+
+        let exec = ActionPrimitiveGrounding::for_action(ActionType::Execute);
+        assert_eq!(exec.agency, 1.0);
+
+        // Observe should have low agency
+        let obs = ActionPrimitiveGrounding::for_action(ActionType::Observe);
+        assert!(obs.agency < 0.5);
+    }
+
+    #[test]
+    fn test_action_direction_values() {
+        // Reflect is inward-directed
+        let reflect = ActionPrimitiveGrounding::for_action(ActionType::Reflect);
+        assert!(reflect.direction < 0.0, "Reflect should be inward");
+
+        // Explore is outward-directed
+        let explore = ActionPrimitiveGrounding::for_action(ActionType::Explore);
+        assert!(explore.direction > 0.0, "Explore should be outward");
+    }
+
+    #[test]
+    fn test_enacted_encoding_deterministic() {
+        let enactive = EnactiveCognition::new();
+        let enc1 = enactive.enacted_encoding(ActionType::Explore, MeaningCategory::Opportunity);
+        let enc2 = enactive.enacted_encoding(ActionType::Explore, MeaningCategory::Opportunity);
+        assert_eq!(enc1.similarity(&enc2), 1.0, "Same input should produce identical encoding");
+    }
 }
