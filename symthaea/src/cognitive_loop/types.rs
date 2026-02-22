@@ -115,7 +115,6 @@ pub(crate) struct QualityMetrics {
     /// Last dissipative consciousness health score (0.0–1.0, cached from last update).
     pub(crate) last_dissipative_health: f64,
     /// Last Φ_eff from epistemic conflict (cached, updated every 50 cycles).
-    #[allow(dead_code)]
     pub(crate) last_phi_eff: f64,
     /// Last differentiable consciousness gradient magnitude (cached).
     pub(crate) last_gradient_magnitude: f64,
@@ -639,6 +638,11 @@ pub struct CycleMetadata {
 
     /// Support subsystem expected free energy (0.0 when not computed).
     pub support_efe: f64,
+
+    /// Soul value alignment score (-1.0 to 1.0). Weighted cosine similarity
+    /// of current encoding against Seven Harmonies core values. Modulates
+    /// learning rate: >0.3 boosts, <-0.3 dampens. 0.0 when soul disabled.
+    pub soul_alignment: f32,
 
     /// Σ (Sigma) — Synergistic integration via covariance-based Phi* (Layer 2).
     /// `None` when not computed this cycle (only computed every N cycles).

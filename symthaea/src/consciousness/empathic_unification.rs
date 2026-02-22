@@ -903,19 +903,6 @@ impl Default for EmpathicUnification {
     }
 }
 
-// Note: CoreEmotion doesn't have Frustration variant, using Anger as proxy
-impl CoreEmotion {
-    #[allow(dead_code)]
-    fn default_valence_f64(&self) -> f64 {
-        self.default_valence() as f64
-    }
-
-    #[allow(dead_code)]
-    fn default_arousal_f64(&self) -> f64 {
-        self.default_arousal() as f64
-    }
-}
-
 // ============================================================================
 // TESTS
 // ============================================================================

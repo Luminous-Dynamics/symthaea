@@ -99,7 +99,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::Instant;
 
-use crate::hdc::tiered_phi::{ApproximationTier, TieredPhi};
+use symthaea_core::hdc::tiered_phi::{ApproximationTier, TieredPhi};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 
 // =============================================================================

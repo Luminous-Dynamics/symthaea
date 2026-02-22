@@ -1906,4 +1906,317 @@ mod tests {
         let report = integration.last_value_report().unwrap();
         assert!(report.timestamp > 0); // Should be a valid Unix timestamp
     }
+
+    // ========================================================================
+    // Additional coverage: edge cases, config defaults, state recovery
+    // ========================================================================
+
+    #[test]
+    fn test_default_config_values() {
+        let config = NarrativeGWTConfig::default();
+
+        assert_eq!(config.min_self_phi, 0.3);
+        assert_eq!(config.goal_alignment_bias, 0.4);
+        assert_eq!(config.value_consistency_weight, 0.6);
+        assert!(config.enable_coherence_veto);
+        assert_eq!(config.phi_delta_warning_threshold, 0.15);
+        assert_eq!(config.phi_history_size, 100);
+        assert!(config.enable_cross_modal);
+        assert_eq!(config.standing_coalition_activation, 0.7);
+        assert!(config.enable_predictive_self);
+        assert_eq!(config.prediction_horizon, 3);
+        assert_eq!(config.min_predicted_phi, 0.25);
+        assert!(config.enable_counterfactuals);
+        assert!(config.enable_prospective_memory);
+        assert_eq!(config.predictive_veto_weight, 0.4);
+        assert!(config.enable_temporal_consciousness);
+        assert!(config.temporal_config.is_some());
+    }
+
+    #[test]
+    fn test_veto_disabled_always_allows() {
+        let mut config = NarrativeGWTConfig::default();
+        config.enable_coherence_veto = false;
+
+        let mut integration = NarrativeGWTIntegration::new(
+            NarrativeSelfConfig::default(),
+            UnifiedGWTConfig::default(),
+            config,
+        );
+
+        // Even a harmful action description should not be vetoed
+        let action = BinaryHV::random(30000);
+        let veto = integration.check_veto(&action, "destroying everything maliciously");
+        assert!(!veto.vetoed, "Veto should be disabled");
+    }
+
+    #[test]
+    fn test_veto_result_allow_fields() {
+        let result = VetoResult::allow();
+        assert!(!result.vetoed);
+        assert!(result.reason.is_none());
+        assert_eq!(result.confidence, 1.0);
+        assert!(result.alternative.is_none());
+        assert_eq!(result.phi_impact, 0.0);
+    }
+
+    #[test]
+    fn test_veto_result_veto_fields() {
+        let reason = VetoReason::SelfPhiTooLow {
+            current: 0.2,
+            projected: 0.1,
+            minimum: 0.3,
+        };
+        let result = VetoResult::veto(reason, 0.9, -0.1);
+
+        assert!(result.vetoed);
+        assert!(result.reason.is_some());
+        assert_eq!(result.confidence, 0.9);
+        assert_eq!(result.phi_impact, -0.1);
+
+        if let Some(VetoReason::SelfPhiTooLow {
+            current,
+            projected,
+            minimum,
+        }) = result.reason
+        {
+            assert_eq!(current, 0.2);
+            assert_eq!(projected, 0.1);
+            assert_eq!(minimum, 0.3);
+        } else {
+            panic!("Expected SelfPhiTooLow reason");
+        }
+    }
+
+    #[test]
+    fn test_veto_reason_variants_constructable() {
+        // Ensure all veto reason variants can be constructed
+        let reasons: Vec<VetoReason> = vec![
+            VetoReason::SelfPhiTooLow {
+                current: 0.2,
+                projected: 0.1,
+                minimum: 0.3,
+            },
+            VetoReason::ValueViolation {
+                value: "honesty".to_string(),
+                conflict: "lying".to_string(),
+            },
+            VetoReason::GoalConflict {
+                goal: "help".to_string(),
+                conflict: "ignore".to_string(),
+            },
+            VetoReason::ContinuityFracture {
+                description: "identity break".to_string(),
+            },
+            VetoReason::TraitContradiction {
+                trait_name: "kind".to_string(),
+                action: "cruel act".to_string(),
+            },
+            VetoReason::PredictedPhiTooLow {
+                current: 0.5,
+                predicted: 0.1,
+                horizon: 3,
+                minimum: 0.25,
+            },
+            VetoReason::BetterAlternativeExists {
+                proposed_action: "A".to_string(),
+                alternative: "B".to_string(),
+                improvement: 0.3,
+            },
+            VetoReason::ProspectiveConflict {
+                intention: "plan".to_string(),
+                action: "contradiction".to_string(),
+            },
+            VetoReason::CoherenceTrajectoryHarm {
+                current_coherence: 0.7,
+                predicted_coherence: 0.3,
+                decay_rate: 0.4,
+            },
+        ];
+
+        assert_eq!(reasons.len(), 9, "Should have 9 veto reason variants");
+    }
+
+    #[test]
+    fn test_goal_alignment_clamped_range() {
+        let integration = NarrativeGWTIntegration::default_config();
+
+        let content = BinaryHV::random(31000);
+        let alignment = integration.assess_goal_alignment(&content, "arbitrary content");
+
+        // Score should be clamped to [-1, 1]
+        assert!(
+            alignment.score >= -1.0 && alignment.score <= 1.0,
+            "Goal alignment score should be in [-1, 1], got {}",
+            alignment.score,
+        );
+
+        // Activation modifier should be in [0.5, 1.5]
+        assert!(
+            alignment.activation_modifier >= 0.5 && alignment.activation_modifier <= 1.5,
+            "Activation modifier should be in [0.5, 1.5], got {}",
+            alignment.activation_modifier,
+        );
+    }
+
+    #[test]
+    fn test_submit_content_empty_content_vector() {
+        let mut integration = NarrativeGWTIntegration::default_config();
+
+        // Empty content should not crash
+        let result = integration.submit_content(
+            "EmptyStrategy",
+            vec![],
+            "no content",
+            vec!["module".to_string()],
+            0.5,
+        );
+
+        // Should not be vetoed (no content to evaluate)
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_prediction_accuracy_no_predictions() {
+        let integration = NarrativeGWTIntegration::default_config();
+
+        // Before any processing, accuracy should be 0
+        assert_eq!(integration.prediction_accuracy(), 0.0);
+    }
+
+    #[test]
+    fn test_stats_default_zeroed() {
+        let stats = NarrativeGWTStats::default();
+
+        assert_eq!(stats.ignitions_processed, 0);
+        assert_eq!(stats.vetoes_issued, 0);
+        assert_eq!(stats.avg_self_phi, 0.0);
+        assert_eq!(stats.phi_variance, 0.0);
+        assert_eq!(stats.goal_alignments, 0);
+        assert_eq!(stats.goal_conflicts, 0);
+        assert_eq!(stats.warnings_issued, 0);
+        assert_eq!(stats.predictions_made, 0);
+        assert_eq!(stats.accurate_predictions, 0);
+        assert_eq!(stats.predictive_vetoes, 0);
+        assert_eq!(stats.counterfactuals_explored, 0);
+        assert_eq!(stats.intentions_tracked, 0);
+        assert_eq!(stats.intentions_triggered, 0);
+        assert_eq!(stats.avg_prediction_error, 0.0);
+        assert_eq!(stats.alternatives_found, 0);
+    }
+
+    #[test]
+    fn test_is_coherent_with_custom_threshold() {
+        let mut config = NarrativeGWTConfig::default();
+        config.min_self_phi = 0.01; // Very low threshold
+
+        let integration = NarrativeGWTIntegration::new(
+            NarrativeSelfConfig::default(),
+            UnifiedGWTConfig::default(),
+            config,
+        );
+
+        // With a very low threshold, should almost always be coherent
+        assert!(
+            integration.is_coherent(),
+            "Should be coherent with very low phi threshold",
+        );
+    }
+
+    #[test]
+    fn test_cross_modal_psi_available() {
+        let integration = NarrativeGWTIntegration::default_config();
+
+        // Cross-modal is enabled by default
+        let psi = integration.cross_modal_psi();
+        assert!(psi.is_some(), "Cross-modal psi should be available by default");
+
+        let value = psi.unwrap();
+        assert!(value.is_finite(), "Cross-modal psi should be finite, got {}", value);
+    }
+
+    #[test]
+    fn test_cross_modal_disabled() {
+        let mut config = NarrativeGWTConfig::default();
+        config.enable_cross_modal = false;
+
+        let integration = NarrativeGWTIntegration::new(
+            NarrativeSelfConfig::default(),
+            UnifiedGWTConfig::default(),
+            config,
+        );
+
+        assert!(
+            integration.cross_modal_psi().is_none(),
+            "Cross-modal psi should be None when disabled",
+        );
+    }
+
+    #[test]
+    fn test_last_veto_initially_none() {
+        let integration = NarrativeGWTIntegration::default_config();
+        assert!(
+            integration.last_veto().is_none(),
+            "Last veto should be None before any veto check",
+        );
+    }
+
+    #[test]
+    fn test_last_veto_populated_after_submit() {
+        let mut integration = NarrativeGWTIntegration::default_config();
+
+        // last_veto is set inside submit_content, not check_veto
+        integration.submit_content(
+            "VetoTrackStrategy",
+            vec![BinaryHV::random(32000)],
+            "some action",
+            vec!["mod".to_string()],
+            0.5,
+        );
+
+        assert!(
+            integration.last_veto().is_some(),
+            "Last veto should be Some after submit_content",
+        );
+    }
+
+    #[test]
+    fn test_self_phi_positive_initial() {
+        let integration = NarrativeGWTIntegration::default_config();
+        let phi = integration.self_phi();
+        assert!(phi > 0.0, "Initial Self-Phi should be positive, got {}", phi);
+        assert!(phi.is_finite(), "Self-Phi should be finite");
+    }
+
+    #[test]
+    fn test_phi_history_empty_initially() {
+        let integration = NarrativeGWTIntegration::default_config();
+        assert!(
+            integration.phi_history().is_empty(),
+            "Phi history should be empty before processing",
+        );
+    }
+
+    #[test]
+    fn test_process_result_fields_finite() {
+        let mut integration = NarrativeGWTIntegration::default_config();
+
+        integration.submit_content(
+            "FiniteTest",
+            vec![BinaryHV::random(33000)],
+            "test finiteness",
+            vec!["mod".to_string()],
+            0.5,
+        );
+
+        let result = integration.process();
+
+        assert!(result.self_phi.is_finite(), "self_phi should be finite");
+        assert!(result.phi_delta.is_finite(), "phi_delta should be finite");
+        assert!(result.coherence.is_finite(), "coherence should be finite");
+        assert!(
+            result.prediction_accuracy.is_finite(),
+            "prediction_accuracy should be finite",
+        );
+    }
 }

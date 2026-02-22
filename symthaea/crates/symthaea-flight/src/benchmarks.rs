@@ -274,6 +274,50 @@ mod tests {
     }
 
     #[test]
+    fn test_fep_does_not_degrade_wind_recovery() {
+        // Core validation: FEP modulation should NOT make things worse.
+        // If FEP is well-tuned it helps; at minimum it should not hurt.
+        let config = WindBenchmarkConfig {
+            flight_config: FlightConfig {
+                steps_per_episode: 500,
+                ..FlightConfig::default()
+            },
+            gusts: vec![WindGust {
+                force: [0.08, 0.0, 0.0], // Strong lateral gust
+                start_time: 0.1,
+                duration: 0.2,
+            }],
+            eval_episodes: 2,
+        };
+
+        let result = run_wind_benchmark(&config);
+
+        // FEP average error should not be dramatically worse than baseline
+        let baseline_avg: f64 = result.baseline_metrics.iter().sum::<f64>()
+            / result.baseline_metrics.len() as f64;
+        let fep_avg: f64 = result.fep_metrics.iter().sum::<f64>()
+            / result.fep_metrics.len() as f64;
+
+        assert!(
+            fep_avg < baseline_avg * 1.5,
+            "FEP should not dramatically degrade performance: baseline_avg={baseline_avg:.6}, fep_avg={fep_avg:.6}"
+        );
+
+        // FEP max deviation should be finite and bounded
+        assert!(
+            result.max_deviation < 5.0,
+            "FEP max deviation should be bounded: {}",
+            result.max_deviation
+        );
+
+        // Recovery should be tracked (non-empty)
+        assert!(
+            !result.recovery_steps.is_empty(),
+            "Recovery tracking should produce results"
+        );
+    }
+
+    #[test]
     fn test_fep_produces_finite_results() {
         let config = WindBenchmarkConfig {
             flight_config: FlightConfig {

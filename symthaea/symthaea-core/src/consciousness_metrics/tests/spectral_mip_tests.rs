@@ -855,3 +855,93 @@ mod proptests {
         }
     }
 }
+
+// ─── Config validation tests ─────────────────────────────────────────
+
+#[test]
+fn test_spectral_mip_default_config_is_valid() {
+    let config = SpectralMIPConfig::default();
+    assert!(config.validate().is_ok(), "default SpectralMIPConfig must be valid");
+}
+
+#[test]
+fn test_spectral_mip_invalid_dimension_rejected() {
+    let config = SpectralMIPConfig {
+        num_components: 0,
+        ..Default::default()
+    };
+    let err = config.validate().unwrap_err();
+    assert!(err.contains("num_components"), "error should mention num_components: {err}");
+
+    // Also test below minimum (< 4)
+    let config = SpectralMIPConfig {
+        num_components: 3,
+        ..Default::default()
+    };
+    assert!(config.validate().is_err(), "num_components=3 should fail (minimum is 4)");
+}
+
+#[test]
+fn test_spectral_mip_window_size_must_exceed_min_samples() {
+    let config = SpectralMIPConfig {
+        window_size: 5,
+        min_samples: 10,
+        ..Default::default()
+    };
+    let err = config.validate().unwrap_err();
+    assert!(err.contains("window_size"), "error should mention window_size: {err}");
+    assert!(err.contains("min_samples"), "error should mention min_samples: {err}");
+}
+
+#[test]
+fn test_spectral_mip_min_samples_at_least_two() {
+    let config = SpectralMIPConfig {
+        min_samples: 1,
+        ..Default::default()
+    };
+    assert!(config.validate().is_err(), "min_samples=1 should fail (need >= 2 for covariance)");
+
+    let config = SpectralMIPConfig {
+        min_samples: 0,
+        ..Default::default()
+    };
+    assert!(config.validate().is_err(), "min_samples=0 should fail");
+}
+
+#[test]
+fn test_spectral_mip_invalid_regularization_rejected() {
+    let config = SpectralMIPConfig {
+        regularization: 0.0,
+        ..Default::default()
+    };
+    assert!(config.validate().is_err(), "regularization=0.0 should fail");
+
+    let config = SpectralMIPConfig {
+        regularization: -1e-6,
+        ..Default::default()
+    };
+    assert!(config.validate().is_err(), "negative regularization should fail");
+
+    let config = SpectralMIPConfig {
+        regularization: f64::NAN,
+        ..Default::default()
+    };
+    assert!(config.validate().is_err(), "NaN regularization should fail");
+
+    let config = SpectralMIPConfig {
+        regularization: f64::INFINITY,
+        ..Default::default()
+    };
+    assert!(config.validate().is_err(), "infinite regularization should fail");
+}
+
+#[test]
+fn test_spectral_mip_valid_custom_config() {
+    let config = SpectralMIPConfig {
+        num_components: 64,
+        window_size: 100,
+        min_samples: 20,
+        regularization: 1e-4,
+    };
+    assert!(config.validate().is_ok(), "valid custom config should pass");
+}

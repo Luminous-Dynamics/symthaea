@@ -66,7 +66,7 @@ use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 // Import existing plasma types for integration
-use super::plasma_hdc_encoder::PlasmaState;
+use crate::plasma_hdc_encoder::PlasmaState;
 
 // =============================================================================
 // CORE DATA STRUCTURES
@@ -636,7 +636,7 @@ pub fn load_csv(path: &Path) -> Result<Vec<CModShot>> {
         let parse_f32 = |idx: usize| -> f32 {
             record
                 .get(idx)
-                .and_then(|s| s.parse::<f32>().ok())
+                .and_then(|s: &str| s.parse::<f32>().ok())
                 .unwrap_or(f32::NAN)
         };
 
@@ -658,10 +658,10 @@ pub fn load_csv(path: &Path) -> Result<Vec<CModShot>> {
         // Parse disruption info
         let disrupted: bool = record
             .get(10)
-            .map(|s| s == "1" || s.to_lowercase() == "true")
+            .map(|s: &str| s == "1" || s.to_lowercase() == "true")
             .unwrap_or(false);
 
-        let disruption_time_ms: Option<f64> = record.get(11).and_then(|s| s.parse::<f64>().ok());
+        let disruption_time_ms: Option<f64> = record.get(11).and_then(|s: &str| s.parse::<f64>().ok());
 
         // Add to shot
         let shot = shots_map.entry(shot_id).or_insert_with(|| {

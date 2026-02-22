@@ -312,20 +312,6 @@ fn unbind(a: &[f32], b: &[f32], bipolar: bool) -> Vec<f32> {
     }
 }
 
-/// Threshold to binary/bipolar
-#[allow(dead_code)]
-fn threshold(v: &[f32], bipolar: bool) -> Vec<f32> {
-    if bipolar {
-        v.iter()
-            .map(|&x| if x >= 0.0 { 1.0 } else { -1.0 })
-            .collect()
-    } else {
-        v.iter()
-            .map(|&x| if x >= 0.0 { 1.0 } else { 0.0 })
-            .collect()
-    }
-}
-
 // ============================================================================
 // Memory System: Episodic Memory with Resonator Retrieval
 // ============================================================================

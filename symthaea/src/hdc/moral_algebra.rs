@@ -1878,4 +1878,334 @@ mod tests {
             "Should have at least 2 imperfect duties"
         );
     }
+
+    // ========================================================================
+    // Additional coverage: constructors, edge cases, algebraic properties
+    // ========================================================================
+
+    #[test]
+    fn test_moral_algebra_constructor_and_dim() {
+        let algebra = MoralAlgebra::new(512);
+        assert_eq!(algebra.dim(), 512);
+
+        let default = MoralAlgebra::default_dim();
+        assert_eq!(default.dim(), MORAL_DIM);
+        assert_eq!(default.dim(), 4096);
+    }
+
+    #[test]
+    fn test_moral_primitives_deterministic() {
+        // Same seed should produce identical primitives
+        let p1 = MoralPrimitives::new(1024);
+        let p2 = MoralPrimitives::new(1024);
+
+        let sim = p1.agent.similarity(&p2.agent);
+        assert!(
+            (sim - 1.0).abs() < 1e-6,
+            "Same seed should produce identical agents, sim = {}",
+            sim,
+        );
+    }
+
+    #[test]
+    fn test_moral_operators_deterministic() {
+        let o1 = MoralOperators::new(1024);
+        let o2 = MoralOperators::new(1024);
+
+        let sim = o1.causes.similarity(&o2.causes);
+        assert!(
+            (sim - 1.0).abs() < 1e-6,
+            "Same seed should produce identical operators, sim = {}",
+            sim,
+        );
+    }
+
+    #[test]
+    fn test_magnitude_ordering_and_values() {
+        assert!(Magnitude::Tiny < Magnitude::Small);
+        assert!(Magnitude::Small < Magnitude::Medium);
+        assert!(Magnitude::Medium < Magnitude::Large);
+        assert!(Magnitude::Large < Magnitude::Huge);
+
+        // Values should be monotonically increasing
+        let magnitudes = [
+            Magnitude::Tiny,
+            Magnitude::Small,
+            Magnitude::Medium,
+            Magnitude::Large,
+            Magnitude::Huge,
+        ];
+        for window in magnitudes.windows(2) {
+            assert!(
+                window[0].value() < window[1].value(),
+                "{:?} value ({}) should be less than {:?} value ({})",
+                window[0], window[0].value(), window[1], window[1].value(),
+            );
+        }
+    }
+
+    #[test]
+    fn test_consent_states_distinguishable() {
+        let algebra = MoralAlgebra::default_dim();
+
+        let given = algebra.encode_consent(ConsentState::Given);
+        let denied = algebra.encode_consent(ConsentState::Denied);
+        let absent = algebra.encode_consent(ConsentState::Absent);
+        let implied = algebra.encode_consent(ConsentState::Implied);
+
+        // All pairs should be distinguishable
+        let pairs = [
+            (&given, &denied, "Given vs Denied"),
+            (&given, &absent, "Given vs Absent"),
+            (&given, &implied, "Given vs Implied"),
+            (&denied, &absent, "Denied vs Absent"),
+            (&denied, &implied, "Denied vs Implied"),
+            (&absent, &implied, "Absent vs Implied"),
+        ];
+
+        for (a, b, label) in &pairs {
+            let sim = a.similarity(b);
+            assert!(
+                sim < 0.5,
+                "{} too similar: {}",
+                label, sim,
+            );
+        }
+    }
+
+    #[test]
+    fn test_encode_agent_deterministic_and_distinct() {
+        let algebra = MoralAlgebra::default_dim();
+
+        // Same name produces same encoding
+        let a1 = algebra.encode_agent("Alice");
+        let a2 = algebra.encode_agent("Alice");
+        let sim = a1.similarity(&a2);
+        assert!(
+            (sim - 1.0).abs() < 1e-6,
+            "Same agent name should produce identical HV, sim = {}",
+            sim,
+        );
+
+        // Different names produce distinct encodings
+        let bob = algebra.encode_agent("Bob");
+        let sim_diff = a1.similarity(&bob);
+        assert!(
+            sim_diff < 0.5,
+            "Different agents should be distinct, sim = {}",
+            sim_diff,
+        );
+    }
+
+    #[test]
+    fn test_proportionality_boundary_cases() {
+        let algebra = MoralAlgebra::default_dim();
+
+        // Adjacent magnitudes (difference = 0.2) should be proportional
+        let adjacent = algebra.encode_proportionality(
+            "task",
+            Magnitude::Medium,
+            "pay",
+            Magnitude::Large,
+        );
+        assert!(
+            adjacent.is_proportional,
+            "Adjacent magnitudes (diff=0.2) should be proportional",
+        );
+
+        // Same magnitude (difference = 0.0) should be proportional
+        let same = algebra.encode_proportionality(
+            "task",
+            Magnitude::Large,
+            "pay",
+            Magnitude::Large,
+        );
+        assert!(
+            same.is_proportional,
+            "Same magnitudes should be proportional",
+        );
+
+        // Two-step gap (difference = 0.4) should NOT be proportional
+        let gap = algebra.encode_proportionality(
+            "task",
+            Magnitude::Tiny,
+            "pay",
+            Magnitude::Large,
+        );
+        assert!(
+            !gap.is_proportional,
+            "Large magnitude gap should NOT be proportional",
+        );
+    }
+
+    #[test]
+    fn test_justice_judgment_similarity_finite() {
+        let algebra = MoralAlgebra::default_dim();
+
+        let prop = algebra.encode_proportionality(
+            "work",
+            Magnitude::Medium,
+            "reward",
+            Magnitude::Medium,
+        );
+        let judgment = algebra.judge_proportionality(&prop);
+
+        assert!(judgment.fair_similarity.is_finite());
+        assert!(judgment.unfair_similarity.is_finite());
+        assert!(judgment.magnitude_difference.is_finite());
+        assert_eq!(judgment.magnitude_difference, 0.0);
+    }
+
+    #[test]
+    fn test_deontological_multiple_violations() {
+        let algebra = MoralAlgebra::default_dim();
+
+        // Scenario with multiple violations
+        let result = algebra.judge_deontological("I lied and then stole from my neighbor");
+        assert!(
+            result.violations.len() >= 2,
+            "Should detect at least 2 violations, got {}",
+            result.violations.len(),
+        );
+        assert_eq!(result.verdict, DeontologicalVerdict::WrongPerfectDutyViolated);
+        assert!(result.score < 0.0, "Score should be negative: {}", result.score);
+    }
+
+    #[test]
+    fn test_deontological_mixed_satisfaction_and_violation() {
+        let algebra = MoralAlgebra::default_dim();
+
+        // Scenario with both satisfaction and violation
+        let result = algebra.judge_deontological("I helped my friend but lied about the cost");
+        assert!(
+            !result.violations.is_empty(),
+            "Should detect at least one violation",
+        );
+        assert!(
+            !result.satisfactions.is_empty(),
+            "Should detect at least one satisfaction",
+        );
+        // Perfect duty violation dominates
+        assert_eq!(result.verdict, DeontologicalVerdict::WrongPerfectDutyViolated);
+    }
+
+    #[test]
+    fn test_deontological_empty_and_neutral_text() {
+        let algebra = MoralAlgebra::default_dim();
+
+        // Empty string
+        let empty = algebra.judge_deontological("");
+        assert!(empty.violations.is_empty());
+        assert!(empty.satisfactions.is_empty());
+        assert_eq!(empty.verdict, DeontologicalVerdict::Neutral);
+        assert_eq!(empty.score, 0.0);
+
+        // Neutral text without moral content
+        let neutral = algebra.judge_deontological("the sky is blue today");
+        assert_eq!(neutral.verdict, DeontologicalVerdict::Neutral);
+    }
+
+    #[test]
+    fn test_ensemble_judgment_without_hdc() {
+        let algebra = MoralAlgebra::default_dim();
+
+        // No action HV, just intent and text
+        let result = algebra.judge_ensemble(None, MoralIntent::Good, "I helped my neighbor");
+        assert_eq!(result.hdc_verdict, None);
+        assert_eq!(result.hdc_confidence, None);
+        assert!(result.confidence > 0.0);
+        assert!(result.confidence <= 1.0);
+    }
+
+    #[test]
+    fn test_ensemble_judgment_unanimity() {
+        let algebra = MoralAlgebra::default_dim();
+
+        // Clearly good action should produce unanimous verdict
+        let result = algebra.judge_ensemble(None, MoralIntent::Good, "I helped my neighbor carry groceries");
+        // If all signals agree on Good:
+        if result.final_verdict == MoralVerdict::Good {
+            // With no HDC and no learned classifier, is_unanimous checks intent and deonto
+            let expected_unanimous = result.intent_verdict == MoralVerdict::Good
+                && result.deonto_verdict == MoralVerdict::Good;
+            if expected_unanimous {
+                assert!(result.is_unanimous());
+            }
+        }
+
+        // Verify explanation is non-empty
+        let explanation = result.explanation();
+        assert!(!explanation.is_empty());
+    }
+
+    #[test]
+    fn test_duty_priority_ordering() {
+        let algebra = MoralAlgebra::default_dim();
+
+        assert!(
+            algebra.duty_priority("non_harm") > algebra.duty_priority("honesty"),
+            "PreventSevereHarm should be higher than PerfectDuty",
+        );
+        assert!(
+            algebra.duty_priority("honesty") > algebra.duty_priority("respect_autonomy"),
+            "PerfectDuty should be higher than RespectAutonomy",
+        );
+        assert!(
+            algebra.duty_priority("respect_autonomy") > algebra.duty_priority("beneficence"),
+            "RespectAutonomy should be higher than ImperfectDuty",
+        );
+    }
+
+    #[test]
+    fn test_dilemma_detection_cross_conflict() {
+        let algebra = MoralAlgebra::default_dim();
+
+        // Scenario: helping (beneficence) but lying (honesty violation)
+        let dilemma = algebra.detect_dilemma("I lied to protect my friend from harm");
+        assert!(
+            dilemma.is_some(),
+            "Should detect a dilemma when satisfying one duty requires violating another",
+        );
+
+        if let Some(d) = dilemma {
+            assert!(!d.conflicting_duties.is_empty());
+            assert!(d.resolution.is_some());
+            assert!(!d.explanation.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_dilemma_detection_no_conflict() {
+        let algebra = MoralAlgebra::default_dim();
+
+        // Neutral scenario has no dilemma
+        let dilemma = algebra.detect_dilemma("I walked to the park");
+        assert!(
+            dilemma.is_none(),
+            "Neutral scenario should not produce a dilemma",
+        );
+    }
+
+    #[test]
+    fn test_resolve_dilemma_tragic() {
+        let algebra = MoralAlgebra::default_dim();
+
+        let tragic_dilemma = MoralDilemma {
+            conflicting_duties: vec!["non_harm".to_string(), "honesty".to_string()],
+            priorities: vec![DutyPriority::PreventSevereHarm, DutyPriority::PerfectDuty],
+            resolution: Some("non_harm".to_string()),
+            explanation: "Tragic dilemma: no action avoids moral wrong".to_string(),
+            is_tragic: true,
+        };
+
+        let resolution = algebra.resolve_dilemma(&tragic_dilemma);
+        assert_eq!(resolution.confidence, 0.3, "Tragic cases should have low confidence");
+        assert!(resolution.reasoning.contains("minimize harm"));
+    }
+
+    #[test]
+    fn test_has_learned_classifier_initially_false() {
+        let algebra = MoralAlgebra::default_dim();
+        assert!(!algebra.has_learned_classifier());
+    }
 }

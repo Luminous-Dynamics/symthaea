@@ -1799,4 +1799,548 @@ mod tests {
         assert_eq!(provenance.source, PhiSource::UnifiedEngine);
         assert_eq!(provenance.components.len(), 2);
     }
+
+    // ================================================================
+    // NEW TESTS: Constructor/Default creation
+    // ================================================================
+
+    #[test]
+    fn test_phi_provenance_default() {
+        let prov = PhiProvenance::default();
+        assert_eq!(prov.source, PhiSource::UnifiedEngine);
+        assert_eq!(prov.method, PhiMethod::IntegratedInformationTheory);
+        assert!((prov.confidence - 1.0).abs() < f64::EPSILON);
+        assert!(prov.components.is_empty());
+    }
+
+    #[test]
+    fn test_unified_emotional_state_default() {
+        let state = UnifiedEmotionalState::default();
+        assert!((state.valence - 0.0).abs() < f64::EPSILON);
+        assert!((state.arousal - 0.0).abs() < f64::EPSILON);
+        assert!((state.dominance - 0.0).abs() < f64::EPSILON);
+        assert_eq!(state.discrete_emotion, Some(UnifiedEmotion::Neutral));
+        assert!(state.blend.is_empty());
+        assert!(state.trajectory.is_empty());
+        assert!((state.mood.stability - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_emotional_bridge_default() {
+        let bridge = EmotionalBridge::default();
+        assert!((bridge.state().valence - 0.0).abs() < f64::EPSILON);
+        assert_eq!(bridge.detect_pattern(), EmotionalPattern::Stable);
+    }
+
+    #[test]
+    fn test_conscious_dialogue_pipeline_default() {
+        let pipeline = ConsciousDialoguePipeline::default();
+        assert!(pipeline.response_history.is_empty());
+        assert!((pipeline.user_adaptation.expertise - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_consciousness_unification_engine_default() {
+        let engine = ConsciousnessUnificationEngine::default();
+        assert!((engine.psi - 0.5).abs() < f64::EPSILON);
+        assert!(engine.reality.last_update.is_none());
+    }
+
+    // ================================================================
+    // NEW TESTS: UnifiedEmotion VAD roundtrips
+    // ================================================================
+
+    #[test]
+    fn test_all_primary_emotions_vad_roundtrip() {
+        let primary_emotions = [
+            UnifiedEmotion::Joy,
+            UnifiedEmotion::Sadness,
+            UnifiedEmotion::Anger,
+            UnifiedEmotion::Fear,
+            UnifiedEmotion::Surprise,
+            UnifiedEmotion::Disgust,
+            UnifiedEmotion::Trust,
+            UnifiedEmotion::Anticipation,
+        ];
+        for emotion in &primary_emotions {
+            let (v, a, d) = emotion.to_vad();
+            let recovered = UnifiedEmotion::from_vad(v, a, d);
+            assert_eq!(
+                *emotion, recovered,
+                "VAD roundtrip failed for {:?}: ({v}, {a}, {d}) -> {:?}",
+                emotion, recovered
+            );
+        }
+    }
+
+    #[test]
+    fn test_neutral_emotion_vad_is_origin() {
+        let (v, a, d) = UnifiedEmotion::Neutral.to_vad();
+        assert!((v).abs() < f64::EPSILON);
+        assert!((a).abs() < f64::EPSILON);
+        assert!((d).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_from_vad_extreme_positive_yields_positive_emotion() {
+        let emotion = UnifiedEmotion::from_vad(1.0, 1.0, 1.0);
+        let (v, _a, _d) = emotion.to_vad();
+        // An extreme positive VAD should map to a positive-valence emotion
+        assert!(v > 0.0, "Extreme positive VAD should map to positive emotion, got {:?}", emotion);
+    }
+
+    #[test]
+    fn test_from_vad_extreme_negative_yields_negative_emotion() {
+        let emotion = UnifiedEmotion::from_vad(-1.0, 1.0, -1.0);
+        let (v, _a, _d) = emotion.to_vad();
+        assert!(v < 0.0, "Extreme negative VAD should map to negative emotion, got {:?}", emotion);
+    }
+
+    // ================================================================
+    // NEW TESTS: UnifiedEmotionalState computation paths
+    // ================================================================
+
+    #[test]
+    fn test_emotional_state_intensity_neutral_is_zero() {
+        let state = UnifiedEmotionalState::default();
+        assert!((state.intensity() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_emotional_state_intensity_bounded() {
+        // Maximum possible intensity: sqrt((1^2+1^2+1^2)/3) = 1.0
+        let state = UnifiedEmotionalState::from_vad(1.0, 1.0, 1.0);
+        assert!(state.intensity() <= 1.0 + f64::EPSILON);
+        assert!(state.intensity() >= 0.0);
+    }
+
+    #[test]
+    fn test_emotional_state_update_momentum() {
+        let mut state = UnifiedEmotionalState::default();
+        // Update with strong positive valence
+        state.update(1.0, 0.5);
+        // With 0.3 momentum and starting from 0.0:
+        // valence = 0.0 * 0.3 + 1.0 * 0.7 = 0.7
+        assert!((state.valence - 0.7).abs() < 0.01);
+        assert!((state.arousal - 0.35).abs() < 0.01);
+        assert_eq!(state.trajectory.len(), 1);
+    }
+
+    #[test]
+    fn test_emotional_state_update_trajectory_cap() {
+        let mut state = UnifiedEmotionalState::default();
+        // Fill trajectory past capacity
+        for i in 0..110 {
+            state.update(i as f64 * 0.01, 0.1);
+        }
+        assert!(state.trajectory.len() <= 100, "Trajectory should be capped at 100");
+    }
+
+    #[test]
+    fn test_emotional_state_mood_slow_update() {
+        let mut state = UnifiedEmotionalState::default();
+        // Apply one strong positive update
+        state.update(1.0, 1.0);
+        // Mood should barely change (0.95 momentum):
+        // baseline_valence = 0.0 * 0.95 + 1.0 * 0.05 = 0.05
+        assert!(state.mood.baseline_valence < 0.1, "Mood should change slowly");
+        assert!(state.mood.baseline_arousal < 0.1, "Mood arousal should change slowly");
+    }
+
+    #[test]
+    fn test_emotional_state_describe_intensity_words() {
+        // High intensity
+        let high = UnifiedEmotionalState::from_vad(0.9, 0.9, 0.9);
+        assert!(high.describe().contains("intensely"));
+
+        // Low intensity
+        let low = UnifiedEmotionalState::from_vad(0.05, 0.05, 0.05);
+        let desc = low.describe();
+        assert!(desc.contains("slightly") || desc.contains("barely"));
+    }
+
+    // ================================================================
+    // NEW TESTS: EmotionalBridge pattern detection
+    // ================================================================
+
+    #[test]
+    fn test_emotional_bridge_escalating_pattern() {
+        let mut bridge = EmotionalBridge::new();
+        // First 3 low-valence updates
+        for _ in 0..3 {
+            bridge.update_from_core_affect(0.1, 0.1, 0.0);
+        }
+        // Then 3 high-valence + high-arousal updates
+        for _ in 0..3 {
+            bridge.update_from_core_affect(0.8, 0.7, 0.0);
+        }
+        assert_eq!(bridge.detect_pattern(), EmotionalPattern::Escalating);
+    }
+
+    #[test]
+    fn test_emotional_bridge_calming_pattern() {
+        let mut bridge = EmotionalBridge::new();
+        // First 3 high-valence + high-arousal updates
+        for _ in 0..3 {
+            bridge.update_from_core_affect(0.8, 0.7, 0.0);
+        }
+        // Then 3 lower-valence + lower-arousal updates
+        for _ in 0..3 {
+            bridge.update_from_core_affect(0.1, 0.1, 0.0);
+        }
+        assert_eq!(bridge.detect_pattern(), EmotionalPattern::Calming);
+    }
+
+    #[test]
+    fn test_emotional_bridge_volatile_pattern() {
+        let mut bridge = EmotionalBridge::new();
+        // High valence but same arousal (valence difference > 0.2 without arousal shift)
+        for _ in 0..3 {
+            bridge.update_from_core_affect(-0.5, 0.5, 0.0);
+        }
+        for _ in 0..3 {
+            bridge.update_from_core_affect(0.5, 0.5, 0.0);
+        }
+        let pattern = bridge.detect_pattern();
+        // Should be Volatile (large valence shift without matching arousal)
+        // or Escalating if arousal also moved
+        assert!(
+            pattern == EmotionalPattern::Volatile || pattern == EmotionalPattern::Escalating,
+            "Expected Volatile or Escalating, got {:?}", pattern
+        );
+    }
+
+    #[test]
+    fn test_emotional_bridge_insufficient_history_is_stable() {
+        let mut bridge = EmotionalBridge::new();
+        bridge.update_from_core_affect(0.5, 0.5, 0.5);
+        bridge.update_from_core_affect(0.9, 0.9, 0.9);
+        // Only 2 entries, less than 5 needed
+        assert_eq!(bridge.detect_pattern(), EmotionalPattern::Stable);
+    }
+
+    #[test]
+    fn test_emotional_bridge_history_capped() {
+        let mut bridge = EmotionalBridge::new();
+        for i in 0..60 {
+            bridge.update_from_core_affect(i as f64 * 0.01, 0.5, 0.5);
+        }
+        assert!(bridge.history.len() <= 50, "History should be capped at 50");
+    }
+
+    // ================================================================
+    // NEW TESTS: EmotionalBridge from different sources
+    // ================================================================
+
+    #[test]
+    fn test_emotional_bridge_from_emotional_depth() {
+        let mut bridge = EmotionalBridge::new();
+        bridge.update_from_emotional_depth(
+            "joy",
+            0.8,
+            vec![("fear".to_string(), 0.2), ("anger".to_string(), 0.1)],
+        );
+        assert!(bridge.state().sources.has_emotional_depth);
+        assert!(bridge.state().valence > 0.0);
+        assert_eq!(bridge.state().discrete_emotion, Some(UnifiedEmotion::Joy));
+        assert_eq!(bridge.state().blend.len(), 2);
+    }
+
+    #[test]
+    fn test_emotional_bridge_from_emotional_core() {
+        let mut bridge = EmotionalBridge::new();
+        bridge.update_from_emotional_core(0.6, 0.3, "gratitude");
+        assert!(bridge.state().sources.has_emotional_core);
+        assert_eq!(bridge.state().discrete_emotion, Some(UnifiedEmotion::Gratitude));
+    }
+
+    #[test]
+    fn test_emotional_bridge_unknown_emotion_maps_to_neutral() {
+        let mut bridge = EmotionalBridge::new();
+        bridge.update_from_emotional_depth("unknown_emotion", 0.5, vec![]);
+        assert_eq!(bridge.state().discrete_emotion, Some(UnifiedEmotion::Neutral));
+    }
+
+    // ================================================================
+    // NEW TESTS: CausalReasoning
+    // ================================================================
+
+    #[test]
+    fn test_causal_reasoning_counterfactual_rigorous() {
+        let mut causal = UnifiedCausalReasoning::new();
+        let result = causal.reason(
+            CausalQuery::Counterfactual {
+                actual: "A".to_string(),
+                hypothetical: "B".to_string(),
+            },
+            CausalDetail::Rigorous,
+        );
+        assert!(result.sources.used_pearl_scm);
+        assert!((result.confidence - 0.8).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_causal_reasoning_comprehensive_uses_all_sources() {
+        let mut causal = UnifiedCausalReasoning::new();
+        let result = causal.reason(
+            CausalQuery::WhatCaused { effect: "X".to_string() },
+            CausalDetail::Comprehensive,
+        );
+        assert!(result.sources.used_pearl_scm);
+        assert!(result.sources.used_causal_mind);
+        assert!(result.sources.used_uce);
+        assert!((result.confidence - 0.85).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_causal_reasoning_why_did_uses_uce() {
+        let mut causal = UnifiedCausalReasoning::new();
+        let result = causal.reason(
+            CausalQuery::WhyDid { event: "failure".to_string() },
+            CausalDetail::Fast,
+        );
+        assert!(result.sources.used_uce);
+    }
+
+    #[test]
+    fn test_causal_reasoning_cache_fills() {
+        let mut causal = UnifiedCausalReasoning::new();
+        for i in 0..5 {
+            causal.reason(
+                CausalQuery::WhyDid { event: format!("event_{i}") },
+                CausalDetail::Fast,
+            );
+        }
+        assert_eq!(causal.query_cache.len(), 5);
+    }
+
+    #[test]
+    fn test_causal_reasoning_cache_eviction() {
+        let mut causal = UnifiedCausalReasoning::new();
+        // Fill past capacity (100)
+        for i in 0..105 {
+            causal.reason(
+                CausalQuery::WhyDid { event: format!("event_{i}") },
+                CausalDetail::Fast,
+            );
+        }
+        assert!(causal.query_cache.len() <= 100, "Cache should be capped at 100");
+    }
+
+    // ================================================================
+    // NEW TESTS: DialoguePipeline
+    // ================================================================
+
+    #[test]
+    fn test_dialogue_pipeline_reflective_depth() {
+        let mut pipeline = ConsciousDialoguePipeline::new();
+        let bridge = EmotionalBridge::new();
+        let response = pipeline.generate("test", 0.45, &bridge);
+        assert_eq!(response.depth, DialogueDepth::Reflective);
+    }
+
+    #[test]
+    fn test_dialogue_pipeline_response_history_cap() {
+        let mut pipeline = ConsciousDialoguePipeline::new();
+        let bridge = EmotionalBridge::new();
+        for i in 0..105 {
+            pipeline.generate(&format!("input {i}"), 0.5, &bridge);
+        }
+        assert!(pipeline.response_history.len() <= 100);
+    }
+
+    #[test]
+    fn test_dialogue_pipeline_adapt_for_user_low_verbosity() {
+        let mut pipeline = ConsciousDialoguePipeline::new();
+        pipeline.user_adaptation.verbosity = 0.2;
+        let response = DialogueResponse {
+            text: "First sentence. Second sentence here.".to_string(),
+            depth: DialogueDepth::Reactive,
+            emotional_tone: UnifiedEmotion::Neutral,
+            confidence: 0.5,
+        };
+        let adapted = pipeline.adapt_for_user(response);
+        // Low verbosity should truncate to first sentence
+        assert!(adapted.contains("First sentence."));
+        assert!(!adapted.contains("Second sentence"));
+    }
+
+    #[test]
+    fn test_dialogue_pipeline_adapt_for_user_low_expertise() {
+        let mut pipeline = ConsciousDialoguePipeline::new();
+        pipeline.user_adaptation.expertise = 0.2;
+        let response = DialogueResponse {
+            text: "The Φ value indicates integration".to_string(),
+            depth: DialogueDepth::Reflective,
+            emotional_tone: UnifiedEmotion::Neutral,
+            confidence: 0.5,
+        };
+        let adapted = pipeline.adapt_for_user(response);
+        assert!(adapted.contains("consciousness integration"));
+    }
+
+    #[test]
+    fn test_dialogue_pipeline_user_model_update() {
+        let mut pipeline = ConsciousDialoguePipeline::new();
+        let initial_patience = pipeline.user_adaptation.patience;
+        pipeline.update_user_model(true, Duration::from_secs(1));
+        assert!(pipeline.user_adaptation.patience > initial_patience);
+        assert!(pipeline.user_adaptation.expertise > 0.5); // Fast response bumps expertise
+    }
+
+    #[test]
+    fn test_dialogue_pipeline_user_model_rejection() {
+        let mut pipeline = ConsciousDialoguePipeline::new();
+        let initial_patience = pipeline.user_adaptation.patience;
+        pipeline.update_user_model(false, Duration::from_secs(5));
+        assert!(pipeline.user_adaptation.patience < initial_patience);
+    }
+
+    // ================================================================
+    // NEW TESTS: ConsciousnessUnificationEngine
+    // ================================================================
+
+    #[test]
+    fn test_engine_psi_history_tracks() {
+        let mut engine = ConsciousnessUnificationEngine::new();
+        engine.update_psi(0.3);
+        engine.update_psi(0.5);
+        engine.update_psi(0.7);
+        assert_eq!(engine.psi_history.len(), 3);
+        assert!((engine.psi - 0.7).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_engine_psi_history_cap() {
+        let mut engine = ConsciousnessUnificationEngine::new();
+        for i in 0..110 {
+            engine.update_psi(i as f64 * 0.01);
+        }
+        assert!(engine.psi_history.len() <= 100);
+    }
+
+    #[test]
+    fn test_engine_describe_state_initializing() {
+        let engine = ConsciousnessUnificationEngine::new();
+        let desc = engine.describe_state();
+        assert!(desc.contains("initializing"));
+    }
+
+    #[test]
+    fn test_engine_describe_state_rising() {
+        let mut engine = ConsciousnessUnificationEngine::new();
+        // Old values: low
+        for _ in 0..3 {
+            engine.update_psi(0.2);
+        }
+        // Recent values: high
+        for _ in 0..3 {
+            engine.update_psi(0.8);
+        }
+        let desc = engine.describe_state();
+        assert!(desc.contains("rising"), "Expected 'rising' in: {desc}");
+    }
+
+    #[test]
+    fn test_engine_describe_state_falling() {
+        let mut engine = ConsciousnessUnificationEngine::new();
+        for _ in 0..3 {
+            engine.update_psi(0.8);
+        }
+        for _ in 0..3 {
+            engine.update_psi(0.2);
+        }
+        let desc = engine.describe_state();
+        assert!(desc.contains("falling"), "Expected 'falling' in: {desc}");
+    }
+
+    #[test]
+    fn test_engine_process_reality_grounded() {
+        let mut engine = ConsciousnessUnificationEngine::new();
+        engine.reality = SystemReality::from_live_system();
+        let result = engine.process("test");
+        assert!(result.reality_grounded);
+    }
+
+    #[test]
+    fn test_engine_process_not_grounded() {
+        let mut engine = ConsciousnessUnificationEngine::new();
+        let result = engine.process("test");
+        assert!(!result.reality_grounded);
+    }
+
+    // ================================================================
+    // NEW TESTS: SystemReality queries
+    // ================================================================
+
+    #[test]
+    fn test_system_reality_is_installed_found() {
+        let mut reality = SystemReality::default();
+        reality.packages.push(PackageReality {
+            name: "firefox".to_string(),
+            installed: true,
+            version: Some("120.0".to_string()),
+        });
+        assert_eq!(reality.is_installed("firefox"), Some(true));
+    }
+
+    #[test]
+    fn test_system_reality_is_installed_not_found() {
+        let reality = SystemReality::default();
+        assert_eq!(reality.is_installed("nonexistent"), None);
+    }
+
+    #[test]
+    fn test_system_reality_service_active() {
+        let mut reality = SystemReality::default();
+        reality.services.push(ServiceReality {
+            name: "nginx".to_string(),
+            active: true,
+            enabled: true,
+        });
+        assert_eq!(reality.is_service_active("nginx"), Some(true));
+        assert_eq!(reality.is_service_active("apache"), None);
+    }
+
+    // ================================================================
+    // NEW TESTS: Edge cases
+    // ================================================================
+
+    #[test]
+    fn test_emotional_state_from_vad_zero() {
+        let state = UnifiedEmotionalState::from_vad(0.0, 0.0, 0.0);
+        assert_eq!(state.discrete_emotion, Some(UnifiedEmotion::Neutral));
+        assert!((state.intensity() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_emotional_bridge_blend_sources_zero_weights() {
+        let mut bridge = EmotionalBridge::new();
+        bridge.update_from_core_affect(0.5, 0.5, 0.5);
+        // Should not panic even with zero weights
+        bridge.blend_sources(0.0, 0.0, 0.0);
+        assert!(bridge.state().valence.is_finite());
+    }
+
+    #[test]
+    fn test_causal_reasoning_default_fallback() {
+        let mut causal = UnifiedCausalReasoning::new();
+        let result = causal.reason(
+            CausalQuery::WhatWillCause { cause: "X".to_string() },
+            CausalDetail::Fast,
+        );
+        // Falls into the default match arm
+        assert!((result.confidence - 0.5).abs() < f64::EPSILON);
+        assert!(!result.sources.used_pearl_scm);
+        assert!(!result.sources.used_causal_mind);
+        assert!(!result.sources.used_uce);
+    }
+
+    #[test]
+    fn test_phi_source_delegated() {
+        let source = PhiSource::Delegated(Box::new(PhiSource::LivingMind));
+        // Should be constructible and debuggable
+        let debug_str = format!("{:?}", source);
+        assert!(debug_str.contains("LivingMind"));
+    }
 }

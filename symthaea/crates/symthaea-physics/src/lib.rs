@@ -1,4 +1,4 @@
-//! # Physics Module
+//! # Symthaea Physics
 //!
 //! Physics simulation and sensor encoding for the Spark Engine.
 //!

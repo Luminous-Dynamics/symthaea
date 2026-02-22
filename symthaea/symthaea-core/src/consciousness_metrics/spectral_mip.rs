@@ -68,6 +68,43 @@ impl Default for SpectralMIPConfig {
     }
 }
 
+impl SpectralMIPConfig {
+    /// Validate spectral MIP configuration parameters.
+    ///
+    /// Checks that:
+    /// - `num_components` >= 4 (minimum for meaningful MIP computation)
+    /// - `window_size` >= `min_samples` (window must fit minimum required samples)
+    /// - `min_samples` >= 2 (need at least 2 samples for covariance)
+    /// - `regularization` is positive and finite
+    pub fn validate(&self) -> Result<(), String> {
+        if self.num_components < 4 {
+            return Err(format!(
+                "SpectralMIPConfig: num_components must be >= 4, got {}",
+                self.num_components
+            ));
+        }
+        if self.min_samples < 2 {
+            return Err(format!(
+                "SpectralMIPConfig: min_samples must be >= 2, got {}",
+                self.min_samples
+            ));
+        }
+        if self.window_size < self.min_samples {
+            return Err(format!(
+                "SpectralMIPConfig: window_size ({}) must be >= min_samples ({})",
+                self.window_size, self.min_samples
+            ));
+        }
+        if self.regularization <= 0.0 || !self.regularization.is_finite() {
+            return Err(format!(
+                "SpectralMIPConfig: regularization must be positive and finite, got {}",
+                self.regularization
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Result of a spectral MIP computation.
 #[derive(Debug, Clone)]
 pub struct SpectralMIPResult {
@@ -130,7 +167,15 @@ pub struct SpectralMIPFinder {
 
 impl SpectralMIPFinder {
     /// Create a new spectral MIP finder with the given configuration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the configuration is invalid (see [`SpectralMIPConfig::validate`]).
+    /// Use `SpectralMIPConfig::validate()` beforehand for graceful error handling.
     pub fn new(config: SpectralMIPConfig) -> Self {
+        if let Err(e) = config.validate() {
+            panic!("Invalid SpectralMIPConfig: {e}");
+        }
         let n = config.num_components;
         Self {
             window: VecDeque::with_capacity(config.window_size),

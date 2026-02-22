@@ -311,13 +311,6 @@ impl TMazeEnvironment {
         }
     }
 
-    #[allow(dead_code)]
-    fn is_done(&self) -> bool {
-        matches!(
-            self.location,
-            TMazeLocation::LeftArm | TMazeLocation::RightArm
-        )
-    }
 }
 
 /// Results from the T-Maze benchmark.

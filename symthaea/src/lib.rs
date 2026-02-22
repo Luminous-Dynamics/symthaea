@@ -228,6 +228,14 @@ Key types are re-exported at the crate root for convenience:
 )]
 
 // ============================================================================
+// Unified Error Types
+// ============================================================================
+
+/// Unified error types for cross-subsystem error handling.
+pub mod errors;
+pub use errors::{SymthaeaError, SymthaeaResult};
+
+// ============================================================================
 // Symthaea Facade (Primary Entry Point)
 // ============================================================================
 pub mod symthaea;
@@ -389,9 +397,9 @@ pub mod identity;
 pub mod gui_bridge;
 
 // Physics: tokamak plasma encoding, C-Mod adapter, Phi-based control loops
-// Kept in-crate (not extracted) due to deps on consciousness::fep_active_inference + language::phi_monitor
+// Extracted to crates/symthaea-physics (deps resolved: FEP via symthaea-fep, TieredPhi via symthaea-core)
 #[cfg(feature = "physics")]
-pub mod physics;
+pub use symthaea_physics as physics;
 
 // Flight: HDC-LTC + FEP Active Inference quadrotor flight control
 #[cfg(feature = "flight")]

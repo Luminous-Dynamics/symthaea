@@ -1605,4 +1605,583 @@ mod tests {
 
         assert!(summary.posture_stability > 0.5); // Default is balanced
     }
+
+    // ================================================================
+    // NEW TESTS: Position3D edge cases
+    // ================================================================
+
+    #[test]
+    fn test_position3d_distance_to_self_is_zero() {
+        let p = Position3D::new(3.5, -2.1, 7.0);
+        assert!((p.distance(&p) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_position3d_distance_symmetry() {
+        let a = Position3D::new(1.0, 2.0, 3.0);
+        let b = Position3D::new(-4.0, 5.0, -1.0);
+        assert!((a.distance(&b) - b.distance(&a)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_position3d_origin() {
+        let o = Position3D::origin();
+        assert!((o.x).abs() < f64::EPSILON);
+        assert!((o.y).abs() < f64::EPSILON);
+        assert!((o.z).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_position3d_distance_known_values() {
+        // 3-4-5 triangle in 3D: (0,0,0) to (3,4,0) = 5
+        let a = Position3D::origin();
+        let b = Position3D::new(3.0, 4.0, 0.0);
+        assert!((a.distance(&b) - 5.0).abs() < 1e-10);
+
+        // Diagonal in a unit cube: sqrt(3)
+        let c = Position3D::new(1.0, 1.0, 1.0);
+        assert!((a.distance(&c) - 3.0_f64.sqrt()).abs() < 1e-10);
+    }
+
+    // ================================================================
+    // NEW TESTS: BodySchema and derived properties
+    // ================================================================
+
+    #[test]
+    fn test_body_schema_all_parts_have_default_positions() {
+        let body = BodySchema::new();
+        for part in BodyPart::all() {
+            assert!(body.parts.contains_key(part), "Missing body part: {:?}", part);
+            let state = &body.parts[part];
+            assert!(state.position.z.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_body_schema_balance_default_is_centered() {
+        let body = BodySchema::new();
+        assert!(
+            body.balance.abs() < 0.01,
+            "Default balance should be near zero, got {}",
+            body.balance
+        );
+    }
+
+    #[test]
+    fn test_body_schema_update_part_affects_balance() {
+        let mut body = BodySchema::new();
+        // Move the torso far to the right to shift center of mass
+        let mut torso = BodyPartState::default();
+        torso.position = Position3D::new(2.0, 0.0, 1.0);
+        body.update_part(BodyPart::Torso, torso);
+        // Balance should shift positive (rightward)
+        assert!(body.balance > 0.0, "Balance should shift right");
+    }
+
+    #[test]
+    fn test_body_schema_ownership_and_coherence_defaults() {
+        let body = BodySchema::new();
+        assert!((body.ownership_confidence - 1.0).abs() < f64::EPSILON);
+        assert!((body.schema_image_coherence - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_body_part_connections_symmetry() {
+        // If A connects to B, B should connect to A
+        for part in BodyPart::all() {
+            for connected in part.connected_to() {
+                assert!(
+                    connected.connected_to().contains(part),
+                    "{:?} connects to {:?} but {:?} does not connect back",
+                    part, connected, connected
+                );
+            }
+        }
+    }
+
+    // ================================================================
+    // NEW TESTS: InteroceptiveState
+    // ================================================================
+
+    #[test]
+    fn test_interoceptive_default_homeostatic_deviation_low() {
+        let intero = InteroceptiveState::default();
+        // All zeros => deviation = (0+0+0+0+0.3)/5 = 0.06 (heart_rate=0, default offset)
+        let dev = intero.homeostatic_deviation();
+        assert!(dev < 0.2, "Default homeostatic deviation should be low, got {dev}");
+    }
+
+    #[test]
+    fn test_interoceptive_allostatic_load_zero_when_resting() {
+        let intero = InteroceptiveState::default();
+        // visceral_arousal=0 => allostatic_load = 0
+        assert!((intero.allostatic_load() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_interoceptive_allostatic_load_increases_under_stress() {
+        let intero = InteroceptiveState {
+            hunger: 0.8,
+            thirst: 0.7,
+            fatigue: 0.9,
+            visceral_arousal: 0.8,
+            ..Default::default()
+        };
+        let load = intero.allostatic_load();
+        assert!(load > 0.2, "Stressed state should have significant allostatic load, got {load}");
+    }
+
+    #[test]
+    fn test_interoceptive_to_core_affect_bounds() {
+        let intero = InteroceptiveState {
+            hunger: 1.0,
+            thirst: 1.0,
+            fatigue: 1.0,
+            heart_rate: 1.0,
+            breathing_rate: 1.0,
+            temperature: 1.0,
+            gut_state: -1.0,
+            visceral_arousal: 1.0,
+        };
+        let affect = intero.to_core_affect();
+        // Values should be finite
+        assert!(affect.valence.is_finite());
+        assert!(affect.arousal.is_finite());
+    }
+
+    #[test]
+    fn test_interoceptive_to_physiological_mapping() {
+        let intero = InteroceptiveState {
+            heart_rate: 0.7,
+            breathing_rate: 0.6,
+            fatigue: 0.5,
+            visceral_arousal: 0.4,
+            gut_state: 0.3,
+            ..Default::default()
+        };
+        let phys = intero.to_physiological();
+        assert!((phys.gut_feeling - 0.3).abs() < 0.01);
+        assert!(phys.heart_rate_delta.is_finite());
+        assert!(phys.skin_conductance.is_finite());
+    }
+
+    // ================================================================
+    // NEW TESTS: SensorimotorEngine
+    // ================================================================
+
+    #[test]
+    fn test_sensorimotor_engine_no_prediction_without_learning() {
+        let engine = SensorimotorEngine::new(100);
+        let action = ActionPattern {
+            involved_parts: vec![BodyPart::Head],
+            movement_type: MovementType::Look,
+            intensity: 0.5,
+            duration: 5,
+            encoding: BinaryHV::random(42),
+        };
+        assert!(engine.predict(&action).is_none());
+    }
+
+    #[test]
+    fn test_sensorimotor_engine_average_prediction_error_neutral_default() {
+        let engine = SensorimotorEngine::new(100);
+        assert!((engine.average_prediction_error() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_sensorimotor_engine_learning_updates_confidence() {
+        let mut engine = SensorimotorEngine::new(100);
+        let encoding = BinaryHV::random(42);
+        let action = ActionPattern {
+            involved_parts: vec![BodyPart::RightHand],
+            movement_type: MovementType::Grasp,
+            intensity: 0.5,
+            duration: 10,
+            encoding,
+        };
+        let sensation = SensoryPrediction {
+            visual_change: 0.3,
+            tactile_expected: 0.7,
+            proprioceptive_change: 0.5,
+            auditory_expected: 0.1,
+            encoding: BinaryHV::random(99),
+        };
+        // Learn the same contingency twice
+        engine.learn(action.clone(), sensation.clone(), None);
+        engine.learn(action.clone(), sensation.clone(), None);
+        // Confidence should increase
+        let contingency = &engine.contingencies[0];
+        assert!(contingency.confidence > 0.5, "Confidence should increase after repeated learning");
+        assert_eq!(contingency.experience_count, 2);
+    }
+
+    #[test]
+    fn test_sensorimotor_engine_eviction_at_capacity() {
+        let mut engine = SensorimotorEngine::new(3);
+        for i in 0..5 {
+            let action = ActionPattern {
+                involved_parts: vec![BodyPart::RightHand],
+                movement_type: MovementType::Grasp,
+                intensity: 0.5,
+                duration: 10,
+                encoding: BinaryHV::random(i * 1000 + 777), // Different encodings
+            };
+            let sensation = SensoryPrediction {
+                visual_change: 0.1,
+                tactile_expected: 0.2,
+                proprioceptive_change: 0.3,
+                auditory_expected: 0.0,
+                encoding: BinaryHV::random(i * 1000 + 888),
+            };
+            engine.learn(action, sensation, None);
+        }
+        assert!(engine.contingencies.len() <= 3, "Should be capped at max_contingencies=3");
+    }
+
+    #[test]
+    fn test_sensorimotor_engine_prediction_error_tracking() {
+        let mut engine = SensorimotorEngine::new(100);
+        let encoding = BinaryHV::random(42);
+        let action = ActionPattern {
+            involved_parts: vec![BodyPart::RightHand],
+            movement_type: MovementType::Grasp,
+            intensity: 0.5,
+            duration: 10,
+            encoding,
+        };
+        let learned_sensation = SensoryPrediction {
+            visual_change: 0.3,
+            tactile_expected: 0.7,
+            proprioceptive_change: 0.5,
+            auditory_expected: 0.1,
+            encoding: BinaryHV::random(99),
+        };
+        // Learn then learn again with a prediction
+        engine.learn(action.clone(), learned_sensation.clone(), None);
+        let pred = engine.predict(&action).unwrap();
+        // Learn again, this time with prediction provided
+        engine.learn(action, learned_sensation, Some(&pred));
+        // Now there should be a prediction error recorded
+        assert!(!engine.prediction_errors.is_empty());
+        let avg = engine.average_prediction_error();
+        assert!(avg.is_finite());
+        assert!(avg >= 0.0);
+    }
+
+    // ================================================================
+    // NEW TESTS: Affordance
+    // ================================================================
+
+    #[test]
+    fn test_affordance_attractiveness_high_value_low_cost() {
+        let aff = Affordance {
+            action_type: MovementType::Grasp,
+            required_parts: vec![BodyPart::RightHand],
+            location: Position3D::origin(),
+            saliency: 1.0,
+            effort: 0.0,
+            risk: 0.0,
+            expected_value: 1.0,
+            encoding: BinaryHV::random(1),
+        };
+        assert!((aff.attractiveness() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_affordance_attractiveness_high_risk_reduces_score() {
+        let low_risk = Affordance {
+            action_type: MovementType::Walk,
+            required_parts: vec![],
+            location: Position3D::origin(),
+            saliency: 0.8,
+            effort: 0.2,
+            risk: 0.0,
+            expected_value: 0.8,
+            encoding: BinaryHV::random(1),
+        };
+        let high_risk = Affordance {
+            action_type: MovementType::Walk,
+            required_parts: vec![],
+            location: Position3D::origin(),
+            saliency: 0.8,
+            effort: 0.2,
+            risk: 1.0,
+            expected_value: 0.8,
+            encoding: BinaryHV::random(1),
+        };
+        assert!(low_risk.attractiveness() > high_risk.attractiveness());
+    }
+
+    #[test]
+    fn test_affordance_attractiveness_clamped() {
+        // Extremely negative scenario
+        let aff = Affordance {
+            action_type: MovementType::Walk,
+            required_parts: vec![],
+            location: Position3D::origin(),
+            saliency: 0.0,
+            effort: 1.0,
+            risk: 1.0,
+            expected_value: 0.0,
+            encoding: BinaryHV::random(1),
+        };
+        assert!(aff.attractiveness() >= -1.0);
+        assert!(aff.attractiveness() <= 1.0);
+    }
+
+    // ================================================================
+    // NEW TESTS: AffordanceDetector
+    // ================================================================
+
+    #[test]
+    fn test_affordance_detector_empty_environment() {
+        let mut detector = AffordanceDetector::new();
+        let body = BodySchema::new();
+        let env = EnvironmentState::default();
+        detector.detect(&body, &env);
+        assert!(detector.current_affordances.is_empty());
+        assert!(detector.most_attractive().is_none());
+    }
+
+    #[test]
+    fn test_affordance_detector_out_of_reach_object_ignored() {
+        let mut detector = AffordanceDetector::new();
+        let body = BodySchema::new();
+        let mut env = EnvironmentState::default();
+        env.objects.push(EnvironmentObject {
+            id: 1,
+            position: Position3D::new(100.0, 100.0, 100.0), // Far away
+            graspable: true,
+            saliency: 1.0,
+            value: 1.0,
+        });
+        detector.detect(&body, &env);
+        assert!(detector.current_affordances.is_empty());
+    }
+
+    #[test]
+    fn test_affordance_detector_non_graspable_ignored() {
+        let mut detector = AffordanceDetector::new();
+        let body = BodySchema::new();
+        let mut env = EnvironmentState::default();
+        env.objects.push(EnvironmentObject {
+            id: 1,
+            position: Position3D::new(0.3, 0.3, 1.0), // Within reach
+            graspable: false, // Not graspable
+            saliency: 1.0,
+            value: 1.0,
+        });
+        detector.detect(&body, &env);
+        // Should not detect grasp affordance for non-graspable object
+        let grasp_affordances: Vec<_> = detector.current_affordances.iter()
+            .filter(|a| a.action_type == MovementType::Grasp)
+            .collect();
+        assert!(grasp_affordances.is_empty());
+    }
+
+    #[test]
+    fn test_affordance_detector_walkable_surface_detected() {
+        let mut detector = AffordanceDetector::new();
+        let body = BodySchema::new();
+        let mut env = EnvironmentState::default();
+        env.surfaces.push(EnvironmentSurface {
+            id: 1,
+            center: Position3D::new(0.0, 1.0, 0.0),
+            walkable: true,
+            slope: 0.0,
+        });
+        detector.detect(&body, &env);
+        let walk_affordances: Vec<_> = detector.current_affordances.iter()
+            .filter(|a| a.action_type == MovementType::Walk)
+            .collect();
+        assert!(!walk_affordances.is_empty(), "Should detect walkable surface");
+    }
+
+    #[test]
+    fn test_affordance_detector_sorted_by_attractiveness() {
+        let mut detector = AffordanceDetector::new();
+        let body = BodySchema::new();
+        let mut env = EnvironmentState::default();
+        // Two graspable objects at different values
+        env.objects.push(EnvironmentObject {
+            id: 1,
+            position: Position3D::new(0.2, 0.2, 1.0),
+            graspable: true,
+            saliency: 0.3,
+            value: 0.2,
+        });
+        env.objects.push(EnvironmentObject {
+            id: 2,
+            position: Position3D::new(0.3, 0.3, 1.0),
+            graspable: true,
+            saliency: 0.9,
+            value: 0.9,
+        });
+        detector.detect(&body, &env);
+        if detector.current_affordances.len() >= 2 {
+            assert!(
+                detector.current_affordances[0].attractiveness()
+                    >= detector.current_affordances[1].attractiveness(),
+                "Affordances should be sorted by attractiveness"
+            );
+        }
+    }
+
+    // ================================================================
+    // NEW TESTS: EmbodiedConsciousnessAnalyzer
+    // ================================================================
+
+    #[test]
+    fn test_analyzer_phi_modulation_finite_and_positive() {
+        let config = EmbodiedConfig::default();
+        let mut analyzer = EmbodiedConsciousnessAnalyzer::new(config);
+        let response = analyzer.process();
+        assert!(response.phi_modulation.is_finite());
+        assert!(response.phi_modulation > 0.0, "Phi modulation should be positive");
+    }
+
+    #[test]
+    fn test_analyzer_visceral_arousal_increases_phi_modulation() {
+        let config = EmbodiedConfig::default();
+        let mut analyzer_calm = EmbodiedConsciousnessAnalyzer::new(config.clone());
+        let mut analyzer_aroused = EmbodiedConsciousnessAnalyzer::new(config);
+
+        analyzer_aroused.interoception.visceral_arousal = 0.9;
+        let calm_response = analyzer_calm.process();
+        let aroused_response = analyzer_aroused.process();
+
+        assert!(
+            aroused_response.phi_modulation > calm_response.phi_modulation,
+            "Higher visceral arousal should increase phi modulation"
+        );
+    }
+
+    #[test]
+    fn test_analyzer_action_updates_tension() {
+        let config = EmbodiedConfig::default();
+        let mut analyzer = EmbodiedConsciousnessAnalyzer::new(config);
+        let initial_tension = analyzer.body.parts[&BodyPart::RightHand].tension;
+
+        let action = ActionPattern {
+            involved_parts: vec![BodyPart::RightHand],
+            movement_type: MovementType::Grasp,
+            intensity: 0.8,
+            duration: 5,
+            encoding: BinaryHV::random(100),
+        };
+        analyzer.perform_action(action);
+
+        let final_tension = analyzer.body.parts[&BodyPart::RightHand].tension;
+        assert!(final_tension > initial_tension, "Action should increase tension");
+    }
+
+    #[test]
+    fn test_analyzer_repeated_actions_improve_agency() {
+        let config = EmbodiedConfig::default();
+        let mut analyzer = EmbodiedConsciousnessAnalyzer::new(config);
+
+        // Perform the same action multiple times to build contingency
+        let encoding = BinaryHV::random(42);
+        for _ in 0..5 {
+            let action = ActionPattern {
+                involved_parts: vec![BodyPart::RightHand],
+                movement_type: MovementType::Reach,
+                intensity: 0.5,
+                duration: 5,
+                encoding,
+            };
+            analyzer.perform_action(action);
+        }
+        // Agency should remain high or improve with consistent predictions
+        assert!(analyzer.agency > 0.5, "Agency should remain reasonable after consistent actions");
+    }
+
+    #[test]
+    fn test_analyzer_update_environment_triggers_affordance_detection() {
+        let config = EmbodiedConfig::default();
+        let mut analyzer = EmbodiedConsciousnessAnalyzer::new(config);
+        let mut env = EnvironmentState::default();
+        env.objects.push(EnvironmentObject {
+            id: 1,
+            position: Position3D::new(0.3, 0.3, 1.0),
+            graspable: true,
+            saliency: 0.8,
+            value: 0.9,
+        });
+        analyzer.update_environment(env);
+        let response = analyzer.process();
+        assert!(response.available_affordances > 0);
+    }
+
+    #[test]
+    fn test_analyzer_summary_all_fields_bounded() {
+        let config = EmbodiedConfig::default();
+        let analyzer = EmbodiedConsciousnessAnalyzer::new(config);
+        let summary = analyzer.summary();
+
+        assert!(summary.body_tension >= 0.0 && summary.body_tension <= 1.0);
+        assert!(summary.body_balance >= -1.0 && summary.body_balance <= 1.0);
+        assert!(summary.agency >= 0.0 && summary.agency <= 1.0);
+        assert!(summary.ownership >= 0.0 && summary.ownership <= 1.0);
+        assert!(summary.overall_embodiment >= 0.0);
+        assert!(summary.homeostatic_state.is_finite());
+        assert!(summary.sensorimotor_competence.is_finite());
+        assert!(summary.affordance_richness >= 0.0);
+    }
+
+    #[test]
+    fn test_analyzer_zero_intensity_action() {
+        let config = EmbodiedConfig::default();
+        let mut analyzer = EmbodiedConsciousnessAnalyzer::new(config);
+        let action = ActionPattern {
+            involved_parts: vec![BodyPart::Head],
+            movement_type: MovementType::Look,
+            intensity: 0.0,
+            duration: 1,
+            encoding: BinaryHV::random(55),
+        };
+        let outcome = analyzer.perform_action(action);
+        // Zero intensity should produce zero sensation changes
+        assert!((outcome.sensation.visual_change - 0.0).abs() < f64::EPSILON);
+        assert!((outcome.sensation.proprioceptive_change - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ================================================================
+    // NEW TESTS: BodyPart coverage
+    // ================================================================
+
+    #[test]
+    fn test_body_part_all_has_ten_parts() {
+        assert_eq!(BodyPart::all().len(), 10);
+    }
+
+    #[test]
+    fn test_body_parts_symmetric_positions() {
+        let body = BodySchema::new();
+        // Left and right arms should be symmetric about x=0
+        let left_arm = &body.parts[&BodyPart::LeftArm].position;
+        let right_arm = &body.parts[&BodyPart::RightArm].position;
+        assert!((left_arm.x + right_arm.x).abs() < 0.01, "Arms should be symmetric about x=0");
+        assert!((left_arm.z - right_arm.z).abs() < 0.01, "Arms should be at same height");
+
+        // Left and right legs
+        let left_leg = &body.parts[&BodyPart::LeftLeg].position;
+        let right_leg = &body.parts[&BodyPart::RightLeg].position;
+        assert!((left_leg.x + right_leg.x).abs() < 0.01, "Legs should be symmetric about x=0");
+    }
+
+    #[test]
+    fn test_head_is_highest_body_part() {
+        let body = BodySchema::new();
+        let head_z = body.parts[&BodyPart::Head].position.z;
+        for (part, state) in &body.parts {
+            if *part != BodyPart::Head {
+                assert!(
+                    head_z >= state.position.z,
+                    "Head should be highest, but {:?} at z={} vs head z={}",
+                    part, state.position.z, head_z
+                );
+            }
+        }
+    }
 }

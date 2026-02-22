@@ -2,15 +2,13 @@
 //!
 //! High-level query methods (flow state, prediction confidence, consciousness
 //! snapshot, etc.) are `pub` for use by external consumers (examples, LUCID,
-//! symthaea-nix). Raw subsystem references (e.g., `thalamic_router()`,
-//! `unification_engine_mut()`) are `pub(crate)` to prevent external coupling
-//! to implementation details.
+//! symthaea-nix). A small number of `pub(crate)` accessors exist for internal
+//! unit tests (e.g., `flow_state()`, `curiosity_drive()`).
 
 use crate::causal::{CausalGraph, DiscoveredRelationship};
 use crate::consciousness::consciousness_unification::{
-    ConsciousnessUnificationEngine, EmotionalPattern, UnifiedEmotion, UnifiedEmotionalState,
+    EmotionalPattern, UnifiedEmotion, UnifiedEmotionalState,
 };
-use crate::consciousness::fep_active_inference::ActiveInferenceAgent;
 use crate::consciousness::stability_regime::StabilityRegimeProcessor;
 use crate::dynamics::cfc_coherence::CoherenceSummary;
 use crate::dynamics::temporal_signatures::{ConsciousnessPattern, TemporalStateSummary};
@@ -19,13 +17,11 @@ use crate::voice::voice_feedback::{VoiceOutputMetrics, VoiceQualitySummary};
 use anyhow::Result;
 
 use super::snapshot::ConsciousnessSnapshot;
-use super::temporal_network::TemporalNetwork;
 use super::{
-    ActionHint, ActiveInferenceBridge, AdaptiveBehavior, ClosedLearningLoop, CognitiveDepth,
-    CognitiveGoal, CognitiveLoopConfig, CognitiveLoopService, CouplingQuality, CuriosityDrive,
-    CycleLearningResult, EmotionContagion, EpisodicMemory, EpisodicMemoryBridge, FlowState,
-    GoalSystemBridge, LoopStats, Recommendation, ReflectionSummary, ReflectionThresholds,
-    ResponseStrategy, SelfAssessment, SelfReflection, ThalamicRouter, WorldModelBridge,
+    ActionHint, AdaptiveBehavior, CognitiveDepth, CognitiveGoal, CognitiveLoopConfig,
+    CognitiveLoopService, CouplingQuality, CuriosityDrive, CycleLearningResult, EmotionContagion,
+    EpisodicMemory, EpisodicMemoryBridge, FlowState, LoopStats, Recommendation, ReflectionSummary,
+    ReflectionThresholds, ResponseStrategy, SelfAssessment, SelfReflection, WorldModelBridge,
 };
 
 impl CognitiveLoopService {
@@ -73,34 +69,6 @@ impl CognitiveLoopService {
             .unwrap_or(false)
     }
 
-    /// Force a causal discovery run (useful for testing)
-    #[allow(dead_code)]
-    pub(crate) fn force_causal_discovery(&mut self) -> Option<CausalGraph> {
-        self.causal_enhancer.as_mut().map(|e| e.run_discovery())
-    }
-
-    /// Get causal attention weights for a target dimension
-    #[allow(dead_code)]
-    pub(crate) fn causal_attention_weights(&mut self, target_dim: usize) -> Option<Vec<f32>> {
-        self.causal_enhancer
-            .as_mut()
-            .map(|e| e.causal_attention_weights(target_dim))
-    }
-
-    /// Suggest an intervention based on discovered causal structure
-    #[allow(dead_code)]
-    pub(crate) fn suggest_causal_intervention(&mut self) -> Option<(usize, f64)> {
-        self.causal_enhancer
-            .as_mut()
-            .and_then(|e| e.suggest_intervention())
-    }
-
-    /// Get encoder statistics
-    #[allow(dead_code)]
-    pub(crate) fn encoder_stats(&self) -> &symthaea_core::hdc::predictive_encoder::EncoderStats {
-        self.encoder.stats()
-    }
-
     // ═══════════════════════════════════════════════════════════════════════
     // EPISODIC REPLAY ACCESSORS
     // ═══════════════════════════════════════════════════════════════════════
@@ -131,52 +99,6 @@ impl CognitiveLoopService {
             .as_ref()
             .map(|r| r.get_top_episodes(n))
             .unwrap_or_default()
-    }
-
-    /// Force an episodic replay session (useful for testing or manual consolidation)
-    #[allow(dead_code)]
-    pub(crate) fn force_episodic_replay(
-        &mut self,
-        learning_rate: f32,
-    ) -> Option<crate::memory::episodic_replay::ReplaySessionResult> {
-        if let Some(ref mut replay) = self.phi_episodic_replay {
-            if let TemporalNetwork::CfC(ref mut cfc) = self.temporal_network {
-                // Temporarily bypass should_replay check by manually running replay
-                let batch =
-                    replay.sample_replay_batch(self.config.episodic_replay_config.batch_size);
-                if batch.is_empty() {
-                    return Some(crate::memory::episodic_replay::ReplaySessionResult {
-                        episodes_replayed: 0,
-                        average_loss: 0.0,
-                        average_psi: 0.0,
-                        skipped: true,
-                    });
-                }
-
-                let mut total_loss = 0.0;
-                let mut total_psi = 0.0;
-
-                for episode in &batch {
-                    let loss = replay.replay_training_step(
-                        cfc,
-                        episode,
-                        learning_rate,
-                        self.config.episodic_replay_config.replay_dt,
-                    );
-                    total_loss += loss;
-                    total_psi += episode.psi;
-                }
-
-                let n = batch.len();
-                return Some(crate::memory::episodic_replay::ReplaySessionResult {
-                    episodes_replayed: n,
-                    average_loss: total_loss / n as f32,
-                    average_psi: total_psi / n as f64,
-                    skipped: false,
-                });
-            }
-        }
-        None
     }
 
     /// Get CfC state diversity (activation variance across cells)
@@ -583,12 +505,6 @@ impl CognitiveLoopService {
         self.cognitive_depth
     }
 
-    /// Get the thalamic router reference
-    #[allow(dead_code)]
-    pub(crate) fn thalamic_router(&self) -> &ThalamicRouter {
-        &self.thalamic_router
-    }
-
     /// Get thalamic routing statistics (reflex_rate, cortical_rate, deep_rate)
     pub fn thalamic_stats(&self) -> (f32, f32, f32) {
         self.thalamic_router.routing_stats()
@@ -597,18 +513,6 @@ impl CognitiveLoopService {
     /// Get the unified Phi from the ConsciousnessUnificationEngine
     pub fn unified_psi(&self) -> f64 {
         self.unification_engine.psi
-    }
-
-    /// Get the ConsciousnessUnificationEngine reference
-    #[allow(dead_code)]
-    pub(crate) fn unification_engine(&self) -> &ConsciousnessUnificationEngine {
-        &self.unification_engine
-    }
-
-    /// Get mutable reference to the unification engine
-    #[allow(dead_code)]
-    pub(crate) fn unification_engine_mut(&mut self) -> &mut ConsciousnessUnificationEngine {
-        &mut self.unification_engine
     }
 
     /// Get the unified emotional state (VAD-based)
@@ -642,18 +546,6 @@ impl CognitiveLoopService {
     /// Get a description of the current consciousness state
     pub fn unified_state_description(&self) -> String {
         self.unification_engine.describe_state()
-    }
-
-    /// Get the Active Inference Bridge reference
-    #[allow(dead_code)]
-    pub(crate) fn active_inference_bridge(&self) -> &ActiveInferenceBridge {
-        &self.active_inference_bridge
-    }
-
-    /// Get the FEP Active Inference Agent reference
-    #[allow(dead_code)]
-    pub(crate) fn fep_agent(&self) -> &ActiveInferenceAgent {
-        &self.fep_agent
     }
 
     /// Get the current FEP free energy (if available)
@@ -701,12 +593,6 @@ impl CognitiveLoopService {
         self.closed_learning_loop.best_strategy()
     }
 
-    /// Get the closed learning loop reference
-    #[allow(dead_code)]
-    pub(crate) fn closed_learning_loop(&self) -> &ClosedLearningLoop {
-        &self.closed_learning_loop
-    }
-
     /// Get average reward from the learning loop
     pub fn average_reward(&self) -> f32 {
         self.closed_learning_loop.average_reward()
@@ -737,12 +623,6 @@ impl CognitiveLoopService {
         &self.episodic_memory
     }
 
-    /// Get mutable reference to episodic memory
-    #[allow(dead_code)]
-    pub(crate) fn episodic_memory_mut(&mut self) -> &mut EpisodicMemoryBridge {
-        &mut self.episodic_memory
-    }
-
     /// Get memory counts (short_term, long_term)
     pub fn memory_counts(&self) -> (usize, usize) {
         self.episodic_memory.memory_count()
@@ -751,18 +631,6 @@ impl CognitiveLoopService {
     /// Recall memories similar to input
     pub fn recall_memories(&mut self, query: &[f32], top_k: usize) -> Vec<(EpisodicMemory, f32)> {
         self.episodic_memory.recall(query, top_k, 0.2)
-    }
-
-    /// Get the goal system bridge reference
-    #[allow(dead_code)]
-    pub(crate) fn goal_system(&self) -> &GoalSystemBridge {
-        &self.goal_system
-    }
-
-    /// Get mutable reference to goal system
-    #[allow(dead_code)]
-    pub(crate) fn goal_system_mut(&mut self) -> &mut GoalSystemBridge {
-        &mut self.goal_system
     }
 
     /// Add a goal to the system

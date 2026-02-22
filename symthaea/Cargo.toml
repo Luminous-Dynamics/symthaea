@@ -29,6 +29,7 @@ members = [
     "crates/symthaea-support",
     "crates/symthaea-psych-bench",
     "crates/symthaea-flight",
+    "crates/symthaea-physics",
 ]
 
 
@@ -128,6 +129,9 @@ symthaea-sentinel = { path = "crates/symthaea-sentinel", optional = true }
 
 # Symthaea Flight - HDC-LTC + FEP Active Inference quadrotor flight control
 symthaea-flight = { path = "crates/symthaea-flight", optional = true }
+
+# Symthaea Physics - Tokamak plasma HDC encoding, C-Mod adapter, Phi-based control
+symthaea-physics = { path = "crates/symthaea-physics", optional = true }
 
 # Symthaea Nix - Conscious NixOS mind (HDC + active inference)
 symthaea-nix = { path = "crates/symthaea-nix", optional = true }
@@ -332,7 +336,7 @@ nix-cli = ["symthaea-nix", "symthaea-nix/cli"]
 nix-tui = ["symthaea-nix", "symthaea-nix/tui"]
 nix-daemon = ["symthaea-nix", "symthaea-nix/daemon"]
 identity = ["ed25519-dalek", "sha2"]        # Ed25519 signatures, capability gating
-physics = []                                # Tokamak plasma encoding, C-Mod adapter
+physics = ["dep:symthaea-physics"]           # Tokamak plasma encoding, C-Mod adapter
 flight = ["dep:symthaea-flight"]            # HDC-LTC quadrotor flight control via FEP Active Inference
 
 # ── Database backends ───────────────────────────────────────────────
@@ -823,6 +827,22 @@ harness = false
 
 [[bench]]
 name = "cognitive_cycle"
+harness = false
+
+[[bench]]
+name = "dynamics_ode"
+harness = false
+
+[[bench]]
+name = "dynamics_cfc"
+harness = false
+
+[[bench]]
+name = "dynamics_stability"
+harness = false
+
+[[bench]]
+name = "dynamics_temporal"
 harness = false
 
 [profile.test]
