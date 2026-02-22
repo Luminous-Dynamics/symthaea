@@ -361,7 +361,12 @@ impl CognitiveLoopService {
         let mut resonator_wm_primed = false;
         let mut resonator_reconsolidated: usize = 0;
         let mut resonator_best_sim: f32 = 0.0;
-        if urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
+        // Coherence gate: skip resonator recall during unstable CfC dynamics
+        // Science: noisy priors during turbulent dynamics can destabilize predictions
+        // Uses previous cycle's smoothed coherence (updated at line ~646)
+        let resonator_coherence_gate = self.coherence_bridge.smoothed_coherence() > 0.3
+            || self.stats.total_cycles < 10; // bypass gate during warmup
+        if resonator_coherence_gate && urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
         if let Some(ref mut res_mem) = self.resonator_memory {
             let res_start = Instant::now();
 
@@ -569,7 +574,20 @@ impl CognitiveLoopService {
         } else {
             1.0
         };
-        let delta_t = self.config.cfc_config.delta_t * resonance_tau_factor * arousal_tau_factor;
+        // FEEDBACK: Resonator familiarity modulates CfC processing speed
+        // Science: Nosofsky (1986) — familiar stimuli processed faster (exemplar theory)
+        // High similarity → lower tau (faster), novel → higher tau (slower, more deliberate)
+        let codebook_tau_factor = if resonator_best_sim > 0.5 {
+            1.0 - (resonator_best_sim - 0.5) * 0.1 // up to 5% faster for familiar
+        } else if resonator_best_sim > 0.0 && resonator_best_sim < 0.2 {
+            1.0 + (0.2 - resonator_best_sim) * 0.15 // up to 3% slower for novel
+        } else {
+            1.0
+        };
+        let delta_t = self.config.cfc_config.delta_t
+            * resonance_tau_factor
+            * arousal_tau_factor
+            * codebook_tau_factor;
         let _t_core = Instant::now();
         if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
             tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
@@ -1123,11 +1141,11 @@ impl CognitiveLoopService {
                 prediction_error,
                 urgency,
             };
-            self.psi_attestation_buffer.push_back(record);
-            // Evict oldest if over capacity
-            while self.psi_attestation_buffer.len() > self.config.attestation_buffer_capacity {
+            // Capacity bound: attestation_buffer_capacity (max 256) — evict before push
+            while self.psi_attestation_buffer.len() >= self.config.attestation_buffer_capacity {
                 let _ = self.psi_attestation_buffer.pop_front();
             }
+            self.psi_attestation_buffer.push_back(record);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -1260,10 +1278,11 @@ impl CognitiveLoopService {
             }
 
             // Track agreement for adaptive temperature
-            self.policy_agreement_window.push_back(policy_agreement);
-            if self.policy_agreement_window.len() > POLICY_WINDOW_SIZE {
+            // Capacity bound: POLICY_WINDOW_SIZE (20) — evict before push
+            if self.policy_agreement_window.len() >= POLICY_WINDOW_SIZE {
                 self.policy_agreement_window.pop_front();
             }
+            self.policy_agreement_window.push_back(policy_agreement);
             // Adapt FEP softmax temperature: high agreement → exploit (low temp),
             // low agreement → explore (high temp)
             if self.policy_agreement_window.len() >= POLICY_MIN_WINDOW {
@@ -1456,26 +1475,16 @@ impl CognitiveLoopService {
         let pp_emotional_valence = self.emotion_contagion.prosody_valence();
         let pp_phi = self.unification_engine.psi as f32;
         let pp_smoothed_coh = self.coherence_bridge.smoothed_coherence() as f64;
+        // World model error → resonator storage importance bias
+        // Science: Rescorla-Wagner (1972) — surprising events deserve higher encoding priority
+        let pp_wm_importance_boost = self.world_model.avg_error.clamp(0.0, 1.0) * 0.3;
         let pp_learning_threshold = self.config.learning_threshold;
 
         // Compute cycle reward before parallel section (reads prediction_confidence, flow_state)
-        let internal_reward = if prediction_error < pp_learning_threshold {
-            REWARD_GOOD_BASE + REWARD_GOOD_CONFIDENCE_SCALE * self.prediction_confidence
-        } else if prediction_error > 0.5 {
-            REWARD_BAD_BASE + REWARD_BAD_SCALE * (prediction_error - 0.5)
-        } else {
-            REWARD_MID_BASE + REWARD_MID_SCALE * prediction_error
-        };
-        let cycle_reward = if self.external_reward.abs() > f32::EPSILON {
-            let blended = internal_reward * REWARD_EXTERNAL_BLEND + self.external_reward * REWARD_EXTERNAL_BLEND;
-            self.external_reward = 0.0; // consume
-            blended
-        } else {
-            internal_reward
-        };
+        let cycle_reward = self.compute_reward_signal(prediction_error, pp_learning_threshold);
 
         let cycle_learning_result = CycleLearningResult {
-            reward: cycle_reward.clamp(-1.0, 1.0),
+            reward: cycle_reward,
             strategy_used: selected_strategy,
             successful: prediction_error < pp_learning_threshold && pp_in_flow,
             prediction_error,
@@ -1602,7 +1611,9 @@ impl CognitiveLoopService {
                                         ("valence", val_label, &v_hv),
                                         ("phi_level", phi_label, &p_hv),
                                     ],
-                                    pp_phi, // importance = consciousness level
+                                    // importance = consciousness level + world model error bias
+                                    // Higher WM error → this input is poorly predicted → store with higher priority
+                                    pp_phi + pp_wm_importance_boost,
                                 );
                             }
                         }
@@ -1906,15 +1917,16 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         // Maintain ring buffer of last 4 BinaryHVs for multi-component profile
-        self.carryover.history.recent_hvs.push(hv16_cached);
-        if self.carryover.history.recent_hvs.len() > 4 {
-            self.carryover.history.recent_hvs.remove(0);
+        // Capacity bound: 4 elements — evict before push to prevent transient over-capacity
+        if self.carryover.history.recent_hvs.len() >= 4 {
+            self.carryover.history.recent_hvs.pop_front();
         }
+        self.carryover.history.recent_hvs.push_back(hv16_cached);
         let (consciousness_profile_composite, synergy_enhanced_composite, emergent_properties_count) =
             if self.stats.total_cycles % 23 == 0 && self.primitive_processor.is_some() {
                 let profile =
                     crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
-                        &self.carryover.history.recent_hvs,
+                        self.carryover.history.recent_hvs.make_contiguous(),
                     );
                 let composite = profile.composite;
                 // Dimension synergies: discover non-linear interactions between consciousness dims
@@ -3154,6 +3166,24 @@ impl CognitiveLoopService {
         } else {
             self.stats.codebook_diversity // carry forward cached value
         };
+
+        // Track 3f: Codebook diversity → exploration governor
+        // Science: competitive learning — low diversity signals representational collapse
+        // Low diversity → boost exploration urge (seek novel inputs)
+        // High diversity → allow exploitation (good codebook coverage)
+        if codebook_diversity > 0.0 {
+            if codebook_diversity < 0.3 {
+                // Representational collapse risk — boost exploration
+                let diversity_boost = (0.3 - codebook_diversity) * 0.2;
+                self.curiosity_drive.exploration_urge =
+                    (self.curiosity_drive.exploration_urge + diversity_boost).clamp(0.0, 1.0);
+            } else if codebook_diversity > 0.7 {
+                // Good coverage — allow exploitation, dampen exploration slightly
+                let exploit_dampen = (codebook_diversity - 0.7) * 0.1;
+                self.curiosity_drive.exploration_urge =
+                    (self.curiosity_drive.exploration_urge - exploit_dampen).clamp(0.0, 1.0);
+            }
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // DEMAND-DRIVEN CONSOLIDATION TRIGGERS

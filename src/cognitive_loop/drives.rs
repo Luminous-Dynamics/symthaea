@@ -239,8 +239,9 @@ impl EmotionContagion {
 /// exploration mode to discover new patterns and prevent cognitive stagnation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CuriosityDrive {
-    /// Recent prediction errors (rolling window)
-    error_history: Vec<f32>,
+    /// Recent prediction errors (rolling window).
+    /// Capacity bound: HISTORY_SIZE (50) elements — evict before push via pop_front.
+    error_history: std::collections::VecDeque<f32>,
 
     /// Boredom level (0.0 to 1.0)
     /// High when predictions are too accurate for too long
@@ -268,7 +269,7 @@ pub struct CuriosityDrive {
 impl Default for CuriosityDrive {
     fn default() -> Self {
         Self {
-            error_history: Vec::with_capacity(50),
+            error_history: std::collections::VecDeque::with_capacity(50),
             boredom: 0.0,
             curiosity: 0.3, // Start with some curiosity
             exploration_urge: 0.0,
@@ -289,11 +290,11 @@ impl CuriosityDrive {
 
     /// Update curiosity drive based on prediction error
     pub fn update(&mut self, prediction_error: f32) {
-        // Track error history
-        self.error_history.push(prediction_error);
-        if self.error_history.len() > Self::HISTORY_SIZE {
-            self.error_history.remove(0);
+        // Track error history — evict before push to prevent transient over-capacity
+        if self.error_history.len() >= Self::HISTORY_SIZE {
+            self.error_history.pop_front();
         }
+        self.error_history.push_back(prediction_error);
 
         // Compute average error (safe division with max(1))
         let avg_error = if !self.error_history.is_empty() {
