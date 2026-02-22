@@ -5,8 +5,11 @@
 //! mid-flight, FEP's prediction error spikes, tau drops, and the system
 //! re-stabilizes WITHOUT retraining — a biological survival reflex.
 
+#[cfg(feature = "mujoco")]
 use crate::mujoco_sim::MuJoCoSimulator;
+#[cfg(feature = "mujoco")]
 use crate::simulator::PhysicsSimulator;
+#[cfg(feature = "mujoco")]
 use crate::types::QuadrotorCommand;
 
 /// A physical perturbation applied to the MuJoCo simulation mid-flight.
@@ -70,8 +73,30 @@ impl PerturbationSchedule {
         self
     }
 
+    /// Return all perturbations that trigger at the given step.
+    ///
+    /// This enables schedule logic testing without requiring a MuJoCo simulator.
+    /// WindBurst perturbations are active for their full duration window.
+    pub fn triggered_at(&self, step: usize) -> Vec<&FlightPerturbation> {
+        self.perturbations
+            .iter()
+            .filter(|p| match p {
+                FlightPerturbation::MassChange { at_step, .. } => step == *at_step,
+                FlightPerturbation::RotorDegradation { at_step, .. } => step == *at_step,
+                FlightPerturbation::CenterOfMassShift { at_step, .. } => step == *at_step,
+                FlightPerturbation::DensityChange { at_step, .. } => step == *at_step,
+                FlightPerturbation::WindBurst {
+                    at_step,
+                    duration_steps,
+                    ..
+                } => step >= *at_step && step < at_step + duration_steps,
+            })
+            .collect()
+    }
+
     /// Apply any perturbations scheduled for the given step.
     /// Returns true if any perturbation was applied.
+    #[cfg(feature = "mujoco")]
     pub fn apply(&self, step: usize, sim: &mut MuJoCoSimulator) -> bool {
         let mut applied = false;
 
@@ -267,5 +292,69 @@ mod tests {
         let schedule = PerturbationSchedule::default();
         assert!(schedule.is_empty());
         assert_eq!(schedule.len(), 0);
+    }
+
+    #[test]
+    fn test_triggered_at_mass_change() {
+        let schedule = PerturbationSchedule::new()
+            .with(FlightPerturbation::MassChange {
+                factor: 1.3,
+                at_step: 100,
+            });
+        assert!(schedule.triggered_at(99).is_empty());
+        assert_eq!(schedule.triggered_at(100).len(), 1);
+        assert!(schedule.triggered_at(101).is_empty());
+    }
+
+    #[test]
+    fn test_triggered_at_wind_burst_duration() {
+        let schedule = PerturbationSchedule::new()
+            .with(FlightPerturbation::WindBurst {
+                force: [0.1, 0.0, 0.0],
+                at_step: 50,
+                duration_steps: 20,
+            });
+        // Before window
+        assert!(schedule.triggered_at(49).is_empty());
+        // During window
+        assert_eq!(schedule.triggered_at(50).len(), 1);
+        assert_eq!(schedule.triggered_at(60).len(), 1);
+        assert_eq!(schedule.triggered_at(69).len(), 1);
+        // After window
+        assert!(schedule.triggered_at(70).is_empty());
+    }
+
+    #[test]
+    fn test_triggered_at_ordering() {
+        let schedule = PerturbationSchedule::new()
+            .with(FlightPerturbation::MassChange {
+                factor: 1.2,
+                at_step: 100,
+            })
+            .with(FlightPerturbation::RotorDegradation {
+                rotor_index: 0,
+                max_fraction: 0.5,
+                at_step: 200,
+            })
+            .with(FlightPerturbation::WindBurst {
+                force: [0.05, 0.0, 0.0],
+                at_step: 150,
+                duration_steps: 100,
+            });
+        // Step 100: only mass change
+        assert_eq!(schedule.triggered_at(100).len(), 1);
+        // Step 180: only wind burst (in window 150..250)
+        assert_eq!(schedule.triggered_at(180).len(), 1);
+        // Step 200: rotor degradation + wind burst (still in window)
+        assert_eq!(schedule.triggered_at(200).len(), 2);
+        // Step 250: nothing (wind ends at 250, rotor was one-shot at 200)
+        assert!(schedule.triggered_at(250).is_empty());
+    }
+
+    #[test]
+    fn test_triggered_at_empty_schedule() {
+        let schedule = PerturbationSchedule::new();
+        assert!(schedule.triggered_at(0).is_empty());
+        assert!(schedule.triggered_at(1000).is_empty());
     }
 }

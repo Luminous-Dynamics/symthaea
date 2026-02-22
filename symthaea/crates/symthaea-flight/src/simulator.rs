@@ -37,6 +37,12 @@ pub struct SimplePhysicsSimulator {
     drag_coeff: f64,
     /// Angular damping coefficient (1/s). Used as `exp(-c * dt)` per step.
     angular_damping: f64,
+    /// Current effective motor outputs [thrust, roll, pitch, yaw] after lag filter.
+    motor_state: [f64; 4],
+    /// First-order motor response time constant (seconds). Crazyflie BL motors ≈ 20ms.
+    motor_time_constant: f64,
+    /// Whether to apply motor lag filter (default: true).
+    enable_motor_lag: bool,
 }
 
 impl SimplePhysicsSimulator {
@@ -49,7 +55,20 @@ impl SimplePhysicsSimulator {
             external_force: [0.0; 3],
             drag_coeff: 0.01,     // N·s/m — empirical for Crazyflie-size
             angular_damping: 5.0, // 1/s — moderate rotational damping
+            motor_state: [QuadrotorCommand::HOVER_THRUST as f64, 0.0, 0.0, 0.0],
+            motor_time_constant: 0.02, // 20ms — Crazyflie BL motor response
+            enable_motor_lag: true,
         }
+    }
+
+    /// Motor response time constant in seconds.
+    pub fn motor_time_constant(&self) -> f64 {
+        self.motor_time_constant
+    }
+
+    /// Enable or disable motor lag simulation.
+    pub fn set_motor_lag(&mut self, enabled: bool) {
+        self.enable_motor_lag = enabled;
     }
 }
 
@@ -63,7 +82,24 @@ impl PhysicsSimulator for SimplePhysicsSimulator {
     fn step(&mut self, cmd: &QuadrotorCommand, dt: f64) {
         let g = 9.81;
 
-        let thrust = cmd.thrust as f64;
+        // Motor lag: first-order exponential filter
+        let effective = if self.enable_motor_lag {
+            let alpha = 1.0 - (-dt / self.motor_time_constant).exp();
+            let cmd_vals = cmd.to_ctrl();
+            for i in 0..4 {
+                self.motor_state[i] += alpha * (cmd_vals[i] - self.motor_state[i]);
+            }
+            QuadrotorCommand {
+                thrust: self.motor_state[0] as f32,
+                roll_moment: self.motor_state[1] as f32,
+                pitch_moment: self.motor_state[2] as f32,
+                yaw_moment: self.motor_state[3] as f32,
+            }
+        } else {
+            *cmd
+        };
+
+        let thrust = effective.thrust as f64;
         let [w, x, y, z] = self.state.quaternion;
 
         // Simplified rotation of thrust vector (body z → world)
@@ -98,9 +134,9 @@ impl PhysicsSimulator for SimplePhysicsSimulator {
         }
 
         // Angular acceleration from moments
-        let alpha_x = cmd.roll_moment as f64 / self.inertia[0];
-        let alpha_y = cmd.pitch_moment as f64 / self.inertia[1];
-        let alpha_z = cmd.yaw_moment as f64 / self.inertia[2];
+        let alpha_x = effective.roll_moment as f64 / self.inertia[0];
+        let alpha_y = effective.pitch_moment as f64 / self.inertia[1];
+        let alpha_z = effective.yaw_moment as f64 / self.inertia[2];
 
         // Update angular velocity
         self.state.angular_velocity[0] += alpha_x * dt;
@@ -135,11 +171,13 @@ impl PhysicsSimulator for SimplePhysicsSimulator {
     fn reset(&mut self, altitude: f64) {
         self.state = FlightState::hover(altitude);
         self.external_force = [0.0; 3];
+        self.motor_state = [QuadrotorCommand::HOVER_THRUST as f64, 0.0, 0.0, 0.0];
     }
 
     fn reset_with_perturbation(&mut self, altitude: f64, perturbation: f64, seed: u64) {
         self.state = FlightState::hover(altitude);
         self.external_force = [0.0; 3];
+        self.motor_state = [QuadrotorCommand::HOVER_THRUST as f64, 0.0, 0.0, 0.0];
 
         let mut rng = seed;
         let mut next_f64 = || -> f64 {
@@ -301,6 +339,83 @@ mod tests {
             (sim.state().altitude() - 0.1).abs() < 0.05,
             "Long-horizon hover failed: final altitude = {:.4}m",
             sim.state().altitude()
+        );
+    }
+
+    #[test]
+    fn test_motor_lag_smooths_step_input() {
+        let mut sim = SimplePhysicsSimulator::new();
+        assert!(sim.enable_motor_lag);
+
+        // Command full thrust — motor state starts at hover, should ramp up
+        let full_thrust = QuadrotorCommand {
+            thrust: QuadrotorCommand::MAX_THRUST,
+            roll_moment: 0.0,
+            pitch_moment: 0.0,
+            yaw_moment: 0.0,
+        };
+
+        sim.step(&full_thrust, 0.002);
+        // After one step, motor_state should be between hover and max (not max yet)
+        assert!(
+            sim.motor_state[0] > QuadrotorCommand::HOVER_THRUST as f64,
+            "Motor should start ramping up"
+        );
+        assert!(
+            sim.motor_state[0] < QuadrotorCommand::MAX_THRUST as f64,
+            "Motor should not reach max instantly: {}",
+            sim.motor_state[0]
+        );
+    }
+
+    #[test]
+    fn test_motor_lag_disabled_passthrough() {
+        let mut sim = SimplePhysicsSimulator::new();
+        sim.set_motor_lag(false);
+
+        let full_thrust = QuadrotorCommand {
+            thrust: QuadrotorCommand::MAX_THRUST,
+            roll_moment: 0.0,
+            pitch_moment: 0.0,
+            yaw_moment: 0.0,
+        };
+
+        sim.step(&full_thrust, 0.002);
+        // Without lag, the command should be applied directly
+        // (motor_state is NOT updated when lag is disabled)
+        // The state should show full thrust effect immediately
+        assert!(
+            sim.state().altitude() > 0.1,
+            "Full thrust without lag should immediately accelerate upward"
+        );
+    }
+
+    #[test]
+    fn test_motor_lag_converges_to_steady_state() {
+        let mut sim = SimplePhysicsSimulator::new();
+
+        let target = QuadrotorCommand {
+            thrust: 0.4,
+            roll_moment: 0.001,
+            pitch_moment: 0.0,
+            yaw_moment: 0.0,
+        };
+
+        // Run for 200ms (100 steps at 2ms) — well beyond 20ms time constant
+        for _ in 0..100 {
+            sim.step(&target, 0.002);
+        }
+
+        // Motor state should converge close to target (within 1%)
+        assert!(
+            (sim.motor_state[0] - 0.4).abs() < 0.004,
+            "Thrust should converge: {}",
+            sim.motor_state[0]
+        );
+        assert!(
+            (sim.motor_state[1] - 0.001).abs() < 0.0001,
+            "Roll moment should converge: {}",
+            sim.motor_state[1]
         );
     }
 

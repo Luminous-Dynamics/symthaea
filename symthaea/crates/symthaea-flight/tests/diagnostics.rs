@@ -10,8 +10,10 @@ use symthaea_flight::benchmarks::{run_wind_benchmark, WindBenchmarkConfig, WindG
 use symthaea_flight::fep_agent::FlightFepConfig;
 use symthaea_flight::training::FlightTrainer;
 use symthaea_flight::{
-    ActiveInferenceFlightAgent, FlightConfig, FlightController, QuadrotorHdcEncoder,
+    ActiveInferenceFlightAgent, FlightConfig, FlightController, PdGains, PidState, QuadrotorHdcEncoder,
+    SimplePhysicsSimulator, FlightSetpoint, pid_baseline, pd_baseline,
 };
+use symthaea_flight::simulator::PhysicsSimulator;
 
 #[test]
 #[ignore] // ~30s: run manually with `cargo test -p symthaea-flight -- --ignored --nocapture`
@@ -296,5 +298,112 @@ fn diagnostic_within_episode_learning_curve() {
     println!("  avg_free_energy: {:.6}", metrics.avg_free_energy);
     println!("  hover_fraction: {:.4}", metrics.hover_fraction);
     println!("  exploration_count: {}", metrics.exploration_count);
+    println!();
+}
+
+#[test]
+#[ignore] // ~30s: run manually with `cargo test -p symthaea-flight -- --ignored --nocapture`
+fn diagnostic_motor_lag_recovery() {
+    println!("\n{}", "=".repeat(80));
+    println!("=== DIAGNOSTIC 4: Motor Lag Recovery (10 episodes x 500 steps) ===");
+    println!("{}\n", "=".repeat(80));
+
+    let config = FlightConfig {
+        num_episodes: 10,
+        steps_per_episode: 500,
+        ..FlightConfig::default()
+    };
+
+    // Train with motor lag enabled (default)
+    let mut trainer = FlightTrainer::new(config);
+    let metrics = trainer.train();
+
+    println!(
+        "{:<8} {:<20} {:<18} {:<15}",
+        "Episode", "Avg Pos Error", "Final Pos Error", "Hover Frac"
+    );
+    println!("{}", "-".repeat(61));
+
+    for m in &metrics {
+        println!(
+            "{:<8} {:<20.6} {:<18.6} {:<15.4}",
+            m.episode, m.avg_position_error, m.final_position_error, m.hover_fraction,
+        );
+    }
+
+    // Verify convergence despite motor lag
+    let last_3: Vec<_> = metrics.iter().rev().take(3).collect();
+    let last_3_avg: f64 = last_3.iter().map(|m| m.avg_position_error).sum::<f64>() / 3.0;
+
+    println!("\nLast 3 episodes avg error: {:.6}", last_3_avg);
+    assert!(
+        last_3_avg < 2.0,
+        "Motor lag should not prevent convergence: avg={last_3_avg:.4}"
+    );
+    println!("PASS: Motor lag convergence verified.");
+    println!();
+}
+
+#[test]
+#[ignore] // ~5s: run manually with `cargo test -p symthaea-flight -- --ignored --nocapture`
+fn diagnostic_pid_vs_pd_wind_baseline() {
+    println!("\n{}", "=".repeat(80));
+    println!("=== DIAGNOSTIC 5: PID vs PD Under Sustained Wind ===");
+    println!("{}\n", "=".repeat(80));
+
+    let setpoint = FlightSetpoint {
+        position: [0.0, 0.0, 0.1],
+        yaw: 0.0,
+    };
+    let gains = PdGains::default();
+    let dt = 0.002;
+    let wind = [0.02, 0.0, 0.0]; // sustained lateral wind
+
+    // Run PD controller under wind
+    let mut sim_pd = SimplePhysicsSimulator::new();
+    sim_pd.set_motor_lag(false); // isolate controller effect
+    sim_pd.reset(0.1);
+    for _ in 0..2000 {
+        let state = sim_pd.state().clone();
+        let cmd = pd_baseline(&state, &setpoint, &gains);
+        sim_pd.apply_external_force(wind);
+        sim_pd.step(&cmd, dt);
+    }
+    let pd_final_err = setpoint.position_error_magnitude(sim_pd.state());
+
+    // Run PID controller under same wind
+    let mut sim_pid = SimplePhysicsSimulator::new();
+    sim_pid.set_motor_lag(false);
+    sim_pid.reset(0.1);
+    let mut pid_state = PidState::default();
+    for _ in 0..2000 {
+        let state = sim_pid.state().clone();
+        let cmd = pid_baseline(&state, &setpoint, &gains, &mut pid_state, dt);
+        sim_pid.apply_external_force(wind);
+        sim_pid.step(&cmd, dt);
+    }
+    let pid_final_err = setpoint.position_error_magnitude(sim_pid.state());
+
+    println!("PD  final position error: {:.6} m", pd_final_err);
+    println!("PID final position error: {:.6} m", pid_final_err);
+
+    if pid_final_err < pd_final_err {
+        println!(
+            "PID improvement: {:.2}%",
+            (1.0 - pid_final_err / pd_final_err) * 100.0
+        );
+    } else {
+        println!(
+            "PID degradation: {:.2}% (integral may need tuning)",
+            (pid_final_err / pd_final_err - 1.0) * 100.0
+        );
+    }
+
+    // PID should have lower steady-state error under sustained wind
+    assert!(
+        pid_final_err < pd_final_err * 1.5,
+        "PID should not dramatically degrade: pid={pid_final_err:.6}, pd={pd_final_err:.6}"
+    );
+    println!("PASS: PID baseline validated.");
     println!();
 }

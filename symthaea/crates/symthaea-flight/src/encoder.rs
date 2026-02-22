@@ -4,6 +4,20 @@
 //! Each of 13 sensor channels gets a genesis-seeded base vector. Values are level-encoded
 //! (thermometer coding) then bound with the base vector. The result is bundled into a single
 //! 16,384D ContinuousHV. Derivative encoding provides velocity context.
+//!
+//! # Shared HDC Sensor Encoding Pattern
+//!
+//! Both this encoder and `PlasmaHdcEncoder` (in `symthaea-physics`) follow the same
+//! 5-step pipeline for encoding continuous sensor data into hyperdimensional vectors:
+//!
+//! 1. **Normalize** each channel to \[0, 1\] using known physical ranges
+//! 2. **Level-encode** via thermometer coding (bundle levels 0..=k)
+//! 3. **Bind** the level HV with a genesis-seeded channel base vector
+//! 4. **Bundle** all bound channel HVs into a single representation
+//! 5. **Derivative encoding** (optional): encode rate-of-change channels
+//!
+//! If a third domain encoder appears, consider extracting a shared `SensorHdcEncoder`
+//! trait to formalize this pattern.
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
