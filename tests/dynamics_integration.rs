@@ -77,7 +77,11 @@ fn cfc_cell_construction_and_forward_dimensions() {
     let output = cell.forward(&input, 0.05);
 
     // Output dimension must match hidden_dim
-    assert_eq!(output.len(), 16, "CfCCell forward output should have hidden_dim elements");
+    assert_eq!(
+        output.len(),
+        16,
+        "CfCCell forward output should have hidden_dim elements"
+    );
     assert_all_finite(&output, "CfCCell forward output");
 }
 
@@ -109,8 +113,14 @@ fn cfc_cell_forward_with_cache_and_backward() {
     assert_eq!(grads.dtau.len(), 16);
 
     // All gradients must be finite
-    assert!(grads.dw_in.iter().all(|v| v.is_finite()), "dw_in contains non-finite");
-    assert!(grads.dw_h.iter().all(|v| v.is_finite()), "dw_h contains non-finite");
+    assert!(
+        grads.dw_in.iter().all(|v| v.is_finite()),
+        "dw_in contains non-finite"
+    );
+    assert!(
+        grads.dw_h.iter().all(|v| v.is_finite()),
+        "dw_h contains non-finite"
+    );
     assert_all_finite(&grads.db_h, "db_h gradient");
     assert_all_finite(&grads.dtau, "dtau gradient");
 }
@@ -151,9 +161,17 @@ fn cfc_network_forward_sequence() {
 
     let outputs = net.forward_sequence(&inputs, &dts);
 
-    assert_eq!(outputs.len(), seq_len, "Should produce one output per timestep");
+    assert_eq!(
+        outputs.len(),
+        seq_len,
+        "Should produce one output per timestep"
+    );
     for (t, out) in outputs.iter().enumerate() {
-        assert_eq!(out.len(), 4, "Output at step {t} should have output_dim=4 elements");
+        assert_eq!(
+            out.len(),
+            4,
+            "Output at step {t} should have output_dim=4 elements"
+        );
         assert_all_finite(out, &format!("sequence output[{t}]"));
     }
 }
@@ -174,7 +192,11 @@ fn cfc_network_state_save_restore_round_trip() {
 
     // Snapshot states
     let saved_states = net.state();
-    assert_eq!(saved_states.len(), 2, "Should have one state vector per layer");
+    assert_eq!(
+        saved_states.len(),
+        2,
+        "Should have one state vector per layer"
+    );
 
     // Run more forward passes to change state
     for _ in 0..5 {
@@ -187,14 +209,18 @@ fn cfc_network_state_save_restore_round_trip() {
         .iter()
         .zip(changed_states.iter())
         .any(|(a, b)| a.iter().zip(b.iter()).any(|(x, y)| (x - y).abs() > 1e-12));
-    assert!(any_changed, "States should have changed after additional forward passes");
+    assert!(
+        any_changed,
+        "States should have changed after additional forward passes"
+    );
 
     // Restore original states
     net.set_state(saved_states.clone());
     let restored_states = net.state();
 
     // Restored states should match saved
-    for (layer_idx, (saved, restored)) in saved_states.iter().zip(restored_states.iter()).enumerate()
+    for (layer_idx, (saved, restored)) in
+        saved_states.iter().zip(restored_states.iter()).enumerate()
     {
         for (i, (s, r)) in saved.iter().zip(restored.iter()).enumerate() {
             assert!(
@@ -224,7 +250,10 @@ fn cfc_network_parameter_count_is_positive_and_consistent() {
     //        = 256 + 256 + 16 + 16 = 544
     // Output: hidden_dim(16) * output_dim(4) + bias(4) = 64 + 4 = 68
     // Total = 416 + 544 + 68 = 1028
-    assert_eq!(params, 1028, "Parameter count should match analytical computation");
+    assert_eq!(
+        params, 1028,
+        "Parameter count should match analytical computation"
+    );
 }
 
 // ============================================================================
@@ -247,7 +276,11 @@ fn hierarchical_cfc_multi_scale_forward() {
     };
     let mut hcfc = HierarchicalCfC::new(config);
 
-    assert_eq!(hcfc.num_layers(), 4, "Should have 4 layers matching DEFAULT_TIME_CONSTANTS");
+    assert_eq!(
+        hcfc.num_layers(),
+        4,
+        "Should have 4 layers matching DEFAULT_TIME_CONSTANTS"
+    );
 
     let input = input_8();
     let output = hcfc.forward_hierarchical(&input, 0.01);
@@ -259,7 +292,11 @@ fn hierarchical_cfc_multi_scale_forward() {
     // Should produce one scale output per layer
     assert_eq!(output.scale_outputs.len(), 4);
     for (i, scale_out) in output.scale_outputs.iter().enumerate() {
-        assert_eq!(scale_out.len(), 4, "Scale {i} output should match output_dim");
+        assert_eq!(
+            scale_out.len(),
+            4,
+            "Scale {i} output should match output_dim"
+        );
         assert_all_finite(scale_out, &format!("scale_output[{i}]"));
     }
 
@@ -297,8 +334,14 @@ fn hierarchical_cfc_train_step_produces_finite_loss() {
     let target = Array1::from_vec(vec![0.5, -0.3, 0.1, 0.8]);
 
     let loss = hcfc.train_step(&input, &target, 0.1, 0.01).unwrap();
-    assert!(loss.is_finite(), "Training loss should be finite, got {loss}");
-    assert!(loss >= 0.0, "MSE-based loss should be non-negative, got {loss}");
+    assert!(
+        loss.is_finite(),
+        "Training loss should be finite, got {loss}"
+    );
+    assert!(
+        loss >= 0.0,
+        "MSE-based loss should be non-negative, got {loss}"
+    );
 }
 
 // ============================================================================
@@ -403,7 +446,11 @@ fn crystalized_concept_with_details_and_activate() {
 #[test]
 fn activation_type_apply_known_values() {
     // ReLU(-1) = 0, ReLU(1) = 1
-    assert_eq!(ActivationType::ReLU.apply(-1.0), 0.0, "ReLU(-1) should be 0");
+    assert_eq!(
+        ActivationType::ReLU.apply(-1.0),
+        0.0,
+        "ReLU(-1) should be 0"
+    );
     assert_eq!(ActivationType::ReLU.apply(1.0), 1.0, "ReLU(1) should be 1");
     assert_eq!(ActivationType::ReLU.apply(0.0), 0.0, "ReLU(0) should be 0");
 
@@ -416,9 +463,15 @@ fn activation_type_apply_known_values() {
 
     // Sigmoid is bounded in (0, 1)
     let sig_large = ActivationType::Sigmoid.apply(100.0);
-    assert!(sig_large > 0.99 && sig_large <= 1.0, "Sigmoid(100) should be ~1.0");
+    assert!(
+        sig_large > 0.99 && sig_large <= 1.0,
+        "Sigmoid(100) should be ~1.0"
+    );
     let sig_neg = ActivationType::Sigmoid.apply(-100.0);
-    assert!(sig_neg >= 0.0 && sig_neg < 0.01, "Sigmoid(-100) should be ~0.0");
+    assert!(
+        sig_neg >= 0.0 && sig_neg < 0.01,
+        "Sigmoid(-100) should be ~0.0"
+    );
 
     // Tanh(0) = 0
     let tanh_zero = ActivationType::Tanh.apply(0.0);
@@ -429,10 +482,7 @@ fn activation_type_apply_known_values() {
 
     // Tanh is bounded in (-1, 1)
     let tanh_large = ActivationType::Tanh.apply(100.0);
-    assert!(
-        (tanh_large - 1.0).abs() < 1e-4,
-        "Tanh(100) should be ~1.0"
-    );
+    assert!((tanh_large - 1.0).abs() < 1e-4, "Tanh(100) should be ~1.0");
 
     // SiLU(0) = 0 * sigmoid(0) = 0 * 0.5 = 0
     let silu_zero = ActivationType::SiLU.apply(0.0);
@@ -525,7 +575,10 @@ fn online_learning_stats_tracking() {
     net_config.cell_config.online_learning = Some(online_config);
 
     let mut net = CfCNetwork::new(net_config);
-    assert!(net.online_learning_enabled(), "Online learning should be enabled");
+    assert!(
+        net.online_learning_enabled(),
+        "Online learning should be enabled"
+    );
 
     let input = input_8();
     let target = Array1::from_vec(vec![1.0, -1.0, 0.5, -0.5]);
