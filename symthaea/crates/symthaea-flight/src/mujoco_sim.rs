@@ -47,6 +47,8 @@ impl MuJoCoSimulator {
             body_id,
             sensory_filter: None,
         };
+        // Forward kinematics to populate xpos/xquat from qpos
+        sim.data.forward();
         sim.extract_state();
         sim
     }
@@ -68,6 +70,8 @@ impl MuJoCoSimulator {
             body_id,
             sensory_filter: None,
         };
+        // Forward kinematics to populate xpos/xquat from qpos
+        sim.data.forward();
         sim.extract_state();
         sim
     }
@@ -217,11 +221,7 @@ impl MuJoCoSimulator {
     fn find_body_id(model: &MjModel, name: &str) -> usize {
         let c_name = std::ffi::CString::new(name).expect("Body name contains null byte");
         let id = unsafe {
-            mujoco_rs::mujoco_c::mj_name2id(
-                model.ffi(),
-                MjtObj::mjOBJ_BODY as i32,
-                c_name.as_ptr(),
-            )
+            mujoco_rs::mujoco_c::mj_name2id(model.ffi(), MjtObj::mjOBJ_BODY as i32, c_name.as_ptr())
         };
         assert!(id >= 0, "Body '{}' not found in MJCF model", name);
         id as usize

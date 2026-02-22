@@ -37,6 +37,26 @@
           sentencepiece  # For tokenizers
         ]);
 
+        # MuJoCo 3.3.7 pre-built binary (matches mujoco-rs 2.3.3+mj-3.3.7)
+        mujoco337 = pkgs.stdenv.mkDerivation {
+          pname = "mujoco";
+          version = "3.3.7";
+          src = pkgs.fetchurl {
+            url = "https://github.com/google-deepmind/mujoco/releases/download/3.3.7/mujoco-3.3.7-linux-x86_64.tar.gz";
+            sha256 = "075y1niyrg1slzwmdb0551whgbrjmqgxrsq3cw1adnc63vvs558q";
+          };
+          dontBuild = true;
+          installPhase = ''
+            mkdir -p $out
+            cp -r lib $out/
+            cp -r include $out/
+            cp -r bin $out/ 2>/dev/null || true
+          '';
+          fixupPhase = ''
+            patchelf --set-rpath "${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib pkgs.libGL pkgs.xorg.libX11 ]}" $out/lib/libmujoco.so* 2>/dev/null || true
+          '';
+        };
+
         # Common build inputs
         buildInputs = with pkgs; [
           # Rust toolchain
@@ -88,8 +108,8 @@
           # Note: ort crate uses load-dynamic, so we need the shared lib
           onnxruntime
 
-          # MuJoCo physics engine (for symthaea-flight mujoco feature)
-          mujoco
+          # MuJoCo 3.3.7 physics engine (for symthaea-flight mujoco feature)
+          mujoco337
           glfw
           libGL
 
@@ -129,8 +149,8 @@
         # ONNX Runtime path for dynamic loading
         onnxPath = "${pkgs.onnxruntime}/lib";
 
-        # MuJoCo library path
-        mujocoPath = "${pkgs.mujoco}/lib";
+        # MuJoCo library path (3.3.7 for mujoco-rs compatibility)
+        mujocoPath = "${mujoco337}/lib";
 
       in {
         devShells.default = pkgs.mkShell {
@@ -138,7 +158,7 @@
 
           shellHook = ''
             export LD_LIBRARY_PATH="${libPath}:${onnxPath}:${mujocoPath}:$LD_LIBRARY_PATH"
-            export MUJOCO_PATH="${pkgs.mujoco}"
+            export MUJOCO_PATH="${mujoco337}"
             export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig:${pkgs.alsa-lib}/lib/pkgconfig:${pkgs.dbus}/lib/pkgconfig:$PKG_CONFIG_PATH"
 
             # ONNX Runtime dynamic loading

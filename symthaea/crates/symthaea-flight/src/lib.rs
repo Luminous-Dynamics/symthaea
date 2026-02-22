@@ -36,9 +36,9 @@ pub mod controller;
 pub mod encoder;
 pub mod fep_agent;
 pub mod formation;
+pub mod perturbations;
 pub mod simulator;
 pub mod training;
-pub mod perturbations;
 pub mod types;
 
 // ── MuJoCo-dependent modules ──
@@ -58,8 +58,8 @@ pub mod swarm;
 pub use controller::FlightController;
 pub use encoder::QuadrotorHdcEncoder;
 pub use fep_agent::ActiveInferenceFlightAgent;
-pub use simulator::{PhysicsSimulator, SimplePhysicsSimulator};
 pub use perturbations::{FlightPerturbation, PerturbationSchedule};
+pub use simulator::{PhysicsSimulator, SimplePhysicsSimulator};
 pub use training::FlightTrainer;
 pub use types::*;
 
