@@ -676,7 +676,7 @@ fn test_resonator_recall_no_panic_on_cold_start() {
     let result = service.cycle("cold start input with no prior episodes");
     assert!(result.prediction_error.is_finite());
     assert!(result.metadata.resonator_episodes <= 1); // encoding may fire on high pred_error
-    // Factorization needs >= 2 episodes, so 0 on first cycle
+                                                      // Factorization needs >= 2 episodes, so 0 on first cycle
     assert_eq!(result.metadata.resonator_factorization_iters, 0);
 }
 

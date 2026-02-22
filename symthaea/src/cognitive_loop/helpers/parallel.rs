@@ -170,8 +170,7 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
     }
 
     // Apply memory context boost to confidence
-    *prediction_confidence =
-        (*prediction_confidence + ctx.memory_context_boost).clamp(0.0, 1.0);
+    *prediction_confidence = (*prediction_confidence + ctx.memory_context_boost).clamp(0.0, 1.0);
 
     // Primitive-Belief Bridge: map primitives to beliefs, compute TD signals
     let prim_state = CognitiveLoopService::build_primitive_state(

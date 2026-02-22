@@ -95,7 +95,9 @@ impl CognitiveLoopService {
                 // Add current input as a working memory item
                 let wm_item = crate::brain::prefrontal::WorkingMemoryItem::new(
                     format!("cycle_{}", self.stats.total_cycles),
-                    symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(ctx.compressed_state.to_vec()),
+                    symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(
+                        ctx.compressed_state.to_vec(),
+                    ),
                 );
                 pfc.add_to_memory(wm_item);
 
@@ -129,13 +131,22 @@ impl CognitiveLoopService {
                                 // Project to resonator dim and find best episode match
                                 let projected: Vec<f32> =
                                     grad_vals.iter().take(res_dim).copied().collect();
-                                let best_sim = res_mem.episodes.iter()
+                                let best_sim = res_mem
+                                    .episodes
+                                    .iter()
                                     .map(|ep| {
-                                        ep.hv.iter().zip(projected.iter())
-                                            .map(|(a, b)| a * b).sum::<f32>()
+                                        ep.hv
+                                            .iter()
+                                            .zip(projected.iter())
+                                            .map(|(a, b)| a * b)
+                                            .sum::<f32>()
                                             / (ep.hv.iter().map(|x| x * x).sum::<f32>().sqrt()
-                                               * projected.iter().map(|x| x * x).sum::<f32>().sqrt())
-                                                .max(1e-8)
+                                                * projected
+                                                    .iter()
+                                                    .map(|x| x * x)
+                                                    .sum::<f32>()
+                                                    .sqrt())
+                                            .max(1e-8)
                                     })
                                     .fold(0.0f32, f32::max);
                                 // High resonator match → boost importance (consolidation-worthy)
@@ -223,7 +234,10 @@ impl CognitiveLoopService {
                 }
             } else {
                 // Read cached accuracy/depth without updating (avoid 0.0 in telemetry on skip)
-                self.meta_cognition.as_ref().map(|m| (m.accuracy(), m.depth())).unwrap_or((0.0, 0))
+                self.meta_cognition
+                    .as_ref()
+                    .map(|m| (m.accuracy(), m.depth()))
+                    .unwrap_or((0.0, 0))
             };
 
         module_timings.meta_cognition = _t.elapsed().as_micros() as u64;
@@ -259,7 +273,11 @@ impl CognitiveLoopService {
             } else {
                 // Urgency-skipped: use carryover for phi_modulation and arousal; valence has no
                 // carryover so use neutral 0.0 (lightweight — doesn't trigger somatic marker feedback).
-                (self.carryover.consciousness.body_phi_modulation, 0.0, self.carryover.history.body_arousal)
+                (
+                    self.carryover.consciousness.body_phi_modulation,
+                    0.0,
+                    self.carryover.history.body_arousal,
+                )
             };
 
         module_timings.virtual_body = _t.elapsed().as_micros() as u64;
@@ -318,7 +336,11 @@ impl CognitiveLoopService {
             // Science: Prolonged high arousal suppresses LR → error stays high → arousal stays
             // high → positive feedback trap. After 10 stuck cycles, force exploration escape.
             if affective_arousal > 0.8 {
-                self.carryover.urgency.arousal_trap_counter = self.carryover.urgency.arousal_trap_counter.saturating_add(1);
+                self.carryover.urgency.arousal_trap_counter = self
+                    .carryover
+                    .urgency
+                    .arousal_trap_counter
+                    .saturating_add(1);
             }
             if self.carryover.urgency.arousal_trap_counter > 10 {
                 self.curiosity_drive.exploration_urge = 1.0; // forced escape attempt
@@ -375,7 +397,10 @@ impl CognitiveLoopService {
             }
         } else {
             // Read cached self_phi without processing (avoid 0.0 triggering weak-identity feedback)
-            self.narrative_self.as_ref().map(|n| n.self_phi()).unwrap_or(0.0)
+            self.narrative_self
+                .as_ref()
+                .map(|n| n.self_phi())
+                .unwrap_or(0.0)
         };
 
         // FEEDBACK: Narrative self-Phi modulates prediction confidence (identity coherence)
@@ -395,7 +420,8 @@ impl CognitiveLoopService {
             self.fep_learning_signal *= 1.0 + (narrative_self_psi as f32 - 0.7) * 0.1;
         } else if narrative_self_psi > 0.0 && narrative_self_psi < 0.2 {
             // Low self-coherence → amplify moral concern sensitivity
-            self.adaptive_behavior.attention_sensitivity *= 1.0 + (0.2 - narrative_self_psi as f32) * 0.15;
+            self.adaptive_behavior.attention_sensitivity *=
+                1.0 + (0.2 - narrative_self_psi as f32) * 0.15;
         }
 
         module_timings.narrative_self = _t.elapsed().as_micros() as u64;
@@ -434,41 +460,42 @@ impl CognitiveLoopService {
         // Science: Friston (2008) — hierarchical predictive processing
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let hierarchical_total_free_energy = if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4)
-        {
-            if let Some(ref mut hfe) = self.hierarchical_free_energy {
-                // FEEDBACK: Phi→precision coupling — higher integrated information
-                // sharpens lower-level precision (Feldman & Friston 2010, §7.4).
-                // This creates a causal mechanism: consciousness improves perceptual accuracy.
-                let psi_boost = (ctx.unified_psi * 0.5).clamp(0.0, 0.5);
-                let base_decay = hfe.config.precision_decay;
-                for level in &mut hfe.levels {
-                    let base_precision = base_decay.powi(level.level as i32);
-                    level.precision = base_precision * (1.0 + psi_boost);
-                }
+        let hierarchical_total_free_energy =
+            if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
+                if let Some(ref mut hfe) = self.hierarchical_free_energy {
+                    // FEEDBACK: Phi→precision coupling — higher integrated information
+                    // sharpens lower-level precision (Feldman & Friston 2010, §7.4).
+                    // This creates a causal mechanism: consciousness improves perceptual accuracy.
+                    let psi_boost = (ctx.unified_psi * 0.5).clamp(0.0, 0.5);
+                    let base_decay = hfe.config.precision_decay;
+                    for level in &mut hfe.levels {
+                        let base_precision = base_decay.powi(level.level as i32);
+                        level.precision = base_precision * (1.0 + psi_boost);
+                    }
 
-                // Build observation from compressed state (clamped to state_dim)
-                let obs: Vec<f64> = ctx.compressed_state
-                    .iter()
-                    .take(hfe.config.state_dim)
-                    .map(|&x| x as f64)
-                    .collect();
-                hfe.update_beliefs(&obs);
-                hfe.total_free_energy()
+                    // Build observation from compressed state (clamped to state_dim)
+                    let obs: Vec<f64> = ctx
+                        .compressed_state
+                        .iter()
+                        .take(hfe.config.state_dim)
+                        .map(|&x| x as f64)
+                        .collect();
+                    hfe.update_beliefs(&obs);
+                    hfe.total_free_energy()
+                } else {
+                    0.0
+                }
             } else {
                 0.0
-            }
-        } else {
-            0.0
-        };
+            };
 
         // FEEDBACK: High hierarchical free energy suppresses exploration AND boosts learning
         // Science: Friston (2008) — poor model → focus on learning, not exploring
         if hierarchical_total_free_energy > 1.0 {
             let fe_factor = (1.0 / (1.0 + hierarchical_total_free_energy * 0.1)) as f32;
             self.curiosity_drive.boredom *= fe_factor; // suppress exploration urge
-            // Boost LR proportional to free energy (poor model → learn harder)
-            // Capped at +30% to prevent instability
+                                                       // Boost LR proportional to free energy (poor model → learn harder)
+                                                       // Capped at +30% to prevent instability
             let hfe_lr_boost = (1.0 + (hierarchical_total_free_energy * 0.05).min(0.3)) as f32;
             self.fep_lr_boost = (self.fep_lr_boost * hfe_lr_boost).clamp(1.0, 2.0);
         }
@@ -532,11 +559,11 @@ impl CognitiveLoopService {
         // high focus → deep attention, suppress context-switching to maintain flow
         if attention_schema_focus > 0.0 {
             if attention_schema_focus < 0.3 {
-                let novelty_push = ((0.3 - attention_schema_focus) * 0.12) as f32;
+                let novelty_push = (0.3 - attention_schema_focus) * 0.12;
                 self.curiosity_drive.exploration_urge =
                     (self.curiosity_drive.exploration_urge + novelty_push).clamp(0.0, 1.0);
             } else if attention_schema_focus > 0.8 {
-                let focus_lock = ((attention_schema_focus - 0.8) * 0.15) as f32;
+                let focus_lock = (attention_schema_focus - 0.8) * 0.15;
                 self.adaptive_behavior.exploration_factor *= (1.0 - focus_lock).max(0.7);
             }
         }
@@ -564,8 +591,18 @@ impl CognitiveLoopService {
         // Attention visualization: record snapshot for debugging/introspection
         if let Some(ref mut viz) = self.attention_visualizer {
             let snapshot = crate::visualization::AttentionSnapshot::new(
-                vec!["psi".into(), "coherence".into(), "body".into(), "attention".into()],
-                vec![ctx.unified_psi, ctx.coherence as f64, body_psi_modulation, psi_attention_avg as f64],
+                vec![
+                    "psi".into(),
+                    "coherence".into(),
+                    "body".into(),
+                    "attention".into(),
+                ],
+                vec![
+                    ctx.unified_psi,
+                    ctx.coherence as f64,
+                    body_psi_modulation,
+                    psi_attention_avg as f64,
+                ],
                 vec![
                     ctx.unified_psi as f32,
                     ctx.coherence,
@@ -635,7 +672,9 @@ impl CognitiveLoopService {
         // FEEDBACK: GWT broadcast boosts confidence (conscious access moment)
         // Science: Baars (1988) — broadcast = conscious access, should amplify integration
         if gwt_broadcast {
-            self.prediction_confidence = (self.prediction_confidence + super::cycle::GWT_BROADCAST_CONFIDENCE_BOOST).clamp(0.0, 1.0);
+            self.prediction_confidence = (self.prediction_confidence
+                + super::cycle::GWT_BROADCAST_CONFIDENCE_BOOST)
+                .clamp(0.0, 1.0);
         }
 
         module_timings.gwt = _t.elapsed().as_micros() as u64;
@@ -645,8 +684,11 @@ impl CognitiveLoopService {
         // Runs every cycle (lightweight: 2 HV ops + similarity)
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let (cross_modal_binding_strength, cross_modal_psi) =
-            self.update_cross_modal_binding(&ctx.hv16_cached, late.affective_valence, late.predictive_free_energy);
+        let (cross_modal_binding_strength, cross_modal_psi) = self.update_cross_modal_binding(
+            &ctx.hv16_cached,
+            late.affective_valence,
+            late.predictive_free_energy,
+        );
 
         module_timings.cross_modal_binding = _t.elapsed().as_micros() as u64;
 
@@ -800,7 +842,8 @@ impl CognitiveLoopService {
                 (self.carryover.learning.adaptive_threshold_scale * 1.01).clamp(0.6, 1.5);
         } else {
             // Slowly return toward baseline
-            self.carryover.learning.adaptive_threshold_scale += (1.0 - self.carryover.learning.adaptive_threshold_scale) * 0.02;
+            self.carryover.learning.adaptive_threshold_scale +=
+                (1.0 - self.carryover.learning.adaptive_threshold_scale) * 0.02;
         }
 
         // FEEDBACK: High temporal coherence strengthens narrative self engagement
@@ -887,7 +930,8 @@ impl CognitiveLoopService {
                     (self.curiosity_drive.exploration_urge + entropy_boost).clamp(0.0, 1.0);
             } else if thermodynamic_entropy < 0.3 {
                 let consolidation_bias = ((0.3 - thermodynamic_entropy) * 0.08).min(0.08) as f32;
-                self.fep_lr_boost = (self.fep_lr_boost * (1.0 + consolidation_bias)).clamp(1.0, 2.0);
+                self.fep_lr_boost =
+                    (self.fep_lr_boost * (1.0 + consolidation_bias)).clamp(1.0, 2.0);
             }
         }
 
@@ -987,8 +1031,11 @@ impl CognitiveLoopService {
         #[cfg(feature = "full_consciousness")]
         let (living_mind_vitality, living_mind_coherence) = {
             // Update autopoietic self-maintenance with current consciousness signals
-            self.autopoietic
-                .update(ctx.unified_psi, ctx.coherence as f64, ctx.prediction_error as f64);
+            self.autopoietic.update(
+                ctx.unified_psi,
+                ctx.coherence as f64,
+                ctx.prediction_error as f64,
+            );
 
             // Map cognitive loop action to enactive ActionType based on adaptive behavior
             let enactive_action = match self.adaptive_behavior.action_hint {
@@ -1080,7 +1127,8 @@ impl CognitiveLoopService {
             // FEEDBACK: MCE consciousness level boosts learning rate (decaying)
             // Science: Dehaene (2014) — conscious access improves encoding
             if level > 0.0 {
-                self.carryover.learning.mce_lr_boost = (level * super::cycle::MCE_LR_BOOST_SCALE as f64) as f32;
+                self.carryover.learning.mce_lr_boost =
+                    (level * super::cycle::MCE_LR_BOOST_SCALE as f64) as f32;
             } else {
                 self.carryover.learning.mce_lr_boost *= super::cycle::MCE_BOOST_DECAY;
             }

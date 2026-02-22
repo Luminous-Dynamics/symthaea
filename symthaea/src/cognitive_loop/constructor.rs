@@ -371,17 +371,24 @@ impl CognitiveLoopService {
 
         // Build optional primitive consciousness processor
         let primitive_processor = if config.enable_primitive_consciousness {
-            Some(crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor::new())
+            Some(
+                crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor::new(
+                ),
+            )
         } else {
             None
         };
 
         // Build optional temporal analyzer + lattice (co-gated with primitive consciousness)
-        let (temporal_analyzer, primitive_lattice) = if let Some(ref processor) = primitive_processor {
-            let analyzer = crate::consciousness::temporal_primitives::ConsciousnessTemporalAnalyzer::new(0.3);
-            let lattice = crate::consciousness::primitive_lattice::PrimitiveLattice::from_primitive_system(
-                processor.primitive_system(),
-            );
+        let (temporal_analyzer, primitive_lattice) = if let Some(ref processor) =
+            primitive_processor
+        {
+            let analyzer =
+                crate::consciousness::temporal_primitives::ConsciousnessTemporalAnalyzer::new(0.3);
+            let lattice =
+                crate::consciousness::primitive_lattice::PrimitiveLattice::from_primitive_system(
+                    processor.primitive_system(),
+                );
             (Some(analyzer), Some(lattice))
         } else {
             (None, None)
@@ -389,32 +396,47 @@ impl CognitiveLoopService {
 
         // Build optional compositionality engine + value evaluator + harmonics + reasoning + validation
         // (all co-gated with primitive consciousness)
-        let (compositionality_engine, value_evaluator, harmonic_field, harmonic_resolver,
-             primitive_reasoner, adaptive_reasoner, phi_validation) =
-            if primitive_processor.is_some() {
-                let comp_engine = {
-                    let ps = std::sync::Arc::new(
-                        symthaea_core::hdc::primitive_system::PrimitiveSystem::new(),
-                    );
-                    crate::consciousness::compositionality::CompositionalityEngine::new(
-                        ps,
-                        crate::consciousness::compositionality::CompositionalityConfig::default(),
-                    )
-                };
-                let val_eval = crate::consciousness::unified_value_evaluator::UnifiedValueEvaluator::new();
-                let hf = crate::consciousness::harmonics::HarmonicField::new();
-                let hr = crate::consciousness::harmonics::HarmonicResolver::new();
-                let pr = crate::consciousness::primitive_reasoning::PrimitiveReasoner::new(
-                    crate::consciousness::primitive_reasoning::ReasonerConfig::default(),
+        let (
+            compositionality_engine,
+            value_evaluator,
+            harmonic_field,
+            harmonic_resolver,
+            primitive_reasoner,
+            adaptive_reasoner,
+            phi_validation,
+        ) = if primitive_processor.is_some() {
+            let comp_engine = {
+                let ps = std::sync::Arc::new(
+                    symthaea_core::hdc::primitive_system::PrimitiveSystem::new(),
                 );
-                let ar = crate::consciousness::adaptive_reasoning::AdaptiveReasoner::new(
-                    symthaea_core::hdc::primitive_system::PrimitiveTier::NSM,
-                );
-                let pv = crate::consciousness::phi_validation::PhiValidationFramework::new();
-                (Some(comp_engine), Some(val_eval), Some(hf), Some(hr), Some(pr), Some(ar), Some(pv))
-            } else {
-                (None, None, None, None, None, None, None)
+                crate::consciousness::compositionality::CompositionalityEngine::new(
+                    ps,
+                    crate::consciousness::compositionality::CompositionalityConfig::default(),
+                )
             };
+            let val_eval =
+                crate::consciousness::unified_value_evaluator::UnifiedValueEvaluator::new();
+            let hf = crate::consciousness::harmonics::HarmonicField::new();
+            let hr = crate::consciousness::harmonics::HarmonicResolver::new();
+            let pr = crate::consciousness::primitive_reasoning::PrimitiveReasoner::new(
+                crate::consciousness::primitive_reasoning::ReasonerConfig::default(),
+            );
+            let ar = crate::consciousness::adaptive_reasoning::AdaptiveReasoner::new(
+                symthaea_core::hdc::primitive_system::PrimitiveTier::NSM,
+            );
+            let pv = crate::consciousness::phi_validation::PhiValidationFramework::new();
+            (
+                Some(comp_engine),
+                Some(val_eval),
+                Some(hf),
+                Some(hr),
+                Some(pr),
+                Some(ar),
+                Some(pv),
+            )
+        } else {
+            (None, None, None, None, None, None, None)
+        };
 
         // Build optional causal self-explainer (co-gated with primitive consciousness)
         let causal_explainer = if primitive_processor.is_some() {
@@ -432,12 +454,14 @@ impl CognitiveLoopService {
 
         // Build optional harmonies integrator (co-gated with primitive consciousness)
         let harmonies_integrator = if primitive_processor.is_some() {
-            Some(crate::consciousness::harmonies_integration::HarmoniesIntegrator::new(
-                crate::consciousness::harmonies_integration::HarmoniesIntegrationConfig {
-                    dimension: config.cfc_config.input_dim,
-                    ..Default::default()
-                },
-            ))
+            Some(
+                crate::consciousness::harmonies_integration::HarmoniesIntegrator::new(
+                    crate::consciousness::harmonies_integration::HarmoniesIntegrationConfig {
+                        dimension: config.cfc_config.input_dim,
+                        ..Default::default()
+                    },
+                ),
+            )
         } else {
             None
         };
@@ -461,54 +485,67 @@ impl CognitiveLoopService {
 
         // Build optional semantic value embedder at CfC input dimension (co-gated with primitive consciousness)
         let semantic_value_embedder = if primitive_processor.is_some() {
-            Some(crate::consciousness::semantic_value_embedder::SemanticValueEmbedder::new(
-                crate::consciousness::semantic_value_embedder::EmbedderConfig {
-                    dimension: config.cfc_config.input_dim,
-                    ..Default::default()
-                },
-            ))
+            Some(
+                crate::consciousness::semantic_value_embedder::SemanticValueEmbedder::new(
+                    crate::consciousness::semantic_value_embedder::EmbedderConfig {
+                        dimension: config.cfc_config.input_dim,
+                        ..Default::default()
+                    },
+                ),
+            )
         } else {
             None
         };
 
         // Build optional dissipative consciousness + epistemic conflict + equation v2 + hierarchical LTC
         // (all co-gated with primitive consciousness — NO feature gate)
-        let (dissipative_consciousness, epistemic_conflict_detector, theory_calibrator,
-             consciousness_equation_v2, hierarchical_ltc) =
-            if primitive_processor.is_some() {
-                let dc = crate::consciousness::dissipative_consciousness::DissipativeConsciousness::new();
-                let cd = crate::consciousness::epistemic_conflict::ConflictDetector::new();
-                let tc = crate::consciousness::epistemic_conflict::TheoryCalibrator::new();
-                let eq = crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2::new();
-                let hltc = crate::consciousness::hierarchical_ltc::HierarchicalLTC::minimal_network()
-                    .ok();
-                (Some(dc), Some(cd), Some(tc), Some(eq), hltc)
-            } else {
-                (None, None, None, None, None)
-            };
+        let (
+            dissipative_consciousness,
+            epistemic_conflict_detector,
+            theory_calibrator,
+            consciousness_equation_v2,
+            hierarchical_ltc,
+        ) = if primitive_processor.is_some() {
+            let dc =
+                crate::consciousness::dissipative_consciousness::DissipativeConsciousness::new();
+            let cd = crate::consciousness::epistemic_conflict::ConflictDetector::new();
+            let tc = crate::consciousness::epistemic_conflict::TheoryCalibrator::new();
+            let eq =
+                crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2::new();
+            let hltc =
+                crate::consciousness::hierarchical_ltc::HierarchicalLTC::minimal_network().ok();
+            (Some(dc), Some(cd), Some(tc), Some(eq), hltc)
+        } else {
+            (None, None, None, None, None)
+        };
 
         // Build optional holographic + differentiable + affective + pipeline + multi-modal
         // (all co-gated with primitive consciousness)
-        let (holographic_analyzer, differentiable_consciousness, affective_consciousness,
-             unified_consciousness_pipeline, multi_modal_integrator) =
-            if primitive_processor.is_some() {
-                let ha = crate::consciousness::consciousness_holography::HolographicConsciousnessAnalyzer::new(
+        let (
+            holographic_analyzer,
+            differentiable_consciousness,
+            affective_consciousness,
+            unified_consciousness_pipeline,
+            multi_modal_integrator,
+        ) = if primitive_processor.is_some() {
+            let ha = crate::consciousness::consciousness_holography::HolographicConsciousnessAnalyzer::new(
                     crate::consciousness::consciousness_holography::HolographicConfig::default(),
                 );
-                let dc = crate::consciousness::differentiable::DifferentiableConsciousness::new();
-                let ac = crate::consciousness::affective_consciousness::AffectiveConsciousnessAnalyzer::new(
+            let dc = crate::consciousness::differentiable::DifferentiableConsciousness::new();
+            let ac =
+                crate::consciousness::affective_consciousness::AffectiveConsciousnessAnalyzer::new(
                     crate::consciousness::affective_consciousness::AffectiveConfig::default(),
                 );
-                let ucp = crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline::new(
+            let ucp = crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline::new(
                     crate::consciousness::unified_consciousness_pipeline::PipelineConfig::default(),
                 ).ok(); // Returns Result — use .ok() for graceful degradation
-                let mmi = crate::consciousness::multi_modal_integration::MultiModalIntegrator::new(
-                    crate::consciousness::multi_modal_integration::IntegrationConfig::default(),
-                );
-                (Some(ha), Some(dc), Some(ac), ucp, Some(mmi))
-            } else {
-                (None, None, None, None, None)
-            };
+            let mmi = crate::consciousness::multi_modal_integration::MultiModalIntegrator::new(
+                crate::consciousness::multi_modal_integration::IntegrationConfig::default(),
+            );
+            (Some(ha), Some(dc), Some(ac), ucp, Some(mmi))
+        } else {
+            (None, None, None, None, None)
+        };
 
         // Build optional synthetic states NSM grounding + epistemic gate
         // (co-gated with primitive consciousness)
@@ -639,7 +676,7 @@ impl CognitiveLoopService {
                 let dim = resonator_cfc_input_dim; // matches compressed_state
                 let res_config = crate::dynamics::resonator::ResonatorConfig {
                     dim,
-                    max_iters: 50,               // Real-time budget (default 100 too slow)
+                    max_iters: 50, // Real-time budget (default 100 too slow)
                     convergence_threshold: 0.995, // Slightly relaxed for speed
                     temperature: 0.1,
                     bipolar: true,
@@ -649,15 +686,22 @@ impl CognitiveLoopService {
                 // Helper: generate deterministic random bipolar HV from seed
                 let make_hv = |seed: u64, d: usize| -> Vec<f32> {
                     let mut state = seed ^ 0x9E3779B97F4A7C15; // xorshift64 seed-0 fix
-                    (0..d).map(|_| {
-                        state ^= state << 13;
-                        state ^= state >> 7;
-                        state ^= state << 17;
-                        if state % 2 == 0 { 1.0 } else { -1.0 }
-                    }).collect()
+                    (0..d)
+                        .map(|_| {
+                            state ^= state << 13;
+                            state ^= state >> 7;
+                            state ^= state << 17;
+                            if state % 2 == 0 {
+                                1.0
+                            } else {
+                                -1.0
+                            }
+                        })
+                        .collect()
                 };
 
-                let seed_base: u64 = resonator_genesis_phrase.as_ref()
+                let seed_base: u64 = resonator_genesis_phrase
+                    .as_ref()
                     .map(|p| {
                         let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(p);
                         genesis.domain("resonator_memory").gen::<u64>()
@@ -667,22 +711,25 @@ impl CognitiveLoopService {
                 // Codebook 1: "semantic" — 8 proto-symbols, grows dynamically
                 let mut semantic_cb = crate::dynamics::Codebook::new("semantic");
                 for i in 0..8u64 {
-                    semantic_cb.add(&format!("proto_{i}"), make_hv(seed_base.wrapping_add(i), dim));
+                    semantic_cb.add(
+                        &format!("proto_{i}"),
+                        make_hv(seed_base.wrapping_add(i), dim),
+                    );
                 }
                 mem.add_codebook(semantic_cb);
 
                 // Codebook 2: "valence" — 3 fixed emotional poles
                 let mut valence_cb = crate::dynamics::Codebook::new("valence");
                 valence_cb.add("positive", make_hv(seed_base.wrapping_add(100), dim));
-                valence_cb.add("neutral",  make_hv(seed_base.wrapping_add(101), dim));
+                valence_cb.add("neutral", make_hv(seed_base.wrapping_add(101), dim));
                 valence_cb.add("negative", make_hv(seed_base.wrapping_add(102), dim));
                 mem.add_codebook(valence_cb);
 
                 // Codebook 3: "phi_level" — 3 consciousness tiers
                 let mut phi_cb = crate::dynamics::Codebook::new("phi_level");
-                phi_cb.add("low",    make_hv(seed_base.wrapping_add(200), dim));
+                phi_cb.add("low", make_hv(seed_base.wrapping_add(200), dim));
                 phi_cb.add("medium", make_hv(seed_base.wrapping_add(201), dim));
-                phi_cb.add("high",   make_hv(seed_base.wrapping_add(202), dim));
+                phi_cb.add("high", make_hv(seed_base.wrapping_add(202), dim));
                 mem.add_codebook(phi_cb);
 
                 Some(mem)
@@ -742,7 +789,8 @@ impl CognitiveLoopService {
             prev_primitive_state: None,
             dream_engine,
             #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
-            dream_feedback_bridge: crate::consciousness::recursive_improvement::DreamFeedbackBridge::new(),
+            dream_feedback_bridge:
+                crate::consciousness::recursive_improvement::DreamFeedbackBridge::new(),
             predictive_mind,
             cross_modal_binder,
             affective_bridge,
@@ -811,7 +859,8 @@ impl CognitiveLoopService {
             temporal_consciousness,
             embodied_cognition,
             narrative_gwt,
-            spectral_mip_finder: symthaea_core::consciousness_metrics::SpectralMIPFinder::with_defaults(),
+            spectral_mip_finder:
+                symthaea_core::consciousness_metrics::SpectralMIPFinder::with_defaults(),
             soul: Some(crate::soul::Soul::new(crate::soul::SoulConfig {
                 dimension: symthaea_core::hdc::unified_hv::HDC_DIMENSION,
                 ..Default::default()

@@ -20,8 +20,8 @@ use super::snapshot::ConsciousnessSnapshot;
 use super::{
     ActionHint, AdaptiveBehavior, CognitiveDepth, CognitiveGoal, CognitiveLoopConfig,
     CognitiveLoopService, CouplingQuality, CuriosityDrive, CycleLearningResult, EmotionContagion,
-    EpisodicMemory, FlowState, LoopStats, Recommendation, ReflectionSummary,
-    ReflectionThresholds, ResponseStrategy, SelfAssessment, SelfReflection, WorldModelBridge,
+    EpisodicMemory, FlowState, LoopStats, Recommendation, ReflectionSummary, ReflectionThresholds,
+    ResponseStrategy, SelfAssessment, SelfReflection, WorldModelBridge,
 };
 
 impl CognitiveLoopService {
@@ -436,10 +436,14 @@ impl CognitiveLoopService {
                 .unwrap_or(0.0),
             fep_precision: self.fep_agent.precision.perceptual_precision(),
             spectral_mip_phi: self.carryover.consciousness.last_spectral_mip_phi,
-            harmonies_alignment: self.harmonies_integrator.as_ref()
+            harmonies_alignment: self
+                .harmonies_integrator
+                .as_ref()
                 .map(|h| h.stats().avg_alignment)
                 .unwrap_or(0.0),
-            empathic_compassion: self.empathic_unification.as_ref()
+            empathic_compassion: self
+                .empathic_unification
+                .as_ref()
                 .map(|_| 0.0) // Compassion is per-cycle; snapshot shows lifetime average
                 .unwrap_or(0.0),
             sigma: self.carryover.consciousness.last_sigma,
@@ -761,22 +765,30 @@ impl CognitiveLoopService {
     }
 
     /// Borrow the temporal primitives analyzer (if enabled).
-    pub fn temporal_analyzer(&self) -> Option<&crate::consciousness::temporal_primitives::ConsciousnessTemporalAnalyzer> {
+    pub fn temporal_analyzer(
+        &self,
+    ) -> Option<&crate::consciousness::temporal_primitives::ConsciousnessTemporalAnalyzer> {
         self.temporal_analyzer.as_ref()
     }
 
     /// Borrow the primitive lattice (if enabled).
-    pub fn primitive_lattice(&self) -> Option<&crate::consciousness::primitive_lattice::PrimitiveLattice> {
+    pub fn primitive_lattice(
+        &self,
+    ) -> Option<&crate::consciousness::primitive_lattice::PrimitiveLattice> {
         self.primitive_lattice.as_ref()
     }
 
     /// Borrow the compositionality engine (if enabled).
-    pub fn compositionality_engine(&self) -> Option<&crate::consciousness::compositionality::CompositionalityEngine> {
+    pub fn compositionality_engine(
+        &self,
+    ) -> Option<&crate::consciousness::compositionality::CompositionalityEngine> {
         self.compositionality_engine.as_ref()
     }
 
     /// Borrow the unified value evaluator (if enabled).
-    pub fn value_evaluator(&self) -> Option<&crate::consciousness::unified_value_evaluator::UnifiedValueEvaluator> {
+    pub fn value_evaluator(
+        &self,
+    ) -> Option<&crate::consciousness::unified_value_evaluator::UnifiedValueEvaluator> {
         self.value_evaluator.as_ref()
     }
 
@@ -786,47 +798,65 @@ impl CognitiveLoopService {
     }
 
     /// Borrow the primitive reasoner (if enabled).
-    pub fn primitive_reasoner(&self) -> Option<&crate::consciousness::primitive_reasoning::PrimitiveReasoner> {
+    pub fn primitive_reasoner(
+        &self,
+    ) -> Option<&crate::consciousness::primitive_reasoning::PrimitiveReasoner> {
         self.primitive_reasoner.as_ref()
     }
 
     /// Borrow the adaptive reasoner (if enabled).
-    pub fn adaptive_reasoner(&self) -> Option<&crate::consciousness::adaptive_reasoning::AdaptiveReasoner> {
+    pub fn adaptive_reasoner(
+        &self,
+    ) -> Option<&crate::consciousness::adaptive_reasoning::AdaptiveReasoner> {
         self.adaptive_reasoner.as_ref()
     }
 
     /// Borrow the causal self-explainer (if enabled).
-    pub fn causal_explainer(&self) -> Option<&crate::consciousness::causal_explanation::CausalExplainer> {
+    pub fn causal_explainer(
+        &self,
+    ) -> Option<&crate::consciousness::causal_explanation::CausalExplainer> {
         self.causal_explainer.as_ref()
     }
 
     /// Borrow the context-aware optimizer (if enabled).
-    pub fn context_optimizer(&self) -> Option<&crate::consciousness::context_aware_evolution::ContextAwareOptimizer> {
+    pub fn context_optimizer(
+        &self,
+    ) -> Option<&crate::consciousness::context_aware_evolution::ContextAwareOptimizer> {
         self.context_optimizer.as_ref()
     }
 
     /// Borrow the evolution coordinator (if enabled).
-    pub fn evolution_coordinator(&self) -> Option<&crate::consciousness::evolution_bridge::EvolutionCoordinator> {
+    pub fn evolution_coordinator(
+        &self,
+    ) -> Option<&crate::consciousness::evolution_bridge::EvolutionCoordinator> {
         self.evolution_coordinator.as_ref()
     }
 
     /// Borrow the harmonies integrator (if enabled).
-    pub fn harmonies_integrator(&self) -> Option<&crate::consciousness::harmonies_integration::HarmoniesIntegrator> {
+    pub fn harmonies_integrator(
+        &self,
+    ) -> Option<&crate::consciousness::harmonies_integration::HarmoniesIntegrator> {
         self.harmonies_integrator.as_ref()
     }
 
     /// Borrow the composition rule engine (if enabled).
-    pub fn composition_rule_engine(&self) -> Option<&crate::consciousness::primitive_composition_rules::CompositionRuleEngine> {
+    pub fn composition_rule_engine(
+        &self,
+    ) -> Option<&crate::consciousness::primitive_composition_rules::CompositionRuleEngine> {
         self.composition_rule_engine.as_ref()
     }
 
     /// Borrow the semantic value embedder (if enabled).
-    pub fn semantic_value_embedder(&self) -> Option<&crate::consciousness::semantic_value_embedder::SemanticValueEmbedder> {
+    pub fn semantic_value_embedder(
+        &self,
+    ) -> Option<&crate::consciousness::semantic_value_embedder::SemanticValueEmbedder> {
         self.semantic_value_embedder.as_ref()
     }
 
     /// Borrow the dissipative consciousness model (if enabled).
-    pub fn dissipative_consciousness(&self) -> Option<&crate::consciousness::dissipative_consciousness::DissipativeConsciousness> {
+    pub fn dissipative_consciousness(
+        &self,
+    ) -> Option<&crate::consciousness::dissipative_consciousness::DissipativeConsciousness> {
         self.dissipative_consciousness.as_ref()
     }
 
@@ -859,47 +889,68 @@ impl CognitiveLoopService {
     }
 
     /// Borrow the holographic consciousness analyzer (if enabled).
-    pub fn holographic_analyzer(&self) -> Option<&crate::consciousness::consciousness_holography::HolographicConsciousnessAnalyzer> {
+    pub fn holographic_analyzer(
+        &self,
+    ) -> Option<&crate::consciousness::consciousness_holography::HolographicConsciousnessAnalyzer>
+    {
         self.holographic_analyzer.as_ref()
     }
 
     /// Borrow the differentiable consciousness model (if enabled).
-    pub fn differentiable_consciousness(&self) -> Option<&crate::consciousness::differentiable::DifferentiableConsciousness> {
+    pub fn differentiable_consciousness(
+        &self,
+    ) -> Option<&crate::consciousness::differentiable::DifferentiableConsciousness> {
         self.differentiable_consciousness.as_ref()
     }
 
     /// Borrow the affective consciousness analyzer (if enabled).
-    pub fn affective_consciousness(&self) -> Option<&crate::consciousness::affective_consciousness::AffectiveConsciousnessAnalyzer> {
+    pub fn affective_consciousness(
+        &self,
+    ) -> Option<&crate::consciousness::affective_consciousness::AffectiveConsciousnessAnalyzer>
+    {
         self.affective_consciousness.as_ref()
     }
 
     /// Borrow the unified consciousness pipeline (if enabled).
-    pub fn unified_consciousness_pipeline(&self) -> Option<&crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline> {
+    pub fn unified_consciousness_pipeline(
+        &self,
+    ) -> Option<&crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline>
+    {
         self.unified_consciousness_pipeline.as_ref()
     }
 
     /// Borrow the multi-modal integrator (if enabled).
-    pub fn multi_modal_integrator(&self) -> Option<&crate::consciousness::multi_modal_integration::MultiModalIntegrator> {
+    pub fn multi_modal_integrator(
+        &self,
+    ) -> Option<&crate::consciousness::multi_modal_integration::MultiModalIntegrator> {
         self.multi_modal_integrator.as_ref()
     }
 
     /// Borrow the synthetic states NSM grounding (if enabled).
-    pub fn synthetic_grounding(&self) -> Option<&crate::consciousness::synthetic_states::SyntheticStatesNSMGrounding> {
+    pub fn synthetic_grounding(
+        &self,
+    ) -> Option<&crate::consciousness::synthetic_states::SyntheticStatesNSMGrounding> {
         self.synthetic_grounding.as_ref()
     }
 
     /// Borrow the epistemic decision gate (if enabled).
-    pub fn epistemic_gate(&self) -> Option<&crate::consciousness::gis_integration::EpistemicDecisionGate> {
+    pub fn epistemic_gate(
+        &self,
+    ) -> Option<&crate::consciousness::gis_integration::EpistemicDecisionGate> {
         self.epistemic_gate.as_ref()
     }
 
     /// Borrow the meta-cognitive reasoner (if enabled).
-    pub fn meta_cognitive_reasoner(&self) -> Option<&crate::consciousness::meta_reasoning::MetaCognitiveReasoner> {
+    pub fn meta_cognitive_reasoner(
+        &self,
+    ) -> Option<&crate::consciousness::meta_reasoning::MetaCognitiveReasoner> {
         self.meta_cognitive_reasoner.as_ref()
     }
 
     /// Borrow the code primitive router (if enabled).
-    pub fn code_primitive_router(&self) -> Option<&crate::consciousness::code_primitives::CodePrimitiveRouter> {
+    pub fn code_primitive_router(
+        &self,
+    ) -> Option<&crate::consciousness::code_primitives::CodePrimitiveRouter> {
         self.code_primitive_router.as_ref()
     }
 
@@ -919,7 +970,9 @@ impl CognitiveLoopService {
 
     /// Current guiding question from wisdom system.
     pub fn guiding_question(&self) -> Option<&'static str> {
-        self.experience_bus.as_ref().map(|bus| bus.current_guiding_question())
+        self.experience_bus
+            .as_ref()
+            .map(|bus| bus.current_guiding_question())
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -940,6 +993,8 @@ impl CognitiveLoopService {
 
     /// Render attention heatmap as ASCII art (inputs x time).
     pub fn attention_heatmap(&self) -> Option<String> {
-        self.attention_visualizer.as_ref().map(|viz| viz.render_heatmap())
+        self.attention_visualizer
+            .as_ref()
+            .map(|viz| viz.render_heatmap())
     }
 }

@@ -659,4 +659,3 @@ fn test_cognitive_depth_equality() {
     assert_eq!(CognitiveDepth::DeepThought, CognitiveDepth::DeepThought);
     assert_ne!(CognitiveDepth::Reflex, CognitiveDepth::Cortical);
 }
-
