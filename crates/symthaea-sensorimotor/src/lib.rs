@@ -1600,7 +1600,10 @@ mod tests {
         let b = ContingencyHV::random(5678);
         let bound = a.bind(&b);
         let recovered = bound.bind(&b);
-        assert!((a.similarity(&recovered) - 1.0).abs() < 0.001, "Bind should be involutive");
+        assert!(
+            (a.similarity(&recovered) - 1.0).abs() < 0.001,
+            "Bind should be involutive"
+        );
     }
 
     #[test]
@@ -1614,14 +1617,20 @@ mod tests {
     fn test_contingency_hv_permute_256_is_identity() {
         let hv = ContingencyHV::random(99);
         let perm = hv.permute(256);
-        assert!((hv.similarity(&perm) - 1.0).abs() < 0.001, "Permute by 256 should be identity (mod 256)");
+        assert!(
+            (hv.similarity(&perm) - 1.0).abs() < 0.001,
+            "Permute by 256 should be identity (mod 256)"
+        );
     }
 
     #[test]
     fn test_contingency_hv_bundle_single() {
         let hv = ContingencyHV::random(42);
         let bundled = ContingencyHV::bundle(&[hv.clone()]);
-        assert!((hv.similarity(&bundled) - 1.0).abs() < 0.001, "Bundle of one should return the same vector");
+        assert!(
+            (hv.similarity(&bundled) - 1.0).abs() < 0.001,
+            "Bundle of one should return the same vector"
+        );
     }
 
     #[test]
@@ -1630,21 +1639,30 @@ mod tests {
         let b = ContingencyHV::random(2);
         // Bundle of 3 copies of a and 1 of b should be very similar to a
         let bundled = ContingencyHV::bundle(&[a.clone(), a.clone(), a.clone(), b.clone()]);
-        assert!(a.similarity(&bundled) > 0.7, "Majority of a should dominate bundle");
+        assert!(
+            a.similarity(&bundled) > 0.7,
+            "Majority of a should dominate bundle"
+        );
     }
 
     #[test]
     fn test_contingency_hv_from_id_deterministic() {
         let a = ContingencyHV::from_id("test_action");
         let b = ContingencyHV::from_id("test_action");
-        assert!((a.similarity(&b) - 1.0).abs() < 0.001, "Same ID should produce same HV");
+        assert!(
+            (a.similarity(&b) - 1.0).abs() < 0.001,
+            "Same ID should produce same HV"
+        );
     }
 
     #[test]
     fn test_contingency_hv_different_ids_dissimilar() {
         let a = ContingencyHV::from_id("action_reach");
         let b = ContingencyHV::from_id("action_push");
-        assert!(a.similarity(&b) < 0.7, "Different IDs should produce dissimilar HVs");
+        assert!(
+            a.similarity(&b) < 0.7,
+            "Different IDs should produce dissimilar HVs"
+        );
     }
 
     #[test]
@@ -1656,9 +1674,11 @@ mod tests {
 
     #[test]
     fn test_sensory_change_with_vector_updates_magnitude() {
-        let change = SensoryChange::new(SensoryModality::Visual)
-            .with_vector(vec![3.0, 4.0]);
-        assert!((change.magnitude - 5.0).abs() < 0.001, "Magnitude should be sqrt(9+16)=5");
+        let change = SensoryChange::new(SensoryModality::Visual).with_vector(vec![3.0, 4.0]);
+        assert!(
+            (change.magnitude - 5.0).abs() < 0.001,
+            "Magnitude should be sqrt(9+16)=5"
+        );
     }
 
     #[test]
@@ -1674,7 +1694,10 @@ mod tests {
     fn test_sensory_change_distance_symmetric() {
         let a = SensoryChange::new(SensoryModality::Visual).with_vector(vec![0.1, 0.2, 0.3, 0.4]);
         let b = SensoryChange::new(SensoryModality::Visual).with_vector(vec![0.5, 0.6, 0.7, 0.8]);
-        assert!((a.distance(&b) - b.distance(&a)).abs() < 1e-10, "Distance should be symmetric");
+        assert!(
+            (a.distance(&b) - b.distance(&a)).abs() < 1e-10,
+            "Distance should be symmetric"
+        );
     }
 
     #[test]
@@ -1725,8 +1748,8 @@ mod tests {
 
     #[test]
     fn test_context_descriptor_self_similarity() {
-        let ctx = ContextDescriptor::new("scene_a", SensoryModality::Visual)
-            .with_feature("light", 0.5);
+        let ctx =
+            ContextDescriptor::new("scene_a", SensoryModality::Visual).with_feature("light", 0.5);
         let sim = ctx.similarity(&ctx);
         // Feature sim = 1.0 (identical), hdc sim = 1.0
         assert!(sim > 0.95, "Self-similarity should be ~1.0, got {sim}");
@@ -1746,7 +1769,10 @@ mod tests {
         let action = ActionDescriptor::new(ActionType::Push);
         let context = ContextDescriptor::new("test", SensoryModality::Tactile);
         let prediction = learner.predict(&action, &context);
-        assert!(prediction.is_none(), "Should have no prediction before learning");
+        assert!(
+            prediction.is_none(),
+            "Should have no prediction before learning"
+        );
     }
 
     #[test]
@@ -1754,7 +1780,8 @@ mod tests {
         let mut learner = ContingencyLearner::new();
         let action = ActionDescriptor::new(ActionType::Touch);
         let context = ContextDescriptor::new("test", SensoryModality::Tactile);
-        let outcome = SensoryChange::new(SensoryModality::Tactile).with_vector(vec![0.5, 0.0, 0.0, 0.0]);
+        let outcome =
+            SensoryChange::new(SensoryModality::Tactile).with_vector(vec![0.5, 0.0, 0.0, 0.0]);
 
         for _ in 0..5 {
             learner.learn(action.clone(), context.clone(), outcome.clone());
@@ -1775,7 +1802,8 @@ mod tests {
         let mut perception = EnactivistPerception::new();
         let action = ActionDescriptor::new(ActionType::Fixate);
         let context = ContextDescriptor::new("scene", SensoryModality::Visual);
-        let outcome = SensoryChange::new(SensoryModality::Visual).with_vector(vec![0.1, 0.0, 0.0, 0.0]);
+        let outcome =
+            SensoryChange::new(SensoryModality::Visual).with_vector(vec![0.1, 0.0, 0.0, 0.0]);
         perception.perceive_through_action(action, context, outcome);
         assert_eq!(perception.stats().total_cycles, 1);
     }
@@ -1846,7 +1874,8 @@ mod tests {
         let mut detector = AffordanceDetector::new();
         let action = ActionDescriptor::new(ActionType::Touch);
         let context = ContextDescriptor::new("test", SensoryModality::Tactile);
-        let outcome = SensoryChange::new(SensoryModality::Tactile).with_vector(vec![0.5, 0.0, 0.0, 0.0]);
+        let outcome =
+            SensoryChange::new(SensoryModality::Tactile).with_vector(vec![0.5, 0.0, 0.0, 0.0]);
 
         for _ in 0..30 {
             detector.process_action(action.clone(), context.clone(), outcome.clone());
@@ -1854,6 +1883,9 @@ mod tests {
 
         let contribution = ContingencyConsciousnessContribution::from_detector(&detector, &context);
         let cc = contribution.consciousness_contribution();
-        assert!(cc >= 0.0 && cc <= 1.0, "Consciousness contribution should be in [0,1], got {cc}");
+        assert!(
+            cc >= 0.0 && cc <= 1.0,
+            "Consciousness contribution should be in [0,1], got {cc}"
+        );
     }
 }
