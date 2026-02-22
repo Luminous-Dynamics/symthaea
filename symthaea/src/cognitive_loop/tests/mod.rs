@@ -7,5 +7,6 @@
 
 mod core;
 mod feedback;
+mod helpers;
 mod integration;
 mod subsystems;
