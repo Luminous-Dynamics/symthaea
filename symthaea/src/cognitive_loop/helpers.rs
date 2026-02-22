@@ -4,7 +4,8 @@
 //! prediction confidence tracking, reset, and neural bridge processing.
 
 use super::CycleCarryover;
-use crate::consciousness::fep_active_inference::ActiveInferenceAgent;
+use crate::consciousness::cross_modal_binding::{ModalRepresentation, Modality};
+use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, Observation};
 use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 #[cfg(feature = "neural-bridge")]
 use anyhow::Result;
@@ -1098,5 +1099,134 @@ impl CognitiveLoopService {
                     self.adaptive_behavior.pause_multiplier.max(STRATEGY_SUPPORTIVE_PAUSE);
             }
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Phase 4: Medium-high risk extractions
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// FEP active inference perception-action loop.
+    ///
+    /// Constructs an observation from current cognitive state, runs the FEP agent's
+    /// perceive→select_action→act pipeline, then applies action-specific modulations
+    /// (learning rate boost, sensory precision reset, exploration nudge, trust tightening).
+    ///
+    /// Returns (action_index, action_probabilities, is_surprised).
+    pub(super) fn step_fep_active_inference(
+        &mut self,
+        prediction_error: f32,
+        coherence: f32,
+    ) -> (usize, Vec<f64>, bool, f64) {
+        let effective_lr = self.stats.adaptive_learning_rate;
+        let fep_obs = Observation::from_consciousness_state(
+            prediction_error as f64,
+            coherence as f64,
+            self.prediction_confidence as f64,
+            effective_lr as f64,
+        );
+        let _perception = self.fep_agent.perceive(&fep_obs);
+        let action_result = self.fep_agent.select_action();
+        let _outcome = self.fep_agent.act(action_result.action);
+
+        let fep_action_idx = action_result.action;
+        let fep_action_probs = action_result.action_probabilities.clone();
+
+        let is_surprised = self.fep_agent.is_surprised();
+        match action_result.action {
+            0 => {
+                // Boost learning rate when free energy is high
+                if let Some(ref fe) = self.fep_agent.last_fe_components {
+                    let fe_boost = (fe.total.abs() as f32 / 2.0).clamp(0.0, 1.5);
+                    self.fep_lr_boost =
+                        (self.fep_lr_boost * (1.0 + fe_boost * 0.5)).clamp(1.0, 2.0);
+                }
+            }
+            1 => {
+                // Reset sensory precision toward 1.0 to trust new observations after shift
+                let current = self.fep_agent.precision.sensory_precision;
+                self.fep_agent.precision.sensory_precision = current * 0.7 + 1.0 * 0.3;
+            }
+            2 => {
+                // Boost exploration -- stronger nudge when surprised
+                let nudge = if is_surprised { 0.15 } else { 0.05 };
+                self.curiosity_drive.exploration_urge =
+                    (self.curiosity_drive.exploration_urge + nudge).clamp(0.0, 1.0);
+            }
+            3 => {
+                // Tighten trust via precision
+                if let Some(ref fe) = self.fep_agent.last_fe_components {
+                    let precision_mod = (1.0 - fe.prediction_error).clamp(0.0, 1.0) as f32;
+                    self.self_reflection.trust_threshold =
+                        (self.self_reflection.trust_threshold * 0.9 + precision_mod * 0.1)
+                            .clamp(0.1, 0.9);
+                }
+            }
+            _ => {}
+        }
+
+        (fep_action_idx, fep_action_probs, is_surprised, action_result.pragmatic_value)
+    }
+
+    /// Cross-modal binding: bind HDC encodings across linguistic and affective modalities.
+    ///
+    /// Clears stale representations, adds linguistic (from BinaryHV) and affective
+    /// (if bridge enabled) modalities, computes binding strength and cross-modal Psi.
+    /// Also applies feedback loops: high Psi boosts prediction confidence, high binding
+    /// boosts predictive precision, high free energy dampens binding attention.
+    ///
+    /// Returns (binding_strength, cross_modal_psi).
+    pub(super) fn update_cross_modal_binding(
+        &mut self,
+        hv16: &symthaea_core::hdc::binary_hv::BinaryHV,
+        affective_valence: f32,
+        predictive_free_energy: f64,
+    ) -> (f32, f64) {
+        let (cross_modal_binding_strength, cross_modal_psi) =
+            if let Some(ref mut binder) = self.cross_modal_binder {
+                use symthaea_core::hdc::unified_hv::ContinuousHV;
+                binder.clear();
+                let linguistic_repr = ModalRepresentation::new(
+                    Modality::Linguistic,
+                    ContinuousHV::from_vec(hv16.to_bipolar()),
+                    0.8,
+                    "encoder",
+                );
+                binder.add_representation(linguistic_repr);
+                if self.affective_bridge.is_some() {
+                    let affect_seed = (affective_valence * 1000.0) as u64;
+                    let affective_hv =
+                        symthaea_core::hdc::binary_hv::BinaryHV::random(affect_seed);
+                    binder.update_modality(Modality::Affective, affective_hv);
+                }
+                let strength = binder.bind().map(|r| r.strength).unwrap_or(0.0);
+                let phi = binder.cross_modal_psi();
+                self.carryover.consciousness.cross_modal_psi = phi;
+                (strength, phi)
+            } else {
+                (0.0, 0.0)
+            };
+
+        // FEEDBACK: High cross-modal Phi boosts confidence (binding integration)
+        // Science: Treisman (1996) — coherent binding → confident perception
+        if cross_modal_psi > 0.3 {
+            let boost = ((cross_modal_psi - 0.3) * 0.05) as f32;
+            self.prediction_confidence = (self.prediction_confidence + boost).clamp(0.0, 1.0);
+        }
+
+        // FEEDBACK: Predictive ↔ Cross-Modal bidirectional coupling (Talsma 2015)
+        if let Some(ref mut mind) = self.predictive_mind {
+            if cross_modal_binding_strength > 0.5 {
+                let precision_boost = (cross_modal_binding_strength - 0.5) as f64 * 0.1;
+                mind.precision.boost_precision(precision_boost);
+            }
+        }
+        if let Some(ref mut binder) = self.cross_modal_binder {
+            if predictive_free_energy > 0.6 {
+                let dampen = (1.0 - (predictive_free_energy - 0.6) * 0.3).max(0.5) as f32;
+                binder.set_attention_weight(dampen);
+            }
+        }
+
+        (cross_modal_binding_strength, cross_modal_psi)
     }
 }
