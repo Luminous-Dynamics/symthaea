@@ -405,6 +405,10 @@ pub use symthaea_physics as physics;
 #[cfg(feature = "flight")]
 pub use symthaea_flight as flight;
 
+// Humanoid: HDC-LTC + FEP Active Inference bipedal humanoid control (DMC benchmark)
+#[cfg(feature = "humanoid")]
+pub use symthaea_humanoid as humanoid;
+
 // Meta: Self-analysis, code quality metrics, active inference exploration, dream synthesis
 #[cfg(feature = "code_generation")]
 pub mod meta;

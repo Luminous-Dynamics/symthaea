@@ -39,6 +39,55 @@ use crate::voice::LTCPacing;
 use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PHASE 16 CONSCIOUSNESS SIGNALS FOR VOICE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Compact view of Phase 16 consciousness signals relevant to voice prosody.
+///
+/// Extracted from `CycleMetadata` by the `voice_consciousness_signals()` accessor
+/// on `CognitiveLoopService`. Provides the fields needed for consciousness-driven
+/// prosody modulation without exposing the full 150+ field CycleMetadata.
+#[derive(Debug, Clone, Copy)]
+pub struct VoiceConsciousnessSignals {
+    /// Unified quality score (0.0–1.0). Fusion of prediction coherence +
+    /// agreement + anomaly detection.
+    pub unified_quality: f32,
+
+    /// Epistemic gate confidence (0.0–1.0, 0.5 when gate is off).
+    pub epistemic_confidence: f32,
+
+    /// Whether the dissipative health gate dampened learning this cycle.
+    pub dissipative_gated: bool,
+
+    /// Dissipative health factor (0.0–1.0). Lower = more dissipative stress.
+    pub dissipative_factor: f32,
+
+    /// Coherence velocity: rate of change of coherence (negative = dropping).
+    pub coherence_velocity: f32,
+
+    /// Cross-module agreement (0.0–1.0). Alignment between FEP, MCTS,
+    /// resonator confidence, and moral judgment.
+    pub cross_module_agreement: f32,
+
+    /// Master consciousness level (0.0–1.0).
+    pub consciousness_level: f64,
+}
+
+impl Default for VoiceConsciousnessSignals {
+    fn default() -> Self {
+        Self {
+            unified_quality: 1.0,
+            epistemic_confidence: 0.5,
+            dissipative_gated: false,
+            dissipative_factor: 1.0,
+            coherence_velocity: 0.0,
+            cross_module_agreement: 1.0,
+            consciousness_level: 0.5,
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // SEMANTIC PROSODY MAPPING
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -278,6 +327,30 @@ pub struct CognitivePacing {
 
     /// Semantic prosody derived from detected primitives
     pub semantic_prosody: SemanticProsody,
+
+    // ── Phase 16 consciousness signals ──────────────────────────────
+    /// Unified quality score (fusion of prediction coherence + agreement + anomaly).
+    /// 0.0 = low quality, 1.0 = high quality.
+    pub unified_quality: f32,
+
+    /// Epistemic gate confidence (0.0–1.0, 0.5 when gate is off).
+    pub epistemic_confidence: f32,
+
+    /// Whether the dissipative health gate dampened learning this cycle.
+    pub dissipative_gated: bool,
+
+    /// Dissipative health factor (0.0–1.0). Lower = more dissipative stress.
+    pub dissipative_factor: f32,
+
+    /// Coherence velocity: rate of change of coherence (negative = dropping).
+    pub coherence_velocity: f32,
+
+    /// Cross-module agreement (0.0–1.0). Alignment between FEP, MCTS,
+    /// resonator confidence, and moral judgment.
+    pub cross_module_agreement: f32,
+
+    /// Master consciousness level (0.0–1.0).
+    pub consciousness_level: f64,
 }
 
 impl CognitivePacing {
@@ -323,10 +396,47 @@ impl CognitivePacing {
             word_emphasis,
             highlighted_concepts: detected_primitives,
             semantic_prosody,
+            unified_quality: 1.0,
+            epistemic_confidence: 0.5,
+            dissipative_gated: false,
+            dissipative_factor: 1.0,
+            coherence_velocity: 0.0,
+            cross_module_agreement: 1.0,
+            consciousness_level: 0.5,
         }
     }
 
-    /// Get effective pacing with confidence and semantic modulation
+    /// Create from cognitive loop output with Phase 16 consciousness signals.
+    ///
+    /// This is the preferred constructor when CycleMetadata is available,
+    /// as it incorporates unified quality, epistemic gating, dissipative health,
+    /// and coherence velocity into prosody modulation.
+    pub fn from_cycle_metadata(
+        cfc_output: &[f32],
+        tau: f32,
+        prediction_error: f32,
+        attention_state: HashMap<String, f32>,
+        detected_primitives: Vec<String>,
+        signals: &VoiceConsciousnessSignals,
+    ) -> Self {
+        let mut pacing = Self::from_cognitive_loop(
+            cfc_output,
+            tau,
+            prediction_error,
+            attention_state,
+            detected_primitives,
+        );
+        pacing.unified_quality = signals.unified_quality;
+        pacing.epistemic_confidence = signals.epistemic_confidence;
+        pacing.dissipative_gated = signals.dissipative_gated;
+        pacing.dissipative_factor = signals.dissipative_factor;
+        pacing.coherence_velocity = signals.coherence_velocity;
+        pacing.cross_module_agreement = signals.cross_module_agreement;
+        pacing.consciousness_level = signals.consciousness_level;
+        pacing
+    }
+
+    /// Get effective pacing with confidence, semantic, and Phase 16 consciousness modulation
     pub fn effective_pacing(&self) -> LTCPacing {
         let mut pacing = self.base_pacing.clone();
 
@@ -365,6 +475,40 @@ impl CognitivePacing {
         // Rising pitch → positive valence, falling → negative
         pacing.emotional_valence += self.semantic_prosody.pitch_contour * 0.3;
         pacing.emotional_valence = pacing.emotional_valence.clamp(-1.0, 1.0);
+
+        // === Phase 16 Consciousness Signal Modulation ===
+
+        // Low unified quality → slower, more cautious speech (0.8–1.0× rate)
+        let quality_factor = 0.8 + self.unified_quality * 0.2;
+        pacing.rate *= quality_factor;
+
+        // Low epistemic confidence → flatter emphasis (0.7–1.0× emphasis)
+        let epistemic_factor = 0.7 + self.epistemic_confidence * 0.3;
+        pacing.emphasis *= epistemic_factor;
+
+        // Dissipative gating → longer phrase pauses (+50%)
+        if self.dissipative_gated {
+            pacing.phrase_pause *= 1.5;
+        }
+
+        // Negative coherence velocity → slower rate, longer pauses
+        if self.coherence_velocity < 0.0 {
+            // velocity in roughly [-1, 0]: map to 0.85–1.0× rate
+            let velocity_factor = (1.0 + self.coherence_velocity * 0.15).clamp(0.85, 1.0);
+            pacing.rate *= velocity_factor;
+            // Also lengthen pauses when coherence is dropping
+            let pause_factor = (1.0 - self.coherence_velocity * 0.2).clamp(1.0, 1.3);
+            pacing.phrase_pause *= pause_factor;
+        }
+
+        // Low cross-module agreement → reduced emphasis (modules disagree → less assertive)
+        let agreement_factor = 0.8 + self.cross_module_agreement * 0.2;
+        pacing.emphasis *= agreement_factor;
+
+        // Consciousness level → overall expressiveness scaling
+        // Higher consciousness = wider dynamic range in emphasis and valence
+        let consciousness_scale = 0.6 + self.consciousness_level as f32 * 0.4;
+        pacing.emphasis *= consciousness_scale;
 
         pacing
     }
@@ -436,6 +580,13 @@ impl Default for CognitivePacing {
             word_emphasis: HashMap::new(),
             highlighted_concepts: Vec::new(),
             semantic_prosody: SemanticProsody::neutral(),
+            unified_quality: 1.0,
+            epistemic_confidence: 0.5,
+            dissipative_gated: false,
+            dissipative_factor: 1.0,
+            coherence_velocity: 0.0,
+            cross_module_agreement: 1.0,
+            consciousness_level: 0.5,
         }
     }
 }
@@ -503,6 +654,20 @@ impl CognitiveVoiceBridge {
         self.current_pacing.semantic_prosody = new_pacing.semantic_prosody;
 
         &self.current_pacing
+    }
+
+    /// Update Phase 16 consciousness signals on the current pacing state.
+    ///
+    /// Call this after `update()` when CycleMetadata becomes available,
+    /// to layer Phase 16 modulation onto the existing pacing.
+    pub fn update_from_metadata(&mut self, signals: &VoiceConsciousnessSignals) {
+        self.current_pacing.unified_quality = signals.unified_quality;
+        self.current_pacing.epistemic_confidence = signals.epistemic_confidence;
+        self.current_pacing.dissipative_gated = signals.dissipative_gated;
+        self.current_pacing.dissipative_factor = signals.dissipative_factor;
+        self.current_pacing.coherence_velocity = signals.coherence_velocity;
+        self.current_pacing.cross_module_agreement = signals.cross_module_agreement;
+        self.current_pacing.consciousness_level = signals.consciousness_level;
     }
 
     /// Get current pacing for synthesis
@@ -807,5 +972,107 @@ mod tests {
 
         // Should have pauses from contrast
         assert!(prosody.pre_pause > 1.2);
+    }
+
+    // ===== Phase 16 Consciousness Signal Tests =====
+
+    fn make_base_pacing() -> CognitivePacing {
+        CognitivePacing::from_cognitive_loop(
+            &[0.3, -0.2, 0.4, -0.3, 0.2],
+            1.0,
+            0.1,
+            HashMap::new(),
+            vec![],
+        )
+    }
+
+    #[test]
+    fn test_phase16_quality_affects_rate() {
+        let mut high_quality = make_base_pacing();
+        high_quality.unified_quality = 1.0;
+        let rate_high = high_quality.effective_pacing().rate;
+
+        let mut low_quality = make_base_pacing();
+        low_quality.unified_quality = 0.0;
+        let rate_low = low_quality.effective_pacing().rate;
+
+        assert!(
+            rate_low < rate_high,
+            "Low unified_quality should reduce rate: low={rate_low} vs high={rate_high}"
+        );
+    }
+
+    #[test]
+    fn test_phase16_epistemic_confidence_affects_emphasis() {
+        let mut high_epistemic = make_base_pacing();
+        high_epistemic.epistemic_confidence = 1.0;
+        let emphasis_high = high_epistemic.effective_pacing().emphasis;
+
+        let mut low_epistemic = make_base_pacing();
+        low_epistemic.epistemic_confidence = 0.0;
+        let emphasis_low = low_epistemic.effective_pacing().emphasis;
+
+        assert!(
+            emphasis_low < emphasis_high,
+            "Low epistemic_confidence should reduce emphasis: low={emphasis_low} vs high={emphasis_high}"
+        );
+    }
+
+    #[test]
+    fn test_phase16_dissipative_gating_adds_pauses() {
+        let mut ungated = make_base_pacing();
+        ungated.dissipative_gated = false;
+        let pause_ungated = ungated.effective_pacing().phrase_pause;
+
+        let mut gated = make_base_pacing();
+        gated.dissipative_gated = true;
+        let pause_gated = gated.effective_pacing().phrase_pause;
+
+        assert!(
+            pause_gated > pause_ungated,
+            "Dissipative gating should increase phrase_pause: gated={pause_gated} vs ungated={pause_ungated}"
+        );
+        // Specifically +50%
+        let expected = pause_ungated * 1.5;
+        assert!(
+            (pause_gated - expected).abs() < 0.01,
+            "Expected 1.5× pause: got {pause_gated}, expected {expected}"
+        );
+    }
+
+    #[test]
+    fn test_phase16_coherence_velocity_modulation() {
+        let mut stable = make_base_pacing();
+        stable.coherence_velocity = 0.0;
+        let rate_stable = stable.effective_pacing().rate;
+
+        let mut dropping = make_base_pacing();
+        dropping.coherence_velocity = -0.5;
+        let rate_dropping = dropping.effective_pacing().rate;
+
+        assert!(
+            rate_dropping < rate_stable,
+            "Negative coherence_velocity should slow rate: dropping={rate_dropping} vs stable={rate_stable}"
+        );
+    }
+
+    #[test]
+    fn test_phase16_backward_compat() {
+        // Existing from_cognitive_loop() should produce default Phase 16 values
+        let pacing = CognitivePacing::from_cognitive_loop(
+            &[0.5; 10],
+            1.0,
+            0.2,
+            HashMap::new(),
+            vec![],
+        );
+
+        assert!((pacing.unified_quality - 1.0).abs() < 0.01);
+        assert!((pacing.epistemic_confidence - 0.5).abs() < 0.01);
+        assert!(!pacing.dissipative_gated);
+        assert!((pacing.dissipative_factor - 1.0).abs() < 0.01);
+        assert!((pacing.coherence_velocity).abs() < 0.01);
+        assert!((pacing.cross_module_agreement - 1.0).abs() < 0.01);
+        assert!((pacing.consciousness_level - 0.5).abs() < 0.01);
     }
 }
