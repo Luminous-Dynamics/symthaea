@@ -22,7 +22,7 @@ impl ProbabilisticReasoningBenchmark {
             state_dim: 4,
             obs_dim: 4,
             num_actions: 4,
-            belief_learning_rate: 0.2,
+            belief_learning_rate: 0.15,
             ..Default::default()
         };
         let mut agent = ActiveInferenceAgent::new(agent_config);
