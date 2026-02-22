@@ -1644,6 +1644,7 @@ mod tests {
         let dag = CausalDAG::new();
         let scm = StructuralCausalModel::new(dag);
         let configs = scm.enumerate_configs(&[]);
-        assert_eq!(configs, vec![vec![]]);
+        let expected: Vec<Vec<usize>> = vec![vec![]];
+        assert_eq!(configs, expected);
     }
 }

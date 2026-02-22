@@ -531,7 +531,7 @@ impl CognitiveLoopService {
     ///
     /// Science: Allen (1983), Varela (1999).
     #[allow(clippy::type_complexity)]
-    fn compute_temporal_primitives_phase(
+    pub(in crate::cognitive_loop) fn compute_temporal_primitives_phase(
         &mut self,
         hv16_cached: symthaea_core::hdc::BinaryHV,
         unified_psi: f64,
@@ -700,7 +700,7 @@ impl CognitiveLoopService {
     /// `recommend_action()` — exploration, coherence, differentiation, integration.
     ///
     /// Science: Prigogine (1977), Kauffman (1993), England (2013).
-    fn compute_dissipative_phase(
+    pub(in crate::cognitive_loop) fn compute_dissipative_phase(
         &mut self,
         prediction_error: f32,
         coherence: f32,
@@ -779,7 +779,7 @@ impl CognitiveLoopService {
     /// low consciousness boosts exploration.
     ///
     /// Science: Tononi (2004), Baars (1988), Friston (2010), Graziano (2013).
-    fn compute_equation_v2_phase(
+    pub(in crate::cognitive_loop) fn compute_equation_v2_phase(
         &mut self,
         unified_psi: f64,
         coherence: f32,
@@ -854,7 +854,7 @@ impl CognitiveLoopService {
     /// Applies feedback: deep lattice (height > 5) reduces LR on first cycle.
     ///
     /// Science: Davey & Priestley (2002) — lattice theory for knowledge systems.
-    fn compute_lattice_phase(
+    pub(in crate::cognitive_loop) fn compute_lattice_phase(
         &mut self,
         active_primitive_names: &[String],
         module_timings: &mut super::ModuleTimings,
@@ -928,7 +928,7 @@ impl CognitiveLoopService {
     /// Applies feedback: Veto decision drastically reduces learning rate.
     ///
     /// Science: Panksepp (1998) affective neuroscience + value alignment.
-    fn compute_value_evaluator_phase(
+    pub(in crate::cognitive_loop) fn compute_value_evaluator_phase(
         &mut self,
         unified_psi: f64,
         module_timings: &mut super::ModuleTimings,
@@ -972,7 +972,7 @@ impl CognitiveLoopService {
     /// interferences reduce prediction confidence.
     ///
     /// Science: Whitehead (1929), Deci & Ryan (2000) — value coherence theory.
-    fn compute_fiduciary_harmonics_phase(
+    pub(in crate::cognitive_loop) fn compute_fiduciary_harmonics_phase(
         &mut self,
         coherence: f32,
         prediction_error: f32,
@@ -1044,7 +1044,7 @@ impl CognitiveLoopService {
     /// reasoning chains from active primitives and feeding them to the causal explainer.
     ///
     /// Science: Pearl (2009) — causal inference, Woodward (2003) — interventionism.
-    fn compute_causal_self_explanation_phase(
+    pub(in crate::cognitive_loop) fn compute_causal_self_explanation_phase(
         &mut self,
         hv16_cached: symthaea_core::hdc::BinaryHV,
         active_primitive_names: &[String],

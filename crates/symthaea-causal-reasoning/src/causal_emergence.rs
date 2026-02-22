@@ -797,7 +797,12 @@ mod tests {
     #[test]
     fn test_degeneracy_identical_rows() {
         // All inputs lead to same output distribution = maximum degeneracy
-        let tpm = vec![vec![0.3, 0.7], vec![0.3, 0.7], vec![0.3, 0.7]];
+        // Note: degeneracy() assumes square TPM (num_states x num_states)
+        let tpm = vec![
+            vec![0.3, 0.3, 0.4],
+            vec![0.3, 0.3, 0.4],
+            vec![0.3, 0.3, 0.4],
+        ];
         let d = degeneracy(&tpm);
         assert!(
             (d - 1.0).abs() < 1e-6,
