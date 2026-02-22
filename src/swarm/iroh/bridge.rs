@@ -255,13 +255,6 @@ impl IrohBridgeActor {
         );
     }
 
-    /// Forward a received message from a peer into the Mind's inbound channel.
-    ///
-    /// Returns `false` if the inbound channel is full (Mind not draining fast enough).
-    #[allow(dead_code)]
-    fn forward_to_mind(&self, msg: SocialMessage) -> bool {
-        self.inbound_tx.try_send(msg).is_ok()
-    }
 }
 
 impl std::fmt::Debug for IrohBridgeActor {

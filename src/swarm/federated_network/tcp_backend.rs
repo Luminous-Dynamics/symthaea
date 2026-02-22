@@ -319,17 +319,6 @@ impl TcpBackend {
         }
     }
 
-    /// Look up the `SocketAddr` for a node by its 32-byte ID.
-    #[allow(dead_code)]
-    fn lookup_node_addr(&self, node_id: &[u8; 32]) -> NetworkResult<SocketAddr> {
-        self.registered_nodes
-            .read()
-            .get(node_id)
-            .copied()
-            .ok_or_else(|| NetworkError::NodeNotFound {
-                node_id: hex::encode(&node_id[..8]),
-            })
-    }
 }
 
 #[async_trait]

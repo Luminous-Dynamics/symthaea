@@ -89,8 +89,6 @@ pub struct CausalDiscoveryEngine {
     cache: Arc<Mutex<HashMap<u64, CausalDirection>>>,
     /// Use parallel processing
     pub parallel: bool,
-    /// Use HSIC-ANM (slower but more accurate)
-    pub use_hsic_anm: bool,
 }
 
 impl CausalDiscoveryEngine {
@@ -102,7 +100,6 @@ impl CausalDiscoveryEngine {
             seed,
             cache: Arc::new(Mutex::new(HashMap::new())),
             parallel: true,
-            use_hsic_anm: false,
         }
     }
 
@@ -114,14 +111,7 @@ impl CausalDiscoveryEngine {
             seed,
             cache: Arc::new(Mutex::new(HashMap::new())),
             parallel: true,
-            use_hsic_anm: false,
         }
-    }
-
-    /// Enable HSIC-ANM for better non-linear detection (slower)
-    pub fn with_hsic_anm(mut self) -> Self {
-        self.use_hsic_anm = true;
-        self
     }
 
     /// Disable parallel processing
@@ -228,7 +218,6 @@ impl CausalDiscoveryEngine {
         let x_arc = Arc::new(x.to_vec());
         let y_arc = Arc::new(y.to_vec());
         let seed = self.seed;
-        let use_hsic = self.use_hsic_anm;
 
         (0..self.n_ensemble)
             .into_par_iter()
@@ -237,7 +226,6 @@ impl CausalDiscoveryEngine {
                 let mut rng = StdRng::seed_from_u64(seed.wrapping_add(i as u64));
                 let mut engine = ParallelPredictHelper {
                     rng: &mut rng,
-                    use_hsic_anm: use_hsic,
                 };
                 if engine.predict_single(&x_arc, &y_arc) == CausalDirection::Forward {
                     1
@@ -545,53 +533,6 @@ impl CausalDiscoveryEngine {
         (hxy - hy) - (hxy - hx)
     }
 
-    /// HSIC-based ANM: Uses kernel independence testing
-    ///
-    /// This is more powerful than correlation-based ANM for non-linear relationships
-    #[allow(dead_code)] // Reserved for advanced causal discovery mode
-    fn hsic_anm_score(&self, x: &[f64], y: &[f64]) -> f64 {
-        let res_xy = self.linear_residuals(x, y);
-        let res_yx = self.linear_residuals(y, x);
-
-        // HSIC measures dependence in kernel space
-        let hsic_x_res = self.compute_hsic(x, &res_xy);
-        let hsic_y_res = self.compute_hsic(y, &res_yx);
-
-        // Lower HSIC = more independent = better fit
-        hsic_x_res - hsic_y_res
-    }
-
-    /// Compute HSIC (Hilbert-Schmidt Independence Criterion)
-    #[allow(dead_code)] // Used by hsic_anm_score
-    fn compute_hsic(&self, x: &[f64], y: &[f64]) -> f64 {
-        let n = x.len().min(100); // Limit for O(n²) computation
-
-        // Use first n samples
-        let xs: Vec<f64> = x.iter().take(n).cloned().collect();
-        let ys: Vec<f64> = y.iter().take(n).cloned().collect();
-
-        // Compute median bandwidth
-        let sigma_x = self.median_bandwidth(&xs);
-        let sigma_y = self.median_bandwidth(&ys);
-
-        // Compute centered kernel matrices
-        let kx = self.rbf_kernel_matrix(&xs, sigma_x);
-        let ky = self.rbf_kernel_matrix(&ys, sigma_y);
-
-        let hkx = self.center_kernel(&kx);
-        let hky = self.center_kernel(&ky);
-
-        // HSIC = trace(Hkx @ Hky) / (n-1)^2
-        let mut trace = 0.0;
-        for i in 0..n {
-            for j in 0..n {
-                trace += hkx[i][j] * hky[j][i];
-            }
-        }
-
-        trace / ((n - 1) * (n - 1)) as f64
-    }
-
     fn median_bandwidth(&self, x: &[f64]) -> f64 {
         let n = x.len().min(50);
         let mut dists = Vec::new();
@@ -617,30 +558,6 @@ impl CausalDiscoveryEngine {
         }
 
         k
-    }
-
-    #[allow(dead_code)] // Used by compute_hsic
-    fn center_kernel(&self, k: &[Vec<f64>]) -> Vec<Vec<f64>> {
-        let n = k.len();
-        let mut row_means = vec![0.0; n];
-        let mut total_mean = 0.0;
-
-        for i in 0..n {
-            row_means[i] = k[i].iter().sum::<f64>() / n as f64;
-            total_mean += row_means[i];
-        }
-        total_mean /= n as f64;
-
-        let col_means = row_means.clone(); // Symmetric matrix
-
-        let mut h = vec![vec![0.0; n]; n];
-        for i in 0..n {
-            for j in 0..n {
-                h[i][j] = k[i][j] - row_means[i] - col_means[j] + total_mean;
-            }
-        }
-
-        h
     }
 
     // ========================================================================
@@ -1052,8 +969,6 @@ impl CausalDiscoveryEngine {
 /// in a parallel context with thread-local RNG.
 struct ParallelPredictHelper<'a> {
     rng: &'a mut StdRng,
-    #[allow(dead_code)] // Reserved for HSIC-ANM mode activation
-    use_hsic_anm: bool,
 }
 
 impl<'a> ParallelPredictHelper<'a> {

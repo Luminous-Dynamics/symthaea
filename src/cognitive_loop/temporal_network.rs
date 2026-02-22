@@ -22,7 +22,6 @@ pub(super) enum TemporalNetwork {
     HdcLtc(HdcLtcBridge),
 }
 
-#[allow(dead_code)] // Methods provided for API completeness and future use
 impl TemporalNetwork {
     /// Step the network forward
     pub fn step(&mut self, input: &Array1<f32>, dt: f32) -> Result<()> {
@@ -37,14 +36,6 @@ impl TemporalNetwork {
         match self {
             Self::CfC(cfc) => cfc.read_state(),
             Self::HdcLtc(bridge) => bridge.read_state(),
-        }
-    }
-
-    /// Forward pass and return output
-    pub fn forward(&mut self, input: &Array1<f32>, dt: f32) -> Array1<f32> {
-        match self {
-            Self::CfC(cfc) => cfc.forward(input, dt),
-            Self::HdcLtc(bridge) => bridge.forward(input, dt),
         }
     }
 
@@ -110,27 +101,11 @@ impl TemporalNetwork {
         }
     }
 
-    /// Reset the network
-    pub fn reset(&mut self) {
-        match self {
-            Self::CfC(cfc) => cfc.reset(),
-            Self::HdcLtc(bridge) => bridge.reset(),
-        }
-    }
-
     /// Get state diversity metric
     pub fn state_diversity(&self) -> f32 {
         match self {
             Self::CfC(cfc) => cfc.state_diversity(),
             Self::HdcLtc(bridge) => bridge.state_diversity(),
-        }
-    }
-
-    /// Get all tau values for coherence tracking
-    pub fn all_tau(&self) -> Vec<&Array1<f32>> {
-        match self {
-            Self::CfC(cfc) => cfc.all_tau(),
-            Self::HdcLtc(_) => vec![], // HdcLtc returns owned, handled separately
         }
     }
 
@@ -142,24 +117,11 @@ impl TemporalNetwork {
         }
     }
 
-    /// Get flattened tau values
-    pub fn flattened_tau(&self) -> Vec<f32> {
-        match self {
-            Self::CfC(cfc) => cfc.flattened_tau(),
-            Self::HdcLtc(bridge) => bridge.flattened_tau(),
-        }
-    }
-
     /// Adaptively resize HDC dimension based on prediction error (HdcLtc only)
     pub fn maybe_resize(&mut self, current_error: f32) {
         if let Self::HdcLtc(bridge) = self {
             bridge.maybe_resize(current_error);
         }
-    }
-
-    /// Check if using HdcLtc backend
-    pub fn is_hdc_ltc(&self) -> bool {
-        matches!(self, Self::HdcLtc(_))
     }
 
     /// Get backend type

@@ -946,33 +946,6 @@ pub struct CompositionResult {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// AUTOMATIC COMPOSITION DISCOVERY
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Discover useful compositions automatically
-pub struct CompositionDiscovery {
-    #[allow(dead_code)]
-    engine: Arc<CompositionalityEngine>,
-}
-
-impl CompositionDiscovery {
-    /// Find compositions that improve Φ on given test cases
-    pub fn discover_beneficial_compositions(
-        &self,
-        _test_inputs: &[BinaryHV],
-        _base_primitive_ids: &[String],
-        _max_compositions: usize,
-    ) -> Vec<ComposedPrimitive> {
-        // Implementation would:
-        // 1. Try all pairwise compositions
-        // 2. Measure Φ improvement on test cases
-        // 3. Return top compositions by improvement
-
-        Vec::new() // Placeholder
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
