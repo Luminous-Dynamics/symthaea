@@ -9,29 +9,8 @@ use rayon::join as rayon_join;
 use std::time::Instant;
 use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Result structs for extracted cycle phases
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Result from the resonator codebook growth + high-phi promotion + diversity phase.
-pub(super) struct ResonatorCodebookResult {
-    pub resonator_promotions: usize,
-    pub codebook_evictions: usize,
-    pub codebook_diversity: f32,
-    pub codebook_utilization_rate: f32,
-}
-
-/// Result from the dream engine phase (recording, dreaming, wisdom application).
-pub(super) struct DreamPhaseResult {
-    pub dream_insights: usize,
-    pub dream_phi_improvement: f32,
-    pub dream_wisdom_count: usize,
-}
-
-/// Result from the episodic replay and memory coordinator phase.
-pub(super) struct EpisodicReplayResult {
-    pub surprise_replay_batch_size: usize,
-}
+// Result structs imported from helpers::cycle_phases
+use super::helpers::{DreamPhaseResult, EpisodicReplayResult, ResonatorCodebookResult};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Tuning Constants: centralized for sweep-ability and self-documentation
@@ -106,7 +85,7 @@ use super::temporal_network::TemporalNetwork;
 use super::training::TrainingSample;
 use super::{
     ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, CycleResult,
-    ResponseStrategy, TrainingMethod,
+    CycleState, ResponseStrategy, TrainingMethod,
 };
 
 impl CognitiveLoopService {
@@ -126,6 +105,26 @@ impl CognitiveLoopService {
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
         let mut module_timings = super::ModuleTimings::default();
+
+        // ── Phase 17: Startup transient suppression ─────────────────────────
+        // Science: Hopfield (1982) — recurrent networks require settling time before
+        // producing reliable dynamics. During warmup (cycles 0–50), suppress learning
+        // rate and curiosity to prevent cementing transient noise as learned patterns.
+        let startup_warmup_cycles = 50usize;
+        let startup_suppressed = self.stats.total_cycles <= startup_warmup_cycles;
+        let startup_warmup_progress = if startup_suppressed {
+            self.stats.total_cycles as f32 / startup_warmup_cycles as f32
+        } else {
+            1.0
+        };
+        if startup_suppressed {
+            self.stats.startup_suppressed_cycles += 1;
+            // Ramp learning rate from 20% → 100% over warmup period
+            let lr_scale = 0.2 + 0.8 * startup_warmup_progress;
+            self.stats.adaptive_learning_rate *= lr_scale;
+            // Suppress curiosity during transient (let CfC settle)
+            self.curiosity_drive.exploration_urge *= startup_warmup_progress;
+        }
 
         // Snapshot exploration_urge for end-of-cycle budget clamping (Task B)
         let exploration_urge_start = self.curiosity_drive.exploration_urge;
@@ -380,11 +379,27 @@ impl CognitiveLoopService {
             prediction_error // Use raw error during bootstrap
         };
         // Hysteresis: require stronger signal to LEAVE current urgency level
-        let hysteresis_threshold = match self.carryover.urgency.urgency {
+        let base_hysteresis = match self.carryover.urgency.urgency {
             super::CycleUrgency::Cruise => effective_threshold * 1.2, // harder to leave Cruise
             super::CycleUrgency::Critical => effective_threshold * 0.8, // harder to leave Critical
             _ => effective_threshold,
         };
+        // ── Phase 17: Predictive interval tuning via error pattern ──────
+        // Science: Clark (2013) — predictive brain anticipates state changes.
+        // Rising error pattern → lower threshold (prepare to escalate).
+        // Falling error pattern → raise threshold (allow settling).
+        let error_history_len = self.carryover.history.error_history.len();
+        let pattern_mod = if error_history_len >= 4 {
+            let recent: Vec<f32> = self.carryover.history.error_history.iter()
+                .rev().take(4).copied().collect();
+            let slope = (recent[0] - recent[3]) / 3.0;
+            if slope > 0.02 { 0.9f32 } // Rising → easier to escalate
+            else if slope < -0.02 { 1.1 } // Falling → easier to de-escalate
+            else { 1.0 }
+        } else {
+            1.0
+        };
+        let hysteresis_threshold = base_hysteresis * pattern_mod;
         let error_urgency = super::CycleUrgency::from_state(
             smoothed_urgency_error,
             hysteresis_threshold,
@@ -396,7 +411,7 @@ impl CognitiveLoopService {
         // Reflex → cap at Cruise (skip heavy subsystems for familiar inputs)
         // DeepThought → floor at Normal (force full processing for novel/high-stakes)
         // Cortical → use error-based urgency as-is
-        let urgency = match self.cognitive_depth {
+        let raw_urgency = match self.cognitive_depth {
             super::CognitiveDepth::Reflex => match error_urgency {
                 super::CycleUrgency::Critical => super::CycleUrgency::Normal,
                 _ => super::CycleUrgency::Cruise,
@@ -407,6 +422,148 @@ impl CognitiveLoopService {
             },
             super::CognitiveDepth::Cortical => error_urgency,
         };
+
+        // ── Phase 17: Cross-temporal error pattern learning ──────────────
+        // Science: Rao & Ballard (1999) — hierarchical predictive coding tracks error
+        // trajectories across time, not just instantaneous snapshots.
+        // Maintain rolling window of prediction errors, classify pattern.
+        let error_history = &mut self.carryover.history.error_history;
+        if error_history.len() >= 16 {
+            error_history.pop_front();
+        }
+        error_history.push_back(prediction_error);
+
+        let (error_pattern, predicted_urgency) = if error_history.len() >= 4 {
+            let len = error_history.len();
+            let recent_4: Vec<f32> = error_history.iter().rev().take(4).copied().collect();
+            // Compute linear trend (simple slope)
+            let slope = (recent_4[0] - recent_4[3]) / 3.0; // newest - oldest, normalized
+            // Count sign changes for oscillation detection
+            let mut sign_changes = 0u32;
+            for w in error_history.iter().collect::<Vec<_>>().windows(2) {
+                if (w[1] - w[0]).signum() != (w[0] - recent_4.last().copied().unwrap_or(0.0)).signum() {
+                    sign_changes += 1;
+                }
+            }
+            let oscillation_ratio = if len > 2 { sign_changes as f32 / (len - 1) as f32 } else { 0.0 };
+            // Spike detection: current error > 2× running mean
+            let mean_err = error_history.iter().sum::<f32>() / len as f32;
+            let is_spike = prediction_error > mean_err * 2.0 && prediction_error > 0.1;
+
+            let pattern = if is_spike {
+                "Spike"
+            } else if oscillation_ratio > 0.6 {
+                "Oscillating"
+            } else if slope > 0.02 {
+                "Rising"
+            } else if slope < -0.02 {
+                "Falling"
+            } else {
+                "Stable"
+            };
+            // Predict urgency 5 cycles ahead from pattern
+            let predicted = match pattern {
+                "Rising" | "Spike" => "Critical",
+                "Oscillating" => "Normal",
+                "Falling" | "Stable" => {
+                    if self.carryover.urgency.consecutive_low_error > 15 {
+                        "Cruise"
+                    } else {
+                        "Normal"
+                    }
+                }
+                _ => "Normal",
+            };
+            (pattern.to_string(), predicted.to_string())
+        } else {
+            ("Warmup".to_string(), "Normal".to_string())
+        };
+
+        // ── Phase 17: Mode transition smoothing ──────────────────────────
+        // Science: Kelso (1995) — metastable coordination dynamics: transitions between
+        // attractor states should be smooth, not abrupt. Ramp mode_confidence over 5 cycles.
+        let urgency;
+        if raw_urgency != self.carryover.urgency.prev_urgency {
+            // Mode changed — start transition
+            self.stats.mode_transitions += 1;
+            self.carryover.urgency.mode_confidence = 0.0;
+            self.carryover.urgency.mode_stability_counter = 0;
+            // During transition, stay in the HIGHER urgency (more cautious)
+            let raw_level = match raw_urgency {
+                super::CycleUrgency::Critical => 2,
+                super::CycleUrgency::Normal => 1,
+                super::CycleUrgency::Cruise => 0,
+            };
+            let prev_level = match self.carryover.urgency.prev_urgency {
+                super::CycleUrgency::Critical => 2,
+                super::CycleUrgency::Normal => 1,
+                super::CycleUrgency::Cruise => 0,
+            };
+            urgency = if raw_level > prev_level {
+                raw_urgency // escalating → use new immediately
+            } else {
+                // de-escalating → hold old urgency for 1 cycle
+                self.carryover.urgency.prev_urgency
+            };
+            self.carryover.urgency.prev_urgency = raw_urgency;
+        } else {
+            // Same mode — ramp confidence
+            self.carryover.urgency.mode_stability_counter = self
+                .carryover
+                .urgency
+                .mode_stability_counter
+                .saturating_add(1);
+            self.carryover.urgency.mode_confidence =
+                (self.carryover.urgency.mode_stability_counter as f32 / 5.0).min(1.0);
+            urgency = raw_urgency;
+        }
+        self.stats.avg_mode_stability = self.stats.avg_mode_stability * 0.9
+            + self.carryover.urgency.mode_stability_counter as f32 * 0.1;
+
+        // ── Phase 17: Self-model accuracy tracking ───────────────────────
+        // Science: Fleming & Dolan (2012) — metacognitive monitoring improves when
+        // predictions about one's own performance are validated against outcomes.
+        // Record prediction at T, validate at T+5, feed accuracy back to LR/confidence.
+        let self_model_accuracy = self.carryover.learning.self_model_accuracy;
+        if let Some((made_at, pred_confidence, pred_urgency)) =
+            self.carryover.history.self_model_prediction.take()
+        {
+            // Validate if 5 cycles have passed
+            if self.stats.total_cycles >= made_at + 5 {
+                let confidence_error = (self.prediction_confidence - pred_confidence).abs();
+                let urgency_match = if urgency == pred_urgency { 1.0f32 } else { 0.0 };
+                // Accuracy = blend of confidence prediction (70%) + urgency prediction (30%)
+                let accuracy = (1.0 - confidence_error) * 0.7 + urgency_match * 0.3;
+                self.carryover.learning.self_model_accuracy =
+                    self.carryover.learning.self_model_accuracy * 0.9 + accuracy * 0.1;
+                self.stats.self_model_predictions_validated += 1;
+                self.stats.avg_self_model_accuracy =
+                    self.stats.avg_self_model_accuracy * 0.9 + accuracy * 0.1;
+
+                // Feed back: high self-model accuracy → trust confidence more
+                if self.carryover.learning.self_model_accuracy > 0.7 {
+                    let trust_boost = (self.carryover.learning.self_model_accuracy - 0.7) * 0.03;
+                    self.prediction_confidence =
+                        (self.prediction_confidence + trust_boost).clamp(0.0, 1.0);
+                }
+                // Low accuracy → dampen confidence (self-model unreliable)
+                if self.carryover.learning.self_model_accuracy < 0.3 {
+                    self.prediction_confidence *= 0.98;
+                }
+            } else {
+                // Not yet time to validate — put it back
+                self.carryover.history.self_model_prediction =
+                    Some((made_at, pred_confidence, pred_urgency));
+            }
+        }
+        // Make new prediction every 7 cycles (co-prime)
+        if self.stats.total_cycles % 7 == 0
+            && self.carryover.history.self_model_prediction.is_none()
+        {
+            self.carryover.history.self_model_prediction =
+                Some((self.stats.total_cycles, self.prediction_confidence, urgency));
+            self.stats.self_model_predictions_made += 1;
+        }
 
         // FEEDBACK: Quantum coherence boosts exploration (prev cycle)
         // Science: Lambert (2013) — quantum coherence enhances biological search
@@ -459,11 +616,15 @@ impl CognitiveLoopService {
             } else {
                 0.0 // no prediction yet (first cycle)
             };
+        // ── Phase 17: Coherence memoization — cache pre-update value ─────
+        // Science: O(n) history averaging computed once per cycle, not 5×.
+        let pre_update_coherence = self.coherence_bridge.smoothed_coherence();
+
         // Coherence gate: skip resonator recall during unstable CfC dynamics
         // Science: noisy priors during turbulent dynamics can destabilize predictions
         // Uses previous cycle's smoothed coherence (updated at line ~646)
         let reflection_thresholds = self.self_reflection.get_thresholds();
-        let resonator_coherence_gate = self.coherence_bridge.smoothed_coherence()
+        let resonator_coherence_gate = pre_update_coherence
             > reflection_thresholds.coherence_gate
             || self.stats.total_cycles < 10; // bypass gate during warmup
         if resonator_coherence_gate && urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
@@ -706,7 +867,7 @@ impl CognitiveLoopService {
             .unwrap_or_else(|| compressed_state.clone());
         // Phi-weighted learning rate: consciousness level modulates how aggressively
         // we adjust to prediction errors on similar past inputs.
-        let current_phi_for_lr = self.coherence_bridge.smoothed_coherence() as f64;
+        let current_phi_for_lr = pre_update_coherence as f64;
         let semantic_lr_factor = self.semantic_memory.compute_lr_factor_phi_weighted(
             &semantic_hdc,
             3,
@@ -756,8 +917,7 @@ impl CognitiveLoopService {
         if self.carryover.urgency.arousal_trap_counter > 5
             && self.carryover.urgency.arousal_trap_counter <= 10
         {
-            let recovery_intensity =
-                (self.carryover.urgency.arousal_trap_counter - 5) as f32 / 5.0;
+            let recovery_intensity = (self.carryover.urgency.arousal_trap_counter - 5) as f32 / 5.0;
             arousal_recovery_tau_factor = 1.0 + recovery_intensity * 0.2; // up to 20% slower
             arousal_recovery_active = true;
         } else {
@@ -878,6 +1038,8 @@ impl CognitiveLoopService {
         // 10c. Update adaptive behavior based on consciousness state
         let (pattern, pattern_confidence) = self.temporal_signature_encoder.classify_state();
         let coherence = self.coherence_bridge.smoothed_coherence();
+        // Phase 17: Cache post-update coherence for external accessors
+        self.carryover.history.cached_coherence = Some(coherence);
         let voice_confidence = self.voice_feedback_bridge.summary().voice_confidence;
         self.adaptive_behavior = AdaptiveBehavior::from_consciousness_state(
             pattern,
@@ -1398,8 +1560,7 @@ impl CognitiveLoopService {
                 "epistemic"
             } else if q.contains("feel") || q.contains("emotion") || q.contains("care") {
                 // Affective question → boost emotional processing sensitivity
-                self.prediction_confidence =
-                    (self.prediction_confidence + 0.01).clamp(0.0, 1.0);
+                self.prediction_confidence = (self.prediction_confidence + 0.01).clamp(0.0, 1.0);
                 "affective"
             } else if q.contains("do") || q.contains("act") || q.contains("make") {
                 // Pragmatic question → boost action-oriented processing
@@ -1407,8 +1568,7 @@ impl CognitiveLoopService {
                 "pragmatic"
             } else if q.contains("connect") || q.contains("relate") || q.contains("together") {
                 // Social question → boost coherence sensitivity
-                self.prediction_confidence =
-                    (self.prediction_confidence + 0.02).clamp(0.0, 1.0);
+                self.prediction_confidence = (self.prediction_confidence + 0.02).clamp(0.0, 1.0);
                 "social"
             } else {
                 "general"
@@ -1637,8 +1797,11 @@ impl CognitiveLoopService {
         // Science: Luria (1973) — executive recovery is gradual, not instantaneous.
         // After anomaly clears, progressively restore LR over 20 cycles.
         if !metacognitive_anomaly && self.carryover.urgency.anomaly_was_active {
-            self.carryover.urgency.anomaly_recovery_counter =
-                self.carryover.urgency.anomaly_recovery_counter.saturating_add(1);
+            self.carryover.urgency.anomaly_recovery_counter = self
+                .carryover
+                .urgency
+                .anomaly_recovery_counter
+                .saturating_add(1);
             let counter = self.carryover.urgency.anomaly_recovery_counter;
             if counter <= 20 {
                 // Gradually recover: 0.5 → 1.0 over 20 cycles
@@ -1790,7 +1953,7 @@ impl CognitiveLoopService {
             .maybe_resize(prediction_error * consciousness_resize_factor);
 
         // Update coherence metrics in stats
-        self.stats.temporal_coherence = self.coherence_bridge.smoothed_coherence();
+        self.stats.temporal_coherence = coherence; // Phase 17: use cached post-update value
         self.stats.effective_learning_rate = effective_lr;
         self.stats.coherence_phi_contribution = self.coherence_bridge.phi_contribution();
 
@@ -1868,7 +2031,7 @@ impl CognitiveLoopService {
         let pp_in_flow = self.flow_state.in_flow;
         let pp_emotional_valence = self.emotion_contagion.prosody_valence();
         let pp_phi = self.unification_engine.psi as f32;
-        let pp_smoothed_coh = self.coherence_bridge.smoothed_coherence() as f64;
+        let pp_smoothed_coh = coherence as f64; // Phase 17: use cached post-update value
         // World model error → resonator storage importance bias
         // Science: Rescorla-Wagner (1972) — surprising events deserve higher encoding priority
         let pp_wm_importance_boost = self.world_model.avg_error.clamp(0.0, 1.0) * 0.3;
@@ -1972,6 +2135,22 @@ impl CognitiveLoopService {
         self.stats.semantic_entries_stored = self.semantic_memory.stats().total_stored;
 
         // ═══════════════════════════════════════════════════════════════════════
+        // CYCLE STATE: Shared read-only snapshot for extracted phase functions
+        // ═══════════════════════════════════════════════════════════════════════
+        let cycle_state = CycleState {
+            compressed_state: &compressed_state,
+            output: &output,
+            prediction_error,
+            coherence,
+            unified_psi,
+            phi_attention_weight,
+            hv16_cached: &hv16_cached,
+            input,
+            urgency,
+            total_cycles: self.stats.total_cycles,
+        };
+
+        // ═══════════════════════════════════════════════════════════════════════
         // CONSCIOUSNESS METRICS: Extracted to cycle_consciousness.rs
         // Includes: primitive consciousness, temporal primitives, lattice,
         // compositionality, value evaluator, consciousness profile, context-aware
@@ -1981,14 +2160,7 @@ impl CognitiveLoopService {
         // consciousness, epistemic conflict, consciousness equation v2.
         // ═══════════════════════════════════════════════════════════════════════
         let consciousness_metrics = self.compute_consciousness_metrics(
-            hv16_cached,
-            unified_psi,
-            coherence,
-            prediction_error,
-            phi_attention_weight,
-            &compressed_state,
-            input,
-            urgency,
+            &cycle_state,
             &mut module_timings,
         );
 
@@ -2043,13 +2215,7 @@ impl CognitiveLoopService {
         // router, empathic unification, multi-objective evolution.
         // ═══════════════════════════════════════════════════════════════════════
         let subsystem_metrics = self.run_advanced_subsystems(
-            hv16_cached,
-            unified_psi,
-            coherence,
-            prediction_error,
-            phi_attention_weight,
-            &compressed_state,
-            input,
+            &cycle_state,
             &active_primitive_names,
             &mut module_timings,
         );
@@ -2109,16 +2275,22 @@ impl CognitiveLoopService {
             // Low confidence → raise coherence requirements (be cautious)
             let caution_factor = (0.4 - epistemic_gate_confidence) * 0.3;
             self.carryover.learning.adaptive_threshold_scale *= 1.0 + caution_factor;
-            self.carryover.learning.adaptive_threshold_scale =
-                self.carryover.learning.adaptive_threshold_scale.clamp(0.5, 2.0);
+            self.carryover.learning.adaptive_threshold_scale = self
+                .carryover
+                .learning
+                .adaptive_threshold_scale
+                .clamp(0.5, 2.0);
             epistemic_coherence_gated = true;
             self.stats.epistemic_coherence_gated_count += 1;
         } else if epistemic_gate_confidence > 0.8 {
             // High confidence → loosen threshold (trust inputs, learn faster)
             let trust_factor = (epistemic_gate_confidence - 0.8) * 0.15;
             self.carryover.learning.adaptive_threshold_scale *= 1.0 - trust_factor;
-            self.carryover.learning.adaptive_threshold_scale =
-                self.carryover.learning.adaptive_threshold_scale.clamp(0.5, 2.0);
+            self.carryover.learning.adaptive_threshold_scale = self
+                .carryover
+                .learning
+                .adaptive_threshold_scale
+                .clamp(0.5, 2.0);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -2154,13 +2326,10 @@ impl CognitiveLoopService {
         let EpisodicReplayResult {
             surprise_replay_batch_size,
         } = self.run_episodic_replay_and_memory_phase(
-            prediction_error,
+            &cycle_state,
             memory_context_boost,
-            coherence,
             fep_surprise,
             surprise_thresh,
-            &compressed_state,
-            &output,
             &mut module_timings,
         );
 
@@ -2253,13 +2422,8 @@ impl CognitiveLoopService {
             dream_phi_improvement,
             dream_wisdom_count,
         } = self.run_dream_phase(
-            &compressed_state,
-            &output,
+            &cycle_state,
             &prediction,
-            prediction_error,
-            unified_psi,
-            &hv16_cached,
-            urgency,
             &mut module_timings,
         );
 
@@ -2392,8 +2556,11 @@ impl CognitiveLoopService {
                 self.prediction_confidence *= 1.0 - severity * 0.1;
                 // Raise learning threshold (require higher error to trigger training)
                 self.carryover.learning.adaptive_threshold_scale *= 1.0 + severity * 0.2;
-                self.carryover.learning.adaptive_threshold_scale =
-                    self.carryover.learning.adaptive_threshold_scale.clamp(0.5, 2.0);
+                self.carryover.learning.adaptive_threshold_scale = self
+                    .carryover
+                    .learning
+                    .adaptive_threshold_scale
+                    .clamp(0.5, 2.0);
                 coherence_velocity_gated = true;
                 self.stats.coherence_velocity_gated_count += 1;
             } else {
@@ -2620,9 +2787,8 @@ impl CognitiveLoopService {
         let unified_quality_score;
         {
             let anomaly_factor = if metacognitive_anomaly { 0.0 } else { 1.0 };
-            unified_quality_score = 0.5 * prediction_coherence
-                + 0.3 * cross_module_agreement
-                + 0.2 * anomaly_factor;
+            unified_quality_score =
+                0.5 * prediction_coherence + 0.3 * cross_module_agreement + 0.2 * anomaly_factor;
             self.stats.avg_unified_quality =
                 self.stats.avg_unified_quality * 0.9 + unified_quality_score * 0.1;
 
@@ -2851,6 +3017,14 @@ impl CognitiveLoopService {
             coherence_velocity_gated,
             anomaly_recovery_progress,
             anomaly_recovering,
+            // Phase 17: Predictive Self-Tuning
+            error_pattern,
+            startup_suppressed,
+            startup_warmup_progress,
+            self_model_accuracy,
+            mode_confidence: self.carryover.urgency.mode_confidence,
+            mode_stability_counter: self.carryover.urgency.mode_stability_counter,
+            predicted_urgency,
         };
 
         // Update cumulative stats for resonator-memory loop diagnostics
@@ -2906,696 +3080,10 @@ impl CognitiveLoopService {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Extracted cycle phases: each method is a self-contained phase of the main
-    // cognitive loop, taking only the inputs it needs and returning results via
-    // dedicated result structs. All logic and side effects are preserved exactly.
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// Resonator codebook growth, high-Phi episode promotion, diversity computation,
-    /// utilization tracking, and diversity-driven exploration governor.
-    ///
-    /// Extracted from cycle() -- all logic and behavior preserved exactly.
-    fn run_resonator_codebook_phase(
-        &mut self,
-        epistemic_gate_approved: bool,
-        compressed_state: &[f32],
-        active_primitive_names: &[String],
-        causal_codebook_entries: &[(String, Vec<f32>)],
-        reflection_thresholds: &super::drives::ReflectionThresholds,
-        module_timings: &mut super::ModuleTimings,
-    ) -> ResonatorCodebookResult {
-        // ═══════════════════════════════════════════════════════════════════════
-        // RESONATOR CODEBOOK GROWTH: add novel patterns to semantic codebook
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        // Gate codebook growth on epistemic approval — don't learn from rejected inputs
-        if epistemic_gate_approved {
-            if let Some(ref mut res_mem) = self.resonator_memory {
-                let res_dim_ok = compressed_state.len() == res_mem.resonator.config.dim;
-                if res_dim_ok
-                    && self.stats.total_cycles % self.config.resonator_growth_interval == 0
-                {
-                    if let Some(ref mut semantic_cb) = res_mem.resonator.codebooks.get_mut(0) {
-                        // Check novelty: max similarity to existing symbols
-                        let max_sim = semantic_cb
-                            .symbols
-                            .iter()
-                            .map(|(_, hv)| {
-                                let dot: f32 = compressed_state
-                                    .iter()
-                                    .zip(hv.iter())
-                                    .map(|(a, b)| a * b)
-                                    .sum();
-                                let na: f32 =
-                                    compressed_state.iter().map(|x| x * x).sum::<f32>().sqrt();
-                                let nb: f32 = hv.iter().map(|x| x * x).sum::<f32>().sqrt();
-                                if na > 0.0 && nb > 0.0 {
-                                    dot / (na * nb)
-                                } else {
-                                    0.0
-                                }
-                            })
-                            .fold(0.0f32, f32::max);
-
-                        if max_sim < self.config.resonator_novelty_threshold
-                            && semantic_cb.len() < self.config.resonator_max_symbols
-                        {
-                            semantic_cb.add(
-                                &format!("learned_{}", self.stats.total_cycles),
-                                compressed_state.to_vec(),
-                            );
-
-                            // Track B: Lattice meet for semantic grounding of learned symbol
-                            if let Some(ref lattice) = self.primitive_lattice {
-                                if active_primitive_names.len() >= 2 {
-                                    if let (Some(a), Some(b)) = (
-                                        lattice.element_index_by_name(&active_primitive_names[0]),
-                                        lattice.element_index_by_name(&active_primitive_names[1]),
-                                    ) {
-                                        if let Some(meet_idx) = lattice.meet(a, b) {
-                                            let last = semantic_cb.symbols.len() - 1;
-                                            semantic_cb.symbols[last].0 = format!(
-                                                "learned_{}_{}",
-                                                self.stats.total_cycles,
-                                                lattice.elements[meet_idx].name
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-
-                            tracing::trace!(
-                                symbols = semantic_cb.len(),
-                                max_sim,
-                                cycle = self.stats.total_cycles,
-                                "Resonator: novel pattern added to semantic codebook"
-                            );
-                        }
-                    }
-                }
-            }
-
-            // Track A-2: Causal chain content → resonator codebook symbols
-            if !causal_codebook_entries.is_empty() {
-                if let Some(ref mut res_mem) = self.resonator_memory {
-                    for (label, hv) in causal_codebook_entries {
-                        if let Some(ref mut semantic_cb) = res_mem.resonator.codebooks.get_mut(0) {
-                            if semantic_cb.len() < self.config.resonator_max_symbols
-                                && hv.len() == res_mem.resonator.config.dim
-                            {
-                                semantic_cb.add(label, hv.clone());
-                            }
-                        }
-                    }
-                }
-            }
-        } // end epistemic_gate_approved guard for codebook growth
-
-        module_timings.resonator_codebook = _t.elapsed().as_micros() as u64;
-
-        // Track 3c: High-Phi episodes → resonator codebook promotion
-        // Science: Dehaene (2014) — conscious access creates durable representations
-        // Co-prime cadence (97 cycles) avoids interference with other periodic tasks
-        let _t = Instant::now();
-        let mut resonator_promotions: usize = 0;
-        let mut codebook_evictions: usize = 0;
-        if self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0 {
-            let top_eps = self
-                .phi_episodic_replay
-                .as_ref()
-                .map(|replay| replay.get_top_episodes(3))
-                .unwrap_or_default();
-
-            if !top_eps.is_empty() {
-                if let Some(ref mut res_mem) = self.resonator_memory {
-                    let dim = res_mem.resonator.config.dim;
-                    if let Some(ref mut semantic_cb) = res_mem.resonator.codebooks.get_mut(0) {
-                        for ep in &top_eps {
-                            if ep.psi > 0.5 {
-                                let ep_vec = &ep.input.values;
-                                if ep_vec.len() != dim {
-                                    continue;
-                                }
-
-                                // Track 3c-evict: Prune most redundant entry when at capacity
-                                // Science: competitive learning — maintain codebook diversity
-                                if semantic_cb.len() >= self.config.resonator_max_symbols
-                                    && semantic_cb.len() > 1
-                                {
-                                    let n = semantic_cb.symbols.len();
-                                    let mut max_redundancy = f32::MIN;
-                                    let mut evict_idx = 0;
-                                    for i in 0..n {
-                                        let avg_sim: f32 = (0..n)
-                                            .filter(|&j| j != i)
-                                            .map(|j| {
-                                                let dot: f32 = semantic_cb.symbols[i]
-                                                    .1
-                                                    .iter()
-                                                    .zip(semantic_cb.symbols[j].1.iter())
-                                                    .map(|(a, b)| a * b)
-                                                    .sum();
-                                                let na: f32 = semantic_cb.symbols[i]
-                                                    .1
-                                                    .iter()
-                                                    .map(|x| x * x)
-                                                    .sum::<f32>()
-                                                    .sqrt();
-                                                let nb: f32 = semantic_cb.symbols[j]
-                                                    .1
-                                                    .iter()
-                                                    .map(|x| x * x)
-                                                    .sum::<f32>()
-                                                    .sqrt();
-                                                if na > 0.0 && nb > 0.0 {
-                                                    dot / (na * nb)
-                                                } else {
-                                                    0.0
-                                                }
-                                            })
-                                            .sum::<f32>()
-                                            / (n - 1) as f32;
-                                        if avg_sim > max_redundancy {
-                                            max_redundancy = avg_sim;
-                                            evict_idx = i;
-                                        }
-                                    }
-                                    semantic_cb.symbols.remove(evict_idx);
-                                    codebook_evictions += 1;
-                                }
-
-                                if semantic_cb.len() < self.config.resonator_max_symbols {
-                                    semantic_cb.add(
-                                        &format!("phi_{:.0}_{}", ep.psi * 100.0, ep.timestamp),
-                                        ep_vec.clone(),
-                                    );
-                                    resonator_promotions += 1;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        module_timings.high_phi_promotion = _t.elapsed().as_micros() as u64;
-
-        // Track 3e: Codebook diversity metric
-        // Science: competitive learning — low diversity = redundant representations
-        // Compute average pairwise cosine distance (every 50 cycles to amortize cost)
-        let codebook_diversity: f32 = if self.stats.total_cycles % 50 == 0 {
-            if let Some(ref res_mem) = self.resonator_memory {
-                if let Some(semantic_cb) = res_mem.resonator.codebooks.first() {
-                    let n = semantic_cb.symbols.len();
-                    if n >= 2 {
-                        let mut total_dist = 0.0f32;
-                        let mut pairs = 0u32;
-                        for i in 0..n {
-                            for j in (i + 1)..n {
-                                let dot: f32 = semantic_cb.symbols[i]
-                                    .1
-                                    .iter()
-                                    .zip(semantic_cb.symbols[j].1.iter())
-                                    .map(|(a, b)| a * b)
-                                    .sum();
-                                let na: f32 = semantic_cb.symbols[i]
-                                    .1
-                                    .iter()
-                                    .map(|x| x * x)
-                                    .sum::<f32>()
-                                    .sqrt();
-                                let nb: f32 = semantic_cb.symbols[j]
-                                    .1
-                                    .iter()
-                                    .map(|x| x * x)
-                                    .sum::<f32>()
-                                    .sqrt();
-                                let sim = if na > 0.0 && nb > 0.0 {
-                                    dot / (na * nb)
-                                } else {
-                                    0.0
-                                };
-                                total_dist += 1.0 - sim; // distance = 1 - similarity
-                                pairs += 1;
-                            }
-                        }
-                        if pairs > 0 {
-                            total_dist / pairs as f32
-                        } else {
-                            0.0
-                        }
-                    } else {
-                        0.0
-                    }
-                } else {
-                    0.0
-                }
-            } else {
-                0.0
-            }
-        } else {
-            self.stats.codebook_diversity // carry forward cached value
-        };
-
-        // ── Track 5d: Codebook utilization rate ─────────────────────────────
-        // Science: Kohonen (1982) — self-organizing maps need active symbol usage
-        // Compute fraction of codebook symbols that match recent input (similarity > 0.2).
-        // Low utilization → too many dead symbols → slow codebook growth.
-        let codebook_utilization_rate: f32 = if self.stats.total_cycles % 50 == 0 {
-            if let Some(ref res_mem) = self.resonator_memory {
-                if let Some(semantic_cb) = res_mem.resonator.codebooks.first() {
-                    let n = semantic_cb.symbols.len();
-                    if n > 0 && compressed_state.len() == res_mem.resonator.config.dim {
-                        let utilized = semantic_cb
-                            .symbols
-                            .iter()
-                            .filter(|(_, hv)| {
-                                let dot: f32 = compressed_state
-                                    .iter()
-                                    .zip(hv.iter())
-                                    .map(|(a, b)| a * b)
-                                    .sum();
-                                let na: f32 =
-                                    compressed_state.iter().map(|x| x * x).sum::<f32>().sqrt();
-                                let nb: f32 = hv.iter().map(|x| x * x).sum::<f32>().sqrt();
-                                let sim = if na > 0.0 && nb > 0.0 {
-                                    dot / (na * nb)
-                                } else {
-                                    0.0
-                                };
-                                sim > 0.2
-                            })
-                            .count();
-                        let rate = utilized as f32 / n as f32;
-                        // EMA update
-                        self.stats.codebook_utilization_rate =
-                            self.stats.codebook_utilization_rate * 0.8 + rate * 0.2;
-                        // Low utilization → increase novelty threshold (harder to add)
-                        if rate < 0.2 && self.config.resonator_novelty_threshold < 0.9 {
-                            self.config.resonator_novelty_threshold =
-                                (self.config.resonator_novelty_threshold + 0.02).min(0.9);
-                        } else if rate > 0.6 && self.config.resonator_novelty_threshold > 0.3 {
-                            // High utilization → lower novelty threshold (easier to add)
-                            self.config.resonator_novelty_threshold =
-                                (self.config.resonator_novelty_threshold - 0.01).max(0.3);
-                        }
-                        rate
-                    } else {
-                        self.stats.codebook_utilization_rate
-                    }
-                } else {
-                    self.stats.codebook_utilization_rate
-                }
-            } else {
-                0.0
-            }
-        } else {
-            self.stats.codebook_utilization_rate
-        };
-
-        // Track 3f: Codebook diversity → exploration governor
-        // Science: competitive learning — low diversity signals representational collapse
-        // Low diversity → boost exploration urge (seek novel inputs)
-        // High diversity → allow exploitation (good codebook coverage)
-        let div_low = reflection_thresholds.diversity_low;
-        let div_high = reflection_thresholds.diversity_high;
-        if codebook_diversity > 0.0 {
-            if codebook_diversity < div_low {
-                // Representational collapse risk — boost exploration
-                let diversity_boost = (div_low - codebook_diversity) * 0.2;
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + diversity_boost).clamp(0.0, 1.0);
-            } else if codebook_diversity > div_high {
-                // Good coverage — allow exploitation, dampen exploration slightly
-                let exploit_dampen = (codebook_diversity - div_high) * 0.1;
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge - exploit_dampen).clamp(0.0, 1.0);
-            }
-        }
-
-        ResonatorCodebookResult {
-            resonator_promotions,
-            codebook_evictions,
-            codebook_diversity,
-            codebook_utilization_rate,
-        }
-    }
-
-    /// Episodic replay session: demand-driven consolidation triggers, replay with
-    /// surprise-boosted batch sizes, resonator factorization, adaptive scheduling,
-    /// and memory coordinator graduation.
-    ///
-    /// Extracted from cycle() -- all logic and behavior preserved exactly.
-    #[allow(clippy::too_many_arguments)]
-    fn run_episodic_replay_and_memory_phase(
-        &mut self,
-        prediction_error: f32,
-        memory_context_boost: f32,
-        coherence: f32,
-        fep_surprise: f64,
-        surprise_thresh: f64,
-        compressed_state: &[f32],
-        output: &[f32],
-        module_timings: &mut super::ModuleTimings,
-    ) -> EpisodicReplayResult {
-        let mut surprise_replay_batch_size: usize = 0;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // DEMAND-DRIVEN CONSOLIDATION TRIGGERS
-        // ═══════════════════════════════════════════════════════════════════════
-        // Trigger early episodic replay when:
-        //   (a) prediction error spikes >2x the moving average, or
-        //   (b) semantic memory returned zero hits (retrieval miss)
-        // The periodic 100-cycle floor is still enforced by should_replay().
-        let _t = Instant::now();
-        if let Some(ref mut replay) = self.phi_episodic_replay {
-            let avg_err = self.stats.avg_prediction_error;
-            let error_spike = avg_err > 0.01 && prediction_error > avg_err * 2.0;
-            let semantic_miss = self.semantic_memory.stats().semantic_misses > 0
-                && memory_context_boost == 0.0 // no episodic memories recalled this cycle
-                && self.stats.total_cycles > 10;
-
-            if error_spike || semantic_miss {
-                replay.trigger_demand_replay();
-                tracing::trace!(
-                    error_spike,
-                    semantic_miss,
-                    cycle = self.stats.total_cycles,
-                    "Demand-driven consolidation triggered"
-                );
-            }
-        }
-
-        module_timings.demand_consolidation = _t.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // SEQUENTIAL: Episodic replay + Memory coordinator
-        // ═══════════════════════════════════════════════════════════════════════
-        // These remain sequential because:
-        // - Episodic replay needs &mut temporal_network for CfC retraining
-        // - Memory coordinator needs &mut phi_episodic_replay after replay completes
-        let _t = Instant::now();
-        if let Some(ref mut replay) = self.phi_episodic_replay {
-            let coherence_summary = self.coherence_bridge.summary();
-            let current_phi = coherence_summary.smoothed_coherence as f64;
-
-            let input_hv =
-                symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(compressed_state.to_vec());
-            let output_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(output.to_vec());
-
-            let episode = crate::memory::episodic_replay::Episode::with_metadata(
-                input_hv,
-                output_hv,
-                current_phi,
-                self.stats.total_cycles as u64,
-                prediction_error,
-                self.emotion_contagion.smoothed_valence(),
-                coherence_summary.coherence,
-            );
-
-            let stored = replay.store_if_significant(episode);
-            if stored {
-                tracing::trace!(
-                    phi = current_phi,
-                    cycle = self.stats.total_cycles,
-                    "High-Phi episode stored for replay"
-                );
-            }
-
-            if replay.should_replay() {
-                // ── Track 5f: FEP surprise → replay batch size modulation ────────
-                // Science: Mnih et al. (2015) — prioritized experience replay:
-                // high surprise = high learning potential → replay more episodes
-                let base_batch = replay.config.batch_size;
-                let surprise_batch_boost = if fep_surprise > surprise_thresh {
-                    // High surprise → up to 2x batch size
-                    let boost_factor =
-                        ((fep_surprise - surprise_thresh) / surprise_thresh).min(1.0) as f32;
-                    (base_batch as f32 * boost_factor).round() as usize
-                } else {
-                    0
-                };
-                let boosted_batch = base_batch + surprise_batch_boost;
-                // Temporarily set boosted batch size for this replay session
-                let original_batch = replay.config.batch_size;
-                replay.config.batch_size = boosted_batch;
-                surprise_replay_batch_size = boosted_batch;
-
-                if let TemporalNetwork::CfC(ref mut cfc) = self.temporal_network {
-                    let learning_rate = self.config.cfc_config.learning_rate;
-                    let result = replay.replay_session(cfc, learning_rate);
-
-                    if !result.skipped {
-                        tracing::debug!(
-                            episodes = result.episodes_replayed,
-                            avg_loss = result.average_loss,
-                            avg_psi = result.average_psi,
-                            "Episodic replay session completed"
-                        );
-
-                        // Track 3g: Dream consolidation — resonator factorization of replayed episodes
-                        // Science: Stickgold (2005) — sleep replay extracts gist representations
-                        // After episodic replay, factorize top episodes through the resonator to
-                        // extract clean semantic components and strengthen codebook representations.
-                        if let Some(ref mut res_mem) = self.resonator_memory {
-                            if !res_mem.resonator.codebooks.is_empty() {
-                                let res_dim = res_mem.resonator.config.dim;
-                                let top_eps = replay.get_top_episodes(3);
-                                for ep in &top_eps {
-                                    // Project episode input down to resonator dim
-                                    let ep_vals = &ep.input.values;
-                                    if ep_vals.len() >= res_dim {
-                                        let projected: Vec<f32> =
-                                            ep_vals.iter().take(res_dim).copied().collect();
-                                        if let Ok(factors) = res_mem.resonator.factorize(&projected)
-                                        {
-                                            // Each factor strengthens its codebook entry via re-exposure
-                                            // This is the "gist extraction" — dreaming distills episodes
-                                            // into their categorical components
-                                            for (label, _factor_hv) in &factors {
-                                                tracing::trace!(
-                                                    label,
-                                                    psi = ep.psi,
-                                                    "Dream factorized episode component"
-                                                );
-                                            }
-                                            let _ = factors.len(); // factorization itself updates resonator state
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                // Restore original batch size after replay session
-                replay.config.batch_size = original_batch;
-                if surprise_batch_boost > 0 {
-                    self.stats.surprise_boosted_replays += 1;
-                }
-            }
-        }
-
-        // Track 4d: Adaptive replay scheduling — modulate interval based on error volatility
-        // Science: McClelland et al. (1995) — fast-changing environments need more replay
-        if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 50 {
-            if let Some(ref mut replay) = self.phi_episodic_replay {
-                // Variance = E[X²] - E[X]² (from EMA-tracked moments)
-                let error_variance = (self.stats.avg_prediction_error_sq
-                    - self.stats.avg_prediction_error * self.stats.avg_prediction_error)
-                    .max(0.0);
-                replay.adapt_replay_interval(error_variance);
-            }
-        }
-
-        // Memory coordinator: broadcast signals and process graduations
-        {
-            let coord_phi = self.coherence_bridge.smoothed_coherence() as f64;
-            let coord_coherence = coherence as f64;
-            self.memory_coordinator.update_signals_with_sigma(
-                coord_phi,
-                coord_coherence,
-                self.carryover.consciousness.last_sigma,
-            );
-
-            if let Some(ref mut replay) = self.phi_episodic_replay {
-                let graduated = self.memory_coordinator.process_graduations(replay);
-                if graduated > 0 {
-                    tracing::debug!(
-                        graduated,
-                        "Memory coordinator graduated items to episodic storage"
-                    );
-                }
-            }
-        }
-
-        module_timings.episodic_replay = _t.elapsed().as_micros() as u64;
-
-        EpisodicReplayResult {
-            surprise_replay_batch_size,
-        }
-    }
-
-    /// Dream engine phase: record surprise events, run dream simulations during Cruise
-    /// urgency, apply accumulated wisdom to exploration/confidence, and manage the
-    /// dream feedback bridge for context-aware priors.
-    ///
-    /// Extracted from cycle() -- all logic and behavior preserved exactly.
-    #[allow(clippy::too_many_arguments)]
-    fn run_dream_phase(
-        &mut self,
-        compressed_state: &[f32],
-        output: &[f32],
-        prediction: &[f32],
-        prediction_error: f32,
-        unified_psi: f64,
-        hv16_cached: &symthaea_core::hdc::BinaryHV,
-        urgency: super::CycleUrgency,
-        module_timings: &mut super::ModuleTimings,
-    ) -> DreamPhaseResult {
-        let _t = Instant::now();
-        // 1. Every cycle: record high-surprise events for later dreaming.
-        // 2. During Cruise urgency: run a dream cycle to discover better actions.
-        // 3. Apply accumulated wisdom to bias exploration toward Phi-optimal choices.
-        let mut dream_insights: usize = 0;
-        let mut dream_phi_improvement: f32 = 0.0;
-        let mut dream_wisdom_count: usize = 0;
-        if let Some(ref mut dream) = self.dream_engine {
-            // Record: use compressed state as "state", output as "action",
-            // and prediction as "outcome" — these align with the dream API dimensions
-            let dream_state: Vec<f32> = compressed_state.iter().take(64).copied().collect();
-            let dream_action: Vec<f32> = output.iter().take(32).copied().collect();
-            let dream_outcome: Vec<f32> = prediction.iter().take(64).copied().collect();
-            // Weight surprise by consciousness level and narrative self-coherence:
-            // Science: Tononi (2015) — consciousness = integrated information = memory salience
-            // Narrative→Dream coupling (Conway 2005): self-relevant memories encode preferentially.
-            let narrative_salience = self
-                .narrative_self
-                .as_ref()
-                .map(|n| 1.0 + n.self_phi() as f32 * 0.5) // 1.0 to 1.5x boost
-                .unwrap_or(1.0);
-            let phi_weighted_surprise =
-                prediction_error * (1.0 + unified_psi as f32).clamp(1.0, 2.0) * narrative_salience;
-            dream.record(
-                &dream_state,
-                &dream_action,
-                &dream_outcome,
-                phi_weighted_surprise,
-            );
-
-            // Dream during Cruise urgency (low-error steady state) or every 20th cycle
-            if matches!(urgency, super::CycleUrgency::Cruise)
-                || urgency.should_run(self.stats.total_cycles, 10, 20, 5)
-            {
-                if let Ok(result) = dream.dream() {
-                    dream_insights = result.insights;
-                    dream_phi_improvement = result.best_phi_improvement;
-
-                    if result.insights > 0 {
-                        tracing::debug!(
-                            insights = result.insights,
-                            phi_improvement = result.best_phi_improvement,
-                            simulations = result.simulations_run,
-                            cycle = self.stats.total_cycles,
-                            "Dream replay generated insights"
-                        );
-
-                        // Dream→Narrative coupling: dream insights feed narrative self-model.
-                        // Science: Revonsuo (2000) — dreaming enhances threat simulation
-                        // and narrative integration of novel experiences.
-                        if let Some(ref mut narrative) = self.narrative_self {
-                            narrative.process_experience(
-                                hv16_cached,
-                                &format!("dream_insight_{}", result.insights),
-                                true, // counterfactual-validated
-                                unified_psi,
-                                result.best_phi_improvement as f64,
-                            );
-                        }
-                    }
-                }
-            }
-
-            dream_wisdom_count = dream.wisdom().len();
-
-            // Feed dream wisdom into DreamFeedbackBridge for context-aware priors.
-            // Bridge converts Wisdom → action priors + confidence adjustments keyed
-            // by context hash, enabling future cycles to leverage dream discoveries.
-            #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
-            for wisdom in dream.wisdom().iter() {
-                let context_hash = crate::consciousness::recursive_improvement::hash_context(
-                    &wisdom.context_state,
-                );
-                let insight = crate::consciousness::recursive_improvement::DreamInsight::new(
-                    context_hash,
-                    wisdom.context_state.clone(), // original action = context state
-                    wisdom.better_action.clone(), // alternative action
-                    wisdom.phi_improvement as f64,
-                );
-                self.dream_feedback_bridge.process_insight(insight);
-            }
-
-            // Apply wisdom: if we have accumulated wisdom, modulate exploration
-            // toward states where dream counterfactuals found Phi improvements
-            if !dream.wisdom().is_empty() {
-                let avg_phi_improvement: f32 = dream
-                    .wisdom()
-                    .iter()
-                    .map(|w| w.phi_improvement)
-                    .sum::<f32>()
-                    / dream.wisdom().len() as f32;
-                // Dream wisdom boosts exploration when Phi improvements are found
-                let wisdom_exploration_boost = (avg_phi_improvement * 0.5).clamp(0.0, 0.2);
-                self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
-                    + wisdom_exploration_boost)
-                    .clamp(0.0, 1.0);
-
-                // FEEDBACK: Dream Phi insights feed forward into waking prediction confidence
-                // Science: Prospective consciousness — offline simulation prepares waking cognition.
-                // Dream-discovered Phi improvements signal that exploration can yield better states,
-                // boosting confidence that the system can navigate toward them.
-                if avg_phi_improvement > 0.01 {
-                    let dream_confidence_boost = (avg_phi_improvement * 0.1).min(0.05);
-                    self.prediction_confidence =
-                        (self.prediction_confidence + dream_confidence_boost).clamp(0.0, 1.0);
-                }
-            }
-        }
-
-        // FEEDBACK: Current-cycle dream insights boost learning signal
-        // (reinforces pathways that produced the insight)
-        if dream_phi_improvement > 0.05 {
-            self.fep_learning_signal *= 1.0 + (dream_phi_improvement * 0.2).min(0.15);
-        }
-
-        // Dream feedback bridge: adjust prediction confidence based on accumulated
-        // dream priors. Context hash from compressed state enables context-specific
-        // calibration — contexts where dreams found better alternatives get a boost.
-        #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
-        if self.dream_feedback_bridge.num_priors() > 0 {
-            let context_hash = crate::consciousness::recursive_improvement::hash_context(
-                &compressed_state[..64.min(compressed_state.len())],
-            );
-            let (adjusted, was_informed) = self
-                .dream_feedback_bridge
-                .adjust_confidence(self.prediction_confidence as f64, context_hash);
-            if was_informed {
-                self.prediction_confidence = (adjusted as f32).clamp(0.0, 1.0);
-            }
-            // Decay priors every 199 cycles to forget stale wisdom (co-prime)
-            if self.stats.total_cycles % 199 == 0 {
-                self.dream_feedback_bridge.decay_priors(0.95);
-            }
-        }
-
-        module_timings.dream_replay = _t.elapsed().as_micros() as u64;
-
-        DreamPhaseResult {
-            dream_insights,
-            dream_phi_improvement,
-            dream_wisdom_count,
-        }
-    }
+    // Extracted cycle phases moved to helpers/cycle_phases.rs:
+    // - run_resonator_codebook_phase()
+    // - run_episodic_replay_and_memory_phase()
+    // - run_dream_phase()
 
     /// Safe wrapper around `cycle()` that catches panics from unexpected subsystem failures.
     ///

@@ -3774,7 +3774,10 @@ fn test_attention_budget_tracking() {
             budget_recorded = true;
         }
     }
-    assert!(budget_recorded, "attention budget elapsed_us never recorded");
+    assert!(
+        budget_recorded,
+        "attention budget elapsed_us never recorded"
+    );
 
     let stats = service.stats();
     // Over 30 cycles, some may exceed budget — just ensure counter is finite
@@ -3906,8 +3909,14 @@ fn test_input_similarity_memoization() {
 
     // First cycle: no previous state to compare
     let r1 = service.cycle("memoization test input");
-    assert_eq!(r1.metadata.input_similarity, 0.0, "first cycle should have 0 similarity");
-    assert!(!r1.metadata.input_memoized, "first cycle should not be memoized");
+    assert_eq!(
+        r1.metadata.input_similarity, 0.0,
+        "first cycle should have 0 similarity"
+    );
+    assert!(
+        !r1.metadata.input_memoized,
+        "first cycle should not be memoized"
+    );
 
     // Second cycle: same input → should have high similarity
     let r2 = service.cycle("memoization test input");

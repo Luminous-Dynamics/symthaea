@@ -482,8 +482,7 @@ fn test_compute_temporal_primitives_confidence_stable_without_analyzer() {
 fn test_compute_dissipative_no_dc() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let mut timings = super::super::ModuleTimings::default();
-    let (health, regime, entropy) =
-        service.compute_dissipative_phase(0.3, 0.6, 0.5, &mut timings);
+    let (health, regime, entropy) = service.compute_dissipative_phase(0.3, 0.6, 0.5, &mut timings);
     // Without dissipative_consciousness, all zeros
     assert!((health - 0.0).abs() < f64::EPSILON);
     assert!(regime.is_empty());

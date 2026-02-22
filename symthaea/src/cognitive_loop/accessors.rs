@@ -6,13 +6,12 @@
 //! unit tests (e.g., `flow_state()`, `curiosity_drive()`).
 
 use crate::causal::{CausalGraph, DiscoveredRelationship};
-use crate::consciousness::consciousness_unification::{
-    EmotionalPattern, UnifiedEmotion, UnifiedEmotionalState,
-};
+use crate::consciousness::consciousness_unification::EmotionalPattern;
 use crate::consciousness::stability_regime::StabilityRegimeProcessor;
 use crate::dynamics::cfc_coherence::CoherenceSummary;
 use crate::dynamics::temporal_signatures::{ConsciousnessPattern, TemporalStateSummary};
 use crate::memory::coherence_tracker::ConversationCoherenceTracker;
+use crate::voice::cognitive_bridge::VoiceConsciousnessSignals;
 use crate::voice::voice_feedback::{VoiceOutputMetrics, VoiceQualitySummary};
 use anyhow::Result;
 
@@ -39,11 +38,6 @@ impl CognitiveLoopService {
     // ═══════════════════════════════════════════════════════════════════════
     // CAUSAL ENHANCEMENT ACCESSORS
     // ═══════════════════════════════════════════════════════════════════════
-
-    /// Check if causal enhancement is enabled
-    pub fn causal_enhancement_enabled(&self) -> bool {
-        self.causal_enhancer.is_some()
-    }
 
     /// Get the current causal graph (if causal enhancement is enabled)
     pub fn causal_graph(&self) -> Option<&CausalGraph> {
@@ -73,11 +67,6 @@ impl CognitiveLoopService {
     // ═══════════════════════════════════════════════════════════════════════
     // EPISODIC REPLAY ACCESSORS
     // ═══════════════════════════════════════════════════════════════════════
-
-    /// Check if episodic replay is enabled
-    pub fn episodic_replay_enabled(&self) -> bool {
-        self.phi_episodic_replay.is_some()
-    }
 
     /// Get episodic replay statistics
     pub fn episodic_replay_stats(
@@ -144,24 +133,15 @@ impl CognitiveLoopService {
             })
     }
 
-    /// Check if loop is learning (error trend negative)
-    pub fn is_learning(&self) -> bool {
-        self.stats.error_trend < 0.0 && self.stats.learning_cycles > 0
-    }
-
-    /// Check if attention has emerged (variance > threshold)
-    pub fn has_emerged_attention(&self) -> bool {
-        self.stats.attention_variance > 0.01
-    }
-
     /// Get coherence summary for external systems
     pub fn coherence_summary(&self) -> CoherenceSummary {
         self.coherence_bridge.summary()
     }
 
-    /// Get temporal coherence value
+    /// Get temporal coherence value (uses cycle-cached value when available)
     pub fn temporal_coherence(&self) -> f32 {
-        self.coherence_bridge.smoothed_coherence()
+        self.carryover.history.cached_coherence
+            .unwrap_or_else(|| self.coherence_bridge.smoothed_coherence())
     }
 
     // ========== Semantic Memory Accessors ==========
@@ -279,11 +259,6 @@ impl CognitiveLoopService {
     /// Get curiosity level (0.0 to 1.0)
     pub fn curiosity(&self) -> f32 {
         self.curiosity_drive.curiosity
-    }
-
-    /// Get exploration urge (0.0 to 1.0)
-    pub fn exploration_urge(&self) -> f32 {
-        self.curiosity_drive.exploration_urge
     }
 
     /// Check if curiosity-triggered exploration should occur
@@ -493,6 +468,35 @@ impl CognitiveLoopService {
         self.voice_feedback_bridge.is_uncertain()
     }
 
+    /// Get Phase 16 consciousness signals for voice prosody modulation.
+    ///
+    /// Returns a compact struct containing unified quality, epistemic gating,
+    /// dissipative health, coherence velocity, and consciousness level —
+    /// the signals needed by `CognitivePacing::from_cycle_metadata()`.
+    pub fn voice_consciousness_signals(&self) -> VoiceConsciousnessSignals {
+        let (_, pattern_confidence) = self.temporal_signature_encoder.classify_state();
+        let consciousness_level = super::snapshot::ConsciousnessSnapshot::compute_consciousness_level(
+            self.prediction_confidence,
+            self.coherence_bridge.smoothed_coherence(),
+            self.flow_state.intensity,
+            pattern_confidence,
+        );
+
+        VoiceConsciousnessSignals {
+            unified_quality: self.stats.avg_unified_quality,
+            epistemic_confidence: self.carryover.quality.last_epistemic_confidence,
+            dissipative_gated: self.stats.dissipative_health_gated_count > 0
+                && self.stats.total_cycles > 0
+                && (self.stats.dissipative_health_gated_count as f32
+                    / self.stats.total_cycles as f32)
+                    > 0.5,
+            dissipative_factor: self.carryover.quality.last_dissipative_health as f32,
+            coherence_velocity: self.carryover.quality.coherence_velocity,
+            cross_module_agreement: self.stats.avg_cross_module_agreement,
+            consciousness_level: consciousness_level as f64,
+        }
+    }
+
     /// Get combined phi contribution from all feedback sources
     pub fn combined_phi_contribution(&self) -> f32 {
         self.coherence_bridge.phi_contribution()
@@ -513,16 +517,6 @@ impl CognitiveLoopService {
         self.thalamic_router.routing_stats()
     }
 
-    /// Get the unified Phi from the ConsciousnessUnificationEngine
-    pub fn unified_psi(&self) -> f64 {
-        self.unification_engine.psi
-    }
-
-    /// Get the unified emotional state (VAD-based)
-    pub fn unified_emotional_state(&self) -> &UnifiedEmotionalState {
-        self.unification_engine.emotional.state()
-    }
-
     /// Get the emotional pattern (Stable/Escalating/Calming/Volatile)
     pub fn emotional_pattern(&self) -> EmotionalPattern {
         self.unification_engine.emotional.detect_pattern()
@@ -533,22 +527,12 @@ impl CognitiveLoopService {
         self.unification_engine.emotional.state().describe()
     }
 
-    /// Get the discrete unified emotion
-    pub fn unified_emotion(&self) -> Option<UnifiedEmotion> {
-        self.unification_engine.emotional.state().discrete_emotion
-    }
-
     /// Process input through the unified dialogue pipeline
     pub fn process_unified(
         &mut self,
         input: &str,
     ) -> crate::consciousness::consciousness_unification::UnifiedConsciousnessResult {
         self.unification_engine.process(input)
-    }
-
-    /// Get a description of the current consciousness state
-    pub fn unified_state_description(&self) -> String {
-        self.unification_engine.describe_state()
     }
 
     /// Get the current FEP free energy (if available)
@@ -572,13 +556,6 @@ impl CognitiveLoopService {
     /// Get the coupling quality assessment
     pub fn coupling_quality(&self) -> CouplingQuality {
         self.active_inference_bridge.coupling_quality()
-    }
-
-    /// Check if prediction-outcome coupling is meaningful
-    pub fn has_meaningful_coupling(&self) -> bool {
-        self.active_inference_bridge
-            .coupling_quality()
-            .is_meaningful()
     }
 
     // ═══════════════════════════════════════════════════════════════════════

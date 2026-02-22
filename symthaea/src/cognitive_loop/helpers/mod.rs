@@ -8,6 +8,7 @@
 //! - `parallel`: Phase 5 free functions for `rayon::join` branches
 
 mod cycle_extracted;
+mod cycle_phases;
 mod parallel;
 
 // Re-export Phase 5 items so cycle.rs can use `helpers::run_stability_regime` etc.
@@ -15,6 +16,9 @@ pub(super) use parallel::{
     parallel_episodic_learning, parallel_semantic_causal, run_stability_regime,
     EpisodicLearningContext,
 };
+
+// Re-export Phase 7 result structs so cycle.rs can destructure them
+pub(super) use cycle_phases::{DreamPhaseResult, EpisodicReplayResult, ResonatorCodebookResult};
 
 // Re-export pub(super) constants used by cycle.rs
 pub(super) use cycle_extracted::MEMORY_RECALL_TOP_K;

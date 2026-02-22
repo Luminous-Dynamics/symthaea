@@ -355,8 +355,9 @@ impl CognitiveLoopService {
                 // Gradual LR dampening: up to 20% reduced learning during recovery
                 self.fep_lr_boost = (self.fep_lr_boost * (1.0 - recovery_intensity * 0.2)).max(1.0);
                 // Slight exploration boost to help escape
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + recovery_intensity * 0.05).clamp(0.0, 1.0);
+                self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
+                    + recovery_intensity * 0.05)
+                    .clamp(0.0, 1.0);
                 self.stats.arousal_recovery_cycles += 1;
                 tracing::debug!(
                     cycle = self.stats.total_cycles,

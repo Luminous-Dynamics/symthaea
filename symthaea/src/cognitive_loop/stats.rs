@@ -383,6 +383,27 @@ pub struct LoopStats {
     pub anomaly_recovery_active_count: u64,
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // PHASE 17: PREDICTIVE SELF-TUNING
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Cycles where startup transient suppression was active (cumulative).
+    pub startup_suppressed_cycles: u64,
+
+    /// Self-model predictions made (cumulative).
+    pub self_model_predictions_made: u64,
+
+    /// Self-model predictions validated (cumulative).
+    pub self_model_predictions_validated: u64,
+
+    /// Mode transitions detected (cumulative).
+    pub mode_transitions: u64,
+
+    /// Average mode stability duration (EMA, alpha=0.1).
+    pub avg_mode_stability: f32,
+
+    /// Average self-model accuracy (EMA, alpha=0.1).
+    pub avg_self_model_accuracy: f32,
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)
     // ═══════════════════════════════════════════════════════════════════════════
     /// Cached lattice height (0 = not yet computed)

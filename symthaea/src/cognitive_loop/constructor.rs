@@ -897,7 +897,20 @@ impl CognitiveLoopService {
             experience_bus: Some(crate::experience::ExperienceBus::with_defaults()),
             #[cfg(feature = "school_learning")]
             school_bridge: None,
-            causal_consciousness: None,
+            causal_consciousness: if config.causal_enhancement {
+                config
+                    .genesis_phrase
+                    .as_ref()
+                    .map(|p| {
+                        crate::intelligence::CausalConsciousness::from_genesis(
+                            &symthaea_core::genesis::GenesisSeed::from_phrase(p),
+                            "causal_consciousness",
+                            8,
+                        )
+                    })
+            } else {
+                None
+            },
         })
     }
 

@@ -69,6 +69,13 @@ pub(crate) struct UrgencyState {
     pub(crate) anomaly_recovery_counter: u32,
     /// Whether an anomaly was active in the previous cycle
     pub(crate) anomaly_was_active: bool,
+    // ── Phase 17: Predictive Self-Tuning ──────────────────────────────
+    /// Mode transition confidence (0.0 = just switched, 1.0 = fully settled)
+    pub(crate) mode_confidence: f32,
+    /// Previous urgency for transition smoothing
+    pub(crate) prev_urgency: super::CycleUrgency,
+    /// Cycles since last urgency mode change
+    pub(crate) mode_stability_counter: u32,
 }
 
 impl Default for UrgencyState {
@@ -79,6 +86,9 @@ impl Default for UrgencyState {
             arousal_trap_counter: 0,
             anomaly_recovery_counter: 0,
             anomaly_was_active: false,
+            mode_confidence: 1.0,
+            prev_urgency: CycleUrgency::Normal,
+            mode_stability_counter: 0,
         }
     }
 }
@@ -94,6 +104,9 @@ pub(crate) struct LearningState {
     pub(crate) adaptive_threshold_scale: f32,
     /// Subsystem LR modulation factor (accumulated post-training, consumed next cycle).
     pub(crate) subsystem_lr_factor: f32,
+    // ── Phase 17: Predictive Self-Tuning ──────────────────────────────
+    /// Self-model accuracy EMA (how well past predictions matched outcomes)
+    pub(crate) self_model_accuracy: f32,
 }
 
 impl Default for LearningState {
@@ -103,6 +116,7 @@ impl Default for LearningState {
             mce_lr_boost: 0.0,
             adaptive_threshold_scale: 1.0,
             subsystem_lr_factor: 1.0,
+            self_model_accuracy: 0.5,
         }
     }
 }
@@ -205,6 +219,13 @@ pub(crate) struct CycleHistory {
     pub(crate) last_emotion_valence: f32,
     /// Previous cycle's emotion_contagion arousal (for homeostasis return-to-baseline).
     pub(crate) last_emotion_arousal: f32,
+    // ── Phase 17: Predictive Self-Tuning ──────────────────────────────
+    /// Rolling window of recent prediction errors (last 16 cycles).
+    pub(crate) error_history: std::collections::VecDeque<f32>,
+    /// Self-model prediction: (cycle_made, predicted_confidence, predicted_urgency)
+    pub(crate) self_model_prediction: Option<(usize, f32, super::CycleUrgency)>,
+    /// Cached coherence value for this cycle (computed once, reused everywhere).
+    pub(crate) cached_coherence: Option<f32>,
 }
 
 impl Default for CycleHistory {
@@ -224,6 +245,9 @@ impl Default for CycleHistory {
             last_compressed_state: None,
             last_emotion_valence: 0.0,
             last_emotion_arousal: 0.0,
+            error_history: std::collections::VecDeque::with_capacity(16),
+            self_model_prediction: None,
+            cached_coherence: None,
         }
     }
 }
@@ -325,6 +349,22 @@ impl CycleUrgency {
     pub fn run_consciousness_monitors(&self) -> bool {
         matches!(self, CycleUrgency::Critical | CycleUrgency::Normal)
     }
+}
+
+/// Read-only snapshot of shared cycle state, passed to extracted phase functions
+/// to replace loose multi-parameter signatures.
+#[derive(Debug, Clone)]
+pub(crate) struct CycleState<'a> {
+    pub compressed_state: &'a [f32],
+    pub output: &'a [f32],
+    pub prediction_error: f32,
+    pub coherence: f32,
+    pub unified_psi: f64,
+    pub phi_attention_weight: f32,
+    pub hv16_cached: &'a symthaea_core::hdc::BinaryHV,
+    pub input: &'a str,
+    pub urgency: CycleUrgency,
+    pub total_cycles: usize,
 }
 
 /// Metadata about internal decision-making during a cycle.
@@ -818,6 +858,22 @@ pub struct CycleMetadata {
     pub anomaly_recovery_progress: f32,
     /// Whether anomaly recovery is actively in progress.
     pub anomaly_recovering: bool,
+
+    // ── Phase 17: Predictive Self-Tuning ──────────────────────────────
+    /// Detected error pattern (Rising/Falling/Oscillating/Spike/Stable).
+    pub error_pattern: String,
+    /// Whether startup transient suppression is active (cycles 0-50).
+    pub startup_suppressed: bool,
+    /// Startup warmup progress (0.0–1.0, 1.0 = fully warmed up).
+    pub startup_warmup_progress: f32,
+    /// Self-model prediction accuracy EMA (0.0–1.0).
+    pub self_model_accuracy: f32,
+    /// Mode transition confidence (0.0 = just switched, 1.0 = fully settled).
+    pub mode_confidence: f32,
+    /// Cycles since last urgency mode change.
+    pub mode_stability_counter: u32,
+    /// Predicted urgency for next 5 cycles (from error pattern analysis).
+    pub predicted_urgency: String,
 }
 
 /// Compact subset of CycleMetadata with the most essential telemetry fields.
