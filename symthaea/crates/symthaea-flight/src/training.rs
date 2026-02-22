@@ -431,7 +431,7 @@ fn sample_prioritized_index(priorities: &[f32], alpha: f32, rng: &mut u64) -> us
         return (*rng >> 33) as usize % len;
     }
 
-    let r = ((*rng >> 33) as f64 / u32::MAX as f64) as f32 * total;
+    let r = ((*rng >> 33) as f64 / (1u64 << 31) as f64) as f32 * total;
     let mut cumsum = 0.0f32;
     for (i, p) in priorities.iter().enumerate() {
         cumsum += p.powf(alpha);

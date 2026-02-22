@@ -559,7 +559,10 @@ mod tests {
         cell.reset(42);
         assert_eq!(cell.get_state(), initial.as_slice());
         let vel = cell.get_velocity();
-        assert!(vel.iter().all(|v| v.abs() < 1e-10), "Velocity zero after reset");
+        assert!(
+            vel.iter().all(|v| v.abs() < 1e-10),
+            "Velocity zero after reset"
+        );
     }
 
     #[test]
@@ -655,10 +658,7 @@ mod tests {
         }
         let states = hcfc.get_level_states();
         // Different time constants should produce different states
-        assert_ne!(
-            states[0], states[4],
-            "Fast and slow levels should differ"
-        );
+        assert_ne!(states[0], states[4], "Fast and slow levels should differ");
     }
 
     #[test]
@@ -698,7 +698,10 @@ mod tests {
         tw.push(&[2.0]);
         tw.push(&[4.0]);
         let avg = tw.get_averaged_context();
-        assert!((avg[0] - 3.0).abs() < 1e-6, "Average of 2 and 4 should be 3");
+        assert!(
+            (avg[0] - 3.0).abs() < 1e-6,
+            "Average of 2 and 4 should be 3"
+        );
     }
 
     #[test]
@@ -710,8 +713,7 @@ mod tests {
         }
         // Only last TEMPORAL_WINDOW_SIZE values should contribute
         let avg = tw.get_averaged_context();
-        let expected: f32 =
-            (5..10).map(|i| i as f32).sum::<f32>() / TEMPORAL_WINDOW_SIZE as f32;
+        let expected: f32 = (5..10).map(|i| i as f32).sum::<f32>() / TEMPORAL_WINDOW_SIZE as f32;
         assert!(
             (avg[0] - expected).abs() < 1e-5,
             "Circular buffer average: got {}, expected {}",
@@ -730,7 +732,10 @@ mod tests {
         assert!(weighted[0] > 1.0 && weighted[0] < 2.0);
         // High decay should weight recent more
         let weighted_high = tw.get_weighted_context(10.0);
-        assert!(weighted_high[0] > weighted[0], "Higher decay = more recent emphasis");
+        assert!(
+            weighted_high[0] > weighted[0],
+            "Higher decay = more recent emphasis"
+        );
     }
 
     #[test]
@@ -800,7 +805,8 @@ mod tests {
         let vels = ltc.get_level_velocities();
         assert_eq!(vels.len(), 5);
         assert!(
-            vels.iter().any(|v| v.values.iter().any(|x| x.abs() > 1e-10)),
+            vels.iter()
+                .any(|v| v.values.iter().any(|x| x.abs() > 1e-10)),
             "Some velocity should be nonzero after step"
         );
     }

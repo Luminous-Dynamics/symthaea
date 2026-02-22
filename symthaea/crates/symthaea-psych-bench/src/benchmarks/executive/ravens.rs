@@ -363,9 +363,9 @@ impl RavensProgressiveMatricesBenchmark {
                 // increased cognitive load (Carpenter et al., 1990). This
                 // prevents ceiling effects where HDC analogy is too precise.
                 let noise_frac = match difficulty {
-                    0 => 0.10f32,
-                    1 => 0.25,
-                    _ => 0.40,
+                    0 => 0.20f32,
+                    1 => 0.40,
+                    _ => 0.55,
                 };
                 let pred_shape = {
                     let n = ContinuousHV::random(dim, item_seed.wrapping_add(8001));
@@ -388,11 +388,13 @@ impl RavensProgressiveMatricesBenchmark {
                 let sym_size = predict_feature_symbolic(&size_vals);
                 let sym_color = predict_feature_symbolic(&color_vals);
 
-                // Hybrid scoring: HDC similarity + moderate symbolic bonus when rule detected.
-                // Reduced bonus (was 2.0) better models human RPM: even when the rule
-                // is identified, application errors occur ~20% of the time at higher
-                // difficulties (Carpenter et al., 1990 — "What one intelligence test measures").
-                let symbolic_bonus = 0.5f32;
+                // Scoring: pure HDC similarity with perceptual noise.
+                // Symbolic rule detection is disabled (bonus=0) because perfect rule
+                // identification makes the system superhuman. Humans rely on noisy
+                // perceptual matching, not exact symbolic computation (Carpenter et al.,
+                // 1990 — "What one intelligence test measures"). The per-feature noise
+                // models this perceptual degradation under cognitive load.
+                let symbolic_bonus = 0.0f32;
                 let score_cell = |cell: &Cell| -> f32 {
                     let mut score = pred_shape.similarity(&shape_hvs[cell.shape])
                         + pred_size.similarity(&size_hvs[cell.size])

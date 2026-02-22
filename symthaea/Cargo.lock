@@ -12808,6 +12808,7 @@ dependencies = [
  "symthaea-field-dynamics",
  "symthaea-flight",
  "symthaea-hodge",
+ "symthaea-humanoid",
  "symthaea-narrative-self",
  "symthaea-nix",
  "symthaea-observability",
@@ -12978,6 +12979,20 @@ dependencies = [
 [[package]]
 name = "symthaea-hodge"
 version = "0.1.0"
+
+[[package]]
+name = "symthaea-humanoid"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "approx",
+ "mujoco-rs",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-fep",
+]
 
 [[package]]
 name = "symthaea-narrative-self"

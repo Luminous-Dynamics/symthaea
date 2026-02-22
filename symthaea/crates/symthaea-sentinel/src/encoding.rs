@@ -373,7 +373,10 @@ mod tests {
             .sum::<f32>()
             .sqrt();
         // Normalized should have norm close to sqrt(HDC_DIM) for bipolar or 1.0
-        assert!(norm.is_finite() && norm > 0.0, "Context norm should be positive");
+        assert!(
+            norm.is_finite() && norm > 0.0,
+            "Context norm should be positive"
+        );
     }
 
     // =========================================================================

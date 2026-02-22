@@ -9,7 +9,7 @@
 //! 3. FEP's tau modulation shifts the setpoint from "fly to payload" to "minimize danger"
 //! 4. Same math as wind gust recovery — just overwhelmingly larger magnitude
 //!
-//! The 27g drone can't stop a 2kg beam. But it can deflect it ~15cm sideways.
+//! The 27g drone can't stop a 0.3kg beam. But it can deflect it ~20cm sideways.
 //! The drone is destroyed. The human is safe. The physics is honest.
 
 use symthaea_core::genesis::GenesisSeed;
@@ -174,7 +174,9 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
 
     let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.flight_config.num_levels);
     let mut controller = FlightController::new(&genesis, &config.flight_config);
-    let mut fep_agent = ActiveInferenceFlightAgent::new(config.fep_config.clone());
+    let mut fep_config = config.fep_config.clone();
+    fep_config.extended_observation = true;
+    let mut fep_agent = ActiveInferenceFlightAgent::new(fep_config);
 
     // Initial setpoint: payload target at (-3, 0, 1)
     let mut setpoint = FlightSetpoint {
@@ -320,7 +322,12 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
         if step % cognitive_interval == 0 {
             // Temporarily increase FEP sensitivity when danger is detected
             // This is the "safety prior" — human_danger creates overwhelming prediction error
-            fep_result = fep_agent.step(sim.state(), &setpoint);
+            fep_result = fep_agent.step_extended(
+                sim.state(),
+                &setpoint,
+                human_danger,
+                mission_progress,
+            );
 
             // The tau modulation from danger is amplified
             let danger_boost = if human_danger > 0.5 {

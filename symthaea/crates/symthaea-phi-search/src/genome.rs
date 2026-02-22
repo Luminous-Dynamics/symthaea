@@ -597,7 +597,11 @@ mod tests {
         // Test several seeds to check range constraints
         for seed in 0..20u64 {
             let g = ArchitectureGenome::random(seed + 1);
-            assert!(g.num_nodes >= 8 && g.num_nodes <= 64, "num_nodes out of range: {}", g.num_nodes);
+            assert!(
+                g.num_nodes >= 8 && g.num_nodes <= 64,
+                "num_nodes out of range: {}",
+                g.num_nodes
+            );
             assert!(g.hierarchy_depth >= 2 && g.hierarchy_depth <= 7);
             assert!(g.base_tau >= 100.0 && g.base_tau <= 2000.0);
             assert!(g.tau_ratio >= 0.2 && g.tau_ratio <= 0.8);
@@ -680,7 +684,10 @@ mod tests {
         let child = p1.crossover(&p2, 77);
         // Each gene comes from one parent
         assert!(child.num_nodes == p1.num_nodes || child.num_nodes == p2.num_nodes);
-        assert!(child.hierarchy_depth == p1.hierarchy_depth || child.hierarchy_depth == p2.hierarchy_depth);
+        assert!(
+            child.hierarchy_depth == p1.hierarchy_depth
+                || child.hierarchy_depth == p2.hierarchy_depth
+        );
         assert!(
             (child.base_tau - p1.base_tau).abs() < f32::EPSILON
                 || (child.base_tau - p2.base_tau).abs() < f32::EPSILON
@@ -853,12 +860,20 @@ mod tests {
         // First step
         g.mutate_with_momentum(&gradient, &mut velocity, 0.9, 0.1);
         let v1 = velocity.v_density;
-        assert!(v1 > 0.0, "velocity should be positive after positive gradient");
+        assert!(
+            v1 > 0.0,
+            "velocity should be positive after positive gradient"
+        );
 
         // Second step: momentum should carry forward
         g.mutate_with_momentum(&gradient, &mut velocity, 0.9, 0.1);
         let v2 = velocity.v_density;
-        assert!(v2 > v1, "velocity should accumulate with momentum: v2={} > v1={}", v2, v1);
+        assert!(
+            v2 > v1,
+            "velocity should accumulate with momentum: v2={} > v1={}",
+            v2,
+            v1
+        );
     }
 
     #[test]

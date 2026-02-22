@@ -178,6 +178,23 @@ impl QuadrotorHdcEncoder {
         }
     }
 
+    /// Encode a flight state WITHOUT updating derivative state.
+    ///
+    /// Used for experience replay where temporal continuity is broken.
+    /// Takes `&self` (not `&mut self`) — safe to call during replay without
+    /// polluting encoder state. Produces position-only encoding (no derivatives).
+    pub fn encode_stateless(&self, state: &FlightState) -> ContinuousHV {
+        let channels = state.to_channels();
+        let mut bound_hvs: Vec<ContinuousHV> = Vec::with_capacity(13);
+        for i in 0..13 {
+            let normalized = Self::normalize_channel(i, channels[i]);
+            let level_hv = self.encode_level(normalized);
+            bound_hvs.push(self.base_vectors[i].bind(&level_hv));
+        }
+        let refs: Vec<&ContinuousHV> = bound_hvs.iter().collect();
+        ContinuousHV::bundle(&refs)
+    }
+
     /// Reset the encoder state (clear derivative memory).
     pub fn reset(&mut self) {
         self.prev_channels = None;
@@ -302,6 +319,46 @@ mod tests {
 
         enc.reset();
         assert!(enc.prev_channels.is_none());
+    }
+
+    #[test]
+    fn test_encode_stateless_deterministic() {
+        let genesis = test_genesis();
+        let enc = QuadrotorHdcEncoder::new(&genesis, 32);
+        let state = FlightState::hover(0.1);
+        let hv1 = enc.encode_stateless(&state);
+        let hv2 = enc.encode_stateless(&state);
+        assert!(
+            (hv1.similarity(&hv2) - 1.0).abs() < 1e-5,
+            "encode_stateless should be deterministic"
+        );
+    }
+
+    #[test]
+    fn test_encode_stateless_no_side_effects() {
+        let genesis = test_genesis();
+        let mut enc = QuadrotorHdcEncoder::new(&genesis, 32);
+        assert!(enc.prev_channels.is_none());
+
+        let state = FlightState::hover(0.1);
+        let _ = enc.encode_stateless(&state);
+
+        // Should NOT have updated prev_channels
+        assert!(
+            enc.prev_channels.is_none(),
+            "encode_stateless must not modify encoder state"
+        );
+
+        // Now call encode() — first call, no derivatives
+        let hv_encode = enc.encode(&state);
+        let hv_stateless = enc.encode_stateless(&state);
+
+        // First encode() call (no prev) should match encode_stateless (both lack derivatives)
+        assert!(
+            hv_encode.similarity(&hv_stateless) > 0.99,
+            "First encode() should match encode_stateless: sim={}",
+            hv_encode.similarity(&hv_stateless)
+        );
     }
 
     #[test]

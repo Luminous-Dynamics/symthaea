@@ -1075,7 +1075,11 @@ mod tests {
 
         let enc = model.unified_encoding();
         // The initial unified_self is BinaryHV::random(999), so it should not be all zeros
-        assert_ne!(*enc, BinaryHV::zero(), "unified encoding should be non-zero");
+        assert_ne!(
+            *enc,
+            BinaryHV::zero(),
+            "unified encoding should be non-zero"
+        );
     }
 
     #[test]
@@ -1263,7 +1267,11 @@ mod tests {
         assert!((proto.arousal - 0.5).abs() < f64::EPSILON);
         assert!((proto.primordial_phi - 0.0).abs() < f64::EPSILON);
         assert_eq!(proto.sensory_now, BinaryHV::zero());
-        assert_ne!(proto.body_state, BinaryHV::zero(), "body_state is random, should be non-zero");
+        assert_ne!(
+            proto.body_state,
+            BinaryHV::zero(),
+            "body_state is random, should be non-zero"
+        );
     }
 
     #[test]

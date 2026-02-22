@@ -521,27 +521,35 @@ mod tests {
 
     #[test]
     fn test_alignment_result_has_violations() {
-        let positive = AlignmentResult::from_alignments(vec![
-            HarmonyAlignment::new(Harmony::ResonantCoherence, 0.5, 0.8),
-        ]);
+        let positive = AlignmentResult::from_alignments(vec![HarmonyAlignment::new(
+            Harmony::ResonantCoherence,
+            0.5,
+            0.8,
+        )]);
         assert!(!positive.has_violations());
 
-        let negative = AlignmentResult::from_alignments(vec![
-            HarmonyAlignment::new(Harmony::ResonantCoherence, -0.1, 0.8),
-        ]);
+        let negative = AlignmentResult::from_alignments(vec![HarmonyAlignment::new(
+            Harmony::ResonantCoherence,
+            -0.1,
+            0.8,
+        )]);
         assert!(negative.has_violations());
     }
 
     #[test]
     fn test_alignment_result_should_veto() {
-        let mild = AlignmentResult::from_alignments(vec![
-            HarmonyAlignment::new(Harmony::ResonantCoherence, -0.3, 0.8),
-        ]);
+        let mild = AlignmentResult::from_alignments(vec![HarmonyAlignment::new(
+            Harmony::ResonantCoherence,
+            -0.3,
+            0.8,
+        )]);
         assert!(!mild.should_veto(), "Mild negative should not veto");
 
-        let severe = AlignmentResult::from_alignments(vec![
-            HarmonyAlignment::new(Harmony::ResonantCoherence, -0.8, 0.8),
-        ]);
+        let severe = AlignmentResult::from_alignments(vec![HarmonyAlignment::new(
+            Harmony::ResonantCoherence,
+            -0.8,
+            0.8,
+        )]);
         assert!(severe.should_veto(), "Score < -0.7 should veto");
     }
 
@@ -558,9 +566,7 @@ mod tests {
 
     #[test]
     fn test_alignment_result_get_specific_harmony() {
-        let alignments = vec![
-            HarmonyAlignment::new(Harmony::IntegralWisdom, 0.6, 0.9),
-        ];
+        let alignments = vec![HarmonyAlignment::new(Harmony::IntegralWisdom, 0.6, 0.9)];
         let result = AlignmentResult::from_alignments(alignments);
         assert!(result.get(Harmony::IntegralWisdom).is_some());
         assert!(result.get(Harmony::InfinitePlay).is_none());
@@ -579,19 +585,25 @@ mod tests {
 
     #[test]
     fn test_alignment_result_summary_messages() {
-        let strong = AlignmentResult::from_alignments(vec![
-            HarmonyAlignment::new(Harmony::ResonantCoherence, 0.9, 0.9),
-        ]);
+        let strong = AlignmentResult::from_alignments(vec![HarmonyAlignment::new(
+            Harmony::ResonantCoherence,
+            0.9,
+            0.9,
+        )]);
         assert!(strong.summary.contains("strongly"));
 
-        let weak = AlignmentResult::from_alignments(vec![
-            HarmonyAlignment::new(Harmony::ResonantCoherence, 0.1, 0.5),
-        ]);
+        let weak = AlignmentResult::from_alignments(vec![HarmonyAlignment::new(
+            Harmony::ResonantCoherence,
+            0.1,
+            0.5,
+        )]);
         assert!(weak.summary.contains("generally"));
 
-        let bad = AlignmentResult::from_alignments(vec![
-            HarmonyAlignment::new(Harmony::ResonantCoherence, -0.8, 0.9),
-        ]);
+        let bad = AlignmentResult::from_alignments(vec![HarmonyAlignment::new(
+            Harmony::ResonantCoherence,
+            -0.8,
+            0.9,
+        )]);
         assert!(bad.summary.contains("conflicts"));
     }
 
@@ -611,7 +623,10 @@ mod tests {
         let mut harmonies = SevenHarmonies::new();
         harmonies.set_weight(Harmony::ResonantCoherence, 10.0);
         // The weight should be stored
-        assert_eq!(*harmonies.weights.get(&Harmony::ResonantCoherence).unwrap(), 10.0);
+        assert_eq!(
+            *harmonies.weights.get(&Harmony::ResonantCoherence).unwrap(),
+            10.0
+        );
     }
 
     #[test]
@@ -656,7 +671,10 @@ mod tests {
         let mut harmonies = SevenHarmonies::new();
         let result = harmonies.evaluate("install firefox");
         // Neutral text should have low confidence (0.3 default)
-        assert!(result.overall_confidence <= 0.5, "Neutral text should have low confidence");
+        assert!(
+            result.overall_confidence <= 0.5,
+            "Neutral text should have low confidence"
+        );
     }
 
     #[test]

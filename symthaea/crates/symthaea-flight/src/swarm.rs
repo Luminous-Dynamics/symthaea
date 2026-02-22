@@ -243,11 +243,10 @@ pub fn train_swarm(config: &SwarmConfig) -> SwarmResult {
                         let swarm_experiences =
                             local_buffer.sample(config.swarm_replay_count, replay_seed);
                         for (channels, replay_target) in &swarm_experiences {
-                            // Re-encode from channels for training
-                            // (simplified: use the current sensor_hv as proxy)
-                            controller.train_output_only(replay_target, Some(lr * 0.5));
+                            let replay_state = FlightState::from_channels(*channels);
+                            let replay_hv = encoder.encode_stateless(&replay_state);
+                            controller.train_step(&replay_hv, replay_target, dt as f32, Some(lr * 0.5));
                         }
-                        let _ = channels_used_for_training(&swarm_experiences);
                     }
 
                     // Cognitive tick
@@ -313,13 +312,6 @@ pub fn train_swarm(config: &SwarmConfig) -> SwarmResult {
         best_final_error,
         buffer_utilization: buffer_utilization.min(1.0),
     }
-}
-
-/// Placeholder to avoid unused variable warnings for swarm replay channels.
-#[inline]
-fn channels_used_for_training(_experiences: &[([f32; 13], QuadrotorCommand)]) {
-    // In a full implementation, we'd re-encode these channels through the HDC encoder.
-    // For now, we train output-only using the command targets (no re-encoding needed).
 }
 
 /// Get number of available CPUs (capped at 128 for swarm).
