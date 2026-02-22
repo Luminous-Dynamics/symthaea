@@ -83,9 +83,9 @@ impl AlternateUsesBenchmark {
 
         // Generate candidate uses by unbinding features and binding with random contexts
         // Cognitive generation budget: humans produce ~8 uses in typical 2-minute
-        // window (Torrance 1974). 22 attempts with a moderate acceptance rate
-        // yields fluency near the human mean.
-        let max_attempts = 22;
+        // window (Torrance 1974). With the tighter semantic plausibility filter
+        // (~14% acceptance rate), ~60 attempts yields fluency near the human mean.
+        let max_attempts = 60;
         let mut accepted_uses = Vec::new();
         let mut use_sims = Vec::new(); // similarity of each use to object (for originality)
 

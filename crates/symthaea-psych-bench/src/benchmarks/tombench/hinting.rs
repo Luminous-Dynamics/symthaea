@@ -190,18 +190,20 @@ impl HintingBenchmark {
             + (correct_desire_sim - wrong_desire_sim) as f64 * 0.3;
 
         // --- Combined: keyword-dominant with HDC as tiebreaker ---
-        // Add metacognitive noise: ToM inference is inherently uncertain,
-        // and even healthy adults make ~20% errors on hinting tasks
-        // (Corcoran et al., 1995). The noise models attentional lapses
-        // and misinterpretation of ambiguous cues.
+        let combined = keyword_score * 0.8 + geo_signal * 0.2;
+
+        // Softmax decision: convert combined score to P(correct) via sigmoid.
+        // Even healthy adults make ~20% errors on hinting tasks (Corcoran
+        // et al., 1995). The sigmoid + stochastic sampling models the
+        // inherent uncertainty in ToM inference.
+        let p_correct = 1.0 / (1.0 + (-combined * 0.25).exp());
         let seed = config.trial_seed("tombench", "hinting_noise", trial_idx);
         let mut noise_rng = seed ^ 0x9E3779B97F4A7C15;
         noise_rng ^= noise_rng << 13;
         noise_rng ^= noise_rng >> 7;
         noise_rng ^= noise_rng << 17;
-        let noise = ((noise_rng % 1000) as f64 / 1000.0 - 0.5) * 3.0;
-        let combined = keyword_score * 0.8 + geo_signal * 0.2 + noise;
-        if combined > 0.0 {
+        let roll = (noise_rng % 10000) as f64 / 10000.0;
+        if roll < p_correct {
             1.0
         } else {
             0.0

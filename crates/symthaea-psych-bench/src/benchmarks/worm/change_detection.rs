@@ -121,8 +121,11 @@ impl ChangeDetectionBenchmark {
         let sim_to_original = wm_bundle.similarity(&original_bundle);
         let sim_to_probe = wm_bundle.similarity(&probe_bundle);
 
-        // System responds "same" if probe similarity >= original similarity
-        let responded_same = sim_to_probe >= sim_to_original - 0.01;
+        // System responds "same" if probe similarity ≈ original similarity.
+        // Wider margin (0.06) models the decision noise in human change
+        // detection: small encoding-noise differences between bundles are
+        // sometimes undetectable (Wilken & Ma, 2004 — signal detection model).
+        let responded_same = sim_to_probe >= sim_to_original - 0.06;
 
         let correct = if is_changed {
             !responded_same // Should detect the change

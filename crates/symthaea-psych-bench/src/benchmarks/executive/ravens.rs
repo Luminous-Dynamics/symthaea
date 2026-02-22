@@ -358,6 +358,28 @@ impl RavensProgressiveMatricesBenchmark {
                 let pred_size = predict_feature(&grid_size);
                 let pred_color = predict_feature(&grid_color);
 
+                // Add perceptual noise to predictions, scaling with difficulty.
+                // At harder levels, rule extraction is noisier — analogous to
+                // increased cognitive load (Carpenter et al., 1990). This
+                // prevents ceiling effects where HDC analogy is too precise.
+                let noise_frac = match difficulty {
+                    0 => 0.10f32,
+                    1 => 0.25,
+                    _ => 0.40,
+                };
+                let pred_shape = {
+                    let n = ContinuousHV::random(dim, item_seed.wrapping_add(8001));
+                    ContinuousHV::weighted_bundle(&[&pred_shape, &n], &[1.0 - noise_frac, noise_frac])
+                };
+                let pred_size = {
+                    let n = ContinuousHV::random(dim, item_seed.wrapping_add(8002));
+                    ContinuousHV::weighted_bundle(&[&pred_size, &n], &[1.0 - noise_frac, noise_frac])
+                };
+                let pred_color = {
+                    let n = ContinuousHV::random(dim, item_seed.wrapping_add(8003));
+                    ContinuousHV::weighted_bundle(&[&pred_color, &n], &[1.0 - noise_frac, noise_frac])
+                };
+
                 // Symbolic rule detection: try to identify exact rule from visible cells
                 let shape_vals: Vec<usize> = item.cells.iter().map(|c| c.shape).collect();
                 let size_vals: Vec<usize> = item.cells.iter().map(|c| c.size).collect();

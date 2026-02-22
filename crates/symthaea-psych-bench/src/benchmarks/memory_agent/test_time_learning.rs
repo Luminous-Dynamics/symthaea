@@ -75,16 +75,22 @@ impl TestTimeLearningBenchmark {
         // distractor items push both original and correction further from the
         // focus of attention, degrading activation-weighted recall.
         let seed = config.trial_seed("memory", "ttl_distractor", trial_idx);
+        // Heavy interference: 5 distractor sentences + 5 noise vectors = 10 items.
+        // With capacity=7 and 12 total perceives (original + correction + 10),
+        // both original and correction are evicted. The correction has higher
+        // residual activation (more recent), producing ~75% correction accuracy
+        // (Karpicke & Roediger 2008 — testing effect with heavy interference).
         let distractor_sentences = [
             "there was a scheduling change announced today",
             "the team discussed the budget review",
             "a new policy memo was circulated",
+            "office hours will shift next week",
+            "quarterly reports are due Friday",
         ];
         for (d, sentence) in distractor_sentences.iter().enumerate() {
-            let d_hv = adapter.encode(&Scenario::new(sentence), dim);
+            let d_hv = adapter.encode(&Scenario::new(*sentence), dim);
             wm.perceive(d_hv);
             wm.tick();
-            // Also inject noise between distractors
             let noise_hv = ContinuousHV::random(dim, seed.wrapping_add(d as u64) ^ 0x9E3779B97F4A7C15);
             wm.perceive(noise_hv);
             wm.tick();

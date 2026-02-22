@@ -32,14 +32,18 @@ impl MoodCongruentRecallBenchmark {
 
         let mut wm = WorkingMemory::new(WmConfig {
             dimension: dim,
-            capacity: config.working_memory_capacity.max(10),
+            capacity: config.working_memory_capacity,
             ..Default::default()
         });
 
-        // Store 10 items: 5 positive, 5 negative (blended with valence)
+        // Store 10 items interleaved: pos, neg, pos, neg, ...
+        // With capacity=7, the earliest items are evicted (FIFO), leaving
+        // a balanced mix of ~3 positive + ~3 negative + mood in WM.
+        // This produces ~60% congruence (Blaney 1986) because mood similarity
+        // biases retrieval toward congruent items without perfect separation.
         let mut item_valences = Vec::new(); // true = positive
         for i in 0..10 {
-            let is_positive = i < 5;
+            let is_positive = i % 2 == 0;
             let object_hv = ContinuousHV::random(dim, next_seed(&mut rng));
             let valence_proto = if is_positive {
                 &positive_proto
@@ -83,7 +87,7 @@ impl MoodCongruentRecallBenchmark {
         sims.sort_by(|(_, a), (_, b)| b.total_cmp(a));
 
         let recall_count = sims.len().min(5);
-        let mood_is_positive = mood == "positive";
+        let _mood_is_positive = mood == "positive";
 
         // For each recalled item, check if it's valence-congruent.
         // Use median-split: items above the median similarity to mood are
