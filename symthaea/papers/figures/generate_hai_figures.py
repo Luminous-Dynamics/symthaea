@@ -595,6 +595,7 @@ def fig8_scenario_efe():
     efe_mission = [float(r['efe_mission']) for r in rows]
     efe_intercept = [float(r['efe_intercept']) for r in rows]
     matches = [int(r['matches']) for r in rows]
+    rv_fracs = [float(r['best_rv_frac']) if r.get('best_rv_frac') else None for r in rows]
 
     fig, ax = plt.subplots(1, 1, figsize=(9, 4.5))
 
@@ -604,12 +605,18 @@ def fig8_scenario_efe():
     bars_m = ax.bar(x - width/2, efe_mission, width, label='EFE(mission)', color='#e74c3c', alpha=0.85, edgecolor='black', linewidth=0.5)
     bars_i = ax.bar(x + width/2, efe_intercept, width, label='EFE(intercept)', color='#3498db', alpha=0.85, edgecolor='black', linewidth=0.5)
 
-    # Mark correct decisions
+    # Mark correct decisions + annotate rendezvous fraction on intercept bars
     for i, match in enumerate(matches):
         marker = '\u2713' if match else '\u2717'
         color = '#2ecc71' if match else '#e74c3c'
         ax.text(x[i], max(efe_mission[i], efe_intercept[i]) * 1.02 + 5,
                 marker, ha='center', va='bottom', fontsize=14, color=color, fontweight='bold')
+        # Annotate RV fraction on intercept bar
+        if rv_fracs[i] is not None:
+            frac_str = f'{int(rv_fracs[i]*100)}%'
+            ax.text(x[i] + width/2, efe_intercept[i] * 0.5,
+                    frac_str, ha='center', va='center', fontsize=7,
+                    color='white', fontweight='bold')
 
     ax.set_xlabel('Scenario Variant')
     ax.set_ylabel('Expected Free Energy')
