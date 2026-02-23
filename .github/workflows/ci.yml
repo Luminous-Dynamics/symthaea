@@ -145,6 +145,7 @@ jobs:
           - "physics"
           - "code_generation"
           - "flight"
+          - "mesh"
     steps:
       - uses: actions/checkout@v4
 
@@ -218,6 +219,7 @@ jobs:
           - "physics,reasoning_engine"
           - "full_consciousness,reasoning_engine"
           - "flight,humanoid"
+          - "mesh,full_consciousness"
     steps:
       - uses: actions/checkout@v4
 
