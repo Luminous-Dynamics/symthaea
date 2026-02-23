@@ -413,9 +413,73 @@ impl TextEncoder {
         Ok(result)
     }
 
+    /// Encode text using a pre-computed primitive i8 cache.
+    ///
+    /// Like [`encode_with_primitives`](Self::encode_with_primitives) but avoids calling
+    /// `to_bipolar_i8()` (16KB allocation) on every primitive match. The caller pre-computes
+    /// `Arc<Vec<i8>>` encodings once at construction time and passes them here.
+    ///
+    /// **Performance**: Eliminates ~16KB alloc per recognized primitive per cycle.
+    /// Cache hits are O(1) Arc refcount increments.
+    pub fn encode_with_cached_primitives(
+        &mut self,
+        text: &str,
+        primitive_cache: &HashMap<String, Arc<Vec<i8>>>,
+    ) -> Result<Vec<i8>> {
+        let words: Vec<&str> = text.split_whitespace().collect();
+
+        if words.is_empty() {
+            return Ok(self.special_tokens["[PAD]"].clone());
+        }
+
+        let dim = self.config.dimension;
+
+        // Zero the pre-allocated accumulation buffer (avoids 64KB alloc per call)
+        self.bundle_accum[..dim].fill(0);
+
+        for (pos, word) in words.iter().enumerate().take(self.config.max_length) {
+            let normalized = word.to_lowercase();
+
+            // Both branches produce &[i8] via Arc -- zero allocation on cache hit:
+            // - Primitive path: Arc<Vec<i8>> from pre-computed cache (O(1) clone)
+            // - Fallback path: Arc<Vec<i8>> from encode_word() (O(1) cache hit)
+            let prim_arc;
+            let word_arc;
+            let word_slice: &[i8] = if let Some(cached) = primitive_cache.get(&normalized) {
+                prim_arc = Arc::clone(cached);
+                &prim_arc
+            } else {
+                word_arc = self.encode_word(word)?;
+                &word_arc
+            };
+
+            // Fused bind + accumulate in single pass (better cache locality)
+            if self.config.use_positional && pos < self.position_vectors.len() {
+                let pos_vec = &self.position_vectors[pos];
+                for i in 0..dim {
+                    self.bundle_accum[i] += (word_slice[i] * pos_vec[i]) as i32;
+                }
+            } else {
+                for i in 0..dim {
+                    self.bundle_accum[i] += word_slice[i] as i32;
+                }
+            }
+        }
+
+        // Majority vote -- single output allocation
+        let result = self.bundle_accum[..dim]
+            .iter()
+            .map(|&s| if s > 0 { 1i8 } else { -1i8 })
+            .collect();
+
+        self.stats.sentences_encoded += 1;
+
+        Ok(result)
+    }
+
     /// Encode with explicit semantic role marking
     ///
-    /// Useful for causal reasoning: "A causes B" → bind(A, [CAUSE]) + bind(B, [EFFECT])
+    /// Useful for causal reasoning: "A causes B" -> bind(A, [CAUSE]) + bind(B, [EFFECT])
     pub fn encode_with_roles(
         &mut self,
         subject: &str,
@@ -720,5 +784,60 @@ mod tests {
         assert_eq!(stats.words_encoded, 4); // test + test + hello + world
         assert_eq!(stats.sentences_encoded, 1);
         assert!(stats.cache_hits > 0);
+    }
+
+    #[test]
+    fn test_cached_primitives_produces_valid_encoding() {
+        use crate::hdc::primitive_system::PrimitiveSystem;
+
+        let primitives = PrimitiveSystem::global();
+
+        // Build the same cache that PredictiveHdcEncoder builds (keyed by lowercase)
+        let cache: HashMap<String, Arc<Vec<i8>>> = primitives
+            .all_primitives()
+            .map(|prim| {
+                let key = prim.name.to_lowercase();
+                let encoding = Arc::new(prim.encoding.to_bipolar_i8());
+                (key, encoding)
+            })
+            .collect();
+
+        let mut encoder = TextEncoder::new(TextEncoderConfig::default()).unwrap();
+
+        // Basic: encoding should have correct dimension
+        let encoded = encoder
+            .encode_with_cached_primitives("cause leads to effect", &cache)
+            .unwrap();
+        assert_eq!(encoded.len(), HDC_DIMENSION);
+
+        // All values should be bipolar (-1 or +1)
+        assert!(encoded.iter().all(|&v| v == 1 || v == -1));
+
+        // Same input should produce same output (deterministic)
+        let mut encoder2 = TextEncoder::new(TextEncoderConfig::default()).unwrap();
+        let encoded2 = encoder2
+            .encode_with_cached_primitives("cause leads to effect", &cache)
+            .unwrap();
+        assert_eq!(encoded, encoded2, "Encoding must be deterministic");
+
+        // Different input should produce different output
+        let mut encoder3 = TextEncoder::new(TextEncoderConfig::default()).unwrap();
+        let different = encoder3
+            .encode_with_cached_primitives("hello world", &cache)
+            .unwrap();
+        assert_ne!(encoded, different, "Different text must produce different encoding");
+
+        // With empty cache, should fall back to word encoding (same as encode_sentence)
+        let empty_cache: HashMap<String, Arc<Vec<i8>>> = HashMap::new();
+        let mut encoder4 = TextEncoder::new(TextEncoderConfig::default()).unwrap();
+        let fallback = encoder4
+            .encode_with_cached_primitives("hello world", &empty_cache)
+            .unwrap();
+        let mut encoder5 = TextEncoder::new(TextEncoderConfig::default()).unwrap();
+        let sentence = encoder5.encode_sentence("hello world").unwrap();
+        assert_eq!(
+            fallback, sentence,
+            "With empty cache, should match encode_sentence output"
+        );
     }
 }

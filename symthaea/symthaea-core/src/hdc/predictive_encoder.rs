@@ -36,6 +36,7 @@ use crate::hdc::HDC_DIMENSION;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::mem;
+use std::sync::Arc;
 
 /// Configuration for the predictive encoder
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,6 +156,11 @@ pub struct PredictiveHdcEncoder {
 
     /// Pre-allocated buffer for detected primitives (avoids Vec<String> alloc per cycle)
     detected_buffer: Vec<String>,
+
+    /// Pre-computed i8 bipolar encodings for all primitives (keyed by lowercase name).
+    /// Avoids calling `to_bipolar_i8()` (16KB allocation) on every primitive match per cycle.
+    /// Built once at construction; all values are `Arc` so cache lookups are O(1).
+    primitive_i8_cache: HashMap<String, Arc<Vec<i8>>>,
 }
 
 impl PredictiveHdcEncoder {
@@ -195,6 +201,18 @@ impl PredictiveHdcEncoder {
         let initial_attention = config.initial_attention;
         let dimension = config.dimension;
 
+        // Pre-compute i8 bipolar encodings for ALL primitives (keyed by lowercase name).
+        // This is done once at construction so encode() never calls to_bipolar_i8()
+        // (which allocates 16KB per call) on the hot path.
+        let primitive_i8_cache: HashMap<String, Arc<Vec<i8>>> = primitive_system
+            .all_primitives()
+            .map(|prim| {
+                let key = prim.name.to_lowercase();
+                let encoding = Arc::new(prim.encoding.to_bipolar_i8());
+                (key, encoding)
+            })
+            .collect();
+
         Ok(Self {
             config,
             primitive_system,
@@ -208,6 +226,7 @@ impl PredictiveHdcEncoder {
             peak_attention: initial_attention,
             conversion_buffer: vec![0.0f32; dimension],
             detected_buffer: Vec::with_capacity(32),
+            primitive_i8_cache,
         })
     }
 
@@ -215,10 +234,10 @@ impl PredictiveHdcEncoder {
     pub fn encode(&mut self, input: &str) -> EncodingResult {
         self.stats.total_cycles += 1;
 
-        // 1. Get base encoding via text encoder (uses primitives internally)
+        // 1. Get base encoding via text encoder (uses pre-cached primitive i8 encodings)
         let base_encoding = match self
             .text_encoder
-            .encode_with_primitives(input, self.primitive_system)
+            .encode_with_cached_primitives(input, &self.primitive_i8_cache)
         {
             Ok(enc) => enc,
             Err(_) => {
