@@ -29,16 +29,16 @@ impl FlightViewer {
     pub fn new(sim: &MuJoCoSimulator, title: &str) -> Self {
         #[cfg(feature = "mujoco-viewer")]
         {
-            let viewer = match mujoco_rs::viewer::MjViewer::launch_passive(
-                sim.model_arc().clone(),
-                0,
-            ) {
-                Ok(v) => Some(v),
-                Err(e) => {
-                    eprintln!("[FlightViewer] Failed to launch viewer: {e:?} — running headless");
-                    None
-                }
-            };
+            let viewer =
+                match mujoco_rs::viewer::MjViewer::launch_passive(sim.model_arc().clone(), 0) {
+                    Ok(v) => Some(v),
+                    Err(e) => {
+                        eprintln!(
+                            "[FlightViewer] Failed to launch viewer: {e:?} — running headless"
+                        );
+                        None
+                    }
+                };
             Self {
                 title: title.to_string(),
                 frame_count: 0,

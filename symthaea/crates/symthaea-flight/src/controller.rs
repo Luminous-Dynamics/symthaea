@@ -696,7 +696,10 @@ mod tests {
         // Multiple NaN inputs in a row should not corrupt state
         for _ in 0..10 {
             let cmd = ctrl.forward(&nan_hv, 0.002);
-            assert!(cmd.thrust.is_finite(), "Repeated NaN input should stay safe");
+            assert!(
+                cmd.thrust.is_finite(),
+                "Repeated NaN input should stay safe"
+            );
         }
     }
 

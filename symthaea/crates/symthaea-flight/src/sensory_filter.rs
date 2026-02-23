@@ -112,10 +112,15 @@ impl SensoryFilter {
         // 3. Push into delay buffer, pop oldest
         self.delay_buffer.push_back(drifted);
         if self.delay_buffer.len() > self.config.delay_ticks {
-            self.delay_buffer.pop_front().expect("buffer non-empty after push")
+            self.delay_buffer
+                .pop_front()
+                .expect("buffer non-empty after push")
         } else {
             // Not enough history yet — return current with noise only
-            self.delay_buffer.back().expect("buffer non-empty after push").clone()
+            self.delay_buffer
+                .back()
+                .expect("buffer non-empty after push")
+                .clone()
         }
     }
 

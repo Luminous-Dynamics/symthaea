@@ -39,8 +39,13 @@ fn main() {
         };
         println!(
             "{:<20} {:>14.4} {:>14.4} {:>10} {:>10} {:>7} {:>8}",
-            r.variant_name, r.efe_mission, r.efe_intercept, decision, r.expected_decision,
-            match_str, rv_str
+            r.variant_name,
+            r.efe_mission,
+            r.efe_intercept,
+            decision,
+            r.expected_decision,
+            match_str,
+            rv_str
         );
     }
 
