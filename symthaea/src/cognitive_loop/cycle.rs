@@ -613,9 +613,65 @@ impl CognitiveLoopService {
             } else {
                 0.0 // no prediction yet (first cycle)
             };
+
+        // ── Phase 20: Resonator prediction error → exploration/confidence ────
+        // Science: Bar (2007) — high analogical mismatch signals novel territory.
+        // High prediction error (bad analogy) → boost exploration, dampen confidence.
+        // Low error (good analogy) → boost confidence (familiar territory).
+        let resonator_error_exploration_mod = if resonator_prediction_error > 0.5
+            && self.stats.total_cycles > 5
+        {
+            let boost = (resonator_prediction_error - 0.5) * 0.08;
+            self.adaptive_behavior.exploration_urge =
+                (self.adaptive_behavior.exploration_urge + boost).min(1.0);
+            self.prediction_confidence =
+                (self.prediction_confidence - boost * 0.5).clamp(0.0, 1.0);
+            self.stats.resonator_error_exploration_count += 1;
+            boost
+        } else if resonator_prediction_error < 0.2 && resonator_prediction_error > 0.0 {
+            let confidence_boost = (0.2 - resonator_prediction_error) * 0.03;
+            self.prediction_confidence =
+                (self.prediction_confidence + confidence_boost).clamp(0.0, 1.0);
+            self.stats.resonator_error_exploration_count += 1;
+            -confidence_boost // negative = confidence gain (no exploration boost)
+        } else {
+            0.0
+        };
+
         // ── Phase 17: Coherence memoization — cache pre-update value ─────
         // Science: O(n) history averaging computed once per cycle, not 5×.
         let pre_update_coherence = self.coherence_bridge.smoothed_coherence();
+
+        // ── Phase 20: Phenomenal binding → threshold gating ──────────────────
+        // Science: Tononi (2004) — binding strength is a proxy for consciousness
+        // integration quality. Strong binding → integrate confidently (lower threshold).
+        // Weak binding → raise threshold (protect against fragmented learning).
+        let cached_binding = self.carryover.quality.last_phenomenal_binding as f32;
+        let binding_threshold_mod = if cached_binding > 0.7 {
+            // Strong binding → lower threshold (integrate confidently)
+            let relief = (cached_binding - 0.7) * 0.3; // up to -0.09
+            self.carryover.learning.adaptive_threshold_scale *= 1.0 - relief;
+            self.carryover.learning.adaptive_threshold_scale = self
+                .carryover
+                .learning
+                .adaptive_threshold_scale
+                .clamp(0.5, 2.0);
+            self.stats.binding_threshold_mod_count += 1;
+            -relief
+        } else if cached_binding < 0.3 && cached_binding > 0.0 {
+            // Weak binding → raise threshold (be cautious)
+            let caution = (0.3 - cached_binding) * 0.2; // up to +0.06
+            self.carryover.learning.adaptive_threshold_scale *= 1.0 + caution;
+            self.carryover.learning.adaptive_threshold_scale = self
+                .carryover
+                .learning
+                .adaptive_threshold_scale
+                .clamp(0.5, 2.0);
+            self.stats.binding_threshold_mod_count += 1;
+            caution
+        } else {
+            0.0
+        };
 
         // Coherence gate: skip resonator recall during unstable CfC dynamics
         // Science: noisy priors during turbulent dynamics can destabilize predictions
@@ -863,13 +919,32 @@ impl CognitiveLoopService {
         // Phi-weighted learning rate: consciousness level modulates how aggressively
         // we adjust to prediction errors on similar past inputs.
         let current_phi_for_lr = pre_update_coherence as f64;
-        let semantic_lr_factor = self.semantic_memory.compute_lr_factor_phi_weighted(
+        let mut semantic_lr_factor = self.semantic_memory.compute_lr_factor_phi_weighted(
             &semantic_hdc,
             3,
             current_phi_for_lr,
             self.stats.total_cycles as u64,
         );
         module_timings.core_semantic_lookup = _t_core.elapsed().as_micros() as u64;
+
+        // ── Phase 20: Epistemic gate → semantic memory LR bidirectionality ───
+        // Science: Fernandez-Duque & Johnson (2002) — metacognitive uncertainty
+        // should propagate into memory consolidation (cautious when uncertain).
+        // Uses previous cycle's cached epistemic confidence to avoid temporal dependency.
+        let prev_epistemic = self.carryover.quality.last_epistemic_confidence;
+        let epistemic_semantic_lr_mod = if prev_epistemic < 0.4 && prev_epistemic > 0.0 {
+            let caution = 0.8 + prev_epistemic * 0.5; // [0.8, 1.0] when conf in [0, 0.4]
+            semantic_lr_factor *= caution as f64;
+            self.stats.epistemic_semantic_mod_count += 1;
+            caution - 1.0 // negative mod means dampening
+        } else if prev_epistemic > 0.8 {
+            let boost = 1.0 + (prev_epistemic - 0.8) * 1.0; // [1.0, 1.2] when conf in [0.8, 1.0]
+            semantic_lr_factor *= boost as f64;
+            self.stats.epistemic_semantic_mod_count += 1;
+            boost - 1.0 // positive mod means boosting
+        } else {
+            0.0
+        };
 
         // 3. Convert to ndarray for CfC (copy elements directly — avoids Vec clone)
         let input_array: Array1<f32> = compressed_state.iter().copied().collect();
@@ -1602,6 +1677,16 @@ impl CognitiveLoopService {
             self.stats.attention_budget_exceeded_count = 0;
         }
 
+        // ── Phase 20: Predictive budget gating ───────────────────────────────
+        // Science: Botvinick & Braver (2015) — proactive control anticipates
+        // resource depletion before it happens. If midpoint elapsed > 80% budget,
+        // preemptively gate expensive subsystems for the remainder of this cycle.
+        let predictive_budget_gated =
+            attention_budget_elapsed_us > (ATTENTION_BUDGET_US * 4 / 5) && !attention_budget_exceeded;
+        if predictive_budget_gated {
+            self.stats.predictive_budget_gated_count += 1;
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // 10h.0 Generate PsiAttestation record for governance bridge
         // ═══════════════════════════════════════════════════════════════════════
@@ -2151,6 +2236,7 @@ impl CognitiveLoopService {
             input,
             urgency,
             attention_budget_exceeded,
+            predictive_budget_gated,
         };
 
         // ═══════════════════════════════════════════════════════════════════════

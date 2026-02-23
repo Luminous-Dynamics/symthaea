@@ -431,6 +431,27 @@ pub struct LoopStats {
     pub reasoning_chain_boost_count: u64,
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // PHASE 20: SIGNAL-TO-CONTROL SYNTHESIS
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Cycles where harmonic interference modulated LR (cumulative).
+    pub harmonic_interference_mod_count: u64,
+
+    /// Cycles where resonator prediction error boosted exploration (cumulative).
+    pub resonator_error_exploration_count: u64,
+
+    /// Cycles where phenomenal binding modulated threshold (cumulative).
+    pub binding_threshold_mod_count: u64,
+
+    /// Cycles where causal density gated urgency (cumulative).
+    pub causal_urgency_gated_count: u64,
+
+    /// Cycles where epistemic gate modulated semantic LR (cumulative).
+    pub epistemic_semantic_mod_count: u64,
+
+    /// Cycles where predictive budget gating was active (cumulative).
+    pub predictive_budget_gated_count: u64,
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)
     // ═══════════════════════════════════════════════════════════════════════════
     /// Cached lattice height (0 = not yet computed)

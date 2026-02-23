@@ -365,6 +365,7 @@ pub(crate) struct CycleState<'a> {
     pub input: &'a str,
     pub urgency: CycleUrgency,
     pub attention_budget_exceeded: bool,
+    pub predictive_budget_gated: bool,
 }
 
 /// Metadata about internal decision-making during a cycle.
@@ -900,6 +901,20 @@ pub struct CycleMetadata {
     pub reasoning_chain_boosted: bool,
     /// AttentionShift motor command intensity applied to attention_sensitivity.
     pub attention_shift_applied: f32,
+
+    // ── Phase 20: Signal-to-Control Synthesis ────────────────────────
+    /// LR modulation from harmonic interferences (>0.5 dampens, <0.2 boosts).
+    pub harmonic_interference_lr_mod: f32,
+    /// Exploration modulation from resonator prediction error (cosine distance).
+    pub resonator_error_exploration_mod: f32,
+    /// Threshold modulation from phenomenal binding strength (±scale).
+    pub binding_threshold_mod: f32,
+    /// Whether causal density gated urgency this cycle.
+    pub causal_urgency_gated: bool,
+    /// Semantic LR modulation from epistemic gate confidence (previous cycle).
+    pub epistemic_semantic_lr_mod: f32,
+    /// Whether predictive budget gating was active (>80% budget at midpoint).
+    pub predictive_budget_gated: bool,
 }
 
 /// Compact subset of CycleMetadata with the most essential telemetry fields.
