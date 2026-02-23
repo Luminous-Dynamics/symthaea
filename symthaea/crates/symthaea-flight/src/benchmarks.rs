@@ -605,10 +605,13 @@ pub struct EfeAblationPoint {
     pub safety_precision: f64,
     /// EFE for continuing mission at this precision.
     pub efe_mission: f64,
-    /// EFE for intercepting threat at this precision.
+    /// EFE for best intercept candidate at this precision.
     pub efe_intercept: f64,
     /// Whether interception was chosen (efe_intercept < efe_mission).
     pub chose_intercept: bool,
+    /// Which rendezvous fraction produced the best intercept EFE.
+    /// None if no velocity (static intercept).
+    pub best_rendezvous_frac: Option<f64>,
 }
 
 /// Result of a full EFE ablation sweep.
@@ -624,9 +627,10 @@ pub struct EfeAblationResult {
 
 /// Sweep safety_prior_precision to find the decision boundary.
 ///
-/// For each precision value, constructs an agent and calls `instantaneous_efe()`
-/// for both the mission and intercept setpoints. Records which wins and finds
-/// the crossover point via linear interpolation.
+/// For each precision value, evaluates EFE for mission and all 3 rendezvous
+/// intercept candidates (25%, 50%, 75% of impact time). Uses trajectory EFE
+/// when threat velocity is available, instantaneous EFE otherwise.
+/// Records the best intercept and finds the crossover via linear interpolation.
 ///
 /// Pure analytical computation — no MuJoCo or physics simulation required.
 pub fn run_efe_ablation(
@@ -648,9 +652,34 @@ pub fn run_efe_ablation(
     };
     let entity_pos = env.entity_pos.unwrap_or([0.0; 3]);
 
-    let intercept_setpoint =
-        crate::fep_agent::compute_rendezvous_intercept(threat_pos, env.threat_vel, entity_pos);
+    // Pre-compute rendezvous intercept candidates (reused for each precision)
+    let rendezvous_fracs = [0.25, 0.50, 0.75];
+    let intercept_candidates: Vec<([f64; 3], Option<f64>)> = if let Some(vel) = env.threat_vel {
+        let impact_t = crate::fep_agent::predict_impact_time_z(threat_pos, vel, entity_pos[2]);
+        if impact_t.is_finite() && impact_t > 0.0 {
+            rendezvous_fracs
+                .iter()
+                .map(|&frac| {
+                    let rv_t = impact_t * frac;
+                    let beam =
+                        crate::fep_agent::predict_falling_position(threat_pos, vel, rv_t);
+                    ([beam[0], beam[1], beam[2].max(entity_pos[2] + 0.3)], Some(frac))
+                })
+                .collect()
+        } else {
+            vec![(
+                [threat_pos[0], threat_pos[1], threat_pos[2].max(entity_pos[2] + 0.5)],
+                None,
+            )]
+        }
+    } else {
+        vec![(
+            crate::fep_agent::compute_rendezvous_intercept(threat_pos, None, entity_pos),
+            None,
+        )]
+    };
 
+    let use_trajectory = env.threat_vel.is_some();
     let mut points = Vec::with_capacity(precisions.len());
     let mut crossover = None;
 
@@ -664,25 +693,35 @@ pub fn run_efe_ablation(
         };
         let agent = ActiveInferenceFlightAgent::new(config);
 
-        let use_trajectory = env.threat_vel.is_some();
         let efe_mission = if use_trajectory {
             agent.trajectory_efe(drone_state, mission_setpoint.position, mission_setpoint, env)
         } else {
             agent.instantaneous_efe(drone_state, mission_setpoint.position, mission_setpoint, env)
         };
-        let efe_intercept = if use_trajectory {
-            agent.trajectory_efe(drone_state, intercept_setpoint, mission_setpoint, env)
-        } else {
-            agent.instantaneous_efe(drone_state, intercept_setpoint, mission_setpoint, env)
-        };
 
-        let chose_intercept = efe_intercept < efe_mission;
+        // Evaluate all intercept candidates, pick best
+        let mut best_efe = f64::INFINITY;
+        let mut best_frac: Option<f64> = None;
+        for &(candidate, frac) in &intercept_candidates {
+            let efe = if use_trajectory {
+                agent.trajectory_efe(drone_state, candidate, mission_setpoint, env)
+            } else {
+                agent.instantaneous_efe(drone_state, candidate, mission_setpoint, env)
+            };
+            if efe < best_efe {
+                best_efe = efe;
+                best_frac = frac;
+            }
+        }
+
+        let chose_intercept = best_efe < efe_mission;
 
         points.push(EfeAblationPoint {
             safety_precision: pi_safety,
             efe_mission,
-            efe_intercept,
+            efe_intercept: best_efe,
             chose_intercept,
+            best_rendezvous_frac: best_frac,
         });
     }
 
@@ -884,11 +923,11 @@ pub fn evaluate_scenario_variants() -> Vec<ScenarioVariantResult> {
         let mut best_frac: Option<f64> = None;
 
         if let Some(vel) = env.threat_vel {
-            let impact_t = crate::fep_agent::predict_impact_time_z_pub(threat_pos, vel, entity_pos[2]);
+            let impact_t = crate::fep_agent::predict_impact_time_z(threat_pos, vel, entity_pos[2]);
             if impact_t.is_finite() && impact_t > 0.0 {
                 for &frac in &rendezvous_fracs {
                     let rv_t = impact_t * frac;
-                    let beam = crate::fep_agent::predict_falling_position_pub(threat_pos, vel, rv_t);
+                    let beam = crate::fep_agent::predict_falling_position(threat_pos, vel, rv_t);
                     let candidate = [beam[0], beam[1], beam[2].max(entity_pos[2] + 0.3)];
                     let efe = agent.trajectory_efe(
                         &drone_state,
@@ -1253,6 +1292,57 @@ mod tests {
         assert!(
             override_pos.is_none(),
             "No human → should continue mission (no override)"
+        );
+    }
+
+    #[test]
+    fn test_ablation_rendezvous_frac_varies_with_precision() {
+        // At low precision, 75% rendezvous wins (closer to ground → more danger reduction);
+        // at high precision, 50% wins (midpoint intercept optimal when safety dominates).
+        let env = FlightEnvironment {
+            human_danger: 0.7,
+            mission_progress: 0.3,
+            threat_pos: Some([-1.5, 0.0, 2.0]),
+            threat_vel: Some([0.0, 0.0, -3.0]),
+            entity_pos: Some([-1.5, 0.0, 0.0]),
+        };
+        let drone_state = FlightState {
+            position: [0.0, 0.0, 1.5],
+            ..FlightState::hover(0.1)
+        };
+        let mission_setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+
+        // Low precision: 75% should win
+        let result_low = run_efe_ablation(
+            &[1.0],
+            &env,
+            &drone_state,
+            &mission_setpoint,
+            1.0,
+            0.1,
+        );
+        assert_eq!(
+            result_low.points[0].best_rendezvous_frac,
+            Some(0.75),
+            "At low precision (1.0), 75% rendezvous should win"
+        );
+
+        // High precision: 50% should win
+        let result_high = run_efe_ablation(
+            &[1000.0],
+            &env,
+            &drone_state,
+            &mission_setpoint,
+            1.0,
+            0.1,
+        );
+        assert_eq!(
+            result_high.points[0].best_rendezvous_frac,
+            Some(0.50),
+            "At high precision (1000.0), 50% rendezvous should win"
         );
     }
 

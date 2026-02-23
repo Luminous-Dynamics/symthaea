@@ -173,16 +173,7 @@ impl Default for FlightFepConfig {
 ///
 /// Uses kinematic equation: pos(t) = pos₀ + vel₀·t + 0.5·g·t²
 /// where g acts downward (negative z).
-pub(crate) fn predict_falling_position_pub(pos: [f64; 3], vel: [f64; 3], t: f64) -> [f64; 3] {
-    predict_falling_position(pos, vel, t)
-}
-
-/// Predict time until a falling object reaches a target altitude (crate-visible wrapper).
-pub(crate) fn predict_impact_time_z_pub(pos: [f64; 3], vel: [f64; 3], target_z: f64) -> f64 {
-    predict_impact_time_z(pos, vel, target_z)
-}
-
-fn predict_falling_position(pos: [f64; 3], vel: [f64; 3], t: f64) -> [f64; 3] {
+pub(crate) fn predict_falling_position(pos: [f64; 3], vel: [f64; 3], t: f64) -> [f64; 3] {
     [
         pos[0] + vel[0] * t,
         pos[1] + vel[1] * t,
@@ -194,7 +185,7 @@ fn predict_falling_position(pos: [f64; 3], vel: [f64; 3], t: f64) -> [f64; 3] {
 ///
 /// Solves: pos_z + vel_z·t - 0.5·g·t² = target_z
 /// Returns the positive root (time to reach target_z), or `f64::INFINITY` if unreachable.
-fn predict_impact_time_z(pos: [f64; 3], vel: [f64; 3], target_z: f64) -> f64 {
+pub(crate) fn predict_impact_time_z(pos: [f64; 3], vel: [f64; 3], target_z: f64) -> f64 {
     // Rearrange: -0.5·g·t² + vel_z·t + (pos_z - target_z) = 0
     // → 0.5·g·t² - vel_z·t - (pos_z - target_z) = 0
     let a = 0.5 * 9.81;
@@ -2192,6 +2183,111 @@ mod tests {
             (efe - efe_inst).abs() < 1e-10,
             "Upward beam trajectory EFE ({:.4}) should equal instantaneous EFE ({:.4})",
             efe, efe_inst
+        );
+    }
+
+    // ── compute_rendezvous_intercept tests ──
+
+    #[test]
+    fn test_rendezvous_intercept_with_velocity() {
+        // Beam at (0,0,4) falling at -4 m/s toward entity at z=0.
+        // impact_t = solve: 4 + (-4)t - 4.905t² = 0 → positive root ≈ 0.545s
+        // rendezvous at 50%: t_rv ≈ 0.273s
+        // beam_z at t_rv: 4 + (-4)(0.273) - 4.905*(0.273)² ≈ 2.542m
+        let result = compute_rendezvous_intercept(
+            [0.0, 0.0, 4.0],
+            Some([0.0, 0.0, -4.0]),
+            [0.0, 0.0, 0.0],
+        );
+
+        // X/Y should match beam
+        assert!((result[0] - 0.0).abs() < 1e-6);
+        assert!((result[1] - 0.0).abs() < 1e-6);
+        // Z should be between entity+0.3 and threat_z
+        assert!(result[2] >= 0.3, "Z should be at least entity_z + 0.3: {}", result[2]);
+        assert!(result[2] < 4.0, "Z should be below threat start: {}", result[2]);
+    }
+
+    #[test]
+    fn test_rendezvous_intercept_no_velocity() {
+        // No velocity → static fallback
+        let result = compute_rendezvous_intercept(
+            [3.0, 4.0, 5.0],
+            None,
+            [0.0, 0.0, 0.0],
+        );
+        assert_eq!(result, [3.0, 4.0, 5.0]); // max(5.0, 0.5) = 5.0
+    }
+
+    #[test]
+    fn test_rendezvous_intercept_no_velocity_low_threat() {
+        // Threat below entity+0.5 → clamped up
+        let result = compute_rendezvous_intercept(
+            [1.0, 2.0, 0.3],
+            None,
+            [0.0, 0.0, 0.0],
+        );
+        assert_eq!(result, [1.0, 2.0, 0.5]); // max(0.3, 0.5) = 0.5
+    }
+
+    #[test]
+    fn test_rendezvous_intercept_beam_going_up_unreachable() {
+        // Beam going upward: at z=2 with vel_z=+5.
+        // Max height ≈ 2 + 25/(2*9.81) ≈ 3.27m. Entity at z=100 → unreachable.
+        // impact_time has no positive real root → static fallback
+        let result = compute_rendezvous_intercept(
+            [1.0, 1.0, 2.0],
+            Some([0.0, 0.0, 5.0]),
+            [0.0, 0.0, 100.0],
+        );
+        // Static fallback: [1, 1, max(2, 100.5)] = [1, 1, 100.5]
+        assert_eq!(result, [1.0, 1.0, 100.5]);
+    }
+
+    #[test]
+    fn test_rendezvous_intercept_beam_going_up_reachable() {
+        // Beam going upward from z=2 at +5 m/s, entity at z=0.
+        // Gravity brings it back down — impact_t ≈ 1.33s → valid rendezvous.
+        let result = compute_rendezvous_intercept(
+            [1.0, 1.0, 2.0],
+            Some([0.0, 0.0, 5.0]),
+            [0.0, 0.0, 0.0],
+        );
+        // Should compute rendezvous, not static fallback
+        // Z should be above entity+0.3 (beam is rising at 50% of impact time)
+        assert!(result[2] >= 0.3, "Z should be at least 0.3: {}", result[2]);
+        assert!(result[2] < 5.0, "Z should be reasonable: {}", result[2]);
+    }
+
+    #[test]
+    fn test_rendezvous_intercept_z_clamp() {
+        // Fast-falling beam: at z=0.5, vel_z=-10, entity at z=0.
+        // impact_t very small → rendezvous z very low → clamped to entity_z + 0.3
+        let result = compute_rendezvous_intercept(
+            [0.0, 0.0, 0.5],
+            Some([0.0, 0.0, -10.0]),
+            [0.0, 0.0, 0.0],
+        );
+        assert!(
+            result[2] >= 0.3 - 1e-10,
+            "Z should be clamped to at least entity_z + 0.3: {}",
+            result[2]
+        );
+    }
+
+    #[test]
+    fn test_rendezvous_intercept_lateral_velocity() {
+        // Beam moving laterally: at (0,0,4), vel=(2,0,-4), entity at (0,0,0).
+        // At rendezvous, X should shift in direction of lateral velocity.
+        let result = compute_rendezvous_intercept(
+            [0.0, 0.0, 4.0],
+            Some([2.0, 0.0, -4.0]),
+            [0.0, 0.0, 0.0],
+        );
+        assert!(
+            result[0] > 0.0,
+            "Lateral velocity should shift intercept X positive: {}",
+            result[0]
         );
     }
 }
