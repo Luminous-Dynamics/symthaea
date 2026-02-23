@@ -98,6 +98,24 @@ pub use symthaea_causal_reasoning::counterfactual;
 pub mod reasoning_engine;
 
 // ============================================================================
+// Module Integration Status (as of v0.5.x)
+// ============================================================================
+//
+// | Module                        | Status       | Gate                  | Notes                                            |
+// |-------------------------------|--------------|-----------------------|--------------------------------------------------|
+// | temporal_planning             | Wired        | reasoning_engine      | Used in reasoning engine 7-step cycle            |
+// | tool_gate                     | Wired        | reasoning_engine      | Used in reasoning engine                         |
+// | empathic_unification          | Wired        | full_consciousness    | Stub provided when feature disabled              |
+// | recursive_improvement         | Disconnected | full_consciousness    | Used by narrative only                           |
+// | consciousness_driven_evolution| Dead         | (none)                | Commented out, zero callers                      |
+// | unified_intelligence          | Disconnected | full_consciousness    | Depends on meta_reasoning (not yet ported)       |
+// | mycelix_bridge                | Structural   | (none)                | Compiled but not called from cognitive loop       |
+// | byzantine_collective          | Disconnected | full_consciousness    | Multi-agent only                                 |
+// | unified_living_mind           | Disconnected | full_consciousness    | Depends on LifeState                             |
+//
+// ============================================================================
+
+// ============================================================================
 // Modules with external dependencies (cfg-gated)
 // ============================================================================
 
@@ -225,7 +243,7 @@ pub mod empathic_unification {
 
     /// Stub empathic unification engine
     #[derive(Debug, Default)]
-    #[allow(dead_code)] // Fields reserved for empathic processing
+    #[allow(dead_code)] // RESERVED(future): empathic unification processing state
     pub struct EmpathicUnification {
         /// Current user need
         current_need: UserNeed,

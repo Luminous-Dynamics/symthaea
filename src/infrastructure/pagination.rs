@@ -155,7 +155,7 @@ pub struct Paginator<K, T> {
 #[derive(Clone)]
 struct CachedPage<T> {
     page: Page<T>,
-    #[allow(dead_code)] // Reserved for cache TTL implementation
+    #[allow(dead_code)] // RESERVED(future): cache TTL timestamp
     cached_at: Instant,
 }
 

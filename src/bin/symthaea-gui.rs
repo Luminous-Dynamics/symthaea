@@ -180,7 +180,6 @@ impl SafetyLevel {
 
 /// Status message level
 #[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
 enum StatusLevel {
     Info,
     Success,

@@ -1039,7 +1039,9 @@ mod tests {
 
     #[test]
     fn test_update_model_updates_value_weights() {
-        let mut learner = make_learner();
+        // Use a learner without eligibility traces so trace_scale is 1.0
+        // (with traces enabled but empty, trace_scale = 0, blocking weight updates)
+        let mut learner = make_learner_no_traces();
         let mut model = GenerativeModel::new(STATE_DIM, OBS_DIM, NUM_ACTIONS);
         let old = state_from(&[0.8, 0.1, 0.05, 0.05]);
         let new = state_from(&[0.1, 0.8, 0.05, 0.05]);
@@ -1058,10 +1060,10 @@ mod tests {
             .any(|(a, b)| (a - b).abs() > 1e-15);
         assert!(weights_changed, "value weights should change after update");
 
-        // Bias may also change
+        // Bias should also change with nonzero td_error and dtanh
         assert!(
-            (learner.value_bias - bias_before).abs() >= 0.0,
-            "bias computation should be finite"
+            (learner.value_bias - bias_before).abs() > 1e-15,
+            "bias should change after update with nonzero td_error"
         );
         assert!(learner.value_bias.is_finite());
     }

@@ -91,3 +91,4 @@ papers/latex/*.out
 
 # Telemetry output
 *_telemetry.csv
+output/

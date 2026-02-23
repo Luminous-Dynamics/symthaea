@@ -74,7 +74,7 @@ pub struct MetricsCollector {
 
     /// Request counters
     requests_total: AtomicU64,
-    #[allow(dead_code)] // Reserved for per-type metrics dashboard
+    #[allow(dead_code)] // RESERVED(future): per-type request metrics
     requests_by_type: HashMap<String, AtomicU64>,
 
     /// Execution metrics

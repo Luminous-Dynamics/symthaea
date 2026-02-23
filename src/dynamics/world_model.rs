@@ -64,7 +64,7 @@ impl Default for WorldModelConfig {
 
 /// A single layer in the world model hierarchy
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields reserved for predictive coding
+#[allow(dead_code)] // RESERVED(future): predictive coding layer fields
 pub struct WorldModelLayer {
     /// Layer index (0 = lowest/sensory)
     level: usize,

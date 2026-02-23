@@ -212,7 +212,7 @@ impl SchoolConfig {
 /// - RealityCheck for self-correcting predictions
 /// - Assessment tracking for progress monitoring
 /// - Curriculum management for structured learning paths
-#[allow(dead_code)] // Fields reserved for curriculum learning
+#[allow(dead_code)] // RESERVED(feature-school_learning): curriculum learning system
 pub struct School {
     /// Configuration
     config: SchoolConfig,

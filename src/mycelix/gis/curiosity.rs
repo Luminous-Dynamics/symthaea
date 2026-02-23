@@ -261,7 +261,7 @@ impl SourceStats {
 
 /// Pending exploration
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields reserved for exploration tracking
+#[allow(dead_code)] // RESERVED(future): exploration agenda tracking
 struct PendingExploration {
     query: String,
     strategy: ExplorationStrategy,

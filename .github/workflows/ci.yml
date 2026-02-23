@@ -136,10 +136,15 @@ jobs:
         features:
           - "shell"
           - "service"
-          - "consciousness_module"
+          - "full_consciousness"
           - "reasoning_engine"
           - "voice-tts"
           - "humanoid"
+          - "school_learning"
+          - "lancedb-backend"
+          - "physics"
+          - "code_generation"
+          - "flight"
     steps:
       - uses: actions/checkout@v4
 
@@ -210,6 +215,9 @@ jobs:
           - "code_generation,reasoning_engine"
           - "identity,reasoning_engine"
           - "lancedb-backend,reasoning_engine"
+          - "physics,reasoning_engine"
+          - "full_consciousness,reasoning_engine"
+          - "flight,humanoid"
     steps:
       - uses: actions/checkout@v4
 

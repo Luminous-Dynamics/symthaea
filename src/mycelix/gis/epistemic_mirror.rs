@@ -737,7 +737,7 @@ pub enum KnowledgeDepth {
 
 /// Record of a prediction for calibration
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields reserved for calibration tracking
+#[allow(dead_code)] // RESERVED(future): calibration tracking structure
 struct PredictionRecord {
     id: String,
     statement: String,
@@ -824,7 +824,7 @@ pub enum BiasType {
 
 /// Record of a detected bias
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields reserved for bias tracking
+#[allow(dead_code)] // RESERVED(future): bias detection record
 struct BiasRecord {
     bias_type: BiasType,
     severity: f32,

@@ -14,7 +14,7 @@ use ndarray::Array1;
 ///
 /// This allows the CognitiveLoopService to use either CfC or HdcLtcUnified
 /// as the temporal prediction backend, selected at runtime.
-#[allow(dead_code)] // Some methods are provided for API completeness
+#[allow(dead_code)] // RESERVED(future): temporal network routing
 pub(super) enum TemporalNetwork {
     /// CfC (Closed-form Continuous-time) network
     CfC(CfCNetwork),

@@ -126,7 +126,7 @@ pub struct HDLTCCodec {
 
     /// Momentum buffer for ltc_to_hv
     #[serde(skip)]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // RESERVED(serialization): momentum buffer for forward compatibility
     ltc_to_hv_momentum: Vec<f32>,
 
     /// Statistics

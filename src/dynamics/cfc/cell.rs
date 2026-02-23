@@ -1446,7 +1446,7 @@ mod tests {
 
     #[test]
     fn test_from_genesis_is_deterministic() {
-        let genesis = GenesisSeed::new(42);
+        let genesis = GenesisSeed::from_phrase("test-cfc-cell-42");
         let config = small_config();
 
         let cell1 = CfCCell::from_genesis(config.clone(), &genesis, "test_cell");

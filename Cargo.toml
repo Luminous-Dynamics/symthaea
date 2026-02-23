@@ -479,6 +479,10 @@ name = "humanoid_paper_figures"
 required-features = ["flight", "humanoid"]
 
 [[example]]
+name = "humanoid_100ep_telemetry"
+required-features = ["humanoid"]
+
+[[example]]
 name = "demo_self_analysis"
 required-features = ["code_generation"]
 

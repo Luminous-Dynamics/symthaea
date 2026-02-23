@@ -1380,9 +1380,13 @@ impl CognitiveLoopService {
         if let Some(ref enhanced_result) = enhanced_result {
             match enhanced_result.motor_command.command_type {
                 MotorCommandType::AttentionShift => {
-                    // Shift attention based on motor command intensity
+                    // Phase 19: Activate FEP → motor → attention → perception loop
+                    // Science: Friston (2010) — active inference uses motor commands to
+                    // modulate sensory precision (attention_sensitivity).
                     let shift_amount = enhanced_result.motor_command.intensity as f32 * 0.1;
-                    // Could modulate HDC attention weights here
+                    self.adaptive_behavior.attention_sensitivity =
+                        (self.adaptive_behavior.attention_sensitivity * (1.0 + shift_amount * 0.1))
+                            .clamp(0.5, 2.0);
                     self.stats.attention_shift = shift_amount;
                 }
                 MotorCommandType::LearningRateAdjust => {
@@ -2282,8 +2286,66 @@ impl CognitiveLoopService {
             0.0
         };
 
-        // (Inline code for HIERARCHICAL LTC through MULTI-OBJECTIVE EVOLUTION
-        //  removed — now in run_advanced_subsystems() in cycle_subsystems.rs)
+        // ── Phase 19: Consciousness limiting component → targeted boost ─────
+        // Science: Bengio (2017) — gradient descent requires acting on gradient info.
+        // Match on the limiting component to apply a targeted nudge.
+        let limiting_component_boosted = if !consciousness_limiting_component.is_empty()
+            && consciousness_gradient_magnitude > 0.01
+        {
+            match consciousness_limiting_component.as_str() {
+                "Attention" => {
+                    self.adaptive_behavior.attention_sensitivity =
+                        (self.adaptive_behavior.attention_sensitivity * 1.05).min(2.0);
+                    self.stats.limiting_component_boost_count += 1;
+                    "Attention"
+                }
+                "Binding" => {
+                    // Boost prediction confidence — binding weakness signals integration gap
+                    self.prediction_confidence =
+                        (self.prediction_confidence + 0.01).clamp(0.0, 1.0);
+                    self.stats.limiting_component_boost_count += 1;
+                    "Binding"
+                }
+                "Efficacy" => {
+                    self.fep_lr_boost = (self.fep_lr_boost * 1.05).min(3.0);
+                    self.stats.limiting_component_boost_count += 1;
+                    "Efficacy"
+                }
+                _ => "",
+            }
+        } else {
+            ""
+        };
+
+        // ── Phase 19: Harmonic love resonance → confidence/soul amplifier ────
+        // Science: The Seven Harmonies' emergent unity signal. When all harmonics
+        // resonate together (love > 0.6), boost confidence and soul learning rate.
+        let love_resonance_boost = if harmonic_love_resonance > 0.6 {
+            let boost = ((harmonic_love_resonance - 0.6) * 0.04) as f32; // up to +1.6%
+            self.prediction_confidence = (self.prediction_confidence + boost).clamp(0.0, 1.0);
+            self.carryover.learning.subsystem_lr_factor *= 1.0 + boost * 0.5;
+            self.carryover.learning.subsystem_lr_factor =
+                self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.3);
+            self.stats.love_resonance_boost_count += 1;
+            boost
+        } else {
+            0.0
+        };
+
+        // ── Phase 19: Reasoning chain confidence + depth → confidence ────────
+        // Science: Pearl (2000) — causal chains with high confidence = genuine explanation.
+        let reasoning_chain_boosted =
+            reasoning_chain_confidence > 0.7 && reasoning_chain_depth >= 3;
+        if reasoning_chain_boosted {
+            let chain_boost = (reasoning_chain_confidence - 0.7) * 0.05;
+            self.prediction_confidence =
+                (self.prediction_confidence + chain_boost).clamp(0.0, 1.0);
+            self.stats.reasoning_chain_boost_count += 1;
+        }
+
+        // ── Phase 19: Attention budget gated flag for metadata ───────────────
+        let attention_budget_gated = attention_budget_exceeded
+            && self.stats.attention_budget_exceeded_count > 3;
 
         // ── Track 5a: Epistemic gate → actual information gating ─────────────
         // Science: Kruger & Dunning (1999) — epistemic humility gates downstream integration
@@ -3075,6 +3137,12 @@ impl CognitiveLoopService {
             evolution_confidence_delta,
             homeostasis_pull_strength,
             prediction_coherence_urgency_bias,
+            // Phase 19: Activating Dormant Pathways
+            attention_budget_gated,
+            limiting_component_boosted: limiting_component_boosted.into(),
+            love_resonance_boost,
+            reasoning_chain_boosted,
+            attention_shift_applied: self.stats.attention_shift,
         };
 
         // Update cumulative stats for resonator-memory loop diagnostics

@@ -43,7 +43,7 @@ use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 /// 2. Regression features: residuals, R², error asymmetry
 /// 3. Independence features: HSIC, conditional entropy estimates
 /// 4. Structural features: linearity, noise level, sample size
-#[allow(dead_code)] // Fields reserved for causal encoding
+#[allow(dead_code)] // RESERVED(future): causal feature encoding
 pub struct CausalFeatureEncoder {
     /// Dimension of output hypervectors
     dim: usize,
@@ -487,7 +487,7 @@ pub struct CausalCantorNetwork {
 }
 
 /// A training example for the causal network
-#[allow(dead_code)] // Fields reserved for training pipeline
+#[allow(dead_code)] // RESERVED(future): causal feature encoding
 struct TrainingPair {
     features: ContinuousHV,
     direction: CausalDirection,

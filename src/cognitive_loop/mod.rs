@@ -114,7 +114,7 @@ pub mod builder;
 pub use builder::*;
 
 pub mod executor;
-pub use executor::*;
+pub(crate) use executor::*;
 
 // ── Private submodules ──────────────────────────────────────────────────────
 mod training;
@@ -729,7 +729,7 @@ pub struct CognitiveLoopService {
     /// Proposes and gates actions based on autonomy level.
     /// Consumed by bridge dispatch when conductor events are wired.
     #[cfg(feature = "support")]
-    #[allow(dead_code)] // consumed by bridge dispatch, not the cognitive cycle
+    #[allow(dead_code)] // RESERVED(feature-support): autonomy-aware action engine
     support_action_engine: Option<symthaea_support::actions::ActionEngine>,
 
     /// Cycle counter for amortizing support subsystem updates.

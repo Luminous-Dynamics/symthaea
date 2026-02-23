@@ -133,7 +133,7 @@ pub use checkpoint::{
 // ============================================================================
 
 /// Main swarm node combining Iroh transport with Holochain trust
-#[allow(dead_code)] // Fields reserved for full implementation
+#[allow(dead_code)] // RESERVED(future): peer-to-peer swarm node
 pub struct SwarmNode {
     config: SwarmConfig,
     #[cfg(feature = "swarm")]

@@ -282,7 +282,7 @@ pub struct PhiMonitor {
 
 /// Tracking for current operation
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields reserved for Φ tracking
+#[allow(dead_code)] // RESERVED(future): phi-guided operation tracking
 struct OperationTracking {
     /// Operation ID
     id: String,
