@@ -1,0 +1,31 @@
+[package]
+name = "symthaea-hal"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Hardware abstraction layer for Symthaea: PCA9685 servo control, I2C sensors, safety interlocks"
+license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["robotics", "hal", "i2c", "servo", "embedded"]
+categories = ["embedded", "hardware-support"]
+
+[dependencies]
+symthaea-humanoid = { path = "../symthaea-humanoid" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+embedded-hal = "1.0"
+
+[dependencies.linux-embedded-hal]
+version = "0.4"
+optional = true
+default-features = false
+features = ["i2c"]
+
+[features]
+default = []
+linux = ["dep:linux-embedded-hal"]
