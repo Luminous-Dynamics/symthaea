@@ -22,6 +22,8 @@ pub struct VocalTractMetrics {
     pub energy_correlation: f32,
     /// Number of frames evaluated.
     pub num_frames: usize,
+    /// Mel-Cepstral Distortion (dB). Lower is better (<5 dB = excellent).
+    pub mcd: f32,
 }
 
 impl VocalTractMetrics {
@@ -66,6 +68,8 @@ impl VocalTractMetrics {
         let frame_energies: Vec<f32> = frames[..n].iter().map(|f| f.energy).collect();
         let energy_correlation = pearson_r(&frame_energies, &target_energies);
 
+        let mcd = mel_cepstral_distortion(&frames[..n], &targets[..n]);
+
         Self {
             mean_f1_error: f1_err_sum / nf,
             mean_f2_error: f2_err_sum / nf,
@@ -74,6 +78,7 @@ impl VocalTractMetrics {
             f0_rmse: (f0_sq_sum / nf).sqrt(),
             energy_correlation,
             num_frames: n,
+            mcd,
         }
     }
 
@@ -114,6 +119,56 @@ pub fn load_wav(path: &str) -> Result<(Vec<f32>, u32), hound::Error> {
         .map(|s| s as f32 / i16::MAX as f32)
         .collect();
     Ok((samples, spec.sample_rate))
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MEL-CEPSTRAL DISTORTION (MCD)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Convert formant frequencies to a pseudo-mel-cepstral representation.
+///
+/// Maps F1/F2/F3 through the mel scale and computes a simple cepstral-like
+/// decomposition suitable for MCD calculation in formant-based synthesis.
+fn formants_to_mel_cepstrum(f1: f32, f2: f32, f3: f32) -> [f32; 3] {
+    // HTK mel scale: mel = 2595 * log10(1 + f/700)
+    let to_mel = |f: f32| 2595.0 * (1.0 + f / 700.0).log10();
+    [to_mel(f1), to_mel(f2), to_mel(f3)]
+}
+
+/// Compute Mel-Cepstral Distortion between synthesized and target formant trajectories.
+///
+/// MCD (dB) = (10√2 / ln10) × √(Σ (c_synth_i - c_target_i)²)
+///
+/// Lower is better. Typical speech synthesis values:
+/// - <5 dB: excellent (near-natural)
+/// - 5-8 dB: good
+/// - >8 dB: noticeable artifacts
+pub fn mel_cepstral_distortion(
+    synth_frames: &[FormantFrame],
+    target_frames: &[FormantTarget],
+) -> f32 {
+    let n = synth_frames.len().min(target_frames.len());
+    if n == 0 {
+        return 0.0;
+    }
+
+    let scale = 10.0 * std::f32::consts::SQRT_2 / std::f32::consts::LN_10;
+    let mut total_mcd = 0.0f32;
+
+    for i in 0..n {
+        let synth_mc = formants_to_mel_cepstrum(synth_frames[i].f1, synth_frames[i].f2, synth_frames[i].f3);
+        let target_mc = formants_to_mel_cepstrum(target_frames[i].f1, target_frames[i].f2, target_frames[i].f3);
+
+        let sq_sum: f32 = synth_mc
+            .iter()
+            .zip(target_mc.iter())
+            .map(|(s, t)| (s - t).powi(2))
+            .sum();
+
+        total_mcd += scale * sq_sum.sqrt();
+    }
+
+    total_mcd / n as f32
 }
 
 /// Pearson correlation coefficient.
@@ -215,6 +270,73 @@ mod tests {
         assert!(max_err < 0.001, "WAV roundtrip error too large: {max_err}");
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_mcd_perfect_match() {
+        let target = FormantTarget {
+            f1: 520.0,
+            f2: 1190.0,
+            f3: 2390.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            is_vowel: true,
+            is_voiced: true,
+            duration_ms: 80.0,
+            manner: crate::types::SourceType::Vowel,
+        };
+        let frame = FormantFrame {
+            f1: 520.0,
+            f2: 1190.0,
+            f3: 2390.0,
+            ..Default::default()
+        };
+
+        let mcd = super::mel_cepstral_distortion(&[frame; 10], &[target; 10]);
+        assert!(
+            mcd < 0.01,
+            "Perfect match should have near-zero MCD: {mcd:.4}"
+        );
+    }
+
+    #[test]
+    fn test_mcd_error_scales() {
+        let target = FormantTarget {
+            f1: 520.0,
+            f2: 1190.0,
+            f3: 2390.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            is_vowel: true,
+            is_voiced: true,
+            duration_ms: 80.0,
+            manner: crate::types::SourceType::Vowel,
+        };
+
+        // Small error
+        let small_err = FormantFrame {
+            f1: 530.0,
+            f2: 1200.0,
+            f3: 2400.0,
+            ..Default::default()
+        };
+        let mcd_small = super::mel_cepstral_distortion(&[small_err; 10], &[target; 10]);
+
+        // Large error (schwa bias)
+        let large_err = FormantFrame {
+            f1: 500.0,
+            f2: 1500.0,
+            f3: 2500.0,
+            ..Default::default()
+        };
+        let mcd_large = super::mel_cepstral_distortion(&[large_err; 10], &[target; 10]);
+
+        assert!(
+            mcd_large > mcd_small,
+            "Larger formant error should produce higher MCD: small={mcd_small:.2}, large={mcd_large:.2}"
+        );
     }
 
     #[test]

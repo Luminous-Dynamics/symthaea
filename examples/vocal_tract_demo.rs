@@ -20,7 +20,10 @@ fn main() {
     use symthaea::voice::formant_targets::FormantDatabase;
     use symthaea::voice::vocal_tract_encoder::VoiceCognitiveState;
     use symthaea::voice::vocal_tract_fep::VocalTractObservation;
-    use symthaea::voice::vocal_tract_fep::{populate_manner_map, ProsodyContext, VocalTractPipeline};
+    use symthaea::voice::vocal_tract_fep::{
+        populate_manner_map, Intonation, ProsodyContext, VocalTractPipeline,
+    };
+    use symthaea::voice::predict_duration;
     use symthaea::voice::vocoder::FormantVocoder;
     use symthaea::voice::FormantFrame;
     use symthaea_core::genesis::GenesisSeed;
@@ -90,26 +93,25 @@ fn main() {
         n_phonemes
     );
 
-    let mut losses = Vec::new();
-    for epoch in 0..30 {
-        let loss = symthaea::voice::train_controller_on_phoneme_db(
-            &mut pipeline.controller,
-            &genesis,
-            &db,
-            1,
-        );
-        losses.push(loss);
-        if epoch < 5 || (epoch + 1) % 10 == 0 {
-            println!("  Epoch {}: avg loss = {:.2}", epoch + 1, loss);
-        }
-    }
+    let final_loss = symthaea::voice::train_controller_on_phoneme_db(
+        &mut pipeline.controller,
+        &genesis,
+        &db,
+        30,
+    );
+    println!("  Final loss (30 epochs): {:.4}", final_loss);
 
-    let improvement = if losses[0] > 0.0 {
-        (1.0 - losses[29] / losses[0]) * 100.0
-    } else {
-        0.0
-    };
-    println!("  Loss reduction: {:.1}%\n", improvement);
+    // Transition training: BPTT on vowel pairs for smooth coarticulation
+    println!("  Training transitions (10 epochs on 30 vowel pairs)...");
+    let trans_loss = symthaea::voice::train_controller_transitions(
+        &mut pipeline.controller,
+        &genesis,
+        &db,
+        10,
+    );
+    println!("  Transition loss: {:.4}", trans_loss);
+
+    println!();
 
     // ── 3. Vowel sequence synthesis with WAV output ──────────────────────
     println!("--- 3. Vowel Sequence Synthesis (with WAV output) ---");
@@ -329,32 +331,38 @@ fn main() {
     vocoder.reset();
 
     let dt = 1.0 / 200.0; // 200Hz motor rate
-    let phoneme_base_ms = 80.0; // Base phoneme duration
 
-    for (label, words) in &sentences {
-        // Build flat phoneme sequence with word-boundary pauses
-        let mut phoneme_seq: Vec<(&str, u8, f32)> = Vec::new(); // (phoneme, stress, duration_s)
+    // Intonation per sentence
+    let sentence_intonations = [
+        Intonation::Statement,  // "hello world"
+        Intonation::Statement,  // "i am conscious"
+        Intonation::Exclamation, // "the mind speaks"
+    ];
+
+    for (sent_idx, (label, words)) in sentences.iter().enumerate() {
+        let intonation = sentence_intonations[sent_idx];
+
+        // Build flat phoneme sequence with linguistically-predicted durations
+        let mut phoneme_seq: Vec<(&str, u8, usize)> = Vec::new(); // (phoneme, stress, frames)
         for (w_idx, word) in words.iter().enumerate() {
             if let Some(phonemes) = word_dict.get(word) {
-                for &(ph, stress) in phonemes {
-                    // Stressed vowels are longer
-                    let dur_ms = if stress == 1 { phoneme_base_ms * 1.3 } else { phoneme_base_ms };
-                    // Lookup actual duration from DB if available
-                    let dur_ms = db.lookup(ph).map_or(dur_ms, |t| {
-                        if t.duration_ms > 0.0 { t.duration_ms } else { dur_ms }
-                    });
-                    phoneme_seq.push((ph, stress, dur_ms / 1000.0));
+                let n_ph = phonemes.len();
+                for (ph_idx, &(ph, stress)) in phonemes.iter().enumerate() {
+                    let is_word_final = ph_idx == n_ph - 1;
+                    let is_utterance_final = w_idx == words.len() - 1 && is_word_final;
+                    let frames = predict_duration(ph, stress, is_word_final, is_utterance_final, 1.0);
+                    phoneme_seq.push((ph, stress, frames));
                 }
             }
-            // Word boundary: short pause between words
+            // Word boundary: short pause between words (10 frames = 50ms)
             if w_idx < words.len() - 1 {
-                phoneme_seq.push(("SIL", 0, 0.05));
+                phoneme_seq.push(("SIL", 0, 10));
             }
         }
 
-        // Compute total utterance duration for prosody
-        let total_duration: f32 = phoneme_seq.iter().map(|(_, _, d)| d).sum();
-        let mut elapsed = 0.0f32;
+        // Compute total utterance frames for prosody progress
+        let total_frames: usize = phoneme_seq.iter().map(|(_, _, f)| f).sum();
+        let mut frame_idx = 0usize;
         let mut all_frames: Vec<FormantFrame> = Vec::new();
 
         let cog_state = VoiceCognitiveState {
@@ -365,16 +373,15 @@ fn main() {
             ..Default::default()
         };
 
-        for &(phoneme, stress, duration) in &phoneme_seq {
+        for &(phoneme, stress, n_frames) in &phoneme_seq {
             let is_silence = phoneme == "SIL" || phoneme == "SP";
-            let n_frames = (duration / dt).max(1.0) as usize;
 
-            for frame_i in 0..n_frames {
+            for fi in 0..n_frames {
                 if is_silence {
-                    all_frames.push(FormantFrame::silent(elapsed));
+                    all_frames.push(FormantFrame::silent(frame_idx as f32 * dt));
                 } else {
-                    let phoneme_progress = frame_i as f32 / n_frames as f32;
-                    let utterance_progress = (elapsed / total_duration).clamp(0.0, 1.0);
+                    let phoneme_progress = fi as f32 / n_frames as f32;
+                    let utterance_progress = (frame_idx as f32 / total_frames as f32).clamp(0.0, 1.0);
 
                     let prosody = ProsodyContext {
                         utterance_progress,
@@ -382,6 +389,7 @@ fn main() {
                         stress,
                         base_f0: 120.0,
                         arousal: 0.5,
+                        intonation,
                     };
 
                     let frame = pipeline.tick_with_prosody(
@@ -393,7 +401,7 @@ fn main() {
                     );
                     all_frames.push(frame);
                 }
-                elapsed += dt;
+                frame_idx += 1;
             }
         }
 
@@ -404,9 +412,12 @@ fn main() {
 
         let audio_duration = audio_samples.len() as f32 / sample_rate as f32;
         let word_str = words.join(" ");
+        let total_dur_ms = total_frames as f32 * 5.0;
         println!(
-            "  \"{word_str}\": {} phonemes, {:.2}s audio → {}",
+            "  \"{word_str}\" ({:?}): {} phonemes, {:.0}ms ({:.2}s audio) → {}",
+            intonation,
             phoneme_seq.len(),
+            total_dur_ms,
             audio_duration,
             wav_path.display()
         );
@@ -419,8 +430,8 @@ fn main() {
     // ── 7. Summary ───────────────────────────────────────────────────────
     println!("--- 7. Summary ---");
     println!(
-        "  Phoneme training: {} phonemes, {:.1}% loss reduction",
-        n_phonemes, improvement
+        "  Phoneme training: {} phonemes, final loss: {:.4}",
+        n_phonemes, final_loss
     );
     println!("  FEP loop: closed (learn_from_outcome active)");
     println!("  Connected speech: {} sentences synthesized", sentences.len());

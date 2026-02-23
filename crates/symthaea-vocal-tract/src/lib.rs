@@ -43,5 +43,5 @@ pub use controller::{
 pub use encoder::{VocalTractHdcEncoder, VoiceCognitiveState};
 pub use fep::{VocalAction, VocalTractFepAgent, VocalTractFepResult, VocalTractObservation};
 pub use metrics::VocalTractMetrics;
-pub use pipeline::{ProsodyContext, VocalTractPipeline};
+pub use pipeline::{predict_duration, Intonation, ProsodyContext, VocalTractPipeline};
 pub use types::{FormantFrame, FormantTarget};
