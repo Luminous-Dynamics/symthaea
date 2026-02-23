@@ -1140,6 +1140,10 @@ pub struct CycleResult {
     /// Internal decision-making metadata for observability
     pub metadata: CycleMetadata,
 
+    /// The cycle's BinaryHV (16,384D) — the cognitive state distilled to a wisdom
+    /// vector, suitable for mesh broadcast to peer nodes.
+    pub wisdom_hv: symthaea_core::hdc::BinaryHV,
+
     /// Signed output for identity verification (when identity feature enabled)
     /// Contains Ed25519 signature over output hash and agent metadata
     #[cfg(feature = "identity")]
