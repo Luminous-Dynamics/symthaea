@@ -716,8 +716,9 @@ impl ActiveInferenceFlightAgent {
 
         // ── Generate candidate setpoints (action policies) ──
         // Fixed-size stack array: max 8 candidates (no heap allocation).
-        // Layout: [mission, intercept×3, hover, shield, retreat, lateral]
-        let mut candidates: [[f64; 3]; 8] = [[0.0; 3]; 8];
+        // Layout: [mission, intercept×1..3, hover, shield, retreat, lateral]
+        const MAX_CANDIDATES: usize = 8;
+        let mut candidates: [[f64; 3]; MAX_CANDIDATES] = [[0.0; 3]; MAX_CANDIDATES];
         let mut n_candidates: usize = 0;
 
         // 0: Continue mission
@@ -802,6 +803,10 @@ impl ActiveInferenceFlightAgent {
         n_candidates += 1;
 
         // ── Evaluate each candidate via EFE ──
+        debug_assert!(
+            n_candidates <= MAX_CANDIDATES,
+            "Candidate buffer overflow: {n_candidates} > {MAX_CANDIDATES}"
+        );
         let use_trajectory = env.threat_vel.is_some();
         let mut best_idx = 0;
         let mut best_efe = f64::INFINITY;
@@ -2368,5 +2373,40 @@ mod tests {
             "Lateral velocity should shift intercept X positive: {}",
             result[0]
         );
+    }
+
+    #[test]
+    fn test_rendezvous_intercept_zero_velocity_vs_none() {
+        // Some([0,0,0]) should compute gravity-only fall (valid rendezvous),
+        // while None gives static intercept. Results should differ.
+        let threat = [0.0, 0.0, 4.0];
+        let entity = [0.0, 0.0, 0.0];
+
+        let result_zero_vel = compute_rendezvous_intercept(threat, Some([0.0, 0.0, 0.0]), entity);
+        let result_none = compute_rendezvous_intercept(threat, None, entity);
+
+        // With zero velocity, gravity pulls beam down: impact_t = sqrt(2h/g) ≈ 0.904s
+        // Rendezvous at 50%: t=0.452s → z = 4 - 4.905*(0.452)² ≈ 3.0m
+        // Clamped to max(3.0, 0.3) = 3.0
+
+        // Static (None): z = max(4.0, 0.5) = 4.0
+        assert!(
+            (result_zero_vel[2] - result_none[2]).abs() > 0.1,
+            "Zero vel ({:.2}) and None ({:.2}) should differ — gravity matters",
+            result_zero_vel[2],
+            result_none[2],
+        );
+
+        // Zero velocity should produce a lower intercept (gravity pulls beam down)
+        assert!(
+            result_zero_vel[2] < result_none[2],
+            "Zero vel Z ({:.2}) should be lower than static Z ({:.2}): gravity",
+            result_zero_vel[2],
+            result_none[2],
+        );
+
+        // X and Y should be the same for both (no lateral component)
+        assert_eq!(result_zero_vel[0], result_none[0]);
+        assert_eq!(result_zero_vel[1], result_none[1]);
     }
 }
