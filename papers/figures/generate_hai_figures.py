@@ -502,6 +502,116 @@ def fig6_lambda2_phi_proxy():
     plt.close()
 
 
+def fig7_efe_ablation():
+    """Figure 7: EFE Ablation — Safety precision sweep showing decision boundary."""
+    csv_path = OUTPUT_DIR / 'efe_ablation.csv'
+    if not csv_path.exists():
+        print("  SKIP fig7: efe_ablation.csv not found (run: cargo run -p symthaea-flight --example efe_ablation --release)")
+        return
+
+    import csv
+    with open(csv_path) as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+    precisions = [float(r['safety_precision']) for r in rows]
+    efe_mission = [float(r['efe_mission']) for r in rows]
+    efe_intercept = [float(r['efe_intercept']) for r in rows]
+
+    # Find crossover via linear interpolation
+    crossover = None
+    for i in range(1, len(rows)):
+        prev_chose = int(rows[i-1]['chose_intercept'])
+        curr_chose = int(rows[i]['chose_intercept'])
+        if prev_chose != curr_chose:
+            p0, p1 = precisions[i-1], precisions[i]
+            d0 = efe_mission[i-1] - efe_intercept[i-1]
+            d1 = efe_mission[i] - efe_intercept[i]
+            if abs(d1 - d0) > 1e-12:
+                t = -d0 / (d1 - d0)
+                crossover = p0 + t * (p1 - p0)
+            else:
+                crossover = (p0 + p1) / 2.0
+            break
+
+    fig, ax = plt.subplots(1, 1, figsize=(7, 4.5))
+
+    ax.plot(precisions, efe_mission, 'r-o', linewidth=2, markersize=5, label='EFE(mission)', zorder=3)
+    ax.plot(precisions, efe_intercept, 'b-s', linewidth=2, markersize=5, label='EFE(intercept)', zorder=3)
+
+    ax.set_xscale('log')
+    ax.set_xlabel('Safety Prior Precision ($\\pi_{\\mathrm{safety}}$)')
+    ax.set_ylabel('Expected Free Energy')
+    ax.set_title('EFE Ablation: Safety Precision Decision Boundary')
+
+    if crossover is not None:
+        ax.axvline(x=crossover, color='gray', linestyle='--', linewidth=1.5, alpha=0.7)
+        ax.text(crossover * 1.3, ax.get_ylim()[1] * 0.85,
+                f'Crossover\n$\\pi$ = {crossover:.2f}',
+                fontsize=9, ha='left', va='top',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow', alpha=0.8))
+
+        # Shade regions
+        ax.axvspan(precisions[0], crossover, alpha=0.08, color='red', label='MISSION region')
+        ax.axvspan(crossover, precisions[-1], alpha=0.08, color='blue', label='INTERCEPT region')
+
+    ax.legend(loc='upper left', fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(OUTPUT_DIR / 'fig7_efe_ablation.pdf')
+    plt.savefig(OUTPUT_DIR / 'fig7_efe_ablation.png')
+    print("  Figure 7: EFE ablation saved")
+    plt.close()
+
+
+def fig8_scenario_efe():
+    """Figure 8: Multi-scenario EFE comparison — grouped bar chart."""
+    csv_path = OUTPUT_DIR / 'multi_scenario.csv'
+    if not csv_path.exists():
+        print("  SKIP fig8: multi_scenario.csv not found (run: cargo run -p symthaea-flight --example multi_scenario --release)")
+        return
+
+    import csv
+    with open(csv_path) as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+    variants = [r['variant'] for r in rows]
+    efe_mission = [float(r['efe_mission']) for r in rows]
+    efe_intercept = [float(r['efe_intercept']) for r in rows]
+    matches = [int(r['matches']) for r in rows]
+
+    fig, ax = plt.subplots(1, 1, figsize=(9, 4.5))
+
+    x = np.arange(len(variants))
+    width = 0.35
+
+    bars_m = ax.bar(x - width/2, efe_mission, width, label='EFE(mission)', color='#e74c3c', alpha=0.85, edgecolor='black', linewidth=0.5)
+    bars_i = ax.bar(x + width/2, efe_intercept, width, label='EFE(intercept)', color='#3498db', alpha=0.85, edgecolor='black', linewidth=0.5)
+
+    # Mark correct decisions
+    for i, match in enumerate(matches):
+        marker = '\u2713' if match else '\u2717'
+        color = '#2ecc71' if match else '#e74c3c'
+        ax.text(x[i], max(efe_mission[i], efe_intercept[i]) * 1.02 + 5,
+                marker, ha='center', va='bottom', fontsize=14, color=color, fontweight='bold')
+
+    ax.set_xlabel('Scenario Variant')
+    ax.set_ylabel('Expected Free Energy')
+    ax.set_title('Multi-Scenario EFE Evaluation: 6 Geometry Variants')
+    ax.set_xticks(x)
+    ax.set_xticklabels(variants, fontsize=8)
+    ax.legend(loc='upper right', fontsize=9)
+    ax.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    plt.savefig(OUTPUT_DIR / 'fig8_scenario_efe.pdf')
+    plt.savefig(OUTPUT_DIR / 'fig8_scenario_efe.png')
+    print("  Figure 8: Scenario EFE comparison saved")
+    plt.close()
+
+
 def main():
     """Generate all figures."""
     print("Generating HAI paper figures...")
@@ -517,6 +627,8 @@ def main():
     fig4_scaling()
     fig5_benchmark_radar()
     fig6_lambda2_phi_proxy()
+    fig7_efe_ablation()
+    fig8_scenario_efe()
 
     print("=" * 50)
     print(f"All figures saved to: {OUTPUT_DIR}")
