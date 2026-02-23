@@ -4382,6 +4382,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "361a90feb7004eca4019fb28352a9465666b24f840f5c3cddf0ff13920590b89"
 
 [[package]]
+name = "embedded-hal-bus"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "513e0b3a8fb7d3013a8ae17a834283f170deaf7d0eeab0a7c1a36ad4dd356d22"
+dependencies = [
+ "critical-section",
+ "embedded-hal",
+]
+
+[[package]]
 name = "embedded-hal-nb"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13061,9 +13071,13 @@ dependencies = [
 name = "symthaea-hal"
 version = "0.1.0"
 dependencies = [
+ "clap",
+ "ctrlc",
  "embedded-hal",
+ "embedded-hal-bus",
  "linux-embedded-hal",
  "parking_lot",
+ "proptest",
  "serde",
  "serde_json",
  "symthaea-humanoid",
