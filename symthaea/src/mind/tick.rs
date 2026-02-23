@@ -28,7 +28,7 @@ impl ContinuousMind {
         self.process_social();
         self.sync_iroh_bridge();
         self.process_mesh();
-        self.sync_mesh_bridge();
+        self.process_sensors();
 
         // Check for Dream State
         let should_dream = bio.phase == CircadianPhase::Night
@@ -63,6 +63,10 @@ impl ContinuousMind {
         if self.state.consciousness_level > self.stats.peak_consciousness {
             self.stats.peak_consciousness = self.state.consciousness_level;
         }
+
+        // Auto-emit wisdom to mesh + flush bridge (after all processing)
+        self.auto_emit_wisdom();
+        self.sync_mesh_bridge();
 
         output
     }
@@ -376,6 +380,9 @@ impl ContinuousMind {
         let mut affective_count = 0u64;
 
         for packet in &inbox {
+            // Track all peers in the registry
+            self.mesh_peers.update(packet);
+
             match packet.payload_type {
                 crate::swarm::mesh::PayloadType::WisdomVector => {
                     wisdom_count += 1;
@@ -394,10 +401,29 @@ impl ContinuousMind {
                 }
                 crate::swarm::mesh::PayloadType::Affective => {
                     affective_count += 1;
+                    if let Some(ref mut hf) = self.hyperfeel {
+                        if let Some(affect) = packet.extract_affective() {
+                            let peer_id = crate::swarm::mesh::hex_short(&packet.source_id);
+                            hf.receive_peer_state(peer_id, affect);
+                        }
+                    }
                 }
                 crate::swarm::mesh::PayloadType::Gradient => {
                     // Gradient packets handled by federated learning system
                 }
+            }
+        }
+
+        // Periodically expire stale peers (every 100 ticks)
+        if self.state.tick.is_multiple_of(100) {
+            let expired = self.mesh_peers.expire_stale();
+            if expired > 0 {
+                tracing::debug!(
+                    target: "symthaea::mind::mesh",
+                    expired,
+                    remaining = self.mesh_peers.peer_count(),
+                    "Expired stale mesh peers"
+                );
             }
         }
 
@@ -448,6 +474,69 @@ impl ContinuousMind {
                 count,
                 "Drained inbound packets from mesh bridge"
             );
+        }
+    }
+
+    /// Poll physical sensors and feed readings into the cognitive loop.
+    ///
+    /// Each sensor reading is encoded as an HDC hypervector and fed into
+    /// the perception queue.  Critical urgency readings (e.g., smoke alarm)
+    /// trigger an immediate mesh broadcast.
+    fn process_sensors(&mut self) {
+        let registry = match &mut self.sensor_registry {
+            Some(r) => r,
+            None => return,
+        };
+
+        let readings = registry.poll_all();
+        if readings.is_empty() {
+            return;
+        }
+
+        for (reading, urgency) in &readings {
+            let hv = registry.encode_reading(reading);
+
+            // Feed encoded sensor reading into working memory as a perception
+            self.perceive(hv);
+
+            // If urgency is Critical (e.g., smoke alarm), broadcast immediately
+            if *urgency == crate::swarm::mesh::MeshUrgency::Critical
+                && self.mesh_bridge.is_some()
+            {
+                let binary = symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(
+                    &self.state.current_thought,
+                );
+                self.emit_wisdom(
+                    binary,
+                    crate::cognitive_loop::types::CycleUrgency::Critical,
+                    self.state.consciousness_level as f32,
+                );
+            }
+
+            tracing::debug!(
+                target: "symthaea::mind::sensor",
+                sensor = reading.sensor_id,
+                urgency = ?urgency,
+                values = reading.values.len(),
+                "Sensor reading perceived"
+            );
+        }
+    }
+
+    /// Auto-emit wisdom to mesh if a bridge is attached.
+    ///
+    /// Called at the end of every waking tick (after `generate_output()`),
+    /// so the mesh always carries the mind's most up-to-date cognitive state.
+    /// Emission frequency is still gated by `emit_wisdom()`'s urgency throttle.
+    fn auto_emit_wisdom(&mut self) {
+        if self.mesh_bridge.is_some() {
+            let wisdom_hv = symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(
+                &self.state.current_thought,
+            );
+            let urgency =
+                crate::cognitive_loop::types::CycleUrgency::from_arousal(self.state.arousal);
+            let phi = self.state.consciousness_level as f32;
+            self.emit_wisdom(wisdom_hv, urgency, phi);
         }
     }
 

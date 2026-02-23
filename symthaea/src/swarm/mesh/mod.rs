@@ -44,13 +44,15 @@
 mod dual_layer;
 mod lora_fragment;
 mod mesh_receiver;
+pub mod sensor;
 
-pub use dual_layer::{DualLayerMesh, LoopbackTransport, MeshRoute, MeshTransport};
+pub use dual_layer::{BiLoopbackTransport, DualLayerMesh, LoopbackTransport, MeshRoute, MeshTransport};
 pub use lora_fragment::{
     crc16_ccitt, fragment, FragmentAssembler, LoRaFragment, FLAG_FEC, HEADER_SIZE, LORA_MTU,
     PAYLOAD_SIZE,
 };
 pub use mesh_receiver::{MeshPeer, MeshReceiver, ReceiverStats, StreamKey};
+pub use sensor::{MockSensor, SensorInput, SensorReading, SensorRegistry};
 
 mod bridge;
 
@@ -252,6 +254,50 @@ impl WisdomPacket {
         })
     }
 
+    /// Extract an [`AffectiveState`] from an Affective payload.
+    ///
+    /// Returns `None` if the payload type is not Affective, or if any
+    /// extracted float is non-finite (NaN/Inf protection).
+    ///
+    /// # Wire format
+    ///
+    /// ```text
+    /// wisdom[0..4]   = valence   f32 LE  (-1.0 to 1.0)
+    /// wisdom[4..8]   = arousal   f32 LE  (0.0 to 1.0)
+    /// wisdom[8..12]  = dominance f32 LE  (-1.0 to 1.0)
+    /// wisdom[12..16] = intensity f32 LE  (0.0 to 1.0)
+    /// wisdom[16..20] = confidence f32 LE (0.0 to 1.0)
+    /// ```
+    pub fn extract_affective(&self) -> Option<crate::swarm::AffectiveState> {
+        if self.payload_type != PayloadType::Affective {
+            return None;
+        }
+        let w = &self.wisdom.0;
+        let valence = f32::from_le_bytes([w[0], w[1], w[2], w[3]]);
+        let arousal = f32::from_le_bytes([w[4], w[5], w[6], w[7]]);
+        let dominance = f32::from_le_bytes([w[8], w[9], w[10], w[11]]);
+        let intensity = f32::from_le_bytes([w[12], w[13], w[14], w[15]]);
+        let confidence = f32::from_le_bytes([w[16], w[17], w[18], w[19]]);
+
+        // Reject if any value is non-finite
+        if ![valence, arousal, dominance, intensity, confidence]
+            .iter()
+            .all(|v| v.is_finite())
+        {
+            return None;
+        }
+
+        Some(crate::swarm::AffectiveState {
+            valence: valence.clamp(-1.0, 1.0),
+            arousal: arousal.clamp(0.0, 1.0),
+            dominance: dominance.clamp(-1.0, 1.0),
+            intensity: intensity.clamp(0.0, 1.0),
+            confidence: confidence.clamp(0.0, 1.0),
+            timestamp_ms: (self.timestamp_s as u64) * 1000,
+            sequence: self.sequence as u64,
+        })
+    }
+
     /// Derive a `thought_id` for LoRa fragmentation.
     ///
     /// Uses the low 16 bits of the sequence number — sufficient for
@@ -300,6 +346,102 @@ pub fn hex_short(bytes: &[u8]) -> String {
         .take(8)
         .map(|b| format!("{b:02x}"))
         .collect()
+}
+
+// ============================================================================
+// MESH PEER REGISTRY
+// ============================================================================
+
+/// Tracked state for a single mesh peer (distinct from [`MeshPeer`] which
+/// tracks LoRa fragment reassembly statistics).
+#[derive(Debug, Clone)]
+pub struct MeshPeerEntry {
+    /// First 8 bytes of the peer's node identity.
+    pub source_id: [u8; 8],
+    /// Last time we received a packet from this peer.
+    pub last_seen: std::time::Instant,
+    /// Total packets received from this peer.
+    pub packets_received: u64,
+    /// Most recent Phi value reported by this peer.
+    pub last_phi: f32,
+    /// Most recent urgency level from this peer.
+    pub last_urgency: MeshUrgency,
+    /// Most recent payload type from this peer.
+    pub last_payload_type: PayloadType,
+}
+
+/// Registry of active mesh peers, updated each tick from incoming packets.
+///
+/// Provides swarm awareness: "which peers are alive?", "what's the swarm's
+/// average phi?", etc. Stale peers are expired after `stale_timeout`.
+pub struct MeshPeerRegistry {
+    peers: std::collections::HashMap<[u8; 8], MeshPeerEntry>,
+    stale_timeout: std::time::Duration,
+}
+
+impl MeshPeerRegistry {
+    /// Create a new registry with the default 60-second stale timeout.
+    pub fn new() -> Self {
+        Self {
+            peers: std::collections::HashMap::new(),
+            stale_timeout: std::time::Duration::from_secs(60),
+        }
+    }
+
+    /// Update the registry with a received packet.
+    pub fn update(&mut self, packet: &WisdomPacket) {
+        let entry = self
+            .peers
+            .entry(packet.source_id)
+            .or_insert_with(|| MeshPeerEntry {
+                source_id: packet.source_id,
+                last_seen: std::time::Instant::now(),
+                packets_received: 0,
+                last_phi: packet.phi,
+                last_urgency: packet.urgency,
+                last_payload_type: packet.payload_type,
+            });
+        entry.last_seen = std::time::Instant::now();
+        entry.packets_received += 1;
+        entry.last_phi = packet.phi;
+        entry.last_urgency = packet.urgency;
+        entry.last_payload_type = packet.payload_type;
+    }
+
+    /// Remove peers not seen within the stale timeout.
+    ///
+    /// Returns the number of peers removed.
+    pub fn expire_stale(&mut self) -> usize {
+        let cutoff = std::time::Instant::now() - self.stale_timeout;
+        let before = self.peers.len();
+        self.peers.retain(|_, entry| entry.last_seen > cutoff);
+        before - self.peers.len()
+    }
+
+    /// Get all active (non-expired) peers.
+    pub fn active_peers(&self) -> Vec<&MeshPeerEntry> {
+        self.peers.values().collect()
+    }
+
+    /// Number of tracked peers.
+    pub fn peer_count(&self) -> usize {
+        self.peers.len()
+    }
+
+    /// Average Phi across all tracked peers. Returns 0.0 if no peers.
+    pub fn average_phi(&self) -> f32 {
+        if self.peers.is_empty() {
+            return 0.0;
+        }
+        let sum: f32 = self.peers.values().map(|p| p.last_phi).sum();
+        sum / self.peers.len() as f32
+    }
+}
+
+impl Default for MeshPeerRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ============================================================================
@@ -427,5 +569,181 @@ mod tests {
         assert_eq!(MeshUrgency::from(CycleUrgency::Critical), MeshUrgency::Critical);
         assert_eq!(MeshUrgency::from(CycleUrgency::Normal), MeshUrgency::Normal);
         assert_eq!(MeshUrgency::from(CycleUrgency::Cruise), MeshUrgency::Cruise);
+    }
+
+    // ====================================================================
+    // extract_affective Tests
+    // ====================================================================
+
+    /// Build an Affective WisdomPacket with specific VAD floats in the wisdom field.
+    fn affective_packet(
+        valence: f32,
+        arousal: f32,
+        dominance: f32,
+        intensity: f32,
+        confidence: f32,
+    ) -> WisdomPacket {
+        let mut wisdom_bytes = [0u8; 2048];
+        wisdom_bytes[0..4].copy_from_slice(&valence.to_le_bytes());
+        wisdom_bytes[4..8].copy_from_slice(&arousal.to_le_bytes());
+        wisdom_bytes[8..12].copy_from_slice(&dominance.to_le_bytes());
+        wisdom_bytes[12..16].copy_from_slice(&intensity.to_le_bytes());
+        wisdom_bytes[16..20].copy_from_slice(&confidence.to_le_bytes());
+        WisdomPacket {
+            source_id: [0xAF; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 1_700_000,
+            payload_type: PayloadType::Affective,
+            wisdom: BinaryHV(wisdom_bytes),
+        }
+    }
+
+    #[test]
+    fn test_extract_affective_valid() {
+        let pkt = affective_packet(0.5, 0.7, -0.3, 0.8, 0.95);
+        let affect = pkt.extract_affective().unwrap();
+        assert!((affect.valence - 0.5).abs() < 1e-6);
+        assert!((affect.arousal - 0.7).abs() < 1e-6);
+        assert!((affect.dominance - (-0.3)).abs() < 1e-6);
+        assert!((affect.intensity - 0.8).abs() < 1e-6);
+        assert!((affect.confidence - 0.95).abs() < 1e-6);
+        assert_eq!(affect.timestamp_ms, 1_700_000_000);
+        assert_eq!(affect.sequence, 1);
+    }
+
+    #[test]
+    fn test_extract_affective_wrong_type() {
+        let mut pkt = affective_packet(0.5, 0.7, -0.3, 0.8, 0.95);
+        pkt.payload_type = PayloadType::WisdomVector;
+        assert!(pkt.extract_affective().is_none());
+    }
+
+    #[test]
+    fn test_extract_affective_nan_rejected() {
+        let pkt = affective_packet(f32::NAN, 0.7, -0.3, 0.8, 0.95);
+        assert!(pkt.extract_affective().is_none());
+    }
+
+    #[test]
+    fn test_extract_affective_clamped() {
+        // Values outside range should be clamped
+        let pkt = affective_packet(2.0, -1.0, 5.0, 3.0, -0.5);
+        let affect = pkt.extract_affective().unwrap();
+        assert!((affect.valence - 1.0).abs() < 1e-6);
+        assert!((affect.arousal - 0.0).abs() < 1e-6);
+        assert!((affect.dominance - 1.0).abs() < 1e-6);
+        assert!((affect.intensity - 1.0).abs() < 1e-6);
+        assert!((affect.confidence - 0.0).abs() < 1e-6);
+    }
+
+    // ====================================================================
+    // MeshPeerRegistry Tests
+    // ====================================================================
+
+    #[test]
+    fn test_peer_registry_tracks_packets() {
+        let mut registry = MeshPeerRegistry::new();
+
+        let pkt_a1 = WisdomPacket {
+            source_id: [0xAA; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: test_hv(0x01),
+        };
+        let pkt_a2 = WisdomPacket {
+            source_id: [0xAA; 8],
+            sequence: 2,
+            phi: 0.6,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 1,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: test_hv(0x02),
+        };
+        let pkt_b = WisdomPacket {
+            source_id: [0xBB; 8],
+            sequence: 1,
+            phi: 0.9,
+            urgency: MeshUrgency::Critical,
+            timestamp_s: 0,
+            payload_type: PayloadType::Heartbeat,
+            wisdom: test_hv(0x03),
+        };
+
+        registry.update(&pkt_a1);
+        registry.update(&pkt_a2);
+        registry.update(&pkt_b);
+
+        assert_eq!(registry.peer_count(), 2);
+        let peers = registry.active_peers();
+        let peer_a = peers.iter().find(|p| p.source_id == [0xAA; 8]).unwrap();
+        assert_eq!(peer_a.packets_received, 2);
+        assert!((peer_a.last_phi - 0.6).abs() < 1e-6);
+
+        let peer_b = peers.iter().find(|p| p.source_id == [0xBB; 8]).unwrap();
+        assert_eq!(peer_b.packets_received, 1);
+    }
+
+    #[test]
+    fn test_peer_registry_expire_stale() {
+        let mut registry = MeshPeerRegistry {
+            peers: std::collections::HashMap::new(),
+            stale_timeout: std::time::Duration::from_millis(10),
+        };
+
+        let pkt = WisdomPacket {
+            source_id: [0xCC; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Cruise,
+            timestamp_s: 0,
+            payload_type: PayloadType::Heartbeat,
+            wisdom: test_hv(0x04),
+        };
+        registry.update(&pkt);
+        assert_eq!(registry.peer_count(), 1);
+
+        // Wait for entry to become stale
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        let removed = registry.expire_stale();
+        assert_eq!(removed, 1);
+        assert_eq!(registry.peer_count(), 0);
+    }
+
+    #[test]
+    fn test_peer_registry_average_phi() {
+        let mut registry = MeshPeerRegistry::new();
+
+        // No peers → 0.0
+        assert_eq!(registry.average_phi(), 0.0);
+
+        let pkt1 = WisdomPacket {
+            source_id: [0x01; 8],
+            sequence: 1,
+            phi: 0.4,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: test_hv(0x10),
+        };
+        let pkt2 = WisdomPacket {
+            source_id: [0x02; 8],
+            sequence: 1,
+            phi: 0.8,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: test_hv(0x20),
+        };
+
+        registry.update(&pkt1);
+        registry.update(&pkt2);
+
+        let avg = registry.average_phi();
+        assert!((avg - 0.6).abs() < 1e-6, "Expected ~0.6, got {avg}");
     }
 }
