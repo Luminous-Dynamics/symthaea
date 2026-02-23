@@ -179,8 +179,17 @@ fn validate_market(m: Market) -> ExternResult<ValidateCallbackResult> {
     if m.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Market ID cannot be empty".into()));
     }
+    if m.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Market ID must be 64 characters or fewer".into()));
+    }
     if m.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Market name cannot be empty".into()));
+    }
+    if m.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Market name must be 256 characters or fewer".into()));
+    }
+    if m.schedule.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Schedule must be 256 characters or fewer".into()));
     }
     if !m.location_lat.is_finite() {
         return Ok(ValidateCallbackResult::Invalid("Latitude must be a finite number".into()));
@@ -200,6 +209,9 @@ fn validate_market(m: Market) -> ExternResult<ValidateCallbackResult> {
 fn validate_listing(l: Listing) -> ExternResult<ValidateCallbackResult> {
     if l.product_name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Product name cannot be empty".into()));
+    }
+    if l.product_name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Product name must be 256 characters or fewer".into()));
     }
     if !l.quantity_kg.is_finite() {
         return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
@@ -977,5 +989,63 @@ mod tests {
         let mut l = valid_listing();
         l.cultural_markers = vec!["x".repeat(129)];
         assert_invalid(validate_listing(l), "Cultural marker too long (max 128 chars)");
+    }
+
+    // ── String length limit boundary tests ────────────────────────────────
+
+    #[test]
+    fn market_id_at_limit_accepted() {
+        let mut m = valid_market();
+        m.id = "A".repeat(64);
+        assert_valid(validate_market(m));
+    }
+
+    #[test]
+    fn market_id_over_limit_rejected() {
+        let mut m = valid_market();
+        m.id = "A".repeat(65);
+        assert_invalid(validate_market(m), "Market ID must be 64 characters or fewer");
+    }
+
+    #[test]
+    fn market_name_at_limit_accepted() {
+        let mut m = valid_market();
+        m.name = "A".repeat(256);
+        assert_valid(validate_market(m));
+    }
+
+    #[test]
+    fn market_name_over_limit_rejected() {
+        let mut m = valid_market();
+        m.name = "A".repeat(257);
+        assert_invalid(validate_market(m), "Market name must be 256 characters or fewer");
+    }
+
+    #[test]
+    fn market_schedule_at_limit_accepted() {
+        let mut m = valid_market();
+        m.schedule = "S".repeat(256);
+        assert_valid(validate_market(m));
+    }
+
+    #[test]
+    fn market_schedule_over_limit_rejected() {
+        let mut m = valid_market();
+        m.schedule = "S".repeat(257);
+        assert_invalid(validate_market(m), "Schedule must be 256 characters or fewer");
+    }
+
+    #[test]
+    fn listing_product_name_at_limit_accepted() {
+        let mut l = valid_listing();
+        l.product_name = "P".repeat(256);
+        assert_valid(validate_listing(l));
+    }
+
+    #[test]
+    fn listing_product_name_over_limit_rejected() {
+        let mut l = valid_listing();
+        l.product_name = "P".repeat(257);
+        assert_invalid(validate_listing(l), "Product name must be 256 characters or fewer");
     }
 }

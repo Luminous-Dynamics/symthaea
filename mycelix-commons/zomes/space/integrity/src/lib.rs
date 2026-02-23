@@ -358,6 +358,14 @@ fn validate_create_capability(
         ));
     }
 
+    for func in &cap.allowed_functions {
+        if func.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Allowed function name too long (max 256 chars per item)".into(),
+            ));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -716,6 +724,59 @@ mod tests {
         let mut b = valid_booking();
         b.id = "x".repeat(257);
         let result = validate_booking(b);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // ── String length boundary tests ──────────────────────────────────
+
+    fn fake_create() -> Create {
+        Create {
+            author: agent_1(),
+            timestamp: Timestamp::from_micros(0),
+            action_seq: 0,
+            prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                EntryDefIndex(0),
+                ZomeIndex(0),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![0u8; 36]),
+            weight: EntryRateWeight::default(),
+        }
+    }
+
+    fn valid_capability() -> SpaceCapability {
+        SpaceCapability {
+            space_id: "space:test:123".to_string(),
+            grantee: agent_1(),
+            allowed_functions: vec!["read_data".to_string(), "write_data".to_string()],
+            expires_at: None,
+            revoked: false,
+            granted_at: Timestamp::from_micros(1000000),
+        }
+    }
+
+    #[test]
+    fn capability_allowed_function_at_limit_accepted() {
+        let mut cap = valid_capability();
+        cap.allowed_functions = vec!["x".repeat(256)];
+        let result = validate_create_capability(fake_create(), cap);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn capability_allowed_function_over_limit_rejected() {
+        let mut cap = valid_capability();
+        cap.allowed_functions = vec!["x".repeat(257)];
+        let result = validate_create_capability(fake_create(), cap);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn capability_second_function_over_limit_rejected() {
+        let mut cap = valid_capability();
+        cap.allowed_functions = vec!["valid_func".to_string(), "x".repeat(257)];
+        let result = validate_create_capability(fake_create(), cap);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 }

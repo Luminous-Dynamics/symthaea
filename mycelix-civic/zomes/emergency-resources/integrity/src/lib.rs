@@ -214,9 +214,19 @@ fn validate_create_resource(
             "Resource ID cannot be empty".into(),
         ));
     }
+    if resource.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource ID too long (max 64)".into(),
+        ));
+    }
     if resource.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Resource name cannot be empty".into(),
+        ));
+    }
+    if resource.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource name too long (max 256)".into(),
         ));
     }
     if resource.unit.trim().is_empty() {
@@ -224,9 +234,19 @@ fn validate_create_resource(
             "Resource unit cannot be empty".into(),
         ));
     }
+    if resource.unit.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource unit too long (max 128)".into(),
+        ));
+    }
     if resource.location.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Resource location cannot be empty".into(),
+        ));
+    }
+    if resource.location.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource location too long (max 4096)".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -236,6 +256,26 @@ fn validate_update_resource(resource: EmergencyResource) -> ExternResult<Validat
     if resource.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Resource ID cannot be empty".into(),
+        ));
+    }
+    if resource.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource ID too long (max 64)".into(),
+        ));
+    }
+    if resource.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource name too long (max 256)".into(),
+        ));
+    }
+    if resource.unit.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource unit too long (max 128)".into(),
+        ));
+    }
+    if resource.location.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource location too long (max 4096)".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -255,6 +295,11 @@ fn validate_create_request(
             "Request location cannot be empty".into(),
         ));
     }
+    if request.location.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request location too long (max 4096)".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -262,6 +307,11 @@ fn validate_update_request(request: ResourceRequest) -> ExternResult<ValidateCal
     if request.location.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Request location cannot be empty".into(),
+        ));
+    }
+    if request.location.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request location too long (max 4096)".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -980,19 +1030,19 @@ mod tests {
     // ========================================================================
 
     #[test]
-    fn create_resource_very_long_name_passes() {
+    fn create_resource_very_long_name_rejected() {
         let mut r = make_resource();
         r.name = "A".repeat(10_000);
         let result = validate_create_resource(fake_create(), r);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
     }
 
     #[test]
-    fn create_request_very_long_location_passes() {
+    fn create_request_very_long_location_rejected() {
         let mut req = make_request();
         req.location = "B".repeat(10_000);
         let result = validate_create_request(fake_create(), req);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
     }
 
     // ========================================================================
@@ -1137,6 +1187,154 @@ mod tests {
                 lt
             );
         }
+    }
+
+    // ========================================================================
+    // STRING LENGTH LIMIT BOUNDARY TESTS
+    // ========================================================================
+
+    // -- Resource ID (max 64) --
+
+    #[test]
+    fn create_resource_id_at_limit_accepted() {
+        let mut r = make_resource();
+        r.id = "x".repeat(64);
+        let result = validate_create_resource(fake_create(), r);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_resource_id_over_limit_rejected() {
+        let mut r = make_resource();
+        r.id = "x".repeat(65);
+        let result = validate_create_resource(fake_create(), r);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Resource ID too long (max 64)");
+    }
+
+    // -- Resource name (max 256) --
+
+    #[test]
+    fn create_resource_name_at_limit_accepted() {
+        let mut r = make_resource();
+        r.name = "x".repeat(256);
+        let result = validate_create_resource(fake_create(), r);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_resource_name_over_limit_rejected() {
+        let mut r = make_resource();
+        r.name = "x".repeat(257);
+        let result = validate_create_resource(fake_create(), r);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Resource name too long (max 256)");
+    }
+
+    // -- Resource unit (max 128) --
+
+    #[test]
+    fn create_resource_unit_at_limit_accepted() {
+        let mut r = make_resource();
+        r.unit = "x".repeat(128);
+        let result = validate_create_resource(fake_create(), r);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_resource_unit_over_limit_rejected() {
+        let mut r = make_resource();
+        r.unit = "x".repeat(129);
+        let result = validate_create_resource(fake_create(), r);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Resource unit too long (max 128)");
+    }
+
+    // -- Resource location (max 4096) --
+
+    #[test]
+    fn create_resource_location_at_limit_accepted() {
+        let mut r = make_resource();
+        r.location = "x".repeat(4096);
+        let result = validate_create_resource(fake_create(), r);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_resource_location_over_limit_rejected() {
+        let mut r = make_resource();
+        r.location = "x".repeat(4097);
+        let result = validate_create_resource(fake_create(), r);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Resource location too long (max 4096)");
+    }
+
+    // -- Request location (max 4096) --
+
+    #[test]
+    fn create_request_location_at_limit_accepted() {
+        let mut req = make_request();
+        req.location = "x".repeat(4096);
+        let result = validate_create_request(fake_create(), req);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_request_location_over_limit_rejected() {
+        let mut req = make_request();
+        req.location = "x".repeat(4097);
+        let result = validate_create_request(fake_create(), req);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Request location too long (max 4096)");
+    }
+
+    // -- Update resource string limits --
+
+    #[test]
+    fn update_resource_id_over_limit_rejected() {
+        let mut r = make_resource();
+        r.id = "x".repeat(65);
+        let result = validate_update_resource(r);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Resource ID too long (max 64)");
+    }
+
+    #[test]
+    fn update_resource_name_over_limit_rejected() {
+        let mut r = make_resource();
+        r.name = "x".repeat(257);
+        let result = validate_update_resource(r);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Resource name too long (max 256)");
+    }
+
+    #[test]
+    fn update_resource_unit_over_limit_rejected() {
+        let mut r = make_resource();
+        r.unit = "x".repeat(129);
+        let result = validate_update_resource(r);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Resource unit too long (max 128)");
+    }
+
+    #[test]
+    fn update_resource_location_over_limit_rejected() {
+        let mut r = make_resource();
+        r.location = "x".repeat(4097);
+        let result = validate_update_resource(r);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Resource location too long (max 4096)");
+    }
+
+    // -- Update request location limit --
+
+    #[test]
+    fn update_request_location_over_limit_rejected() {
+        let mut req = make_request();
+        req.location = "x".repeat(4097);
+        let result = validate_update_request(req);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Request location too long (max 4096)");
     }
 
     // -- Delete link tag tests --

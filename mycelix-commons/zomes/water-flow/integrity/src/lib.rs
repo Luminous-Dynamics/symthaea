@@ -391,9 +391,19 @@ fn validate_create_water_source(
             "Water source ID cannot be empty".into(),
         ));
     }
+    if source.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Water source ID must be 64 characters or fewer".into(),
+        ));
+    }
     if source.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Water source name cannot be empty".into(),
+        ));
+    }
+    if source.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Water source name must be 256 characters or fewer".into(),
         ));
     }
     if source.max_capacity_liters == 0 {
@@ -521,6 +531,13 @@ fn validate_create_usage_record(
         return Ok(ValidateCallbackResult::Invalid(
             "Usage liters must be greater than zero".into(),
         ));
+    }
+    if let Some(ref mr) = usage.meter_reference {
+        if mr.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Meter reference must be 256 characters or fewer".into(),
+            ));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -1333,6 +1350,70 @@ mod tests {
             let result = validate_create_usage_record(fake_create(), usage);
             assert!(is_valid(&result));
         }
+    }
+
+    // ========================================================================
+    // STRING LENGTH LIMIT BOUNDARY TESTS
+    // ========================================================================
+
+    #[test]
+    fn water_source_id_at_limit_accepted() {
+        let mut src = make_water_source();
+        src.id = "A".repeat(64);
+        let result = validate_create_water_source(fake_create(), src);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn water_source_id_over_limit_rejected() {
+        let mut src = make_water_source();
+        src.id = "A".repeat(65);
+        let result = validate_create_water_source(fake_create(), src);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Water source ID must be 64 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn water_source_name_at_limit_accepted() {
+        let mut src = make_water_source();
+        src.name = "A".repeat(256);
+        let result = validate_create_water_source(fake_create(), src);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn water_source_name_over_limit_rejected() {
+        let mut src = make_water_source();
+        src.name = "A".repeat(257);
+        let result = validate_create_water_source(fake_create(), src);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Water source name must be 256 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn usage_record_meter_reference_at_limit_accepted() {
+        let mut usage = make_usage_record();
+        usage.meter_reference = Some("M".repeat(256));
+        let result = validate_create_usage_record(fake_create(), usage);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn usage_record_meter_reference_over_limit_rejected() {
+        let mut usage = make_usage_record();
+        usage.meter_reference = Some("M".repeat(257));
+        let result = validate_create_usage_record(fake_create(), usage);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Meter reference must be 256 characters or fewer"
+        );
     }
 
     // ========================================================================

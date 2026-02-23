@@ -284,6 +284,13 @@ fn validate_create_diagnostic(
     _action: Create,
     r: DiagnosticResult,
 ) -> ExternResult<ValidateCallbackResult> {
+    for rec in &r.recommendations {
+        if rec.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Recommendation too long (max 256 chars per item)".into(),
+            ));
+        }
+    }
     // findings must be valid JSON
     if serde_json::from_str::<serde_json::Value>(&r.findings).is_err() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -304,6 +311,13 @@ fn validate_update_diagnostic(
     r: DiagnosticResult,
     _original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
+    for rec in &r.recommendations {
+        if rec.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Recommendation too long (max 256 chars per item)".into(),
+            ));
+        }
+    }
     // Same validation as create
     if serde_json::from_str::<serde_json::Value>(&r.findings).is_err() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -355,6 +369,16 @@ fn validate_create_cognitive_update(
     _action: Create,
     u: CognitiveUpdate,
 ) -> ExternResult<ValidateCallbackResult> {
+    if u.resolution_pattern.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "CognitiveUpdate resolution_pattern cannot be empty".into(),
+        ));
+    }
+    if u.resolution_pattern.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "CognitiveUpdate resolution_pattern too long (max 4096 chars)".into(),
+        ));
+    }
     if u.encoding.len() != 2048 {
         return Ok(ValidateCallbackResult::Invalid(format!(
             "CognitiveUpdate encoding must be exactly 2048 bytes, got {}",
@@ -374,6 +398,16 @@ fn validate_update_cognitive_update(
     u: CognitiveUpdate,
     _original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
+    if u.resolution_pattern.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "CognitiveUpdate resolution_pattern cannot be empty".into(),
+        ));
+    }
+    if u.resolution_pattern.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "CognitiveUpdate resolution_pattern too long (max 4096 chars)".into(),
+        ));
+    }
     if u.encoding.len() != 2048 {
         return Ok(ValidateCallbackResult::Invalid(format!(
             "CognitiveUpdate encoding must be exactly 2048 bytes, got {}",
@@ -1176,5 +1210,101 @@ mod tests {
         };
         assert_eq!(delete_link.link_add_address, fake_action_hash());
         assert_eq!(delete_link.author, fake_agent());
+    }
+
+    // ========================================================================
+    // STRING LENGTH BOUNDARY TESTS
+    // ========================================================================
+
+    #[test]
+    fn diagnostic_recommendation_at_limit_accepted() {
+        let mut diag = make_diagnostic_result();
+        diag.recommendations = vec!["x".repeat(256)];
+        let result = validate_create_diagnostic(fake_create(), diag);
+        assert_valid(&result);
+    }
+
+    #[test]
+    fn diagnostic_recommendation_over_limit_rejected() {
+        let mut diag = make_diagnostic_result();
+        diag.recommendations = vec!["x".repeat(257)];
+        let result = validate_create_diagnostic(fake_create(), diag);
+        assert_invalid(&result);
+        assert_eq!(
+            invalid_msg(&result),
+            "Recommendation too long (max 256 chars per item)"
+        );
+    }
+
+    #[test]
+    fn diagnostic_update_recommendation_over_limit_rejected() {
+        let mut diag = make_diagnostic_result();
+        diag.recommendations = vec!["x".repeat(257)];
+        let result = validate_update_diagnostic(fake_update(), diag, fake_action_hash());
+        assert_invalid(&result);
+        assert_eq!(
+            invalid_msg(&result),
+            "Recommendation too long (max 256 chars per item)"
+        );
+    }
+
+    #[test]
+    fn cognitive_update_resolution_pattern_empty_rejected() {
+        let mut cu = make_cognitive_update();
+        cu.resolution_pattern = String::new();
+        let result = validate_create_cognitive_update(fake_create(), cu);
+        assert_invalid(&result);
+        assert_eq!(
+            invalid_msg(&result),
+            "CognitiveUpdate resolution_pattern cannot be empty"
+        );
+    }
+
+    #[test]
+    fn cognitive_update_resolution_pattern_whitespace_rejected() {
+        let mut cu = make_cognitive_update();
+        cu.resolution_pattern = "   ".to_string();
+        let result = validate_create_cognitive_update(fake_create(), cu);
+        assert_invalid(&result);
+        assert_eq!(
+            invalid_msg(&result),
+            "CognitiveUpdate resolution_pattern cannot be empty"
+        );
+    }
+
+    #[test]
+    fn cognitive_update_resolution_pattern_at_limit_accepted() {
+        let mut cu = make_cognitive_update();
+        cu.resolution_pattern = "x".repeat(4096);
+        let result = validate_create_cognitive_update(fake_create(), cu);
+        assert_valid(&result);
+    }
+
+    #[test]
+    fn cognitive_update_resolution_pattern_over_limit_rejected() {
+        let mut cu = make_cognitive_update();
+        cu.resolution_pattern = "x".repeat(4097);
+        let result = validate_create_cognitive_update(fake_create(), cu);
+        assert_invalid(&result);
+        assert_eq!(
+            invalid_msg(&result),
+            "CognitiveUpdate resolution_pattern too long (max 4096 chars)"
+        );
+    }
+
+    #[test]
+    fn cognitive_update_update_resolution_pattern_empty_rejected() {
+        let mut cu = make_cognitive_update();
+        cu.resolution_pattern = String::new();
+        let result = validate_update_cognitive_update(fake_update(), cu, fake_action_hash());
+        assert_invalid(&result);
+    }
+
+    #[test]
+    fn cognitive_update_update_resolution_pattern_over_limit_rejected() {
+        let mut cu = make_cognitive_update();
+        cu.resolution_pattern = "x".repeat(4097);
+        let result = validate_update_cognitive_update(fake_update(), cu, fake_action_hash());
+        assert_invalid(&result);
     }
 }

@@ -193,7 +193,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::SupportTicket(ticket) => validate_support_ticket(ticket),
                 EntryTypes::TicketComment(comment) => validate_ticket_comment(comment),
-                EntryTypes::AutonomousAction(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::AutonomousAction(a) => validate_autonomous_action(a),
                 EntryTypes::UndoAction(undo) => validate_undo_action(undo),
                 EntryTypes::PreemptiveAlert(alert) => validate_preemptive_alert(alert),
                 EntryTypes::Escalation(escalation) => validate_escalation(escalation),
@@ -308,10 +308,27 @@ fn validate_support_ticket(ticket: SupportTicket) -> ExternResult<ValidateCallba
             "Support ticket title cannot be empty".into(),
         ));
     }
+    if ticket.title.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Support ticket title too long (max 256 chars)".into(),
+        ));
+    }
     if ticket.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Support ticket description cannot be empty".into(),
         ));
+    }
+    if ticket.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Support ticket description too long (max 4096 chars)".into(),
+        ));
+    }
+    if let Some(ref info) = ticket.system_info {
+        if info.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Support ticket system_info too long (max 4096 chars)".into(),
+            ));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -322,10 +339,79 @@ fn validate_ticket_comment(comment: TicketComment) -> ExternResult<ValidateCallb
             "Ticket comment content cannot be empty".into(),
         ));
     }
+    if comment.content.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Ticket comment content too long (max 4096 chars)".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_autonomous_action(a: AutonomousAction) -> ExternResult<ValidateCallbackResult> {
+    if a.description.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "AutonomousAction description cannot be empty".into(),
+        ));
+    }
+    if a.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "AutonomousAction description too long (max 4096 chars)".into(),
+        ));
+    }
+    if let Some(ref result) = a.result {
+        if result.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "AutonomousAction result too long (max 4096 chars)".into(),
+            ));
+        }
+    }
+    if let Some(ref steps) = a.rollback_steps {
+        for step in steps {
+            if step.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "AutonomousAction rollback step too long (max 256 chars per item)".into(),
+                ));
+            }
+        }
+    }
+    if let Some(ref state) = a.rollback_state {
+        if state.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "AutonomousAction rollback_state too long (max 4096 chars)".into(),
+            ));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_preemptive_alert(alert: PreemptiveAlert) -> ExternResult<ValidateCallbackResult> {
+    if alert.predicted_failure.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "PreemptiveAlert predicted_failure cannot be empty".into(),
+        ));
+    }
+    if alert.predicted_failure.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "PreemptiveAlert predicted_failure too long (max 4096 chars)".into(),
+        ));
+    }
+    if alert.recommended_action.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "PreemptiveAlert recommended_action cannot be empty".into(),
+        ));
+    }
+    if alert.recommended_action.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "PreemptiveAlert recommended_action too long (max 4096 chars)".into(),
+        ));
+    }
+    if let Some(ref ettf) = alert.expected_time_to_failure {
+        if ettf.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "PreemptiveAlert expected_time_to_failure too long (max 256 chars)".into(),
+            ));
+        }
+    }
     if !alert.free_energy.is_finite() {
         return Ok(ValidateCallbackResult::Invalid(
             "PreemptiveAlert free_energy must be finite".into(),
@@ -345,9 +431,19 @@ fn validate_undo_action(undo: UndoAction) -> ExternResult<ValidateCallbackResult
             "UndoAction reason cannot be empty".into(),
         ));
     }
+    if undo.reason.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "UndoAction reason too long (max 4096 chars)".into(),
+        ));
+    }
     if undo.rollback_result.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "UndoAction rollback_result cannot be empty".into(),
+        ));
+    }
+    if undo.rollback_result.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "UndoAction rollback_result too long (max 4096 chars)".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -1247,5 +1343,210 @@ mod tests {
     fn link_ticket_to_survey_tag_over_max_rejected() {
         let result = validate_link_tag(&LinkTypes::TicketToSurvey, 257);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- String length boundary tests -----------------------------------------
+
+    #[test]
+    fn ticket_title_at_limit_accepted() {
+        let mut t = valid_support_ticket();
+        t.title = "x".repeat(256);
+        assert_valid(validate_support_ticket(t));
+    }
+
+    #[test]
+    fn ticket_title_over_limit_rejected() {
+        let mut t = valid_support_ticket();
+        t.title = "x".repeat(257);
+        assert_invalid(validate_support_ticket(t), "title too long");
+    }
+
+    #[test]
+    fn ticket_description_at_limit_accepted() {
+        let mut t = valid_support_ticket();
+        t.description = "x".repeat(4096);
+        assert_valid(validate_support_ticket(t));
+    }
+
+    #[test]
+    fn ticket_description_over_limit_rejected() {
+        let mut t = valid_support_ticket();
+        t.description = "x".repeat(4097);
+        assert_invalid(validate_support_ticket(t), "description too long");
+    }
+
+    #[test]
+    fn ticket_system_info_at_limit_accepted() {
+        let mut t = valid_support_ticket();
+        t.system_info = Some("x".repeat(4096));
+        assert_valid(validate_support_ticket(t));
+    }
+
+    #[test]
+    fn ticket_system_info_over_limit_rejected() {
+        let mut t = valid_support_ticket();
+        t.system_info = Some("x".repeat(4097));
+        assert_invalid(validate_support_ticket(t), "system_info too long");
+    }
+
+    #[test]
+    fn comment_content_at_limit_accepted() {
+        let mut c = valid_ticket_comment();
+        c.content = "x".repeat(4096);
+        assert_valid(validate_ticket_comment(c));
+    }
+
+    #[test]
+    fn comment_content_over_limit_rejected() {
+        let mut c = valid_ticket_comment();
+        c.content = "x".repeat(4097);
+        assert_invalid(validate_ticket_comment(c), "content too long");
+    }
+
+    #[test]
+    fn autonomous_action_empty_description_rejected() {
+        let mut a = valid_autonomous_action();
+        a.description = String::new();
+        assert_invalid(validate_autonomous_action(a), "description cannot be empty");
+    }
+
+    #[test]
+    fn autonomous_action_description_at_limit_accepted() {
+        let mut a = valid_autonomous_action();
+        a.description = "x".repeat(4096);
+        assert_valid(validate_autonomous_action(a));
+    }
+
+    #[test]
+    fn autonomous_action_description_over_limit_rejected() {
+        let mut a = valid_autonomous_action();
+        a.description = "x".repeat(4097);
+        assert_invalid(validate_autonomous_action(a), "description too long");
+    }
+
+    #[test]
+    fn autonomous_action_result_at_limit_accepted() {
+        let mut a = valid_autonomous_action();
+        a.result = Some("x".repeat(4096));
+        assert_valid(validate_autonomous_action(a));
+    }
+
+    #[test]
+    fn autonomous_action_result_over_limit_rejected() {
+        let mut a = valid_autonomous_action();
+        a.result = Some("x".repeat(4097));
+        assert_invalid(validate_autonomous_action(a), "result too long");
+    }
+
+    #[test]
+    fn autonomous_action_rollback_step_at_limit_accepted() {
+        let mut a = valid_autonomous_action();
+        a.rollback_steps = Some(vec!["x".repeat(256)]);
+        assert_valid(validate_autonomous_action(a));
+    }
+
+    #[test]
+    fn autonomous_action_rollback_step_over_limit_rejected() {
+        let mut a = valid_autonomous_action();
+        a.rollback_steps = Some(vec!["x".repeat(257)]);
+        assert_invalid(validate_autonomous_action(a), "rollback step too long");
+    }
+
+    #[test]
+    fn autonomous_action_rollback_state_at_limit_accepted() {
+        let mut a = valid_autonomous_action();
+        a.rollback_state = Some("x".repeat(4096));
+        assert_valid(validate_autonomous_action(a));
+    }
+
+    #[test]
+    fn autonomous_action_rollback_state_over_limit_rejected() {
+        let mut a = valid_autonomous_action();
+        a.rollback_state = Some("x".repeat(4097));
+        assert_invalid(validate_autonomous_action(a), "rollback_state too long");
+    }
+
+    #[test]
+    fn undo_reason_at_limit_accepted() {
+        let mut u = valid_undo_action();
+        u.reason = "x".repeat(4096);
+        assert_valid(validate_undo_action(u));
+    }
+
+    #[test]
+    fn undo_reason_over_limit_rejected() {
+        let mut u = valid_undo_action();
+        u.reason = "x".repeat(4097);
+        assert_invalid(validate_undo_action(u), "reason too long");
+    }
+
+    #[test]
+    fn undo_rollback_result_at_limit_accepted() {
+        let mut u = valid_undo_action();
+        u.rollback_result = "x".repeat(4096);
+        assert_valid(validate_undo_action(u));
+    }
+
+    #[test]
+    fn undo_rollback_result_over_limit_rejected() {
+        let mut u = valid_undo_action();
+        u.rollback_result = "x".repeat(4097);
+        assert_invalid(validate_undo_action(u), "rollback_result too long");
+    }
+
+    #[test]
+    fn alert_predicted_failure_empty_rejected() {
+        let mut a = valid_preemptive_alert();
+        a.predicted_failure = String::new();
+        assert_invalid(validate_preemptive_alert(a), "predicted_failure cannot be empty");
+    }
+
+    #[test]
+    fn alert_predicted_failure_at_limit_accepted() {
+        let mut a = valid_preemptive_alert();
+        a.predicted_failure = "x".repeat(4096);
+        assert_valid(validate_preemptive_alert(a));
+    }
+
+    #[test]
+    fn alert_predicted_failure_over_limit_rejected() {
+        let mut a = valid_preemptive_alert();
+        a.predicted_failure = "x".repeat(4097);
+        assert_invalid(validate_preemptive_alert(a), "predicted_failure too long");
+    }
+
+    #[test]
+    fn alert_recommended_action_empty_rejected() {
+        let mut a = valid_preemptive_alert();
+        a.recommended_action = String::new();
+        assert_invalid(validate_preemptive_alert(a), "recommended_action cannot be empty");
+    }
+
+    #[test]
+    fn alert_recommended_action_at_limit_accepted() {
+        let mut a = valid_preemptive_alert();
+        a.recommended_action = "x".repeat(4096);
+        assert_valid(validate_preemptive_alert(a));
+    }
+
+    #[test]
+    fn alert_recommended_action_over_limit_rejected() {
+        let mut a = valid_preemptive_alert();
+        a.recommended_action = "x".repeat(4097);
+        assert_invalid(validate_preemptive_alert(a), "recommended_action too long");
+    }
+
+    #[test]
+    fn alert_expected_time_to_failure_at_limit_accepted() {
+        let mut a = valid_preemptive_alert();
+        a.expected_time_to_failure = Some("x".repeat(256));
+        assert_valid(validate_preemptive_alert(a));
+    }
+
+    #[test]
+    fn alert_expected_time_to_failure_over_limit_rejected() {
+        let mut a = valid_preemptive_alert();
+        a.expected_time_to_failure = Some("x".repeat(257));
+        assert_invalid(validate_preemptive_alert(a), "expected_time_to_failure too long");
     }
 }

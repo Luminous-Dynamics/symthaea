@@ -205,6 +205,46 @@ fn validate_create_publication(
     if publication.content_hash.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Content hash required".into()));
     }
+
+    // String length limits
+    if publication.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Publication ID too long (max 256)".into()));
+    }
+    if publication.title.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid("Publication title too long (max 512)".into()));
+    }
+    if publication.content_hash.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Content hash too long (max 256)".into()));
+    }
+    if publication.author_did.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Author DID too long (max 256)".into()));
+    }
+    if publication.language.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid("Language too long (max 128)".into()));
+    }
+
+    // Vec length limits
+    if publication.co_authors.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid("Too many co-authors (max 50)".into()));
+    }
+    if publication.tags.len() > 100 {
+        return Ok(ValidateCallbackResult::Invalid("Too many tags (max 100)".into()));
+    }
+
+    // Validate co-author DIDs
+    for co_author in &publication.co_authors {
+        if co_author.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Co-author DID too long (max 256)".into()));
+        }
+    }
+
+    // Validate tag lengths
+    for tag in &publication.tags {
+        if tag.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Tag too long (max 256)".into()));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -215,6 +255,46 @@ fn validate_update_publication(
     if publication.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Title cannot be empty".into()));
     }
+
+    // String length limits
+    if publication.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Publication ID too long (max 256)".into()));
+    }
+    if publication.title.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid("Publication title too long (max 512)".into()));
+    }
+    if publication.content_hash.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Content hash too long (max 256)".into()));
+    }
+    if publication.author_did.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Author DID too long (max 256)".into()));
+    }
+    if publication.language.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid("Language too long (max 128)".into()));
+    }
+
+    // Vec length limits
+    if publication.co_authors.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid("Too many co-authors (max 50)".into()));
+    }
+    if publication.tags.len() > 100 {
+        return Ok(ValidateCallbackResult::Invalid("Too many tags (max 100)".into()));
+    }
+
+    // Validate co-author DIDs
+    for co_author in &publication.co_authors {
+        if co_author.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Co-author DID too long (max 256)".into()));
+        }
+    }
+
+    // Validate tag lengths
+    for tag in &publication.tags {
+        if tag.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Tag too long (max 256)".into()));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -228,6 +308,20 @@ fn validate_create_content_block(
     if block.content.trim().is_empty() && block.encrypted_content.is_none() {
         return Ok(ValidateCallbackResult::Invalid("Content block must have content or encrypted_content".into()));
     }
+
+    // String length limits
+    if block.publication_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Content block publication_id too long (max 256)".into()));
+    }
+    if block.content.len() > 1_048_576 {
+        return Ok(ValidateCallbackResult::Invalid("Content block content too long (max 1048576)".into()));
+    }
+    if let Some(ref encrypted) = block.encrypted_content {
+        if encrypted.len() > 1_048_576 {
+            return Ok(ValidateCallbackResult::Invalid("Content block encrypted_content too long (max 1048576)".into()));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -244,6 +338,18 @@ fn validate_create_publication_version(
     if version.version == 0 {
         return Ok(ValidateCallbackResult::Invalid("Publication version number must be at least 1".into()));
     }
+
+    // String length limits
+    if version.publication_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Publication version publication_id too long (max 256)".into()));
+    }
+    if version.content_hash.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Publication version content_hash too long (max 256)".into()));
+    }
+    if version.change_summary.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid("Publication version change_summary too long (max 4096)".into()));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -760,7 +866,7 @@ mod tests {
     }
 
     #[test]
-    fn publication_with_very_long_title() {
+    fn publication_with_very_long_title_rejected() {
         let mut pub_data = valid_publication();
         pub_data.title = "a".repeat(10000);
         let result = validate_create_publication(
@@ -770,7 +876,7 @@ mod tests {
             )),
             pub_data,
         );
-        assert!(is_valid(result));
+        assert!(is_invalid(result));
     }
 
     #[test]
@@ -932,6 +1038,243 @@ mod tests {
             pub_data,
         );
         assert!(is_valid(result));
+    }
+
+    // ========================================================================
+    // STRING LENGTH BOUNDARY TESTS
+    // ========================================================================
+
+    #[test]
+    fn publication_title_at_limit_passes() {
+        let mut pub_data = valid_publication();
+        pub_data.title = "a".repeat(512);
+        let result = validate_create_publication(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            pub_data,
+        );
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn publication_title_over_limit_rejected() {
+        let mut pub_data = valid_publication();
+        pub_data.title = "a".repeat(513);
+        let result = validate_create_publication(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            pub_data,
+        );
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn publication_id_at_limit_passes() {
+        let mut pub_data = valid_publication();
+        pub_data.id = "x".repeat(256);
+        let result = validate_create_publication(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            pub_data,
+        );
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn publication_id_over_limit_rejected() {
+        let mut pub_data = valid_publication();
+        pub_data.id = "x".repeat(257);
+        let result = validate_create_publication(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            pub_data,
+        );
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn publication_content_hash_at_limit_passes() {
+        let mut pub_data = valid_publication();
+        pub_data.content_hash = "h".repeat(256);
+        let result = validate_create_publication(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            pub_data,
+        );
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn publication_content_hash_over_limit_rejected() {
+        let mut pub_data = valid_publication();
+        pub_data.content_hash = "h".repeat(257);
+        let result = validate_create_publication(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            pub_data,
+        );
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn publication_language_at_limit_passes() {
+        let mut pub_data = valid_publication();
+        pub_data.language = "l".repeat(128);
+        let result = validate_create_publication(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            pub_data,
+        );
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn publication_language_over_limit_rejected() {
+        let mut pub_data = valid_publication();
+        pub_data.language = "l".repeat(129);
+        let result = validate_create_publication(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            pub_data,
+        );
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn publication_tag_at_limit_passes() {
+        let mut pub_data = valid_publication();
+        pub_data.tags = vec!["t".repeat(256)];
+        let result = validate_create_publication(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            pub_data,
+        );
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn publication_tag_over_limit_rejected() {
+        let mut pub_data = valid_publication();
+        pub_data.tags = vec!["t".repeat(257)];
+        let result = validate_create_publication(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            pub_data,
+        );
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn publication_co_author_over_limit_rejected() {
+        let mut pub_data = valid_publication();
+        pub_data.co_authors = vec!["d".repeat(257)];
+        let result = validate_create_publication(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            pub_data,
+        );
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn content_block_publication_id_at_limit_passes() {
+        let mut block = valid_content_block();
+        block.publication_id = "p".repeat(256);
+        let result = validate_create_content_block(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            block,
+        );
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn content_block_publication_id_over_limit_rejected() {
+        let mut block = valid_content_block();
+        block.publication_id = "p".repeat(257);
+        let result = validate_create_content_block(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            block,
+        );
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn publication_version_change_summary_at_limit_passes() {
+        let mut version = valid_publication_version();
+        version.change_summary = "s".repeat(4096);
+        let result = validate_create_publication_version(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            version,
+        );
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn publication_version_change_summary_over_limit_rejected() {
+        let mut version = valid_publication_version();
+        version.change_summary = "s".repeat(4097);
+        let result = validate_create_publication_version(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            version,
+        );
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn publication_update_title_over_limit_rejected() {
+        let mut pub_data = valid_publication();
+        pub_data.title = "a".repeat(513);
+        let update_action = Update {
+            author: AgentPubKey::from_raw_36(vec![1; 36]),
+            timestamp: Timestamp::from_micros(1),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![0; 36]),
+            original_action_address: ActionHash::from_raw_36(vec![0; 36]),
+            original_entry_address: EntryHash::from_raw_36(vec![0; 36]),
+            entry_type: EntryType::App(AppEntryDef {
+                entry_index: 0.into(),
+                zome_index: 0.into(),
+                visibility: EntryVisibility::Public,
+            }),
+            entry_hash: EntryHash::from_raw_36(vec![0; 36]),
+            weight: Default::default(),
+        };
+        let result = validate_update_publication(update_action, pub_data);
+        assert!(is_invalid(result));
     }
 
     // ========================================================================

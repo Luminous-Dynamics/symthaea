@@ -329,14 +329,29 @@ fn validate_create_conservation_method(
             "Conservation method ID cannot be empty".into(),
         ));
     }
+    if method.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Conservation method ID must be 64 characters or fewer".into(),
+        ));
+    }
     if method.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Conservation method title cannot be empty".into(),
         ));
     }
+    if method.title.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Conservation method title must be 256 characters or fewer".into(),
+        ));
+    }
     if method.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Conservation method description cannot be empty".into(),
+        ));
+    }
+    if method.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Conservation method description must be 4096 characters or fewer".into(),
         ));
     }
     if let Some(pct) = method.water_saved_percent {
@@ -363,14 +378,29 @@ fn validate_create_climate_pattern(
             "Region cannot be empty".into(),
         ));
     }
+    if pattern.region.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Region must be 256 characters or fewer".into(),
+        ));
+    }
     if pattern.season.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Season cannot be empty".into(),
         ));
     }
+    if pattern.season.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Season must be 128 characters or fewer".into(),
+        ));
+    }
     if pattern.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Description cannot be empty".into(),
+        ));
+    }
+    if pattern.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Description must be 4096 characters or fewer".into(),
         ));
     }
     if pattern.indicators.len() > 50 {
@@ -1005,7 +1035,7 @@ mod tests {
     #[test]
     fn conservation_method_long_description_accepted() {
         let mut m = make_conservation_method();
-        m.description = "B".repeat(10_000);
+        m.description = "B".repeat(4096);
         let result = validate_create_conservation_method(fake_create(), m);
         assert!(is_valid(&result));
     }
@@ -1210,7 +1240,7 @@ mod tests {
     #[test]
     fn climate_pattern_long_description_accepted() {
         let mut cp = make_climate_pattern();
-        cp.description = "C".repeat(10_000);
+        cp.description = "C".repeat(4096);
         let result = validate_create_climate_pattern(fake_create(), cp);
         assert!(is_valid(&result));
     }
@@ -1506,5 +1536,133 @@ mod tests {
         assert!(p.title.len() > 512);
         let result = validate_create_practice(fake_create(), p);
         assert!(is_invalid(&result));
+    }
+
+    // ========================================================================
+    // STRING LENGTH LIMIT BOUNDARY TESTS — CONSERVATION METHOD
+    // ========================================================================
+
+    #[test]
+    fn conservation_method_id_at_limit_accepted() {
+        let mut m = make_conservation_method();
+        m.id = "A".repeat(64);
+        let result = validate_create_conservation_method(fake_create(), m);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn conservation_method_id_over_limit_rejected() {
+        let mut m = make_conservation_method();
+        m.id = "A".repeat(65);
+        let result = validate_create_conservation_method(fake_create(), m);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Conservation method ID must be 64 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn conservation_method_title_at_limit_accepted() {
+        let mut m = make_conservation_method();
+        m.title = "A".repeat(256);
+        let result = validate_create_conservation_method(fake_create(), m);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn conservation_method_title_over_limit_rejected() {
+        let mut m = make_conservation_method();
+        m.title = "A".repeat(257);
+        let result = validate_create_conservation_method(fake_create(), m);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Conservation method title must be 256 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn conservation_method_description_at_limit_accepted() {
+        let mut m = make_conservation_method();
+        m.description = "A".repeat(4096);
+        let result = validate_create_conservation_method(fake_create(), m);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn conservation_method_description_over_limit_rejected() {
+        let mut m = make_conservation_method();
+        m.description = "A".repeat(4097);
+        let result = validate_create_conservation_method(fake_create(), m);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Conservation method description must be 4096 characters or fewer"
+        );
+    }
+
+    // ========================================================================
+    // STRING LENGTH LIMIT BOUNDARY TESTS — CLIMATE PATTERN
+    // ========================================================================
+
+    #[test]
+    fn climate_pattern_region_at_limit_accepted() {
+        let mut cp = make_climate_pattern();
+        cp.region = "A".repeat(256);
+        let result = validate_create_climate_pattern(fake_create(), cp);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn climate_pattern_region_over_limit_rejected() {
+        let mut cp = make_climate_pattern();
+        cp.region = "A".repeat(257);
+        let result = validate_create_climate_pattern(fake_create(), cp);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Region must be 256 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn climate_pattern_season_at_limit_accepted() {
+        let mut cp = make_climate_pattern();
+        cp.season = "A".repeat(128);
+        let result = validate_create_climate_pattern(fake_create(), cp);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn climate_pattern_season_over_limit_rejected() {
+        let mut cp = make_climate_pattern();
+        cp.season = "A".repeat(129);
+        let result = validate_create_climate_pattern(fake_create(), cp);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Season must be 128 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn climate_pattern_description_at_limit_accepted() {
+        let mut cp = make_climate_pattern();
+        cp.description = "A".repeat(4096);
+        let result = validate_create_climate_pattern(fake_create(), cp);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn climate_pattern_description_over_limit_rejected() {
+        let mut cp = make_climate_pattern();
+        cp.description = "A".repeat(4097);
+        let result = validate_create_climate_pattern(fake_create(), cp);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Description must be 4096 characters or fewer"
+        );
     }
 }

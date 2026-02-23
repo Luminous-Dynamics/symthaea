@@ -279,6 +279,13 @@ fn validate_create_application(
             "Maximum 10 references allowed".into(),
         ));
     }
+    for r in &app.references {
+        if r.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Reference too long (max 256 chars per item)".into(),
+            ));
+        }
+    }
     if app.status != ApplicationStatus::Pending {
         return Ok(ValidateCallbackResult::Invalid(
             "New applications must have Pending status".into(),
@@ -1465,5 +1472,36 @@ mod tests {
     #[test]
     fn link_tag_empty_tag_valid() {
         assert_valid(validate_create_link_tag(LinkTypes::AllMembers, vec![]));
+    }
+
+    // ========================================================================
+    // STRING LENGTH BOUNDARY TESTS
+    // ========================================================================
+
+    #[test]
+    fn create_application_reference_at_limit_accepted() {
+        let mut app = valid_application();
+        app.references = vec!["x".repeat(256)];
+        assert_valid(validate_create_application(fake_create(), app));
+    }
+
+    #[test]
+    fn create_application_reference_over_limit_rejected() {
+        let mut app = valid_application();
+        app.references = vec!["x".repeat(257)];
+        assert_invalid(
+            validate_create_application(fake_create(), app),
+            "Reference too long (max 256 chars per item)",
+        );
+    }
+
+    #[test]
+    fn create_application_second_reference_over_limit_rejected() {
+        let mut app = valid_application();
+        app.references = vec!["valid".to_string(), "x".repeat(257)];
+        assert_invalid(
+            validate_create_application(fake_create(), app),
+            "Reference too long (max 256 chars per item)",
+        );
     }
 }

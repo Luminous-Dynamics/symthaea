@@ -262,15 +262,39 @@ fn validate_article(a: KnowledgeArticle) -> ExternResult<ValidateCallbackResult>
             "Article title cannot be empty".into(),
         ));
     }
+    if a.title.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Article title too long (max 256 chars)".into(),
+        ));
+    }
     if a.content.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Article content cannot be empty".into(),
+        ));
+    }
+    if a.content.len() > 65536 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Article content too long (max 65536 chars)".into(),
         ));
     }
     if a.tags.len() > 20 {
         return Ok(ValidateCallbackResult::Invalid(
             "Article cannot have more than 20 tags".into(),
         ));
+    }
+    for tag in &a.tags {
+        if tag.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Tag too long (max 256 chars per item)".into(),
+            ));
+        }
+    }
+    if let Some(ref reason) = a.deprecation_reason {
+        if reason.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Deprecation reason too long (max 4096 chars)".into(),
+            ));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -280,6 +304,20 @@ fn validate_resolution(r: Resolution) -> ExternResult<ValidateCallbackResult> {
         return Ok(ValidateCallbackResult::Invalid(
             "Resolution must have at least one step".into(),
         ));
+    }
+    for step in &r.steps {
+        if step.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Resolution step too long (max 4096 chars per item)".into(),
+            ));
+        }
+    }
+    if let Some(ref root_cause) = r.root_cause {
+        if root_cause.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Root cause too long (max 4096 chars)".into(),
+            ));
+        }
     }
     if let Some(rating) = r.effectiveness_rating {
         if !(1..=5).contains(&rating) {
@@ -295,6 +333,11 @@ fn validate_flag(f: ArticleFlag) -> ExternResult<ValidateCallbackResult> {
     if f.description.len() < 10 {
         return Ok(ValidateCallbackResult::Invalid(
             "Flag description must be at least 10 characters".into(),
+        ));
+    }
+    if f.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Flag description too long (max 4096 chars)".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -1048,5 +1091,107 @@ mod tests {
     fn link_ticket_to_articles_tag_over_max_rejected() {
         let result = validate_link_tag(&LinkTypes::TicketToArticles, 257);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── String length boundary tests ──────────────────────────────────
+
+    #[test]
+    fn article_title_at_limit_accepted() {
+        let mut a = valid_article();
+        a.title = "x".repeat(256);
+        assert_valid(validate_article(a));
+    }
+
+    #[test]
+    fn article_title_over_limit_rejected() {
+        let mut a = valid_article();
+        a.title = "x".repeat(257);
+        assert_invalid(validate_article(a), "Article title too long");
+    }
+
+    #[test]
+    fn article_content_at_limit_accepted() {
+        let mut a = valid_article();
+        a.content = "x".repeat(65536);
+        assert_valid(validate_article(a));
+    }
+
+    #[test]
+    fn article_content_over_limit_rejected() {
+        let mut a = valid_article();
+        a.content = "x".repeat(65537);
+        assert_invalid(validate_article(a), "Article content too long");
+    }
+
+    #[test]
+    fn article_tag_at_limit_accepted() {
+        let mut a = valid_article();
+        a.tags = vec!["x".repeat(256)];
+        assert_valid(validate_article(a));
+    }
+
+    #[test]
+    fn article_tag_over_limit_rejected() {
+        let mut a = valid_article();
+        a.tags = vec!["x".repeat(257)];
+        assert_invalid(validate_article(a), "Tag too long");
+    }
+
+    #[test]
+    fn article_deprecation_reason_at_limit_accepted() {
+        let mut a = valid_article();
+        a.deprecated = true;
+        a.deprecation_reason = Some("x".repeat(4096));
+        assert_valid(validate_article(a));
+    }
+
+    #[test]
+    fn article_deprecation_reason_over_limit_rejected() {
+        let mut a = valid_article();
+        a.deprecated = true;
+        a.deprecation_reason = Some("x".repeat(4097));
+        assert_invalid(validate_article(a), "Deprecation reason too long");
+    }
+
+    #[test]
+    fn resolution_step_at_limit_accepted() {
+        let mut r = valid_resolution();
+        r.steps = vec!["x".repeat(4096)];
+        assert_valid(validate_resolution(r));
+    }
+
+    #[test]
+    fn resolution_step_over_limit_rejected() {
+        let mut r = valid_resolution();
+        r.steps = vec!["x".repeat(4097)];
+        assert_invalid(validate_resolution(r), "Resolution step too long");
+    }
+
+    #[test]
+    fn resolution_root_cause_at_limit_accepted() {
+        let mut r = valid_resolution();
+        r.root_cause = Some("x".repeat(4096));
+        assert_valid(validate_resolution(r));
+    }
+
+    #[test]
+    fn resolution_root_cause_over_limit_rejected() {
+        let mut r = valid_resolution();
+        r.root_cause = Some("x".repeat(4097));
+        assert_invalid(validate_resolution(r), "Root cause too long");
+    }
+
+    #[test]
+    fn flag_description_at_limit_accepted() {
+        let mut f = valid_flag();
+        f.description = "x".repeat(4096);
+        assert_valid(validate_flag(f));
+    }
+
+    #[test]
+    fn flag_description_over_limit_rejected() {
+        let mut f = valid_flag();
+        f.description = "x".repeat(4097);
+        assert_invalid(validate_flag(f), "Flag description too long");
     }
 }

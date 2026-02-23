@@ -353,10 +353,27 @@ fn validate_create_watershed(
             "Watershed ID cannot be empty".into(),
         ));
     }
+    if ws.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Watershed ID must be 64 characters or fewer".into(),
+        ));
+    }
     if ws.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Watershed name cannot be empty".into(),
         ));
+    }
+    if ws.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Watershed name must be 256 characters or fewer".into(),
+        ));
+    }
+    if let Some(ref huc) = ws.huc_code {
+        if huc.len() > 64 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "HUC code must be 64 characters or fewer".into(),
+            ));
+        }
     }
     if ws.boundary.len() < 3 {
         return Ok(ValidateCallbackResult::Invalid(
@@ -473,6 +490,13 @@ fn validate_create_water_dispute(
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot have more than 100 evidence items".into(),
         ));
+    }
+    if let Some(ref res) = dispute.resolution {
+        if res.len() > 8192 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Resolution must be 8192 characters or fewer".into(),
+            ));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -1579,6 +1603,90 @@ mod tests {
         dispute.resolution = Some("".into());
         let result = validate_create_water_dispute(fake_create(), dispute);
         assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // STRING LENGTH LIMIT BOUNDARY TESTS
+    // ========================================================================
+
+    #[test]
+    fn watershed_id_at_limit_accepted() {
+        let mut ws = make_watershed();
+        ws.id = "A".repeat(64);
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn watershed_id_over_limit_rejected() {
+        let mut ws = make_watershed();
+        ws.id = "A".repeat(65);
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Watershed ID must be 64 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn watershed_name_at_limit_accepted() {
+        let mut ws = make_watershed();
+        ws.name = "A".repeat(256);
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn watershed_name_over_limit_rejected() {
+        let mut ws = make_watershed();
+        ws.name = "A".repeat(257);
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Watershed name must be 256 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn watershed_huc_code_at_limit_accepted() {
+        let mut ws = make_watershed();
+        ws.huc_code = Some("H".repeat(64));
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn watershed_huc_code_over_limit_rejected() {
+        let mut ws = make_watershed();
+        ws.huc_code = Some("H".repeat(65));
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "HUC code must be 64 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn water_dispute_resolution_at_limit_accepted() {
+        let mut dispute = make_dispute();
+        dispute.resolution = Some("R".repeat(8192));
+        let result = validate_create_water_dispute(fake_create(), dispute);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn water_dispute_resolution_over_limit_rejected() {
+        let mut dispute = make_dispute();
+        dispute.resolution = Some("R".repeat(8193));
+        let result = validate_create_water_dispute(fake_create(), dispute);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Resolution must be 8192 characters or fewer"
+        );
     }
 
     // ========================================================================

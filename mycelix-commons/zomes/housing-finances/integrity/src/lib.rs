@@ -264,6 +264,16 @@ fn validate_create_fund(
             "Fund name cannot be empty".into(),
         ));
     }
+    if fund.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fund name too long (max 256 chars)".into(),
+        ));
+    }
+    if fund.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fund description too long (max 4096 chars)".into(),
+        ));
+    }
     if fund.target_cents == 0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Fund target must be greater than 0".into(),
@@ -287,6 +297,11 @@ fn validate_create_budget(_action: Create, budget: Budget) -> ExternResult<Valid
         if cat.name.trim().is_empty() {
             return Ok(ValidateCallbackResult::Invalid(
                 "Budget category name cannot be empty".into(),
+            ));
+        }
+        if cat.name.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Budget category name too long (max 256 chars)".into(),
             ));
         }
     }
@@ -329,6 +344,16 @@ fn validate_update_fund(fund: ReserveFund) -> ExternResult<ValidateCallbackResul
     if fund.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Fund name cannot be empty".into(),
+        ));
+    }
+    if fund.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fund name too long (max 256 chars)".into(),
+        ));
+    }
+    if fund.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fund description too long (max 4096 chars)".into(),
         ));
     }
     if fund.target_cents == 0 {
@@ -1815,5 +1840,109 @@ mod tests {
     fn link_tag_empty_tag_valid() {
         let result = validate_create_link_tag(LinkTypes::MemberToCharge, vec![]).unwrap();
         assert!(is_valid(&Ok(result)));
+    }
+
+    // ========================================================================
+    // STRING LENGTH BOUNDARY TESTS
+    // ========================================================================
+
+    #[test]
+    fn fund_name_at_limit_accepted() {
+        let mut fund = make_fund();
+        fund.name = "x".repeat(256);
+        let result = validate_create_fund(fake_create(), fund);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn fund_name_over_limit_rejected() {
+        let mut fund = make_fund();
+        fund.name = "x".repeat(257);
+        let result = validate_create_fund(fake_create(), fund);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn fund_description_at_limit_accepted() {
+        let mut fund = make_fund();
+        fund.description = "x".repeat(4096);
+        let result = validate_create_fund(fake_create(), fund);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn fund_description_over_limit_rejected() {
+        let mut fund = make_fund();
+        fund.description = "x".repeat(4097);
+        let result = validate_create_fund(fake_create(), fund);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn update_fund_name_at_limit_accepted() {
+        let mut fund = make_fund();
+        fund.name = "x".repeat(256);
+        let result = validate_update_fund(fund);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn update_fund_name_over_limit_rejected() {
+        let mut fund = make_fund();
+        fund.name = "x".repeat(257);
+        let result = validate_update_fund(fund);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn update_fund_description_at_limit_accepted() {
+        let mut fund = make_fund();
+        fund.description = "x".repeat(4096);
+        let result = validate_update_fund(fund);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn update_fund_description_over_limit_rejected() {
+        let mut fund = make_fund();
+        fund.description = "x".repeat(4097);
+        let result = validate_update_fund(fund);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn budget_category_name_at_limit_accepted() {
+        let budget = Budget {
+            fiscal_year: 2025,
+            income_projected_cents: 100_000,
+            expenses_projected_cents: 100_000,
+            categories: vec![BudgetCategory {
+                name: "x".repeat(256),
+                allocated_cents: 100_000,
+                spent_cents: 0,
+            }],
+            approved: false,
+            approved_at: None,
+        };
+        let result = validate_create_budget(fake_create(), budget);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn budget_category_name_over_limit_rejected() {
+        let budget = Budget {
+            fiscal_year: 2025,
+            income_projected_cents: 100_000,
+            expenses_projected_cents: 100_000,
+            categories: vec![BudgetCategory {
+                name: "x".repeat(257),
+                allocated_cents: 100_000,
+                spent_cents: 0,
+            }],
+            approved: false,
+            approved_at: None,
+        };
+        let result = validate_create_budget(fake_create(), budget);
+        assert!(is_invalid(&result));
     }
 }
