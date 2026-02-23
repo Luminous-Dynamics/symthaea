@@ -41,7 +41,7 @@
 //!
 //! - `viewer` — Interactive MuJoCo 3D viewer
 
-#![allow(clippy::needless_range_loop)]
+#![allow(clippy::needless_range_loop, clippy::io_other_error)]
 
 pub mod benchmarks;
 pub mod controller;
@@ -56,7 +56,7 @@ pub mod types;
 
 pub use controller::{ControllerCheckpoint, HumanoidController};
 pub use encoder::HumanoidHdcEncoder;
-pub use fep_agent::ActiveInferenceHumanoidAgent;
+pub use fep_agent::{ActiveInferenceHumanoidAgent, HumanoidFepConfig};
 pub use perturbations::{HumanoidPerturbation, PerturbationSchedule};
 pub use reward::{episode_reward, standing_reward};
 #[cfg(feature = "mujoco")]

@@ -280,10 +280,7 @@ impl MorphologicalTransfer {
 
         // Replace the controller's network with the blended one.
         // We reconstruct the controller since network is private.
-        *controller = HumanoidController::from_network(
-            target_network,
-            &self.target_genesis,
-        );
+        *controller = HumanoidController::from_network(target_network, &self.target_genesis);
     }
 
     /// Number of shared channel pairs in this transfer mapping.
@@ -318,7 +315,8 @@ pub fn transfer_learning_comparison(
     // Transfer-initialized training
     let transfer = MorphologicalTransfer::flight_to_humanoid();
     let transfer_controller = transfer.initialize_humanoid(source_network, &config);
-    let mut transfer_trainer = HumanoidTrainer::with_controller(config.clone(), transfer_controller);
+    let mut transfer_trainer =
+        HumanoidTrainer::with_controller(config.clone(), transfer_controller);
     let transfer_metrics = transfer_trainer.train();
 
     // Random baseline training

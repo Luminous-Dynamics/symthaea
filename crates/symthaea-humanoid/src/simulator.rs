@@ -68,65 +68,41 @@ impl HumanoidBodyModel {
         // Per-joint effective inertia: I_eff ~ m_segment * L_segment^2
         let joint_inertias = [
             // Abdomen y/z/x (torso segment)
-            0.30, 0.30, 0.30,
-            // Right hip x/z/y (thigh segment)
-            0.50, 0.50, 0.50,
-            // Right knee (shin segment)
-            0.20,
-            // Right ankle x/y (foot segment)
-            0.05, 0.05,
-            // Left hip x/z/y
-            0.50, 0.50, 0.50,
-            // Left knee
-            0.20,
-            // Left ankle x/y
-            0.05, 0.05,
-            // Right shoulder1/2 (upper arm)
-            0.10, 0.10,
-            // Right elbow (forearm)
-            0.03,
-            // Left shoulder1/2
-            0.10, 0.10,
-            // Left elbow
+            0.30, 0.30, 0.30, // Right hip x/z/y (thigh segment)
+            0.50, 0.50, 0.50, // Right knee (shin segment)
+            0.20, // Right ankle x/y (foot segment)
+            0.05, 0.05, // Left hip x/z/y
+            0.50, 0.50, 0.50, // Left knee
+            0.20, // Left ankle x/y
+            0.05, 0.05, // Right shoulder1/2 (upper arm)
+            0.10, 0.10, // Right elbow (forearm)
+            0.03, // Left shoulder1/2
+            0.10, 0.10, // Left elbow
             0.03,
         ];
 
         let joint_damping = [
             // Abdomen
-            6.0, 6.0, 6.0,
-            // Right hip
-            8.0, 8.0, 8.0,
-            // Right knee
-            5.0,
-            // Right ankle
-            3.0, 3.0,
-            // Left hip
-            8.0, 8.0, 8.0,
-            // Left knee
-            5.0,
-            // Left ankle
-            3.0, 3.0,
-            // Right arm
-            2.0, 2.0, 1.5,
-            // Left arm
+            6.0, 6.0, 6.0, // Right hip
+            8.0, 8.0, 8.0, // Right knee
+            5.0, // Right ankle
+            3.0, 3.0, // Left hip
+            8.0, 8.0, 8.0, // Left knee
+            5.0, // Left ankle
+            3.0, 3.0, // Right arm
+            2.0, 2.0, 1.5, // Left arm
             2.0, 2.0, 1.5,
         ];
 
         // Torque scale matches MJCF gear ratios
         let joint_torque_scale = [
             // Abdomen (gear=100)
-            100.0, 100.0, 100.0,
-            // Right hip (100, 100, 300), knee (200)
-            100.0, 100.0, 300.0, 200.0,
-            // Right ankle (100, 100)
-            100.0, 100.0,
-            // Left hip, knee
-            100.0, 100.0, 300.0, 200.0,
-            // Left ankle
-            100.0, 100.0,
-            // Right arm (25)
-            25.0, 25.0, 25.0,
-            // Left arm (25)
+            100.0, 100.0, 100.0, // Right hip (100, 100, 300), knee (200)
+            100.0, 100.0, 300.0, 200.0, // Right ankle (100, 100)
+            100.0, 100.0, // Left hip, knee
+            100.0, 100.0, 300.0, 200.0, // Left ankle
+            100.0, 100.0, // Right arm (25)
+            25.0, 25.0, 25.0, // Left arm (25)
             25.0, 25.0, 25.0,
         ];
 
@@ -293,8 +269,7 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             let damping = self.body.joint_damping[i];
             let inertia = self.body.joint_inertias[i];
 
-            let accel =
-                (torque - damping * self.state.joint_velocities[i]) / inertia;
+            let accel = (torque - damping * self.state.joint_velocities[i]) / inertia;
             self.state.joint_velocities[i] += accel * dt;
             self.state.joint_angles[i] += self.state.joint_velocities[i] * dt;
 
@@ -338,9 +313,9 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
 
         // Gravity: inverted pendulum torque from tilt
         let lean_torque = -g * self.body.total_mass * tilt_mag * 0.15;
-        self.state.root_linear_velocity[2] +=
-            (lean_torque / self.body.total_mass + self.external_force[2] / self.body.total_mass)
-                * dt;
+        self.state.root_linear_velocity[2] += (lean_torque / self.body.total_mass
+            + self.external_force[2] / self.body.total_mass)
+            * dt;
         self.state.root_height += self.state.root_linear_velocity[2] * dt;
 
         // Blend dynamic height with kinematic (70% kinematic, 30% dynamic)
@@ -378,7 +353,7 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
         let l_foot_z = (self.state.root_height - left_leg_len).max(0.0);
 
         let ground_threshold = 0.05; // foot within 5cm of ground = contact
-        let pushoff_gain = 1.5; // N·s per (rad/s) of hip extension
+        let pushoff_gain = 6.0; // N·s per (rad/s) of hip extension
 
         let mut pushoff_accel = 0.0;
 
@@ -398,13 +373,41 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             }
         }
 
+        // Ankle pushoff: plantarflexion during toe-off adds forward impulse
+        let ankle_pushoff_gain = 2.0;
+        let r_ankle_vel = self.state.joint_velocities[8]; // right ankle_y
+        let l_ankle_vel = self.state.joint_velocities[14]; // left ankle_y
+
+        if r_foot_z < ground_threshold && r_ankle_vel > 0.0 && uprightness > 0.4 {
+            pushoff_accel += r_ankle_vel * ankle_pushoff_gain;
+        }
+        if l_foot_z < ground_threshold && l_ankle_vel > 0.0 && uprightness > 0.4 {
+            pushoff_accel += l_ankle_vel * ankle_pushoff_gain;
+        }
+
+        // Knee extension force: straightening during stance propels forward
+        let knee_ext_gain = 1.5;
+        let r_knee_vel = self.state.joint_velocities[6];
+        let l_knee_vel = self.state.joint_velocities[12];
+
+        if r_foot_z < ground_threshold && r_knee_vel > 0.0 && uprightness > 0.4 {
+            pushoff_accel += r_knee_vel * knee_ext_gain;
+        }
+        if l_foot_z < ground_threshold && l_knee_vel > 0.0 && uprightness > 0.4 {
+            pushoff_accel += l_knee_vel * knee_ext_gain;
+        }
+
         self.state.root_linear_velocity[0] +=
             (forward_accel + pushoff_accel + self.external_force[0] / self.body.total_mass) * dt;
         self.state.root_linear_velocity[1] +=
             (lateral_accel + self.external_force[1] / self.body.total_mass) * dt;
 
-        // Ground friction drag
-        let drag = 1.0;
+        // Speed-dependent drag: high at rest (prevents drift), low at speed (allows running)
+        let speed = (self.state.root_linear_velocity[0].powi(2)
+            + self.state.root_linear_velocity[1].powi(2))
+            .sqrt();
+        let drag = 1.0 - 0.7 * (1.0 - (-speed * 0.5).exp());
+        // drag ≈ 1.0 at rest, ≈ 0.3 at high speed
         self.state.root_linear_velocity[0] *= (1.0 - drag * dt).max(0.0);
         self.state.root_linear_velocity[1] *= (1.0 - drag * dt).max(0.0);
 
@@ -617,11 +620,7 @@ impl MuJoCoHumanoidSimulator {
     fn find_body_id(model: &MjModel, name: &str) -> usize {
         let c_name = std::ffi::CString::new(name).expect("Body name contains null byte");
         let id = unsafe {
-            mujoco_rs::mujoco_c::mj_name2id(
-                model.ffi(),
-                MjtObj::mjOBJ_BODY as i32,
-                c_name.as_ptr(),
-            )
+            mujoco_rs::mujoco_c::mj_name2id(model.ffi(), MjtObj::mjOBJ_BODY as i32, c_name.as_ptr())
         };
         assert!(id >= 0, "Body '{}' not found in MJCF model", name);
         id as usize
@@ -631,13 +630,13 @@ impl MuJoCoHumanoidSimulator {
     fn find_body_id_or(model: &MjModel, name: &str, fallback: usize) -> usize {
         let c_name = std::ffi::CString::new(name).expect("Body name contains null byte");
         let id = unsafe {
-            mujoco_rs::mujoco_c::mj_name2id(
-                model.ffi(),
-                MjtObj::mjOBJ_BODY as i32,
-                c_name.as_ptr(),
-            )
+            mujoco_rs::mujoco_c::mj_name2id(model.ffi(), MjtObj::mjOBJ_BODY as i32, c_name.as_ptr())
         };
-        if id >= 0 { id as usize } else { fallback }
+        if id >= 0 {
+            id as usize
+        } else {
+            fallback
+        }
     }
 
     /// Read body position (xpos) for a given body ID.
@@ -907,7 +906,7 @@ mod tests {
             + result[1] * result[1]
             + result[2] * result[2]
             + result[3] * result[3])
-        .sqrt();
+            .sqrt();
         assert!(
             (norm - 1.0).abs() < 1e-6,
             "Quaternion should stay normalized: {norm}"
@@ -1019,8 +1018,7 @@ mod tests {
 
         let state = sim.state();
         assert!(
-            state.root_linear_velocity[0].abs() > 0.0
-                || state.com_velocity[0].abs() > 0.0,
+            state.root_linear_velocity[0].abs() > 0.0 || state.com_velocity[0].abs() > 0.0,
             "External force should affect velocity"
         );
     }
@@ -1030,7 +1028,9 @@ mod tests {
     #[ignore] // Requires MuJoCo library
     fn test_mujoco_reset() {
         let mut sim = MuJoCoHumanoidSimulator::from_bundled_asset().unwrap();
-        let cmd = HumanoidCommand { torques: [0.5; NUM_ACTUATORS] };
+        let cmd = HumanoidCommand {
+            torques: [0.5; NUM_ACTUATORS],
+        };
 
         for _ in 0..50 {
             sim.step(&cmd, 0.025);

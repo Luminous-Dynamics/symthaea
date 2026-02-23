@@ -6,10 +6,10 @@
 //! - Cognitive tick at 10Hz: FEP agent modulates tau/LR/precision
 //!
 //! Curriculum:
-//! 1. Episodes 0-50: Stand (PD teacher 80%, HDC-LTC 20%)
-//! 2. Episodes 50-100: Stand (PD decays to 20%, HDC-LTC takes over)
-//! 3. Episodes 100-150: Walk (target speed ramps 0->1 m/s)
-//! 4. Episodes 150-200: Run (target speed ramps 1->10 m/s)
+//! 1. Episodes 0-25%: Stand (PD teacher 80%→40%)
+//! 2. Episodes 25-40%: Stand (PD decays 40%→10%, autonomy ramp)
+//! 3. Episodes 40-90%: Walk (PD 10%→5%, speed 0→1 m/s)
+//! 4. Episodes 90-100%: Run (PD 5%→0%, speed 1→3 m/s)
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
@@ -121,10 +121,10 @@ impl HumanoidTrainer {
     /// Determine the task and PD teacher weight for a given episode (curriculum).
     ///
     /// Returns (task, pd_weight, target_speed) with smooth transitions:
-    /// - Phase 1 (0-40%):  Stand, PD 80%→40%
-    /// - Phase 2 (40-60%): Stand, PD 40%→10% (autonomy ramp)
-    /// - Phase 3 (60-95%): Walk, PD 10%→5%, speed 0→1 m/s (35 episodes)
-    /// - Phase 4 (95-100%): Run, PD 5%→0%, speed 1→3 m/s (5 episodes)
+    /// - Phase 1 (0-25%):  Stand, PD 80%→40%
+    /// - Phase 2 (25-40%): Stand, PD 40%→10% (autonomy ramp)
+    /// - Phase 3 (40-90%): Walk, PD 10%→5%, speed 0→1 m/s (50 episodes)
+    /// - Phase 4 (90-100%): Run, PD 5%→0%, speed 1→3 m/s (10 episodes)
     fn curriculum(&self, episode: usize) -> (HumanoidTask, f32, f64) {
         let total = self.config.num_episodes;
         if total <= 1 {
@@ -133,27 +133,27 @@ impl HumanoidTrainer {
 
         let progress = episode as f64 / (total - 1) as f64;
 
-        if progress < 0.4 {
+        if progress < 0.25 {
             // Phase 1: Stand with PD guidance decaying 80%→40%
-            let phase_progress = progress / 0.4;
+            let phase_progress = progress / 0.25;
             let pd_weight = 0.8 - 0.4 * phase_progress as f32;
             (HumanoidTask::Stand, pd_weight, 0.0)
-        } else if progress < 0.6 {
+        } else if progress < 0.40 {
             // Phase 2: Stand with PD decaying 40%→10% (autonomy ramp)
-            let phase_progress = (progress - 0.4) / 0.2;
+            let phase_progress = (progress - 0.25) / 0.15;
             let pd_weight = 0.4 - 0.3 * phase_progress as f32;
             (HumanoidTask::Stand, pd_weight, 0.0)
-        } else if progress < 0.95 {
+        } else if progress < 0.90 {
             // Phase 3: Walk, PD 10%→5%, speed ramps 0→1 m/s
-            // Extended to 35% of training (was 25%) for longer Walk practice
-            let phase_progress = (progress - 0.6) / 0.35;
+            // Extended to 50% of training for longer Walk practice
+            let phase_progress = (progress - 0.40) / 0.50;
             let pd_weight = 0.10 - 0.05 * phase_progress as f32;
             let target_speed = phase_progress * 1.0;
             (HumanoidTask::Walk, pd_weight, target_speed)
         } else {
             // Phase 4: Run, PD 5%→0%, speed ramps 1→3 m/s
-            // Shortened to 5% (was 15%) with gentler speed cap (3 m/s vs 5 m/s)
-            let phase_progress = (progress - 0.95) / 0.05;
+            // 10% of training with gentler speed cap (3 m/s)
+            let phase_progress = (progress - 0.90) / 0.10;
             let pd_weight = 0.05 * (1.0 - phase_progress as f32);
             let target_speed = 1.0 + phase_progress * 2.0;
             (HumanoidTask::Run, pd_weight, target_speed)
@@ -698,26 +698,32 @@ mod tests {
         assert!((pd0 - 0.8).abs() < 0.01);
         assert!((speed0 - 0.0).abs() < 0.01);
 
-        // Phase 2: Stand with decaying PD (episode 50 = progress 0.505)
-        let (task50, pd50, _) = trainer.curriculum(50);
-        assert_eq!(task50, HumanoidTask::Stand);
-        assert!(pd50 < 0.4, "PD should be decaying: {pd50}");
+        // Phase 2: Stand with decaying PD (episode 30 = progress 0.303)
+        let (task30, pd30, _) = trainer.curriculum(30);
+        assert_eq!(task30, HumanoidTask::Stand);
+        assert!(pd30 < 0.4, "PD should be decaying: {pd30}");
 
-        // Phase 3: Walk (episode 70 = progress 0.707)
-        let (task70, _pd70, speed70) = trainer.curriculum(70);
-        assert_eq!(task70, HumanoidTask::Walk);
-        assert!(speed70 > 0.0 && speed70 < 1.0, "Walk speed ramping: {speed70}");
+        // Phase 3: Walk (episode 50 = progress 0.505)
+        let (task50, _pd50, speed50) = trainer.curriculum(50);
+        assert_eq!(task50, HumanoidTask::Walk);
+        assert!(
+            speed50 > 0.0 && speed50 < 1.0,
+            "Walk speed ramping: {speed50}"
+        );
 
-        // Phase 3 still: Walk extends to 95% (episode 90 = progress 0.909)
-        let (task90, _pd90, speed90) = trainer.curriculum(90);
-        assert_eq!(task90, HumanoidTask::Walk);
-        assert!(speed90 > 0.5 && speed90 <= 1.0, "Walk speed near end: {speed90}");
+        // Phase 3 still: Walk extends to 90% (episode 80 = progress 0.808)
+        let (task80, _pd80, speed80) = trainer.curriculum(80);
+        assert_eq!(task80, HumanoidTask::Walk);
+        assert!(
+            speed80 > 0.5 && speed80 <= 1.0,
+            "Walk speed near end: {speed80}"
+        );
 
-        // Phase 4: Run (episode 96 = progress 0.969)
-        let (task96, pd96, speed96) = trainer.curriculum(96);
-        assert_eq!(task96, HumanoidTask::Run);
-        assert!(pd96 < 0.05, "PD nearly zero in Run: {pd96}");
-        assert!(speed96 > 1.0, "Run speed > 1 m/s: {speed96}");
+        // Phase 4: Run (episode 92 = progress 0.929)
+        let (task92, pd92, speed92) = trainer.curriculum(92);
+        assert_eq!(task92, HumanoidTask::Run);
+        assert!(pd92 < 0.05, "PD nearly zero in Run: {pd92}");
+        assert!(speed92 > 1.0, "Run speed > 1 m/s: {speed92}");
 
         // Final episode: speed capped at 3 m/s
         let (_task99, _pd99, speed99) = trainer.curriculum(99);

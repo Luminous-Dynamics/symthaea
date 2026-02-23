@@ -83,6 +83,10 @@ pub struct HumanoidFepConfig {
     pub exploration_patience: usize,
     /// Magnitude of exploration noise.
     pub exploration_magnitude: f32,
+    /// Decay rate for high-FE counter when FE drops below threshold.
+    /// 0.0 = never decays (pure accumulator), 1.0 ≈ consecutive behavior.
+    /// Default: 0.5
+    pub exploration_decay_rate: f64,
     /// Enable TD learning.
     pub enable_td_learning: bool,
     /// TD discount factor.
@@ -101,6 +105,7 @@ impl Default for HumanoidFepConfig {
             exploration_fe_threshold: 1.2,
             exploration_patience: 5,
             exploration_magnitude: 0.03,
+            exploration_decay_rate: 0.5,
             enable_td_learning: true,
             td_discount: 0.99,
             td_lambda: 0.8,
@@ -121,8 +126,8 @@ pub struct ActiveInferenceHumanoidAgent {
     agent: ActiveInferenceAgent,
     /// Configuration.
     config: HumanoidFepConfig,
-    /// Consecutive high-FE ticks.
-    high_fe_ticks: usize,
+    /// Leaky accumulator for high-FE ticks (tolerates transient FE dips).
+    high_fe_ticks: f64,
     /// Previous head height error for trend detection.
     prev_head_height_error: f64,
     /// EMA of applied tau factors.
@@ -163,7 +168,7 @@ impl ActiveInferenceHumanoidAgent {
         Self {
             agent,
             config,
-            high_fe_ticks: 0,
+            high_fe_ticks: 0.0,
             prev_head_height_error: 0.0,
             tau_ema: 1.0,
             current_fe: 0.0,
@@ -319,10 +324,10 @@ impl ActiveInferenceHumanoidAgent {
             }
         }
 
-        // Exploration patience
+        // Exploration patience: leaky accumulator (tolerates transient FE dips)
         if free_energy > self.config.exploration_fe_threshold {
-            self.high_fe_ticks += 1;
-            if self.high_fe_ticks >= self.config.exploration_patience
+            self.high_fe_ticks += 1.0;
+            if self.high_fe_ticks >= self.config.exploration_patience as f64
                 && result.exploration_noise.is_none()
             {
                 let mag = self.config.exploration_magnitude;
@@ -330,7 +335,9 @@ impl ActiveInferenceHumanoidAgent {
                 result.exploration_noise = Some(noise);
             }
         } else {
-            self.high_fe_ticks = 0;
+            // Slow decay instead of hard reset
+            self.high_fe_ticks =
+                (self.high_fe_ticks - self.config.exploration_decay_rate).max(0.0);
         }
 
         // Update tracking state
@@ -345,7 +352,7 @@ impl ActiveInferenceHumanoidAgent {
     /// Reset the agent (for new episode).
     pub fn reset(&mut self) {
         self.agent.reset();
-        self.high_fe_ticks = 0;
+        self.high_fe_ticks = 0.0;
         self.prev_head_height_error = 0.0;
         self.tau_ema = 1.0;
         self.current_fe = 0.0;
@@ -440,7 +447,7 @@ mod tests {
         agent.step(&state, &cmd);
 
         agent.reset();
-        assert_eq!(agent.high_fe_ticks, 0);
+        assert!(agent.high_fe_ticks.abs() < 1e-10);
         assert!((agent.prev_head_height_error - 0.0).abs() < 1e-10);
     }
 
