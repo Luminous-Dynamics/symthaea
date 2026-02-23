@@ -159,6 +159,7 @@
           shellHook = ''
             export LD_LIBRARY_PATH="${libPath}:${onnxPath}:${mujocoPath}:$LD_LIBRARY_PATH"
             export MUJOCO_PATH="${mujoco337}"
+            export MUJOCO_DYNAMIC_LINK_DIR="${mujoco337}/lib"
             export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig:${pkgs.alsa-lib}/lib/pkgconfig:${pkgs.dbus}/lib/pkgconfig:$PKG_CONFIG_PATH"
 
             # ONNX Runtime dynamic loading
