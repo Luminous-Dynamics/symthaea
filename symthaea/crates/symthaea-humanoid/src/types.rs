@@ -325,9 +325,9 @@ pub struct HumanoidConfig {
     pub cognitive_hz: f64,
     /// Training learning rate.
     pub learning_rate: f32,
-    /// Number of HDC-LTC network layers (default: 3, deeper than drone's 2).
+    /// Number of HDC-LTC network layers (default: 4, deeper than drone's 2).
     pub network_layers: usize,
-    /// Neurons per layer (default: 8, wider than drone's 4).
+    /// Neurons per layer (default: 12, wider than drone's 4).
     pub neurons_per_layer: usize,
     /// Number of HDC level codebook entries.
     pub num_levels: usize,
@@ -361,8 +361,8 @@ impl Default for HumanoidConfig {
             physics_hz: 40.0,
             cognitive_hz: 10.0,
             learning_rate: 0.0005,
-            network_layers: 3,
-            neurons_per_layer: 8,
+            network_layers: 4,
+            neurons_per_layer: 12,
             num_levels: 32,
             num_episodes: 200,
             steps_per_episode: 1000,
@@ -460,11 +460,14 @@ pub fn pd_standing_baseline(state: &HumanoidState, gains: &HumanoidPdGains) -> H
 ///
 /// Target angles include:
 /// - Abdomen forward lean (sagittal tilt for forward COM shift)
-/// - Cyclic hip/knee flexion (simple sinusoidal gait pattern)
+/// - Cyclic hip/knee flexion (sinusoidal gait pattern)
+/// - Foot-contact-aware stance/swing modulation
 /// - Arms swing opposite to legs (natural counterbalance)
 ///
 /// The `phase` parameter (0.0..1.0) drives the gait cycle.
 /// `target_speed` scales the amplitude of the gait pattern.
+/// Foot contact is detected from `state.extremities[8]` (right foot z)
+/// and `state.extremities[11]` (left foot z).
 pub fn pd_walking_baseline(
     state: &HumanoidState,
     gains: &HumanoidPdGains,
@@ -478,24 +481,49 @@ pub fn pd_walking_baseline(
     let cycle = (phase * 2.0 * std::f64::consts::PI).sin();
     let half_cycle = ((phase * 2.0 * std::f64::consts::PI) + std::f64::consts::FRAC_PI_2).sin();
 
+    // Foot contact detection: z < 0.05m = on ground (stance phase)
+    let contact_threshold = 0.05;
+    let r_foot_z = state.extremities[8];
+    let l_foot_z = state.extremities[11];
+    let r_stance = r_foot_z < contact_threshold;
+    let l_stance = l_foot_z < contact_threshold;
+
+    // Stance/swing modulation: blend sinusoidal with contact-aware targets
+    // Stance leg: extend hip back (pushoff), extend knee
+    // Swing leg: flex hip forward (lift), flex knee (clearance)
+    // During double-support (both feet down), reduce contact modulation
+    // to avoid overpowering the sinusoidal gait pattern.
+    let contact_blend = if r_stance && l_stance { 0.1 } else { 0.4 };
+    let sin_blend = 1.0 - contact_blend;
+
+    let r_contact_mod = if r_stance { 0.3 } else { -0.3 };
+    let l_contact_mod = if l_stance { 0.3 } else { -0.3 };
+
+    let r_hip_target = sin_blend * cycle + contact_blend * r_contact_mod;
+    let l_hip_target = sin_blend * (-cycle) + contact_blend * l_contact_mod;
+
+    // Knee: during swing (not in stance), flex more for foot clearance
+    let r_knee_swing = if r_stance { 0.0 } else { -0.3 };
+    let l_knee_swing = if l_stance { 0.0 } else { -0.3 };
+
     // Abdomen: forward lean for COM shift (sagittal tilt)
     target_angles[0] = 0.15 * amplitude; // abdomen_y: forward lean
     target_angles[1] = 0.0; // abdomen_z: no yaw
     target_angles[2] = 0.0; // abdomen_x: no lateral lean
 
-    // Right leg: hip flexion/extension + knee bend
+    // Right leg: contact-aware hip + knee
     target_angles[3] = 0.0; // right_hip_x: abduction (minimal)
     target_angles[4] = 0.0; // right_hip_z: rotation (minimal)
-    target_angles[5] = 0.3 * amplitude * cycle; // right_hip_y: sagittal swing
-    target_angles[6] = -0.4 * amplitude * half_cycle.max(0.0); // right_knee: flexion during swing
+    target_angles[5] = 0.3 * amplitude * r_hip_target; // right_hip_y: contact-aware swing
+    target_angles[6] = -0.4 * amplitude * half_cycle.max(0.0) + amplitude * r_knee_swing;
     target_angles[7] = -0.1 * amplitude * cycle; // right_ankle_x
     target_angles[8] = 0.05 * amplitude; // right_ankle_y: slight dorsiflexion
 
-    // Left leg: opposite phase
+    // Left leg: contact-aware
     target_angles[9] = 0.0; // left_hip_x
     target_angles[10] = 0.0; // left_hip_z
-    target_angles[11] = -0.3 * amplitude * cycle; // left_hip_y: opposite phase
-    target_angles[12] = -0.4 * amplitude * (-half_cycle).max(0.0); // left_knee
+    target_angles[11] = 0.3 * amplitude * l_hip_target; // left_hip_y: contact-aware
+    target_angles[12] = -0.4 * amplitude * (-half_cycle).max(0.0) + amplitude * l_knee_swing;
     target_angles[13] = 0.1 * amplitude * cycle; // left_ankle_x
     target_angles[14] = 0.05 * amplitude; // left_ankle_y
 
@@ -522,7 +550,7 @@ pub fn pd_walking_baseline(
 /// Amplified version of walking baseline with:
 /// - Steeper forward lean
 /// - Larger hip swing amplitude
-/// - Higher knee lift
+/// - Higher knee lift + foot-contact-aware stance/swing
 /// - More aggressive arm swing
 pub fn pd_running_baseline(
     state: &HumanoidState,
@@ -536,24 +564,45 @@ pub fn pd_running_baseline(
     let cycle = (phase * 2.0 * std::f64::consts::PI).sin();
     let half_cycle = ((phase * 2.0 * std::f64::consts::PI) + std::f64::consts::FRAC_PI_2).sin();
 
+    // Foot contact detection
+    let contact_threshold = 0.05;
+    let r_foot_z = state.extremities[8];
+    let l_foot_z = state.extremities[11];
+    let r_stance = r_foot_z < contact_threshold;
+    let l_stance = l_foot_z < contact_threshold;
+
+    // Contact-aware hip targets: stance → extend (pushoff), swing → flex (lift)
+    // Reduce modulation during double support to keep sinusoidal dominant.
+    let contact_blend = if r_stance && l_stance { 0.1 } else { 0.4 };
+    let sin_blend = 1.0 - contact_blend;
+
+    let r_contact_mod = if r_stance { 0.4 } else { -0.4 };
+    let l_contact_mod = if l_stance { 0.4 } else { -0.4 };
+    let r_hip_target = sin_blend * cycle + contact_blend * r_contact_mod;
+    let l_hip_target = sin_blend * (-cycle) + contact_blend * l_contact_mod;
+
+    // Knee: swing phase needs higher clearance for running
+    let r_knee_swing = if r_stance { 0.0 } else { -0.5 };
+    let l_knee_swing = if l_stance { 0.0 } else { -0.5 };
+
     // Deeper forward lean for running
     target_angles[0] = 0.25 * amplitude; // abdomen_y: steeper lean
     target_angles[1] = 0.0;
     target_angles[2] = 0.0;
 
-    // Right leg: larger stride
+    // Right leg: contact-aware larger stride
     target_angles[3] = 0.0;
     target_angles[4] = 0.0;
-    target_angles[5] = 0.5 * amplitude * cycle; // right_hip_y: bigger swing
-    target_angles[6] = -0.7 * amplitude * half_cycle.max(0.0); // right_knee: higher lift
+    target_angles[5] = 0.5 * amplitude * r_hip_target; // right_hip_y: contact-aware
+    target_angles[6] = -0.7 * amplitude * half_cycle.max(0.0) + amplitude * r_knee_swing;
     target_angles[7] = -0.15 * amplitude * cycle;
     target_angles[8] = 0.08 * amplitude;
 
-    // Left leg
+    // Left leg: contact-aware
     target_angles[9] = 0.0;
     target_angles[10] = 0.0;
-    target_angles[11] = -0.5 * amplitude * cycle;
-    target_angles[12] = -0.7 * amplitude * (-half_cycle).max(0.0);
+    target_angles[11] = 0.5 * amplitude * l_hip_target;
+    target_angles[12] = -0.7 * amplitude * (-half_cycle).max(0.0) + amplitude * l_knee_swing;
     target_angles[13] = 0.15 * amplitude * cycle;
     target_angles[14] = 0.08 * amplitude;
 

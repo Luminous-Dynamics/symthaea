@@ -325,7 +325,14 @@ impl HumanoidTrainer {
                         pd_running_baseline(&state, &self.pd_gains, gait_phase, target_speed)
                     }
                 };
-                let lr = controller.learning_rate() * fep_result.learning_rate_factor * lr_scale;
+                // Reward-modulated BPTT: scale gradient by standing_reward so the
+                // network learns more when upright (clear signal) and less when
+                // fallen (noisy signal). Floor at 0.1 to preserve some gradient.
+                let reward_mod = (standing_r as f32).max(0.1);
+                let lr = controller.learning_rate()
+                    * fep_result.learning_rate_factor
+                    * lr_scale
+                    * reward_mod;
 
                 controller.train_step(&sensor_hv, &target, dt as f32, Some(lr));
 

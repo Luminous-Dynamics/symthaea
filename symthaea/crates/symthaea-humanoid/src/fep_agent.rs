@@ -98,8 +98,8 @@ impl Default for HumanoidFepConfig {
         Self {
             inference_iterations: 5,
             action_temperature: 0.5,
-            exploration_fe_threshold: 2.0,
-            exploration_patience: 15,
+            exploration_fe_threshold: 1.2,
+            exploration_patience: 5,
             exploration_magnitude: 0.03,
             enable_td_learning: true,
             td_discount: 0.99,
