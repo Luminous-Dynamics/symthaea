@@ -43,8 +43,8 @@ impl AudioOutput {
             .output_devices()
             .context("Failed to enumerate output devices")?
             .find(|d| {
-                d.name()
-                    .map(|n| n.contains(device_name))
+                d.description()
+                    .map(|desc| desc.name().contains(device_name))
                     .unwrap_or(false)
             })
             .with_context(|| format!("No output device matching '{device_name}'"))?;
