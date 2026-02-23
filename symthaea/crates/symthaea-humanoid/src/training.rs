@@ -325,7 +325,7 @@ impl HumanoidTrainer {
                         pd_running_baseline(&state, &self.pd_gains, gait_phase, target_speed)
                     }
                 };
-                let lr = self.config.learning_rate * fep_result.learning_rate_factor * lr_scale;
+                let lr = controller.learning_rate() * fep_result.learning_rate_factor * lr_scale;
 
                 controller.train_step(&sensor_hv, &target, dt as f32, Some(lr));
 
