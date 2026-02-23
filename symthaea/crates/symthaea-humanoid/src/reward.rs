@@ -65,14 +65,75 @@ pub fn metabolic_efficiency_reward(cmd: &HumanoidCommand) -> f64 {
     (-2.0 * normalized).exp()
 }
 
+/// Clearance threshold: foot z above this = swing phase.
+const CLEARANCE_THRESHOLD: f64 = 0.03;
+
+/// Foot clearance reward: incentivizes proper foot lift during swing.
+///
+/// Swing phase (foot z > threshold): reward clearance near target 0.04-0.12m.
+/// Stance phase (foot on ground): neutral 0.5 (no penalty for grounding).
+pub fn clearance_reward(state: &HumanoidState) -> f64 {
+    let foot_score = |z: f64| -> f64 {
+        if z > CLEARANCE_THRESHOLD {
+            tolerance(z, 0.04, 0.12, 0.03)
+        } else {
+            0.5
+        }
+    };
+    0.5 * foot_score(state.extremities[8]) + 0.5 * foot_score(state.extremities[11])
+}
+
+/// Phasic metabolic cost: penalizes sustained activation, tolerates bursts.
+///
+/// Biological locomotion uses brief, high-amplitude muscle bursts during
+/// stance phase (gastrocnemius pushoff ~200ms). This reward distinguishes
+/// efficient burst patterns from wasteful sustained co-contraction.
+///
+/// Uses variance of squared torques across actuators: high variance = some
+/// actuators active (bursting), others relaxed (efficient). Low variance
+/// with high mean = co-contraction (inefficient).
+pub fn phasic_metabolic_reward(cmd: &HumanoidCommand) -> f64 {
+    let squares: Vec<f64> = cmd.torques.iter().map(|t| (*t as f64).powi(2)).collect();
+    let mean_sq = squares.iter().sum::<f64>() / 21.0;
+    let variance = squares.iter().map(|s| (s - mean_sq).powi(2)).sum::<f64>() / 21.0;
+
+    // High mean + low variance = co-contraction → low reward
+    // Low mean = efficient → high reward
+    // High variance (burst pattern) gets partial credit even with higher mean
+    let efficiency = (-2.0 * mean_sq).exp();
+    let burst_bonus = (variance * 10.0).min(0.3); // up to 0.3 bonus for burst patterns
+    (efficiency + burst_bonus).min(1.0)
+}
+
+/// Cost-of-transport efficiency reward: penalizes high power relative to speed.
+///
+/// Instantaneous: power = Σ|torque_i × velocity_i|, CoT_inst = power / (mass × max(speed, 0.1)).
+/// Returns exp(-CoT_inst) — high when efficient, low when wasteful.
+pub fn cot_efficiency_reward(state: &HumanoidState, cmd: &HumanoidCommand) -> f64 {
+    let power: f64 = cmd
+        .torques
+        .iter()
+        .zip(state.joint_velocities.iter())
+        .map(|(t, v)| (*t as f64 * v).abs())
+        .sum();
+    let speed = state.horizontal_speed().max(0.1);
+    let cot_inst = power / (70.0 * speed);
+    (-cot_inst).exp()
+}
+
 /// Combined episode reward based on task with curriculum target speed.
 ///
 /// - Stand: standing_reward × small_control
-/// - Walk/Run: 0.4 × standing + 0.3 × locomotion + 0.15 × symmetry + 0.15 × metabolic
+/// - Walk/Run: 0.30×stand + 0.28×locomotion + 0.10×symmetry + 0.12×metabolic + 0.10×clearance + 0.10×cot_eff
 ///
 /// The additive formulation ensures a gradient signal exists even when
 /// horizontal speed is far from target (multiplicative `stand × locomotion`
 /// collapses to ~0 when either factor is small, starving the learner).
+///
+/// Clearance partially subsumes symmetry (proper foot lift implies alternation),
+/// so symmetry weight is reduced. CoT efficiency overlaps metabolic (both penalize
+/// torque), so metabolic drops 0.15→0.12. Standing drops 0.35→0.30 since CoT
+/// provides complementary signal. Locomotion 0.30→0.28 to maintain sum=1.0.
 ///
 /// The `target_speed` parameter allows the curriculum to ramp speed gradually
 /// (e.g., Walk: 0→1 m/s, Run: 1→3 m/s).
@@ -88,8 +149,15 @@ pub fn episode_reward(
         HumanoidTask::Walk | HumanoidTask::Run => {
             let locomotion = locomotion_reward(state, target_speed);
             let symmetry = gait_symmetry_reward(state);
-            let metabolic = metabolic_efficiency_reward(cmd);
-            0.4 * stand + 0.3 * locomotion + 0.15 * symmetry + 0.15 * metabolic
+            let metabolic = phasic_metabolic_reward(cmd);
+            let clearance = clearance_reward(state);
+            let cot_eff = cot_efficiency_reward(state, cmd);
+            0.30 * stand
+                + 0.28 * locomotion
+                + 0.10 * symmetry
+                + 0.12 * metabolic
+                + 0.10 * clearance
+                + 0.10 * cot_eff
         }
     }
 }
@@ -294,6 +362,116 @@ mod tests {
         assert!(
             reward > 0.0,
             "Metabolic reward should stay positive: {reward}"
+        );
+    }
+
+    #[test]
+    fn test_phasic_metabolic_burst_pattern() {
+        // Few actuators at high torque, rest at zero → burst pattern
+        let mut cmd = HumanoidCommand::zero();
+        cmd.torques[5] = 0.8; // right hip pushoff
+        cmd.torques[6] = 0.6; // right knee
+        let burst_reward = phasic_metabolic_reward(&cmd);
+
+        // Uniform moderate torque → co-contraction
+        let uniform_cmd = HumanoidCommand { torques: [0.4; 21] };
+        let uniform_reward = phasic_metabolic_reward(&uniform_cmd);
+
+        assert!(
+            burst_reward > uniform_reward,
+            "Burst pattern should reward higher than co-contraction: burst={burst_reward} uniform={uniform_reward}"
+        );
+    }
+
+    #[test]
+    fn test_phasic_metabolic_cocontraction() {
+        // All actuators at moderate torque → co-contraction (low reward)
+        let cmd = HumanoidCommand { torques: [0.5; 21] };
+        let reward = phasic_metabolic_reward(&cmd);
+
+        // Burst pattern: few active, rest zero
+        let mut burst_cmd = HumanoidCommand::zero();
+        burst_cmd.torques[5] = 0.8;
+        burst_cmd.torques[11] = 0.8;
+        let burst_reward = phasic_metabolic_reward(&burst_cmd);
+
+        assert!(
+            reward < burst_reward,
+            "Co-contraction should reward lower than burst: cocontract={reward} burst={burst_reward}"
+        );
+    }
+
+    #[test]
+    fn test_phasic_metabolic_zero_torque() {
+        let cmd = HumanoidCommand::zero();
+        let reward = phasic_metabolic_reward(&cmd);
+        assert!(
+            (reward - 1.0).abs() < 0.01,
+            "Zero torque should give max phasic metabolic reward: {reward}"
+        );
+    }
+
+    #[test]
+    fn test_clearance_reward_foot_lifted() {
+        let mut state = HumanoidState::standing();
+        state.extremities[8] = 0.06; // right foot lifted to 6cm (within target)
+        state.extremities[11] = 0.0; // left foot on ground
+        let reward = clearance_reward(&state);
+        assert!(
+            reward > 0.5,
+            "One foot lifted in target range should give reward > 0.5: {reward}"
+        );
+    }
+
+    #[test]
+    fn test_clearance_reward_both_grounded() {
+        let mut state = HumanoidState::standing();
+        state.extremities[8] = 0.0;
+        state.extremities[11] = 0.0;
+        let reward = clearance_reward(&state);
+        assert!(
+            (reward - 0.5).abs() < 1e-10,
+            "Both feet grounded should give neutral 0.5: {reward}"
+        );
+    }
+
+    #[test]
+    fn test_clearance_reward_shuffling() {
+        let mut state = HumanoidState::standing();
+        state.extremities[8] = 0.01; // barely lifted (below threshold)
+        state.extremities[11] = 0.0;
+        let reward = clearance_reward(&state);
+        assert!(
+            reward <= 0.5 + 1e-10,
+            "Shuffling (below threshold) should give reward <= 0.5: {reward}"
+        );
+    }
+
+    // ── CoT efficiency reward tests ──
+
+    #[test]
+    fn test_cot_efficiency_zero_torque() {
+        let state = HumanoidState::standing();
+        let cmd = HumanoidCommand::zero();
+        let reward = cot_efficiency_reward(&state, &cmd);
+        assert!(
+            (reward - 1.0).abs() < 0.01,
+            "Zero torque should give max CoT efficiency: {reward}"
+        );
+    }
+
+    #[test]
+    fn test_cot_efficiency_high_power() {
+        let mut state = HumanoidState::standing();
+        // Low speed (horizontal speed ≈ 0 → clamped to 0.1)
+        state.com_velocity = [0.05, 0.0, 0.0];
+        // High joint velocities + high torques = high power
+        state.joint_velocities = [2.0; 21];
+        let cmd = HumanoidCommand { torques: [0.8; 21] };
+        let reward = cot_efficiency_reward(&state, &cmd);
+        assert!(
+            reward < 0.5,
+            "High power + low speed should give low CoT efficiency: {reward}"
         );
     }
 

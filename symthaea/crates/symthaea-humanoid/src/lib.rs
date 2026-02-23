@@ -47,6 +47,7 @@ pub mod benchmarks;
 pub mod controller;
 pub mod encoder;
 pub mod fep_agent;
+pub mod gait;
 pub mod perturbations;
 pub mod reward;
 pub mod simulator;
@@ -55,10 +56,11 @@ pub mod transfer;
 pub mod types;
 
 pub use controller::{ControllerCheckpoint, HumanoidController};
+pub use gait::GaitAnalyzer;
 pub use encoder::HumanoidHdcEncoder;
 pub use fep_agent::{ActiveInferenceHumanoidAgent, HumanoidFepConfig};
 pub use perturbations::{HumanoidPerturbation, PerturbationSchedule};
-pub use reward::{episode_reward, standing_reward};
+pub use reward::{clearance_reward, cot_efficiency_reward, episode_reward, standing_reward};
 #[cfg(feature = "mujoco")]
 pub use simulator::MuJoCoHumanoidSimulator;
 pub use simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
