@@ -12871,6 +12871,7 @@ dependencies = [
  "iroh",
  "lancedb",
  "lru 0.16.3",
+ "lz4_flex",
  "mycelix-fl-core",
  "nalgebra",
  "ndarray 0.16.1",
