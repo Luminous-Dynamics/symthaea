@@ -98,6 +98,13 @@ fn validate_need(need: Need) -> ExternResult<ValidateCallbackResult> {
         ));
     }
 
+    // ID length limit
+    if need.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Need ID exceeds 64 character limit".to_string(),
+        ));
+    }
+
     // Title must not be empty
     if need.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -106,24 +113,33 @@ fn validate_need(need: Need) -> ExternResult<ValidateCallbackResult> {
     }
 
     // Title length limit
-    if need.title.len() > 200 {
+    if need.title.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Need title cannot exceed 200 characters".to_string(),
+            "Need title exceeds 256 character limit".to_string(),
         ));
     }
 
     // Description length limit
-    if need.description.len() > 3000 {
+    if need.description.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Need description cannot exceed 3000 characters".to_string(),
+            "Need description exceeds 4096 character limit".to_string(),
         ));
     }
 
     // Reciprocity offers limit
-    if need.reciprocity_offers.len() > 10 {
+    if need.reciprocity_offers.len() > 100 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Cannot have more than 10 reciprocity offers".to_string(),
+            "Cannot have more than 100 reciprocity offers".to_string(),
         ));
+    }
+
+    // Individual reciprocity offer length limit
+    for offer in &need.reciprocity_offers {
+        if offer.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Reciprocity offer exceeds 256 character limit".to_string(),
+            ));
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -138,6 +154,13 @@ fn validate_offer(offer: Offer) -> ExternResult<ValidateCallbackResult> {
         ));
     }
 
+    // ID length limit
+    if offer.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Offer ID exceeds 64 character limit".to_string(),
+        ));
+    }
+
     // Title must not be empty
     if offer.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -146,24 +169,33 @@ fn validate_offer(offer: Offer) -> ExternResult<ValidateCallbackResult> {
     }
 
     // Title length limit
-    if offer.title.len() > 200 {
+    if offer.title.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Offer title cannot exceed 200 characters".to_string(),
+            "Offer title exceeds 256 character limit".to_string(),
         ));
     }
 
     // Description length limit
-    if offer.description.len() > 3000 {
+    if offer.description.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Offer description cannot exceed 3000 characters".to_string(),
+            "Offer description exceeds 4096 character limit".to_string(),
         ));
     }
 
     // Asking for limit
-    if offer.asking_for.len() > 10 {
+    if offer.asking_for.len() > 100 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Cannot have more than 10 asking for items".to_string(),
+            "Cannot have more than 100 asking for items".to_string(),
         ));
+    }
+
+    // Individual asking for item length limit
+    for item in &offer.asking_for {
+        if item.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Asking for item exceeds 256 character limit".to_string(),
+            ));
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -178,6 +210,13 @@ fn validate_match(m: Match) -> ExternResult<ValidateCallbackResult> {
         ));
     }
 
+    // ID length limit
+    if m.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Match ID exceeds 64 character limit".to_string(),
+        ));
+    }
+
     // Requester and offerer must be different
     if m.requester == m.offerer {
         return Ok(ValidateCallbackResult::Invalid(
@@ -186,9 +225,9 @@ fn validate_match(m: Match) -> ExternResult<ValidateCallbackResult> {
     }
 
     // Notes length limit
-    if m.notes.len() > 1000 {
+    if m.notes.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Match notes cannot exceed 1000 characters".to_string(),
+            "Match notes exceeds 4096 character limit".to_string(),
         ));
     }
 
@@ -198,17 +237,17 @@ fn validate_match(m: Match) -> ExternResult<ValidateCallbackResult> {
 /// Validate a fulfillment
 fn validate_fulfillment(fulfillment: Fulfillment) -> ExternResult<ValidateCallbackResult> {
     // Notes length limit
-    if fulfillment.notes.len() > 1000 {
+    if fulfillment.notes.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Fulfillment notes cannot exceed 1000 characters".to_string(),
+            "Fulfillment notes exceeds 4096 character limit".to_string(),
         ));
     }
 
     // Gratitude message length limit
     if let Some(ref msg) = fulfillment.gratitude_message {
-        if msg.len() > 500 {
+        if msg.len() > 4096 {
             return Ok(ValidateCallbackResult::Invalid(
-                "Gratitude message cannot exceed 500 characters".to_string(),
+                "Gratitude message exceeds 4096 character limit".to_string(),
             ));
         }
     }
@@ -425,7 +464,7 @@ mod tests {
     #[test]
     fn test_need_title_at_boundary() {
         let mut need = valid_need();
-        need.title = "a".repeat(200);
+        need.title = "a".repeat(256);
         let result = validate_need(need);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -433,7 +472,7 @@ mod tests {
     #[test]
     fn test_need_title_exceeds_limit() {
         let mut need = valid_need();
-        need.title = "a".repeat(201);
+        need.title = "a".repeat(257);
         let result = validate_need(need);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
@@ -449,7 +488,7 @@ mod tests {
     #[test]
     fn test_need_description_at_boundary() {
         let mut need = valid_need();
-        need.description = "b".repeat(3000);
+        need.description = "b".repeat(4096);
         let result = validate_need(need);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -457,7 +496,7 @@ mod tests {
     #[test]
     fn test_need_description_exceeds_limit() {
         let mut need = valid_need();
-        need.description = "b".repeat(3001);
+        need.description = "b".repeat(4097);
         let result = validate_need(need);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
@@ -473,7 +512,7 @@ mod tests {
     #[test]
     fn test_need_reciprocity_offers_at_boundary() {
         let mut need = valid_need();
-        need.reciprocity_offers = (0..10).map(|i| format!("offer_{}", i)).collect();
+        need.reciprocity_offers = (0..100).map(|i| format!("offer_{}", i)).collect();
         let result = validate_need(need);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -481,7 +520,7 @@ mod tests {
     #[test]
     fn test_need_reciprocity_offers_exceeds_limit() {
         let mut need = valid_need();
-        need.reciprocity_offers = (0..11).map(|i| format!("offer_{}", i)).collect();
+        need.reciprocity_offers = (0..101).map(|i| format!("offer_{}", i)).collect();
         let result = validate_need(need);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
@@ -533,7 +572,7 @@ mod tests {
     #[test]
     fn test_offer_title_at_boundary() {
         let mut offer = valid_offer();
-        offer.title = "c".repeat(200);
+        offer.title = "c".repeat(256);
         let result = validate_offer(offer);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -541,7 +580,7 @@ mod tests {
     #[test]
     fn test_offer_title_exceeds_limit() {
         let mut offer = valid_offer();
-        offer.title = "c".repeat(201);
+        offer.title = "c".repeat(257);
         let result = validate_offer(offer);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
@@ -557,7 +596,7 @@ mod tests {
     #[test]
     fn test_offer_description_at_boundary() {
         let mut offer = valid_offer();
-        offer.description = "d".repeat(3000);
+        offer.description = "d".repeat(4096);
         let result = validate_offer(offer);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -565,7 +604,7 @@ mod tests {
     #[test]
     fn test_offer_description_exceeds_limit() {
         let mut offer = valid_offer();
-        offer.description = "d".repeat(3001);
+        offer.description = "d".repeat(4097);
         let result = validate_offer(offer);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
@@ -581,7 +620,7 @@ mod tests {
     #[test]
     fn test_offer_asking_for_at_boundary() {
         let mut offer = valid_offer();
-        offer.asking_for = (0..10).map(|i| format!("item_{}", i)).collect();
+        offer.asking_for = (0..100).map(|i| format!("item_{}", i)).collect();
         let result = validate_offer(offer);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -589,7 +628,7 @@ mod tests {
     #[test]
     fn test_offer_asking_for_exceeds_limit() {
         let mut offer = valid_offer();
-        offer.asking_for = (0..11).map(|i| format!("item_{}", i)).collect();
+        offer.asking_for = (0..101).map(|i| format!("item_{}", i)).collect();
         let result = validate_offer(offer);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
@@ -642,7 +681,7 @@ mod tests {
     #[test]
     fn test_match_notes_at_boundary() {
         let mut m = valid_match();
-        m.notes = "e".repeat(1000);
+        m.notes = "e".repeat(4096);
         let result = validate_match(m);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -650,7 +689,7 @@ mod tests {
     #[test]
     fn test_match_notes_exceeds_limit() {
         let mut m = valid_match();
-        m.notes = "e".repeat(1001);
+        m.notes = "e".repeat(4097);
         let result = validate_match(m);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
@@ -677,7 +716,7 @@ mod tests {
     #[test]
     fn test_fulfillment_notes_at_boundary() {
         let mut fulfillment = valid_fulfillment();
-        fulfillment.notes = "f".repeat(1000);
+        fulfillment.notes = "f".repeat(4096);
         let result = validate_fulfillment(fulfillment);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -685,7 +724,7 @@ mod tests {
     #[test]
     fn test_fulfillment_notes_exceeds_limit() {
         let mut fulfillment = valid_fulfillment();
-        fulfillment.notes = "f".repeat(1001);
+        fulfillment.notes = "f".repeat(4097);
         let result = validate_fulfillment(fulfillment);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
@@ -701,7 +740,7 @@ mod tests {
     #[test]
     fn test_fulfillment_gratitude_message_at_boundary() {
         let mut fulfillment = valid_fulfillment();
-        fulfillment.gratitude_message = Some("g".repeat(500));
+        fulfillment.gratitude_message = Some("g".repeat(4096));
         let result = validate_fulfillment(fulfillment);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -709,7 +748,7 @@ mod tests {
     #[test]
     fn test_fulfillment_gratitude_message_exceeds_limit() {
         let mut fulfillment = valid_fulfillment();
-        fulfillment.gratitude_message = Some("g".repeat(501));
+        fulfillment.gratitude_message = Some("g".repeat(4097));
         let result = validate_fulfillment(fulfillment);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
@@ -830,9 +869,10 @@ mod tests {
     #[test]
     fn test_need_all_fields_at_boundaries() {
         let mut need = valid_need();
-        need.title = "t".repeat(200);
-        need.description = "d".repeat(3000);
-        need.reciprocity_offers = (0..10).map(|i| format!("offer_{}", i)).collect();
+        need.id = "i".repeat(64);
+        need.title = "t".repeat(256);
+        need.description = "d".repeat(4096);
+        need.reciprocity_offers = (0..100).map(|i| format!("offer_{}", i)).collect();
         let result = validate_need(need);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -840,9 +880,10 @@ mod tests {
     #[test]
     fn test_offer_all_fields_at_boundaries() {
         let mut offer = valid_offer();
-        offer.title = "t".repeat(200);
-        offer.description = "d".repeat(3000);
-        offer.asking_for = (0..10).map(|i| format!("item_{}", i)).collect();
+        offer.id = "i".repeat(64);
+        offer.title = "t".repeat(256);
+        offer.description = "d".repeat(4096);
+        offer.asking_for = (0..100).map(|i| format!("item_{}", i)).collect();
         let result = validate_offer(offer);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -850,7 +891,8 @@ mod tests {
     #[test]
     fn test_match_all_fields_at_boundaries() {
         let mut m = valid_match();
-        m.notes = "n".repeat(1000);
+        m.id = "i".repeat(64);
+        m.notes = "n".repeat(4096);
         let result = validate_match(m);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -858,8 +900,8 @@ mod tests {
     #[test]
     fn test_fulfillment_all_fields_at_boundaries() {
         let mut fulfillment = valid_fulfillment();
-        fulfillment.notes = "n".repeat(1000);
-        fulfillment.gratitude_message = Some("g".repeat(500));
+        fulfillment.notes = "n".repeat(4096);
+        fulfillment.gratitude_message = Some("g".repeat(4096));
         let result = validate_fulfillment(fulfillment);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -918,9 +960,9 @@ mod tests {
     #[test]
     fn test_offer_title_exceeds_error_message() {
         let mut offer = valid_offer();
-        offer.title = "x".repeat(201);
+        offer.title = "x".repeat(257);
         if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_offer(offer) {
-            assert_eq!(msg, "Offer title cannot exceed 200 characters");
+            assert_eq!(msg, "Offer title exceeds 256 character limit");
         } else {
             panic!("Expected Invalid result");
         }
@@ -941,9 +983,9 @@ mod tests {
     #[test]
     fn test_fulfillment_gratitude_exceeds_error_message() {
         let mut fulfillment = valid_fulfillment();
-        fulfillment.gratitude_message = Some("g".repeat(501));
+        fulfillment.gratitude_message = Some("g".repeat(4097));
         if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_fulfillment(fulfillment) {
-            assert_eq!(msg, "Gratitude message cannot exceed 500 characters");
+            assert_eq!(msg, "Gratitude message exceeds 4096 character limit");
         } else {
             panic!("Expected Invalid result");
         }
@@ -1045,73 +1087,73 @@ mod tests {
     }
 
     #[test]
-    fn test_need_title_exactly_199_chars() {
+    fn test_need_title_exactly_255_chars() {
         let mut need = valid_need();
-        need.title = "x".repeat(199);
+        need.title = "x".repeat(255);
         let result = validate_need(need);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
 
     #[test]
-    fn test_offer_title_exactly_199_chars() {
+    fn test_offer_title_exactly_255_chars() {
         let mut offer = valid_offer();
-        offer.title = "y".repeat(199);
+        offer.title = "y".repeat(255);
         let result = validate_offer(offer);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
 
     #[test]
-    fn test_need_description_exactly_2999_chars() {
+    fn test_need_description_exactly_4095_chars() {
         let mut need = valid_need();
-        need.description = "z".repeat(2999);
+        need.description = "z".repeat(4095);
         let result = validate_need(need);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
 
     #[test]
-    fn test_offer_description_exactly_2999_chars() {
+    fn test_offer_description_exactly_4095_chars() {
         let mut offer = valid_offer();
-        offer.description = "w".repeat(2999);
+        offer.description = "w".repeat(4095);
         let result = validate_offer(offer);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
 
     #[test]
-    fn test_match_notes_exactly_999_chars() {
+    fn test_match_notes_exactly_4095_chars() {
         let mut m = valid_match();
-        m.notes = "v".repeat(999);
+        m.notes = "v".repeat(4095);
         let result = validate_match(m);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
 
     #[test]
-    fn test_fulfillment_notes_exactly_999_chars() {
+    fn test_fulfillment_notes_exactly_4095_chars() {
         let mut fulfillment = valid_fulfillment();
-        fulfillment.notes = "u".repeat(999);
+        fulfillment.notes = "u".repeat(4095);
         let result = validate_fulfillment(fulfillment);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
 
     #[test]
-    fn test_fulfillment_gratitude_exactly_499_chars() {
+    fn test_fulfillment_gratitude_exactly_4095_chars() {
         let mut fulfillment = valid_fulfillment();
-        fulfillment.gratitude_message = Some("t".repeat(499));
+        fulfillment.gratitude_message = Some("t".repeat(4095));
         let result = validate_fulfillment(fulfillment);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
 
     #[test]
-    fn test_need_reciprocity_offers_exactly_9_items() {
+    fn test_need_reciprocity_offers_exactly_99_items() {
         let mut need = valid_need();
-        need.reciprocity_offers = (0..9).map(|i| format!("offer_{}", i)).collect();
+        need.reciprocity_offers = (0..99).map(|i| format!("offer_{}", i)).collect();
         let result = validate_need(need);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
 
     #[test]
-    fn test_offer_asking_for_exactly_9_items() {
+    fn test_offer_asking_for_exactly_99_items() {
         let mut offer = valid_offer();
-        offer.asking_for = (0..9).map(|i| format!("item_{}", i)).collect();
+        offer.asking_for = (0..99).map(|i| format!("item_{}", i)).collect();
         let result = validate_offer(offer);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -1119,9 +1161,9 @@ mod tests {
     #[test]
     fn test_need_description_exceeds_error_message() {
         let mut need = valid_need();
-        need.description = "x".repeat(3001);
+        need.description = "x".repeat(4097);
         if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_need(need) {
-            assert_eq!(msg, "Need description cannot exceed 3000 characters");
+            assert_eq!(msg, "Need description exceeds 4096 character limit");
         } else {
             panic!("Expected Invalid result");
         }
@@ -1163,9 +1205,9 @@ mod tests {
     #[test]
     fn test_match_notes_exceeds_error_message() {
         let mut m = valid_match();
-        m.notes = "x".repeat(1001);
+        m.notes = "x".repeat(4097);
         if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_match(m) {
-            assert_eq!(msg, "Match notes cannot exceed 1000 characters");
+            assert_eq!(msg, "Match notes exceeds 4096 character limit");
         } else {
             panic!("Expected Invalid result");
         }
@@ -1174,9 +1216,9 @@ mod tests {
     #[test]
     fn test_fulfillment_notes_exceeds_error_message() {
         let mut fulfillment = valid_fulfillment();
-        fulfillment.notes = "x".repeat(1001);
+        fulfillment.notes = "x".repeat(4097);
         if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_fulfillment(fulfillment) {
-            assert_eq!(msg, "Fulfillment notes cannot exceed 1000 characters");
+            assert_eq!(msg, "Fulfillment notes exceeds 4096 character limit");
         } else {
             panic!("Expected Invalid result");
         }
@@ -1185,9 +1227,9 @@ mod tests {
     #[test]
     fn test_need_reciprocity_exceeds_error_message() {
         let mut need = valid_need();
-        need.reciprocity_offers = (0..11).map(|i| format!("offer_{}", i)).collect();
+        need.reciprocity_offers = (0..101).map(|i| format!("offer_{}", i)).collect();
         if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_need(need) {
-            assert_eq!(msg, "Cannot have more than 10 reciprocity offers");
+            assert_eq!(msg, "Cannot have more than 100 reciprocity offers");
         } else {
             panic!("Expected Invalid result");
         }
@@ -1196,9 +1238,9 @@ mod tests {
     #[test]
     fn test_offer_asking_for_exceeds_error_message() {
         let mut offer = valid_offer();
-        offer.asking_for = (0..11).map(|i| format!("item_{}", i)).collect();
+        offer.asking_for = (0..101).map(|i| format!("item_{}", i)).collect();
         if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_offer(offer) {
-            assert_eq!(msg, "Cannot have more than 10 asking for items");
+            assert_eq!(msg, "Cannot have more than 100 asking for items");
         } else {
             panic!("Expected Invalid result");
         }
@@ -1411,6 +1453,144 @@ mod tests {
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let result = validate_create_link(LinkTypes::AllOffers, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // =========================================================================
+    // STRING LENGTH LIMIT BOUNDARY TESTS
+    // =========================================================================
+
+    // -- Need ID --
+
+    #[test]
+    fn test_validate_need_id_at_limit() {
+        let mut need = valid_need();
+        need.id = "x".repeat(64);
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_validate_need_id_too_long() {
+        let mut need = valid_need();
+        need.id = "x".repeat(65);
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_validate_need_id_whitespace() {
+        let mut need = valid_need();
+        need.id = "   ".to_string();
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // -- Offer ID --
+
+    #[test]
+    fn test_validate_offer_id_at_limit() {
+        let mut offer = valid_offer();
+        offer.id = "x".repeat(64);
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_validate_offer_id_too_long() {
+        let mut offer = valid_offer();
+        offer.id = "x".repeat(65);
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_validate_offer_id_whitespace() {
+        let mut offer = valid_offer();
+        offer.id = "  \t ".to_string();
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // -- Match ID --
+
+    #[test]
+    fn test_validate_match_id_at_limit() {
+        let mut m = valid_match();
+        m.id = "x".repeat(64);
+        let result = validate_match(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_validate_match_id_too_long() {
+        let mut m = valid_match();
+        m.id = "x".repeat(65);
+        let result = validate_match(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_validate_match_id_whitespace() {
+        let mut m = valid_match();
+        m.id = "  \t  ".to_string();
+        let result = validate_match(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // -- Need title whitespace --
+
+    #[test]
+    fn test_validate_need_title_whitespace() {
+        let mut need = valid_need();
+        need.title = "  \t ".to_string();
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // -- Offer title whitespace --
+
+    #[test]
+    fn test_validate_offer_title_whitespace() {
+        let mut offer = valid_offer();
+        offer.title = "  \t ".to_string();
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // -- Reciprocity offer item length --
+
+    #[test]
+    fn test_validate_need_reciprocity_item_at_limit() {
+        let mut need = valid_need();
+        need.reciprocity_offers = vec!["x".repeat(256)];
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_validate_need_reciprocity_item_too_long() {
+        let mut need = valid_need();
+        need.reciprocity_offers = vec!["x".repeat(257)];
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // -- Asking for item length --
+
+    #[test]
+    fn test_validate_offer_asking_for_item_at_limit() {
+        let mut offer = valid_offer();
+        offer.asking_for = vec!["x".repeat(256)];
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_validate_offer_asking_for_item_too_long() {
+        let mut offer = valid_offer();
+        offer.asking_for = vec!["x".repeat(257)];
+        let result = validate_offer(offer);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 }

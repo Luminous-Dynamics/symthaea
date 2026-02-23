@@ -231,6 +231,18 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
+fn validate_care_type_other(care_type: &CareType) -> Result<(), String> {
+    if let CareType::Other(s) = care_type {
+        if s.trim().is_empty() {
+            return Err("Custom care type label cannot be empty".to_string());
+        }
+        if s.len() > 128 {
+            return Err("Custom care type label must be 128 characters or fewer".to_string());
+        }
+    }
+    Ok(())
+}
+
 fn validate_create_plan(_action: Create, plan: CarePlan) -> ExternResult<ValidateCallbackResult> {
     if plan.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -292,6 +304,9 @@ fn validate_create_plan(_action: Create, plan: CarePlan) -> ExternResult<Validat
             "Special instructions must be 4096 characters or fewer".into(),
         ));
     }
+    if let Err(msg) = validate_care_type_other(&plan.care_type) {
+        return Ok(ValidateCallbackResult::Invalid(msg));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -301,10 +316,38 @@ fn validate_update_plan(plan: CarePlan) -> ExternResult<ValidateCallbackResult> 
             "Plan title cannot be empty".into(),
         ));
     }
+    if plan.title.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Plan title must be 256 characters or fewer".into(),
+        ));
+    }
+    if plan.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Plan description must be 4096 characters or fewer".into(),
+        ));
+    }
+    if plan.schedule.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schedule must be 512 characters or fewer".into(),
+        ));
+    }
     if plan.caregivers.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "At least one caregiver must be assigned".into(),
         ));
+    }
+    if plan.caregivers.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 50 caregivers".into(),
+        ));
+    }
+    if plan.special_instructions.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Special instructions must be 4096 characters or fewer".into(),
+        ));
+    }
+    if let Err(msg) = validate_care_type_other(&plan.care_type) {
+        return Ok(ValidateCallbackResult::Invalid(msg));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -339,6 +382,11 @@ fn validate_create_session(
         ));
     }
     for task in &session.tasks_completed {
+        if task.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Task description cannot be empty".into(),
+            ));
+        }
         if task.len() > 256 {
             return Ok(ValidateCallbackResult::Invalid(
                 "Each task must be 256 characters or fewer".into(),
@@ -688,9 +736,17 @@ mod tests {
     }
 
     #[test]
-    fn test_plan_update_allows_long_description() {
+    fn test_plan_update_rejects_long_description() {
         let mut plan = valid_plan();
-        plan.description = "x".repeat(5000);
+        plan.description = "x".repeat(4097);
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_update_description_at_limit() {
+        let mut plan = valid_plan();
+        plan.description = "x".repeat(4096);
         let result = validate_update_plan(plan);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -1239,5 +1295,153 @@ mod tests {
         };
         let result = validate_create_session(mock_create_action(), session);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    // ============================================================================
+    // CareType::Other string length validation tests
+    // ============================================================================
+
+    #[test]
+    fn test_create_plan_custom_care_type_at_limit() {
+        let mut plan = valid_plan();
+        plan.care_type = CareType::Other("a".repeat(128));
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_create_plan_custom_care_type_too_long() {
+        let mut plan = valid_plan();
+        plan.care_type = CareType::Other("a".repeat(129));
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_create_plan_custom_care_type_empty() {
+        let mut plan = valid_plan();
+        plan.care_type = CareType::Other("".to_string());
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_create_plan_custom_care_type_whitespace_only() {
+        let mut plan = valid_plan();
+        plan.care_type = CareType::Other("   ".to_string());
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // ============================================================================
+    // Hardened validate_update_plan tests
+    // ============================================================================
+
+    #[test]
+    fn test_update_plan_title_at_limit() {
+        let mut plan = valid_plan();
+        plan.title = "t".repeat(256);
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_update_plan_title_too_long() {
+        let mut plan = valid_plan();
+        plan.title = "t".repeat(257);
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_update_plan_schedule_at_limit() {
+        let mut plan = valid_plan();
+        plan.schedule = "s".repeat(512);
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_update_plan_schedule_too_long() {
+        let mut plan = valid_plan();
+        plan.schedule = "s".repeat(513);
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_update_plan_special_instructions_at_limit() {
+        let mut plan = valid_plan();
+        plan.special_instructions = "i".repeat(4096);
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_update_plan_special_instructions_too_long() {
+        let mut plan = valid_plan();
+        plan.special_instructions = "i".repeat(4097);
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_update_plan_too_many_caregivers() {
+        let mut plan = valid_plan();
+        plan.caregivers = (0..51).map(|_| valid_agent()).collect();
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_update_plan_50_caregivers_at_limit() {
+        let mut plan = valid_plan();
+        plan.caregivers = (0..50).map(|_| valid_agent()).collect();
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_update_plan_custom_care_type_too_long() {
+        let mut plan = valid_plan();
+        plan.care_type = CareType::Other("a".repeat(129));
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_update_plan_custom_care_type_empty() {
+        let mut plan = valid_plan();
+        plan.care_type = CareType::Other("".to_string());
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // ============================================================================
+    // Session task empty string validation tests
+    // ============================================================================
+
+    #[test]
+    fn test_session_task_empty_string() {
+        let mut session = valid_session();
+        session.tasks_completed = vec!["".to_string()];
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_session_task_whitespace_only() {
+        let mut session = valid_session();
+        session.tasks_completed = vec!["   ".to_string()];
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_session_mixed_valid_and_empty_task() {
+        let mut session = valid_session();
+        session.tasks_completed = vec!["Valid task".to_string(), "".to_string()];
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 }

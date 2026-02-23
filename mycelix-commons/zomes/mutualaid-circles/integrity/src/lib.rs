@@ -92,6 +92,13 @@ fn validate_credit_circle(circle: CreditCircle) -> ExternResult<ValidateCallback
         ));
     }
 
+    // ID length limit
+    if circle.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Circle ID exceeds 64 character limit".to_string(),
+        ));
+    }
+
     // Name must not be empty
     if circle.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -100,16 +107,16 @@ fn validate_credit_circle(circle: CreditCircle) -> ExternResult<ValidateCallback
     }
 
     // Name length limit
-    if circle.name.len() > 100 {
+    if circle.name.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Circle name cannot exceed 100 characters".to_string(),
+            "Circle name exceeds 256 character limit".to_string(),
         ));
     }
 
     // Description length limit
-    if circle.description.len() > 2000 {
+    if circle.description.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Circle description cannot exceed 2000 characters".to_string(),
+            "Circle description exceeds 4096 character limit".to_string(),
         ));
     }
 
@@ -120,10 +127,24 @@ fn validate_credit_circle(circle: CreditCircle) -> ExternResult<ValidateCallback
         ));
     }
 
+    // Currency name length limit
+    if circle.currency_name.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Currency name exceeds 128 character limit".to_string(),
+        ));
+    }
+
     // Currency symbol must not be empty
     if circle.currency_symbol.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Currency symbol cannot be empty".to_string(),
+        ));
+    }
+
+    // Currency symbol length limit
+    if circle.currency_symbol.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Currency symbol exceeds 128 character limit".to_string(),
         ));
     }
 
@@ -162,10 +183,26 @@ fn validate_credit_circle(circle: CreditCircle) -> ExternResult<ValidateCallback
         ));
     }
 
+    // Geographic scope length limit
+    if let Some(ref scope) = circle.geographic_scope {
+        if scope.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Geographic scope exceeds 256 character limit".to_string(),
+            ));
+        }
+    }
+
     // Must have at least one founder
     if circle.founders.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Circle must have at least one founder".to_string(),
+        ));
+    }
+
+    // Founders limit
+    if circle.founders.len() > 100 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 100 founders".to_string(),
         ));
     }
 
@@ -200,6 +237,13 @@ fn validate_credit_transaction(tx: CreditTransaction) -> ExternResult<ValidateCa
         ));
     }
 
+    // ID length limit
+    if tx.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Transaction ID exceeds 64 character limit".to_string(),
+        ));
+    }
+
     // Amount must be positive (transfer direction determined by from/to)
     if tx.amount <= 0 {
         return Ok(ValidateCallbackResult::Invalid(
@@ -215,9 +259,9 @@ fn validate_credit_transaction(tx: CreditTransaction) -> ExternResult<ValidateCa
     }
 
     // Memo length limit
-    if tx.memo.len() > 500 {
+    if tx.memo.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Transaction memo cannot exceed 500 characters".to_string(),
+            "Transaction memo exceeds 4096 character limit".to_string(),
         ));
     }
 
@@ -416,15 +460,15 @@ mod tests {
     #[test]
     fn test_credit_circle_name_too_long() {
         let mut circle = valid_credit_circle();
-        circle.name = "a".repeat(101);
+        circle.name = "a".repeat(257);
         let result = validate_credit_circle(circle).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
-    fn test_credit_circle_name_exactly_100() {
+    fn test_credit_circle_name_at_limit() {
         let mut circle = valid_credit_circle();
-        circle.name = "a".repeat(100);
+        circle.name = "a".repeat(256);
         let result = validate_credit_circle(circle).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
@@ -432,15 +476,15 @@ mod tests {
     #[test]
     fn test_credit_circle_description_too_long() {
         let mut circle = valid_credit_circle();
-        circle.description = "a".repeat(2001);
+        circle.description = "a".repeat(4097);
         let result = validate_credit_circle(circle).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
-    fn test_credit_circle_description_exactly_2000() {
+    fn test_credit_circle_description_at_limit() {
         let mut circle = valid_credit_circle();
-        circle.description = "a".repeat(2000);
+        circle.description = "a".repeat(4096);
         let result = validate_credit_circle(circle).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
@@ -745,15 +789,15 @@ mod tests {
     #[test]
     fn test_credit_transaction_memo_too_long() {
         let mut tx = valid_credit_transaction();
-        tx.memo = "a".repeat(501);
+        tx.memo = "a".repeat(4097);
         let result = validate_credit_transaction(tx).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
-    fn test_credit_transaction_memo_exactly_500() {
+    fn test_credit_transaction_memo_at_limit() {
         let mut tx = valid_credit_transaction();
-        tx.memo = "a".repeat(500);
+        tx.memo = "a".repeat(4096);
         let result = validate_credit_transaction(tx).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
@@ -1068,5 +1112,161 @@ mod tests {
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let result = validate_create_link(LinkTypes::CircleToBalances, base, target, tag);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // =============================================================================
+    // STRING LENGTH LIMIT BOUNDARY TESTS
+    // =============================================================================
+
+    // -- Circle ID --
+
+    #[test]
+    fn test_validate_circle_id_at_limit() {
+        let mut circle = valid_credit_circle();
+        circle.id = "x".repeat(64);
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_validate_circle_id_too_long() {
+        let mut circle = valid_credit_circle();
+        circle.id = "x".repeat(65);
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_circle_id_whitespace() {
+        let mut circle = valid_credit_circle();
+        circle.id = "   ".to_string();
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- Currency name --
+
+    #[test]
+    fn test_validate_circle_currency_name_at_limit() {
+        let mut circle = valid_credit_circle();
+        circle.currency_name = "c".repeat(128);
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_validate_circle_currency_name_too_long() {
+        let mut circle = valid_credit_circle();
+        circle.currency_name = "c".repeat(129);
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_circle_currency_name_whitespace() {
+        let mut circle = valid_credit_circle();
+        circle.currency_name = "  \t ".to_string();
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- Currency symbol --
+
+    #[test]
+    fn test_validate_circle_currency_symbol_at_limit() {
+        let mut circle = valid_credit_circle();
+        circle.currency_symbol = "s".repeat(128);
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_validate_circle_currency_symbol_too_long() {
+        let mut circle = valid_credit_circle();
+        circle.currency_symbol = "s".repeat(129);
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_circle_currency_symbol_whitespace() {
+        let mut circle = valid_credit_circle();
+        circle.currency_symbol = "  ".to_string();
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- Geographic scope --
+
+    #[test]
+    fn test_validate_circle_geographic_scope_at_limit() {
+        let mut circle = valid_credit_circle();
+        circle.geographic_scope = Some("g".repeat(256));
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_validate_circle_geographic_scope_too_long() {
+        let mut circle = valid_credit_circle();
+        circle.geographic_scope = Some("g".repeat(257));
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_circle_geographic_scope_none() {
+        let mut circle = valid_credit_circle();
+        circle.geographic_scope = None;
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    // -- Founders Vec limit --
+
+    #[test]
+    fn test_validate_circle_founders_at_limit() {
+        let mut circle = valid_credit_circle();
+        circle.founders = (0..100)
+            .map(|i| AgentPubKey::from_raw_36(vec![(i & 0xff) as u8; 36]))
+            .collect();
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_validate_circle_founders_too_many() {
+        let mut circle = valid_credit_circle();
+        circle.founders = (0..101)
+            .map(|i| AgentPubKey::from_raw_36(vec![(i & 0xff) as u8; 36]))
+            .collect();
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- Transaction ID --
+
+    #[test]
+    fn test_validate_transaction_id_at_limit() {
+        let mut tx = valid_credit_transaction();
+        tx.id = "t".repeat(64);
+        let result = validate_credit_transaction(tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_validate_transaction_id_too_long() {
+        let mut tx = valid_credit_transaction();
+        tx.id = "t".repeat(65);
+        let result = validate_credit_transaction(tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_transaction_id_whitespace() {
+        let mut tx = valid_credit_transaction();
+        tx.id = "  \t ".to_string();
+        let result = validate_credit_transaction(tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

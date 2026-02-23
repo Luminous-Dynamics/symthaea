@@ -233,6 +233,18 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
+fn validate_circle_type_custom(circle_type: &CircleType) -> Result<(), String> {
+    if let CircleType::Custom(s) = circle_type {
+        if s.trim().is_empty() {
+            return Err("Custom circle type label cannot be empty".to_string());
+        }
+        if s.len() > 128 {
+            return Err("Custom circle type label must be 128 characters or fewer".to_string());
+        }
+    }
+    Ok(())
+}
+
 fn validate_create_circle(
     _action: Create,
     circle: CareCircle,
@@ -277,6 +289,9 @@ fn validate_create_circle(
             "Location must be 512 characters or fewer".into(),
         ));
     }
+    if let Err(msg) = validate_circle_type_custom(&circle.circle_type) {
+        return Ok(ValidateCallbackResult::Invalid(msg));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -310,6 +325,9 @@ fn validate_update_circle(circle: CareCircle) -> ExternResult<ValidateCallbackRe
         return Ok(ValidateCallbackResult::Invalid(
             "Circle cannot have more than 500 members".into(),
         ));
+    }
+    if let Err(msg) = validate_circle_type_custom(&circle.circle_type) {
+        return Ok(ValidateCallbackResult::Invalid(msg));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -1304,5 +1322,92 @@ mod tests {
             validate_delete_link_tag(LinkTypes::AgentToCreatedCircle, vec![0u8; 257]),
             "AgentToCreatedCircle delete link tag too long",
         );
+    }
+
+    // ── CircleType::Custom string length validation tests ──────────────
+
+    #[test]
+    fn test_create_circle_custom_type_at_limit() {
+        let mut circle = valid_circle();
+        circle.circle_type = CircleType::Custom("a".repeat(128));
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_circle_custom_type_too_long() {
+        let mut circle = valid_circle();
+        circle.circle_type = CircleType::Custom("a".repeat(129));
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Custom circle type label must be 128 characters or fewer");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_create_circle_custom_type_empty() {
+        let mut circle = valid_circle();
+        circle.circle_type = CircleType::Custom("".to_string());
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Custom circle type label cannot be empty");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_create_circle_custom_type_whitespace_only() {
+        let mut circle = valid_circle();
+        circle.circle_type = CircleType::Custom("   ".to_string());
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Custom circle type label cannot be empty");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_update_circle_custom_type_at_limit() {
+        let mut circle = valid_circle();
+        circle.circle_type = CircleType::Custom("a".repeat(128));
+        let result = validate_update_circle(circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_circle_custom_type_too_long() {
+        let mut circle = valid_circle();
+        circle.circle_type = CircleType::Custom("a".repeat(129));
+        let result = validate_update_circle(circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Custom circle type label must be 128 characters or fewer");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_update_circle_custom_type_empty() {
+        let mut circle = valid_circle();
+        circle.circle_type = CircleType::Custom("".to_string());
+        let result = validate_update_circle(circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Custom circle type label cannot be empty");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
     }
 }

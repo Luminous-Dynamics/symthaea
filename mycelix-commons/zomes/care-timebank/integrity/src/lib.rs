@@ -333,6 +333,20 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
+fn validate_service_category_other(category: &ServiceCategory) -> Result<(), String> {
+    if let ServiceCategory::Other(s) = category {
+        if s.trim().is_empty() {
+            return Err("Custom service category label cannot be empty".to_string());
+        }
+        if s.len() > 128 {
+            return Err(
+                "Custom service category label must be 128 characters or fewer".to_string(),
+            );
+        }
+    }
+    Ok(())
+}
+
 fn validate_create_offer(
     _action: Create,
     offer: ServiceOffer,
@@ -393,11 +407,19 @@ fn validate_create_offer(
         ));
     }
     for skill in &offer.skills_required {
+        if skill.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Skill name cannot be empty".into(),
+            ));
+        }
         if skill.len() > 128 {
             return Ok(ValidateCallbackResult::Invalid(
                 "Each skill must be 128 characters or fewer".into(),
             ));
         }
+    }
+    if let Err(msg) = validate_service_category_other(&offer.category) {
+        return Ok(ValidateCallbackResult::Invalid(msg));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -456,6 +478,9 @@ fn validate_create_request(
             "Preferred schedule must be 512 characters or fewer".into(),
         ));
     }
+    if let Err(msg) = validate_service_category_other(&request.category) {
+        return Ok(ValidateCallbackResult::Invalid(msg));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -501,6 +526,9 @@ fn validate_create_exchange(
         return Ok(ValidateCallbackResult::Invalid(
             "Notes must be 4096 characters or fewer".into(),
         ));
+    }
+    if let Err(msg) = validate_service_category_other(&exchange.category) {
+        return Ok(ValidateCallbackResult::Invalid(msg));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -569,6 +597,11 @@ fn validate_update_offer(offer: ServiceOffer) -> ExternResult<ValidateCallbackRe
         ));
     }
     for skill in &offer.skills_required {
+        if skill.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Skill name cannot be empty".into(),
+            ));
+        }
         if skill.len() > 128 {
             return Ok(ValidateCallbackResult::Invalid(
                 "Each skill must be 128 characters or fewer".into(),
@@ -584,6 +617,9 @@ fn validate_update_offer(offer: ServiceOffer) -> ExternResult<ValidateCallbackRe
         return Ok(ValidateCallbackResult::Invalid(
             "Hours available cannot be negative".into(),
         ));
+    }
+    if let Err(msg) = validate_service_category_other(&offer.category) {
+        return Ok(ValidateCallbackResult::Invalid(msg));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -623,6 +659,9 @@ fn validate_update_request(request: ServiceRequest) -> ExternResult<ValidateCall
         return Ok(ValidateCallbackResult::Invalid(
             "Hours needed cannot be negative".into(),
         ));
+    }
+    if let Err(msg) = validate_service_category_other(&request.category) {
+        return Ok(ValidateCallbackResult::Invalid(msg));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -1963,5 +2002,196 @@ mod tests {
     #[test]
     fn link_tag_empty_tag_valid() {
         assert_valid(validate_create_link_tag(LinkTypes::AgentToOffer, vec![]));
+    }
+
+    // ── ServiceCategory::Other string length validation tests ─────────
+
+    #[test]
+    fn create_offer_other_category_at_limit() {
+        let mut o = valid_offer();
+        o.category = ServiceCategory::Other("a".repeat(128));
+        assert_valid(validate_create_offer(fake_create(), o));
+    }
+
+    #[test]
+    fn create_offer_other_category_too_long() {
+        let mut o = valid_offer();
+        o.category = ServiceCategory::Other("a".repeat(129));
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Custom service category label must be 128 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_offer_other_category_empty() {
+        let mut o = valid_offer();
+        o.category = ServiceCategory::Other("".to_string());
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Custom service category label cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_offer_other_category_whitespace_only() {
+        let mut o = valid_offer();
+        o.category = ServiceCategory::Other("   ".to_string());
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Custom service category label cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_request_other_category_at_limit() {
+        let mut r = valid_request();
+        r.category = ServiceCategory::Other("a".repeat(128));
+        assert_valid(validate_create_request(fake_create(), r));
+    }
+
+    #[test]
+    fn create_request_other_category_too_long() {
+        let mut r = valid_request();
+        r.category = ServiceCategory::Other("a".repeat(129));
+        assert_invalid(
+            validate_create_request(fake_create(), r),
+            "Custom service category label must be 128 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_request_other_category_empty() {
+        let mut r = valid_request();
+        r.category = ServiceCategory::Other("".to_string());
+        assert_invalid(
+            validate_create_request(fake_create(), r),
+            "Custom service category label cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_exchange_other_category_at_limit() {
+        let mut e = valid_exchange();
+        e.category = ServiceCategory::Other("a".repeat(128));
+        assert_valid(validate_create_exchange(fake_create(), e));
+    }
+
+    #[test]
+    fn create_exchange_other_category_too_long() {
+        let mut e = valid_exchange();
+        e.category = ServiceCategory::Other("a".repeat(129));
+        assert_invalid(
+            validate_create_exchange(fake_create(), e),
+            "Custom service category label must be 128 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_exchange_other_category_empty() {
+        let mut e = valid_exchange();
+        e.category = ServiceCategory::Other("".to_string());
+        assert_invalid(
+            validate_create_exchange(fake_create(), e),
+            "Custom service category label cannot be empty",
+        );
+    }
+
+    // ── Empty skill validation tests ─────────────────────────────────
+
+    #[test]
+    fn create_offer_empty_skill_name() {
+        let mut o = valid_offer();
+        o.skills_required = vec!["".to_string()];
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Skill name cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_offer_whitespace_skill_name() {
+        let mut o = valid_offer();
+        o.skills_required = vec!["   ".to_string()];
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Skill name cannot be empty",
+        );
+    }
+
+    #[test]
+    fn update_offer_empty_skill_name() {
+        let mut o = valid_offer();
+        o.skills_required = vec!["".to_string()];
+        assert_invalid(
+            validate_update_offer(o),
+            "Skill name cannot be empty",
+        );
+    }
+
+    #[test]
+    fn update_offer_whitespace_skill_name() {
+        let mut o = valid_offer();
+        o.skills_required = vec!["   ".to_string()];
+        assert_invalid(
+            validate_update_offer(o),
+            "Skill name cannot be empty",
+        );
+    }
+
+    // ── Update category validation tests ─────────────────────────────
+
+    #[test]
+    fn update_offer_other_category_at_limit() {
+        let mut o = valid_offer();
+        o.category = ServiceCategory::Other("a".repeat(128));
+        assert_valid(validate_update_offer(o));
+    }
+
+    #[test]
+    fn update_offer_other_category_too_long() {
+        let mut o = valid_offer();
+        o.category = ServiceCategory::Other("a".repeat(129));
+        assert_invalid(
+            validate_update_offer(o),
+            "Custom service category label must be 128 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn update_offer_other_category_empty() {
+        let mut o = valid_offer();
+        o.category = ServiceCategory::Other("".to_string());
+        assert_invalid(
+            validate_update_offer(o),
+            "Custom service category label cannot be empty",
+        );
+    }
+
+    #[test]
+    fn update_request_other_category_at_limit() {
+        let mut r = valid_request();
+        r.category = ServiceCategory::Other("a".repeat(128));
+        assert_valid(validate_update_request(r));
+    }
+
+    #[test]
+    fn update_request_other_category_too_long() {
+        let mut r = valid_request();
+        r.category = ServiceCategory::Other("a".repeat(129));
+        assert_invalid(
+            validate_update_request(r),
+            "Custom service category label must be 128 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn update_request_other_category_empty() {
+        let mut r = valid_request();
+        r.category = ServiceCategory::Other("".to_string());
+        assert_invalid(
+            validate_update_request(r),
+            "Custom service category label cannot be empty",
+        );
     }
 }

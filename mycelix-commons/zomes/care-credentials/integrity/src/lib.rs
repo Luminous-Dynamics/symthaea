@@ -121,8 +121,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 original_entry_hash: _,
             } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::CareCredential(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::CareReference(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::CareCredential(cred) => validate_update_credential(cred),
+                EntryTypes::CareReference(reference) => validate_update_reference(reference),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -189,6 +189,20 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
+fn validate_credential_type_other(credential_type: &CredentialType) -> Result<(), String> {
+    if let CredentialType::Other(s) = credential_type {
+        if s.trim().is_empty() {
+            return Err("Custom credential type label cannot be empty".to_string());
+        }
+        if s.len() > 128 {
+            return Err(
+                "Custom credential type label must be 128 characters or fewer".to_string(),
+            );
+        }
+    }
+    Ok(())
+}
+
 fn validate_create_credential(
     _action: Create,
     cred: CareCredential,
@@ -223,6 +237,45 @@ fn validate_create_credential(
             ));
         }
     }
+    if let Err(msg) = validate_credential_type_other(&cred.credential_type) {
+        return Ok(ValidateCallbackResult::Invalid(msg));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_credential(cred: CareCredential) -> ExternResult<ValidateCallbackResult> {
+    if cred.issuer.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Issuer cannot be empty".into(),
+        ));
+    }
+    if cred.issuer.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Issuer must be 512 characters or fewer".into(),
+        ));
+    }
+    if cred.metadata.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Metadata must be 4096 characters or fewer".into(),
+        ));
+    }
+    if !cred.metadata.trim().is_empty()
+        && serde_json::from_str::<serde_json::Value>(&cred.metadata).is_err()
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Metadata must be valid JSON".into(),
+        ));
+    }
+    if let Some(expires) = cred.expires_at {
+        if expires <= cred.issued_at {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Expiry must be after issuance".into(),
+            ));
+        }
+    }
+    if let Err(msg) = validate_credential_type_other(&cred.credential_type) {
+        return Ok(ValidateCallbackResult::Invalid(msg));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -230,6 +283,40 @@ fn validate_create_reference(
     _action: Create,
     reference: CareReference,
 ) -> ExternResult<ValidateCallbackResult> {
+    if reference.rating < 1 || reference.rating > 5 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Rating must be between 1 and 5".into(),
+        ));
+    }
+    if reference.comment.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Comment cannot be empty".into(),
+        ));
+    }
+    if reference.comment.len() > 2048 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Comment must be 2048 characters or fewer".into(),
+        ));
+    }
+    if reference.care_type.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Care type cannot be empty".into(),
+        ));
+    }
+    if reference.care_type.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Care type must be 128 characters or fewer".into(),
+        ));
+    }
+    if reference.provider == reference.from_recipient {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot write a reference for yourself".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_reference(reference: CareReference) -> ExternResult<ValidateCallbackResult> {
     if reference.rating < 1 || reference.rating > 5 {
         return Ok(ValidateCallbackResult::Invalid(
             "Rating must be between 1 and 5".into(),
@@ -976,5 +1063,250 @@ mod tests {
             CredentialType::Other("Test1".to_string()),
             CredentialType::Other("Test2".to_string())
         );
+    }
+
+    // ============================================================================
+    // CredentialType::Other string length validation tests
+    // ============================================================================
+
+    #[test]
+    fn test_validate_credential_other_type_at_limit() {
+        let mut cred = valid_credential();
+        cred.credential_type = CredentialType::Other("a".repeat(128));
+        let result = validate_create_credential(valid_create_action(), cred).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_credential_other_type_too_long() {
+        let mut cred = valid_credential();
+        cred.credential_type = CredentialType::Other("a".repeat(129));
+        let result = validate_create_credential(valid_create_action(), cred).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Custom credential type label must be 128 characters or fewer");
+        }
+    }
+
+    #[test]
+    fn test_validate_credential_other_type_empty() {
+        let mut cred = valid_credential();
+        cred.credential_type = CredentialType::Other("".to_string());
+        let result = validate_create_credential(valid_create_action(), cred).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Custom credential type label cannot be empty");
+        }
+    }
+
+    #[test]
+    fn test_validate_credential_other_type_whitespace_only() {
+        let mut cred = valid_credential();
+        cred.credential_type = CredentialType::Other("   ".to_string());
+        let result = validate_create_credential(valid_create_action(), cred).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Custom credential type label cannot be empty");
+        }
+    }
+
+    // ============================================================================
+    // validate_update_credential tests
+    // ============================================================================
+
+    #[test]
+    fn test_update_credential_valid() {
+        let cred = valid_credential();
+        let result = validate_update_credential(cred).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_credential_empty_issuer() {
+        let mut cred = valid_credential();
+        cred.issuer = "".to_string();
+        let result = validate_update_credential(cred).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Issuer cannot be empty");
+        }
+    }
+
+    #[test]
+    fn test_update_credential_issuer_at_limit() {
+        let mut cred = valid_credential();
+        cred.issuer = "a".repeat(512);
+        let result = validate_update_credential(cred).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_credential_issuer_too_long() {
+        let mut cred = valid_credential();
+        cred.issuer = "a".repeat(513);
+        let result = validate_update_credential(cred).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Issuer must be 512 characters or fewer");
+        }
+    }
+
+    #[test]
+    fn test_update_credential_metadata_at_limit() {
+        let mut cred = valid_credential();
+        let value = "x".repeat(4096 - 2);
+        cred.metadata = format!("\"{}\"", value);
+        let result = validate_update_credential(cred).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_credential_metadata_too_long() {
+        let mut cred = valid_credential();
+        cred.metadata = "a".repeat(4097);
+        let result = validate_update_credential(cred).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Metadata must be 4096 characters or fewer");
+        }
+    }
+
+    #[test]
+    fn test_update_credential_metadata_invalid_json() {
+        let mut cred = valid_credential();
+        cred.metadata = "{bad json}".to_string();
+        let result = validate_update_credential(cred).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Metadata must be valid JSON");
+        }
+    }
+
+    #[test]
+    fn test_update_credential_expires_before_issued() {
+        let mut cred = valid_credential();
+        cred.issued_at = later_timestamp();
+        cred.expires_at = Some(valid_timestamp());
+        let result = validate_update_credential(cred).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Expiry must be after issuance");
+        }
+    }
+
+    #[test]
+    fn test_update_credential_other_type_too_long() {
+        let mut cred = valid_credential();
+        cred.credential_type = CredentialType::Other("a".repeat(129));
+        let result = validate_update_credential(cred).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Custom credential type label must be 128 characters or fewer");
+        }
+    }
+
+    // ============================================================================
+    // validate_update_reference tests
+    // ============================================================================
+
+    #[test]
+    fn test_update_reference_valid() {
+        let reference = valid_reference();
+        let result = validate_update_reference(reference).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_reference_rating_zero() {
+        let mut reference = valid_reference();
+        reference.rating = 0;
+        let result = validate_update_reference(reference).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Rating must be between 1 and 5");
+        }
+    }
+
+    #[test]
+    fn test_update_reference_rating_six() {
+        let mut reference = valid_reference();
+        reference.rating = 6;
+        let result = validate_update_reference(reference).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Rating must be between 1 and 5");
+        }
+    }
+
+    #[test]
+    fn test_update_reference_comment_empty() {
+        let mut reference = valid_reference();
+        reference.comment = "".to_string();
+        let result = validate_update_reference(reference).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Comment cannot be empty");
+        }
+    }
+
+    #[test]
+    fn test_update_reference_comment_at_limit() {
+        let mut reference = valid_reference();
+        reference.comment = "a".repeat(2048);
+        let result = validate_update_reference(reference).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_reference_comment_too_long() {
+        let mut reference = valid_reference();
+        reference.comment = "a".repeat(2049);
+        let result = validate_update_reference(reference).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Comment must be 2048 characters or fewer");
+        }
+    }
+
+    #[test]
+    fn test_update_reference_care_type_empty() {
+        let mut reference = valid_reference();
+        reference.care_type = "".to_string();
+        let result = validate_update_reference(reference).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Care type cannot be empty");
+        }
+    }
+
+    #[test]
+    fn test_update_reference_care_type_at_limit() {
+        let mut reference = valid_reference();
+        reference.care_type = "a".repeat(128);
+        let result = validate_update_reference(reference).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_reference_care_type_too_long() {
+        let mut reference = valid_reference();
+        reference.care_type = "a".repeat(129);
+        let result = validate_update_reference(reference).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Care type must be 128 characters or fewer");
+        }
+    }
+
+    #[test]
+    fn test_update_reference_self_reference() {
+        let mut reference = valid_reference();
+        reference.provider = valid_agent_key();
+        reference.from_recipient = valid_agent_key();
+        let result = validate_update_reference(reference).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+        if let ValidateCallbackResult::Invalid(msg) = result {
+            assert_eq!(msg, "Cannot write a reference for yourself");
+        }
     }
 }

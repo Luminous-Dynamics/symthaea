@@ -196,14 +196,58 @@ fn validate_aid_request(request: &AidRequest) -> ExternResult<ValidateCallbackRe
     // Validate requester DID
     validate_did(&request.requester_did)?;
 
+    // DID length limit
+    if request.requester_did.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Requester DID exceeds 256 character limit".into()
+        ));
+    }
+
     // Validate ID
     validate_id(&request.id, "Request ID")?;
+
+    // ID length limit
+    if request.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request ID exceeds 64 character limit".into()
+        ));
+    }
 
     // Validate description is not empty
     if request.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             RequestsError::EmptyDescription.to_string()
         ));
+    }
+
+    // Description length limit
+    if request.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Description exceeds 4096 character limit".into()
+        ));
+    }
+
+    // Location length limit
+    if let Some(ref loc) = request.location {
+        if loc.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Location exceeds 256 character limit".into()
+            ));
+        }
+    }
+
+    // RequestType::Other variant length limit
+    if let RequestType::Other(ref s) = request.request_type {
+        if s.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Custom request type cannot be empty".into()
+            ));
+        }
+        if s.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Custom request type exceeds 128 character limit".into()
+            ));
+        }
     }
 
     // Validate fulfilled amount doesn't exceed needed amount
@@ -223,9 +267,28 @@ fn validate_aid_offer(offer: &AidOffer) -> ExternResult<ValidateCallbackResult> 
     // Validate offerer DID
     validate_did(&offer.offerer_did)?;
 
+    // DID length limit
+    if offer.offerer_did.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Offerer DID exceeds 256 character limit".into()
+        ));
+    }
+
     // Validate IDs
     validate_id(&offer.id, "Offer ID")?;
     validate_id(&offer.request_id, "Request ID")?;
+
+    // ID length limits
+    if offer.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Offer ID exceeds 64 character limit".into()
+        ));
+    }
+    if offer.request_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request ID exceeds 64 character limit".into()
+        ));
+    }
 
     // Validate offer amount is non-zero when present
     if let Some(amount) = offer.amount {
@@ -958,12 +1021,12 @@ mod tests {
     }
 
     #[test]
-    fn test_aid_request_very_long_description() {
+    fn test_aid_request_very_long_description_rejected() {
         let mut request = valid_aid_request();
         request.description = "a".repeat(10000);
         let result = validate_aid_request(&request);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
@@ -1267,5 +1330,191 @@ mod tests {
         offer.request_id = "  ".to_string();
         let result = validate_aid_offer(&offer);
         assert!(result.is_err());
+    }
+
+    // ========================================================================
+    // HARDENING: String length limit boundary tests
+    // ========================================================================
+
+    // ── AidRequest ID (max 64) ─────────────────────────────────────────
+
+    #[test]
+    fn test_validate_request_id_at_limit() {
+        let mut request = valid_aid_request();
+        request.id = "a".repeat(64);
+        let result = validate_aid_request(&request);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_request_id_too_long() {
+        let mut request = valid_aid_request();
+        request.id = "a".repeat(65);
+        let result = validate_aid_request(&request);
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── AidRequest requester_did (max 256) ─────────────────────────────
+
+    #[test]
+    fn test_validate_request_requester_did_at_limit() {
+        let mut request = valid_aid_request();
+        // Build a valid DID that's exactly 256 chars: "did:key:" + padding
+        let prefix = "did:key:";
+        let padding = "x".repeat(256 - prefix.len());
+        request.requester_did = format!("{}{}", prefix, padding);
+        assert_eq!(request.requester_did.len(), 256);
+        let result = validate_aid_request(&request);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_request_requester_did_too_long() {
+        let mut request = valid_aid_request();
+        let prefix = "did:key:";
+        let padding = "x".repeat(257 - prefix.len());
+        request.requester_did = format!("{}{}", prefix, padding);
+        assert_eq!(request.requester_did.len(), 257);
+        let result = validate_aid_request(&request);
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── AidRequest description (max 4096) ──────────────────────────────
+
+    #[test]
+    fn test_validate_request_description_at_limit() {
+        let mut request = valid_aid_request();
+        request.description = "d".repeat(4096);
+        let result = validate_aid_request(&request);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_request_description_too_long() {
+        let mut request = valid_aid_request();
+        request.description = "d".repeat(4097);
+        let result = validate_aid_request(&request);
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── AidRequest location (max 256) ──────────────────────────────────
+
+    #[test]
+    fn test_validate_request_location_at_limit() {
+        let mut request = valid_aid_request();
+        request.location = Some("L".repeat(256));
+        let result = validate_aid_request(&request);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_request_location_too_long() {
+        let mut request = valid_aid_request();
+        request.location = Some("L".repeat(257));
+        let result = validate_aid_request(&request);
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── AidRequest RequestType::Other (max 128) ────────────────────────
+
+    #[test]
+    fn test_validate_request_custom_type_at_limit() {
+        let mut request = valid_aid_request();
+        request.request_type = RequestType::Other("c".repeat(128));
+        let result = validate_aid_request(&request);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_request_custom_type_too_long() {
+        let mut request = valid_aid_request();
+        request.request_type = RequestType::Other("c".repeat(129));
+        let result = validate_aid_request(&request);
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_request_custom_type_empty() {
+        let mut request = valid_aid_request();
+        request.request_type = RequestType::Other("".to_string());
+        let result = validate_aid_request(&request);
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── AidOffer ID (max 64) ───────────────────────────────────────────
+
+    #[test]
+    fn test_validate_offer_id_at_limit() {
+        let mut offer = valid_aid_offer();
+        offer.id = "a".repeat(64);
+        let result = validate_aid_offer(&offer);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_offer_id_too_long() {
+        let mut offer = valid_aid_offer();
+        offer.id = "a".repeat(65);
+        let result = validate_aid_offer(&offer);
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── AidOffer request_id (max 64) ───────────────────────────────────
+
+    #[test]
+    fn test_validate_offer_request_id_at_limit() {
+        let mut offer = valid_aid_offer();
+        offer.request_id = "r".repeat(64);
+        let result = validate_aid_offer(&offer);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_offer_request_id_too_long() {
+        let mut offer = valid_aid_offer();
+        offer.request_id = "r".repeat(65);
+        let result = validate_aid_offer(&offer);
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── AidOffer offerer_did (max 256) ─────────────────────────────────
+
+    #[test]
+    fn test_validate_offer_offerer_did_at_limit() {
+        let mut offer = valid_aid_offer();
+        let prefix = "did:key:";
+        let padding = "x".repeat(256 - prefix.len());
+        offer.offerer_did = format!("{}{}", prefix, padding);
+        assert_eq!(offer.offerer_did.len(), 256);
+        let result = validate_aid_offer(&offer);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_offer_offerer_did_too_long() {
+        let mut offer = valid_aid_offer();
+        let prefix = "did:key:";
+        let padding = "x".repeat(257 - prefix.len());
+        offer.offerer_did = format!("{}{}", prefix, padding);
+        assert_eq!(offer.offerer_did.len(), 257);
+        let result = validate_aid_offer(&offer);
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
     }
 }

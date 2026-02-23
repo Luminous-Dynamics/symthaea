@@ -154,6 +154,20 @@ fn validate_shared_resource(resource: SharedResource) -> ExternResult<ValidateCa
         }
     }
 
+    // ResourceType::Custom variant length limit
+    if let ResourceType::Custom(ref s) = resource.resource_type {
+        if s.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Custom resource type cannot be empty".to_string(),
+            ));
+        }
+        if s.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Custom resource type exceeds 128 character limit".to_string(),
+            ));
+        }
+    }
+
     // Sharing model validation
     if resource.sharing_model.hourly_rate < 0 {
         return Ok(ValidateCallbackResult::Invalid(
@@ -285,6 +299,20 @@ fn validate_maintenance(maintenance: Maintenance) -> ExternResult<ValidateCallba
         if cost < 0 {
             return Ok(ValidateCallbackResult::Invalid(
                 "Maintenance cost cannot be negative".to_string(),
+            ));
+        }
+    }
+
+    // MaintenanceType::Other variant length limit
+    if let MaintenanceType::Other(ref s) = maintenance.maintenance_type {
+        if s.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Custom maintenance type cannot be empty".to_string(),
+            ));
+        }
+        if s.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Custom maintenance type exceeds 128 character limit".to_string(),
             ));
         }
     }
@@ -1409,6 +1437,102 @@ mod tests {
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let result = validate_create_link(LinkTypes::AvailableResources, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // =============================================================================
+    // HARDENING: Custom enum variant string length boundary tests
+    // =============================================================================
+
+    // ── ResourceType::Custom (max 128) ─────────────────────────────────
+
+    #[test]
+    fn test_shared_resource_custom_type_at_limit() {
+        let mut resource = valid_shared_resource();
+        resource.resource_type = ResourceType::Custom("c".repeat(128));
+        let result = validate_shared_resource(resource);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_shared_resource_custom_type_too_long() {
+        let mut resource = valid_shared_resource();
+        resource.resource_type = ResourceType::Custom("c".repeat(129));
+        let result = validate_shared_resource(resource);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_shared_resource_custom_type_empty() {
+        let mut resource = valid_shared_resource();
+        resource.resource_type = ResourceType::Custom("".to_string());
+        let result = validate_shared_resource(resource);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // ── MaintenanceType::Other (max 128) ───────────────────────────────
+
+    #[test]
+    fn test_maintenance_custom_type_at_limit() {
+        let mut maintenance = valid_maintenance();
+        maintenance.maintenance_type = MaintenanceType::Other("m".repeat(128));
+        let result = validate_maintenance(maintenance);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_maintenance_custom_type_too_long() {
+        let mut maintenance = valid_maintenance();
+        maintenance.maintenance_type = MaintenanceType::Other("m".repeat(129));
+        let result = validate_maintenance(maintenance);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_maintenance_custom_type_empty() {
+        let mut maintenance = valid_maintenance();
+        maintenance.maintenance_type = MaintenanceType::Other("".to_string());
+        let result = validate_maintenance(maintenance);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // ── SharedResource whitespace-only name ────────────────────────────
+
+    #[test]
+    fn test_shared_resource_whitespace_name() {
+        let mut resource = valid_shared_resource();
+        resource.name = "   \t  ".to_string();
+        let result = validate_shared_resource(resource);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // ── SharedResource whitespace-only ID ──────────────────────────────
+
+    #[test]
+    fn test_shared_resource_whitespace_id() {
+        let mut resource = valid_shared_resource();
+        resource.id = "  \t ".to_string();
+        let result = validate_shared_resource(resource);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // ── Booking whitespace-only ID ─────────────────────────────────────
+
+    #[test]
+    fn test_booking_whitespace_id() {
+        let mut booking = valid_booking();
+        booking.id = "  \t ".to_string();
+        let result = validate_booking(booking);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // ── Maintenance whitespace-only description ────────────────────────
+
+    #[test]
+    fn test_maintenance_whitespace_description() {
+        let mut maintenance = valid_maintenance();
+        maintenance.description = "  \n\t  ".to_string();
+        let result = validate_maintenance(maintenance);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 }

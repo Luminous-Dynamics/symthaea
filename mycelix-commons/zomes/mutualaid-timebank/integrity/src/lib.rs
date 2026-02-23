@@ -99,6 +99,13 @@ fn validate_service_offer(offer: ServiceOffer) -> ExternResult<ValidateCallbackR
         ));
     }
 
+    // ID length limit
+    if offer.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Service offer ID exceeds 64 character limit".to_string(),
+        ));
+    }
+
     // Title must not be empty
     if offer.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -143,6 +150,29 @@ fn validate_service_offer(offer: ServiceOffer) -> ExternResult<ValidateCallbackR
         ));
     }
 
+    // Qualification entry length limit
+    for qual in &offer.qualifications {
+        if qual.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each qualification must be 256 characters or fewer".to_string(),
+            ));
+        }
+    }
+
+    // ServiceCategory::Custom variant length limit
+    if let ServiceCategory::Custom(ref s) = offer.category {
+        if s.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Custom service category cannot be empty".to_string(),
+            ));
+        }
+        if s.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Custom service category exceeds 128 character limit".to_string(),
+            ));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -152,6 +182,13 @@ fn validate_service_request(request: ServiceRequest) -> ExternResult<ValidateCal
     if request.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Service request ID cannot be empty".to_string(),
+        ));
+    }
+
+    // ID length limit
+    if request.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Service request ID exceeds 64 character limit".to_string(),
         ));
     }
 
@@ -190,6 +227,20 @@ fn validate_service_request(request: ServiceRequest) -> ExternResult<ValidateCal
         ));
     }
 
+    // ServiceCategory::Custom variant length limit
+    if let ServiceCategory::Custom(ref s) = request.category {
+        if s.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Custom service category cannot be empty".to_string(),
+            ));
+        }
+        if s.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Custom service category exceeds 128 character limit".to_string(),
+            ));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -199,6 +250,13 @@ fn validate_time_exchange(exchange: TimeExchange) -> ExternResult<ValidateCallba
     if exchange.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Time exchange ID cannot be empty".to_string(),
+        ));
+    }
+
+    // ID length limit
+    if exchange.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Time exchange ID exceeds 64 character limit".to_string(),
         ));
     }
 
@@ -230,12 +288,26 @@ fn validate_time_exchange(exchange: TimeExchange) -> ExternResult<ValidateCallba
         ));
     }
 
+    // Description length limit
+    if exchange.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Exchange description exceeds 4096 character limit".to_string(),
+        ));
+    }
+
     // Validate ratings if present
     if let Some(rating) = &exchange.provider_rating {
         if rating.score < 1 || rating.score > 5 {
             return Ok(ValidateCallbackResult::Invalid(
                 "Rating score must be between 1 and 5".to_string(),
             ));
+        }
+        if let Some(ref comment) = rating.comment {
+            if comment.len() > 1024 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Rating comment exceeds 1024 character limit".to_string(),
+                ));
+            }
         }
     }
 
@@ -244,6 +316,13 @@ fn validate_time_exchange(exchange: TimeExchange) -> ExternResult<ValidateCallba
             return Ok(ValidateCallbackResult::Invalid(
                 "Rating score must be between 1 and 5".to_string(),
             ));
+        }
+        if let Some(ref comment) = rating.comment {
+            if comment.len() > 1024 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Rating comment exceeds 1024 character limit".to_string(),
+                ));
+            }
         }
     }
 
@@ -278,6 +357,27 @@ fn validate_time_credit(credit: TimeCredit) -> ExternResult<ValidateCallbackResu
         return Ok(ValidateCallbackResult::Invalid(
             "Credit description cannot be empty".to_string(),
         ));
+    }
+
+    // Description length limit
+    if credit.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Credit description exceeds 4096 character limit".to_string(),
+        ));
+    }
+
+    // ServiceCategory::Custom variant length limit
+    if let ServiceCategory::Custom(ref s) = credit.service_category {
+        if s.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Custom service category cannot be empty".to_string(),
+            ));
+        }
+        if s.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Custom service category exceeds 128 character limit".to_string(),
+            ));
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -2007,5 +2107,261 @@ mod tests {
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         assert!(is_invalid(&validate_create_link(LinkTypes::AgentToCredits, base, target, tag)));
+    }
+
+    // =========================================================================
+    // HARDENING: String length limit boundary tests
+    // =========================================================================
+
+    // ── ServiceOffer ID (max 64) ───────────────────────────────────────
+
+    #[test]
+    fn test_validate_offer_id_at_limit() {
+        let mut o = valid_offer();
+        o.id = "a".repeat(64);
+        assert!(is_valid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn test_validate_offer_id_too_long() {
+        let mut o = valid_offer();
+        o.id = "a".repeat(65);
+        assert!(is_invalid(&validate_service_offer(o)));
+    }
+
+    // ── ServiceOffer qualifications items (max 256 each) ───────────────
+
+    #[test]
+    fn test_validate_offer_qualification_at_limit() {
+        let mut o = valid_offer();
+        o.qualifications = vec!["q".repeat(256)];
+        assert!(is_valid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn test_validate_offer_qualification_too_long() {
+        let mut o = valid_offer();
+        o.qualifications = vec!["q".repeat(257)];
+        assert!(is_invalid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn test_validate_offer_qualification_one_too_long_among_valid() {
+        let mut o = valid_offer();
+        o.qualifications = vec!["valid qual".into(), "q".repeat(257)];
+        assert!(is_invalid(&validate_service_offer(o)));
+    }
+
+    // ── ServiceOffer custom category (max 128) ─────────────────────────
+
+    #[test]
+    fn test_validate_offer_custom_category_at_limit() {
+        let mut o = valid_offer();
+        o.category = ServiceCategory::Custom("c".repeat(128));
+        assert!(is_valid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn test_validate_offer_custom_category_too_long() {
+        let mut o = valid_offer();
+        o.category = ServiceCategory::Custom("c".repeat(129));
+        assert!(is_invalid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn test_validate_offer_custom_category_empty() {
+        let mut o = valid_offer();
+        o.category = ServiceCategory::Custom("".into());
+        assert!(is_invalid(&validate_service_offer(o)));
+    }
+
+    // ── ServiceRequest ID (max 64) ─────────────────────────────────────
+
+    #[test]
+    fn test_validate_request_id_at_limit() {
+        let mut r = valid_request();
+        r.id = "a".repeat(64);
+        assert!(is_valid(&validate_service_request(r)));
+    }
+
+    #[test]
+    fn test_validate_request_id_too_long() {
+        let mut r = valid_request();
+        r.id = "a".repeat(65);
+        assert!(is_invalid(&validate_service_request(r)));
+    }
+
+    // ── ServiceRequest custom category (max 128) ───────────────────────
+
+    #[test]
+    fn test_validate_request_custom_category_at_limit() {
+        let mut r = valid_request();
+        r.category = ServiceCategory::Custom("c".repeat(128));
+        assert!(is_valid(&validate_service_request(r)));
+    }
+
+    #[test]
+    fn test_validate_request_custom_category_too_long() {
+        let mut r = valid_request();
+        r.category = ServiceCategory::Custom("c".repeat(129));
+        assert!(is_invalid(&validate_service_request(r)));
+    }
+
+    #[test]
+    fn test_validate_request_custom_category_empty() {
+        let mut r = valid_request();
+        r.category = ServiceCategory::Custom("".into());
+        assert!(is_invalid(&validate_service_request(r)));
+    }
+
+    // ── TimeExchange ID (max 64) ───────────────────────────────────────
+
+    #[test]
+    fn test_validate_exchange_id_at_limit() {
+        let mut e = valid_exchange();
+        e.id = "a".repeat(64);
+        assert!(is_valid(&validate_time_exchange(e)));
+    }
+
+    #[test]
+    fn test_validate_exchange_id_too_long() {
+        let mut e = valid_exchange();
+        e.id = "a".repeat(65);
+        assert!(is_invalid(&validate_time_exchange(e)));
+    }
+
+    // ── TimeExchange description (max 4096) ────────────────────────────
+
+    #[test]
+    fn test_validate_exchange_description_at_limit() {
+        let mut e = valid_exchange();
+        e.description = "d".repeat(4096);
+        assert!(is_valid(&validate_time_exchange(e)));
+    }
+
+    #[test]
+    fn test_validate_exchange_description_too_long() {
+        let mut e = valid_exchange();
+        e.description = "d".repeat(4097);
+        assert!(is_invalid(&validate_time_exchange(e)));
+    }
+
+    // ── TimeExchange whitespace-only description ───────────────────────
+
+    #[test]
+    fn test_validate_exchange_whitespace_description() {
+        let mut e = valid_exchange();
+        e.description = "  \t\n ".into();
+        assert!(is_invalid(&validate_time_exchange(e)));
+    }
+
+    // ── TimeExchange rating comment (max 1024) ─────────────────────────
+
+    #[test]
+    fn test_validate_exchange_provider_rating_comment_at_limit() {
+        let mut e = valid_exchange();
+        e.provider_rating = Some(Rating {
+            score: 4,
+            comment: Some("c".repeat(1024)),
+            rated_at: Timestamp::from_micros(0),
+        });
+        assert!(is_valid(&validate_time_exchange(e)));
+    }
+
+    #[test]
+    fn test_validate_exchange_provider_rating_comment_too_long() {
+        let mut e = valid_exchange();
+        e.provider_rating = Some(Rating {
+            score: 4,
+            comment: Some("c".repeat(1025)),
+            rated_at: Timestamp::from_micros(0),
+        });
+        assert!(is_invalid(&validate_time_exchange(e)));
+    }
+
+    #[test]
+    fn test_validate_exchange_recipient_rating_comment_too_long() {
+        let mut e = valid_exchange();
+        e.recipient_rating = Some(Rating {
+            score: 3,
+            comment: Some("c".repeat(1025)),
+            rated_at: Timestamp::from_micros(0),
+        });
+        assert!(is_invalid(&validate_time_exchange(e)));
+    }
+
+    // ── TimeCredit description (max 4096) ──────────────────────────────
+
+    #[test]
+    fn test_validate_credit_description_at_limit() {
+        let mut c = valid_credit();
+        c.description = "d".repeat(4096);
+        assert!(is_valid(&validate_time_credit(c)));
+    }
+
+    #[test]
+    fn test_validate_credit_description_too_long() {
+        let mut c = valid_credit();
+        c.description = "d".repeat(4097);
+        assert!(is_invalid(&validate_time_credit(c)));
+    }
+
+    // ── TimeCredit whitespace-only description ─────────────────────────
+
+    #[test]
+    fn test_validate_credit_whitespace_description() {
+        let mut c = valid_credit();
+        c.description = "  \t\n ".into();
+        assert!(is_invalid(&validate_time_credit(c)));
+    }
+
+    // ── TimeCredit custom category (max 128) ───────────────────────────
+
+    #[test]
+    fn test_validate_credit_custom_category_at_limit() {
+        let mut c = valid_credit();
+        c.service_category = ServiceCategory::Custom("c".repeat(128));
+        assert!(is_valid(&validate_time_credit(c)));
+    }
+
+    #[test]
+    fn test_validate_credit_custom_category_too_long() {
+        let mut c = valid_credit();
+        c.service_category = ServiceCategory::Custom("c".repeat(129));
+        assert!(is_invalid(&validate_time_credit(c)));
+    }
+
+    #[test]
+    fn test_validate_credit_custom_category_empty() {
+        let mut c = valid_credit();
+        c.service_category = ServiceCategory::Custom("".into());
+        assert!(is_invalid(&validate_time_credit(c)));
+    }
+
+    // ── ServiceOffer whitespace-only ID ────────────────────────────────
+
+    #[test]
+    fn test_validate_offer_whitespace_id() {
+        let mut o = valid_offer();
+        o.id = "  \t ".into();
+        assert!(is_invalid(&validate_service_offer(o)));
+    }
+
+    // ── ServiceRequest whitespace-only ID ──────────────────────────────
+
+    #[test]
+    fn test_validate_request_whitespace_id() {
+        let mut r = valid_request();
+        r.id = "  \t ".into();
+        assert!(is_invalid(&validate_service_request(r)));
+    }
+
+    // ── TimeExchange whitespace-only ID ────────────────────────────────
+
+    #[test]
+    fn test_validate_exchange_whitespace_id() {
+        let mut e = valid_exchange();
+        e.id = "  \t ".into();
+        assert!(is_invalid(&validate_time_exchange(e)));
     }
 }
