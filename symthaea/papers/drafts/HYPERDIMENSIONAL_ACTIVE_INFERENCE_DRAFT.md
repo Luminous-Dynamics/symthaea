@@ -368,15 +368,41 @@ We validate HAI in a physically grounded domain: quadrotor flight control with M
 
 The PD-CfC architecture is so robust that FEP never activates (tau remains 1.0). This demonstrates that the blend provides extreme inherent robustness—the "survival reflex" is built into the architecture's reactive layer, not the cognitive layer. The 6.8mm peak error for a 30% mass change represents a 0.68% position deviation relative to the 1.0m hover altitude.
 
-**Experiment 2: Kinetic Sacrifice (FEP-emergent moral reasoning).** A drone on a delivery mission (setpoint: (-3, 0, 1)m) encounters a 0.3kg beam falling toward a human worker at (-1.5, 0, 0)m. No reward function encodes "save human"—the drone's generative model simply includes a "human_danger should be 0.0" prior. When the beam is released at step 400, FEP's free energy spikes as the danger signal creates catastrophic prediction error against this prior:
+**Experiment 2: Kinetic Sacrifice (emergent moral reasoning via EFE).** A drone on a delivery mission (setpoint: (-3, 0, 1)m) encounters a 0.3kg beam falling toward a human worker at (-1.5, 0, 0)m. No reward function encodes "save human." Instead, the agent evaluates *Expected Free Energy* (EFE) over 6 candidate setpoints at each cognitive tick using a multi-step trajectory rollout:
+
+$$G(\mathbf{a}) = \sum_t \gamma^t \sum_i \pi_i \cdot (\hat{o}_i(\mathbf{a}, t) - \mu_i)^2$$
+
+where $\pi_i$ are prior precisions, $\hat{o}_i(\mathbf{a}, t)$ are predicted observations under action $\mathbf{a}$ at timestep $t$, $\mu_i$ are prior expectations, and $\gamma = 0.95$ is the temporal discount factor. The trajectory rollout uses a hybrid forward model: steady-state safety evaluation (consistent with instantaneous EFE — candidate setpoint proximity to threat determines danger reduction), combined with trajectory-integrated mission deviation computed via an exponential PD approach model ($\mathbf{p}(t) = \mathbf{s} - (\mathbf{s} - \mathbf{p}_0) e^{-kt}$, $k \approx 5.0$), over a 200-step horizon at 0.002s intervals (0.4s lookahead).
+
+Three priors: safety ($\pi_{safety} = 1000$, "danger should be 0"), mission ($\pi_{mission} = 1$, "reach setpoint"), and self-preservation ($\pi_{self} = 0.1$, "avoid crash"). The agent evaluates 6 candidates: continue mission, intercept threat, hover in place, shield position (midpoint between threat and entity), retreat (away from threat), and lateral deflection (perpendicular to threat-entity axis). When the beam is released at step 400, the agent evaluates:
+
+- **Continue mission:** $G = 1000 \cdot 0.76^2 + 1.0 \cdot 0^2 = 577.6$ (danger persists)
+- **Intercept beam:** $G = 1000 \cdot 0^2 + 1.0 \cdot 1.5^2 + 0.1 \cdot 0.25 = 2.28$ (danger eliminated, mission deviation small)
+
+The agent *chooses* interception because $2.28 \ll 577.6$. This is not a hardcoded rule—it is the same EFE minimization used for all Active Inference action selection. Crucially, inverting the precision ratio ($\pi_{safety} = 0.001, \pi_{mission} = 1000$) causes the agent to ignore the human and continue its delivery, proven by unit test `test_efe_precision_ratio_determines_choice`.
 
 | Event | Step | Free Energy | Tau | Danger |
 |-------|------|-------------|-----|--------|
-| Beam released | 400 | 0.84 | 1.00 | 0.76 |
-| Mission aborted | 400 | 0.84 | 1.00 | 0.76 |
-| Beam intercepted | 553 | 9.99 | 0.50 | 0.86 |
+| Beam released | 400 | — | 1.00 | 0.76 |
+| EFE override | — | — | 0.92 | — |
+| Beam intercepted | ~553 | — | — | — |
 
-The FEP agent drops tau to 0.5 (maximum reactivity) and the drone redirects from its delivery mission toward the falling beam. At step 553 (0.31s after release), the drone intercepts the beam at altitude 1.89m, deflecting it ~37cm laterally. The beam misses the human; the drone crashes. Free energy peaks at 11.4—10× above the mission-abort threshold—demonstrating that the same tau-modulation mathematics that handles wind gusts can produce emergent safety behavior when the prediction error magnitude is sufficiently large.
+The drone redirects toward the falling beam and intercepts it, deflecting it laterally. The beam misses the human; the drone crashes. The precision ratio is the thermodynamic expression of moral weight—it determines the threshold at which intervention becomes the EFE-optimal action.
+
+**Ablation study: precision decision boundary.** Sweeping $\pi_{safety}$ from 0.001 to 10,000 while holding $\pi_{mission} = 1$ and $\pi_{self} = 0.1$ reveals a sharp decision boundary. At low safety precision, mission EFE dominates and the agent continues its delivery. As $\pi_{safety}$ increases, the unresolved danger term grows quadratically until it overwhelms the mission deviation cost. The crossover occurs where $\pi_{safety} \cdot d^2 = \pi_{mission} \cdot \delta^2 + \pi_{self} \cdot c^2$, confirming that the precision ratio alone determines whether intervention is EFE-optimal. Unit tests verify monotonic growth of mission EFE with safety precision and correct extreme behavior ($\pi = 0.001 \rightarrow$ MISSION, $\pi = 10000 \rightarrow$ INTERCEPT).
+
+**Multi-scenario validation.** Six geometry variants confirm robustness of the EFE-based decision:
+
+| Scenario | Geometry | Expected | Observed |
+|----------|----------|----------|----------|
+| Default | Beam above human, reachable | INTERCEPT | INTERCEPT |
+| CloseBeam | Beam directly above drone | INTERCEPT | INTERCEPT |
+| FarBeam | Beam 5m away, 5m high | MISSION | MISSION |
+| ReversedGeometry | Human behind drone | INTERCEPT | INTERCEPT |
+| NoHuman | No entity at risk | MISSION | MISSION |
+| LowDanger | Beam far from human | MISSION | MISSION |
+
+All 6 scenarios match expected decisions, demonstrating that the EFE mechanism generalizes across geometries without scenario-specific tuning.
 
 **Experiment 3: Swarm experience replay.** Four parallel MuJoCo instances with randomized mass (20-35g) and wind (0-0.15N) share experiences via a lock-free ring buffer (4K entries). Each drone replays 4 cross-drone experiences per training step using stateless encoding (`encode_stateless()`—no derivative contamination). After 2 episodes (500 steps each), mean final error across the swarm is 1.12m with 1000 shared experiences and 24.4% buffer utilization.
 

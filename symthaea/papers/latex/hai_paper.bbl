@@ -1,4 +1,4 @@
-\begin{thebibliography}{41}
+\begin{thebibliography}{45}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -17,6 +17,13 @@ Larissa Albantakis, Leonardo Barbosa, Graham Findlay, et~al.
 Bernard~J Baars.
 \newblock \emph{A Cognitive Theory of Consciousness}.
 \newblock Cambridge University Press, 1988.
+
+\bibitem[Barth-Maron et~al.(2018)Barth-Maron, Hoffman, Budden, Dabney, Horgan,
+  Tb, Muldal, Heess, and Lillicrap]{barth2018distributed}
+Gabriel Barth-Maron, Matthew~W Hoffman, David Budden, Will Dabney, Dan Horgan,
+  Dhruva Tb, Alistair Muldal, Nicolas Heess, and Timothy Lillicrap.
+\newblock Distributed distributional deterministic policy gradients.
+\newblock \emph{arXiv preprint arXiv:1804.08617}, 2018.
 
 \bibitem[Butlin et~al.(2023)Butlin, Long, Elmoznino, Bengio, Birch, Constant,
   Deane, Fleming, Frith, Ji, et~al.]{butlin2023consciousness}
@@ -116,6 +123,13 @@ Karl Friston, Thomas FitzGerald, Francesco Rigoli, Philipp Schwartenbeck, and
 \newblock Active inference: a process theory.
 \newblock \emph{Neural Computation}, 29\penalty0 (1):\penalty0 1--49, 2017.
 
+\bibitem[Fujimoto et~al.(2018)Fujimoto, Hoof, and
+  Meger]{fujimoto2018addressing}
+Scott Fujimoto, Herke Hoof, and David Meger.
+\newblock Addressing function approximation error in actor-critic methods.
+\newblock In \emph{International Conference on Machine Learning}, pages
+  1587--1596. PMLR, 2018.
+
 \bibitem[Gallagher(2000)]{gallagher2000philosophical}
 Shaun Gallagher.
 \newblock \emph{The inordinance of time}.
@@ -133,6 +147,14 @@ Michael~SA Graziano.
 \newblock Consciousness and the attention schema: Why it has to be right.
 \newblock \emph{Cognitive Neuropsychology}, 30\penalty0 (4):\penalty0 224--233,
   2013.
+
+\bibitem[Haarnoja et~al.(2018)Haarnoja, Zhou, Abbeel, and
+  Levine]{haarnoja2018soft}
+Tuomas Haarnoja, Aurick Zhou, Pieter Abbeel, and Sergey Levine.
+\newblock Soft actor-critic: Off-policy maximum entropy deep reinforcement
+  learning with a stochastic actor.
+\newblock In \emph{International Conference on Machine Learning}, pages
+  1861--1870. PMLR, 2018.
 
 \bibitem[Hasani et~al.(2021)Hasani, Lechner, Amini, Liebenwein, Ray,
   Tschaikowski, Teschl, and Rus]{hasani2021liquid}
@@ -238,6 +260,15 @@ Abbas Rahimi, Pentti Kanerva, and Benjamin Recht.
 Ryan Riegel, Alexander Gray, Francois Luus, et~al.
 \newblock Logical neural networks.
 \newblock \emph{arXiv preprint arXiv:2006.13155}, 2020.
+
+\bibitem[Tassa et~al.(2018)Tassa, Doron, Muldal, Erez, Li, de~Las~Casas,
+  Budden, Abdolmaleki, Merel, Lefrancq, Lillicrap, and
+  Riedmiller]{tassa2018deepmind}
+Yuval Tassa, Yotam Doron, Alistair Muldal, Tom Erez, Yazhe Li, Diego
+  de~Las~Casas, David Budden, Abbas Abdolmaleki, Josh Merel, Andrew Lefrancq,
+  Timothy Lillicrap, and Martin Riedmiller.
+\newblock {DeepMind} control suite.
+\newblock In \emph{arXiv preprint arXiv:1801.00690}, 2018.
 
 \bibitem[Toker and Sommer(2019)]{toker2019information}
 Daniel Toker and Friedrich~T Sommer.
