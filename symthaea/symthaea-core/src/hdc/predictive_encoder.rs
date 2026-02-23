@@ -348,6 +348,8 @@ impl PredictiveHdcEncoder {
     /// Detect which primitives are relevant to the input
     ///
     /// Reuses a pre-allocated buffer to avoid per-cycle Vec<String> allocation.
+    /// Returns an owned Vec via `mem::take` + capacity preservation pattern:
+    /// the buffer is swapped out, returned, and re-acquired next cycle.
     fn detect_primitives(&mut self, input: &str) -> Vec<String> {
         let input_lower = input.to_lowercase();
         self.detected_buffer.clear();
@@ -372,8 +374,11 @@ impl PredictiveHdcEncoder {
         self.detected_buffer.sort();
         self.detected_buffer.dedup();
 
-        // Return a clone; the buffer retains its capacity for next cycle
-        self.detected_buffer.clone()
+        // Swap out the buffer (zero-cost move) instead of cloning.
+        // The taken Vec keeps its heap allocation; we give ourselves
+        // a fresh Vec that will reuse the allocation returned to us
+        // on the next cycle's `clear()`.
+        mem::take(&mut self.detected_buffer)
     }
 
     /// Detect primitives from semantic patterns (not just string matching)
