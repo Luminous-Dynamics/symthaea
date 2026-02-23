@@ -184,10 +184,15 @@ impl DualLayerMesh {
     pub fn send(&self, packet: &WisdomPacket) -> Result<MeshRoute, MeshError> {
         let route = self.route(packet.urgency).ok_or(MeshError::NoTransport)?;
 
+        // Compress the packet into an envelope (1-byte header + payload).
+        // COMPRESS_NONE if compression doesn't help; COMPRESS_LZ4 if it does.
+        let raw = packet.to_bytes();
+        let compressed = super::compress_packet(&raw);
+
         match route {
             MeshRoute::LoRa => {
                 let transport = self.lora.as_ref().unwrap();
-                let frags = packet.fragment();
+                let frags = fragment(packet.thought_id(), &compressed);
                 let mut buf = [0u8; LORA_MTU];
                 for frag in &frags {
                     let len = frag.to_bytes(&mut buf);
@@ -196,13 +201,11 @@ impl DualLayerMesh {
             }
             MeshRoute::Batman => {
                 let transport = self.batman.as_ref().unwrap();
-                let bytes = packet.to_bytes();
-                transport.send_raw(&bytes)?;
+                transport.send_raw(&compressed)?;
             }
             MeshRoute::Yggdrasil => {
                 let transport = self.yggdrasil.as_ref().unwrap();
-                let bytes = packet.to_bytes();
-                transport.send_raw(&bytes)?;
+                transport.send_raw(&compressed)?;
             }
         }
 
