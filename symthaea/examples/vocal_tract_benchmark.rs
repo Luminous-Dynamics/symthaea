@@ -21,6 +21,8 @@ fn main() {
     use std::time::Instant;
     use symthaea::voice::formant_targets::FormantDatabase;
     use symthaea::voice::vocal_tract_controller::{VocalTractConfig, VocalTractController};
+    use symthaea::voice::vocal_tract_encoder::VoiceCognitiveState;
+    use symthaea::voice::vocal_tract_fep::{populate_manner_map, VocalTractPipeline};
     use symthaea::voice::{ArticulatoryConfig, ArticulatorySynthesizer, LTCPacing, TimedPhoneme};
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_core::hdc::HDC_DIMENSION;
@@ -35,10 +37,10 @@ fn main() {
     let mut ltc = VocalTractController::new(&genesis, &config);
 
     println!(
-        "Training LTC controller on {} phonemes (50 epochs)...",
+        "Training LTC controller on {} phonemes (100 epochs)...",
         db.all_phonemes().len()
     );
-    for epoch in 0..50 {
+    for epoch in 0..100 {
         let loss = symthaea::voice::train_controller_on_phoneme_db(&mut ltc, &genesis, &db, 1);
         println!("  Epoch {}: avg loss = {:.2}", epoch + 1, loss);
     }
@@ -148,30 +150,47 @@ fn main() {
     }
     println!();
 
-    // ── Benchmark 2: Transition smoothness ───────────────────────────────
-    println!("--- Benchmark 2: Transition Smoothness (AH → IY) ---");
+    // ── Benchmark 2: Transition smoothness (pipeline-based) ─────────────
+    println!("--- Benchmark 2: Transition Smoothness (AH → IY, pipeline) ---");
 
-    // LTC transition
-    ltc.reset();
-    let ah_hv = genesis.hv("phoneme::AH", HDC_DIMENSION);
-    let iy_hv = genesis.hv("phoneme::IY", HDC_DIMENSION);
+    // Pipeline-based transition (includes coarticulation + adaptive rate limiting)
+    let mut pipeline = VocalTractPipeline::new(&genesis);
+    populate_manner_map(&mut pipeline);
+    // Train pipeline's controller to match the standalone one
+    symthaea::voice::train_controller_on_phoneme_db(
+        &mut pipeline.controller,
+        &genesis,
+        &db,
+        100,
+    );
 
-    let mut ltc_f1_values = Vec::new();
+    let state = VoiceCognitiveState::default();
+    let dt = 0.005;
+
+    // Run 40 frames of /AH/ then 40 frames of /IY/ through pipeline
+    let mut pipeline_f1_values = Vec::new();
     for _ in 0..40 {
-        let frame = ltc.forward(&ah_hv, 0.005);
-        ltc_f1_values.push(frame.f1);
+        let frame = pipeline.tick_phoneme(&state, None, dt, Some("AH"));
+        pipeline_f1_values.push(frame.f1);
     }
     for _ in 0..40 {
-        let frame = ltc.forward(&iy_hv, 0.005);
-        ltc_f1_values.push(frame.f1);
+        let frame = pipeline.tick_phoneme(&state, None, dt, Some("IY"));
+        pipeline_f1_values.push(frame.f1);
     }
 
-    let ltc_max_delta: f32 = ltc_f1_values
+    // Separate transition frames (around frame 40) from steady-state
+    let transition_start = 35; // 5 frames before switch
+    let transition_end = 56; // 16 frames after switch (coarticulation window)
+    let pipeline_transition_max: f32 = pipeline_f1_values[transition_start..transition_end]
+        .windows(2)
+        .map(|w| (w[1] - w[0]).abs())
+        .fold(0.0f32, f32::max);
+    let pipeline_steady_max: f32 = pipeline_f1_values[60..]
         .windows(2)
         .map(|w| (w[1] - w[0]).abs())
         .fold(0.0f32, f32::max);
 
-    // Rule-based transition
+    // Rule-based transition for comparison
     let pacing = LTCPacing::default();
     let timed = vec![
         TimedPhoneme {
@@ -193,16 +212,15 @@ fn main() {
         .map(|w| (w[1].f1 - w[0].f1).abs())
         .fold(0.0f32, f32::max);
 
-    println!("  LTC  max F1 delta: {:.2} Hz/frame", ltc_max_delta);
-    println!("  Rule max F1 delta: {:.2} Hz/frame", rule_max_delta);
     println!(
-        "  Winner: {}",
-        if ltc_max_delta < rule_max_delta {
-            "LTC (smoother)"
-        } else {
-            "Rule-based (smoother)"
-        }
+        "  Pipeline max F1 delta (transition): {:.2} Hz/frame",
+        pipeline_transition_max
     );
+    println!(
+        "  Pipeline max F1 delta (steady):     {:.2} Hz/frame",
+        pipeline_steady_max
+    );
+    println!("  Rule     max F1 delta:              {:.2} Hz/frame", rule_max_delta);
     println!();
 
     // ── Benchmark 3: Timing ──────────────────────────────────────────────
@@ -250,6 +268,138 @@ fn main() {
     );
     let ltc_hz = 1_000_000.0 / ltc_us_per_frame;
     println!("  LTC throughput: {:.0} Hz (target: 200Hz)", ltc_hz);
+    println!();
+
+    // ── Benchmark 4: Consonant formant accuracy ─────────────────────────
+    println!("--- Benchmark 4: Consonant Formant Accuracy ---");
+    println!(
+        "  {:>6} | {:>10} {:>10} {:>10} | {:>10} {:>10} {:>10} | {:>8} {:>8} | {:>10}",
+        "Phon", "LTC-F1", "LTC-F2", "LTC-F3", "Tgt-F1", "Tgt-F2", "Tgt-F3", "LTC-err",
+        "Rule-err", "Manner"
+    );
+    println!("  {}", "-".repeat(115));
+
+    let test_consonants = ["P", "T", "K", "B", "D", "G", "S", "F", "M", "N", "L", "R"];
+    let mut cons_ltc_total_err = 0.0f32;
+    let mut cons_rule_total_err = 0.0f32;
+    let mut cons_count = 0;
+
+    for consonant in &test_consonants {
+        if let Some(target) = db.lookup(consonant) {
+            // LTC prediction
+            ltc.reset();
+            let phoneme_hv = genesis.hv(&format!("phoneme::{}", consonant), HDC_DIMENSION);
+            for _ in 0..20 {
+                ltc.forward(&phoneme_hv, 0.005);
+            }
+            let mut f1_sum = 0.0f32;
+            let mut f2_sum = 0.0f32;
+            let mut f3_sum = 0.0f32;
+            for _ in 0..10 {
+                let frame = ltc.forward(&phoneme_hv, 0.005);
+                f1_sum += frame.f1;
+                f2_sum += frame.f2;
+                f3_sum += frame.f3;
+            }
+            let ltc_f1 = f1_sum / 10.0;
+            let ltc_f2 = f2_sum / 10.0;
+            let ltc_f3 = f3_sum / 10.0;
+
+            let ltc_err = ((ltc_f1 - target.f1).powi(2)
+                + (ltc_f2 - target.f2).powi(2)
+                + (ltc_f3 - target.f3).powi(2))
+            .sqrt();
+
+            // Rule-based prediction
+            let timed = vec![TimedPhoneme {
+                phoneme: consonant.to_string(),
+                start_time: 0.0,
+                duration: 0.1,
+                stress: 0,
+            }];
+            let rule_frames = articulatory.synthesize(&timed, &pacing);
+            let rule_err = if rule_frames.len() > 5 {
+                let stable = &rule_frames[5..];
+                let n = stable.len() as f32;
+                let rf1: f32 = stable.iter().map(|f| f.f1).sum::<f32>() / n;
+                let rf2: f32 = stable.iter().map(|f| f.f2).sum::<f32>() / n;
+                let rf3: f32 = stable.iter().map(|f| f.f3).sum::<f32>() / n;
+                ((rf1 - target.f1).powi(2)
+                    + (rf2 - target.f2).powi(2)
+                    + (rf3 - target.f3).powi(2))
+                .sqrt()
+            } else {
+                f32::MAX
+            };
+
+            let manner_str = format!("{:?}", target.manner);
+            println!(
+                "  {:>6} | {:>10.1} {:>10.1} {:>10.1} | {:>10.1} {:>10.1} {:>10.1} | {:>8.1} {:>8.1} | {:>10}",
+                consonant, ltc_f1, ltc_f2, ltc_f3, target.f1, target.f2, target.f3,
+                ltc_err, rule_err, manner_str
+            );
+
+            cons_ltc_total_err += ltc_err;
+            cons_rule_total_err += rule_err;
+            cons_count += 1;
+        }
+    }
+
+    if cons_count > 0 {
+        println!("  {}", "-".repeat(115));
+        println!(
+            "  {:>6} | {:>10} {:>10} {:>10} | {:>10} {:>10} {:>10} | {:>8.1} {:>8.1}",
+            "AVG", "", "", "", "", "", "",
+            cons_ltc_total_err / cons_count as f32,
+            cons_rule_total_err / cons_count as f32
+        );
+    }
+    println!();
+
+    // ── Benchmark 5: Source type verification ─────────────────────────────
+    println!("--- Benchmark 5: Source Type Verification (pipeline) ---");
+
+    // Use pipeline since source_type is set in tick_phoneme() from manner map
+    pipeline.reset();
+
+    let source_type_tests: Vec<(&str, &str)> = vec![
+        ("AH", "Vowel"),
+        ("IY", "Vowel"),
+        ("P", "Stop"),
+        ("T", "Stop"),
+        ("K", "Stop"),
+        ("B", "Stop"),
+        ("S", "Fricative"),
+        ("F", "Fricative"),
+        ("M", "Nasal"),
+        ("N", "Nasal"),
+        ("CH", "Affricate"),
+        ("L", "Liquid"),
+    ];
+
+    let mut pass_count = 0;
+    let total = source_type_tests.len();
+
+    for (phoneme, expected_str) in &source_type_tests {
+        let frame = pipeline.tick_phoneme(&state, None, dt, Some(phoneme));
+        let actual_str = format!("{:?}", frame.source_type);
+        let ok = actual_str == *expected_str;
+        if ok {
+            pass_count += 1;
+        }
+        println!(
+            "  {:>4} → expected {:>10}, got {:>10} [{}]",
+            phoneme,
+            expected_str,
+            actual_str,
+            if ok { "PASS" } else { "FAIL" }
+        );
+    }
+
+    println!(
+        "\n  Source type verification: {}/{} passed",
+        pass_count, total
+    );
     println!();
 
     // ── Summary ──────────────────────────────────────────────────────────

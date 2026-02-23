@@ -380,7 +380,7 @@ impl ArticulatorySynthesizer {
                 energy,
                 voicing: if effective_target.is_voiced { 1.0 } else { 0.0 },
                 time,
-                ..Default::default()
+                source_type: effective_target.manner,
             });
 
             time_in_phoneme += frame_duration;

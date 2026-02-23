@@ -1,11 +1,11 @@
 //! Vocal tract HDC encoder: cognitive voice state → ContinuousHV (16,384D).
 //!
 //! Follows the `QuadrotorHdcEncoder` pattern from `crates/symthaea-flight/src/encoder.rs`.
-//! Each of 10 cognitive voice channels gets a genesis-seeded base vector. Values are
+//! Each of 12 cognitive voice channels gets a genesis-seeded base vector. Values are
 //! level-encoded (thermometer coding) then bound with the base vector. The result is
 //! bundled into a single 16,384D ContinuousHV. Derivative encoding provides temporal context.
 //!
-//! # 10-Channel Cognitive Voice State
+//! # 12-Channel Cognitive Voice State
 //!
 //! | Channel              | Range    | Description                              |
 //! |----------------------|----------|------------------------------------------|
@@ -19,12 +19,14 @@
 //! | consciousness_level  | [0, 1]   | Master consciousness level               |
 //! | articulation_quality | [0, 1]   | Voice feedback articulation score        |
 //! | rate_stability       | [0, 1]   | Speech rate stability                    |
+//! | integrated_phi       | [0, 2]   | IIT integrated information (Phi)         |
+//! | expected_free_energy | [0, 5]   | Active inference expected free energy     |
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 /// Number of cognitive voice channels.
-const NUM_CHANNELS: usize = 10;
+pub const NUM_CHANNELS: usize = 12;
 
 /// Channel names for genesis seeding.
 const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
@@ -38,6 +40,8 @@ const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
     "consciousness_level",
     "articulation_quality",
     "rate_stability",
+    "integrated_phi",
+    "expected_free_energy",
 ];
 
 /// Channel ranges [min, max] for normalization to [0, 1].
@@ -52,9 +56,11 @@ const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
     [0.0, 1.0],  // consciousness_level
     [0.0, 1.0],  // articulation_quality
     [0.0, 1.0],  // rate_stability
+    [0.0, 2.0],  // integrated_phi
+    [0.0, 5.0],  // expected_free_energy
 ];
 
-/// Cognitive voice state: 10 channels driving the vocal tract controller.
+/// Cognitive voice state: 12 channels driving the vocal tract controller.
 #[derive(Debug, Clone, Copy)]
 pub struct VoiceCognitiveState {
     pub prediction_error: f32,
@@ -67,6 +73,12 @@ pub struct VoiceCognitiveState {
     pub consciousness_level: f32,
     pub articulation_quality: f32,
     pub rate_stability: f32,
+    /// IIT integrated information (Phi). Higher = more integrated consciousness.
+    /// Maps to richer prosody: higher Phi → more expressive F0.
+    pub integrated_phi: f32,
+    /// Active inference expected free energy. Higher = more surprise/uncertainty.
+    /// Maps to deliberate speech: higher EFE → reduced energy, slight F0 drop.
+    pub expected_free_energy: f32,
 }
 
 impl Default for VoiceCognitiveState {
@@ -82,6 +94,8 @@ impl Default for VoiceCognitiveState {
             consciousness_level: 0.5,
             articulation_quality: 0.8,
             rate_stability: 0.8,
+            integrated_phi: 0.5,
+            expected_free_energy: 1.0,
         }
     }
 }
@@ -100,13 +114,15 @@ impl VoiceCognitiveState {
             self.consciousness_level,
             self.articulation_quality,
             self.rate_stability,
+            self.integrated_phi,
+            self.expected_free_energy,
         ]
     }
 }
 
 /// HDC encoder for cognitive voice state.
 ///
-/// Encodes a 10D `VoiceCognitiveState` into a full 16,384D `ContinuousHV` via:
+/// Encodes a 12D `VoiceCognitiveState` into a full 16,384D `ContinuousHV` via:
 /// 1. Per-channel normalization to [0, 1] using known ranges
 /// 2. Level encoding (thermometer coding via bundled levels 0..k)
 /// 3. Binding with genesis-seeded channel base vectors
@@ -339,6 +355,7 @@ mod tests {
             consciousness_level: -0.5,
             articulation_quality: 1.5,
             rate_stability: -0.1,
+            ..Default::default()
         };
 
         let hv = enc.encode(&extreme);
@@ -359,6 +376,7 @@ mod tests {
             consciousness_level: 0.75,
             articulation_quality: 0.8,
             rate_stability: 0.9,
+            ..Default::default()
         };
 
         let channels = state.to_channels();

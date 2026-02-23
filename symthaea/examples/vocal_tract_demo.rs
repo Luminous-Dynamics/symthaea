@@ -13,14 +13,16 @@ fn main() {
 
 #[cfg(feature = "vocal-tract")]
 fn main() {
+    use std::collections::HashMap;
     use std::fs;
     use std::io::Write;
     use std::path::Path;
     use symthaea::voice::formant_targets::FormantDatabase;
     use symthaea::voice::vocal_tract_encoder::VoiceCognitiveState;
     use symthaea::voice::vocal_tract_fep::VocalTractObservation;
-    use symthaea::voice::vocal_tract_fep::VocalTractPipeline;
+    use symthaea::voice::vocal_tract_fep::{populate_manner_map, ProsodyContext, VocalTractPipeline};
     use symthaea::voice::vocoder::FormantVocoder;
+    use symthaea::voice::FormantFrame;
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_core::hdc::HDC_DIMENSION;
 
@@ -161,6 +163,58 @@ fn main() {
     println!("\n  Concatenated sequence → {}", seq_path.display());
     println!();
 
+    // ── 3b. CVC Syllable Synthesis ──────────────────────────────────────
+    println!("--- 3b. CVC Syllable Synthesis ---");
+
+    // Register manner map for source_type propagation
+    populate_manner_map(&mut pipeline);
+
+    // CVC syllable definitions: (label, consonant1_frames, vowel_frames, consonant2_frames)
+    let cvc_syllables: Vec<(&str, &[(&str, usize)])> = vec![
+        ("PAT", &[("P", 20), ("AE", 60), ("T", 20)]),
+        ("SIT", &[("S", 20), ("IH", 60), ("T", 20)]),
+        ("MOM", &[("M", 20), ("AA", 60), ("M", 20)]),
+    ];
+
+    let cvc_state = VoiceCognitiveState::default();
+
+    for (label, segments) in &cvc_syllables {
+        pipeline.controller.reset();
+        pipeline.reset();
+        populate_manner_map(&mut pipeline);
+        vocoder.reset();
+
+        let mut cvc_audio = Vec::new();
+        let mut source_types_seen = Vec::new();
+
+        for &(phoneme, n_frames) in *segments {
+            for _ in 0..n_frames {
+                let frame = pipeline.tick_phoneme(&cvc_state, None, 0.005, Some(phoneme));
+                let st = format!("{:?}", frame.source_type);
+                if source_types_seen.last().map_or(true, |last: &String| *last != st) {
+                    source_types_seen.push(st);
+                }
+                let chunk = vocoder.synthesize_frame(&frame, samples_per_frame);
+                cvc_audio.extend_from_slice(&chunk);
+            }
+        }
+
+        let wav_name = format!("ltc_cvc_{}.wav", label.to_lowercase());
+        let wav_path = audio_dir.join(&wav_name);
+        write_wav(&wav_path, &cvc_audio, sample_rate);
+
+        let total_frames: usize = segments.iter().map(|(_, n)| n).sum();
+        let duration_ms = total_frames as f32 * 5.0; // 0.005s per frame
+        println!(
+            "  /{}/ ({:.0}ms): source_types={:?} → {}",
+            label,
+            duration_ms,
+            source_types_seen,
+            wav_path.display()
+        );
+    }
+    println!();
+
     // ── 4. Consciousness modulation ──────────────────────────────────────
     println!("--- 4. Consciousness Modulation ---");
     let states = [
@@ -245,21 +299,131 @@ fn main() {
         stats.avg_free_energy
     );
 
-    // ── 6. Summary ───────────────────────────────────────────────────────
-    println!("\n--- Summary ---");
-    println!(
-        "  Total frames generated: {}",
-        n_cognitive_ticks * frames_per_tick + frames_per_vowel * vowels.len() + 60
-    );
-    println!(
-        "  Pipeline cumulative time: {:.3}s",
-        pipeline.cumulative_time()
-    );
+    // ── 6. Connected Speech Synthesis ──────────────────────────────────
+    println!("--- 6. Connected Speech Synthesis ---");
+
+    // Mini word → ARPABET dictionary (stress: 0=none, 1=primary, 2=secondary)
+    let mut word_dict: HashMap<&str, Vec<(&str, u8)>> = HashMap::new();
+    word_dict.insert("hello", vec![("HH", 0), ("AH", 0), ("L", 0), ("OW", 1)]);
+    word_dict.insert("world", vec![("W", 0), ("ER", 1), ("L", 0), ("D", 0)]);
+    word_dict.insert("i", vec![("AY", 1)]);
+    word_dict.insert("am", vec![("AE", 1), ("M", 0)]);
+    word_dict.insert("conscious", vec![("K", 0), ("AA", 1), ("N", 0), ("SH", 0), ("AH", 0), ("S", 0)]);
+    word_dict.insert("the", vec![("DH", 0), ("AH", 0)]);
+    word_dict.insert("mind", vec![("M", 0), ("AY", 1), ("N", 0), ("D", 0)]);
+    word_dict.insert("speaks", vec![("S", 0), ("P", 0), ("IY", 1), ("K", 0), ("S", 0)]);
+    word_dict.insert("a", vec![("AH", 0)]);
+    word_dict.insert("is", vec![("IH", 0), ("Z", 0)]);
+    word_dict.insert("beautiful", vec![("B", 0), ("Y", 0), ("UW", 1), ("T", 0), ("AH", 0), ("F", 0), ("AH", 0), ("L", 0)]);
+
+    // Sentences to synthesize
+    let sentences: Vec<(&str, &[&str])> = vec![
+        ("hello_world", &["hello", "world"]),
+        ("i_am_conscious", &["i", "am", "conscious"]),
+        ("the_mind_speaks", &["the", "mind", "speaks"]),
+    ];
+
+    // Register manner map so vocoder uses correct excitation per phoneme
+    populate_manner_map(&mut pipeline);
+    pipeline.reset();
+    vocoder.reset();
+
+    let dt = 1.0 / 200.0; // 200Hz motor rate
+    let phoneme_base_ms = 80.0; // Base phoneme duration
+
+    for (label, words) in &sentences {
+        // Build flat phoneme sequence with word-boundary pauses
+        let mut phoneme_seq: Vec<(&str, u8, f32)> = Vec::new(); // (phoneme, stress, duration_s)
+        for (w_idx, word) in words.iter().enumerate() {
+            if let Some(phonemes) = word_dict.get(word) {
+                for &(ph, stress) in phonemes {
+                    // Stressed vowels are longer
+                    let dur_ms = if stress == 1 { phoneme_base_ms * 1.3 } else { phoneme_base_ms };
+                    // Lookup actual duration from DB if available
+                    let dur_ms = db.lookup(ph).map_or(dur_ms, |t| {
+                        if t.duration_ms > 0.0 { t.duration_ms } else { dur_ms }
+                    });
+                    phoneme_seq.push((ph, stress, dur_ms / 1000.0));
+                }
+            }
+            // Word boundary: short pause between words
+            if w_idx < words.len() - 1 {
+                phoneme_seq.push(("SIL", 0, 0.05));
+            }
+        }
+
+        // Compute total utterance duration for prosody
+        let total_duration: f32 = phoneme_seq.iter().map(|(_, _, d)| d).sum();
+        let mut elapsed = 0.0f32;
+        let mut all_frames: Vec<FormantFrame> = Vec::new();
+
+        let cog_state = VoiceCognitiveState {
+            consciousness_level: 0.7,
+            emotional_arousal: 0.5,
+            emotional_valence: 0.3,
+            integrated_phi: 0.8,
+            ..Default::default()
+        };
+
+        for &(phoneme, stress, duration) in &phoneme_seq {
+            let is_silence = phoneme == "SIL" || phoneme == "SP";
+            let n_frames = (duration / dt).max(1.0) as usize;
+
+            for frame_i in 0..n_frames {
+                if is_silence {
+                    all_frames.push(FormantFrame::silent(elapsed));
+                } else {
+                    let phoneme_progress = frame_i as f32 / n_frames as f32;
+                    let utterance_progress = (elapsed / total_duration).clamp(0.0, 1.0);
+
+                    let prosody = ProsodyContext {
+                        utterance_progress,
+                        phoneme_progress,
+                        stress,
+                        base_f0: 120.0,
+                        arousal: 0.5,
+                    };
+
+                    let frame = pipeline.tick_with_prosody(
+                        &cog_state,
+                        None,
+                        dt,
+                        Some(phoneme),
+                        &prosody,
+                    );
+                    all_frames.push(frame);
+                }
+                elapsed += dt;
+            }
+        }
+
+        // Synthesize audio from frames
+        let audio_samples = vocoder.synthesize(&all_frames);
+        let wav_path = audio_dir.join(format!("ltc_speech_{label}.wav"));
+        write_wav(&wav_path, &audio_samples, sample_rate);
+
+        let audio_duration = audio_samples.len() as f32 / sample_rate as f32;
+        let word_str = words.join(" ");
+        println!(
+            "  \"{word_str}\": {} phonemes, {:.2}s audio → {}",
+            phoneme_seq.len(),
+            audio_duration,
+            wav_path.display()
+        );
+
+        pipeline.reset();
+        vocoder.reset();
+    }
+    println!();
+
+    // ── 7. Summary ───────────────────────────────────────────────────────
+    println!("--- 7. Summary ---");
     println!(
         "  Phoneme training: {} phonemes, {:.1}% loss reduction",
         n_phonemes, improvement
     );
     println!("  FEP loop: closed (learn_from_outcome active)");
+    println!("  Connected speech: {} sentences synthesized", sentences.len());
     println!("  Audio files written to: {}/", audio_dir.display());
     println!("\n=== Demo Complete ===");
 }
