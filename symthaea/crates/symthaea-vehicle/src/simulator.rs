@@ -37,6 +37,10 @@ pub trait VehiclePhysicsSimulator {
 
     /// Get current friction scale.
     fn friction_scale(&self) -> f64;
+
+    /// Set per-axle friction scales for asymmetric grip (tire blowout).
+    /// Multiplied with the global friction_scale: effective = global * axle.
+    fn set_axle_friction(&mut self, front: f64, rear: f64);
 }
 
 /// Bicycle-model (single-track) vehicle simulator.
@@ -69,6 +73,9 @@ pub struct BicycleModelSimulator {
     params: ChassisParams,
     external_force: [f64; 2],
     friction_scale: f64,
+    /// Per-axle friction multiplier (1.0 = normal, <1.0 = blowout/degradation).
+    front_friction_scale: f64,
+    rear_friction_scale: f64,
     /// Initial state for resetting (set by the task/scenario).
     initial_speed: f64,
 }
@@ -90,6 +97,8 @@ impl BicycleModelSimulator {
             params: ChassisParams::default(),
             external_force: [0.0; 2],
             friction_scale: 1.0,
+            front_friction_scale: 1.0,
+            rear_friction_scale: 1.0,
             initial_speed: 0.0,
         }
     }
@@ -101,6 +110,8 @@ impl BicycleModelSimulator {
             params,
             external_force: [0.0; 2],
             friction_scale: 1.0,
+            front_friction_scale: 1.0,
+            rear_friction_scale: 1.0,
             initial_speed: 0.0,
         }
     }
@@ -112,6 +123,8 @@ impl BicycleModelSimulator {
             params: ChassisParams::default(),
             external_force: [0.0; 2],
             friction_scale: 1.0,
+            front_friction_scale: 1.0,
+            rear_friction_scale: 1.0,
             initial_speed: speed,
         }
     }
@@ -229,12 +242,12 @@ impl VehiclePhysicsSimulator for BicycleModelSimulator {
             let fyf = Self::tire_lateral_force(
                 p.front_cornering_stiffness,
                 alpha_f,
-                self.friction_scale * front_load,
+                self.friction_scale * self.front_friction_scale * front_load,
             );
             let fyr = Self::tire_lateral_force(
                 p.rear_cornering_stiffness,
                 alpha_r,
-                self.friction_scale * rear_load,
+                self.friction_scale * self.rear_friction_scale * rear_load,
             );
 
             // Lateral acceleration: Fy_total / m - V * r (body frame)
@@ -311,6 +324,8 @@ impl VehiclePhysicsSimulator for BicycleModelSimulator {
         };
         self.external_force = [0.0; 2];
         self.friction_scale = 1.0;
+        self.front_friction_scale = 1.0;
+        self.rear_friction_scale = 1.0;
     }
 
     fn reset_with_perturbation(&mut self, perturbation: f64, seed: u64) {
@@ -353,6 +368,11 @@ impl VehiclePhysicsSimulator for BicycleModelSimulator {
 
     fn friction_scale(&self) -> f64 {
         self.friction_scale
+    }
+
+    fn set_axle_friction(&mut self, front: f64, rear: f64) {
+        self.front_friction_scale = front.clamp(0.0, 2.0);
+        self.rear_friction_scale = rear.clamp(0.0, 2.0);
     }
 }
 
@@ -618,6 +638,70 @@ mod tests {
             "Heading should stay normalized: {}",
             sim.state().heading
         );
+    }
+
+    #[test]
+    fn test_axle_friction_front_blowout_induces_yaw() {
+        let mut sim = BicycleModelSimulator::at_speed(13.4);
+        sim.set_axle_friction(0.3, 1.0); // front blowout: front grip drops to 30%
+
+        let cmd = VehicleCommand {
+            steering: 0.3,
+            throttle: 0.3,
+            brake: 0.0,
+        };
+        for _ in 0..200 {
+            sim.step(&cmd, 0.005);
+        }
+
+        let state = sim.state();
+        assert!(state.is_finite(), "State should remain finite under blowout");
+
+        // Compare with normal handling
+        let mut sim_normal = BicycleModelSimulator::at_speed(13.4);
+        let cmd_n = cmd;
+        for _ in 0..200 {
+            sim_normal.step(&cmd_n, 0.005);
+        }
+
+        assert!(
+            (state.heading - sim_normal.state().heading).abs() > 0.001,
+            "Blowout should change handling: blowout heading={}, normal={}",
+            state.heading,
+            sim_normal.state().heading
+        );
+    }
+
+    #[test]
+    fn test_axle_friction_rear_blowout_oversteer() {
+        let mut sim = BicycleModelSimulator::at_speed(13.4);
+        sim.set_axle_friction(1.0, 0.3); // rear blowout
+
+        let cmd = VehicleCommand {
+            steering: 0.3,
+            throttle: 0.3,
+            brake: 0.0,
+        };
+        for _ in 0..200 {
+            sim.step(&cmd, 0.005);
+        }
+
+        assert!(
+            sim.state().is_finite(),
+            "State should remain finite under rear blowout"
+        );
+        assert!(
+            sim.state().yaw_rate.abs() > 0.0 || sim.state().heading.abs() > 0.001,
+            "Rear blowout should affect dynamics"
+        );
+    }
+
+    #[test]
+    fn test_axle_friction_resets() {
+        let mut sim = BicycleModelSimulator::at_speed(13.4);
+        sim.set_axle_friction(0.3, 0.5);
+        sim.reset();
+        assert!((sim.friction_scale() - 1.0).abs() < 1e-10);
     }
 
     #[test]

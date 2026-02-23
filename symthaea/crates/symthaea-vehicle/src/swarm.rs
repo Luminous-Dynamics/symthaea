@@ -125,6 +125,13 @@ impl SwarmSimulator {
         }
     }
 
+    /// Reset all peers to non-braking state.
+    pub fn reset_braking(&mut self) {
+        for peer in &mut self.peers {
+            peer.is_braking = false;
+        }
+    }
+
     /// Compute mesh signals from all peers relative to the ego vehicle.
     pub fn mesh_signals(&self, ego_state: &VehicleState) -> Vec<MeshSignal> {
         self.peers
@@ -399,6 +406,21 @@ mod tests {
                 "Peer state should be finite: {:?}",
                 peer.sim.state()
             );
+        }
+    }
+
+    #[test]
+    fn test_reset_braking() {
+        let config = SwarmConfig::convoy_straight(3);
+        let mut swarm = SwarmSimulator::new(config);
+        swarm.trigger_lead_brake(0);
+        swarm.trigger_lead_brake(2);
+        assert!(swarm.peers()[0].is_braking);
+        assert!(swarm.peers()[2].is_braking);
+
+        swarm.reset_braking();
+        for peer in swarm.peers() {
+            assert!(!peer.is_braking, "All peers should stop braking after reset");
         }
     }
 

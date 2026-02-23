@@ -103,6 +103,20 @@ impl PerturbationSchedule {
         }
     }
 
+    /// Front-left tire blowout at step 300: front grip drops to 30%.
+    pub fn tire_blowout_front() -> Self {
+        Self {
+            events: vec![(
+                300,
+                VehiclePerturbation::TireBlowout {
+                    tire: "front_left".to_string(),
+                    grip_reduction: 0.3,
+                },
+            )],
+            clear_step: Some(1000),
+        }
+    }
+
     /// Combined crucible: ice + blindness + crosswind at staggered intervals.
     pub fn gauntlet() -> Self {
         Self {
@@ -147,7 +161,24 @@ impl PerturbationSchedule {
                     VehiclePerturbation::RoadImpulse { decel_impulse } => {
                         sim.apply_external_force([-decel_impulse * 1500.0, 0.0]);
                     }
-                    // SensorBlindness, TireBlowout, MeshSpoof are handled at the
+                    VehiclePerturbation::TireBlowout {
+                        ref tire,
+                        grip_reduction,
+                    } => {
+                        // Map tire position to front/rear axle (bicycle model collapses L/R)
+                        let front = if tire.starts_with("front") {
+                            *grip_reduction
+                        } else {
+                            1.0
+                        };
+                        let rear = if tire.starts_with("rear") {
+                            *grip_reduction
+                        } else {
+                            1.0
+                        };
+                        sim.set_axle_friction(front, rear);
+                    }
+                    // SensorBlindness and MeshSpoof are handled at the
                     // encoder/controller level, not the physics level.
                     _ => {}
                 }
@@ -259,6 +290,47 @@ mod tests {
     fn test_no_failure_normal_driving() {
         let state = VehicleState::cruising(13.4);
         assert!(!is_critical_failure(&state));
+    }
+
+    #[test]
+    fn test_tire_blowout_schedule() {
+        let schedule = PerturbationSchedule::tire_blowout_front();
+        assert_eq!(schedule.events.len(), 1);
+    }
+
+    #[test]
+    fn test_tire_blowout_changes_handling() {
+        let mut sim = BicycleModelSimulator::at_speed(13.4);
+        let schedule = PerturbationSchedule::tire_blowout_front();
+
+        let cmd = crate::types::VehicleCommand {
+            steering: 0.2,
+            throttle: 0.3,
+            brake: 0.0,
+        };
+
+        // Drive normally before blowout
+        for step in 0..300 {
+            schedule.apply(step, &mut sim);
+            sim.step(&cmd, 0.005);
+        }
+        let heading_before = sim.state().heading;
+
+        // Apply blowout and drive more
+        schedule.apply(300, &mut sim);
+        for step in 301..500 {
+            schedule.apply(step, &mut sim);
+            sim.step(&cmd, 0.005);
+        }
+
+        assert!(
+            sim.state().is_finite(),
+            "Vehicle should remain stable through blowout"
+        );
+        assert!(
+            (sim.state().heading - heading_before).abs() > 0.01,
+            "Blowout should affect heading trajectory"
+        );
     }
 
     #[test]

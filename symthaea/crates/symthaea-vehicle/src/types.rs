@@ -303,12 +303,13 @@ impl VehicleCommand {
 }
 
 /// Driving task variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub enum VehicleTask {
     /// Maintain lane position at a target velocity.
+    #[default]
     LaneKeep,
     /// Follow a lead vehicle (adaptive cruise).
-    Follow,
+    Follow { target_gap: f64 },
     /// Execute a lane change maneuver.
     LaneChange,
     /// Emergency stop from speed.
@@ -320,7 +321,7 @@ impl VehicleTask {
     pub fn target_speed(&self) -> f64 {
         match self {
             VehicleTask::LaneKeep => 13.4,     // ~30 mph / ~48 km/h
-            VehicleTask::Follow => 13.4,       // match lead
+            VehicleTask::Follow { .. } => 13.4,  // match lead
             VehicleTask::LaneChange => 13.4,   // maintain during maneuver
             VehicleTask::EmergencyStop => 0.0, // stop
         }
@@ -447,6 +448,17 @@ impl VehicleConfig {
         self.target_speed
             .unwrap_or_else(|| self.task.target_speed())
     }
+
+    /// Speed at which the simulator initializes.
+    ///
+    /// For EmergencyStop, defaults to 13.4 m/s (need to start at cruising speed
+    /// to have something to stop from). For other tasks, same as `effective_target_speed()`.
+    pub fn init_speed(&self) -> f64 {
+        match self.task {
+            VehicleTask::EmergencyStop => self.target_speed.unwrap_or(13.4),
+            _ => self.effective_target_speed(),
+        }
+    }
 }
 
 /// Vehicle chassis parameters for the bicycle model.
@@ -555,6 +567,50 @@ pub fn pd_cruise_baseline_with_road(
         throttle,
         brake,
     }
+}
+
+/// PD cruise-control for Follow task: modulates speed based on gap to nearest peer.
+///
+/// Same lateral/heading control as `pd_cruise_baseline_with_road`, but the speed
+/// command is adjusted by the gap error: if the peer is too close, slow down;
+/// if too far, speed up (up to 120% of target).
+pub fn pd_cruise_with_follow(
+    state: &VehicleState,
+    target_speed: f64,
+    road_heading: f64,
+    target_gap: f64,
+) -> VehicleCommand {
+    // Gap-modulated speed: speed_cmd = target_speed + gap_error * 0.3
+    let gap_error = state.nearest_peer_distance - target_gap;
+    let speed_cmd = (target_speed + gap_error * 0.3).clamp(0.0, target_speed * 1.2);
+
+    pd_cruise_baseline_with_road(state, speed_cmd, road_heading)
+}
+
+/// Training-level perturbations that interact with the swarm (distinct from physics-level
+/// `VehiclePerturbation`). These trigger scenario events like cascading brake lights.
+#[derive(Debug, Clone)]
+pub enum TrainingPerturbation {
+    /// No perturbation.
+    None,
+    /// Trigger a lead-brake event on a specific peer at a specific step.
+    LeadBrake {
+        trigger_step: usize,
+        peer_idx: usize,
+    },
+}
+
+/// Generate a cascading lead-brake sequence for a convoy.
+///
+/// Peer 0 brakes at step 50, peer 1 at step 80, peer 2 at step 110, etc.
+/// Simulates cascading brake lights propagating through a convoy.
+pub fn lead_brake_cascade(num_peers: usize) -> Vec<TrainingPerturbation> {
+    (0..num_peers)
+        .map(|i| TrainingPerturbation::LeadBrake {
+            trigger_step: 50 + 30 * i,
+            peer_idx: i,
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -741,6 +797,38 @@ mod tests {
             cmd.steering < 0.0,
             "Left offset → steer right (negative): {}",
             cmd.steering
+        );
+    }
+
+    #[test]
+    fn test_pd_follow_slows_for_close_peer() {
+        let mut state = VehicleState::cruising(13.4);
+        state.nearest_peer_distance = 15.0; // closer than target gap
+        let cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0);
+        // Gap error = 15 - 30 = -15 → speed_cmd = 13.4 + (-15)*0.3 = 8.9
+        // At 13.4 m/s with target 8.9 → speed_error negative → should brake or reduce throttle
+        let baseline = pd_cruise_baseline(&state, 13.4);
+        assert!(
+            cmd.throttle < baseline.throttle || cmd.brake > baseline.brake,
+            "Close peer → reduced throttle or increased brake: follow={:?}, baseline={:?}",
+            cmd,
+            baseline
+        );
+    }
+
+    #[test]
+    fn test_pd_follow_speeds_for_far_peer() {
+        let mut state = VehicleState::cruising(10.0);
+        state.nearest_peer_distance = 60.0; // farther than target gap
+        let cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0);
+        // Gap error = 60 - 30 = 30 → speed_cmd = 13.4 + 30*0.3 = 22.4, clamped to 16.08
+        // At 10.0 m/s with target 16.08 → should throttle harder than baseline at 13.4
+        let baseline = pd_cruise_baseline_with_road(&state, 13.4, 0.0);
+        assert!(
+            cmd.throttle >= baseline.throttle,
+            "Far peer → increased throttle: follow={:?}, baseline={:?}",
+            cmd,
+            baseline
         );
     }
 }
