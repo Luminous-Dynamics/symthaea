@@ -53,7 +53,10 @@ fn main() {
         std::process::exit(1);
     }
 
-    println!("=== Humanoid Training Curves ({} episodes) ===", episodes.len());
+    println!(
+        "=== Humanoid Training Curves ({} episodes) ===",
+        episodes.len()
+    );
     println!();
 
     // Standing Reward
@@ -142,8 +145,8 @@ fn ascii_chart(
     let mut prev_task = String::new();
     for (col, ep) in episodes.iter().enumerate().take(width) {
         let val = value_fn(ep);
-        let row = ((val - y_min) / y_range * (height - 1) as f64)
-            .clamp(0.0, (height - 1) as f64) as usize;
+        let row = ((val - y_min) / y_range * (height - 1) as f64).clamp(0.0, (height - 1) as f64)
+            as usize;
         let row = height - 1 - row; // invert for display
 
         let ch = match ep.task.as_str() {
@@ -180,10 +183,6 @@ fn ascii_chart(
     // X-axis
     print!("       +");
     println!("{}", "-".repeat(width));
-    println!(
-        "        0{:>width$}",
-        episodes.len() - 1,
-        width = width - 1
-    );
+    println!("        0{:>width$}", episodes.len() - 1, width = width - 1);
     println!();
 }

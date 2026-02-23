@@ -18,10 +18,9 @@ fn main() {
     use std::path::Path;
     use symthaea::voice::formant_targets::FormantDatabase;
     use symthaea::voice::vocal_tract_encoder::VoiceCognitiveState;
-    use symthaea::voice::vocal_tract_fep::VocalTractPipeline;
     use symthaea::voice::vocal_tract_fep::VocalTractObservation;
+    use symthaea::voice::vocal_tract_fep::VocalTractPipeline;
     use symthaea::voice::vocoder::FormantVocoder;
-    use symthaea::voice::FormantFrame;
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_core::hdc::HDC_DIMENSION;
 
@@ -46,7 +45,7 @@ fn main() {
         buf.extend_from_slice(&byte_rate.to_le_bytes());
         buf.extend_from_slice(&2u16.to_le_bytes()); // block align
         buf.extend_from_slice(&16u16.to_le_bytes()); // bits per sample
-        // data chunk
+                                                     // data chunk
         buf.extend_from_slice(b"data");
         buf.extend_from_slice(&data_size.to_le_bytes());
         for &s in samples {
@@ -73,19 +72,30 @@ fn main() {
     let mut vocoder = FormantVocoder::new();
     let sample_rate = vocoder.sample_rate();
     let samples_per_frame = (sample_rate as f32 / 200.0) as usize; // 120 at 24kHz
-    println!("  Pipeline created (16,384D HDC → 3×8 LTC → 9D FormantFrame)");
+    println!("  Pipeline created (16,384D HDC → 2×4 LTC → 9D FormantFrame)");
     println!("  Dual-rate: 200Hz motor / 10Hz cognitive");
-    println!("  Vocoder: {}Hz, {} samples/frame\n", sample_rate, samples_per_frame);
+    println!(
+        "  Vocoder: {}Hz, {} samples/frame\n",
+        sample_rate, samples_per_frame
+    );
 
     // ── 2. Phoneme training ──────────────────────────────────────────────
     println!("--- 2. Phoneme Target Training ---");
     let db = FormantDatabase::new();
     let n_phonemes = db.all_phonemes().len();
-    println!("  Training on {} ARPABET phonemes from FormantDatabase...", n_phonemes);
+    println!(
+        "  Training on {} ARPABET phonemes from FormantDatabase...",
+        n_phonemes
+    );
 
     let mut losses = Vec::new();
     for epoch in 0..30 {
-        let loss = symthaea::voice::train_controller_on_phoneme_db(&mut pipeline.controller, &genesis, &db, 1);
+        let loss = symthaea::voice::train_controller_on_phoneme_db(
+            &mut pipeline.controller,
+            &genesis,
+            &db,
+            1,
+        );
         losses.push(loss);
         if epoch < 5 || (epoch + 1) % 10 == 0 {
             println!("  Epoch {}: avg loss = {:.2}", epoch + 1, loss);
@@ -154,24 +164,33 @@ fn main() {
     // ── 4. Consciousness modulation ──────────────────────────────────────
     println!("--- 4. Consciousness Modulation ---");
     let states = [
-        ("Calm", VoiceCognitiveState {
-            emotional_arousal: 0.2,
-            emotional_valence: 0.0,
-            consciousness_level: 0.3,
-            ..Default::default()
-        }),
-        ("Excited", VoiceCognitiveState {
-            emotional_arousal: 0.9,
-            emotional_valence: 0.7,
-            consciousness_level: 0.9,
-            ..Default::default()
-        }),
-        ("Uncertain", VoiceCognitiveState {
-            prediction_error: 0.8,
-            epistemic_confidence: 0.2,
-            consciousness_level: 0.4,
-            ..Default::default()
-        }),
+        (
+            "Calm",
+            VoiceCognitiveState {
+                emotional_arousal: 0.2,
+                emotional_valence: 0.0,
+                consciousness_level: 0.3,
+                ..Default::default()
+            },
+        ),
+        (
+            "Excited",
+            VoiceCognitiveState {
+                emotional_arousal: 0.9,
+                emotional_valence: 0.7,
+                consciousness_level: 0.9,
+                ..Default::default()
+            },
+        ),
+        (
+            "Uncertain",
+            VoiceCognitiveState {
+                prediction_error: 0.8,
+                epistemic_confidence: 0.2,
+                consciousness_level: 0.4,
+                ..Default::default()
+            },
+        ),
     ];
 
     pipeline.reset();
@@ -228,9 +247,18 @@ fn main() {
 
     // ── 6. Summary ───────────────────────────────────────────────────────
     println!("\n--- Summary ---");
-    println!("  Total frames generated: {}", n_cognitive_ticks * frames_per_tick + frames_per_vowel * vowels.len() + 60);
-    println!("  Pipeline cumulative time: {:.3}s", pipeline.cumulative_time());
-    println!("  Phoneme training: {} phonemes, {:.1}% loss reduction", n_phonemes, improvement);
+    println!(
+        "  Total frames generated: {}",
+        n_cognitive_ticks * frames_per_tick + frames_per_vowel * vowels.len() + 60
+    );
+    println!(
+        "  Pipeline cumulative time: {:.3}s",
+        pipeline.cumulative_time()
+    );
+    println!(
+        "  Phoneme training: {} phonemes, {:.1}% loss reduction",
+        n_phonemes, improvement
+    );
     println!("  FEP loop: closed (learn_from_outcome active)");
     println!("  Audio files written to: {}/", audio_dir.display());
     println!("\n=== Demo Complete ===");

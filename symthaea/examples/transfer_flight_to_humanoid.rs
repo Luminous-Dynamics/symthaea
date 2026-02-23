@@ -37,11 +37,16 @@ fn main() {
         flight_ctrl.train_step(&sensor_hv, &target, 0.002, None);
 
         if step % 100 == 0 {
-            println!("  Step {step:>3}: thrust = {:.4}, moments = ({:.5}, {:.5}, {:.5})",
-                cmd.thrust, cmd.roll_moment, cmd.pitch_moment, cmd.yaw_moment);
+            println!(
+                "  Step {step:>3}: thrust = {:.4}, moments = ({:.5}, {:.5}, {:.5})",
+                cmd.thrust, cmd.roll_moment, cmd.pitch_moment, cmd.yaw_moment
+            );
         }
     }
-    println!("  Flight training complete. Network stats: {:?}", flight_ctrl.stats());
+    println!(
+        "  Flight training complete. Network stats: {:?}",
+        flight_ctrl.stats()
+    );
     println!();
 
     // ── Phase 2: Extract transfer concepts ──
@@ -54,7 +59,10 @@ fn main() {
     println!("  Blend factor: {}", transfer.blend_factor());
 
     let concepts = transfer.extract_concepts(flight_ctrl.network());
-    println!("  Extracted {} concept HVs from flight network", concepts.len());
+    println!(
+        "  Extracted {} concept HVs from flight network",
+        concepts.len()
+    );
 
     // Check concept norms
     let avg_norm: f32 =
@@ -93,12 +101,24 @@ fn main() {
     println!();
 
     // ── Summary ──
-    let transfer_final = transfer_metrics.last().map(|m| m.avg_standing_reward).unwrap_or(0.0);
-    let random_final = random_metrics.last().map(|m| m.avg_standing_reward).unwrap_or(0.0);
-    let transfer_avg: f64 =
-        transfer_metrics.iter().map(|m| m.avg_standing_reward).sum::<f64>() / transfer_metrics.len() as f64;
-    let random_avg: f64 =
-        random_metrics.iter().map(|m| m.avg_standing_reward).sum::<f64>() / random_metrics.len() as f64;
+    let transfer_final = transfer_metrics
+        .last()
+        .map(|m| m.avg_standing_reward)
+        .unwrap_or(0.0);
+    let random_final = random_metrics
+        .last()
+        .map(|m| m.avg_standing_reward)
+        .unwrap_or(0.0);
+    let transfer_avg: f64 = transfer_metrics
+        .iter()
+        .map(|m| m.avg_standing_reward)
+        .sum::<f64>()
+        / transfer_metrics.len() as f64;
+    let random_avg: f64 = random_metrics
+        .iter()
+        .map(|m| m.avg_standing_reward)
+        .sum::<f64>()
+        / random_metrics.len() as f64;
 
     println!("Summary:");
     println!("  Transfer avg standing reward: {transfer_avg:.4}");
@@ -124,6 +144,9 @@ fn main() {
         transfer_ctrl.forward(&test_input, 0.025);
         random_ctrl.forward(&test_input, 0.025);
     }
-    let sim = transfer_ctrl.network().output().similarity(&random_ctrl.network().output());
+    let sim = transfer_ctrl
+        .network()
+        .output()
+        .similarity(&random_ctrl.network().output());
     println!("  Network state similarity:     {sim:.4} (1.0 = identical, <0.99 = diverged)");
 }

@@ -165,10 +165,7 @@ fn main() {
         run_episodes.len()
     );
     println!();
-    println!(
-        "  Peak head height:       {:.3}m",
-        peak.avg_head_height
-    );
+    println!("  Peak head height:       {:.3}m", peak.avg_head_height);
     println!(
         "  Peak uprightness:       {:.1}%",
         peak.avg_uprightness * 100.0

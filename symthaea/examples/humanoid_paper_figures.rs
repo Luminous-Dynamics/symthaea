@@ -70,15 +70,15 @@ fn main() {
 
     println!();
     println!("Training Summary:");
-    println!("  Initial standing reward:  {:.4}", first.avg_standing_reward);
+    println!(
+        "  Initial standing reward:  {:.4}",
+        first.avg_standing_reward
+    );
     println!(
         "  Peak standing reward:     {:.4} (episode {})",
         peak.avg_standing_reward, peak.episode
     );
-    println!(
-        "  Peak head height:         {:.3}m",
-        peak.avg_head_height
-    );
+    println!("  Peak head height:         {:.3}m", peak.avg_head_height);
     println!(
         "  Peak uprightness:         {:.1}%",
         peak.avg_uprightness * 100.0
@@ -99,8 +99,7 @@ fn main() {
     let flight_genesis = GenesisSeed::from_phrase("symthaea-flight-quadrotor");
     let flight_config = FlightConfig::default();
     let mut flight_ctrl = FlightController::new(&flight_genesis, &flight_config);
-    let mut flight_encoder =
-        QuadrotorHdcEncoder::new(&flight_genesis, flight_config.num_levels);
+    let mut flight_encoder = QuadrotorHdcEncoder::new(&flight_genesis, flight_config.num_levels);
 
     let hover_state = FlightState::hover(1.0);
     for _ in 0..500 {
@@ -189,27 +188,12 @@ fn main() {
     // Build benchmark result for comparison
     let our_return = best_stand.avg_standing_reward;
 
-    println!(
-        "  {:<20} {:>8}",
-        "Method", "Return"
-    );
+    println!("  {:<20} {:>8}", "Method", "Return");
     println!("  {}", "─".repeat(30));
-    println!(
-        "  {:<20} {:>8.3}  ← ours",
-        "HDC-LTC-FEP", our_return
-    );
-    println!(
-        "  {:<20} {:>8.3}",
-        "SAC", baselines.sac_return
-    );
-    println!(
-        "  {:<20} {:>8.3}",
-        "D4PG", baselines.d4pg_return
-    );
-    println!(
-        "  {:<20} {:>8.3}",
-        "TD3", baselines.td3_return
-    );
+    println!("  {:<20} {:>8.3}  ← ours", "HDC-LTC-FEP", our_return);
+    println!("  {:<20} {:>8.3}", "SAC", baselines.sac_return);
+    println!("  {:<20} {:>8.3}", "D4PG", baselines.d4pg_return);
+    println!("  {:<20} {:>8.3}", "TD3", baselines.td3_return);
 
     println!();
     let vs_sac = our_return / baselines.sac_return * 100.0;
@@ -222,12 +206,12 @@ fn main() {
     println!("━━━ Figure 4: Perturbation Recovery ━━━");
     println!();
 
-    use symthaea::humanoid::{
-        HumanoidController, HumanoidHdcEncoder, HumanoidPdGains, HumanoidTask,
-    };
     use symthaea::humanoid::fep_agent::{ActiveInferenceHumanoidAgent, HumanoidFepConfig};
     use symthaea::humanoid::simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
     use symthaea::humanoid::types::pd_standing_baseline;
+    use symthaea::humanoid::{
+        HumanoidController, HumanoidHdcEncoder, HumanoidPdGains, HumanoidTask,
+    };
 
     let genesis = GenesisSeed::from_phrase("symthaea-humanoid-dmc");
     let config = HumanoidConfig::default();
@@ -320,14 +304,8 @@ fn main() {
         "║  vs SAC (DMC Stand):         {:<5.1}%                          ║",
         vs_sac
     );
-    println!(
-        "║  Architecture:               HDC(16384D) + LTC/CfC + FEP   ║"
-    );
-    println!(
-        "║  Parameters:                 3×8 neurons (~400K weights)    ║"
-    );
-    println!(
-        "║  Training:                   20 episodes (8000 steps)       ║"
-    );
+    println!("║  Architecture:               HDC(16384D) + LTC/CfC + FEP   ║");
+    println!("║  Parameters:                 3×8 neurons (~400K weights)    ║");
+    println!("║  Training:                   20 episodes (8000 steps)       ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
 }
