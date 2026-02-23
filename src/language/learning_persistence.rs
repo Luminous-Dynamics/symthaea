@@ -12,7 +12,52 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::consciousness_language_integration::{AdaptiveThresholds, OutcomePatterns};
+/// Adaptive thresholds for consciousness-language integration.
+/// Originally from consciousness_language_integration module; defined locally
+/// since that module was removed during the crate consolidation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdaptiveThresholds {
+    /// Current Φ threshold for engaging deeper processing
+    pub phi_threshold: f64,
+    /// Confidence threshold for accepting a prediction
+    pub confidence_threshold: f64,
+    /// Number of successful predictions
+    pub successes: u64,
+    /// Number of failed predictions
+    pub failures: u64,
+    /// History of threshold adjustments (timestamp, old, new)
+    pub adjustment_history: Vec<(u64, f64, f64)>,
+}
+
+impl Default for AdaptiveThresholds {
+    fn default() -> Self {
+        Self {
+            phi_threshold: 0.5,
+            confidence_threshold: 0.6,
+            successes: 0,
+            failures: 0,
+            adjustment_history: Vec::new(),
+        }
+    }
+}
+
+/// Outcome patterns tracking success rates across different strategies.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutcomePatterns {
+    /// Samples per quadrant (low-φ/low-conf, low-φ/high-conf, high-φ/low-conf, high-φ/high-conf)
+    pub quadrant_samples: [u32; 4],
+    /// Success rate per quadrant
+    pub quadrant_success_rates: [f64; 4],
+}
+
+impl Default for OutcomePatterns {
+    fn default() -> Self {
+        Self {
+            quadrant_samples: [0; 4],
+            quadrant_success_rates: [0.0; 4],
+        }
+    }
+}
 
 // ============================================================================
 // LEARNING STATE CONTAINER

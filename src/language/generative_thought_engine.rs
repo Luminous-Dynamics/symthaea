@@ -504,7 +504,7 @@ mod tests {
         println!("Proto-language: {}", thought.proto_language);
         println!("Response: {}", thought.response);
         println!("Primitives: {:?}", thought.generated.primitives);
-        println!("Ψ: {:.3}", thought.psi);
+        println!("Ψ: {:.3}", thought.phi);
 
         assert!(!thought.response.is_empty());
         assert!(thought.metadata.is_thoughtful);

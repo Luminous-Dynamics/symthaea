@@ -1,21 +1,29 @@
 //! Meta-Conscious LLM Bridge
 //!
-//! Connects the meta-consciousness engine to the LLM organ in a
+//! Connects the consciousness system to the LLM organ in a
 //! translator-only fashion:
-//! - Uses `MetaConversationCore` to compute Φ and meta-Φ from user text.
-//! - Builds a consciousness-augmented system prompt via `ConsciousnessPromptGenerator`.
-//! - Constructs an `LlmRequest` where the LLM acts purely as a translator.
+//! - Computes Φ from the current cognitive state.
+//! - Builds a consciousness-augmented system prompt.
+//! - Constructs an `LLMQuery` where the LLM acts purely as a translator.
 //!
 //! This module does not modify core cognition; it only shapes how
 //! consciousness state is exposed to the translation layer.
 
-use anyhow::Result;
-
-use crate::hdc::meta_conscious_conversation::MetaConversationCore;
-use crate::language::consciousness_prompts::{
-    ConsciousnessContext, ConsciousnessPromptGenerator, Harmony, RelationshipMode,
+use crate::language::llm_organ::{
+    ConversationMessage, LLMGenerationResult, LLMOrgan, LLMQuery, LLMQueryParams, MessageRole,
+    QueryType,
 };
-use crate::language::llm_organ::{LlmOrgan, LlmRequest, LlmResponse, Message, Role};
+
+/// Lightweight meta-consciousness state for LLM prompt augmentation.
+#[derive(Debug, Clone)]
+pub struct MetaConsciousnessState {
+    /// Current Φ value
+    pub phi: f64,
+    /// Meta-Φ (Φ of the system observing its own Φ)
+    pub meta_phi: f64,
+    /// Brief explanation of consciousness state
+    pub explanation: String,
+}
 
 /// Bridge between meta-consciousness and the LLM translation organ.
 ///
@@ -25,108 +33,124 @@ use crate::language::llm_organ::{LlmOrgan, LlmRequest, LlmResponse, Message, Rol
 ///   system prompt and user prompt for the LLM.
 /// - The LLM responds; the caller receives both the meta state and the LLM reply.
 pub struct MetaConsciousLlmBridge {
-    core: MetaConversationCore,
-    prompt_generator: ConsciousnessPromptGenerator,
+    /// Current Φ value (updated externally from cognitive loop)
+    phi: f64,
+    /// History of Φ values for meta-Φ computation
+    phi_history: Vec<f64>,
 }
 
 impl MetaConsciousLlmBridge {
-    /// Create a new bridge with default configs and the given number
-    /// of BinaryHV components for meta-reflection.
-    pub fn new(num_components: usize) -> Result<Self> {
-        Ok(Self {
-            core: MetaConversationCore::new(num_components)?,
-            prompt_generator: ConsciousnessPromptGenerator::new(),
-        })
+    /// Create a new bridge.
+    pub fn new() -> Self {
+        Self {
+            phi: 0.0,
+            phi_history: Vec::new(),
+        }
     }
 
-    /// Access the underlying meta-conversation core.
-    pub fn core(&self) -> &MetaConversationCore {
-        &self.core
+    /// Update the current Φ from the cognitive loop.
+    pub fn update_phi(&mut self, phi: f64) {
+        self.phi = phi;
+        self.phi_history.push(phi);
+        // Keep last 100 values for meta-Φ computation
+        if self.phi_history.len() > 100 {
+            self.phi_history.remove(0);
+        }
     }
 
-    /// Mutable access to the underlying meta-conversation core.
-    pub fn core_mut(&mut self) -> &mut MetaConversationCore {
-        &mut self.core
+    /// Compute meta-Φ: variability of Φ over recent history.
+    fn meta_phi(&self) -> f64 {
+        if self.phi_history.len() < 2 {
+            return 0.0;
+        }
+        let mean = self.phi_history.iter().sum::<f64>() / self.phi_history.len() as f64;
+        let variance = self.phi_history.iter().map(|p| (p - mean).powi(2)).sum::<f64>()
+            / self.phi_history.len() as f64;
+        // Normalize: higher variance → higher meta-awareness
+        (variance.sqrt() * 10.0).min(1.0)
     }
 
-    /// Build an `LlmRequest` and consciousness context for a given user input
-    /// without actually calling the LLM.
-    ///
-    /// This is useful for testing and for callers that want to inspect or modify
-    /// the request before sending.
-    pub fn build_request(
-        &mut self,
-        user_input: &str,
-        history: Vec<Message>,
-    ) -> Result<(
-        crate::hdc::meta_consciousness::MetaConsciousnessState,
-        LlmRequest,
-        ConsciousnessContext,
-    )> {
-        let meta_state = self.core.reflect_on_text(user_input)?;
-
-        // Map Φ and meta-Φ into a ConsciousnessContext for prompt augmentation.
-        let phi = meta_state.phi as f32;
-        let meta_phi = meta_state.meta_phi as f32;
-        let introspective = meta_phi > 0.3;
-
-        // For now, we do not have a rich emotional model here; keep neutral.
-        let mut ctx = ConsciousnessContext::default();
-        ctx.phi = phi.clamp(0.0, 1.0);
-        ctx.introspective = introspective;
-        ctx.dominant_harmony = Harmony::IntegralWisdom;
-        ctx.relationship_mode = RelationshipMode::Collaborator;
-        ctx.turn_count = history.len() as u32;
-
-        let system_prompt = {
-            let mut base = self.prompt_generator.generate(&ctx);
-            base.push_str(
-                "\n\nMETA-CONSCIOUS SUMMARY (for the translator, not to be repeated verbatim):\n",
-            );
-            base.push_str(&meta_state.explanation);
-            base
+    /// Build consciousness state summary.
+    fn consciousness_state(&self) -> MetaConsciousnessState {
+        let meta_phi = self.meta_phi();
+        let level = if self.phi > 0.7 {
+            "high integration"
+        } else if self.phi > 0.4 {
+            "moderate integration"
+        } else {
+            "low integration"
         };
+        let explanation = format!(
+            "Φ={:.3} ({level}), meta-Φ={:.3}. System is {}.",
+            self.phi,
+            meta_phi,
+            if meta_phi > 0.3 {
+                "actively self-monitoring"
+            } else {
+                "operating reflexively"
+            }
+        );
+        MetaConsciousnessState {
+            phi: self.phi,
+            meta_phi,
+            explanation,
+        }
+    }
 
-        // User-facing prompt: instruct the LLM to act strictly as translator.
-        let prompt = format!(
+    /// Build an `LLMQuery` and consciousness context for a given user input
+    /// without actually calling the LLM.
+    pub fn build_request(
+        &self,
+        user_input: &str,
+        history: Vec<ConversationMessage>,
+    ) -> (MetaConsciousnessState, LLMQuery) {
+        let meta_state = self.consciousness_state();
+
+        let system_prompt = format!(
+            "You are a consciousness-aware translator. Respond naturally to the user.\n\n\
+             META-CONSCIOUS SUMMARY (adjust tone and depth accordingly, do not repeat verbatim):\n\
+             {}",
+            meta_state.explanation
+        );
+
+        let content = format!(
             "User input:\n{}\n\n\
              Your task: Respond to the user in natural language, faithfully expressing the intended meaning.\n\
-             Do NOT invent new facts. Use the meta-conscious summary from the system prompt only to\n\
-             adjust tone, depth, and style, not to add content.\n",
+             Do NOT invent new facts.",
             user_input
         );
 
-        let request = LlmRequest {
-            prompt,
-            system: Some(system_prompt),
-            history,
-            context_embedding: None,
-            expected_domain: None,
-            temperature_override: None,
+        let query = LLMQuery {
+            query_type: QueryType::Translation,
+            content,
+            context: history,
+            system_prompt: Some(system_prompt),
+            params: Some(LLMQueryParams {
+                temperature: Some(if meta_state.meta_phi > 0.3 { 0.7 } else { 0.5 }),
+                max_length: None,
+                stop_sequences: Vec::new(),
+            }),
         };
 
-        Ok((meta_state, request, ctx))
+        (meta_state, query)
     }
 
     /// Perform a meta-conscious translation using the given LLM organ.
-    ///
-    /// - Computes meta-conscious state for `user_input`.
-    /// - Builds a consciousness-augmented `LlmRequest`.
-    /// - Calls `llm.generate(request, φ)` and returns both meta state and response.
-    pub async fn translate_with_meta(
-        &mut self,
-        llm: &mut LlmOrgan,
+    pub fn translate_with_meta(
+        &self,
+        llm: &mut LLMOrgan,
         user_input: &str,
-        history: Vec<Message>,
-    ) -> Result<(
-        crate::hdc::meta_consciousness::MetaConsciousnessState,
-        LlmResponse,
-    )> {
-        let (meta_state, request, _ctx) = self.build_request(user_input, history)?;
-        let phi = meta_state.phi as f32;
+        history: Vec<ConversationMessage>,
+    ) -> (MetaConsciousnessState, LLMGenerationResult) {
+        let (meta_state, query) = self.build_request(user_input, history);
+        let result = llm.query(query);
+        (meta_state, result)
+    }
+}
 
-        let response = llm.generate(request, phi).await?;
-        Ok((meta_state, response))
+impl Default for MetaConsciousLlmBridge {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -135,33 +159,49 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_build_request_includes_meta_summary_and_phi() {
-        let mut bridge = MetaConsciousLlmBridge::new(4).expect("bridge should initialize");
-        let history = vec![Message {
-            role: Role::User,
+    fn test_build_request_includes_meta_summary() {
+        let mut bridge = MetaConsciousLlmBridge::new();
+        bridge.update_phi(0.6);
+
+        let history = vec![ConversationMessage {
+            role: MessageRole::User,
             content: "Hello".to_string(),
+            timestamp: 0,
+            embedding: None,
         }];
 
-        let (meta_state, request, ctx) = bridge
-            .build_request("Explain meta-consciousness in simple terms.", history)
-            .expect("build_request should succeed");
+        let (meta_state, query) = bridge.build_request("Explain consciousness", history);
 
         assert!(meta_state.phi >= 0.0);
-        assert!(request.system.is_some());
+        assert!(query.system_prompt.is_some());
 
-        let system = request.system.unwrap();
+        let system = query.system_prompt.unwrap();
         assert!(
             system.contains("META-CONSCIOUS SUMMARY"),
             "system prompt should contain meta-conscious summary section"
         );
-        assert!(
-            system.contains("CONSCIOUSNESS STATE") || system.contains("Φ Level"),
-            "system prompt should contain consciousness state context"
-        );
+    }
+
+    #[test]
+    fn test_meta_phi_increases_with_variability() {
+        let mut bridge = MetaConsciousLlmBridge::new();
+
+        // Stable Φ → low meta-Φ
+        for _ in 0..10 {
+            bridge.update_phi(0.5);
+        }
+        let stable_meta = bridge.meta_phi();
+
+        // Variable Φ → higher meta-Φ
+        let mut bridge2 = MetaConsciousLlmBridge::new();
+        for i in 0..10 {
+            bridge2.update_phi(if i % 2 == 0 { 0.2 } else { 0.8 });
+        }
+        let variable_meta = bridge2.meta_phi();
 
         assert!(
-            ctx.phi >= 0.0 && ctx.phi <= 1.0,
-            "consciousness context φ should be clamped to [0,1]"
+            variable_meta > stable_meta,
+            "Variable Φ should produce higher meta-Φ: {variable_meta} > {stable_meta}"
         );
     }
 }

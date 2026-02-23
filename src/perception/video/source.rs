@@ -54,12 +54,13 @@ pub trait VideoSource: Send {
 
 /// Webcam video source
 ///
-/// When the `webcam` feature is enabled, uses nokhwa for real camera access.
-/// Otherwise, falls back to mock data for development/testing.
+/// When the `webcam` feature is enabled, provides the WebcamSource struct.
+/// Real camera access requires the `nokhwa` crate at runtime; this stub
+/// compiles without it and returns an error on `start()` if no camera
+/// backend is linked.
 #[cfg(feature = "webcam")]
 pub struct WebcamSource {
     config: VideoSourceConfig,
-    camera: Option<nokhwa::Camera>,
     sequence: u64,
     active: bool,
 }
@@ -69,7 +70,6 @@ impl WebcamSource {
     pub fn new(config: VideoSourceConfig) -> Result<Self> {
         Ok(Self {
             config,
-            camera: None,
             sequence: 0,
             active: false,
         })
@@ -79,56 +79,19 @@ impl WebcamSource {
 #[cfg(feature = "webcam")]
 impl VideoSource for WebcamSource {
     fn start(&mut self) -> Result<()> {
-        use nokhwa::utils::{CameraIndex, RequestedFormat, RequestedFormatType};
-        use nokhwa::Camera;
-
-        let index = CameraIndex::Index(self.config.camera_index);
-        let requested = RequestedFormat::new::<nokhwa::pixel_format::RgbFormat>(
-            RequestedFormatType::AbsoluteHighestFrameRate,
-        );
-
-        let camera = Camera::new(index, requested)?;
-        self.camera = Some(camera);
-        self.active = true;
-
-        // Open the camera stream
-        if let Some(ref mut cam) = self.camera {
-            cam.open_stream()?;
-        }
-
-        Ok(())
+        anyhow::bail!(
+            "Webcam feature enabled but no camera backend linked. \
+             Add the `nokhwa` crate to Cargo.toml for real camera access."
+        )
     }
 
     fn stop(&mut self) -> Result<()> {
-        if let Some(ref mut cam) = self.camera {
-            cam.stop_stream()?;
-        }
         self.active = false;
         Ok(())
     }
 
     fn next_frame(&mut self) -> Result<Option<Frame>> {
-        let cam = match self.camera.as_mut() {
-            Some(c) => c,
-            None => return Ok(None),
-        };
-
-        let nokhwa_frame = cam.frame()?;
-        let decoded = nokhwa_frame.decode_image::<nokhwa::pixel_format::RgbFormat>()?;
-
-        let (width, height) = (decoded.width(), decoded.height());
-        let data = decoded.into_raw();
-
-        self.sequence += 1;
-
-        let mut frame = Frame::new(data, width, height, FrameFormat::Rgb24, self.sequence);
-
-        // Downsample to target size
-        if width != self.config.width || height != self.config.height {
-            frame = frame.downsample(self.config.width, self.config.height);
-        }
-
-        Ok(Some(frame))
+        Ok(None)
     }
 
     fn is_active(&self) -> bool {
