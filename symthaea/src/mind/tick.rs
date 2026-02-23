@@ -27,6 +27,8 @@ impl ContinuousMind {
         self.process_federated();
         self.process_social();
         self.sync_iroh_bridge();
+        self.process_mesh();
+        self.sync_mesh_bridge();
 
         // Check for Dream State
         let should_dream = bio.phase == CircadianPhase::Night
@@ -354,6 +356,97 @@ impl ContinuousMind {
                 target: "symthaea::mind::iroh",
                 count,
                 "Drained inbound messages from Iroh bridge"
+            );
+        }
+    }
+
+    /// Process inbound mesh wisdom packets from radio peers.
+    ///
+    /// Drains `mesh_inbox` and logs received packets. WisdomVector payloads
+    /// represent a peer's cognitive state and can be fed into social coherence
+    /// for cross-node consciousness integration.
+    fn process_mesh(&mut self) {
+        let inbox = std::mem::take(&mut self.mesh_inbox);
+        if inbox.is_empty() {
+            return;
+        }
+
+        let mut wisdom_count = 0u64;
+        let mut heartbeat_count = 0u64;
+        let mut affective_count = 0u64;
+
+        for packet in &inbox {
+            match packet.payload_type {
+                crate::swarm::mesh::PayloadType::WisdomVector => {
+                    wisdom_count += 1;
+
+                    // Feed peer's wisdom into social coherence if enabled.
+                    // Convert BinaryHV → ContinuousHV for compatibility with the
+                    // social coherence API (which operates in continuous HDC space).
+                    if let Some(ref mut sc) = self.social_coherence {
+                        let peer_id = crate::swarm::mesh::hex_short(&packet.source_id);
+                        let continuous = packet.wisdom.to_continuous();
+                        sc.observe_agent(&peer_id, &continuous, &continuous);
+                    }
+                }
+                crate::swarm::mesh::PayloadType::Heartbeat => {
+                    heartbeat_count += 1;
+                }
+                crate::swarm::mesh::PayloadType::Affective => {
+                    affective_count += 1;
+                }
+                crate::swarm::mesh::PayloadType::Gradient => {
+                    // Gradient packets handled by federated learning system
+                }
+            }
+        }
+
+        tracing::debug!(
+            target: "symthaea::mind::mesh",
+            total = inbox.len(),
+            wisdom = wisdom_count,
+            heartbeat = heartbeat_count,
+            affective = affective_count,
+            "Processed mesh wisdom packets"
+        );
+    }
+
+    /// Sync mesh packets through the mesh bridge (if attached).
+    ///
+    /// 1. Flushes `mesh_outbox` to the radio network actor (non-blocking)
+    /// 2. Drains inbound wisdom packets into `mesh_inbox`
+    ///
+    /// Packets arriving from the network will be processed on the *next* tick
+    /// by `process_mesh()`.
+    fn sync_mesh_bridge(&mut self) {
+        let bridge = match &mut self.mesh_bridge {
+            Some(b) if b.is_alive() => b,
+            _ => return,
+        };
+
+        // Flush outgoing mesh packets to the network
+        let outgoing = std::mem::take(&mut self.mesh_outbox);
+        if !outgoing.is_empty() {
+            let count = outgoing.len();
+            bridge.flush_outbox(outgoing);
+            tracing::trace!(
+                target: "symthaea::mind::mesh",
+                count,
+                "Flushed mesh packets to bridge"
+            );
+        }
+
+        // Drain inbound packets from network into inbox
+        let incoming = bridge.drain_inbox();
+        if !incoming.is_empty() {
+            let count = incoming.len();
+            for pkt in incoming {
+                self.mesh_inbox.push(pkt);
+            }
+            tracing::trace!(
+                target: "symthaea::mind::mesh",
+                count,
+                "Drained inbound packets from mesh bridge"
             );
         }
     }
