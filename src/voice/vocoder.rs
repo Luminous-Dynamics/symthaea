@@ -743,6 +743,7 @@ mod tests {
                 energy: 0.8,
                 voicing: 1.0,
                 time: 0.0,
+                source_type: SourceType::Vowel,
                 ..Default::default()
             },
             FormantFrame {
@@ -756,6 +757,7 @@ mod tests {
                 energy: 0.8,
                 voicing: 1.0,
                 time: 0.1,
+                source_type: SourceType::Vowel,
                 ..Default::default()
             },
         ];
@@ -795,6 +797,7 @@ mod tests {
                 energy: 0.8,
                 voicing: 1.0,
                 time: 0.0,
+                source_type: SourceType::Vowel,
                 ..Default::default()
             },
             FormantFrame {
@@ -808,6 +811,7 @@ mod tests {
                 energy: 0.8,
                 voicing: 1.0,
                 time: 0.1,
+                source_type: SourceType::Vowel,
                 ..Default::default()
             },
         ];
@@ -870,6 +874,7 @@ mod tests {
             energy: 0.8,
             voicing: 1.0,
             time: 0.0,
+            source_type: SourceType::Vowel,
             ..Default::default()
         };
 
@@ -915,6 +920,7 @@ mod tests {
             energy: 0.8,
             voicing: 1.0,
             time: 0.0,
+            source_type: SourceType::Vowel,
             ..Default::default()
         };
 
@@ -962,6 +968,7 @@ mod tests {
             energy: 0.8,
             voicing: 1.0,
             time: 0.0,
+            source_type: SourceType::Vowel,
             ..Default::default()
         };
 
@@ -1010,6 +1017,7 @@ mod tests {
             energy: 0.8,
             voicing: 1.0,
             time: 0.0,
+            source_type: SourceType::Vowel,
             ..Default::default()
         };
 
