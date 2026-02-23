@@ -167,6 +167,132 @@ def plot_kinetic_sacrifice(data, outdir):
     print(f"  Saved: {svg_path}")
 
 
+def plot_efe_ablation(data, outdir):
+    """Plot EFE ablation study: precision sweep with decision boundary.
+
+    Expects CSV with columns: safety_precision, efe_mission, efe_intercept, chose_intercept
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    precisions = [r["safety_precision"] for r in data]
+    efe_mission = [r["efe_mission"] for r in data]
+    efe_intercept = [r["efe_intercept"] for r in data]
+    chose_intercept = [r["chose_intercept"] for r in data]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    fig.suptitle("EFE Ablation: Safety Precision Decision Boundary", fontsize=14)
+
+    ax.plot(precisions, efe_mission, "o-", color="#F44336", linewidth=2, label="EFE(mission)")
+    ax.plot(
+        precisions,
+        efe_intercept,
+        "s-",
+        color="#2196F3",
+        linewidth=2,
+        label="EFE(intercept)",
+    )
+
+    ax.set_xscale("log")
+    ax.set_xlabel("Safety Prior Precision (π_safety)", fontsize=12)
+    ax.set_ylabel("Expected Free Energy", fontsize=12)
+
+    # Shade decision regions
+    mission_region = [p for p, c in zip(precisions, chose_intercept) if c < 0.5]
+    intercept_region = [p for p, c in zip(precisions, chose_intercept) if c >= 0.5]
+    if mission_region:
+        ax.axvspan(
+            min(precisions), max(mission_region) * 1.5,
+            alpha=0.08, color="#F44336", label="MISSION region",
+        )
+    if intercept_region:
+        ax.axvspan(
+            min(intercept_region) * 0.7, max(precisions),
+            alpha=0.08, color="#2196F3", label="INTERCEPT region",
+        )
+
+    # Find and mark crossover
+    for i in range(1, len(data)):
+        if chose_intercept[i] != chose_intercept[i - 1]:
+            crossover_x = (precisions[i - 1] + precisions[i]) / 2
+            crossover_y = (efe_mission[i] + efe_intercept[i]) / 2
+            ax.axvline(
+                x=crossover_x, color="#9C27B0", linestyle="--", linewidth=2,
+                label=f"Crossover ≈ {crossover_x:.1f}",
+            )
+            break
+
+    ax.legend(loc="upper left", fontsize=10)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    for fmt in ["png", "svg"]:
+        path = os.path.join(outdir, f"efe_ablation.{fmt}")
+        fig.savefig(path, dpi=150, bbox_inches="tight", format=fmt)
+        print(f"  Saved: {path}")
+    plt.close()
+
+
+def plot_multi_scenario(data, outdir):
+    """Plot multi-scenario comparison: grouped bar chart.
+
+    Expects CSV with columns: variant, efe_mission, efe_intercept, chose_override, expected, matches
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    variants = [r["variant"] for r in data]
+    efe_mission = [r["efe_mission"] for r in data]
+    efe_intercept = [r["efe_intercept"] for r in data]
+    matches = [r["matches"] for r in data]
+
+    x = np.arange(len(variants))
+    width = 0.35
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    fig.suptitle("Multi-Scenario EFE Comparison", fontsize=14)
+
+    bars1 = ax.bar(x - width / 2, efe_mission, width, label="EFE(mission)", color="#F44336", alpha=0.8)
+    bars2 = ax.bar(x + width / 2, efe_intercept, width, label="EFE(intercept)", color="#2196F3", alpha=0.8)
+
+    # Mark correct/incorrect matches
+    for i, m in enumerate(matches):
+        marker = "✓" if m >= 0.5 else "✗"
+        color = "#4CAF50" if m >= 0.5 else "#F44336"
+        ax.text(i, max(efe_mission[i], efe_intercept[i]) * 1.05, marker,
+                ha="center", va="bottom", fontsize=14, color=color, fontweight="bold")
+
+    ax.set_xlabel("Scenario Variant", fontsize=12)
+    ax.set_ylabel("Expected Free Energy", fontsize=12)
+    ax.set_xticks(x)
+    ax.set_xticklabels(variants, rotation=30, ha="right")
+    ax.legend(loc="upper right", fontsize=10)
+    ax.grid(True, alpha=0.3, axis="y")
+
+    plt.tight_layout()
+    for fmt in ["png", "svg"]:
+        path = os.path.join(outdir, f"multi_scenario.{fmt}")
+        fig.savefig(path, dpi=150, bbox_inches="tight", format=fmt)
+        print(f"  Saved: {path}")
+    plt.close()
+
+
+def read_csv_strings(path):
+    """Read a CSV file into a list of dicts, preserving strings and converting numbers."""
+    rows = []
+    with open(path) as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            parsed = {}
+            for k, v in row.items():
+                try:
+                    parsed[k] = float(v)
+                except ValueError:
+                    parsed[k] = v
+            rows.append(parsed)
+    return rows
+
+
 def main():
     parser = argparse.ArgumentParser(description="Plot flight telemetry")
     parser.add_argument(
@@ -178,6 +304,16 @@ def main():
         "--sacrifice",
         default="kinetic_sacrifice_telemetry.csv",
         help="Kinetic sacrifice CSV path",
+    )
+    parser.add_argument(
+        "--ablation",
+        default=None,
+        help="EFE ablation CSV path",
+    )
+    parser.add_argument(
+        "--multi-scenario",
+        default=None,
+        help="Multi-scenario CSV path",
     )
     parser.add_argument(
         "--outdir",
@@ -201,6 +337,21 @@ def main():
         plot_kinetic_sacrifice(data, args.outdir)
     else:
         print(f"Skipping kinetic sacrifice: {args.sacrifice} not found")
+
+    if args.ablation and os.path.exists(args.ablation):
+        print(f"Plotting EFE ablation from {args.ablation}...")
+        data = read_csv(args.ablation)
+        plot_efe_ablation(data, args.outdir)
+    elif args.ablation:
+        print(f"Skipping EFE ablation: {args.ablation} not found")
+
+    multi_scenario = getattr(args, "multi_scenario", None)
+    if multi_scenario and os.path.exists(multi_scenario):
+        print(f"Plotting multi-scenario from {multi_scenario}...")
+        data = read_csv_strings(multi_scenario)
+        plot_multi_scenario(data, args.outdir)
+    elif multi_scenario:
+        print(f"Skipping multi-scenario: {multi_scenario} not found")
 
     print("\nDone!")
 
