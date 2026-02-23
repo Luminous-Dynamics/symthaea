@@ -83,20 +83,28 @@ pub struct ContinuousMind {
     pub(crate) iroh_bridge: Option<crate::swarm::IrohBridgeHandle>,
     /// Optional mesh network bridge for physical radio consciousness exchange.
     /// When set, each `tick()` syncs mesh_outbox/mesh_inbox with the bridge actor.
+    #[cfg(feature = "mesh")]
     pub(crate) mesh_bridge: Option<crate::swarm::mesh::MeshBridgeHandle>,
     /// Incoming wisdom packets from mesh radio peers.
+    #[cfg(feature = "mesh")]
     pub(crate) mesh_inbox: Vec<crate::swarm::mesh::WisdomPacket>,
     /// Outgoing mesh packets queued for transmission.
+    #[cfg(feature = "mesh")]
     pub(crate) mesh_outbox: Vec<crate::swarm::mesh::MeshOutbound>,
     /// Tick counter for last mesh emission (emission rate gating).
+    #[cfg(feature = "mesh")]
     mesh_last_emit_tick: u64,
     /// Monotonic sequence number for outgoing WisdomPackets.
+    #[cfg(feature = "mesh")]
     mesh_sequence: u32,
     /// Registry of active mesh peers (updated by process_mesh).
+    #[cfg(feature = "mesh")]
     pub(crate) mesh_peers: crate::swarm::mesh::MeshPeerRegistry,
     /// Optional Hyperfeel engine for affective mesh payload processing.
+    #[cfg(feature = "mesh")]
     pub(crate) hyperfeel: Option<crate::swarm::Hyperfeel>,
     /// Optional sensor registry for physical environmental inputs.
+    #[cfg(feature = "mesh")]
     pub(crate) sensor_registry: Option<crate::swarm::mesh::SensorRegistry>,
 }
 
@@ -138,13 +146,21 @@ impl ContinuousMind {
             social_inbox: Vec::new(),
             social_outbox: Vec::new(),
             iroh_bridge: None,
+            #[cfg(feature = "mesh")]
             mesh_bridge: None,
+            #[cfg(feature = "mesh")]
             mesh_inbox: Vec::new(),
+            #[cfg(feature = "mesh")]
             mesh_outbox: Vec::new(),
+            #[cfg(feature = "mesh")]
             mesh_last_emit_tick: 0,
+            #[cfg(feature = "mesh")]
             mesh_sequence: 0,
+            #[cfg(feature = "mesh")]
             mesh_peers: crate::swarm::mesh::MeshPeerRegistry::new(),
+            #[cfg(feature = "mesh")]
             hyperfeel: None,
+            #[cfg(feature = "mesh")]
             sensor_registry: None,
         }
     }
@@ -381,31 +397,37 @@ impl ContinuousMind {
     /// 2. Drain inbound wisdom packets into `mesh_inbox`
     ///
     /// The bridge actor must be spawned separately on a tokio runtime.
+    #[cfg(feature = "mesh")]
     pub fn set_mesh_bridge(&mut self, handle: crate::swarm::mesh::MeshBridgeHandle) {
         self.mesh_bridge = Some(handle);
     }
 
     /// Check if a mesh network bridge is attached and alive.
+    #[cfg(feature = "mesh")]
     pub fn has_mesh_bridge(&self) -> bool {
         self.mesh_bridge.as_ref().is_some_and(|h| h.is_alive())
     }
 
     /// Get a reference to the mesh peer registry.
+    #[cfg(feature = "mesh")]
     pub fn mesh_peers(&self) -> &crate::swarm::mesh::MeshPeerRegistry {
         &self.mesh_peers
     }
 
     /// Attach a Hyperfeel engine for affective mesh payload processing.
+    #[cfg(feature = "mesh")]
     pub fn set_hyperfeel(&mut self, hf: crate::swarm::Hyperfeel) {
         self.hyperfeel = Some(hf);
     }
 
     /// Attach a sensor registry for physical environmental inputs.
+    #[cfg(feature = "mesh")]
     pub fn set_sensor_registry(&mut self, registry: crate::swarm::mesh::SensorRegistry) {
         self.sensor_registry = Some(registry);
     }
 
     /// Register a single sensor (creates registry if needed).
+    #[cfg(feature = "mesh")]
     pub fn register_sensor(&mut self, sensor: Box<dyn crate::swarm::mesh::SensorInput>) {
         if self.sensor_registry.is_none() {
             self.sensor_registry =
@@ -422,6 +444,7 @@ impl ContinuousMind {
     /// - `Cruise`: ~once per 10 seconds (~every 500 calls over LoRa)
     ///
     /// If not enough ticks have elapsed since the last emission, this is a no-op.
+    #[cfg(feature = "mesh")]
     pub(crate) fn emit_wisdom(
         &mut self,
         wisdom_hv: symthaea_core::hdc::BinaryHV,
@@ -1160,12 +1183,14 @@ mod tests {
     // Mesh Network Bridge Integration Tests
     // ====================================================================
 
+    #[cfg(feature = "mesh")]
     #[test]
     fn test_mesh_bridge_not_set_by_default() {
         let mind = ContinuousMind::default();
         assert!(!mind.has_mesh_bridge());
     }
 
+    #[cfg(feature = "mesh")]
     #[test]
     fn test_mesh_bridge_attach() {
         let mut mind = ContinuousMind::default();
@@ -1174,6 +1199,7 @@ mod tests {
         assert!(mind.has_mesh_bridge());
     }
 
+    #[cfg(feature = "mesh")]
     #[test]
     fn test_emit_wisdom_critical_every_tick() {
         use crate::cognitive_loop::types::CycleUrgency;
@@ -1192,6 +1218,7 @@ mod tests {
         assert_eq!(mind.mesh_outbox.len(), 2);
     }
 
+    #[cfg(feature = "mesh")]
     #[test]
     fn test_emit_wisdom_normal_throttled() {
         use crate::cognitive_loop::types::CycleUrgency;
@@ -1216,6 +1243,7 @@ mod tests {
         assert_eq!(mind.mesh_outbox.len(), 2);
     }
 
+    #[cfg(feature = "mesh")]
     #[test]
     fn test_emit_wisdom_cruise_rare() {
         use crate::cognitive_loop::types::CycleUrgency;
@@ -1238,6 +1266,7 @@ mod tests {
         assert_eq!(mind.mesh_outbox.len(), 2);
     }
 
+    #[cfg(feature = "mesh")]
     #[test]
     fn test_mesh_bridge_flushes_outbox_on_tick() {
         use crate::cognitive_loop::types::CycleUrgency;
@@ -1261,6 +1290,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "mesh")]
     #[test]
     fn test_process_mesh_drains_inbox() {
         use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
@@ -1297,6 +1327,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "mesh")]
     #[test]
     fn test_emit_wisdom_sequence_increments() {
         use crate::cognitive_loop::types::CycleUrgency;
@@ -1316,6 +1347,119 @@ mod tests {
         assert_eq!(mind.mesh_outbox[0].packet.sequence, 0);
         assert_eq!(mind.mesh_outbox[1].packet.sequence, 1);
         assert_eq!(mind.mesh_outbox[2].packet.sequence, 2);
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_auto_emit_on_tick_with_bridge() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        // Perceive something so current_thought is non-zero
+        mind.perceive(ContinuousHV::random(512, 0xFACE));
+
+        // Tick many times — auto-emit should fire at urgency-gated intervals
+        for _ in 0..50 {
+            mind.tick();
+        }
+
+        // At minimum, the first tick should have emitted (sequence 0 is always allowed)
+        // The bridge flushed outbox each tick, so outbox may be empty but emissions occurred
+        assert!(
+            mind.mesh_sequence > 0,
+            "Auto-emit should have incremented sequence counter"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_no_auto_emit_without_bridge() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // No bridge attached
+        mind.perceive(ContinuousHV::random(512, 0xFACE));
+
+        for _ in 0..50 {
+            mind.tick();
+        }
+
+        // No emissions should have occurred
+        assert_eq!(
+            mind.mesh_sequence, 0,
+            "No auto-emit without bridge attached"
+        );
+        assert!(
+            mind.mesh_outbox.is_empty(),
+            "No packets in outbox without bridge"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_process_mesh_updates_registry() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // Inject packets from two peers
+        mind.mesh_inbox.push(WisdomPacket {
+            source_id: [0x11; 8],
+            sequence: 1,
+            phi: 0.7,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: BinaryHV([0xAA; 2048]),
+        });
+        mind.mesh_inbox.push(WisdomPacket {
+            source_id: [0x22; 8],
+            sequence: 1,
+            phi: 0.9,
+            urgency: MeshUrgency::Critical,
+            timestamp_s: 0,
+            payload_type: PayloadType::Heartbeat,
+            wisdom: BinaryHV([0xBB; 2048]),
+        });
+
+        mind.tick();
+
+        assert_eq!(
+            mind.mesh_peers().peer_count(),
+            2,
+            "Registry should track 2 peers"
+        );
+        let avg = mind.mesh_peers().average_phi();
+        assert!((avg - 0.8).abs() < 1e-6, "Average phi should be ~0.8: {avg}");
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_process_sensors_feeds_working_memory() {
+        use crate::swarm::mesh::{MockSensor, MeshUrgency};
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        let sensor = MockSensor::new(
+            "test::thermometer",
+            MeshUrgency::Cruise,
+            vec![vec![22.5, 45.0]],
+        );
+        mind.register_sensor(Box::new(sensor));
+
+        let wm_before = mind.working_memory.len();
+        mind.tick();
+        let wm_after = mind.working_memory.len();
+
+        assert!(
+            wm_after > wm_before,
+            "Sensor reading should have been perceived into working memory"
+        );
     }
 
     // ====================================================================

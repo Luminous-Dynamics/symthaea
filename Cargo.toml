@@ -332,6 +332,7 @@ neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers"
 neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 
 # ── Distributed / Network ──────────────────────────────────────────
+mesh = []                                   # Physical mesh radio (LoRa + B.A.T.M.A.N. + Yggdrasil)
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
 mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
 # mycelix_sdk: Add mycelix-sdk dep when it's published to crates.io, then enable:
