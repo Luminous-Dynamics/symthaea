@@ -121,6 +121,13 @@ impl BicycleModelSimulator {
         &self.params
     }
 
+    /// Set the vehicle's world-frame position and heading directly.
+    pub fn set_position(&mut self, x: f64, y: f64, heading: f64) {
+        self.state.position_x = x;
+        self.state.position_y = y;
+        self.state.heading = heading;
+    }
+
     /// Simplified Pacejka tire force: linear region with saturation.
     ///
     /// f(α) = Cs * α * (1 - |α| / α_max) for |α| < α_max

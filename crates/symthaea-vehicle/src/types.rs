@@ -516,7 +516,20 @@ impl Default for ChassisParams {
 ///
 /// Generates a target VehicleCommand from the current state.
 /// This is the "teacher" that the CfC network learns to imitate, then surpass.
+/// Assumes target heading is 0.0 (east / straight road).
 pub fn pd_cruise_baseline(state: &VehicleState, target_speed: f64) -> VehicleCommand {
+    pd_cruise_baseline_with_road(state, target_speed, 0.0)
+}
+
+/// PD cruise-control baseline with explicit road heading and curvature feed-forward.
+///
+/// Same as `pd_cruise_baseline` but corrects toward `road_heading` instead of 0.0,
+/// and adds a curvature feed-forward term from `state.curvature_ahead`.
+pub fn pd_cruise_baseline_with_road(
+    state: &VehicleState,
+    target_speed: f64,
+    road_heading: f64,
+) -> VehicleCommand {
     // Longitudinal: PD on speed error
     let speed_error = target_speed - state.speed;
     let throttle = if speed_error > 0.0 {
@@ -530,10 +543,12 @@ pub fn pd_cruise_baseline(state: &VehicleState, target_speed: f64) -> VehicleCom
         0.0
     };
 
-    // Lateral: PD on lane offset + heading
+    // Lateral: PD on lane offset + heading error relative to road
     let lane_error = -state.lateral_offset; // negative feedback: left offset → steer right
-    let heading_error = -state.heading;
-    let steering = ((lane_error * 0.8 + heading_error * 2.0) as f32).clamp(-1.0, 1.0);
+    let heading_error = -(state.heading - road_heading);
+    let curvature_ff = state.curvature_ahead * 5.0; // feed-forward for upcoming curvature
+    let steering =
+        ((lane_error * 0.8 + heading_error * 2.0 + curvature_ff) as f32).clamp(-1.0, 1.0);
 
     VehicleCommand {
         steering,

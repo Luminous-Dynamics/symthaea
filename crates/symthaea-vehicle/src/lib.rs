@@ -69,7 +69,9 @@ pub mod encoder;
 pub mod fep_agent;
 pub mod perturbations;
 pub mod reward;
+pub mod road;
 pub mod simulator;
+pub mod swarm;
 pub mod training;
 pub mod types;
 
@@ -78,6 +80,8 @@ pub use encoder::VehicleHdcEncoder;
 pub use fep_agent::{ActiveInferenceVehicleAgent, VehicleFepConfig, VehicleFepResult};
 pub use perturbations::{PerturbationSchedule, VehiclePerturbation};
 pub use reward::{episode_reward, safety_reward, speed_reward};
+pub use road::Road;
 pub use simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
+pub use swarm::{SwarmConfig, SwarmSimulator};
 pub use training::{EpisodeMetrics, VehicleTrainer};
 pub use types::*;
