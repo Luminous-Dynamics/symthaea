@@ -56,11 +56,24 @@ pub mod voice_feedback;
 pub mod vocal_tract_encoder;
 pub mod vocal_tract_controller;
 pub mod vocal_tract_fep;
+pub mod vocal_tract_metrics;
 
 // Rap/rhythmic synthesis modules
 pub mod beat_sync;
 pub mod rap;
 pub mod rhyme_hdc;
+
+// Real-time audio output (cpal + ringbuf)
+#[cfg(feature = "live-voice")]
+pub mod audio_out;
+#[cfg(feature = "live-voice")]
+pub use audio_out::AudioOutput;
+
+// Real-time streaming voice (G2P → synthesis → speaker)
+#[cfg(feature = "live-voice")]
+pub mod live_voice;
+#[cfg(feature = "live-voice")]
+pub use live_voice::LiveVoice;
 
 // REPL voice output (consciousness-modulated speech for interactive use)
 pub mod repl_voice;
@@ -90,10 +103,13 @@ pub use voice_feedback::{
 
 // Re-export vocal tract types (Phase 17)
 pub use vocal_tract_encoder::{VocalTractHdcEncoder, VoiceCognitiveState};
-pub use vocal_tract_controller::{VocalTractConfig, VocalTractController};
-pub use vocal_tract_fep::{VocalAction, VocalTractFepAgent, VocalTractFepResult};
+pub use vocal_tract_controller::{ProsodyCorrection, ProsodyHead, SpeakerProfile, VocalTractConfig, VocalTractController};
+pub use vocal_tract_fep::{VocalAction, VocalTractFepAgent, VocalTractFepResult, VocalTractObservation};
 #[cfg(feature = "vocal-tract")]
-pub use vocal_tract_fep::VocalTractPipeline;
+pub use vocal_tract_fep::{ProsodyContext, StreamingVocalTract, VocalTractPipeline};
+#[cfg(feature = "vocal-tract")]
+pub use vocal_tract_metrics::VocalTractMetrics;
+pub use vocal_tract_controller::train_controller_on_phoneme_db;
 
 // Re-export rap synthesis types
 pub use beat_sync::{BeatPosition, BeatSync, FlowPattern, SwingConfig, SyllableTiming};

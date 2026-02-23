@@ -39,97 +39,17 @@
 //! coarticulation: faster transitions for rapid speech, slower
 //! for careful articulation. The tau is modulated by LTCPacing.
 
-use crate::voice::formant_targets::{FormantDatabase, FormantTarget};
+use crate::voice::formant_targets::FormantDatabase;
 use crate::voice::phoneme_hdc::PhonemeHdcCodec;
 use crate::voice::LTCPacing;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// FORMANT FRAME
+// FORMANT FRAME — canonical definition in symthaea-vocal-tract sub-crate
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Single frame of formant parameters for vocoder
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct FormantFrame {
-    /// First formant frequency (Hz)
-    pub f1: f32,
-    /// Second formant frequency (Hz)
-    pub f2: f32,
-    /// Third formant frequency (Hz)
-    pub f3: f32,
-    /// Bandwidth of F1 (Hz)
-    pub b1: f32,
-    /// Bandwidth of F2 (Hz)
-    pub b2: f32,
-    /// Bandwidth of F3 (Hz)
-    pub b3: f32,
-    /// Fundamental frequency / pitch (Hz)
-    pub f0: f32,
-    /// Energy/amplitude (0.0 to 1.0)
-    pub energy: f32,
-    /// Voicing probability (0.0 = unvoiced, 1.0 = fully voiced)
-    pub voicing: f32,
-    /// Timestamp in seconds
-    pub time: f32,
-}
-
-impl FormantFrame {
-    /// Create a silent frame
-    pub fn silent(time: f32) -> Self {
-        Self {
-            f1: 0.0,
-            f2: 0.0,
-            f3: 0.0,
-            b1: 60.0,
-            b2: 90.0,
-            b3: 150.0,
-            f0: 0.0,
-            energy: 0.0,
-            voicing: 0.0,
-            time,
-        }
-    }
-
-    /// Create from formant target with pitch and energy
-    pub fn from_target(target: &FormantTarget, f0: f32, energy: f32, time: f32) -> Self {
-        Self {
-            f1: target.f1,
-            f2: target.f2,
-            f3: target.f3,
-            b1: target.b1,
-            b2: target.b2,
-            b3: target.b3,
-            f0,
-            energy,
-            voicing: if target.is_voiced { 1.0 } else { 0.0 },
-            time,
-        }
-    }
-
-    /// Linear interpolation between frames
-    pub fn lerp(&self, other: &Self, t: f32) -> Self {
-        let t = t.clamp(0.0, 1.0);
-        Self {
-            f1: self.f1 + (other.f1 - self.f1) * t,
-            f2: self.f2 + (other.f2 - self.f2) * t,
-            f3: self.f3 + (other.f3 - self.f3) * t,
-            b1: self.b1 + (other.b1 - self.b1) * t,
-            b2: self.b2 + (other.b2 - self.b2) * t,
-            b3: self.b3 + (other.b3 - self.b3) * t,
-            f0: self.f0 + (other.f0 - self.f0) * t,
-            energy: self.energy + (other.energy - self.energy) * t,
-            voicing: self.voicing + (other.voicing - self.voicing) * t,
-            time: self.time + (other.time - self.time) * t,
-        }
-    }
-}
-
-impl Default for FormantFrame {
-    fn default() -> Self {
-        Self::silent(0.0)
-    }
-}
+pub use symthaea_vocal_tract::types::FormantFrame;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PHONEME WITH TIMING

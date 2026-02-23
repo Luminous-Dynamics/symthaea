@@ -12754,6 +12754,7 @@ dependencies = [
  "candle-transformers",
  "chrono",
  "clap",
+ "cpal 0.17.1",
  "criterion",
  "crossterm 0.27.0",
  "ctrlc",
@@ -12786,6 +12787,7 @@ dependencies = [
  "rayon",
  "regex",
  "reqwest 0.13.1",
+ "ringbuf",
  "rmp-serde",
  "rodio",
  "rusqlite",
@@ -12821,6 +12823,7 @@ dependencies = [
  "symthaea-stt",
  "symthaea-support",
  "symthaea-types",
+ "symthaea-vocal-tract",
  "symthaea-wisdom",
  "syn 2.0.114",
  "tempfile",
@@ -13163,6 +13166,16 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "symthaea-vocal-tract"
+version = "0.1.0"
+dependencies = [
+ "hound",
+ "serde",
+ "symthaea-core",
+ "symthaea-fep",
 ]
 
 [[package]]
