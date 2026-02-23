@@ -143,9 +143,8 @@ impl SensorRegistry {
             };
 
             // Scatter across multiple dimensions for rich encoding
-            for k in 0..8 {
-                let idx = ((hash.wrapping_mul(k as u64 + 1).wrapping_add(k * 0x517cc1b7))
-                    as usize)
+            for k in 0u64..8 {
+                let idx = ((hash.wrapping_mul(k + 1).wrapping_add(k * 0x517cc1b7)) as usize)
                     % self.dimension;
                 // Alternate sign based on k parity for orthogonality
                 let sign = if k % 2 == 0 { 1.0 } else { -1.0 };
@@ -222,6 +221,56 @@ impl SensorInput for MockSensor {
 }
 
 // ============================================================================
+// HAL SENSOR BRIDGE (hardware → SensorInput)
+// ============================================================================
+
+/// Bridge from a [`HalSensorAdapter`](symthaea_hal::HalSensorAdapter) to [`SensorInput`].
+///
+/// Wraps any HAL sensor (real hardware or mock) as a `SensorInput` that
+/// the [`SensorRegistry`] can poll and encode into HDC space.
+#[cfg(feature = "hal")]
+pub struct HalSensorBridge<T: symthaea_hal::HalSensorAdapter> {
+    adapter: T,
+    urgency: MeshUrgency,
+}
+
+#[cfg(feature = "hal")]
+impl<T: symthaea_hal::HalSensorAdapter> HalSensorBridge<T> {
+    /// Create a bridge with a given urgency class.
+    pub fn new(adapter: T, urgency: MeshUrgency) -> Self {
+        Self { adapter, urgency }
+    }
+}
+
+#[cfg(feature = "hal")]
+impl<T: symthaea_hal::HalSensorAdapter + Sync> SensorInput for HalSensorBridge<T> {
+    fn name(&self) -> &str {
+        self.adapter.name()
+    }
+
+    fn poll(&mut self) -> Option<SensorReading> {
+        let values = self.adapter.read_raw()?;
+        Some(SensorReading {
+            sensor_id: self.adapter.name().to_string(),
+            values,
+            urgency_override: None,
+            timestamp_s: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() as u32,
+        })
+    }
+
+    fn urgency_class(&self) -> MeshUrgency {
+        self.urgency
+    }
+
+    fn is_available(&self) -> bool {
+        self.adapter.is_available()
+    }
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
@@ -232,11 +281,7 @@ mod tests {
     #[test]
     fn test_sensor_registry_creation() {
         let mut registry = SensorRegistry::new(512);
-        let temp = MockSensor::new(
-            "zigbee::temperature",
-            MeshUrgency::Cruise,
-            vec![vec![22.5]],
-        );
+        let temp = MockSensor::new("zigbee::temperature", MeshUrgency::Cruise, vec![vec![22.5]]);
         let smoke = MockSensor::new(
             "zigbee::smoke_alarm",
             MeshUrgency::Critical,
@@ -263,7 +308,11 @@ mod tests {
         assert_eq!(results[0].1, MeshUrgency::Cruise);
 
         let hv = registry.encode_reading(&results[0].0);
-        assert!(hv.norm() > 0.9, "Encoded HV should be normalized: norm={}", hv.norm());
+        assert!(
+            hv.norm() > 0.9,
+            "Encoded HV should be normalized: norm={}",
+            hv.norm()
+        );
     }
 
     #[test]
@@ -312,11 +361,7 @@ mod tests {
     #[test]
     fn test_sensor_poll_exhausts_queue() {
         let mut registry = SensorRegistry::new(512);
-        let sensor = MockSensor::new(
-            "test",
-            MeshUrgency::Normal,
-            vec![vec![1.0], vec![2.0]],
-        );
+        let sensor = MockSensor::new("test", MeshUrgency::Normal, vec![vec![1.0], vec![2.0]]);
         registry.register(Box::new(sensor));
 
         // First poll: one reading
@@ -337,11 +382,7 @@ mod tests {
     #[test]
     fn test_sensor_unavailable_skipped() {
         let mut registry = SensorRegistry::new(512);
-        let mut sensor = MockSensor::new(
-            "offline",
-            MeshUrgency::Normal,
-            vec![vec![1.0]],
-        );
+        let mut sensor = MockSensor::new("offline", MeshUrgency::Normal, vec![vec![1.0]]);
         sensor.set_available(false);
         registry.register(Box::new(sensor));
 

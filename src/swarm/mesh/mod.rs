@@ -46,7 +46,9 @@ mod lora_fragment;
 mod mesh_receiver;
 pub mod sensor;
 
-pub use dual_layer::{BiLoopbackTransport, DualLayerMesh, LoopbackTransport, MeshRoute, MeshTransport};
+pub use dual_layer::{
+    BiLoopbackTransport, DualLayerMesh, LoopbackTransport, MeshRoute, MeshTransport,
+};
 pub use lora_fragment::{
     crc16_ccitt, fragment, FragmentAssembler, LoRaFragment, FLAG_FEC, HEADER_SIZE, LORA_MTU,
     PAYLOAD_SIZE,
@@ -298,6 +300,114 @@ impl WisdomPacket {
         })
     }
 
+    /// Extract a [`GradientMessage`](crate::swarm::GradientMessage) from a Gradient-type packet.
+    ///
+    /// Returns `None` if payload_type is not Gradient, data is malformed,
+    /// or any float value is non-finite (NaN/Inf protection).
+    ///
+    /// # Wire format (inside the 2,048-byte wisdom field)
+    ///
+    /// ```text
+    /// bytes[0..4]    gradient_count  u32 LE   (number of f32 values)
+    /// bytes[4..8]    trust_score     f32 LE
+    /// bytes[8..16]   timestamp       u64 LE   (ms since epoch)
+    /// bytes[16..24]  sample_count    u64 LE
+    /// bytes[24..32]  model_version   u64 LE
+    /// bytes[32..]    gradient_data   [f32 LE; gradient_count]  (max 504 floats)
+    /// ```
+    pub fn extract_gradient(&self) -> Option<crate::swarm::GradientMessage> {
+        if self.payload_type != PayloadType::Gradient {
+            return None;
+        }
+        let w = &self.wisdom.0;
+        if w.len() < 32 {
+            return None;
+        }
+
+        let gradient_count = u32::from_le_bytes([w[0], w[1], w[2], w[3]]) as usize;
+        let trust_score = f32::from_le_bytes([w[4], w[5], w[6], w[7]]);
+        let timestamp = u64::from_le_bytes([w[8], w[9], w[10], w[11], w[12], w[13], w[14], w[15]]);
+        let sample_count =
+            u64::from_le_bytes([w[16], w[17], w[18], w[19], w[20], w[21], w[22], w[23]]);
+        let model_version =
+            u64::from_le_bytes([w[24], w[25], w[26], w[27], w[28], w[29], w[30], w[31]]);
+
+        // Validate: trust_score must be finite
+        if !trust_score.is_finite() {
+            return None;
+        }
+
+        // Validate: enough bytes for gradient_count f32s
+        let data_start = 32;
+        let data_end = data_start + gradient_count * 4;
+        if data_end > w.len() {
+            return None;
+        }
+
+        let gradient_data: Vec<f32> = (0..gradient_count)
+            .map(|i| {
+                let off = data_start + i * 4;
+                f32::from_le_bytes([w[off], w[off + 1], w[off + 2], w[off + 3]])
+            })
+            .collect();
+
+        // Reject if any gradient is non-finite
+        if !gradient_data.iter().all(|v| v.is_finite()) {
+            return None;
+        }
+
+        // Expand 8-byte mesh source_id to 32-byte gradient source_id (zero-padded)
+        let mut source_32 = [0u8; 32];
+        source_32[..8].copy_from_slice(&self.source_id);
+
+        Some(crate::swarm::GradientMessage {
+            source_id: source_32,
+            gradient_data,
+            trust_score,
+            noise_scale: 0.0, // DP noise not tracked over mesh (applied at source)
+            timestamp,
+            sample_count,
+            model_version,
+        })
+    }
+
+    /// Create a Gradient-type WisdomPacket from a [`GradientMessage`](crate::swarm::GradientMessage).
+    ///
+    /// Returns `None` if the gradient data exceeds the 2,048-byte wisdom capacity
+    /// (max 504 floats).
+    pub fn from_gradient(
+        source_id: [u8; 8],
+        sequence: u32,
+        msg: &crate::swarm::GradientMessage,
+    ) -> Option<Self> {
+        let gradient_count = msg.gradient_data.len();
+        let data_end = 32 + gradient_count * 4;
+        if data_end > 2048 {
+            return None;
+        }
+
+        let mut bytes = [0u8; 2048];
+        bytes[0..4].copy_from_slice(&(gradient_count as u32).to_le_bytes());
+        bytes[4..8].copy_from_slice(&msg.trust_score.to_le_bytes());
+        bytes[8..16].copy_from_slice(&msg.timestamp.to_le_bytes());
+        bytes[16..24].copy_from_slice(&msg.sample_count.to_le_bytes());
+        bytes[24..32].copy_from_slice(&msg.model_version.to_le_bytes());
+        for (i, val) in msg.gradient_data.iter().enumerate() {
+            let off = 32 + i * 4;
+            bytes[off..off + 4].copy_from_slice(&val.to_le_bytes());
+        }
+
+        Some(Self {
+            source_id,
+            sequence,
+            phi: 0.0,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: (msg.timestamp / 1000) as u32,
+            payload_type: PayloadType::Gradient,
+            wisdom: BinaryHV(bytes),
+        })
+    }
+
     /// Derive a `thought_id` for LoRa fragmentation.
     ///
     /// Uses the low 16 bits of the sequence number — sufficient for
@@ -341,11 +451,7 @@ impl std::fmt::Debug for WisdomPacket {
 
 /// Format a byte slice as short hex for debug output.
 pub fn hex_short(bytes: &[u8]) -> String {
-    bytes
-        .iter()
-        .take(8)
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    bytes.iter().take(8).map(|b| format!("{b:02x}")).collect()
 }
 
 // ============================================================================
@@ -566,7 +672,10 @@ mod tests {
     fn cycle_urgency_to_mesh_urgency() {
         use crate::cognitive_loop::types::CycleUrgency;
 
-        assert_eq!(MeshUrgency::from(CycleUrgency::Critical), MeshUrgency::Critical);
+        assert_eq!(
+            MeshUrgency::from(CycleUrgency::Critical),
+            MeshUrgency::Critical
+        );
         assert_eq!(MeshUrgency::from(CycleUrgency::Normal), MeshUrgency::Normal);
         assert_eq!(MeshUrgency::from(CycleUrgency::Cruise), MeshUrgency::Cruise);
     }
@@ -636,6 +745,163 @@ mod tests {
         assert!((affect.dominance - 1.0).abs() < 1e-6);
         assert!((affect.intensity - 1.0).abs() < 1e-6);
         assert!((affect.confidence - 0.0).abs() < 1e-6);
+    }
+
+    // ====================================================================
+    // extract_gradient / from_gradient Tests
+    // ====================================================================
+
+    #[test]
+    fn test_extract_gradient_valid() {
+        let msg = crate::swarm::GradientMessage {
+            source_id: [0u8; 32],
+            gradient_data: vec![0.1, -0.2, 0.3, 0.0],
+            trust_score: 0.85,
+            noise_scale: 0.0,
+            timestamp: 1_700_000_000_000,
+            sample_count: 100,
+            model_version: 3,
+        };
+        let pkt = WisdomPacket::from_gradient([0xAB; 8], 42, &msg).unwrap();
+        let extracted = pkt.extract_gradient().unwrap();
+
+        assert_eq!(extracted.gradient_data.len(), 4);
+        assert!((extracted.gradient_data[0] - 0.1).abs() < 1e-6);
+        assert!((extracted.gradient_data[1] - (-0.2)).abs() < 1e-6);
+        assert!((extracted.gradient_data[2] - 0.3).abs() < 1e-6);
+        assert!((extracted.gradient_data[3] - 0.0).abs() < 1e-6);
+        assert!((extracted.trust_score - 0.85).abs() < 1e-6);
+        assert_eq!(extracted.timestamp, 1_700_000_000_000);
+        assert_eq!(extracted.sample_count, 100);
+        assert_eq!(extracted.model_version, 3);
+        // source_id should be zero-padded from 8 → 32 bytes
+        assert_eq!(&extracted.source_id[..8], &[0xAB; 8]);
+        assert_eq!(&extracted.source_id[8..], &[0u8; 24]);
+    }
+
+    #[test]
+    fn test_extract_gradient_wrong_type() {
+        let pkt = WisdomPacket {
+            source_id: [0; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: BinaryHV([0; 2048]),
+        };
+        assert!(pkt.extract_gradient().is_none());
+    }
+
+    #[test]
+    fn test_extract_gradient_nan_rejected() {
+        // NaN in gradient data — manually build the packet to test extraction rejects it
+        let mut bytes = [0u8; 2048];
+        bytes[0..4].copy_from_slice(&3u32.to_le_bytes());
+        bytes[4..8].copy_from_slice(&0.5f32.to_le_bytes());
+        bytes[8..16].copy_from_slice(&0u64.to_le_bytes());
+        bytes[16..24].copy_from_slice(&1u64.to_le_bytes());
+        bytes[24..32].copy_from_slice(&1u64.to_le_bytes());
+        bytes[32..36].copy_from_slice(&0.1f32.to_le_bytes());
+        bytes[36..40].copy_from_slice(&f32::NAN.to_le_bytes());
+        bytes[40..44].copy_from_slice(&0.3f32.to_le_bytes());
+
+        let pkt = WisdomPacket {
+            source_id: [0; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::Gradient,
+            wisdom: BinaryHV(bytes),
+        };
+        assert!(pkt.extract_gradient().is_none());
+    }
+
+    #[test]
+    fn test_extract_gradient_nan_trust_rejected() {
+        let mut bytes = [0u8; 2048];
+        bytes[0..4].copy_from_slice(&1u32.to_le_bytes());
+        bytes[4..8].copy_from_slice(&f32::NAN.to_le_bytes()); // NaN trust
+        bytes[8..16].copy_from_slice(&0u64.to_le_bytes());
+        bytes[16..24].copy_from_slice(&1u64.to_le_bytes());
+        bytes[24..32].copy_from_slice(&1u64.to_le_bytes());
+        bytes[32..36].copy_from_slice(&0.1f32.to_le_bytes());
+
+        let pkt = WisdomPacket {
+            source_id: [0; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::Gradient,
+            wisdom: BinaryHV(bytes),
+        };
+        assert!(pkt.extract_gradient().is_none());
+    }
+
+    #[test]
+    fn test_extract_gradient_overflow_rejected() {
+        // gradient_count claims 999 floats, but not enough bytes
+        let mut bytes = [0u8; 2048];
+        bytes[0..4].copy_from_slice(&999u32.to_le_bytes());
+        bytes[4..8].copy_from_slice(&0.5f32.to_le_bytes());
+        bytes[8..16].copy_from_slice(&0u64.to_le_bytes());
+        bytes[16..24].copy_from_slice(&1u64.to_le_bytes());
+        bytes[24..32].copy_from_slice(&1u64.to_le_bytes());
+
+        let pkt = WisdomPacket {
+            source_id: [0; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::Gradient,
+            wisdom: BinaryHV(bytes),
+        };
+        assert!(pkt.extract_gradient().is_none());
+    }
+
+    #[test]
+    fn test_gradient_roundtrip() {
+        let original = crate::swarm::GradientMessage {
+            source_id: [0u8; 32],
+            gradient_data: vec![1.0, -2.5, 0.001, 42.0, -0.0],
+            trust_score: 0.73,
+            noise_scale: 0.01, // not preserved (set to 0 on extraction)
+            timestamp: 1_708_000_000_000,
+            sample_count: 500,
+            model_version: 7,
+        };
+
+        let pkt = WisdomPacket::from_gradient([0x42; 8], 99, &original).unwrap();
+        assert_eq!(pkt.payload_type, PayloadType::Gradient);
+        assert_eq!(pkt.sequence, 99);
+
+        let extracted = pkt.extract_gradient().unwrap();
+        assert_eq!(extracted.gradient_data.len(), original.gradient_data.len());
+        for (a, b) in extracted.gradient_data.iter().zip(&original.gradient_data) {
+            assert!((a - b).abs() < 1e-6, "{a} != {b}");
+        }
+        assert!((extracted.trust_score - original.trust_score).abs() < 1e-6);
+        assert_eq!(extracted.timestamp, original.timestamp);
+        assert_eq!(extracted.sample_count, original.sample_count);
+        assert_eq!(extracted.model_version, original.model_version);
+        assert_eq!(extracted.noise_scale, 0.0); // not preserved
+    }
+
+    #[test]
+    fn test_from_gradient_too_large() {
+        let msg = crate::swarm::GradientMessage {
+            source_id: [0u8; 32],
+            gradient_data: vec![0.0; 505], // 32 + 505*4 = 2052 > 2048
+            trust_score: 0.5,
+            noise_scale: 0.0,
+            timestamp: 0,
+            sample_count: 1,
+            model_version: 1,
+        };
+        assert!(WisdomPacket::from_gradient([0; 8], 1, &msg).is_none());
     }
 
     // ====================================================================
