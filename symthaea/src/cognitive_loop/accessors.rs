@@ -497,6 +497,29 @@ impl CognitiveLoopService {
         }
     }
 
+    /// Map consciousness signals to the 10-channel `VoiceCognitiveState` used
+    /// by the vocal tract pipeline.
+    ///
+    /// This bridges the cognitive loop's consciousness metrics to the vocal tract
+    /// encoder's input format. Does NOT run the pipeline (too expensive for 50Hz).
+    pub fn voice_cognitive_state(&self) -> crate::voice::vocal_tract_encoder::VoiceCognitiveState {
+        let signals = self.voice_consciousness_signals();
+        let emotional = self.unification_engine.emotional.state();
+
+        crate::voice::vocal_tract_encoder::VoiceCognitiveState {
+            prediction_error: self.stats.avg_prediction_error,
+            emotional_valence: emotional.valence as f32,
+            emotional_arousal: emotional.arousal as f32,
+            unified_quality: signals.unified_quality,
+            epistemic_confidence: signals.epistemic_confidence,
+            coherence_velocity: signals.coherence_velocity,
+            cross_agreement: signals.cross_module_agreement,
+            consciousness_level: signals.consciousness_level as f32,
+            articulation_quality: self.voice_feedback_bridge.smoothed_articulation(),
+            rate_stability: self.voice_feedback_bridge.rate_stability(),
+        }
+    }
+
     /// Get combined phi contribution from all feedback sources
     pub fn combined_phi_contribution(&self) -> f32 {
         self.coherence_bridge.phi_contribution()

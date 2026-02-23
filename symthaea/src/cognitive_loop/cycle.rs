@@ -3320,6 +3320,7 @@ impl CognitiveLoopService {
             training_loss,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             metadata,
+            wisdom_hv: hv16_cached,
             #[cfg(feature = "identity")]
             signed_output,
             #[cfg(feature = "identity")]
