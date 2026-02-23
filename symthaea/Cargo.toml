@@ -30,6 +30,7 @@ members = [
     "crates/symthaea-flight",
     "crates/symthaea-humanoid",
     "crates/symthaea-physics",
+    "crates/symthaea-vocal-tract",
 ]
 
 
@@ -132,6 +133,9 @@ symthaea-flight = { path = "crates/symthaea-flight", optional = true }
 
 # Symthaea Humanoid - HDC-LTC + FEP Active Inference DMC Humanoid bipedal control
 symthaea-humanoid = { path = "crates/symthaea-humanoid", optional = true }
+
+# Symthaea Vocal Tract - LTC-driven articulatory synthesis (encoder, controller, FEP, pipeline, metrics)
+symthaea-vocal-tract = { path = "crates/symthaea-vocal-tract", default-features = false }
 
 # Symthaea Physics - Tokamak plasma HDC encoding, C-Mod adapter, Phi-based control
 symthaea-physics = { path = "crates/symthaea-physics", optional = true }
@@ -257,6 +261,8 @@ ignore = "0.4"       # .gitignore-aware file walking
 ort = { version = "2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }  # ONNX Runtime
 # futures removed: voice-tts-async feature never implemented in source
 rodio = { version = "0.19", default-features = false, optional = true }  # Audio playback (no backends by default)
+cpal = { version = "0.17", optional = true }      # Low-level audio I/O (live-voice)
+ringbuf = { version = "0.4", optional = true }    # Lock-free ring buffer (live-voice)
 hound = { workspace = true, optional = true }
 hf-hub = { version = "0.4", optional = true }       # HuggingFace Hub for model download
 espeak-rs = { version = "0.1", optional = true }    # espeak-ng bindings for proper G2P
@@ -313,7 +319,8 @@ api_module = ["axum", "tower-http"]         # HTTP API binary + module
 voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + espeak-ng G2P
 voice-stt = ["symthaea-stt", "hound"]                 # STT with symthaea-stt crate (HDC + LTC + CfC)
 audio = ["voice-tts", "rodio"]                        # Full audio including playback
-vocal-tract = []                                      # LTC-driven articulatory synthesis pipeline (no external deps)
+vocal-tract = ["hound", "symthaea-vocal-tract/hound"]  # LTC-driven articulatory synthesis pipeline + WAV output
+live-voice = ["cpal", "ringbuf", "vocal-tract"]         # Real-time speaker output (cpal + ringbuf + vocal tract pipeline)
 
 # ── Perception & Embeddings ─────────────────────────────────────────
 embeddings = ["tokenizers", "ort", "hf-hub"]          # Qwen3/BGE text embeddings via ONNX
