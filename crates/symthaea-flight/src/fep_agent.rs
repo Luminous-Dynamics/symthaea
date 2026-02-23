@@ -35,6 +35,10 @@ pub struct FlightFepResult {
     /// calculated that intercepting a beam minimizes expected free energy.
     /// This is a true Active Inference decision, not a hardcoded rule.
     pub setpoint_override: Option<[f64; 3]>,
+    /// When Some, the agent requests a different cognitive tick rate.
+    /// High danger → faster ticks (100Hz) for quicker EFE re-evaluation.
+    /// The simulation loop should adjust its cognitive interval accordingly.
+    pub requested_cognitive_hz: Option<f32>,
 }
 
 /// Environmental context for embodied Active Inference.
@@ -67,6 +71,7 @@ impl Default for FlightFepResult {
             prediction_error: 0.0,
             use_pid_target: false,
             setpoint_override: None,
+            requested_cognitive_hz: None,
         }
     }
 }
@@ -168,7 +173,15 @@ impl Default for FlightFepConfig {
 ///
 /// Uses kinematic equation: pos(t) = pos₀ + vel₀·t + 0.5·g·t²
 /// where g acts downward (negative z).
-#[allow(dead_code)]
+pub(crate) fn predict_falling_position_pub(pos: [f64; 3], vel: [f64; 3], t: f64) -> [f64; 3] {
+    predict_falling_position(pos, vel, t)
+}
+
+/// Predict time until a falling object reaches a target altitude (crate-visible wrapper).
+pub(crate) fn predict_impact_time_z_pub(pos: [f64; 3], vel: [f64; 3], target_z: f64) -> f64 {
+    predict_impact_time_z(pos, vel, target_z)
+}
+
 fn predict_falling_position(pos: [f64; 3], vel: [f64; 3], t: f64) -> [f64; 3] {
     [
         pos[0] + vel[0] * t,
@@ -181,7 +194,6 @@ fn predict_falling_position(pos: [f64; 3], vel: [f64; 3], t: f64) -> [f64; 3] {
 ///
 /// Solves: pos_z + vel_z·t - 0.5·g·t² = target_z
 /// Returns the positive root (time to reach target_z), or `f64::INFINITY` if unreachable.
-#[allow(dead_code)]
 fn predict_impact_time_z(pos: [f64; 3], vel: [f64; 3], target_z: f64) -> f64 {
     // Rearrange: -0.5·g·t² + vel_z·t + (pos_z - target_z) = 0
     // → 0.5·g·t² - vel_z·t - (pos_z - target_z) = 0
@@ -218,6 +230,31 @@ fn predict_drone_approach(
         setpoint[1] - (setpoint[1] - current[1]) * decay,
         setpoint[2] - (setpoint[2] - current[2]) * decay,
     ]
+}
+
+/// Compute the intercept setpoint for a threat, using rendezvous prediction
+/// when velocity is available.
+///
+/// Returns the predicted beam position at 50% of impact time (the midpoint
+/// rendezvous). When no velocity is available or the beam is not descending
+/// toward the entity, falls back to the static threat position.
+pub(crate) fn compute_rendezvous_intercept(
+    threat_pos: [f64; 3],
+    threat_vel: Option<[f64; 3]>,
+    entity_pos: [f64; 3],
+) -> [f64; 3] {
+    if let Some(vel) = threat_vel {
+        let impact_t = predict_impact_time_z(threat_pos, vel, entity_pos[2]);
+        if impact_t.is_finite() && impact_t > 0.0 {
+            let rendezvous_t = impact_t * 0.5;
+            let beam_at_rv = predict_falling_position(threat_pos, vel, rendezvous_t);
+            [beam_at_rv[0], beam_at_rv[1], beam_at_rv[2].max(entity_pos[2] + 0.3)]
+        } else {
+            [threat_pos[0], threat_pos[1], threat_pos[2].max(entity_pos[2] + 0.5)]
+        }
+    } else {
+        [threat_pos[0], threat_pos[1], threat_pos[2].max(entity_pos[2] + 0.5)]
+    }
 }
 
 /// Active Inference flight agent operating at cognitive rate (25Hz).
@@ -461,6 +498,14 @@ impl ActiveInferenceFlightAgent {
         result.setpoint_override =
             self.evaluate_setpoint_candidates(state, setpoint, env);
 
+        // Adaptive cognitive frequency: smooth ramp from 25Hz to 100Hz
+        result.requested_cognitive_hz = if env.human_danger > 0.1 {
+            let t = ((env.human_danger - 0.1) / 0.9).min(1.0) as f32;
+            Some(25.0 + 75.0 * t) // 25Hz at danger=0.1, 100Hz at danger=1.0
+        } else {
+            None // default cognitive rate
+        };
+
         result
     }
 
@@ -527,17 +572,22 @@ impl ActiveInferenceFlightAgent {
             + self.config.self_preservation_precision * crash_risk.powi(2)
     }
 
-    /// Calculate multi-step trajectory Expected Free Energy with physics rollout.
+    /// Calculate multi-step trajectory Expected Free Energy with physics-based beam rollout.
     ///
     /// G(a) = Σ_t γ^t · [π_safety · danger(t)² + π_mission · deviation(t)² + π_self · crash(t)²]
     ///
     /// Uses physics-based forward prediction:
-    /// - Beam position via kinematic equations (gravity)
-    /// - Drone position via exponential PD approach model
-    /// - Danger from beam-entity geometry and time-to-impact
+    /// - Beam trajectory via kinematic equations (gravity + initial velocity)
+    /// - Drone reachability via exponential PD approach model
+    /// - Danger from candidate proximity to beam's predicted path
     ///
-    /// Horizon: 50 steps at 0.002s (0.1s lookahead), discount γ = 0.95.
-    fn trajectory_efe(
+    /// **Key insight:** evaluates whether the *candidate setpoint* lies on the beam's
+    /// predicted trajectory, not whether the drone's transient position passes near
+    /// the beam. This prevents false danger reduction for candidates whose approach
+    /// path transiently crosses the beam fall line.
+    ///
+    /// Horizon: 200 steps at 0.002s (0.4s lookahead), discount γ = 0.95.
+    pub(crate) fn trajectory_efe(
         &self,
         state: &FlightState,
         candidate: [f64; 3],
@@ -549,48 +599,76 @@ impl ActiveInferenceFlightAgent {
             None => return 0.0,
         };
         // threat_vel presence gates trajectory vs instantaneous fallback
-        if env.threat_vel.is_none() {
+        let threat_vel = match env.threat_vel {
+            Some(v) => v,
+            None => return self.instantaneous_efe(state, candidate, mission_setpoint, env),
+        };
+
+        let entity_pos = env.entity_pos.unwrap_or([0.0; 3]);
+
+        // ── Phase A: Beam trajectory parameters ──
+        let impact_time = predict_impact_time_z(threat_pos, threat_vel, entity_pos[2]);
+        if impact_time.is_infinite() || impact_time <= 0.0 {
+            // Beam going up or already below entity → fallback to instantaneous
             return self.instantaneous_efe(state, candidate, mission_setpoint, env);
         }
 
-        let horizon = 200; // 200 steps × 0.002s = 0.4s lookahead
-        let dt = 0.002;
-        let gamma = 0.95f64;
+        // ── Phase B: Sample beam trajectory, find min distance to candidate ──
+        let beam_samples = 50;
+        let beam_dt = impact_time / beam_samples as f64;
+        let mut min_beam_dist = f64::INFINITY;
+
+        for i in 0..=beam_samples {
+            let t = i as f64 * beam_dt;
+            let beam_t = predict_falling_position(threat_pos, threat_vel, t);
+            let dist = ((candidate[0] - beam_t[0]).powi(2)
+                + (candidate[1] - beam_t[1]).powi(2)
+                + (candidate[2] - beam_t[2]).powi(2))
+            .sqrt();
+            if dist < min_beam_dist {
+                min_beam_dist = dist;
+            }
+        }
+
+        // ── Phase C: Reachability check ──
+        // Can the drone reach the candidate before the beam hits the entity?
+        // Uses impact_time (not closest_approach_time) — the drone has until
+        // beam impact to position itself near the candidate.
         let approach_rate = 5.0;
-
-        // ── Safety term: use instantaneous model (setpoint-based) ──
-        // The safety evaluation is based on the candidate setpoint's steady-state
-        // proximity to the threat, consistent with instantaneous_efe. This correctly
-        // evaluates whether THIS setpoint positions the drone to intercept the threat,
-        // rather than tracking transient positions which may misleadingly pass near
-        // the threat en route to a distant setpoint.
-        let dist_to_threat = ((candidate[0] - threat_pos[0]).powi(2)
-            + (candidate[1] - threat_pos[1]).powi(2)
-            + (candidate[2] - threat_pos[2]).powi(2))
+        let initial_dist = ((state.position[0] - candidate[0]).powi(2)
+            + (state.position[1] - candidate[1]).powi(2)
+            + (state.position[2] - candidate[2]).powi(2))
         .sqrt();
+        let drone_gap = initial_dist * (-approach_rate * impact_time).exp();
+        let reachable = drone_gap < 0.5; // Within 0.5m by impact time
 
-        let predicted_danger = if dist_to_threat < 1.0 {
-            env.human_danger * dist_to_threat
+        let effective_dist = if reachable {
+            min_beam_dist
+        } else {
+            min_beam_dist + drone_gap
+        };
+
+        // ── Phase D: Safety + crash from effective_dist ──
+        let predicted_danger = if effective_dist < 1.0 {
+            env.human_danger * effective_dist
         } else {
             env.human_danger.min(1.0)
         };
 
-        // Crash risk: setpoint near falling heavy object
-        let crash_risk: f64 = if dist_to_threat < 0.5 { 0.5 } else { 0.0 };
+        let crash_risk: f64 = if effective_dist < 0.5 { 0.5 } else { 0.0 };
 
-        // ── Mission deviation + temporal discounting via trajectory rollout ──
-        // The trajectory rollout adds value by computing the time-integrated mission
-        // deviation, accounting for the drone's approach dynamics.
+        // ── Phase E: Mission deviation via trajectory rollout (unchanged) ──
+        let horizon = 200;
+        let dt = 0.002;
+        let gamma = 0.95f64;
+
         let mut total_mission_efe = 0.0;
         let mut discount = 1.0;
 
         for step in 0..horizon {
             let t = (step + 1) as f64 * dt;
-
-            // Predict drone position approaching candidate setpoint
             let drone_t = predict_drone_approach(state.position, candidate, t, approach_rate);
 
-            // Predicted mission deviation at this timestep
             let mission_target = mission_setpoint.position;
             let deviation_t = ((drone_t[0] - mission_target[0]).powi(2)
                 + (drone_t[1] - mission_target[1]).powi(2)
@@ -602,11 +680,8 @@ impl ActiveInferenceFlightAgent {
             discount *= gamma;
         }
 
-        // Combine: safety and crash use steady-state evaluation (scaled by effective
-        // horizon weight), mission deviation uses trajectory-integrated value.
-        let effective_horizon_weight: f64 = (0..horizon)
-            .map(|s| gamma.powi(s))
-            .sum();
+        // ── Phase F: Combine with horizon weight ──
+        let effective_horizon_weight: f64 = (0..horizon).map(|s| gamma.powi(s)).sum();
 
         self.config.safety_prior_precision * predicted_danger.powi(2) * effective_horizon_weight
             + total_mission_efe
@@ -615,13 +690,18 @@ impl ActiveInferenceFlightAgent {
 
     /// Evaluate candidate setpoints and return the EFE-optimal override.
     ///
-    /// Generates 6 candidate action policies and evaluates each via EFE:
+    /// Generates 8 candidate action policies (when velocity available) via EFE:
     /// 0. Continue mission (current setpoint)
-    /// 1. Intercept threat (fly to threat position, above entity)
+    /// 1a/1b/1c. Intercept threat at 25%, 50%, 75% of impact time (3 rendezvous)
     /// 2. Hover in place (hold current position)
     /// 3. Shield position (midpoint between threat and entity, +0.3m up)
     /// 4. Retreat (move 1m away from threat)
     /// 5. Lateral deflection (perpendicular to threat→entity line)
+    ///
+    /// **Design note:** Multi-rendezvous sampling lets EFE discover the optimal
+    /// intercept timing rather than relying on a fixed 50% heuristic. For some
+    /// geometries (drone far away, beam fast), an earlier or later rendezvous
+    /// produces a better intercept.
     ///
     /// Uses `trajectory_efe()` when `threat_vel` is available for physics-based
     /// multi-step rollout, falls back to `instantaneous_efe()` otherwise.
@@ -643,29 +723,57 @@ impl ActiveInferenceFlightAgent {
         let entity_pos = env.entity_pos.unwrap_or([0.0; 3]);
         let drone_pos = state.position;
 
-        // ── Generate 6 candidate setpoints (action policies) ──
+        // ── Generate candidate setpoints (action policies) ──
+        // Fixed-size stack array: max 8 candidates (no heap allocation).
+        // Layout: [mission, intercept×3, hover, shield, retreat, lateral]
+        let mut candidates: [[f64; 3]; 8] = [[0.0; 3]; 8];
+        let mut n_candidates: usize = 0;
 
         // 0: Continue mission
-        let c_mission = current_setpoint.position;
+        candidates[n_candidates] = current_setpoint.position;
+        n_candidates += 1;
 
-        // 1: Intercept threat (fly to threat, above entity)
-        let c_intercept = [
-            threat_pos[0],
-            threat_pos[1],
-            threat_pos[2].max(entity_pos[2] + 0.5),
-        ];
+        // 1a/1b/1c: Intercept threat — sample rendezvous at 25%, 50%, 75% of impact time
+        if let Some(vel) = env.threat_vel {
+            let impact_t = predict_impact_time_z(threat_pos, vel, entity_pos[2]);
+            if impact_t.is_finite() && impact_t > 0.0 {
+                for &frac in &[0.25, 0.5, 0.75] {
+                    let rv_t = impact_t * frac;
+                    let beam = predict_falling_position(threat_pos, vel, rv_t);
+                    candidates[n_candidates] =
+                        [beam[0], beam[1], beam[2].max(entity_pos[2] + 0.3)];
+                    n_candidates += 1;
+                }
+            } else {
+                candidates[n_candidates] = [
+                    threat_pos[0],
+                    threat_pos[1],
+                    threat_pos[2].max(entity_pos[2] + 0.5),
+                ];
+                n_candidates += 1;
+            }
+        } else {
+            candidates[n_candidates] = [
+                threat_pos[0],
+                threat_pos[1],
+                threat_pos[2].max(entity_pos[2] + 0.5),
+            ];
+            n_candidates += 1;
+        }
 
-        // 2: Hover in place
-        let c_hover = drone_pos;
+        // Hover in place
+        candidates[n_candidates] = drone_pos;
+        n_candidates += 1;
 
-        // 3: Shield position (midpoint between threat and entity, +0.3m up)
-        let c_shield = [
+        // Shield position (midpoint between threat and entity, +0.3m up)
+        candidates[n_candidates] = [
             (threat_pos[0] + entity_pos[0]) * 0.5,
             (threat_pos[1] + entity_pos[1]) * 0.5,
             ((threat_pos[2] + entity_pos[2]) * 0.5) + 0.3,
         ];
+        n_candidates += 1;
 
-        // 4: Retreat (move 1m away from threat)
+        // Retreat (move 1m away from threat)
         let threat_to_drone = [
             drone_pos[0] - threat_pos[0],
             drone_pos[1] - threat_pos[1],
@@ -676,13 +784,14 @@ impl ActiveInferenceFlightAgent {
             + threat_to_drone[2].powi(2))
         .sqrt()
         .max(0.01);
-        let c_retreat = [
+        candidates[n_candidates] = [
             drone_pos[0] + threat_to_drone[0] / retreat_dist,
             drone_pos[1] + threat_to_drone[1] / retreat_dist,
             drone_pos[2] + threat_to_drone[2] / retreat_dist,
         ];
+        n_candidates += 1;
 
-        // 5: Lateral deflection (perpendicular to threat→entity line)
+        // Lateral deflection (perpendicular to threat→entity line)
         let threat_to_entity = [
             entity_pos[0] - threat_pos[0],
             entity_pos[1] - threat_pos[1],
@@ -691,28 +800,26 @@ impl ActiveInferenceFlightAgent {
         let tte_len = (threat_to_entity[0].powi(2) + threat_to_entity[1].powi(2))
             .sqrt()
             .max(0.01);
-        // Perpendicular in XY plane: rotate 90 degrees
         let perp = [-threat_to_entity[1] / tte_len, threat_to_entity[0] / tte_len];
         let midpoint_x = (threat_pos[0] + entity_pos[0]) * 0.5;
         let midpoint_y = (threat_pos[1] + entity_pos[1]) * 0.5;
-        let c_lateral = [
+        candidates[n_candidates] = [
             midpoint_x + perp[0] * 0.5,
             midpoint_y + perp[1] * 0.5,
             threat_pos[2].max(entity_pos[2] + 0.3),
         ];
-
-        let candidates = [c_mission, c_intercept, c_hover, c_shield, c_retreat, c_lateral];
+        n_candidates += 1;
 
         // ── Evaluate each candidate via EFE ──
         let use_trajectory = env.threat_vel.is_some();
         let mut best_idx = 0;
         let mut best_efe = f64::INFINITY;
 
-        for (i, candidate) in candidates.iter().enumerate() {
+        for i in 0..n_candidates {
             let efe = if use_trajectory {
-                self.trajectory_efe(state, *candidate, current_setpoint, env)
+                self.trajectory_efe(state, candidates[i], current_setpoint, env)
             } else {
-                self.instantaneous_efe(state, *candidate, current_setpoint, env)
+                self.instantaneous_efe(state, candidates[i], current_setpoint, env)
             };
             if efe < best_efe {
                 best_efe = efe;
@@ -1622,7 +1729,9 @@ mod tests {
 
     #[test]
     fn test_trajectory_efe_intercept_lower_than_mission() {
-        // With physics rollout, intercepting should still have lower EFE than continuing mission
+        // With physics rollout, intercepting should still have lower EFE than continuing mission.
+        // Use the rendezvous position: beam at [-1.5,0,2] vel [0,0,-3] → entity z=0
+        // impact_t ≈ 0.4s, rendezvous at t≈0.2s, beam_z ≈ 2+(-3)(0.2)-0.5(9.81)(0.04) ≈ 1.204
         let config = FlightFepConfig {
             extended_observation: true,
             ..FlightFepConfig::default()
@@ -1645,16 +1754,140 @@ mod tests {
             entity_pos: Some([-1.5, 0.0, 0.0]),
         };
 
+        // Compute the rendezvous position the agent would use
+        let impact_t = predict_impact_time_z([-1.5, 0.0, 2.0], [0.0, 0.0, -3.0], 0.0);
+        let rv_t = impact_t * 0.5;
+        let beam_rv = predict_falling_position([-1.5, 0.0, 2.0], [0.0, 0.0, -3.0], rv_t);
+        let intercept_candidate = [beam_rv[0], beam_rv[1], beam_rv[2].max(0.3)];
+
         let efe_mission =
             agent.trajectory_efe(&state, mission_setpoint.position, &mission_setpoint, &env);
         let efe_intercept =
-            agent.trajectory_efe(&state, [-1.5, 0.0, 2.0], &mission_setpoint, &env);
+            agent.trajectory_efe(&state, intercept_candidate, &mission_setpoint, &env);
 
         assert!(
             efe_intercept < efe_mission,
             "Trajectory EFE: intercept ({:.2}) should be < mission ({:.2})",
             efe_intercept,
             efe_mission
+        );
+    }
+
+    #[test]
+    fn test_step_embodied_requests_fast_cognitive_under_danger() {
+        let config = FlightFepConfig {
+            extended_observation: true,
+            ..FlightFepConfig::default()
+        };
+        let mut agent = ActiveInferenceFlightAgent::new(config);
+
+        let state = FlightState {
+            position: [0.0, 0.0, 1.5],
+            ..FlightState::hover(0.1)
+        };
+        let setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+
+        // High danger → smooth ramp: danger=0.8 → t=(0.8-0.1)/0.9≈0.778 → 25+75*0.778≈83.3Hz
+        let env_danger = FlightEnvironment {
+            human_danger: 0.8,
+            mission_progress: 0.3,
+            threat_pos: Some([-1.5, 0.0, 2.0]),
+            threat_vel: Some([0.0, 0.0, -3.0]),
+            entity_pos: Some([-1.5, 0.0, 0.0]),
+        };
+        let result = agent.step_embodied(&state, &setpoint, &env_danger);
+        let hz = result.requested_cognitive_hz.expect("danger=0.8 should request cognitive Hz");
+        assert!(
+            hz > 80.0,
+            "danger=0.8 should request >80Hz, got {:.1}Hz",
+            hz
+        );
+
+        // No danger → should request None (default rate)
+        let env_safe = FlightEnvironment {
+            human_danger: 0.0,
+            mission_progress: 0.5,
+            threat_pos: None,
+            threat_vel: None,
+            entity_pos: None,
+        };
+        let result_safe = agent.step_embodied(&state, &setpoint, &env_safe);
+        assert!(
+            result_safe.requested_cognitive_hz.is_none(),
+            "No danger should use default cognitive rate"
+        );
+    }
+
+    #[test]
+    fn test_adaptive_hz_smooth_ramp_intermediate() {
+        // Verify the smooth ramp at intermediate danger values.
+        // Formula: hz = 25 + 75 * ((danger - 0.1) / 0.9)
+        let config = FlightFepConfig {
+            extended_observation: true,
+            ..FlightFepConfig::default()
+        };
+
+        let state = FlightState {
+            position: [0.0, 0.0, 1.5],
+            ..FlightState::hover(0.1)
+        };
+        let setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+
+        // danger=0.5 → t=(0.5-0.1)/0.9≈0.444 → hz=25+75*0.444≈58.3
+        let mut agent = ActiveInferenceFlightAgent::new(config.clone());
+        let env_mid = FlightEnvironment {
+            human_danger: 0.5,
+            mission_progress: 0.3,
+            threat_pos: Some([-1.5, 0.0, 2.0]),
+            threat_vel: Some([0.0, 0.0, -3.0]),
+            entity_pos: Some([-1.5, 0.0, 0.0]),
+        };
+        let result_mid = agent.step_embodied(&state, &setpoint, &env_mid);
+        let hz_mid = result_mid.requested_cognitive_hz.expect("danger=0.5 should request Hz");
+        assert!(
+            (hz_mid - 58.3).abs() < 1.0,
+            "danger=0.5 should be ~58Hz, got {:.1}Hz",
+            hz_mid
+        );
+
+        // danger=0.1 → t=0 → hz=25 (threshold boundary)
+        let mut agent2 = ActiveInferenceFlightAgent::new(config.clone());
+        let env_low = FlightEnvironment {
+            human_danger: 0.1,
+            mission_progress: 0.3,
+            threat_pos: Some([-1.5, 0.0, 2.0]),
+            threat_vel: Some([0.0, 0.0, -3.0]),
+            entity_pos: Some([-1.5, 0.0, 0.0]),
+        };
+        // danger=0.1 is exactly at the threshold — should NOT trigger (> 0.1 required)
+        let result_low = agent2.step_embodied(&state, &setpoint, &env_low);
+        assert!(
+            result_low.requested_cognitive_hz.is_none(),
+            "danger=0.1 (at threshold) should use default rate, got {:?}",
+            result_low.requested_cognitive_hz
+        );
+
+        // danger=1.0 → t=1.0 → hz=100 (maximum)
+        let mut agent3 = ActiveInferenceFlightAgent::new(config);
+        let env_max = FlightEnvironment {
+            human_danger: 1.0,
+            mission_progress: 0.3,
+            threat_pos: Some([-1.5, 0.0, 2.0]),
+            threat_vel: Some([0.0, 0.0, -3.0]),
+            entity_pos: Some([-1.5, 0.0, 0.0]),
+        };
+        let result_max = agent3.step_embodied(&state, &setpoint, &env_max);
+        let hz_max = result_max.requested_cognitive_hz.expect("danger=1.0 should request Hz");
+        assert!(
+            (hz_max - 100.0).abs() < 0.1,
+            "danger=1.0 should be 100Hz, got {:.1}Hz",
+            hz_max
         );
     }
 
@@ -1773,6 +2006,192 @@ mod tests {
         assert!(
             override_pos.is_none(),
             "Very low danger should not trigger override"
+        );
+    }
+
+    // ── Beam-Trajectory Proximity Tests ──
+
+    #[test]
+    fn test_trajectory_efe_uses_beam_trajectory() {
+        // Beam starts high (z=5), candidate at beam's future position gets low EFE.
+        // Entity at ground level — beam falls from z=5 toward z=0.
+        let config = FlightFepConfig {
+            extended_observation: true,
+            ..FlightFepConfig::default()
+        };
+        let agent = ActiveInferenceFlightAgent::new(config);
+
+        let state = FlightState {
+            position: [0.0, 0.0, 2.0],
+            ..FlightState::hover(0.1)
+        };
+        let mission_setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+        let env = FlightEnvironment {
+            human_danger: 0.8,
+            mission_progress: 0.3,
+            threat_pos: Some([0.0, 0.0, 5.0]),   // Beam starts at z=5
+            threat_vel: Some([0.0, 0.0, -3.0]),   // Falling at -3 m/s
+            entity_pos: Some([0.0, 0.0, 0.0]),    // Human at ground
+        };
+
+        // Candidate at a point on the beam's trajectory (beam will pass z≈2.0
+        // at t≈0.33s based on kinematics: 5 + (-3)*t - 0.5*9.81*t² = 2)
+        let beam_path_candidate = [0.0, 0.0, 2.0];
+        // Candidate far from beam path
+        let off_path_candidate = [3.0, 3.0, 2.0];
+
+        let efe_on_path = agent.trajectory_efe(
+            &state, beam_path_candidate, &mission_setpoint, &env,
+        );
+        let efe_off_path = agent.trajectory_efe(
+            &state, off_path_candidate, &mission_setpoint, &env,
+        );
+
+        // On-path candidate should have lower EFE (danger reduced by proximity)
+        assert!(
+            efe_on_path < efe_off_path,
+            "Candidate on beam path ({:.2}) should have lower EFE than off-path ({:.2})",
+            efe_on_path, efe_off_path
+        );
+    }
+
+    #[test]
+    fn test_trajectory_efe_reachability_penalizes_distant_drone() {
+        // Perfect intercept position but drone 20m away — unreachable.
+        let config = FlightFepConfig {
+            extended_observation: true,
+            ..FlightFepConfig::default()
+        };
+        let agent = ActiveInferenceFlightAgent::new(config);
+
+        // Drone very far from the intercept candidate
+        let state_far = FlightState {
+            position: [20.0, 20.0, 1.5],
+            ..FlightState::hover(0.1)
+        };
+        // Drone close to the intercept candidate
+        let state_close = FlightState {
+            position: [-1.0, 0.0, 1.5],
+            ..FlightState::hover(0.1)
+        };
+        let mission_setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+        let env = FlightEnvironment {
+            human_danger: 0.8,
+            mission_progress: 0.3,
+            threat_pos: Some([-1.5, 0.0, 2.0]),
+            threat_vel: Some([0.0, 0.0, -3.0]),
+            entity_pos: Some([-1.5, 0.0, 0.0]),
+        };
+
+        let intercept_candidate = [-1.5, 0.0, 2.0];
+
+        let efe_far = agent.trajectory_efe(
+            &state_far, intercept_candidate, &mission_setpoint, &env,
+        );
+        let efe_close = agent.trajectory_efe(
+            &state_close, intercept_candidate, &mission_setpoint, &env,
+        );
+
+        // Far drone should have higher EFE for the same candidate (reachability penalty)
+        assert!(
+            efe_far > efe_close,
+            "Distant drone EFE ({:.2}) should exceed close drone EFE ({:.2}) due to reachability penalty",
+            efe_far, efe_close
+        );
+    }
+
+    #[test]
+    fn test_trajectory_efe_mission_not_on_beam_path() {
+        // Regression test: mission at (-3,0,1) gets NO danger reduction when
+        // beam falls at x=-1.5. The beam path never comes within 1.0m of (-3,0,1).
+        let config = FlightFepConfig {
+            extended_observation: true,
+            ..FlightFepConfig::default()
+        };
+        let agent = ActiveInferenceFlightAgent::new(config);
+
+        let state = FlightState {
+            position: [0.0, 0.0, 1.5],
+            ..FlightState::hover(0.1)
+        };
+        let mission_setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+        let env = FlightEnvironment {
+            human_danger: 0.8,
+            mission_progress: 0.3,
+            threat_pos: Some([-1.5, 0.0, 2.0]),
+            threat_vel: Some([0.0, 0.0, -3.0]),
+            entity_pos: Some([-1.5, 0.0, 0.0]),
+        };
+
+        let efe_mission = agent.trajectory_efe(
+            &state, mission_setpoint.position, &mission_setpoint, &env,
+        );
+
+        // Mission candidate at (-3,0,1) is 1.5m horizontally from beam at x=-1.5.
+        // The beam falls straight down → min_beam_dist ≥ 1.5m → no danger reduction.
+        // Safety term should use full danger: π_safety * danger² * weight.
+        let efe_intercept = agent.trajectory_efe(
+            &state, [-1.5, 0.0, 2.0], &mission_setpoint, &env,
+        );
+
+        assert!(
+            efe_mission > efe_intercept,
+            "Mission EFE ({:.2}) should be > intercept EFE ({:.2}): mission not on beam path",
+            efe_mission, efe_intercept
+        );
+    }
+
+    #[test]
+    fn test_trajectory_efe_beam_going_up_fallback() {
+        // Upward beam velocity toward unreachable entity → impact_time = ∞ → falls back to instantaneous.
+        let config = FlightFepConfig {
+            extended_observation: true,
+            ..FlightFepConfig::default()
+        };
+        let agent = ActiveInferenceFlightAgent::new(config);
+
+        let state = FlightState {
+            position: [0.0, 0.0, 1.5],
+            ..FlightState::hover(0.1)
+        };
+        let mission_setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+
+        // Beam going upward at 10 m/s from z=2. Max height ≈ 7.1m (v²/2g + z₀).
+        // Entity at z=100 — beam can never reach it → discriminant < 0 → impact_time = ∞.
+        let env = FlightEnvironment {
+            human_danger: 0.8,
+            mission_progress: 0.3,
+            threat_pos: Some([-1.5, 0.0, 2.0]),
+            threat_vel: Some([0.0, 0.0, 10.0]),   // Going up!
+            entity_pos: Some([-1.5, 0.0, 100.0]), // Entity far above beam's max height
+        };
+
+        // Should not panic — falls back to instantaneous
+        let efe = agent.trajectory_efe(
+            &state, mission_setpoint.position, &mission_setpoint, &env,
+        );
+        assert!(efe.is_finite(), "Upward beam should produce finite EFE via fallback: {}", efe);
+
+        // Compare with explicit instantaneous to verify fallback
+        let efe_inst = agent.instantaneous_efe(
+            &state, mission_setpoint.position, &mission_setpoint, &env,
+        );
+        assert!(
+            (efe - efe_inst).abs() < 1e-10,
+            "Upward beam trajectory EFE ({:.4}) should equal instantaneous EFE ({:.4})",
+            efe, efe_inst
         );
     }
 }

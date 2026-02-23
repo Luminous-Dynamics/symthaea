@@ -189,7 +189,8 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
     };
 
     let dt = config.flight_config.motor_dt();
-    let cognitive_interval = config.flight_config.cognitive_interval();
+    let base_cognitive_interval = config.flight_config.cognitive_interval();
+    let mut active_cognitive_interval = base_cognitive_interval;
     let pd_gains = PdGains::default();
 
     // Auto-calibrate hover thrust from MuJoCo model mass
@@ -359,7 +360,7 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
         // The agent perceives danger through its observation channels, and the EFE
         // calculation over candidate setpoints determines whether to redirect.
         // No hardcoded danger thresholds — the math does the work.
-        if step % cognitive_interval == 0 {
+        if step % active_cognitive_interval == 0 {
             let env = FlightEnvironment {
                 human_danger,
                 mission_progress,
@@ -376,6 +377,12 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
                 entity_pos: Some(human_pos),
             };
             fep_result = fep_agent.step_embodied(sim.state(), &setpoint, &env);
+
+            // Adaptive cognitive frequency: think faster under danger
+            active_cognitive_interval = match fep_result.requested_cognitive_hz {
+                Some(hz) => ((config.flight_config.motor_hz / hz as f64) as usize).max(1),
+                None => base_cognitive_interval,
+            };
 
             if (fep_result.tau_factor - 1.0).abs() > 0.01 {
                 controller.modulate_tau(fep_result.tau_factor);
