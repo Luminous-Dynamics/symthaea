@@ -72,7 +72,7 @@ Code is available at \url{https://github.com/Luminous-Dynamics/symthaea}.
 % ============================================================================
 % Author Summary (required by PLoS Computational Biology)
 \section*{Author Summary}
-Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We show that the same principles can be implemented using \emph{hyperdimensional computing}, a brain-inspired approach that represents information as very long random vectors (16,384 dimensions). Our system, called Hyperdimensional Active Inference (HAI), replaces costly matrix operations with simple vector operations that run in linear time. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 17 domains: HAI achieves 93\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. The entire system is implemented in Rust (343,000 lines across 22 workspace crates, 7,100+ tests, 51 feature flags) and released as open-source software, demonstrating that biologically-inspired computation can be both theoretically rigorous and practically efficient.
+Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We show that the same principles can be implemented using \emph{hyperdimensional computing}, a brain-inspired approach that represents information as very long random vectors (16,384 dimensions). Our system, called Hyperdimensional Active Inference (HAI), replaces costly matrix operations with simple vector operations that run in linear time. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 17 domains: HAI achieves 93\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. The entire system is implemented in Rust (343,000 lines across 30 workspace crates, 9,600+ tests, 47 feature flags) and released as open-source software, demonstrating that biologically-inspired computation can be both theoretically rigorous and practically efficient.
 
 % ============================================================================
 \section{Introduction}
@@ -304,8 +304,8 @@ where intrinsic reward is negative prediction error. The value function is $V_\t
 
 \subsection{Experimental Setup}
 
-\textbf{Implementation:} Rust, ${\sim}343$K LOC main crate (22 workspace crates, 15 extracted sub-crates), 3,700+ lines core FEP.
-\textbf{Test suite:} 7,100+ tests pass (2,760 main + 3,473 core + ${\sim}870$ integration/sub-crate), 0 failures, 11 ignored (see Figure~\ref{fig:radar} for full validation radar).
+\textbf{Implementation:} Rust, ${\sim}343$K LOC main crate (30 workspace crates, 28 extracted sub-crates), 3,700+ lines core FEP.
+\textbf{Test suite:} 9,600+ tests pass (3,014 main + 3,555 core + ${\sim}3{,}060$ integration/sub-crate), 0 failures, 11 ignored (see Figure~\ref{fig:radar} for full validation radar).
 \textbf{HDC Dimension:} $d = 16{,}384$ (configurable).
 \textbf{Baseline:} pymdp v0.0.8~\citep{heins2022pymdp}.
 \textbf{Tasks:} T-Maze (context inference), Grid World 3$\times$3 and 5$\times$5 (navigation).
@@ -432,7 +432,7 @@ Federated Learning & 8/8 + 22/22 & Unified pipeline (\S\ref{sec:fl}): 8 E2E + MN
 PyPhi Groundtruth & 6/6 & IIT 3.0 theory tests pass; exact $\Phi$ degenerates for weighted systems \\
 Drosophila $\Phi$ & 6/6 & Scales to 4096 neurons, MB $\Phi >$ OL $\Phi$ \\
 Sleep Staging (EDF) & 5/5 stages & Preliminary: 25.6\% overall (3 recordings), N2 best at 55.0\% \\
-\emph{C.~elegans} $\Phi$ & Complete & 448 neurons, 7379 connections, circuit $\Phi$ 0.54--0.58 \\
+\emph{C.~elegans} $\Phi$ & Complete & 448 neurons, 7,379 connections, circuit $\Phi$ 0.54--0.58 \\
 LibriSpeech HDC & 3/3 & 94.5\% speaker ID (10 speakers) \\
 ISOLET HDC & 3/3 & 91.7\% with retrain (lr=0.1, 8K dim) \\
 Meditation EEG & 6/6 & Gamma flow, theta absorption validated \\
@@ -523,12 +523,12 @@ IIT-1 & IIT & \textsc{Present} & Integrated information $>$ 0 & 0.80 \\
 
 \textbf{Key evidence.} RPT-1 (score~1.0): CfC closed-form temporal feedback provides algorithmic recurrence with $O(1)$ temporal jumps.  GWT-2 (score~1.0): working memory capacity of 7 items with FIFO eviction enforces the information bottleneck required by GWT.  The two \textsc{Partial} indicators---PP-2 (hierarchical prediction, 0.50) and AST-1 (attention self-model, 0.50)---reflect current architectural gaps: multi-scale CfC time constants provide multi-level prediction but lack a full cortical hierarchy, and the attention schema tracks focus state without maintaining a complete self-model of the attention process.
 
-The mean indicator score across all 14 indicators is $\bar{s} = 0.81$, with no theory category scoring below 0.50.  These results are produced by the \texttt{symthaea-psych-bench} crate's static architectural analysis module, which evaluates each indicator against known implementation properties without requiring live cognitive loop execution.
+The mean indicator score across all 14 indicators is $\bar{s} = 0.79$, with no theory category scoring below 0.50.  These results are produced by the \texttt{symthaea-psych-bench} crate's static architectural analysis module, which evaluates each indicator against known implementation properties without requiring live cognitive loop execution.
 
 \subsection{Psychological Benchmark Suite}
 \label{sec:psych-bench}
 
-We developed a standardized psychological benchmark suite (\texttt{symthaea-psych-bench}, 5,219~LOC, 79~tests) that evaluates Symthaea's subsystems against five established paradigms: WorM~(working memory), CogBench~(FEP active inference), Butlin indicators~(\S\ref{sec:butlin}), ToMBench~(Theory of Mind), and MemoryAgentBench~(memory pipeline).  Table~\ref{tab:psych-bench} reports key metrics from the full benchmark suite (512D, 10~trials/condition).
+We developed a standardized psychological benchmark suite (\texttt{symthaea-psych-bench}, 18,734~LOC, 213~tests) that evaluates Symthaea's subsystems against five established paradigms: WorM~(working memory), CogBench~(FEP active inference), Butlin indicators~(\S\ref{sec:butlin}), ToMBench~(Theory of Mind), and MemoryAgentBench~(memory pipeline).  Table~\ref{tab:psych-bench} reports key metrics from the full benchmark suite (512D, 10~trials/condition).
 
 \begin{table}[ht]
 \centering
@@ -708,7 +708,7 @@ The eight motor command types provide an interpretable action vocabulary for cog
 
 The full cognitive loop integrates surprise-driven exploration (modulating curiosity thresholds from prediction error), prefrontal executive control (working memory gating with capacity-7 buffer), social coherence (Theory of Mind via agent modeling and trust dynamics), reasoning engine feedback (Phi-effective confidence modulation of learning rate), counterfactual dream replay (off-line simulation of alternative actions to discover $\Phi$-improving strategies), and adaptive urgency throttling (three-tier scheduling---Critical, Normal, Cruise---that gates subsystem execution frequency based on prediction error magnitude). These subsystems operate within the HDC encode $\to$ CfC evolve $\to$ predict $\to$ learn pipeline at ${\sim}4$~Hz sustained throughput.
 
-\textbf{Closed feedback loops.} Beyond feed-forward integration, 13 subsystems form closed feedback loops---previous-cycle outputs modulate current-cycle processing. These include: (1)~prefrontal veto suppressing exploration when working memory is overloaded~\citep{miller2001integrative}, (2)~predictive self-model confidence reducing learning rate under uncertainty~\citep{clark2013whatever}, (3)~attention schema bidirectionally modulating processing gain~\citep{graziano2013consciousness}, (4)~GWT broadcast boosting prediction confidence~\citep{baars1988cognitive}, (5)~temporal discontinuity resetting adaptation~\citep{varela1999present}, (6)~embodied phi modulation feeding somatic state back into unified consciousness~\citep{damasio1999feeling}, (7)~narrative-GWT veto suppressing consolidation, (8)~resonance frequency modulating CfC time constants ($\pm 5\%$)~\citep{buzsaki2006rhythms}, (9)~quantum coherence boosting exploration (up to $+10\%$ urge), (10)~MCE consciousness level providing decaying learning rate boost ($+10\%$, $\tau \approx 9$ cycles)~\citep{dehaene2014consciousness}, (11)~narrative self-Phi modulating prediction confidence ($+2\%/-5\%$ based on identity coherence)~\citep{gallagher2000philosophical}, (12)~counterfactual dream replay biasing exploration toward $\Phi$-improving actions discovered via off-line simulation during low-urgency cycles, and (13)~adaptive urgency throttling dynamically scheduling subsystem frequency based on consecutive low-error cycles (Critical $\to$ Normal $\to$ Cruise). Single-module ablation shows $\leq 5\%$ degradation; multi-module synergy stays within $30\%$ of baseline with $<2\%$ computational overhead.
+\textbf{Closed feedback loops.} Beyond feed-forward integration, 16 subsystems form closed feedback loops---previous-cycle outputs modulate current-cycle processing. These include: (1)~prefrontal veto suppressing exploration when working memory is overloaded~\citep{miller2001integrative}, (2)~predictive self-model confidence reducing learning rate under uncertainty~\citep{clark2013whatever}, (3)~attention schema bidirectionally modulating processing gain~\citep{graziano2013consciousness}, (4)~GWT broadcast boosting prediction confidence~\citep{baars1988cognitive}, (5)~temporal discontinuity resetting adaptation~\citep{varela1999present}, (6)~embodied phi modulation feeding somatic state back into unified consciousness~\citep{damasio1999feeling}, (7)~narrative-GWT veto suppressing consolidation, (8)~resonance frequency modulating CfC time constants ($\pm 5\%$)~\citep{buzsaki2006rhythms}, (9)~quantum coherence boosting exploration (up to $+10\%$ urge), (10)~MCE consciousness level providing decaying learning rate boost ($+10\%$, $\tau \approx 9$ cycles)~\citep{dehaene2014consciousness}, (11)~narrative self-Phi modulating prediction confidence ($+2\%/-5\%$ based on identity coherence)~\citep{gallagher2000philosophical}, (12)~counterfactual dream replay biasing exploration toward $\Phi$-improving actions discovered via off-line simulation during low-urgency cycles, (13)~adaptive urgency throttling dynamically scheduling subsystem frequency based on consecutive low-error cycles (Critical $\to$ Normal $\to$ Cruise), (14)~affective bridge modulating curiosity drive from emotional valence, (15)~predictive processing adjusting learning rate from accumulated prediction error, and (16)~cross-modal binding bidirectionally coupling sensory modalities through shared hypervector representations. Single-module ablation shows $\leq 5\%$ degradation; multi-module synergy stays within $30\%$ of baseline with $<2\%$ computational overhead.
 
 \subsection{Dream Replay and Adaptive Scheduling}
 
@@ -1051,10 +1051,49 @@ We presented Hyperdimensional Active Inference (HAI), the first integration of F
   \item \textbf{Federated learning:} Consciousness-aware FL pipeline with 34\% Byzantine tolerance validated on real MNIST.
   \item \textbf{Closed feedback loops:} 16 bidirectional feedback loops (prefrontal, embodied, resonance, quantum, MCE, narrative identity, dream replay, adaptive urgency, affective bridge, predictive processing, cross-modal binding, and others) with $<2\%$ computational overhead and bounded degradation under ablation.
   \item \textbf{Consciousness advantage:} Full consciousness pipeline recovers $3.5\times$ faster from distributional shifts and achieves $2\times$ better multi-pattern generalization vs.\ ablated configurations. Two-agent social cognition emerges from the pipeline without explicit programming.
-  \item \textbf{Psychological validation:} 12 of 14 Butlin et al.\ consciousness indicators present (mean score 0.81), with human-like capacity limits (change detection drop at $K{>}4$, binding deficit at $K{=}6$, FIFO eviction at $L{=}9$) and 100\% test-time learning correction via activation decay.
+  \item \textbf{Psychological validation:} 12 of 14 Butlin et al.\ consciousness indicators present (mean score 0.79), with human-like capacity limits (change detection drop at $K{>}4$, binding deficit at $K{=}6$, FIFO eviction at $L{=}9$) and 100\% test-time learning correction via activation decay.
 \end{enumerate}
 
 HAI opens new directions for efficient, interpretable cognitive architectures combining the rigor of active inference with the elegance of hyperdimensional computing.
+
+% ============================================================================
+\section*{Author Contributions}
+
+T.S.\ conceived the study, designed experiments, implemented the hyperdimensional
+computing framework, generated all network topologies, conducted all $\Phi$
+measurements, performed statistical analyses, created all figures, wrote the
+manuscript, and takes full responsibility for the scientific content.
+
+Claude Code (AI assistant, Anthropic PBC) contributed to manuscript drafting,
+figure generation, statistical analysis, and literature review under human
+direction and supervision. All AI-generated content was critically reviewed,
+edited, and validated by the human author.
+
+\emph{Sacred Trinity Development Model:} This work demonstrates a novel
+human--AI collaborative scientific writing approach, enabling solo researchers
+to produce publication-quality manuscripts while maintaining human oversight
+and accountability.
+
+% ============================================================================
+\section*{Ethics Approval}
+
+This study is entirely computational and does not involve human subjects,
+animal subjects, or clinical data. No ethics approval was required.
+
+% ============================================================================
+\section*{Competing Interests}
+
+The authors declare no competing interests. This work received no external
+funding.
+
+% ============================================================================
+\section*{Acknowledgments}
+
+This work was conducted independently using personal computational resources
+(NixOS~25.11, Rust~1.82). We thank the open-source communities developing
+Rust, NixOS, NumPy, Matplotlib, and SciPy for enabling reproducible scientific
+computing. T.S.\ acknowledges the transformative potential of human--AI
+collaborative research exemplified by the Sacred Trinity development model.
 
 % ============================================================================
 % PLoS uses numbered Vancouver-style references.
@@ -1073,10 +1112,10 @@ HAI opens new directions for efficient, interpretable cognitive architectures co
 \textbf{Repository:} \url{https://github.com/Luminous-Dynamics/symthaea}\par
 \textbf{Language:} Rust (Edition 2021)\par
 \textbf{Dependencies:} ndarray, nalgebra, rand, burn (optional GPU), duckdb\par
-\textbf{Lines of code:} ${\sim}343$K main crate (22 workspace crates, 15 extracted sub-crates), ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
-\textbf{Test suite:} 7,100+ tests (2,760 main lib + 3,473 core lib + ${\sim}870$ integration/sub-crate), 11 ignored, 0 failures\par
+\textbf{Lines of code:} ${\sim}343$K main crate (30 workspace crates, 28 extracted sub-crates), ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
+\textbf{Test suite:} 9,600+ tests (3,014 main lib + 3,555 core lib + ${\sim}3{,}060$ integration/sub-crate), 11 ignored, 0 failures\par
 \textbf{SIMD:} AVX2+FMA continuous HV acceleration enabled by default; runtime-dispatched AVX-512/AVX2/SSE4.1 for binary HV operations\par
-\textbf{Feature flags:} 51 (42 with cfg gates in source; remainder are binary-build bundles and meta-groups)\par
+\textbf{Feature flags:} 47 (41 with cfg gates in source; remainder are binary-build bundles and meta-groups)\par
 \textbf{Test command:} \texttt{cargo test test\_fep\_active\_inference}\par
 \textbf{Demo command:} \texttt{cargo run --example fep\_active\_inference\_demo}\par
 }
