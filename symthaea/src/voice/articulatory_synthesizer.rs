@@ -380,6 +380,7 @@ impl ArticulatorySynthesizer {
                 energy,
                 voicing: if effective_target.is_voiced { 1.0 } else { 0.0 },
                 time,
+                ..Default::default()
             });
 
             time_in_phoneme += frame_duration;
@@ -546,6 +547,7 @@ mod tests {
             energy: 1.0,
             voicing: 1.0,
             time: 0.0,
+            ..Default::default()
         };
         let b = FormantFrame {
             f1: 700.0,
@@ -558,6 +560,7 @@ mod tests {
             energy: 0.5,
             voicing: 0.0,
             time: 1.0,
+            ..Default::default()
         };
 
         let mid = a.lerp(&b, 0.5);
