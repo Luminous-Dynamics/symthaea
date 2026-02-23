@@ -1007,6 +1007,21 @@ impl BinaryHV {
         result
     }
 
+    /// Convert to bipolar representation as i8 (-1, +1)
+    ///
+    /// Returns `Vec<i8>` (16KB) instead of `Vec<f32>` (64KB) — 4× less allocation.
+    /// Use this when downstream code works with i8 bipolar vectors (e.g., text encoder).
+    pub fn to_bipolar_i8(&self) -> Vec<i8> {
+        let mut result = Vec::with_capacity(Self::DIM);
+        for byte_idx in 0..2048 {
+            for bit_idx in 0..8 {
+                let bit = (self.0[byte_idx] >> bit_idx) & 1;
+                result.push(if bit == 1 { 1 } else { -1 });
+            }
+        }
+        result
+    }
+
     /// Convert to a [`ContinuousHV`](super::unified_hv::ContinuousHV)
     ///
     /// Each bit maps to ±1.0 in the continuous representation.
@@ -1470,6 +1485,18 @@ mod tests {
         let recovered = BinaryHV::from_bipolar(&bipolar);
 
         assert_eq!(original, recovered, "Bipolar round-trip preserves vector");
+    }
+
+    #[test]
+    fn test_bipolar_i8_matches_f32() {
+        let hv = BinaryHV::random(42);
+        let f32_bipolar = hv.to_bipolar();
+        let i8_bipolar = hv.to_bipolar_i8();
+
+        assert_eq!(f32_bipolar.len(), i8_bipolar.len());
+        for (f, i) in f32_bipolar.iter().zip(i8_bipolar.iter()) {
+            assert_eq!(*f as i8, *i, "i8 output must match f32 cast");
+        }
     }
 
     #[test]

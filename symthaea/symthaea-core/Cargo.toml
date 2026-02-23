@@ -97,6 +97,10 @@ harness = false
 name = "spectral_mip"
 harness = false
 
+[[bench]]
+name = "encoder_optimization"
+harness = false
+
 [features]
 default = ["simd"]
 embeddings = []       # Enable embedding model integration
