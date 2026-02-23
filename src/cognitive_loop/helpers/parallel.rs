@@ -63,7 +63,6 @@ pub(in crate::cognitive_loop) fn run_stability_regime(
 }
 
 /// Parallel Branch A: Semantic memory storage + causal enhancement.
-#[allow(clippy::too_many_arguments)]
 pub(in crate::cognitive_loop) fn parallel_semantic_causal(
     semantic_memory: &mut SemanticMemory,
     causal_enhancer: &mut Option<CausalLoopEnhancer>,

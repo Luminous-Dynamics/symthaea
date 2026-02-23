@@ -553,9 +553,10 @@ fn test_compute_lattice_lr_unaffected_without_lattice() {
 fn test_compute_value_evaluator_no_evaluator() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let mut timings = super::super::ModuleTimings::default();
-    let (score, decision) = service.compute_value_evaluator_phase(0.5, &mut timings);
+    let (score, decision, gate_factor) = service.compute_value_evaluator_phase(0.5, &mut timings);
     assert!((score - 0.0).abs() < f64::EPSILON);
     assert!(decision.is_empty());
+    assert!((gate_factor - 1.0).abs() < f32::EPSILON);
 }
 
 #[test]

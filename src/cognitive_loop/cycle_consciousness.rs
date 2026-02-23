@@ -27,6 +27,7 @@ pub(crate) struct ConsciousnessMetrics {
     pub compositionality_total: usize,
     pub value_evaluator_score: f64,
     pub value_evaluator_decision: String,
+    pub value_gate_factor: f32,
     pub consciousness_profile_composite: f64,
     pub synergy_enhanced_composite: f64,
     pub emergent_properties_count: usize,
@@ -60,19 +61,19 @@ impl CognitiveLoopService {
     ///
     /// This is Phase "consciousness metrics" — extracted from cycle.rs lines ~1634-2370.
     /// All logic and behavior is preserved exactly.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn compute_consciousness_metrics(
         &mut self,
-        hv16_cached: symthaea_core::hdc::BinaryHV,
-        unified_psi: f64,
-        coherence: f32,
-        prediction_error: f32,
-        phi_attention_weight: f32,
-        compressed_state: &[f32],
-        input: &str,
-        urgency: super::CycleUrgency,
+        state: &super::CycleState<'_>,
         module_timings: &mut super::ModuleTimings,
     ) -> ConsciousnessMetrics {
+        let hv16_cached = *state.hv16_cached;
+        let unified_psi = state.unified_psi;
+        let coherence = state.coherence;
+        let prediction_error = state.prediction_error;
+        let phi_attention_weight = state.phi_attention_weight;
+        let compressed_state = state.compressed_state;
+        let input = state.input;
+        let urgency = state.urgency;
         // ═══════════════════════════════════════════════════════════════════════
         // PRIMITIVE CONSCIOUSNESS: Decompose consciousness state into primitives
         // Provides explainable consciousness by mapping HDC encodings to the
@@ -142,7 +143,7 @@ impl CognitiveLoopService {
         // UNIFIED VALUE EVALUATOR: Seven Harmonies alignment scoring
         // [extracted to compute_value_evaluator_phase]
         // ═══════════════════════════════════════════════════════════════════════
-        let (value_evaluator_score, value_evaluator_decision) =
+        let (value_evaluator_score, value_evaluator_decision, value_gate_factor) =
             self.compute_value_evaluator_phase(unified_psi, module_timings);
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -503,6 +504,7 @@ impl CognitiveLoopService {
             compositionality_total,
             value_evaluator_score,
             value_evaluator_decision,
+            value_gate_factor,
             consciousness_profile_composite,
             synergy_enhanced_composite,
             emergent_properties_count,
@@ -946,7 +948,7 @@ impl CognitiveLoopService {
         &mut self,
         unified_psi: f64,
         module_timings: &mut super::ModuleTimings,
-    ) -> (f64, String) {
+    ) -> (f64, String, f32) {
         let _t = Instant::now();
         let (value_evaluator_score, value_evaluator_decision) =
             if let Some(ref mut evaluator) = self.value_evaluator {
@@ -971,12 +973,25 @@ impl CognitiveLoopService {
             };
         module_timings.value_evaluator = _t.elapsed().as_micros() as u64;
 
-        // FEEDBACK: Value evaluator Veto → suppress learning for this cycle
-        if value_evaluator_decision == "Veto" {
+        // FEEDBACK: Value evaluator → learning gate (Phase 14 Veto + Phase 18 alignment boost)
+        // Science: Panksepp (1998) — value alignment should modulate learning bidirectionally
+        let value_gate_factor = if value_evaluator_decision == "Veto" {
             self.carryover.learning.subsystem_lr_factor *= 0.1; // Drastically reduce LR on value violation
-        }
+            self.stats.value_gate_applied_count += 1;
+            0.1
+        } else if value_evaluator_score > 0.7 && !value_evaluator_decision.is_empty() {
+            // High Seven Harmonies alignment → boost learning (reinforce aligned experiences)
+            let boost = 1.0 + (value_evaluator_score as f32 - 0.7) * 0.15; // up to +4.5%
+            self.carryover.learning.subsystem_lr_factor *= boost;
+            self.carryover.learning.subsystem_lr_factor =
+                self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.3);
+            self.stats.value_gate_applied_count += 1;
+            boost
+        } else {
+            1.0
+        };
 
-        (value_evaluator_score, value_evaluator_decision)
+        (value_evaluator_score, value_evaluator_decision, value_gate_factor)
     }
 
     /// Fiduciary Harmonics: Seven Harmonies field coherence + interference detection.

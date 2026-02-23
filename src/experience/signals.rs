@@ -279,7 +279,7 @@ impl SignalComputer {
     }
 
     fn ema(&self, previous: f32, current: f32) -> f32 {
-        self.ema_alpha * current + (1.0 - self.ema_alpha) * previous
+        symthaea_core::math::ema_update(previous, current, self.ema_alpha)
     }
 
     /// Compute prediction error from similarity scores

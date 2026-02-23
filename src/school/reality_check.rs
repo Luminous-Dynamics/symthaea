@@ -231,7 +231,7 @@ impl RealityChecker {
 
         // Update error EMA (exponential moving average)
         let ema_alpha = 0.1;
-        self.error_ema = ema_alpha * abs_error + (1.0 - ema_alpha) * self.error_ema;
+        self.error_ema = symthaea_core::math::ema_update(self.error_ema, abs_error, ema_alpha);
 
         // Apply correction
         let correction = self.apply_correction(error, lookahead);

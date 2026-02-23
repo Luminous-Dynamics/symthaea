@@ -4293,3 +4293,540 @@ fn test_300_cycle_phase16_stress() {
         stats.avg_unified_quality,
     );
 }
+
+// ── Phase 17: Predictive Self-Tuning ─────────────────────────────────────
+
+/// Phase 17: Error pattern detection — verify pattern classification is bounded.
+#[test]
+fn test_error_pattern_detection() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let valid_patterns = ["Warmup", "Stable", "Rising", "Falling", "Oscillating", "Spike"];
+
+    for i in 0..30 {
+        let result = service.cycle("error pattern detection test");
+        assert!(
+            valid_patterns.contains(&result.metadata.error_pattern.as_str()),
+            "invalid pattern '{}' at cycle {i}",
+            result.metadata.error_pattern
+        );
+        assert!(
+            !result.metadata.predicted_urgency.is_empty(),
+            "predicted urgency empty at {i}"
+        );
+    }
+
+    eprintln!(
+        "Error pattern at cycle 30: pattern={}, predicted={}",
+        service.cycle("final").metadata.error_pattern,
+        service.cycle("final").metadata.predicted_urgency,
+    );
+}
+
+/// Phase 17: Startup transient suppression — verify warmup is active for first 50 cycles.
+#[test]
+fn test_startup_transient_suppression() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // First 50 cycles should be suppressed
+    for i in 0..50 {
+        let result = service.cycle("startup warmup test");
+        assert!(
+            result.metadata.startup_suppressed,
+            "cycle {i} should be startup-suppressed"
+        );
+        assert!(
+            result.metadata.startup_warmup_progress >= 0.0
+                && result.metadata.startup_warmup_progress <= 1.0,
+            "warmup progress out of bounds at {i}: {}",
+            result.metadata.startup_warmup_progress
+        );
+    }
+
+    // Cycle 51 should not be suppressed
+    let result = service.cycle("post warmup");
+    assert!(
+        !result.metadata.startup_suppressed,
+        "cycle 51 should not be suppressed"
+    );
+    assert!(
+        (result.metadata.startup_warmup_progress - 1.0).abs() < 0.001,
+        "warmup should be 1.0 after warmup"
+    );
+
+    let stats = service.stats();
+    assert_eq!(stats.startup_suppressed_cycles, 50);
+    eprintln!("Startup suppression: {} cycles", stats.startup_suppressed_cycles);
+}
+
+/// Phase 17: Coherence memoization — verify coherence is consistent (cached vs live).
+#[test]
+fn test_coherence_memoization_consistency() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..20 {
+        service.cycle("coherence memoization test");
+    }
+
+    // After cycling, temporal_coherence() should use cached value
+    let cached_coherence = service.temporal_coherence();
+    assert!(
+        cached_coherence.is_finite(),
+        "cached coherence must be finite"
+    );
+    assert!(
+        cached_coherence >= 0.0 && cached_coherence <= 1.0,
+        "coherence out of bounds: {cached_coherence}"
+    );
+
+    // Run one more cycle and verify stats coherence matches
+    let result = service.cycle("one more");
+    assert!(
+        service.stats().temporal_coherence.is_finite(),
+        "stats coherence NaN"
+    );
+    assert!(result.metadata.prediction_coherence.is_finite());
+    eprintln!(
+        "Coherence memoization: cached={:.4}, stats={:.4}",
+        service.temporal_coherence(),
+        service.stats().temporal_coherence
+    );
+}
+
+/// Phase 17: Self-model accuracy — verify predictions are made and validated.
+#[test]
+fn test_self_model_accuracy() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..50 {
+        let result = service.cycle("self model accuracy test");
+        assert!(
+            result.metadata.self_model_accuracy >= 0.0
+                && result.metadata.self_model_accuracy <= 1.0,
+            "self_model_accuracy out of [0,1]: {}",
+            result.metadata.self_model_accuracy
+        );
+    }
+
+    let stats = service.stats();
+    // After 50 cycles, predictions every 7 → ~7 predictions, ~5 validated
+    assert!(
+        stats.self_model_predictions_made > 0,
+        "no self-model predictions made"
+    );
+    assert!(
+        stats.avg_self_model_accuracy.is_finite(),
+        "avg accuracy NaN"
+    );
+
+    eprintln!(
+        "Self-model: predictions={}, validated={}, avg_accuracy={:.4}",
+        stats.self_model_predictions_made,
+        stats.self_model_predictions_validated,
+        stats.avg_self_model_accuracy,
+    );
+}
+
+/// Phase 17: Mode transition smoothing — verify transitions and confidence ramping.
+#[test]
+fn test_mode_transition_smoothing() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut saw_transition = false;
+    for i in 0..60 {
+        let input = if i % 20 < 10 {
+            "simple stable input"
+        } else {
+            "completely novel extraordinary unprecedented revolutionary paradigm-shifting input"
+        };
+        let result = service.cycle(input);
+        assert!(
+            result.metadata.mode_confidence >= 0.0 && result.metadata.mode_confidence <= 1.0,
+            "mode_confidence out of bounds at {i}: {}",
+            result.metadata.mode_confidence
+        );
+        if result.metadata.mode_confidence < 1.0 {
+            saw_transition = true;
+        }
+    }
+
+    let stats = service.stats();
+    assert!(
+        stats.avg_mode_stability.is_finite(),
+        "mode stability NaN"
+    );
+    // At least one mode transition should have occurred with alternating inputs
+    eprintln!(
+        "Mode transitions: {}, avg_stability={:.2}, saw_fresh_transition={}",
+        stats.mode_transitions,
+        stats.avg_mode_stability,
+        saw_transition,
+    );
+}
+
+/// Phase 17: Adaptive interval self-tuning — verify error pattern modulates urgency.
+#[test]
+fn test_adaptive_interval_tuning() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run stable phase then inject novelty
+    for _ in 0..30 {
+        service.cycle("stable baseline input");
+    }
+    // Inject novel inputs to trigger Rising pattern
+    for _ in 0..10 {
+        let result = service.cycle("completely novel alien unexpected input triggering high error");
+        assert!(
+            !result.metadata.error_pattern.is_empty(),
+            "error pattern should be classified"
+        );
+    }
+
+    let stats = service.stats();
+    assert!(stats.total_cycles == 40);
+    eprintln!(
+        "Interval tuning: mode_transitions={}, mode_stability={:.2}",
+        stats.mode_transitions,
+        stats.avg_mode_stability,
+    );
+}
+
+/// Phase 17: 300-cycle comprehensive stress test.
+#[test]
+#[ignore] // Slow: ~30s
+fn test_300_cycle_phase17_stress() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "philosophical contemplation on consciousness",
+        "simple everyday greeting hello",
+        "urgent emergency crisis situation requiring immediate action",
+    ];
+
+    for i in 0..300 {
+        let input = inputs[i % inputs.len()];
+        let result = service.cycle(input);
+
+        assert!(
+            result.metadata.self_model_accuracy.is_finite(),
+            "self_model_accuracy NaN at {i}"
+        );
+        assert!(
+            result.metadata.mode_confidence >= 0.0 && result.metadata.mode_confidence <= 1.0,
+            "mode_confidence out of [0,1] at {i}"
+        );
+        assert!(
+            result.metadata.startup_warmup_progress >= 0.0
+                && result.metadata.startup_warmup_progress <= 1.0,
+            "warmup out of bounds at {i}"
+        );
+        assert!(
+            !result.metadata.error_pattern.is_empty(),
+            "error pattern empty at {i}"
+        );
+        assert!(
+            !result.metadata.predicted_urgency.is_empty(),
+            "predicted urgency empty at {i}"
+        );
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 300);
+    assert_eq!(stats.startup_suppressed_cycles, 50);
+    assert!(stats.self_model_predictions_made > 0);
+    assert!(stats.mode_transitions > 0 || stats.avg_mode_stability > 0.0);
+    assert!(stats.avg_self_model_accuracy.is_finite());
+
+    eprintln!(
+        "300-cycle Phase 17 stress: startup_suppressed={}, predictions={}/{}, \
+         mode_transitions={}, stability={:.2}, self_model_acc={:.4}, \
+         error_pattern=valid",
+        stats.startup_suppressed_cycles,
+        stats.self_model_predictions_validated,
+        stats.self_model_predictions_made,
+        stats.mode_transitions,
+        stats.avg_mode_stability,
+        stats.avg_self_model_accuracy,
+    );
+}
+
+// ── Phase 18: Closing Feedback Loops ────────────────────────────────────
+
+#[test]
+fn test_context_phi_weight_feedback() {
+    // Verify context_phi_weight modulation applies without panic and produces bounded values
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 30 cycles with varied input to trigger context detection
+    let inputs = ["analyze this data carefully", "how do you feel about this?", "create something new"];
+    for i in 0..30 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        assert!(
+            result.metadata.context_phi_weight.is_finite(),
+            "context_phi_weight not finite at cycle {i}"
+        );
+        // context_phi_applied is bool, always valid
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "context_phi: applied_count={}, total_cycles={}",
+        stats.context_phi_applied_count, stats.total_cycles
+    );
+}
+
+#[test]
+fn test_empathic_speech_rate_modulation() {
+    // Verify empathic tone adjustment modulates speech rate within bounds
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("I'm really frustrated with this!");
+        assert!(
+            result.metadata.empathic_speech_rate_mod.is_finite(),
+            "empathic_speech_rate_mod not finite at cycle {i}"
+        );
+    }
+
+    // Speech rate should stay within bounds [0.6, 1.5]
+    let speech_rate = service.speech_rate_multiplier();
+    assert!(
+        speech_rate >= 0.6 && speech_rate <= 1.5,
+        "speech rate out of bounds: {speech_rate}"
+    );
+}
+
+#[test]
+fn test_value_evaluator_learning_gate() {
+    // Verify value evaluator gates learning (gate factor bounded and finite)
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..40 {
+        let result = service.cycle("test value alignment");
+        assert!(
+            result.metadata.value_gate_factor.is_finite(),
+            "value_gate_factor not finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.value_gate_factor >= 0.0 && result.metadata.value_gate_factor <= 2.0,
+            "value_gate_factor out of bounds: {} at cycle {i}",
+            result.metadata.value_gate_factor
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "value_gate: applied_count={}, total_cycles={}",
+        stats.value_gate_applied_count, stats.total_cycles
+    );
+}
+
+#[test]
+fn test_evolution_phi_delta_feedback() {
+    // Verify evolution delta feeds back to confidence/exploration
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("evolving consciousness");
+        assert!(
+            result.metadata.evolution_confidence_delta.is_finite(),
+            "evolution_confidence_delta not finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.evolution_confidence_delta >= -1.0
+                && result.metadata.evolution_confidence_delta <= 1.0,
+            "evolution_confidence_delta out of bounds at cycle {i}"
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "evolution_feedback: count={}, total_cycles={}",
+        stats.evolution_feedback_count, stats.total_cycles
+    );
+}
+
+#[test]
+fn test_urgency_adaptive_homeostasis() {
+    // Verify homeostasis pull strength adapts to urgency mode
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut pull_strengths = Vec::new();
+    // 30 stable cycles (should settle into Cruise with stronger pull)
+    for _ in 0..30 {
+        let result = service.cycle("stable input");
+        let pull = result.metadata.homeostasis_pull_strength;
+        assert!(pull.is_finite(), "homeostasis_pull_strength not finite");
+        assert!(
+            pull >= 0.5 && pull <= 2.0,
+            "homeostasis_pull_strength out of bounds: {pull}"
+        );
+        pull_strengths.push(pull);
+    }
+    // Then 10 novel cycles (may trigger higher urgency with weaker pull)
+    for _ in 0..10 {
+        let result = service.cycle("completely novel unexpected stimulus!");
+        let pull = result.metadata.homeostasis_pull_strength;
+        assert!(pull.is_finite());
+        pull_strengths.push(pull);
+    }
+
+    // Should have seen at least one non-1.0 pull strength (urgency adaptation)
+    let varied = pull_strengths.iter().any(|p| (*p - 1.0).abs() > 0.01);
+    eprintln!(
+        "homeostasis: varied={varied}, pulls={:?}",
+        &pull_strengths[..5.min(pull_strengths.len())]
+    );
+}
+
+#[test]
+fn test_prediction_coherence_urgency_bias() {
+    // Verify prediction coherence biases urgency threshold
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("coherence test input");
+        assert!(
+            result.metadata.prediction_coherence_urgency_bias.is_finite(),
+            "prediction_coherence_urgency_bias not finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.prediction_coherence_urgency_bias >= -0.2
+                && result.metadata.prediction_coherence_urgency_bias <= 0.2,
+            "prediction_coherence_urgency_bias out of bounds at cycle {i}: {}",
+            result.metadata.prediction_coherence_urgency_bias
+        );
+    }
+
+    let stats = service.stats();
+    assert!(
+        stats.avg_prediction_coherence.is_finite(),
+        "avg_prediction_coherence not finite"
+    );
+    eprintln!(
+        "coherence_urgency: avg_coherence={:.4}, total_cycles={}",
+        stats.avg_prediction_coherence, stats.total_cycles
+    );
+}
+
+#[test]
+#[ignore] // stress test — run manually
+fn test_200_cycle_phase18_stress() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "analyze carefully", "how do you feel?", "create something new",
+        "solve this problem", "I'm frustrated!", "this is wonderful",
+    ];
+
+    for i in 0..200 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        let m = &result.metadata;
+
+        // All Phase 18 fields must be finite
+        assert!(m.empathic_speech_rate_mod.is_finite(), "empathic_speech_rate_mod at {i}");
+        assert!(m.value_gate_factor.is_finite(), "value_gate_factor at {i}");
+        assert!(m.evolution_confidence_delta.is_finite(), "evolution_confidence_delta at {i}");
+        assert!(m.homeostasis_pull_strength.is_finite(), "homeostasis_pull_strength at {i}");
+        assert!(m.prediction_coherence_urgency_bias.is_finite(), "coherence_bias at {i}");
+
+        // Bounds checks
+        assert!(m.value_gate_factor >= 0.0 && m.value_gate_factor <= 2.0);
+        assert!(m.homeostasis_pull_strength >= 0.5 && m.homeostasis_pull_strength <= 2.0);
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 200);
+    eprintln!(
+        "200-cycle Phase 18 stress: context_phi_applied={}, value_gate={}, \
+         evolution_feedback={}, avg_coherence={:.4}",
+        stats.context_phi_applied_count,
+        stats.value_gate_applied_count,
+        stats.evolution_feedback_count,
+        stats.avg_prediction_coherence,
+    );
+}

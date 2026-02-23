@@ -17,9 +17,9 @@
 use symthaea::consciousness::recursive_improvement::{
     ActionContext, DreamConfig, DreamMode, SemanticBridge, SemanticBridgeConfig, SemanticInput,
 };
+use symthaea::dynamics::AttractorConcept as CrystalizedConcept;
 use symthaea::hdc::binary_hv::BinaryHV;
 use symthaea::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
-use symthaea_dynamics::CrystalizedConcept;
 
 /// Decompose a crystallized concept into its constituent primitives
 fn decompose_concept(concept: &CrystalizedConcept) -> Vec<(String, PrimitiveTier, f32)> {

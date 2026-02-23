@@ -75,6 +75,9 @@ pub struct ReplVoiceConfig {
     /// Whether to use articulatory synthesis (vs simulated TTS)
     pub use_articulatory: bool,
 
+    /// Whether to use the LTC-driven vocal tract pipeline (requires `vocal-tract` feature)
+    pub use_ltc_pipeline: bool,
+
     /// Phoneme duration base (seconds)
     pub phoneme_duration_base: f32,
 }
@@ -89,6 +92,7 @@ impl Default for ReplVoiceConfig {
             consciousness_modulated: true,
             base_f0: 150.0, // Neutral voice
             use_articulatory: true,
+            use_ltc_pipeline: false,
             phoneme_duration_base: 0.08,
         }
     }
@@ -1367,6 +1371,10 @@ pub struct ReplVoiceOutput {
     #[cfg(feature = "audio")]
     audio_sink: Option<rodio::Sink>,
 
+    /// LTC-driven vocal tract pipeline (feature-gated)
+    #[cfg(feature = "vocal-tract")]
+    ltc_pipeline: Option<super::vocal_tract_fep::VocalTractPipeline>,
+
     /// Statistics
     total_utterances: u64,
     total_audio_seconds: f32,
@@ -1411,6 +1419,20 @@ impl ReplVoiceOutput {
         // Try to initialize audio
         let (audio_available, _audio_stream, _audio_sink) = Self::init_audio(&config);
 
+        // Initialize LTC pipeline if requested and feature-enabled
+        #[cfg(feature = "vocal-tract")]
+        let ltc_pipeline = if config.use_ltc_pipeline {
+            use symthaea_core::genesis::GenesisSeed;
+            let genesis = GenesisSeed::from_phrase("repl-vocal-tract");
+            let mut pipeline = super::vocal_tract_fep::VocalTractPipeline::new(&genesis);
+            // Pre-train on phoneme database for reasonable starting point
+            let db = super::formant_targets::FormantDatabase::new();
+            pipeline.controller.train_on_phoneme_targets(&genesis, &db, 3);
+            Some(pipeline)
+        } else {
+            None
+        };
+
         Ok(Self {
             config,
             articulatory,
@@ -1424,6 +1446,8 @@ impl ReplVoiceOutput {
             _audio_stream,
             #[cfg(feature = "audio")]
             audio_sink,
+            #[cfg(feature = "vocal-tract")]
+            ltc_pipeline,
             total_utterances: 0,
             total_audio_seconds: 0.0,
         })
@@ -1569,7 +1593,21 @@ impl ReplVoiceOutput {
 
         let start = std::time::Instant::now();
 
-        let samples = if self.config.use_articulatory {
+        #[cfg(feature = "vocal-tract")]
+        let use_ltc = self.ltc_pipeline.is_some();
+        #[cfg(not(feature = "vocal-tract"))]
+        let use_ltc = false;
+
+        let samples = if use_ltc {
+            #[cfg(feature = "vocal-tract")]
+            {
+                self.synthesize_ltc_pipeline(text)?
+            }
+            #[cfg(not(feature = "vocal-tract"))]
+            {
+                unreachable!()
+            }
+        } else if self.config.use_articulatory {
             self.synthesize_articulatory(text)?
         } else {
             self.synthesize_simple(text)?
@@ -1623,6 +1661,76 @@ impl ReplVoiceOutput {
         let samples = self.vocoder.synthesize(&frames);
 
         // Apply volume scaling
+        let scaled: Vec<f32> = samples.iter().map(|s| s * self.config.volume).collect();
+
+        Ok(scaled)
+    }
+
+    /// Synthesize using the LTC-driven vocal tract pipeline.
+    ///
+    /// Converts text → phonemes, then for each phoneme generates FormantFrames
+    /// via the HdcLtcUnifiedNetwork controller at 200Hz, feeding through the vocoder.
+    #[cfg(feature = "vocal-tract")]
+    fn synthesize_ltc_pipeline(&mut self, text: &str) -> Result<Vec<f32>> {
+        use super::vocal_tract_encoder::VoiceCognitiveState;
+        use symthaea_core::genesis::GenesisSeed;
+
+        let pipeline = self
+            .ltc_pipeline
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("LTC pipeline not initialized"))?;
+
+        let genesis = GenesisSeed::from_phrase("repl-vocal-tract");
+
+        // Convert text → phonemes
+        let base_duration = self.config.phoneme_duration_base / self.current_pacing.rate;
+        let phonemes = self.g2p.text_to_phonemes(text, base_duration);
+        if phonemes.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let speech_phonemes: Vec<TimedPhoneme> = phonemes
+            .into_iter()
+            .filter(|p| p.phoneme != "SIL")
+            .collect();
+
+        if speech_phonemes.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let dt = 1.0 / 200.0; // 200Hz frame rate
+        let mut all_frames = Vec::new();
+
+        // Build cognitive state from current pacing
+        let cognitive_state = VoiceCognitiveState {
+            prediction_error: 0.1,
+            emotional_valence: self.current_pacing.emotional_valence,
+            emotional_arousal: self.current_pacing.arousal,
+            unified_quality: 0.7,
+            epistemic_confidence: 0.8,
+            coherence_velocity: 0.0,
+            cross_agreement: 0.7,
+            consciousness_level: 0.6,
+            articulation_quality: 0.7,
+            rate_stability: 1.0,
+        };
+
+        for timed_phoneme in &speech_phonemes {
+            // Number of frames for this phoneme's duration
+            let n_frames = (timed_phoneme.duration / dt).max(1.0) as usize;
+
+            for _ in 0..n_frames {
+                let frame = pipeline.tick(&cognitive_state, None, dt);
+                all_frames.push(frame);
+            }
+        }
+
+        if all_frames.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Convert formants → audio via vocoder
+        let samples = self.vocoder.synthesize(&all_frames);
         let scaled: Vec<f32> = samples.iter().map(|s| s * self.config.volume).collect();
 
         Ok(scaled)
@@ -1842,5 +1950,35 @@ mod tests {
 
         let samples = voice.synthesize("").unwrap();
         assert!(samples.is_empty(), "Empty text should produce no samples");
+    }
+
+    #[test]
+    fn test_ltc_pipeline_config_default() {
+        let config = ReplVoiceConfig::default();
+        assert!(
+            !config.use_ltc_pipeline,
+            "LTC pipeline should be disabled by default"
+        );
+    }
+
+    #[cfg(feature = "vocal-tract")]
+    #[test]
+    fn test_ltc_pipeline_synthesis() {
+        let config = ReplVoiceConfig {
+            use_ltc_pipeline: true,
+            ..Default::default()
+        };
+        let mut voice = ReplVoiceOutput::new(config).unwrap();
+
+        let samples = voice.synthesize("Hello world.").unwrap();
+        assert!(!samples.is_empty(), "LTC pipeline should produce audio samples");
+
+        // Samples should be in reasonable range
+        for &s in &samples {
+            assert!(
+                s.is_finite(),
+                "All samples should be finite"
+            );
+        }
     }
 }

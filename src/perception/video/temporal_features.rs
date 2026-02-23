@@ -130,8 +130,8 @@ impl TemporalFeatureExtractor {
 
         // Update running averages
         self.avg_brightness =
-            self.avg_brightness * (1.0 - self.ema_alpha) + brightness * self.ema_alpha;
-        self.avg_motion = self.avg_motion * (1.0 - self.ema_alpha) + motion * self.ema_alpha;
+            symthaea_core::math::ema_update(self.avg_brightness, brightness, self.ema_alpha);
+        self.avg_motion = symthaea_core::math::ema_update(self.avg_motion, motion, self.ema_alpha);
         self.prev_brightness = brightness;
         self.frame_count += 1;
 
