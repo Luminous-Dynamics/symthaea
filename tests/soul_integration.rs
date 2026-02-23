@@ -8,9 +8,7 @@
 //! - Self-model inspection
 //! - WeaverActor discovery recording
 
-use symthaea::soul::{
-    ConceptDiscovery, CoreValue, Experience, Soul, SoulConfig, WeaverActor,
-};
+use symthaea::soul::{ConceptDiscovery, CoreValue, Experience, Soul, SoulConfig, WeaverActor};
 use symthaea_core::hdc::ContinuousHV;
 
 // ============================================================================
@@ -21,7 +19,11 @@ use symthaea_core::hdc::ContinuousHV;
 fn test_soul_default_has_seven_harmonies() {
     let soul = Soul::default();
     let values: Vec<_> = soul.core_values().collect();
-    assert_eq!(values.len(), 7, "Default soul should have 7 core values (Seven Harmonies)");
+    assert_eq!(
+        values.len(),
+        7,
+        "Default soul should have 7 core values (Seven Harmonies)"
+    );
     assert!(
         soul.get_value("resonance").is_some(),
         "Default soul should include 'resonance' value"
@@ -94,7 +96,8 @@ fn test_experience_integration_updates_stats() {
         });
     }
     assert_eq!(
-        soul.stats().experiences_integrated, 3,
+        soul.stats().experiences_integrated,
+        3,
         "Should have integrated exactly 3 experiences"
     );
     assert!(
@@ -133,7 +136,11 @@ fn test_update_value_blends_embedding() {
     let new_hv = ContinuousHV::random(512, 999);
     soul.update_value("resonance", new_hv);
 
-    assert_eq!(soul.stats().value_updates, 1, "Should record 1 value update");
+    assert_eq!(
+        soul.stats().value_updates,
+        1,
+        "Should record 1 value update"
+    );
     let updated = &soul.get_value("resonance").unwrap().embedding;
     // The embedding should have changed (blended, not replaced entirely)
     assert_ne!(
@@ -154,7 +161,11 @@ fn test_add_custom_value() {
         "Custom value should be retrievable"
     );
     let values: Vec<_> = soul.core_values().collect();
-    assert_eq!(values.len(), 8, "Should now have 8 values (7 default + 1 custom)");
+    assert_eq!(
+        values.len(),
+        8,
+        "Should now have 8 values (7 default + 1 custom)"
+    );
 }
 
 // ============================================================================

@@ -3,14 +3,18 @@
 //! Tests the full widget↔Nix bidirectional pipeline: binding registration,
 //! change handling, Nix sync, semantic search, and constraint validation.
 
-use symthaea::gui_bridge::*;
 use symthaea::gui_bridge::widget_mapper::WidgetValueType;
+use symthaea::gui_bridge::*;
 
 #[test]
 fn test_bridge_creation() {
     let bridge = GuiBridge::new();
-    assert!(bridge.bindings_for_category(ConfigCategory::Services).is_empty());
-    assert!(bridge.bindings_for_category(ConfigCategory::Packages).is_empty());
+    assert!(bridge
+        .bindings_for_category(ConfigCategory::Services)
+        .is_empty());
+    assert!(bridge
+        .bindings_for_category(ConfigCategory::Packages)
+        .is_empty());
 }
 
 #[test]
@@ -41,13 +45,13 @@ fn test_widget_change_produces_mapping() {
 
     bridge.register_binding(binding);
 
-    let result = bridge.on_widget_change(
-        WidgetId::new("sshd_toggle"),
-        WidgetValue::Bool(true),
-    );
+    let result = bridge.on_widget_change(WidgetId::new("sshd_toggle"), WidgetValue::Bool(true));
     // Should produce a mapping result (success or validation)
     assert!(
-        matches!(result, MappingResult::Success { .. } | MappingResult::ValidationFailed { .. }),
+        matches!(
+            result,
+            MappingResult::Success { .. } | MappingResult::ValidationFailed { .. }
+        ),
         "Expected Success or ValidationFailed, got {result:?}"
     );
 }
@@ -178,7 +182,11 @@ fn test_widget_mapper_bidirectional() {
     let nix = mapper.widget_to_nix(&binding, &WidgetValue::Bool(true));
     let back = mapper.nix_to_widget(&binding, &nix);
 
-    assert_eq!(back, WidgetValue::Bool(true), "Roundtrip should preserve Bool(true)");
+    assert_eq!(
+        back,
+        WidgetValue::Bool(true),
+        "Roundtrip should preserve Bool(true)"
+    );
 }
 
 #[test]

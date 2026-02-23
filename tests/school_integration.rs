@@ -74,15 +74,14 @@ fn test_recommend_next_with_objectives() {
 
     school.add_curriculum(curriculum).unwrap();
 
-    let rec = school.recommend_next().expect("should produce recommendation");
+    let rec = school
+        .recommend_next()
+        .expect("should produce recommendation");
     assert!(
         rec.predicted_phi_gain.is_finite(),
         "phi_gain should be finite"
     );
-    assert!(
-        rec.confidence.is_finite(),
-        "confidence should be finite"
-    );
+    assert!(rec.confidence.is_finite(), "confidence should be finite");
 }
 
 #[test]

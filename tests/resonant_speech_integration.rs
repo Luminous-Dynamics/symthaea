@@ -18,9 +18,13 @@ fn test_speech_creation_and_generation() {
     let mut speech = ResonantSpeech::new();
     let response = speech.generate("Hello", "greeting");
 
-    assert!(!response.is_empty(), "Generated response should be non-empty");
+    assert!(
+        !response.is_empty(),
+        "Generated response should be non-empty"
+    );
     assert_eq!(
-        speech.stats().total_responses, 1,
+        speech.stats().total_responses,
+        1,
         "Should have 1 total response"
     );
 }
@@ -48,10 +52,7 @@ fn test_response_profile_scales_with_load() {
         low_profile.max_sentences,
         overloaded_profile.max_sentences
     );
-    assert!(
-        low_profile.use_examples,
-        "Low load should allow examples"
-    );
+    assert!(low_profile.use_examples, "Low load should allow examples");
     assert!(
         !overloaded_profile.use_examples,
         "Overloaded should not use examples"

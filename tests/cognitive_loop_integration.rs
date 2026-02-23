@@ -4307,7 +4307,14 @@ fn test_error_pattern_detection() {
     })
     .unwrap();
 
-    let valid_patterns = ["Warmup", "Stable", "Rising", "Falling", "Oscillating", "Spike"];
+    let valid_patterns = [
+        "Warmup",
+        "Stable",
+        "Rising",
+        "Falling",
+        "Oscillating",
+        "Spike",
+    ];
 
     for i in 0..30 {
         let result = service.cycle("error pattern detection test");
@@ -4368,7 +4375,10 @@ fn test_startup_transient_suppression() {
 
     let stats = service.stats();
     assert_eq!(stats.startup_suppressed_cycles, 50);
-    eprintln!("Startup suppression: {} cycles", stats.startup_suppressed_cycles);
+    eprintln!(
+        "Startup suppression: {} cycles",
+        stats.startup_suppressed_cycles
+    );
 }
 
 /// Phase 17: Coherence memoization — verify coherence is consistent (cached vs live).
@@ -4481,16 +4491,11 @@ fn test_mode_transition_smoothing() {
     }
 
     let stats = service.stats();
-    assert!(
-        stats.avg_mode_stability.is_finite(),
-        "mode stability NaN"
-    );
+    assert!(stats.avg_mode_stability.is_finite(), "mode stability NaN");
     // At least one mode transition should have occurred with alternating inputs
     eprintln!(
         "Mode transitions: {}, avg_stability={:.2}, saw_fresh_transition={}",
-        stats.mode_transitions,
-        stats.avg_mode_stability,
-        saw_transition,
+        stats.mode_transitions, stats.avg_mode_stability, saw_transition,
     );
 }
 
@@ -4522,8 +4527,7 @@ fn test_adaptive_interval_tuning() {
     assert!(stats.total_cycles == 40);
     eprintln!(
         "Interval tuning: mode_transitions={}, mode_stability={:.2}",
-        stats.mode_transitions,
-        stats.avg_mode_stability,
+        stats.mode_transitions, stats.avg_mode_stability,
     );
 }
 
@@ -4606,7 +4610,11 @@ fn test_context_phi_weight_feedback() {
     .unwrap();
 
     // Run 30 cycles with varied input to trigger context detection
-    let inputs = ["analyze this data carefully", "how do you feel about this?", "create something new"];
+    let inputs = [
+        "analyze this data carefully",
+        "how do you feel about this?",
+        "create something new",
+    ];
     for i in 0..30 {
         let result = service.cycle(inputs[i % inputs.len()]);
         assert!(
@@ -4765,7 +4773,10 @@ fn test_prediction_coherence_urgency_bias() {
     for i in 0..30 {
         let result = service.cycle("coherence test input");
         assert!(
-            result.metadata.prediction_coherence_urgency_bias.is_finite(),
+            result
+                .metadata
+                .prediction_coherence_urgency_bias
+                .is_finite(),
             "prediction_coherence_urgency_bias not finite at cycle {i}"
         );
         assert!(
@@ -4799,8 +4810,12 @@ fn test_200_cycle_phase18_stress() {
     .unwrap();
 
     let inputs = [
-        "analyze carefully", "how do you feel?", "create something new",
-        "solve this problem", "I'm frustrated!", "this is wonderful",
+        "analyze carefully",
+        "how do you feel?",
+        "create something new",
+        "solve this problem",
+        "I'm frustrated!",
+        "this is wonderful",
     ];
 
     for i in 0..200 {
@@ -4808,11 +4823,23 @@ fn test_200_cycle_phase18_stress() {
         let m = &result.metadata;
 
         // All Phase 18 fields must be finite
-        assert!(m.empathic_speech_rate_mod.is_finite(), "empathic_speech_rate_mod at {i}");
+        assert!(
+            m.empathic_speech_rate_mod.is_finite(),
+            "empathic_speech_rate_mod at {i}"
+        );
         assert!(m.value_gate_factor.is_finite(), "value_gate_factor at {i}");
-        assert!(m.evolution_confidence_delta.is_finite(), "evolution_confidence_delta at {i}");
-        assert!(m.homeostasis_pull_strength.is_finite(), "homeostasis_pull_strength at {i}");
-        assert!(m.prediction_coherence_urgency_bias.is_finite(), "coherence_bias at {i}");
+        assert!(
+            m.evolution_confidence_delta.is_finite(),
+            "evolution_confidence_delta at {i}"
+        );
+        assert!(
+            m.homeostasis_pull_strength.is_finite(),
+            "homeostasis_pull_strength at {i}"
+        );
+        assert!(
+            m.prediction_coherence_urgency_bias.is_finite(),
+            "coherence_bias at {i}"
+        );
 
         // Bounds checks
         assert!(m.value_gate_factor >= 0.0 && m.value_gate_factor <= 2.0);
@@ -5014,8 +5041,12 @@ fn test_200_cycle_phase19_stress() {
     .unwrap();
 
     let inputs = [
-        "analyze carefully", "how do you feel?", "create something new",
-        "solve this problem", "love and harmony", "deep reasoning",
+        "analyze carefully",
+        "how do you feel?",
+        "create something new",
+        "solve this problem",
+        "love and harmony",
+        "deep reasoning",
     ];
 
     for i in 0..200 {
@@ -5024,7 +5055,10 @@ fn test_200_cycle_phase19_stress() {
 
         // All Phase 19 fields must be finite/valid
         assert!(m.love_resonance_boost.is_finite(), "love_resonance at {i}");
-        assert!(m.attention_shift_applied.is_finite(), "attention_shift at {i}");
+        assert!(
+            m.attention_shift_applied.is_finite(),
+            "attention_shift at {i}"
+        );
 
         // Bounds checks
         assert!(m.love_resonance_boost >= 0.0 && m.love_resonance_boost <= 0.1);
