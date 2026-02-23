@@ -6,8 +6,9 @@
 //! - Perturbation recovery metrics
 //! - Comparison against published SAC/TD3 baselines
 
+use crate::gait::GaitAnalyzer;
 use crate::reward;
-use crate::types::{HumanoidCommand, HumanoidState, HumanoidTask};
+use crate::types::{HumanoidCommand, HumanoidState, HumanoidTask, NUM_ACTUATORS};
 
 /// DMC benchmark result for a single evaluation run.
 #[derive(Debug, Clone)]
@@ -30,6 +31,20 @@ pub struct DmcBenchmarkResult {
     pub steps_to_fall: usize,
     /// Total steps evaluated.
     pub total_steps: usize,
+    /// Average foot clearance during swing phases (meters).
+    pub avg_foot_clearance: f64,
+    /// Minimum foot clearance across all strides (meters).
+    pub min_foot_clearance: f64,
+    /// Average stride length (meters).
+    pub avg_stride_length: f64,
+    /// Average cadence (steps per second).
+    pub avg_cadence: f64,
+    /// Gait asymmetry: |R-L|/(R+L), 0 = symmetric.
+    pub gait_asymmetry: f64,
+    /// Step regularity: exp(-CV) of step intervals.
+    pub step_regularity: f64,
+    /// Cost of Transport: energy / (mass × distance).
+    pub cost_of_transport: f64,
 }
 
 /// Published baseline scores for DMC Humanoid tasks.
@@ -90,6 +105,13 @@ pub fn evaluate_episode(
             fell: true,
             steps_to_fall: 0,
             total_steps: 0,
+            avg_foot_clearance: 0.0,
+            min_foot_clearance: 0.0,
+            avg_stride_length: 0.0,
+            avg_cadence: 0.0,
+            gait_asymmetry: 0.0,
+            step_regularity: 0.0,
+            cost_of_transport: 0.0,
         };
     }
 
@@ -100,6 +122,12 @@ pub fn evaluate_episode(
     let mut total_speed = 0.0;
     let mut fell = false;
     let mut steps_to_fall = n;
+
+    // Gait quality tracking
+    let mut gait_analyzer = GaitAnalyzer::new();
+    let mut horizontal_pos = [0.0f64; 2];
+    let mut total_mechanical_energy = 0.0f64;
+    let dt = 0.025; // standard DMC timestep
 
     for i in 0..n {
         let target_speed = match task {
@@ -123,6 +151,15 @@ pub fn evaluate_episode(
             fell = true;
             steps_to_fall = i;
         }
+
+        // Gait quality tracking
+        horizontal_pos[0] += states[i].root_linear_velocity[0] * dt;
+        horizontal_pos[1] += states[i].root_linear_velocity[1] * dt;
+        for j in 0..NUM_ACTUATORS {
+            total_mechanical_energy +=
+                (commands[i].torques[j] as f64 * states[i].joint_velocities[j]).abs() * dt;
+        }
+        gait_analyzer.update_with_position(&states[i], horizontal_pos, states[i].timestamp);
     }
 
     let mean_return: f64 = rewards.iter().sum::<f64>() / n as f64;
@@ -135,6 +172,14 @@ pub fn evaluate_episode(
         variance.sqrt()
     };
 
+    let gait_summary = gait_analyzer.summary();
+    let total_distance = (horizontal_pos[0].powi(2) + horizontal_pos[1].powi(2)).sqrt();
+    let cost_of_transport = if total_distance > 0.01 {
+        total_mechanical_energy / (70.0 * total_distance)
+    } else {
+        0.0
+    };
+
     DmcBenchmarkResult {
         mean_return,
         return_std,
@@ -145,6 +190,13 @@ pub fn evaluate_episode(
         fell,
         steps_to_fall,
         total_steps: n,
+        avg_foot_clearance: gait_summary.avg_clearance,
+        min_foot_clearance: gait_summary.min_clearance,
+        avg_stride_length: gait_summary.avg_stride_length,
+        avg_cadence: gait_summary.avg_cadence,
+        gait_asymmetry: gait_summary.gait_asymmetry,
+        step_regularity: gait_summary.step_regularity,
+        cost_of_transport,
     }
 }
 
@@ -164,7 +216,14 @@ pub fn format_comparison(result: &DmcBenchmarkResult, task: &HumanoidTask) -> St
          Uprightness:  {:.3}\n\
          Speed:        {:.3} m/s\n\
          Fell:         {}\n\
-         Steps:        {}",
+         Steps:        {}\n\
+         ───────────────────────────────\n\
+         Gait Quality:\n\
+           Clearance:    {:.4}m (min {:.4}m)\n\
+           Stride:       {:.3}m @ {:.1} steps/s\n\
+           Asymmetry:    {:.4}\n\
+           Regularity:   {:.3}\n\
+           CoT:          {:.3}",
         task,
         result.mean_return,
         baselines.sac_return,
@@ -176,6 +235,13 @@ pub fn format_comparison(result: &DmcBenchmarkResult, task: &HumanoidTask) -> St
         result.mean_horizontal_speed,
         result.fell,
         result.total_steps,
+        result.avg_foot_clearance,
+        result.min_foot_clearance,
+        result.avg_stride_length,
+        result.avg_cadence,
+        result.gait_asymmetry,
+        result.step_regularity,
+        result.cost_of_transport,
     )
 }
 
@@ -247,9 +313,71 @@ mod tests {
             fell: false,
             steps_to_fall: 1000,
             total_steps: 1000,
+            avg_foot_clearance: 0.0,
+            min_foot_clearance: 0.0,
+            avg_stride_length: 0.0,
+            avg_cadence: 0.0,
+            gait_asymmetry: 0.0,
+            step_regularity: 0.0,
+            cost_of_transport: 0.0,
         };
         let output = format_comparison(&result, &HumanoidTask::Stand);
         assert!(output.contains("HDC-LTC-FEP"));
         assert!(output.contains("0.850"));
+    }
+
+    #[test]
+    fn test_benchmark_gait_fields() {
+        let states: Vec<HumanoidState> = (0..100).map(|_| HumanoidState::standing()).collect();
+        let commands: Vec<HumanoidCommand> = (0..100).map(|_| HumanoidCommand::zero()).collect();
+
+        let result = evaluate_episode(&states, &commands, &HumanoidTask::Stand);
+        // All gait fields should be finite (even if zero for standing)
+        assert!(result.avg_foot_clearance.is_finite());
+        assert!(result.min_foot_clearance.is_finite());
+        assert!(result.avg_stride_length.is_finite());
+        assert!(result.avg_cadence.is_finite());
+        assert!(result.gait_asymmetry.is_finite());
+        assert!(result.step_regularity.is_finite());
+        assert!(result.cost_of_transport.is_finite());
+    }
+
+    #[test]
+    fn test_format_comparison_extended() {
+        let result = DmcBenchmarkResult {
+            mean_return: 0.75,
+            return_std: 0.15,
+            standing_fraction: 0.9,
+            mean_head_height: 1.35,
+            mean_uprightness: 0.95,
+            mean_horizontal_speed: 0.8,
+            fell: false,
+            steps_to_fall: 1000,
+            total_steps: 1000,
+            avg_foot_clearance: 0.06,
+            min_foot_clearance: 0.03,
+            avg_stride_length: 0.65,
+            avg_cadence: 1.8,
+            gait_asymmetry: 0.05,
+            step_regularity: 0.85,
+            cost_of_transport: 3.2,
+        };
+        let output = format_comparison(&result, &HumanoidTask::Walk);
+        assert!(
+            output.contains("Gait Quality"),
+            "Output should contain Gait Quality section"
+        );
+        assert!(
+            output.contains("Clearance"),
+            "Output should contain Clearance metric"
+        );
+        assert!(
+            output.contains("Regularity"),
+            "Output should contain Regularity metric"
+        );
+        assert!(
+            output.contains("CoT"),
+            "Output should contain CoT metric"
+        );
     }
 }

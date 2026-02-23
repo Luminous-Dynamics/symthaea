@@ -17,6 +17,7 @@ use symthaea_core::hdc::ContinuousHV;
 use crate::controller::HumanoidController;
 use crate::encoder::HumanoidHdcEncoder;
 use crate::fep_agent::{ActiveInferenceHumanoidAgent, HumanoidFepConfig};
+use crate::gait::GaitAnalyzer;
 use crate::reward;
 use crate::simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
 use crate::types::*;
@@ -46,6 +47,22 @@ pub struct EpisodeMetrics {
     pub total_steps: usize,
     /// Task for this episode.
     pub task: HumanoidTask,
+    /// Average maximum foot clearance during swing phases (meters).
+    pub avg_foot_clearance: f64,
+    /// Minimum maximum foot clearance across all strides (meters).
+    pub min_foot_clearance: f64,
+    /// Average stride length in meters.
+    pub avg_stride_length: f64,
+    /// Average cadence in steps per second.
+    pub avg_cadence: f64,
+    /// Gait asymmetry (0 = symmetric).
+    pub gait_asymmetry: f64,
+    /// Cost of Transport: energy / (mass × distance). Normalized proxy, not SI.
+    pub cost_of_transport: f64,
+    /// Step regularity: exp(-CV) of step intervals (1.0 = perfectly regular).
+    pub step_regularity: f64,
+    /// Foot strike quality: proper heel-strike dorsiflexion + toe-off plantarflexion.
+    pub foot_strike_quality: f64,
     /// Per-step telemetry (populated when collect_telemetry is true).
     pub telemetry: Vec<HumanoidTelemetry>,
 }
@@ -366,6 +383,14 @@ impl HumanoidTrainer {
             1.0f32
         };
 
+        // Gait quality analyzer (foot clearance + stride tracking)
+        let mut gait_analyzer = GaitAnalyzer::new();
+
+        // Horizontal position accumulator (from velocity × dt)
+        let mut horizontal_pos = [0.0f64; 2];
+        // Mechanical energy accumulator for Cost of Transport
+        let mut total_mechanical_energy = 0.0f64;
+
         // Speed-dependent gait frequency (biomechanical: cadence increases with speed)
         // Walk: 1.2 Hz at 0 m/s → 1.8 Hz at 1 m/s
         // Run: 2.0 Hz at 1 m/s → 2.6 Hz at 3 m/s
@@ -410,6 +435,19 @@ impl HumanoidTrainer {
 
             physics.step(&command, dt);
 
+            // Update position, energy, and gait analyzer with post-step state
+            {
+                let post_state = physics.state();
+                horizontal_pos[0] += post_state.root_linear_velocity[0] * dt;
+                horizontal_pos[1] += post_state.root_linear_velocity[1] * dt;
+                for i in 0..NUM_ACTUATORS {
+                    total_mechanical_energy +=
+                        (command.torques[i] as f64 * post_state.joint_velocities[i]).abs() * dt;
+                }
+                gait_analyzer
+                    .update_with_position(post_state, horizontal_pos, post_state.timestamp);
+            }
+
             // Track metrics
             let standing_r = reward::standing_reward(&state);
             let episode_r = reward::episode_reward(&state, &command, &task, target_speed);
@@ -452,6 +490,8 @@ impl HumanoidTrainer {
                     tau_factor: current_tau_factor,
                     learning_rate: controller.learning_rate(),
                     control_effort: command.control_effort(),
+                    r_foot_z: state.extremities[8],
+                    l_foot_z: state.extremities[11],
                 });
             }
 
@@ -521,6 +561,17 @@ impl HumanoidTrainer {
 
         let n = steps_completed.max(1) as f64;
 
+        let gait_summary = gait_analyzer.summary();
+
+        // Cost of Transport: energy / (mass × distance)
+        let total_distance =
+            (horizontal_pos[0].powi(2) + horizontal_pos[1].powi(2)).sqrt();
+        let cost_of_transport = if total_distance > 0.01 {
+            total_mechanical_energy / (70.0 * total_distance)
+        } else {
+            0.0
+        };
+
         EpisodeMetrics {
             episode,
             avg_standing_reward: total_standing_reward / n,
@@ -537,6 +588,14 @@ impl HumanoidTrainer {
             exploration_count,
             total_steps: steps_completed,
             task,
+            avg_foot_clearance: gait_summary.avg_clearance,
+            min_foot_clearance: gait_summary.min_clearance,
+            avg_stride_length: gait_summary.avg_stride_length,
+            avg_cadence: gait_summary.avg_cadence,
+            gait_asymmetry: gait_summary.gait_asymmetry,
+            cost_of_transport,
+            step_regularity: gait_summary.step_regularity,
+            foot_strike_quality: gait_summary.foot_strike_quality,
             telemetry,
         }
     }
@@ -549,7 +608,18 @@ impl HumanoidTrainer {
         fep_agent: &mut ActiveInferenceHumanoidAgent,
         episode: usize,
     ) -> EpisodeMetrics {
-        let mut physics = SimpleHumanoidSimulator::new();
+        let noise_scale = if self.config.progressive_noise && self.config.num_episodes > 1 {
+            let progress = episode as f64 / (self.config.num_episodes - 1) as f64;
+            progress.clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        let mut physics = SimpleHumanoidSimulator::new()
+            .with_domain_randomization(self.config.domain_randomization)
+            .with_actuator_noise(self.config.actuator_noise_std)
+            .with_observation_noise(self.config.observation_noise_std)
+            .with_terrain_variation(self.config.terrain_variation)
+            .with_noise_scale(noise_scale);
         self.run_episode_with_sim(encoder, controller, fep_agent, &mut physics, episode)
     }
 
@@ -721,11 +791,11 @@ impl HumanoidTrainer {
             if !metrics.telemetry.is_empty() {
                 let step_path = format!("{}/episode_{:04}.csv", output_dir, ep);
                 let mut csv = String::from(
-                    "step,time,head_height,uprightness,horizontal_speed,standing_reward,episode_reward,free_energy,tau_factor,learning_rate,control_effort\n",
+                    "step,time,head_height,uprightness,horizontal_speed,standing_reward,episode_reward,free_energy,tau_factor,learning_rate,control_effort,r_foot_z,l_foot_z\n",
                 );
                 for t in &metrics.telemetry {
                     csv.push_str(&format!(
-                        "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}\n",
+                        "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}\n",
                         t.step,
                         t.time,
                         t.head_height,
@@ -737,6 +807,8 @@ impl HumanoidTrainer {
                         t.tau_factor,
                         t.learning_rate,
                         t.control_effort,
+                        t.r_foot_z,
+                        t.l_foot_z,
                     ));
                 }
                 let _ = std::fs::write(&step_path, csv);
@@ -924,8 +996,16 @@ mod tests {
                 avg_horizontal_speed: 0.0,
                 avg_control_effort: 0.3,
                 exploration_count: 0,
-                total_steps: config.steps_per_episode, // Full episode (no early term)
+                total_steps: config.steps_per_episode,
                 task: HumanoidTask::Stand,
+                avg_foot_clearance: 0.0,
+                min_foot_clearance: 0.0,
+                avg_stride_length: 0.0,
+                avg_cadence: 0.0,
+                gait_asymmetry: 0.0,
+                cost_of_transport: 0.0,
+                step_regularity: 0.0,
+                foot_strike_quality: 0.0,
                 telemetry: Vec::new(),
             };
             if trainer.check_phase_advance(ep, &metrics) {
@@ -971,6 +1051,14 @@ mod tests {
             exploration_count: 0,
             total_steps: config.steps_per_episode,
             task: HumanoidTask::Stand,
+            avg_foot_clearance: 0.0,
+            min_foot_clearance: 0.0,
+            avg_stride_length: 0.0,
+            avg_cadence: 0.0,
+            gait_asymmetry: 0.0,
+            cost_of_transport: 0.0,
+            step_regularity: 0.0,
+            foot_strike_quality: 0.0,
             telemetry: Vec::new(),
         };
         let advanced = trainer.check_phase_advance(5, &metrics);
@@ -1069,6 +1157,67 @@ mod tests {
         }
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_cost_of_transport_computed() {
+        let config = HumanoidConfig {
+            num_episodes: 1,
+            steps_per_episode: 100,
+            task: HumanoidTask::Walk,
+            target_speed: Some(1.0),
+            ..HumanoidConfig::default()
+        };
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let trainer = HumanoidTrainer::new(config.clone());
+
+        let mut encoder = HumanoidHdcEncoder::new(&genesis, config.num_levels);
+        let mut controller = HumanoidController::new(&genesis, &config);
+        let mut fep_agent =
+            ActiveInferenceHumanoidAgent::new(HumanoidFepConfig::default(), HumanoidTask::Walk);
+
+        let metrics = trainer.run_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
+
+        assert!(
+            metrics.cost_of_transport.is_finite(),
+            "CoT should be finite: {}",
+            metrics.cost_of_transport
+        );
+        assert!(
+            metrics.cost_of_transport >= 0.0,
+            "CoT should be non-negative: {}",
+            metrics.cost_of_transport
+        );
+    }
+
+    #[test]
+    fn test_cost_of_transport_zero_for_standing() {
+        // With domain randomization and actuator noise disabled, standing
+        // should produce minimal horizontal drift → CoT near 0.
+        let config = HumanoidConfig {
+            num_episodes: 1,
+            steps_per_episode: 50,
+            task: HumanoidTask::Stand,
+            domain_randomization: false,
+            actuator_noise_std: 0.0,
+            ..HumanoidConfig::default()
+        };
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let trainer = HumanoidTrainer::new(config.clone());
+
+        let mut encoder = HumanoidHdcEncoder::new(&genesis, config.num_levels);
+        let mut controller = HumanoidController::new(&genesis, &config);
+        let mut fep_agent =
+            ActiveInferenceHumanoidAgent::new(HumanoidFepConfig::default(), HumanoidTask::Stand);
+
+        let metrics = trainer.run_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
+
+        // Standing with no noise: minimal drift, CoT should be very low
+        assert!(
+            metrics.cost_of_transport < 5.0,
+            "Standing CoT should be low: {}",
+            metrics.cost_of_transport
+        );
     }
 
     #[test]

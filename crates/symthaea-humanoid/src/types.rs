@@ -314,6 +314,10 @@ pub struct HumanoidTelemetry {
     pub learning_rate: f32,
     /// Mean absolute torque.
     pub control_effort: f32,
+    /// Current right foot z-height.
+    pub r_foot_z: f64,
+    /// Current left foot z-height.
+    pub l_foot_z: f64,
 }
 
 /// Configuration for the humanoid training system.
@@ -361,6 +365,16 @@ pub struct HumanoidConfig {
     pub mastery_streak_required: usize,
     /// Exploration decay rate for the FEP agent's leaky accumulator.
     pub exploration_decay_rate: f64,
+    /// Standard deviation of actuator noise for sim-to-real transfer (default: 0.03).
+    pub actuator_noise_std: f64,
+    /// Enable per-episode domain randomization of body parameters (default: true).
+    pub domain_randomization: bool,
+    /// Standard deviation of observation noise for sim-to-real transfer (default: 0.01).
+    pub observation_noise_std: f64,
+    /// Enable progressive noise curriculum: noise ramps 0→100% over training (default: true).
+    pub progressive_noise: bool,
+    /// Enable per-episode terrain variation (slope + compliance) (default: false).
+    pub terrain_variation: bool,
 }
 
 impl Default for HumanoidConfig {
@@ -387,6 +401,11 @@ impl Default for HumanoidConfig {
             standing_mastery_threshold: 0.85,
             mastery_streak_required: 3,
             exploration_decay_rate: 0.5,
+            actuator_noise_std: 0.03,
+            domain_randomization: true,
+            observation_noise_std: 0.01,
+            progressive_noise: true,
+            terrain_variation: false,
         }
     }
 }
