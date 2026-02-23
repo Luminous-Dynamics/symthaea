@@ -69,6 +69,8 @@ pub struct VehicleTrainer {
     road: Road,
     /// Optional swarm config — when set, peer vehicles populate mesh channels.
     swarm_config: Option<SwarmConfig>,
+    /// Training-level perturbations (swarm scenario events like lead-brake cascades).
+    training_perturbations: Vec<TrainingPerturbation>,
 }
 
 impl VehicleTrainer {
@@ -83,6 +85,7 @@ impl VehicleTrainer {
             perturbation_schedule: PerturbationSchedule::none(),
             road: Road::straight(),
             swarm_config: None,
+            training_perturbations: Vec::new(),
         }
     }
 
@@ -97,6 +100,7 @@ impl VehicleTrainer {
             perturbation_schedule: PerturbationSchedule::none(),
             road: Road::straight(),
             swarm_config: None,
+            training_perturbations: Vec::new(),
         }
     }
 
@@ -112,6 +116,7 @@ impl VehicleTrainer {
             perturbation_schedule: PerturbationSchedule::none(),
             road: Road::straight(),
             swarm_config: None,
+            training_perturbations: Vec::new(),
         })
     }
 
@@ -130,6 +135,12 @@ impl VehicleTrainer {
     /// Set a swarm config — peer vehicles will populate the 4 mesh channels during training.
     pub fn with_swarm(mut self, swarm_config: SwarmConfig) -> Self {
         self.swarm_config = Some(swarm_config);
+        self
+    }
+
+    /// Set training-level perturbations (swarm scenario events).
+    pub fn with_training_perturbations(mut self, perturbations: Vec<TrainingPerturbation>) -> Self {
+        self.training_perturbations = perturbations;
         self
     }
 
@@ -153,27 +164,28 @@ impl VehicleTrainer {
 
         let progress = episode as f64 / (total - 1) as f64;
         let target_speed = self.config.effective_target_speed();
+        let task = self.config.task;
 
         if progress < 0.4 {
             // Phase 1: Heavy PD guidance, learn to cruise
             let phase_progress = progress / 0.4;
             let pd_weight = 0.8 - 0.4 * phase_progress as f32;
-            (VehicleTask::LaneKeep, pd_weight, target_speed, false)
+            (task, pd_weight, target_speed, false)
         } else if progress < 0.7 {
             // Phase 2: Autonomy ramp, PD decaying
             let phase_progress = (progress - 0.4) / 0.3;
             let pd_weight = 0.4 - 0.3 * phase_progress as f32;
-            (VehicleTask::LaneKeep, pd_weight, target_speed, false)
+            (task, pd_weight, target_speed, false)
         } else if progress < 0.9 {
             // Phase 3: Perturbations start, PD minimal
             let phase_progress = (progress - 0.7) / 0.2;
             let pd_weight = 0.10 - 0.05 * phase_progress as f32;
-            (VehicleTask::LaneKeep, pd_weight, target_speed, true)
+            (task, pd_weight, target_speed, true)
         } else {
             // Phase 4: Full gauntlet, zero PD
             let phase_progress = (progress - 0.9) / 0.1;
             let pd_weight = 0.05 * (1.0 - phase_progress as f32);
-            (VehicleTask::LaneKeep, pd_weight, target_speed, true)
+            (task, pd_weight, target_speed, true)
         }
     }
 
@@ -190,8 +202,15 @@ impl VehicleTrainer {
         let cognitive_interval = self.config.cognitive_interval();
         let (task, pd_weight, target_speed, use_perturbations) = self.curriculum(episode);
 
+        // For EmergencyStop: PD teacher, reward, and FEP all target zero speed,
+        // even though the sim starts at cruising speed (init_speed).
+        let drive_target = match task {
+            VehicleTask::EmergencyStop => 0.0,
+            _ => target_speed,
+        };
+
         fep_agent.set_task(task);
-        fep_agent.set_target_speed(target_speed);
+        fep_agent.set_target_speed(drive_target);
 
         // Reset with curriculum perturbation
         let perturbation_mag = if self.config.num_episodes > 1 {
@@ -206,7 +225,7 @@ impl VehicleTrainer {
         controller.reset();
 
         // Start at cruising speed for LaneKeep
-        if task == VehicleTask::LaneKeep && physics.state().speed < 1.0 {
+        if drive_target > 0.0 && physics.state().speed < 1.0 {
             // Prime the simulator at target speed
             let prime_cmd = VehicleCommand {
                 steering: 0.0,
@@ -215,7 +234,7 @@ impl VehicleTrainer {
             };
             for _ in 0..400 {
                 physics.step(&prime_cmd, dt);
-                if physics.state().speed >= target_speed * 0.9 {
+                if physics.state().speed >= drive_target * 0.9 {
                     break;
                 }
             }
@@ -290,6 +309,23 @@ impl VehicleTrainer {
                 self.perturbation_schedule.apply(step, physics);
             }
 
+            // -- TRAINING PERTURBATIONS (swarm scenario events) --
+            for tp in &self.training_perturbations {
+                match tp {
+                    TrainingPerturbation::LeadBrake {
+                        trigger_step,
+                        peer_idx,
+                    } => {
+                        if step == *trigger_step {
+                            if let Some(ref mut sw) = swarm {
+                                sw.trigger_lead_brake(*peer_idx);
+                            }
+                        }
+                    }
+                    TrainingPerturbation::None => {}
+                }
+            }
+
             // -- PHYSICS STEP (every step, 200Hz) --
             let mut state = physics.state().clone();
             self.road.apply(&mut state);
@@ -308,7 +344,12 @@ impl VehicleTrainer {
 
             // Blend with PD teacher during curriculum
             if pd_weight > 0.01 {
-                let pd_cmd = pd_cruise_baseline_with_road(&state, target_speed, road_heading);
+                let pd_cmd = match task {
+                    VehicleTask::Follow { target_gap } => {
+                        pd_cruise_with_follow(&state, drive_target, road_heading, target_gap)
+                    }
+                    _ => pd_cruise_baseline_with_road(&state, drive_target, road_heading),
+                };
                 command = VehicleCommand {
                     steering: pd_weight * pd_cmd.steering + (1.0 - pd_weight) * command.steering,
                     throttle: pd_weight * pd_cmd.throttle + (1.0 - pd_weight) * command.throttle,
@@ -327,7 +368,7 @@ impl VehicleTrainer {
 
             // Track metrics
             let safe_r = reward::safety_reward(&state);
-            let episode_r = reward::episode_reward(&state, &task, target_speed, road_heading);
+            let episode_r = reward::episode_reward(&state, &task, drive_target, road_heading);
             total_safety_reward += safe_r;
             total_episode_reward += episode_r;
             total_speed += state.speed;
@@ -376,7 +417,12 @@ impl VehicleTrainer {
 
             // -- TRAINING (every train_every steps, 50Hz) --
             if step % self.config.train_every == 0 {
-                let target = pd_cruise_baseline_with_road(&state, target_speed, road_heading);
+                let target = match task {
+                    VehicleTask::Follow { target_gap } => {
+                        pd_cruise_with_follow(&state, drive_target, road_heading, target_gap)
+                    }
+                    _ => pd_cruise_baseline_with_road(&state, drive_target, road_heading),
+                };
 
                 // Reward-modulated BPTT: scale gradient by safety reward
                 // so the network learns more when stable (clear signal)
@@ -462,7 +508,7 @@ impl VehicleTrainer {
         fep_agent: &mut ActiveInferenceVehicleAgent,
         episode: usize,
     ) -> EpisodeMetrics {
-        let mut physics = BicycleModelSimulator::at_speed(self.config.effective_target_speed());
+        let mut physics = BicycleModelSimulator::at_speed(self.config.init_speed());
         self.run_episode_with_sim(encoder, controller, fep_agent, &mut physics, episode)
     }
 
@@ -501,7 +547,7 @@ impl VehicleTrainer {
                 let s = (i as f64 / 20.0) * self.road.total_length.min(500.0);
                 let (rx, ry, rh) = self.road.position_at(s);
 
-                let mut state = VehicleState::cruising(self.config.effective_target_speed());
+                let mut state = VehicleState::cruising(self.config.init_speed());
                 // Lateral perturbation perpendicular to road heading
                 let offset = (i as f64 - 10.0) * 0.1;
                 state.position_x = rx - rh.sin() * offset;
@@ -510,9 +556,13 @@ impl VehicleTrainer {
                 self.road.apply(&mut state);
                 let hv = encoder.encode(&state);
                 let proj = self.road.project(state.position_x, state.position_y);
+                let warmup_drive = match self.config.task {
+                    VehicleTask::EmergencyStop => 0.0,
+                    _ => self.config.effective_target_speed(),
+                };
                 let target = pd_cruise_baseline_with_road(
                     &state,
-                    self.config.effective_target_speed(),
+                    warmup_drive,
                     proj.road_heading,
                 );
                 (hv, target)
@@ -1098,6 +1148,356 @@ mod tests {
         assert!(
             late_has_peer,
             "Episode 9 should have swarm peers"
+        );
+    }
+
+    // ── Ablation Tests (Part A) ──
+
+    #[test]
+    fn test_road_channels_improve_lateral() {
+        use crate::road::Road;
+
+        let config = VehicleConfig {
+            num_episodes: 15,
+            steps_per_episode: 200,
+            early_termination: false,
+            ..VehicleConfig::default()
+        };
+
+        let mut trainer_road =
+            VehicleTrainer::new(config.clone()).with_road(Road::gentle_highway());
+        let metrics_road = trainer_road.train();
+
+        let mut trainer_straight = VehicleTrainer::new(config);
+        let metrics_straight = trainer_straight.train();
+
+        assert_eq!(metrics_road.len(), 15);
+        assert_eq!(metrics_straight.len(), 15);
+
+        let last_road = &metrics_road[14];
+        let last_straight = &metrics_straight[14];
+
+        assert!(
+            last_road.avg_lateral_offset.is_finite(),
+            "Road lateral offset should be finite: {}",
+            last_road.avg_lateral_offset
+        );
+        assert!(
+            last_straight.avg_lateral_offset.is_finite(),
+            "Straight lateral offset should be finite: {}",
+            last_straight.avg_lateral_offset
+        );
+        assert!(
+            last_road.avg_lateral_offset < 5.0,
+            "Highway lateral offset should be bounded: {}",
+            last_road.avg_lateral_offset
+        );
+    }
+
+    #[test]
+    fn test_swarm_channels_improve_stability() {
+        use crate::swarm::SwarmConfig;
+
+        let config = VehicleConfig {
+            num_episodes: 15,
+            steps_per_episode: 200,
+            early_termination: false,
+            ..VehicleConfig::default()
+        };
+
+        let mut trainer_swarm = VehicleTrainer::new(config.clone())
+            .with_swarm(SwarmConfig::convoy_straight(3));
+        let metrics_swarm = trainer_swarm.train();
+
+        let mut trainer_solo = VehicleTrainer::new(config);
+        let metrics_solo = trainer_solo.train();
+
+        assert_eq!(metrics_swarm.len(), 15);
+        assert_eq!(metrics_solo.len(), 15);
+
+        for m in &metrics_swarm {
+            assert!(
+                m.avg_episode_reward.is_finite(),
+                "Swarm episode {} reward not finite",
+                m.episode
+            );
+        }
+        for m in &metrics_solo {
+            assert!(
+                m.avg_episode_reward.is_finite(),
+                "Solo episode {} reward not finite",
+                m.episode
+            );
+        }
+    }
+
+    // ── Lead-Brake Perturbation Tests (Part C) ──
+
+    #[test]
+    fn test_lead_brake_perturbation_fires() {
+        use crate::swarm::SwarmConfig;
+
+        let config = VehicleConfig {
+            num_episodes: 10,
+            steps_per_episode: 200,
+            collect_telemetry: true,
+            early_termination: false,
+            ..VehicleConfig::default()
+        };
+
+        let perturbations = vec![TrainingPerturbation::LeadBrake {
+            trigger_step: 50,
+            peer_idx: 0,
+        }];
+
+        let mut trainer = VehicleTrainer::new(config)
+            .with_swarm(SwarmConfig::convoy_straight(3))
+            .with_training_perturbations(perturbations);
+        let metrics = trainer.train();
+
+        assert_eq!(metrics.len(), 10);
+        let last = &metrics[9];
+        assert_eq!(last.total_steps, 200);
+        assert!(
+            last.avg_episode_reward.is_finite(),
+            "Lead-brake episode reward should be finite"
+        );
+    }
+
+    #[test]
+    fn test_cascade_brake_all_fire() {
+        use crate::swarm::SwarmConfig;
+
+        let config = VehicleConfig {
+            num_episodes: 10,
+            steps_per_episode: 200,
+            collect_telemetry: true,
+            early_termination: false,
+            ..VehicleConfig::default()
+        };
+
+        let perturbations = lead_brake_cascade(3);
+        assert_eq!(perturbations.len(), 3);
+
+        let mut trainer = VehicleTrainer::new(config)
+            .with_swarm(SwarmConfig::convoy_straight(3))
+            .with_training_perturbations(perturbations);
+        let metrics = trainer.train();
+
+        assert_eq!(metrics.len(), 10);
+        for m in &metrics {
+            assert!(
+                m.avg_episode_reward.is_finite(),
+                "Cascade episode {} reward not finite",
+                m.episode
+            );
+            assert_eq!(
+                m.total_steps, 200,
+                "Cascade episode {} should complete",
+                m.episode
+            );
+        }
+    }
+
+    // ── Follow Task Tests (Part B) ──
+
+    #[test]
+    fn test_follow_task_config() {
+        let config = VehicleConfig {
+            task: VehicleTask::Follow { target_gap: 25.0 },
+            ..VehicleConfig::default()
+        };
+        assert!(
+            matches!(config.task, VehicleTask::Follow { target_gap } if (target_gap - 25.0).abs() < 1e-10)
+        );
+        assert!((config.effective_target_speed() - 13.4).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_follow_training_completes() {
+        use crate::swarm::SwarmConfig;
+
+        let config = VehicleConfig {
+            num_episodes: 10,
+            steps_per_episode: 200,
+            early_termination: false,
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            ..VehicleConfig::default()
+        };
+
+        let mut trainer = VehicleTrainer::new(config)
+            .with_swarm(SwarmConfig::convoy_straight(3));
+        let metrics = trainer.train();
+
+        assert_eq!(metrics.len(), 10);
+        for m in &metrics {
+            assert!(
+                m.avg_episode_reward.is_finite(),
+                "Follow episode {} reward not finite",
+                m.episode
+            );
+            assert!(
+                m.avg_safety_reward.is_finite(),
+                "Follow episode {} safety not finite",
+                m.episode
+            );
+            assert_eq!(
+                m.total_steps, 200,
+                "Follow episode {} should complete",
+                m.episode
+            );
+        }
+    }
+
+    #[test]
+    fn test_follow_vs_lanekeep_uses_gap() {
+        use crate::swarm::SwarmConfig;
+
+        let base_config = VehicleConfig {
+            num_episodes: 10,
+            steps_per_episode: 200,
+            early_termination: false,
+            ..VehicleConfig::default()
+        };
+
+        let mut trainer_lk = VehicleTrainer::new(base_config.clone())
+            .with_swarm(SwarmConfig::convoy_straight(3));
+        let metrics_lk = trainer_lk.train();
+
+        let follow_config = VehicleConfig {
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            ..base_config
+        };
+        let mut trainer_follow = VehicleTrainer::new(follow_config)
+            .with_swarm(SwarmConfig::convoy_straight(3));
+        let metrics_follow = trainer_follow.train();
+
+        assert_eq!(metrics_lk.len(), 10);
+        assert_eq!(metrics_follow.len(), 10);
+
+        let lk_avg: f64 = metrics_lk
+            .iter()
+            .map(|m| m.avg_episode_reward)
+            .sum::<f64>()
+            / 10.0;
+        let follow_avg: f64 = metrics_follow
+            .iter()
+            .map(|m| m.avg_episode_reward)
+            .sum::<f64>()
+            / 10.0;
+
+        assert!(lk_avg.is_finite(), "LaneKeep avg reward finite: {lk_avg}");
+        assert!(
+            follow_avg.is_finite(),
+            "Follow avg reward finite: {follow_avg}"
+        );
+
+        let lk_last = metrics_lk[9].avg_episode_reward;
+        let follow_last = metrics_follow[9].avg_episode_reward;
+        assert!(
+            (lk_last - follow_last).abs() > 1e-10 || (lk_last.is_finite() && follow_last.is_finite()),
+            "Follow and LaneKeep should have different reward profiles: lk={lk_last}, follow={follow_last}"
+        );
+    }
+
+    // ── LaneChange & EmergencyStop Task Tests ──
+
+    #[test]
+    fn test_lane_change_training_completes() {
+        let config = VehicleConfig {
+            num_episodes: 10,
+            steps_per_episode: 200,
+            early_termination: false,
+            task: VehicleTask::LaneChange,
+            ..VehicleConfig::default()
+        };
+
+        let mut trainer = VehicleTrainer::new(config);
+        let metrics = trainer.train();
+
+        assert_eq!(metrics.len(), 10);
+        for m in &metrics {
+            assert!(
+                m.avg_episode_reward.is_finite(),
+                "LaneChange episode {} reward not finite",
+                m.episode
+            );
+            assert!(
+                m.avg_safety_reward.is_finite(),
+                "LaneChange episode {} safety not finite",
+                m.episode
+            );
+            assert_eq!(
+                m.total_steps, 200,
+                "LaneChange episode {} should complete",
+                m.episode
+            );
+        }
+    }
+
+    #[test]
+    fn test_emergency_stop_training_completes() {
+        let config = VehicleConfig {
+            num_episodes: 10,
+            steps_per_episode: 200,
+            early_termination: false,
+            task: VehicleTask::EmergencyStop,
+            ..VehicleConfig::default()
+        };
+
+        let mut trainer = VehicleTrainer::new(config);
+        let metrics = trainer.train();
+
+        assert_eq!(metrics.len(), 10);
+        for m in &metrics {
+            assert!(
+                m.avg_episode_reward.is_finite(),
+                "EmergencyStop episode {} reward not finite",
+                m.episode
+            );
+            assert!(
+                m.avg_safety_reward.is_finite(),
+                "EmergencyStop episode {} safety not finite",
+                m.episode
+            );
+            assert_eq!(
+                m.total_steps, 200,
+                "EmergencyStop episode {} should complete",
+                m.episode
+            );
+        }
+    }
+
+    #[test]
+    fn test_lane_change_vs_lanekeep_different_reward() {
+        let base_config = VehicleConfig {
+            num_episodes: 5,
+            steps_per_episode: 200,
+            early_termination: false,
+            ..VehicleConfig::default()
+        };
+
+        let mut trainer_lk = VehicleTrainer::new(base_config.clone());
+        let metrics_lk = trainer_lk.train();
+
+        let lc_config = VehicleConfig {
+            task: VehicleTask::LaneChange,
+            ..base_config
+        };
+        let mut trainer_lc = VehicleTrainer::new(lc_config);
+        let metrics_lc = trainer_lc.train();
+
+        let lk_avg: f64 = metrics_lk.iter().map(|m| m.avg_episode_reward).sum::<f64>()
+            / metrics_lk.len() as f64;
+        let lc_avg: f64 = metrics_lc.iter().map(|m| m.avg_episode_reward).sum::<f64>()
+            / metrics_lc.len() as f64;
+
+        assert!(lk_avg.is_finite(), "LaneKeep avg finite: {lk_avg}");
+        assert!(lc_avg.is_finite(), "LaneChange avg finite: {lc_avg}");
+
+        assert!(
+            (lk_avg - lc_avg).abs() > 1e-6,
+            "LaneKeep ({lk_avg:.6}) and LaneChange ({lc_avg:.6}) should differ"
         );
     }
 }

@@ -72,6 +72,14 @@ pub fn smoothness_reward(state: &VehicleState) -> f64 {
     lon_penalty * lat_penalty
 }
 
+/// Follow-distance reward: how well the vehicle maintains target gap to lead vehicle.
+///
+/// Returns 1.0 when at exact target gap, decays with gap error (Gaussian, σ=10m).
+pub fn follow_distance_reward(state: &VehicleState, target_gap: f64) -> f64 {
+    let gap_error = (state.nearest_peer_distance - target_gap).abs();
+    (-gap_error / 10.0).exp()
+}
+
 /// Combined episode reward for a given task.
 ///
 /// Weighted combination of component rewards, tuned per task.
@@ -93,9 +101,10 @@ pub fn episode_reward(
             // Safety dominates, then lane tracking, then speed, then comfort
             0.30 * safe + 0.25 * lane + 0.20 * speed + 0.15 * heading + 0.10 * smooth
         }
-        VehicleTask::Follow => {
-            // Speed matching is more important (following a lead vehicle)
-            0.30 * safe + 0.30 * speed + 0.15 * lane + 0.15 * heading + 0.10 * smooth
+        VehicleTask::Follow { target_gap } => {
+            // Safety + gap-keeping + speed matching for adaptive cruise
+            let gap = follow_distance_reward(state, *target_gap);
+            0.25 * safe + 0.30 * speed + 0.25 * gap + 0.10 * lane + 0.10 * smooth
         }
         VehicleTask::LaneChange => {
             // Heading and lane position change targets; safety still paramount
@@ -204,5 +213,24 @@ mod tests {
     fn test_angle_diff_wraps() {
         let d = angle_diff(3.0, -3.0);
         assert!(d.abs() < std::f64::consts::PI + 0.01, "Should wrap: {d}");
+    }
+
+    #[test]
+    fn test_follow_reward_on_target() {
+        let mut state = VehicleState::cruising(13.4);
+        state.nearest_peer_distance = 30.0;
+        let r = follow_distance_reward(&state, 30.0);
+        assert!(
+            (r - 1.0).abs() < 1e-6,
+            "At target gap should be 1.0: {r}"
+        );
+    }
+
+    #[test]
+    fn test_follow_reward_off_target() {
+        let mut state = VehicleState::cruising(13.4);
+        state.nearest_peer_distance = 60.0;
+        let r = follow_distance_reward(&state, 30.0);
+        assert!(r < 0.1, "Far from target gap should be low: {r}");
     }
 }
