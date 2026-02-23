@@ -91,6 +91,14 @@ pub struct MeshStats {
     pub bytes_sent: u64,
     /// Total bytes received from mesh (estimated from packet count × WISDOM_PACKET_SIZE).
     pub bytes_received: u64,
+    /// Packets dropped due to inbox/outbox backpressure caps.
+    pub packets_dropped: u64,
+    /// Duplicate packets detected and skipped.
+    pub packets_deduplicated: u64,
+    /// Packets rejected by per-peer rate limiting.
+    pub packets_rate_limited: u64,
+    /// Emissions throttled by bandwidth budget enforcement.
+    pub bandwidth_throttled: u64,
 }
 
 impl MeshStats {
@@ -581,6 +589,11 @@ pub fn hex_short(bytes: &[u8]) -> String {
 // MESH PEER REGISTRY
 // ============================================================================
 
+/// Maximum packets allowed per peer within the rate limit window.
+const MESH_RATE_LIMIT_MAX: u64 = 100;
+/// Duration of the per-peer rate limiting window.
+const MESH_RATE_LIMIT_WINDOW: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// Tracked state for a single mesh peer (distinct from [`MeshPeer`] which
 /// tracks LoRa fragment reassembly statistics).
 #[derive(Debug, Clone)]
@@ -597,6 +610,10 @@ pub struct MeshPeerEntry {
     pub last_urgency: MeshUrgency,
     /// Most recent payload type from this peer.
     pub last_payload_type: PayloadType,
+    /// Start of the current rate-limiting window.
+    pub window_start: std::time::Instant,
+    /// Packet count within the current rate-limiting window.
+    pub window_count: u64,
 }
 
 /// Registry of active mesh peers, updated each tick from incoming packets.
@@ -637,6 +654,8 @@ impl MeshPeerRegistry {
                 last_phi: packet.phi,
                 last_urgency: packet.urgency,
                 last_payload_type: packet.payload_type,
+                window_start: std::time::Instant::now(),
+                window_count: 0,
             });
         entry.last_seen = std::time::Instant::now();
         entry.packets_received += 1;
@@ -670,6 +689,25 @@ impl MeshPeerRegistry {
     /// Number of tracked peers.
     pub fn peer_count(&self) -> usize {
         self.peers.len()
+    }
+
+    /// Check if a peer has exceeded the rate limit.
+    ///
+    /// Returns `true` if the peer's packet count within the current window
+    /// exceeds [`MESH_RATE_LIMIT_MAX`]. Resets the window if the previous
+    /// one has elapsed.
+    pub fn is_rate_limited(&mut self, source_id: &[u8; 8]) -> bool {
+        let entry = match self.peers.get_mut(source_id) {
+            Some(e) => e,
+            None => return false, // Unknown peer — not rate limited
+        };
+        let now = std::time::Instant::now();
+        if now.duration_since(entry.window_start) >= MESH_RATE_LIMIT_WINDOW {
+            entry.window_start = now;
+            entry.window_count = 0;
+        }
+        entry.window_count += 1;
+        entry.window_count > MESH_RATE_LIMIT_MAX
     }
 
     /// Average Phi across all tracked peers. Returns 0.0 if no peers.
@@ -1230,5 +1268,93 @@ mod tests {
         assert!((extracted.confidence - 0.95).abs() < 1e-6);
         assert_eq!(extracted.timestamp_ms, 1_700_000_000);
         assert_eq!(extracted.sequence, 42);
+    }
+
+    // ====================================================================
+    // Per-Peer Rate Limiting Tests
+    // ====================================================================
+
+    #[test]
+    fn test_rate_limit_allows_under_limit() {
+        let mut registry = MeshPeerRegistry::new();
+        let peer_id = [0xAA; 8];
+
+        // Register peer first
+        let pkt = WisdomPacket {
+            source_id: peer_id,
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: test_hv(0x01),
+        };
+        registry.update(&pkt);
+
+        // 99 calls should all be under limit (window_count 1..=99)
+        for _ in 0..99 {
+            assert!(!registry.is_rate_limited(&peer_id), "Should be under limit");
+        }
+    }
+
+    #[test]
+    fn test_rate_limit_blocks_over_limit() {
+        let mut registry = MeshPeerRegistry::new();
+        let peer_id = [0xBB; 8];
+
+        let pkt = WisdomPacket {
+            source_id: peer_id,
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: test_hv(0x02),
+        };
+        registry.update(&pkt);
+
+        // First 100 should pass (window_count 1..=100)
+        for _ in 0..100 {
+            registry.is_rate_limited(&peer_id);
+        }
+        // 101st should be blocked (window_count == 101 > 100)
+        assert!(
+            registry.is_rate_limited(&peer_id),
+            "101st call should be rate limited"
+        );
+    }
+
+    #[test]
+    fn test_rate_limit_window_resets() {
+        let mut registry = MeshPeerRegistry::new();
+        let peer_id = [0xCC; 8];
+
+        let pkt = WisdomPacket {
+            source_id: peer_id,
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: test_hv(0x03),
+        };
+        registry.update(&pkt);
+
+        // Exhaust the limit
+        for _ in 0..101 {
+            registry.is_rate_limited(&peer_id);
+        }
+        assert!(registry.is_rate_limited(&peer_id), "Should be rate limited");
+
+        // Manually reset window_start to simulate time passage
+        if let Some(entry) = registry.peers.get_mut(&peer_id) {
+            entry.window_start = std::time::Instant::now() - std::time::Duration::from_secs(11);
+        }
+
+        // Should be allowed again after window reset
+        assert!(
+            !registry.is_rate_limited(&peer_id),
+            "Should be allowed after window reset"
+        );
     }
 }

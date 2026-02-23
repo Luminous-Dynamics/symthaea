@@ -931,6 +931,16 @@ pub struct CycleMetadata {
     pub epistemic_semantic_lr_mod: f32,
     /// Whether predictive budget gating was active (>80% budget at midpoint).
     pub predictive_budget_gated: bool,
+
+    // ── Mesh Network Telemetry ────────────────────────────────────────
+    /// Mesh network composite health score (0.0–1.0, 0.0 when mesh disabled).
+    pub mesh_health_score: f32,
+    /// Number of active mesh peers (0 when mesh disabled).
+    pub mesh_peer_count: u32,
+    /// Total bytes sent over mesh since startup.
+    pub mesh_bytes_sent: u64,
+    /// Total bytes received from mesh since startup.
+    pub mesh_bytes_received: u64,
 }
 
 /// Compact subset of CycleMetadata with the most essential telemetry fields.

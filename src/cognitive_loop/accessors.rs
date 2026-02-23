@@ -500,11 +500,13 @@ impl CognitiveLoopService {
         }
     }
 
-    /// Map consciousness signals to the 10-channel `VoiceCognitiveState` used
+    /// Map consciousness signals to the 12-channel `VoiceCognitiveState` used
     /// by the vocal tract pipeline.
     ///
     /// This bridges the cognitive loop's consciousness metrics to the vocal tract
-    /// encoder's input format. Does NOT run the pipeline (too expensive for 50Hz).
+    /// encoder's input format. Includes Phi (integrated information) and EFE
+    /// (expected free energy) for affective prosody modulation.
+    /// Does NOT run the pipeline (too expensive for 50Hz).
     pub fn voice_cognitive_state(&self) -> crate::voice::vocal_tract_encoder::VoiceCognitiveState {
         let signals = self.voice_consciousness_signals();
         let emotional = self.unification_engine.emotional.state();
@@ -520,6 +522,17 @@ impl CognitiveLoopService {
             consciousness_level: signals.consciousness_level as f32,
             articulation_quality: self.voice_feedback_bridge.smoothed_articulation(),
             rate_stability: self.voice_feedback_bridge.rate_stability(),
+            integrated_phi: self
+                .carryover
+                .consciousness
+                .last_spectral_mip_phi
+                .unwrap_or(0.5) as f32,
+            expected_free_energy: self
+                .fep_agent
+                .last_fe_components
+                .as_ref()
+                .map(|fe| fe.total as f32)
+                .unwrap_or(1.0),
         }
     }
 
