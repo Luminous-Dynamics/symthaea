@@ -82,9 +82,9 @@ impl FlightController {
     /// Non-finite values (NaN, Inf) in `sensor_hv` are replaced with 0.0 to prevent
     /// a single bad sensor reading from permanently corrupting network state.
     pub fn forward(&mut self, sensor_hv: &ContinuousHV, dt: f32) -> QuadrotorCommand {
-        // Sanitize input: replace NaN/Inf with 0.0
-        let clean_hv = sanitize_hv(sensor_hv);
-        let sensor_hv = &clean_hv;
+        // Sanitize input: replace NaN/Inf with 0.0 (zero-alloc on clean input)
+        let sanitized = sanitize_hv(sensor_hv);
+        let sensor_hv = sanitized.as_ref().unwrap_or(sensor_hv);
 
         // 1. Evolve network dynamics
         self.network.evolve_closed_form(dt, sensor_hv);
@@ -389,21 +389,20 @@ impl FlightController {
     }
 }
 
-/// Replace NaN/Inf values in a ContinuousHV with 0.0.
+/// Check for NaN/Inf values in a ContinuousHV and return a sanitized copy if needed.
 ///
-/// A single corrupted sensor reading (e.g., division by zero in encoder) could
-/// permanently corrupt network hidden state. This guard ensures the network
-/// only ever sees finite inputs.
-fn sanitize_hv(hv: &ContinuousHV) -> ContinuousHV {
+/// Returns `None` when input is clean (zero allocation fast path).
+/// Returns `Some(sanitized)` only when non-finite values are found.
+fn sanitize_hv(hv: &ContinuousHV) -> Option<ContinuousHV> {
     let values = hv.as_slice();
     if values.iter().all(|v| v.is_finite()) {
-        return hv.clone();
+        return None;
     }
     let clean: Vec<f32> = values
         .iter()
         .map(|&v| if v.is_finite() { v } else { 0.0 })
         .collect();
-    ContinuousHV::from_vec(clean)
+    Some(ContinuousHV::from_vec(clean))
 }
 
 /// Fast sigmoid activation.

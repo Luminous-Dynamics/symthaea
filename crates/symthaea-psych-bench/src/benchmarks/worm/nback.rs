@@ -15,14 +15,14 @@ use symthaea_core::hdc::ContinuousHV;
 pub struct NBackBenchmark;
 
 impl NBackBenchmark {
-    /// Run a single N-back trial and return (hit_rate, false_alarm_rate).
+    /// Run a single N-back trial and return (hit_rate, false_alarm_rate, rt_ticks).
     fn run_trial(
         &self,
         n: usize,
         sequence_len: usize,
         config: &BenchmarkConfig,
         trial_idx: usize,
-    ) -> (f64, f64) {
+    ) -> (f64, f64, Vec<f64>) {
         let dim = config.dimension;
         let seed = config.trial_seed("worm", &format!("nback_{}", n), trial_idx);
         let adapter = SequenceAdapter;
@@ -61,6 +61,7 @@ impl NBackBenchmark {
         let mut misses = 0u64;
         let mut false_alarms = 0u64;
         let mut correct_rejections = 0u64;
+        let mut rt_ticks = Vec::new();
 
         // Keep history of perceived HVs for position-aware n-back retrieval
         let mut perceived_history: Vec<ContinuousHV> = Vec::with_capacity(sequence_len);
@@ -86,7 +87,9 @@ impl NBackBenchmark {
                 // Compare current item to n-back item (identity test via HDC similarity)
                 let nback_hv = &perceived_history[i - n];
                 let match_sim = hv.similarity(nback_hv);
-                let match_threshold = 0.5;
+                // Time pressure lowers the match threshold (more liberal responding,
+                // faster but more false alarms).
+                let match_threshold = (0.5 - config.time_pressure * 0.15) as f32;
 
                 // Proactive interference: check for "lure" items at nearby positions
                 // (n±1 back). Lures cause false alarms in human n-back (Jonides & Nee,
@@ -110,6 +113,11 @@ impl NBackBenchmark {
                 // matches the current item. Lure matches cause false alarms.
                 let responded_match = nback_retained && (match_sim > match_threshold || lure_match);
 
+                // RT proxy: deliberation ticks based on decision margin
+                let margin = (match_sim - match_threshold).abs() as f64;
+                let ticks = 3.0 + (1.0 - margin.min(1.0)) * 5.0;
+                rt_ticks.push(ticks);
+
                 match (is_target, responded_match) {
                     (true, true) => hits += 1,
                     (true, false) => misses += 1,
@@ -130,7 +138,7 @@ impl NBackBenchmark {
             0.0
         };
 
-        (hit_rate, fa_rate)
+        (hit_rate, fa_rate, rt_ticks)
     }
 }
 
@@ -148,13 +156,15 @@ impl PsychBenchmark for NBackBenchmark {
             let mut hit_rates = Vec::new();
             let mut fa_rates = Vec::new();
             let mut accuracies = Vec::new();
+            let mut all_rts = Vec::new();
 
             for trial in 0..config.trials_per_condition {
-                let (hr, fa) = self.run_trial(n, sequence_len, config, trial);
+                let (hr, fa, rts) = self.run_trial(n, sequence_len, config, trial);
                 hit_rates.push(hr);
                 fa_rates.push(fa);
                 // d'-like accuracy: hit_rate - false_alarm_rate
                 accuracies.push(hr - fa);
+                all_rts.extend_from_slice(&rts);
             }
 
             result.insert(
@@ -168,6 +178,10 @@ impl PsychBenchmark for NBackBenchmark {
             result.insert(
                 format!("nback_{}::accuracy", n),
                 MetricValue::from_samples(&accuracies),
+            );
+            result.insert(
+                format!("nback_{}::rt_ticks", n),
+                MetricValue::from_samples(&all_rts),
             );
         }
 

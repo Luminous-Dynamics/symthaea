@@ -759,3 +759,585 @@ impl Default for EffectEstimator {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ObservationalData Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_data_new_and_add_observation() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        assert_eq!(data.n(), 0);
+        assert_eq!(data.variables.len(), 2);
+
+        data.add_observation(vec![1.0, 2.0]);
+        assert_eq!(data.n(), 1);
+
+        data.add_observation(vec![3.0, 4.0]);
+        assert_eq!(data.n(), 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "Value count must match variable count")]
+    fn test_data_add_observation_wrong_length() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        data.add_observation(vec![1.0]); // Wrong length
+    }
+
+    #[test]
+    fn test_data_mean_empty() {
+        let data = ObservationalData::new(vec!["X".into()]);
+        assert!((data.mean(0) - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_data_mean_computed_correctly() {
+        let mut data = ObservationalData::new(vec!["X".into()]);
+        data.add_observation(vec![2.0]);
+        data.add_observation(vec![4.0]);
+        data.add_observation(vec![6.0]);
+        assert!((data.mean(0) - 4.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_data_variance_single_obs() {
+        let mut data = ObservationalData::new(vec!["X".into()]);
+        data.add_observation(vec![5.0]);
+        assert!((data.variance(0) - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_data_variance_computed_correctly() {
+        let mut data = ObservationalData::new(vec!["X".into()]);
+        // Values: 2, 4, 6, 8 → mean=5, var = (9+1+1+9)/3 = 20/3
+        data.add_observation(vec![2.0]);
+        data.add_observation(vec![4.0]);
+        data.add_observation(vec![6.0]);
+        data.add_observation(vec![8.0]);
+        let expected_var = 20.0 / 3.0;
+        assert!(
+            (data.variance(0) - expected_var).abs() < 1e-10,
+            "Expected variance {}, got {}",
+            expected_var,
+            data.variance(0)
+        );
+    }
+
+    #[test]
+    fn test_data_covariance_perfect_positive() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for i in 0..10 {
+            let x = i as f64;
+            data.add_observation(vec![x, 2.0 * x]);
+        }
+        let cov = data.covariance(0, 1);
+        // Cov(X, 2X) = 2 * Var(X)
+        let var_x = data.variance(0);
+        assert!(
+            (cov - 2.0 * var_x).abs() < 1e-10,
+            "Cov(X, 2X) should equal 2*Var(X)"
+        );
+    }
+
+    #[test]
+    fn test_data_covariance_independent() {
+        // Constant Y → zero covariance
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for i in 0..20 {
+            data.add_observation(vec![i as f64, 5.0]);
+        }
+        assert!(
+            data.covariance(0, 1).abs() < 1e-10,
+            "Covariance with constant should be zero"
+        );
+    }
+
+    #[test]
+    fn test_data_filter() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for i in 0..10 {
+            data.add_observation(vec![i as f64, (i * 2) as f64]);
+        }
+        let filtered = data.filter(0, |x| x >= 5.0);
+        assert_eq!(filtered.n(), 5);
+        assert_eq!(filtered.variables.len(), 2);
+        // Mean of 5,6,7,8,9 = 7
+        assert!((filtered.mean(0) - 7.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_data_filter_none_pass() {
+        let mut data = ObservationalData::new(vec!["X".into()]);
+        data.add_observation(vec![1.0]);
+        data.add_observation(vec![2.0]);
+        let filtered = data.filter(0, |x| x > 100.0);
+        assert_eq!(filtered.n(), 0);
+    }
+
+    #[test]
+    fn test_data_group_by() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for i in 0..20 {
+            data.add_observation(vec![i as f64, i as f64 * 2.0]);
+        }
+        let groups = data.group_by(0, &[5.0, 10.0, 15.0]);
+        // Bins: [<5), [5,10), [10,15), [15+)
+        assert!(groups.contains_key(&0)); // 0-4
+        assert!(groups.contains_key(&1)); // 5-9
+        assert!(groups.contains_key(&2)); // 10-14
+        assert!(groups.contains_key(&3)); // 15-19
+        assert_eq!(groups[&0].n(), 5);
+        assert_eq!(groups[&1].n(), 5);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // EffectEstimator Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_estimator_new_and_default() {
+        let est1 = EffectEstimator::new();
+        let est2 = EffectEstimator::default();
+        // Both should construct successfully
+        assert!(std::mem::size_of_val(&est1) > 0);
+        assert!(std::mem::size_of_val(&est2) > 0);
+    }
+
+    #[test]
+    fn test_regression_estimate_perfect_linear() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for i in 0..100 {
+            let x = i as f64 / 10.0;
+            let y = 3.0 * x + 1.0;
+            data.add_observation(vec![x, y]);
+        }
+        let est = EffectEstimator::new();
+        let beta = est.estimate_regression(0, 1, &data);
+        assert!(
+            (beta - 3.0).abs() < 1e-6,
+            "Regression coefficient should be 3.0, got {}",
+            beta
+        );
+    }
+
+    #[test]
+    fn test_regression_estimate_zero_variance() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for _ in 0..10 {
+            data.add_observation(vec![5.0, 10.0]); // Constant X
+        }
+        let est = EffectEstimator::new();
+        let beta = est.estimate_regression(0, 1, &data);
+        assert!((beta - 0.0).abs() < 1e-10, "Zero variance X should return 0");
+    }
+
+    #[test]
+    fn test_backdoor_estimate_no_confounders() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for i in 0..100 {
+            let x = i as f64 / 50.0;
+            let y = 2.5 * x + 0.01 * (i % 7) as f64;
+            data.add_observation(vec![x, y]);
+        }
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+        let est = EffectEstimator::new();
+        let effect = est.estimate_backdoor(&query, &[], &data);
+        assert!(
+            (effect - 2.5).abs() < 0.1,
+            "No-confounder backdoor should be ~2.5, got {}",
+            effect
+        );
+    }
+
+    #[test]
+    fn test_backdoor_estimate_with_confounder() {
+        // Z confounds X and Y
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into(), "Z".into()]);
+        for i in 0..200 {
+            let z = (i % 5) as f64;
+            let x = 0.5 * z + 0.01 * (i % 3) as f64;
+            let y = 2.0 * x + 1.0 * z + 0.01 * (i % 7) as f64;
+            data.add_observation(vec![x, y, z]);
+        }
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+        let est = EffectEstimator::new();
+        let effect = est.estimate_backdoor(&query, &[2], &data);
+        // After adjusting for Z, should get closer to true effect of 2.0
+        assert!(
+            (effect - 2.0).abs() < 1.0,
+            "Backdoor with confounder should be ~2.0, got {}",
+            effect
+        );
+    }
+
+    #[test]
+    fn test_backdoor_estimate_insufficient_data() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        data.add_observation(vec![1.0, 2.0]);
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+        let est = EffectEstimator::new();
+        let effect = est.estimate_backdoor(&query, &[], &data);
+        assert!(
+            (effect - 0.0).abs() < 1e-10,
+            "Single obs should return 0"
+        );
+    }
+
+    #[test]
+    fn test_estimate_identifies_and_computes() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for i in 0..100 {
+            let x = i as f64 / 50.0;
+            let y = 2.0 * x + 0.01 * (i % 5) as f64;
+            data.add_observation(vec![x, y]);
+        }
+        let dag = CausalDAG::new(vec!["X".into(), "Y".into()], vec![(0, 1)]);
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+        let est = EffectEstimator::new();
+        let result = est.estimate(&dag, &query, &data);
+        match result {
+            CausalQueryOutcome::Identified { estimand, .. } => {
+                assert!(
+                    (estimand.effect - 2.0).abs() < 0.1,
+                    "Estimated effect should be ~2.0, got {}",
+                    estimand.effect
+                );
+            }
+            _ => panic!("Expected Identified result"),
+        }
+    }
+
+    #[test]
+    fn test_estimate_unidentified_passthrough() {
+        // Disconnected nodes → Unidentified
+        let data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        let dag = CausalDAG::new(vec!["X".into(), "Y".into()], vec![]);
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+        let est = EffectEstimator::new();
+        let result = est.estimate(&dag, &query, &data);
+        assert!(matches!(result, CausalQueryOutcome::Unidentified { .. }));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // IPW Estimation Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_ipw_insufficient_data() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for i in 0..5 {
+            data.add_observation(vec![i as f64, i as f64 * 2.0]);
+        }
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+        let est = EffectEstimator::new();
+        let ipw = est.estimate_ipw(&query, &[], &data);
+        assert!((ipw - 0.0).abs() < 1e-10, "IPW with <10 obs should return 0");
+    }
+
+    #[test]
+    fn test_ipw_binary_treatment() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into(), "Z".into()]);
+        for i in 0..200 {
+            let z = (i % 2) as f64;
+            let x = if (i % 5) < 3 { z } else { 1.0 - z };
+            let y = 2.0 * x + 0.5 * z + 0.05 * (i % 7) as f64;
+            data.add_observation(vec![x, y, z]);
+        }
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+        let est = EffectEstimator::new();
+        let ipw = est.estimate_ipw(&query, &[2], &data);
+        assert!(
+            ipw.is_finite(),
+            "IPW estimate should be finite"
+        );
+        assert!(
+            (ipw - 2.0).abs() < 2.0,
+            "IPW estimate should be in reasonable range, got {}",
+            ipw
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Doubly Robust Estimation Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_dr_insufficient_data() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for i in 0..5 {
+            data.add_observation(vec![i as f64, i as f64 * 2.0]);
+        }
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+        let est = EffectEstimator::new();
+        let dr = est.estimate_doubly_robust(&query, &[], &data);
+        assert!((dr - 0.0).abs() < 1e-10, "DR with <10 obs should return 0");
+    }
+
+    #[test]
+    fn test_dr_binary_treatment_estimate() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into(), "Z".into()]);
+        for i in 0..300 {
+            let z = (i % 3) as f64 / 2.0;
+            let x = if z + 0.1 * (i % 5) as f64 > 0.5 { 1.0 } else { 0.0 };
+            let y = 1.5 * x + 0.8 * z + 0.02 * (i % 11) as f64;
+            data.add_observation(vec![x, y, z]);
+        }
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+        let est = EffectEstimator::new();
+        let dr = est.estimate_doubly_robust(&query, &[2], &data);
+        assert!(
+            dr.is_finite(),
+            "DR estimate should be finite"
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Robust Estimation Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_robust_estimate_all_methods() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into(), "Z".into()]);
+        for i in 0..300 {
+            let z = (i % 4) as f64 / 3.0;
+            let x = if z + 0.1 * (i % 5) as f64 > 0.4 { 1.0 } else { 0.0 };
+            let y = 2.0 * x + 0.5 * z + 0.02 * (i % 7) as f64;
+            data.add_observation(vec![x, y, z]);
+        }
+        let dag = CausalDAG::new(
+            vec!["X".into(), "Y".into(), "Z".into()],
+            vec![(0, 1), (2, 0), (2, 1)],
+        );
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+        let est = EffectEstimator::new();
+        let robust = est.estimate_robust(&dag, &query, &data);
+
+        assert!(robust.is_identified);
+        assert!(robust.regression_estimate.is_finite());
+        assert!(robust.ipw_estimate.is_finite());
+        assert!(robust.dr_estimate.is_finite());
+        assert!((robust.effect - robust.dr_estimate).abs() < 1e-10, "Primary effect should be DR");
+    }
+
+    #[test]
+    fn test_robust_estimate_unidentified() {
+        let data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        let dag = CausalDAG::new(vec!["X".into(), "Y".into()], vec![]);
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+        let est = EffectEstimator::new();
+        let robust = est.estimate_robust(&dag, &query, &data);
+        assert!(!robust.is_identified);
+        assert!((robust.effect - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_robust_estimate_agreement() {
+        let estimate = RobustEstimate {
+            effect: 1.0,
+            regression_estimate: 1.0,
+            ipw_estimate: 1.05,
+            dr_estimate: 1.02,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+        assert!(estimate.estimates_agree(0.1));
+        assert!(!estimate.estimates_agree(0.01));
+    }
+
+    #[test]
+    fn test_robust_estimate_disagreement() {
+        let estimate = RobustEstimate {
+            effect: 2.0,
+            regression_estimate: 1.0,
+            ipw_estimate: 3.0,
+            dr_estimate: 2.0,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+        assert!(!estimate.estimates_agree(1.0));
+    }
+
+    #[test]
+    fn test_robust_confidence_identified() {
+        let estimate = RobustEstimate {
+            effect: 1.0,
+            regression_estimate: 1.0,
+            ipw_estimate: 1.0,
+            dr_estimate: 1.0,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+        assert!(estimate.confidence() > 0.9, "Perfect agreement should have high confidence");
+    }
+
+    #[test]
+    fn test_robust_confidence_unidentified() {
+        let estimate = RobustEstimate {
+            effect: 0.0,
+            regression_estimate: 0.0,
+            ipw_estimate: 0.0,
+            dr_estimate: 0.0,
+            method: IdentificationMethod::DSeparation,
+            is_identified: false,
+        };
+        assert!((estimate.confidence() - 0.0).abs() < 1e-10);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // E-Value and Sensitivity Analysis Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_e_value_null_effect() {
+        let estimate = RobustEstimate {
+            effect: 0.0,
+            regression_estimate: 0.0,
+            ipw_estimate: 0.0,
+            dr_estimate: 0.0,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+        assert!(
+            (estimate.e_value() - 1.0).abs() < 1e-10,
+            "Null effect should have E-value = 1.0"
+        );
+    }
+
+    #[test]
+    fn test_e_value_large_effect() {
+        let estimate = RobustEstimate {
+            effect: 2.0,
+            regression_estimate: 2.0,
+            ipw_estimate: 2.0,
+            dr_estimate: 2.0,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+        let e = estimate.e_value();
+        assert!(
+            e > 3.0,
+            "Large effect should have E-value > 3, got {}",
+            e
+        );
+    }
+
+    #[test]
+    fn test_e_value_ci_crosses_null() {
+        let estimate = RobustEstimate {
+            effect: 0.5,
+            regression_estimate: 0.5,
+            ipw_estimate: 0.5,
+            dr_estimate: 0.5,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+        // CI crosses null: [-0.1, 1.1]
+        let e_ci = estimate.e_value_ci(-0.1, 1.1);
+        assert!(
+            (e_ci - 1.0).abs() < 1e-10,
+            "CI crossing null should have E-value_CI = 1.0"
+        );
+    }
+
+    #[test]
+    fn test_e_value_ci_doesnt_cross_null() {
+        let estimate = RobustEstimate {
+            effect: 2.0,
+            regression_estimate: 2.0,
+            ipw_estimate: 2.0,
+            dr_estimate: 2.0,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+        // CI doesn't cross null: [0.5, 3.5]
+        let e_ci = estimate.e_value_ci(0.5, 3.5);
+        assert!(
+            e_ci > 1.0,
+            "CI not crossing null should have E-value_CI > 1"
+        );
+    }
+
+    #[test]
+    fn test_sensitivity_analysis_weak() {
+        let estimate = RobustEstimate {
+            effect: 0.1,
+            regression_estimate: 0.1,
+            ipw_estimate: 0.1,
+            dr_estimate: 0.1,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+        let sa = estimate.sensitivity_analysis();
+        assert!(sa.e_value >= 1.0);
+        assert!(sa.robustness_score >= 0.0 && sa.robustness_score <= 1.0);
+        assert!(!sa.e_value_interpretation.is_empty());
+    }
+
+    #[test]
+    fn test_sensitivity_analysis_robust() {
+        let estimate = RobustEstimate {
+            effect: 3.0,
+            regression_estimate: 3.0,
+            ipw_estimate: 3.0,
+            dr_estimate: 3.0,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+        let sa = estimate.sensitivity_analysis();
+        assert!(
+            sa.e_value > 3.0,
+            "Strong effect should have E-value > 3"
+        );
+        assert!(sa.e_value_interpretation.contains("Robust"));
+        assert!(sa.min_confounder_rr_treatment > 1.0);
+        assert!(sa.min_confounder_rr_outcome > 1.0);
+    }
+}

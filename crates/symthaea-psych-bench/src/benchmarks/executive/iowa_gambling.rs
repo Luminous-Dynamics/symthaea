@@ -69,6 +69,7 @@ impl IowaGamblingBenchmark {
         let mut deck_draw_count = [0u32; 4];
         let mut block_net_scores = [0i32; 5]; // (C+D) - (A+B) per block
         let mut total_net_score = 0i32;
+        let mut rt_ticks = Vec::new();
         let ema_decay = 0.6f32; // Moderate HDC learning
 
         let num_trials = 100;
@@ -124,6 +125,11 @@ impl IowaGamblingBenchmark {
                     break;
                 }
             }
+
+            // RT proxy: decision difficulty from max probability spread
+            let max_prob = probs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let ticks = 4.0 + (1.0 - max_prob) * 8.0;
+            rt_ticks.push(ticks);
 
             // Get gain and loss from schedule
             let draw_idx = deck_draw_count[chosen] as usize % 10;
@@ -196,6 +202,7 @@ impl IowaGamblingBenchmark {
             overall_net_score: total_net_score,
             learning_rate,
             deck_preference_good: good_last_40,
+            rt_ticks,
         }
     }
 }
@@ -205,6 +212,7 @@ struct IgtResult {
     overall_net_score: i32,
     learning_rate: f64,
     deck_preference_good: f64,
+    rt_ticks: Vec<f64>,
 }
 
 impl PsychBenchmark for IowaGamblingBenchmark {
@@ -220,6 +228,7 @@ impl PsychBenchmark for IowaGamblingBenchmark {
         let mut block5_scores = Vec::new();
         let mut rates = Vec::new();
         let mut preferences = Vec::new();
+        let mut all_rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -227,6 +236,7 @@ impl PsychBenchmark for IowaGamblingBenchmark {
             block5_scores.push(r.block_net_scores[4] as f64);
             rates.push(r.learning_rate);
             preferences.push(r.deck_preference_good);
+            all_rts.extend_from_slice(&r.rt_ticks);
         }
 
         result.insert(
@@ -242,6 +252,7 @@ impl PsychBenchmark for IowaGamblingBenchmark {
             "deck_preference_good",
             MetricValue::from_samples(&preferences),
         );
+        result.insert("rt_ticks", MetricValue::from_samples(&all_rts));
 
         result.conditions = 5; // 5 blocks
         result.trials_per_condition = config.trials_per_condition;

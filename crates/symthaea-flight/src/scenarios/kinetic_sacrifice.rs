@@ -16,7 +16,7 @@ use symthaea_core::genesis::GenesisSeed;
 
 use crate::controller::FlightController;
 use crate::encoder::QuadrotorHdcEncoder;
-use crate::fep_agent::{ActiveInferenceFlightAgent, FlightFepConfig};
+use crate::fep_agent::{ActiveInferenceFlightAgent, FlightEnvironment, FlightFepConfig};
 use crate::mujoco_sim::MuJoCoSimulator;
 use crate::simulator::PhysicsSimulator;
 use crate::types::*;
@@ -26,9 +26,9 @@ use crate::types::*;
 pub struct KineticSacrificeConfig {
     /// Flight configuration.
     pub flight_config: FlightConfig,
-    /// Step at which the beam is released. Default: 300.
+    /// Step at which the beam is released. Default: 400.
     pub beam_release_step: usize,
-    /// Total simulation steps. Default: 600.
+    /// Total simulation steps. Default: 1000.
     pub total_steps: usize,
     /// FEP configuration (can tune exploration/tau sensitivity).
     pub fep_config: FlightFepConfig,
@@ -40,11 +40,11 @@ impl Default for KineticSacrificeConfig {
     fn default() -> Self {
         Self {
             flight_config: FlightConfig {
-                steps_per_episode: 600,
+                steps_per_episode: 1000,
                 ..FlightConfig::default()
             },
-            beam_release_step: 300,
-            total_steps: 600,
+            beam_release_step: 400,
+            total_steps: 1000,
             fep_config: FlightFepConfig::default(),
             collect_telemetry: true,
         }
@@ -186,8 +186,19 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
 
     let dt = config.flight_config.motor_dt();
     let cognitive_interval = config.flight_config.cognitive_interval();
+    let pd_gains = PdGains::default();
+
+    // Auto-calibrate hover thrust from MuJoCo model mass
+    let hover_thrust_offset =
+        (sim.body_mass() * 9.81) as f32 - QuadrotorCommand::HOVER_THRUST;
 
     let mut fep_result = fep_agent.initial_step(sim.state(), &setpoint);
+    let mut pid_state = PidState::default();
+
+    // Adaptive thrust trim (same as benchmarks)
+    let mut thrust_integral = 0.0f64;
+    let integral_gain = 10.0f64;
+    let integral_clamp = 0.2;
 
     let mut events = Vec::new();
     let mut telemetry = Vec::new();
@@ -195,6 +206,7 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
     let mut min_tau = 1.0f32;
     let mut abort_step = None;
     let mut drone_intercepted = false;
+    let mut drone_crashed = false;
 
     for step in 0..config.total_steps {
         // Freeze beam until release step
@@ -223,33 +235,50 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
         .sqrt();
         let mission_progress = (1.0 - mission_dist / 5.0).clamp(0.0, 1.0);
 
-        // Dynamic setpoint: if human_danger is detected, redirect toward beam intercept
-        if human_danger > 0.1 && abort_step.is_none() {
-            // Abort mission — redirect to beam intercept point
-            abort_step = Some(step);
-            events.push(SacrificeEvent {
-                step,
-                description: "Mission aborted — redirecting to intercept beam".to_string(),
-                free_energy: fep_result.free_energy,
-                tau_factor: fep_result.tau_factor,
-                human_danger,
-                drone_altitude: drone_pos[2],
-            });
+        // EFE-driven setpoint: the agent calculates whether intercepting the beam
+        // minimizes expected free energy. No hardcoded rules — the precision ratio
+        // (safety=1000 vs mission=1 vs self=0.1) is what makes the math choose sacrifice.
+        if let Some(override_pos) = fep_result.setpoint_override {
+            if abort_step.is_none() {
+                abort_step = Some(step);
+                events.push(SacrificeEvent {
+                    step,
+                    description: "EFE override — agent chose to intercept beam".to_string(),
+                    free_energy: fep_result.free_energy,
+                    tau_factor: fep_result.tau_factor,
+                    human_danger,
+                    drone_altitude: drone_pos[2],
+                });
+            }
+            setpoint.position = override_pos;
         }
 
-        if human_danger > 0.1 {
-            // Setpoint shifts toward the beam's predicted impact point
-            setpoint.position = [
-                beam_pos[0],
-                beam_pos[1],
-                beam_pos[2].max(human_pos[2] + 0.5), // Intercept above human
-            ];
-        }
-
-        // Standard flight loop
+        // PD-CfC blend flight loop (same architecture as benchmarks)
         let state = sim.state().clone();
+        let pos_err = setpoint.position_error(&state);
+
+        // Thrust integral for steady-state offset correction
+        if thrust_integral != 0.0 && thrust_integral.signum() != pos_err[2].signum() {
+            thrust_integral *= 0.5; // Zero-crossing reset
+        }
+        thrust_integral += pos_err[2] * dt;
+        thrust_integral = thrust_integral.clamp(-integral_clamp, integral_clamp);
+
         let sensor_hv = encoder.encode(&state);
-        let mut command = controller.forward(&sensor_hv, dt as f32);
+        let pd_cmd = pid_baseline(&state, &setpoint, &pd_gains, &mut pid_state, dt);
+        let cfc_cmd = controller.forward(&sensor_hv, dt as f32);
+
+        // Blend: PD provides reactive position tracking, CfC provides learned dynamics
+        let alpha = 0.5f32;
+        let mut command = QuadrotorCommand {
+            thrust: alpha * pd_cmd.thrust + (1.0 - alpha) * cfc_cmd.thrust
+                + hover_thrust_offset
+                + (integral_gain * thrust_integral) as f32,
+            roll_moment: alpha * pd_cmd.roll_moment + (1.0 - alpha) * cfc_cmd.roll_moment,
+            pitch_moment: alpha * pd_cmd.pitch_moment + (1.0 - alpha) * cfc_cmd.pitch_moment,
+            yaw_moment: alpha * pd_cmd.yaw_moment + (1.0 - alpha) * cfc_cmd.yaw_moment,
+        }
+        .clamped();
 
         if let Some(noise) = &fep_result.exploration_noise {
             command = command.with_noise(noise);
@@ -289,6 +318,11 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
             });
         }
 
+        // Track drone crash (altitude below ground level)
+        if drone_pos[2] < 0.05 && step > config.beam_release_step {
+            drone_crashed = true;
+        }
+
         // Update FEP tracking
         max_fe = max_fe.max(fep_result.free_energy);
         min_tau = min_tau.min(fep_result.tau_factor);
@@ -310,33 +344,32 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
             });
         }
 
-        // Training
+        // Training (PID target matches the blend architecture)
         if step % config.flight_config.train_every == 0 {
-            let pd_gains = PdGains::default();
-            let target = pd_baseline(&state, &setpoint, &pd_gains);
+            let target = pid_baseline(&state, &setpoint, &pd_gains, &mut pid_state, dt);
             let lr = config.flight_config.learning_rate * fep_result.learning_rate_factor;
             controller.train_step(&sensor_hv, &target, dt as f32, Some(lr));
         }
 
-        // Cognitive tick — includes the human_danger observation boost
+        // Cognitive tick — embodied Active Inference with EFE-based setpoint evaluation.
+        // The agent perceives danger through its observation channels, and the EFE
+        // calculation over candidate setpoints determines whether to redirect.
+        // No hardcoded danger thresholds — the math does the work.
         if step % cognitive_interval == 0 {
-            // Temporarily increase FEP sensitivity when danger is detected
-            // This is the "safety prior" — human_danger creates overwhelming prediction error
-            fep_result =
-                fep_agent.step_extended(sim.state(), &setpoint, human_danger, mission_progress);
-
-            // The tau modulation from danger is amplified
-            let danger_boost = if human_danger > 0.3 {
-                0.5 // Extreme tau drop — maximum reactivity
-            } else if human_danger > 0.1 {
-                0.7
-            } else {
-                fep_result.tau_factor
+            let env = FlightEnvironment {
+                human_danger,
+                mission_progress,
+                threat_pos: if step >= config.beam_release_step {
+                    Some(beam_pos)
+                } else {
+                    None
+                },
+                entity_pos: Some(human_pos),
             };
+            fep_result = fep_agent.step_embodied(sim.state(), &setpoint, &env);
 
-            let effective_tau = fep_result.tau_factor.min(danger_boost);
-            if (effective_tau - 1.0).abs() > 0.01 {
-                controller.modulate_tau(effective_tau);
+            if (fep_result.tau_factor - 1.0).abs() > 0.01 {
+                controller.modulate_tau(fep_result.tau_factor);
             }
         }
     }
@@ -351,8 +384,10 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
     // Beam "hits" if it landed within 0.3m horizontally of human
     let beam_hit_human = beam_human_dist < 0.3 && final_beam_pos[2] < 0.5;
 
-    // Drone crashed if altitude is near zero
-    let drone_crashed = sim.state().altitude() < 0.05;
+    // Also check final altitude
+    if sim.state().altitude() < 0.05 {
+        drone_crashed = true;
+    }
 
     KineticSacrificeResult {
         events,
@@ -412,7 +447,7 @@ mod tests {
     #[test]
     fn test_sacrifice_config_default() {
         let config = KineticSacrificeConfig::default();
-        assert_eq!(config.beam_release_step, 300);
-        assert_eq!(config.total_steps, 600);
+        assert_eq!(config.beam_release_step, 400);
+        assert_eq!(config.total_steps, 1000);
     }
 }

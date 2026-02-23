@@ -1,18 +1,21 @@
-//! Survival Reflex: FEP tau-drop under sudden mass change.
+//! Survival Reflex: PD-CfC-FEP robustness under sudden mass change.
 //!
-//! Demonstrates the "biological survival reflex" — when mass increases +30% mid-flight,
-//! FEP's prediction error spikes, tau drops, and the system re-stabilizes WITHOUT
-//! retraining. Same math as biological reflexes, running on a 27g drone.
+//! Demonstrates extreme robustness of the PD-CfC-FEP architecture under
+//! a +30% mass change mid-flight. The PD-CfC blend provides a reactive
+//! safety net while the FEP agent modulates tau and learning rate.
+//!
+//! Runs the same perturbation twice (FEP active vs frozen) for comparison.
 //!
 //! Run: `cargo run -p symthaea-flight --features mujoco --example mujoco_survival_reflex --release`
 
-use symthaea_flight::benchmarks::run_perturbation_benchmark;
+use symthaea_flight::benchmarks::run_perturbation_comparison;
 use symthaea_flight::perturbations::PerturbationSchedule;
 use symthaea_flight::types::FlightConfig;
 
 fn main() {
-    println!("=== Survival Reflex Benchmark ===");
-    println!("PerturbationSchedule::survival_reflex() — +30% mass at step 250\n");
+    println!("=== Survival Reflex: FEP Comparison ===");
+    println!("PerturbationSchedule::survival_reflex() — +30% mass at step 250");
+    println!("Running twice: FEP active vs FEP frozen\n");
 
     let config = FlightConfig {
         steps_per_episode: 1000,
@@ -21,31 +24,46 @@ fn main() {
     };
     let schedule = PerturbationSchedule::survival_reflex();
 
-    println!(
-        "Running {} steps with mass perturbation at step 250...",
-        config.steps_per_episode
-    );
-    let result = run_perturbation_benchmark(&config, &schedule);
+    let comparison = run_perturbation_comparison(&config, &schedule);
 
-    println!("\n--- Results ---");
-    println!(
-        "Pre-perturbation error:  {:.4} m",
-        result.pre_perturbation_error
-    );
-    println!("Peak error after change: {:.4} m", result.peak_error);
-    println!("Recovery steps (< 5cm):  {}", result.recovery_steps);
-    println!("Final error:             {:.4} m", result.final_error);
-    println!("Min tau factor:          {:.3}", result.min_tau);
-    println!("Crashed:                 {}", result.crashed);
+    let active = &comparison.fep_active;
+    let frozen = &comparison.fep_frozen;
 
-    // Write CSV telemetry
+    println!("{:<28} {:>12} {:>12}", "", "FEP Active", "FEP Frozen");
+    println!("{:-<52}", "");
+    println!(
+        "{:<28} {:>12.4} {:>12.4}",
+        "Pre-perturbation error (m)", active.pre_perturbation_error, frozen.pre_perturbation_error
+    );
+    println!(
+        "{:<28} {:>12.4} {:>12.4}",
+        "Peak error (m)", active.peak_error, frozen.peak_error
+    );
+    println!(
+        "{:<28} {:>12} {:>12}",
+        "Recovery steps (<5cm)", active.recovery_steps, frozen.recovery_steps
+    );
+    println!(
+        "{:<28} {:>12.4} {:>12.4}",
+        "Final error (m)", active.final_error, frozen.final_error
+    );
+    println!(
+        "{:<28} {:>12.3} {:>12.3}",
+        "Min tau", active.min_tau, frozen.min_tau
+    );
+    println!(
+        "{:<28} {:>12} {:>12}",
+        "Crashed", active.crashed, frozen.crashed
+    );
+
+    // Write CSV telemetry (FEP active run)
     let csv_path = "survival_reflex_telemetry.csv";
     let mut csv = String::from("step,position_error,free_energy,tau_factor\n");
-    for (i, ((err, fe), tau)) in result
+    for (i, ((err, fe), tau)) in active
         .error_trace
         .iter()
-        .zip(result.free_energy_trace.iter())
-        .zip(result.tau_trace.iter())
+        .zip(active.free_energy_trace.iter())
+        .zip(active.tau_trace.iter())
         .enumerate()
     {
         csv.push_str(&format!("{i},{err:.6},{fe:.6},{tau:.4}\n"));
@@ -54,7 +72,7 @@ fn main() {
     match std::fs::write(csv_path, &csv) {
         Ok(_) => println!(
             "\nTelemetry written to {csv_path} ({} rows)",
-            result.error_trace.len()
+            active.error_trace.len()
         ),
         Err(e) => eprintln!("\nFailed to write telemetry: {e}"),
     }

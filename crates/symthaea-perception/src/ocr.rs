@@ -111,8 +111,8 @@ impl RustOcrEngine {
 
     /// Initialize the OCR engine (load models)
     pub fn initialize(&mut self) -> Result<()> {
-        // TODO: Load rten/ocrs models
-        // Models are small (~8MB total) and fast to load
+        // STUB(model-required): Marks initialized without loading models.
+        // Returns empty OcrResult when rten/ocrs models are unavailable.
         self.initialized = true;
         Ok(())
     }
@@ -125,8 +125,8 @@ impl RustOcrEngine {
 
         let start = Instant::now();
 
-        // TODO: Actual rten/ocrs inference
-        // For now, return placeholder result
+        // STUB(model-required): Returns empty OcrResult when rten/ocrs models unavailable.
+        // Degraded-mode contract: empty text, zero confidence, valid structure.
         let result = OcrResult {
             text: String::new(),
             confidence: 0.0,

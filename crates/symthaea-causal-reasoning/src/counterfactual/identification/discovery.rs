@@ -1621,3 +1621,500 @@ impl TransportabilityResult {
         !matches!(self, TransportabilityResult::NotTransportable { .. })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PC Algorithm Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_pc_algorithm_default() {
+        let pc = PCAlgorithm::new();
+        assert!((pc.alpha - 0.05).abs() < 1e-10);
+        assert_eq!(pc.max_cond_size, 4);
+
+        let pc2 = PCAlgorithm::default();
+        assert!((pc2.alpha - 0.05).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_pc_algorithm_with_alpha() {
+        let pc = PCAlgorithm::with_alpha(0.01);
+        assert!((pc.alpha - 0.01).abs() < 1e-10);
+        assert_eq!(pc.max_cond_size, 4);
+    }
+
+    #[test]
+    fn test_pc_discover_empty_data() {
+        let data = ObservationalData::new(vec![]);
+        let pc = PCAlgorithm::new();
+        let result = pc.discover(&data);
+        assert!(!result.is_valid());
+        assert_eq!(result.cpdag.nodes.len(), 0);
+        assert_eq!(result.independence_tests, 0);
+    }
+
+    #[test]
+    fn test_pc_discover_single_variable() {
+        let mut data = ObservationalData::new(vec!["X".into()]);
+        for i in 0..20 {
+            data.add_observation(vec![i as f64]);
+        }
+        let pc = PCAlgorithm::new();
+        let result = pc.discover(&data);
+        assert!(result.is_valid());
+        assert_eq!(result.skeleton.num_edges(), 0);
+    }
+
+    #[test]
+    fn test_pc_discover_correlated_pair() {
+        // Strongly correlated pair: X and Y = 3*X + small noise
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for i in 0..100 {
+            let x = (i as f64) / 10.0;
+            let y = 3.0 * x + 0.001 * (i % 7) as f64;
+            data.add_observation(vec![x, y]);
+        }
+
+        let pc = PCAlgorithm::new();
+        let result = pc.discover(&data);
+
+        assert!(result.is_valid());
+        // Strongly correlated pair should keep edge in skeleton
+        assert!(
+            result.skeleton.adjacent(0, 1),
+            "Strongly correlated variables should be adjacent in skeleton"
+        );
+        assert!(result.independence_tests > 0);
+    }
+
+    #[test]
+    fn test_pc_discover_chain_structure() {
+        // Generate data from chain: X → Y → Z
+        // X independent of Z given Y
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into(), "Z".into()]);
+        for i in 0..200 {
+            let x = (i as f64) / 100.0 - 1.0;
+            let y = 0.8 * x + 0.02 * (i % 11) as f64;
+            let z = 0.7 * y + 0.02 * (i % 13) as f64;
+            data.add_observation(vec![x, y, z]);
+        }
+
+        let pc = PCAlgorithm::new();
+        let result = pc.discover(&data);
+
+        assert!(result.is_valid());
+        let summary = result.summary();
+        assert!(summary.contains("PC Algorithm Result"));
+        assert!(summary.contains("Independence tests"));
+    }
+
+    #[test]
+    fn test_pc_result_summary_format() {
+        let mut data = ObservationalData::new(vec!["A".into(), "B".into()]);
+        for i in 0..50 {
+            data.add_observation(vec![i as f64, i as f64 * 2.0]);
+        }
+        let pc = PCAlgorithm::new();
+        let result = pc.discover(&data);
+        let summary = result.summary();
+        assert!(summary.contains("Nodes: 2"));
+    }
+
+    #[test]
+    fn test_pc_result_to_dag() {
+        let mut data = ObservationalData::new(vec!["A".into(), "B".into()]);
+        for i in 0..50 {
+            data.add_observation(vec![i as f64, i as f64 * 2.0]);
+        }
+        let pc = PCAlgorithm::new();
+        let result = pc.discover(&data);
+        let dag = result.to_dag();
+        assert_eq!(dag.nodes.len(), 2);
+    }
+
+    #[test]
+    fn test_fisher_z_transform_zero_correlation() {
+        let z = fisher_z_transform(0.0, 100, 0);
+        assert!(z.abs() < 1e-10, "Zero correlation should give zero z-stat");
+    }
+
+    #[test]
+    fn test_fisher_z_transform_near_perfect_correlation() {
+        let z = fisher_z_transform(0.99, 100, 0);
+        assert!(z > 10.0, "Near-perfect correlation should give large z-stat");
+    }
+
+    #[test]
+    fn test_fisher_z_transform_insufficient_df() {
+        // n=3, k=1 → df = 3-1-3 = -1, should return 0
+        let z = fisher_z_transform(0.5, 3, 1);
+        assert!((z - 0.0).abs() < 1e-10, "Insufficient df should return 0");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Mediation Analysis Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_mediation_full_mediation_detection() {
+        // X → M → Y (full mediation, all indirect)
+        let dag = CausalDAG::new(
+            vec!["X".into(), "M".into(), "Y".into()],
+            vec![(0, 1), (1, 2)],
+        );
+
+        let mut data = ObservationalData::new(vec!["X".into(), "M".into(), "Y".into()]);
+        for i in 0..200 {
+            let x = (i as f64) / 100.0 - 1.0;
+            let m = 0.8 * x + 0.01 * (i % 7) as f64;
+            let y = 0.9 * m + 0.01 * (i % 11) as f64;
+            data.add_observation(vec![x, m, y]);
+        }
+
+        let analysis = MediationAnalysis::new(&dag, 0, 1, 2);
+        let result = analysis.analyze(&data);
+        assert!(result.is_identified);
+        assert!(result.a_path.is_finite());
+        assert!(result.b_path.is_finite());
+        // High proportion mediated for full mediation
+        assert!(
+            result.proportion_mediated > 0.5,
+            "Expected high proportion mediated for full mediation, got {}",
+            result.proportion_mediated
+        );
+    }
+
+    #[test]
+    fn test_mediation_no_mediator_m_to_y() {
+        // X → M but M has no path to Y
+        let dag = CausalDAG::new(
+            vec!["X".into(), "M".into(), "Y".into()],
+            vec![(0, 1), (0, 2)],
+        );
+
+        let analysis = MediationAnalysis::new(&dag, 0, 1, 2);
+        let id = analysis.is_identified();
+        assert!(
+            matches!(id, MediationIdentification::NotMediator { .. }),
+            "Expected NotMediator when M has no path to Y"
+        );
+    }
+
+    #[test]
+    fn test_mediation_result_summary_identified() {
+        let result = MediationResult {
+            total_effect: 1.0,
+            natural_direct_effect: 0.3,
+            natural_indirect_effect: 0.7,
+            a_path: 0.8,
+            b_path: 0.875,
+            c_prime: 0.3,
+            proportion_mediated: 0.7,
+            is_identified: true,
+            identification: MediationIdentification::Identified {
+                nde_adjustment: vec![],
+                nie_adjustment: vec![],
+                has_direct_effect: true,
+            },
+        };
+
+        assert!(result.is_partially_mediated());
+        assert!(!result.is_fully_mediated());
+        assert!(result.has_significant_mediation(0.1));
+        let summary = result.summary();
+        assert!(summary.contains("Partial mediation"));
+    }
+
+    #[test]
+    fn test_mediation_result_summary_not_identified() {
+        let result = MediationResult {
+            total_effect: f64::NAN,
+            natural_direct_effect: f64::NAN,
+            natural_indirect_effect: f64::NAN,
+            a_path: f64::NAN,
+            b_path: f64::NAN,
+            c_prime: f64::NAN,
+            proportion_mediated: f64::NAN,
+            is_identified: false,
+            identification: MediationIdentification::NotMediator {
+                reason: "test".into(),
+            },
+        };
+
+        assert!(!result.is_fully_mediated());
+        assert!(!result.is_partially_mediated());
+        assert!(!result.has_significant_mediation(0.1));
+        let summary = result.summary();
+        assert!(summary.contains("not identified"));
+    }
+
+    #[test]
+    fn test_mediation_insufficient_data() {
+        let dag = CausalDAG::new(
+            vec!["X".into(), "M".into(), "Y".into()],
+            vec![(0, 1), (1, 2), (0, 2)],
+        );
+
+        // Only 1 observation — regressions should return 0
+        let mut data = ObservationalData::new(vec!["X".into(), "M".into(), "Y".into()]);
+        data.add_observation(vec![1.0, 2.0, 3.0]);
+
+        let analysis = MediationAnalysis::new(&dag, 0, 1, 2);
+        let result = analysis.analyze(&data);
+        assert!(result.is_identified);
+        assert!((result.total_effect - 0.0).abs() < 1e-10);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Instrumental Variable Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_iv_valid_instrument() {
+        // Z → X → Y, Z is a valid instrument
+        let dag = CausalDAG::new(
+            vec!["Z".into(), "X".into(), "Y".into()],
+            vec![(0, 1), (1, 2)],
+        );
+        let validity = IVEstimator::is_valid_instrument(&dag, 0, 1, 2);
+        assert!(
+            matches!(validity, IVValidity::Valid { .. }),
+            "Z should be valid instrument for X→Y"
+        );
+    }
+
+    #[test]
+    fn test_iv_invalid_no_relevance() {
+        // Z has no path to X
+        let dag = CausalDAG::new(
+            vec!["Z".into(), "X".into(), "Y".into()],
+            vec![(1, 2)], // Only X → Y
+        );
+        let validity = IVEstimator::is_valid_instrument(&dag, 0, 1, 2);
+        assert!(
+            matches!(validity, IVValidity::Invalid { .. }),
+            "Z should be invalid: no Z→X path"
+        );
+    }
+
+    #[test]
+    fn test_iv_invalid_direct_effect() {
+        // Z → X → Y, Z → Y (violates exclusion restriction)
+        let dag = CausalDAG::new(
+            vec!["Z".into(), "X".into(), "Y".into()],
+            vec![(0, 1), (1, 2), (0, 2)],
+        );
+        let validity = IVEstimator::is_valid_instrument(&dag, 0, 1, 2);
+        assert!(
+            matches!(validity, IVValidity::Invalid { .. }),
+            "Z should be invalid: direct Z→Y path"
+        );
+    }
+
+    #[test]
+    fn test_iv_2sls_estimation() {
+        // Z → X → Y with true effect X→Y = 2.0
+        let mut data =
+            ObservationalData::new(vec!["Z".into(), "X".into(), "Y".into()]);
+        for i in 0..200 {
+            let z = (i % 2) as f64;
+            let x = 0.8 * z + 0.05 * (i % 5) as f64;
+            let y = 2.0 * x + 0.05 * (i % 7) as f64;
+            data.add_observation(vec![z, x, y]);
+        }
+
+        let result = IVEstimator::estimate_2sls(&data, 0, 1, 2);
+        assert!(result.effect.is_finite(), "2SLS effect should be finite");
+        assert!(
+            (result.effect - 2.0).abs() < 1.0,
+            "2SLS effect should be ~2.0, got {}",
+            result.effect
+        );
+        assert_eq!(result.method, "2SLS");
+    }
+
+    #[test]
+    fn test_iv_2sls_insufficient_data() {
+        let mut data =
+            ObservationalData::new(vec!["Z".into(), "X".into(), "Y".into()]);
+        for i in 0..5 {
+            data.add_observation(vec![i as f64, i as f64 * 2.0, i as f64 * 4.0]);
+        }
+        let result = IVEstimator::estimate_2sls(&data, 0, 1, 2);
+        assert!(result.effect.is_nan(), "Insufficient data should return NaN");
+        assert!(result.is_weak_instrument);
+    }
+
+    #[test]
+    fn test_iv_wald_estimator() {
+        // Binary instrument Z, X = Z + noise, Y = 2*X + noise
+        let mut data =
+            ObservationalData::new(vec!["Z".into(), "X".into(), "Y".into()]);
+        for i in 0..200 {
+            let z = (i % 2) as f64;
+            let x = z + 0.01 * (i % 3) as f64;
+            let y = 2.0 * x + 0.01 * (i % 5) as f64;
+            data.add_observation(vec![z, x, y]);
+        }
+
+        let wald = IVEstimator::estimate_wald(&data, 0, 1, 2);
+        assert!(wald.is_finite(), "Wald estimate should be finite");
+        assert!(
+            (wald - 2.0).abs() < 0.5,
+            "Wald estimate should be ~2.0, got {}",
+            wald
+        );
+    }
+
+    #[test]
+    fn test_iv_wald_no_variance() {
+        // All instrument values are the same
+        let mut data =
+            ObservationalData::new(vec!["Z".into(), "X".into(), "Y".into()]);
+        for i in 0..20 {
+            data.add_observation(vec![0.0, i as f64, i as f64 * 2.0]);
+        }
+        let wald = IVEstimator::estimate_wald(&data, 0, 1, 2);
+        assert!(wald.is_nan(), "All-same instrument should return NaN");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Time-Series Causal Discovery Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_time_series_data_construction() {
+        let mut ts = TimeSeriesData::new(vec!["X".into(), "Y".into()]);
+        assert_eq!(ts.n_timepoints(), 0);
+        ts.add_observation(vec![1.0, 2.0]);
+        ts.add_observation(vec![3.0, 4.0]);
+        assert_eq!(ts.n_timepoints(), 2);
+        assert_eq!(ts.variables.len(), 2);
+    }
+
+    #[test]
+    fn test_granger_mismatched_lengths() {
+        let tscd = TimeSeriesCausalDiscovery::new(2);
+        let x = vec![1.0, 2.0, 3.0];
+        let y = vec![1.0, 2.0]; // different length
+        let result = tscd.granger_test(&x, &y, 1);
+        assert!(!result.is_significant);
+        assert!((result.f_statistic - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_granger_too_short_for_lag() {
+        let tscd = TimeSeriesCausalDiscovery::new(5);
+        let x = vec![1.0, 2.0, 3.0];
+        let y = vec![1.0, 2.0, 3.0];
+        let result = tscd.granger_test(&x, &y, 5);
+        assert!(!result.is_significant);
+    }
+
+    #[test]
+    fn test_time_series_causal_graph_summary() {
+        let tscd = TimeSeriesCausalDiscovery::new(1);
+        let mut ts = TimeSeriesData::new(vec!["A".into(), "B".into()]);
+        for t in 0..30 {
+            ts.add_observation(vec![t as f64, t as f64 * 0.5]);
+        }
+        let graph = tscd.discover(&ts);
+        let summary = graph.summary();
+        assert!(summary.contains("Time-Series Causal Graph"));
+    }
+
+    #[test]
+    fn test_time_series_default() {
+        let tscd = TimeSeriesCausalDiscovery::default();
+        assert_eq!(tscd.max_lag, 5);
+        assert!((tscd.alpha - 0.05).abs() < 1e-10);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Transportability Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_transportability_selection_on_pathway() {
+        // X → S → Y, where S is a selection node on the causal pathway
+        let source_dag = CausalDAG::new(
+            vec!["X".into(), "S".into(), "Y".into()],
+            vec![(0, 1), (1, 2)],
+        );
+        let target_dag = source_dag.clone();
+        let analyzer = TransportabilityAnalyzer::new(source_dag, target_dag, vec![1]);
+        let result = analyzer.is_transportable(0, 2);
+        // S is on the causal pathway X→S→Y, so effect is NOT directly transportable
+        assert!(
+            !matches!(result, TransportabilityResult::DirectlyTransportable { .. }),
+            "Selection node on pathway should block direct transport"
+        );
+    }
+
+    #[test]
+    fn test_transportability_selection_off_pathway() {
+        // X → Y, Z is a selection node not on the pathway
+        let source_dag = CausalDAG::new(
+            vec!["X".into(), "Y".into(), "Z".into()],
+            vec![(0, 1)],
+        );
+        let target_dag = source_dag.clone();
+        let analyzer = TransportabilityAnalyzer::new(source_dag, target_dag, vec![2]);
+        let result = analyzer.is_transportable(0, 1);
+        assert!(
+            result.is_transportable(),
+            "Selection node off pathway should not block transport"
+        );
+    }
+
+    #[test]
+    fn test_transportability_transport_effect_direct() {
+        let source_dag = CausalDAG::new(vec!["X".into(), "Y".into()], vec![(0, 1)]);
+        let target_dag = source_dag.clone();
+
+        let mut source_data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        let mut target_data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for i in 0..50 {
+            let x = i as f64 / 25.0;
+            source_data.add_observation(vec![x, 2.0 * x]);
+            target_data.add_observation(vec![x, 2.0 * x]);
+        }
+
+        let analyzer = TransportabilityAnalyzer::new(source_dag, target_dag, vec![]);
+        let effect = analyzer.transport_effect(&source_data, &target_data, 0, 1);
+        assert!(
+            effect.is_some(),
+            "Direct transport should produce an effect estimate"
+        );
+        let eff = effect.unwrap();
+        assert!(
+            (eff - 2.0).abs() < 0.5,
+            "Transported effect should be ~2.0, got {}",
+            eff
+        );
+    }
+
+    #[test]
+    fn test_transportability_result_enum() {
+        let directly = TransportabilityResult::DirectlyTransportable {
+            explanation: "test".into(),
+        };
+        assert!(directly.is_transportable());
+
+        let with_adj = TransportabilityResult::TransportableWithAdjustment {
+            adjustment_set: vec![0],
+            explanation: "test".into(),
+        };
+        assert!(with_adj.is_transportable());
+
+        let not = TransportabilityResult::NotTransportable {
+            reason: "blocked".into(),
+            blocking_nodes: vec![1],
+        };
+        assert!(!not.is_transportable());
+    }
+}

@@ -4,7 +4,8 @@
 //! Symthaea's performance against published human norms.
 
 use symthaea_psych_bench::benchmarks::{
-    affect::{MoodCongruentRecallBenchmark, ValenceClassificationBenchmark},
+    affect::{EmotionalStroopBenchmark, MoodCongruentRecallBenchmark, ValenceClassificationBenchmark},
+    attention::AttentionalBlinkBenchmark,
     butlin::ButlinIndicatorSuite,
     cogbench::{
         BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
@@ -16,9 +17,10 @@ use symthaea_psych_bench::benchmarks::{
         FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark,
         StroopBenchmark, TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
     },
+    inhibition::GoNoGoBenchmark,
     memory_agent::{
         AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
-        TestTimeLearningBenchmark,
+        ProspectiveMemoryBenchmark, TestTimeLearningBenchmark,
     },
     metacognition::MetacognitiveCalibrationBenchmark,
     tombench::{
@@ -46,6 +48,7 @@ fn battery_config() -> BenchmarkConfig {
         planning_horizon: 3,
         action_temperature: 1.0,
         label: None,
+        time_pressure: 0.0,
     }
 }
 
@@ -100,6 +103,7 @@ fn full_battery_report() {
     // ── Affect ──
     report.add(ValenceClassificationBenchmark.run(&config));
     report.add(MoodCongruentRecallBenchmark.run(&config));
+    report.add(EmotionalStroopBenchmark.run(&config));
 
     // ── Creativity ──
     report.add(RemoteAssociatesBenchmark.run(&config));
@@ -108,11 +112,20 @@ fn full_battery_report() {
     // ── Butlin Consciousness Indicators ──
     report.add(ButlinIndicatorSuite.run(&config));
 
-    // Verify all 35 benchmarks produced results
+    // ── Inhibition ──
+    report.add(GoNoGoBenchmark.run(&config));
+
+    // ── Attention ──
+    report.add(AttentionalBlinkBenchmark.run(&config));
+
+    // ── Additional MemoryAgent ──
+    report.add(ProspectiveMemoryBenchmark.run(&config));
+
+    // Verify all 39 benchmarks produced results
     assert_eq!(
         report.results.len(),
-        35,
-        "Expected 35 benchmark results, got {}",
+        39,
+        "Expected 39 benchmark results, got {}",
         report.results.len()
     );
 
@@ -205,9 +218,13 @@ fn regression_against_baseline() {
     report.add(MetacognitiveCalibrationBenchmark.run(&config));
     report.add(ValenceClassificationBenchmark.run(&config));
     report.add(MoodCongruentRecallBenchmark.run(&config));
+    report.add(EmotionalStroopBenchmark.run(&config));
     report.add(RemoteAssociatesBenchmark.run(&config));
     report.add(AlternateUsesBenchmark.run(&config));
     report.add(ButlinIndicatorSuite.run(&config));
+    report.add(GoNoGoBenchmark.run(&config));
+    report.add(AttentionalBlinkBenchmark.run(&config));
+    report.add(ProspectiveMemoryBenchmark.run(&config));
 
     let current = RegressionSnapshot::from_report(&report, "current");
     let regression = RegressionReport::compare(&baseline, &current, 0.05, 0.10);

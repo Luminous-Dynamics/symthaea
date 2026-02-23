@@ -9,7 +9,6 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
 use crate::wm::{WmConfig, WorkingMemory};
-use symthaea_core::hdc::ContinuousHV;
 
 /// Test-time learning benchmark.
 pub struct TestTimeLearningBenchmark;
@@ -90,8 +89,8 @@ impl TestTimeLearningBenchmark {
         // updating (Karpicke & Roediger 2008 — testing effect).
         // β controls discriminability: lower β → more noise → more errors.
         let beta = 4.0;
-        let p_correction = (beta * corr_sim).exp()
-            / ((beta * corr_sim).exp() + (beta * orig_sim).exp());
+        let p_correction =
+            (beta * corr_sim).exp() / ((beta * corr_sim).exp() + (beta * orig_sim).exp());
 
         let roll_seed = config.trial_seed("memory", "ttl_decision", trial_idx);
         let mut ns = roll_seed ^ 0x9E3779B97F4A7C15;

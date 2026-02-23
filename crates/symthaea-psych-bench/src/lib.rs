@@ -3,7 +3,7 @@
 //! Standardized evaluation of Symthaea's neuroscience-inspired subsystems
 //! against established psychological benchmarks and published human baselines.
 //!
-//! ## Benchmarks (35 across 9 domains)
+//! ## Benchmarks (39 across 11 domains)
 //!
 //! - **WorM** — Working memory tasks (N-back, change detection, serial recall,
 //!   spatial updating, binding, digit span)
@@ -18,9 +18,12 @@
 //! - **ToMBench** — Theory of Mind tasks (false belief, faux-pas, persuasion,
 //!   strange story, hinting)
 //! - **MemoryAgentBench** — Full memory pipeline competencies (retrieval,
-//!   test-time learning, long-range, conflict resolution)
-//! - **Affect** — Affective processing (valence classification, mood-congruent recall)
+//!   test-time learning, long-range, conflict resolution, prospective memory)
+//! - **Affect** — Affective processing (valence classification, mood-congruent
+//!   recall, emotional Stroop)
 //! - **Creativity** — Creative cognition (Remote Associates Test, Alternate Uses Task)
+//! - **Inhibition** — Response inhibition (Go/No-Go prepotent response control)
+//! - **Attention** — Temporal attention (Attentional Blink RSVP paradigm)
 //!
 //! ## Usage
 //!

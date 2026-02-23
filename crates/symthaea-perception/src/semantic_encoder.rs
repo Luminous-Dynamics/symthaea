@@ -52,7 +52,7 @@ impl SemanticEncoder {
         if self.use_dream {
             self.dream_encode(text)
         } else {
-            // TODO: Implement actual ONNX inference
+            // STUB(model-required): Falls through to dream_encode() — deterministic hash-based vector
             self.dream_encode(text)
         }
     }
@@ -62,7 +62,7 @@ impl SemanticEncoder {
         if self.use_dream {
             Ok(self.dream_encode_real(text))
         } else {
-            // TODO: Implement actual ONNX inference
+            // STUB(model-required): Falls through to dream_encode() — deterministic hash-based vector
             Ok(self.dream_encode_real(text))
         }
     }

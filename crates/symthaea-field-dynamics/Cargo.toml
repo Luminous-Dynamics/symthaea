@@ -13,3 +13,4 @@ categories = ["science", "algorithms"]
 
 [dependencies]
 serde = { workspace = true }
+thiserror = { workspace = true }

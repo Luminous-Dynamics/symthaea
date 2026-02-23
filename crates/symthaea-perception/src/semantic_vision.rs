@@ -600,8 +600,8 @@ impl MoondreamModel {
         if self.vision_encoder.is_some() {
             let _features = self.encode_image(image)?;
 
-            // TODO: Run text decoder with "Describe this image:" prompt
-            // For now, return basic caption based on feature presence
+            // STUB(model-required): Returns placeholder caption when Moondream2 text decoder unavailable.
+            // Degraded-mode contract: generic description, 0.6 confidence, valid structure.
             let elapsed = start.elapsed();
             tracing::debug!("Moondream captioning took {:?}", elapsed);
 
@@ -647,7 +647,8 @@ impl MoondreamModel {
         if self.vision_encoder.is_some() {
             let _features = self.encode_image(image)?;
 
-            // TODO: Run text decoder with question as prompt
+            // STUB(model-required): Returns placeholder answer when Moondream2 text decoder unavailable.
+            // Degraded-mode contract: echoes question, 0.5 confidence, valid structure.
             let elapsed = start.elapsed();
             tracing::debug!("Moondream VQA took {:?}", elapsed);
 

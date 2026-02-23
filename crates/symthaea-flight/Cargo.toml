@@ -44,3 +44,7 @@ required-features = ["mujoco"]
 [[example]]
 name = "mujoco_kinetic_sacrifice"
 required-features = ["mujoco"]
+
+[[example]]
+name = "mujoco_swarm_validation"
+required-features = ["swarm"]
