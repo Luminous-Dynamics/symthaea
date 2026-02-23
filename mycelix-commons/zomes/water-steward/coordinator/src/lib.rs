@@ -40,14 +40,14 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn define_watershed(watershed: Watershed) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_voting(), "define_watershed")?;
-    if watershed.id.is_empty() || watershed.id.len() > 256 {
+    if watershed.id.trim().is_empty() || watershed.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Watershed ID must be 1-256 characters".into()
+            "Watershed ID must be 1-256 non-whitespace characters".into()
         )));
     }
-    if watershed.name.is_empty() || watershed.name.len() > 256 {
+    if watershed.name.trim().is_empty() || watershed.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Watershed name must be 1-256 characters".into()
+            "Watershed name must be 1-256 non-whitespace characters".into()
         )));
     }
 
@@ -185,6 +185,12 @@ pub fn transfer_right(input: TransferRightInput) -> ExternResult<Record> {
         )));
     }
 
+    if input.volume_liters == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Transfer volume must be greater than zero".into()
+        )));
+    }
+
     if input.volume_liters > right.volume_authorized_liters {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Transfer volume exceeds authorized volume".into()
@@ -253,9 +259,9 @@ pub struct TransferRightInput {
 #[hdk_extern]
 pub fn file_dispute(dispute: WaterDispute) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "file_dispute")?;
-    if dispute.description.is_empty() || dispute.description.len() > 8192 {
+    if dispute.description.trim().is_empty() || dispute.description.len() > 8192 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Description must be 1-8192 characters".into()
+            "Description must be 1-8192 non-whitespace characters".into()
         )));
     }
 
@@ -291,6 +297,13 @@ pub fn file_dispute(dispute: WaterDispute) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_constitutional(), "resolve_dispute")?;
+
+    if input.resolution_text.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Resolution text cannot be empty or whitespace-only".into()
+        )));
+    }
+
     let record = get(input.dispute_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Dispute not found".into())
     ))?;
@@ -872,5 +885,91 @@ mod tests {
         assert_eq!(decoded.has_clear_title, false);
         assert_eq!(decoded.owner_matches, false);
         assert!(decoded.error.is_some());
+    }
+
+    // ========================================================================
+    // VALIDATION HARDENING EDGE CASE TESTS
+    // ========================================================================
+
+    /// Whitespace-only watershed ID should be rejected.
+    #[test]
+    fn watershed_whitespace_only_id_serde() {
+        let ws = Watershed {
+            id: "   ".to_string(),
+            name: "Valid Name".to_string(),
+            huc_code: None,
+            boundary: vec![(0.0, 0.0), (1.0, 1.0), (2.0, 0.0)],
+            area_sq_km: 10.0,
+            stewardship_type: StewardshipType::Commons,
+            governing_body: None,
+            primary_source_type: WaterSourceType::River,
+        };
+        let json = serde_json::to_string(&ws).unwrap();
+        let decoded: Watershed = serde_json::from_str(&json).unwrap();
+        assert!(decoded.id.trim().is_empty(), "Whitespace-only ID must be caught by trim()");
+    }
+
+    /// Whitespace-only watershed name should be rejected.
+    #[test]
+    fn watershed_whitespace_only_name_serde() {
+        let ws = Watershed {
+            id: "ws-001".to_string(),
+            name: " \t\n ".to_string(),
+            huc_code: None,
+            boundary: vec![(0.0, 0.0), (1.0, 1.0), (2.0, 0.0)],
+            area_sq_km: 10.0,
+            stewardship_type: StewardshipType::Commons,
+            governing_body: None,
+            primary_source_type: WaterSourceType::River,
+        };
+        let json = serde_json::to_string(&ws).unwrap();
+        let decoded: Watershed = serde_json::from_str(&json).unwrap();
+        assert!(decoded.name.trim().is_empty(), "Whitespace-only name must be caught by trim()");
+    }
+
+    /// Whitespace-only dispute description should be rejected.
+    #[test]
+    fn dispute_whitespace_only_description_serde() {
+        let dispute = WaterDispute {
+            watershed_hash: fake_action_hash(),
+            complainant: fake_agent(),
+            respondent: fake_agent_2(),
+            dispute_type: DisputeType::Allocation,
+            description: "    ".to_string(),
+            evidence: vec![],
+            status: DisputeStatus::Filed,
+            resolution: None,
+        };
+        let json = serde_json::to_string(&dispute).unwrap();
+        let decoded: WaterDispute = serde_json::from_str(&json).unwrap();
+        assert!(decoded.description.trim().is_empty(), "Whitespace-only description must be caught by trim()");
+    }
+
+    /// Zero-volume transfer right should be rejected.
+    #[test]
+    fn transfer_right_input_zero_volume_serde() {
+        let input = TransferRightInput {
+            right_hash: fake_action_hash(),
+            to_holder: fake_agent_2(),
+            volume_liters: 0,
+            transfer_type: TransferType::Sale,
+            approved_by: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferRightInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.volume_liters, 0, "Zero volume preserved in struct for coordinator rejection");
+    }
+
+    /// Whitespace-only resolution text should be rejected.
+    #[test]
+    fn resolve_dispute_input_whitespace_only_resolution_serde() {
+        let input = ResolveDisputeInput {
+            dispute_hash: fake_action_hash(),
+            new_status: DisputeStatus::Resolved,
+            resolution_text: "   \t  ".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ResolveDisputeInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.resolution_text.trim().is_empty(), "Whitespace-only resolution must be caught by trim()");
     }
 }

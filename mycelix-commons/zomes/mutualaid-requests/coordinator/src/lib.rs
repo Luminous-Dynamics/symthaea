@@ -163,6 +163,30 @@ fn require_consciousness(
 #[hdk_extern]
 pub fn create_request(input: CreateRequestInput) -> ExternResult<RequestWithHash> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "create_request")?;
+
+    // Validate description is not empty or whitespace-only
+    if input.description.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Request description cannot be empty or whitespace-only".into()
+        )));
+    }
+
+    // Validate requester DID is not empty or whitespace-only
+    if input.requester_did.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Requester DID cannot be empty or whitespace-only".into()
+        )));
+    }
+
+    // Validate amount_needed is non-zero when provided
+    if let Some(amount) = input.amount_needed {
+        if amount == 0 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Request amount must be greater than zero".into()
+            )));
+        }
+    }
+
     let now = sys_time()?;
     let id = generate_id("req")?;
 
@@ -412,6 +436,30 @@ pub fn get_requests_by_requester(requester_did: String) -> ExternResult<Vec<Requ
 #[hdk_extern]
 pub fn create_offer(input: CreateOfferInput) -> ExternResult<OfferWithHash> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "create_offer")?;
+
+    // Validate message is not empty or whitespace-only
+    if input.message.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Offer message cannot be empty or whitespace-only".into()
+        )));
+    }
+
+    // Validate offerer DID is not empty or whitespace-only
+    if input.offerer_did.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Offerer DID cannot be empty or whitespace-only".into()
+        )));
+    }
+
+    // Validate amount is non-zero when provided
+    if let Some(amount) = input.amount {
+        if amount == 0 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Offer amount must be greater than zero".into()
+            )));
+        }
+    }
+
     let now = sys_time()?;
     let id = generate_id("off")?;
 
@@ -1107,5 +1155,155 @@ mod tests {
         assert!(decoded.request_type.is_none());
         assert_eq!(decoded.status, Some(RequestStatus::Fulfilled));
         assert_eq!(decoded.urgency, Some(Urgency::Low));
+    }
+
+    // ── Validation edge case tests ──────────────────────────────────
+
+    #[test]
+    fn create_request_input_whitespace_description_detected() {
+        let input = CreateRequestInput {
+            requester_did: "did:mycelix:alice".to_string(),
+            request_type: RequestType::Financial,
+            description: "   \t\n  ".to_string(),
+            urgency: Urgency::Medium,
+            location: None,
+            amount_needed: Some(100),
+        };
+        assert!(input.description.trim().is_empty(), "Whitespace-only description should be detected");
+    }
+
+    #[test]
+    fn create_request_input_empty_description_detected() {
+        let input = CreateRequestInput {
+            requester_did: "did:mycelix:alice".to_string(),
+            request_type: RequestType::Food,
+            description: "".to_string(),
+            urgency: Urgency::High,
+            location: None,
+            amount_needed: None,
+        };
+        assert!(input.description.trim().is_empty(), "Empty description should be detected");
+    }
+
+    #[test]
+    fn create_request_input_whitespace_requester_did_detected() {
+        let input = CreateRequestInput {
+            requester_did: "  \t ".to_string(),
+            request_type: RequestType::Medical,
+            description: "Valid description".to_string(),
+            urgency: Urgency::Critical,
+            location: None,
+            amount_needed: None,
+        };
+        assert!(input.requester_did.trim().is_empty(), "Whitespace-only DID should be detected");
+    }
+
+    #[test]
+    fn create_request_input_zero_amount_detected() {
+        let input = CreateRequestInput {
+            requester_did: "did:mycelix:alice".to_string(),
+            request_type: RequestType::Financial,
+            description: "Need funds".to_string(),
+            urgency: Urgency::High,
+            location: None,
+            amount_needed: Some(0),
+        };
+        assert_eq!(input.amount_needed, Some(0), "Zero amount should be detected");
+    }
+
+    #[test]
+    fn create_request_input_valid_accepted() {
+        let input = CreateRequestInput {
+            requester_did: "did:mycelix:alice".to_string(),
+            request_type: RequestType::Financial,
+            description: "Need help with rent".to_string(),
+            urgency: Urgency::High,
+            location: Some("Downtown".to_string()),
+            amount_needed: Some(500),
+        };
+        assert!(!input.description.trim().is_empty(), "Valid description should pass");
+        assert!(!input.requester_did.trim().is_empty(), "Valid DID should pass");
+        assert!(input.amount_needed.unwrap() > 0, "Valid amount should pass");
+    }
+
+    #[test]
+    fn create_request_input_none_amount_accepted() {
+        // None amount_needed is valid (non-financial requests)
+        let input = CreateRequestInput {
+            requester_did: "did:mycelix:bob".to_string(),
+            request_type: RequestType::Childcare,
+            description: "Need childcare help".to_string(),
+            urgency: Urgency::Medium,
+            location: None,
+            amount_needed: None,
+        };
+        assert!(input.amount_needed.is_none(), "None amount should be accepted for non-financial requests");
+    }
+
+    #[test]
+    fn create_offer_input_whitespace_message_detected() {
+        let request_hash = ActionHash::from_raw_36(vec![0xBB; 36]);
+        let input = CreateOfferInput {
+            request_hash,
+            request_id: "req_1".to_string(),
+            offerer_did: "did:mycelix:helper".to_string(),
+            amount: Some(100),
+            message: "   \t\n  ".to_string(),
+        };
+        assert!(input.message.trim().is_empty(), "Whitespace-only message should be detected");
+    }
+
+    #[test]
+    fn create_offer_input_empty_message_detected() {
+        let request_hash = ActionHash::from_raw_36(vec![0xBB; 36]);
+        let input = CreateOfferInput {
+            request_hash,
+            request_id: "req_2".to_string(),
+            offerer_did: "did:mycelix:helper".to_string(),
+            amount: None,
+            message: "".to_string(),
+        };
+        assert!(input.message.trim().is_empty(), "Empty message should be detected");
+    }
+
+    #[test]
+    fn create_offer_input_zero_amount_detected() {
+        let request_hash = ActionHash::from_raw_36(vec![0xBB; 36]);
+        let input = CreateOfferInput {
+            request_hash,
+            request_id: "req_3".to_string(),
+            offerer_did: "did:mycelix:helper".to_string(),
+            amount: Some(0),
+            message: "I can help".to_string(),
+        };
+        assert_eq!(input.amount, Some(0), "Zero offer amount should be detected");
+    }
+
+    #[test]
+    fn create_offer_input_whitespace_offerer_did_detected() {
+        let request_hash = ActionHash::from_raw_36(vec![0xBB; 36]);
+        let input = CreateOfferInput {
+            request_hash,
+            request_id: "req_4".to_string(),
+            offerer_did: "   ".to_string(),
+            amount: Some(50),
+            message: "Offering help".to_string(),
+        };
+        assert!(input.offerer_did.trim().is_empty(), "Whitespace-only offerer DID should be detected");
+    }
+
+    #[test]
+    fn create_offer_input_valid_accepted() {
+        let request_hash = ActionHash::from_raw_36(vec![0xBB; 36]);
+        let input = CreateOfferInput {
+            request_hash,
+            request_id: "req_5".to_string(),
+            offerer_did: "did:mycelix:generous".to_string(),
+            amount: Some(200),
+            message: "Happy to help!".to_string(),
+        };
+        assert!(!input.message.trim().is_empty(), "Valid message should pass");
+        assert!(!input.offerer_did.trim().is_empty(), "Valid DID should pass");
+        assert!(input.amount.unwrap() > 0, "Valid amount should pass");
     }
 }

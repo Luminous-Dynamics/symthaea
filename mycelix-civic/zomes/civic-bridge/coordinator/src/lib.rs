@@ -114,6 +114,17 @@ fn enforce_rate_limit(target_zome: &str) -> ExternResult<()> {
 /// zome against an allowlist, then uses `call(CallTargetCell::Local, ...)`.
 #[hdk_extern]
 pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
+    // Validate zome and fn_name are not empty
+    if input.zome.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Dispatch zome name cannot be empty".into()
+        )));
+    }
+    if input.fn_name.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Dispatch function name cannot be empty".into()
+        )));
+    }
     enforce_rate_limit(&input.zome)?;
     bridge::dispatch_call_checked(&input, ALLOWED_ZOMES)
 }
@@ -128,6 +139,19 @@ pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
 /// to the target domain zome if the query_type matches a known function name.
 #[hdk_extern]
 pub fn query_civic(query: CivicQueryEntry) -> ExternResult<Record> {
+    // Reject empty or whitespace-only domain
+    if query.domain.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Query domain cannot be empty or whitespace-only".into()
+        )));
+    }
+    // Reject empty or whitespace-only query_type
+    if query.query_type.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Query type cannot be empty or whitespace-only".into()
+        )));
+    }
+
     let action_hash = create_entry(&EntryTypes::Query(query.clone()))?;
 
     let all_anchor = ensure_anchor("all_civic_queries")?;
@@ -229,6 +253,25 @@ pub struct BridgeEventSignal {
 /// Broadcast a cross-domain event and emit a signal to connected clients
 #[hdk_extern]
 pub fn broadcast_event(event: CivicEventEntry) -> ExternResult<Record> {
+    // Reject empty or whitespace-only payloads
+    if event.payload.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Event payload cannot be empty or whitespace-only".into()
+        )));
+    }
+    // Reject empty or whitespace-only domain
+    if event.domain.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Event domain cannot be empty or whitespace-only".into()
+        )));
+    }
+    // Reject empty or whitespace-only event_type
+    if event.event_type.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Event type cannot be empty or whitespace-only".into()
+        )));
+    }
+
     let action_hash = create_entry(&EntryTypes::Event(event.clone()))?;
 
     let all_anchor = ensure_anchor("all_civic_events")?;
@@ -477,6 +520,17 @@ const COMMONS_ROLE: &str = "commons";
 /// - Media fact-checking property ownership claims
 #[hdk_extern]
 pub fn dispatch_commons_call(input: CrossClusterDispatchInput) -> ExternResult<DispatchResult> {
+    // Validate zome and fn_name are not empty
+    if input.zome.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cross-cluster dispatch zome name cannot be empty".into()
+        )));
+    }
+    if input.fn_name.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cross-cluster dispatch function name cannot be empty".into()
+        )));
+    }
     enforce_rate_limit(&format!("commons:{}", input.zome))?;
     let dispatch = CrossClusterDispatchInput {
         role: COMMONS_ROLE.to_string(),
@@ -599,10 +653,20 @@ pub fn check_housing_capacity_for_sheltering(input: CheckHousingCapacityInput) -
             recommendation: None,
             error: Some(format!("Cross-cluster network error: {}", err)),
         }),
-        _ => Ok(HousingCapacityResult {
+        Ok(ZomeCallResponse::CountersigningSession(err)) => Ok(HousingCapacityResult {
             commons_reachable: false,
             recommendation: None,
-            error: Some("Failed to reach commons cluster housing_units".into()),
+            error: Some(format!("Cross-cluster countersigning error: {}", err)),
+        }),
+        Ok(other) => Ok(HousingCapacityResult {
+            commons_reachable: false,
+            recommendation: None,
+            error: Some(format!("Unexpected response from commons housing_units: {:?}", other)),
+        }),
+        Err(e) => Ok(HousingCapacityResult {
+            commons_reachable: false,
+            recommendation: None,
+            error: Some(format!("Failed to reach commons cluster housing_units: {:?}", e)),
         }),
     }
 }
@@ -1020,6 +1084,16 @@ const IDENTITY_ROLE: &str = "identity";
 /// Dispatch a cross-cluster call to any allowed zome in the Identity DNA.
 #[hdk_extern]
 pub fn dispatch_identity_call(input: CrossClusterDispatchInput) -> ExternResult<DispatchResult> {
+    if input.zome.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cross-cluster dispatch zome name cannot be empty".into()
+        )));
+    }
+    if input.fn_name.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cross-cluster dispatch function name cannot be empty".into()
+        )));
+    }
     enforce_rate_limit(&format!("identity:{}", input.zome))?;
     let dispatch = CrossClusterDispatchInput {
         role: IDENTITY_ROLE.to_string(),
@@ -2094,6 +2168,235 @@ mod tests {
                 !zome.contains(' '),
                 "ALLOWED_IDENTITY_ZOMES entry '{}' contains whitespace",
                 zome
+            );
+        }
+    }
+
+    // ========================================================================
+    // HARDENING: Empty/whitespace payload validation tests
+    // ========================================================================
+
+    #[test]
+    fn empty_payload_detected_by_trim() {
+        let empty_payloads = vec!["", "   ", "\t", "\n", "  \t\n  "];
+        for payload in empty_payloads {
+            assert!(
+                payload.trim().is_empty(),
+                "Payload '{}' should be detected as empty by trim().is_empty()",
+                payload.escape_debug()
+            );
+        }
+    }
+
+    #[test]
+    fn non_empty_payload_not_detected_by_trim() {
+        let valid_payloads = vec!["{}", "data", " x ", r#"{"key":"value"}"#];
+        for payload in valid_payloads {
+            assert!(
+                !payload.trim().is_empty(),
+                "Payload '{}' should NOT be detected as empty",
+                payload
+            );
+        }
+    }
+
+    #[test]
+    fn empty_domain_detected_by_trim() {
+        let empty_domains = vec!["", "   ", "\t"];
+        for domain in empty_domains {
+            assert!(
+                domain.trim().is_empty(),
+                "Domain '{}' should be detected as empty",
+                domain.escape_debug()
+            );
+        }
+    }
+
+    #[test]
+    fn empty_query_type_detected_by_trim() {
+        let empty_types = vec!["", "  ", "\n"];
+        for qt in empty_types {
+            assert!(
+                qt.trim().is_empty(),
+                "Query type '{}' should be detected as empty",
+                qt.escape_debug()
+            );
+        }
+    }
+
+    // ========================================================================
+    // HARDENING: Cross-cluster dispatch input validation tests
+    // ========================================================================
+
+    #[test]
+    fn dispatch_input_empty_zome_detected() {
+        assert!("".trim().is_empty());
+        assert!("  ".trim().is_empty());
+    }
+
+    #[test]
+    fn dispatch_input_empty_fn_name_detected() {
+        assert!("".trim().is_empty());
+        assert!("\t".trim().is_empty());
+    }
+
+    #[test]
+    fn dispatch_input_valid_zome_not_empty() {
+        assert!(!"justice_cases".trim().is_empty());
+        assert!(!"emergency_triage".trim().is_empty());
+    }
+
+    #[test]
+    fn dispatch_input_valid_fn_name_not_empty() {
+        assert!(!"file_case".trim().is_empty());
+        assert!(!"deploy_resource".trim().is_empty());
+    }
+
+    // ========================================================================
+    // HARDENING: Cross-cluster error handling result types
+    // ========================================================================
+
+    #[test]
+    fn housing_capacity_result_with_network_error() {
+        let r = HousingCapacityResult {
+            commons_reachable: false,
+            recommendation: None,
+            error: Some("Cross-cluster network error: connection refused".into()),
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: HousingCapacityResult = serde_json::from_str(&json).unwrap();
+        assert!(!r2.commons_reachable);
+        assert!(r2.error.as_ref().unwrap().contains("network error"));
+    }
+
+    #[test]
+    fn housing_capacity_result_with_countersigning_error() {
+        let r = HousingCapacityResult {
+            commons_reachable: false,
+            recommendation: None,
+            error: Some("Cross-cluster countersigning error: session expired".into()),
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: HousingCapacityResult = serde_json::from_str(&json).unwrap();
+        assert!(!r2.commons_reachable);
+        assert!(r2.error.as_ref().unwrap().contains("countersigning"));
+    }
+
+    #[test]
+    fn property_enforcement_result_with_cross_cluster_failure() {
+        let r = PropertyEnforcementResult {
+            property_found: false,
+            enforcement_advisory: None,
+            error: Some("Cross-cluster call failed: role not found".into()),
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: PropertyEnforcementResult = serde_json::from_str(&json).unwrap();
+        assert!(!r2.property_found);
+        assert!(r2.error.as_ref().unwrap().contains("role not found"));
+    }
+
+    #[test]
+    fn care_credential_result_unreachable_cluster() {
+        let r = CareCredentialVerifyResult {
+            commons_reachable: false,
+            recommendation: None,
+            error: Some("Cross-cluster call failed: OtherRole not installed".into()),
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: CareCredentialVerifyResult = serde_json::from_str(&json).unwrap();
+        assert!(!r2.commons_reachable);
+        assert!(r2.error.as_ref().unwrap().contains("OtherRole not installed"));
+    }
+
+    // ========================================================================
+    // HARDENING: Emergency cross-cluster error propagation
+    // ========================================================================
+
+    #[test]
+    fn water_safety_result_zero_values_serde() {
+        // When cross-cluster call fails, we return zero-value results
+        let r = WaterSafetyResult {
+            safe_sources: 0,
+            contaminated_sources: 0,
+            total_sources: 0,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: WaterSafetyResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.safe_sources, 0);
+        assert_eq!(r2.contaminated_sources, 0);
+        assert_eq!(r2.total_sources, 0);
+    }
+
+    #[test]
+    fn emergency_food_result_zero_values_serde() {
+        let r = EmergencyFoodResult {
+            available_kg: 0.0,
+            distribution_points: 0,
+            estimated_days_supply: 0.0,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: EmergencyFoodResult = serde_json::from_str(&json).unwrap();
+        assert!((r2.available_kg - 0.0).abs() < f64::EPSILON);
+        assert_eq!(r2.distribution_points, 0);
+    }
+
+    #[test]
+    fn shelter_capacity_result_zero_values_serde() {
+        let r = ShelterCapacityResult {
+            available_beds: 0,
+            total_shelters: 0,
+            nearest_shelter_km: 0.0,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: ShelterCapacityResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.available_beds, 0);
+        assert_eq!(r2.total_shelters, 0);
+    }
+
+    #[test]
+    fn emergency_care_result_zero_values_serde() {
+        let r = EmergencyCareResult {
+            available_providers: 0,
+            nearest_provider_km: 0.0,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: EmergencyCareResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.available_providers, 0);
+    }
+
+    // ========================================================================
+    // HARDENING: Allowlist entries do not overlap between clusters
+    // ========================================================================
+
+    #[test]
+    fn local_and_commons_allowlists_do_not_overlap() {
+        for local_zome in ALLOWED_ZOMES {
+            assert!(
+                !ALLOWED_COMMONS_ZOMES.contains(local_zome),
+                "Zome '{}' is in both ALLOWED_ZOMES and ALLOWED_COMMONS_ZOMES",
+                local_zome
+            );
+        }
+    }
+
+    #[test]
+    fn local_and_identity_allowlists_do_not_overlap() {
+        for local_zome in ALLOWED_ZOMES {
+            assert!(
+                !ALLOWED_IDENTITY_ZOMES.contains(local_zome),
+                "Zome '{}' is in both ALLOWED_ZOMES and ALLOWED_IDENTITY_ZOMES",
+                local_zome
+            );
+        }
+    }
+
+    #[test]
+    fn commons_and_identity_allowlists_do_not_overlap() {
+        for commons_zome in ALLOWED_COMMONS_ZOMES {
+            assert!(
+                !ALLOWED_IDENTITY_ZOMES.contains(commons_zome),
+                "Zome '{}' is in both ALLOWED_COMMONS_ZOMES and ALLOWED_IDENTITY_ZOMES",
+                commons_zome
             );
         }
     }

@@ -40,6 +40,74 @@ fn require_consciousness(
 #[hdk_extern]
 pub fn submit_reading(reading: QualityReading) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "submit_reading")?;
+
+    // Validate pH range (0-14) if provided
+    if let Some(ph) = reading.ph {
+        if !(0.0..=14.0).contains(&ph) {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "pH must be between 0.0 and 14.0".into()
+            )));
+        }
+    }
+
+    // Validate non-negative contamination levels
+    if let Some(turb) = reading.turbidity_ntu {
+        if turb < 0.0 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Turbidity cannot be negative".into()
+            )));
+        }
+    }
+    if let Some(tds) = reading.tds_ppm {
+        if tds < 0.0 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "TDS cannot be negative".into()
+            )));
+        }
+    }
+    if let Some(nitrates) = reading.nitrates_mg_l {
+        if nitrates < 0.0 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Nitrate concentration cannot be negative".into()
+            )));
+        }
+    }
+    if let Some(arsenic) = reading.arsenic_ug_l {
+        if arsenic < 0.0 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Arsenic concentration cannot be negative".into()
+            )));
+        }
+    }
+    if let Some(lead) = reading.lead_ug_l {
+        if lead < 0.0 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Lead concentration cannot be negative".into()
+            )));
+        }
+    }
+    if let Some(chlorine) = reading.chlorine_mg_l {
+        if chlorine < 0.0 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Chlorine concentration cannot be negative".into()
+            )));
+        }
+    }
+    if let Some(dissolved_o2) = reading.dissolved_oxygen_mg_l {
+        if dissolved_o2 < 0.0 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Dissolved oxygen cannot be negative".into()
+            )));
+        }
+    }
+
+    // Validate potability score range
+    if reading.potability_score < 0.0 || reading.potability_score > 1.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Potability score must be between 0.0 and 1.0".into()
+        )));
+    }
+
     let action_hash = create_entry(&EntryTypes::QualityReading(reading.clone()))?;
 
     // Link source to reading
@@ -169,9 +237,19 @@ pub struct PotabilityResult {
 #[hdk_extern]
 pub fn raise_alert(alert: ContaminationAlert) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "raise_alert")?;
-    if alert.contaminant.is_empty() || alert.contaminant.len() > 256 {
+    if alert.contaminant.trim().is_empty() || alert.contaminant.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Contaminant name must be 1-256 characters".into()
+            "Contaminant name must be 1-256 non-whitespace characters".into()
+        )));
+    }
+    if alert.measured_value < 0.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Measured contamination value cannot be negative".into()
+        )));
+    }
+    if alert.threshold_value < 0.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Threshold value cannot be negative".into()
         )));
     }
 
@@ -272,9 +350,9 @@ pub struct ResolveAlertInput {
 #[hdk_extern]
 pub fn start_remediation(remediation: Remediation) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "start_remediation")?;
-    if remediation.method.is_empty() || remediation.method.len() > 1024 {
+    if remediation.method.trim().is_empty() || remediation.method.len() > 1024 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Remediation method must be 1-1024 characters".into()
+            "Remediation method must be 1-1024 non-whitespace characters".into()
         )));
     }
 
@@ -730,5 +808,122 @@ mod tests {
     fn alert_severity_clone_eq() {
         let s = AlertSeverity::Emergency;
         assert_eq!(s.clone(), AlertSeverity::Emergency);
+    }
+
+    // ========================================================================
+    // VALIDATION HARDENING EDGE CASE TESTS
+    // ========================================================================
+
+    /// pH value below 0.0 should be rejected by submit_reading validation.
+    #[test]
+    fn quality_reading_negative_ph_serde_roundtrip() {
+        let mut reading = make_reading();
+        reading.ph = Some(-1.0);
+        let json = serde_json::to_string(&reading).unwrap();
+        let decoded: QualityReading = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.ph, Some(-1.0));
+        // Coordinator rejects at runtime: "pH must be between 0.0 and 14.0"
+    }
+
+    /// pH value above 14.0 should be rejected by submit_reading validation.
+    #[test]
+    fn quality_reading_ph_above_14_serde_roundtrip() {
+        let mut reading = make_reading();
+        reading.ph = Some(14.5);
+        let json = serde_json::to_string(&reading).unwrap();
+        let decoded: QualityReading = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.ph, Some(14.5));
+    }
+
+    /// pH boundary values (0.0 and 14.0) should be accepted.
+    #[test]
+    fn quality_reading_ph_boundary_values_serde() {
+        for ph_val in [0.0_f32, 14.0] {
+            let mut reading = make_reading();
+            reading.ph = Some(ph_val);
+            let json = serde_json::to_string(&reading).unwrap();
+            let decoded: QualityReading = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.ph, Some(ph_val));
+        }
+    }
+
+    /// Negative turbidity should be rejected by submit_reading validation.
+    #[test]
+    fn quality_reading_negative_turbidity_serde_roundtrip() {
+        let mut reading = make_reading();
+        reading.turbidity_ntu = Some(-0.5);
+        let json = serde_json::to_string(&reading).unwrap();
+        let decoded: QualityReading = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.turbidity_ntu, Some(-0.5));
+    }
+
+    /// Negative arsenic level should be rejected.
+    #[test]
+    fn quality_reading_negative_arsenic_serde_roundtrip() {
+        let mut reading = make_reading();
+        reading.arsenic_ug_l = Some(-1.0);
+        let json = serde_json::to_string(&reading).unwrap();
+        let decoded: QualityReading = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.arsenic_ug_l, Some(-1.0));
+    }
+
+    /// Negative lead level should be rejected.
+    #[test]
+    fn quality_reading_negative_lead_serde_roundtrip() {
+        let mut reading = make_reading();
+        reading.lead_ug_l = Some(-2.0);
+        let json = serde_json::to_string(&reading).unwrap();
+        let decoded: QualityReading = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.lead_ug_l, Some(-2.0));
+    }
+
+    /// Potability score below 0.0 should be rejected.
+    #[test]
+    fn quality_reading_negative_potability_score_serde() {
+        let mut reading = make_reading();
+        reading.potability_score = -0.1;
+        let json = serde_json::to_string(&reading).unwrap();
+        let decoded: QualityReading = serde_json::from_str(&json).unwrap();
+        assert!(decoded.potability_score < 0.0);
+    }
+
+    /// Potability score above 1.0 should be rejected.
+    #[test]
+    fn quality_reading_over_one_potability_score_serde() {
+        let mut reading = make_reading();
+        reading.potability_score = 1.5;
+        let json = serde_json::to_string(&reading).unwrap();
+        let decoded: QualityReading = serde_json::from_str(&json).unwrap();
+        assert!(decoded.potability_score > 1.0);
+    }
+
+    /// Whitespace-only contaminant name should be rejected by raise_alert.
+    #[test]
+    fn contamination_alert_whitespace_only_contaminant() {
+        let mut alert = make_alert();
+        alert.contaminant = "   \t  ".to_string();
+        let json = serde_json::to_string(&alert).unwrap();
+        let decoded: ContaminationAlert = serde_json::from_str(&json).unwrap();
+        assert!(decoded.contaminant.trim().is_empty(), "Whitespace-only contaminant must be caught by trim()");
+    }
+
+    /// Negative measured contamination value should be rejected.
+    #[test]
+    fn contamination_alert_negative_measured_value_serde() {
+        let mut alert = make_alert();
+        alert.measured_value = -5.0;
+        let json = serde_json::to_string(&alert).unwrap();
+        let decoded: ContaminationAlert = serde_json::from_str(&json).unwrap();
+        assert!(decoded.measured_value < 0.0);
+    }
+
+    /// Whitespace-only remediation method should be rejected.
+    #[test]
+    fn remediation_whitespace_only_method_serde() {
+        let mut rem = make_remediation();
+        rem.method = "  \n\t  ".to_string();
+        let json = serde_json::to_string(&rem).unwrap();
+        let decoded: Remediation = serde_json::from_str(&json).unwrap();
+        assert!(decoded.method.trim().is_empty(), "Whitespace-only method must be caught by trim()");
     }
 }

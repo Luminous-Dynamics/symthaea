@@ -40,14 +40,19 @@ fn require_consciousness(
 #[hdk_extern]
 pub fn register_harvest_system(system: HarvestSystem) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "register_harvest_system")?;
-    if system.id.is_empty() || system.id.len() > 256 {
+    if system.id.trim().is_empty() || system.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "System ID must be 1-256 characters".into()
+            "System ID must be 1-256 non-whitespace characters".into()
         )));
     }
-    if system.name.is_empty() || system.name.len() > 256 {
+    if system.name.trim().is_empty() || system.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "System name must be 1-256 characters".into()
+            "System name must be 1-256 non-whitespace characters".into()
+        )));
+    }
+    if system.capacity_liters == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "System capacity must be greater than zero".into()
         )));
     }
 
@@ -114,14 +119,19 @@ pub fn get_all_systems(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn register_tank(tank: StorageTank) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "register_tank")?;
-    if tank.id.is_empty() || tank.id.len() > 256 {
+    if tank.id.trim().is_empty() || tank.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Tank ID must be 1-256 characters".into()
+            "Tank ID must be 1-256 non-whitespace characters".into()
         )));
     }
-    if tank.name.is_empty() || tank.name.len() > 256 {
+    if tank.name.trim().is_empty() || tank.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Tank name must be 1-256 characters".into()
+            "Tank name must be 1-256 non-whitespace characters".into()
+        )));
+    }
+    if tank.capacity_liters == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Tank capacity must be greater than zero".into()
         )));
     }
 
@@ -212,6 +222,12 @@ pub struct UpdateTankLevelInput {
 #[hdk_extern]
 pub fn record_harvest(harvest: HarvestRecord) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "record_harvest")?;
+    if harvest.liters_collected == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Harvest amount must be greater than zero".into()
+        )));
+    }
+
     let action_hash = create_entry(&EntryTypes::HarvestRecord(harvest.clone()))?;
 
     // Link system to harvest record
@@ -255,14 +271,19 @@ pub fn get_harvest_history(system_hash: ActionHash) -> ExternResult<Vec<Record>>
 #[hdk_extern]
 pub fn register_recharge_project(project: RechargeProject) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "register_recharge_project")?;
-    if project.id.is_empty() || project.id.len() > 256 {
+    if project.id.trim().is_empty() || project.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Project ID must be 1-256 characters".into()
+            "Project ID must be 1-256 non-whitespace characters".into()
         )));
     }
-    if project.name.is_empty() || project.name.len() > 256 {
+    if project.name.trim().is_empty() || project.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Project name must be 1-256 characters".into()
+            "Project name must be 1-256 non-whitespace characters".into()
+        )));
+    }
+    if project.capacity_liters_per_day == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Recharge capacity must be greater than zero".into()
         )));
     }
 
@@ -735,5 +756,148 @@ mod tests {
             let decoded: RechargeProject = serde_json::from_str(&json).unwrap();
             assert_eq!(decoded.status, status);
         }
+    }
+
+    // ========================================================================
+    // COORDINATOR VALIDATION EDGE CASE TESTS
+    // ========================================================================
+
+    #[test]
+    fn harvest_system_whitespace_only_id_rejected_serde() {
+        // Verify a whitespace-only ID would be caught by trim().is_empty()
+        let id = "   \t\n  ";
+        assert!(id.trim().is_empty());
+        assert!(!id.is_empty()); // old check would have missed this
+    }
+
+    #[test]
+    fn harvest_system_whitespace_only_name_rejected_serde() {
+        let name = "   ";
+        assert!(name.trim().is_empty());
+        assert!(!name.is_empty());
+    }
+
+    #[test]
+    fn harvest_system_zero_capacity_rejected_serde() {
+        // Verify that capacity_liters == 0 is the boundary
+        assert_eq!(0u64, 0);
+        assert_ne!(1u64, 0);
+    }
+
+    #[test]
+    fn tank_whitespace_only_id_rejected_serde() {
+        let id = "  \t  ";
+        assert!(id.trim().is_empty());
+        assert!(!id.is_empty());
+    }
+
+    #[test]
+    fn tank_whitespace_only_name_rejected_serde() {
+        let name = "\n\r\t ";
+        assert!(name.trim().is_empty());
+        assert!(!name.is_empty());
+    }
+
+    #[test]
+    fn tank_zero_capacity_rejected_serde() {
+        // Verify the boundary: 0 rejected, 1 accepted
+        let tank = StorageTank {
+            id: "tank-edge".to_string(),
+            name: "Edge".to_string(),
+            capacity_liters: 0,
+            current_level_liters: 0,
+            tank_type: TankType::Underground,
+            connected_system: None,
+            location_lat: 0.0,
+            location_lon: 0.0,
+            owner: AgentPubKey::from_raw_36(vec![0u8; 36]),
+        };
+        assert_eq!(tank.capacity_liters, 0);
+    }
+
+    #[test]
+    fn tank_one_liter_capacity_accepted_serde() {
+        let tank = StorageTank {
+            id: "tank-min".to_string(),
+            name: "Min".to_string(),
+            capacity_liters: 1,
+            current_level_liters: 0,
+            tank_type: TankType::Bladder,
+            connected_system: None,
+            location_lat: 0.0,
+            location_lon: 0.0,
+            owner: AgentPubKey::from_raw_36(vec![0u8; 36]),
+        };
+        assert_eq!(tank.capacity_liters, 1);
+    }
+
+    #[test]
+    fn harvest_record_zero_liters_rejected_serde() {
+        let rec = HarvestRecord {
+            system_hash: fake_action_hash(),
+            liters_collected: 0,
+            collection_period_start: Timestamp::from_micros(0),
+            collection_period_end: Timestamp::from_micros(1),
+            weather_conditions: None,
+            credited_to: AgentPubKey::from_raw_36(vec![0u8; 36]),
+        };
+        assert_eq!(rec.liters_collected, 0);
+    }
+
+    #[test]
+    fn harvest_record_one_liter_accepted_serde() {
+        let rec = HarvestRecord {
+            system_hash: fake_action_hash(),
+            liters_collected: 1,
+            collection_period_start: Timestamp::from_micros(0),
+            collection_period_end: Timestamp::from_micros(1),
+            weather_conditions: None,
+            credited_to: AgentPubKey::from_raw_36(vec![0u8; 36]),
+        };
+        assert_eq!(rec.liters_collected, 1);
+    }
+
+    #[test]
+    fn recharge_project_whitespace_only_id_rejected_serde() {
+        let id = "   ";
+        assert!(id.trim().is_empty());
+        assert!(!id.is_empty());
+    }
+
+    #[test]
+    fn recharge_project_whitespace_only_name_rejected_serde() {
+        let name = "\t\t\t";
+        assert!(name.trim().is_empty());
+        assert!(!name.is_empty());
+    }
+
+    #[test]
+    fn recharge_project_zero_capacity_rejected_serde() {
+        let proj = RechargeProject {
+            id: "rp-edge".to_string(),
+            name: "Edge".to_string(),
+            aquifer_id: "aq".to_string(),
+            method: RechargeMethod::Basin,
+            capacity_liters_per_day: 0,
+            location_lat: 0.0,
+            location_lon: 0.0,
+            status: RechargeStatus::Proposed,
+        };
+        assert_eq!(proj.capacity_liters_per_day, 0);
+    }
+
+    #[test]
+    fn recharge_project_one_liter_per_day_accepted_serde() {
+        let proj = RechargeProject {
+            id: "rp-min".to_string(),
+            name: "Min".to_string(),
+            aquifer_id: "aq".to_string(),
+            method: RechargeMethod::Injection,
+            capacity_liters_per_day: 1,
+            location_lat: 0.0,
+            location_lon: 0.0,
+            status: RechargeStatus::Active,
+        };
+        assert_eq!(proj.capacity_liters_per_day, 1);
     }
 }

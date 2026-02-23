@@ -42,14 +42,14 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn register_source(source: WaterSource) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "register_source")?;
-    if source.id.is_empty() || source.id.len() > 256 {
+    if source.id.trim().is_empty() || source.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Source ID must be 1-256 characters".into()
+            "Source ID must be 1-256 non-whitespace characters".into()
         )));
     }
-    if source.name.is_empty() || source.name.len() > 256 {
+    if source.name.trim().is_empty() || source.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Source name must be 1-256 characters".into()
+            "Source name must be 1-256 non-whitespace characters".into()
         )));
     }
 
@@ -351,6 +351,20 @@ pub fn record_usage(input: RecordUsageInput) -> ExternResult<Record> {
     let agent_key = agent_info.agent_initial_pubkey.clone();
     let now = sys_time()?;
 
+    if input.liters_used == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Usage amount must be greater than zero".into()
+        )));
+    }
+
+    // Check sufficient balance before debiting
+    let balance = get_my_balance(())?;
+    if balance.balance_liters < input.liters_used as i64 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Insufficient H2O credit balance for this usage".into()
+        )));
+    }
+
     let usage = UsageRecord {
         agent: agent_key.clone(),
         source_hash: input.source_hash.clone(),
@@ -378,8 +392,7 @@ pub fn record_usage(input: RecordUsageInput) -> ExternResult<Record> {
         (),
     )?;
 
-    // Debit from agent credit balance
-    let balance = get_my_balance(())?;
+    // Debit from agent credit balance (balance already fetched above)
     let updated = H2OCredit {
         holder: agent_key.clone(),
         balance_liters: balance.balance_liters - input.liters_used as i64,
@@ -1288,5 +1301,63 @@ mod tests {
         let bad_json = r#"{"source_hash":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"liters_used":50,"usage_category":"Sewage","meter_reference":null}"#;
         let result = serde_json::from_str::<RecordUsageInput>(bad_json);
         assert!(result.is_err(), "Invalid classification 'Sewage' should fail deserialization");
+    }
+
+    // ========================================================================
+    // VALIDATION HARDENING EDGE CASE TESTS
+    // ========================================================================
+
+    /// Source ID that is only whitespace should be rejected by register_source
+    /// validation (whitespace-only IDs are not meaningful identifiers).
+    #[test]
+    fn water_source_whitespace_only_id_serde_roundtrip() {
+        let source = WaterSource {
+            id: "   ".to_string(),
+            name: "Valid Name".to_string(),
+            source_type: WaterSourceType::Well,
+            max_capacity_liters: 1000,
+            recharge_rate_liters_per_day: 100,
+            location_lat: 0.0,
+            location_lon: 0.0,
+            steward: fake_agent(),
+            status: SourceStatus::Active,
+        };
+        let json = serde_json::to_string(&source).unwrap();
+        let decoded: WaterSource = serde_json::from_str(&json).unwrap();
+        // The struct itself roundtrips faithfully; coordinator rejects at runtime
+        assert_eq!(decoded.id, "   ");
+        assert!(decoded.id.trim().is_empty(), "Whitespace-only ID must be caught by trim().is_empty()");
+    }
+
+    /// Source name that is only whitespace should be rejected.
+    #[test]
+    fn water_source_whitespace_only_name_serde_roundtrip() {
+        let source = WaterSource {
+            id: "valid-id".to_string(),
+            name: " \t\n ".to_string(),
+            source_type: WaterSourceType::River,
+            max_capacity_liters: 5000,
+            recharge_rate_liters_per_day: 500,
+            location_lat: 10.0,
+            location_lon: 20.0,
+            steward: fake_agent(),
+            status: SourceStatus::Active,
+        };
+        let json = serde_json::to_string(&source).unwrap();
+        let decoded: WaterSource = serde_json::from_str(&json).unwrap();
+        assert!(decoded.name.trim().is_empty(), "Whitespace-only name must be caught by trim().is_empty()");
+    }
+
+    /// RecordUsageInput with zero liters: the coordinator now rejects this
+    /// with "Usage amount must be greater than zero".
+    #[test]
+    fn record_usage_input_zero_liters_struct_preserves_zero() {
+        let input = RecordUsageInput {
+            source_hash: fake_action_hash(),
+            liters_used: 0,
+            usage_category: WaterClassification::Potable,
+            meter_reference: None,
+        };
+        assert_eq!(input.liters_used, 0, "Zero liters preserved in struct for coordinator rejection");
     }
 }

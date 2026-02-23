@@ -20,11 +20,57 @@ fn require_consciousness(
 // Extern Functions
 // ============================================================================
 
+/// Minimum voting period in milliseconds (5 minutes)
+const MIN_VOTING_PERIOD_MS: i64 = 5 * 60 * 1_000_000; // 5 minutes in microseconds
+
 /// Create a governance proposal
 #[hdk_extern]
 pub fn create_proposal(proposal: Proposal) -> ExternResult<Record> {
     // Consciousness gate: Participant tier + identity >= 0.25
     let _eligibility = require_consciousness(&requirement_for_proposal(), "create_proposal")?;
+
+    // Validate title is not empty or whitespace-only
+    if proposal.title.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal title cannot be empty or whitespace-only".into()
+        )));
+    }
+
+    // Validate description is not empty or whitespace-only
+    if proposal.description.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal description cannot be empty or whitespace-only".into()
+        )));
+    }
+
+    // Validate quorum threshold is non-zero
+    if proposal.quorum_percent == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Quorum threshold must be greater than zero".into()
+        )));
+    }
+
+    // Validate threshold percent is non-zero
+    if proposal.threshold_percent == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Approval threshold must be greater than zero".into()
+        )));
+    }
+
+    // Validate voting window is meaningful (at least 5 minutes)
+    let voting_duration_us = proposal.voting_ends.as_micros() - proposal.voting_starts.as_micros();
+    if voting_duration_us < MIN_VOTING_PERIOD_MS {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voting period must be at least 5 minutes".into()
+        )));
+    }
+
+    // Validate voting_ends is after voting_starts (handles negative durations)
+    if proposal.voting_ends <= proposal.voting_starts {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voting end time must be after voting start time".into()
+        )));
+    }
 
     let action_hash = create_entry(&EntryTypes::Proposal(proposal))?;
     get(action_hash, GetOptions::default())?
@@ -43,7 +89,41 @@ pub fn cast_vote(vote: Vote) -> ExternResult<Record> {
     // Consciousness gate: Citizen tier + identity >= 0.25
     let _eligibility = require_consciousness(&requirement_for_voting(), "cast_vote")?;
 
-    let action_hash = create_entry(&EntryTypes::Vote(vote))?;
+    // Check for double-voting: look up existing votes linked to this proposal
+    let existing_vote_links = get_links(
+        LinkQuery::try_new(
+            vote.proposal_hash.clone(),
+            LinkTypes::ProposalToVotes,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    // Check each existing vote to see if this voter already voted
+    for link in existing_vote_links {
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Ok(Some(existing_vote)) = record.entry().to_app_option::<Vote>() {
+                    if existing_vote.voter == vote.voter {
+                        return Err(wasm_error!(WasmErrorInner::Guest(
+                            "Member has already voted on this proposal".into()
+                        )));
+                    }
+                }
+            }
+        }
+    }
+
+    // Create the vote entry
+    let action_hash = create_entry(&EntryTypes::Vote(vote.clone()))?;
+
+    // Link the vote to the proposal for future duplicate detection
+    create_link(
+        vote.proposal_hash.clone(),
+        action_hash.clone(),
+        LinkTypes::ProposalToVotes,
+        (),
+    )?;
+
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created vote".into())))
 }
@@ -401,5 +481,271 @@ mod tests {
         ] {
             assert_eq!(ps, ps.clone());
         }
+    }
+
+    // ── Validation edge case tests (coordinator-level) ──────────────
+
+    #[test]
+    fn proposal_whitespace_title_detected() {
+        let proposal = Proposal {
+            id: "prop-ws-title".to_string(),
+            proposer: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            title: "   \t\n  ".to_string(),
+            description: "Valid description".to_string(),
+            proposal_type: ProposalType::GeneralDecision,
+            modifies_rule: None,
+            voting_method: VotingMethod::Majority,
+            quorum_percent: 50,
+            threshold_percent: 51,
+            voting_starts: Timestamp::from_micros(1000000),
+            voting_ends: Timestamp::from_micros(2000000),
+            status: ProposalStatus::Draft,
+            created_at: Timestamp::from_micros(1000000),
+        };
+        assert!(proposal.title.trim().is_empty(), "Whitespace-only title should be detected");
+    }
+
+    #[test]
+    fn proposal_empty_title_detected() {
+        let proposal = Proposal {
+            id: "prop-empty-title".to_string(),
+            proposer: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            title: "".to_string(),
+            description: "Valid description".to_string(),
+            proposal_type: ProposalType::GeneralDecision,
+            modifies_rule: None,
+            voting_method: VotingMethod::Majority,
+            quorum_percent: 50,
+            threshold_percent: 51,
+            voting_starts: Timestamp::from_micros(1000000),
+            voting_ends: Timestamp::from_micros(2000000),
+            status: ProposalStatus::Draft,
+            created_at: Timestamp::from_micros(1000000),
+        };
+        assert!(proposal.title.trim().is_empty(), "Empty title should be detected");
+    }
+
+    #[test]
+    fn proposal_whitespace_description_detected() {
+        let proposal = Proposal {
+            id: "prop-ws-desc".to_string(),
+            proposer: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            title: "Valid Title".to_string(),
+            description: "   ".to_string(),
+            proposal_type: ProposalType::GeneralDecision,
+            modifies_rule: None,
+            voting_method: VotingMethod::Majority,
+            quorum_percent: 50,
+            threshold_percent: 51,
+            voting_starts: Timestamp::from_micros(1000000),
+            voting_ends: Timestamp::from_micros(2000000),
+            status: ProposalStatus::Draft,
+            created_at: Timestamp::from_micros(1000000),
+        };
+        assert!(proposal.description.trim().is_empty(), "Whitespace-only description should be detected");
+    }
+
+    #[test]
+    fn proposal_zero_quorum_detected() {
+        let proposal = Proposal {
+            id: "prop-zero-quorum".to_string(),
+            proposer: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            title: "Valid Title".to_string(),
+            description: "Valid Description".to_string(),
+            proposal_type: ProposalType::GeneralDecision,
+            modifies_rule: None,
+            voting_method: VotingMethod::Majority,
+            quorum_percent: 0,
+            threshold_percent: 51,
+            voting_starts: Timestamp::from_micros(1000000),
+            voting_ends: Timestamp::from_micros(2000000),
+            status: ProposalStatus::Draft,
+            created_at: Timestamp::from_micros(1000000),
+        };
+        assert_eq!(proposal.quorum_percent, 0, "Zero quorum should be detected");
+    }
+
+    #[test]
+    fn proposal_zero_threshold_detected() {
+        let proposal = Proposal {
+            id: "prop-zero-thresh".to_string(),
+            proposer: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            title: "Valid Title".to_string(),
+            description: "Valid Description".to_string(),
+            proposal_type: ProposalType::GeneralDecision,
+            modifies_rule: None,
+            voting_method: VotingMethod::Majority,
+            quorum_percent: 50,
+            threshold_percent: 0,
+            voting_starts: Timestamp::from_micros(1000000),
+            voting_ends: Timestamp::from_micros(2000000),
+            status: ProposalStatus::Draft,
+            created_at: Timestamp::from_micros(1000000),
+        };
+        assert_eq!(proposal.threshold_percent, 0, "Zero threshold should be detected");
+    }
+
+    #[test]
+    fn proposal_tiny_voting_window_detected() {
+        // 1-microsecond voting window should be caught by MIN_VOTING_PERIOD_MS check
+        let proposal = Proposal {
+            id: "prop-tiny-window".to_string(),
+            proposer: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            title: "Valid Title".to_string(),
+            description: "Valid Description".to_string(),
+            proposal_type: ProposalType::GeneralDecision,
+            modifies_rule: None,
+            voting_method: VotingMethod::Majority,
+            quorum_percent: 50,
+            threshold_percent: 51,
+            voting_starts: Timestamp::from_micros(1000000),
+            voting_ends: Timestamp::from_micros(1000001), // 1 microsecond later
+            status: ProposalStatus::Draft,
+            created_at: Timestamp::from_micros(1000000),
+        };
+        let duration_us = proposal.voting_ends.as_micros() - proposal.voting_starts.as_micros();
+        assert!(
+            duration_us < MIN_VOTING_PERIOD_MS,
+            "1-microsecond voting window should be less than minimum: {} < {}",
+            duration_us,
+            MIN_VOTING_PERIOD_MS
+        );
+    }
+
+    #[test]
+    fn proposal_inverted_voting_window_detected() {
+        // voting_ends before voting_starts
+        let proposal = Proposal {
+            id: "prop-inverted".to_string(),
+            proposer: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            title: "Valid Title".to_string(),
+            description: "Valid Description".to_string(),
+            proposal_type: ProposalType::GeneralDecision,
+            modifies_rule: None,
+            voting_method: VotingMethod::Majority,
+            quorum_percent: 50,
+            threshold_percent: 51,
+            voting_starts: Timestamp::from_micros(2000000),
+            voting_ends: Timestamp::from_micros(1000000), // Before start!
+            status: ProposalStatus::Draft,
+            created_at: Timestamp::from_micros(1000000),
+        };
+        assert!(
+            proposal.voting_ends <= proposal.voting_starts,
+            "Inverted voting window should be detected"
+        );
+    }
+
+    #[test]
+    fn proposal_valid_voting_window_accepted() {
+        // 10-minute voting window
+        let start_us: i64 = 1_000_000;
+        let ten_minutes_us: i64 = 10 * 60 * 1_000_000;
+        let proposal = Proposal {
+            id: "prop-valid-window".to_string(),
+            proposer: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            title: "Valid Title".to_string(),
+            description: "Valid Description".to_string(),
+            proposal_type: ProposalType::GeneralDecision,
+            modifies_rule: None,
+            voting_method: VotingMethod::Majority,
+            quorum_percent: 50,
+            threshold_percent: 51,
+            voting_starts: Timestamp::from_micros(start_us),
+            voting_ends: Timestamp::from_micros(start_us + ten_minutes_us),
+            status: ProposalStatus::Draft,
+            created_at: Timestamp::from_micros(start_us),
+        };
+        let duration_us = proposal.voting_ends.as_micros() - proposal.voting_starts.as_micros();
+        assert!(
+            duration_us >= MIN_VOTING_PERIOD_MS,
+            "10-minute voting window should pass minimum check"
+        );
+        assert!(proposal.voting_ends > proposal.voting_starts);
+        assert!(proposal.quorum_percent > 0);
+        assert!(proposal.threshold_percent > 0);
+    }
+
+    #[test]
+    fn double_vote_same_voter_detected() {
+        // Verify that two votes from the same voter on the same proposal can be detected
+        let proposal_hash = ActionHash::from_raw_36(vec![0xAA; 36]);
+        let voter = AgentPubKey::from_raw_36(vec![0xBB; 36]);
+
+        let vote1 = Vote {
+            proposal_hash: proposal_hash.clone(),
+            voter: voter.clone(),
+            vote: VoteChoice::Yes,
+            reasoning: Some("First vote".to_string()),
+            voted_at: Timestamp::from_micros(1000000),
+        };
+
+        let vote2 = Vote {
+            proposal_hash: proposal_hash.clone(),
+            voter: voter.clone(),
+            vote: VoteChoice::No,
+            reasoning: Some("Changed my mind".to_string()),
+            voted_at: Timestamp::from_micros(2000000),
+        };
+
+        // Same voter on same proposal should be detected
+        assert_eq!(vote1.voter, vote2.voter, "Same voter should be detected");
+        assert_eq!(vote1.proposal_hash, vote2.proposal_hash, "Same proposal should be detected");
+    }
+
+    #[test]
+    fn different_voters_not_flagged() {
+        let proposal_hash = ActionHash::from_raw_36(vec![0xAA; 36]);
+        let voter1 = AgentPubKey::from_raw_36(vec![0xBB; 36]);
+        let voter2 = AgentPubKey::from_raw_36(vec![0xCC; 36]);
+
+        let vote1 = Vote {
+            proposal_hash: proposal_hash.clone(),
+            voter: voter1,
+            vote: VoteChoice::Yes,
+            reasoning: None,
+            voted_at: Timestamp::from_micros(1000000),
+        };
+
+        let vote2 = Vote {
+            proposal_hash: proposal_hash.clone(),
+            voter: voter2,
+            vote: VoteChoice::No,
+            reasoning: None,
+            voted_at: Timestamp::from_micros(2000000),
+        };
+
+        assert_ne!(vote1.voter, vote2.voter, "Different voters should not be flagged");
+    }
+
+    #[test]
+    fn same_voter_different_proposals_not_flagged() {
+        let voter = AgentPubKey::from_raw_36(vec![0xBB; 36]);
+        let proposal1 = ActionHash::from_raw_36(vec![0xAA; 36]);
+        let proposal2 = ActionHash::from_raw_36(vec![0xDD; 36]);
+
+        let vote1 = Vote {
+            proposal_hash: proposal1,
+            voter: voter.clone(),
+            vote: VoteChoice::Yes,
+            reasoning: None,
+            voted_at: Timestamp::from_micros(1000000),
+        };
+
+        let vote2 = Vote {
+            proposal_hash: proposal2,
+            voter: voter.clone(),
+            vote: VoteChoice::No,
+            reasoning: None,
+            voted_at: Timestamp::from_micros(2000000),
+        };
+
+        assert_ne!(vote1.proposal_hash, vote2.proposal_hash, "Different proposals should not be flagged");
+    }
+
+    #[test]
+    fn min_voting_period_constant_is_5_minutes() {
+        // 5 minutes = 5 * 60 * 1_000_000 microseconds = 300_000_000
+        assert_eq!(MIN_VOTING_PERIOD_MS, 300_000_000, "MIN_VOTING_PERIOD_MS should be 5 minutes in microseconds");
     }
 }

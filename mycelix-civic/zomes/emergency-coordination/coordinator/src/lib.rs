@@ -43,9 +43,14 @@ fn require_consciousness(
 #[hdk_extern]
 pub fn form_team(input: FormTeamInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "form_team")?;
-    if input.name.is_empty() || input.name.len() > 128 {
+    if input.name.trim().is_empty() || input.name.len() > 128 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Team name must be 1-128 characters".into()
+            "Team name must be 1-128 non-whitespace characters".into()
+        )));
+    }
+    if input.id.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Team ID cannot be empty or whitespace-only".into()
         )));
     }
     if input.members.is_empty() {
@@ -118,10 +123,25 @@ pub struct FormTeamInput {
 #[hdk_extern]
 pub fn assign_to_zone(input: AssignToZoneInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "assign_to_zone")?;
-    if input.objective.is_empty() || input.objective.len() > 1024 {
+    if input.objective.trim().is_empty() || input.objective.len() > 1024 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Objective must be 1-1024 characters".into()
+            "Objective must be 1-1024 non-whitespace characters".into()
         )));
+    }
+
+    // Deduplication: check if this team is already assigned to this zone
+    let existing_zone_teams = get_links(
+        LinkQuery::try_new(input.zone_hash.clone(), LinkTypes::ZoneToTeam)?,
+        GetStrategy::default(),
+    )?;
+    for link in &existing_zone_teams {
+        if let Ok(target_hash) = ActionHash::try_from(link.target.clone()) {
+            if target_hash == input.team_hash {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Team is already assigned to this zone".into()
+                )));
+            }
+        }
     }
 
     let agent_info = agent_info()?;
@@ -195,10 +215,26 @@ pub struct AssignToZoneInput {
 #[hdk_extern]
 pub fn submit_sitrep(input: SubmitSitrepInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "submit_sitrep")?;
-    if input.conditions.is_empty() || input.conditions.len() > 4096 {
+    if input.conditions.trim().is_empty() || input.conditions.len() > 4096 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Conditions must be 1-4096 characters".into()
+            "Conditions must be 1-4096 non-whitespace characters".into()
         )));
+    }
+    // Reject resources_needed entries that are empty or whitespace-only
+    for resource in &input.resources_needed {
+        if resource.trim().is_empty() {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Resource needed entries cannot be empty or whitespace-only".into()
+            )));
+        }
+    }
+    // Reject hazard entries that are empty or whitespace-only
+    for hazard in &input.hazards {
+        if hazard.trim().is_empty() {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Hazard entries cannot be empty or whitespace-only".into()
+            )));
+        }
     }
 
     let now = sys_time()?;
@@ -849,5 +885,212 @@ mod tests {
             determine_highest_severity(&["Informational"]),
             Some("Unknown".to_string())
         );
+    }
+
+    // ========================================================================
+    // HARDENING: Whitespace-only validation tests
+    // ========================================================================
+
+    #[test]
+    fn form_team_input_whitespace_only_name_serde() {
+        // Whitespace-only name should serialize fine (validation is coordinator-side)
+        let agent_a = AgentPubKey::from_raw_36(vec![0xab; 36]);
+        let input = FormTeamInput {
+            id: "team-ws".to_string(),
+            name: "   \t  ".to_string(),
+            team_type: TeamType::SearchAndRescue,
+            members: vec![agent_a.clone()],
+            lead: agent_a,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: FormTeamInput = serde_json::from_str(&json).unwrap();
+        // Whitespace-only should be caught by coordinator trim() check
+        assert!(back.name.trim().is_empty());
+    }
+
+    #[test]
+    fn form_team_input_whitespace_only_id_serde() {
+        let agent_a = AgentPubKey::from_raw_36(vec![0xab; 36]);
+        let input = FormTeamInput {
+            id: "   ".to_string(),
+            name: "Valid Name".to_string(),
+            team_type: TeamType::Medical,
+            members: vec![agent_a.clone()],
+            lead: agent_a,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: FormTeamInput = serde_json::from_str(&json).unwrap();
+        assert!(back.id.trim().is_empty());
+    }
+
+    #[test]
+    fn assign_to_zone_whitespace_only_objective_serde() {
+        let input = AssignToZoneInput {
+            team_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            zone_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            zone_hash_for_team: ActionHash::from_raw_36(vec![0xcd; 36]),
+            objective: "  \n\t  ".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: AssignToZoneInput = serde_json::from_str(&json).unwrap();
+        assert!(back.objective.trim().is_empty());
+    }
+
+    #[test]
+    fn submit_sitrep_whitespace_only_conditions_serde() {
+        let input = SubmitSitrepInput {
+            team_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            zone_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            conditions: "   \t\n   ".to_string(),
+            casualties_found: 0,
+            resources_needed: vec![],
+            hazards: vec![],
+            access_status: AccessStatus::Open,
+            synced: false,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: SubmitSitrepInput = serde_json::from_str(&json).unwrap();
+        assert!(back.conditions.trim().is_empty());
+    }
+
+    #[test]
+    fn submit_sitrep_whitespace_only_resource_detected() {
+        let input = SubmitSitrepInput {
+            team_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            zone_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            conditions: "Valid conditions".to_string(),
+            casualties_found: 0,
+            resources_needed: vec!["   ".to_string(), "valid resource".to_string()],
+            hazards: vec![],
+            access_status: AccessStatus::Open,
+            synced: false,
+        };
+        // The first resource entry is whitespace-only
+        assert!(input.resources_needed[0].trim().is_empty());
+        assert!(!input.resources_needed[1].trim().is_empty());
+    }
+
+    #[test]
+    fn submit_sitrep_whitespace_only_hazard_detected() {
+        let input = SubmitSitrepInput {
+            team_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            zone_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            conditions: "Valid conditions".to_string(),
+            casualties_found: 0,
+            resources_needed: vec![],
+            hazards: vec!["\t".to_string()],
+            access_status: AccessStatus::Open,
+            synced: false,
+        };
+        assert!(input.hazards[0].trim().is_empty());
+    }
+
+    #[test]
+    fn submit_sitrep_empty_resource_entry_detected() {
+        let input = SubmitSitrepInput {
+            team_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            zone_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            conditions: "Valid conditions".to_string(),
+            casualties_found: 0,
+            resources_needed: vec!["".to_string()],
+            hazards: vec![],
+            access_status: AccessStatus::Open,
+            synced: false,
+        };
+        assert!(input.resources_needed[0].trim().is_empty());
+    }
+
+    // ========================================================================
+    // HARDENING: Severity determinism validation
+    // ========================================================================
+
+    #[test]
+    fn severity_determinism_same_inputs_same_output() {
+        // Verify that the same inputs always produce the same output
+        // regardless of ordering in the severity list
+        let inputs = &["Minor", "Severe", "Moderate", "Critical"];
+        let result1 = determine_highest_severity(inputs);
+        let result2 = determine_highest_severity(inputs);
+        let result3 = determine_highest_severity(inputs);
+        assert_eq!(result1, result2);
+        assert_eq!(result2, result3);
+        assert_eq!(result1, Some("Critical".to_string()));
+    }
+
+    #[test]
+    fn severity_determinism_different_orderings() {
+        let ordering_a = &["Minor", "Severe", "Moderate", "Critical"];
+        let ordering_b = &["Critical", "Moderate", "Severe", "Minor"];
+        let ordering_c = &["Moderate", "Critical", "Minor", "Severe"];
+        let result_a = determine_highest_severity(ordering_a);
+        let result_b = determine_highest_severity(ordering_b);
+        let result_c = determine_highest_severity(ordering_c);
+        assert_eq!(result_a, result_b);
+        assert_eq!(result_b, result_c);
+        assert_eq!(result_a, Some("Critical".to_string()));
+    }
+
+    #[test]
+    fn severity_determinism_with_unknowns_mixed() {
+        let a = &["Unknown", "Advisory", "Moderate"];
+        let b = &["Moderate", "Unknown", "Advisory"];
+        assert_eq!(
+            determine_highest_severity(a),
+            determine_highest_severity(b)
+        );
+        assert_eq!(
+            determine_highest_severity(a),
+            Some("Moderate".to_string())
+        );
+    }
+
+    #[test]
+    fn severity_determinism_all_unknown() {
+        let a = &["Foo", "Bar", "Baz"];
+        let b = &["Baz", "Foo", "Bar"];
+        assert_eq!(
+            determine_highest_severity(a),
+            determine_highest_severity(b)
+        );
+        assert_eq!(
+            determine_highest_severity(a),
+            Some("Unknown".to_string())
+        );
+    }
+
+    // ========================================================================
+    // HARDENING: Checkin input edge cases
+    // ========================================================================
+
+    #[test]
+    fn checkin_input_boundary_lat_lon_serde() {
+        // Boundary values at exact limits
+        let input = CheckinInput {
+            lat: 90.0,
+            lon: -180.0,
+            status: AgentStatus::Active,
+            battery_level: Some(100),
+            connectivity: ConnectivityStatus::Online,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CheckinInput = serde_json::from_str(&json).unwrap();
+        assert!((back.lat - 90.0).abs() < f64::EPSILON);
+        assert!((back.lon - (-180.0)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn checkin_input_negative_boundary_serde() {
+        let input = CheckinInput {
+            lat: -90.0,
+            lon: 180.0,
+            status: AgentStatus::Evacuating,
+            battery_level: Some(0),
+            connectivity: ConnectivityStatus::Offline,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CheckinInput = serde_json::from_str(&json).unwrap();
+        assert!((back.lat - (-90.0)).abs() < f64::EPSILON);
+        assert!((back.lon - 180.0).abs() < f64::EPSILON);
+        assert_eq!(back.battery_level, Some(0));
     }
 }

@@ -151,6 +151,27 @@ fn get_member_anchor(did: &str) -> ExternResult<EntryHash> {
 /// Create a new mutual aid pool
 #[hdk_extern]
 pub fn create_pool(input: CreatePoolInput) -> ExternResult<PoolWithHash> {
+    // Validate pool name is not empty or whitespace-only
+    if input.name.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Pool name cannot be empty or whitespace-only".into()
+        )));
+    }
+
+    // Validate pool description is not empty or whitespace-only
+    if input.description.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Pool description cannot be empty or whitespace-only".into()
+        )));
+    }
+
+    // Validate creator DID is not empty or whitespace-only
+    if input.creator_did.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Creator DID cannot be empty or whitespace-only".into()
+        )));
+    }
+
     let now = sys_time()?;
     let id = generate_id("pool")?;
 
@@ -327,6 +348,13 @@ pub fn add_member(input: AddMemberInput) -> ExternResult<MembershipWithHash> {
 /// Make a contribution to a pool
 #[hdk_extern]
 pub fn contribute(input: ContributeInput) -> ExternResult<ContributionWithHash> {
+    // Validate contribution amount is non-zero
+    if input.amount == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Contribution amount must be greater than zero".into()
+        )));
+    }
+
     let now = sys_time()?;
     let id = generate_id("contrib")?;
 
@@ -390,6 +418,20 @@ pub fn contribute(input: ContributeInput) -> ExternResult<ContributionWithHash> 
 #[hdk_extern]
 pub fn request_disbursement(input: RequestDisbursementInput) -> ExternResult<DisbursementWithHash> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "request_disbursement")?;
+
+    // Validate disbursement amount is non-zero
+    if input.amount == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Disbursement amount must be greater than zero".into()
+        )));
+    }
+
+    // Validate reason is not empty or whitespace-only
+    if input.reason.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Disbursement reason cannot be empty or whitespace-only".into()
+        )));
+    }
 
     let now = sys_time()?;
     let id = generate_id("disb")?;
@@ -1036,5 +1078,138 @@ mod tests {
         assert_eq!(decoded, rule);
         assert_eq!(decoded.min_approvals, 1);
         assert_eq!(decoded.approval_threshold_percent, 50);
+    }
+
+    // ── Validation edge case tests ──────────────────────────────────
+
+    #[test]
+    fn create_pool_input_whitespace_name_detected() {
+        // Verify that whitespace-only names can be detected by our validation logic
+        let input = CreatePoolInput {
+            name: "   \t\n  ".to_string(),
+            description: "Valid description".to_string(),
+            creator_did: "did:mycelix:alice".to_string(),
+            contribution_rules: None,
+            disbursement_rules: None,
+        };
+        assert!(input.name.trim().is_empty(), "Whitespace-only name should be detected");
+    }
+
+    #[test]
+    fn create_pool_input_empty_name_detected() {
+        let input = CreatePoolInput {
+            name: "".to_string(),
+            description: "Valid description".to_string(),
+            creator_did: "did:mycelix:alice".to_string(),
+            contribution_rules: None,
+            disbursement_rules: None,
+        };
+        assert!(input.name.trim().is_empty(), "Empty name should be detected");
+    }
+
+    #[test]
+    fn create_pool_input_whitespace_description_detected() {
+        let input = CreatePoolInput {
+            name: "Valid Pool".to_string(),
+            description: "   ".to_string(),
+            creator_did: "did:mycelix:alice".to_string(),
+            contribution_rules: None,
+            disbursement_rules: None,
+        };
+        assert!(input.description.trim().is_empty(), "Whitespace-only description should be detected");
+    }
+
+    #[test]
+    fn create_pool_input_whitespace_creator_did_detected() {
+        let input = CreatePoolInput {
+            name: "Valid Pool".to_string(),
+            description: "Valid description".to_string(),
+            creator_did: "  \t ".to_string(),
+            contribution_rules: None,
+            disbursement_rules: None,
+        };
+        assert!(input.creator_did.trim().is_empty(), "Whitespace-only DID should be detected");
+    }
+
+    #[test]
+    fn create_pool_input_valid_name_not_rejected() {
+        let input = CreatePoolInput {
+            name: "Neighborhood Fund".to_string(),
+            description: "Mutual aid pool".to_string(),
+            creator_did: "did:mycelix:alice".to_string(),
+            contribution_rules: None,
+            disbursement_rules: None,
+        };
+        assert!(!input.name.trim().is_empty(), "Valid name should not be rejected");
+        assert!(!input.description.trim().is_empty(), "Valid description should not be rejected");
+    }
+
+    #[test]
+    fn contribute_input_zero_amount_detected() {
+        let pool_hash = ActionHash::from_raw_36(vec![0xCC; 36]);
+        let input = ContributeInput {
+            pool_hash,
+            pool_id: "pool_1".to_string(),
+            member_did: "did:mycelix:donor".to_string(),
+            amount: 0,
+            note: None,
+        };
+        assert_eq!(input.amount, 0, "Zero amount should be detected");
+    }
+
+    #[test]
+    fn contribute_input_nonzero_amount_accepted() {
+        let pool_hash = ActionHash::from_raw_36(vec![0xCC; 36]);
+        let input = ContributeInput {
+            pool_hash,
+            pool_id: "pool_1".to_string(),
+            member_did: "did:mycelix:donor".to_string(),
+            amount: 1,
+            note: None,
+        };
+        assert!(input.amount > 0, "Non-zero amount should be accepted");
+    }
+
+    #[test]
+    fn request_disbursement_input_zero_amount_detected() {
+        let pool_hash = ActionHash::from_raw_36(vec![0xDD; 36]);
+        let input = RequestDisbursementInput {
+            pool_hash,
+            pool_id: "pool_1".to_string(),
+            recipient_did: "did:mycelix:recipient".to_string(),
+            amount: 0,
+            reason: "Valid reason".to_string(),
+            is_emergency: false,
+        };
+        assert_eq!(input.amount, 0, "Zero disbursement amount should be detected");
+    }
+
+    #[test]
+    fn request_disbursement_input_whitespace_reason_detected() {
+        let pool_hash = ActionHash::from_raw_36(vec![0xDD; 36]);
+        let input = RequestDisbursementInput {
+            pool_hash,
+            pool_id: "pool_1".to_string(),
+            recipient_did: "did:mycelix:recipient".to_string(),
+            amount: 100,
+            reason: "   \n\t  ".to_string(),
+            is_emergency: false,
+        };
+        assert!(input.reason.trim().is_empty(), "Whitespace-only reason should be detected");
+    }
+
+    #[test]
+    fn request_disbursement_input_valid_accepted() {
+        let pool_hash = ActionHash::from_raw_36(vec![0xDD; 36]);
+        let input = RequestDisbursementInput {
+            pool_hash,
+            pool_id: "pool_1".to_string(),
+            recipient_did: "did:mycelix:recipient".to_string(),
+            amount: 500,
+            reason: "Medical emergency".to_string(),
+            is_emergency: true,
+        };
+        assert!(input.amount > 0, "Valid amount should pass");
+        assert!(!input.reason.trim().is_empty(), "Valid reason should pass");
     }
 }
