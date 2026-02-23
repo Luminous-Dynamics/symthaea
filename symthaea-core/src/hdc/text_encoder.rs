@@ -23,6 +23,7 @@ use anyhow::Result;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 
 use super::primitive_system::PrimitiveSystem;
 use super::HDC_DIMENSION;
@@ -93,10 +94,12 @@ pub struct TextEncoder {
     config: TextEncoderConfig,
 
     /// Learned word embeddings (word → hypervector)
-    word_embeddings: HashMap<String, Vec<i8>>,
+    /// Arc-wrapped to avoid 16KB clone on cache hit (O(1) refcount instead).
+    word_embeddings: HashMap<String, Arc<Vec<i8>>>,
 
     /// Character n-gram cache
-    ngram_cache: HashMap<String, Vec<i8>>,
+    /// Arc-wrapped to avoid 16KB clone on cache hit.
+    ngram_cache: HashMap<String, Arc<Vec<i8>>>,
 
     /// Position vectors (for sequence encoding)
     position_vectors: Vec<Vec<i8>>,
@@ -243,11 +246,11 @@ impl TextEncoder {
     }
 
     /// Encode character n-grams
-    fn encode_ngrams(&mut self, word: &str) -> Vec<i8> {
-        // Check cache
+    fn encode_ngrams(&mut self, word: &str) -> Arc<Vec<i8>> {
+        // Check cache — Arc::clone is O(1) refcount increment (vs 16KB memcpy)
         if let Some(cached) = self.ngram_cache.get(word) {
             self.stats.cache_hits += 1;
-            return cached.clone();
+            return Arc::clone(cached);
         }
         self.stats.cache_misses += 1;
 
@@ -268,29 +271,34 @@ impl TextEncoder {
             self.bundle_vectors(&ngram_vectors)
         };
 
-        // Cache result
-        self.ngram_cache.insert(word.to_string(), result.clone());
+        // Cache result wrapped in Arc
+        let arc_result = Arc::new(result);
+        self.ngram_cache
+            .insert(word.to_string(), Arc::clone(&arc_result));
 
-        result
+        arc_result
     }
 
     /// Encode a single word
-    pub fn encode_word(&mut self, word: &str) -> Result<Vec<i8>> {
+    ///
+    /// Returns an `Arc<Vec<i8>>` — cache hits are O(1) refcount increment
+    /// instead of 16KB memcpy. Callers that only need `&[i8]` can deref directly.
+    pub fn encode_word(&mut self, word: &str) -> Result<Arc<Vec<i8>>> {
         let normalized = word.to_lowercase().trim().to_string();
 
-        // Check learned embeddings first (word-level cache)
+        // Check learned embeddings first — Arc::clone is O(1)
         if let Some(embedding) = self.word_embeddings.get(&normalized) {
             self.stats.words_encoded += 1;
-            self.stats.cache_hits += 1; // Word embedding cache hit
-            return Ok(embedding.clone());
+            self.stats.cache_hits += 1;
+            return Ok(Arc::clone(embedding));
         }
 
-        // Fall back to character n-gram encoding
+        // Fall back to character n-gram encoding (returns Arc)
         let ngram_encoding = self.encode_ngrams(&normalized);
 
         // Store in word embeddings for future use
         self.word_embeddings
-            .insert(normalized, ngram_encoding.clone());
+            .insert(normalized, Arc::clone(&ngram_encoding));
         self.stats.vocabulary_size = self.word_embeddings.len();
         self.stats.words_encoded += 1;
 
@@ -368,28 +376,28 @@ impl TextEncoder {
         for (pos, word) in words.iter().enumerate().take(self.config.max_length) {
             let normalized = word.to_lowercase();
 
-            // Encode word — returns owned Vec<i8>
-            let word_vec = if let Some(prim) = primitives.get(&normalized) {
-                // Convert BinaryHV (f32 bipolar) to i8 bipolar
-                let f32_vec = prim.encoding.to_bipolar();
-                f32_vec
-                    .iter()
-                    .map(|&x| if x > 0.0 { 1i8 } else { -1i8 })
-                    .collect()
+            // Both branches produce something borrowable as &[i8]:
+            // - Primitive path: owned Vec<i8> from to_bipolar_i8()
+            // - Fallback path: Arc<Vec<i8>> from encode_word() (O(1) cache hit)
+            let owned_vec;
+            let arc_vec;
+            let word_slice: &[i8] = if let Some(prim) = primitives.get(&normalized) {
+                owned_vec = prim.encoding.to_bipolar_i8();
+                &owned_vec
             } else {
-                // Fall back to n-gram encoding
-                self.encode_word(word)?
+                arc_vec = self.encode_word(word)?;
+                &arc_vec
             };
 
             // Fused bind + accumulate in single pass (better cache locality)
             if self.config.use_positional && pos < self.position_vectors.len() {
                 let pos_vec = &self.position_vectors[pos];
                 for i in 0..dim {
-                    self.bundle_accum[i] += (word_vec[i] * pos_vec[i]) as i32;
+                    self.bundle_accum[i] += (word_slice[i] * pos_vec[i]) as i32;
                 }
             } else {
                 for i in 0..dim {
-                    self.bundle_accum[i] += word_vec[i] as i32;
+                    self.bundle_accum[i] += word_slice[i] as i32;
                 }
             }
         }
@@ -427,8 +435,9 @@ impl TextEncoder {
         // Object bound with patient role
         let object_marked = self.bind_vectors(&object_vec, patient_marker);
 
-        // Bundle: subject + predicate + object
-        let result = self.bundle_vectors(&[subject_marked, predicate_vec, object_marked]);
+        // Bundle: subject + predicate + object (predicate_vec deref to slice for bind)
+        let predicate_owned: Vec<i8> = (*predicate_vec).clone();
+        let result = self.bundle_vectors(&[subject_marked, predicate_owned, object_marked]);
 
         Ok(result)
     }
@@ -481,12 +490,13 @@ impl TextEncoder {
         for word in words1.iter().chain(words2.iter()) {
             let normalized = word.to_lowercase();
             if let Some(embedding) = self.word_embeddings.get_mut(&normalized) {
-                // Simple update: move toward target direction
-                for i in 0..embedding.len() {
+                // Arc::make_mut clones only if refcount > 1 (copy-on-write)
+                let inner = Arc::make_mut(embedding);
+                for i in 0..inner.len() {
                     let target = if similarity > 0.5 { vec2[i] } else { -vec2[i] };
-                    let delta = (target as f32 - embedding[i] as f32) * lr;
-                    let new_val = embedding[i] as f32 + delta;
-                    embedding[i] = if new_val > 0.0 { 1 } else { -1 };
+                    let delta = (target as f32 - inner[i] as f32) * lr;
+                    let new_val = inner[i] as f32 + delta;
+                    inner[i] = if new_val > 0.0 { 1 } else { -1 };
                 }
             }
         }
@@ -557,13 +567,16 @@ impl TextEncoder {
     }
 
     /// Export word embeddings for persistence
-    pub fn export_embeddings(&self) -> &HashMap<String, Vec<i8>> {
+    pub fn export_embeddings(&self) -> &HashMap<String, Arc<Vec<i8>>> {
         &self.word_embeddings
     }
 
     /// Import word embeddings (for persistence)
     pub fn import_embeddings(&mut self, embeddings: HashMap<String, Vec<i8>>) {
-        self.word_embeddings = embeddings;
+        self.word_embeddings = embeddings
+            .into_iter()
+            .map(|(k, v)| (k, Arc::new(v)))
+            .collect();
         self.stats.vocabulary_size = self.word_embeddings.len();
     }
 

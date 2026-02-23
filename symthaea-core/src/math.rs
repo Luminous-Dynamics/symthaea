@@ -73,6 +73,114 @@ pub fn softmax(values: &[f32]) -> Vec<f32> {
     softmax_with_temperature(values, 1.0)
 }
 
+/// Cosine similarity between two `f32` slices.
+///
+/// Returns a value in `[-1.0, 1.0]` measuring the cosine of the angle between
+/// the two vectors.  Returns `0.0` for empty slices, zero-norm vectors, or
+/// mismatched lengths.
+///
+/// # Examples
+/// ```
+/// use symthaea_core::math::cosine_similarity_f32;
+///
+/// let a = [1.0_f32, 0.0, 0.0];
+/// let b = [0.0_f32, 1.0, 0.0];
+/// assert!((cosine_similarity_f32(&a, &b) - 0.0).abs() < 1e-6);
+///
+/// assert!((cosine_similarity_f32(&a, &a) - 1.0).abs() < 1e-6);
+/// ```
+pub fn cosine_similarity_f32(a: &[f32], b: &[f32]) -> f32 {
+    if a.len() != b.len() || a.is_empty() {
+        return 0.0;
+    }
+
+    let mut dot = 0.0_f32;
+    let mut norm_a = 0.0_f32;
+    let mut norm_b = 0.0_f32;
+
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        dot += x * y;
+        norm_a += x * x;
+        norm_b += y * y;
+    }
+
+    let denom = (norm_a * norm_b).sqrt();
+    if denom > 0.0 {
+        dot / denom
+    } else {
+        0.0
+    }
+}
+
+/// Cosine similarity between two `f64` slices.
+///
+/// Returns a value in `[-1.0, 1.0]` measuring the cosine of the angle between
+/// the two vectors.  Returns `0.0` for empty slices, zero-norm vectors, or
+/// mismatched lengths.
+///
+/// # Examples
+/// ```
+/// use symthaea_core::math::cosine_similarity_f64;
+///
+/// let a = [1.0_f64, 0.0, 0.0];
+/// let b = [0.0_f64, 1.0, 0.0];
+/// assert!((cosine_similarity_f64(&a, &b) - 0.0).abs() < 1e-12);
+///
+/// assert!((cosine_similarity_f64(&a, &a) - 1.0).abs() < 1e-12);
+/// ```
+pub fn cosine_similarity_f64(a: &[f64], b: &[f64]) -> f64 {
+    if a.len() != b.len() || a.is_empty() {
+        return 0.0;
+    }
+
+    let mut dot = 0.0_f64;
+    let mut norm_a = 0.0_f64;
+    let mut norm_b = 0.0_f64;
+
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        dot += x * y;
+        norm_a += x * x;
+        norm_b += y * y;
+    }
+
+    let denom = (norm_a * norm_b).sqrt();
+    if denom > 0.0 {
+        dot / denom
+    } else {
+        0.0
+    }
+}
+
+/// Exponential moving average (EMA) update.
+///
+/// Computes `alpha * current + (1.0 - alpha) * previous`, the standard
+/// single-step EMA recurrence.
+///
+/// # Arguments
+/// * `previous` - The previous EMA value.
+/// * `current`  - The new observation.
+/// * `alpha`    - Smoothing factor in `[0.0, 1.0]`. Higher values weight
+///   the current observation more heavily.
+///
+/// # Examples
+/// ```
+/// use symthaea_core::math::ema_update;
+///
+/// // With alpha = 1.0, result equals current.
+/// assert!((ema_update(10.0, 5.0, 1.0) - 5.0).abs() < 1e-6);
+///
+/// // With alpha = 0.0, result equals previous.
+/// assert!((ema_update(10.0, 5.0, 0.0) - 10.0).abs() < 1e-6);
+///
+/// // Typical update
+/// let result = ema_update(0.8, 0.6, 0.3);
+/// assert!((result - 0.74).abs() < 1e-6); // 0.3*0.6 + 0.7*0.8 = 0.18 + 0.56 = 0.74
+/// ```
+#[inline]
+pub fn ema_update(previous: f32, current: f32, alpha: f32) -> f32 {
+    alpha * current + (1.0 - alpha) * previous
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,5 +321,179 @@ mod tests {
                 p
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // cosine_similarity_f32 tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_cosine_similarity_f32_empty() {
+        assert_eq!(cosine_similarity_f32(&[], &[]), 0.0);
+    }
+
+    #[test]
+    fn test_cosine_similarity_f32_zero_vector() {
+        let zero = [0.0_f32; 3];
+        let v = [1.0, 2.0, 3.0];
+        assert_eq!(cosine_similarity_f32(&zero, &v), 0.0);
+        assert_eq!(cosine_similarity_f32(&v, &zero), 0.0);
+        assert_eq!(cosine_similarity_f32(&zero, &zero), 0.0);
+    }
+
+    #[test]
+    fn test_cosine_similarity_f32_identical() {
+        let v = [1.0, 2.0, 3.0];
+        let sim = cosine_similarity_f32(&v, &v);
+        assert!(
+            (sim - 1.0).abs() < 1e-6,
+            "Identical vectors should have similarity 1.0, got {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_cosine_similarity_f32_orthogonal() {
+        let a = [1.0_f32, 0.0, 0.0];
+        let b = [0.0_f32, 1.0, 0.0];
+        let sim = cosine_similarity_f32(&a, &b);
+        assert!(
+            sim.abs() < 1e-6,
+            "Orthogonal vectors should have similarity ~0.0, got {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_cosine_similarity_f32_anti_parallel() {
+        let a = [1.0_f32, 0.0, 0.0];
+        let b = [-1.0_f32, 0.0, 0.0];
+        let sim = cosine_similarity_f32(&a, &b);
+        assert!(
+            (sim + 1.0).abs() < 1e-6,
+            "Anti-parallel vectors should have similarity -1.0, got {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_cosine_similarity_f32_different_lengths() {
+        let a = [1.0_f32, 2.0];
+        let b = [1.0_f32, 2.0, 3.0];
+        assert_eq!(
+            cosine_similarity_f32(&a, &b),
+            0.0,
+            "Mismatched lengths should return 0.0"
+        );
+    }
+
+    #[test]
+    fn test_cosine_similarity_f32_scaled_vectors() {
+        let a = [1.0_f32, 2.0, 3.0];
+        let b = [10.0_f32, 20.0, 30.0];
+        let sim = cosine_similarity_f32(&a, &b);
+        assert!(
+            (sim - 1.0).abs() < 1e-5,
+            "Scaled vectors should have similarity ~1.0, got {}",
+            sim
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // cosine_similarity_f64 tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_cosine_similarity_f64_empty() {
+        assert_eq!(cosine_similarity_f64(&[], &[]), 0.0);
+    }
+
+    #[test]
+    fn test_cosine_similarity_f64_zero_vector() {
+        let zero = [0.0_f64; 3];
+        let v = [1.0, 2.0, 3.0];
+        assert_eq!(cosine_similarity_f64(&zero, &v), 0.0);
+    }
+
+    #[test]
+    fn test_cosine_similarity_f64_identical() {
+        let v = [1.0_f64, 2.0, 3.0];
+        let sim = cosine_similarity_f64(&v, &v);
+        assert!(
+            (sim - 1.0).abs() < 1e-12,
+            "Identical vectors should have similarity 1.0, got {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_cosine_similarity_f64_orthogonal() {
+        let a = [1.0_f64, 0.0, 0.0];
+        let b = [0.0_f64, 1.0, 0.0];
+        let sim = cosine_similarity_f64(&a, &b);
+        assert!(
+            sim.abs() < 1e-12,
+            "Orthogonal vectors should have similarity ~0.0, got {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_cosine_similarity_f64_anti_parallel() {
+        let a = [1.0_f64, 0.0, 0.0];
+        let b = [-1.0_f64, 0.0, 0.0];
+        let sim = cosine_similarity_f64(&a, &b);
+        assert!(
+            (sim + 1.0).abs() < 1e-12,
+            "Anti-parallel vectors should have similarity -1.0, got {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_cosine_similarity_f64_different_lengths() {
+        let a = [1.0_f64, 2.0];
+        let b = [1.0_f64, 2.0, 3.0];
+        assert_eq!(cosine_similarity_f64(&a, &b), 0.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // ema_update tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ema_update_alpha_one() {
+        // alpha=1.0 means current value only
+        assert!((ema_update(10.0, 5.0, 1.0) - 5.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_ema_update_alpha_zero() {
+        // alpha=0.0 means previous value only
+        assert!((ema_update(10.0, 5.0, 0.0) - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_ema_update_typical() {
+        // 0.3 * 0.6 + 0.7 * 0.8 = 0.18 + 0.56 = 0.74
+        let result = ema_update(0.8, 0.6, 0.3);
+        assert!(
+            (result - 0.74).abs() < 1e-6,
+            "Expected 0.74, got {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_ema_update_half() {
+        // 0.5 * 10 + 0.5 * 20 = 15
+        assert!((ema_update(20.0, 10.0, 0.5) - 15.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_ema_update_equal_values() {
+        // If previous == current, result should be the same regardless of alpha
+        assert!((ema_update(7.0, 7.0, 0.3) - 7.0).abs() < 1e-6);
+        assert!((ema_update(7.0, 7.0, 0.9) - 7.0).abs() < 1e-6);
     }
 }
