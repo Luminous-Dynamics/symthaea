@@ -825,7 +825,10 @@ mod tests {
         let different = encoder3
             .encode_with_cached_primitives("hello world", &cache)
             .unwrap();
-        assert_ne!(encoded, different, "Different text must produce different encoding");
+        assert_ne!(
+            encoded, different,
+            "Different text must produce different encoding"
+        );
 
         // With empty cache, should fall back to word encoding (same as encode_sentence)
         let empty_cache: HashMap<String, Arc<Vec<i8>>> = HashMap::new();

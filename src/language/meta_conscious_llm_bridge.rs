@@ -64,7 +64,11 @@ impl MetaConsciousLlmBridge {
             return 0.0;
         }
         let mean = self.phi_history.iter().sum::<f64>() / self.phi_history.len() as f64;
-        let variance = self.phi_history.iter().map(|p| (p - mean).powi(2)).sum::<f64>()
+        let variance = self
+            .phi_history
+            .iter()
+            .map(|p| (p - mean).powi(2))
+            .sum::<f64>()
             / self.phi_history.len() as f64;
         // Normalize: higher variance → higher meta-awareness
         (variance.sqrt() * 10.0).min(1.0)

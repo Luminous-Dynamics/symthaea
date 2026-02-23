@@ -765,7 +765,11 @@ impl ActiveInferenceFlightAgent {
             env.human_danger.min(1.0)
         };
 
-        let crash_risk: f64 = if can_intercept { CRASH_RISK_MAGNITUDE } else { 0.0 };
+        let crash_risk: f64 = if can_intercept {
+            CRASH_RISK_MAGNITUDE
+        } else {
+            0.0
+        };
 
         // ── Phase D: Mission deviation via per-step trajectory rollout ──
 
@@ -798,7 +802,9 @@ impl ActiveInferenceFlightAgent {
 
         self.config.safety_prior_precision * effective_danger.powi(2) * effective_horizon_weight
             + total_mission_efe
-            + self.config.self_preservation_precision * crash_risk.powi(2) * effective_horizon_weight
+            + self.config.self_preservation_precision
+                * crash_risk.powi(2)
+                * effective_horizon_weight
     }
 
     /// Evaluate candidate setpoints and return the EFE-optimal override.
@@ -854,8 +860,11 @@ impl ActiveInferenceFlightAgent {
                 for &frac in &RENDEZVOUS_FRACS {
                     let rv_t = impact_t * frac;
                     let beam = predict_falling_position(threat_pos, vel, rv_t);
-                    candidates[n_candidates] =
-                        [beam[0], beam[1], beam[2].max(entity_pos[2] + INTERCEPT_Z_MARGIN_VEL)];
+                    candidates[n_candidates] = [
+                        beam[0],
+                        beam[1],
+                        beam[2].max(entity_pos[2] + INTERCEPT_Z_MARGIN_VEL),
+                    ];
                     n_candidates += 1;
                 }
             } else {
@@ -2598,7 +2607,11 @@ mod tests {
         for &frac in &RENDEZVOUS_FRACS {
             let rv_t = impact_t * frac;
             let beam = predict_falling_position(threat_pos, threat_vel, rv_t);
-            let candidate = [beam[0], beam[1], beam[2].max(entity_pos[2] + INTERCEPT_Z_MARGIN_VEL)];
+            let candidate = [
+                beam[0],
+                beam[1],
+                beam[2].max(entity_pos[2] + INTERCEPT_Z_MARGIN_VEL),
+            ];
             let efe = agent.trajectory_efe(&state, candidate, &setpoint, &env);
             efes.push((frac, efe));
         }
@@ -2661,8 +2674,11 @@ mod tests {
             for &frac in &RENDEZVOUS_FRACS {
                 let rv_t = impact_t * frac;
                 let beam = predict_falling_position(threat_pos, threat_vel, rv_t);
-                let candidate =
-                    [beam[0], beam[1], beam[2].max(entity_pos[2] + INTERCEPT_Z_MARGIN_VEL)];
+                let candidate = [
+                    beam[0],
+                    beam[1],
+                    beam[2].max(entity_pos[2] + INTERCEPT_Z_MARGIN_VEL),
+                ];
                 let efe = ActiveInferenceFlightAgent::new(config.clone())
                     .trajectory_efe(&state, candidate, &setpoint, &env);
                 if efe < best_efe {
@@ -2722,7 +2738,10 @@ mod tests {
         let beam_vel = [0.0, 0.0, -1.0];
         let candidate = [0.0, 0.0, 0.03];
         let impact_t = predict_impact_time_z(beam_pos, beam_vel, 0.0);
-        assert!(impact_t > 0.0 && impact_t < 0.1, "Impact should be imminent");
+        assert!(
+            impact_t > 0.0 && impact_t < 0.1,
+            "Impact should be imminent"
+        );
         let dist = min_beam_distance(beam_pos, beam_vel, candidate, impact_t);
         // Beam passes very close to candidate
         assert!(
@@ -2810,13 +2829,13 @@ mod tests {
             let env = FlightEnvironment {
                 human_danger: danger,
                 mission_progress: next_f64(0.0, 1.0),
-                threat_pos: Some([
-                    next_f64(-3.0, 3.0),
-                    next_f64(-3.0, 3.0),
-                    next_f64(1.0, 5.0),
-                ]),
+                threat_pos: Some([next_f64(-3.0, 3.0), next_f64(-3.0, 3.0), next_f64(1.0, 5.0)]),
                 threat_vel: if has_vel {
-                    Some([next_f64(-2.0, 2.0), next_f64(-2.0, 2.0), next_f64(-8.0, -0.5)])
+                    Some([
+                        next_f64(-2.0, 2.0),
+                        next_f64(-2.0, 2.0),
+                        next_f64(-8.0, -0.5),
+                    ])
                 } else {
                     None
                 },

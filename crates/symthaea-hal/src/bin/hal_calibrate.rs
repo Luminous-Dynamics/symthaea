@@ -16,7 +16,7 @@ use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 
 use symthaea_hal::calibration::CalibrationProfile;
-use symthaea_hal::mock::{MockI2cBus, MockHalSensor};
+use symthaea_hal::mock::{MockHalSensor, MockI2cBus};
 use symthaea_hal::pca9685::Pca9685;
 use symthaea_hal::sensor::HalSensorAdapter;
 
@@ -75,7 +75,11 @@ fn main() {
     println!("=== symthaea-hal calibration ===");
     println!(
         "Mode: {}",
-        if cli.dry_run { "dry-run (mock)" } else { "hardware" }
+        if cli.dry_run {
+            "dry-run (mock)"
+        } else {
+            "hardware"
+        }
     );
     println!("Output: {}", cli.output.display());
 
@@ -269,10 +273,7 @@ fn run_test_sweep<I: I2c>(
     delay_ms: u64,
 ) {
     let cal = &profile.joints[joint];
-    println!(
-        "\n--- Test sweep: joint {} ({}) ---",
-        joint, cal.name
-    );
+    println!("\n--- Test sweep: joint {} ({}) ---", joint, cal.name);
     println!(
         "  Range: {} → {} µs, step {} µs, delay {} ms",
         cal.pulse_min_us, cal.pulse_max_us, step, delay_ms
@@ -346,10 +347,7 @@ fn run_test_sweep_monitored<I: I2c>(
     stall_threshold: f32,
 ) {
     let cal = &profile.joints[joint];
-    println!(
-        "\n--- Monitored sweep: joint {} ({}) ---",
-        joint, cal.name
-    );
+    println!("\n--- Monitored sweep: joint {} ({}) ---", joint, cal.name);
     println!(
         "  Range: {} → {} µs, step {} µs, delay {} ms, stall threshold {:.2}A",
         cal.pulse_min_us, cal.pulse_max_us, step, delay_ms, stall_threshold
@@ -425,11 +423,7 @@ fn save_profile(profile: &CalibrationProfile, path: &Path) {
 fn resolve_joints(joint: Option<usize>, profile: &CalibrationProfile) -> Vec<usize> {
     if let Some(j) = joint {
         if j >= profile.joints.len() {
-            eprintln!(
-                "Joint {} out of range (0-{})",
-                j,
-                profile.joints.len() - 1
-            );
+            eprintln!("Joint {} out of range (0-{})", j, profile.joints.len() - 1);
             std::process::exit(1);
         }
         vec![j]
@@ -508,10 +502,7 @@ mod tests {
         // Normal readings (below stall threshold)
         let readings: Vec<Vec<f32>> = (0..100).map(|_| vec![0.5, 5.0]).collect();
         let mut sensor = MockHalSensor::new("ina219", readings);
-        run_test_sweep_monitored(
-            &mut pca0, &mut pca1, &profile, 0, 200, 0,
-            &mut sensor, 1.5,
-        );
+        run_test_sweep_monitored(&mut pca0, &mut pca1, &profile, 0, 200, 0, &mut sensor, 1.5);
     }
 
     #[test]
@@ -524,10 +515,7 @@ mod tests {
 
         // Empty sensor: no data
         let mut sensor = MockHalSensor::new("ina219", vec![]);
-        run_test_sweep_monitored(
-            &mut pca0, &mut pca1, &profile, 0, 200, 0,
-            &mut sensor, 1.5,
-        );
+        run_test_sweep_monitored(&mut pca0, &mut pca1, &profile, 0, 200, 0, &mut sensor, 1.5);
     }
 
     #[test]

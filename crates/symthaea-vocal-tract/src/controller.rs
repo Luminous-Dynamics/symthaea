@@ -765,7 +765,12 @@ impl VocalTractController {
     pub fn train_on_transitions(
         &mut self,
         genesis: &GenesisSeed,
-        transition_pairs: &[(&str, &crate::types::FormantTarget, &str, &crate::types::FormantTarget)],
+        transition_pairs: &[(
+            &str,
+            &crate::types::FormantTarget,
+            &str,
+            &crate::types::FormantTarget,
+        )],
         epochs: usize,
     ) -> f32 {
         if transition_pairs.is_empty() {
@@ -784,7 +789,8 @@ impl VocalTractController {
             .map(|(from_name, from_target, to_name, to_target)| {
                 let from_hv = genesis.hv(&format!("phoneme::{from_name}"), HDC_DIMENSION);
                 let to_hv = genesis.hv(&format!("phoneme::{to_name}"), HDC_DIMENSION);
-                let from_frame = FormantFrame::from_target(from_target, self.config.base_f0, 0.7, 0.0);
+                let from_frame =
+                    FormantFrame::from_target(from_target, self.config.base_f0, 0.7, 0.0);
                 let to_frame = FormantFrame::from_target(to_target, self.config.base_f0, 0.7, 0.0);
                 (from_hv, from_frame, to_hv, to_frame)
             })
@@ -840,8 +846,8 @@ fn formant_mse(a: &FormantFrame, b: &FormantFrame) -> f32 {
         1.0, // voicing
     ];
     let diffs = [
-        (a.f1 - b.f1) / 400.0,   // Match ERROR_SCALE[F1]
-        (a.f2 - b.f2) / 600.0,   // Match ERROR_SCALE[F2]
+        (a.f1 - b.f1) / 400.0, // Match ERROR_SCALE[F1]
+        (a.f2 - b.f2) / 600.0, // Match ERROR_SCALE[F2]
         (a.f3 - b.f3) / 1500.0,
         (a.b1 - b.b1) / 100.0,
         (a.b2 - b.b2) / 150.0,
@@ -1560,7 +1566,8 @@ mod tests {
         assert!(
             frame_high.f0 > frame_low.f0,
             "High Phi should raise F0: high={:.1}, low={:.1}",
-            frame_high.f0, frame_low.f0
+            frame_high.f0,
+            frame_low.f0
         );
     }
 
@@ -1585,7 +1592,8 @@ mod tests {
         assert!(
             frame_low.energy > frame_high.energy,
             "High EFE should reduce energy: low_efe={:.3}, high_efe={:.3}",
-            frame_low.energy, frame_high.energy
+            frame_low.energy,
+            frame_high.energy
         );
     }
 
@@ -1654,17 +1662,20 @@ mod tests {
         assert!(
             frame_high.b1 < frame_low.b1,
             "High consciousness should tighten B1: high={:.1}, low={:.1}",
-            frame_high.b1, frame_low.b1
+            frame_high.b1,
+            frame_low.b1
         );
         assert!(
             frame_high.b2 < frame_low.b2,
             "High consciousness should tighten B2: high={:.1}, low={:.1}",
-            frame_high.b2, frame_low.b2
+            frame_high.b2,
+            frame_low.b2
         );
         assert!(
             frame_high.b3 < frame_low.b3,
             "High consciousness should tighten B3: high={:.1}, low={:.1}",
-            frame_high.b3, frame_low.b3
+            frame_high.b3,
+            frame_low.b3
         );
 
         // Verify the expected ratio: high/low should be 0.8/1.2 = 2/3
@@ -1679,17 +1690,20 @@ mod tests {
         assert!(
             (frame_high.f1 - frame_low.f1).abs() < 1e-4,
             "F1 should be unaffected: high={:.1}, low={:.1}",
-            frame_high.f1, frame_low.f1
+            frame_high.f1,
+            frame_low.f1
         );
         assert!(
             (frame_high.f2 - frame_low.f2).abs() < 1e-4,
             "F2 should be unaffected: high={:.1}, low={:.1}",
-            frame_high.f2, frame_low.f2
+            frame_high.f2,
+            frame_low.f2
         );
         assert!(
             (frame_high.f3 - frame_low.f3).abs() < 1e-4,
             "F3 should be unaffected: high={:.1}, low={:.1}",
-            frame_high.f3, frame_low.f3
+            frame_high.f3,
+            frame_low.f3
         );
     }
 
@@ -1828,12 +1842,96 @@ mod tests {
 
         // 6 cardinal vowels with known formant targets
         let vowels: Vec<(&str, crate::types::FormantTarget)> = vec![
-            ("AH", crate::types::FormantTarget { f1: 520.0, f2: 1190.0, f3: 2390.0, b1: 60.0, b2: 90.0, b3: 150.0, is_vowel: true, is_voiced: true, duration_ms: 80.0, manner: crate::types::SourceType::Vowel }),
-            ("IY", crate::types::FormantTarget { f1: 270.0, f2: 2290.0, f3: 3010.0, b1: 40.0, b2: 80.0, b3: 120.0, is_vowel: true, is_voiced: true, duration_ms: 80.0, manner: crate::types::SourceType::Vowel }),
-            ("UW", crate::types::FormantTarget { f1: 300.0, f2: 870.0, f3: 2240.0, b1: 40.0, b2: 70.0, b3: 110.0, is_vowel: true, is_voiced: true, duration_ms: 80.0, manner: crate::types::SourceType::Vowel }),
-            ("AE", crate::types::FormantTarget { f1: 660.0, f2: 1720.0, f3: 2410.0, b1: 70.0, b2: 100.0, b3: 160.0, is_vowel: true, is_voiced: true, duration_ms: 80.0, manner: crate::types::SourceType::Vowel }),
-            ("AA", crate::types::FormantTarget { f1: 730.0, f2: 1090.0, f3: 2440.0, b1: 80.0, b2: 100.0, b3: 120.0, is_vowel: true, is_voiced: true, duration_ms: 80.0, manner: crate::types::SourceType::Vowel }),
-            ("EH", crate::types::FormantTarget { f1: 530.0, f2: 1840.0, f3: 2480.0, b1: 50.0, b2: 90.0, b3: 140.0, is_vowel: true, is_voiced: true, duration_ms: 80.0, manner: crate::types::SourceType::Vowel }),
+            (
+                "AH",
+                crate::types::FormantTarget {
+                    f1: 520.0,
+                    f2: 1190.0,
+                    f3: 2390.0,
+                    b1: 60.0,
+                    b2: 90.0,
+                    b3: 150.0,
+                    is_vowel: true,
+                    is_voiced: true,
+                    duration_ms: 80.0,
+                    manner: crate::types::SourceType::Vowel,
+                },
+            ),
+            (
+                "IY",
+                crate::types::FormantTarget {
+                    f1: 270.0,
+                    f2: 2290.0,
+                    f3: 3010.0,
+                    b1: 40.0,
+                    b2: 80.0,
+                    b3: 120.0,
+                    is_vowel: true,
+                    is_voiced: true,
+                    duration_ms: 80.0,
+                    manner: crate::types::SourceType::Vowel,
+                },
+            ),
+            (
+                "UW",
+                crate::types::FormantTarget {
+                    f1: 300.0,
+                    f2: 870.0,
+                    f3: 2240.0,
+                    b1: 40.0,
+                    b2: 70.0,
+                    b3: 110.0,
+                    is_vowel: true,
+                    is_voiced: true,
+                    duration_ms: 80.0,
+                    manner: crate::types::SourceType::Vowel,
+                },
+            ),
+            (
+                "AE",
+                crate::types::FormantTarget {
+                    f1: 660.0,
+                    f2: 1720.0,
+                    f3: 2410.0,
+                    b1: 70.0,
+                    b2: 100.0,
+                    b3: 160.0,
+                    is_vowel: true,
+                    is_voiced: true,
+                    duration_ms: 80.0,
+                    manner: crate::types::SourceType::Vowel,
+                },
+            ),
+            (
+                "AA",
+                crate::types::FormantTarget {
+                    f1: 730.0,
+                    f2: 1090.0,
+                    f3: 2440.0,
+                    b1: 80.0,
+                    b2: 100.0,
+                    b3: 120.0,
+                    is_vowel: true,
+                    is_voiced: true,
+                    duration_ms: 80.0,
+                    manner: crate::types::SourceType::Vowel,
+                },
+            ),
+            (
+                "EH",
+                crate::types::FormantTarget {
+                    f1: 530.0,
+                    f2: 1840.0,
+                    f3: 2480.0,
+                    b1: 50.0,
+                    b2: 90.0,
+                    b3: 140.0,
+                    is_vowel: true,
+                    is_voiced: true,
+                    duration_ms: 80.0,
+                    manner: crate::types::SourceType::Vowel,
+                },
+            ),
         ];
 
         let targets: Vec<(&str, &crate::types::FormantTarget)> =

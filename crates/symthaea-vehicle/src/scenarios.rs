@@ -276,11 +276,7 @@ mod tests {
 
         assert_eq!(results.len(), 9);
         for r in &results {
-            assert!(
-                r.all_finite,
-                "Scenario '{}' has non-finite metrics",
-                r.name
-            );
+            assert!(r.all_finite, "Scenario '{}' has non-finite metrics", r.name);
             assert!(
                 r.all_completed,
                 "Scenario '{}' has incomplete episodes",

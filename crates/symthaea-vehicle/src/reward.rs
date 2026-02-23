@@ -220,10 +220,7 @@ mod tests {
         let mut state = VehicleState::cruising(13.4);
         state.nearest_peer_distance = 30.0;
         let r = follow_distance_reward(&state, 30.0);
-        assert!(
-            (r - 1.0).abs() < 1e-6,
-            "At target gap should be 1.0: {r}"
-        );
+        assert!((r - 1.0).abs() < 1e-6, "At target gap should be 1.0: {r}");
     }
 
     #[test]

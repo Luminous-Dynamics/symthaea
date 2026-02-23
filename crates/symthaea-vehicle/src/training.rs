@@ -560,11 +560,7 @@ impl VehicleTrainer {
                     VehicleTask::EmergencyStop => 0.0,
                     _ => self.config.effective_target_speed(),
                 };
-                let target = pd_cruise_baseline_with_road(
-                    &state,
-                    warmup_drive,
-                    proj.road_heading,
-                );
+                let target = pd_cruise_baseline_with_road(&state, warmup_drive, proj.road_heading);
                 (hv, target)
             })
             .collect();
@@ -968,8 +964,11 @@ mod tests {
         assert_eq!(metrics.len(), 30);
 
         // Compare first 5 vs last 5 — wider window for robustness
-        let first_avg: f64 =
-            metrics[..5].iter().map(|m| m.avg_episode_reward).sum::<f64>() / 5.0;
+        let first_avg: f64 = metrics[..5]
+            .iter()
+            .map(|m| m.avg_episode_reward)
+            .sum::<f64>()
+            / 5.0;
         let last_avg: f64 = metrics[25..]
             .iter()
             .map(|m| m.avg_episode_reward)
@@ -1036,8 +1035,7 @@ mod tests {
             early_termination: false,
             ..VehicleConfig::default()
         };
-        let mut trainer =
-            VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(3));
+        let mut trainer = VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(3));
         let metrics = trainer.train();
 
         assert_eq!(metrics.len(), 3);
@@ -1126,8 +1124,7 @@ mod tests {
             early_termination: false,
             ..VehicleConfig::default()
         };
-        let mut trainer =
-            VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(4));
+        let mut trainer = VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(4));
         let metrics = trainer.train();
 
         assert_eq!(metrics.len(), 10);
@@ -1137,18 +1134,12 @@ mod tests {
             .telemetry
             .iter()
             .any(|t| t.mesh_peers_visible > 0);
-        assert!(
-            !early_has_peer,
-            "Episode 0 should have no swarm peers"
-        );
+        assert!(!early_has_peer, "Episode 0 should have no swarm peers");
 
         // Last episode (progress=1.0) should have peers visible
         let last = &metrics[9];
         let late_has_peer = last.telemetry.iter().any(|t| t.mesh_peers_visible > 0);
-        assert!(
-            late_has_peer,
-            "Episode 9 should have swarm peers"
-        );
+        assert!(late_has_peer, "Episode 9 should have swarm peers");
     }
 
     // ── Ablation Tests (Part A) ──
@@ -1205,8 +1196,8 @@ mod tests {
             ..VehicleConfig::default()
         };
 
-        let mut trainer_swarm = VehicleTrainer::new(config.clone())
-            .with_swarm(SwarmConfig::convoy_straight(3));
+        let mut trainer_swarm =
+            VehicleTrainer::new(config.clone()).with_swarm(SwarmConfig::convoy_straight(3));
         let metrics_swarm = trainer_swarm.train();
 
         let mut trainer_solo = VehicleTrainer::new(config);
@@ -1325,8 +1316,7 @@ mod tests {
             ..VehicleConfig::default()
         };
 
-        let mut trainer = VehicleTrainer::new(config)
-            .with_swarm(SwarmConfig::convoy_straight(3));
+        let mut trainer = VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(3));
         let metrics = trainer.train();
 
         assert_eq!(metrics.len(), 10);
@@ -1360,26 +1350,22 @@ mod tests {
             ..VehicleConfig::default()
         };
 
-        let mut trainer_lk = VehicleTrainer::new(base_config.clone())
-            .with_swarm(SwarmConfig::convoy_straight(3));
+        let mut trainer_lk =
+            VehicleTrainer::new(base_config.clone()).with_swarm(SwarmConfig::convoy_straight(3));
         let metrics_lk = trainer_lk.train();
 
         let follow_config = VehicleConfig {
             task: VehicleTask::Follow { target_gap: 30.0 },
             ..base_config
         };
-        let mut trainer_follow = VehicleTrainer::new(follow_config)
-            .with_swarm(SwarmConfig::convoy_straight(3));
+        let mut trainer_follow =
+            VehicleTrainer::new(follow_config).with_swarm(SwarmConfig::convoy_straight(3));
         let metrics_follow = trainer_follow.train();
 
         assert_eq!(metrics_lk.len(), 10);
         assert_eq!(metrics_follow.len(), 10);
 
-        let lk_avg: f64 = metrics_lk
-            .iter()
-            .map(|m| m.avg_episode_reward)
-            .sum::<f64>()
-            / 10.0;
+        let lk_avg: f64 = metrics_lk.iter().map(|m| m.avg_episode_reward).sum::<f64>() / 10.0;
         let follow_avg: f64 = metrics_follow
             .iter()
             .map(|m| m.avg_episode_reward)
@@ -1487,10 +1473,10 @@ mod tests {
         let mut trainer_lc = VehicleTrainer::new(lc_config);
         let metrics_lc = trainer_lc.train();
 
-        let lk_avg: f64 = metrics_lk.iter().map(|m| m.avg_episode_reward).sum::<f64>()
-            / metrics_lk.len() as f64;
-        let lc_avg: f64 = metrics_lc.iter().map(|m| m.avg_episode_reward).sum::<f64>()
-            / metrics_lc.len() as f64;
+        let lk_avg: f64 =
+            metrics_lk.iter().map(|m| m.avg_episode_reward).sum::<f64>() / metrics_lk.len() as f64;
+        let lc_avg: f64 =
+            metrics_lc.iter().map(|m| m.avg_episode_reward).sum::<f64>() / metrics_lc.len() as f64;
 
         assert!(lk_avg.is_finite(), "LaneKeep avg finite: {lk_avg}");
         assert!(lc_avg.is_finite(), "LaneChange avg finite: {lc_avg}");

@@ -237,11 +237,7 @@ impl FormantTarget {
             } else {
                 other.is_voiced
             },
-            manner: if t < 0.5 {
-                self.manner
-            } else {
-                other.manner
-            },
+            manner: if t < 0.5 { self.manner } else { other.manner },
         }
     }
 

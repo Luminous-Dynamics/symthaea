@@ -320,10 +320,10 @@ impl VehicleTask {
     /// Target speed for this task (m/s).
     pub fn target_speed(&self) -> f64 {
         match self {
-            VehicleTask::LaneKeep => 13.4,     // ~30 mph / ~48 km/h
-            VehicleTask::Follow { .. } => 13.4,  // match lead
-            VehicleTask::LaneChange => 13.4,   // maintain during maneuver
-            VehicleTask::EmergencyStop => 0.0, // stop
+            VehicleTask::LaneKeep => 13.4,      // ~30 mph / ~48 km/h
+            VehicleTask::Follow { .. } => 13.4, // match lead
+            VehicleTask::LaneChange => 13.4,    // maintain during maneuver
+            VehicleTask::EmergencyStop => 0.0,  // stop
         }
     }
 }

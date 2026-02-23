@@ -81,7 +81,10 @@ fn main() {
     match result {
         Ok(count) => {
             println!("\n[OK] Completed {} ticks", count);
-            println!("     Final pulse[0] = {} µs", runtime.servo().last_pulses()[0]);
+            println!(
+                "     Final pulse[0] = {} µs",
+                runtime.servo().last_pulses()[0]
+            );
         }
         Err(e) => {
             println!("\n[ERR] Runtime stopped: {}", e);

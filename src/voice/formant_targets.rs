@@ -130,8 +130,7 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
     );
     db.insert(
         "B".into(),
-        FormantTarget::voiced_consonant(200.0, 1000.0, 2200.0, 60.0)
-            .with_manner(SourceType::Stop),
+        FormantTarget::voiced_consonant(200.0, 1000.0, 2200.0, 60.0).with_manner(SourceType::Stop),
     );
 
     // Alveolar stops
@@ -142,8 +141,7 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
     );
     db.insert(
         "D".into(),
-        FormantTarget::voiced_consonant(400.0, 1800.0, 2600.0, 50.0)
-            .with_manner(SourceType::Stop),
+        FormantTarget::voiced_consonant(400.0, 1800.0, 2600.0, 50.0).with_manner(SourceType::Stop),
     );
 
     // Velar stops
@@ -154,8 +152,7 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
     );
     db.insert(
         "G".into(),
-        FormantTarget::voiced_consonant(350.0, 1500.0, 2500.0, 70.0)
-            .with_manner(SourceType::Stop),
+        FormantTarget::voiced_consonant(350.0, 1500.0, 2500.0, 70.0).with_manner(SourceType::Stop),
     );
 
     // Glottal stop
@@ -236,18 +233,15 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
 
     db.insert(
         "M".into(),
-        FormantTarget::voiced_consonant(280.0, 1000.0, 2200.0, 70.0)
-            .with_manner(SourceType::Nasal),
+        FormantTarget::voiced_consonant(280.0, 1000.0, 2200.0, 70.0).with_manner(SourceType::Nasal),
     );
     db.insert(
         "N".into(),
-        FormantTarget::voiced_consonant(280.0, 1500.0, 2500.0, 70.0)
-            .with_manner(SourceType::Nasal),
+        FormantTarget::voiced_consonant(280.0, 1500.0, 2500.0, 70.0).with_manner(SourceType::Nasal),
     );
     db.insert(
         "NG".into(),
-        FormantTarget::voiced_consonant(280.0, 1900.0, 2600.0, 70.0)
-            .with_manner(SourceType::Nasal),
+        FormantTarget::voiced_consonant(280.0, 1900.0, 2600.0, 70.0).with_manner(SourceType::Nasal),
     );
 
     // ═══════════════════════════════════════════════════════════════════════════

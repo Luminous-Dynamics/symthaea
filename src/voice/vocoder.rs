@@ -447,13 +447,13 @@ impl FormantVocoder {
         let ou_jitter = OrnsteinUhlenbeck::new(
             100.0,
             1.0,
-            config.jitter * (2.0 * 100.0_f32).sqrt(),   // σ so stddev = config.jitter
+            config.jitter * (2.0 * 100.0_f32).sqrt(), // σ so stddev = config.jitter
             0xF0F0CAFE,
         );
         let ou_shimmer = OrnsteinUhlenbeck::new(
             50.0,
             1.0,
-            config.shimmer * (2.0 * 50.0_f32).sqrt(),   // σ so stddev = config.shimmer
+            config.shimmer * (2.0 * 50.0_f32).sqrt(), // σ so stddev = config.shimmer
             0xBEEF1234,
         );
 
@@ -538,8 +538,7 @@ impl FormantVocoder {
                 let filtered = self.apply_filters(source, current.source_type);
 
                 // Apply energy envelope with shimmer
-                let output =
-                    filtered * current.energy * self.shimmer_factor * self.config.volume;
+                let output = filtered * current.energy * self.shimmer_factor * self.config.volume;
 
                 // Low-pass filter for smoothing
                 let smoothed = self.lowpass.process(output);
@@ -702,8 +701,7 @@ impl FormantVocoder {
             // Formant filtering + nasal anti-resonance
             let filtered = self.apply_filters(source, frame.source_type);
 
-            let output =
-                filtered * frame.energy * self.shimmer_factor * self.config.volume;
+            let output = filtered * frame.energy * self.shimmer_factor * self.config.volume;
             let smoothed = self.lowpass.process(output);
             audio.push(soft_clip(smoothed));
         }
@@ -1074,10 +1072,7 @@ mod tests {
             .zip(&audio_yes)
             .map(|(a, b)| (a - b).powi(2))
             .sum();
-        assert!(
-            diff > 0.001,
-            "Jitter should change the output, diff={diff}"
-        );
+        assert!(diff > 0.001, "Jitter should change the output, diff={diff}");
     }
 
     #[test]
@@ -1154,11 +1149,8 @@ mod tests {
         let closure_end = (480.0 * 0.8) as usize;
         let closure_energy: f32 =
             audio[..closure_end].iter().map(|s| s * s).sum::<f32>() / closure_end as f32;
-        let burst_energy: f32 = audio[closure_end..]
-            .iter()
-            .map(|s| s * s)
-            .sum::<f32>()
-            / (480 - closure_end) as f32;
+        let burst_energy: f32 =
+            audio[closure_end..].iter().map(|s| s * s).sum::<f32>() / (480 - closure_end) as f32;
 
         assert!(
             burst_energy > closure_energy,
@@ -1191,7 +1183,10 @@ mod tests {
         let first_quarter: f32 = audio[..120].iter().map(|s| s * s).sum::<f32>();
         let last_quarter: f32 = audio[360..].iter().map(|s| s * s).sum::<f32>();
 
-        assert!(first_quarter > 0.001, "First quarter energy: {first_quarter}");
+        assert!(
+            first_quarter > 0.001,
+            "First quarter energy: {first_quarter}"
+        );
         assert!(last_quarter > 0.001, "Last quarter energy: {last_quarter}");
     }
 
@@ -1217,6 +1212,9 @@ mod tests {
         assert!(!audio.is_empty());
 
         let rms: f32 = (audio.iter().map(|s| s * s).sum::<f32>() / audio.len() as f32).sqrt();
-        assert!(rms > 0.001, "Nasal should produce voiced audio: rms={rms:.4}");
+        assert!(
+            rms > 0.001,
+            "Nasal should produce voiced audio: rms={rms:.4}"
+        );
     }
 }

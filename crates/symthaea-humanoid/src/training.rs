@@ -217,9 +217,9 @@ impl HumanoidTrainer {
 
         // Max durations per phase (in episodes)
         let max_durations = [
-            (total as f64 * 0.25).ceil() as usize, // Phase 0: Stand PD↓
-            (total as f64 * 0.15).ceil() as usize, // Phase 1: Stand autonomy
-            (total as f64 * 0.50).ceil() as usize, // Phase 2: Walk
+            (total as f64 * 0.25).ceil() as usize,   // Phase 0: Stand PD↓
+            (total as f64 * 0.15).ceil() as usize,   // Phase 1: Stand autonomy
+            (total as f64 * 0.50).ceil() as usize,   // Phase 2: Walk
             total.saturating_sub(cs.phase_start_ep), // Phase 3: Run (remainder)
         ];
 
@@ -290,9 +290,7 @@ impl HumanoidTrainer {
                 metrics.avg_standing_reward > self.config.standing_mastery_threshold && full_episode
             }
             1 => {
-                metrics.avg_standing_reward > 0.90
-                    && metrics.avg_uprightness > 0.95
-                    && full_episode
+                metrics.avg_standing_reward > 0.90 && metrics.avg_uprightness > 0.95 && full_episode
             }
             2 => {
                 let (_, _, target_speed) = self.curriculum_adaptive(ep);
@@ -444,8 +442,11 @@ impl HumanoidTrainer {
                     total_mechanical_energy +=
                         (command.torques[i] as f64 * post_state.joint_velocities[i]).abs() * dt;
                 }
-                gait_analyzer
-                    .update_with_position(post_state, horizontal_pos, post_state.timestamp);
+                gait_analyzer.update_with_position(
+                    post_state,
+                    horizontal_pos,
+                    post_state.timestamp,
+                );
             }
 
             // Track metrics
@@ -564,8 +565,7 @@ impl HumanoidTrainer {
         let gait_summary = gait_analyzer.summary();
 
         // Cost of Transport: energy / (mass × distance)
-        let total_distance =
-            (horizontal_pos[0].powi(2) + horizontal_pos[1].powi(2)).sqrt();
+        let total_distance = (horizontal_pos[0].powi(2) + horizontal_pos[1].powi(2)).sqrt();
         let cost_of_transport = if total_distance > 0.01 {
             total_mechanical_energy / (70.0 * total_distance)
         } else {
@@ -638,8 +638,7 @@ impl HumanoidTrainer {
             exploration_decay_rate: self.config.exploration_decay_rate,
             ..HumanoidFepConfig::default()
         };
-        let mut fep_agent =
-            ActiveInferenceHumanoidAgent::new(fep_config, self.config.task);
+        let mut fep_agent = ActiveInferenceHumanoidAgent::new(fep_config, self.config.task);
 
         // Warmup: pre-train on static standing samples
         let warmup_samples: Vec<(ContinuousHV, HumanoidCommand)> = (0..20)
@@ -731,8 +730,7 @@ impl HumanoidTrainer {
             exploration_decay_rate: self.config.exploration_decay_rate,
             ..HumanoidFepConfig::default()
         };
-        let mut fep_agent =
-            ActiveInferenceHumanoidAgent::new(fep_config, self.config.task);
+        let mut fep_agent = ActiveInferenceHumanoidAgent::new(fep_config, self.config.task);
 
         let mut all_metrics = Vec::with_capacity(self.config.num_episodes);
         let _ = std::fs::create_dir_all(output_dir);
@@ -1062,7 +1060,10 @@ mod tests {
             telemetry: Vec::new(),
         };
         let advanced = trainer.check_phase_advance(5, &metrics);
-        assert!(!advanced, "Should not advance before min duration (10 episodes)");
+        assert!(
+            !advanced,
+            "Should not advance before min duration (10 episodes)"
+        );
         assert_eq!(trainer.curriculum_state.phase, 0);
     }
 

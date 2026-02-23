@@ -156,8 +156,13 @@ pub fn mel_cepstral_distortion(
     let mut total_mcd = 0.0f32;
 
     for i in 0..n {
-        let synth_mc = formants_to_mel_cepstrum(synth_frames[i].f1, synth_frames[i].f2, synth_frames[i].f3);
-        let target_mc = formants_to_mel_cepstrum(target_frames[i].f1, target_frames[i].f2, target_frames[i].f3);
+        let synth_mc =
+            formants_to_mel_cepstrum(synth_frames[i].f1, synth_frames[i].f2, synth_frames[i].f3);
+        let target_mc = formants_to_mel_cepstrum(
+            target_frames[i].f1,
+            target_frames[i].f2,
+            target_frames[i].f3,
+        );
 
         let sq_sum: f32 = synth_mc
             .iter()

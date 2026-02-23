@@ -336,8 +336,7 @@ impl ActiveInferenceHumanoidAgent {
             }
         } else {
             // Slow decay instead of hard reset
-            self.high_fe_ticks =
-                (self.high_fe_ticks - self.config.exploration_decay_rate).max(0.0);
+            self.high_fe_ticks = (self.high_fe_ticks - self.config.exploration_decay_rate).max(0.0);
         }
 
         // Update tracking state

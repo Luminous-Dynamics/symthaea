@@ -212,7 +212,9 @@ impl SensoryJitterBuffer {
     /// Randomize delay using a seed, fill buffer with the given state.
     fn reset(&mut self, standing: &HumanoidState, seed: u64) {
         // Deterministic delay: 1 + (seed_hash % max_delay)
-        let hash = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let hash = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         self.delay_ticks = 1 + (hash as usize % self.max_delay).min(self.max_delay);
         for slot in &mut self.buffer {
             *slot = standing.clone();
@@ -315,13 +317,27 @@ struct DomainRandomization {
 
 /// Mapping from joint index to body segment index for inertia scaling.
 const JOINT_SEGMENT_MAP: [usize; NUM_ACTUATORS] = [
-    SEG_TORSO, SEG_TORSO, SEG_TORSO,                   // abdomen y/z/x
-    SEG_THIGH, SEG_THIGH, SEG_THIGH, SEG_SHIN,         // right hip x/z/y, knee
-    SEG_FOOT, SEG_FOOT,                                  // right ankle x/y
-    SEG_THIGH, SEG_THIGH, SEG_THIGH, SEG_SHIN,         // left hip x/z/y, knee
-    SEG_FOOT, SEG_FOOT,                                  // left ankle x/y
-    SEG_UPPER_ARM, SEG_UPPER_ARM, SEG_FOREARM,          // right shoulder1/2, elbow
-    SEG_UPPER_ARM, SEG_UPPER_ARM, SEG_FOREARM,          // left shoulder1/2, elbow
+    SEG_TORSO,
+    SEG_TORSO,
+    SEG_TORSO, // abdomen y/z/x
+    SEG_THIGH,
+    SEG_THIGH,
+    SEG_THIGH,
+    SEG_SHIN, // right hip x/z/y, knee
+    SEG_FOOT,
+    SEG_FOOT, // right ankle x/y
+    SEG_THIGH,
+    SEG_THIGH,
+    SEG_THIGH,
+    SEG_SHIN, // left hip x/z/y, knee
+    SEG_FOOT,
+    SEG_FOOT, // left ankle x/y
+    SEG_UPPER_ARM,
+    SEG_UPPER_ARM,
+    SEG_FOREARM, // right shoulder1/2, elbow
+    SEG_UPPER_ARM,
+    SEG_UPPER_ARM,
+    SEG_FOREARM, // left shoulder1/2, elbow
 ];
 
 /// Observation noise model: additive sensor noise on state observations.
@@ -510,8 +526,8 @@ impl DomainRandomization {
 
         // Recompute total mass proportionally
         let baseline_segment_total: f64 = baseline.segment_masses.iter().sum();
-        body.total_mass =
-            body.segment_masses.iter().sum::<f64>() + (baseline.total_mass - baseline_segment_total);
+        body.total_mass = body.segment_masses.iter().sum::<f64>()
+            + (baseline.total_mass - baseline_segment_total);
 
         // Scale joint inertias: I ∝ m × L²
         for i in 0..NUM_ACTUATORS {
@@ -803,8 +819,7 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             };
             if self.state.root_height < ground_margin {
                 self.state.root_height = ground_margin;
-                self.state.root_linear_velocity[2] =
-                    self.state.root_linear_velocity[2].max(0.0);
+                self.state.root_linear_velocity[2] = self.state.root_linear_velocity[2].max(0.0);
             }
         }
 
@@ -892,7 +907,7 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
         // Speed-dependent drag: high at rest (prevents drift), low at speed (allows running)
         let speed = (self.state.root_linear_velocity[0].powi(2)
             + self.state.root_linear_velocity[1].powi(2))
-            .sqrt();
+        .sqrt();
         let drag = 1.0 - 0.7 * (1.0 - (-speed * 0.5).exp());
         // drag ≈ 1.0 at rest, ≈ 0.3 at high speed
         self.state.root_linear_velocity[0] *= (1.0 - drag * dt).max(0.0);
@@ -1033,7 +1048,8 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
 
         // Terrain randomization
         if self.terrain.enabled {
-            self.terrain.randomize(seed.wrapping_mul(7046029254386353131));
+            self.terrain
+                .randomize(seed.wrapping_mul(7046029254386353131));
         }
     }
 
@@ -1566,7 +1582,9 @@ mod tests {
         noise.enabled = true;
         noise.reset(42);
 
-        let cmd = HumanoidCommand { torques: [0.5; NUM_ACTUATORS] };
+        let cmd = HumanoidCommand {
+            torques: [0.5; NUM_ACTUATORS],
+        };
         // Push twice to fill buffer past delay
         let _ = noise.apply(&cmd);
         let out = noise.apply(&cmd);
@@ -1582,7 +1600,9 @@ mod tests {
 
     #[test]
     fn test_actuator_noise_deterministic() {
-        let cmd = HumanoidCommand { torques: [0.5; NUM_ACTUATORS] };
+        let cmd = HumanoidCommand {
+            torques: [0.5; NUM_ACTUATORS],
+        };
 
         let mut noise_a = ActuatorNoiseModel::new(3, 0.05);
         noise_a.enabled = true;

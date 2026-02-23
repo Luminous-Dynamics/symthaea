@@ -616,11 +616,7 @@ mod tests {
             analyzer.update_with_position(&state, [i as f64 * 0.3, 0.0], time);
             if i < times.len() - 1 {
                 state.extremities[8] = 0.08; // swing
-                analyzer.update_with_position(
-                    &state,
-                    [i as f64 * 0.3 + 0.1, 0.0],
-                    time + 0.05,
-                );
+                analyzer.update_with_position(&state, [i as f64 * 0.3 + 0.1, 0.0], time + 0.05);
             }
         }
 

@@ -655,7 +655,10 @@ mod tests {
         }
 
         let state = sim.state();
-        assert!(state.is_finite(), "State should remain finite under blowout");
+        assert!(
+            state.is_finite(),
+            "State should remain finite under blowout"
+        );
 
         // Compare with normal handling
         let mut sim_normal = BicycleModelSimulator::at_speed(13.4);

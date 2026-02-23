@@ -156,9 +156,7 @@ pub fn phoneme_manner_class(phoneme: &str) -> MannerClass {
         // Stops
         "B" | "D" | "G" | "K" | "P" | "T" => MannerClass::Stop,
         // Fricatives
-        "CH" | "DH" | "F" | "HH" | "S" | "SH" | "TH" | "V" | "Z" | "ZH" => {
-            MannerClass::Fricative
-        }
+        "CH" | "DH" | "F" | "HH" | "S" | "SH" | "TH" | "V" | "Z" | "ZH" => MannerClass::Fricative,
         // Nasals
         "M" | "N" | "NG" => MannerClass::Nasal,
         // Liquids
@@ -334,8 +332,7 @@ impl VocalTractPipeline {
 
     /// Register a single phoneme's manner of articulation.
     pub fn register_phoneme_manner(&mut self, phoneme: &str, manner: SourceType) {
-        self.phoneme_manner_map
-            .insert(phoneme.to_string(), manner);
+        self.phoneme_manner_map.insert(phoneme.to_string(), manner);
     }
 
     /// Get or create a cached phoneme identity HV.
@@ -409,10 +406,12 @@ impl VocalTractPipeline {
         // a cognitive re-encode frame. Saves ~0.5-1ms for ~90% of frames.
         let effective_hv = if let Some(ph) = phoneme {
             let is_same = self.prev_phoneme.as_deref() == Some(ph);
-            let is_reencode =
-                (self.motor_frame_count - 1) % self.frames_per_cognitive_tick == 0;
+            let is_reencode = (self.motor_frame_count - 1) % self.frames_per_cognitive_tick == 0;
 
-            let new_bound = if is_same && !is_reencode && self.coarticulation_counter >= self.coarticulation_frames {
+            let new_bound = if is_same
+                && !is_reencode
+                && self.coarticulation_counter >= self.coarticulation_frames
+            {
                 // Cache hit: same phoneme, no re-encode, past blend window
                 if let Some(ref cached) = self.prev_phoneme_bound_hv {
                     cached.clone()
@@ -430,8 +429,7 @@ impl VocalTractPipeline {
                     // Phoneme changed — save old HV for blending
                     if let Some(old_ph) = self.prev_phoneme.take() {
                         let old_phoneme_hv = self.get_or_create_phoneme_hv(&old_ph);
-                        self.prev_phoneme_bound_hv =
-                            Some(self.cached_hv.bind(&old_phoneme_hv));
+                        self.prev_phoneme_bound_hv = Some(self.cached_hv.bind(&old_phoneme_hv));
                         self.coarticulation_counter = 0;
                     }
                 } else {
@@ -448,8 +446,7 @@ impl VocalTractPipeline {
             if self.coarticulation_counter < self.coarticulation_frames {
                 self.coarticulation_counter += 1;
                 if let Some(ref prev_hv) = self.prev_phoneme_bound_hv {
-                    let t = self.coarticulation_counter as f32
-                        / self.coarticulation_frames as f32;
+                    let t = self.coarticulation_counter as f32 / self.coarticulation_frames as f32;
                     prev_hv.scale(1.0 - t).add(&new_bound.scale(t))
                 } else {
                     new_bound
@@ -1102,7 +1099,10 @@ mod tests {
 
         // Frames 2-4 (cached) should be close to frame 1 (uncached)
         // since the LTC network evolves smoothly with the same input
-        let f1_drift: f32 = frames[1..].iter().map(|f| (f.f1 - frames[0].f1).abs()).sum::<f32>();
+        let f1_drift: f32 = frames[1..]
+            .iter()
+            .map(|f| (f.f1 - frames[0].f1).abs())
+            .sum::<f32>();
         assert!(
             f1_drift < 200.0,
             "Cached frames should be consistent with uncached: drift={f1_drift:.1}"
@@ -1127,8 +1127,14 @@ mod tests {
 
         // Train briefly so the network can distinguish AH vs IY
         let targets = vec![
-            ("AH", crate::types::FormantTarget::vowel(520.0, 1190.0, 2390.0, 80.0)),
-            ("IY", crate::types::FormantTarget::vowel(270.0, 2290.0, 3010.0, 100.0)),
+            (
+                "AH",
+                crate::types::FormantTarget::vowel(520.0, 1190.0, 2390.0, 80.0),
+            ),
+            (
+                "IY",
+                crate::types::FormantTarget::vowel(270.0, 2290.0, 3010.0, 100.0),
+            ),
         ];
         let target_refs: Vec<(&str, &crate::types::FormantTarget)> =
             targets.iter().map(|(name, t)| (*name, t)).collect();

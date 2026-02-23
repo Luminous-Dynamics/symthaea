@@ -665,7 +665,11 @@ pub fn run_efe_ablation(
                     let rv_t = impact_t * frac;
                     let beam = crate::fep_agent::predict_falling_position(threat_pos, vel, rv_t);
                     (
-                        [beam[0], beam[1], beam[2].max(entity_pos[2] + INTERCEPT_Z_MARGIN_VEL)],
+                        [
+                            beam[0],
+                            beam[1],
+                            beam[2].max(entity_pos[2] + INTERCEPT_Z_MARGIN_VEL),
+                        ],
                         Some(frac),
                     )
                 })
@@ -962,8 +966,11 @@ pub fn evaluate_scenario_variants() -> Vec<ScenarioVariantResult> {
                 for &frac in &RENDEZVOUS_FRACS {
                     let rv_t = impact_t * frac;
                     let beam = crate::fep_agent::predict_falling_position(threat_pos, vel, rv_t);
-                    let candidate =
-                        [beam[0], beam[1], beam[2].max(entity_pos[2] + INTERCEPT_Z_MARGIN_VEL)];
+                    let candidate = [
+                        beam[0],
+                        beam[1],
+                        beam[2].max(entity_pos[2] + INTERCEPT_Z_MARGIN_VEL),
+                    ];
                     let efe =
                         agent.trajectory_efe(&drone_state, candidate, &mission_setpoint, &env);
                     if efe < best_intercept_efe {
@@ -1340,8 +1347,7 @@ mod tests {
         );
 
         // Medium precision: 50% should win (balanced tradeoff)
-        let result_mid =
-            run_efe_ablation(&[10.0], &env, &drone_state, &mission_setpoint, 1.0, 0.1);
+        let result_mid = run_efe_ablation(&[10.0], &env, &drone_state, &mission_setpoint, 1.0, 0.1);
         assert_eq!(
             result_mid.points[0].best_rendezvous_frac,
             Some(0.50),

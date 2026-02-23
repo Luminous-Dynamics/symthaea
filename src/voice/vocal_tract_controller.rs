@@ -59,8 +59,15 @@ pub fn train_controller_transitions(
     }
 
     // Convert to the format train_on_transitions expects
-    let pair_refs: Vec<(&str, &super::formant_targets::FormantTarget, &str, &super::formant_targets::FormantTarget)> =
-        pairs.iter().map(|(f, ft, t, tt)| (*f, *ft, *t, *tt)).collect();
+    let pair_refs: Vec<(
+        &str,
+        &super::formant_targets::FormantTarget,
+        &str,
+        &super::formant_targets::FormantTarget,
+    )> = pairs
+        .iter()
+        .map(|(f, ft, t, tt)| (*f, *ft, *t, *tt))
+        .collect();
 
     controller.train_on_transitions(genesis, &pair_refs, epochs)
 }

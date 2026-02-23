@@ -375,9 +375,6 @@ mod tests {
             output.contains("Regularity"),
             "Output should contain Regularity metric"
         );
-        assert!(
-            output.contains("CoT"),
-            "Output should contain CoT metric"
-        );
+        assert!(output.contains("CoT"), "Output should contain CoT metric");
     }
 }
