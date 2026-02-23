@@ -1,17 +1,18 @@
-# Suggested Reviewers - Topology-Φ Manuscript
+# Suggested Reviewers - HAI Manuscript
 
-**For**: Network Topology and Integrated Information: A Comprehensive Characterization
-**Journal**: Nature Neuroscience
-**Date**: December 28, 2025
+**For**: Hyperdimensional Active Inference: Free Energy Principle in Vector Symbolic Architectures
+**Journal**: PLoS Computational Biology
+**Date**: February 23, 2026
 
 ---
 
 ## Overview
 
-We suggest **7 expert reviewers** spanning the manuscript's three core domains:
-1. **Integrated Information Theory** (IIT expertise)
-2. **Network Neuroscience** (brain topology, connectomics)
+We suggest **7 expert reviewers** spanning the manuscript's core domains:
+1. **Active Inference / Free Energy Principle** (FEP expertise)
+2. **Integrated Information Theory** (IIT / consciousness)
 3. **Hyperdimensional Computing** (HDC methodology)
+4. **Network Neuroscience** (brain topology, connectomics)
 
 All reviewers are internationally recognized experts with no apparent conflicts of interest.
 
