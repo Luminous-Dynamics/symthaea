@@ -62,8 +62,7 @@ impl DemoRunner {
         if let Ok(service) = CognitiveLoopService::new(CognitiveLoopConfig::default()) {
             self.service = service;
             self.cycle_count = 0;
-            self.current_input =
-                "consciousness emerges from integrated information".to_string();
+            self.current_input = "consciousness emerges from integrated information".to_string();
         }
     }
 }
