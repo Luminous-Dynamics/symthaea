@@ -648,11 +648,8 @@ pub fn run_efe_ablation(
     };
     let entity_pos = env.entity_pos.unwrap_or([0.0; 3]);
 
-    let intercept_setpoint = [
-        threat_pos[0],
-        threat_pos[1],
-        threat_pos[2].max(entity_pos[2] + 0.5),
-    ];
+    let intercept_setpoint =
+        crate::fep_agent::compute_rendezvous_intercept(threat_pos, env.threat_vel, entity_pos);
 
     let mut points = Vec::with_capacity(precisions.len());
     let mut crossover = None;
@@ -667,14 +664,17 @@ pub fn run_efe_ablation(
         };
         let agent = ActiveInferenceFlightAgent::new(config);
 
-        let efe_mission = agent.instantaneous_efe(
-            drone_state,
-            mission_setpoint.position,
-            mission_setpoint,
-            env,
-        );
-        let efe_intercept =
-            agent.instantaneous_efe(drone_state, intercept_setpoint, mission_setpoint, env);
+        let use_trajectory = env.threat_vel.is_some();
+        let efe_mission = if use_trajectory {
+            agent.trajectory_efe(drone_state, mission_setpoint.position, mission_setpoint, env)
+        } else {
+            agent.instantaneous_efe(drone_state, mission_setpoint.position, mission_setpoint, env)
+        };
+        let efe_intercept = if use_trajectory {
+            agent.trajectory_efe(drone_state, intercept_setpoint, mission_setpoint, env)
+        } else {
+            agent.instantaneous_efe(drone_state, intercept_setpoint, mission_setpoint, env)
+        };
 
         let chose_intercept = efe_intercept < efe_mission;
 
@@ -795,10 +795,10 @@ impl ScenarioVariant {
                 entity_pos: Some([0.0, 0.0, 0.0]),
             },
             ScenarioVariant::FarBeam => FlightEnvironment {
-                human_danger: 0.3,
+                human_danger: 0.15,
                 mission_progress: 0.3,
-                threat_pos: Some([5.0, 5.0, 5.0]),
-                threat_vel: Some([0.0, 0.0, -2.0]),
+                threat_pos: Some([5.0, 5.0, 3.0]),
+                threat_vel: Some([0.0, 0.0, -5.0]),
                 entity_pos: Some([5.0, 5.0, 0.0]),
             },
             ScenarioVariant::ReversedGeometry => FlightEnvironment {
@@ -835,7 +835,7 @@ pub struct ScenarioVariantResult {
     pub variant_name: String,
     /// EFE for continuing mission.
     pub efe_mission: f64,
-    /// EFE for intercepting.
+    /// EFE for best intercept candidate.
     pub efe_intercept: f64,
     /// Whether the agent chose to override (intercept or other non-mission).
     pub chose_override: bool,
@@ -843,6 +843,9 @@ pub struct ScenarioVariantResult {
     pub expected_decision: &'static str,
     /// Whether actual decision matches expected.
     pub matches_expected: bool,
+    /// Which rendezvous fraction produced the best intercept EFE.
+    /// None if no velocity (static intercept) or decision was MISSION.
+    pub best_rendezvous_frac: Option<f64>,
 }
 
 /// Evaluate all scenario variants with default precision ratio.
@@ -862,35 +865,79 @@ pub fn evaluate_scenario_variants() -> Vec<ScenarioVariantResult> {
 
         let threat_pos = env.threat_pos.unwrap_or([0.0; 3]);
         let entity_pos = env.entity_pos.unwrap_or([0.0; 3]);
-        let intercept_setpoint = [
-            threat_pos[0],
-            threat_pos[1],
-            threat_pos[2].max(entity_pos[2] + 0.5),
-        ];
 
-        let efe_mission = agent.instantaneous_efe(
-            &drone_state,
-            mission_setpoint.position,
-            &mission_setpoint,
-            &env,
-        );
-        let efe_intercept = agent.instantaneous_efe(
-            &drone_state,
-            intercept_setpoint,
-            &mission_setpoint,
-            &env,
-        );
+        let use_trajectory = env.threat_vel.is_some();
+        let efe_mission = if use_trajectory {
+            agent.trajectory_efe(&drone_state, mission_setpoint.position, &mission_setpoint, &env)
+        } else {
+            agent.instantaneous_efe(
+                &drone_state,
+                mission_setpoint.position,
+                &mission_setpoint,
+                &env,
+            )
+        };
 
-        let chose_override = efe_intercept < efe_mission && env.human_danger >= 0.01;
+        // Evaluate all 3 rendezvous candidates (25%, 50%, 75%) and find the best
+        let rendezvous_fracs = [0.25, 0.50, 0.75];
+        let mut best_intercept_efe = f64::INFINITY;
+        let mut best_frac: Option<f64> = None;
+
+        if let Some(vel) = env.threat_vel {
+            let impact_t = crate::fep_agent::predict_impact_time_z_pub(threat_pos, vel, entity_pos[2]);
+            if impact_t.is_finite() && impact_t > 0.0 {
+                for &frac in &rendezvous_fracs {
+                    let rv_t = impact_t * frac;
+                    let beam = crate::fep_agent::predict_falling_position_pub(threat_pos, vel, rv_t);
+                    let candidate = [beam[0], beam[1], beam[2].max(entity_pos[2] + 0.3)];
+                    let efe = agent.trajectory_efe(
+                        &drone_state,
+                        candidate,
+                        &mission_setpoint,
+                        &env,
+                    );
+                    if efe < best_intercept_efe {
+                        best_intercept_efe = efe;
+                        best_frac = Some(frac);
+                    }
+                }
+            } else {
+                // Beam not descending — static fallback
+                let static_candidate = [
+                    threat_pos[0],
+                    threat_pos[1],
+                    threat_pos[2].max(entity_pos[2] + 0.5),
+                ];
+                best_intercept_efe = agent.trajectory_efe(
+                    &drone_state,
+                    static_candidate,
+                    &mission_setpoint,
+                    &env,
+                );
+            }
+        } else {
+            // No velocity — instantaneous EFE with static intercept
+            let static_candidate =
+                crate::fep_agent::compute_rendezvous_intercept(threat_pos, None, entity_pos);
+            best_intercept_efe = agent.instantaneous_efe(
+                &drone_state,
+                static_candidate,
+                &mission_setpoint,
+                &env,
+            );
+        }
+
+        let chose_override = best_intercept_efe < efe_mission && env.human_danger >= 0.01;
         let actual_decision = if chose_override { "INTERCEPT" } else { "MISSION" };
 
         results.push(ScenarioVariantResult {
             variant_name: variant.name().to_string(),
             efe_mission,
-            efe_intercept,
+            efe_intercept: best_intercept_efe,
             chose_override,
             expected_decision: variant.expected_decision(),
             matches_expected: actual_decision == variant.expected_decision(),
+            best_rendezvous_frac: best_frac,
         });
     }
 
@@ -1226,7 +1273,7 @@ mod tests {
         );
         let efe_intercept = agent.instantaneous_efe(
             &drone_state,
-            [5.0, 5.0, 5.0],
+            [5.0, 5.0, 3.0],
             &mission_setpoint,
             &env,
         );

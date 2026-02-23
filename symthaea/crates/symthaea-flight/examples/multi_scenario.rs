@@ -17,10 +17,10 @@ fn main() {
     let results = evaluate_scenario_variants();
 
     println!(
-        "{:<20} {:>14} {:>14} {:>10} {:>10} {:>7}",
-        "Variant", "EFE(mission)", "EFE(intercept)", "Decision", "Expected", "Match?"
+        "{:<20} {:>14} {:>14} {:>10} {:>10} {:>7} {:>8}",
+        "Variant", "EFE(mission)", "EFE(intercept)", "Decision", "Expected", "Match?", "RV frac"
     );
-    println!("{}", "─".repeat(79));
+    println!("{}", "─".repeat(87));
 
     let mut all_match = true;
     for r in &results {
@@ -33,9 +33,14 @@ fn main() {
         if !r.matches_expected {
             all_match = false;
         }
+        let rv_str = match r.best_rendezvous_frac {
+            Some(f) => format!("{:.0}%", f * 100.0),
+            None => "---".to_string(),
+        };
         println!(
-            "{:<20} {:>14.4} {:>14.4} {:>10} {:>10} {:>7}",
-            r.variant_name, r.efe_mission, r.efe_intercept, decision, r.expected_decision, match_str
+            "{:<20} {:>14.4} {:>14.4} {:>10} {:>10} {:>7} {:>8}",
+            r.variant_name, r.efe_mission, r.efe_intercept, decision, r.expected_decision,
+            match_str, rv_str
         );
     }
 
@@ -44,6 +49,18 @@ fn main() {
         println!("All {} scenarios match expected decisions.", results.len());
     } else {
         println!("WARNING: Some scenarios did not match expected decisions!");
+    }
+
+    // Rendezvous analysis
+    println!("\nRendezvous Time Analysis:");
+    for r in &results {
+        if let Some(frac) = r.best_rendezvous_frac {
+            println!(
+                "  {:<20} Best intercept at {:.0}% of impact time",
+                r.variant_name,
+                frac * 100.0
+            );
+        }
     }
 
     // Print scenario descriptions
@@ -61,17 +78,22 @@ fn main() {
 
     // Write CSV
     let csv_path = "multi_scenario.csv";
-    let mut csv =
-        String::from("variant,efe_mission,efe_intercept,chose_override,expected,matches\n");
+    let mut csv = String::from(
+        "variant,efe_mission,efe_intercept,chose_override,expected,matches,best_rv_frac\n",
+    );
     for r in &results {
+        let rv = r
+            .best_rendezvous_frac
+            .map_or("".to_string(), |f| format!("{:.2}", f));
         csv.push_str(&format!(
-            "{},{},{},{},{},{}\n",
+            "{},{},{},{},{},{},{}\n",
             r.variant_name,
             r.efe_mission,
             r.efe_intercept,
             r.chose_override as u8,
             r.expected_decision,
-            r.matches_expected as u8
+            r.matches_expected as u8,
+            rv
         ));
     }
     std::fs::write(csv_path, &csv).expect("Failed to write CSV");
