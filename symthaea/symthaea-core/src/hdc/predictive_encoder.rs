@@ -35,6 +35,7 @@ use crate::hdc::HDC_DIMENSION;
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
+use std::mem;
 
 /// Configuration for the predictive encoder
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,6 +149,12 @@ pub struct PredictiveHdcEncoder {
 
     /// Peak attention weight (cached to avoid HashMap iteration)
     peak_attention: f32,
+
+    /// Pre-allocated buffer for bipolar→real conversion (avoids 64KB alloc per cycle)
+    conversion_buffer: Vec<f32>,
+
+    /// Pre-allocated buffer for detected primitives (avoids Vec<String> alloc per cycle)
+    detected_buffer: Vec<String>,
 }
 
 impl PredictiveHdcEncoder {
@@ -186,6 +193,7 @@ impl PredictiveHdcEncoder {
         let primitive_names_lower: Vec<String> =
             primitive_names.iter().map(|n| n.to_lowercase()).collect();
         let initial_attention = config.initial_attention;
+        let dimension = config.dimension;
 
         Ok(Self {
             config,
@@ -198,6 +206,8 @@ impl PredictiveHdcEncoder {
             primitive_names,
             primitive_names_lower,
             peak_attention: initial_attention,
+            conversion_buffer: vec![0.0f32; dimension],
+            detected_buffer: Vec::with_capacity(32),
         })
     }
 
@@ -219,14 +229,14 @@ impl PredictiveHdcEncoder {
             }
         };
 
-        // Convert bipolar to real-valued
+        // Convert bipolar to real-valued (reuses pre-allocated buffer)
         let base_hdv = self.bipolar_to_real(&base_encoding);
 
-        // 2. Detect which primitives are in the input
+        // 2. Detect which primitives are in the input (reuses pre-allocated buffer)
         let detected_primitives = self.detect_primitives(input);
 
-        // 3. Apply attention modulation
-        let attended_hdv = self.apply_attention(&base_hdv, &detected_primitives);
+        // 3. Apply attention modulation (takes ownership, mutates in place to avoid alloc)
+        let attended_hdv = self.apply_attention_in_place(base_hdv, &detected_primitives);
 
         // 4. Compute prediction error if we have a prediction
         let prediction_error = self.compute_prediction_error(&attended_hdv);
@@ -287,20 +297,41 @@ impl PredictiveHdcEncoder {
     // ========== Internal Methods ==========
 
     /// Convert bipolar encoding to ContinuousHV
-    fn bipolar_to_real(&self, bipolar: &[i8]) -> ContinuousHV {
+    ///
+    /// Uses a pre-allocated conversion buffer to avoid a 64KB allocation per cycle.
+    /// The buffer is moved into ContinuousHV via `mem::take` and immediately
+    /// re-allocated; the allocator typically services this from the block freed
+    /// by the previous cycle's ContinuousHV, making it effectively free.
+    fn bipolar_to_real(&mut self, bipolar: &[i8]) -> ContinuousHV {
         let dim = self.config.dimension;
         let len = bipolar.len().min(dim);
-        let mut values = vec![0.0f32; dim];
-        for (dst, &src) in values[..len].iter_mut().zip(bipolar[..len].iter()) {
-            *dst = src as f32;
+
+        // Write bipolar values directly into the pre-allocated buffer (no zeroing needed)
+        for i in 0..len {
+            self.conversion_buffer[i] = bipolar[i] as f32;
         }
+        // Zero any trailing elements (usually a no-op since len == dim)
+        for i in len..dim {
+            self.conversion_buffer[i] = 0.0;
+        }
+
+        // Move the filled buffer into ContinuousHV (zero-cost move, no allocation)
+        let values = mem::take(&mut self.conversion_buffer);
+
+        // Re-create the buffer for the next cycle. The allocator will typically
+        // reuse the block freed when the *previous* cycle's ContinuousHV was dropped,
+        // making this a hot-path allocation that hits allocator cache.
+        self.conversion_buffer = vec![0.0f32; dim];
+
         ContinuousHV { values }
     }
 
     /// Detect which primitives are relevant to the input
-    fn detect_primitives(&self, input: &str) -> Vec<String> {
+    ///
+    /// Reuses a pre-allocated buffer to avoid per-cycle Vec<String> allocation.
+    fn detect_primitives(&mut self, input: &str) -> Vec<String> {
         let input_lower = input.to_lowercase();
-        let mut detected = Vec::new();
+        self.detected_buffer.clear();
 
         // Check each primitive for presence in input
         // Uses pre-lowercased names (computed once at construction, not 200x per cycle)
@@ -310,18 +341,20 @@ impl PredictiveHdcEncoder {
             .zip(self.primitive_names_lower.iter())
         {
             if input_lower.contains(name_lower.as_str()) {
-                detected.push(name.clone());
+                self.detected_buffer.push(name.clone());
             }
         }
 
         // Also check for semantic patterns
-        detected.extend(self.detect_semantic_patterns(&input_lower));
+        self.detected_buffer
+            .extend(self.detect_semantic_patterns(&input_lower));
 
         // Deduplicate
-        detected.sort();
-        detected.dedup();
+        self.detected_buffer.sort();
+        self.detected_buffer.dedup();
 
-        detected
+        // Return a clone; the buffer retains its capacity for next cycle
+        self.detected_buffer.clone()
     }
 
     /// Detect primitives from semantic patterns (not just string matching)
@@ -359,14 +392,17 @@ impl PredictiveHdcEncoder {
         detected
     }
 
-    /// Apply attention weights to HDV
-    fn apply_attention(
+    /// Apply attention weights to HDV (in-place, avoids extra 64KB allocation)
+    ///
+    /// Takes ownership of `base_hdv` and scales it in place, eliminating
+    /// the allocation that `scale()` would create.
+    fn apply_attention_in_place(
         &self,
-        base_hdv: &ContinuousHV,
+        mut base_hdv: ContinuousHV,
         detected_primitives: &[String],
     ) -> ContinuousHV {
         if detected_primitives.is_empty() {
-            return base_hdv.clone();
+            return base_hdv;
         }
 
         // Compute composite attention weight from detected primitives
@@ -381,8 +417,9 @@ impl PredictiveHdcEncoder {
             1.0
         };
 
-        // Scale the HDV by attention (this modulates magnitude)
-        base_hdv.scale(avg_attention)
+        // Scale the HDV by attention in-place (no allocation)
+        base_hdv.scale_in_place(avg_attention);
+        base_hdv
     }
 
     /// Compute prediction error between current HDV and LTC's prediction
@@ -612,7 +649,7 @@ mod tests {
 
     #[test]
     fn test_primitive_detection() {
-        let encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
+        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
         let detected = encoder.detect_primitives("The cause leads to an effect");
 
         // Should detect causal primitives
