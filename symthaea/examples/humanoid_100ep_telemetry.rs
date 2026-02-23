@@ -9,6 +9,13 @@
 use symthaea::humanoid::{HumanoidConfig, HumanoidTrainer};
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    let resume_path = args
+        .iter()
+        .position(|a| a == "--resume")
+        .and_then(|i| args.get(i + 1))
+        .cloned();
+
     println!("=== Symthaea Humanoid: 100-Episode Training with Telemetry ===");
     println!();
 
@@ -41,9 +48,21 @@ fn main() {
     );
     println!("  Learning rate:  {}", config.learning_rate);
     println!("  Output dir:     output/humanoid_telemetry/");
-    println!();
 
-    let mut trainer = HumanoidTrainer::new(config);
+    let mut trainer = if let Some(ref path) = resume_path {
+        println!("  Resuming from:  {}", path);
+        println!();
+        match HumanoidTrainer::with_checkpoint(config, path) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("Failed to load checkpoint {path}: {e}");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        println!();
+        HumanoidTrainer::new(config)
+    };
     let start = std::time::Instant::now();
 
     let metrics = trainer.train_with_telemetry("output/humanoid_telemetry");
