@@ -790,14 +790,20 @@ mod tests {
         let has_nonzero = traces.transition_traces[0]
             .iter()
             .any(|row| row.iter().any(|&v| v != 0.0));
-        assert!(has_nonzero, "transition traces should have nonzero values after update");
+        assert!(
+            has_nonzero,
+            "transition traces should have nonzero values after update"
+        );
 
         // Likelihood traces should also have nonzero values
         let has_nonzero_lk = traces
             .likelihood_traces
             .iter()
             .any(|row| row.iter().any(|&v| v != 0.0));
-        assert!(has_nonzero_lk, "likelihood traces should have nonzero values after update");
+        assert!(
+            has_nonzero_lk,
+            "likelihood traces should have nonzero values after update"
+        );
     }
 
     #[test]
@@ -816,14 +822,24 @@ mod tests {
         traces.decay();
 
         let after = traces.transition_traces[0][0][1];
-        assert!(after < before, "decay should reduce trace values: {} < {}", after, before);
+        assert!(
+            after < before,
+            "decay should reduce trace values: {} < {}",
+            after,
+            before
+        );
         assert!(after > 0.0, "decay should not zero out traces in one step");
     }
 
     #[test]
     fn test_eligibility_traces_reset_zeros_all() {
         let mut traces = EligibilityTraces::new(NUM_ACTIONS, STATE_DIM, OBS_DIM, 0.8, 0.99);
-        traces.update(0, &[1.0, 0.0, 0.0, 0.0], &[0.0, 1.0, 0.0, 0.0], &[0.5, 0.5, 0.0, 0.0]);
+        traces.update(
+            0,
+            &[1.0, 0.0, 0.0, 0.0],
+            &[0.0, 1.0, 0.0, 0.0],
+            &[0.5, 0.5, 0.0, 0.0],
+        );
 
         traces.reset();
 
@@ -896,7 +912,11 @@ mod tests {
             tracker.update_transition(0, 0, 0);
         }
         let conf = tracker.transition_confidence[0][0][0];
-        assert!(conf > 0.9, "confidence should approach 1.0 after many observations: {}", conf);
+        assert!(
+            conf > 0.9,
+            "confidence should approach 1.0 after many observations: {}",
+            conf
+        );
         assert!(conf <= 1.0);
     }
 
@@ -941,7 +961,11 @@ mod tests {
         let obs = obs_from(&[0.4, 0.4, 0.1, 0.1]);
 
         let td_error = learner.observe_transition(&old, 0, &new, &obs, &model, 1);
-        assert!(td_error.is_finite(), "TD error should be finite: {}", td_error);
+        assert!(
+            td_error.is_finite(),
+            "TD error should be finite: {}",
+            td_error
+        );
     }
 
     #[test]
@@ -1009,10 +1033,12 @@ mod tests {
         learner.update_model(&mut model, &old, 0, &new, &obs, 0.5);
 
         let after = &model.transition_matrices[0];
-        let changed = before
-            .iter()
-            .zip(after.iter())
-            .any(|(b_row, a_row)| b_row.iter().zip(a_row.iter()).any(|(b, a)| (b - a).abs() > 1e-15));
+        let changed = before.iter().zip(after.iter()).any(|(b_row, a_row)| {
+            b_row
+                .iter()
+                .zip(a_row.iter())
+                .any(|(b, a)| (b - a).abs() > 1e-15)
+        });
         assert!(changed, "update_model should modify the transition matrix");
     }
 
@@ -1202,7 +1228,11 @@ mod tests {
         let td_error = learner.observe_transition(&old, 0, &new, &obs, &model, 1);
         // With large prediction error, reward is very negative
         assert!(td_error.is_finite());
-        assert!(td_error < 0.0, "large prediction error should yield negative TD error: {}", td_error);
+        assert!(
+            td_error < 0.0,
+            "large prediction error should yield negative TD error: {}",
+            td_error
+        );
     }
 
     #[test]
@@ -1224,10 +1254,12 @@ mod tests {
     fn test_high_learning_rate_effect() {
         let mut config = TemporalDifferenceLearningConfig::default();
         config.initial_learning_rate = 0.9;
-        let mut learner_high = TemporalDifferenceLearner::new(config.clone(), NUM_ACTIONS, STATE_DIM, OBS_DIM);
+        let mut learner_high =
+            TemporalDifferenceLearner::new(config.clone(), NUM_ACTIONS, STATE_DIM, OBS_DIM);
 
         config.initial_learning_rate = 0.01;
-        let mut learner_low = TemporalDifferenceLearner::new(config, NUM_ACTIONS, STATE_DIM, OBS_DIM);
+        let mut learner_low =
+            TemporalDifferenceLearner::new(config, NUM_ACTIONS, STATE_DIM, OBS_DIM);
 
         let mut model_high = GenerativeModel::new(STATE_DIM, OBS_DIM, NUM_ACTIONS);
         let mut model_low = GenerativeModel::new(STATE_DIM, OBS_DIM, NUM_ACTIONS);
@@ -1240,16 +1272,8 @@ mod tests {
         learner_low.update_model(&mut model_low, &old, 0, &new, &obs, 0.5);
 
         // Higher learning rate should produce larger weight changes
-        let delta_high: f64 = learner_high
-            .value_weights
-            .iter()
-            .map(|w| w.abs())
-            .sum();
-        let delta_low: f64 = learner_low
-            .value_weights
-            .iter()
-            .map(|w| w.abs())
-            .sum();
+        let delta_high: f64 = learner_high.value_weights.iter().map(|w| w.abs()).sum();
+        let delta_low: f64 = learner_low.value_weights.iter().map(|w| w.abs()).sum();
 
         // With td_error of same sign and magnitude, higher LR gives bigger weights
         // (though value weights start at 0, the delta is lr*td_error*dtanh*state)
@@ -1287,11 +1311,17 @@ mod tests {
         // After 50 updates, value weights and avg_td_error should be finite
         assert!(learner.avg_td_error.is_finite());
         assert!(learner.avg_prediction_accuracy.is_finite());
-        assert!(learner.avg_prediction_accuracy > 0.0, "accuracy should be positive");
+        assert!(
+            learner.avg_prediction_accuracy > 0.0,
+            "accuracy should be positive"
+        );
 
         // Value weights should have been modified from zero
         let weight_sum: f64 = learner.value_weights.iter().map(|w| w.abs()).sum();
-        assert!(weight_sum > 0.0, "value weights should be nonzero after training");
+        assert!(
+            weight_sum > 0.0,
+            "value weights should be nonzero after training"
+        );
     }
 
     // ---------------------------------------------------------------
