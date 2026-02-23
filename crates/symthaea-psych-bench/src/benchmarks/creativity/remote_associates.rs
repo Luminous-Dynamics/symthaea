@@ -183,7 +183,11 @@ impl RemoteAssociatesBenchmark {
         let mut all_sims: Vec<(usize, f32)> = vec![(0, solution_sim)]; // index 0 = solution
         for (i, dhv) in distractor_hvs.iter().enumerate() {
             // Alternating noise sign disrupts ranking under pressure
-            let noise = if i % 2 == 0 { pressure_noise } else { -pressure_noise };
+            let noise = if i % 2 == 0 {
+                pressure_noise
+            } else {
+                -pressure_noise
+            };
             all_sims.push((i + 1, bundle.similarity(dhv) + noise));
         }
         all_sims.sort_by(|(_, a), (_, b)| b.total_cmp(a));

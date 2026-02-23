@@ -4,10 +4,8 @@
 //! boundary conditions that push beyond typical human baselines.
 
 use symthaea_psych_bench::benchmarks::{
-    affect::EmotionalStroopBenchmark,
-    attention::AttentionalBlinkBenchmark,
-    inhibition::GoNoGoBenchmark,
-    memory_agent::ProspectiveMemoryBenchmark,
+    affect::EmotionalStroopBenchmark, attention::AttentionalBlinkBenchmark,
+    inhibition::GoNoGoBenchmark, memory_agent::ProspectiveMemoryBenchmark,
 };
 use symthaea_psych_bench::harness::{BenchmarkConfig, PsychBenchmark};
 
@@ -105,15 +103,8 @@ fn stress_gonogo_ssrt_positive() {
     };
     let result = GoNoGoBenchmark.run(&config);
     let ssrt = result.metrics["ssrt_ticks"].mean;
-    assert!(
-        ssrt >= 0.0,
-        "SSRT ({:.3}) should be non-negative",
-        ssrt
-    );
-    assert!(
-        ssrt.is_finite(),
-        "SSRT should be finite"
-    );
+    assert!(ssrt >= 0.0, "SSRT ({:.3}) should be non-negative", ssrt);
+    assert!(ssrt.is_finite(), "SSRT should be finite");
 }
 
 /// Attentional Blink: T1 accuracy should exceed chance (0.50).
@@ -126,11 +117,7 @@ fn stress_ab_t1_above_chance() {
     };
     let result = AttentionalBlinkBenchmark.run(&config);
     let t1 = result.metrics["t1_accuracy"].mean;
-    assert!(
-        t1 > 0.50,
-        "T1 accuracy ({:.3}) should be above chance",
-        t1
-    );
+    assert!(t1 > 0.50, "T1 accuracy ({:.3}) should be above chance", t1);
 }
 
 /// Attentional Blink: blink magnitude should be non-negative (lag8 >= lag3).

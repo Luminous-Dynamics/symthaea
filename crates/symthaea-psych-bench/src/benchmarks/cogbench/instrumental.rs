@@ -14,7 +14,11 @@ use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation
 pub struct InstrumentalLearningBenchmark;
 
 impl InstrumentalLearningBenchmark {
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64, f64, Vec<f64>) {
+    fn run_trial(
+        &self,
+        config: &BenchmarkConfig,
+        trial_idx: usize,
+    ) -> (f64, f64, f64, f64, Vec<f64>) {
         let seed = config.trial_seed("cogbench", "instrumental", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
 

@@ -17,7 +17,12 @@ pub struct SerialRecallBenchmark;
 impl SerialRecallBenchmark {
     /// Run a single trial: present a list, then probe each position.
     /// Returns (accuracy per serial position, mean_rt_ticks).
-    fn run_trial(&self, list_len: usize, config: &BenchmarkConfig, trial_idx: usize) -> (Vec<f64>, f64) {
+    fn run_trial(
+        &self,
+        list_len: usize,
+        config: &BenchmarkConfig,
+        trial_idx: usize,
+    ) -> (Vec<f64>, f64) {
         let dim = config.dimension;
         let seed = config.trial_seed("worm", &format!("serial_{}", list_len), trial_idx);
         let adapter = SequenceAdapter;

@@ -207,11 +207,20 @@ impl WisconsinCardSortingBenchmark {
             let chosen_target = candidates[chosen_rule_idx];
 
             // RT proxy: deliberation ticks based on confidence spread
-            let max_conf = rule_confidence.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let second_conf = rule_confidence.iter().cloned()
+            let max_conf = rule_confidence
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max);
+            let second_conf = rule_confidence
+                .iter()
+                .cloned()
                 .filter(|&c| (c - max_conf).abs() > 1e-10)
                 .fold(f64::NEG_INFINITY, f64::max);
-            let conf_margin = if second_conf.is_finite() { max_conf - second_conf } else { max_conf };
+            let conf_margin = if second_conf.is_finite() {
+                max_conf - second_conf
+            } else {
+                max_conf
+            };
             let ticks = 4.0 + (1.0 - conf_margin.min(1.0).max(0.0)) * 6.0;
             rt_ticks.push(ticks);
 

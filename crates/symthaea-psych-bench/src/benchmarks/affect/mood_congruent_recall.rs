@@ -58,7 +58,8 @@ impl MoodCongruentRecallBenchmark {
             let pressure_penalty = config.time_pressure * 0.05;
             let valence_w = (0.15 - pressure_penalty) as f32;
             let object_w = (0.85 + pressure_penalty) as f32;
-            let item = ContinuousHV::weighted_bundle(&[&object_hv, valence_proto], &[object_w, valence_w]);
+            let item =
+                ContinuousHV::weighted_bundle(&[&object_hv, valence_proto], &[object_w, valence_w]);
             wm.perceive(item);
             wm.tick();
             item_valences.push(is_positive);

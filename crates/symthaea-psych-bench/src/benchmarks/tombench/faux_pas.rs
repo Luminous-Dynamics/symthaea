@@ -189,7 +189,9 @@ impl FauxPasBenchmark {
         // Time pressure: 0.3/unit noise injection models degraded social cue integration
         // under speed emphasis (Baron-Cohen et al., 1999 faux pas; Heitz, 2014 SAT).
         let pressure_noise = config.time_pressure * 0.3;
-        let combined = geometric_divergence as f64 * 0.2 + keyword_signal * 0.8 + pressure_noise * (0.5 - (trial_idx as f64 % 2.0));
+        let combined = geometric_divergence as f64 * 0.2
+            + keyword_signal * 0.8
+            + pressure_noise * (0.5 - (trial_idx as f64 % 2.0));
         let detected_faux_pas = combined > 0.0;
 
         if detected_faux_pas == scenario.is_faux_pas {

@@ -141,8 +141,7 @@ impl ChangeDetectionBenchmark {
         // RT proxy: deliberation ticks based on same/different decision difficulty.
         // Smaller margin between original and probe similarity → harder to discriminate
         // → longer RT (Wilken & Ma, 2004; Luck & Vogel, 1997).
-        let decision_margin =
-            ((sim_to_original - sim_to_probe).abs() as f64).min(1.0);
+        let decision_margin = ((sim_to_original - sim_to_probe).abs() as f64).min(1.0);
         let rt_ticks = 4.0 + (1.0 - decision_margin) * 7.0;
 
         let acc = if correct { 1.0 } else { 0.0 };

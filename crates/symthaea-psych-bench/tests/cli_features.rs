@@ -60,7 +60,10 @@ fn cli_paper_table_markdown_valid() {
     let report = small_report();
     let md = report.paper_summary();
     assert!(md.contains("| Domain |"), "markdown should have header");
-    assert!(md.contains("N-back") || md.contains("NBack"), "should list N-back");
+    assert!(
+        md.contains("N-back") || md.contains("NBack"),
+        "should list N-back"
+    );
     // Check it has the right number of |'s per line (table format)
     for line in md.lines().skip(2) {
         // data rows
@@ -103,7 +106,10 @@ fn cli_forest_plot_csv_valid() {
     let csv = report.forest_plot_csv();
     assert!(csv.starts_with("domain,benchmark,metric"));
     let line_count = csv.lines().count();
-    assert!(line_count >= 2, "CSV should have header + at least 1 data row");
+    assert!(
+        line_count >= 2,
+        "CSV should have header + at least 1 data row"
+    );
 }
 
 #[test]
@@ -239,10 +245,7 @@ fn cli_correlation_matrix_format() {
 #[test]
 fn cli_reliability_cronbachs_alpha() {
     // 3 items (seeds), 2 benchmarks → should produce finite alpha
-    let items = vec![
-        vec![0.85, 0.90, 0.88],
-        vec![0.75, 0.78, 0.72],
-    ];
+    let items = vec![vec![0.85, 0.90, 0.88], vec![0.75, 0.78, 0.72]];
     let alpha = cronbachs_alpha(&items);
     assert!(alpha.is_finite(), "alpha should be finite, got {}", alpha);
 }

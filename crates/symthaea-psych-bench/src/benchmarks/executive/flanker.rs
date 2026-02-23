@@ -213,10 +213,7 @@ impl PsychBenchmark for FlankerBenchmark {
             "incongruent::rt_ticks",
             MetricValue::from_samples(&all_incong_rt),
         );
-        result.insert(
-            "neutral::rt_ticks",
-            MetricValue::from_samples(&all_neut_rt),
-        );
+        result.insert("neutral::rt_ticks", MetricValue::from_samples(&all_neut_rt));
 
         result.conditions = 3;
         result.trials_per_condition = config.trials_per_condition;

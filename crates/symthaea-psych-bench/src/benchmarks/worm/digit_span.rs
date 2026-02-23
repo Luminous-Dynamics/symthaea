@@ -180,8 +180,7 @@ impl DigitSpanBenchmark {
             // RT proxy: deliberation ticks based on retrieval difficulty.
             // Margin between recall_score and threshold → harder retrieval → longer RT
             // (Sternberg, 1966 serial search; Wickelgren, 1977 SAT).
-            let decision_margin =
-                ((recall_score as f64 - threshold as f64).abs()).min(1.0);
+            let decision_margin = ((recall_score as f64 - threshold as f64).abs()).min(1.0);
             let rt_ticks = 3.0 + (1.0 - decision_margin) * 5.0;
             rt_sum += rt_ticks;
 

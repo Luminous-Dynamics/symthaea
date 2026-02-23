@@ -19,7 +19,12 @@ pub struct BindingBenchmark;
 impl BindingBenchmark {
     /// Run a single trial.
     /// Returns (binding_correct, feature_only_correct, rt_ticks).
-    fn run_trial(&self, set_size: usize, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64) {
+    fn run_trial(
+        &self,
+        set_size: usize,
+        config: &BenchmarkConfig,
+        trial_idx: usize,
+    ) -> (f64, f64, f64) {
         let dim = config.dimension;
         let seed = config.trial_seed("worm", &format!("binding_{}", set_size), trial_idx);
         let adapter = VisualObjectAdapter::default();
@@ -115,8 +120,7 @@ impl BindingBenchmark {
         // RT proxy: deliberation ticks based on binding decision difficulty.
         // Smaller margin between target and lure → harder discrimination → longer RT
         // (Luck & Vogel, 1997; Wheeler & Treisman, 2002).
-        let decision_margin =
-            ((binding_sim - lure_sim).abs() as f64).min(1.0);
+        let decision_margin = ((binding_sim - lure_sim).abs() as f64).min(1.0);
         let rt_ticks = 4.0 + (1.0 - decision_margin) * 6.0;
 
         (binding_correct, feature_correct, rt_ticks)

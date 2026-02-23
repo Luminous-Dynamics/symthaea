@@ -49,7 +49,10 @@ impl ProspectiveMemoryBenchmark {
 
         // PM intention stored in WM (reduces effective capacity)
         let pm_intention = ContinuousHV::weighted_bundle(
-            &[&pm_target, &ContinuousHV::random(dim, seed.wrapping_add(400))],
+            &[
+                &pm_target,
+                &ContinuousHV::random(dim, seed.wrapping_add(400)),
+            ],
             &[0.65, 0.35],
         );
 
@@ -155,8 +158,7 @@ impl ProspectiveMemoryBenchmark {
                 let ev_a = sim_a / temperature;
                 let ev_b = sim_b / temperature;
                 let max_ev = ev_a.max(ev_b);
-                let p_a =
-                    (ev_a - max_ev).exp() / ((ev_a - max_ev).exp() + (ev_b - max_ev).exp());
+                let p_a = (ev_a - max_ev).exp() / ((ev_a - max_ev).exp() + (ev_b - max_ev).exp());
 
                 xor_shift(&mut rng);
                 let r = (rng % 10000) as f64 / 10000.0;
@@ -220,7 +222,10 @@ impl PsychBenchmark for ProspectiveMemoryBenchmark {
         }
 
         result.insert("pm_hit_rate", MetricValue::from_samples(&hit_rates));
-        result.insert("pm_ongoing_accuracy", MetricValue::from_samples(&ongoing_accs));
+        result.insert(
+            "pm_ongoing_accuracy",
+            MetricValue::from_samples(&ongoing_accs),
+        );
         result.insert("pm_cost", MetricValue::from_samples(&costs));
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
 

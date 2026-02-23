@@ -427,9 +427,7 @@ impl TowerOfLondonBenchmark {
                 // and excess moves (planning errors). Base 3 ticks + 2 per optimal move
                 // + 1.5 per excess move (Shallice, 1982; Kaller et al., 2016 — RT increases
                 // ~linearly with minimum moves).
-                let problem_rt = 3.0
-                    + problem.optimal_moves as f64 * 2.0
-                    + excess * 1.5;
+                let problem_rt = 3.0 + problem.optimal_moves as f64 * 2.0 + excess * 1.5;
                 rt_ticks.push(problem_rt);
             }
         }

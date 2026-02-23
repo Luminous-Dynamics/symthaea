@@ -450,29 +450,13 @@ impl BenchmarkReport {
             // Go/No-Go (Inhibition)
             ("go_accuracy", "go_accuracy", &bl.inhibition),
             ("nogo_accuracy", "nogo_accuracy", &bl.inhibition),
-            (
-                "inhibition_cost",
-                "inhibition_cost",
-                &bl.inhibition,
-            ),
+            ("inhibition_cost", "inhibition_cost", &bl.inhibition),
             ("go_rt_ticks", "go_rt_ticks", &bl.inhibition),
             // Attentional Blink (Attention)
             ("t1_accuracy", "t1_accuracy", &bl.attention),
-            (
-                "lag3_t2_accuracy",
-                "lag3_t2_accuracy",
-                &bl.attention,
-            ),
-            (
-                "lag8_t2_accuracy",
-                "lag8_t2_accuracy",
-                &bl.attention,
-            ),
-            (
-                "blink_magnitude",
-                "blink_magnitude",
-                &bl.attention,
-            ),
+            ("lag3_t2_accuracy", "lag3_t2_accuracy", &bl.attention),
+            ("lag8_t2_accuracy", "lag8_t2_accuracy", &bl.attention),
+            ("blink_magnitude", "blink_magnitude", &bl.attention),
             // Prospective Memory (MemoryAgent)
             ("pm_hit_rate", "pm_hit_rate", &bl.memory_agent),
             (
@@ -667,7 +651,11 @@ impl BenchmarkReport {
         }
         if benchmark.contains("DigitSpan") {
             push_specific("forward::rt_ticks", "digit_span_forward_rt_ticks", &bl.worm);
-            push_specific("backward::rt_ticks", "digit_span_backward_rt_ticks", &bl.worm);
+            push_specific(
+                "backward::rt_ticks",
+                "digit_span_backward_rt_ticks",
+                &bl.worm,
+            );
         }
         if benchmark.contains("Binding") {
             push_specific("rt_ticks", "binding_rt_ticks", &bl.worm);
@@ -696,8 +684,16 @@ impl BenchmarkReport {
         }
         // Affect RT mappings
         if benchmark.contains("EmotionalStroop") {
-            push_specific("neutral::rt_ticks", "emotional_stroop_neutral_rt_ticks", &bl.affect);
-            push_specific("negative::rt_ticks", "emotional_stroop_negative_rt_ticks", &bl.affect);
+            push_specific(
+                "neutral::rt_ticks",
+                "emotional_stroop_neutral_rt_ticks",
+                &bl.affect,
+            );
+            push_specific(
+                "negative::rt_ticks",
+                "emotional_stroop_negative_rt_ticks",
+                &bl.affect,
+            );
         }
         if benchmark.contains("ValenceClassification") {
             push_specific("rt_ticks", "valence_rt_ticks", &bl.affect);
@@ -1308,13 +1304,23 @@ impl BenchmarkReport {
                     human_sd: {
                         // Look up the baseline SD directly
                         let baseline_maps = [
-                            &bl.worm, &bl.cogbench, &bl.executive, &bl.tombench,
-                            &bl.memory_agent, &bl.metacognition, &bl.affect, &bl.creativity,
-                            &bl.butlin, &bl.inhibition, &bl.attention,
+                            &bl.worm,
+                            &bl.cogbench,
+                            &bl.executive,
+                            &bl.tombench,
+                            &bl.memory_agent,
+                            &bl.metacognition,
+                            &bl.affect,
+                            &bl.creativity,
+                            &bl.butlin,
+                            &bl.inhibition,
+                            &bl.attention,
                         ];
-                        baseline_maps
-                            .iter()
-                            .find_map(|bm| bm.values().find(|b| (b.value - c.human_value).abs() < 1e-10).and_then(|b| b.sd))
+                        baseline_maps.iter().find_map(|bm| {
+                            bm.values()
+                                .find(|b| (b.value - c.human_value).abs() < 1e-10)
+                                .and_then(|b| b.sd)
+                        })
                     },
                     cohens_d: c.effect_size,
                     ci_lower: metric.ci_lower,
@@ -1342,18 +1348,12 @@ impl BenchmarkReport {
                 r.metric,
                 r.agent_mean,
                 r.human_mean,
-                r.human_sd
-                    .map(|s| format!("{:.4}", s))
-                    .unwrap_or_default(),
-                r.cohens_d
-                    .map(|d| format!("{:.4}", d))
-                    .unwrap_or_default(),
+                r.human_sd.map(|s| format!("{:.4}", s)).unwrap_or_default(),
+                r.cohens_d.map(|d| format!("{:.4}", d)).unwrap_or_default(),
                 r.ci_lower,
                 r.ci_upper,
                 r.ratio,
-                r.z_score
-                    .map(|z| format!("{:+.4}", z))
-                    .unwrap_or_default(),
+                r.z_score.map(|z| format!("{:+.4}", z)).unwrap_or_default(),
             ));
         }
         lines.join("\n")
