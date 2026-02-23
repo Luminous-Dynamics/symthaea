@@ -59,14 +59,14 @@ pub mod genesis;
 /// Hyperdimensional computing: vector types, encoding, binding, bundling, similarity, and consciousness topology.
 #[allow(missing_docs)]
 pub mod hdc;
+/// Shared mathematical utilities: softmax, numerical helpers.
+pub mod math;
 /// Metrics, tracing, and introspection.
 #[allow(missing_docs)]
 pub mod observability;
 /// Integrated Information (Phi) calculation engine.
 #[allow(missing_docs)]
 pub mod phi_engine;
-/// Shared mathematical utilities: softmax, numerical helpers.
-pub mod math;
 /// Physics-grounded modeling: periodic table, emergence, kinetics, and thermodynamics.
 #[allow(missing_docs)]
 pub mod physics;

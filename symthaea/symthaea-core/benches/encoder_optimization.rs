@@ -109,11 +109,8 @@ fn bench_sentence_encoding(c: &mut Criterion) {
     // Cold sentence encoding: fresh encoder each time (worst case)
     group.bench_function(BenchmarkId::new("cold_words", 10), |b| {
         b.iter(|| {
-            let mut encoder =
-                TextEncoder::new(TextEncoderConfig::default()).expect("encoder init");
-            black_box(
-                encoder.encode_sentence(black_box(medium_sentence)),
-            )
+            let mut encoder = TextEncoder::new(TextEncoderConfig::default()).expect("encoder init");
+            black_box(encoder.encode_sentence(black_box(medium_sentence)))
         })
     });
 
@@ -161,11 +158,7 @@ fn bench_full_cycle(c: &mut Criterion) {
         for _ in 0..50 {
             let _ = encoder.encode("repeated stimulus for convergence");
         }
-        b.iter(|| {
-            black_box(encoder.encode(black_box(
-                "repeated stimulus for convergence",
-            )))
-        })
+        b.iter(|| black_box(encoder.encode(black_box("repeated stimulus for convergence"))))
     });
 
     group.finish();
