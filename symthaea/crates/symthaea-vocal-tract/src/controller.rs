@@ -170,18 +170,21 @@ impl VocalTractController {
 
         // Bias initialized to schwa (neutral vowel) defaults
         let output_bias = [
-            500.0,  // F1 (Hz)
-            1500.0, // F2 (Hz)
-            2500.0, // F3 (Hz)
-            60.0,   // B1 (Hz)
-            90.0,   // B2 (Hz)
-            150.0,  // B3 (Hz)
+            500.0,          // F1 (Hz)
+            1500.0,         // F2 (Hz)
+            2500.0,         // F3 (Hz)
+            60.0,           // B1 (Hz)
+            90.0,           // B2 (Hz)
+            150.0,          // B3 (Hz)
             config.base_f0, // F0 (Hz)
-            0.0,    // energy (pre-sigmoid → sigmoid(0) = 0.5)
-            1.39,   // voicing (pre-sigmoid → sigmoid(1.39) ≈ 0.8)
+            0.0,            // energy (pre-sigmoid → sigmoid(0) = 0.5)
+            1.39,           // voicing (pre-sigmoid → sigmoid(1.39) ≈ 0.8)
         ];
 
-        let prosody_head = Some(ProsodyHead::from_genesis(genesis, config.learning_rate * 10.0));
+        let prosody_head = Some(ProsodyHead::from_genesis(
+            genesis,
+            config.learning_rate * 10.0,
+        ));
 
         Self {
             network,
@@ -303,8 +306,15 @@ impl VocalTractController {
         ];
 
         let tgt = [
-            target.f1, target.f2, target.f3, target.b1, target.b2, target.b3, target.f0,
-            target.energy, target.voicing,
+            target.f1,
+            target.f2,
+            target.f3,
+            target.b1,
+            target.b2,
+            target.b3,
+            target.f0,
+            target.energy,
+            target.voicing,
         ];
 
         // Compute error (pred - target)
@@ -538,14 +548,23 @@ impl VocalTractController {
 
         // Convergence-critical parameters:
         // - 20 warmup steps for LTC neurons to reach differentiated steady states
-        // - 10 gradient steps per phoneme per epoch (was 1 → 10× more signal)
-        // - 10× learning rate during supervised training
-        // - No weight decay (prevents erosion of learned weights across epochs)
+        // - 10 gradient steps per phoneme per epoch (10× more signal)
+        // - Cosine LR annealing: high LR early (fast separation), low LR late (fine-tune)
+        // - No weight decay during supervised training (prevents erosion)
         const WARMUP_STEPS: usize = 20;
         const TRAIN_STEPS: usize = 10;
-        let supervised_lr = self.learning_rate * 10.0;
 
-        for _epoch in 0..epochs {
+        // Cosine annealing: peak LR = 30× base, decays to 3× base over the schedule.
+        // This gives strong early gradients for vowel separation, then fine-tunes.
+        let lr_peak = self.learning_rate * 30.0;
+        let lr_min = self.learning_rate * 3.0;
+
+        for epoch in 0..epochs {
+            // Cosine annealing schedule
+            let progress = epoch as f32 / epochs.max(1) as f32;
+            let cos_factor = 0.5 * (1.0 + (progress * std::f32::consts::PI).cos());
+            let epoch_lr = lr_min + (lr_peak - lr_min) * cos_factor;
+
             let mut epoch_loss = 0.0;
 
             for (_, hv, target) in &phoneme_hvs {
@@ -567,7 +586,7 @@ impl VocalTractController {
                 // Multiple gradient steps with no weight decay for faster convergence
                 for _ in 0..TRAIN_STEPS {
                     self.forward(hv, 0.005);
-                    self.train_step_impl(hv, target, 0.005, supervised_lr, 0.0);
+                    self.train_step_impl(hv, target, 0.005, epoch_lr, 0.0);
                 }
             }
 
@@ -774,13 +793,19 @@ mod tests {
     fn test_phoneme_targets() -> Vec<(&'static str, FormantTarget)> {
         vec![
             // Vowels
-            ("AH", FormantTarget::vowel(520.0, 1190.0, 2390.0, 80.0)),    // "but" (stressed)
-            ("IY", FormantTarget::vowel(270.0, 2290.0, 3010.0, 100.0)),   // "beat"
-            ("EH", FormantTarget::vowel(530.0, 1840.0, 2480.0, 80.0)),    // "bet"
+            ("AH", FormantTarget::vowel(520.0, 1190.0, 2390.0, 80.0)), // "but" (stressed)
+            ("IY", FormantTarget::vowel(270.0, 2290.0, 3010.0, 100.0)), // "beat"
+            ("EH", FormantTarget::vowel(530.0, 1840.0, 2480.0, 80.0)), // "bet"
             // Voiced consonant (bilabial stop)
-            ("P", FormantTarget::unvoiced_consonant(200.0, 1000.0, 2200.0, 60.0)),
+            (
+                "P",
+                FormantTarget::unvoiced_consonant(200.0, 1000.0, 2200.0, 60.0),
+            ),
             // Unvoiced consonant (alveolar fricative)
-            ("S", FormantTarget::unvoiced_consonant(320.0, 1700.0, 2600.0, 100.0)),
+            (
+                "S",
+                FormantTarget::unvoiced_consonant(320.0, 1700.0, 2600.0, 100.0),
+            ),
         ]
     }
 
@@ -1013,7 +1038,11 @@ mod tests {
         let targets = test_phoneme_targets();
 
         // Get /AH/ target (open vowel, F1≈520)
-        let ah_target = targets.iter().find(|(name, _)| *name == "AH").map(|(_, t)| t).expect("AH should exist in test data");
+        let ah_target = targets
+            .iter()
+            .find(|(name, _)| *name == "AH")
+            .map(|(_, t)| t)
+            .expect("AH should exist in test data");
         let ah_hv = genesis.hv("phoneme::AH", HDC_DIMENSION);
 
         let target_frame = FormantFrame {
