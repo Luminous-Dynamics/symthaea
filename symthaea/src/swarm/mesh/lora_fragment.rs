@@ -438,7 +438,10 @@ impl FragmentAssembler {
 
         // Recover the missing fragment via XOR
         let recovered: Option<[u8; PAYLOAD_SIZE]> = missing_idx.map(|missing| {
-            let fec = self.fec.as_ref().expect("FEC required when data fragment missing");
+            let fec = self
+                .fec
+                .as_ref()
+                .expect("FEC required when data fragment missing");
             let mut recovered = *fec;
             for i in 0..data_count {
                 if i != missing {
@@ -825,7 +828,11 @@ mod tests {
 
         assert!(assembler.is_complete());
         let payload = assembler.assemble().unwrap();
-        assert_eq!(&payload[..], &hv.0[..], "recovered payload must match original");
+        assert_eq!(
+            &payload[..],
+            &hv.0[..],
+            "recovered payload must match original"
+        );
     }
 
     // -- FEC recovery detection --

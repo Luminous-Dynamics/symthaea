@@ -351,8 +351,7 @@ impl LoopbackTransport {
 
         // Decode first fragment to get thought_id and total_fragments
         let first = LoRaFragment::from_bytes(&sent[0])?;
-        let mut assembler =
-            WisdomPacket::assembler(first.thought_id, first.total_fragments);
+        let mut assembler = WisdomPacket::assembler(first.thought_id, first.total_fragments);
 
         for data in sent.iter() {
             if let Some(frag) = LoRaFragment::from_bytes(data) {
@@ -412,11 +411,7 @@ impl BiLoopbackTransport {
     /// Create a matched pair of transports.
     ///
     /// Data sent on `a` is received on `b` and vice versa.
-    pub fn pair(
-        name_a: &'static str,
-        name_b: &'static str,
-        mtu: usize,
-    ) -> (Self, Self) {
+    pub fn pair(name_a: &'static str, name_b: &'static str, mtu: usize) -> (Self, Self) {
         let buf_a = std::sync::Arc::new(Mutex::new(std::collections::VecDeque::new()));
         let buf_b = std::sync::Arc::new(Mutex::new(std::collections::VecDeque::new()));
         (
@@ -503,10 +498,7 @@ mod tests {
             .with_lora(Box::new(LoopbackTransport::lora()))
             .with_batman(Box::new(LoopbackTransport::batman()));
 
-        assert_eq!(
-            mesh.route(MeshUrgency::Critical),
-            Some(MeshRoute::Batman)
-        );
+        assert_eq!(mesh.route(MeshUrgency::Critical), Some(MeshRoute::Batman));
     }
 
     #[test]
@@ -515,10 +507,7 @@ mod tests {
             .with_lora(Box::new(LoopbackTransport::lora()))
             .with_yggdrasil(Box::new(LoopbackTransport::yggdrasil()));
 
-        assert_eq!(
-            mesh.route(MeshUrgency::Normal),
-            Some(MeshRoute::Yggdrasil)
-        );
+        assert_eq!(mesh.route(MeshUrgency::Normal), Some(MeshRoute::Yggdrasil));
     }
 
     #[test]
@@ -619,10 +608,7 @@ mod tests {
     fn mesh_route_display() {
         assert_eq!(MeshRoute::LoRa.to_string(), "LoRa (868 MHz)");
         assert_eq!(MeshRoute::Batman.to_string(), "B.A.T.M.A.N. (802.11s)");
-        assert_eq!(
-            MeshRoute::Yggdrasil.to_string(),
-            "Yggdrasil (IPv6 overlay)"
-        );
+        assert_eq!(MeshRoute::Yggdrasil.to_string(), "Yggdrasil (IPv6 overlay)");
     }
 
     #[test]

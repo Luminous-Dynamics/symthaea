@@ -177,11 +177,7 @@ impl MeshReceiver {
     /// Returns a completed [`WisdomPacket`] if this fragment completed the
     /// reassembly. Returns `None` if more fragments are needed, the fragment
     /// was corrupt, or it was a duplicate.
-    pub fn receive_fragment(
-        &mut self,
-        source: [u8; 8],
-        raw: &[u8],
-    ) -> Option<WisdomPacket> {
+    pub fn receive_fragment(&mut self, source: [u8; 8], raw: &[u8]) -> Option<WisdomPacket> {
         // Parse and CRC-validate
         let frag = match LoRaFragment::from_bytes(raw) {
             Some(f) => f,
@@ -379,9 +375,7 @@ impl Default for MeshReceiver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::swarm::mesh::{
-        fragment, MeshUrgency, PayloadType, LORA_MTU,
-    };
+    use crate::swarm::mesh::{fragment, MeshUrgency, PayloadType, LORA_MTU};
     use symthaea_core::hdc::BinaryHV;
 
     fn test_hv(seed: u8) -> BinaryHV {
