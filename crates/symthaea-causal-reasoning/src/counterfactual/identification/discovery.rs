@@ -1745,7 +1745,10 @@ mod tests {
     #[test]
     fn test_fisher_z_transform_near_perfect_correlation() {
         let z = fisher_z_transform(0.99, 100, 0);
-        assert!(z > 10.0, "Near-perfect correlation should give large z-stat");
+        assert!(
+            z > 10.0,
+            "Near-perfect correlation should give large z-stat"
+        );
     }
 
     #[test]
@@ -1918,8 +1921,7 @@ mod tests {
     #[test]
     fn test_iv_2sls_estimation() {
         // Z → X → Y with true effect X→Y = 2.0
-        let mut data =
-            ObservationalData::new(vec!["Z".into(), "X".into(), "Y".into()]);
+        let mut data = ObservationalData::new(vec!["Z".into(), "X".into(), "Y".into()]);
         for i in 0..200 {
             let z = (i % 2) as f64;
             let x = 0.8 * z + 0.05 * (i % 5) as f64;
@@ -1939,21 +1941,22 @@ mod tests {
 
     #[test]
     fn test_iv_2sls_insufficient_data() {
-        let mut data =
-            ObservationalData::new(vec!["Z".into(), "X".into(), "Y".into()]);
+        let mut data = ObservationalData::new(vec!["Z".into(), "X".into(), "Y".into()]);
         for i in 0..5 {
             data.add_observation(vec![i as f64, i as f64 * 2.0, i as f64 * 4.0]);
         }
         let result = IVEstimator::estimate_2sls(&data, 0, 1, 2);
-        assert!(result.effect.is_nan(), "Insufficient data should return NaN");
+        assert!(
+            result.effect.is_nan(),
+            "Insufficient data should return NaN"
+        );
         assert!(result.is_weak_instrument);
     }
 
     #[test]
     fn test_iv_wald_estimator() {
         // Binary instrument Z, X = Z + noise, Y = 2*X + noise
-        let mut data =
-            ObservationalData::new(vec!["Z".into(), "X".into(), "Y".into()]);
+        let mut data = ObservationalData::new(vec!["Z".into(), "X".into(), "Y".into()]);
         for i in 0..200 {
             let z = (i % 2) as f64;
             let x = z + 0.01 * (i % 3) as f64;
@@ -1973,8 +1976,7 @@ mod tests {
     #[test]
     fn test_iv_wald_no_variance() {
         // All instrument values are the same
-        let mut data =
-            ObservationalData::new(vec!["Z".into(), "X".into(), "Y".into()]);
+        let mut data = ObservationalData::new(vec!["Z".into(), "X".into(), "Y".into()]);
         for i in 0..20 {
             data.add_observation(vec![0.0, i as f64, i as f64 * 2.0]);
         }
@@ -2058,10 +2060,7 @@ mod tests {
     #[test]
     fn test_transportability_selection_off_pathway() {
         // X → Y, Z is a selection node not on the pathway
-        let source_dag = CausalDAG::new(
-            vec!["X".into(), "Y".into(), "Z".into()],
-            vec![(0, 1)],
-        );
+        let source_dag = CausalDAG::new(vec!["X".into(), "Y".into(), "Z".into()], vec![(0, 1)]);
         let target_dag = source_dag.clone();
         let analyzer = TransportabilityAnalyzer::new(source_dag, target_dag, vec![2]);
         let result = analyzer.is_transportable(0, 1);

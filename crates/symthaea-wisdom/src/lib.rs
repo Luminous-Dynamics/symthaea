@@ -227,7 +227,12 @@ mod tests {
         // All harmonics should stay in [0, 1]
         for h in ActiveHarmonic::all() {
             let val = wisdom.harmonics.get(h);
-            assert!(val >= 0.0 && val <= 1.0, "Harmonic {:?} = {} out of bounds", h, val);
+            assert!(
+                val >= 0.0 && val <= 1.0,
+                "Harmonic {:?} = {} out of bounds",
+                h,
+                val
+            );
         }
     }
 
@@ -244,7 +249,12 @@ mod tests {
             wisdom.update_from_experience(0.1, 0.1, 0.9);
         }
         let after = wisdom.harmonics.get(ActiveHarmonic::Wisdom);
-        assert!(after < boosted, "Should decay toward 0.5: was {}, now {}", boosted, after);
+        assert!(
+            after < boosted,
+            "Should decay toward 0.5: was {}, now {}",
+            boosted,
+            after
+        );
     }
 
     #[test]

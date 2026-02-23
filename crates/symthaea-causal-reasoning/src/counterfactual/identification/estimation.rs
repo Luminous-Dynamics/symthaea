@@ -932,7 +932,10 @@ mod tests {
         }
         let est = EffectEstimator::new();
         let beta = est.estimate_regression(0, 1, &data);
-        assert!((beta - 0.0).abs() < 1e-10, "Zero variance X should return 0");
+        assert!(
+            (beta - 0.0).abs() < 1e-10,
+            "Zero variance X should return 0"
+        );
     }
 
     #[test]
@@ -993,10 +996,7 @@ mod tests {
         };
         let est = EffectEstimator::new();
         let effect = est.estimate_backdoor(&query, &[], &data);
-        assert!(
-            (effect - 0.0).abs() < 1e-10,
-            "Single obs should return 0"
-        );
+        assert!((effect - 0.0).abs() < 1e-10, "Single obs should return 0");
     }
 
     #[test]
@@ -1059,7 +1059,10 @@ mod tests {
         };
         let est = EffectEstimator::new();
         let ipw = est.estimate_ipw(&query, &[], &data);
-        assert!((ipw - 0.0).abs() < 1e-10, "IPW with <10 obs should return 0");
+        assert!(
+            (ipw - 0.0).abs() < 1e-10,
+            "IPW with <10 obs should return 0"
+        );
     }
 
     #[test]
@@ -1078,10 +1081,7 @@ mod tests {
         };
         let est = EffectEstimator::new();
         let ipw = est.estimate_ipw(&query, &[2], &data);
-        assert!(
-            ipw.is_finite(),
-            "IPW estimate should be finite"
-        );
+        assert!(ipw.is_finite(), "IPW estimate should be finite");
         assert!(
             (ipw - 2.0).abs() < 2.0,
             "IPW estimate should be in reasonable range, got {}",
@@ -1114,7 +1114,11 @@ mod tests {
         let mut data = ObservationalData::new(vec!["X".into(), "Y".into(), "Z".into()]);
         for i in 0..300 {
             let z = (i % 3) as f64 / 2.0;
-            let x = if z + 0.1 * (i % 5) as f64 > 0.5 { 1.0 } else { 0.0 };
+            let x = if z + 0.1 * (i % 5) as f64 > 0.5 {
+                1.0
+            } else {
+                0.0
+            };
             let y = 1.5 * x + 0.8 * z + 0.02 * (i % 11) as f64;
             data.add_observation(vec![x, y, z]);
         }
@@ -1125,10 +1129,7 @@ mod tests {
         };
         let est = EffectEstimator::new();
         let dr = est.estimate_doubly_robust(&query, &[2], &data);
-        assert!(
-            dr.is_finite(),
-            "DR estimate should be finite"
-        );
+        assert!(dr.is_finite(), "DR estimate should be finite");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1140,7 +1141,11 @@ mod tests {
         let mut data = ObservationalData::new(vec!["X".into(), "Y".into(), "Z".into()]);
         for i in 0..300 {
             let z = (i % 4) as f64 / 3.0;
-            let x = if z + 0.1 * (i % 5) as f64 > 0.4 { 1.0 } else { 0.0 };
+            let x = if z + 0.1 * (i % 5) as f64 > 0.4 {
+                1.0
+            } else {
+                0.0
+            };
             let y = 2.0 * x + 0.5 * z + 0.02 * (i % 7) as f64;
             data.add_observation(vec![x, y, z]);
         }
@@ -1160,7 +1165,10 @@ mod tests {
         assert!(robust.regression_estimate.is_finite());
         assert!(robust.ipw_estimate.is_finite());
         assert!(robust.dr_estimate.is_finite());
-        assert!((robust.effect - robust.dr_estimate).abs() < 1e-10, "Primary effect should be DR");
+        assert!(
+            (robust.effect - robust.dr_estimate).abs() < 1e-10,
+            "Primary effect should be DR"
+        );
     }
 
     #[test]
@@ -1215,7 +1223,10 @@ mod tests {
             method: IdentificationMethod::BackdoorAdjustment,
             is_identified: true,
         };
-        assert!(estimate.confidence() > 0.9, "Perfect agreement should have high confidence");
+        assert!(
+            estimate.confidence() > 0.9,
+            "Perfect agreement should have high confidence"
+        );
     }
 
     #[test]
@@ -1262,11 +1273,7 @@ mod tests {
             is_identified: true,
         };
         let e = estimate.e_value();
-        assert!(
-            e > 3.0,
-            "Large effect should have E-value > 3, got {}",
-            e
-        );
+        assert!(e > 3.0, "Large effect should have E-value > 3, got {}", e);
     }
 
     #[test]
@@ -1332,10 +1339,7 @@ mod tests {
             is_identified: true,
         };
         let sa = estimate.sensitivity_analysis();
-        assert!(
-            sa.e_value > 3.0,
-            "Strong effect should have E-value > 3"
-        );
+        assert!(sa.e_value > 3.0, "Strong effect should have E-value > 3");
         assert!(sa.e_value_interpretation.contains("Robust"));
         assert!(sa.min_confounder_rr_treatment > 1.0);
         assert!(sa.min_confounder_rr_outcome > 1.0);

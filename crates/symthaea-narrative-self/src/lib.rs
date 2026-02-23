@@ -391,8 +391,10 @@ impl AutobiographicalSelf {
 
         // Update self-concept by integrating significant episodes
         if significance > 0.5 {
-            self.self_concept =
-                BinaryHV::bundle(&[self.self_concept, self.life_story.last().expect("just pushed").encoding]);
+            self.self_concept = BinaryHV::bundle(&[
+                self.self_concept,
+                self.life_story.last().expect("just pushed").encoding,
+            ]);
         }
 
         // Update narrative coherence
@@ -1362,7 +1364,11 @@ mod tests {
     fn test_config_default_weights_sum_to_one() {
         let config = NarrativeSelfConfig::default();
         let sum = config.proto_weight + config.core_weight + config.autobio_weight;
-        assert!((sum - 1.0).abs() < f64::EPSILON, "Weights should sum to 1.0, got {}", sum);
+        assert!(
+            (sum - 1.0).abs() < f64::EPSILON,
+            "Weights should sum to 1.0, got {}",
+            sum
+        );
     }
 
     #[test]
@@ -1398,7 +1404,10 @@ mod tests {
         let mut proto = ProtoSelf::new();
         let input = BinaryHV::random(10);
         proto.update(&input, false, 0.3);
-        assert!(proto.valence < 0.0, "Failed task should produce negative valence");
+        assert!(
+            proto.valence < 0.0,
+            "Failed task should produce negative valence"
+        );
     }
 
     // ── CoreSelf goals ──────────────────────────────────────────────────
@@ -1476,7 +1485,12 @@ mod tests {
         // With no traits/values: trait_coherence=0.5, value_coherence=0.5
         // identity_stability=1.0, narrative_coherence=1.0
         let expected = (1.0 + 1.0 + 0.5 + 0.5) / 4.0;
-        assert!((coh - expected).abs() < f64::EPSILON, "coh={}, expected={}", coh, expected);
+        assert!(
+            (coh - expected).abs() < f64::EPSILON,
+            "coh={}, expected={}",
+            coh,
+            expected
+        );
     }
 
     #[test]
@@ -1513,7 +1527,10 @@ mod tests {
             model.process_experience(&input, &format!("Exp {}", i), i % 2 == 0, 0.5, 0.5);
         }
         let coh = model.coherence();
-        assert!(coh.is_finite(), "Coherence should be finite after many experiences");
+        assert!(
+            coh.is_finite(),
+            "Coherence should be finite after many experiences"
+        );
     }
 
     #[test]

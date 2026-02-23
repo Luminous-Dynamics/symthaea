@@ -493,17 +493,33 @@ mod tests {
     fn test_unknown_primitive_returns_neutral_weight() {
         for h in ActiveHarmonic::all() {
             let w = h.bias().primitive_weight_modifier("UNKNOWN_PRIMITIVE");
-            assert!((w - 1.0).abs() < f32::EPSILON, "Unknown primitive should get 1.0");
+            assert!(
+                (w - 1.0).abs() < f32::EPSILON,
+                "Unknown primitive should get 1.0"
+            );
         }
     }
 
     #[test]
     fn test_all_biases_positive_weights() {
-        let primitives = ["INTEGRATE", "PROTECT", "QUESTION", "EXPLORE", "RELATE", "GIVE", "LEARN"];
+        let primitives = [
+            "INTEGRATE",
+            "PROTECT",
+            "QUESTION",
+            "EXPLORE",
+            "RELATE",
+            "GIVE",
+            "LEARN",
+        ];
         for prim in &primitives {
             for h in ActiveHarmonic::all() {
                 let w = h.bias().primitive_weight_modifier(prim);
-                assert!(w > 0.0, "Weight for {} under {:?} must be positive", prim, h);
+                assert!(
+                    w > 0.0,
+                    "Weight for {} under {:?} must be positive",
+                    prim,
+                    h
+                );
             }
         }
     }
@@ -568,7 +584,10 @@ mod tests {
         let profile = HarmonicProfile::balanced();
         // All at exactly 0.5 -- filter requires > 0.5
         let questions = profile.active_questions(7);
-        assert!(questions.is_empty(), "No questions when all at baseline 0.5");
+        assert!(
+            questions.is_empty(),
+            "No questions when all at baseline 0.5"
+        );
     }
 
     #[test]
