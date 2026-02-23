@@ -1,0 +1,556 @@
+//! Dual-Layer Mesh Router — Urgency-based physical transport selection.
+//!
+//! The internal cognitive urgency of the mind (`Critical` vs. `Cruise`)
+//! directly dictates its physical thermodynamic interface with the world.
+//! This is Active Inference made literal: the brain routes data based on
+//! the speed of philosophy.
+//!
+//! ```text
+//!   CycleUrgency::Critical  ──►  B.A.T.M.A.N. (802.11s WiFi mesh)
+//!                                  • <10ms latency, ~100m range
+//!                                  • Full WisdomPacket in one frame
+//!
+//!   CycleUrgency::Normal    ──►  Yggdrasil / Iroh (encrypted overlay)
+//!                                  • End-to-end encrypted IPv6
+//!                                  • Fractal spanning-tree routing
+//!
+//!   CycleUrgency::Cruise    ──►  LoRa (868 MHz radio)
+//!                                  • 10-15km range, milliwatts of power
+//!                                  • 11 fragments, ~3 seconds per thought
+//!                                  • Solar-powered, off-grid sovereign
+//! ```
+//!
+//! When the preferred transport is unavailable, the router falls back
+//! to the next available layer (LoRa → Yggdrasil → B.A.T.M.A.N.).
+
+use super::{
+    fragment, LoRaFragment, MeshError, MeshUrgency, WisdomPacket, LORA_MTU, WISDOM_PACKET_SIZE,
+};
+use std::sync::Mutex;
+
+// ============================================================================
+// MESH TRANSPORT TRAIT
+// ============================================================================
+
+/// Physical mesh transport layer.
+///
+/// Implemented by LoRa radio, B.A.T.M.A.N. WiFi mesh, Yggdrasil overlay,
+/// and [`LoopbackTransport`] (for testing).
+pub trait MeshTransport: Send + Sync {
+    /// Send raw bytes over this transport.
+    fn send_raw(&self, data: &[u8]) -> Result<(), MeshError>;
+
+    /// Receive raw bytes. Returns the number of bytes read.
+    fn recv_raw(&self, buf: &mut [u8]) -> Result<usize, MeshError>;
+
+    /// Maximum transmission unit (bytes per frame).
+    fn mtu(&self) -> usize;
+
+    /// Human-readable transport name.
+    fn name(&self) -> &str;
+
+    /// Whether this transport is currently operational.
+    fn is_available(&self) -> bool;
+}
+
+// ============================================================================
+// MESH ROUTE
+// ============================================================================
+
+/// Which physical layer was selected for transmission.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MeshRoute {
+    /// LoRa radio (long range, low bandwidth).
+    LoRa,
+    /// B.A.T.M.A.N. WiFi mesh (short range, low latency).
+    Batman,
+    /// Yggdrasil encrypted overlay (internet or mesh backhaul).
+    Yggdrasil,
+}
+
+impl MeshRoute {
+    /// Whether this route requires LoRa fragmentation.
+    pub fn needs_fragmentation(&self) -> bool {
+        matches!(self, Self::LoRa)
+    }
+}
+
+impl std::fmt::Display for MeshRoute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LoRa => write!(f, "LoRa (868 MHz)"),
+            Self::Batman => write!(f, "B.A.T.M.A.N. (802.11s)"),
+            Self::Yggdrasil => write!(f, "Yggdrasil (IPv6 overlay)"),
+        }
+    }
+}
+
+// ============================================================================
+// DUAL-LAYER MESH
+// ============================================================================
+
+/// Routes mesh messages across physical layers based on cognitive urgency.
+///
+/// Transports are optional — the router gracefully falls back when a
+/// preferred layer is unavailable. A node with only LoRa hardware still
+/// participates in the Swarm; it just thinks more slowly.
+pub struct DualLayerMesh {
+    /// Node identity (32 bytes, matches swarm node_id).
+    node_id: [u8; 32],
+    /// LoRa radio transport (long range, ~3s per WisdomVector).
+    lora: Option<Box<dyn MeshTransport>>,
+    /// B.A.T.M.A.N. WiFi mesh transport (<10ms latency).
+    batman: Option<Box<dyn MeshTransport>>,
+    /// Yggdrasil encrypted overlay transport.
+    yggdrasil: Option<Box<dyn MeshTransport>>,
+}
+
+impl DualLayerMesh {
+    /// Create a new router with no transports attached.
+    pub fn new(node_id: [u8; 32]) -> Self {
+        Self {
+            node_id,
+            lora: None,
+            batman: None,
+            yggdrasil: None,
+        }
+    }
+
+    /// Attach a LoRa transport (Cruise-mode routing).
+    pub fn with_lora(mut self, transport: Box<dyn MeshTransport>) -> Self {
+        self.lora = Some(transport);
+        self
+    }
+
+    /// Attach a B.A.T.M.A.N. transport (Critical-mode routing).
+    pub fn with_batman(mut self, transport: Box<dyn MeshTransport>) -> Self {
+        self.batman = Some(transport);
+        self
+    }
+
+    /// Attach a Yggdrasil transport (Normal-mode routing).
+    pub fn with_yggdrasil(mut self, transport: Box<dyn MeshTransport>) -> Self {
+        self.yggdrasil = Some(transport);
+        self
+    }
+
+    /// The truncated source_id (first 8 bytes) for WisdomPacket headers.
+    pub fn source_id(&self) -> [u8; 8] {
+        let mut id = [0u8; 8];
+        id.copy_from_slice(&self.node_id[..8]);
+        id
+    }
+
+    /// Determine which physical layer to use for a given urgency.
+    ///
+    /// Falls back through available transports:
+    /// - Critical: B.A.T.M.A.N. → Yggdrasil → LoRa
+    /// - Normal: Yggdrasil → B.A.T.M.A.N. → LoRa
+    /// - Cruise: LoRa → Yggdrasil → B.A.T.M.A.N.
+    pub fn route(&self, urgency: MeshUrgency) -> Option<MeshRoute> {
+        let preference = match urgency {
+            MeshUrgency::Critical => [
+                (MeshRoute::Batman, &self.batman),
+                (MeshRoute::Yggdrasil, &self.yggdrasil),
+                (MeshRoute::LoRa, &self.lora),
+            ],
+            MeshUrgency::Normal => [
+                (MeshRoute::Yggdrasil, &self.yggdrasil),
+                (MeshRoute::Batman, &self.batman),
+                (MeshRoute::LoRa, &self.lora),
+            ],
+            MeshUrgency::Cruise => [
+                (MeshRoute::LoRa, &self.lora),
+                (MeshRoute::Yggdrasil, &self.yggdrasil),
+                (MeshRoute::Batman, &self.batman),
+            ],
+        };
+
+        for (route, transport) in &preference {
+            if let Some(t) = transport {
+                if t.is_available() {
+                    return Some(*route);
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Send a WisdomPacket over the appropriate mesh layer.
+    ///
+    /// Automatically fragments for LoRa, sends whole for B.A.T.M.A.N./Yggdrasil.
+    /// Returns the route that was used.
+    pub fn send(&self, packet: &WisdomPacket) -> Result<MeshRoute, MeshError> {
+        let route = self.route(packet.urgency).ok_or(MeshError::NoTransport)?;
+
+        match route {
+            MeshRoute::LoRa => {
+                let transport = self.lora.as_ref().unwrap();
+                let frags = packet.fragment();
+                let mut buf = [0u8; LORA_MTU];
+                for frag in &frags {
+                    let len = frag.to_bytes(&mut buf);
+                    transport.send_raw(&buf[..len])?;
+                }
+            }
+            MeshRoute::Batman => {
+                let transport = self.batman.as_ref().unwrap();
+                let bytes = packet.to_bytes();
+                transport.send_raw(&bytes)?;
+            }
+            MeshRoute::Yggdrasil => {
+                let transport = self.yggdrasil.as_ref().unwrap();
+                let bytes = packet.to_bytes();
+                transport.send_raw(&bytes)?;
+            }
+        }
+
+        Ok(route)
+    }
+
+    /// Poll all transports for incoming data and feed into the receiver.
+    ///
+    /// Returns completed `WisdomPacket`s from both fragmented (LoRa) and
+    /// whole-packet (B.A.T.M.A.N./Yggdrasil) paths.
+    pub fn poll_incoming(&self, receiver: &mut super::MeshReceiver) -> Vec<WisdomPacket> {
+        let mut completed = Vec::new();
+
+        // Poll LoRa (fragmented path)
+        if let Some(ref transport) = self.lora {
+            let mut buf = [0u8; LORA_MTU];
+            while let Ok(n) = transport.recv_raw(&mut buf) {
+                if n == 0 {
+                    break;
+                }
+                // Use source_id [0;8] as placeholder — real impl reads from radio header
+                if let Some(packet) = receiver.receive_fragment([0u8; 8], &buf[..n]) {
+                    completed.push(packet);
+                }
+            }
+        }
+
+        // Poll B.A.T.M.A.N. (whole-packet path)
+        if let Some(ref transport) = self.batman {
+            let mut buf = [0u8; WISDOM_PACKET_SIZE + 64]; // small margin
+            while let Ok(n) = transport.recv_raw(&mut buf) {
+                if n == 0 {
+                    break;
+                }
+                if let Some(packet) = receiver.receive_whole(&buf[..n]) {
+                    completed.push(packet);
+                }
+            }
+        }
+
+        // Poll Yggdrasil (whole-packet path)
+        if let Some(ref transport) = self.yggdrasil {
+            let mut buf = [0u8; WISDOM_PACKET_SIZE + 64];
+            while let Ok(n) = transport.recv_raw(&mut buf) {
+                if n == 0 {
+                    break;
+                }
+                if let Some(packet) = receiver.receive_whole(&buf[..n]) {
+                    completed.push(packet);
+                }
+            }
+        }
+
+        completed
+    }
+
+    /// Check which transports are currently available.
+    pub fn available_transports(&self) -> Vec<MeshRoute> {
+        let mut routes = Vec::new();
+        if self.lora.as_ref().is_some_and(|t| t.is_available()) {
+            routes.push(MeshRoute::LoRa);
+        }
+        if self.batman.as_ref().is_some_and(|t| t.is_available()) {
+            routes.push(MeshRoute::Batman);
+        }
+        if self.yggdrasil.as_ref().is_some_and(|t| t.is_available()) {
+            routes.push(MeshRoute::Yggdrasil);
+        }
+        routes
+    }
+}
+
+// ============================================================================
+// LOOPBACK TRANSPORT (TESTING)
+// ============================================================================
+
+/// In-memory loopback transport for testing the mesh protocol.
+///
+/// Captures all sent data in a buffer for inspection.
+pub struct LoopbackTransport {
+    name: &'static str,
+    mtu: usize,
+    available: bool,
+    sent: Mutex<Vec<Vec<u8>>>,
+}
+
+impl LoopbackTransport {
+    /// Create a loopback with LoRa-like characteristics.
+    pub fn lora() -> Self {
+        Self {
+            name: "LoRa (loopback)",
+            mtu: LORA_MTU,
+            available: true,
+            sent: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Create a loopback with B.A.T.M.A.N.-like characteristics.
+    pub fn batman() -> Self {
+        Self {
+            name: "B.A.T.M.A.N. (loopback)",
+            mtu: 1500, // Ethernet MTU
+            available: true,
+            sent: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Create a loopback with Yggdrasil-like characteristics.
+    pub fn yggdrasil() -> Self {
+        Self {
+            name: "Yggdrasil (loopback)",
+            mtu: 65535, // IPv6 max
+            available: true,
+            sent: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Set whether this transport reports as available.
+    pub fn set_available(&mut self, available: bool) {
+        self.available = available;
+    }
+
+    /// Get all data that was sent through this transport.
+    pub fn sent_data(&self) -> Vec<Vec<u8>> {
+        self.sent.lock().unwrap().clone()
+    }
+
+    /// Number of send operations.
+    pub fn send_count(&self) -> usize {
+        self.sent.lock().unwrap().len()
+    }
+
+    /// Clear the send buffer.
+    pub fn clear(&self) {
+        self.sent.lock().unwrap().clear();
+    }
+
+    /// Reassemble LoRa fragments from the send buffer into a WisdomPacket.
+    ///
+    /// Convenience method for testing the full LoRa pipeline.
+    pub fn reassemble_wisdom(&self) -> Option<WisdomPacket> {
+        let sent = self.sent.lock().unwrap();
+        if sent.is_empty() {
+            return None;
+        }
+
+        // Decode first fragment to get thought_id and total_fragments
+        let first = LoRaFragment::from_bytes(&sent[0])?;
+        let mut assembler =
+            WisdomPacket::assembler(first.thought_id, first.total_fragments);
+
+        for data in sent.iter() {
+            if let Some(frag) = LoRaFragment::from_bytes(data) {
+                assembler.feed(&frag);
+            }
+        }
+
+        WisdomPacket::from_assembler(&assembler)
+    }
+}
+
+impl MeshTransport for LoopbackTransport {
+    fn send_raw(&self, data: &[u8]) -> Result<(), MeshError> {
+        self.sent.lock().unwrap().push(data.to_vec());
+        Ok(())
+    }
+
+    fn recv_raw(&self, _buf: &mut [u8]) -> Result<usize, MeshError> {
+        // Loopback doesn't support recv — use sent_data() for inspection
+        Err(MeshError::Io("loopback recv not supported".into()))
+    }
+
+    fn mtu(&self) -> usize {
+        self.mtu
+    }
+
+    fn name(&self) -> &str {
+        self.name
+    }
+
+    fn is_available(&self) -> bool {
+        self.available
+    }
+}
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use symthaea_core::hdc::BinaryHV;
+
+    fn test_hv(seed: u8) -> BinaryHV {
+        let mut bytes = [0u8; 2048];
+        for (i, b) in bytes.iter_mut().enumerate() {
+            *b = seed.wrapping_mul(i as u8).wrapping_add((i >> 3) as u8);
+        }
+        BinaryHV(bytes)
+    }
+
+    fn test_packet(urgency: MeshUrgency) -> WisdomPacket {
+        WisdomPacket {
+            source_id: [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08],
+            sequence: 1,
+            phi: 0.5,
+            urgency,
+            timestamp_s: 1_700_000_000,
+            payload_type: super::super::PayloadType::WisdomVector,
+            wisdom: test_hv(0xAB),
+        }
+    }
+
+    // -- Routing --
+
+    #[test]
+    fn route_critical_prefers_batman() {
+        let mesh = DualLayerMesh::new([0; 32])
+            .with_lora(Box::new(LoopbackTransport::lora()))
+            .with_batman(Box::new(LoopbackTransport::batman()));
+
+        assert_eq!(
+            mesh.route(MeshUrgency::Critical),
+            Some(MeshRoute::Batman)
+        );
+    }
+
+    #[test]
+    fn route_normal_prefers_yggdrasil() {
+        let mesh = DualLayerMesh::new([0; 32])
+            .with_lora(Box::new(LoopbackTransport::lora()))
+            .with_yggdrasil(Box::new(LoopbackTransport::yggdrasil()));
+
+        assert_eq!(
+            mesh.route(MeshUrgency::Normal),
+            Some(MeshRoute::Yggdrasil)
+        );
+    }
+
+    #[test]
+    fn route_cruise_prefers_lora() {
+        let mesh = DualLayerMesh::new([0; 32])
+            .with_lora(Box::new(LoopbackTransport::lora()))
+            .with_batman(Box::new(LoopbackTransport::batman()));
+
+        assert_eq!(mesh.route(MeshUrgency::Cruise), Some(MeshRoute::LoRa));
+    }
+
+    #[test]
+    fn route_fallback_when_preferred_unavailable() {
+        let mut batman = LoopbackTransport::batman();
+        batman.set_available(false);
+
+        let mesh = DualLayerMesh::new([0; 32])
+            .with_lora(Box::new(LoopbackTransport::lora()))
+            .with_batman(Box::new(batman));
+
+        // Critical wants B.A.T.M.A.N., but it's down — falls back to LoRa
+        assert_eq!(mesh.route(MeshUrgency::Critical), Some(MeshRoute::LoRa));
+    }
+
+    #[test]
+    fn route_none_when_no_transports() {
+        let mesh = DualLayerMesh::new([0; 32]);
+        assert_eq!(mesh.route(MeshUrgency::Normal), None);
+    }
+
+    // -- Sending --
+
+    #[test]
+    fn send_over_lora_fragments() {
+        let mesh = DualLayerMesh::new([0; 32]).with_lora(Box::new(LoopbackTransport::lora()));
+
+        let packet = test_packet(MeshUrgency::Cruise);
+        let route = mesh.send(&packet).unwrap();
+        assert_eq!(route, MeshRoute::LoRa);
+    }
+
+    #[test]
+    fn send_over_batman_whole_packet() {
+        let mesh = DualLayerMesh::new([0; 32]).with_batman(Box::new(LoopbackTransport::batman()));
+
+        let packet = test_packet(MeshUrgency::Critical);
+        let route = mesh.send(&packet).unwrap();
+        assert_eq!(route, MeshRoute::Batman);
+    }
+
+    #[test]
+    fn send_no_transport_returns_error() {
+        let mesh = DualLayerMesh::new([0; 32]);
+        let packet = test_packet(MeshUrgency::Normal);
+        assert!(mesh.send(&packet).is_err());
+    }
+
+    // -- Loopback reassembly --
+
+    #[test]
+    fn loopback_lora_reassemble() {
+        let loopback = LoopbackTransport::lora();
+        let original = test_packet(MeshUrgency::Cruise);
+
+        // Fragment and send through loopback
+        let frags = original.fragment();
+        let mut buf = [0u8; LORA_MTU];
+        for frag in &frags {
+            let len = frag.to_bytes(&mut buf);
+            loopback.send_raw(&buf[..len]).unwrap();
+        }
+
+        assert_eq!(loopback.send_count(), 11);
+
+        // Reassemble
+        let recovered = loopback.reassemble_wisdom().unwrap();
+        assert_eq!(recovered.sequence, original.sequence);
+        assert_eq!(recovered.wisdom.0, original.wisdom.0);
+    }
+
+    // -- Available transports --
+
+    #[test]
+    fn available_transports_list() {
+        let mesh = DualLayerMesh::new([0; 32])
+            .with_lora(Box::new(LoopbackTransport::lora()))
+            .with_batman(Box::new(LoopbackTransport::batman()));
+
+        let available = mesh.available_transports();
+        assert!(available.contains(&MeshRoute::LoRa));
+        assert!(available.contains(&MeshRoute::Batman));
+        assert!(!available.contains(&MeshRoute::Yggdrasil));
+    }
+
+    // -- MeshRoute display --
+
+    #[test]
+    fn mesh_route_display() {
+        assert_eq!(MeshRoute::LoRa.to_string(), "LoRa (868 MHz)");
+        assert_eq!(MeshRoute::Batman.to_string(), "B.A.T.M.A.N. (802.11s)");
+        assert_eq!(
+            MeshRoute::Yggdrasil.to_string(),
+            "Yggdrasil (IPv6 overlay)"
+        );
+    }
+
+    #[test]
+    fn mesh_route_fragmentation() {
+        assert!(MeshRoute::LoRa.needs_fragmentation());
+        assert!(!MeshRoute::Batman.needs_fragmentation());
+        assert!(!MeshRoute::Yggdrasil.needs_fragmentation());
+    }
+}

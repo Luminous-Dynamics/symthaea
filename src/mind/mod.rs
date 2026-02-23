@@ -81,6 +81,17 @@ pub struct ContinuousMind {
     /// and drains inbound messages into `social_inbox` after each
     /// `process_social()` call.
     pub(crate) iroh_bridge: Option<crate::swarm::IrohBridgeHandle>,
+    /// Optional mesh network bridge for physical radio consciousness exchange.
+    /// When set, each `tick()` syncs mesh_outbox/mesh_inbox with the bridge actor.
+    pub(crate) mesh_bridge: Option<crate::swarm::mesh::MeshBridgeHandle>,
+    /// Incoming wisdom packets from mesh radio peers.
+    pub(crate) mesh_inbox: Vec<crate::swarm::mesh::WisdomPacket>,
+    /// Outgoing mesh packets queued for transmission.
+    pub(crate) mesh_outbox: Vec<crate::swarm::mesh::MeshOutbound>,
+    /// Tick counter for last mesh emission (emission rate gating).
+    mesh_last_emit_tick: u64,
+    /// Monotonic sequence number for outgoing WisdomPackets.
+    mesh_sequence: u32,
 }
 
 impl ContinuousMind {
@@ -121,6 +132,11 @@ impl ContinuousMind {
             social_inbox: Vec::new(),
             social_outbox: Vec::new(),
             iroh_bridge: None,
+            mesh_bridge: None,
+            mesh_inbox: Vec::new(),
+            mesh_outbox: Vec::new(),
+            mesh_last_emit_tick: 0,
+            mesh_sequence: 0,
         }
     }
 
@@ -343,6 +359,90 @@ impl ContinuousMind {
     /// Check if an Iroh P2P bridge is attached and alive.
     pub fn has_iroh_bridge(&self) -> bool {
         self.iroh_bridge.as_ref().is_some_and(|h| h.is_alive())
+    }
+
+    // ========================================================================
+    // Mesh Network Bridge Interface
+    // ========================================================================
+
+    /// Attach a mesh network bridge handle for physical radio consciousness exchange.
+    ///
+    /// Once attached, each `tick()` will automatically:
+    /// 1. Flush `mesh_outbox` packets to the radio network via the bridge
+    /// 2. Drain inbound wisdom packets into `mesh_inbox`
+    ///
+    /// The bridge actor must be spawned separately on a tokio runtime.
+    pub fn set_mesh_bridge(&mut self, handle: crate::swarm::mesh::MeshBridgeHandle) {
+        self.mesh_bridge = Some(handle);
+    }
+
+    /// Check if a mesh network bridge is attached and alive.
+    pub fn has_mesh_bridge(&self) -> bool {
+        self.mesh_bridge.as_ref().is_some_and(|h| h.is_alive())
+    }
+
+    /// Emit a wisdom vector over the mesh network, gated by urgency.
+    ///
+    /// Emission frequency is controlled by the cognitive urgency level:
+    /// - `Critical`: every call (~50Hz over B.A.T.M.A.N.)
+    /// - `Normal`: ~once per second (~every 50 calls over Yggdrasil)
+    /// - `Cruise`: ~once per 10 seconds (~every 500 calls over LoRa)
+    ///
+    /// If not enough ticks have elapsed since the last emission, this is a no-op.
+    pub(crate) fn emit_wisdom(
+        &mut self,
+        wisdom_hv: symthaea_core::hdc::BinaryHV,
+        urgency: crate::cognitive_loop::types::CycleUrgency,
+        phi: f32,
+    ) {
+        use crate::cognitive_loop::types::CycleUrgency;
+        use crate::swarm::mesh::{MeshOutbound, MeshUrgency, PayloadType, WisdomPacket};
+
+        // Emission rate gating based on urgency
+        let interval = match urgency {
+            CycleUrgency::Critical => 1,   // every cycle (~50Hz)
+            CycleUrgency::Normal => 50,    // ~1/s at 50Hz
+            CycleUrgency::Cruise => 500,   // ~10s at 50Hz
+        };
+
+        let ticks_since = self.state.tick.saturating_sub(self.mesh_last_emit_tick);
+        // Always allow the first emission (sequence == 0); thereafter gate by interval
+        if ticks_since < interval && self.mesh_sequence > 0 {
+            return;
+        }
+        self.mesh_last_emit_tick = self.state.tick;
+
+        // Construct source_id from config dimension as a stand-in node identity
+        // (real impl would use swarm node_id)
+        let mut source_id = [0u8; 8];
+        let dim_bytes = (self.config.dimension as u64).to_le_bytes();
+        source_id.copy_from_slice(&dim_bytes);
+
+        let timestamp_s = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as u32;
+
+        let packet = WisdomPacket {
+            source_id,
+            sequence: self.mesh_sequence,
+            phi,
+            urgency: MeshUrgency::from(urgency),
+            timestamp_s,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: wisdom_hv,
+        };
+
+        self.mesh_sequence = self.mesh_sequence.wrapping_add(1);
+        self.mesh_outbox.push(MeshOutbound { packet });
+
+        tracing::trace!(
+            target: "symthaea::mind::mesh",
+            sequence = self.mesh_sequence.wrapping_sub(1),
+            urgency = ?urgency,
+            phi,
+            "Emitted wisdom packet"
+        );
     }
 
     // ========================================================================
@@ -1021,6 +1121,168 @@ mod tests {
 
         // Suppress unused variable warning
         drop(actor);
+    }
+
+    // ====================================================================
+    // Mesh Network Bridge Integration Tests
+    // ====================================================================
+
+    #[test]
+    fn test_mesh_bridge_not_set_by_default() {
+        let mind = ContinuousMind::default();
+        assert!(!mind.has_mesh_bridge());
+    }
+
+    #[test]
+    fn test_mesh_bridge_attach() {
+        let mut mind = ContinuousMind::default();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(4, 4);
+        mind.set_mesh_bridge(handle);
+        assert!(mind.has_mesh_bridge());
+    }
+
+    #[test]
+    fn test_emit_wisdom_critical_every_tick() {
+        use crate::cognitive_loop::types::CycleUrgency;
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // Critical urgency should emit every call
+        mind.state.tick = 1;
+        mind.emit_wisdom(BinaryHV([0xAA; 2048]), CycleUrgency::Critical, 0.7);
+        assert_eq!(mind.mesh_outbox.len(), 1);
+
+        mind.state.tick = 2;
+        mind.emit_wisdom(BinaryHV([0xBB; 2048]), CycleUrgency::Critical, 0.8);
+        assert_eq!(mind.mesh_outbox.len(), 2);
+    }
+
+    #[test]
+    fn test_emit_wisdom_normal_throttled() {
+        use crate::cognitive_loop::types::CycleUrgency;
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // First emission at tick 0
+        mind.state.tick = 0;
+        mind.emit_wisdom(BinaryHV([0; 2048]), CycleUrgency::Normal, 0.5);
+        assert_eq!(mind.mesh_outbox.len(), 1);
+
+        // Should NOT emit at tick 10 (interval=50)
+        mind.state.tick = 10;
+        mind.emit_wisdom(BinaryHV([0; 2048]), CycleUrgency::Normal, 0.5);
+        assert_eq!(mind.mesh_outbox.len(), 1);
+
+        // Should emit at tick 50
+        mind.state.tick = 50;
+        mind.emit_wisdom(BinaryHV([0; 2048]), CycleUrgency::Normal, 0.5);
+        assert_eq!(mind.mesh_outbox.len(), 2);
+    }
+
+    #[test]
+    fn test_emit_wisdom_cruise_rare() {
+        use crate::cognitive_loop::types::CycleUrgency;
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        mind.state.tick = 0;
+        mind.emit_wisdom(BinaryHV([0; 2048]), CycleUrgency::Cruise, 0.3);
+        assert_eq!(mind.mesh_outbox.len(), 1);
+
+        // Should NOT emit until tick 500
+        mind.state.tick = 499;
+        mind.emit_wisdom(BinaryHV([0; 2048]), CycleUrgency::Cruise, 0.3);
+        assert_eq!(mind.mesh_outbox.len(), 1);
+
+        mind.state.tick = 500;
+        mind.emit_wisdom(BinaryHV([0; 2048]), CycleUrgency::Cruise, 0.3);
+        assert_eq!(mind.mesh_outbox.len(), 2);
+    }
+
+    #[test]
+    fn test_mesh_bridge_flushes_outbox_on_tick() {
+        use crate::cognitive_loop::types::CycleUrgency;
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        // Emit a wisdom packet directly
+        mind.emit_wisdom(BinaryHV([0; 2048]), CycleUrgency::Critical, 0.5);
+        assert_eq!(mind.mesh_outbox.len(), 1);
+
+        // Tick should flush mesh_outbox through the bridge
+        mind.tick();
+
+        assert!(
+            mind.mesh_outbox.is_empty(),
+            "Bridge should have flushed the mesh outbox"
+        );
+    }
+
+    #[test]
+    fn test_process_mesh_drains_inbox() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::new(MindConfig {
+            enable_social_coherence: true,
+            ..Default::default()
+        });
+        mind.activate();
+
+        // Inject a wisdom packet into the mesh inbox
+        mind.mesh_inbox.push(WisdomPacket {
+            source_id: [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE],
+            sequence: 1,
+            phi: 0.8,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: BinaryHV([0xFF; 2048]),
+        });
+
+        assert_eq!(mind.mesh_inbox.len(), 1);
+        mind.tick();
+
+        // Inbox should be drained after tick
+        assert_eq!(mind.mesh_inbox.len(), 0);
+
+        // Peer should be modeled in social coherence
+        let sc = mind.social_coherence().unwrap();
+        assert!(
+            sc.get_mental_model("deadbeefcafebabe").is_some(),
+            "Mesh peer should be modeled in social coherence"
+        );
+    }
+
+    #[test]
+    fn test_emit_wisdom_sequence_increments() {
+        use crate::cognitive_loop::types::CycleUrgency;
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        mind.state.tick = 0;
+        mind.emit_wisdom(BinaryHV([0; 2048]), CycleUrgency::Critical, 0.5);
+        mind.state.tick = 1;
+        mind.emit_wisdom(BinaryHV([0; 2048]), CycleUrgency::Critical, 0.5);
+        mind.state.tick = 2;
+        mind.emit_wisdom(BinaryHV([0; 2048]), CycleUrgency::Critical, 0.5);
+
+        assert_eq!(mind.mesh_outbox.len(), 3);
+        assert_eq!(mind.mesh_outbox[0].packet.sequence, 0);
+        assert_eq!(mind.mesh_outbox[1].packet.sequence, 1);
+        assert_eq!(mind.mesh_outbox[2].packet.sequence, 2);
     }
 
     // ====================================================================
