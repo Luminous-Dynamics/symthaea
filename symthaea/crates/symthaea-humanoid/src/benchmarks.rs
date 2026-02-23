@@ -102,7 +102,12 @@ pub fn evaluate_episode(
     let mut steps_to_fall = n;
 
     for i in 0..n {
-        let r = reward::episode_reward(&states[i], &commands[i], task);
+        let target_speed = match task {
+            HumanoidTask::Stand => 0.0,
+            HumanoidTask::Walk => 1.0,
+            HumanoidTask::Run => 10.0,
+        };
+        let r = reward::episode_reward(&states[i], &commands[i], task, target_speed);
         rewards.push(r);
 
         let sr = reward::standing_reward(&states[i]);

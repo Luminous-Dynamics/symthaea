@@ -491,10 +491,23 @@ fn integrate_quaternion(q: [f64; 4], omega: [f64; 3], dt: f64) -> [f64; 4] {
 ///
 /// Wraps the dm_control humanoid MJCF model with proper contact dynamics,
 /// ground reaction forces, and full rigid body simulation.
+///
+/// Uses raw FFI access via `model.ffi()` / `data.ffi_mut()` matching the
+/// pattern established by the flight crate's MuJoCo simulator.
+#[cfg(feature = "mujoco")]
+use mujoco_rs::prelude::*;
+
+/// Humanoid qpos size: 7 (free joint) + 21 (hinge joints) = 28.
+#[cfg(feature = "mujoco")]
+const HUMANOID_NQ: usize = 28;
+/// Humanoid qvel size: 6 (free joint DOF) + 21 (hinge joint DOF) = 27.
+#[cfg(feature = "mujoco")]
+const HUMANOID_NV: usize = 27;
+
 #[cfg(feature = "mujoco")]
 pub struct MuJoCoHumanoidSimulator {
-    model: std::sync::Arc<mujoco_rs::MjModel>,
-    data: mujoco_rs::MjData<std::sync::Arc<mujoco_rs::MjModel>>,
+    model: std::sync::Arc<MjModel>,
+    data: MjData<std::sync::Arc<MjModel>>,
     state: HumanoidState,
     body_ids: HumanoidBodyIds,
     external_force: [f64; 3],
@@ -503,39 +516,45 @@ pub struct MuJoCoHumanoidSimulator {
 /// Cached body name -> ID lookups for efficient state extraction.
 #[cfg(feature = "mujoco")]
 struct HumanoidBodyIds {
-    torso: i32,
-    head: i32,
-    right_hand: i32,
-    left_hand: i32,
-    right_foot: i32,
-    left_foot: i32,
+    torso: usize,
+    head: usize,
+    right_hand: usize,
+    left_hand: usize,
+    right_foot: usize,
+    left_foot: usize,
 }
 
 #[cfg(feature = "mujoco")]
 impl MuJoCoHumanoidSimulator {
     /// Create a new simulator from an MJCF XML string.
     pub fn from_xml(xml: &str) -> anyhow::Result<Self> {
-        let model = std::sync::Arc::new(mujoco_rs::MjModel::from_xml(xml)?);
-        let data = mujoco_rs::MjData::new(model.clone());
+        let model = std::sync::Arc::new(MjModel::from_xml_string(xml)?);
+        let data = MjData::new(std::sync::Arc::clone(&model));
 
         let body_ids = HumanoidBodyIds {
-            torso: model.body_name2id("torso").unwrap_or(1),
-            head: model.body_name2id("head").unwrap_or(2),
-            right_hand: model.body_name2id("right_hand").unwrap_or(3),
-            left_hand: model.body_name2id("left_hand").unwrap_or(4),
-            right_foot: model.body_name2id("right_foot").unwrap_or(5),
-            left_foot: model.body_name2id("left_foot").unwrap_or(6),
+            torso: Self::find_body_id(&model, "torso"),
+            head: Self::find_body_id(&model, "head"),
+            right_hand: Self::find_body_id_or(&model, "right_hand", 3),
+            left_hand: Self::find_body_id_or(&model, "left_hand", 4),
+            right_foot: Self::find_body_id_or(&model, "right_foot", 5),
+            left_foot: Self::find_body_id_or(&model, "left_foot", 6),
         };
 
         let state = HumanoidState::standing();
 
-        Ok(Self {
+        let mut sim = Self {
             model,
             data,
             state,
             body_ids,
             external_force: [0.0; 3],
-        })
+        };
+
+        // Forward kinematics to populate xpos/xmat from qpos
+        sim.data.forward();
+        sim.extract_state();
+
+        Ok(sim)
     }
 
     /// Create from an MJCF file path.
@@ -544,20 +563,82 @@ impl MuJoCoHumanoidSimulator {
         Self::from_xml(&xml)
     }
 
+    /// Create from the bundled dm_control humanoid MJCF asset.
+    ///
+    /// Loads `assets/humanoid.xml` from the crate directory. This is the
+    /// standard dm_control humanoid model adapted for mujoco-rs 2.3.
+    pub fn from_bundled_asset() -> anyhow::Result<Self> {
+        let xml = include_str!("../assets/humanoid.xml");
+        Self::from_xml(xml)
+    }
+
+    /// Find body ID by name. Panics if not found.
+    fn find_body_id(model: &MjModel, name: &str) -> usize {
+        let c_name = std::ffi::CString::new(name).expect("Body name contains null byte");
+        let id = unsafe {
+            mujoco_rs::mujoco_c::mj_name2id(
+                model.ffi(),
+                MjtObj::mjOBJ_BODY as i32,
+                c_name.as_ptr(),
+            )
+        };
+        assert!(id >= 0, "Body '{}' not found in MJCF model", name);
+        id as usize
+    }
+
+    /// Find body ID by name, returning a fallback if not found.
+    fn find_body_id_or(model: &MjModel, name: &str, fallback: usize) -> usize {
+        let c_name = std::ffi::CString::new(name).expect("Body name contains null byte");
+        let id = unsafe {
+            mujoco_rs::mujoco_c::mj_name2id(
+                model.ffi(),
+                MjtObj::mjOBJ_BODY as i32,
+                c_name.as_ptr(),
+            )
+        };
+        if id >= 0 { id as usize } else { fallback }
+    }
+
+    /// Read body position (xpos) for a given body ID.
+    fn body_xpos(&self, body_id: usize) -> [f64; 3] {
+        unsafe {
+            let ffi = self.data.ffi();
+            let ptr = ffi.xpos.add(body_id * 3);
+            [*ptr, *ptr.add(1), *ptr.add(2)]
+        }
+    }
+
+    /// Read body rotation matrix column (xmat) for torso vertical.
+    fn body_xmat_col3(&self, body_id: usize) -> [f64; 3] {
+        unsafe {
+            let ffi = self.data.ffi();
+            let ptr = ffi.xmat.add(body_id * 9);
+            // Third column of 3x3 rotation matrix = vertical direction
+            [*ptr.add(6), *ptr.add(7), *ptr.add(8)]
+        }
+    }
+
     /// Extract the current humanoid state from MuJoCo data.
     fn extract_state(&mut self) {
-        let qpos = self.data.qpos();
-        let qvel = self.data.qvel();
+        let ffi = self.data.ffi();
+        let t = ffi.time;
 
-        let head_height = self.data.xpos(self.body_ids.head as usize)[2];
+        let (qpos, qvel) = unsafe {
+            (
+                std::slice::from_raw_parts(ffi.qpos, HUMANOID_NQ),
+                std::slice::from_raw_parts(ffi.qvel, HUMANOID_NV),
+            )
+        };
 
-        let torso_xmat = self.data.xmat(self.body_ids.torso as usize);
-        let torso_vertical = [torso_xmat[6], torso_xmat[7], torso_xmat[8]];
+        let head_pos = self.body_xpos(self.body_ids.head);
+        let head_height = head_pos[2];
 
-        let rh = self.data.xpos(self.body_ids.right_hand as usize);
-        let lh = self.data.xpos(self.body_ids.left_hand as usize);
-        let rf = self.data.xpos(self.body_ids.right_foot as usize);
-        let lf = self.data.xpos(self.body_ids.left_foot as usize);
+        let torso_vertical = self.body_xmat_col3(self.body_ids.torso);
+
+        let rh = self.body_xpos(self.body_ids.right_hand);
+        let lh = self.body_xpos(self.body_ids.left_hand);
+        let rf = self.body_xpos(self.body_ids.right_foot);
+        let lf = self.body_xpos(self.body_ids.left_foot);
         let extremities = [
             rh[0], rh[1], rh[2], lh[0], lh[1], lh[2], rf[0], rf[1], rf[2], lf[0], lf[1], lf[2],
         ];
@@ -571,44 +652,65 @@ impl MuJoCoHumanoidSimulator {
             torso_vertical,
             extremities,
             com_velocity,
-            self.data.time(),
+            t,
         );
     }
 
     /// Get the body mass of the torso.
     pub fn body_mass(&self) -> f64 {
-        self.model.body_mass(self.body_ids.torso as usize)
+        unsafe { *self.model.ffi().body_mass.add(self.body_ids.torso) }
+    }
+
+    /// Write motor commands into MuJoCo ctrl array.
+    fn write_ctrl(&mut self, cmd: &HumanoidCommand) {
+        unsafe {
+            let ffi = self.data.ffi_mut();
+            for i in 0..NUM_ACTUATORS {
+                *ffi.ctrl.add(i) = cmd.torques[i] as f64;
+            }
+        }
+    }
+
+    /// Apply accumulated external force to torso via xfrc_applied.
+    fn apply_xfrc(&mut self) {
+        if self.external_force[0].abs() > 1e-15
+            || self.external_force[1].abs() > 1e-15
+            || self.external_force[2].abs() > 1e-15
+        {
+            let base = self.body_ids.torso * 6;
+            unsafe {
+                let ffi = self.data.ffi_mut();
+                // xfrc_applied is [nBody x 6]: [force(3), torque(3)]
+                *ffi.xfrc_applied.add(base) = self.external_force[0];
+                *ffi.xfrc_applied.add(base + 1) = self.external_force[1];
+                *ffi.xfrc_applied.add(base + 2) = self.external_force[2];
+            }
+        }
+    }
+
+    /// Clear external forces from xfrc_applied.
+    fn clear_xfrc(&mut self) {
+        let base = self.body_ids.torso * 6;
+        unsafe {
+            let ffi = self.data.ffi_mut();
+            for i in 0..6 {
+                *ffi.xfrc_applied.add(base + i) = 0.0;
+            }
+        }
+        self.external_force = [0.0; 3];
     }
 }
 
 #[cfg(feature = "mujoco")]
 impl HumanoidPhysicsSimulator for MuJoCoHumanoidSimulator {
     fn step(&mut self, cmd: &HumanoidCommand, _dt: f64) {
-        let ctrl = self.data.ctrl_mut();
-        for i in 0..NUM_ACTUATORS.min(ctrl.len()) {
-            ctrl[i] = cmd.torques[i] as f64;
-        }
-
-        if self.external_force.iter().any(|f| f.abs() > 1e-10) {
-            let xfrc = self.data.xfrc_applied_mut();
-            let torso_idx = self.body_ids.torso as usize;
-            xfrc[torso_idx * 6] += self.external_force[0];
-            xfrc[torso_idx * 6 + 1] += self.external_force[1];
-            xfrc[torso_idx * 6 + 2] += self.external_force[2];
-        }
+        self.write_ctrl(cmd);
+        self.apply_xfrc();
 
         self.data.step();
 
-        if self.external_force.iter().any(|f| f.abs() > 1e-10) {
-            let xfrc = self.data.xfrc_applied_mut();
-            let torso_idx = self.body_ids.torso as usize;
-            xfrc[torso_idx * 6] = 0.0;
-            xfrc[torso_idx * 6 + 1] = 0.0;
-            xfrc[torso_idx * 6 + 2] = 0.0;
-            self.external_force = [0.0; 3];
-        }
-
         self.extract_state();
+        self.clear_xfrc();
     }
 
     fn state(&self) -> &HumanoidState {
@@ -617,6 +719,7 @@ impl HumanoidPhysicsSimulator for MuJoCoHumanoidSimulator {
 
     fn reset(&mut self) {
         self.data.reset();
+        self.data.forward();
         self.external_force = [0.0; 3];
         self.extract_state();
     }
@@ -633,9 +736,12 @@ impl HumanoidPhysicsSimulator for MuJoCoHumanoidSimulator {
             (rng as f64 / u64::MAX as f64) * 2.0 - 1.0
         };
 
-        let qpos = self.data.qpos_mut();
-        for i in 7..28 {
-            qpos[i] += perturbation * next_f64() * 0.05;
+        // Perturb joint angles (qpos[7..28]) within bounds
+        unsafe {
+            let ffi = self.data.ffi_mut();
+            for i in 7..HUMANOID_NQ {
+                *ffi.qpos.add(i) += perturbation * next_f64() * 0.05;
+            }
         }
 
         self.data.forward();

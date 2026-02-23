@@ -21,14 +21,16 @@
 //! }
 //! ```
 
+pub mod demo_runner;
 pub mod handlers;
 pub mod metrics;
 pub mod models;
 pub mod state;
+pub mod ws;
 
 use crate::api::state::AppState;
 use axum::{
-    extract::Request,
+    extract::{ws::WebSocketUpgrade, Request},
     http::{HeaderMap, Method, StatusCode},
     middleware,
     response::Response,
@@ -36,6 +38,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 
 /// API configuration for security settings
@@ -192,6 +195,77 @@ pub async fn serve_with_config(
     let app = create_router_with_config(config);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     println!("Symthaea API listening on http://{}", addr);
+    axum::serve(listener, app).await?;
+    Ok(())
+}
+
+/// Create a demo router with WebSocket endpoint and static file serving.
+///
+/// This router includes all benchmark endpoints plus:
+/// - `/v1/ws/live` — WebSocket stream of live consciousness telemetry
+/// - `/` — Static file serving from `static/` directory
+pub fn create_demo_router() -> Result<Router, Box<dyn std::error::Error>> {
+    let runner = demo_runner::DemoRunner::new()?;
+    let runner = Arc::new(Mutex::new(runner));
+
+    let state = Arc::new(AppState::new_with_config(&ApiConfig::default()));
+    let cors = build_cors_layer(&ApiConfig::default());
+
+    // Determine static dir relative to the manifest
+    let static_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("static");
+
+    let app = Router::new()
+        // Core benchmark endpoints
+        .route("/v1/submit", post(handlers::submit_model))
+        .route("/v1/results/:submission_id", get(handlers::get_results))
+        .route("/v1/leaderboard", get(handlers::get_leaderboard))
+        .route(
+            "/v1/leaderboard/topologies",
+            get(handlers::get_topology_rankings),
+        )
+        .route("/v1/datasets", get(handlers::list_datasets))
+        .route("/v1/datasets/:dataset_id", get(handlers::get_dataset))
+        .route("/v1/compare", post(handlers::compare_models))
+        .route("/v1/dimensional-sweep", post(handlers::dimensional_sweep))
+        // Metrics
+        .route("/metrics", get(handlers::metrics_prometheus))
+        .route("/v1/metrics", get(handlers::metrics_json))
+        // Health
+        .route("/health", get(handlers::health_check))
+        .route("/v1/health", get(handlers::health_check));
+
+    // WebSocket route — captures the runner Arc (clone per-request for Fn trait)
+    let ws_runner = runner.clone();
+    let app = app.route(
+        "/v1/ws/live",
+        get(move |ws_upgrade: WebSocketUpgrade| {
+            let runner = ws_runner.clone();
+            async move { ws::ws_handler(ws_upgrade, runner).await }
+        }),
+    );
+
+    // Static file serving (if the directory exists)
+    let app = if static_dir.exists() {
+        app.fallback_service(tower_http::services::ServeDir::new(static_dir))
+    } else {
+        app.fallback(|| async { (StatusCode::NOT_FOUND, "No static directory found") })
+    };
+
+    let app = app
+        .layer(middleware::from_fn(auth_middleware))
+        .layer(cors)
+        .with_state(state);
+
+    Ok(app)
+}
+
+/// Start the demo server with WebSocket and static file serving.
+pub async fn serve_demo(addr: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let app = create_demo_router()?;
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    println!("Symthaea Demo running at http://{}", addr);
+    println!("  Live visualization: http://{}", addr);
+    println!("  WebSocket endpoint: ws://{}/v1/ws/live", addr);
     axum::serve(listener, app).await?;
     Ok(())
 }

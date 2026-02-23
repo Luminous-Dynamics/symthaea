@@ -38,17 +38,25 @@ pub fn locomotion_reward(state: &HumanoidState, target_speed: f64) -> f64 {
     tolerance_linear(horizontal_speed, target_speed, f64::INFINITY, margin)
 }
 
-/// Combined episode reward based on task.
+/// Combined episode reward based on task with curriculum target speed.
 ///
 /// - Stand: standing_reward × small_control
-/// - Walk: standing_reward × small_control × locomotion(1.0 m/s)
-/// - Run: standing_reward × small_control × locomotion(10.0 m/s)
-pub fn episode_reward(state: &HumanoidState, cmd: &HumanoidCommand, task: &HumanoidTask) -> f64 {
+/// - Walk: standing_reward × small_control × locomotion(target_speed)
+/// - Run: standing_reward × small_control × locomotion(target_speed)
+///
+/// The `target_speed` parameter allows the curriculum to ramp speed gradually
+/// (e.g., Walk: 0→1 m/s, Run: 1→10 m/s). This prevents the reward from
+/// collapsing to 0 at task transitions.
+pub fn episode_reward(
+    state: &HumanoidState,
+    cmd: &HumanoidCommand,
+    task: &HumanoidTask,
+    target_speed: f64,
+) -> f64 {
     let stand = standing_reward(state) * small_control(cmd);
     match task {
         HumanoidTask::Stand => stand,
-        HumanoidTask::Walk => stand * locomotion_reward(state, 1.0),
-        HumanoidTask::Run => stand * locomotion_reward(state, 10.0),
+        HumanoidTask::Walk | HumanoidTask::Run => stand * locomotion_reward(state, target_speed),
     }
 }
 
@@ -175,7 +183,7 @@ mod tests {
     fn test_episode_reward_stand() {
         let state = HumanoidState::standing();
         let cmd = HumanoidCommand::zero();
-        let reward = episode_reward(&state, &cmd, &HumanoidTask::Stand);
+        let reward = episode_reward(&state, &cmd, &HumanoidTask::Stand, 0.0);
         assert!(
             reward > 0.5,
             "Standing correctly with zero torque should give good reward: {reward}"
@@ -187,10 +195,22 @@ mod tests {
         let mut state = HumanoidState::standing();
         state.com_velocity = [1.0, 0.0, 0.0];
         let cmd = HumanoidCommand::zero();
-        let reward = episode_reward(&state, &cmd, &HumanoidTask::Walk);
+        let reward = episode_reward(&state, &cmd, &HumanoidTask::Walk, 1.0);
         assert!(
             reward > 0.0,
             "Walking at target speed should give positive reward: {reward}"
+        );
+    }
+
+    #[test]
+    fn test_episode_reward_walk_at_zero_speed() {
+        let state = HumanoidState::standing();
+        let cmd = HumanoidCommand::zero();
+        // At curriculum start, target_speed=0, so standing still is "at target"
+        let reward = episode_reward(&state, &cmd, &HumanoidTask::Walk, 0.0);
+        assert!(
+            reward > 0.5,
+            "Walk with target_speed=0 should reward standing: {reward}"
         );
     }
 
