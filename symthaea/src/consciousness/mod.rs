@@ -98,7 +98,7 @@ pub use symthaea_causal_reasoning::counterfactual;
 pub mod reasoning_engine;
 
 // ============================================================================
-// Module Integration Status (as of v0.5.x)
+// Module Integration Status (as of v0.5.2)
 // ============================================================================
 //
 // | Module                        | Status       | Gate                  | Notes                                            |
@@ -106,12 +106,14 @@ pub mod reasoning_engine;
 // | temporal_planning             | Wired        | reasoning_engine      | Used in reasoning engine 7-step cycle            |
 // | tool_gate                     | Wired        | reasoning_engine      | Used in reasoning engine                         |
 // | empathic_unification          | Wired        | full_consciousness    | Stub provided when feature disabled              |
-// | recursive_improvement         | Disconnected | full_consciousness    | Used by narrative only                           |
+// | recursive_improvement         | Wired        | full_consciousness    | Dream feedback loop wired into cognitive cycle   |
 // | consciousness_driven_evolution| Dead         | (none)                | Commented out, zero callers                      |
-// | unified_intelligence          | Disconnected | full_consciousness    | Depends on meta_reasoning (not yet ported)       |
+// | unified_intelligence          | Standalone   | full_consciousness    | Compiles, tested; meta_reasoning available       |
 // | mycelix_bridge                | Structural   | (none)                | Compiled but not called from cognitive loop       |
-// | byzantine_collective          | Disconnected | full_consciousness    | Multi-agent only                                 |
-// | unified_living_mind           | Disconnected | full_consciousness    | Depends on LifeState                             |
+// | byzantine_collective          | Standalone   | full_consciousness    | Compiles, tested; multi-agent trust scoring      |
+// | unified_living_mind           | Standalone   | full_consciousness    | Compiles, tested; depends on LifeState           |
+// | iroh P2P                      | Wired        | swarm                 | sync_iroh_bridge() called every mind tick        |
+// | vocal_tract                   | Wired        | voice-tts             | Controller/encoder/FEP active in voice pipeline  |
 //
 // ============================================================================
 
@@ -340,7 +342,6 @@ pub mod metacognitive_monitoring;
 pub mod harmonics;
 
 /// Unified Emergent Intelligence — collective + context-aware + meta-cognitive
-/// Gated: depends on meta_reasoning + context_aware_evolution (not yet ported)
 #[cfg(feature = "full_consciousness")]
 pub mod unified_intelligence;
 
