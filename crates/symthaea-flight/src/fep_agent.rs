@@ -1883,6 +1883,85 @@ mod tests {
     }
 
     #[test]
+    fn test_step_embodied_multi_tick_escalation() {
+        // Run 10 ticks with escalating danger.
+        // Verify: Hz ramp increases, setpoint_override appears when danger crosses
+        // intervention threshold, and EFE modulation varies consistently.
+        let config = FlightFepConfig {
+            extended_observation: true,
+            ..FlightFepConfig::default()
+        };
+        let mut agent = ActiveInferenceFlightAgent::new(config);
+
+        let state = FlightState {
+            position: [0.0, 0.0, 1.5],
+            ..FlightState::hover(0.1)
+        };
+        let setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+
+        let danger_levels = [0.0, 0.05, 0.1, 0.2, 0.3, 0.5, 0.6, 0.7, 0.8, 1.0];
+        let mut prev_hz: Option<f32> = None;
+        let mut saw_override = false;
+        let mut saw_no_override = false;
+
+        for &danger in &danger_levels {
+            let env = FlightEnvironment {
+                human_danger: danger,
+                mission_progress: 0.3,
+                threat_pos: Some([-1.5, 0.0, 2.0]),
+                threat_vel: Some([0.0, 0.0, -3.0]),
+                entity_pos: Some([-1.5, 0.0, 0.0]),
+            };
+
+            let result = agent.step_embodied(&state, &setpoint, &env);
+
+            // Check Hz monotonically non-decreasing with danger
+            if let Some(hz) = result.requested_cognitive_hz {
+                assert!(
+                    hz >= 25.0 && hz <= 100.0,
+                    "Hz should be in [25, 100], got {:.1} at danger={:.1}",
+                    hz, danger
+                );
+                if let Some(prev) = prev_hz {
+                    assert!(
+                        hz >= prev - 0.1,
+                        "Hz should not decrease: {:.1} < {:.1} at danger={:.1}",
+                        hz, prev, danger
+                    );
+                }
+                prev_hz = Some(hz);
+            } else {
+                assert!(
+                    danger <= 0.1,
+                    "danger={:.1} > 0.1 should have requested_cognitive_hz",
+                    danger
+                );
+            }
+
+            // Track override appearance
+            if result.setpoint_override.is_some() {
+                saw_override = true;
+            } else {
+                saw_no_override = true;
+            }
+
+            // All results should be finite
+            assert!(
+                result.free_energy.is_finite(),
+                "free_energy should be finite at danger={:.1}",
+                danger
+            );
+        }
+
+        // With these danger levels, we should see both override and no-override
+        assert!(saw_override, "Should see setpoint override at high danger");
+        assert!(saw_no_override, "Should see no override at low danger");
+    }
+
+    #[test]
     fn test_trajectory_efe_no_threat_is_zero() {
         let config = FlightFepConfig::default();
         let agent = ActiveInferenceFlightAgent::new(config);
