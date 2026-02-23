@@ -14,9 +14,8 @@ fn main() {
 #[cfg(feature = "vocal-tract")]
 fn main() {
     use symthaea::voice::formant_targets::FormantDatabase;
-    use symthaea::voice::vocal_tract_controller::{VocalTractConfig, VocalTractController};
-    use symthaea::voice::vocal_tract_encoder::{VoiceCognitiveState, VocalTractHdcEncoder};
-    use symthaea::voice::vocal_tract_fep::{VocalTractFepAgent, VocalTractPipeline};
+    use symthaea::voice::vocal_tract_encoder::VoiceCognitiveState;
+    use symthaea::voice::vocal_tract_fep::VocalTractPipeline;
     use symthaea::voice::voice_feedback::VoiceOutputMetrics;
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_core::hdc::HDC_DIMENSION;

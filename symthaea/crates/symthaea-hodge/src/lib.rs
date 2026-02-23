@@ -542,7 +542,7 @@ fn mat_add_inplace(a: &mut [Vec<f64>], b: &[Vec<f64>]) {
 }
 
 /// Matrix-vector multiply: result = A * v.
-#[allow(dead_code)]
+#[cfg(test)]
 fn mat_vec_mul(a: &[Vec<f64>], v: &[f64]) -> Vec<f64> {
     a.iter()
         .map(|row| row.iter().zip(v.iter()).map(|(a, b)| a * b).sum())

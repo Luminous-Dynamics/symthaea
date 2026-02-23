@@ -170,7 +170,7 @@ pub struct CompositionalityEngine {
     operator_encodings: HashMap<CompositionType, BinaryHV>,
 
     /// Reference to base primitive system
-    #[allow(dead_code)]
+    #[allow(dead_code)] // RESERVED(future): primitive system reference for composition
     base_system: Arc<PrimitiveSystem>,
 
     /// Composition statistics

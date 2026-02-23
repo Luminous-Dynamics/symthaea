@@ -219,10 +219,6 @@ impl VirtualBody {
         &self.state
     }
 
-    /// Get the current core affect (VAD).
-    pub fn core_affect(&self) -> CoreAffect {
-        self.state.to_core_affect()
-    }
 }
 
 #[cfg(test)]

@@ -168,7 +168,7 @@ enum FixGenerator {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Variants constructed via pattern-matching rules; not all read yet
+#[allow(dead_code)] // RESERVED(future): NixOS type inference variants
 enum NixType {
     Bool,
     String,

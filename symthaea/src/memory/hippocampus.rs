@@ -262,7 +262,7 @@ pub struct RecallResult {
 }
 
 /// Hippocampus actor - manages episodic memory
-#[allow(dead_code)] // Fields reserved for memory consolidation
+#[allow(dead_code)] // RESERVED(future): hippocampal memory consolidation actor
 pub struct HippocampusActor {
     /// Memory store
     memories: Arc<RwLock<Vec<MemoryTrace>>>,

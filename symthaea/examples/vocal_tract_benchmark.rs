@@ -20,7 +20,7 @@ fn main() {
     use symthaea::voice::formant_targets::FormantDatabase;
     use symthaea::voice::vocal_tract_controller::{VocalTractConfig, VocalTractController};
     use symthaea::voice::{
-        ArticulatoryConfig, ArticulatorySynthesizer, FormantVocoder, LTCPacing, TimedPhoneme,
+        ArticulatoryConfig, ArticulatorySynthesizer, LTCPacing, TimedPhoneme,
     };
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_core::hdc::HDC_DIMENSION;
@@ -39,7 +39,7 @@ fn main() {
     println!("  Final training loss: {:.2}\n", final_loss);
 
     // ── Setup rule-based synthesizer ─────────────────────────────────────
-    let articulatory = ArticulatorySynthesizer::with_config(ArticulatoryConfig {
+    let mut articulatory = ArticulatorySynthesizer::with_config(ArticulatoryConfig {
         base_f0: 120.0,
         base_tau: 0.05,
         frame_rate: 200.0,
@@ -99,7 +99,7 @@ fn main() {
             let rule_frames = articulatory.synthesize(&timed, &pacing);
 
             // Average formants from rule-based frames (skip first few for onset)
-            let (rule_f1, rule_f2, rule_f3, rule_err) = if rule_frames.len() > 5 {
+            let (_rule_f1, _rule_f2, _rule_f3, rule_err) = if rule_frames.len() > 5 {
                 let stable = &rule_frames[5..];
                 let n = stable.len() as f32;
                 let rf1: f32 = stable.iter().map(|f| f.f1).sum::<f32>() / n;

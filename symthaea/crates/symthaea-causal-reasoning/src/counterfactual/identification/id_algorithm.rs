@@ -898,7 +898,7 @@ mod tests {
             vec![(0, 1), (0, 2), (1, 2)],
             vec![],
         );
-        assert_eq!(g.parents(0), vec![]);
+        assert_eq!(g.parents(0), Vec::<usize>::new());
         assert_eq!(g.parents(1), vec![0]);
         let mut parents_c = g.parents(2);
         parents_c.sort();
@@ -907,7 +907,7 @@ mod tests {
         let mut children_a = g.children(0);
         children_a.sort();
         assert_eq!(children_a, vec![1, 2]);
-        assert_eq!(g.children(2), vec![]);
+        assert_eq!(g.children(2), Vec::<usize>::new());
     }
 
     #[test]

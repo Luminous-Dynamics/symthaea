@@ -425,7 +425,7 @@ impl ObservabilityHook for LoggingHook {
 /// Aggregates metrics over time for dashboard display
 pub struct MetricsAggregator {
     /// Session ID
-    #[allow(dead_code)]
+    #[allow(dead_code)] // RESERVED(future): per-session telemetry identifier
     session_id: String,
     /// Statistics
     stats: ObservabilityStats,

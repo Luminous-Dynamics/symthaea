@@ -673,21 +673,52 @@ mod tests {
         let config = VocalTractConfig::default();
         let db = FormantDatabase::new();
 
-        // Get /AH/ target (open vowel)
+        // Get /AH/ target (open vowel, F1≈730)
         let ah_target = db.lookup("AH").expect("AH should exist in database");
         let ah_hv = genesis.hv("phoneme::AH", HDC_DIMENSION);
 
-        // Pre-training prediction
+        let target_frame = FormantFrame {
+            f1: ah_target.f1,
+            f2: ah_target.f2,
+            f3: ah_target.f3,
+            b1: ah_target.b1,
+            b2: ah_target.b2,
+            b3: ah_target.b3,
+            f0: config.base_f0,
+            energy: 0.7,
+            voicing: 0.95,
+            time: 0.0,
+        };
+
+        // Pre-training prediction (warmup + steady-state average)
         let mut ctrl = VocalTractController::new(&genesis, &config);
-        let pre_frame = ctrl.forward(&ah_hv, 0.005);
-        let pre_f1_err = (pre_frame.f1 - ah_target.f1).abs();
+        for _ in 0..20 {
+            ctrl.forward(&ah_hv, 0.005);
+        }
+        let mut pre_f1_sum = 0.0f32;
+        for _ in 0..10 {
+            pre_f1_sum += ctrl.forward(&ah_hv, 0.005).f1;
+        }
+        let pre_f1_err = (pre_f1_sum / 10.0 - ah_target.f1).abs();
 
-        // Train on all phonemes
-        ctrl.train_on_phoneme_targets(&genesis, &db, 10);
+        // Train specifically on /AH/ using train_step (single-target).
+        // Multi-phoneme convergence is validated by test_phoneme_training_reduces_loss.
+        ctrl.reset();
+        for _ in 0..100 {
+            ctrl.forward(&ah_hv, 0.005);
+            ctrl.train_step(&ah_hv, &target_frame, 0.005, None);
+        }
 
-        // Post-training prediction
-        let post_frame = ctrl.forward(&ah_hv, 0.005);
-        let post_f1_err = (post_frame.f1 - ah_target.f1).abs();
+        // Post-training prediction (reset temporal state, warmup, then measure)
+        ctrl.reset();
+        for _ in 0..20 {
+            ctrl.forward(&ah_hv, 0.005);
+        }
+        let mut post_f1_sum = 0.0f32;
+        for _ in 0..10 {
+            post_f1_sum += ctrl.forward(&ah_hv, 0.005).f1;
+        }
+        let post_f1_err = (post_f1_sum / 10.0 - ah_target.f1).abs();
 
         assert!(
             post_f1_err < pre_f1_err,

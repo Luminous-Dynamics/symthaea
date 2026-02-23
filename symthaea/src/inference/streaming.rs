@@ -269,7 +269,7 @@ impl RingBuffer {
     }
 
     /// Get the nth most recent input (0 = most recent)
-    #[allow(dead_code)] // Used by drain_recent; reserved for future introspection
+    #[allow(dead_code)] // RESERVED(future): streaming inference API
     fn get_recent(&self, n: usize) -> Option<&(Array1<f32>, f32, Instant)> {
         if n >= self.len {
             return None;
@@ -279,7 +279,7 @@ impl RingBuffer {
     }
 
     /// Drain n most recent inputs (oldest first in returned vec)
-    #[allow(dead_code)] // Reserved for batch replay/checkpoint recovery
+    #[allow(dead_code)] // RESERVED(future): streaming inference API
     fn drain_recent(&mut self, n: usize) -> Vec<(Array1<f32>, f32, Instant)> {
         let count = n.min(self.len);
         let mut result = Vec::with_capacity(count);
@@ -295,12 +295,12 @@ impl RingBuffer {
         result
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // RESERVED(future): streaming inference API
     fn len(&self) -> usize {
         self.len
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // RESERVED(future): streaming inference API
     fn is_empty(&self) -> bool {
         self.len == 0
     }
@@ -333,7 +333,7 @@ pub struct StreamingInference {
     network: Mutex<CfCNetwork>,
 
     /// Network configuration (for cloning/checkpoints)
-    #[allow(dead_code)] // Stored for checkpoint serialization
+    #[allow(dead_code)] // RESERVED(serialization): streaming inference API
     network_config: CfCNetworkConfig,
 
     /// Input ring buffer

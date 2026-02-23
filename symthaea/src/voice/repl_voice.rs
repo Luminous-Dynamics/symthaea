@@ -1673,14 +1673,11 @@ impl ReplVoiceOutput {
     #[cfg(feature = "vocal-tract")]
     fn synthesize_ltc_pipeline(&mut self, text: &str) -> Result<Vec<f32>> {
         use super::vocal_tract_encoder::VoiceCognitiveState;
-        use symthaea_core::genesis::GenesisSeed;
 
         let pipeline = self
             .ltc_pipeline
             .as_mut()
             .ok_or_else(|| anyhow::anyhow!("LTC pipeline not initialized"))?;
-
-        let genesis = GenesisSeed::from_phrase("repl-vocal-tract");
 
         // Convert text → phonemes
         let base_duration = self.config.phoneme_duration_base / self.current_pacing.rate;

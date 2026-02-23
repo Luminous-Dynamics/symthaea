@@ -156,7 +156,7 @@ struct CpuCfcLayer {
     state: Array1<f32>,
     /// Configuration
     hidden_dim: usize,
-    #[allow(dead_code)] // Stored for layer introspection/serialization
+    #[allow(dead_code)] // RESERVED(serialization): layer introspection and config dump
     input_dim: usize,
     activation: ActivationType,
 }
