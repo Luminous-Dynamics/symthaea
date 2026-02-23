@@ -143,7 +143,7 @@ pub struct ContinuousMind {
     pub(crate) mesh_stats: crate::swarm::mesh::MeshStats,
     /// Ring buffer of recently seen (source_id, sequence) pairs for deduplication.
     #[cfg(feature = "mesh")]
-    mesh_seen_packets: Vec<([u8; 8], u32)>,
+    mesh_seen_packets: Vec<([u8; 8], u32, u8)>,
     /// Start of the current bandwidth budget window.
     #[cfg(feature = "mesh")]
     mesh_bandwidth_window_start: std::time::Instant,
@@ -1931,11 +1931,11 @@ mod tests {
             mind_a.tick();
         }
 
-        // Give the async actor time to transport packets
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        // Give the async actor time to transport packets (500ms = 10× actor poll interval)
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
         // Tick mind B (sync_mesh_bridge drains inbox, process_mesh dispatches)
-        for _ in 0..5 {
+        for _ in 0..10 {
             mind_b.tick();
         }
 
@@ -2488,14 +2488,14 @@ mod tests {
             mind_a.tick();
         }
 
-        // Give async actor time to transport
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        // Give async actor time to transport (500ms = 10× actor poll interval)
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
         // Mind B: tick to drain inbox
         let mut mind_b = ContinuousMind::new(MindConfig::default());
         mind_b.set_mesh_bridge(handle_b);
         mind_b.activate();
-        for _ in 0..5 {
+        for _ in 0..10 {
             mind_b.mesh_bandwidth_window_bytes = 0;
             mind_b.tick();
         }
@@ -2538,7 +2538,8 @@ mod tests {
             mind_a.tick();
         }
 
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        // Give async actor time to transport (500ms = 10× actor poll interval)
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
         // Mind B: attach Hyperfeel, tick to process
         let mut mind_b = ContinuousMind::new(MindConfig::default());
@@ -2548,7 +2549,7 @@ mod tests {
             crate::swarm::HyperfeelConfig::default(),
         ));
 
-        for _ in 0..5 {
+        for _ in 0..10 {
             mind_b.mesh_bandwidth_window_bytes = 0;
             mind_b.tick();
         }

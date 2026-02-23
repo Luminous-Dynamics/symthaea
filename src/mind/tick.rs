@@ -23,7 +23,9 @@ impl ContinuousMind {
         self.state.arousal = bio.arousal_mod as f32;
 
         // External communications run regardless of dream state —
-        // social signals and federated gradients from peers should never be ignored.
+        // social signals, federated gradients, and mesh emissions should never be
+        // gated by circadian phase. Peers must see heartbeats/affective even while
+        // dreaming, and sync_mesh_bridge must drain inbound packets every tick.
         self.process_federated();
         self.process_social();
         self.sync_iroh_bridge();
@@ -31,6 +33,19 @@ impl ContinuousMind {
         {
             self.process_mesh();
             self.process_sensors();
+            self.auto_emit_wisdom();
+            self.emit_heartbeat();
+            self.emit_gradients();
+            self.emit_affective();
+
+            // Outbox backpressure: drop oldest packets when outbox exceeds cap
+            if self.mesh_outbox.len() > super::MAX_OUTBOX_SIZE {
+                let excess = self.mesh_outbox.len() - super::MAX_OUTBOX_SIZE;
+                self.mesh_outbox.drain(..excess);
+                self.mesh_stats.packets_dropped += excess as u64;
+            }
+
+            self.sync_mesh_bridge();
         }
 
         // Check for Dream State
@@ -65,24 +80,6 @@ impl ContinuousMind {
 
         if self.state.consciousness_level > self.stats.peak_consciousness {
             self.stats.peak_consciousness = self.state.consciousness_level;
-        }
-
-        // Auto-emit wisdom + heartbeat + gradients + affective to mesh, then flush bridge
-        #[cfg(feature = "mesh")]
-        {
-            self.auto_emit_wisdom();
-            self.emit_heartbeat();
-            self.emit_gradients();
-            self.emit_affective();
-
-            // Outbox backpressure: drop oldest packets when outbox exceeds cap
-            if self.mesh_outbox.len() > super::MAX_OUTBOX_SIZE {
-                let excess = self.mesh_outbox.len() - super::MAX_OUTBOX_SIZE;
-                self.mesh_outbox.drain(..excess);
-                self.mesh_stats.packets_dropped += excess as u64;
-            }
-
-            self.sync_mesh_bridge();
         }
 
         output
@@ -474,7 +471,7 @@ impl ContinuousMind {
 
         for packet in &inbox {
             // Dedup check: skip if we've already seen this (source_id, sequence) pair
-            let key = (packet.source_id, packet.sequence);
+            let key = (packet.source_id, packet.sequence, packet.payload_type as u8);
             if self.mesh_seen_packets.contains(&key) {
                 self.mesh_stats.packets_deduplicated += 1;
                 continue;
@@ -768,7 +765,7 @@ impl ContinuousMind {
     /// so the mesh always carries the mind's most up-to-date cognitive state.
     /// Emission frequency is gated by `emit_wisdom()`'s urgency throttle,
     /// with health-driven urgency override for mesh recovery.
-    fn auto_emit_wisdom(&mut self) {
+    pub(crate) fn auto_emit_wisdom(&mut self) {
         if self.mesh_bridge.is_some() {
             let wisdom_hv = symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(
                 &self.state.current_thought,
