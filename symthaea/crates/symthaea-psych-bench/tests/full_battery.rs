@@ -4,7 +4,9 @@
 //! Symthaea's performance against published human norms.
 
 use symthaea_psych_bench::benchmarks::{
-    affect::{EmotionalStroopBenchmark, MoodCongruentRecallBenchmark, ValenceClassificationBenchmark},
+    affect::{
+        EmotionalStroopBenchmark, MoodCongruentRecallBenchmark, ValenceClassificationBenchmark,
+    },
     attention::AttentionalBlinkBenchmark,
     butlin::ButlinIndicatorSuite,
     cogbench::{

@@ -173,7 +173,10 @@ impl PsychBenchmark for EmotionalStroopBenchmark {
         }
 
         result.insert("neutral_accuracy", MetricValue::from_samples(&neutral_accs));
-        result.insert("negative_accuracy", MetricValue::from_samples(&negative_accs));
+        result.insert(
+            "negative_accuracy",
+            MetricValue::from_samples(&negative_accs),
+        );
         result.insert(
             "emotional_interference",
             MetricValue::from_samples(&interferences),

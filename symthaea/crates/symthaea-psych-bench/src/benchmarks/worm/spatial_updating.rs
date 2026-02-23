@@ -16,7 +16,12 @@ pub struct SpatialUpdatingBenchmark;
 impl SpatialUpdatingBenchmark {
     /// Run a single trial: start at a position, apply N moves, check final position.
     /// Returns (accuracy, rt_ticks).
-    fn run_trial(&self, num_updates: usize, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+    fn run_trial(
+        &self,
+        num_updates: usize,
+        config: &BenchmarkConfig,
+        trial_idx: usize,
+    ) -> (f64, f64) {
         let dim = config.dimension;
         let seed = config.trial_seed("worm", &format!("spatial_{}", num_updates), trial_idx);
         let adapter = SpatialAdapter::default();
@@ -77,8 +82,7 @@ impl SpatialUpdatingBenchmark {
         // RT proxy: deliberation ticks based on spatial match confidence.
         // Smaller margin between max_sim and threshold → harder discrimination → longer RT
         // (Luce, 1986; Ratcliff, 1978 diffusion model).
-        let decision_margin =
-            ((max_sim - threshold).abs() as f64).min(1.0);
+        let decision_margin = ((max_sim - threshold).abs() as f64).min(1.0);
         let rt_ticks = 4.0 + (1.0 - decision_margin) * 6.0;
 
         let acc = if max_sim > threshold { 1.0 } else { 0.0 };

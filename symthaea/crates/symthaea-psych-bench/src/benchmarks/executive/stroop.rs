@@ -234,10 +234,7 @@ impl PsychBenchmark for StroopBenchmark {
             "incongruent::rt_ticks",
             MetricValue::from_samples(&all_incong_rt),
         );
-        result.insert(
-            "neutral::rt_ticks",
-            MetricValue::from_samples(&all_neut_rt),
-        );
+        result.insert("neutral::rt_ticks", MetricValue::from_samples(&all_neut_rt));
 
         // Ex-Gaussian RT summaries (stored in result metadata for paper reporting)
         let _cong_rt_summary = RtSummary::from_rt_samples(&all_cong_rt);

@@ -14,7 +14,12 @@ use crate::wm::{WmConfig, WorkingMemory};
 pub struct LongRangeBenchmark;
 
 impl LongRangeBenchmark {
-    fn run_trial(&self, delay_cycles: usize, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+    fn run_trial(
+        &self,
+        delay_cycles: usize,
+        config: &BenchmarkConfig,
+        trial_idx: usize,
+    ) -> (f64, f64) {
         let dim = config.dimension;
         let adapter = ScenarioAdapter;
         let seed = config.trial_seed("memory_agent", &format!("long_{}", delay_cycles), trial_idx);

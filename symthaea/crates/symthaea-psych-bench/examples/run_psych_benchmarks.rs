@@ -218,7 +218,10 @@ fn main() {
     // Reliability analysis: run battery with 5 different seeds
     if reliability_mode {
         let seeds = [42, 137, 256, 512, 1024];
-        eprintln!("\nRunning reliability analysis with {} seeds...", seeds.len());
+        eprintln!(
+            "\nRunning reliability analysis with {} seeds...",
+            seeds.len()
+        );
 
         let mut reports = vec![report.clone()]; // seed=42 already run above
         for &seed in &seeds[1..] {
@@ -279,9 +282,7 @@ fn main() {
         println!("\n--- Construct Validity ---");
         println!(
             "Same-domain pairs: {}, Convergent (r>0.3): {}, Mean within-domain r: {:.3}",
-            validity.same_domain_pairs,
-            validity.convergent_pairs,
-            validity.mean_within_correlation,
+            validity.same_domain_pairs, validity.convergent_pairs, validity.mean_within_correlation,
         );
 
         println!("\n--- MTMM Validity ---");
@@ -324,7 +325,11 @@ fn main() {
                 "Poor"
             };
             println!("  Alpha = {:.3} ({})", alpha, interp);
-            println!("  Items (seeds) = {}, Benchmarks = {}", reports.len(), analysis.values.len());
+            println!(
+                "  Items (seeds) = {}, Benchmarks = {}",
+                reports.len(),
+                analysis.values.len()
+            );
         }
 
         // PCA on reliability data
@@ -355,7 +360,13 @@ fn main() {
         );
         println!(
             "| {:25} | {:>8} | {:>8} | {:>8} | {:>8} | {:>8} | {:>7} |",
-            "-------------------------", "--------", "--------", "--------", "--------", "--------", "-------"
+            "-------------------------",
+            "--------",
+            "--------",
+            "--------",
+            "--------",
+            "--------",
+            "-------"
         );
 
         for bench in &benchmarks {
@@ -375,11 +386,7 @@ fn main() {
                     ..config.clone()
                 };
                 let result = bench.run(&block_config);
-                let mean = result
-                    .metrics
-                    .get(key)
-                    .map(|m| m.mean)
-                    .unwrap_or(0.0);
+                let mean = result.metrics.get(key).map(|m| m.mean).unwrap_or(0.0);
                 block_means.push(mean);
             }
 
@@ -432,11 +439,7 @@ fn main() {
                     ..config.clone()
                 };
                 let result = bench.run(&sat_config);
-                let mean = result
-                    .metrics
-                    .get(key)
-                    .map(|m| m.mean)
-                    .unwrap_or(0.0);
+                let mean = result.metrics.get(key).map(|m| m.mean).unwrap_or(0.0);
                 level_means.push(mean);
             }
 
@@ -466,7 +469,12 @@ fn main() {
         );
         println!(
             "| {:25} | {:>8} | {:>8} | {:>8} | {:>8} | {:>10} |",
-            "-------------------------", "--------", "--------", "--------", "--------", "----------"
+            "-------------------------",
+            "--------",
+            "--------",
+            "--------",
+            "--------",
+            "----------"
         );
 
         for bench in &benchmarks {
@@ -547,37 +555,54 @@ fn main() {
 
     // Ablation effect sizes: compare full config vs degraded (low WM, low dim)
     if ablation_effects {
-        use symthaea_psych_bench::harness::analysis::{ablation_effect_sizes, format_ablation_effects};
+        use symthaea_psych_bench::harness::analysis::{
+            ablation_effect_sizes, format_ablation_effects,
+        };
 
         println!("\n--- Ablation Effect Sizes ---\n");
 
         let degraded_configs: Vec<(&str, BenchmarkConfig)> = vec![
-            ("Low WM (capacity=2)", BenchmarkConfig {
-                working_memory_capacity: 2,
-                ..config.clone()
-            }),
-            ("Low Dimension (dim=64)", BenchmarkConfig {
-                dimension: 64,
-                ..config.clone()
-            }),
-            ("High Pressure (p=1.0)", BenchmarkConfig {
-                time_pressure: 1.0,
-                ..config.clone()
-            }),
+            (
+                "Low WM (capacity=2)",
+                BenchmarkConfig {
+                    working_memory_capacity: 2,
+                    ..config.clone()
+                },
+            ),
+            (
+                "Low Dimension (dim=64)",
+                BenchmarkConfig {
+                    dimension: 64,
+                    ..config.clone()
+                },
+            ),
+            (
+                "High Pressure (p=1.0)",
+                BenchmarkConfig {
+                    time_pressure: 1.0,
+                    ..config.clone()
+                },
+            ),
         ];
 
         // Get baseline means
-        let baseline_means: Vec<(&str, f64)> = benchmarks.iter().filter_map(|bench| {
-            if let Some(ref f) = filter {
-                if !bench.name().to_lowercase().contains(f) {
-                    return None;
+        let baseline_means: Vec<(&str, f64)> = benchmarks
+            .iter()
+            .filter_map(|bench| {
+                if let Some(ref f) = filter {
+                    if !bench.name().to_lowercase().contains(f) {
+                        return None;
+                    }
                 }
-            }
-            let key = symthaea_psych_bench::harness::report::key_metric_for_benchmark(bench.name());
-            report.results.iter()
-                .find(|r| r.benchmark == bench.name())
-                .and_then(|r| r.metrics.get(key).map(|m| (bench.name(), m.mean)))
-        }).collect();
+                let key =
+                    symthaea_psych_bench::harness::report::key_metric_for_benchmark(bench.name());
+                report
+                    .results
+                    .iter()
+                    .find(|r| r.benchmark == bench.name())
+                    .and_then(|r| r.metrics.get(key).map(|m| (bench.name(), m.mean)))
+            })
+            .collect();
 
         for (label, deg_config) in &degraded_configs {
             println!("### {} vs Baseline\n", label);
@@ -589,7 +614,8 @@ fn main() {
                         continue;
                     }
                 }
-                let key = symthaea_psych_bench::harness::report::key_metric_for_benchmark(bench.name());
+                let key =
+                    symthaea_psych_bench::harness::report::key_metric_for_benchmark(bench.name());
                 let result = bench.run(deg_config);
                 if let Some(m) = result.metrics.get(key) {
                     ablated_means.push((bench.name(), m.mean));
@@ -615,7 +641,12 @@ fn main() {
         );
         println!(
             "| {:25} | {:>25} | {:>8} | {:>8} | {:>8} | {:>10} |",
-            "-------------------------", "-------------------------", "--------", "--------", "--------", "----------"
+            "-------------------------",
+            "-------------------------",
+            "--------",
+            "--------",
+            "--------",
+            "----------"
         );
 
         for bench_result in &report.results {
@@ -634,8 +665,16 @@ fn main() {
                     } else {
                         "Impaired"
                     };
-                    let agent_val = bench_result.metrics.get(key.as_str()).map(|m| m.mean).unwrap_or(0.0);
-                    let short_bench = bench_result.benchmark.split("::").last().unwrap_or(&bench_result.benchmark);
+                    let agent_val = bench_result
+                        .metrics
+                        .get(key.as_str())
+                        .map(|m| m.mean)
+                        .unwrap_or(0.0);
+                    let short_bench = bench_result
+                        .benchmark
+                        .split("::")
+                        .last()
+                        .unwrap_or(&bench_result.benchmark);
                     let short_key = if key.len() > 25 { &key[..25] } else { key };
                     println!(
                         "| {:25} | {:>25} | {:>8.3} | {:>+8.2} | {:>7.1}% | {:>10} |",
@@ -719,9 +758,7 @@ fn main() {
         println!("\n--- Construct Validity ---");
         println!(
             "Same-domain pairs: {}, Convergent (r>0.3): {}, Mean within-domain r: {:.3}",
-            validity.same_domain_pairs,
-            validity.convergent_pairs,
-            validity.mean_within_correlation,
+            validity.same_domain_pairs, validity.convergent_pairs, validity.mean_within_correlation,
         );
 
         println!("\n--- MTMM Validity ---");

@@ -144,8 +144,8 @@ impl GoNoGoBenchmark {
             let commission_rate = 1.0 - nogo_acc;
             let mut sorted_rts = go_rts.clone();
             sorted_rts.sort_by(|a, b| a.total_cmp(b));
-            let idx = ((commission_rate * sorted_rts.len() as f64) as usize)
-                .min(sorted_rts.len() - 1);
+            let idx =
+                ((commission_rate * sorted_rts.len() as f64) as usize).min(sorted_rts.len() - 1);
             sorted_rts[idx]
         } else {
             0.0

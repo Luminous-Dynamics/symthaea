@@ -51,8 +51,10 @@ impl ValenceClassificationBenchmark {
                 let noise_weight = config.time_pressure * 0.15;
                 let valence_weight = (0.4 - noise_weight) as f32;
                 let object_weight = (0.6 + noise_weight) as f32;
-                let stimulus =
-                    ContinuousHV::weighted_bundle(&[&object_hv, protos[valence]], &[object_weight, valence_weight]);
+                let stimulus = ContinuousHV::weighted_bundle(
+                    &[&object_hv, protos[valence]],
+                    &[object_weight, valence_weight],
+                );
 
                 // Classify by max similarity to prototypes
                 let sims: Vec<f32> = protos.iter().map(|p| stimulus.similarity(p)).collect();

@@ -72,7 +72,8 @@ impl AttentionalBlinkBenchmark {
         let mut t1_total = 0u32;
         let mut lag_correct: [u32; 4] = [0; 4]; // indexed by lag position in array
         let mut t1_rt_ticks = Vec::new();
-        let mut t2_rt_ticks_by_lag: [Vec<f64>; 4] = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+        let mut t2_rt_ticks_by_lag: [Vec<f64>; 4] =
+            [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
 
         for (lag_idx, &lag) in lags.iter().enumerate() {
             for _trial in 0..trials_per_lag {
@@ -88,7 +89,8 @@ impl AttentionalBlinkBenchmark {
                 // Generate T1 as noisy target
                 xor_shift(&mut rng);
                 let t1_noise = ContinuousHV::random(dim, rng);
-                let t1 = ContinuousHV::weighted_bundle(&[&target_category, &t1_noise], &[0.80, 0.20]);
+                let t1 =
+                    ContinuousHV::weighted_bundle(&[&target_category, &t1_noise], &[0.80, 0.20]);
 
                 // Detect T1 (similarity to target category)
                 let t1_sim = t1.similarity(&target_category) as f64;
@@ -97,7 +99,8 @@ impl AttentionalBlinkBenchmark {
                 let t1_ev = t1_sim / temperature;
                 let t1_dev = t1_dsim / temperature;
                 let max_t1 = t1_ev.max(t1_dev);
-                let p_t1 = (t1_ev - max_t1).exp() / ((t1_ev - max_t1).exp() + (t1_dev - max_t1).exp());
+                let p_t1 =
+                    (t1_ev - max_t1).exp() / ((t1_ev - max_t1).exp() + (t1_dev - max_t1).exp());
 
                 xor_shift(&mut rng);
                 let r1 = (rng % 10000) as f64 / 10000.0;
@@ -132,7 +135,11 @@ impl AttentionalBlinkBenchmark {
                 let noise_weight = (1.0 - signal_weight - distractor_leak).max(0.05);
                 let t2 = ContinuousHV::weighted_bundle(
                     &[&target_category, &t2_noise, &distractor_category],
-                    &[signal_weight as f32, noise_weight as f32, distractor_leak as f32],
+                    &[
+                        signal_weight as f32,
+                        noise_weight as f32,
+                        distractor_leak as f32,
+                    ],
                 );
 
                 let t2_sim = t2.similarity(&target_category) as f64;
@@ -141,11 +148,13 @@ impl AttentionalBlinkBenchmark {
                 let t2_ev = t2_sim / temperature;
                 let t2_dev = t2_dsim / temperature;
                 let max_t2 = t2_ev.max(t2_dev);
-                let p_t2 = (t2_ev - max_t2).exp() / ((t2_ev - max_t2).exp() + (t2_dev - max_t2).exp());
+                let p_t2 =
+                    (t2_ev - max_t2).exp() / ((t2_ev - max_t2).exp() + (t2_dev - max_t2).exp());
 
                 // T2 RT: harder when attention depleted (wider margin at high attention)
                 let t2_margin = (t2_sim - t2_dsim).abs();
-                let t2_rt = 3.0 + (1.0 - t2_margin.min(1.0)) * 5.0 + (1.0 - attention_available) * 3.0;
+                let t2_rt =
+                    3.0 + (1.0 - t2_margin.min(1.0)) * 5.0 + (1.0 - attention_available) * 3.0;
                 t2_rt_ticks_by_lag[lag_idx].push(t2_rt);
 
                 xor_shift(&mut rng);

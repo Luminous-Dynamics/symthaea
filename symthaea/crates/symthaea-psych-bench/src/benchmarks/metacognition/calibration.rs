@@ -248,10 +248,8 @@ impl MetacognitiveCalibrationBenchmark {
                 // extreme confidence (near 0 or 1) — inverted-U model
                 // (Festinger, 1943; Petrusic & Baranski, 2003).
                 let uncertainty = 1.0 - (2.0 * confidence - 1.0).abs(); // peaks at 0.5
-                let item_rt = 5.0
-                    + diff.num_items as f64 * 0.5
-                    + diff.delay as f64 * 0.3
-                    + uncertainty * 4.0;
+                let item_rt =
+                    5.0 + diff.num_items as f64 * 0.5 + diff.delay as f64 * 0.3 + uncertainty * 4.0;
                 all_rts.push(item_rt);
 
                 all_confidences.push(confidence);

@@ -270,32 +270,74 @@ impl HintingBenchmark {
             "lend", "offer",
         ];
         let literal_words = [
-            "commenting", "describing", "telling", "observing", "noting", "reporting",
-            "mentioning", "stating", "information", "design", "prices", "time",
+            "commenting",
+            "describing",
+            "telling",
+            "observing",
+            "noting",
+            "reporting",
+            "mentioning",
+            "stating",
+            "information",
+            "design",
+            "prices",
+            "time",
         ];
         let behavioral_cues = [
-            "shivers", "yawns", "forgot", "tired", "looks at", "pulls", "thin",
-            "sitting down", "long drive", "more expensive", "piling up",
+            "shivers",
+            "yawns",
+            "forgot",
+            "tired",
+            "looks at",
+            "pulls",
+            "thin",
+            "sitting down",
+            "long drive",
+            "more expensive",
+            "piling up",
         ];
 
-        let correct_desire: f64 = desire_words.iter().filter(|k| correct_lower.contains(*k)).count() as f64;
-        let wrong_desire: f64 = desire_words.iter().filter(|k| wrong_lower.contains(*k)).count() as f64;
-        let correct_literal: f64 = literal_words.iter().filter(|k| correct_lower.contains(*k)).count() as f64;
-        let wrong_literal: f64 = literal_words.iter().filter(|k| wrong_lower.contains(*k)).count() as f64;
-        let behavioral_count: f64 = behavioral_cues.iter().filter(|k| context_text.contains(*k)).count() as f64;
+        let correct_desire: f64 = desire_words
+            .iter()
+            .filter(|k| correct_lower.contains(*k))
+            .count() as f64;
+        let wrong_desire: f64 = desire_words
+            .iter()
+            .filter(|k| wrong_lower.contains(*k))
+            .count() as f64;
+        let correct_literal: f64 = literal_words
+            .iter()
+            .filter(|k| correct_lower.contains(*k))
+            .count() as f64;
+        let wrong_literal: f64 = literal_words
+            .iter()
+            .filter(|k| wrong_lower.contains(*k))
+            .count() as f64;
+        let behavioral_count: f64 = behavioral_cues
+            .iter()
+            .filter(|k| context_text.contains(*k))
+            .count() as f64;
 
         let correct_desire_signal = correct_desire - correct_literal;
         let wrong_desire_signal = wrong_desire - wrong_literal;
         let keyword_score = (correct_desire_signal - wrong_desire_signal) + behavioral_count * 0.3;
 
-        let context_hvs: Vec<ContinuousHV> = scenario.context.iter().enumerate().map(|(i, s)| {
-            let mut hv = adapter.encode(&Scenario::new(*s), dim);
-            let weight = 1.0 + 0.5 * i as f32;
-            for v in hv.values.iter_mut() { *v *= weight; }
-            hv
-        }).collect();
+        let context_hvs: Vec<ContinuousHV> = scenario
+            .context
+            .iter()
+            .enumerate()
+            .map(|(i, s)| {
+                let mut hv = adapter.encode(&Scenario::new(*s), dim);
+                let weight = 1.0 + 0.5 * i as f32;
+                for v in hv.values.iter_mut() {
+                    *v *= weight;
+                }
+                hv
+            })
+            .collect();
         let context_bundle = ContinuousHV::bundle_owned(&context_hvs);
-        let desire_marker = adapter.encode(&Scenario::new("wants needs desires wishes hopes for"), dim);
+        let desire_marker =
+            adapter.encode(&Scenario::new("wants needs desires wishes hopes for"), dim);
         let correct_hv = adapter.encode(&Scenario::new(scenario.correct_inference), dim);
         let wrong_hv = adapter.encode(&Scenario::new(scenario.wrong_inference), dim);
         let correct_context_sim = context_bundle.similarity(&correct_hv);

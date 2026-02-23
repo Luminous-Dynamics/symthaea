@@ -245,9 +245,7 @@ impl CrossBenchmarkAnalysis {
                 if domain_i == domain_j {
                     convergent_sum += r;
                     convergent_count += 1;
-                    let entry = domain_sums
-                        .entry(domain_i.to_string())
-                        .or_insert((0.0, 0));
+                    let entry = domain_sums.entry(domain_i.to_string()).or_insert((0.0, 0));
                     entry.0 += r;
                     entry.1 += 1;
                 } else {
@@ -450,8 +448,11 @@ pub fn cronbachs_alpha(items: &[Vec<f64>]) -> f64 {
         .map(|p| items.iter().map(|item| item[p]).sum::<f64>())
         .collect();
     let total_mean = total_scores.iter().sum::<f64>() / n as f64;
-    let total_variance =
-        total_scores.iter().map(|x| (x - total_mean).powi(2)).sum::<f64>() / (n - 1) as f64;
+    let total_variance = total_scores
+        .iter()
+        .map(|x| (x - total_mean).powi(2))
+        .sum::<f64>()
+        / (n - 1) as f64;
 
     if total_variance.abs() < 1e-15 {
         return 0.0;
@@ -475,7 +476,9 @@ pub fn percentile_from_z(z: f64) -> f64 {
     let t = 1.0 / (1.0 + 0.2316419 * z.abs());
     let d = 0.3989422804014327; // 1/sqrt(2*pi)
     let p = d * (-z * z / 2.0).exp();
-    let poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+    let poly = t
+        * (0.319381530
+            + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
     let cdf = if z >= 0.0 { 1.0 - p * poly } else { p * poly };
     (cdf * 100.0).clamp(0.01, 99.99)
 }
@@ -590,10 +593,7 @@ impl CrossBenchmarkAnalysis {
         if pca.loadings.len() >= 2 {
             lines.push(String::new());
             lines.push("Top loadings (PC1, PC2):".to_string());
-            lines.push(format!(
-                "  {:<25} {:>8} {:>8}",
-                "Benchmark", "PC1", "PC2"
-            ));
+            lines.push(format!("  {:<25} {:>8} {:>8}", "Benchmark", "PC1", "PC2"));
             for (i, name) in pca.benchmark_names.iter().enumerate() {
                 let short = name.split("::").last().unwrap_or(name);
                 let l1 = pca.loadings[0].get(i).copied().unwrap_or(0.0);
@@ -973,7 +973,11 @@ mod tests {
             vec![3.0, 3.0, 3.0, 3.0, 3.0],
         ];
         let alpha = cronbachs_alpha(&items);
-        assert!(alpha < 0.5, "Uncorrelated items should yield low alpha, got {}", alpha);
+        assert!(
+            alpha < 0.5,
+            "Uncorrelated items should yield low alpha, got {}",
+            alpha
+        );
     }
 
     #[test]
@@ -1076,7 +1080,11 @@ mod tests {
         let x = [5.0, 5.0, 5.0, 5.0, 5.0];
         let y = [3.0, 3.0, 3.0, 3.0, 3.0];
         let r = spearman_correlation(&x, &y);
-        assert!(r.is_finite(), "spearman with all-identical should be finite, got {}", r);
+        assert!(
+            r.is_finite(),
+            "spearman with all-identical should be finite, got {}",
+            r
+        );
         assert!((r - 0.0).abs() < 1e-10, "all-identical should yield r=0");
     }
 
@@ -1096,7 +1104,11 @@ mod tests {
         let y = [1.0, 3.0, 2.0, 4.0, 5.0];
         let r = spearman_correlation(&x, &y);
         assert!(r.is_finite());
-        assert!(r > 0.5, "positively correlated with ties should have r>0.5, got {}", r);
+        assert!(
+            r > 0.5,
+            "positively correlated with ties should have r>0.5, got {}",
+            r
+        );
     }
 
     #[test]
@@ -1105,7 +1117,10 @@ mod tests {
         let x = [1e15, 2e15, 3e15, 4e15, 5e15];
         let y = [5e15, 4e15, 3e15, 2e15, 1e15];
         let r = spearman_correlation(&x, &y);
-        assert!((r - (-1.0)).abs() < 1e-10, "large values should still give -1.0");
+        assert!(
+            (r - (-1.0)).abs() < 1e-10,
+            "large values should still give -1.0"
+        );
     }
 
     #[test]
@@ -1119,10 +1134,7 @@ mod tests {
     #[test]
     fn stress_icc_zero_variance() {
         // All scores identical across all judges and subjects → degenerate
-        let obs = vec![
-            vec![3.0, 3.0, 3.0, 3.0],
-            vec![3.0, 3.0, 3.0, 3.0],
-        ];
+        let obs = vec![vec![3.0, 3.0, 3.0, 3.0], vec![3.0, 3.0, 3.0, 3.0]];
         let icc = icc_2_1(&obs);
         assert!(icc.is_finite(), "zero-variance ICC should be finite");
     }
@@ -1145,16 +1157,17 @@ mod tests {
         ];
         let icc = icc_2_1(&obs);
         assert!(icc.is_finite());
-        assert!(icc >= -1.0 && icc <= 1.0, "ICC should be clamped to [-1,1], got {}", icc);
+        assert!(
+            icc >= -1.0 && icc <= 1.0,
+            "ICC should be clamped to [-1,1], got {}",
+            icc
+        );
     }
 
     #[test]
     fn stress_cronbachs_alpha_zero_variance() {
         // All items have zero variance → should return 0.0
-        let items = vec![
-            vec![5.0, 5.0, 5.0, 5.0],
-            vec![3.0, 3.0, 3.0, 3.0],
-        ];
+        let items = vec![vec![5.0, 5.0, 5.0, 5.0], vec![3.0, 3.0, 3.0, 3.0]];
         let alpha = cronbachs_alpha(&items);
         assert!(alpha.is_finite(), "zero-variance alpha should be finite");
     }
@@ -1162,24 +1175,26 @@ mod tests {
     #[test]
     fn stress_cronbachs_alpha_two_participants() {
         // Minimum viable: 2 participants, 2 items
-        let items = vec![
-            vec![1.0, 2.0],
-            vec![1.0, 2.0],
-        ];
+        let items = vec![vec![1.0, 2.0], vec![1.0, 2.0]];
         let alpha = cronbachs_alpha(&items);
         assert!(alpha.is_finite());
-        assert!((alpha - 1.0).abs() < 0.01, "perfectly correlated 2×2 should yield ~1.0, got {}", alpha);
+        assert!(
+            (alpha - 1.0).abs() < 0.01,
+            "perfectly correlated 2×2 should yield ~1.0, got {}",
+            alpha
+        );
     }
 
     #[test]
     fn stress_cronbachs_alpha_negative() {
         // Negatively correlated items → alpha can be negative
-        let items = vec![
-            vec![1.0, 5.0, 1.0, 5.0],
-            vec![5.0, 1.0, 5.0, 1.0],
-        ];
+        let items = vec![vec![1.0, 5.0, 1.0, 5.0], vec![5.0, 1.0, 5.0, 1.0]];
         let alpha = cronbachs_alpha(&items);
-        assert!(alpha.is_finite(), "negative alpha should be finite, got {}", alpha);
+        assert!(
+            alpha.is_finite(),
+            "negative alpha should be finite, got {}",
+            alpha
+        );
     }
 
     #[test]
@@ -1195,10 +1210,18 @@ mod tests {
     fn stress_percentile_nan_guard() {
         // NaN z-score should not panic, returns 50th percentile as safe default
         let p = percentile_from_z(f64::NAN);
-        assert!((p - 50.0).abs() < 0.01, "NaN z should return 50th percentile, got {}", p);
+        assert!(
+            (p - 50.0).abs() < 0.01,
+            "NaN z should return 50th percentile, got {}",
+            p
+        );
         // Infinity should also be safe
         let p_inf = percentile_from_z(f64::INFINITY);
-        assert!((p_inf - 50.0).abs() < 0.01, "Inf z should return 50th percentile, got {}", p_inf);
+        assert!(
+            (p_inf - 50.0).abs() < 0.01,
+            "Inf z should return 50th percentile, got {}",
+            p_inf
+        );
     }
 
     #[test]
@@ -1266,7 +1289,11 @@ mod tests {
         let r = ranks(&data);
         // All should have the same average rank = 2.5
         for rank in &r {
-            assert!((rank - 2.5).abs() < 1e-10, "identical values should have avg rank 2.5, got {}", rank);
+            assert!(
+                (rank - 2.5).abs() < 1e-10,
+                "identical values should have avg rank 2.5, got {}",
+                rank
+            );
         }
     }
 
