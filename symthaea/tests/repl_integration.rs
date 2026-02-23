@@ -76,12 +76,12 @@ fn test_session_consciousness_state() {
 
     let state = session.consciousness_state();
     assert!(
-        state.phi.is_finite(),
-        "Phi should be finite after processing"
+        state.unified_psi.is_finite(),
+        "Psi should be finite after processing"
     );
     assert!(
-        state.coherence.is_finite(),
-        "Coherence should be finite after processing"
+        state.temporal_coherence.is_finite(),
+        "Temporal coherence should be finite after processing"
     );
 }
 

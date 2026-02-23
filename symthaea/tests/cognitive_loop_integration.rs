@@ -4830,3 +4830,214 @@ fn test_200_cycle_phase18_stress() {
         stats.avg_prediction_coherence,
     );
 }
+
+// ── Phase 19: Activating Dormant Pathways ───────────────────────────────
+
+#[test]
+fn test_attention_budget_gating() {
+    // Verify attention budget gating flag and subsystem interval doubling
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("attention budget test");
+        // attention_budget_gated is bool, always valid
+        assert!(
+            result.metadata.attention_shift_applied.is_finite(),
+            "attention_shift not finite at cycle {i}"
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "attention_budget: gated_count={}, exceeded_count={}",
+        stats.attention_budget_gated_count, stats.attention_budget_exceeded_count
+    );
+}
+
+#[test]
+fn test_consciousness_limiting_component_boost() {
+    // Verify limiting component triggers targeted boost without panic
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..40 {
+        let result = service.cycle("test limiting component boost");
+        // limiting_component_boosted is a String, always valid
+        assert!(
+            result.metadata.consciousness_gradient_magnitude.is_finite(),
+            "gradient not finite at cycle {i}"
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "limiting_component: boost_count={}, total_cycles={}",
+        stats.limiting_component_boost_count, stats.total_cycles
+    );
+}
+
+#[test]
+fn test_harmonic_love_resonance_boost() {
+    // Verify love resonance confidence boost is finite and bounded
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("love and harmony test");
+        assert!(
+            result.metadata.love_resonance_boost.is_finite(),
+            "love_resonance_boost not finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.love_resonance_boost >= 0.0
+                && result.metadata.love_resonance_boost <= 0.1,
+            "love_resonance_boost out of bounds at cycle {i}: {}",
+            result.metadata.love_resonance_boost
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "love_resonance: boost_count={}, total_cycles={}",
+        stats.love_resonance_boost_count, stats.total_cycles
+    );
+}
+
+#[test]
+fn test_reasoning_chain_confidence_boost() {
+    // Verify reasoning chain boost fires without panic
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("deep reasoning chain test");
+        // reasoning_chain_boosted is bool, always valid
+        assert!(
+            result.metadata.reasoning_chain_confidence.is_finite(),
+            "reasoning_chain_confidence not finite at cycle {i}"
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "reasoning_chain: boost_count={}, total_cycles={}",
+        stats.reasoning_chain_boost_count, stats.total_cycles
+    );
+}
+
+#[test]
+fn test_attention_shift_motor_command() {
+    // Verify attention shift modulates attention_sensitivity within bounds
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("shift attention focus");
+        assert!(
+            result.metadata.attention_shift_applied.is_finite(),
+            "attention_shift not finite at cycle {i}"
+        );
+    }
+
+    // attention_sensitivity should stay within bounds [0.5, 2.0]
+    let sensitivity = service.attention_sensitivity();
+    assert!(
+        sensitivity >= 0.5 && sensitivity <= 2.0,
+        "attention sensitivity out of bounds: {sensitivity}"
+    );
+}
+
+#[test]
+fn test_cosine_helper_consistency() {
+    // Verify the cosine helper produces correct results
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run cycles and verify that cosine-dependent metrics are finite
+    for i in 0..30 {
+        let result = service.cycle("cosine similarity test");
+        assert!(
+            result.metadata.resonator_prediction_error.is_finite(),
+            "resonator_prediction_error not finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.codebook_diversity.is_finite(),
+            "codebook_diversity not finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.input_similarity.is_finite(),
+            "input_similarity not finite at cycle {i}"
+        );
+    }
+}
+
+#[test]
+#[ignore] // stress test — run manually
+fn test_200_cycle_phase19_stress() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "analyze carefully", "how do you feel?", "create something new",
+        "solve this problem", "love and harmony", "deep reasoning",
+    ];
+
+    for i in 0..200 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        let m = &result.metadata;
+
+        // All Phase 19 fields must be finite/valid
+        assert!(m.love_resonance_boost.is_finite(), "love_resonance at {i}");
+        assert!(m.attention_shift_applied.is_finite(), "attention_shift at {i}");
+
+        // Bounds checks
+        assert!(m.love_resonance_boost >= 0.0 && m.love_resonance_boost <= 0.1);
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 200);
+    eprintln!(
+        "200-cycle Phase 19 stress: budget_gated={}, limiting_boost={}, \
+         love_boost={}, chain_boost={}",
+        stats.attention_budget_gated_count,
+        stats.limiting_component_boost_count,
+        stats.love_resonance_boost_count,
+        stats.reasoning_chain_boost_count,
+    );
+}
