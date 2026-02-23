@@ -1,4 +1,4 @@
-\begin{thebibliography}{45}
+\begin{thebibliography}{46}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -249,6 +249,12 @@ Peer Neubert, Stefan Schubert, and Peter Protzel.
 \newblock An introduction to hyperdimensional computing for robotics.
 \newblock \emph{KI-K{\"u}nstliche Intelligenz}, 33\penalty0 (4):\penalty0
   319--330, 2019.
+
+\bibitem[Parr et~al.(2022)Parr, Pezzulo, and Friston]{parr2022active}
+Thomas Parr, Giovanni Pezzulo, and Karl~J Friston.
+\newblock \emph{Active Inference: The Free Energy Principle in Mind, Brain, and
+  Behavior}.
+\newblock MIT Press, 2022.
 
 \bibitem[Rahimi et~al.(2016)Rahimi, Kanerva, and Recht]{rahimi2016robust}
 Abbas Rahimi, Pentti Kanerva, and Benjamin Recht.
