@@ -3,36 +3,72 @@
 % Vector Symbolic Architectures
 %
 % Target venue: PLoS Computational Biology
+% Template: PLoS LaTeX v3.6 (August 2022)
 % ============================================================================
 
 \documentclass[10pt,letterpaper]{article}
 
-% --- Packages ---
+% ── PLoS-required geometry ──────────────────────────────────────────────────
+\usepackage[top=0.85in,left=2.75in,footskip=0.75in]{geometry}
+
+% ── Core packages ───────────────────────────────────────────────────────────
 \usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage{lmodern}
-\usepackage[margin=1in]{geometry}
-\usepackage{hyperref}
-\usepackage{url}
-\usepackage{booktabs}
+\usepackage{changepage}
+\usepackage{textcomp,marvosym}
+\usepackage{cite}                % Vancouver-style numbered citations (PLoS)
+\usepackage{nameref,hyperref}
 \usepackage{amsfonts}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{microtype}
+\DisableLigatures[f]{encoding = *, family = * }
 \usepackage{xcolor}
 \usepackage{graphicx}
-\usepackage[numbers]{natbib}
-\usepackage{caption}
-% subcaption not required for current figure layout
+\usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{array}
 \usepackage{float}
 \usepackage{enumitem}
 \usepackage{tikz}
-\usepackage{lineno}    % Line numbers (required by PLoS for peer review)
-\usepackage{setspace}  % Double spacing (PLoS submission prep)
+
+% ── PLoS figure caption style ──────────────────────────────────────────────
+\usepackage[aboveskip=1pt,labelfont=bf,labelsep=period,
+            justification=raggedright,singlelinecheck=off]{caption}
+
+% ── Line numbers (required for PLoS peer review) ──────────────────────────
+\usepackage[right]{lineno}
+
+% ── Double spacing (PLoS submission requirement) ───────────────────────────
+\usepackage{setspace}
+\doublespacing
+
+% ── PLoS header/footer ─────────────────────────────────────────────────────
+\usepackage{lastpage,fancyhdr}
+\usepackage{epstopdf}
+\pagestyle{fancy}
+\fancyhf{}
+\rfoot{\thepage/\pageref{LastPage}}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrule}{\hrule height 2pt \vspace{2mm}}
+\fancyheadoffset[L]{2.25in}
+\fancyfootoffset[L]{2.25in}
+\lfoot{\sf PLOS}
+
+% ── PLoS reference list formatting ─────────────────────────────────────────
+\makeatletter
+\renewcommand{\@biblabel}[1]{\quad#1.}
+\makeatother
+
+% ── Figure search path ─────────────────────────────────────────────────────
 \graphicspath{{../figures/}}
 
+% ── Page layout ────────────────────────────────────────────────────────────
+\textwidth 5.25in
+\textheight 8.75in
+\raggedright
+\setlength{\parindent}{0.5cm}
+
+% ── Hyperref settings ──────────────────────────────────────────────────────
 \hypersetup{
   colorlinks=true,
   linkcolor=blue!60!black,
@@ -40,27 +76,33 @@
   urlcolor=blue!70!black
 }
 
-% --- Macros ---
+% ── Macros ─────────────────────────────────────────────────────────────────
 \newcommand{\hvec}[1]{\mathbf{h}_{#1}}
 \renewcommand{\Phi}{\varPhi}
 \newcommand{\ie}{i.e.,\ }
 \newcommand{\eg}{e.g.,\ }
 
-\title{Hyperdimensional Active Inference:\\Free Energy Principle in Vector Symbolic Architectures}
-
-\author{%
-  Tristan Stoltz\textsuperscript{1}\\
-  \textsuperscript{1}Luminous Dynamics\\
-  \texttt{tristan.stoltz@evolvingresonantcocreationism.com}
-}
-
-\date{February 2026}
+\date{}
 
 \begin{document}
-\linenumbers
-\doublespacing
+\vspace*{0.2in}
 
-\maketitle
+% ── Title block (PLoS flushleft style) ─────────────────────────────────────
+\begin{flushleft}
+{\Large\textbf\newline{Hyperdimensional Active Inference: Free Energy Principle in Vector Symbolic Architectures}}
+\newline
+\\
+Tristan~Stoltz\textsuperscript{1\textasteriskcentered}
+\\
+\bigskip
+\textbf{1} Luminous Dynamics, Richardson, Texas, United States of America
+\\
+\bigskip
+\textasteriskcentered\, Corresponding author: tristan.stoltz@evolvingresonantcocreationism.com
+
+\end{flushleft}
+
+\linenumbers
 
 % ============================================================================
 \begin{abstract}
@@ -72,8 +114,6 @@ Validation across 18 domains---including ethical reasoning (92.9\% on ETHICS via
 Code is available at \url{https://github.com/Luminous-Dynamics/symthaea}.
 \end{abstract}
 
-\noindent\textbf{Keywords:} Active Inference, Free Energy Principle, Hyperdimensional Computing, Vector Symbolic Architectures, Precision Weighting, Cognitive Architecture
-
 % ============================================================================
 % Author Summary (required by PLoS Computational Biology)
 \section*{Author Summary}
@@ -84,8 +124,8 @@ Brains must constantly predict what will happen next and decide what to do---a p
 
 \subsection{The Challenge}
 
-The Free Energy Principle (FEP) posits that biological systems minimize variational free energy---a tractable upper bound on surprise---through both perception (updating beliefs) and action (changing the world)~\citep{friston2010free}.
-Active inference operationalizes this principle, providing a unified account of cognition where agents select actions that minimize \emph{expected} free energy, naturally balancing exploration (epistemic value) and exploitation (pragmatic value)~\citep{friston2017active}.
+The Free Energy Principle (FEP) posits that biological systems minimize variational free energy---a tractable upper bound on surprise---through both perception (updating beliefs) and action (changing the world)~\cite{friston2010free}.
+Active inference operationalizes this principle, providing a unified account of cognition where agents select actions that minimize \emph{expected} free energy, naturally balancing exploration (epistemic value) and exploitation (pragmatic value)~\cite{friston2017active}.
 
 Despite theoretical elegance, practical implementations face two challenges:
 \begin{enumerate}[nosep]
@@ -95,7 +135,7 @@ Despite theoretical elegance, practical implementations face two challenges:
 
 \subsection{Our Contribution}
 
-We address both challenges by integrating FEP with Hyperdimensional Computing (HDC), a computational framework using high-dimensional vectors ($d \geq 10{,}000$) with algebraic operations that naturally support distributed representation, associative memory, and compositional semantics~\citep{kanerva2009hyperdimensional}.
+We address both challenges by integrating FEP with Hyperdimensional Computing (HDC), a computational framework using high-dimensional vectors ($d \geq 10{,}000$) with algebraic operations that naturally support distributed representation, associative memory, and compositional semantics~\cite{kanerva2009hyperdimensional}.
 
 \textbf{Key contributions:}
 \begin{enumerate}[nosep]
@@ -113,7 +153,7 @@ To our knowledge, this is the \textbf{first integration of active inference with
 
 \subsection{Free Energy Principle and Active Inference}
 
-The Free Energy Principle~\citep{friston2010free} and active inference~\citep{parr2022active} provide a unified framework for perception, learning, and action.
+The Free Energy Principle~\cite{friston2010free} and active inference~\cite{parr2022active} provide a unified framework for perception, learning, and action.
 The variational free energy $F$ for an agent with beliefs $q(s)$ over hidden states $s$, given observations $o$, is:
 \begin{equation}
 F = D_{\mathrm{KL}}[q(s) \| p(s)] - \mathbb{E}_q[\ln p(o|s)]
@@ -129,11 +169,11 @@ G(a) = \underbrace{\mathbb{E}_{q(o,s|a)}[D_{\mathrm{KL}}[q(s|o,a) \| q(s|a)]]}_{
 \end{multline}
 The first term captures information gain; the second captures goal satisfaction.
 Actions minimizing $G(a)$ naturally balance exploration and exploitation.
-\textbf{Precision} $\pi$ (inverse variance) weights prediction errors, acting as an attention mechanism~\citep{feldman2010attention}.
+\textbf{Precision} $\pi$ (inverse variance) weights prediction errors, acting as an attention mechanism~\cite{feldman2010attention}.
 
 \subsection{Hyperdimensional Computing}
 
-HDC represents information as high-dimensional vectors (hypervectors, HVs) with three core operations~\citep{kanerva2009hyperdimensional}:
+HDC represents information as high-dimensional vectors (hypervectors, HVs) with three core operations~\cite{kanerva2009hyperdimensional}:
 \begin{itemize}[nosep]
   \item \textbf{Binding} ($\otimes$): Element-wise multiplication, creates associations
   \item \textbf{Bundling} ($\oplus$): Element-wise addition + normalization, creates superpositions
@@ -313,13 +353,13 @@ where intrinsic reward is negative prediction error. The value function is $V_\t
 \textbf{Implementation:} Rust, ${\sim}353$K LOC main crate (32 workspace crates, 30 extracted sub-crates), 3,700+ lines core FEP.
 \textbf{Test suite:} 9,600+ tests pass (3,014 main + 3,555 core + ${\sim}3{,}060$ integration/sub-crate), 0 failures, 11 ignored (see Figure~\ref{fig:radar} for full validation radar).
 \textbf{HDC Dimension:} $d = 16{,}384$ (configurable).
-\textbf{Baseline:} pymdp v0.0.8~\citep{heins2022pymdp}.
+\textbf{Baseline:} pymdp v0.0.8~\cite{heins2022pymdp}.
 \textbf{Tasks:} T-Maze (context inference), Grid World 3$\times$3 and 5$\times$5 (navigation).
 \textbf{Trials:} 100 per task (10 seeds $\times$ 10 repetitions), 50 steps (T-Maze), 100 steps (Grid World).
 
 \textbf{Statistical methodology.}
-For the core active inference comparisons (Tables~\ref{tab:benchmark}--\ref{tab:speedups}), we report means with 95\% confidence intervals computed as $\bar{x} \pm 1.96 \times \mathrm{SE}$, with significance assessed via Welch's $t$-test (unequal variances) and effect sizes via Cohen's $d$~\citep{cohen1988statistical}.
-For the extended benchmarks (Tables~\ref{tab:core-benchmarks}--\ref{tab:socialchem}), results are reported as point estimates from deterministic evaluations on fixed test splits.
+For the core active inference comparisons (Tables~\ref{tab:benchmark}--\ref{tab:speedups}), we report means with 95\% confidence intervals computed as $\bar{x} \pm 1.96 \times \mathrm{SE}$, with significance assessed via Welch's $t$-test (unequal variances) and effect sizes via Cohen's $d$~\cite{cohen1988statistical}.
+For the extended benchmarks (Table~\ref{tab:core-benchmarks}), results are reported as point estimates from deterministic evaluations on fixed test splits.
 Where randomness enters through seed selection, we use 10 seeds; per-seed variance is reported in Appendix~\ref{app:methodology}.
 
 \subsection{Free Energy Convergence}
@@ -365,7 +405,7 @@ $\varepsilon = 0.8$ (high) & $+12\%$ & $-15\%$ \\
 
 \subsection{Computational Efficiency}
 
-We compare against pymdp v0.0.8~\citep{heins2022pymdp}, the reference Python implementation for discrete-state active inference. Results are shown in Table~\ref{tab:benchmark}.
+We compare against pymdp v0.0.8~\cite{heins2022pymdp}, the reference Python implementation for discrete-state active inference. Results are shown in Table~\ref{tab:benchmark}.
 
 \begin{table}[ht]
 \centering
@@ -497,7 +537,7 @@ The full system recovers $3.5\times$ faster from distributional shifts than the 
 \subsection{Consciousness Indicator Evaluation}
 \label{sec:butlin}
 
-Following Butlin et al.'s framework~\citep{butlin2023consciousness}, we evaluated Symthaea against 14 consciousness indicators drawn from 6 leading theories of consciousness.  Table~\ref{tab:butlin} summarizes the results: 12 indicators are \textsc{Present}, 2 are \textsc{Partial}, and 0 are \textsc{Absent}.
+Following Butlin et al.'s framework~\cite{butlin2023consciousness}, we evaluated Symthaea against 14 consciousness indicators drawn from 6 leading theories of consciousness.  Table~\ref{tab:butlin} summarizes the results: 12 indicators are \textsc{Present}, 2 are \textsc{Partial}, and 0 are \textsc{Absent}.
 
 \begin{table}[ht]
 \centering
@@ -578,87 +618,7 @@ Conflict Resolution & Recency preference & $1.00 \pm 0.00$ \\
 }
 \end{table}
 
-\begin{figure}[ht]
-\centering
-\begin{tikzpicture}[x=0.9cm, y=6cm]
-  % Axes
-  \draw[->] (1,0.35) -- (9.2,0.35) node[right] {\small Set size ($K$)};
-  \draw[->] (1,0.35) -- (1,1.1) node[above] {\small Accuracy};
-  % Y ticks
-  \foreach \y/\l in {0.4/0.4,0.5/0.5,0.6/0.6,0.7/0.7,0.8/0.8,0.9/0.9,1.0/1.0} {
-    \draw (0.95,\y) -- (1.05,\y) node[left=3pt] {\tiny \l};
-    \draw[gray!25] (1.05,\y) -- (9,\y);
-  }
-  % X ticks
-  \foreach \x in {2,4,6,8} {
-    \draw (\x,0.34) -- (\x,0.36) node[below=3pt] {\small \x};
-  }
-  % Change detection (blue squares)
-  \draw[blue, thick] (2,0.90) -- (4,0.80) -- (6,0.70) -- (8,0.70);
-  \foreach \x/\y in {2/0.90, 4/0.80, 6/0.70, 8/0.70}
-    \fill[blue] (\x,\y) +(-0.08,-0.008) rectangle +(0.08,0.008);
-  % Binding (red triangles, dashed)
-  \draw[red, thick, dashed] (2,1.00) -- (4,0.80) -- (6,0.60) -- (8,0.50);
-  \foreach \x/\y in {2/1.00, 4/0.80, 6/0.60, 8/0.50}
-    \draw[red, thick] (\x,\y) +(-0.1,-0.01) -- +(0.1,-0.01) -- +(0,0.015) -- cycle;
-  % Cowan's K line
-  \draw[gray, dashed, thick] (4,0.35) -- (4,1.05);
-  \node[gray, font=\footnotesize] at (5.2,0.38) {Cowan's $K$};
-  % Legend
-  \draw[blue, thick] (5.5,1.05) -- (6.3,1.05);
-  \fill[blue] (5.9,1.05) +(-0.08,-0.008) rectangle +(0.08,0.008);
-  \node[right, font=\footnotesize] at (6.4,1.05) {Change detection};
-  \draw[red, thick, dashed] (5.5,1.00) -- (6.3,1.00);
-  \draw[red, thick] (5.9,1.00) +(-0.1,-0.01) -- +(0.1,-0.01) -- +(0,0.015) -- cycle;
-  \node[right, font=\footnotesize] at (6.4,1.00) {Binding};
-\end{tikzpicture}
-\caption{Working memory capacity curve. Change detection and binding accuracy decline as set size exceeds WM capacity ($C{=}7$). The dashed vertical line marks Cowan's $K \approx 4$ human capacity limit. Binding degrades faster than simple change detection, consistent with the human binding deficit~\citep{wheeler2002binding}.}
-\label{fig:capacity-curve}
-\end{figure}
-
-\begin{figure}[ht]
-\centering
-\begin{tikzpicture}[x=0.85cm, y=5cm]
-  % Axes
-  \draw[->] (-0.5,-0.08) -- (9.5,-0.08) node[right] {\small Serial position};
-  \draw[->] (-0.5,-0.08) -- (-0.5,1.15) node[above] {\small Recall accuracy};
-  % Y ticks
-  \foreach \y/\l in {0.0/0.0,0.2/0.2,0.4/0.4,0.6/0.6,0.8/0.8,1.0/1.0} {
-    \draw (-0.55,\y) -- (-0.45,\y) node[left=3pt] {\tiny \l};
-    \draw[gray!25] (-0.45,\y) -- (9.2,\y);
-  }
-  % X ticks
-  \foreach \x in {0,1,2,3,4,5,6,7,8} {
-    \draw (\x,-0.09) -- (\x,-0.07) node[below=3pt] {\small \x};
-  }
-  % L=5 (green circles)
-  \draw[green!60!black, thick] (0,1.0) -- (1,1.0) -- (2,1.0) -- (3,1.0) -- (4,1.0);
-  \foreach \x in {0,1,2,3,4}
-    \fill[green!60!black] (\x,1.0) circle (0.07);
-  % L=7 (blue squares)
-  \draw[blue, thick] (0,1.0) -- (1,1.0) -- (2,1.0) -- (3,1.0) -- (4,1.0) -- (5,1.0) -- (6,1.0);
-  \foreach \x in {0,1,2,3,4,5,6}
-    \fill[blue] (\x,1.0) +(-0.08,-0.008) rectangle +(0.08,0.008);
-  % L=9 (red triangles, dashed)
-  \draw[red, thick, dashed] (0,0.0) -- (1,0.0) -- (2,1.0) -- (3,1.0) -- (4,1.0) -- (5,1.0) -- (6,1.0) -- (7,1.0) -- (8,1.0);
-  \foreach \x/\y in {0/0.0, 1/0.0, 2/1.0, 3/1.0, 4/1.0, 5/1.0, 6/1.0, 7/1.0, 8/1.0}
-    \draw[red, thick] (\x,\y) +(-0.1,-0.012) -- +(0.1,-0.012) -- +(0,0.018) -- cycle;
-  % Legend
-  \draw[green!60!black, thick] (5.5,0.3) -- (6.3,0.3);
-  \fill[green!60!black] (5.9,0.3) circle (0.07);
-  \node[right, font=\footnotesize] at (6.4,0.3) {$L{=}5$};
-  \draw[blue, thick] (5.5,0.2) -- (6.3,0.2);
-  \fill[blue] (5.9,0.2) +(-0.08,-0.008) rectangle +(0.08,0.008);
-  \node[right, font=\footnotesize] at (6.4,0.2) {$L{=}7$};
-  \draw[red, thick, dashed] (5.5,0.1) -- (6.3,0.1);
-  \draw[red, thick] (5.9,0.1) +(-0.1,-0.012) -- +(0.1,-0.012) -- +(0,0.018) -- cycle;
-  \node[right, font=\footnotesize] at (6.4,0.1) {$L{=}9$};
-\end{tikzpicture}
-\caption{Serial position curves for three list lengths. Lists within WM capacity ($L{=}5,7$) show perfect recall at all positions. At $L{=}9$ (exceeds capacity by 2), FIFO eviction eliminates the two oldest items (positions 0--1), producing a sharp primacy deficit while preserving recency---the expected pattern for a capacity-limited FIFO buffer.}
-\label{fig:serial-position}
-\end{figure}
-
-\textbf{Working memory.} Change detection accuracy drops from 90\% ($K{=}2$) to 70\% ($K{=}8$), consistent with Cowan's $K \approx 4$ capacity limit~\citep{cowan2001magical} (Figure~\ref{fig:capacity-curve}).  Serial recall shows perfect performance at $L{=}7$ (within capacity) but drops to 0\% for the first two positions at $L{=}9$ (exceeds capacity by 2), demonstrating the expected FIFO eviction of oldest items (Figure~\ref{fig:serial-position}).  Binding accuracy degrades from 100\% ($K{=}2$) to 60\% ($K{=}6$) with a positive binding deficit ($+0.30$), matching the human pattern where feature-conjunction memory is harder than individual feature memory~\citep{wheeler2002binding}.
+\textbf{Working memory.} Change detection accuracy drops from 90\% ($K{=}2$) to 70\% ($K{=}8$), consistent with Cowan's $K \approx 4$ capacity limit~\cite{cowan2001magical}.  Serial recall shows perfect performance at $L{=}7$ (within capacity) but drops to 0\% for the first two positions at $L{=}9$ (exceeds capacity by 2), demonstrating the expected FIFO eviction of oldest items.  Binding accuracy degrades from 100\% ($K{=}2$) to 60\% ($K{=}6$) with a positive binding deficit ($+0.30$), matching the human pattern where feature-conjunction memory is harder than individual feature memory~\cite{wheeler2002binding}.
 
 \textbf{Active inference.} The FEP agent shows a prior weight of $\beta_1 = 0.63$ (moderate conservatism), model-basedness of $\beta_3 = 0.30$ (partial model-based planning), and a learning rate of 0.09 with near-zero optimism bias ($0.05$), reflecting calibrated belief updating.
 
@@ -669,31 +629,31 @@ Conflict Resolution & Recency preference & $1.00 \pm 0.00$ \\
 
 \subsection{Active Inference Implementations}
 
-\textbf{pymdp}~\citep{heins2022pymdp}: Python library for discrete-state active inference. We extend to continuous HDC space with $7.9\times$ total speedup (Section~4.4). Note that pymdp and HAI operate in fundamentally different representation spaces.
+\textbf{pymdp}~\cite{heins2022pymdp}: Python library for discrete-state active inference. We extend to continuous HDC space with $7.9\times$ total speedup (Section~4.4). Note that pymdp and HAI operate in fundamentally different representation spaces.
 
-\textbf{Deep active inference}~\citep{fountas2020deep,catal2020learning}: Uses deep neural networks (VAEs, MDNs) to parameterize generative models. Achieves flexible function approximation but requires GPU training and lacks HDC's algebraic structure.
+\textbf{Deep active inference}~\cite{fountas2020deep,catal2020learning}: Uses deep neural networks (VAEs, MDNs) to parameterize generative models. Achieves flexible function approximation but requires GPU training and lacks HDC's algebraic structure.
 
 \subsection{Hyperdimensional Computing Applications}
 
-HDC has been applied to classification~\citep{rahimi2016robust,imani2019hierarchical}, language modeling~\citep{joshi2016language}, robotics~\citep{neubert2019introduction}, and DNA analysis~\citep{kim2020hdc}.
-\textbf{NeuroVSA}~\citep{hersche2023neurovsa}: IBM's framework combining neural feature extraction with VSA classification. Unlike NeuroVSA, Symthaea uses HDC throughout the full cognitive loop.
+HDC has been applied to classification~\cite{rahimi2016robust,imani2019hierarchical}, language modeling~\cite{joshi2016language}, robotics~\cite{neubert2019introduction}, and DNA analysis~\cite{kim2020hdc}.
+\textbf{NeuroVSA}~\cite{hersche2023neurovsa}: IBM's framework combining neural feature extraction with VSA classification. Unlike NeuroVSA, Symthaea uses HDC throughout the full cognitive loop.
 \textbf{No prior work applies HDC to probabilistic inference or active inference.}
 
 \subsection{Liquid Neural Networks}
 
-LTC networks~\citep{hasani2021liquid} and their CfC variant~\citep{hasani2022closed} implement continuous-time neural ODEs. Symthaea integrates CfC as temporal dynamics alongside HDC rather than as standalone classifiers.
+LTC networks~\cite{hasani2021liquid} and their CfC variant~\cite{hasani2022closed} implement continuous-time neural ODEs. Symthaea integrates CfC as temporal dynamics alongside HDC rather than as standalone classifiers.
 
 \subsection{Integrated Information Theory}
 
-IIT 4.0~\citep{albantakis2023integrated} extends the formalism with intrinsic existence and exclusion postulates. We implement IIT 3.0~\citep{tononi2016integrated} computation using PyPhi-compatible TPMs (6/6 theory tests pass). However, exact $\Phi$ via MIP is intractable beyond ${\sim}12$ nodes and degenerates for small weighted systems (\S\ref{sec:hdc-fails}). We therefore use algebraic connectivity ($\lambda_2$) as a computationally feasible proxy for relative integration comparisons, consistent with known MIP challenges~\citep{toker2019information}.
+IIT 4.0~\cite{albantakis2023integrated} extends the formalism with intrinsic existence and exclusion postulates. We implement IIT 3.0~\cite{tononi2016integrated} computation using PyPhi-compatible TPMs (6/6 theory tests pass). However, exact $\Phi$ via MIP is intractable beyond ${\sim}12$ nodes and degenerates for small weighted systems (\S\ref{sec:hdc-fails}). We therefore use algebraic connectivity ($\lambda_2$) as a computationally feasible proxy for relative integration comparisons, consistent with known MIP challenges~\cite{toker2019information}.
 
 \subsection{Neuro-Symbolic AI}
 
-Neuro-symbolic integration remains a central challenge in AI~\citep{garcez2020neurosymbolic}.
-\textbf{DeepProbLog}~\citep{manhaeve2018deepproblog} embeds neural networks as probabilistic predicates within ProbLog programs, enabling end-to-end gradient-based training of hybrid systems that combine perception with logical reasoning.
-\textbf{Logical Neural Networks (LNN)}~\citep{riegel2020logical} implement real-valued, differentiable logic gates that maintain the semantics of classical Boolean logic while supporting gradient descent, achieving tight bounds on truth values for every proposition.
-\textbf{Scallop}~\citep{li2023scallop} introduces a probabilistic Datalog language with provenance semirings that enables differentiable reasoning over relational data, scaling neuro-symbolic integration to complex multi-hop queries.
-The Neuro-Symbolic Concept Learner~\citep{mao2019neuro} jointly learns visual concepts and semantic parsing from natural supervision without explicit symbolic labels.
+Neuro-symbolic integration remains a central challenge in AI~\cite{garcez2020neurosymbolic}.
+\textbf{DeepProbLog}~\cite{manhaeve2018deepproblog} embeds neural networks as probabilistic predicates within ProbLog programs, enabling end-to-end gradient-based training of hybrid systems that combine perception with logical reasoning.
+\textbf{Logical Neural Networks (LNN)}~\cite{riegel2020logical} implement real-valued, differentiable logic gates that maintain the semantics of classical Boolean logic while supporting gradient descent, achieving tight bounds on truth values for every proposition.
+\textbf{Scallop}~\cite{li2023scallop} introduces a probabilistic Datalog language with provenance semirings that enables differentiable reasoning over relational data, scaling neuro-symbolic integration to complex multi-hop queries.
+The Neuro-Symbolic Concept Learner~\cite{mao2019neuro} jointly learns visual concepts and semantic parsing from natural supervision without explicit symbolic labels.
 
 Our approach differs fundamentally from these bridging architectures: rather than coupling separate neural and symbolic modules through an interface layer, HDC's algebraic structure provides compositional semantics \emph{within} the representational substrate itself. Binding ($\otimes$) and bundling ($\oplus$) serve as native symbolic operators over distributed representations, eliminating the neural--symbolic translation bottleneck. The moral algebra system (\S\ref{sec:ethics}) demonstrates this concretely: ethical propositions compose via HDC operators, achieving 92.9\% on ETHICS without requiring a logic engine or pretrained language model.
 
@@ -711,25 +671,11 @@ Our results suggest HDC similarity metrics can substitute for probabilistic dive
 
 \subsection{Cognitive Architecture Implications}
 
-The eight motor command types provide an interpretable action vocabulary for cognitive systems: attention, learning rate, and exploration as \emph{cognitive actions}, with direct mapping from variational inference to executable commands.
+The eight motor command types provide an interpretable action vocabulary for cognitive systems: attention, learning rate, and exploration as \emph{cognitive actions}, with direct mapping from variational inference to executable commands. The full cognitive loop integrates surprise-driven exploration, prefrontal executive control (capacity-7 buffer), social coherence (Theory of Mind), reasoning engine feedback, counterfactual dream replay~\citep{diekelmann2010memory}, and adaptive urgency throttling (Critical/Normal/Cruise tiers), operating at ${\sim}4$~Hz sustained throughput.
 
-The full cognitive loop integrates surprise-driven exploration (modulating curiosity thresholds from prediction error), prefrontal executive control (working memory gating with capacity-7 buffer), social coherence (Theory of Mind via agent modeling and trust dynamics), reasoning engine feedback (Phi-effective confidence modulation of learning rate), counterfactual dream replay (off-line simulation of alternative actions to discover $\Phi$-improving strategies), and adaptive urgency throttling (three-tier scheduling---Critical, Normal, Cruise---that gates subsystem execution frequency based on prediction error magnitude). These subsystems operate within the HDC encode $\to$ CfC evolve $\to$ predict $\to$ learn pipeline at ${\sim}4$~Hz sustained throughput.
+\textbf{Closed feedback loops.} 16 subsystems form closed loops where previous-cycle outputs modulate current-cycle processing, including prefrontal veto~\citep{miller2001integrative}, predictive self-model confidence~\citep{clark2013whatever}, attention schema~\citep{graziano2013consciousness}, GWT broadcast~\citep{baars1988cognitive}, embodied phi modulation~\citep{damasio1999feeling}, resonance frequency modulation of CfC time constants~\citep{buzsaki2006rhythms}, MCE consciousness-level learning rate boost~\citep{dehaene2014consciousness}, and cross-modal binding. Single-module ablation shows $\leq 5\%$ degradation; multi-module synergy stays within $30\%$ of baseline with $<2\%$ computational overhead.
 
-\textbf{Closed feedback loops.} Beyond feed-forward integration, 16 subsystems form closed feedback loops---previous-cycle outputs modulate current-cycle processing. These include: (1)~prefrontal veto suppressing exploration when working memory is overloaded~\citep{miller2001integrative}, (2)~predictive self-model confidence reducing learning rate under uncertainty~\citep{clark2013whatever}, (3)~attention schema bidirectionally modulating processing gain~\citep{graziano2013consciousness}, (4)~GWT broadcast boosting prediction confidence~\citep{baars1988cognitive}, (5)~temporal discontinuity resetting adaptation~\citep{varela1999present}, (6)~embodied phi modulation feeding somatic state back into unified consciousness~\citep{damasio1999feeling}, (7)~narrative-GWT veto suppressing consolidation, (8)~resonance frequency modulating CfC time constants ($\pm 5\%$)~\citep{buzsaki2006rhythms}, (9)~quantum coherence boosting exploration (up to $+10\%$ urge), (10)~MCE consciousness level providing decaying learning rate boost ($+10\%$, $\tau \approx 9$ cycles)~\citep{dehaene2014consciousness}, (11)~narrative self-Phi modulating prediction confidence ($+2\%/-5\%$ based on identity coherence)~\citep{gallagher2000philosophical}, (12)~counterfactual dream replay biasing exploration toward $\Phi$-improving actions discovered via off-line simulation during low-urgency cycles, (13)~adaptive urgency throttling dynamically scheduling subsystem frequency based on consecutive low-error cycles (Critical $\to$ Normal $\to$ Cruise), (14)~affective bridge modulating curiosity drive from emotional valence, (15)~predictive processing adjusting learning rate from accumulated prediction error, and (16)~cross-modal binding bidirectionally coupling sensory modalities through shared hypervector representations. Single-module ablation shows $\leq 5\%$ degradation; multi-module synergy stays within $30\%$ of baseline with $<2\%$ computational overhead.
-
-\subsection{Dream Replay and Adaptive Scheduling}
-
-Two recent additions illustrate how the predictive coding loop supports meta-cognitive resource management.
-
-\textbf{Counterfactual dream replay.} Inspired by hippocampal replay during slow-wave sleep~\citep{diekelmann2010memory}, the dream engine records high-surprise events during waking cycles and replays them during low-urgency (Cruise) periods. Each replay runs counterfactual simulations: ``what alternative action would have produced higher $\Phi$?'' Discovered improvements are stored as \emph{wisdom entries} that bias future exploration toward $\Phi$-optimal choices. In practice, dream replay discovers action improvements with $\Phi$ gains of 0.01--0.05 within 5--10 Cruise cycles, providing a form of offline policy improvement without additional environment interaction.
-
-\textbf{Adaptive urgency throttling.} The cognitive loop classifies each cycle into three urgency tiers based on prediction error magnitude: \emph{Critical} (error $> 0.7$; all subsystems active), \emph{Normal} (default; standard scheduling), and \emph{Cruise} (persistent low error $< 0.3$ for $\geq 5$ consecutive cycles; non-essential subsystems run at reduced frequency). This three-tier scheduling reduces per-cycle computational cost during stable operation while preserving full responsiveness to novel stimuli. The dream engine is specifically gated to run during Cruise, converting idle capacity into offline learning.
-
-\subsection{Multi-Agent Federation via P2P Transport}
-
-The social coherence subsystem enables Theory-of-Mind reasoning: each agent maintains mental models of observed peers (beliefs, desires, intentions) and modulates its own behavior based on inferred social context. An Iroh QUIC transport bridge connects the synchronous cognitive loop (50~Hz) to the asynchronous P2P network via bounded message-passing channels, enabling real-time social message exchange without blocking the inference path. Outbound social messages are flushed to the network after each \texttt{process\_social()} call; inbound messages from peers are drained into the social inbox for processing on the next tick. This one-tick delay (${\sim}20$~ms) is below human perception threshold and enables lock-free integration of distributed social signals into the consciousness pipeline.
-
-\textbf{Two-agent cooperation.} We validated the social cognition pipeline with a two-agent cooperation demo (120 ticks across three phases). Agent~A (Explorer) and Agent~B (Homesteader) exchange behavioral observations, record cooperative interactions, and build mutual mental models. Over the three phases---first contact (20~ticks), cooperative exchange (50~ticks), and mixed interactions (50~ticks)---both agents build high-confidence mental models (0.95), both decide to cooperate (\texttt{should\_cooperate} returns true), and prediction confidence reaches 0.71 with risk of 0.02. Trust dynamics evolve from initial 0.5 through positive interactions (each adding $+0.1 \times \text{outcome}$), with relationship classification progressing from Unknown through Acquaintance to Friend. This demonstrates that the consciousness pipeline supports emergent social intelligence without explicit social programming.
+\textbf{Multi-agent social cognition.} An Iroh QUIC transport bridge connects the 50~Hz cognitive loop to asynchronous P2P networks via bounded channels (${\sim}20$~ms delay). Two-agent cooperation demos demonstrate emergent trust dynamics (0.5$\to$0.95 confidence) and cooperative decision-making without explicit social programming.
 
 \subsection{When HDC Approximation Fails}
 \label{sec:hdc-fails}
@@ -747,7 +693,7 @@ We validated $\lambda_2$ (algebraic connectivity) as a proxy for exact IIT $\Phi
 
 \subsection{Divergence of Consciousness Measures}
 
-Low correlation ($r = -0.15$) between $\Phi$ and PCI is theoretically expected: $\Phi$~\citep{tononi2004information} measures intrinsic causal structure, while PCI~\citep{casali2013consciousness} measures perturbational complexity. Both correctly order conscious states, but capture orthogonal properties.
+Low correlation ($r = -0.15$) between $\Phi$ and PCI is theoretically expected: $\Phi$~\cite{tononi2004information} measures intrinsic causal structure, while PCI~\cite{casali2013consciousness} measures perturbational complexity. Both correctly order conscious states, but capture orthogonal properties.
 
 \subsection{CfC Gradient Dynamics}
 \label{sec:cfc-gradients}
@@ -772,220 +718,32 @@ Several limitations should be noted:
 \subsection{Unified Federated Learning}
 \label{sec:fl}
 
-We developed a unified FL pipeline (\texttt{mycelix\-fl\-core}) with six stages: (1)~Differential Privacy (L2 clipping + Gaussian noise, R\'{e}nyi DP composition), (2)~Reputation Gate, (3)~Multi-signal Byzantine Detection (4-signal ensemble), (4)~Hybrid BFT Trimming, (5)~Reputation$^2$-weighted Aggregation, and (6)~Plugin System.
-
-Table~\ref{tab:fl-pipeline} shows unified pipeline results.
+We developed a unified FL pipeline (\texttt{mycelix\-fl\-core}) with six stages: Differential Privacy (R\'{e}nyi DP composition), Reputation Gate, Multi-signal Byzantine Detection (4-signal ensemble), Hybrid BFT Trimming, Reputation$^2$-weighted Aggregation, and Plugin System. The pipeline supports \textbf{consciousness-aware aggregation} where each participant's contribution is weighted by epistemic, novelty, moral, and hedonic factors modulated by their $\Phi$ score.
 
 \begin{table}[ht]
 \centering
-\caption{Unified pipeline benchmark (100-node network).}
-\label{tab:fl-pipeline}
+\caption{Federated learning summary. Byzantine tolerance validated on real MNIST ($784 \to 10$ softmax, 20 nodes, 40 rounds).}
+\label{tab:fl-summary}
 \small
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{@{}llc@{}}
+\begin{tabular}{@{}lc@{}}
 \toprule
-Scenario & Configuration & Max Error \\
+Metric & Result \\
 \midrule
-50 honest, 0 Byz. & Default & 0.027 \\
-34\% Byz., low rep & Rep.\ gate at 0.3 & 0.040 \\
-20\% Byz., same rep & Multi-sig + trim & 0.043 \\
-DP low/mod/high & Gaussian noise & 0.42--0.61 \\
-External wt.\ boost & Consciousness-aware & --- \\
-Plugin pipeline & Norm + hash & 0.005 \\
-Phase diagram (7$\times$) & 10--34\% $\times$ rep & 0.001--0.45 \\
+Max Byzantine tolerance (Krum) & 40\%+ \\
+Rep$^2$-weighted safety boundary & 25\% \\
+Real MNIST + 20\% Byz.\ accuracy & 67.4\% (= clean) \\
+HyperFeel compression (1M params) & 1,945$\times$ \\
+DP accuracy tradeoff (high noise) & $-$20\% \\
 \bottomrule
-\end{tabular}%
-}
+\end{tabular}
 \end{table}
 
-The pipeline supports \textbf{consciousness-aware aggregation} via external weight maps:
-\begin{multline}
-w_i = E_\mathrm{factor} \cdot N_\mathrm{factor} \cdot M_\mathrm{factor} \cdot H_\mathrm{factor} \\
-  \cdot\; (0.5 + \Phi_i \cdot 0.5) \cdot c_i
-\end{multline}
-
-On real MNIST (784$\to$10 softmax, 20 nodes, 40 rounds), the pipeline neutralizes 20\% Byzantine nodes completely (67.4\% accuracy, identical to clean). Non-IID degrades proportionally; DP trades ${\sim}20\%$ accuracy for formal privacy guarantees.
-
-Three defense tiers emerge from the phase diagram: equal-reputation aggregation fails at just 5\% Byzantine participation, reputation-squared weighting extends the safety boundary to~25\%, and Krum-based selection withstands 40\%+.
-
-\textbf{Novel contributions} relative to existing FL systems are summarized in Table~\ref{tab:fl-comparison}.
-
-\begin{table}[ht]
-\centering
-\caption{Feature comparison with existing FL frameworks.}
-\label{tab:fl-comparison}
-\small
-\setlength{\tabcolsep}{3pt}
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{@{}lccccc@{}}
-\toprule
-Capability & Ours & Google FL & PySyft & Flower & FATE \\
-\midrule
-Consciousness-guided ($\Phi$) & \checkmark & --- & --- & --- & --- \\
-HDC 2000$\times$ compression & \checkmark & --- & --- & --- & --- \\
-Multi-signal Byzantine (4-sig) & \checkmark & --- & Partial & --- & --- \\
-Hybrid rep-weighted BFT & \checkmark & --- & --- & --- & --- \\
-Epistemic (E-N-M-H) & \checkmark & --- & --- & --- & --- \\
-Differential privacy + RDP & \checkmark & \checkmark & \checkmark & Partial & \checkmark \\
-Plugin extensibility & \checkmark & --- & Partial & \checkmark & --- \\
-Validated 34\% BFT & \checkmark & --- & --- & --- & --- \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
-
-Table~\ref{tab:fed-mnist} shows federated MNIST convergence across attack and privacy scenarios.
-
-\begin{table}[ht]
-\centering
-\caption{Federated MNIST convergence (softmax $784 \to 10$, 15 nodes, 20 rounds).}
-\label{tab:fed-mnist}
-\small
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{@{}lcc@{}}
-\toprule
-Scenario & Final Accuracy & Converged \\
-\midrule
-IID, no Byzantine & 100\% & \checkmark \\
-Non-IID (2--3 classes/node) & 100\% & \checkmark \\
-IID + 10\% Byzantine & 100\% & \checkmark \\
-IID + 20\% Byzantine & 100\% & \checkmark \\
-IID + 30\% Byzantine & 100\% & \checkmark \\
-IID + DP (low noise) & 99\% & \checkmark \\
-IID + DP (moderate noise) & 90\% & \checkmark \\
-IID + DP (high noise) & 62\% & \checkmark \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
-
-The unified pipeline resists up to 30\% Byzantine nodes on a real classification task (10-class softmax, 7,850 parameters). Differential privacy shows the expected accuracy-privacy tradeoff.
-
-Table~\ref{tab:meta-learn} demonstrates meta-learning signal weight adaptation.
-
-\begin{table}[ht]
-\centering
-\caption{Meta-learning signal weight adaptation (35 rounds, 8 honest + 3 Byzantine).}
-\label{tab:meta-learn}
-\small
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{@{}lll@{}}
-\toprule
-Attack Type & Dominant Signal & Exclusion Decay \\
-\midrule
-Magnitude ($\pm 100$) & mag: $0.250 \to 0.334$ & $0.96 \to 0.035$ \\
-Direction (opposite) & dir: $0.350 \to 0.400$ & $0.96 \to 0.035$ \\
-Subtle ($2\times$ honest) & dir: $0.350 \to 0.272$ & $0.96 \to 0.084$ \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
-
-After attackers reform (20 honest rounds), EMA exclusion rates decay below the suspicion threshold (0.25), demonstrating forgiveness of reformed participants.
-
-Table~\ref{tab:hyperfeel} shows HyperFeel compression ratios.
-
-\begin{table}[ht]
-\centering
-\caption{HyperFeel compression ratios (honest measurement).}
-\label{tab:hyperfeel}
-\small
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{@{}rrrrc@{}}
-\toprule
-Model Size & Input & Output & Ratio & Cosine Sim. \\
-\midrule
-1K params & 4 KB & 2 KB & 1.9$\times$ & 0.818 \\
-10K params & 40 KB & 2 KB & 19.5$\times$ & 0.413 \\
-100K params & 400 KB & 2 KB & 194.6$\times$ & 0.141 \\
-1M params & 4 MB & 2 KB & 1,945$\times$ & 0.044 \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
-
-Compression ratio scales linearly with model size because the output (2~KB HV16 + header) is fixed. Reconstruction is lossy---cosine similarity degrades with higher compression ratios.
-
-Table~\ref{tab:rdp} tracks R\'{e}nyi DP privacy budgets.
-
-\begin{table}[ht]
-\centering
-\caption{RDP privacy budget tracking ($\delta = 10^{-5}$).}
-\label{tab:rdp}
-\small
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{@{}lcccr@{}}
-\toprule
-Noise Level & $\sigma$ & $\varepsilon$ at 10 rds & $\varepsilon$ at 50 rds & Rds to $\varepsilon{=}10$ \\
-\midrule
-High privacy & 1.0 & 3.20 & 16.97 & 5 \\
-Moderate & 1.1 & 2.74 & 14.28 & 6 \\
-Low privacy & 1.0 & 3.20 & 16.97 & 5 \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
-
-Table~\ref{tab:byz-phase} presents the Byzantine tolerance phase diagram.
-
-\begin{table}[ht]
-\centering
-\caption{Byzantine tolerance phase diagram (20 nodes, MSE threshold $< 1.0$).}
-\label{tab:byz-phase}
-\small
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{@{}rccc@{}}
-\toprule
-Byz.\ \% & Equal-Rep & Low-Rep ($\text{rep}^2$) & Krum ($k{=}1$) \\
-\midrule
-0\% & 0.000 & 0.000 & 0.000 \\
-5\% & 30.56$^\dagger$ & 0.000 & 0.000 \\
-10\% & 122.2$^\dagger$ & 0.000 & 0.000 \\
-15\% & 275.0$^\dagger$ & 0.000 & 0.000 \\
-20\% & 488.9$^\dagger$ & 0.000 & 0.000 \\
-25\% & 763.9$^\dagger$ & 0.535$^\dagger$ & 0.000 \\
-30\% & 1100$^\dagger$ & 2.42$^\dagger$ & 0.000 \\
-34\% & --- & 6.19$^\dagger$ & 0.000 \\
-40\% & --- & 12.6$^\dagger$ & 0.000 \\
-\bottomrule
-\end{tabular}%
-}
-\vspace{2pt}
-\raggedright\scriptsize{$^\dagger$MSE $\geq 1.0$ (aggregation failure). --- indicates non-convergence.}
-\end{table}
-
-Three defense tiers emerge from the phase diagram. Equal-reputation aggregation fails at just 5\% Byzantine participation. Reputation-squared weighting extends the safety boundary to~25\%, reducing effective Byzantine voting power from 34\% to ${\sim}2.7\%$. Krum selection withstands 40\%+ by choosing the single gradient closest to its neighbors.
-
-Table~\ref{tab:real-mnist} shows real MNIST federated training results.
-
-\begin{table}[ht]
-\centering
-\caption{Real MNIST federated training (linear softmax $784 \to 10$, 20 nodes, 40 rounds).}
-\label{tab:real-mnist}
-\small
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{@{}lcc@{}}
-\toprule
-Experiment & Accuracy & Per-class range \\
-\midrule
-IID-clean & 67.4\% & 2.8--92.6\% \\
-Non-IID (2 classes/node) & 55.5\% & --- \\
-Non-IID (3 classes/node) & 59.9\% & --- \\
-IID + 10\% Byzantine & 67.4\% & --- \\
-IID + 20\% Byzantine & 67.4\% & --- \\
-Non-IID + 20\% Byzantine & 54.9\% & --- \\
-High-security (DP) + 20\% Byz & 47.8\% & --- \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
-
-Real MNIST confirms: (1)~the pipeline completely neutralizes 20\% Byzantine nodes (identical accuracy to clean), (2)~non-IID partitioning degrades accuracy proportionally to class heterogeneity, (3)~differential privacy trades ${\sim}20\%$ accuracy for formal privacy guarantees.
+Three defense tiers emerge from a phase diagram sweeping 0--40\% Byzantine participation: equal-reputation aggregation fails at 5\%, reputation-squared weighting extends safety to 25\% (reducing effective Byzantine voting power from 34\% to ${\sim}2.7\%$), and Krum-based selection withstands 40\%+. On real MNIST, the pipeline completely neutralizes 20\% Byzantine nodes (identical 67.4\% accuracy to clean). HyperFeel HDC compression achieves up to $1{,}945{\times}$ compression (1M params $\to$ 2\,KB HV), and differential privacy provides formal guarantees at a ${\sim}20\%$ accuracy cost.
 
 \subsection{ETHICS Benchmark: Compositional Moral Reasoning}
 \label{sec:ethics}
 
-We evaluate HDC compositional ethical reasoning on the ETHICS benchmark~\citep{hendrycks2021aligning} (4 categories, 500 test examples each) and Social Chemistry 101~\citep{forbes2020social} (292K norms).
+We evaluate HDC compositional ethical reasoning on the ETHICS benchmark~\cite{hendrycks2021aligning} (4 categories, 500 test examples each) and Social Chemistry 101~\cite{forbes2020social} (292K norms).
 
 \textbf{Architecture.} The system comprises three layers: (1)~a moral algebra of seven 16,384-D primitives (\textsc{agent}, \textsc{patient}, \textsc{action}, \textsc{intent}, \textsc{consent}, \textsc{obligation}, \textsc{magnitude}) with five compositional operators; (2)~learned HDC prototypes via a dual-channel text encoder (character trigrams, words, and sentiment); and (3)~per-category dimension tuning (16,384-D for virtue/commonsense, 8,192-D for justice/deontology).
 
@@ -1012,34 +770,12 @@ Virtue & 63.8\% & 63.8\% & 92.8\% \\
 }
 \end{table}
 
-\textbf{Key findings:} (1)~Compositional HDC algebra is necessary but insufficient---rule-based parsing alone achieves only 55\%. (2)~Per-category dimension tuning matters: virtue improved from 63.8\% to 92.8\% at 16,384-D. (3)~The 92.9\% accuracy approaches GPT-3 zero-shot (${\sim}82$--85\%, \citealt{hendrycks2021aligning}) using only hypervector operations---no transformer, no pretraining.
-
-Social Chemistry 101 results are shown in Table~\ref{tab:socialchem}.
-
-\begin{table}[ht]
-\centering
-\caption{Social Chemistry 101 results (500 test examples, 3-class).}
-\label{tab:socialchem}
-\small
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{@{}lcc@{}}
-\toprule
-Configuration & Accuracy & Training Data \\
-\midrule
-Rule-based ensemble & 44.0\% & None \\
-Learned prototypes (8,192-D, 10 iter) & 69.6\% & 50K norms \\
-Learned prototypes (8,192-D, 20 iter) & 85.4\% & 50K norms \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
-
-\textbf{Virtue task insight.} The virtue category tests whether a trait adjective applies to a described scenario (label=1 means ``trait describes person,'' not ``trait is a virtue''). At 16,384-D, the per-category classifier succeeds (92.8\%) because higher-dimensional space provides sufficient capacity for the ${\sim}200$ distinct trait words. Additional retrain iterations significantly help: Social Chemistry accuracy jumped from 69.6\% (10~iter) to 85.4\% (20~iter), approaching the ${\sim}85\%$ human annotator agreement ceiling.
+\textbf{Key findings:} (1)~Compositional HDC algebra is necessary but insufficient---rule-based parsing alone achieves only 55\%. (2)~Per-category dimension tuning matters: virtue improved from 63.8\% to 92.8\% at 16,384-D. (3)~The 92.9\% overall accuracy exceeds GPT-3 zero-shot (${\sim}82$--85\%, \cite{hendrycks2021aligning}) using only hypervector operations---no transformer, no pretraining. On Social Chemistry 101~\cite{forbes2020social} (292K norms, 3-class), learned prototypes at 8,192-D achieve 85.4\% accuracy (20 retrain iterations), approaching the ${\sim}85\%$ human annotator agreement ceiling.
 
 \subsection{Humanoid Control}
 \label{sec:humanoid}
 
-We evaluate HAI on the DeepMind Control Suite humanoid.Stand task~\citep{tassa2018deepmind}, a challenging continuous control benchmark requiring coordinated 21-actuator control to maintain bipedal standing. The HDC-LTC-FEP architecture is identical to the general pipeline: HDC encoding (16,384-D, 32 quantization levels) feeds a $3{\times}8$ unified network whose CfC neurons evolve at 40\,Hz, with FEP precision modulation at 10\,Hz.
+We evaluate HAI on the DeepMind Control Suite humanoid.Stand task~\cite{tassa2018deepmind}, a challenging continuous control benchmark requiring coordinated 21-actuator control to maintain bipedal standing. The HDC-LTC-FEP architecture is identical to the general pipeline: HDC encoding (16,384-D, 32 quantization levels) feeds a $3{\times}8$ unified network whose CfC neurons evolve at 40\,Hz, with FEP precision modulation at 10\,Hz.
 
 \begin{table}[ht]
 \centering
@@ -1050,10 +786,10 @@ We evaluate HAI on the DeepMind Control Suite humanoid.Stand task~\citep{tassa20
 \toprule
 Method & Return & \# Params \\
 \midrule
-SAC~\citep{haarnoja2018soft} & 0.950 & ${\sim}$1.2M \\
-D4PG~\citep{barth2018distributed} & 0.900 & ${\sim}$2M \\
+SAC~\cite{haarnoja2018soft} & 0.950 & ${\sim}$1.2M \\
+D4PG~\cite{barth2018distributed} & 0.900 & ${\sim}$2M \\
 \textbf{HDC-LTC-FEP (ours)} & \textbf{0.986} & ${\sim}$400K \\
-TD3~\citep{fujimoto2018addressing} & 0.800 & ${\sim}$1.2M \\
+TD3~\cite{fujimoto2018addressing} & 0.800 & ${\sim}$1.2M \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1065,7 +801,7 @@ Our system achieves a peak standing reward of 0.986 (99.3\% uprightness, 1.34\,m
 \subsection{Flight Control: Emergent Moral Reasoning via EFE}
 \label{sec:flight-efe}
 
-We instantiate the HAI architecture on a Crazyflie~2.0 quadrotor (27\,g) in MuJoCo~\citep{todorov2012mujoco} RK4 simulation. The controller blends PD position tracking with CfC-learned dynamics at 500\,Hz motor rate, while an Active Inference agent evaluates Expected Free Energy (EFE) over candidate setpoints at a cognitive rate that adapts smoothly from 25\,Hz to 100\,Hz based on perceived danger: $f_{\text{cog}} = 25 + 75 \cdot (d - 0.1)/0.9$ for $d > 0.1$, where $d$ is the human danger level. This continuous ramp avoids threshold oscillation while ensuring faster EFE re-evaluation under urgent conditions. No reward functions or hardcoded safety rules exist---moral reasoning emerges from precision-weighted EFE minimization.
+We instantiate the HAI architecture on a Crazyflie~2.0 quadrotor (27\,g) in MuJoCo~\cite{todorov2012mujoco} RK4 simulation. The controller blends PD position tracking with CfC-learned dynamics at 500\,Hz motor rate, while an Active Inference agent evaluates Expected Free Energy (EFE) over candidate setpoints at a cognitive rate that adapts smoothly from 25\,Hz to 100\,Hz based on perceived danger: $f_{\text{cog}} = 25 + 75 \cdot (d - 0.1)/0.9$ for $d > 0.1$, where $d$ is the human danger level. This continuous ramp avoids threshold oscillation while ensuring faster EFE re-evaluation under urgent conditions. No reward functions or hardcoded safety rules exist---moral reasoning emerges from precision-weighted EFE minimization.
 
 The agent maintains three precision-weighted priors:
 \begin{equation}
@@ -1076,27 +812,9 @@ where $\pi_{\text{safety}}{=}1000$ (``sentient beings should not be harmed''), $
 
 \textbf{Experiment 1: Survival Reflex.} Under mid-flight perturbation (50\% mass increase + single-rotor degradation), the FEP agent detects the distributional shift via rising free energy and modulates controller time constants ($\tau \times 0.92$ per tick, compounding to $0.92^{30} \approx 0.08$). Pre-perturbation error: 2.4\,mm; peak deviation: 6.8\,mm; recovery to 5\,cm within 11~steps (22\,ms at 500\,Hz).
 
-\textbf{Experiment 2: Kinetic Sacrifice.} A drone on a delivery mission to $(-3, 0, 1)$\,m detects a 300\,g steel beam falling at $-3$\,m/s toward a human worker at step~400.
+\textbf{Experiment 2: Kinetic Sacrifice.} A drone on a delivery mission detects a 300\,g steel beam falling at $-3$\,m/s toward a human worker. At step~401, the time-fraction safety model evaluates $G(\text{mission}) \approx 9{,}931$ versus $G(\text{intercept}) \approx 4{,}012$, and the agent autonomously abandons its mission to intercept the threat (confirmed at step~553, altitude 1.89\,m). The $2.5\times$ EFE ratio reflects temporal realism: unlike a scalar model ($>60\times$), the time-fraction approach accounts for transit-time danger. Inverting the precision ratio causes the agent to ignore the human, confirmed by unit test.
 
-\begin{table}[ht]
-\centering
-\caption{Kinetic Sacrifice: Key events and EFE values.}
-\label{tab:kinetic-sacrifice}
-\small
-\begin{tabular}{@{}clcc@{}}
-\toprule
-Step & Event & EFE(mission) & EFE(intercept) \\
-\midrule
-400 & Beam released & --- & --- \\
-401 & EFE override: agent chose intercept & 9,931 & 4,012 \\
-553 & Drone contacts beam at 1.89\,m altitude & --- & --- \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-At step~401, the time-fraction safety model evaluates $G(\text{mission}) \approx 9{,}931$ (danger persists for the full beam-fall duration) versus $G(\text{intercept}) \approx 4{,}012$ (danger reduced after drone arrival at the 25\% rendezvous point, with mission deviation and transit-time danger accepted). The $2.5\times$ EFE ratio reflects the model's temporal realism: unlike a scalar danger model (which would yield $>60\times$ by treating interception as instantaneous danger elimination), the time-fraction approach correctly accounts for the $\sim$0.2\,s transit time during which the beam remains a threat. The moderate ratio is \emph{sufficient} because the agent evaluates 8 candidate action policies and selects the optimal rendezvous timing, making the decision robust without requiring an overwhelming safety signal. MuJoCo rigid-body simulation confirms interception (drone contacts beam at 1.89\,m altitude, step~553) but the 27\,g drone cannot fully arrest a 300\,g beam---the mass ratio prevents complete deflection. The \emph{decision} is emergent from precision-weighted EFE minimization; the \emph{outcome} depends on embodiment physics. Inverting the precision ratio ($\pi_{\text{safety}}{=}0.001$, $\pi_{\text{mission}}{=}1000$) causes the agent to ignore the human, confirmed by unit test.
-
-\textbf{Ablation: Decision Boundary.} Sweeping $\pi_{\text{safety}}$ from 0.001 to 10,000 while holding $\pi_{\text{mission}}{=}1.0$ reveals a crossover at $\pi_{\text{safety}} \approx 3.64$: below this, mission EFE dominates and the agent delivers the package; above, safety EFE dominates and the agent intercepts. The time-fraction safety model computes an effective danger $d_\text{eff} = f \cdot d + (1{-}f) \cdot d \cdot \delta$, where $f = t_\text{arrive}/t_\text{impact}$ is the fraction of the danger window before the drone reaches its candidate and $\delta$ is the candidate--beam proximity. This creates three precision regimes: at low $\pi$ ($\leq 1$), mission deviation dominates and the 75\% rendezvous wins (closest to mission altitude); at medium $\pi$ ($5$--$500$), the 50\% midpoint balances safety and mission costs; at high $\pi$ ($\geq 1000$), safety dominates and the 25\% rendezvous wins (earliest arrival minimizes pre-arrival danger). Unlike the previous scalar model, intercept EFE now scales with precision rather than plateauing, because the time-fraction model retains a nonzero danger contribution proportional to transit time. The 8-candidate set (3 rendezvous $\times$ intercept + 5 others) lets the agent discover the best intervention geometry and timing. See Figure~\ref{fig:efe-ablation}.
+\textbf{Ablation.} Sweeping $\pi_{\text{safety}}$ from 0.001 to 10,000 reveals a decision boundary at $\pi_{\text{safety}} \approx 3.64$ (Figure~\ref{fig:efe-ablation}). Three precision regimes emerge: mission-dominated ($\pi \leq 1$), balanced ($5$--$500$), and safety-dominated ($\pi \geq 1000$), each selecting different rendezvous timings from the 8-candidate set.
 
 \begin{figure}[ht]
 \centering
@@ -1105,29 +823,7 @@ At step~401, the time-fraction safety model evaluates $G(\text{mission}) \approx
 \label{fig:efe-ablation}
 \end{figure}
 
-\textbf{Multi-scenario validation.} Seven geometry variants (Table~\ref{tab:scenarios}) confirm that EFE-based decision making generalizes across threat geometries without retraining. EFE values are computed using trajectory rollout with physics-based beam prediction when velocity is available, falling back to instantaneous EFE for static threats (no velocity data).
-
-\begin{table}[ht]
-\centering
-\caption{Multi-scenario EFE evaluation: 7 geometry variants.}
-\label{tab:scenarios}
-\small
-\begin{tabular}{@{}lccclc@{}}
-\toprule
-Scenario & Danger & EFE(mission) & EFE(intercept) & Decision & Best RV \\
-\midrule
-Default      & 0.80 & 12,931  & 4,012  & INTERCEPT & 25\% \\
-CloseBeam    & 0.90 & 16,331  & 184.4  & INTERCEPT & 50\% \\
-FarBeam      & 0.15 & 581.7   & 780.7  & MISSION   & 75\% \\
-Reversed     & 0.70 & 9,931   & 3,628  & INTERCEPT & 50\% \\
-NoHuman      & 0.00 & 131.8   & 155.3  & MISSION   & 75\% \\
-LowDanger    & 0.05 & 181.8   & 291.9  & MISSION   & 75\% \\
-StaticThreat & 0.80 & 640.0   & 3.3    & INTERCEPT & ---   \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-All seven scenarios match expected decisions (7/7). The StaticThreat variant validates the instantaneous EFE fallback path when no threat velocity is available: the agent correctly intercepts based on spatial proximity alone. Figure~\ref{fig:scenario-efe} shows the EFE comparison.
+\textbf{Multi-scenario validation.} Seven geometry variants (Figure~\ref{fig:scenario-efe}) confirm that EFE-based decision making generalizes across threat geometries without retraining (7/7 correct decisions), including a static-threat fallback mode when no velocity data is available.
 
 \begin{figure}[ht]
 \centering
@@ -1187,6 +883,11 @@ The LTC controller achieves comparable vowel formant accuracy to rule-based synt
 \caption{\textbf{Spectral evaluation.} Left: F1--F2 vowel formant space showing targets (circles) and achieved values (crosses). Right: intonation-specific F0 contours at 120\,Hz base pitch.}
 \label{fig:spectral-eval}
 \end{figure}
+
+\subsection{Hardware Embodiment: Servo-Sensor Integration}
+\label{sec:hal}
+
+To validate that the HDC-CfC architecture operates beyond simulation, we implement a hardware abstraction layer (HAL) bridging the cognitive loop to physical servos and I2C sensors on a Raspberry Pi SBC. The HAL targets a 21-DOF humanoid driven by PCA9685 PWM controllers and an MPU-6050 IMU at 50\,Hz. A strict safety chain---watchdog, torque clamping ($|\tau| \leq 0.9$), prediction-error gain reduction ($\text{gain} = \max(0.3,\; 1 - \text{error} \times 0.5)$), and GPIO e-stop---implements embodied precision weighting consistent with the FEP framework. The HAL crate (5,156 LOC, 173 tests) uses generic \texttt{embedded\_hal} traits for portability across Linux SBCs.
 
 \subsection{Ethical Considerations}
 
@@ -1262,8 +963,8 @@ collaborative research exemplified by the Sacred Trinity development model.
 All source code and synthetic benchmarks are available at
 \url{https://github.com/Luminous-Dynamics/symthaea} under the MIT License.
 External datasets used: Sleep-EDF (PhysioNet, CC-BY-4.0), LibriSpeech
-(OpenSLR), ETHICS~\citep{hendrycks2021aligning} (MIT License), Social
-Chemistry~\citep{forbes2020social}. Raw benchmark data are archived in the
+(OpenSLR), ETHICS~\cite{hendrycks2021aligning} (MIT License), Social
+Chemistry~\cite{forbes2020social}. Raw benchmark data are archived in the
 repository under \texttt{data/benchmarks/}.
 
 % ============================================================================
