@@ -622,8 +622,8 @@ impl CognitiveLoopService {
             && self.stats.total_cycles > 5
         {
             let boost = (resonator_prediction_error - 0.5) * 0.08;
-            self.adaptive_behavior.exploration_urge =
-                (self.adaptive_behavior.exploration_urge + boost).min(1.0);
+            self.curiosity_drive.exploration_urge =
+                (self.curiosity_drive.exploration_urge + boost).min(1.0);
             self.prediction_confidence =
                 (self.prediction_confidence - boost * 0.5).clamp(0.0, 1.0);
             self.stats.resonator_error_exploration_count += 1;
@@ -932,14 +932,14 @@ impl CognitiveLoopService {
         // should propagate into memory consolidation (cautious when uncertain).
         // Uses previous cycle's cached epistemic confidence to avoid temporal dependency.
         let prev_epistemic = self.carryover.quality.last_epistemic_confidence;
-        let epistemic_semantic_lr_mod = if prev_epistemic < 0.4 && prev_epistemic > 0.0 {
-            let caution = 0.8 + prev_epistemic * 0.5; // [0.8, 1.0] when conf in [0, 0.4]
-            semantic_lr_factor *= caution as f64;
+        let epistemic_semantic_lr_mod: f32 = if prev_epistemic < 0.4 && prev_epistemic > 0.0 {
+            let caution = 0.8_f32 + prev_epistemic * 0.5; // [0.8, 1.0] when conf in [0, 0.4]
+            semantic_lr_factor *= caution;
             self.stats.epistemic_semantic_mod_count += 1;
             caution - 1.0 // negative mod means dampening
         } else if prev_epistemic > 0.8 {
-            let boost = 1.0 + (prev_epistemic - 0.8) * 1.0; // [1.0, 1.2] when conf in [0.8, 1.0]
-            semantic_lr_factor *= boost as f64;
+            let boost = 1.0_f32 + (prev_epistemic - 0.8) * 1.0; // [1.0, 1.2] when conf in [0.8, 1.0]
+            semantic_lr_factor *= boost;
             self.stats.epistemic_semantic_mod_count += 1;
             boost - 1.0 // positive mod means boosting
         } else {
@@ -2429,6 +2429,41 @@ impl CognitiveLoopService {
             self.stats.reasoning_chain_boost_count += 1;
         }
 
+        // ── Phase 20: Harmonic interferences → LR feedback ───────────────────
+        // Science: Treisman (1998) — feature binding conflicts (interferences)
+        // signal integration difficulty. Many interferences (>3) dampen LR to avoid
+        // encoding conflicted representations. Zero interferences boost LR.
+        let harmonic_interference_lr_mod: f32 = if harmonic_interferences > 3 {
+            let dampen = ((harmonic_interferences - 3) as f32 * 0.02).min(0.1);
+            self.carryover.learning.subsystem_lr_factor *= 1.0 - dampen;
+            self.carryover.learning.subsystem_lr_factor =
+                self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.3);
+            self.stats.harmonic_interference_mod_count += 1;
+            -dampen
+        } else if harmonic_interferences == 0 {
+            let boost = 0.02_f32;
+            self.carryover.learning.subsystem_lr_factor *= 1.0 + boost;
+            self.carryover.learning.subsystem_lr_factor =
+                self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.3);
+            self.stats.harmonic_interference_mod_count += 1;
+            boost
+        } else {
+            0.0
+        };
+
+        // ── Phase 20: Causal relations density → urgency gating ──────────────
+        // Science: Spirtes et al. (2000) — dense causal graphs with high confidence
+        // indicate a well-mapped problem space → reduce exploration urgency.
+        let causal_urgency_gated = causal_relations_count > 10
+            && causal_avg_confidence > 0.6
+            && self.stats.total_cycles > 20;
+        if causal_urgency_gated {
+            // Boost consecutive_low_error to extend Cruise mode
+            self.carryover.urgency.consecutive_low_error =
+                self.carryover.urgency.consecutive_low_error.saturating_add(2);
+            self.stats.causal_urgency_gated_count += 1;
+        }
+
         // ── Phase 19: Attention budget gated flag for metadata ───────────────
         let attention_budget_gated = attention_budget_exceeded
             && self.stats.attention_budget_exceeded_count > 3;
@@ -3229,6 +3264,13 @@ impl CognitiveLoopService {
             love_resonance_boost,
             reasoning_chain_boosted,
             attention_shift_applied: self.stats.attention_shift,
+            // Phase 20: Signal-to-Control Synthesis
+            harmonic_interference_lr_mod,
+            resonator_error_exploration_mod,
+            binding_threshold_mod,
+            causal_urgency_gated,
+            epistemic_semantic_lr_mod,
+            predictive_budget_gated,
         };
 
         // Update cumulative stats for resonator-memory loop diagnostics

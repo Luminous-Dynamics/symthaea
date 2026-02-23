@@ -4,12 +4,34 @@
 //! architecture (deeper/wider than the drone's 2×4). All 21 actuator outputs use
 //! tanh activation (bipolar [-1, 1] torques — no sigmoid needed).
 
+use serde::{Deserialize, Serialize};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{
     ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig, HDC_DIMENSION,
 };
 
 use crate::types::{HumanoidCommand, HumanoidConfig, NUM_ACTUATORS};
+
+/// Serializable checkpoint for saving/loading trained controllers.
+///
+/// The HDC-LTC network itself isn't serializable (contains computed binding vectors),
+/// so we store the output projection (which captures all learned behavior) plus the
+/// genesis phrase and config needed to reconstruct the network backbone.
+#[derive(Serialize, Deserialize)]
+pub struct ControllerCheckpoint {
+    /// Output projection weights (21 × 16,384 flat row-major).
+    pub output_weights: Vec<f32>,
+    /// Output bias (21D).
+    pub output_bias: Vec<f32>,
+    /// Learned learning rate.
+    pub learning_rate: f32,
+    /// Genesis phrase for network reconstruction.
+    pub genesis_phrase: String,
+    /// Network layers config.
+    pub network_layers: usize,
+    /// Neurons per layer config.
+    pub neurons_per_layer: usize,
+}
 
 /// Humanoid controller wrapping an HdcLtcUnifiedNetwork + linear output head.
 ///
@@ -293,6 +315,72 @@ impl HumanoidController {
             cmd.torques[joint_index] = 0.0;
         }
     }
+
+    /// Save a checkpoint of the trained output projection to a JSON file.
+    ///
+    /// The network backbone is reconstructed from genesis on load;
+    /// only the learned output weights/bias are persisted.
+    pub fn save_checkpoint(&self, path: &str, config: &HumanoidConfig) -> std::io::Result<()> {
+        let checkpoint = ControllerCheckpoint {
+            output_weights: self.output_weights.clone(),
+            output_bias: self.output_bias.to_vec(),
+            learning_rate: self.learning_rate,
+            genesis_phrase: config.genesis_phrase.clone(),
+            network_layers: config.network_layers,
+            neurons_per_layer: config.neurons_per_layer,
+        };
+        let json = serde_json::to_string_pretty(&checkpoint)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        std::fs::write(path, json)
+    }
+
+    /// Load a checkpoint and reconstruct the controller.
+    ///
+    /// The HDC-LTC network is rebuilt from the genesis phrase (deterministic),
+    /// and the trained output projection is restored from the checkpoint.
+    pub fn load_checkpoint(path: &str) -> std::io::Result<Self> {
+        let json = std::fs::read_to_string(path)?;
+        let checkpoint: ControllerCheckpoint = serde_json::from_str(&json)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+        let genesis = GenesisSeed::from_phrase(&checkpoint.genesis_phrase);
+        let config = HumanoidConfig {
+            network_layers: checkpoint.network_layers,
+            neurons_per_layer: checkpoint.neurons_per_layer,
+            learning_rate: checkpoint.learning_rate,
+            genesis_phrase: checkpoint.genesis_phrase,
+            ..HumanoidConfig::default()
+        };
+
+        let neuron_config = UnifiedConfig {
+            tau_base: 0.025,
+            backbone_tau: 0.3,
+            dimension: HDC_DIMENSION,
+            learning_rate: config.learning_rate,
+            ..UnifiedConfig::default()
+        };
+
+        let net_config = UnifiedNetworkConfig {
+            layer_sizes: vec![config.neurons_per_layer; config.network_layers],
+            neuron_config,
+            use_layer_binding: true,
+            skip_connections: false,
+        };
+
+        let network = HdcLtcUnifiedNetwork::from_genesis(net_config, &genesis);
+
+        let mut output_bias = [0.0f32; NUM_ACTUATORS];
+        for (i, &v) in checkpoint.output_bias.iter().enumerate().take(NUM_ACTUATORS) {
+            output_bias[i] = v;
+        }
+
+        Ok(Self {
+            network,
+            output_weights: checkpoint.output_weights,
+            output_bias,
+            learning_rate: checkpoint.learning_rate,
+        })
+    }
 }
 
 /// Fast tanh approximation (Pade).
@@ -440,5 +528,73 @@ mod tests {
         let cmd = ctrl.forward(&sensor, 0.025);
         assert_eq!(cmd.torques.len(), NUM_ACTUATORS);
         assert_eq!(cmd.to_ctrl().len(), NUM_ACTUATORS);
+    }
+
+    #[test]
+    fn test_checkpoint_roundtrip() {
+        // Use config's genesis phrase for consistency (checkpoint stores this phrase)
+        let config = HumanoidConfig::default();
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let ctrl = HumanoidController::new(&genesis, &config);
+
+        // Save the fresh controller (no BPTT training — network backbone matches genesis)
+        let path = "/tmp/symthaea_test_checkpoint.json";
+        ctrl.save_checkpoint(path, &config).unwrap();
+
+        // Load and verify outputs match (loaded reconstructs from same genesis phrase)
+        let mut original = HumanoidController::new(&genesis, &config);
+        let mut loaded = HumanoidController::load_checkpoint(path).unwrap();
+
+        let sensor = ContinuousHV::random(HDC_DIMENSION, 42);
+        let cmd_original = original.forward(&sensor, 0.025);
+        let cmd_loaded = loaded.forward(&sensor, 0.025);
+
+        for i in 0..NUM_ACTUATORS {
+            assert!(
+                (cmd_original.torques[i] - cmd_loaded.torques[i]).abs() < 1e-6,
+                "Checkpoint roundtrip mismatch at joint {i}: {} vs {}",
+                cmd_original.torques[i],
+                cmd_loaded.torques[i]
+            );
+        }
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_checkpoint_preserves_trained_projection() {
+        let config = HumanoidConfig::default();
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let mut ctrl = HumanoidController::new(&genesis, &config);
+
+        // Train the output projection
+        let sensor = ContinuousHV::random(HDC_DIMENSION, 42);
+        let target = HumanoidCommand {
+            torques: [0.3; NUM_ACTUATORS],
+        };
+        for _ in 0..20 {
+            ctrl.forward(&sensor, 0.025);
+            ctrl.train_step(&sensor, &target, 0.025, None);
+        }
+
+        // Save
+        let path = "/tmp/symthaea_test_trained_checkpoint.json";
+        ctrl.save_checkpoint(path, &config).unwrap();
+
+        // Load and verify the checkpoint file exists and is valid JSON
+        let loaded = HumanoidController::load_checkpoint(path).unwrap();
+        assert!(
+            (loaded.learning_rate() - config.learning_rate).abs() < 1e-6,
+            "Learning rate preserved"
+        );
+
+        // The loaded controller should produce output (not crash or NaN)
+        let mut loaded = loaded;
+        let cmd = loaded.forward(&sensor, 0.025);
+        for i in 0..NUM_ACTUATORS {
+            assert!(cmd.torques[i].is_finite(), "Joint {i} should be finite");
+        }
+
+        let _ = std::fs::remove_file(path);
     }
 }

@@ -358,12 +358,24 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             + self.body.segment_lengths[SEG_HEAD] * uprightness;
 
         // 5. Horizontal dynamics
-        self.state.root_linear_velocity[0] +=
-            self.external_force[0] / self.body.total_mass * dt;
-        self.state.root_linear_velocity[1] +=
-            self.external_force[1] / self.body.total_mass * dt;
+        // Torso lean drives forward/lateral COM acceleration (inverted pendulum model).
+        // Forward (x) from sagittal tilt, lateral (y) from coronal tilt.
+        // Only when upright enough to push off the ground (uprightness > 0.3).
+        let lean_accel_scale = if uprightness > 0.3 {
+            g * 0.4 * (uprightness - 0.3).min(0.7) / 0.7
+        } else {
+            0.0
+        };
+        let forward_accel = tilt_sagittal * lean_accel_scale;
+        let lateral_accel = tilt_coronal * lean_accel_scale;
 
-        let drag = 0.5;
+        self.state.root_linear_velocity[0] +=
+            (forward_accel + self.external_force[0] / self.body.total_mass) * dt;
+        self.state.root_linear_velocity[1] +=
+            (lateral_accel + self.external_force[1] / self.body.total_mass) * dt;
+
+        // Ground friction drag (higher than air drag — feet on ground)
+        let drag = 2.0;
         self.state.root_linear_velocity[0] *= (1.0 - drag * dt).max(0.0);
         self.state.root_linear_velocity[1] *= (1.0 - drag * dt).max(0.0);
 

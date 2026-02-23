@@ -138,6 +138,9 @@ mod moral;
 mod prediction;
 pub(crate) mod virtual_body;
 
+#[cfg(feature = "humanoid")]
+pub mod motor_bridge;
+
 // ── Imports (only what the struct definitions below require) ─────────────────
 use crate::brain::affective_bridge::AffectiveBridge;
 use crate::brain::prefrontal::PrefrontalCortex;
