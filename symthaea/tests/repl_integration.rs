@@ -9,7 +9,9 @@
 //! - MetricsAggregator initial state
 
 use symthaea::repl::observability_hooks::MetricsAggregator;
-use symthaea::repl::{ConsciousnessTracer, OrchestratorConfig, ReplOrchestrator, ReplSession, ReplSessionConfig};
+use symthaea::repl::{
+    ConsciousnessTracer, OrchestratorConfig, ReplOrchestrator, ReplSession, ReplSessionConfig,
+};
 
 // ============================================================================
 // ReplSession Creation Tests
@@ -51,7 +53,8 @@ fn test_session_process_increments_stats() {
     assert!(result2.is_ok(), "Second process should succeed");
 
     assert_eq!(
-        session.stats().total_interactions, 2,
+        session.stats().total_interactions,
+        2,
         "Should have 2 total interactions"
     );
 }
@@ -98,11 +101,7 @@ fn test_session_history_records_turns() {
         let _ = session.process(msg);
     }
 
-    assert_eq!(
-        session.history().len(),
-        3,
-        "History should contain 3 turns"
-    );
+    assert_eq!(session.history().len(), 3, "History should contain 3 turns");
 }
 
 #[test]
