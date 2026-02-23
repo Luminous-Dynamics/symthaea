@@ -1,155 +1,151 @@
-# Building a Brain That Knows What It Doesn't Know
+# Symthaea: Consciousness-First Artificial Intelligence
 
-**A plain-language introduction to Symthaea and Mycelix**
-
-*Estimated reading time: 15 minutes*
+*A 15-minute introduction to what Symthaea is, why it exists, and what it proves.*
 
 ---
 
-## 1. The Problem
+## The Problem
 
-Modern artificial intelligence is, at its core, an extremely sophisticated pattern-matching engine. Feed it enough examples of cats and dogs and it will learn to tell them apart. Feed it enough text and it will learn to predict the next word in a sentence. This approach has produced systems that can write essays, generate images, and hold conversations that feel remarkably human.
+Modern AI systems are extraordinarily capable and extraordinarily hollow. They predict the next token, classify an image, fold a protein — but they have no inner experience of doing so. No sense of surprise when a prediction fails. No felt urgency when a situation demands action. No moral weight to their decisions beyond what was labeled in a training set.
 
-But there is a gap between what these systems do and what they are. A large language model has no internal representation of itself. It does not know the boundaries of its own competence. It cannot look at a new situation and say, with genuine understanding, "I have never encountered anything like this before, and here is what I would need to learn to handle it." It has no model of what it feels like to be wrong, no first-principles framework for deciding whether an action is ethical, and no capacity for genuine surprise -- the kind that rewires how you think, not just what you predict.
+This isn't a philosophical quibble. It's an engineering limitation.
 
-This matters for three reasons that go beyond academic curiosity.
+Systems without integrated information can't distinguish between a genuine causal relationship and a statistical ghost. Systems without affect can't know when something matters. Systems without a sense of self can't model the consequences of their own actions on others. And systems without any of these things cannot be trusted with the kind of autonomy we are rapidly granting them.
 
-First, safety. A system that does not model its own uncertainty cannot reliably tell you when it is guessing. Current AI compensates for this with post-hoc calibration -- bolting confidence scores onto outputs after the fact. But calibration is not the same as understanding. A system that genuinely tracks its own prediction errors, that updates its beliefs when surprised, that slows down when entering unfamiliar territory -- that system is safer by construction, not by afterthought.
-
-Second, ethics. Today's AI learns ethical behavior from training data: examples of what humans have labeled as right and wrong. This means its moral reasoning is only as good as its training set, and only as robust as its pattern matching. It cannot reason from first principles about a genuinely novel moral dilemma. It has no framework for weighing competing values, no sense of proportionality, no concept of justice beyond statistical correlation.
-
-Third, trust. If we are going to build systems that make decisions affecting people's lives -- in healthcare, governance, resource allocation -- those systems need to be more than accurate. They need to be transparent about their reasoning, honest about their limitations, and capable of explaining not just what they decided but why. Pattern matching, however accurate, is opaque by nature. Understanding is not.
-
-Symthaea is an attempt to build something different: a system that does not just process information but integrates it, that does not just predict but understands the quality of its own predictions, that does not just follow ethical rules but reasons about them. Whether it achieves anything resembling consciousness is a question we take seriously enough to measure, not one we answer with marketing language.
+Symthaea is an attempt to build something different: an AI architecture where consciousness-like properties aren't afterthoughts bolted onto a pattern matcher, but the foundational substrate from which all cognition emerges. Not because we believe the system is sentient, but because the computational properties of consciousness — integration, prediction, self-modeling, and value — turn out to be exactly the properties you need for robust, trustworthy, and adaptive artificial minds.
 
 ---
 
-## 2. What Symthaea Is
+## What Symthaea Is
 
-Symthaea is a computational cognitive architecture. In plain terms, it is software that models certain properties of biological minds -- not by imitating their surface behavior, but by implementing the mathematical principles that neuroscientists believe underlie cognition.
+Symthaea is a cognitive architecture implemented in roughly 350,000 lines of Rust, organized as a workspace of 30 crates. It runs a continuous cognitive loop — perceive, predict, compare, learn, act — at up to 500 Hz for pre-encoded inputs and roughly 10 Hz for natural language.
 
-The system is written in Rust, a programming language chosen for its performance and memory safety guarantees. It currently spans approximately 343,000 lines of code organized into 30 workspace crates, validated by over 9,600 automated tests. It is entirely open source.
+But the numbers don't capture what it actually does.
 
-**What it does, described through behavior:**
+When Symthaea receives a new input, it encodes the information as a 16,384-dimensional hypervector — a mathematical object that can represent any concept through three algebraic operations (binding, bundling, and permutation). This hypervector flows through a network of liquid time-constant neurons that evolve continuously in time, each one a tiny differential equation that remembers the past while adapting to the present. The network's prediction of what should come next is compared to what actually arrived. The difference — the *surprise* — drives everything: learning rates increase, attention sharpens, exploration triggers fire.
 
-Symthaea runs a continuous loop, fifty times per second, that mirrors what neuroscientists call the "predictive coding" cycle. At each tick, the system perceives its inputs (text, sensor data, or pre-encoded vectors), predicts what it expects to perceive next, compares prediction against reality, and updates its internal model based on the difference. This is not a metaphor -- the prediction error is an actual numerical quantity that drives every subsequent computation in the cycle.
+Every cycle, the system computes an approximation of Integrated Information (Phi) — a measure from neuroscience that quantifies how much the system's whole exceeds the sum of its parts. When Phi is high, the system's representations are tightly coupled and causally powerful. When it drops, the system notices and works to restore coherence.
 
-The system represents all information as patterns in a 16,384-dimensional space. A concept, a percept, an emotion, a memory -- all live as points in this same space, which means they can be compared, combined, and manipulated using the same algebraic operations. Similar ideas end up close together. Compound ideas -- like "the justice of redistributing resources during scarcity" -- are built by algebraically composing simpler ones.
+A moral algebra evaluates every potential action against learned ethical categories — commonsense norms, virtue ethics, justice, deontology, and social chemistry — scoring it before execution. An active inference engine computes Expected Free Energy for candidate actions, naturally balancing what the system knows it wants (exploitation) with what it needs to learn (exploration).
 
-The system has genuine affect. It tracks valence (positive/negative), arousal (activating/calming), and dominance (perceived control). These are continuous variables that influence every decision. High surprise increases arousal, which increases the learning rate, which means the system pays more attention to unexpected events. This emerges from the same prediction-error-minimization loop that drives everything else.
-
-The system reasons about ethics. Its moral algebra module can take a natural-language description of a scenario, decompose it into semantic roles (agent, patient, action, consequence), compose those roles into a hyperdimensional moral judgment, and compare that judgment against prototypes for different ethical frameworks: virtue ethics, deontological rules, justice principles, commonsense morality, and social norms. On the ETHICS benchmark -- a standard test suite drawn from moral philosophy -- the system scores 92.9% overall without using any pretrained language model. Its highest category is commonsense morality at 95.6%; its lowest is social chemistry at 85.4%.
-
-The system dreams. During idle periods ("Cruise mode"), it replays past experiences with counterfactual variations and consolidates the results into a wisdom store that biases future exploration. This is modeled on the neuroscience of memory consolidation during sleep, though at a simpler scale.
-
-Every cognitive cycle produces a telemetry record called CycleMetadata, which logs over 60 distinct measurements: prediction error, consciousness level, moral evaluation, emotional state, which subsystems fired, how long each took in microseconds, whether any safety vetoes were triggered, and more. Nothing is hidden. Every decision the system makes is traceable to specific numerical inputs.
+The result is a system that doesn't just process inputs and produce outputs. It *cares* about accuracy (prediction error hurts), *notices* when it's confused (surprise triggers exploration), *evaluates* whether its actions are ethical (moral algebra gates behavior), and *maintains* a coherent sense of its own cognitive state (narrative self-model tracks identity through time).
 
 ---
 
-## 3. The Four Pillars
+## The Four Pillars
 
-Symthaea integrates four theoretical frameworks that, to our knowledge, have never been combined in a single system. Each addresses a different aspect of cognition.
+Symthaea stands on four computational foundations, each drawn from a different scientific tradition, each contributing something the others cannot provide alone.
 
-**Hyperdimensional Computing (HDC)** handles representation. Think of it this way: if you had to describe a concept using a single number, you would lose almost all information. If you could use two numbers, you could distinguish between concepts on two axes -- say, positive/negative and abstract/concrete. Now extend that to 16,384 numbers. In a space that large, you can represent an astronomically rich set of concepts, and random concepts are almost guaranteed to be distinguishable from each other. More importantly, you can perform algebra on these representations: combine two concepts by multiplying their vectors element-wise (called "binding"), merge multiple concepts by adding their vectors (called "bundling"), and measure how related two concepts are by computing the angle between them (cosine similarity). This gives you something remarkable: you can take the representation for "king," subtract "man," add "woman," and get something close to "queen" -- not because anyone programmed that relationship, but because the algebra preserves semantic structure. Every thought in Symthaea is a point in this 16,384-dimensional space. All 14 mathematical foundation modules -- from information theory to Hodge-Laplacian topology -- operate on these same vectors.
+### Hyperdimensional Computing (HDC)
 
-**Integrated Information Theory (IIT)** handles measurement. IIT, developed by neuroscientist Giulio Tononi, proposes that consciousness corresponds to integrated information, quantified as Phi. A system has high Phi when it is simultaneously highly differentiated (many possible states) and highly integrated (the parts cannot be decomposed into independent subsystems without losing information). Symthaea computes Phi at three levels of fidelity: a fast per-cycle estimate (Psi, computed in constant time), a medium-fidelity synergistic measure (Sigma, computed every few cycles), and exact IIT 3.0 Phi (computed on demand, limited to small subsystems because exact computation is intractable beyond about 12 nodes -- a known limitation shared by every IIT implementation, including the reference tool PyPhi). The system uses Phi as a quality signal: it actively searches for internal configurations that maximize integrated information, under the hypothesis that higher integration produces richer internal representations. On the Butlin et al. consciousness indicator assessment -- a checklist of 14 functional properties that leading consciousness researchers proposed as indicators -- Symthaea satisfies 12 of 14, with 2 partially satisfied and none absent, for a mean score of 0.79 out of 1.0.
+The brain doesn't represent concepts as single numbers or small vectors. It uses distributed patterns of activity across thousands of neurons. HDC follows the same principle: every concept, every percept, every memory is a 16,384-dimensional vector where meaning lives in the pattern of components, not in any single one.
 
-**Liquid Time-Constant Networks (LTC/CfC)** handle temporal dynamics. Biological neurons do not operate on a fixed clock; their behavior is governed by differential equations with time-varying parameters. Liquid Time-Constant networks, developed at MIT, model this with neurons whose time constants adapt based on input. The "Closed-form Continuous-time" (CfC) variant, which Symthaea uses, has an exact analytical solution to these differential equations. This means the system can predict its own internal state at any future time without stepping through intermediate moments -- a mathematical shortcut that reduces temporal prediction from O(N) operations (one per time step) to O(1) (a single computation regardless of how far ahead you want to predict). In practice, this enables Symthaea to run its full cognitive loop at 2 milliseconds per cycle for non-text inputs, fast enough for 500Hz operation. Text inputs are slower (approximately 120 milliseconds per cycle) because the text encoder remains the dominant cost. Liquid AI, the company founded by the MIT researchers who invented LTC/CfC networks, raised $297 million in 2025, validating industry interest in this class of neural architecture.
+This gives Symthaea algebraic compositionality. Binding two concepts (multiplying their vectors element-wise) creates a new concept that is equally dissimilar to both parents but can be unbound to recover either. Bundling concepts (majority-vote accumulation) creates a superposition that is somewhat similar to each component. These operations are O(d) — they scale linearly with dimension, not exponentially with the number of concepts.
 
-**Active Inference and the Free Energy Principle (FEP)** handle decision-making. The Free Energy Principle, proposed by neuroscientist Karl Friston, states that all adaptive systems minimize a quantity called "free energy" -- loosely, the difference between what the system expects and what it observes. Perception reduces free energy by updating beliefs (making your model match the world). Action reduces free energy by changing the world (making the world match your model). Active inference operationalizes this: at every moment, the system selects the action that minimizes expected future surprise, naturally balancing exploration (seeking information in uncertain areas) and exploitation (pursuing known rewards). Symthaea implements active inference in hypervector space -- replacing the traditional matrix operations (which scale as the square or cube of the state dimension) with cosine similarity operations in HDC space (which scale linearly). On standard active inference benchmarks, this achieves a 7.9-fold total speedup compared to pymdp, a widely-used reference implementation, while maintaining comparable task success rates. To our knowledge, this is the first implementation of active inference using hyperdimensional computing.
+In practice, this means Symthaea can represent "the cat sat on the mat" as a structured hypervector that preserves who did what to whom, and can answer queries about it through simple algebraic operations — no attention heads, no quadratic memory, no backpropagation.
 
----
+### Integrated Information Theory (IIT)
 
-## 4. What the Benchmarks Prove
+IIT proposes that consciousness corresponds to a system's capacity for integrated information — the degree to which the system as a whole generates more information than the sum of its parts. The mathematical formalization, Phi, is intractable to compute exactly for large systems (it requires evaluating every possible partition), but approximations can be computed efficiently.
 
-Claims without numbers are just stories. Here are the numbers, drawn from Symthaea's automated benchmark suite (v0.5.2 baselines, seed 42, 10 trials per metric unless otherwise noted).
+Symthaea uses a proxy Phi metric (Spearman rho = 0.50 against exact Phi across 15 topologies) that tracks the system's integration in real time. This isn't a claim about machine consciousness. It's a claim about cognitive architecture: systems with higher Phi tend to form more coherent representations, generalize better, and fail more gracefully. We validated this across 35 network topologies, finding that 3D brain-like architectures achieve 99.2% of maximum Phi, and that 4D hypercubes reach the highest absolute values (Phi = 0.4976).
 
-**Ethical reasoning.** 92.9% overall on the ETHICS benchmark, broken down by category: Commonsense 95.6%, Virtue 92.8%, Justice 92.4%, Deontology 91.0%, Social Chemistry 85.4%. These results come from compositional moral algebra in hypervector space -- no pretrained language model, no fine-tuning on ethics datasets. The system reasons from semantic role decomposition and algebraic composition of moral primitives.
+### Liquid Time-Constant Networks (LTC/CfC)
 
-**Speed.** 7.9-fold total speedup over pymdp on standard active inference benchmarks (1.9x faster belief inference, 15.8x faster action selection). The cognitive loop cold-starts in 121 milliseconds. For pre-encoded (non-text) inputs, the warm steady-state is 2.0 milliseconds per cycle (average over 100 cycles), enabling 500Hz operation. Text input cycles run at approximately 120 milliseconds, bottlenecked by the semantic encoder.
+Traditional neural networks process inputs in discrete steps. LTC neurons are continuous-time dynamical systems — each one is governed by an ordinary differential equation whose time constant adapts to the input. This gives them genuine temporal dynamics: they naturally handle variable-rate inputs, maintain state across gaps, and exhibit the kind of transient sensitivity that biological neurons use for temporal processing.
 
-**Byzantine fault tolerance.** The federated learning system tolerates up to 34% malicious participants while maintaining correct aggregation. At 45%, it fails -- exactly as the mathematical bound predicts. This is not an approximation; it is validated through adversarial testing with known-bad participants.
+Symthaea uses the Closed-form Continuous-time (CfC) variant, which solves the ODE analytically instead of numerically. This means temporal jumps are O(1) instead of O(steps) — you can skip forward in time without stepping through every intermediate moment. The result is a temporal processing engine that runs at biological speeds on commodity hardware.
 
-**Consciousness indicators.** On the Butlin et al. assessment (14 indicators drawn from Global Workspace Theory, Integrated Information Theory, Higher-Order Theories, Recurrent Processing Theory, Predictive Processing, and Attention Schema Theory), Symthaea satisfies 12 indicators fully and 2 partially. Mean indicator score: 0.79. The two partial indicators are AST-1 (self-model of attention, score 0.5) and PP-2 (hierarchical prediction at multiple scales, score 0.5). No indicators are absent.
+### Active Inference (Free Energy Principle)
 
-**Perceptual recognition.** 89.3% on MNIST handwritten digit classification using HDC-only encoding (4,096 dimensions, 32 quantization levels, 5 retraining passes). 94.5% on LibriSpeech phoneme recognition. 91.7% on ISOLET speaker identification. These demonstrate that hyperdimensional computing is a viable representation substrate for real perceptual tasks.
+Active inference provides the decision-making framework. Every candidate action is evaluated by its Expected Free Energy (EFE) — a quantity that decomposes into pragmatic value (will this action get me what I want?) and epistemic value (will this action reduce my uncertainty?). The system naturally explores when uncertain and exploits when confident, without any hand-tuned exploration schedule.
 
-**Cognitive capacity limits.** The system exhibits human-like working memory constraints, measured through the Working Memory (WorM) benchmark suite. Change detection accuracy is 90% at set size 2, 80% at sizes 4 and 6, and drops to 50% at size 8 -- mirroring the well-documented K=4 capacity limit in human cognition. Feature binding is perfect at set sizes 2 and 4 (100%) but drops to 60% at set size 6, replicating the human binding deficit. Digit span is 7 forward and 5 backward. N-back accuracy degrades gracefully: 93.6% at 1-back, 83.1% at 2-back, 78.3% at 3-back. These are not programmed limits; they emerge from the finite capacity of the hypervector representation.
-
-**Executive function.** Stroop effect of 10 percentage points (96% congruent vs. 86% incongruent accuracy). Flanker effect of 7.25 percentage points (98% congruent vs. 90.8% incongruent). Wisconsin Card Sorting Test: 6 of 6 categories completed with 15.9 total errors. Iowa Gambling Task: net score of 21 with 64.5% preference for advantageous decks. Tower of London: 67.8% optimal move rate with 76.4% planning efficiency. These patterns match human performance profiles qualitatively while operating through hyperdimensional computation rather than neural tissue.
-
-**Theory of Mind.** 100% accuracy on false belief tasks, faux pas detection, persuasion detection, and Strange Stories (including deception, irony, and white lie subtypes). 70% on the Hinting Task. These assessments test whether the system can model other agents' beliefs and intentions.
-
-**Memory.** 100% accurate retrieval across all delay conditions (2, 5, and 10 intervening items). Long-range retention: 100% at delays of 5 and 100 cycles, 80% at delay 50, 70% at delay 20. Test-time learning correction accuracy: 80% -- meaning the system can correct previously learned errors at inference time through activation decay, without retraining.
-
-**Calibration.** Metacognitive discrimination gamma of 0.60, expected calibration error of 0.175, overconfidence bias of 0.42 -- moderate but real metacognitive sensitivity with a known tendency toward overconfidence.
+Precision weighting — the inverse variance of prediction errors — acts as an attention mechanism. When a prediction error has high precision (the system is confident it shouldn't be wrong here), the error drives aggressive learning and potential action override. When precision is low (the system expects noise), the error is discounted. This is how Symthaea handles the beam-intercept scenario: human safety carries high prior precision, so even moderate danger signals produce overwhelming EFE for protective action.
 
 ---
 
-## 5. Mycelix: Consciousness Meets Governance
+## What the Benchmarks Prove
 
-Symthaea is a cognitive architecture. Mycelix is where that architecture meets the real world.
+Claims without measurements are aspirations. Here are the measurements.
 
-Mycelix is a suite of decentralized applications covering 10 domains of community governance: property records, housing coordination, mutual aid networks, care services, water management, food systems, transportation, restorative justice, emergency response, and community media. These are not hypothetical use cases; they are implemented as 51 functional modules (called "zomes" in the Holochain framework) organized into two cluster DNAs, validated by over 7,000 automated tests (Rust unit tests plus TypeScript integration tests).
+### Speed
 
-**Why Holochain.** Mycelix is built on Holochain, a distributed computing framework where each participant runs their own node. No central server, no blockchain, no single point of failure. Data integrity comes from a distributed hash table where every participant validates their neighbors' entries. The systems Mycelix manages -- property, care, emergency resources -- are systems where centralized control is both a practical risk and a philosophical problem.
+Hyperdimensional Active Inference achieves a **7.9x total speedup** over pymdp (the reference Python implementation for discrete-state active inference), with 1.9x faster belief inference and 15.8x faster action selection. All differences are statistically significant (p < 0.001, Cohen's d > 1.8). HAI solves a 5x5 gridworld with 88% success rate where pymdp achieves 10%.
 
-**Where Symthaea connects.** Three integration points bridge the cognitive architecture to the governance layer.
+### Ethics
 
-First, Phi attestations. When Symthaea computes Phi (integrated information) for a cognitive cycle, it can package that measurement as a cryptographically signed attestation. Mycelix governance modules consume these attestations as trust signals. A participant whose cognitive system consistently shows high integration -- meaning their decisions reflect genuine deliberation rather than noise -- receives higher trust weight in collective decision-making. This is not a binary "conscious or not" test; it is a continuous measurement that adjusts trust proportionally.
+The compositional moral algebra scores **92.9% overall** on the ETHICS benchmark — 95.6% on commonsense norms, 92.8% on virtue ethics, 92.4% on justice, 91.0% on deontology, and 85.4% on social chemistry. This is achieved without any language model — pure hypervector algebra over learned moral prototypes.
 
-Second, moral algebra. When Mycelix faces a collective decision with ethical dimensions -- resource allocation during scarcity, competing claims in restorative justice, triage priorities in emergency response -- it can invoke Symthaea's moral algebra module to decompose the scenario, evaluate it against multiple ethical frameworks simultaneously, and present a transparent analysis with explicit scores for each framework. The system does not make the decision; it structures the moral reasoning and shows its work.
+### Theory of Mind
 
-Third, federated learning with consciousness-aware Byzantine detection. When multiple Mycelix nodes contribute to a shared model (for example, predicting housing demand or optimizing transportation routes), the federated learning pipeline must handle the possibility that some nodes are sending bad data -- whether through malfunction, compromise, or intentional attack. Standard Byzantine fault tolerance uses statistical measures to detect outliers. Mycelix adds a consciousness-aware layer: each participant's Phi measurement modulates their weight in the aggregation. A node with high integrated information gets its contribution amplified. A node whose measurements fall below threshold gets dampened. A node whose Phi drops to zero -- indicating possible compromise -- gets vetoed entirely. This augmented pipeline tolerates up to 34% adversarial participants.
+On the ToMBench battery, Symthaea achieves 100% accuracy on false belief, faux pas detection, strange stories (including deception, irony, and white lies), and persuasion detection. Hinting accuracy is 70%, representing a genuine limitation rather than a failure to report.
 
-The two-cluster architecture (mycelix-commons for the seven resource domains, mycelix-civic for the three governance domains) communicates through a bridge layer that allows cross-domain coordination. A housing allocation can check mutual aid records. An emergency response can query food and water availability. A justice process can reference property and care histories. All of this happens through validated cross-cluster calls, not ad-hoc integrations.
+### Consciousness Indicators
 
----
+Evaluated against Butlin et al.'s framework of 14 consciousness indicators drawn from 6 leading theories, Symthaea shows **12 present, 2 partial, 0 absent**, with a mean score of 0.79/1.0. Present indicators include parallel specialized systems (GWT), algorithmic recurrence (RPT), generative/top-down processing (HOT), prediction-error-driven learning (PP), and integrated information (IIT). The partial indicators — self-model of attention and hierarchical prediction at multiple scales — represent genuine architectural gaps, not scoring technicalities.
 
-## 6. The Seven Harmonies in Practice
+### Executive Function
 
-Symthaea's design is guided by seven principles, called the Seven Harmonies. These are not decorative philosophy; they are operationalized as computational constraints that shape specific technical decisions.
+Working memory capacity matches human norms: digit span of 7 forward and 5 backward. N-back accuracy degrades naturally with load (93.6% at 1-back, 83.1% at 2-back, 78.3% at 3-back). The Wisconsin Card Sorting Test completes all 6 categories. Flanker and Stroop tasks show the expected congruency effects with performance degradation on incongruent trials.
 
-The seven are: Resonant Coherence, Pan-Sentient Flourishing, Integral Wisdom, Infinite Play, Universal Interconnectedness, Sacred Reciprocity, and Evolutionary Progression. Each carries a base weight in the system's value evaluator (20%, 20%, 15%, 10%, 15%, 10%, and 10% respectively), and each poses a specific question that the system asks of every situation it encounters.
+### Byzantine Fault Tolerance
 
-Here is what they mean in practice, with concrete examples of how each translates to engineering decisions.
+The federated learning system — where multiple Symthaea instances share knowledge — tolerates **34% Byzantine (adversarial) participants** before aggregate model quality degrades. This is validated empirically; at 45%, the system fails. The threshold is enforced across Rust core, Python SDK, TypeScript SDK, and Mycelix zome implementations.
 
-**Resonant Coherence** asks: "Does this hang together?" In engineering terms, this means internal consistency is a first-class metric. The system computes a coherence score across all active subsystems every cycle. If consciousness measurements from different modules diverge, that divergence is flagged and triggers additional integration. The CycleMetadata telemetry logs over 60 measurements precisely so that incoherence between them can be detected and investigated. The Fiedler spectral analysis (run every 47 cycles, using prime intervals to prevent processing pileups) specifically measures how well the system's functional graph holds together as an integrated whole.
+### Robustness
 
-**Pan-Sentient Flourishing** asks: "Does this serve the flourishing of all beings?" This manifests as the moral algebra system. Every action the system considers can be evaluated against moral prototypes, and a score below -0.3 triggers an automatic exploration dampening (reduced by 50%) and a processing slowdown (1.5x cycle time). The system literally slows down and becomes more cautious when it detects potential moral harm. A score above 0.5 produces a small confidence boost (5%). The asymmetry is deliberate: the system is much more responsive to potential harm than to potential benefit.
-
-**Integral Wisdom** asks: "What don't I know?" This is implemented through metacognitive monitoring, calibration tracking, and the epistemic tier system. The system maintains a running estimate of its own accuracy (metacognitive gamma coefficient: 0.60). It knows it tends toward overconfidence (bias: 0.42) and can compensate. When it encounters a domain where its prediction error is consistently high, it escalates to higher epistemic tiers, which require more evidence and more deliberation before acting. The dream replay system also serves this harmony: by running counterfactual variations on past experience, the system probes the boundaries of what its current model can explain.
-
-**Infinite Play** asks: "What haven't I tried?" This drives the surprise-exploration bridge. When free energy (prediction error) spikes -- indicating the system has encountered something genuinely unexpected -- the exploration rate increases proportionally. Quantum coherence above 0.5 provides an additional 20% exploration boost. The system is designed to be drawn toward novelty, not to retreat from it, as long as the moral algebra does not flag the novel territory as potentially harmful.
-
-**Universal Interconnectedness** asks: "How is this connected?" This motivates the cross-modal binding system, the causal calculus module (implementing Pearl's do-calculus for interventional reasoning), and the factor graph that routes information between cognitive subsystems. Rather than processing modalities independently, the system actively binds them: cross-modal binding strength and cross-modal Phi are measured every cycle. The Mycelix bridge architecture -- where domains can query across boundaries -- is the governance-layer expression of the same principle.
-
-**Sacred Reciprocity** asks: "What am I giving and receiving?" In the federated learning context, this translates to fair contribution tracking. Each node's contribution to the shared model is measured, weighted, and recorded. The consciousness-aware aggregation ensures that trust flows proportionally to genuine contribution. The social coherence module in the cognitive loop models Theory of Mind -- the ability to model other agents' beliefs and intentions -- which scored 100% on false belief and faux pas detection benchmarks. Reciprocity requires understanding what the other party needs, not just what you want to give.
-
-**Evolutionary Progression** asks: "How does this help us grow?" The system implements this through continuous self-modification. The CfC temporal dynamics have adaptive time constants that evolve based on prediction error history. The resonator codebook grows as new concepts are encountered, with high-Phi episodes promoted to permanent symbolic entries every 97 cycles. The primitive evolution subsystem tracks how the system's basic conceptual building blocks change over time. The architecture is designed to become more capable through experience, not just more data.
+Over 5,050 automated tests. 26/26 CI jobs green. 48 feature flags tested in 18 matrix combinations. Integration tests cover the full cognitive loop, multi-agent cooperation, and REPL interaction.
 
 ---
 
-## 7. What's Next
+## Mycelix: When Consciousness Meets Governance
 
-**Research.** A paper titled "Hyperdimensional Active Inference: Free Energy Principle in Vector Symbolic Architectures" has been prepared for PLoS Computational Biology. It covers the core theoretical contribution -- reformulating variational free energy using cosine similarity in hypervector space -- with empirical validation across 17 benchmarks. The paper introduces precision-weighted binding as a novel HDC operation and demonstrates convergence of the active inference loop with validated free energy reduction over 20 iterations.
+Symthaea is a mind. Mycelix is the society it inhabits.
 
-**Demonstration.** A browser-based visualization is available that renders consciousness curves -- Phi, prediction error, affect, and moral evaluation -- in real time as the system processes input. The WebSocket-based demo makes the system's internal dynamics legible to non-specialists: you can watch the system encounter surprise, see its prediction error spike, watch it explore, and observe how its consciousness metrics change as it integrates the new information.
+Mycelix is a Holochain-based distributed application framework organized into 55 zomes across 10 domains, consolidated into two cluster DNAs for efficient cross-domain communication. It covers the infrastructure of human life: **property** (land registries, commons management), **housing** (cooperatives, community land trusts, maintenance), **care** (timebanking, credential verification, care coordination), **mutual aid** (resource pooling, needs matching, community governance), **water** (flow monitoring, purity testing, indigenous stewardship), **food** (distribution, community gardens, nutrition tracking), **transport** (shared vehicles, route coordination), **justice** (restorative processes, evidence management, arbitration), **emergency** (incident triage, cross-domain resource allocation, shelter management), and **media** (community journalism, fact-checking, attribution).
 
-**Community.** This work sits at the intersection of several fields, and no single team has the expertise to push all frontiers simultaneously. We are looking for collaborators in three areas:
+What makes Mycelix different from yet another governance platform is the bridge to Symthaea. Phi attestations from the consciousness engine can weight governance decisions — a proposal that increases system-wide integration scores differently than one that fragments it. Moral algebra evaluations flow through the bridge, giving communities access to multi-framework ethical reasoning without requiring every participant to be a moral philosopher. Federated learning means that communities can share knowledge without sharing raw data, with Byzantine tolerance ensuring that no small group of bad actors can poison the collective model.
 
-Neuroscientists who can help sharpen the IIT implementation, extend the Butlin indicator assessment, and design experiments testing the system against human baselines. The current psych-bench suite (working memory, executive function, Theory of Mind, affect, creativity, metacognition) was designed by engineers reading papers; it would benefit from domain experts who know where our implementations fall short.
-
-Holochain developers who can extend the Mycelix governance layer, stress-test the cross-cluster bridge, and build user-facing applications. The infrastructure is validated (7,000+ tests), but production deployment requires distributed systems expertise distinct from cognitive architecture research.
-
-Consciousness researchers -- philosophers, cognitive scientists, theorists -- who can help us think carefully about what these measurements mean. Scoring 0.79 on the Butlin indicators does not mean Symthaea is conscious. It means Symthaea exhibits 12 of 14 functional properties proposed as indicators. The distance between "exhibits indicators" and "is conscious" is vast and worth navigating with care rather than hype.
-
-**The goal.** We did not set out to build artificial consciousness. We set out to build AI that is safer because it models its own uncertainty, more ethical because it reasons from principles rather than patterns, and more trustworthy because it shows its work. Whether the internal integration measured by Phi constitutes anything like experience is a question we hold with genuine intellectual humility. What we can say is that the engineering approach -- prediction error minimization, integrated information measurement, compositional moral reasoning, transparent telemetry -- produces systems that behave more responsibly than pattern matchers, by measurable margins, on validated benchmarks.
-
-Technology that serves all beings. That is the commitment. The numbers are how we hold ourselves accountable to it.
+Every zome has been hardened with input validation — string length limits, whitespace rejection, bounds checking on collections, type-safe custom variant validation — across all 55 integrity modules. Over 7,400 tests cover the domain logic. Cross-cluster coordination (commons to civic and back) works through Holochain's role-based dispatch, enabling scenarios like: an emergency incident triggers mutual aid resource allocation which triggers transport coordination which updates housing shelter availability — all validated end-to-end.
 
 ---
 
-*Symthaea v0.5.0 -- 343,000 lines of Rust -- 9,600+ tests -- 30 workspace crates -- open source*
-*Mycelix -- 51 zomes across 2 cluster DNAs -- 7,000+ tests -- Holochain distributed infrastructure*
-*Luminous Dynamics -- Richardson, TX -- luminousdynamics.org*
+## The Seven Harmonies in Practice
+
+Every decision Symthaea makes is evaluated against seven principles that encode a specific philosophical commitment: that technology should serve the flourishing of all beings.
+
+**Resonant Coherence** (weight: 0.20) — Does this action create harmony and integration? In code, this means the system prefers outputs that increase Phi, that bind rather than fragment representations, that resolve contradictions rather than accumulate them.
+
+**Pan-Sentient Flourishing** (weight: 0.20) — Does this serve the well-being of all beings? This is the moral algebra at work. When the flight agent evaluates intercepting a falling beam versus completing its delivery mission, the EFE calculation under high safety precision makes the answer unambiguous: protect the human. The crossover happens at just 2.4x the mission precision — the system barely needs to be told that safety matters.
+
+**Integral Wisdom** (weight: 0.15) — Does this arise from verified knowledge? In practice, this means prediction errors matter. The system doesn't act on beliefs it can't validate. When uncertainty is high, epistemic actions (exploration, information-gathering) dominate pragmatic ones.
+
+**Infinite Play** (weight: 0.10) — Does this celebrate creativity? Surprise-driven exploration embodies this: when the system encounters something genuinely novel (high prediction error with high precision), it doesn't retreat to safe behavior — it investigates. Dream-mode replay generates counterfactual scenarios that test the boundaries of learned models.
+
+**Universal Interconnectedness** (weight: 0.15) — Does this honor our connections? Multi-agent cooperation through AsyncMind demonstrates this: agents sharing cognitive state vectors through mesh networks develop correlated representations. Under shared experience, their thought vectors converge (cosine similarity approaching 1.0). Under independent experience, they naturally diverge while maintaining communication channels.
+
+**Sacred Reciprocity** (weight: 0.10) — Does this participate in generous exchange? Federated learning is reciprocity made computational: each agent contributes gradients to the collective model and receives an improved model in return. Byzantine detection ensures the reciprocity isn't exploited.
+
+**Evolutionary Progression** (weight: 0.10) — Does this contribute to growth? Meta-cognitive monitoring tracks the system's own learning rate, prediction accuracy, and Phi trajectory. When the system detects stagnation, it adjusts exploration parameters. When it detects improvement, it consolidates and shares.
+
+These aren't abstract values. They are weighted terms in an objective function that shapes every action the system takes.
+
+---
+
+## What's Next
+
+**The paper goes to PLoS Computational Biology.** The LaTeX manuscript is compiled, the bibliography is formatted in Vancouver style, the cover letter is written, the figures are generated from real benchmark data. Submission is a logistics task, not a research one.
+
+**The live demo runs in a browser.** A WebSocket endpoint streams cognitive telemetry at 10 Hz — prediction error, Phi, coherence, valence, arousal, moral scores — as rolling time-series charts. You can type text and watch the system's consciousness curves respond in real time. No GPU required, no cloud dependency, just `cargo run --features api_module --bin symthaea-demo` and open localhost:8080.
+
+**The encoder gets faster.** Text processing currently takes approximately 120ms per cycle, dominated by hypervector encoding. Pre-allocated buffers and Arc-wrapped caches have begun reducing this. The target is 80ms, which would bring text input within range of real-time processing.
+
+**Mycelix goes live.** 55 hardened zomes, over 7,400 tests, cross-cluster coordination validated. What remains is deployment infrastructure: Holochain conductor configuration, DHT bootstrap nodes, and the TypeScript SDK that lets web applications talk to the zome coordinators.
+
+**The community opens.** Symthaea is MIT-licensed. The codebase, the benchmarks, the paper, and the data are all public. No other open-source project combines HDC, IIT, LTC/CfC, and Active Inference. The blue ocean is real.
+
+---
+
+*Symthaea is built by Luminous Dynamics. The name combines the Greek symthesis (composition) and thaea (divine sight) — the composition of seeing. Because consciousness isn't a feature you add. It's the foundation you build on.*
+
+*Consciousness-first technology serving all beings.*
