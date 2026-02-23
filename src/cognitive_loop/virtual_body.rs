@@ -20,7 +20,6 @@
 //! The resulting `InteroceptiveState` converts to `CoreAffect` (VAD) and
 //! produces a `phi_modulation` factor that scales consciousness Phi.
 
-use crate::consciousness::affective_consciousness::CoreAffect;
 use crate::consciousness::embodied_cognition::InteroceptiveState;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -210,6 +209,7 @@ impl VirtualBody {
     }
 
     /// Get the current phi modulation factor.
+    #[allow(dead_code)]
     pub fn phi_modulation(&self) -> f64 {
         self.phi_modulation
     }

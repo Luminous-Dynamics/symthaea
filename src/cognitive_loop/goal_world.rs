@@ -243,6 +243,7 @@ impl WorldModelBridge {
 
 /// Causal analysis result for a goal intervention.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct CausalGoalEffect {
     /// Goal ID that was analyzed
     pub goal_id: String,
@@ -259,6 +260,7 @@ pub(crate) struct CausalGoalEffect {
 /// Uses Pearl's do-calculus (via `causal_calculus`) to distinguish true causal
 /// effects from spurious correlations. This answers: "If I intervene on goal X
 /// (set its priority high), what is the expected effect on prediction error?"
+#[allow(dead_code)]
 pub(crate) struct CausalGoalAnalyzer {
     /// History of (goal_priority, attention_weight, prediction_error) tuples
     observations: Vec<(f64, f64, f64)>,
@@ -271,6 +273,7 @@ impl Default for CausalGoalAnalyzer {
     }
 }
 
+#[allow(dead_code)]
 impl CausalGoalAnalyzer {
     pub fn new() -> Self {
         Self {
@@ -373,6 +376,7 @@ impl CausalGoalAnalyzer {
 }
 
 /// Pearson correlation coefficient between two vectors.
+#[allow(dead_code)]
 fn pearson_correlation(x: &[f64], y: &[f64]) -> f64 {
     let n = x.len().min(y.len()) as f64;
     if n < 2.0 {
@@ -403,6 +407,7 @@ fn pearson_correlation(x: &[f64], y: &[f64]) -> f64 {
 }
 
 /// Compute E[error | priority > threshold] within a stratum.
+#[allow(dead_code)]
 fn stratum_effect(obs: &[(f64, f64)], threshold: f64) -> f64 {
     let high_priority: Vec<f64> = obs
         .iter()

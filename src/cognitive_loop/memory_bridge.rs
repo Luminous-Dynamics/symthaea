@@ -74,7 +74,7 @@ pub struct EpisodicMemoryBridge {
 
 /// Statistics for the memory bridge
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct MemoryBridgeStats {
+pub struct MemoryBridgeStats {
     pub total_encoded: u64,
     pub total_recalled: u64,
     pub consolidations: u64,

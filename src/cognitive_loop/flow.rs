@@ -270,7 +270,7 @@ impl FlowState {
 
 /// Summary of flow state temporal statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct FlowTemporalSummary {
+pub struct FlowTemporalSummary {
     /// Total time spent in flow during this session (seconds)
     pub total_flow_time_secs: f32,
 

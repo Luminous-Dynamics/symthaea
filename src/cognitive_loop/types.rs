@@ -294,7 +294,7 @@ pub(crate) struct CycleCarryover {
 /// - Self models (meta-cognition, narrative, predictive mind/self): C=1, N=2, Cr=4
 /// - Workspace (attention schema, GWT, cross-modal, narrative-GWT): C=1, N=2, Cr=4
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub(crate) enum CycleUrgency {
+pub enum CycleUrgency {
     /// High prediction error or surprise — run all subsystems
     Critical,
     /// Standard processing
@@ -311,6 +311,7 @@ impl CycleUrgency {
     /// - `> 0.7` → Critical (high arousal, blast wisdom immediately)
     /// - `> 0.3` → Normal  (standard processing)
     /// - `≤ 0.3` → Cruise  (low arousal, conserve bandwidth)
+    #[allow(dead_code)]
     pub(crate) fn from_arousal(arousal: f32) -> Self {
         if arousal > 0.7 {
             Self::Critical
@@ -949,6 +950,7 @@ pub struct CycleMetadata {
 /// Useful for lightweight logging, streaming telemetry, or consumers that only
 /// need high-level consciousness state rather than per-subsystem detail.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) struct CycleMetadataCompact {
     pub(crate) surprise_triggered: bool,
     pub(crate) prefrontal_veto: bool,
@@ -972,6 +974,7 @@ pub(crate) struct CycleMetadataCompact {
 
 impl CycleMetadata {
     /// Extract a compact subset of the most essential telemetry fields.
+    #[allow(dead_code)]
     pub(crate) fn compact(&self) -> CycleMetadataCompact {
         CycleMetadataCompact {
             surprise_triggered: self.surprise_triggered,
@@ -1105,7 +1108,7 @@ pub struct ModuleTimings {
 /// This is a lightweight struct with no external dependencies — the bridge crate
 /// converts it to the Holochain-compatible `PsiAttestationData` format.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PsiAttestationRecord {
+pub struct PsiAttestationRecord {
     /// Ψ — Consciousness estimate from this cycle (clamped to [0.0, 1.0])
     pub psi: f64,
 
@@ -1130,6 +1133,7 @@ impl PsiAttestationRecord {
     /// bridge's reconstruction format in `record_psi_attestation`. This precision
     /// (~0.000001) is sufficient for IIT Phi and ensures signature verification
     /// succeeds across Symthaea → bridge → governance without floating-point drift.
+    #[allow(dead_code)]
     pub(crate) fn sign_message(&self, agent_did: &str) -> Vec<u8> {
         format!(
             "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
@@ -1186,7 +1190,7 @@ pub struct CycleResult {
 
 /// Summary of moral evaluation for an action or input
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct MoralJudgmentSummary {
+pub struct MoralJudgmentSummary {
     /// The input text that was evaluated
     pub input: String,
 
@@ -1270,7 +1274,7 @@ pub(crate) struct AdaptiveBehavior {
 
 /// Recommended action based on consciousness state
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum ActionHint {
+pub enum ActionHint {
     /// Continue normally
     Continue,
     /// Slow down, be more deliberate
