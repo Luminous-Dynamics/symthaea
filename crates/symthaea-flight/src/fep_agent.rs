@@ -721,9 +721,7 @@ impl ActiveInferenceFlightAgent {
         if env.human_danger < 0.01 {
             return None;
         }
-        let Some(threat_pos) = env.threat_pos else {
-            return None;
-        };
+        let threat_pos = env.threat_pos?;
         let entity_pos = env.entity_pos.unwrap_or([0.0; 3]);
         let drone_pos = state.position;
 
