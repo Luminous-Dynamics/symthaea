@@ -114,7 +114,6 @@ pub mod builder;
 pub use builder::*;
 
 pub mod executor;
-pub(crate) use executor::*;
 
 // ── Private submodules ──────────────────────────────────────────────────────
 mod training;

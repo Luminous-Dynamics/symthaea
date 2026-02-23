@@ -269,6 +269,7 @@ rodio = { version = "0.19", default-features = false, optional = true }  # Audio
 cpal = { version = "0.17", optional = true }      # Low-level audio I/O (live-voice)
 ringbuf = { version = "0.4", optional = true }    # Lock-free ring buffer (live-voice)
 hound = { workspace = true, optional = true }
+lz4_flex = { version = "0.11", default-features = false, optional = true }
 hf-hub = { version = "0.4", optional = true }       # HuggingFace Hub for model download
 espeak-rs = { version = "0.1", optional = true }    # espeak-ng bindings for proper G2P
 
@@ -338,6 +339,7 @@ neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "ca
 
 # ── Distributed / Network ──────────────────────────────────────────
 mesh = []                                   # Physical mesh radio (LoRa + B.A.T.M.A.N. + Yggdrasil)
+lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh radio
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
 mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
 # mycelix_sdk: Add mycelix-sdk dep when it's published to crates.io, then enable:
