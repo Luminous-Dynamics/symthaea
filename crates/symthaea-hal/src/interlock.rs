@@ -430,3 +430,50 @@ mod tests {
         assert_eq!(interlock.trip_reason(), Some("e-stop active"));
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn arb_torques() -> impl Strategy<Value = [f32; NUM_ACTUATORS]> {
+        proptest::collection::vec(-2.0f32..2.0, NUM_ACTUATORS..=NUM_ACTUATORS).prop_map(|v| {
+            let mut arr = [0.0f32; NUM_ACTUATORS];
+            arr.copy_from_slice(&v);
+            arr
+        })
+    }
+
+    proptest! {
+        #[test]
+        fn filtered_torques_within_max(torques in arb_torques()) {
+            let mut interlock = SafetyInterlock::new();
+            let mut cmd = HumanoidCommand::zero();
+            cmd.torques = torques;
+
+            if let Ok(safe) = interlock.filter_command(&cmd) {
+                for i in 0..NUM_ACTUATORS {
+                    let max = interlock.config().max_torque[i];
+                    prop_assert!(
+                        safe.torques[i].abs() <= max + f32::EPSILON,
+                        "joint {} torque {} exceeds max {}",
+                        i, safe.torques[i], max
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn filtered_torques_always_finite(torques in arb_torques()) {
+            let mut interlock = SafetyInterlock::new();
+            let mut cmd = HumanoidCommand::zero();
+            cmd.torques = torques;
+
+            if let Ok(safe) = interlock.filter_command(&cmd) {
+                for (i, &t) in safe.torques.iter().enumerate() {
+                    prop_assert!(t.is_finite(), "joint {} torque {} not finite", i, t);
+                }
+            }
+        }
+    }
+}

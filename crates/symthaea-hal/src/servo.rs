@@ -12,6 +12,9 @@
 //! ```
 
 use embedded_hal::i2c::I2c;
+use embedded_hal_bus::i2c::{MutexDevice, RefCellDevice};
+use std::cell::RefCell;
+use std::sync::Mutex;
 use symthaea_humanoid::types::{HumanoidCommand, NUM_ACTUATORS};
 use tracing::debug;
 
@@ -59,6 +62,16 @@ impl<I: I2c> ServoOutput<I> {
             slew_rate_us: DEFAULT_SLEW_RATE_US,
             enabled: false,
         }
+    }
+
+    /// Get a reference to board 0 (joints 0–15).
+    pub fn board0(&self) -> &Pca9685<I> {
+        &self.board0
+    }
+
+    /// Get a reference to board 1 (joints 16–20).
+    pub fn board1(&self) -> &Pca9685<I> {
+        &self.board1
     }
 
     /// Initialize both PCA9685 boards at the given PWM frequency (typically 50 Hz).
@@ -148,6 +161,46 @@ impl<I: I2c> ServoOutput<I> {
     /// Get a reference to the calibration profile.
     pub fn calibration(&self) -> &CalibrationProfile {
         &self.calibration
+    }
+}
+
+// ============================================================================
+// SHARED-BUS CONSTRUCTORS
+// ============================================================================
+
+impl<'a, I: I2c> ServoOutput<RefCellDevice<'a, I>> {
+    /// Create a servo output sharing a single I2C bus via `RefCell` (single-threaded).
+    ///
+    /// Both PCA9685 boards use the same bus wrapped in a `RefCell`.
+    /// This is the simplest approach when all access happens on one thread.
+    pub fn new_shared(bus: &'a RefCell<I>, calibration: CalibrationProfile) -> Self {
+        let center = calibration.joints[0].center_pulse_us();
+        Self {
+            board0: Pca9685::new(RefCellDevice::new(bus), 0x40),
+            board1: Pca9685::new(RefCellDevice::new(bus), 0x41),
+            calibration,
+            last_pulses: [center; NUM_ACTUATORS],
+            slew_rate_us: DEFAULT_SLEW_RATE_US,
+            enabled: false,
+        }
+    }
+}
+
+impl<'a, I: I2c + Send> ServoOutput<MutexDevice<'a, I>> {
+    /// Create a servo output sharing a single I2C bus via `Mutex` (thread-safe).
+    ///
+    /// Both PCA9685 boards use the same bus wrapped in a `std::sync::Mutex`.
+    /// Use this when sensor reads and servo writes happen on different threads.
+    pub fn new_shared_mutex(bus: &'a Mutex<I>, calibration: CalibrationProfile) -> Self {
+        let center = calibration.joints[0].center_pulse_us();
+        Self {
+            board0: Pca9685::new(MutexDevice::new(bus), 0x40),
+            board1: Pca9685::new(MutexDevice::new(bus), 0x41),
+            calibration,
+            last_pulses: [center; NUM_ACTUATORS],
+            slew_rate_us: DEFAULT_SLEW_RATE_US,
+            enabled: false,
+        }
     }
 }
 
@@ -254,6 +307,34 @@ mod tests {
     }
 
     #[test]
+    fn test_servo_new_shared_refcell() {
+        let bus = RefCell::new(MockI2cBus::new());
+        let cal = CalibrationProfile::default_21();
+        let mut servo = ServoOutput::new_shared(&bus, cal);
+        servo.init(50.0).unwrap();
+        servo.enable();
+        let cmd = HumanoidCommand::zero();
+        servo.apply(&cmd).unwrap();
+        for &p in servo.last_pulses() {
+            assert_eq!(p, 1500);
+        }
+    }
+
+    #[test]
+    fn test_servo_new_shared_mutex() {
+        let bus = Mutex::new(MockI2cBus::new());
+        let cal = CalibrationProfile::default_21();
+        let mut servo = ServoOutput::new_shared_mutex(&bus, cal);
+        servo.init(50.0).unwrap();
+        servo.enable();
+        let cmd = HumanoidCommand::zero();
+        servo.apply(&cmd).unwrap();
+        for &p in servo.last_pulses() {
+            assert_eq!(p, 1500);
+        }
+    }
+
+    #[test]
     fn test_center_all() {
         let mut servo = make_servo();
         servo.init(50.0).unwrap();
@@ -270,5 +351,41 @@ mod tests {
         servo.set_slew_rate(50);
         servo.center_all().unwrap();
         assert_eq!(servo.last_pulses()[0], 1500);
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn slew_limit_output_bounded(current in 500u16..2500, target in 500u16..2500, max_step in 1u16..500) {
+            let result = slew_limit(current, target, max_step);
+            // Result must be between current and target (inclusive)
+            let lo = current.min(target);
+            let hi = current.max(target);
+            prop_assert!(result >= lo, "result {} < min(current={}, target={})", result, current, target);
+            prop_assert!(result <= hi, "result {} > max(current={}, target={})", result, current, target);
+        }
+
+        #[test]
+        fn slew_limit_converges(current in 500u16..2500, target in 500u16..2500) {
+            // With max_step = u16::MAX, result should equal target
+            let result = slew_limit(current, target, u16::MAX);
+            prop_assert_eq!(result, target);
+        }
+
+        #[test]
+        fn slew_limit_max_step_respected(current in 500u16..2500, target in 500u16..2500, max_step in 1u16..500) {
+            let result = slew_limit(current, target, max_step);
+            let delta = if result > current {
+                result - current
+            } else {
+                current - result
+            };
+            prop_assert!(delta <= max_step, "delta {} > max_step {}", delta, max_step);
+        }
     }
 }

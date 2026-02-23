@@ -31,6 +31,7 @@
 //!
 //! - `linux`: Enables `linux-embedded-hal` for real I2C devices (`/dev/i2c-*`).
 //!   Without this feature, the crate compiles and tests with [`MockI2cBus`].
+//! - `calibrate`: Enables the `hal-calibrate` CLI binary (adds `clap` dep).
 //!
 //! ## Usage
 //!
@@ -56,10 +57,13 @@
 
 pub mod calibration;
 pub mod error;
+pub mod gpio_estop;
 pub mod imu;
+pub mod ina219;
 pub mod interlock;
 pub mod mock;
 pub mod pca9685;
+pub mod runtime;
 pub mod sensor;
 pub mod servo;
 
@@ -67,11 +71,17 @@ pub mod servo;
 
 pub use calibration::{CalibrationProfile, JointCalibration};
 pub use error::{HalError, HalResult};
+pub use gpio_estop::{EstopPoller, GpioEstop};
 pub use imu::Mpu6050Decoder;
+pub use ina219::Ina219Decoder;
 pub use interlock::{SafetyConfig, SafetyInterlock};
 pub use pca9685::Pca9685;
+pub use runtime::{AngleMonitor, CurrentMonitor, HalRuntime, HalRuntimeBuilder, RuntimeTelemetry};
 pub use sensor::{EmbeddedSensor, HalSensorAdapter, SensorDecoder};
 pub use servo::ServoOutput;
 
 /// Re-export `embedded_hal::i2c::I2c` so downstream crates don't need a direct dependency.
 pub use embedded_hal::i2c::I2c as I2cBus;
+
+/// Re-export shared-bus wrappers for single-bus multi-device setups.
+pub use embedded_hal_bus::i2c::{MutexDevice, RefCellDevice};

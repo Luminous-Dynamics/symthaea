@@ -269,3 +269,41 @@ mod tests {
         assert_eq!(cal.center_pulse_us(), 1500);
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn torque_to_pulse_always_in_range(torque in -10.0f32..10.0) {
+            let cal = JointCalibration::default_for("test");
+            let pulse = cal.torque_to_pulse_us(torque);
+            prop_assert!(pulse >= cal.pulse_min_us, "pulse {} < min {}", pulse, cal.pulse_min_us);
+            prop_assert!(pulse <= cal.pulse_max_us, "pulse {} > max {}", pulse, cal.pulse_max_us);
+        }
+
+        #[test]
+        fn torque_to_pulse_monotonic(a in -1.0f32..1.0, b in -1.0f32..1.0) {
+            let cal = JointCalibration::default_for("test");
+            let pa = cal.torque_to_pulse_us(a);
+            let pb = cal.torque_to_pulse_us(b);
+            if a <= b {
+                prop_assert!(pa <= pb, "monotonicity: t={} → p={}, t={} → p={}", a, pa, b, pb);
+            } else {
+                prop_assert!(pa >= pb, "monotonicity: t={} → p={}, t={} → p={}", a, pa, b, pb);
+            }
+        }
+
+        #[test]
+        fn extreme_torques_clamp_to_endpoints(torque in prop::num::f32::ANY) {
+            if torque.is_finite() {
+                let cal = JointCalibration::default_for("test");
+                let pulse = cal.torque_to_pulse_us(torque);
+                prop_assert!(pulse >= cal.pulse_min_us);
+                prop_assert!(pulse <= cal.pulse_max_us);
+            }
+        }
+    }
+}

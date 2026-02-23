@@ -314,3 +314,29 @@ mod tests {
         let _bus = pca.release();
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use crate::mock::MockI2cBus;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn set_pulse_us_succeeds_on_valid_channel(ch in 0u8..16, pulse in 500u16..2500) {
+            let bus = MockI2cBus::new();
+            let mut pca = Pca9685::new(bus, 0x40);
+            pca.prescale = 121; // 50 Hz
+            prop_assert!(pca.set_pulse_us(ch, pulse).is_ok());
+        }
+
+        #[test]
+        fn set_pulse_us_fails_on_invalid_channel(ch in 16u8..=255) {
+            let bus = MockI2cBus::new();
+            let mut pca = Pca9685::new(bus, 0x40);
+            pca.prescale = 121;
+            // set_pulse_us calls set_channel which checks bounds
+            prop_assert!(pca.set_pulse_us(ch, 1500).is_err());
+        }
+    }
+}
