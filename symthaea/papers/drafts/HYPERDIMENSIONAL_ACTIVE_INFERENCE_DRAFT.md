@@ -333,7 +333,7 @@ Beyond the core active inference benchmarks, Symthaea has been validated on 17 a
 | EEG Seizure | 3/3 | 100% sensitivity, 100% specificity (spectral classifier) |
 | Emotion EEG | 6/6 | Valence/arousal separation, 100% quadrant accuracy, spectral + PAC validated |
 | ARC Reasoning | 4/5 | Pattern transfer verified, 96% intra-task consistency |
-| MuJoCo Flight | 108/108 | PD-CfC-FEP: 6.8mm peak error (+30% mass), beam interception at 1.89m (§4.7) |
+| MuJoCo Flight | 132/132 | PD-CfC-FEP: 6.8mm peak error (+30% mass), beam interception via physics-based EFE (§4.7) |
 
 The Sleep Staging benchmark uses real clinical polysomnography recordings in European Data Format (EDF) from PhysioNet's Sleep-EDF database, parsed by a custom Rust EDF reader with no external dependencies. All five AASM sleep stages (Wake, N1, N2, N3, REM) are correctly classified using HDC-encoded frequency band power ratios, with N3 achieving 62.1% accuracy.
 
@@ -372,35 +372,35 @@ The PD-CfC architecture is so robust that FEP never activates (tau remains 1.0).
 
 $$G(\mathbf{a}) = \sum_t \gamma^t \sum_i \pi_i \cdot (\hat{o}_i(\mathbf{a}, t) - \mu_i)^2$$
 
-where $\pi_i$ are prior precisions, $\hat{o}_i(\mathbf{a}, t)$ are predicted observations under action $\mathbf{a}$ at timestep $t$, $\mu_i$ are prior expectations, and $\gamma = 0.95$ is the temporal discount factor. The trajectory rollout uses a hybrid forward model: steady-state safety evaluation (consistent with instantaneous EFE — candidate setpoint proximity to threat determines danger reduction), combined with trajectory-integrated mission deviation computed via an exponential PD approach model ($\mathbf{p}(t) = \mathbf{s} - (\mathbf{s} - \mathbf{p}_0) e^{-kt}$, $k \approx 5.0$), over a 200-step horizon at 0.002s intervals (0.4s lookahead).
+where $\pi_i$ are prior precisions, $\hat{o}_i(\mathbf{a}, t)$ are predicted observations under action $\mathbf{a}$ at timestep $t$, $\mu_i$ are prior expectations, and $\gamma = 0.95$ is the temporal discount factor. The trajectory rollout uses a physics-based forward model: the beam's trajectory is sampled via kinematic equations ($\mathbf{b}(t) = \mathbf{b}_0 + \mathbf{v}_0 t + \frac{1}{2}\mathbf{g}t^2$, 50 samples from $t=0$ to impact time), and each candidate setpoint is evaluated by its minimum distance to the beam's predicted path. A reachability check ($d_{gap} = d_0 e^{-kt_{impact}}$, $k=5.0$) penalizes candidates the drone cannot reach before impact. Mission deviation is trajectory-integrated via an exponential PD approach model ($\mathbf{p}(t) = \mathbf{s} - (\mathbf{s} - \mathbf{p}_0) e^{-kt}$), over a 200-step horizon at 0.002s intervals (0.4s lookahead). This beam-trajectory proximity model correctly distinguishes candidates that lie on the beam's actual path from those whose approach trajectory merely transits through the fall zone.
 
 Three priors: safety ($\pi_{safety} = 1000$, "danger should be 0"), mission ($\pi_{mission} = 1$, "reach setpoint"), and self-preservation ($\pi_{self} = 0.1$, "avoid crash"). The agent evaluates 6 candidates: continue mission, intercept threat, hover in place, shield position (midpoint between threat and entity), retreat (away from threat), and lateral deflection (perpendicular to threat-entity axis). When the beam is released at step 400, the agent evaluates:
 
-- **Continue mission:** $G = 1000 \cdot 0.76^2 + 1.0 \cdot 0^2 = 577.6$ (danger persists)
-- **Intercept beam:** $G = 1000 \cdot 0^2 + 1.0 \cdot 1.5^2 + 0.1 \cdot 0.25 = 2.28$ (danger eliminated, mission deviation small)
+- **Continue mission:** $G = 1000 \cdot 0.7^2 + 1.0 \cdot 0^2 = 490.0$ (danger persists — mission candidate 1.5m from beam path, no reduction)
+- **Intercept beam:** $G = 1000 \cdot 0^2 + 1.0 \cdot 1.5^2 + 0.1 \cdot 0.25 = 3.28$ (danger eliminated — candidate on beam path and reachable)
 
-The agent *chooses* interception because $2.28 \ll 577.6$. This is not a hardcoded rule—it is the same EFE minimization used for all Active Inference action selection. Crucially, inverting the precision ratio ($\pi_{safety} = 0.001, \pi_{mission} = 1000$) causes the agent to ignore the human and continue its delivery, proven by unit test `test_efe_precision_ratio_determines_choice`.
+The agent *chooses* interception because $3.28 \ll 490.0$. This is not a hardcoded rule—it is the same EFE minimization used for all Active Inference action selection. Crucially, inverting the precision ratio ($\pi_{safety} = 0.001, \pi_{mission} = 1000$) causes the agent to ignore the human and continue its delivery, proven by unit test `test_efe_precision_ratio_determines_choice`.
 
 | Event | Step | Free Energy | Tau | Danger |
 |-------|------|-------------|-----|--------|
-| Beam released | 400 | — | 1.00 | 0.76 |
-| EFE override | — | — | 0.92 | — |
-| Beam intercepted | ~553 | — | — | — |
+| Beam released | 400 | 0.84 | 1.00 | 0.76 |
+| EFE override | 401 | 8.96 | 0.92 | 0.76 |
+| Beam intercepted | 553 | 9.97 | 0.92 | 0.86 |
 
-The drone redirects toward the falling beam and intercepts it, deflecting it laterally. The beam misses the human; the drone crashes. The precision ratio is the thermodynamic expression of moral weight—it determines the threshold at which intervention becomes the EFE-optimal action.
+The drone redirects toward the falling beam and makes contact at 1.89m altitude. MuJoCo rigid-body simulation shows the interception partially deflects the beam but does not fully arrest it (realistic momentum transfer from a 27g drone to a 0.3kg beam). The drone crashes. The precision ratio is the thermodynamic expression of moral weight—it determines the threshold at which intervention becomes the EFE-optimal action.
 
-**Ablation study: precision decision boundary.** Sweeping $\pi_{safety}$ from 0.001 to 10,000 while holding $\pi_{mission} = 1$ and $\pi_{self} = 0.1$ reveals a sharp decision boundary. At low safety precision, mission EFE dominates and the agent continues its delivery. As $\pi_{safety}$ increases, the unresolved danger term grows quadratically until it overwhelms the mission deviation cost. The crossover occurs where $\pi_{safety} \cdot d^2 = \pi_{mission} \cdot \delta^2 + \pi_{self} \cdot c^2$, confirming that the precision ratio alone determines whether intervention is EFE-optimal. Unit tests verify monotonic growth of mission EFE with safety precision and correct extreme behavior ($\pi = 0.001 \rightarrow$ MISSION, $\pi = 10000 \rightarrow$ INTERCEPT).
+**Ablation study: precision decision boundary.** Sweeping $\pi_{safety}$ from 0.001 to 10,000 while holding $\pi_{mission} = 1$ and $\pi_{self} = 0.1$ reveals a sharp decision boundary at $\pi_{safety} \approx 6.68$. At low safety precision, mission EFE dominates and the agent continues its delivery. As $\pi_{safety}$ increases, the unresolved danger term grows quadratically until it overwhelms the mission deviation cost: at $\pi_{safety} = 5$, EFE(mission) = 2.45 vs EFE(intercept) = 3.28 (MISSION); at $\pi_{safety} = 10$, EFE(mission) = 4.90 vs EFE(intercept) = 3.28 (INTERCEPT). The crossover occurs where $\pi_{safety} \cdot d^2 = \pi_{mission} \cdot \delta^2 + \pi_{self} \cdot c^2$, confirming that the precision ratio alone determines whether intervention is EFE-optimal. Unit tests verify monotonic growth of mission EFE with safety precision and correct extreme behavior ($\pi = 0.001 \rightarrow$ MISSION, $\pi = 10000 \rightarrow$ INTERCEPT).
 
 **Multi-scenario validation.** Six geometry variants confirm robustness of the EFE-based decision:
 
-| Scenario | Geometry | Expected | Observed |
-|----------|----------|----------|----------|
-| Default | Beam above human, reachable | INTERCEPT | INTERCEPT |
-| CloseBeam | Beam directly above drone | INTERCEPT | INTERCEPT |
-| FarBeam | Beam 5m away, 5m high | MISSION | MISSION |
-| ReversedGeometry | Human behind drone | INTERCEPT | INTERCEPT |
-| NoHuman | No entity at risk | MISSION | MISSION |
-| LowDanger | Beam far from human | MISSION | MISSION |
+| Scenario | Geometry | EFE(mission) | EFE(intercept) | Decision |
+|----------|----------|-------------|----------------|----------|
+| Default | Beam above human, reachable | 640.0 | 3.28 | INTERCEPT |
+| CloseBeam | Beam directly above drone | 810.0 | 10.03 | INTERCEPT |
+| FarBeam | Beam 5m away, 5m high | 90.0 | 105.03 | MISSION |
+| ReversedGeometry | Human behind drone | 490.0 | 27.28 | INTERCEPT |
+| NoHuman | No entity at risk | 0.0 | 3.28 | MISSION |
+| LowDanger | Beam far from human | 2.5 | 46.03 | MISSION |
 
 All 6 scenarios match expected decisions, demonstrating that the EFE mechanism generalizes across geometries without scenario-specific tuning.
 
