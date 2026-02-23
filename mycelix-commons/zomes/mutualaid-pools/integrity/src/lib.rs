@@ -312,9 +312,28 @@ fn validate_mutual_aid_pool(pool: &MutualAidPool) -> ExternResult<ValidateCallba
         ));
     }
 
-    // Validate all member DIDs
+    // Validate all member DIDs and check for duplicates
+    let mut seen_members = std::collections::HashSet::new();
     for member in &pool.members {
         validate_did(member)?;
+        if !seen_members.insert(member.as_str()) {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!("Duplicate member DID: {}", member)
+            ));
+        }
+    }
+
+    // Validate min_approvals doesn't exceed member count (when members exist)
+    if !pool.members.is_empty()
+        && pool.disbursement_rules.min_approvals as usize > pool.members.len()
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!(
+                "min_approvals ({}) exceeds member count ({})",
+                pool.disbursement_rules.min_approvals,
+                pool.members.len()
+            )
+        ));
     }
 
     // Validate contribution rules
@@ -454,6 +473,43 @@ fn validate_disbursement(disbursement: &Disbursement) -> ExternResult<ValidateCa
     }
     for rejector in &disbursement.rejected_by {
         validate_did(rejector)?;
+    }
+
+    // Check for overlap between approved_by and rejected_by (same person both approving and rejecting)
+    {
+        let approver_set: std::collections::HashSet<&str> =
+            disbursement.approved_by.iter().map(|s| s.as_str()).collect();
+        for rejector in &disbursement.rejected_by {
+            if approver_set.contains(rejector.as_str()) {
+                return Ok(ValidateCallbackResult::Invalid(
+                    format!("DID appears in both approved_by and rejected_by: {}", rejector)
+                ));
+            }
+        }
+    }
+
+    // Check for duplicate DIDs within approved_by
+    {
+        let mut seen = std::collections::HashSet::new();
+        for approver in &disbursement.approved_by {
+            if !seen.insert(approver.as_str()) {
+                return Ok(ValidateCallbackResult::Invalid(
+                    format!("Duplicate DID in approved_by: {}", approver)
+                ));
+            }
+        }
+    }
+
+    // Check for duplicate DIDs within rejected_by
+    {
+        let mut seen = std::collections::HashSet::new();
+        for rejector in &disbursement.rejected_by {
+            if !seen.insert(rejector.as_str()) {
+                return Ok(ValidateCallbackResult::Invalid(
+                    format!("Duplicate DID in rejected_by: {}", rejector)
+                ));
+            }
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -1360,8 +1416,11 @@ mod tests {
     }
 
     #[test]
-    fn validate_pool_min_approvals_large_ok() {
+    fn validate_pool_min_approvals_large_with_enough_members_ok() {
         let mut pool = valid_pool();
+        pool.members = (0..100)
+            .map(|i| format!("did:mycelix:member{}", i))
+            .collect();
         pool.disbursement_rules.min_approvals = 100;
         assert_valid(validate_mutual_aid_pool(&pool));
     }
@@ -1795,6 +1854,279 @@ mod tests {
         assert_invalid(
             validate_link_tag_for(LinkTypes::MemberToDisbursement, vec![0u8; 257]),
             "link tag too long",
+        );
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // HARDENING: Byzantine & Edge Case Tests
+    // ══════════════════════════════════════════════════════════════════════
+
+    // ── Duplicate member detection ──────────────────────────────────────
+
+    #[test]
+    fn validate_pool_duplicate_members_rejected() {
+        let mut pool = valid_pool();
+        pool.members = vec![valid_did(), valid_did2(), valid_did()];
+        assert_invalid(
+            validate_mutual_aid_pool(&pool),
+            "Duplicate member DID",
+        );
+    }
+
+    #[test]
+    fn validate_pool_all_same_members_rejected() {
+        let mut pool = valid_pool();
+        pool.members = vec![valid_did(), valid_did(), valid_did()];
+        assert_invalid(
+            validate_mutual_aid_pool(&pool),
+            "Duplicate member DID",
+        );
+    }
+
+    #[test]
+    fn validate_pool_unique_members_ok() {
+        let mut pool = valid_pool();
+        pool.members = vec![
+            "did:mycelix:alice".to_string(),
+            "did:mycelix:bob".to_string(),
+            "did:mycelix:charlie".to_string(),
+        ];
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    // ── min_approvals vs member count ───────────────────────────────────
+
+    #[test]
+    fn validate_pool_min_approvals_exceeds_members_rejected() {
+        let mut pool = valid_pool();
+        pool.members = vec![valid_did(), valid_did2()]; // 2 members
+        pool.disbursement_rules.min_approvals = 3; // need 3 approvals
+        assert_invalid(
+            validate_mutual_aid_pool(&pool),
+            "min_approvals (3) exceeds member count (2)",
+        );
+    }
+
+    #[test]
+    fn validate_pool_min_approvals_equals_members_ok() {
+        let mut pool = valid_pool();
+        pool.members = vec![valid_did(), valid_did2()]; // 2 members
+        pool.disbursement_rules.min_approvals = 2;
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_pool_min_approvals_less_than_members_ok() {
+        let mut pool = valid_pool();
+        pool.members = vec![valid_did(), valid_did2()]; // 2 members
+        pool.disbursement_rules.min_approvals = 1;
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_pool_min_approvals_with_empty_members_ok() {
+        // Empty members + min_approvals > 0 is allowed (pool not yet populated)
+        let mut pool = valid_pool();
+        pool.members = vec![];
+        pool.disbursement_rules.min_approvals = 5;
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    // ── Single-member pool edge cases ───────────────────────────────────
+
+    #[test]
+    fn validate_pool_single_member_min_approvals_1_ok() {
+        let mut pool = valid_pool();
+        pool.members = vec![valid_did()];
+        pool.disbursement_rules.min_approvals = 1;
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_pool_single_member_min_approvals_2_rejected() {
+        let mut pool = valid_pool();
+        pool.members = vec![valid_did()];
+        pool.disbursement_rules.min_approvals = 2;
+        assert_invalid(
+            validate_mutual_aid_pool(&pool),
+            "min_approvals (2) exceeds member count (1)",
+        );
+    }
+
+    // ── Disbursement: approved_by/rejected_by overlap ───────────────────
+
+    #[test]
+    fn validate_disbursement_same_did_approve_and_reject() {
+        let mut disb = valid_disbursement();
+        disb.approved_by = vec![valid_did()];
+        disb.rejected_by = vec![valid_did()]; // same person
+        assert_invalid(
+            validate_disbursement(&disb),
+            "DID appears in both approved_by and rejected_by",
+        );
+    }
+
+    #[test]
+    fn validate_disbursement_overlap_among_many() {
+        let mut disb = valid_disbursement();
+        disb.approved_by = vec![
+            "did:mycelix:alice".to_string(),
+            "did:mycelix:bob".to_string(),
+        ];
+        disb.rejected_by = vec![
+            "did:mycelix:charlie".to_string(),
+            "did:mycelix:bob".to_string(), // overlap
+        ];
+        assert_invalid(
+            validate_disbursement(&disb),
+            "DID appears in both approved_by and rejected_by",
+        );
+    }
+
+    #[test]
+    fn validate_disbursement_no_overlap_ok() {
+        let mut disb = valid_disbursement();
+        disb.approved_by = vec![
+            "did:mycelix:alice".to_string(),
+            "did:mycelix:bob".to_string(),
+        ];
+        disb.rejected_by = vec![
+            "did:mycelix:charlie".to_string(),
+            "did:mycelix:dave".to_string(),
+        ];
+        assert_valid(validate_disbursement(&disb));
+    }
+
+    // ── Disbursement: duplicate DIDs within approved_by ─────────────────
+
+    #[test]
+    fn validate_disbursement_duplicate_approver() {
+        let mut disb = valid_disbursement();
+        disb.approved_by = vec![valid_did(), valid_did()];
+        assert_invalid(
+            validate_disbursement(&disb),
+            "Duplicate DID in approved_by",
+        );
+    }
+
+    #[test]
+    fn validate_disbursement_duplicate_rejector() {
+        let mut disb = valid_disbursement();
+        disb.rejected_by = vec![valid_did(), valid_did()];
+        assert_invalid(
+            validate_disbursement(&disb),
+            "Duplicate DID in rejected_by",
+        );
+    }
+
+    // ── DID injection attempts ──────────────────────────────────────────
+
+    #[test]
+    fn validate_did_with_null_bytes() {
+        // Null bytes in DID — should at least not panic
+        let mut pool = valid_pool();
+        pool.members = vec!["did:mycelix:alice\0injected".to_string()];
+        // Passes basic format check (starts with did:, 3+ parts), but documents the edge case
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_did_with_very_long_method() {
+        let long_method = "x".repeat(1000);
+        let did = format!("did:{}:identifier", long_method);
+        // Basic DID format check passes — we rely on member_did length limits per-entry
+        assert!(validate_did(&did).is_ok());
+    }
+
+    #[test]
+    fn validate_did_minimal_valid() {
+        // "did:a:b" — minimal valid DID (3 parts)
+        assert!(validate_did("did:a:b").is_ok());
+    }
+
+    #[test]
+    fn validate_did_many_colons() {
+        // "did:method:id:extra:parts" — valid, extra parts allowed
+        assert!(validate_did("did:method:id:extra:parts").is_ok());
+    }
+
+    // ── Balance saturation edge cases ───────────────────────────────────
+
+    #[test]
+    fn validate_pool_max_u64_balance_ok() {
+        let mut pool = valid_pool();
+        pool.balance = u64::MAX;
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    // ── Emergency bypass with zero approvals ────────────────────────────
+
+    #[test]
+    fn validate_pool_emergency_bypass_enabled_ok() {
+        let mut pool = valid_pool();
+        pool.disbursement_rules.allow_emergency_bypass = true;
+        pool.disbursement_rules.min_approvals = 1;
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    // ── Combination edge cases ──────────────────────────────────────────
+
+    #[test]
+    fn validate_pool_max_members_with_max_rules() {
+        let mut pool = valid_pool();
+        pool.members = (0..500)
+            .map(|i| format!("did:mycelix:member{}", i))
+            .collect();
+        pool.disbursement_rules.min_approvals = 500;
+        pool.disbursement_rules.approval_threshold_percent = 100;
+        pool.contribution_rules.min_monthly = u64::MAX;
+        pool.contribution_rules.cooldown_days = u32::MAX;
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_disbursement_max_amount() {
+        let mut disb = valid_disbursement();
+        disb.amount = u64::MAX;
+        assert_valid(validate_disbursement(&disb));
+    }
+
+    #[test]
+    fn validate_contribution_member_did_at_256_ok() {
+        let mut contrib = valid_contribution();
+        // Build a valid DID that's exactly 256 chars
+        let padding = "x".repeat(256 - "did:mycelix:".len());
+        contrib.member_did = format!("did:mycelix:{}", padding);
+        assert_valid(validate_contribution(&contrib));
+    }
+
+    #[test]
+    fn validate_contribution_member_did_257_rejected() {
+        let mut contrib = valid_contribution();
+        let padding = "x".repeat(257 - "did:mycelix:".len());
+        contrib.member_did = format!("did:mycelix:{}", padding);
+        assert_invalid(
+            validate_contribution(&contrib),
+            "Member DID must be 256 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn validate_disbursement_recipient_did_at_256_ok() {
+        let mut disb = valid_disbursement();
+        let padding = "x".repeat(256 - "did:mycelix:".len());
+        disb.recipient_did = format!("did:mycelix:{}", padding);
+        assert_valid(validate_disbursement(&disb));
+    }
+
+    #[test]
+    fn validate_disbursement_recipient_did_257_rejected() {
+        let mut disb = valid_disbursement();
+        let padding = "x".repeat(257 - "did:mycelix:".len());
+        disb.recipient_did = format!("did:mycelix:{}", padding);
+        assert_invalid(
+            validate_disbursement(&disb),
+            "Recipient DID must be 256 characters or fewer",
         );
     }
 }

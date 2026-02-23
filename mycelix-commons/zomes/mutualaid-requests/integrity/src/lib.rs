@@ -227,6 +227,22 @@ fn validate_aid_offer(offer: &AidOffer) -> ExternResult<ValidateCallbackResult> 
     validate_id(&offer.id, "Offer ID")?;
     validate_id(&offer.request_id, "Request ID")?;
 
+    // Validate offer amount is non-zero when present
+    if let Some(amount) = offer.amount {
+        if amount == 0 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Offer amount must be greater than zero".into()
+            ));
+        }
+    }
+
+    // Validate message is not excessively long
+    if offer.message.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Offer message must be 4096 characters or fewer".into()
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -620,7 +636,8 @@ mod tests {
         offer.amount = Some(0);
         let result = validate_aid_offer(&offer);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+        // Zero amount is now rejected as part of hardening
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
     }
 
     // Enum Serde Tests
@@ -1060,5 +1077,195 @@ mod tests {
     fn test_link_offerer_to_offer_tag_too_long() {
         let result = check_link_tag(LinkTypes::OffererToOffer, vec![0u8; 257]);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // ========================================================================
+    // HARDENING: Byzantine & Edge Case Tests
+    // ========================================================================
+
+    // ── Fulfilled amount edge cases ─────────────────────────────────────
+
+    #[test]
+    fn test_aid_request_fulfilled_just_below_needed() {
+        let mut request = valid_aid_request();
+        request.amount_needed = Some(1000);
+        request.fulfilled_amount = 999;
+        let result = validate_aid_request(&request);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_aid_request_fulfilled_just_above_needed() {
+        let mut request = valid_aid_request();
+        request.amount_needed = Some(1000);
+        request.fulfilled_amount = 1001;
+        let result = validate_aid_request(&request);
+        assert_eq!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(RequestsError::FulfilledExceedsNeeded.to_string())
+        );
+    }
+
+    #[test]
+    fn test_aid_request_fulfilled_max_u64_no_needed() {
+        let mut request = valid_aid_request();
+        request.amount_needed = None;
+        request.fulfilled_amount = u64::MAX;
+        let result = validate_aid_request(&request);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_aid_request_fulfilled_0_needed_0() {
+        let mut request = valid_aid_request();
+        request.amount_needed = Some(0);
+        request.fulfilled_amount = 0;
+        let result = validate_aid_request(&request);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_aid_request_fulfilled_1_needed_0_rejected() {
+        let mut request = valid_aid_request();
+        request.amount_needed = Some(0);
+        request.fulfilled_amount = 1;
+        let result = validate_aid_request(&request);
+        assert_eq!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(RequestsError::FulfilledExceedsNeeded.to_string())
+        );
+    }
+
+    // ── Offer amount edge cases ─────────────────────────────────────────
+
+    #[test]
+    fn test_aid_offer_zero_amount_rejected() {
+        let mut offer = valid_aid_offer();
+        offer.amount = Some(0);
+        let result = validate_aid_offer(&offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+        if let Ok(ValidateCallbackResult::Invalid(msg)) = result {
+            assert!(msg.contains("Offer amount must be greater than zero"), "Got: {}", msg);
+        }
+    }
+
+    #[test]
+    fn test_aid_offer_amount_1_ok() {
+        let mut offer = valid_aid_offer();
+        offer.amount = Some(1);
+        let result = validate_aid_offer(&offer);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_aid_offer_max_amount_ok() {
+        let mut offer = valid_aid_offer();
+        offer.amount = Some(u64::MAX);
+        let result = validate_aid_offer(&offer);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_aid_offer_no_amount_ok() {
+        let mut offer = valid_aid_offer();
+        offer.amount = None;
+        let result = validate_aid_offer(&offer);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    // ── Offer message length edge cases ─────────────────────────────────
+
+    #[test]
+    fn test_aid_offer_message_at_4096_ok() {
+        let mut offer = valid_aid_offer();
+        offer.message = "m".repeat(4096);
+        let result = validate_aid_offer(&offer);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_aid_offer_message_4097_rejected() {
+        let mut offer = valid_aid_offer();
+        offer.message = "m".repeat(4097);
+        let result = validate_aid_offer(&offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+        if let Ok(ValidateCallbackResult::Invalid(msg)) = result {
+            assert!(msg.contains("4096 characters"), "Got: {}", msg);
+        }
+    }
+
+    // ── DID edge cases ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_aid_request_whitespace_did_rejected() {
+        let mut request = valid_aid_request();
+        request.requester_did = "   ".to_string();
+        let result = validate_aid_request(&request);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_aid_offer_whitespace_did_rejected() {
+        let mut offer = valid_aid_offer();
+        offer.offerer_did = "  \t  ".to_string();
+        let result = validate_aid_offer(&offer);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_aid_request_did_with_spaces_in_middle() {
+        // "did:my celix:alice" — spaces in method part
+        let mut request = valid_aid_request();
+        request.requester_did = "did:my celix:alice".to_string();
+        // Basic format check passes (has did: prefix, 3+ parts)
+        let result = validate_aid_request(&request);
+        assert!(result.is_ok());
+    }
+
+    // ── Description edge cases ──────────────────────────────────────────
+
+    #[test]
+    fn test_aid_request_description_single_char_ok() {
+        let mut request = valid_aid_request();
+        request.description = "x".to_string();
+        let result = validate_aid_request(&request);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_aid_request_description_tab_only_rejected() {
+        let mut request = valid_aid_request();
+        request.description = "\t".to_string();
+        let result = validate_aid_request(&request);
+        assert_eq!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(RequestsError::EmptyDescription.to_string())
+        );
+    }
+
+    // ── ID edge cases ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_aid_request_whitespace_id_rejected() {
+        let mut request = valid_aid_request();
+        request.id = "   ".to_string();
+        let result = validate_aid_request(&request);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_aid_offer_whitespace_offer_id_rejected() {
+        let mut offer = valid_aid_offer();
+        offer.id = " \t ".to_string();
+        let result = validate_aid_offer(&offer);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_aid_offer_whitespace_request_id_rejected() {
+        let mut offer = valid_aid_offer();
+        offer.request_id = "  ".to_string();
+        let result = validate_aid_offer(&offer);
+        assert!(result.is_err());
     }
 }
