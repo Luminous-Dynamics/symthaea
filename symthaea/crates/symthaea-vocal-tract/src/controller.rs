@@ -47,8 +47,11 @@ pub struct VocalTractConfig {
 impl Default for VocalTractConfig {
     fn default() -> Self {
         Self {
-            network_layers: 3,
-            neurons_per_layer: 8,
+            network_layers: 2,
+            neurons_per_layer: 4,
+            // 8 total neurons (was 24) — 3× fewer evolve_closed_form calls per frame.
+            // With improved supervised training (10 steps/phoneme, 10× lr, no decay),
+            // the smaller network achieves comparable accuracy at much higher throughput.
             learning_rate: 0.001,
             base_f0: 120.0,
             f0_range: 200.0,
