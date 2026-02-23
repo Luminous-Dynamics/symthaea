@@ -92,6 +92,12 @@ pub struct ContinuousMind {
     mesh_last_emit_tick: u64,
     /// Monotonic sequence number for outgoing WisdomPackets.
     mesh_sequence: u32,
+    /// Registry of active mesh peers (updated by process_mesh).
+    pub(crate) mesh_peers: crate::swarm::mesh::MeshPeerRegistry,
+    /// Optional Hyperfeel engine for affective mesh payload processing.
+    pub(crate) hyperfeel: Option<crate::swarm::Hyperfeel>,
+    /// Optional sensor registry for physical environmental inputs.
+    pub(crate) sensor_registry: Option<crate::swarm::mesh::SensorRegistry>,
 }
 
 impl ContinuousMind {
@@ -137,6 +143,9 @@ impl ContinuousMind {
             mesh_outbox: Vec::new(),
             mesh_last_emit_tick: 0,
             mesh_sequence: 0,
+            mesh_peers: crate::swarm::mesh::MeshPeerRegistry::new(),
+            hyperfeel: None,
+            sensor_registry: None,
         }
     }
 
@@ -379,6 +388,30 @@ impl ContinuousMind {
     /// Check if a mesh network bridge is attached and alive.
     pub fn has_mesh_bridge(&self) -> bool {
         self.mesh_bridge.as_ref().is_some_and(|h| h.is_alive())
+    }
+
+    /// Get a reference to the mesh peer registry.
+    pub fn mesh_peers(&self) -> &crate::swarm::mesh::MeshPeerRegistry {
+        &self.mesh_peers
+    }
+
+    /// Attach a Hyperfeel engine for affective mesh payload processing.
+    pub fn set_hyperfeel(&mut self, hf: crate::swarm::Hyperfeel) {
+        self.hyperfeel = Some(hf);
+    }
+
+    /// Attach a sensor registry for physical environmental inputs.
+    pub fn set_sensor_registry(&mut self, registry: crate::swarm::mesh::SensorRegistry) {
+        self.sensor_registry = Some(registry);
+    }
+
+    /// Register a single sensor (creates registry if needed).
+    pub fn register_sensor(&mut self, sensor: Box<dyn crate::swarm::mesh::SensorInput>) {
+        if self.sensor_registry.is_none() {
+            self.sensor_registry =
+                Some(crate::swarm::mesh::SensorRegistry::new(self.config.dimension));
+        }
+        self.sensor_registry.as_mut().unwrap().register(sensor);
     }
 
     /// Emit a wisdom vector over the mesh network, gated by urgency.

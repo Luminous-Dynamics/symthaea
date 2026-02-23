@@ -305,6 +305,22 @@ pub(crate) enum CycleUrgency {
 }
 
 impl CycleUrgency {
+    /// Derive urgency from raw arousal level (used by Mind auto-emit).
+    ///
+    /// Maps the biorhythm arousal value to a CycleUrgency level:
+    /// - `> 0.7` → Critical (high arousal, blast wisdom immediately)
+    /// - `> 0.3` → Normal  (standard processing)
+    /// - `≤ 0.3` → Cruise  (low arousal, conserve bandwidth)
+    pub(crate) fn from_arousal(arousal: f32) -> Self {
+        if arousal > 0.7 {
+            Self::Critical
+        } else if arousal > 0.3 {
+            Self::Normal
+        } else {
+            Self::Cruise
+        }
+    }
+
     /// Compute urgency from current cycle state.
     ///
     /// - `prediction_error`: current cycle's prediction error

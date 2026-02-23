@@ -389,6 +389,84 @@ impl MeshTransport for LoopbackTransport {
 }
 
 // ============================================================================
+// BI-DIRECTIONAL LOOPBACK TRANSPORT (INTEGRATION TESTING)
+// ============================================================================
+
+/// Bidirectional loopback transport for integration testing.
+///
+/// Unlike [`LoopbackTransport`] (write-only), `BiLoopbackTransport` comes in
+/// pairs: A's sends become B's receives and vice versa. This enables full
+/// round-trip testing: emit → bridge actor → mesh transport → bridge actor → process_mesh.
+///
+/// Create pairs with [`BiLoopbackTransport::pair`].
+pub struct BiLoopbackTransport {
+    name: &'static str,
+    mtu: usize,
+    /// Writes go here (peer reads from this)
+    tx_buf: std::sync::Arc<Mutex<std::collections::VecDeque<Vec<u8>>>>,
+    /// Reads come from here (peer writes to this)
+    rx_buf: std::sync::Arc<Mutex<std::collections::VecDeque<Vec<u8>>>>,
+}
+
+impl BiLoopbackTransport {
+    /// Create a matched pair of transports.
+    ///
+    /// Data sent on `a` is received on `b` and vice versa.
+    pub fn pair(
+        name_a: &'static str,
+        name_b: &'static str,
+        mtu: usize,
+    ) -> (Self, Self) {
+        let buf_a = std::sync::Arc::new(Mutex::new(std::collections::VecDeque::new()));
+        let buf_b = std::sync::Arc::new(Mutex::new(std::collections::VecDeque::new()));
+        (
+            Self {
+                name: name_a,
+                mtu,
+                tx_buf: buf_a.clone(),
+                rx_buf: buf_b.clone(),
+            },
+            Self {
+                name: name_b,
+                mtu,
+                tx_buf: buf_b,
+                rx_buf: buf_a,
+            },
+        )
+    }
+}
+
+impl MeshTransport for BiLoopbackTransport {
+    fn send_raw(&self, data: &[u8]) -> Result<(), MeshError> {
+        self.tx_buf.lock().unwrap().push_back(data.to_vec());
+        Ok(())
+    }
+
+    fn recv_raw(&self, buf: &mut [u8]) -> Result<usize, MeshError> {
+        match self.rx_buf.lock().unwrap().pop_front() {
+            Some(data) => {
+                let len = data.len().min(buf.len());
+                buf[..len].copy_from_slice(&data[..len]);
+                Ok(len)
+            }
+            None => Err(MeshError::Io("no data available".into())),
+        }
+    }
+
+    fn mtu(&self) -> usize {
+        self.mtu
+    }
+
+    fn name(&self) -> &str {
+        self.name
+    }
+
+    fn is_available(&self) -> bool {
+        true
+    }
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
@@ -552,5 +630,74 @@ mod tests {
         assert!(MeshRoute::LoRa.needs_fragmentation());
         assert!(!MeshRoute::Batman.needs_fragmentation());
         assert!(!MeshRoute::Yggdrasil.needs_fragmentation());
+    }
+
+    // -- BiLoopbackTransport --
+
+    #[test]
+    fn bi_loopback_batman_roundtrip() {
+        // A sends whole packet, B receives via poll_incoming
+        let (a, b) = BiLoopbackTransport::pair("A (batman)", "B (batman)", 1500);
+
+        let packet = test_packet(MeshUrgency::Critical);
+        let bytes = packet.to_bytes();
+        a.send_raw(&bytes).unwrap();
+
+        let mut buf = [0u8; WISDOM_PACKET_SIZE + 64];
+        let n = b.recv_raw(&mut buf).unwrap();
+        assert_eq!(n, WISDOM_PACKET_SIZE);
+
+        let recovered = WisdomPacket::from_bytes(&buf[..n]).unwrap();
+        assert_eq!(recovered.sequence, packet.sequence);
+        assert_eq!(recovered.wisdom.0, packet.wisdom.0);
+    }
+
+    #[test]
+    fn bi_loopback_lora_fragment_roundtrip() {
+        // A sends fragmented, B reassembles via MeshReceiver
+        let (a, b) = BiLoopbackTransport::pair("A (lora)", "B (lora)", LORA_MTU);
+
+        let original = test_packet(MeshUrgency::Cruise);
+        let frags = original.fragment();
+
+        // Send all fragments from A
+        let mut buf = [0u8; LORA_MTU];
+        for frag in &frags {
+            let len = frag.to_bytes(&mut buf);
+            a.send_raw(&buf[..len]).unwrap();
+        }
+
+        // Receive on B side and reassemble
+        let mesh_b = DualLayerMesh::new([0; 32]).with_lora(Box::new(b));
+        let mut receiver = super::super::MeshReceiver::new();
+        let completed = mesh_b.poll_incoming(&mut receiver);
+        assert_eq!(completed.len(), 1);
+        assert_eq!(completed[0].sequence, original.sequence);
+        assert_eq!(completed[0].wisdom.0, original.wisdom.0);
+    }
+
+    #[test]
+    fn bi_loopback_bidirectional() {
+        // Both sides send and receive simultaneously
+        let (a, b) = BiLoopbackTransport::pair("A", "B", 4096);
+
+        let packet_from_a = test_packet(MeshUrgency::Normal);
+        let mut packet_from_b = test_packet(MeshUrgency::Critical);
+        packet_from_b.sequence = 99;
+
+        // A sends, B sends
+        a.send_raw(&packet_from_a.to_bytes()).unwrap();
+        b.send_raw(&packet_from_b.to_bytes()).unwrap();
+
+        // B receives from A
+        let mut buf = [0u8; WISDOM_PACKET_SIZE + 64];
+        let n = b.recv_raw(&mut buf).unwrap();
+        let from_a = WisdomPacket::from_bytes(&buf[..n]).unwrap();
+        assert_eq!(from_a.sequence, packet_from_a.sequence);
+
+        // A receives from B
+        let n = a.recv_raw(&mut buf).unwrap();
+        let from_b = WisdomPacket::from_bytes(&buf[..n]).unwrap();
+        assert_eq!(from_b.sequence, 99);
     }
 }
