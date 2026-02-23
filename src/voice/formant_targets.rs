@@ -25,7 +25,7 @@ use std::collections::HashMap;
 // FORMANT TARGET — canonical definition in symthaea-vocal-tract sub-crate
 // ═══════════════════════════════════════════════════════════════════════════════
 
-pub use symthaea_vocal_tract::types::FormantTarget;
+pub use symthaea_vocal_tract::types::{FormantTarget, SourceType};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ARPABET FORMANT DATABASE
@@ -125,37 +125,44 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
     // Bilabial stops
     db.insert(
         "P".into(),
-        FormantTarget::unvoiced_consonant(200.0, 1000.0, 2200.0, 60.0),
+        FormantTarget::unvoiced_consonant(200.0, 1000.0, 2200.0, 60.0)
+            .with_manner(SourceType::Stop),
     );
     db.insert(
         "B".into(),
-        FormantTarget::voiced_consonant(200.0, 1000.0, 2200.0, 60.0),
+        FormantTarget::voiced_consonant(200.0, 1000.0, 2200.0, 60.0)
+            .with_manner(SourceType::Stop),
     );
 
     // Alveolar stops
     db.insert(
         "T".into(),
-        FormantTarget::unvoiced_consonant(400.0, 1800.0, 2600.0, 50.0),
+        FormantTarget::unvoiced_consonant(400.0, 1800.0, 2600.0, 50.0)
+            .with_manner(SourceType::Stop),
     );
     db.insert(
         "D".into(),
-        FormantTarget::voiced_consonant(400.0, 1800.0, 2600.0, 50.0),
+        FormantTarget::voiced_consonant(400.0, 1800.0, 2600.0, 50.0)
+            .with_manner(SourceType::Stop),
     );
 
     // Velar stops
     db.insert(
         "K".into(),
-        FormantTarget::unvoiced_consonant(350.0, 1500.0, 2500.0, 70.0),
+        FormantTarget::unvoiced_consonant(350.0, 1500.0, 2500.0, 70.0)
+            .with_manner(SourceType::Stop),
     );
     db.insert(
         "G".into(),
-        FormantTarget::voiced_consonant(350.0, 1500.0, 2500.0, 70.0),
+        FormantTarget::voiced_consonant(350.0, 1500.0, 2500.0, 70.0)
+            .with_manner(SourceType::Stop),
     );
 
     // Glottal stop
     db.insert(
         "Q".into(),
-        FormantTarget::unvoiced_consonant(300.0, 1500.0, 2500.0, 30.0),
+        FormantTarget::unvoiced_consonant(300.0, 1500.0, 2500.0, 30.0)
+            .with_manner(SourceType::Stop),
     );
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -214,11 +221,13 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
 
     db.insert(
         "CH".into(),
-        FormantTarget::unvoiced_consonant(300.0, 1800.0, 2800.0, 100.0),
+        FormantTarget::unvoiced_consonant(300.0, 1800.0, 2800.0, 100.0)
+            .with_manner(SourceType::Affricate),
     ); // "church"
     db.insert(
         "JH".into(),
-        FormantTarget::voiced_consonant(300.0, 1800.0, 2800.0, 100.0),
+        FormantTarget::voiced_consonant(300.0, 1800.0, 2800.0, 100.0)
+            .with_manner(SourceType::Affricate),
     ); // "judge"
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -227,15 +236,18 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
 
     db.insert(
         "M".into(),
-        FormantTarget::voiced_consonant(280.0, 1000.0, 2200.0, 70.0),
+        FormantTarget::voiced_consonant(280.0, 1000.0, 2200.0, 70.0)
+            .with_manner(SourceType::Nasal),
     );
     db.insert(
         "N".into(),
-        FormantTarget::voiced_consonant(280.0, 1500.0, 2500.0, 70.0),
+        FormantTarget::voiced_consonant(280.0, 1500.0, 2500.0, 70.0)
+            .with_manner(SourceType::Nasal),
     );
     db.insert(
         "NG".into(),
-        FormantTarget::voiced_consonant(280.0, 1900.0, 2600.0, 70.0),
+        FormantTarget::voiced_consonant(280.0, 1900.0, 2600.0, 70.0)
+            .with_manner(SourceType::Nasal),
     );
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -281,6 +293,7 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
             duration_ms: 100.0,
             is_vowel: false,
             is_voiced: false,
+            manner: SourceType::Silent,
         },
     );
 
@@ -297,6 +310,7 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
             duration_ms: 50.0,
             is_vowel: false,
             is_voiced: false,
+            manner: SourceType::Silent,
         },
     );
 
@@ -368,6 +382,7 @@ impl FormantDatabase {
                     b1: target.b1 * scale,
                     b2: target.b2 * scale,
                     b3: target.b3 * scale,
+                    manner: target.manner,
                     ..*target
                 },
             );

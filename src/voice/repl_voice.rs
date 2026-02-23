@@ -1382,6 +1382,10 @@ pub struct ReplVoiceOutput {
     /// Last voice output metrics (for feedback to cognitive loop)
     last_voice_metrics: Option<super::voice_feedback::VoiceOutputMetrics>,
 
+    /// Real-time streaming voice (cpal ring buffer) — preferred backend when available.
+    #[cfg(feature = "live-voice")]
+    live_voice: Option<super::live_voice::LiveVoice>,
+
     /// Statistics
     total_utterances: u64,
     total_audio_seconds: f32,
@@ -1445,6 +1449,26 @@ impl ReplVoiceOutput {
             None
         };
 
+        // Try to create LiveVoice (real-time streaming via cpal ring buffer).
+        // Falls back gracefully if no audio device available.
+        #[cfg(feature = "live-voice")]
+        let live_voice = if config.use_ltc_pipeline {
+            use symthaea_core::genesis::GenesisSeed;
+            let genesis = GenesisSeed::from_phrase("repl-vocal-tract");
+            match super::live_voice::LiveVoice::new(&genesis) {
+                Ok(lv) => {
+                    debug!("LiveVoice initialized — using real-time streaming backend");
+                    Some(lv)
+                }
+                Err(e) => {
+                    debug!("LiveVoice unavailable ({}), falling back to rodio", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         Ok(Self {
             config,
             articulatory,
@@ -1463,6 +1487,8 @@ impl ReplVoiceOutput {
             #[cfg(feature = "vocal-tract")]
             formant_db: super::formant_targets::FormantDatabase::new(),
             last_voice_metrics: None,
+            #[cfg(feature = "live-voice")]
+            live_voice,
             total_utterances: 0,
             total_audio_seconds: 0.0,
         })
@@ -1821,8 +1847,18 @@ impl ReplVoiceOutput {
         self.voice_output.synthesize(text)
     }
 
-    /// Speak text (synthesize and play)
+    /// Speak text (synthesize and play).
+    ///
+    /// Prefers the real-time `LiveVoice` backend (cpal ring buffer, frame-by-frame
+    /// streaming) when available. Falls back to batch rodio synthesis.
     pub fn speak(&mut self, text: &str) -> Result<()> {
+        // Prefer LiveVoice for real-time streaming output
+        #[cfg(feature = "live-voice")]
+        if let Some(ref mut lv) = self.live_voice {
+            self.total_utterances += 1;
+            return lv.speak(text);
+        }
+
         let samples = self.synthesize(text)?;
 
         if samples.is_empty() {
@@ -1830,6 +1866,19 @@ impl ReplVoiceOutput {
         }
 
         self.play_audio(&samples)
+    }
+
+    /// Update the cognitive state on the LiveVoice backend (if present).
+    ///
+    /// Changes take effect on the next motor frame (~5ms latency).
+    #[cfg(feature = "live-voice")]
+    pub fn update_live_cognitive_state(
+        &self,
+        state: super::vocal_tract_encoder::VoiceCognitiveState,
+    ) {
+        if let Some(ref lv) = self.live_voice {
+            *lv.cognitive_state_handle().lock() = state;
+        }
     }
 
     /// Play audio samples
@@ -2303,5 +2352,20 @@ mod tests {
         let voice = ReplVoiceOutput::new(config).unwrap();
         // Voice should be functional with LTC pipeline
         assert!(voice.is_audio_available() || !voice.is_audio_available()); // Just checking it exists
+    }
+
+    #[cfg(feature = "live-voice")]
+    #[test]
+    fn test_repl_live_voice_field() {
+        // LiveVoice init may fail without audio device — that's OK, falls back to None.
+        // Just verify ReplVoiceOutput::new() succeeds with the live-voice feature.
+        let config = ReplVoiceConfig {
+            use_ltc_pipeline: true,
+            ..ReplVoiceConfig::default()
+        };
+        let voice = ReplVoiceOutput::new(config).unwrap();
+        // If audio device is available, live_voice will be Some; otherwise None.
+        // Either way, ReplVoiceOutput should be functional.
+        assert!(voice.total_utterances == 0);
     }
 }

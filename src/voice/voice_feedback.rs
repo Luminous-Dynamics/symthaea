@@ -789,6 +789,7 @@ mod tests {
                 energy: 0.8,
                 voicing: 1.0,
                 time: i as f32 * 0.005,
+                ..Default::default()
             })
             .collect();
         let stable_metrics = VoiceOutputMetrics::from_formant_frames(&stable_frames, None);
@@ -822,6 +823,7 @@ mod tests {
                 energy: 0.3 + (i as f32 * 0.4).sin() * 0.5,
                 voicing: if i % 3 == 0 { 0.2 } else { 1.0 },
                 time: i as f32 * 0.005,
+                ..Default::default()
             })
             .collect();
         let unstable_metrics = VoiceOutputMetrics::from_formant_frames(&unstable_frames, None);

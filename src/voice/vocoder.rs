@@ -25,6 +25,7 @@
 
 use crate::voice::articulatory_synthesizer::FormantFrame;
 use serde::{Deserialize, Serialize};
+use symthaea_vocal_tract::types::SourceType;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VOCODER CONFIGURATION
@@ -55,6 +56,13 @@ pub struct VocoderConfig {
     pub f5_bandwidth: f32,
     /// Aspiration noise level (0.0 to 0.1 typical)
     pub aspiration_level: f32,
+    /// Spectral tilt coefficient (0.0 = flat, 0.5 = gentle rolloff, 0.7 = strong).
+    /// Applies a 1-pole low-pass to the source signal for natural speech spectral slope.
+    pub spectral_tilt: f32,
+    /// F0 jitter amount (fraction, e.g. 0.01 = 1%). Per-sample pitch perturbation.
+    pub jitter: f32,
+    /// Amplitude shimmer amount (fraction, e.g. 0.02 = 2%). Per-cycle amplitude variation.
+    pub shimmer: f32,
 }
 
 impl Default for VocoderConfig {
@@ -71,6 +79,9 @@ impl Default for VocoderConfig {
             f4_bandwidth: 250.0,
             f5_bandwidth: 300.0,
             aspiration_level: 0.03,
+            spectral_tilt: 0.5,
+            jitter: 0.01,
+            shimmer: 0.02,
         }
     }
 }
@@ -344,6 +355,14 @@ pub struct FormantVocoder {
     frame_idx: usize,
     /// Samples since last frame
     samples_in_frame: usize,
+    /// Spectral tilt 1-pole filter state
+    tilt_state: f32,
+    /// Current shimmer factor for this glottal cycle (1.0 ± shimmer)
+    shimmer_factor: f32,
+    /// Jitter noise source (separate from main noise to avoid correlation)
+    jitter_noise: NoiseSource,
+    /// Nasal anti-resonator (~300 Hz / 100 Hz BW) — subtracted for nasal phonemes.
+    nasal_antires: Resonator,
 }
 
 impl FormantVocoder {
@@ -366,14 +385,21 @@ impl FormantVocoder {
             config.sample_rate as f32,
         );
 
+        let mut nasal_antires = Resonator::new();
+        nasal_antires.set_params(300.0, 100.0, config.sample_rate as f32);
+
         Self {
             glottal: GlottalSource::new(config.sample_rate as f32, config.glottal_shape),
             noise: NoiseSource::new(0xDEADBEEF),
+            jitter_noise: NoiseSource::new(0xCAFEBABE),
             resonators,
             lowpass,
             config,
             frame_idx: 0,
             samples_in_frame: 0,
+            tilt_state: 0.0,
+            shimmer_factor: 1.0,
+            nasal_antires,
         }
     }
 
@@ -384,8 +410,11 @@ impl FormantVocoder {
             res.reset();
         }
         self.lowpass.reset();
+        self.nasal_antires.reset();
         self.frame_idx = 0;
         self.samples_in_frame = 0;
+        self.tilt_state = 0.0;
+        self.shimmer_factor = 1.0;
     }
 
     /// Synthesize audio from formant frames
@@ -425,11 +454,50 @@ impl FormantVocoder {
                 // Interpolate parameters
                 let current = frame.lerp(next_frame, t);
 
-                // Generate source signal with LF glottal model
-                let voiced = self.glottal.tick(current.f0) * current.voicing;
-                let unvoiced = self.noise.pink() * (1.0 - current.voicing) * 0.3;
+                // Manner-aware source excitation
+                let raw_source = self.generate_source(&current, t);
 
-                // Aspiration noise: breathiness during glottal open phase
+                // Spectral tilt: 1-pole low-pass for natural speech spectral slope
+                let source = raw_source * (1.0 - self.config.spectral_tilt)
+                    + self.tilt_state * self.config.spectral_tilt;
+                self.tilt_state = source;
+
+                // Formant filtering + nasal anti-resonance
+                let filtered = self.apply_filters(source, current.source_type);
+
+                // Apply energy envelope with shimmer
+                let output =
+                    filtered * current.energy * self.shimmer_factor * self.config.volume;
+
+                // Low-pass filter for smoothing
+                let smoothed = self.lowpass.process(output);
+
+                // Soft clip to prevent distortion
+                audio.push(soft_clip(smoothed));
+            }
+        }
+
+        audio
+    }
+
+    /// Generate source excitation signal based on manner of articulation.
+    ///
+    /// Returns the raw source signal before formant filtering.
+    /// - `progress`: position within the current frame/phoneme (0.0–1.0)
+    fn generate_source(&mut self, current: &FormantFrame, progress: f32) -> f32 {
+        match current.source_type {
+            SourceType::Vowel | SourceType::Liquid => {
+                // Standard: glottal pulse + aspiration + unvoiced noise
+                let f0_jittered =
+                    current.f0 * (1.0 + self.config.jitter * self.jitter_noise.white());
+
+                let prev_phase = self.glottal.phase;
+                let voiced = self.glottal.tick(f0_jittered) * current.voicing;
+                if self.glottal.phase < prev_phase {
+                    self.shimmer_factor =
+                        1.0 + self.config.shimmer * self.jitter_noise.white();
+                }
+                let unvoiced = self.noise.pink() * (1.0 - current.voicing) * 0.3;
                 let aspiration = if self.glottal.is_open() {
                     self.noise.white()
                         * self.config.aspiration_level
@@ -437,42 +505,79 @@ impl FormantVocoder {
                 } else {
                     0.0
                 };
-
-                let source = (voiced + aspiration + unvoiced) * 30.0;
-
-                // Apply formant filters (parallel configuration with weighted sum)
-                let mut filtered = 0.0;
-                if self.resonators.len() >= 3 {
-                    filtered += self.resonators[0].process(source) * 1.0; // F1 (strongest)
-                    filtered += self.resonators[1].process(source) * 0.5; // F2
-                    filtered += self.resonators[2].process(source) * 0.25; // F3
-                } else {
-                    for res in &mut self.resonators {
-                        filtered += res.process(source);
+                (voiced + aspiration + unvoiced) * 30.0
+            }
+            SourceType::Stop => {
+                // Closure (first 80%): silence or low voicing bar
+                // Burst (last 20%): white noise burst
+                if progress < 0.8 {
+                    if current.voicing > 0.5 {
+                        self.glottal.tick(current.f0) * 0.1
+                    } else {
+                        0.0
                     }
+                } else {
+                    self.noise.white() * 0.8 * 30.0
                 }
-                // F4/F5: speaker-dependent higher formants (subtle presence)
-                if self.resonators.len() >= 4 {
-                    filtered += self.resonators[3].process(source) * 0.1; // F4
+            }
+            SourceType::Fricative => {
+                // Shaped white noise + optional voicing bar
+                let noise = self.noise.white() * 0.5;
+                let voiced = if current.voicing > 0.5 {
+                    self.glottal.tick(current.f0) * 0.3
+                } else {
+                    0.0
+                };
+                (noise + voiced) * 30.0
+            }
+            SourceType::Nasal => {
+                // Voiced source (nasal anti-formant applied post-filter)
+                let voiced = self.glottal.tick(current.f0) * current.voicing;
+                voiced * 30.0
+            }
+            SourceType::Affricate => {
+                // First 40% closure, 40-50% burst, 50%+ frication
+                if progress < 0.4 {
+                    if current.voicing > 0.5 {
+                        self.glottal.tick(current.f0) * 0.1
+                    } else {
+                        0.0
+                    }
+                } else if progress < 0.5 {
+                    self.noise.white() * 0.8 * 30.0
+                } else {
+                    self.noise.white() * 0.5 * 30.0
                 }
-                if self.resonators.len() >= 5 {
-                    filtered += self.resonators[4].process(source) * 0.05; // F5
-                }
+            }
+            SourceType::Silent => 0.0,
+        }
+    }
 
-                // Apply energy envelope
-                let output = filtered * current.energy * self.config.volume;
-
-                // Low-pass filter for smoothing
-                let smoothed = self.lowpass.process(output);
-
-                // Soft clip to prevent distortion
-                let clipped = soft_clip(smoothed);
-
-                audio.push(clipped);
+    /// Apply formant filtering + optional nasal anti-resonance.
+    fn apply_filters(&mut self, source: f32, source_type: SourceType) -> f32 {
+        let mut filtered = 0.0;
+        if self.resonators.len() >= 3 {
+            filtered += self.resonators[0].process(source) * 1.0;
+            filtered += self.resonators[1].process(source) * 0.5;
+            filtered += self.resonators[2].process(source) * 0.25;
+        } else {
+            for res in &mut self.resonators {
+                filtered += res.process(source);
             }
         }
+        if self.resonators.len() >= 4 {
+            filtered += self.resonators[3].process(source) * 0.1;
+        }
+        if self.resonators.len() >= 5 {
+            filtered += self.resonators[4].process(source) * 0.05;
+        }
 
-        audio
+        // Nasal anti-resonance: subtract anti-formant for nasal phonemes
+        if source_type == SourceType::Nasal {
+            filtered -= self.nasal_antires.process(source) * 0.4;
+        }
+
+        filtered
     }
 
     /// Update resonator parameters from frame
@@ -507,37 +612,22 @@ impl FormantVocoder {
         self.update_resonators(frame);
         let mut audio = Vec::with_capacity(samples_per_frame);
 
-        for _ in 0..samples_per_frame {
-            let voiced = self.glottal.tick(frame.f0) * frame.voicing;
-            let unvoiced = self.noise.pink() * (1.0 - frame.voicing) * 0.3;
+        for j in 0..samples_per_frame {
+            let progress = j as f32 / samples_per_frame.max(1) as f32;
 
-            // Aspiration noise during glottal open phase
-            let aspiration = if self.glottal.is_open() {
-                self.noise.white() * self.config.aspiration_level * (1.0 - self.glottal.shape * 0.7)
-            } else {
-                0.0
-            };
+            // Manner-aware source excitation (includes jitter + shimmer for vowels)
+            let raw_source = self.generate_source(frame, progress);
 
-            let source = (voiced + aspiration + unvoiced) * 30.0;
+            // Spectral tilt: 1-pole low-pass for natural speech spectral slope
+            let source = raw_source * (1.0 - self.config.spectral_tilt)
+                + self.tilt_state * self.config.spectral_tilt;
+            self.tilt_state = source;
 
-            let mut filtered = 0.0;
-            if self.resonators.len() >= 3 {
-                filtered += self.resonators[0].process(source) * 1.0;
-                filtered += self.resonators[1].process(source) * 0.5;
-                filtered += self.resonators[2].process(source) * 0.25;
-            } else {
-                for res in &mut self.resonators {
-                    filtered += res.process(source);
-                }
-            }
-            if self.resonators.len() >= 4 {
-                filtered += self.resonators[3].process(source) * 0.1;
-            }
-            if self.resonators.len() >= 5 {
-                filtered += self.resonators[4].process(source) * 0.05;
-            }
+            // Formant filtering + nasal anti-resonance
+            let filtered = self.apply_filters(source, frame.source_type);
 
-            let output = filtered * frame.energy * self.config.volume;
+            let output =
+                filtered * frame.energy * self.shimmer_factor * self.config.volume;
             let smoothed = self.lowpass.process(output);
             audio.push(soft_clip(smoothed));
         }
@@ -653,6 +743,7 @@ mod tests {
                 energy: 0.8,
                 voicing: 1.0,
                 time: 0.0,
+                ..Default::default()
             },
             FormantFrame {
                 f1: 500.0,
@@ -665,6 +756,7 @@ mod tests {
                 energy: 0.8,
                 voicing: 1.0,
                 time: 0.1,
+                ..Default::default()
             },
         ];
 
@@ -703,6 +795,7 @@ mod tests {
                 energy: 0.8,
                 voicing: 1.0,
                 time: 0.0,
+                ..Default::default()
             },
             FormantFrame {
                 f1: 730.0,
@@ -715,6 +808,7 @@ mod tests {
                 energy: 0.8,
                 voicing: 1.0,
                 time: 0.1,
+                ..Default::default()
             },
         ];
 
@@ -776,6 +870,7 @@ mod tests {
             energy: 0.8,
             voicing: 1.0,
             time: 0.0,
+            ..Default::default()
         };
 
         // Synthesize with aspiration
@@ -805,5 +900,239 @@ mod tests {
             diff_energy > 0.001,
             "Aspiration should measurably change the output, diff_energy={diff_energy}"
         );
+    }
+
+    #[test]
+    fn test_spectral_tilt_reduces_hf() {
+        let frame = FormantFrame {
+            f1: 500.0,
+            f2: 1500.0,
+            f3: 2500.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            f0: 120.0,
+            energy: 0.8,
+            voicing: 1.0,
+            time: 0.0,
+            ..Default::default()
+        };
+
+        // No tilt
+        let config_flat = VocoderConfig {
+            spectral_tilt: 0.0,
+            jitter: 0.0,
+            shimmer: 0.0,
+            ..VocoderConfig::default()
+        };
+        let mut vocoder_flat = FormantVocoder::with_config(config_flat);
+        let audio_flat = vocoder_flat.synthesize_frame(&frame, 2400); // 100ms
+
+        // Strong tilt
+        let config_tilt = VocoderConfig {
+            spectral_tilt: 0.7,
+            jitter: 0.0,
+            shimmer: 0.0,
+            ..VocoderConfig::default()
+        };
+        let mut vocoder_tilt = FormantVocoder::with_config(config_tilt);
+        let audio_tilt = vocoder_tilt.synthesize_frame(&frame, 2400);
+
+        // Tilt should reduce high-frequency energy. Proxy: compute energy of
+        // sample-to-sample differences (≈ high-frequency content)
+        let hf_flat: f32 = audio_flat.windows(2).map(|w| (w[1] - w[0]).powi(2)).sum();
+        let hf_tilt: f32 = audio_tilt.windows(2).map(|w| (w[1] - w[0]).powi(2)).sum();
+
+        assert!(
+            hf_tilt < hf_flat,
+            "Spectral tilt should reduce HF energy: flat={hf_flat:.4}, tilt={hf_tilt:.4}"
+        );
+    }
+
+    #[test]
+    fn test_jitter_adds_pitch_variation() {
+        let frame = FormantFrame {
+            f1: 500.0,
+            f2: 1500.0,
+            f3: 2500.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            f0: 120.0,
+            energy: 0.8,
+            voicing: 1.0,
+            time: 0.0,
+            ..Default::default()
+        };
+
+        // No jitter
+        let config_no = VocoderConfig {
+            jitter: 0.0,
+            shimmer: 0.0,
+            spectral_tilt: 0.0,
+            ..VocoderConfig::default()
+        };
+        let mut vocoder_no = FormantVocoder::with_config(config_no);
+        let audio_no = vocoder_no.synthesize_frame(&frame, 2400);
+
+        // With jitter
+        let config_yes = VocoderConfig {
+            jitter: 0.03,
+            shimmer: 0.0,
+            spectral_tilt: 0.0,
+            ..VocoderConfig::default()
+        };
+        let mut vocoder_yes = FormantVocoder::with_config(config_yes);
+        let audio_yes = vocoder_yes.synthesize_frame(&frame, 2400);
+
+        // Jitter should produce different output
+        let diff: f32 = audio_no
+            .iter()
+            .zip(&audio_yes)
+            .map(|(a, b)| (a - b).powi(2))
+            .sum();
+        assert!(
+            diff > 0.001,
+            "Jitter should change the output, diff={diff}"
+        );
+    }
+
+    #[test]
+    fn test_shimmer_adds_amplitude_variation() {
+        let frame = FormantFrame {
+            f1: 500.0,
+            f2: 1500.0,
+            f3: 2500.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            f0: 120.0,
+            energy: 0.8,
+            voicing: 1.0,
+            time: 0.0,
+            ..Default::default()
+        };
+
+        // No shimmer
+        let config_no = VocoderConfig {
+            shimmer: 0.0,
+            jitter: 0.0,
+            spectral_tilt: 0.0,
+            ..VocoderConfig::default()
+        };
+        let mut vocoder_no = FormantVocoder::with_config(config_no);
+        let audio_no = vocoder_no.synthesize_frame(&frame, 2400);
+
+        // With shimmer
+        let config_yes = VocoderConfig {
+            shimmer: 0.05,
+            jitter: 0.0,
+            spectral_tilt: 0.0,
+            ..VocoderConfig::default()
+        };
+        let mut vocoder_yes = FormantVocoder::with_config(config_yes);
+        let audio_yes = vocoder_yes.synthesize_frame(&frame, 2400);
+
+        // Shimmer should produce different output
+        let diff: f32 = audio_no
+            .iter()
+            .zip(&audio_yes)
+            .map(|(a, b)| (a - b).powi(2))
+            .sum();
+        assert!(
+            diff > 0.001,
+            "Shimmer should change the output, diff={diff}"
+        );
+    }
+
+    #[test]
+    fn test_stop_consonant_burst() {
+        let mut vocoder = FormantVocoder::new();
+
+        let frame = FormantFrame {
+            f1: 200.0,
+            f2: 1000.0,
+            f3: 2200.0,
+            b1: 80.0,
+            b2: 120.0,
+            b3: 200.0,
+            f0: 120.0,
+            energy: 0.8,
+            voicing: 1.0,
+            source_type: SourceType::Stop,
+            ..Default::default()
+        };
+
+        let audio = vocoder.synthesize_frame(&frame, 480);
+        assert!(!audio.is_empty());
+
+        // Burst (last 20%) should have more energy than closure (first 80%)
+        let closure_end = (480.0 * 0.8) as usize;
+        let closure_energy: f32 =
+            audio[..closure_end].iter().map(|s| s * s).sum::<f32>() / closure_end as f32;
+        let burst_energy: f32 = audio[closure_end..]
+            .iter()
+            .map(|s| s * s)
+            .sum::<f32>()
+            / (480 - closure_end) as f32;
+
+        assert!(
+            burst_energy > closure_energy,
+            "Burst energy ({burst_energy:.6}) should exceed closure ({closure_energy:.6})"
+        );
+    }
+
+    #[test]
+    fn test_fricative_noise() {
+        let mut vocoder = FormantVocoder::new();
+
+        let frame = FormantFrame {
+            f1: 320.0,
+            f2: 1700.0,
+            f3: 2600.0,
+            b1: 100.0,
+            b2: 150.0,
+            b3: 250.0,
+            f0: 120.0,
+            energy: 0.6,
+            voicing: 0.0,
+            source_type: SourceType::Fricative,
+            ..Default::default()
+        };
+
+        let audio = vocoder.synthesize_frame(&frame, 480);
+        assert!(!audio.is_empty());
+
+        // Fricative should produce continuous noise throughout
+        let first_quarter: f32 = audio[..120].iter().map(|s| s * s).sum::<f32>();
+        let last_quarter: f32 = audio[360..].iter().map(|s| s * s).sum::<f32>();
+
+        assert!(first_quarter > 0.001, "First quarter energy: {first_quarter}");
+        assert!(last_quarter > 0.001, "Last quarter energy: {last_quarter}");
+    }
+
+    #[test]
+    fn test_nasal_voiced() {
+        let mut vocoder = FormantVocoder::new();
+
+        let frame = FormantFrame {
+            f1: 280.0,
+            f2: 1000.0,
+            f3: 2200.0,
+            b1: 80.0,
+            b2: 120.0,
+            b3: 200.0,
+            f0: 120.0,
+            energy: 0.7,
+            voicing: 1.0,
+            source_type: SourceType::Nasal,
+            ..Default::default()
+        };
+
+        let audio = vocoder.synthesize_frame(&frame, 480);
+        assert!(!audio.is_empty());
+
+        let rms: f32 = (audio.iter().map(|s| s * s).sum::<f32>() / audio.len() as f32).sqrt();
+        assert!(rms > 0.001, "Nasal should produce voiced audio: rms={rms:.4}");
     }
 }
