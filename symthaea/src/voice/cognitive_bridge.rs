@@ -1059,13 +1059,8 @@ mod tests {
     #[test]
     fn test_phase16_backward_compat() {
         // Existing from_cognitive_loop() should produce default Phase 16 values
-        let pacing = CognitivePacing::from_cognitive_loop(
-            &[0.5; 10],
-            1.0,
-            0.2,
-            HashMap::new(),
-            vec![],
-        );
+        let pacing =
+            CognitivePacing::from_cognitive_loop(&[0.5; 10], 1.0, 0.2, HashMap::new(), vec![]);
 
         assert!((pacing.unified_quality - 1.0).abs() < 0.01);
         assert!((pacing.epistemic_confidence - 0.5).abs() < 0.01);

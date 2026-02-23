@@ -1435,7 +1435,10 @@ impl ReplVoiceOutput {
             // Pre-train on phoneme database for reasonable starting point
             let db = super::formant_targets::FormantDatabase::new();
             super::vocal_tract_controller::train_controller_on_phoneme_db(
-                &mut pipeline.controller, &genesis, &db, 3,
+                &mut pipeline.controller,
+                &genesis,
+                &db,
+                3,
             );
             Some(pipeline)
         } else {
@@ -1744,8 +1747,7 @@ impl ReplVoiceOutput {
 
                 // Reset F0 declination at phrase boundary
                 phrase_start_time = elapsed;
-                phrase_duration =
-                    Self::compute_phrase_duration(&phonemes, ph_idx + 1);
+                phrase_duration = Self::compute_phrase_duration(&phonemes, ph_idx + 1);
             } else {
                 let n_frames = (timed_phoneme.duration / dt).max(1.0) as usize;
 
@@ -1788,7 +1790,9 @@ impl ReplVoiceOutput {
                             if target.is_voiced { 0.7 } else { 0.3 },
                             0.0,
                         );
-                        pipeline.controller.train_step(&phoneme_hv, &target_frame, dt, Some(1e-4));
+                        pipeline
+                            .controller
+                            .train_step(&phoneme_hv, &target_frame, dt, Some(1e-4));
                     }
                 }
             }
@@ -1799,9 +1803,8 @@ impl ReplVoiceOutput {
         }
 
         // Auto-compute voice quality metrics for feedback to cognitive loop
-        let metrics = super::voice_feedback::VoiceOutputMetrics::from_formant_frames(
-            &all_frames, None,
-        );
+        let metrics =
+            super::voice_feedback::VoiceOutputMetrics::from_formant_frames(&all_frames, None);
         self.last_voice_metrics = Some(metrics);
 
         // Convert formants → audio via vocoder
@@ -1897,7 +1900,10 @@ impl ReplVoiceOutput {
             let mut pipeline = super::vocal_tract_fep::VocalTractPipeline::new(&genesis);
             let db = super::formant_targets::FormantDatabase::new();
             super::vocal_tract_controller::train_controller_on_phoneme_db(
-                &mut pipeline.controller, &genesis, &db, 3,
+                &mut pipeline.controller,
+                &genesis,
+                &db,
+                3,
             );
             self.ltc_pipeline = Some(pipeline);
         }
@@ -2101,14 +2107,14 @@ mod tests {
         let mut voice = ReplVoiceOutput::new(config).unwrap();
 
         let samples = voice.synthesize("Hello world.").unwrap();
-        assert!(!samples.is_empty(), "LTC pipeline should produce audio samples");
+        assert!(
+            !samples.is_empty(),
+            "LTC pipeline should produce audio samples"
+        );
 
         // Samples should be in reasonable range
         for &s in &samples {
-            assert!(
-                s.is_finite(),
-                "All samples should be finite"
-            );
+            assert!(s.is_finite(), "All samples should be finite");
         }
     }
 
@@ -2126,10 +2132,7 @@ mod tests {
             .iter()
             .filter(|p| p.phoneme == "SIL")
             .count();
-        let sil_count_comma = phonemes_comma
-            .iter()
-            .filter(|p| p.phoneme == "SIL")
-            .count();
+        let sil_count_comma = phonemes_comma.iter().filter(|p| p.phoneme == "SIL").count();
 
         assert!(
             sil_count_comma > sil_count_no_comma,
@@ -2254,7 +2257,10 @@ mod tests {
 
         // Text with many consonants — adaptation should skip them gracefully
         let samples = voice.synthesize("Strict trips.").unwrap();
-        assert!(!samples.is_empty(), "Consonant-heavy text should still produce audio");
+        assert!(
+            !samples.is_empty(),
+            "Consonant-heavy text should still produce audio"
+        );
     }
 
     #[cfg(feature = "vocal-tract")]

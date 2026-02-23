@@ -53,8 +53,8 @@ pub mod cognitive_bridge;
 pub mod voice_feedback;
 
 // LTC-driven articulatory synthesis (Phase 17)
-pub mod vocal_tract_encoder;
 pub mod vocal_tract_controller;
+pub mod vocal_tract_encoder;
 pub mod vocal_tract_fep;
 pub mod vocal_tract_metrics;
 
@@ -102,14 +102,18 @@ pub use voice_feedback::{
 };
 
 // Re-export vocal tract types (Phase 17)
+pub use vocal_tract_controller::train_controller_on_phoneme_db;
+pub use vocal_tract_controller::{
+    ProsodyCorrection, ProsodyHead, SpeakerProfile, VocalTractConfig, VocalTractController,
+};
 pub use vocal_tract_encoder::{VocalTractHdcEncoder, VoiceCognitiveState};
-pub use vocal_tract_controller::{ProsodyCorrection, ProsodyHead, SpeakerProfile, VocalTractConfig, VocalTractController};
-pub use vocal_tract_fep::{VocalAction, VocalTractFepAgent, VocalTractFepResult, VocalTractObservation};
 #[cfg(feature = "vocal-tract")]
 pub use vocal_tract_fep::{ProsodyContext, StreamingVocalTract, VocalTractPipeline};
+pub use vocal_tract_fep::{
+    VocalAction, VocalTractFepAgent, VocalTractFepResult, VocalTractObservation,
+};
 #[cfg(feature = "vocal-tract")]
 pub use vocal_tract_metrics::VocalTractMetrics;
-pub use vocal_tract_controller::train_controller_on_phoneme_db;
 
 // Re-export rap synthesis types
 pub use beat_sync::{BeatPosition, BeatSync, FlowPattern, SwingConfig, SyllableTiming};

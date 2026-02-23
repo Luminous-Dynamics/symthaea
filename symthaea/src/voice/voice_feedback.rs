@@ -120,15 +120,18 @@ impl VoiceOutputMetrics {
         }
 
         // Pitch stability: 1.0 / (1.0 + F0 variance * 10.0)
-        let voiced_f0s: Vec<f32> = frames.iter()
+        let voiced_f0s: Vec<f32> = frames
+            .iter()
             .filter(|f| f.voicing > 0.5 && f.f0 > 0.0)
             .map(|f| f.f0)
             .collect();
         let pitch_stability = if voiced_f0s.len() >= 2 {
             let mean_f0 = voiced_f0s.iter().sum::<f32>() / voiced_f0s.len() as f32;
-            let variance = voiced_f0s.iter()
+            let variance = voiced_f0s
+                .iter()
                 .map(|f| (f - mean_f0).powi(2))
-                .sum::<f32>() / voiced_f0s.len() as f32;
+                .sum::<f32>()
+                / voiced_f0s.len() as f32;
             1.0 / (1.0 + variance * 10.0 / (mean_f0 * mean_f0).max(1.0))
         } else {
             0.5
@@ -137,14 +140,17 @@ impl VoiceOutputMetrics {
         // Energy consistency: 1.0 / (1.0 + energy variance * 5.0)
         let energies: Vec<f32> = frames.iter().map(|f| f.energy).collect();
         let mean_energy = energies.iter().sum::<f32>() / energies.len() as f32;
-        let energy_variance = energies.iter()
+        let energy_variance = energies
+            .iter()
             .map(|e| (e - mean_energy).powi(2))
-            .sum::<f32>() / energies.len() as f32;
+            .sum::<f32>()
+            / energies.len() as f32;
         let energy_consistency = 1.0 / (1.0 + energy_variance * 5.0);
 
         // Coarticulation smoothness: 1.0 - max_frame_delta / expected_range
         let max_delta = if frames.len() >= 2 {
-            frames.windows(2)
+            frames
+                .windows(2)
                 .map(|w| {
                     let df1 = (w[1].f1 - w[0].f1).abs();
                     let df2 = (w[1].f2 - w[0].f2).abs();
@@ -185,9 +191,11 @@ impl VoiceOutputMetrics {
 
         // Articulation score: composite of formant_accuracy + voicing stability
         let voicing_stability = if frames.len() >= 2 {
-            let voicing_changes: f32 = frames.windows(2)
+            let voicing_changes: f32 = frames
+                .windows(2)
                 .map(|w| (w[1].voicing - w[0].voicing).abs())
-                .sum::<f32>() / (frames.len() - 1) as f32;
+                .sum::<f32>()
+                / (frames.len() - 1) as f32;
             (1.0 - voicing_changes * 5.0).clamp(0.0, 1.0)
         } else {
             0.5
@@ -771,20 +779,35 @@ mod tests {
         // Stable frames: consistent F0, energy, formants
         let stable_frames: Vec<FormantFrame> = (0..50)
             .map(|i| FormantFrame {
-                f1: 500.0, f2: 1500.0, f3: 2500.0,
-                b1: 60.0, b2: 90.0, b3: 150.0,
-                f0: 120.0, energy: 0.8, voicing: 1.0,
+                f1: 500.0,
+                f2: 1500.0,
+                f3: 2500.0,
+                b1: 60.0,
+                b2: 90.0,
+                b3: 150.0,
+                f0: 120.0,
+                energy: 0.8,
+                voicing: 1.0,
                 time: i as f32 * 0.005,
             })
             .collect();
         let stable_metrics = VoiceOutputMetrics::from_formant_frames(&stable_frames, None);
 
-        assert!(stable_metrics.pitch_stability > 0.8,
-            "Stable pitch should have high stability: {}", stable_metrics.pitch_stability);
-        assert!(stable_metrics.energy_consistency > 0.8,
-            "Stable energy should have high consistency: {}", stable_metrics.energy_consistency);
-        assert!(stable_metrics.coarticulation_smoothness > 0.9,
-            "No transitions should be smooth: {}", stable_metrics.coarticulation_smoothness);
+        assert!(
+            stable_metrics.pitch_stability > 0.8,
+            "Stable pitch should have high stability: {}",
+            stable_metrics.pitch_stability
+        );
+        assert!(
+            stable_metrics.energy_consistency > 0.8,
+            "Stable energy should have high consistency: {}",
+            stable_metrics.energy_consistency
+        );
+        assert!(
+            stable_metrics.coarticulation_smoothness > 0.9,
+            "No transitions should be smooth: {}",
+            stable_metrics.coarticulation_smoothness
+        );
 
         // Unstable frames: varying F0, energy, jittering formants
         let unstable_frames: Vec<FormantFrame> = (0..50)
@@ -792,7 +815,9 @@ mod tests {
                 f1: 300.0 + (i as f32 * 0.3).sin() * 400.0,
                 f2: 1500.0 + (i as f32 * 0.5).cos() * 500.0,
                 f3: 2500.0,
-                b1: 60.0, b2: 90.0, b3: 150.0,
+                b1: 60.0,
+                b2: 90.0,
+                b3: 150.0,
                 f0: 80.0 + (i as f32 * 0.7).sin() * 80.0,
                 energy: 0.3 + (i as f32 * 0.4).sin() * 0.5,
                 voicing: if i % 3 == 0 { 0.2 } else { 1.0 },
@@ -802,10 +827,14 @@ mod tests {
         let unstable_metrics = VoiceOutputMetrics::from_formant_frames(&unstable_frames, None);
 
         // Unstable should score lower on key metrics
-        assert!(unstable_metrics.pitch_stability < stable_metrics.pitch_stability,
-            "Unstable pitch should be less stable");
-        assert!(unstable_metrics.energy_consistency < stable_metrics.energy_consistency,
-            "Unstable energy should be less consistent");
+        assert!(
+            unstable_metrics.pitch_stability < stable_metrics.pitch_stability,
+            "Unstable pitch should be less stable"
+        );
+        assert!(
+            unstable_metrics.energy_consistency < stable_metrics.energy_consistency,
+            "Unstable energy should be less consistent"
+        );
     }
 
     #[test]
