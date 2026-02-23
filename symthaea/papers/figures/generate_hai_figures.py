@@ -517,7 +517,7 @@ def fig7_efe_ablation():
     precisions = [float(r['safety_precision']) for r in rows]
     efe_mission = [float(r['efe_mission']) for r in rows]
     efe_intercept = [float(r['efe_intercept']) for r in rows]
-    rv_fracs = [float(r['best_rv_frac']) if r.get('best_rv_frac') else None for r in rows]
+    rv_fracs = [float(r['best_rv_frac']) if r.get('best_rv_frac', '').strip() else None for r in rows]
 
     # Find crossover via linear interpolation
     crossover = None
@@ -595,7 +595,7 @@ def fig8_scenario_efe():
     efe_mission = [float(r['efe_mission']) for r in rows]
     efe_intercept = [float(r['efe_intercept']) for r in rows]
     matches = [int(r['matches']) for r in rows]
-    rv_fracs = [float(r['best_rv_frac']) if r.get('best_rv_frac') else None for r in rows]
+    rv_fracs = [float(r['best_rv_frac']) if r.get('best_rv_frac', '').strip() else None for r in rows]
 
     fig, ax = plt.subplots(1, 1, figsize=(9, 4.5))
 
@@ -620,7 +620,7 @@ def fig8_scenario_efe():
 
     ax.set_xlabel('Scenario Variant')
     ax.set_ylabel('Expected Free Energy')
-    ax.set_title('Multi-Scenario EFE Evaluation: 6 Geometry Variants')
+    ax.set_title(f'Multi-Scenario EFE Evaluation: {len(variants)} Geometry Variants')
     ax.set_xticks(x)
     ax.set_xticklabels(variants, fontsize=8)
     ax.legend(loc='upper right', fontsize=9)

@@ -29,6 +29,8 @@
 \usepackage{float}
 \usepackage{enumitem}
 \usepackage{tikz}
+\usepackage{lineno}    % Line numbers (required by PLoS for peer review)
+\usepackage{setspace}  % Double spacing (PLoS submission prep)
 \graphicspath{{../figures/}}
 
 \hypersetup{
@@ -55,6 +57,8 @@
 \date{February 2026}
 
 \begin{document}
+\linenumbers
+\doublespacing
 
 \maketitle
 
@@ -1060,14 +1064,14 @@ Our system achieves a peak standing reward of 0.986 (99.3\% uprightness, 1.34\,m
 \subsection{Flight Control: Emergent Moral Reasoning via EFE}
 \label{sec:flight-efe}
 
-We instantiate the HAI architecture on a Crazyflie~2.0 quadrotor (27\,g) in MuJoCo~\citep{todorov2012mujoco} RK4 simulation. The controller blends PD position tracking with CfC-learned dynamics at 500\,Hz motor rate, while an Active Inference agent evaluates Expected Free Energy (EFE) over candidate setpoints at 25\,Hz cognitive rate (adaptive to 100\,Hz under high danger). No reward functions or hardcoded safety rules exist---moral reasoning emerges from precision-weighted EFE minimization.
+We instantiate the HAI architecture on a Crazyflie~2.0 quadrotor (27\,g) in MuJoCo~\citep{todorov2012mujoco} RK4 simulation. The controller blends PD position tracking with CfC-learned dynamics at 500\,Hz motor rate, while an Active Inference agent evaluates Expected Free Energy (EFE) over candidate setpoints at a cognitive rate that adapts smoothly from 25\,Hz to 100\,Hz based on perceived danger: $f_{\text{cog}} = 25 + 75 \cdot (d - 0.1)/0.9$ for $d > 0.1$, where $d$ is the human danger level. This continuous ramp avoids threshold oscillation while ensuring faster EFE re-evaluation under urgent conditions. No reward functions or hardcoded safety rules exist---moral reasoning emerges from precision-weighted EFE minimization.
 
 The agent maintains three precision-weighted priors:
 \begin{equation}
 G(\mathbf{a}) = \sum_i \pi_i \bigl(\hat{o}_i(\mathbf{a}) - \mu_i\bigr)^2
 \label{eq:efe-flight}
 \end{equation}
-where $\pi_{\text{safety}}{=}1000$ (``sentient beings should not be harmed''), $\pi_{\text{mission}}{=}1.0$ (``reach delivery target''), and $\pi_{\text{self}}{=}0.1$ (``avoid self-destruction''). Six candidate setpoints (continue mission, intercept threat, hover, shield, retreat, lateral deflection) are evaluated per cognitive tick, with physics-based trajectory rollout predicting beam position under gravity.
+where $\pi_{\text{safety}}{=}1000$ (``sentient beings should not be harmed''), $\pi_{\text{mission}}{=}1.0$ (``reach delivery target''), and $\pi_{\text{self}}{=}0.1$ (``avoid self-destruction''). Eight candidate setpoints (continue mission, three intercept rendezvous at 25/50/75\% of impact time, hover, shield, retreat, lateral deflection) are evaluated per cognitive tick. Candidate--beam proximity is computed analytically: since the beam follows a quadratic trajectory under gravity, the squared distance $D^2(t)$ from a candidate to the beam is a quartic polynomial whose minimum lies at a root of its cubic derivative, found via Newton--Raphson in ${\sim}10$ iterations (no sampling required).
 
 \textbf{Experiment 1: Survival Reflex.} Under mid-flight perturbation (50\% mass increase + single-rotor degradation), the FEP agent detects the distributional shift via rising free energy and modulates controller time constants ($\tau \times 0.92$ per tick, compounding to $0.92^{30} \approx 0.08$). Pre-perturbation error: 2.4\,mm; peak deviation: 6.8\,mm; recovery to 5\,cm within 11~steps (22\,ms at 500\,Hz).
 
@@ -1100,11 +1104,11 @@ At step~401, the time-fraction safety model evaluates $G(\text{mission}) \approx
 \label{fig:efe-ablation}
 \end{figure}
 
-\textbf{Multi-scenario validation.} Six geometry variants (Table~\ref{tab:scenarios}) confirm that EFE-based decision making generalizes across threat geometries without retraining. EFE values are computed using trajectory rollout with physics-based beam prediction when velocity is available.
+\textbf{Multi-scenario validation.} Seven geometry variants (Table~\ref{tab:scenarios}) confirm that EFE-based decision making generalizes across threat geometries without retraining. EFE values are computed using trajectory rollout with physics-based beam prediction when velocity is available, falling back to instantaneous EFE for static threats (no velocity data).
 
 \begin{table}[ht]
 \centering
-\caption{Multi-scenario trajectory EFE evaluation: 6 geometry variants.}
+\caption{Multi-scenario EFE evaluation: 7 geometry variants.}
 \label{tab:scenarios}
 \small
 \begin{tabular}{@{}lccclc@{}}
@@ -1117,16 +1121,17 @@ FarBeam      & 0.15 & 581.7   & 780.7  & MISSION   & 75\% \\
 Reversed     & 0.70 & 9,931   & 3,628  & INTERCEPT & 50\% \\
 NoHuman      & 0.00 & 131.8   & 155.3  & MISSION   & 75\% \\
 LowDanger    & 0.05 & 181.8   & 291.9  & MISSION   & 75\% \\
+StaticThreat & 0.80 & 640.0   & 3.3    & INTERCEPT & ---   \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-All six scenarios match expected decisions (6/6). Figure~\ref{fig:scenario-efe} shows the EFE comparison.
+All seven scenarios match expected decisions (7/7). The StaticThreat variant validates the instantaneous EFE fallback path when no threat velocity is available: the agent correctly intercepts based on spatial proximity alone. Figure~\ref{fig:scenario-efe} shows the EFE comparison.
 
 \begin{figure}[ht]
 \centering
 \includegraphics[width=\columnwidth]{fig8_scenario_efe.pdf}
-\caption{Multi-scenario EFE evaluation. Checkmarks indicate correct decisions. The agent intercepts when safety EFE dominates (Default, CloseBeam, Reversed) and continues the mission otherwise (FarBeam, NoHuman, LowDanger).}
+\caption{Multi-scenario EFE evaluation. Checkmarks indicate correct decisions. The agent intercepts when safety EFE dominates (Default, CloseBeam, Reversed, StaticThreat) and continues the mission otherwise (FarBeam, NoHuman, LowDanger).}
 \label{fig:scenario-efe}
 \end{figure}
 
