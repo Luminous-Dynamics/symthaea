@@ -274,6 +274,46 @@ impl Road {
         0.0
     }
 
+    /// Exact world position and heading at arc-length s.
+    ///
+    /// Returns (x, y, heading) using the same closed-form geometry as construction.
+    pub fn position_at(&self, s: f64) -> (f64, f64, f64) {
+        let s = if self.closed && self.total_length > 0.0 {
+            s.rem_euclid(self.total_length)
+        } else {
+            s.clamp(0.0, self.total_length)
+        };
+
+        for seg in &self.segments {
+            let s_end = seg.s_start + seg.length;
+            if s >= seg.s_start && s <= s_end {
+                let ds = s - seg.s_start;
+                return match &seg.kind {
+                    RoadSegment::Straight { .. } => {
+                        let x = seg.start_x + seg.start_heading.cos() * ds;
+                        let y = seg.start_y + seg.start_heading.sin() * ds;
+                        (x, y, seg.start_heading)
+                    }
+                    RoadSegment::Arc {
+                        radius,
+                        sweep_angle,
+                    } => {
+                        let sign = sweep_angle.signum();
+                        let cx = seg.start_x - sign * seg.start_heading.sin() * radius;
+                        let cy = seg.start_y + sign * seg.start_heading.cos() * radius;
+                        let frac = if seg.length > 0.0 { ds / seg.length } else { 0.0 };
+                        let partial_sweep = sweep_angle * frac;
+                        let h = seg.start_heading + partial_sweep;
+                        let x = cx + sign * h.sin() * radius;
+                        let y = cy - sign * h.cos() * radius;
+                        (x, y, h)
+                    }
+                };
+            }
+        }
+        (0.0, 0.0, 0.0)
+    }
+
     /// Apply road context to a vehicle state: sets lateral_offset and curvature_ahead.
     pub fn apply(&self, state: &mut VehicleState) {
         let proj = self.project(state.position_x, state.position_y);
@@ -509,5 +549,64 @@ mod tests {
             "Boundary lat should be ~0.5: {}",
             proj.lateral_offset
         );
+    }
+
+    #[test]
+    fn test_position_at_straight() {
+        let road = Road::straight();
+        let (x, y, h) = road.position_at(500.0);
+        assert!((x - 500.0).abs() < 1e-6, "x={x}");
+        assert!(y.abs() < 1e-6, "y={y}");
+        assert!(h.abs() < 1e-6, "h={h}");
+    }
+
+    #[test]
+    fn test_position_at_arc_quarter_turn() {
+        let r = 100.0;
+        let road = Road::from_segments(&[RoadSegment::Arc {
+            radius: r,
+            sweep_angle: std::f64::consts::FRAC_PI_2,
+        }]);
+        // End of 90° left arc: should be at (R, R) heading pi/2
+        let (x, y, h) = road.position_at(road.total_length);
+        assert!(
+            (x - r).abs() < 1.0,
+            "Quarter turn end x should be ~R: {x}"
+        );
+        assert!(
+            (y - r).abs() < 1.0,
+            "Quarter turn end y should be ~R: {y}"
+        );
+        assert!(
+            (h - std::f64::consts::FRAC_PI_2).abs() < 0.01,
+            "End heading should be pi/2: {h}"
+        );
+    }
+
+    #[test]
+    fn test_position_at_oval_wraps() {
+        let road = Road::oval(200.0, 50.0);
+        // s=0 and s=total_length should give the same position (closed loop)
+        let (x0, y0, h0) = road.position_at(0.0);
+        let (xn, yn, hn) = road.position_at(road.total_length);
+        assert!(
+            (x0 - xn).abs() < 1.0,
+            "Oval wrap x: {x0} vs {xn}"
+        );
+        assert!(
+            (y0 - yn).abs() < 1.0,
+            "Oval wrap y: {y0} vs {yn}"
+        );
+    }
+
+    #[test]
+    fn test_position_at_midpoint_straight() {
+        let road = Road::from_segments(&[
+            RoadSegment::Straight { length: 100.0 },
+            RoadSegment::Straight { length: 100.0 },
+        ]);
+        let (x, y, _) = road.position_at(150.0);
+        assert!((x - 150.0).abs() < 1e-6, "x={x}");
+        assert!(y.abs() < 1e-6, "y={y}");
     }
 }

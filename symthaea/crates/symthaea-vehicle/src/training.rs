@@ -21,6 +21,7 @@ use crate::perturbations::{is_critical_failure, PerturbationSchedule};
 use crate::reward;
 use crate::road::Road;
 use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
+use crate::swarm::{SwarmConfig, SwarmSimulator};
 use crate::types::*;
 
 /// Per-episode metrics.
@@ -66,6 +67,8 @@ pub struct VehicleTrainer {
     perturbation_schedule: PerturbationSchedule,
     /// Road model for computing lateral_offset and curvature_ahead.
     road: Road,
+    /// Optional swarm config — when set, peer vehicles populate mesh channels.
+    swarm_config: Option<SwarmConfig>,
 }
 
 impl VehicleTrainer {
@@ -79,6 +82,7 @@ impl VehicleTrainer {
             initial_controller: None,
             perturbation_schedule: PerturbationSchedule::none(),
             road: Road::straight(),
+            swarm_config: None,
         }
     }
 
@@ -92,6 +96,7 @@ impl VehicleTrainer {
             initial_controller: Some(controller),
             perturbation_schedule: PerturbationSchedule::none(),
             road: Road::straight(),
+            swarm_config: None,
         }
     }
 
@@ -106,6 +111,7 @@ impl VehicleTrainer {
             initial_controller: Some(controller),
             perturbation_schedule: PerturbationSchedule::none(),
             road: Road::straight(),
+            swarm_config: None,
         })
     }
 
@@ -118,6 +124,12 @@ impl VehicleTrainer {
     /// Set the road model for training.
     pub fn with_road(mut self, road: Road) -> Self {
         self.road = road;
+        self
+    }
+
+    /// Set a swarm config — peer vehicles will populate the 4 mesh channels during training.
+    pub fn with_swarm(mut self, swarm_config: SwarmConfig) -> Self {
+        self.swarm_config = Some(swarm_config);
         self
     }
 
@@ -248,6 +260,30 @@ impl VehicleTrainer {
             1.0f32
         };
 
+        // Optional swarm: create fresh each episode. Scale peer count by curriculum phase:
+        // phases 1-2 (progress < 0.7): no peers, phase 3 (0.7-0.9): half, phase 4 (0.9+): full.
+        let mut swarm = self.swarm_config.as_ref().and_then(|cfg| {
+            let progress = if self.config.num_episodes > 1 {
+                episode as f64 / (self.config.num_episodes - 1) as f64
+            } else {
+                1.0
+            };
+            let peer_frac = if progress < 0.7 {
+                0.0
+            } else if progress < 0.9 {
+                (progress - 0.7) / 0.2 // 0→1 over phase 3
+            } else {
+                1.0
+            };
+            let num_peers = (cfg.num_peers as f64 * peer_frac).round() as usize;
+            if num_peers == 0 {
+                return None;
+            }
+            let mut scaled_cfg = cfg.clone();
+            scaled_cfg.num_peers = num_peers;
+            Some(SwarmSimulator::new(scaled_cfg))
+        });
+
         for step in 0..self.config.steps_per_episode {
             // -- PERTURBATION SCHEDULE --
             if use_perturbations {
@@ -257,6 +293,12 @@ impl VehicleTrainer {
             // -- PHYSICS STEP (every step, 200Hz) --
             let mut state = physics.state().clone();
             self.road.apply(&mut state);
+
+            // Step swarm peers and write mesh channels onto ego state
+            if let Some(ref mut sw) = swarm {
+                sw.step(dt);
+                sw.aggregate_mesh(&mut state);
+            }
 
             let proj = self.road.project(state.position_x, state.position_y);
             let road_heading = proj.road_heading;
@@ -451,12 +493,20 @@ impl VehicleTrainer {
         let mut fep_agent =
             ActiveInferenceVehicleAgent::new(VehicleFepConfig::default(), self.config.task);
 
-        // Warmup: pre-train on static cruising samples with PD targets
+        // Warmup: pre-train on static cruising samples with PD targets.
+        // Space samples along the road with small lateral perturbations.
         let warmup_samples: Vec<(ContinuousHV, VehicleCommand)> = (0..20)
             .map(|i| {
+                // Place sample at evenly spaced positions along the road
+                let s = (i as f64 / 20.0) * self.road.total_length.min(500.0);
+                let (rx, ry, rh) = self.road.position_at(s);
+
                 let mut state = VehicleState::cruising(self.config.effective_target_speed());
+                // Lateral perturbation perpendicular to road heading
                 let offset = (i as f64 - 10.0) * 0.1;
-                state.position_y = offset;
+                state.position_x = rx - rh.sin() * offset;
+                state.position_y = ry + rh.cos() * offset;
+                state.heading = rh;
                 self.road.apply(&mut state);
                 let hv = encoder.encode(&state);
                 let proj = self.road.project(state.position_x, state.position_y);
@@ -924,5 +974,130 @@ mod tests {
                 m.episode
             );
         }
+    }
+
+    #[test]
+    fn test_training_with_swarm() {
+        use crate::swarm::SwarmConfig;
+
+        let config = VehicleConfig {
+            num_episodes: 3,
+            steps_per_episode: 100,
+            early_termination: false,
+            ..VehicleConfig::default()
+        };
+        let mut trainer =
+            VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(3));
+        let metrics = trainer.train();
+
+        assert_eq!(metrics.len(), 3);
+        for m in &metrics {
+            assert!(m.avg_episode_reward.is_finite());
+            assert!(m.avg_safety_reward.is_finite());
+            assert_eq!(m.total_steps, 100);
+        }
+    }
+
+    #[test]
+    fn test_swarm_lead_brake_activates_mesh() {
+        use crate::swarm::SwarmConfig;
+
+        let config = VehicleConfig {
+            num_episodes: 1,
+            steps_per_episode: 200,
+            collect_telemetry: true,
+            early_termination: false,
+            ..VehicleConfig::default()
+        };
+        // Use a swarm where we'll trigger a brake externally via run_episode_with_sim
+        let swarm_cfg = SwarmConfig::convoy_straight(3);
+        let trainer = VehicleTrainer::new(config.clone()).with_swarm(swarm_cfg);
+
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let mut encoder = VehicleHdcEncoder::new(&genesis, config.num_levels);
+        let mut controller = VehicleController::new(&genesis, &config);
+        let mut fep_agent =
+            ActiveInferenceVehicleAgent::new(VehicleFepConfig::default(), VehicleTask::LaneKeep);
+
+        let metrics = trainer.run_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
+
+        // With 3 peers at 30m spacing, the nearest should be visible
+        assert!(!metrics.telemetry.is_empty());
+        let has_peer_visible = metrics.telemetry.iter().any(|t| t.mesh_peers_visible > 0);
+        assert!(
+            has_peer_visible,
+            "Swarm peers should be visible in telemetry"
+        );
+    }
+
+    #[test]
+    fn test_training_on_oval() {
+        use crate::road::Road;
+
+        let config = VehicleConfig {
+            num_episodes: 5,
+            steps_per_episode: 300,
+            early_termination: false,
+            ..VehicleConfig::default()
+        };
+        let mut trainer = VehicleTrainer::new(config).with_road(Road::oval(200.0, 50.0));
+        let metrics = trainer.train();
+
+        assert_eq!(metrics.len(), 5);
+        for m in &metrics {
+            assert!(
+                m.avg_episode_reward.is_finite(),
+                "Episode {} reward not finite",
+                m.episode
+            );
+            assert!(
+                m.avg_safety_reward.is_finite(),
+                "Episode {} safety not finite",
+                m.episode
+            );
+            assert_eq!(
+                m.total_steps, 300,
+                "Episode {} should complete all steps",
+                m.episode
+            );
+        }
+    }
+
+    #[test]
+    fn test_swarm_curriculum_scales_peers() {
+        use crate::swarm::SwarmConfig;
+
+        // 10 episodes: phases 1-2 (ep 0-6) should have no swarm,
+        // phase 3 (ep 7-8) partial, phase 4 (ep 9) full
+        let config = VehicleConfig {
+            num_episodes: 10,
+            steps_per_episode: 50,
+            collect_telemetry: true,
+            early_termination: false,
+            ..VehicleConfig::default()
+        };
+        let mut trainer =
+            VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(4));
+        let metrics = trainer.train();
+
+        assert_eq!(metrics.len(), 10);
+
+        // Early episodes (progress < 0.7) should have no mesh peers
+        let early_has_peer = metrics[0]
+            .telemetry
+            .iter()
+            .any(|t| t.mesh_peers_visible > 0);
+        assert!(
+            !early_has_peer,
+            "Episode 0 should have no swarm peers"
+        );
+
+        // Last episode (progress=1.0) should have peers visible
+        let last = &metrics[9];
+        let late_has_peer = last.telemetry.iter().any(|t| t.mesh_peers_visible > 0);
+        assert!(
+            late_has_peer,
+            "Episode 9 should have swarm peers"
+        );
     }
 }

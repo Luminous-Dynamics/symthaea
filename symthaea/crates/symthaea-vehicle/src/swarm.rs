@@ -77,9 +77,8 @@ impl SwarmSimulator {
             let mut sim = BicycleModelSimulator::at_speed(config.target_speed);
             // Stagger peers ahead along the road: peer 0 is closest, peer N-1 is farthest
             let s = (i as f64 + 1.0) * config.initial_spacing;
-            let road_heading = config.road.heading_at(s);
-            let (x, y) = Self::road_position(&config.road, s);
-            sim.set_position(x, y, road_heading);
+            let (x, y, heading) = config.road.position_at(s);
+            sim.set_position(x, y, heading);
             peers.push(PeerVehicle {
                 sim,
                 id: i as u64 + 1,
@@ -88,24 +87,6 @@ impl SwarmSimulator {
         }
 
         Self { config, peers }
-    }
-
-    /// Approximate world position at arc-length s along the road.
-    fn road_position(road: &Road, s: f64) -> (f64, f64) {
-        let mut x = 0.0;
-        let mut y = 0.0;
-        let mut s_remaining = s;
-
-        let step_size = 1.0;
-        while s_remaining > 0.0 {
-            let ds = s_remaining.min(step_size);
-            let h_here = road.heading_at(s - s_remaining);
-            x += h_here.cos() * ds;
-            y += h_here.sin() * ds;
-            s_remaining -= ds;
-        }
-
-        (x, y)
     }
 
     /// Number of peers.
@@ -127,7 +108,7 @@ impl SwarmSimulator {
                 }
             } else {
                 pd_cruise_baseline_with_road(
-                    &peer.sim.state(),
+                    peer.sim.state(),
                     self.config.target_speed,
                     proj.road_heading,
                 )
