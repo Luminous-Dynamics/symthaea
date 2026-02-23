@@ -27,8 +27,11 @@ impl ContinuousMind {
         self.process_federated();
         self.process_social();
         self.sync_iroh_bridge();
-        self.process_mesh();
-        self.process_sensors();
+        #[cfg(feature = "mesh")]
+        {
+            self.process_mesh();
+            self.process_sensors();
+        }
 
         // Check for Dream State
         let should_dream = bio.phase == CircadianPhase::Night
@@ -65,8 +68,11 @@ impl ContinuousMind {
         }
 
         // Auto-emit wisdom to mesh + flush bridge (after all processing)
-        self.auto_emit_wisdom();
-        self.sync_mesh_bridge();
+        #[cfg(feature = "mesh")]
+        {
+            self.auto_emit_wisdom();
+            self.sync_mesh_bridge();
+        }
 
         output
     }
@@ -364,6 +370,7 @@ impl ContinuousMind {
         }
     }
 
+    #[cfg(feature = "mesh")]
     /// Process inbound mesh wisdom packets from radio peers.
     ///
     /// Drains `mesh_inbox` and logs received packets. WisdomVector payloads
@@ -437,6 +444,7 @@ impl ContinuousMind {
         );
     }
 
+    #[cfg(feature = "mesh")]
     /// Sync mesh packets through the mesh bridge (if attached).
     ///
     /// 1. Flushes `mesh_outbox` to the radio network actor (non-blocking)
@@ -477,6 +485,7 @@ impl ContinuousMind {
         }
     }
 
+    #[cfg(feature = "mesh")]
     /// Poll physical sensors and feed readings into the cognitive loop.
     ///
     /// Each sensor reading is encoded as an HDC hypervector and fed into
@@ -493,14 +502,24 @@ impl ContinuousMind {
             return;
         }
 
-        for (reading, urgency) in &readings {
-            let hv = registry.encode_reading(reading);
+        // Encode all readings up front so we can drop the registry borrow
+        // before calling self.perceive() / self.emit_wisdom().
+        let encoded: Vec<_> = readings
+            .iter()
+            .map(|(reading, urgency)| {
+                let hv = registry.encode_reading(reading);
+                let sensor_id = reading.sensor_id.clone();
+                let n_values = reading.values.len();
+                (hv, *urgency, sensor_id, n_values)
+            })
+            .collect();
 
+        for (hv, urgency, sensor_id, n_values) in encoded {
             // Feed encoded sensor reading into working memory as a perception
             self.perceive(hv);
 
             // If urgency is Critical (e.g., smoke alarm), broadcast immediately
-            if *urgency == crate::swarm::mesh::MeshUrgency::Critical
+            if urgency == crate::swarm::mesh::MeshUrgency::Critical
                 && self.mesh_bridge.is_some()
             {
                 let binary = symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(
@@ -515,14 +534,15 @@ impl ContinuousMind {
 
             tracing::debug!(
                 target: "symthaea::mind::sensor",
-                sensor = reading.sensor_id,
+                sensor = sensor_id,
                 urgency = ?urgency,
-                values = reading.values.len(),
+                values = n_values,
                 "Sensor reading perceived"
             );
         }
     }
 
+    #[cfg(feature = "mesh")]
     /// Auto-emit wisdom to mesh if a bridge is attached.
     ///
     /// Called at the end of every waking tick (after `generate_output()`),

@@ -73,6 +73,7 @@ mod holochain;
 #[cfg(feature = "mycelix")]
 pub mod hybrid_bft;
 mod hyperfeel;
+#[cfg(feature = "mesh")]
 pub mod mesh;
 mod service;
 mod types;
