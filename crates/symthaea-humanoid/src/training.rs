@@ -133,10 +133,11 @@ impl HumanoidTrainer {
             let target_speed = phase_progress * 1.0;
             (HumanoidTask::Walk, pd_weight, target_speed)
         } else {
-            // Phase 4: Run, PD 5%→0%, speed ramps 1→10 m/s
+            // Phase 4: Run, PD 5%→0%, speed ramps 1→5 m/s
+            // Capped at 5 m/s (10 m/s destabilizes the simple simulator)
             let phase_progress = (progress - 0.85) / 0.15;
             let pd_weight = 0.05 * (1.0 - phase_progress as f32);
-            let target_speed = 1.0 + phase_progress * 9.0;
+            let target_speed = 1.0 + phase_progress * 4.0;
             (HumanoidTask::Run, pd_weight, target_speed)
         }
     }
@@ -184,6 +185,7 @@ impl HumanoidTrainer {
         let mut steps_completed = 0usize;
         let mut current_tau_factor = fep_result.tau_factor;
         let mut current_fe = fep_result.free_energy;
+        let mut low_reward_streak = 0u32;
 
         let mut telemetry = if self.config.collect_telemetry {
             Vec::with_capacity(self.config.steps_per_episode)
@@ -242,12 +244,20 @@ impl HumanoidTrainer {
 
             steps_completed += 1;
 
-            // Early termination on fall
-            if self.config.early_termination
-                && step > 10
-                && (state.head_height < 0.5 || state.uprightness() < 0.1)
-            {
-                break;
+            // Early termination on fall or sustained degradation
+            if self.config.early_termination && step > 10 {
+                if state.head_height < 0.5 || state.uprightness() < 0.1 {
+                    break;
+                }
+                // Stop if standing reward stays below 0.3 for 50 consecutive steps
+                if standing_r < 0.3 {
+                    low_reward_streak += 1;
+                    if low_reward_streak >= 50 {
+                        break;
+                    }
+                } else {
+                    low_reward_streak = 0;
+                }
             }
 
             // Collect telemetry
@@ -455,6 +465,10 @@ impl HumanoidTrainer {
         let summary_path = format!("{}/summary.csv", output_dir);
         let _ = std::fs::write(&summary_path, summary);
 
+        // Save checkpoint of trained controller
+        let checkpoint_path = format!("{}/checkpoint.json", output_dir);
+        let _ = controller.save_checkpoint(&checkpoint_path, &self.config);
+
         self.metrics = all_metrics.clone();
         all_metrics
     }
@@ -558,6 +572,13 @@ mod tests {
         assert_eq!(task90, HumanoidTask::Run);
         assert!(pd90 < 0.05, "PD nearly zero in Run: {pd90}");
         assert!(speed90 > 1.0, "Run speed > 1 m/s: {speed90}");
+
+        // Final episode: speed capped at 5 m/s (not 10)
+        let (_task99, _pd99, speed99) = trainer.curriculum(99);
+        assert!(
+            speed99 <= 5.01,
+            "Run speed should be capped at ~5 m/s: {speed99}"
+        );
     }
 
     #[test]

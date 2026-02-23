@@ -54,7 +54,7 @@ pub mod training;
 pub mod transfer;
 pub mod types;
 
-pub use controller::HumanoidController;
+pub use controller::{ControllerCheckpoint, HumanoidController};
 pub use encoder::HumanoidHdcEncoder;
 pub use fep_agent::ActiveInferenceHumanoidAgent;
 pub use perturbations::{HumanoidPerturbation, PerturbationSchedule};

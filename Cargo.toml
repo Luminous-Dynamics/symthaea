@@ -483,6 +483,9 @@ name = "humanoid_100ep_telemetry"
 required-features = ["humanoid"]
 
 [[example]]
+name = "humanoid_training_curves"
+
+[[example]]
 name = "demo_self_analysis"
 required-features = ["code_generation"]
 
