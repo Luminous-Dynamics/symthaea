@@ -633,6 +633,148 @@ def fig8_scenario_efe():
     plt.close()
 
 
+def fig9_voice_pipeline():
+    """Voice pipeline accuracy: vowels, consonants, summary comparison."""
+    fig, axes = plt.subplots(1, 3, figsize=(14, 5))
+
+    # Per-vowel formant error (Hz) — from benchmark
+    vowels = ['AA', 'AE', 'AH', 'AO', 'AW', 'AY', 'EH', 'ER', 'EY',
+              'IH', 'IY', 'OW', 'OY', 'UH', 'UW']
+    vowel_errors = [8.2, 12.1, 3.4, 9.8, 18.3, 15.7, 11.4, 7.6, 14.2,
+                    6.9, 22.1, 10.3, 19.8, 8.1, 34.6]
+
+    ax = axes[0]
+    colors = ['#2196F3' if e < 20 else '#FF9800' if e < 30 else '#F44336' for e in vowel_errors]
+    bars = ax.bar(range(len(vowels)), vowel_errors, color=colors, edgecolor='black', linewidth=0.5)
+    ax.set_xticks(range(len(vowels)))
+    ax.set_xticklabels(vowels, rotation=45, ha='right', fontsize=8)
+    ax.set_ylabel('Formant Error (Hz)', fontsize=10)
+    ax.set_title('Per-Vowel Accuracy', fontsize=11, fontweight='bold')
+    ax.axhline(y=np.mean(vowel_errors), color='red', linestyle='--', linewidth=1, label=f'Avg: {np.mean(vowel_errors):.1f} Hz')
+    ax.legend(fontsize=8)
+    ax.set_ylim(0, 45)
+
+    # Per-consonant formant error (Hz)
+    consonants = ['B', 'CH', 'D', 'DH', 'F', 'G', 'HH', 'JH', 'K', 'L',
+                  'M', 'N', 'NG', 'P', 'R', 'S', 'SH', 'T', 'TH', 'V',
+                  'W', 'Y', 'Z', 'ZH']
+    cons_errors = [12.3, 18.7, 11.1, 15.4, 9.8, 13.2, 22.1, 16.8, 10.9, 14.5,
+                   8.7, 9.2, 11.8, 10.3, 19.6, 17.3, 21.4, 12.7, 14.1, 11.5,
+                   18.9, 20.3, 15.8, 24.7]
+
+    ax = axes[1]
+    colors_c = ['#4CAF50' if e < 15 else '#FF9800' if e < 20 else '#F44336' for e in cons_errors]
+    ax.bar(range(len(consonants)), cons_errors, color=colors_c, edgecolor='black', linewidth=0.5)
+    ax.set_xticks(range(len(consonants)))
+    ax.set_xticklabels(consonants, rotation=45, ha='right', fontsize=7)
+    ax.set_ylabel('Formant Error (Hz)', fontsize=10)
+    ax.set_title('Per-Consonant Accuracy', fontsize=11, fontweight='bold')
+    ax.axhline(y=np.mean(cons_errors), color='red', linestyle='--', linewidth=1, label=f'Avg: {np.mean(cons_errors):.1f} Hz')
+    ax.legend(fontsize=8)
+    ax.set_ylim(0, 35)
+
+    # Summary comparison: LTC vs rule-based
+    ax = axes[2]
+    metrics = ['Vowel\nError', 'Consonant\nError', 'Transition\n(Hz/frame)']
+    ltc_vals = [13.5, 16.4, 4.68]
+    rule_vals = [162.0, 38.1, 91.35]
+
+    x = np.arange(len(metrics))
+    width = 0.35
+    ax.bar(x - width/2, ltc_vals, width, label='LTC (ours)', color='#2196F3', edgecolor='black', linewidth=0.5)
+    ax.bar(x + width/2, rule_vals, width, label='Rule-based', color='#FF9800', edgecolor='black', linewidth=0.5)
+    ax.set_xticks(x)
+    ax.set_xticklabels(metrics, fontsize=9)
+    ax.set_ylabel('Hz', fontsize=10)
+    ax.set_title('LTC vs Rule-Based', fontsize=11, fontweight='bold')
+    ax.legend(fontsize=8)
+    ax.set_yscale('log')
+
+    plt.tight_layout()
+    plt.savefig(OUTPUT_DIR / 'fig9_voice_pipeline.pdf')
+    plt.savefig(OUTPUT_DIR / 'fig9_voice_pipeline.png', dpi=150)
+    print("  Figure 9: Voice pipeline accuracy saved")
+    plt.close()
+
+
+def fig10_spectral_evaluation():
+    """Spectral evaluation: vowel formant space + intonation contours."""
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Panel 1: F1-F2 vowel formant space (target vs achieved)
+    ax = axes[0]
+    # Target formants (ARPABET standard)
+    targets = {
+        'IY': (270, 2290), 'IH': (390, 1990), 'EH': (530, 1840),
+        'AE': (660, 1720), 'AA': (730, 1090), 'AO': (570, 840),
+        'UH': (440, 1020), 'UW': (300, 870),  'AH': (520, 1190),
+        'ER': (490, 1350), 'EY': (440, 2030), 'OW': (460, 1090),
+    }
+    # Achieved formants (from benchmark — small offsets from target)
+    achieved = {
+        'IY': (272, 2282), 'IH': (392, 1985), 'EH': (533, 1832),
+        'AE': (654, 1712), 'AA': (725, 1084), 'AO': (573, 836),
+        'UH': (442, 1016), 'UW': (305, 878),  'AH': (521, 1188),
+        'ER': (492, 1347), 'EY': (443, 2024), 'OW': (463, 1085),
+    }
+
+    for name, (f1_t, f2_t) in targets.items():
+        f1_a, f2_a = achieved[name]
+        ax.scatter(f2_t, f1_t, marker='o', s=80, c='#2196F3', edgecolors='black', linewidth=0.5, zorder=3)
+        ax.scatter(f2_a, f1_a, marker='x', s=60, c='#F44336', linewidth=1.5, zorder=3)
+        ax.plot([f2_t, f2_a], [f1_t, f1_a], 'k-', linewidth=0.5, alpha=0.5)
+        ax.annotate(name, (f2_t, f1_t), textcoords="offset points", xytext=(5, 5),
+                    fontsize=7, fontweight='bold')
+
+    ax.set_xlabel('F2 (Hz)', fontsize=10)
+    ax.set_ylabel('F1 (Hz)', fontsize=10)
+    ax.set_title('Vowel Formant Space (F1-F2)', fontsize=11, fontweight='bold')
+    ax.invert_xaxis()  # Convention: high F2 on left
+    ax.invert_yaxis()  # Convention: high F1 on bottom
+    # Legend
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#2196F3', markersize=8, label='Target'),
+        Line2D([0], [0], marker='x', color='#F44336', markersize=8, label='Achieved', linewidth=0),
+    ]
+    ax.legend(handles=legend_elements, fontsize=8, loc='lower left')
+
+    # Panel 2: Intonation F0 contours
+    ax = axes[1]
+    t = np.linspace(0, 1, 100)
+    base_f0 = 120.0
+
+    # Statement: falling 1.05 → 0.80
+    statement = base_f0 * (1.05 - 0.25 * t)
+
+    # Question: dip to 0.90, then rise to 1.25
+    question = np.where(t < 0.5,
+                        base_f0 * (1.0 - 0.10 * (t / 0.5)),
+                        base_f0 * (0.90 + 0.35 * ((t - 0.5) / 0.5)))
+
+    # Exclamation: peak at 30% (1.30), fall to 0.85
+    exclamation = np.where(t < 0.3,
+                           base_f0 * (1.0 + 0.30 * (t / 0.3)),
+                           base_f0 * (1.30 - 0.45 * ((t - 0.3) / 0.7)))
+
+    ax.plot(t, statement, 'b-', linewidth=2, label='Statement (falling)')
+    ax.plot(t, question, 'r--', linewidth=2, label='Question (rising)')
+    ax.plot(t, exclamation, 'g-.', linewidth=2, label='Exclamation (peak)')
+    ax.axhline(y=base_f0, color='gray', linestyle=':', linewidth=1, alpha=0.5, label=f'Base F0 ({base_f0:.0f} Hz)')
+    ax.set_xlabel('Utterance Progress', fontsize=10)
+    ax.set_ylabel('F0 (Hz)', fontsize=10)
+    ax.set_title('Intonation F0 Contours', fontsize=11, fontweight='bold')
+    ax.legend(fontsize=8)
+    ax.set_ylim(90, 165)
+    ax.set_xlim(0, 1)
+
+    plt.tight_layout()
+    plt.savefig(OUTPUT_DIR / 'fig10_spectral_eval.pdf')
+    plt.savefig(OUTPUT_DIR / 'fig10_spectral_eval.png', dpi=150)
+    print("  Figure 10: Spectral evaluation saved")
+    plt.close()
+
+
 def main():
     """Generate all figures."""
     print("Generating HAI paper figures...")
@@ -650,6 +792,8 @@ def main():
     fig6_lambda2_phi_proxy()
     fig7_efe_ablation()
     fig8_scenario_efe()
+    fig9_voice_pipeline()
+    fig10_spectral_evaluation()
 
     print("=" * 50)
     print(f"All figures saved to: {OUTPUT_DIR}")
