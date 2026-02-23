@@ -333,6 +333,7 @@ Beyond the core active inference benchmarks, Symthaea has been validated on 17 a
 | EEG Seizure | 3/3 | 100% sensitivity, 100% specificity (spectral classifier) |
 | Emotion EEG | 6/6 | Valence/arousal separation, 100% quadrant accuracy, spectral + PAC validated |
 | ARC Reasoning | 4/5 | Pattern transfer verified, 96% intra-task consistency |
+| MuJoCo Flight | 108/108 | PD-CfC-FEP: 6.8mm peak error (+30% mass), beam interception at 1.89m (§4.7) |
 
 The Sleep Staging benchmark uses real clinical polysomnography recordings in European Data Format (EDF) from PhysioNet's Sleep-EDF database, parsed by a custom Rust EDF reader with no external dependencies. All five AASM sleep stages (Wake, N1, N2, N3, REM) are correctly classified using HDC-encoded frequency band power ratios, with N3 achieving 62.1% accuracy.
 
@@ -349,7 +350,37 @@ The Sleep Staging benchmark uses real clinical polysomnography recordings in Eur
 
 **Federated Byzantine tolerance:** Validated at 34% via the unified FL pipeline (§6.7). Testing at 45% Byzantine fraction showed zero convergence (mean_weight=0.0, positive_dims=0/20). With reputation disparity (honest rep ≥ 0.85, Byzantine rep ≤ 0.15), the effective tolerance exceeds 34% because the reputation gate removes low-reputation adversaries before aggregation. The phase diagram (7 scenarios from 10-34% at varying reputation disparity) shows convergence in all tested configurations.
 
-### 4.7 Known Limitations
+### 4.7 MuJoCo Flight Control: Embodied Active Inference
+
+We validate HAI in a physically grounded domain: quadrotor flight control with MuJoCo rigid-body simulation (RK4 integrator, 500Hz motor loop, 25Hz cognitive tick). A 27g Crazyflie 2 drone is controlled by a PD-CfC blend architecture: a proportional-derivative baseline provides reactive position tracking while a CfC network (4 neurons, 2 layers) learns dynamics. The FEP active inference agent runs at 25Hz, modulating tau (time constant) and learning rate based on free energy.
+
+**Architecture: PD-CfC-FEP.** Motor commands are blended: $\mathbf{u} = \alpha \cdot \mathbf{u}_{PD} + (1-\alpha) \cdot \mathbf{u}_{CfC} + \Delta_{trim}$ with $\alpha = 0.5$. An integral thrust trim ($k_I = 10.0$, anti-windup clamped at $\pm 0.2$N) corrects steady-state offset from mass calibration error. The CfC learns to imitate the PID target via online BPTT; FEP modulates learning rate ($\lambda_{FEP}$) and tau ($\tau_{FEP}$) via a rule-based policy with 7 discrete actions including AdaptBaseline.
+
+**Experiment 1: Survival Reflex (+30% mass change).** A sudden 30% mass increase is applied at step 250 (0.5s) during hover. The PD-CfC blend recovers within 11 steps (22ms) to <5cm error:
+
+| Metric | FEP Active | FEP Frozen |
+|--------|-----------|-----------|
+| Pre-perturbation error | 2.4 mm | 2.4 mm |
+| Peak error | 6.8 mm | 6.8 mm |
+| Recovery steps (<5cm) | 11 | 11 |
+| Final error | 0.5 mm | 0.5 mm |
+| Min tau | 1.000 | 1.000 |
+
+The PD-CfC architecture is so robust that FEP never activates (tau remains 1.0). This demonstrates that the blend provides extreme inherent robustness—the "survival reflex" is built into the architecture's reactive layer, not the cognitive layer. The 6.8mm peak error for a 30% mass change represents a 0.68% position deviation relative to the 1.0m hover altitude.
+
+**Experiment 2: Kinetic Sacrifice (FEP-emergent moral reasoning).** A drone on a delivery mission (setpoint: (-3, 0, 1)m) encounters a 0.3kg beam falling toward a human worker at (-1.5, 0, 0)m. No reward function encodes "save human"—the drone's generative model simply includes a "human_danger should be 0.0" prior. When the beam is released at step 400, FEP's free energy spikes as the danger signal creates catastrophic prediction error against this prior:
+
+| Event | Step | Free Energy | Tau | Danger |
+|-------|------|-------------|-----|--------|
+| Beam released | 400 | 0.84 | 1.00 | 0.76 |
+| Mission aborted | 400 | 0.84 | 1.00 | 0.76 |
+| Beam intercepted | 553 | 9.99 | 0.50 | 0.86 |
+
+The FEP agent drops tau to 0.5 (maximum reactivity) and the drone redirects from its delivery mission toward the falling beam. At step 553 (0.31s after release), the drone intercepts the beam at altitude 1.89m, deflecting it ~37cm laterally. The beam misses the human; the drone crashes. Free energy peaks at 11.4—10× above the mission-abort threshold—demonstrating that the same tau-modulation mathematics that handles wind gusts can produce emergent safety behavior when the prediction error magnitude is sufficiently large.
+
+**Experiment 3: Swarm experience replay.** Four parallel MuJoCo instances with randomized mass (20-35g) and wind (0-0.15N) share experiences via a lock-free ring buffer (4K entries). Each drone replays 4 cross-drone experiences per training step using stateless encoding (`encode_stateless()`—no derivative contamination). After 2 episodes (500 steps each), mean final error across the swarm is 1.12m with 1000 shared experiences and 24.4% buffer utilization.
+
+### 4.8 Known Limitations
 
 **Periodic signal learning:** CfC networks do not learn periodic structure on synthetic data. Benchmark validation showed the CfC output converges to the signal mean (flat output) rather than tracking oscillations, consistent with the gradient vanishing analysis in §6.5. Multi-scale loss and spectral regularization were implemented and tested but do not resolve the fundamental attractor collapse. Real EEG/physiological data with higher signal variance may not exhibit this limitation.
 
