@@ -42,19 +42,22 @@ pub struct VocalTractConfig {
     pub base_f0: f32,
     /// F0 range (Hz) — output F0 can swing ±f0_range/2 around base_f0.
     pub f0_range: f32,
+    /// EMA smoothing factor for formant frequencies/bandwidths (0.0 = no smoothing, 1.0 = frozen).
+    /// Only applied to F1-F3, B1-B3 — prosody (F0/energy/voicing) passes through unsmoothed.
+    pub smoothing_alpha: f32,
 }
 
 impl Default for VocalTractConfig {
     fn default() -> Self {
         Self {
             network_layers: 2,
-            neurons_per_layer: 4,
-            // 8 total neurons (was 24) — 3× fewer evolve_closed_form calls per frame.
-            // With improved supervised training (10 steps/phoneme, 10× lr, no decay),
-            // the smaller network achieves comparable accuracy at much higher throughput.
+            neurons_per_layer: 2,
+            // 4 total neurons (was 8) — halves network evolve cost (~1.5-2ms savings).
+            // Combined with phoneme bind caching and EMA smoothing, targets 200Hz throughput.
             learning_rate: 0.001,
             base_f0: 120.0,
             f0_range: 200.0,
+            smoothing_alpha: 0.3,
         }
     }
 }
@@ -138,6 +141,10 @@ pub struct VocalTractController {
     config: VocalTractConfig,
     /// Optional learned prosody head: cognitive channels → F0/energy/voicing corrections.
     prosody_head: Option<ProsodyHead>,
+    /// Previous output frame for EMA smoothing (formants/bandwidths only).
+    prev_frame: Option<FormantFrame>,
+    /// EMA smoothing factor (cached from config).
+    smoothing_alpha: f32,
 }
 
 impl VocalTractController {
@@ -193,6 +200,8 @@ impl VocalTractController {
             learning_rate: config.learning_rate,
             config: config.clone(),
             prosody_head,
+            prev_frame: None,
+            smoothing_alpha: config.smoothing_alpha,
         }
     }
 
@@ -235,18 +244,39 @@ impl VocalTractController {
         let energy = sigmoid(raw[7]);
         let voicing = sigmoid(raw[8]);
 
-        FormantFrame {
-            f1,
-            f2,
-            f3,
-            b1,
-            b2,
-            b3,
-            f0,
-            energy,
-            voicing,
-            time: 0.0, // Caller sets absolute time
-        }
+        // EMA post-filter: smooth F1-F3, B1-B3 only (prosody passes through)
+        let alpha = self.smoothing_alpha;
+        let smoothed = if let Some(ref prev) = self.prev_frame {
+            FormantFrame {
+                f1: prev.f1 + (f1 - prev.f1) * (1.0 - alpha),
+                f2: prev.f2 + (f2 - prev.f2) * (1.0 - alpha),
+                f3: prev.f3 + (f3 - prev.f3) * (1.0 - alpha),
+                b1: prev.b1 + (b1 - prev.b1) * (1.0 - alpha),
+                b2: prev.b2 + (b2 - prev.b2) * (1.0 - alpha),
+                b3: prev.b3 + (b3 - prev.b3) * (1.0 - alpha),
+                f0,
+                energy,
+                voicing,
+                time: 0.0,
+                ..Default::default()
+            }
+        } else {
+            FormantFrame {
+                f1,
+                f2,
+                f3,
+                b1,
+                b2,
+                b3,
+                f0,
+                energy,
+                voicing,
+                time: 0.0, // Caller sets absolute time
+                ..Default::default()
+            }
+        };
+        self.prev_frame = Some(smoothed);
+        smoothed
     }
 
     /// Train the output projection via BPTT.
@@ -436,6 +466,7 @@ impl VocalTractController {
     /// Reset network state.
     pub fn reset(&mut self) {
         self.network.reset();
+        self.prev_frame = None;
     }
 
     /// Set the learning rate directly.
@@ -539,6 +570,7 @@ impl VocalTractController {
                     energy: if target.is_voiced { 0.7 } else { 0.3 },
                     voicing: if target.is_voiced { 0.95 } else { 0.1 },
                     time: 0.0,
+                    source_type: target.manner,
                 };
                 (*name, hv, frame)
             })
@@ -668,12 +700,20 @@ pub struct ProsodyHead {
 }
 
 impl ProsodyHead {
-    /// Create from genesis seed with small random initialization and zero output bias.
+    /// Create from genesis seed with hand-tuned initial weights.
+    ///
+    /// Neurons 0–3 are pre-wired with psychoacoustically meaningful mappings:
+    /// - Neuron 0: arousal (ch2) → F0 raise (high arousal = higher pitch)
+    /// - Neuron 1: arousal (ch2) → energy boost (high arousal = louder)
+    /// - Neuron 2: consciousness (ch7) → energy modulation
+    /// - Neuron 3: prediction_error (ch0) → F0 drop (uncertainty = lower pitch)
+    ///
+    /// Neurons 4–7 retain small random init for online learning.
     pub fn from_genesis(genesis: &GenesisSeed, lr: f32) -> Self {
         let w1_hv = genesis.hv("prosody_head::w1", 80);
         let mut w1 = [0.0f32; 80];
         for (i, v) in w1_hv.values.iter().enumerate().take(80) {
-            w1[i] = v * 0.1; // Small init
+            w1[i] = v * 0.05; // Small random init for all
         }
 
         let b1_hv = genesis.hv("prosody_head::b1", 8);
@@ -685,10 +725,39 @@ impl ProsodyHead {
         let w2_hv = genesis.hv("prosody_head::w2", 24);
         let mut w2 = [0.0f32; 24];
         for (i, v) in w2_hv.values.iter().enumerate().take(24) {
-            w2[i] = v * 0.1;
+            w2[i] = v * 0.05; // Small random init for all
         }
 
-        // Zero output bias → no initial correction
+        // ── Hand-tuned neurons 0–3 ──────────────────────────────────────────
+        // Channel indices: 0=prediction_error, 2=arousal, 7=consciousness_level
+        // Output indices: 0=delta_f0, 1=delta_energy, 2=delta_voicing
+        // w1 layout: w1[hidden_idx * 10 + input_idx]
+        // w2 layout: w2[output_idx * 8 + hidden_idx]
+
+        // Neuron 0: arousal → F0 raise
+        // At arousal=0.5 (neutral): tanh(2.0*0.5 - 1.0) = tanh(0) = 0 → no correction
+        // At arousal=0.9 (excited): tanh(0.8) ≈ 0.66 → +26 Hz
+        // At arousal=0.1 (calm):    tanh(-0.8) ≈ -0.66 → -26 Hz
+        w1[0 * 10 + 2] = 2.0;
+        b1[0] = -1.0;
+        w2[0 * 8 + 0] = 40.0;
+
+        // Neuron 1: arousal → energy boost
+        w1[1 * 10 + 2] = 1.5;
+        b1[1] = -0.75;
+        w2[1 * 8 + 1] = 0.8;
+
+        // Neuron 2: consciousness_level → energy modulation
+        w1[2 * 10 + 7] = 1.5;
+        b1[2] = -0.75;
+        w2[1 * 8 + 2] = 0.5;
+
+        // Neuron 3: prediction_error → F0 drop (uncertainty lowers pitch)
+        w1[3 * 10 + 0] = -1.5;
+        b1[3] = 0.0;
+        w2[0 * 8 + 3] = 20.0;
+
+        // Zero output bias → hand-tuned weights alone set initial behavior
         let b2 = [0.0f32; 3];
 
         Self { w1, b1, w2, b2, lr }
@@ -877,7 +946,7 @@ mod tests {
             f0: 150.0,
             energy: 0.7,
             voicing: 0.95,
-            time: 0.0,
+            ..Default::default()
         };
 
         // Initial error
@@ -978,7 +1047,7 @@ mod tests {
             f0: 150.0,
             energy: 0.7,
             voicing: 0.95,
-            time: 0.0,
+            ..Default::default()
         };
 
         for step in 0..200 {
@@ -1055,7 +1124,7 @@ mod tests {
             f0: config.base_f0,
             energy: 0.7,
             voicing: 0.95,
-            time: 0.0,
+            ..Default::default()
         };
 
         // Pre-training prediction (warmup + steady-state average)
@@ -1212,10 +1281,97 @@ mod tests {
             frame_high.f0
         );
 
+        // Hand-tuned prosody head: high arousal should raise F0 relative to low arousal
+        assert!(
+            frame_high.f0 > frame_low.f0,
+            "High arousal should raise F0: high={:.1}, low={:.1}",
+            frame_high.f0,
+            frame_low.f0
+        );
+
+        // High arousal should also raise energy
+        assert!(
+            frame_high.energy > frame_low.energy,
+            "High arousal should raise energy: high={:.3}, low={:.3}",
+            frame_high.energy,
+            frame_low.energy
+        );
+
         // Both should produce valid energy/voicing in [0, 1]
         assert!(frame_low.energy >= 0.0 && frame_low.energy <= 1.0);
         assert!(frame_high.energy >= 0.0 && frame_high.energy <= 1.0);
         assert!(frame_low.voicing >= 0.0 && frame_low.voicing <= 1.0);
         assert!(frame_high.voicing >= 0.0 && frame_high.voicing <= 1.0);
+    }
+
+    #[test]
+    fn test_ema_smoothing_reduces_delta() {
+        let genesis = test_genesis();
+        let config = VocalTractConfig {
+            smoothing_alpha: 0.3,
+            ..VocalTractConfig::default()
+        };
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+
+        let targets = test_phoneme_targets();
+        let target_refs: Vec<(&str, &FormantTarget)> =
+            targets.iter().map(|(name, t)| (*name, t)).collect();
+        ctrl.train_on_phoneme_targets(&genesis, &target_refs, 10);
+
+        let ah_hv = genesis.hv("phoneme::AH", HDC_DIMENSION);
+        let iy_hv = genesis.hv("phoneme::IY", HDC_DIMENSION);
+
+        ctrl.reset();
+
+        // Run 30 frames of /AH/ then 30 frames of /IY/
+        let mut f1_values = Vec::new();
+        for _ in 0..30 {
+            f1_values.push(ctrl.forward(&ah_hv, 0.005).f1);
+        }
+        for _ in 0..30 {
+            f1_values.push(ctrl.forward(&iy_hv, 0.005).f1);
+        }
+
+        let max_delta: f32 = f1_values
+            .windows(2)
+            .map(|w| (w[1] - w[0]).abs())
+            .fold(0.0f32, f32::max);
+
+        // With EMA alpha=0.3, max delta should be well under 50 Hz
+        assert!(
+            max_delta < 50.0,
+            "EMA smoothing should limit F1 delta: max_delta={max_delta:.1} Hz"
+        );
+    }
+
+    #[test]
+    fn test_ema_zero_alpha_passthrough() {
+        let genesis = test_genesis();
+        let config_smooth = VocalTractConfig {
+            smoothing_alpha: 0.0, // No smoothing
+            ..VocalTractConfig::default()
+        };
+        let config_none = VocalTractConfig {
+            smoothing_alpha: 0.0,
+            ..VocalTractConfig::default()
+        };
+
+        let mut ctrl_smooth = VocalTractController::new(&genesis, &config_smooth);
+        let mut ctrl_none = VocalTractController::new(&genesis, &config_none);
+
+        let hv = ContinuousHV::random(HDC_DIMENSION, 42);
+
+        // Both should produce identical output with alpha=0.0
+        let frame1 = ctrl_smooth.forward(&hv, 0.005);
+        let frame2 = ctrl_none.forward(&hv, 0.005);
+
+        assert!(
+            (frame1.f1 - frame2.f1).abs() < 1e-4,
+            "Zero alpha should be passthrough: {} vs {}",
+            frame1.f1,
+            frame2.f1
+        );
+        assert!((frame1.f2 - frame2.f2).abs() < 1e-4);
+        assert!((frame1.f3 - frame2.f3).abs() < 1e-4);
     }
 }

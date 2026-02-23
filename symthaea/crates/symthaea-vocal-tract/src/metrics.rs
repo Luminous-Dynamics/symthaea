@@ -160,6 +160,7 @@ mod tests {
             is_vowel: true,
             is_voiced: true,
             duration_ms: 80.0,
+            manner: crate::types::SourceType::Vowel,
         };
 
         // Frames close to target
@@ -175,6 +176,7 @@ mod tests {
                 energy: 0.7,
                 voicing: 0.95,
                 time: i as f32 * 0.005,
+                ..Default::default()
             })
             .collect();
 
@@ -227,6 +229,7 @@ mod tests {
             is_vowel: true,
             is_voiced: true,
             duration_ms: 80.0,
+            manner: crate::types::SourceType::Vowel,
         };
 
         let frames: Vec<FormantFrame> = (0..10)
@@ -241,6 +244,7 @@ mod tests {
                 energy: 0.5,
                 voicing: 0.8,
                 time: i as f32 * 0.005,
+                ..Default::default()
             })
             .collect();
 
