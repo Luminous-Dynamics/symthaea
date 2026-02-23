@@ -125,14 +125,14 @@ pub fn load_wav(path: &str) -> Result<(Vec<f32>, u32), hound::Error> {
 // MEL-CEPSTRAL DISTORTION (MCD)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Convert formant frequencies to a pseudo-mel-cepstral representation.
+/// Convert formant frequencies to a log-mel-cepstral representation.
 ///
-/// Maps F1/F2/F3 through the mel scale and computes a simple cepstral-like
-/// decomposition suitable for MCD calculation in formant-based synthesis.
+/// Maps F1/F2/F3 through the mel scale and takes the natural log,
+/// producing values comparable to real mel-cepstral coefficients.
 fn formants_to_mel_cepstrum(f1: f32, f2: f32, f3: f32) -> [f32; 3] {
-    // HTK mel scale: mel = 2595 * log10(1 + f/700)
-    let to_mel = |f: f32| 2595.0 * (1.0 + f / 700.0).log10();
-    [to_mel(f1), to_mel(f2), to_mel(f3)]
+    // HTK mel scale: mel = 2595 * log10(1 + f/700), then take ln for cepstral domain
+    let to_log_mel = |f: f32| (2595.0 * (1.0 + f.max(1.0) / 700.0).log10()).ln();
+    [to_log_mel(f1), to_log_mel(f2), to_log_mel(f3)]
 }
 
 /// Compute Mel-Cepstral Distortion between synthesized and target formant trajectories.
