@@ -178,9 +178,7 @@ impl PredictiveMonitor {
         }
 
         // Clone the last telemetry to avoid borrow conflict
-        let Some(last_entry) = self.history.last() else {
-            return None;
-        };
+        let last_entry = self.history.last()?;
         let last_telemetry = last_entry.2.clone();
         let last_input = self.encode_telemetry(&last_telemetry);
 

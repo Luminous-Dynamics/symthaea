@@ -121,6 +121,7 @@ impl DigitSpanBenchmark {
     /// For backward recall, each retrieval incurs a tick (output interference)
     /// and requires higher similarity, modeling the cognitive cost of
     /// maintaining reversed order (Gathercole et al., 2004).
+    #[allow(clippy::too_many_arguments)]
     fn test_recall(
         &self,
         presentation: &[SequenceItem],
