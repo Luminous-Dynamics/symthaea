@@ -1136,9 +1136,7 @@ All six scenarios match expected decisions (6/6). Figure~\ref{fig:scenario-efe} 
 
 The Byzantine detection capabilities in the FL pipeline could be misused for participant exclusion. We recommend transparent disclosure of detection criteria and appeals processes. The ethical reasoning system is trained on existing moral norms and may encode societal biases present in the ETHICS and Social Chemistry datasets.
 
-\subsection{Data Availability}
-
-All synthetic benchmarks are reproducible from released code. External datasets: Sleep-EDF (PhysioNet, CC-BY-4.0), LibriSpeech (OpenSLR), ETHICS~\citep{hendrycks2021aligning} (MIT License), Social Chemistry~\citep{forbes2020social}. Raw benchmark data are archived in the repository under \texttt{data/benchmarks/}.
+% Data Availability moved to standalone section after Acknowledgments (PLoS requirement)
 
 % ============================================================================
 \section{Conclusion}
@@ -1200,6 +1198,16 @@ This work was conducted independently using personal computational resources
 Rust, NixOS, NumPy, Matplotlib, and SciPy for enabling reproducible scientific
 computing. T.S.\ acknowledges the transformative potential of human--AI
 collaborative research exemplified by the Sacred Trinity development model.
+
+% ============================================================================
+\section*{Data Availability}
+
+All source code and synthetic benchmarks are available at
+\url{https://github.com/Luminous-Dynamics/symthaea} under the MIT License.
+External datasets used: Sleep-EDF (PhysioNet, CC-BY-4.0), LibriSpeech
+(OpenSLR), ETHICS~\citep{hendrycks2021aligning} (MIT License), Social
+Chemistry~\citep{forbes2020social}. Raw benchmark data are archived in the
+repository under \texttt{data/benchmarks/}.
 
 % ============================================================================
 % PLoS uses numbered Vancouver-style references.
