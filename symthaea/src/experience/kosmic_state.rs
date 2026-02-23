@@ -463,7 +463,7 @@ impl GisState {
     /// Add a dark spot (something we deliberately don't examine)
     pub fn add_dark_spot(&mut self, topic: &str, reason: &str) {
         self.dark_spots.push(DarkSpot {
-            topic_hash: format!("{:x}", md5::compute(topic.as_bytes())),
+            topic_hash: blake3::hash(topic.as_bytes()).to_hex().to_string(),
             reason: reason.to_string(),
             created_at: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -474,7 +474,7 @@ impl GisState {
 
     /// Check if topic is a dark spot
     pub fn is_dark_spot(&self, topic: &str) -> bool {
-        let hash = format!("{:x}", md5::compute(topic.as_bytes()));
+        let hash = blake3::hash(topic.as_bytes()).to_hex().to_string();
         self.dark_spots.iter().any(|ds| ds.topic_hash == hash)
     }
 }

@@ -359,7 +359,7 @@ pub use symthaea_observability as observability;
 // Shell (enabled - language module provides NixErrorDiagnoser)
 pub mod shell;
 
-// Experience (enabled - md5 crate added)
+// Experience (enabled - uses blake3 for topic hashing)
 pub mod experience;
 
 // Wisdom (enabled - 0 errors)

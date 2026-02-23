@@ -319,26 +319,7 @@ impl Default for CfCCodeSequencer {
     }
 }
 
-/// Cosine similarity between two f32 slices
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-    let n = a.len().min(b.len());
-    let mut dot = 0.0f32;
-    let mut mag_a = 0.0f32;
-    let mut mag_b = 0.0f32;
-
-    for i in 0..n {
-        dot += a[i] * b[i];
-        mag_a += a[i] * a[i];
-        mag_b += b[i] * b[i];
-    }
-
-    let mag = (mag_a * mag_b).sqrt();
-    if mag > 0.0 {
-        dot / mag
-    } else {
-        0.0
-    }
-}
+use symthaea_core::math::cosine_similarity_f32 as cosine_similarity;
 
 #[cfg(test)]
 mod tests {

@@ -404,6 +404,33 @@ pub struct LoopStats {
     pub avg_self_model_accuracy: f32,
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // PHASE 18: CLOSING FEEDBACK LOOPS
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Cycles where context phi weight was applied (cumulative).
+    pub context_phi_applied_count: u64,
+
+    /// Cycles where value evaluator gated learning (cumulative).
+    pub value_gate_applied_count: u64,
+
+    /// Cycles where evolution delta fed back to confidence (cumulative).
+    pub evolution_feedback_count: u64,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PHASE 19: ACTIVATING DORMANT PATHWAYS
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Cycles where attention budget gated expensive subsystems (cumulative).
+    pub attention_budget_gated_count: u64,
+
+    /// Cycles where limiting component triggered targeted boost (cumulative).
+    pub limiting_component_boost_count: u64,
+
+    /// Cycles where love resonance boosted confidence (cumulative).
+    pub love_resonance_boost_count: u64,
+
+    /// Cycles where reasoning chain boosted confidence (cumulative).
+    pub reasoning_chain_boost_count: u64,
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)
     // ═══════════════════════════════════════════════════════════════════════════
     /// Cached lattice height (0 = not yet computed)

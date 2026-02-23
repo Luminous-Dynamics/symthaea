@@ -76,6 +76,9 @@ const POLICY_TEMP_RANGE: f64 = 1.5; // temperature range [0.5, 2.0]
 // -- GWT / broadcast --
 pub(super) const GWT_BROADCAST_CONFIDENCE_BOOST: f32 = 0.03;
 
+// -- Attention budget --
+const ATTENTION_BUDGET_US: u64 = 50_000; // 50ms budget (~20Hz target)
+
 // -- MCE consciousness --
 pub(super) const MCE_LR_BOOST_SCALE: f32 = 0.1; // up to +10% LR from consciousness
 pub(super) const MCE_BOOST_DECAY: f32 = 0.9; // decay when MCE doesn't fire
@@ -323,25 +326,12 @@ impl CognitiveLoopService {
         // downstream subsystem skipping (amortize expensive modules).
         let (input_similarity, input_memoized) =
             if let Some(ref prev) = self.carryover.history.last_compressed_state {
-                if prev.len() == compressed_state.len() {
-                    let mut dot = 0.0f32;
-                    let mut norm_a = 0.0f32;
-                    let mut norm_b = 0.0f32;
-                    for (a, b) in compressed_state.iter().zip(prev.iter()) {
-                        dot += a * b;
-                        norm_a += a * a;
-                        norm_b += b * b;
-                    }
-                    let denom = (norm_a.sqrt() * norm_b.sqrt()).max(1e-10);
-                    let sim = (dot / denom).clamp(0.0, 1.0);
-                    let memoized = sim > 0.95;
-                    if memoized {
-                        self.stats.input_memoization_hits += 1;
-                    }
-                    (sim, memoized)
-                } else {
-                    (0.0, false)
+                let sim = helpers::cosine_f32(&compressed_state, prev).max(0.0);
+                let memoized = sim > 0.95;
+                if memoized {
+                    self.stats.input_memoization_hits += 1;
                 }
+                (sim, memoized)
             } else {
                 (0.0, false)
             };
@@ -401,7 +391,22 @@ impl CognitiveLoopService {
         } else {
             1.0
         };
-        let hysteresis_threshold = base_hysteresis * pattern_mod;
+        // ── Phase 18: Prediction coherence → urgency bias ─────────────────
+        // Science: Bar (2009) — temporal prediction consistency signals model quality.
+        // Uses previous cycle's avg coherence (current not yet computed at urgency time).
+        // Low coherence (<0.3) → model confused across horizons → bias toward Critical.
+        // High coherence (>0.7) → model confident → permit Cruise (raise threshold).
+        let prev_coherence = self.stats.avg_prediction_coherence;
+        let coherence_mod = if prev_coherence < 0.3 && prev_coherence > 0.0 {
+            0.85f32 // Lower threshold → easier to escalate (model confused)
+        } else if prev_coherence > 0.7 {
+            1.1 // Raise threshold → permit Cruise (model confident)
+        } else {
+            1.0
+        };
+        let prediction_coherence_urgency_bias = coherence_mod - 1.0;
+
+        let hysteresis_threshold = base_hysteresis * pattern_mod * coherence_mod;
         let error_urgency = super::CycleUrgency::from_state(
             smoothed_urgency_error,
             hysteresis_threshold,
@@ -603,23 +608,8 @@ impl CognitiveLoopService {
         // Science: Bar (2007) — proactive brain generates predictions from analogies
         let resonator_prediction_error: f32 =
             if let Some(ref prev_pred) = self.stats.last_resonator_prediction {
-                if prev_pred.len() == compressed_state.len() {
-                    let dot: f32 = prev_pred
-                        .iter()
-                        .zip(compressed_state.iter())
-                        .map(|(a, b)| a * b)
-                        .sum();
-                    let na: f32 = prev_pred.iter().map(|x| x * x).sum::<f32>().sqrt();
-                    let nb: f32 = compressed_state.iter().map(|x| x * x).sum::<f32>().sqrt();
-                    let sim = if na > 0.0 && nb > 0.0 {
-                        dot / (na * nb)
-                    } else {
-                        0.0
-                    };
-                    (1.0 - sim).clamp(0.0, 1.0) // cosine distance
-                } else {
-                    0.0
-                }
+                let sim = helpers::cosine_f32(prev_pred, &compressed_state);
+                (1.0 - sim).clamp(0.0, 1.0) // cosine distance
             } else {
                 0.0 // no prediction yet (first cycle)
             };
@@ -651,21 +641,7 @@ impl CognitiveLoopService {
                         // copy what we need before calling query_factorize(&mut res_mem).
                         let best_match_sim = top_matches
                             .iter()
-                            .map(|m| {
-                                let dot: f32 = compressed_state
-                                    .iter()
-                                    .zip(m.hv.iter())
-                                    .map(|(a, b)| a * b)
-                                    .sum();
-                                let na: f32 =
-                                    compressed_state.iter().map(|x| x * x).sum::<f32>().sqrt();
-                                let nb: f32 = m.hv.iter().map(|x| x * x).sum::<f32>().sqrt();
-                                if na > 0.0 && nb > 0.0 {
-                                    dot / (na * nb)
-                                } else {
-                                    0.0
-                                }
-                            })
+                            .map(|m| helpers::cosine_f32(&compressed_state, &m.hv))
                             .fold(0.0f32, f32::max);
                         let match_timestamps: Vec<u64> =
                             top_matches.iter().map(|m| m.timestamp).collect();
@@ -801,21 +777,31 @@ impl CognitiveLoopService {
         // 1b. Analyze emotional content for simple contagion (keyword-based)
         self.emotion_contagion.analyze(input);
 
-        // ── Phase 15: Emotional homeostasis — opponent-process return-to-baseline ──
-        // Science: Solomon & Corbit (1974) — opponent-process theory: emotional states
-        // trigger an opposing process that returns affect to baseline. Prevents emotional
-        // runaway from cumulative contagion nudges.
+        // ── Phase 15+18: Emotional homeostasis — urgency-adaptive opponent-process ──
+        // Science: Solomon & Corbit (1974) + Damasio (1994) — opponent-process theory
+        // with urgency-adaptive pull: stronger in Cruise (stable → return to baseline),
+        // weaker in Critical (preserve genuine emotional signals during high-alertness).
         let valence_homeostasis_pull;
         let arousal_homeostasis_pull;
+        let homeostasis_pull_strength;
         {
             let prev_v = self.carryover.history.last_emotion_valence;
             let prev_a = self.carryover.history.last_emotion_arousal;
             let curr_v = self.emotion_contagion.valence;
             let curr_a = self.emotion_contagion.prosody_arousal();
 
-            // Opponent pull: 5% toward neutral (0.0 for valence, 0.3 for arousal)
-            let v_pull = -curr_v * 0.05;
-            let a_pull = (0.3 - curr_a) * 0.05;
+            // Phase 18: Urgency-adaptive pull multiplier
+            // Cruise → 1.5× (stronger return to baseline), Critical → 0.6× (preserve signals)
+            let pull_mult = match self.carryover.urgency.urgency {
+                super::CycleUrgency::Cruise => 1.5f32,
+                super::CycleUrgency::Normal => 1.0,
+                super::CycleUrgency::Critical => 0.6,
+            };
+            homeostasis_pull_strength = pull_mult;
+
+            // Opponent pull: base 5% toward neutral, scaled by urgency
+            let v_pull = -curr_v * 0.05 * pull_mult;
+            let a_pull = (0.3 - curr_a) * 0.05 * pull_mult;
             self.emotion_contagion.valence = (curr_v + v_pull).clamp(-1.0, 1.0);
 
             valence_homeostasis_pull = v_pull;
@@ -2191,11 +2177,26 @@ impl CognitiveLoopService {
         let compositionality_total = consciousness_metrics.compositionality_total;
         let value_evaluator_score = consciousness_metrics.value_evaluator_score;
         let value_evaluator_decision = consciousness_metrics.value_evaluator_decision;
+        let value_gate_factor = consciousness_metrics.value_gate_factor;
         let consciousness_profile_composite = consciousness_metrics.consciousness_profile_composite;
         let synergy_enhanced_composite = consciousness_metrics.synergy_enhanced_composite;
         let emergent_properties_count = consciousness_metrics.emergent_properties_count;
         let reasoning_context = consciousness_metrics.reasoning_context;
         let context_phi_weight = consciousness_metrics.context_phi_weight;
+
+        // ── Phase 18: Context Phi Weight → Unified Psi modulation ────────────
+        // Science: Gigerenzer (2007) — ecological rationality requires context-adaptive
+        // consciousness weighting. Apply context_phi_weight as multiplicative modulation
+        // so consciousness measurement adapts to reasoning context (analytical/creative/emotional).
+        let context_phi_applied = context_phi_weight > 0.0 && context_phi_weight != 1.0;
+        if context_phi_applied {
+            // Weight range: 0.0-1.0 from optimizer; map to [0.8, 1.2] scaling factor
+            let scale = 0.8 + context_phi_weight * 0.4;
+            let adjusted_psi = (unified_psi * scale).clamp(0.0, 1.0);
+            self.unification_engine.update_psi(adjusted_psi);
+            self.stats.context_phi_applied_count += 1;
+        }
+
         let value_embeddings_created = consciousness_metrics.value_embeddings_created;
         let value_cache_hit_rate = consciousness_metrics.value_cache_hit_rate;
         let harmonies_alignment = consciousness_metrics.harmonies_alignment;
@@ -2236,6 +2237,15 @@ impl CognitiveLoopService {
         let hierarchical_ltc_phi = subsystem_metrics.hierarchical_ltc_phi;
         let evolution_generation = subsystem_metrics.evolution_generation;
         let evolution_phi_delta = subsystem_metrics.evolution_phi_delta;
+        // Phase 18: Track the confidence delta that was applied in run_advanced_subsystems
+        let evolution_confidence_delta = if evolution_phi_delta > 0.01 {
+            (evolution_phi_delta * 0.05).min(0.03) as f32
+        } else if evolution_phi_delta < -0.01 {
+            // Negative: exploration boost (report as negative confidence delta)
+            -((-evolution_phi_delta) * 0.08).min(0.04) as f32
+        } else {
+            0.0
+        };
         let holographic_unity = subsystem_metrics.holographic_unity;
         let holographic_binding = subsystem_metrics.holographic_binding;
         let consciousness_gradient_magnitude = subsystem_metrics.consciousness_gradient_magnitude;
@@ -2256,6 +2266,20 @@ impl CognitiveLoopService {
         let empathic_compassion = subsystem_metrics.empathic_compassion;
         let empathic_tone_adj = subsystem_metrics.empathic_tone_adj;
         let multi_obj_frontier_size = subsystem_metrics.multi_obj_frontier_size;
+
+        // ── Phase 18: Empathic tone → speech rate modulation ─────────────────
+        // Science: Decety & Jackson (2004) — empathic resonance should modulate output.
+        // Positive tone_adj (patience detected) → slow speech; negative (impatience) → speed up.
+        let empathic_speech_rate_mod = if empathic_tone_adj.abs() > 0.1 {
+            // Map [-1, 1] to speech rate multiplier: patience slows, impatience speeds
+            let rate_mod = 1.0 - empathic_tone_adj as f32 * 0.1; // [-1,1] → [0.9, 1.1]
+            self.adaptive_behavior.speech_rate_multiplier *= rate_mod;
+            self.adaptive_behavior.speech_rate_multiplier =
+                self.adaptive_behavior.speech_rate_multiplier.clamp(0.6, 1.5);
+            empathic_tone_adj as f32
+        } else {
+            0.0
+        };
 
         // (Inline code for HIERARCHICAL LTC through MULTI-OBJECTIVE EVOLUTION
         //  removed — now in run_advanced_subsystems() in cycle_subsystems.rs)
@@ -2619,8 +2643,9 @@ impl CognitiveLoopService {
         }
 
         // Boredom homeostasis: slow drift toward neutral (0.5) prevents monotonic saturation.
-        // Without this, boredom accumulates asymmetrically toward 0 or 1.
-        self.curiosity_drive.boredom += (0.5 - self.curiosity_drive.boredom) * 0.02;
+        // Phase 18: urgency-adaptive pull (Cruise=1.5×, Critical=0.6×)
+        self.curiosity_drive.boredom +=
+            (0.5 - self.curiosity_drive.boredom) * 0.02 * homeostasis_pull_strength;
 
         // Exploration urge per-cycle budget: clamp total change to ±0.5.
         // 15+ subsystems write exploration_urge per cycle; without bounding, cumulative
@@ -2631,8 +2656,9 @@ impl CognitiveLoopService {
         );
 
         // Exploration urge homeostasis: slow drift toward neutral (0.3) prevents saturation.
+        // Phase 18: urgency-adaptive pull (Cruise=1.5×, Critical=0.6×)
         self.curiosity_drive.exploration_urge +=
-            (0.3 - self.curiosity_drive.exploration_urge) * 0.03;
+            (0.3 - self.curiosity_drive.exploration_urge) * 0.03 * homeostasis_pull_strength;
 
         // Store urgency for next cycle's hysteresis
         self.carryover.urgency.urgency = urgency;
@@ -3041,6 +3067,13 @@ impl CognitiveLoopService {
             mode_confidence: self.carryover.urgency.mode_confidence,
             mode_stability_counter: self.carryover.urgency.mode_stability_counter,
             predicted_urgency: predicted_urgency.into(),
+            // Phase 18: Closing Feedback Loops
+            context_phi_applied,
+            empathic_speech_rate_mod,
+            value_gate_factor,
+            evolution_confidence_delta,
+            homeostasis_pull_strength,
+            prediction_coherence_urgency_bias,
         };
 
         // Update cumulative stats for resonator-memory loop diagnostics

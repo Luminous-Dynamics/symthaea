@@ -364,6 +364,7 @@ pub(crate) struct CycleState<'a> {
     pub hv16_cached: &'a symthaea_core::hdc::BinaryHV,
     pub input: &'a str,
     pub urgency: CycleUrgency,
+    pub attention_budget_exceeded: bool,
 }
 
 /// Metadata about internal decision-making during a cycle.
@@ -873,6 +874,32 @@ pub struct CycleMetadata {
     pub mode_stability_counter: u32,
     /// Predicted urgency for next 5 cycles (from error pattern analysis).
     pub predicted_urgency: String,
+
+    // ── Phase 18: Closing Feedback Loops ─────────────────────────────
+    /// Whether context_phi_weight was applied to modulate unified Psi this cycle.
+    pub context_phi_applied: bool,
+    /// Empathic tone adjustment applied to speech rate (-1.0 to 1.0, 0.0 = no change).
+    pub empathic_speech_rate_mod: f32,
+    /// Value evaluator gate factor applied to learning rate (1.0 = no change).
+    pub value_gate_factor: f32,
+    /// Evolution phi delta feedback: confidence change applied this cycle.
+    pub evolution_confidence_delta: f32,
+    /// Homeostasis pull strength multiplier (urgency-adaptive, 1.0 = baseline).
+    pub homeostasis_pull_strength: f32,
+    /// Prediction coherence bias applied to urgency threshold (-1.0 to 1.0).
+    pub prediction_coherence_urgency_bias: f32,
+
+    // ── Phase 19: Activating Dormant Pathways ────────────────────────
+    /// Whether attention budget gating skipped expensive subsystems this cycle.
+    pub attention_budget_gated: bool,
+    /// Consciousness limiting component that was boosted (empty when none).
+    pub limiting_component_boosted: String,
+    /// Love resonance confidence boost applied this cycle.
+    pub love_resonance_boost: f32,
+    /// Whether reasoning chain boosted prediction confidence this cycle.
+    pub reasoning_chain_boosted: bool,
+    /// AttentionShift motor command intensity applied to attention_sensitivity.
+    pub attention_shift_applied: f32,
 }
 
 /// Compact subset of CycleMetadata with the most essential telemetry fields.

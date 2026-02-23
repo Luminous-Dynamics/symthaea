@@ -153,7 +153,7 @@ impl RunningStats {
         if self.count == 1 {
             self.ema = value;
         } else {
-            self.ema = ema_alpha * value + (1.0 - ema_alpha) * self.ema;
+            self.ema = symthaea_core::math::ema_update(self.ema, value, ema_alpha);
         }
 
         // Track min/max

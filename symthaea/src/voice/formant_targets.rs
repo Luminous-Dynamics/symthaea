@@ -458,6 +458,13 @@ impl FormantDatabase {
         from_target.lerp(&to_target, position)
     }
 
+    /// Get all phoneme names in the database.
+    pub fn all_phonemes(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.targets.keys().cloned().collect();
+        names.sort();
+        names
+    }
+
     /// Add or update a phoneme target
     pub fn set(&mut self, phoneme: impl Into<String>, target: FormantTarget) {
         self.targets.insert(phoneme.into(), target);

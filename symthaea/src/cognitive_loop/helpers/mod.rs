@@ -35,6 +35,27 @@ use std::time::{Duration, Instant};
 use super::CycleResult;
 use super::{ActionHint, AdaptiveBehavior, CognitiveLoopService, Experience, LoopStats};
 
+/// Cosine similarity between two f32 slices.
+///
+/// Returns 0.0 for mismatched lengths or zero-norm vectors.
+/// Uses `.max(1e-10)` denominator for NaN safety.
+#[inline]
+pub(super) fn cosine_f32(a: &[f32], b: &[f32]) -> f32 {
+    if a.len() != b.len() {
+        return 0.0;
+    }
+    let mut dot = 0.0f32;
+    let mut norm_a = 0.0f32;
+    let mut norm_b = 0.0f32;
+    for (x, y) in a.iter().zip(b.iter()) {
+        dot += x * y;
+        norm_a += x * x;
+        norm_b += y * y;
+    }
+    let denom = (norm_a.sqrt() * norm_b.sqrt()).max(1e-10);
+    (dot / denom).clamp(-1.0, 1.0)
+}
+
 impl CognitiveLoopService {
     /// Process a pre-computed text embedding through the neural bridge and
     /// cognitive loop.

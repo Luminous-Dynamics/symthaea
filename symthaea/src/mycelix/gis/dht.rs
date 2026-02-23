@@ -622,19 +622,7 @@ impl DarkSpotDHT {
     }
 
     fn cosine_similarity(&self, a: &[f32], b: &[f32]) -> f32 {
-        if a.len() != b.len() || a.is_empty() {
-            return 0.0;
-        }
-
-        let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-        let mag_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-        let mag_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-
-        if mag_a < 0.0001 || mag_b < 0.0001 {
-            0.0
-        } else {
-            dot / (mag_a * mag_b)
-        }
+        symthaea_core::math::cosine_similarity_f32(a, b)
     }
 }
 

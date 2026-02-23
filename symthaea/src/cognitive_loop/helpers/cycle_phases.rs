@@ -63,21 +63,7 @@ impl CognitiveLoopService {
                         let max_sim = semantic_cb
                             .symbols
                             .iter()
-                            .map(|(_, hv)| {
-                                let dot: f32 = compressed_state
-                                    .iter()
-                                    .zip(hv.iter())
-                                    .map(|(a, b)| a * b)
-                                    .sum();
-                                let na: f32 =
-                                    compressed_state.iter().map(|x| x * x).sum::<f32>().sqrt();
-                                let nb: f32 = hv.iter().map(|x| x * x).sum::<f32>().sqrt();
-                                if na > 0.0 && nb > 0.0 {
-                                    dot / (na * nb)
-                                } else {
-                                    0.0
-                                }
-                            })
+                            .map(|(_, hv)| super::cosine_f32(compressed_state, hv))
                             .fold(0.0f32, f32::max);
 
                         if max_sim < self.config.resonator_novelty_threshold
@@ -172,29 +158,10 @@ impl CognitiveLoopService {
                                         let avg_sim: f32 = (0..n)
                                             .filter(|&j| j != i)
                                             .map(|j| {
-                                                let dot: f32 = semantic_cb.symbols[i]
-                                                    .1
-                                                    .iter()
-                                                    .zip(semantic_cb.symbols[j].1.iter())
-                                                    .map(|(a, b)| a * b)
-                                                    .sum();
-                                                let na: f32 = semantic_cb.symbols[i]
-                                                    .1
-                                                    .iter()
-                                                    .map(|x| x * x)
-                                                    .sum::<f32>()
-                                                    .sqrt();
-                                                let nb: f32 = semantic_cb.symbols[j]
-                                                    .1
-                                                    .iter()
-                                                    .map(|x| x * x)
-                                                    .sum::<f32>()
-                                                    .sqrt();
-                                                if na > 0.0 && nb > 0.0 {
-                                                    dot / (na * nb)
-                                                } else {
-                                                    0.0
-                                                }
+                                                super::cosine_f32(
+                                                    &semantic_cb.symbols[i].1,
+                                                    &semantic_cb.symbols[j].1,
+                                                )
                                             })
                                             .sum::<f32>()
                                             / (n - 1) as f32;
@@ -235,29 +202,10 @@ impl CognitiveLoopService {
                         let mut pairs = 0u32;
                         for i in 0..n {
                             for j in (i + 1)..n {
-                                let dot: f32 = semantic_cb.symbols[i]
-                                    .1
-                                    .iter()
-                                    .zip(semantic_cb.symbols[j].1.iter())
-                                    .map(|(a, b)| a * b)
-                                    .sum();
-                                let na: f32 = semantic_cb.symbols[i]
-                                    .1
-                                    .iter()
-                                    .map(|x| x * x)
-                                    .sum::<f32>()
-                                    .sqrt();
-                                let nb: f32 = semantic_cb.symbols[j]
-                                    .1
-                                    .iter()
-                                    .map(|x| x * x)
-                                    .sum::<f32>()
-                                    .sqrt();
-                                let sim = if na > 0.0 && nb > 0.0 {
-                                    dot / (na * nb)
-                                } else {
-                                    0.0
-                                };
+                                let sim = super::cosine_f32(
+                                    &semantic_cb.symbols[i].1,
+                                    &semantic_cb.symbols[j].1,
+                                );
                                 total_dist += 1.0 - sim; // distance = 1 - similarity
                                 pairs += 1;
                             }
@@ -292,22 +240,7 @@ impl CognitiveLoopService {
                         let utilized = semantic_cb
                             .symbols
                             .iter()
-                            .filter(|(_, hv)| {
-                                let dot: f32 = compressed_state
-                                    .iter()
-                                    .zip(hv.iter())
-                                    .map(|(a, b)| a * b)
-                                    .sum();
-                                let na: f32 =
-                                    compressed_state.iter().map(|x| x * x).sum::<f32>().sqrt();
-                                let nb: f32 = hv.iter().map(|x| x * x).sum::<f32>().sqrt();
-                                let sim = if na > 0.0 && nb > 0.0 {
-                                    dot / (na * nb)
-                                } else {
-                                    0.0
-                                };
-                                sim > 0.2
-                            })
+                            .filter(|(_, hv)| super::cosine_f32(compressed_state, hv) > 0.2)
                             .count();
                         let rate = utilized as f32 / n as f32;
                         // EMA update

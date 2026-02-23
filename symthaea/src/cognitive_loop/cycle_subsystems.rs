@@ -43,19 +43,19 @@ impl CognitiveLoopService {
     ///
     /// This is extracted from cycle.rs lines ~2372-2900.
     /// All logic and behavior is preserved exactly.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn run_advanced_subsystems(
         &mut self,
-        hv16_cached: symthaea_core::hdc::BinaryHV,
-        unified_psi: f64,
-        coherence: f32,
-        prediction_error: f32,
-        phi_attention_weight: f32,
-        _compressed_state: &[f32],
-        input: &str,
+        state: &super::CycleState<'_>,
         active_primitive_names: &[String],
         module_timings: &mut super::ModuleTimings,
     ) -> SubsystemMetrics {
+        let hv16_cached = *state.hv16_cached;
+        let unified_psi = state.unified_psi;
+        let coherence = state.coherence;
+        let prediction_error = state.prediction_error;
+        let phi_attention_weight = state.phi_attention_weight;
+        let _compressed_state = state.compressed_state;
+        let input = state.input;
         // ═══════════════════════════════════════════════════════════════════════
         // HIERARCHICAL LTC: Distributed temporal processing with local circuits
         // Local circuits + global integrator. Step propagates temporal dynamics;
@@ -130,10 +130,23 @@ impl CognitiveLoopService {
             };
         module_timings.primitive_evolution = _t.elapsed().as_micros() as u64;
 
-        // FEEDBACK: Positive evolution delta → boost learning rate
+        // FEEDBACK: Evolution delta → confidence/exploration + LR (Phase 18 closure)
+        // Science: Holland (1975) — evolutionary fitness signals drive adaptive behavior.
+        // Positive delta: evolution improving → boost confidence + LR (exploit).
+        // Negative delta: evolution regressing → boost exploration (search harder).
         if evolution_phi_delta > 0.01 {
-            let evo_boost = 1.0 + (evolution_phi_delta * 0.1).min(0.05) as f32; // up to +5%
+            let evo_boost = 1.0 + (evolution_phi_delta * 0.1).min(0.05) as f32; // up to +5% LR
             self.carryover.learning.subsystem_lr_factor *= evo_boost;
+            // Phase 18: Positive delta → boost confidence (evolution is working)
+            let conf_boost = (evolution_phi_delta * 0.05).min(0.03) as f32;
+            self.prediction_confidence = (self.prediction_confidence + conf_boost).clamp(0.0, 1.0);
+            self.stats.evolution_feedback_count += 1;
+        } else if evolution_phi_delta < -0.01 {
+            // Phase 18: Negative delta → boost exploration urge (need to search harder)
+            let explore_boost = ((-evolution_phi_delta) * 0.08).min(0.04) as f32;
+            self.curiosity_drive.exploration_urge =
+                (self.curiosity_drive.exploration_urge + explore_boost).clamp(0.0, 1.0);
+            self.stats.evolution_feedback_count += 1;
         }
 
         // ═══════════════════════════════════════════════════════════════════════
