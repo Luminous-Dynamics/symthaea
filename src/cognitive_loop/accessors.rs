@@ -140,7 +140,9 @@ impl CognitiveLoopService {
 
     /// Get temporal coherence value (uses cycle-cached value when available)
     pub fn temporal_coherence(&self) -> f32 {
-        self.carryover.history.cached_coherence
+        self.carryover
+            .history
+            .cached_coherence
             .unwrap_or_else(|| self.coherence_bridge.smoothed_coherence())
     }
 
@@ -475,12 +477,13 @@ impl CognitiveLoopService {
     /// the signals needed by `CognitivePacing::from_cycle_metadata()`.
     pub fn voice_consciousness_signals(&self) -> VoiceConsciousnessSignals {
         let (_, pattern_confidence) = self.temporal_signature_encoder.classify_state();
-        let consciousness_level = super::snapshot::ConsciousnessSnapshot::compute_consciousness_level(
-            self.prediction_confidence,
-            self.coherence_bridge.smoothed_coherence(),
-            self.flow_state.intensity,
-            pattern_confidence,
-        );
+        let consciousness_level =
+            super::snapshot::ConsciousnessSnapshot::compute_consciousness_level(
+                self.prediction_confidence,
+                self.coherence_bridge.smoothed_coherence(),
+                self.flow_state.intensity,
+                pattern_confidence,
+            );
 
         VoiceConsciousnessSignals {
             unified_quality: self.stats.avg_unified_quality,

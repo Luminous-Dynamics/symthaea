@@ -1016,9 +1016,7 @@ mod tests {
 
         // State should change after forward (unless all weights happen to be zero, very unlikely)
         let state_after = cell.state.clone();
-        let diff: f32 = (&state_after - &state_before)
-            .mapv(|x| x.abs())
-            .sum();
+        let diff: f32 = (&state_after - &state_before).mapv(|x| x.abs()).sum();
         assert!(diff > 0.0, "state should change after forward pass");
     }
 
@@ -1041,7 +1039,11 @@ mod tests {
 
         assert_eq!(output.len(), HIDDEN_DIM);
         for &v in output.iter() {
-            assert!(v.is_finite(), "backbone forward output should be finite: {}", v);
+            assert!(
+                v.is_finite(),
+                "backbone forward output should be finite: {}",
+                v
+            );
         }
     }
 
@@ -1156,7 +1158,11 @@ mod tests {
 
         // Different dt should produce different outputs
         let diff: f32 = (&out_fast - &out_slow).mapv(|x| x.abs()).sum();
-        assert!(diff > 1e-6, "different dt should produce different outputs: diff={}", diff);
+        assert!(
+            diff > 1e-6,
+            "different dt should produce different outputs: diff={}",
+            diff
+        );
     }
 
     // ---------------------------------------------------------------
@@ -1348,7 +1354,10 @@ mod tests {
 
         let target = Array1::from_vec(vec![1.0; HIDDEN_DIM]);
         let adapted = cell.adapt_online(1.0, &small_input(), &target, 0.1);
-        assert!(adapted, "adapt_online should trigger on high prediction error");
+        assert!(
+            adapted,
+            "adapt_online should trigger on high prediction error"
+        );
         assert_eq!(cell.online_stats.adaptations_triggered, 1);
     }
 
@@ -1368,7 +1377,10 @@ mod tests {
 
         let target = Array1::from_vec(vec![0.1; HIDDEN_DIM]);
         let adapted = cell.adapt_online(0.01, &small_input(), &target, 0.1);
-        assert!(!adapted, "adapt_online should skip when error is below threshold");
+        assert!(
+            !adapted,
+            "adapt_online should skip when error is below threshold"
+        );
         assert_eq!(cell.online_stats.adaptations_skipped, 1);
     }
 
@@ -1392,7 +1404,11 @@ mod tests {
 
         // With adapt_tau=true, tau should change
         let diff: f32 = (&cell.tau - &tau_before).mapv(|x| x.abs()).sum();
-        assert!(diff > 0.0, "tau should change with adapt_tau=true: diff={}", diff);
+        assert!(
+            diff > 0.0,
+            "tau should change with adapt_tau=true: diff={}",
+            diff
+        );
     }
 
     // ---------------------------------------------------------------
@@ -1417,7 +1433,11 @@ mod tests {
         let output = cell.forward(&large_input, 0.1);
 
         for &v in output.iter() {
-            assert!(v.is_finite(), "output with large input should be finite: {}", v);
+            assert!(
+                v.is_finite(),
+                "output with large input should be finite: {}",
+                v
+            );
             assert!(v.abs() <= 10.0, "output should be clamped: {}", v);
         }
     }
@@ -1436,7 +1456,11 @@ mod tests {
         let mut cell = CfCCell::new(small_config());
         let output = cell.forward(&small_input(), 1000.0);
         for &v in output.iter() {
-            assert!(v.is_finite(), "output with large dt should be finite: {}", v);
+            assert!(
+                v.is_finite(),
+                "output with large dt should be finite: {}",
+                v
+            );
         }
     }
 
@@ -1500,7 +1524,12 @@ mod tests {
         let mut cell = CfCCell::new(config);
 
         cell.forward(&small_input(), 0.1);
-        cell.adapt_online(1.0, &small_input(), &Array1::from_vec(vec![1.0; HIDDEN_DIM]), 0.1);
+        cell.adapt_online(
+            1.0,
+            &small_input(),
+            &Array1::from_vec(vec![1.0; HIDDEN_DIM]),
+            0.1,
+        );
 
         assert!(cell.online_stats.adaptation_steps > 0);
 

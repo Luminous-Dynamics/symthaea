@@ -385,9 +385,17 @@ impl CognitiveLoopService {
             let newest = self.carryover.history.error_history[error_history_len - 1];
             let oldest_4 = self.carryover.history.error_history[error_history_len - 4];
             let slope = (newest - oldest_4) / 3.0;
-            if slope > 0.02 { 0.9f32 } // Rising → easier to escalate
-            else if slope < -0.02 { 1.1 } // Falling → easier to de-escalate
-            else { 1.0 }
+            if slope > 0.02 {
+                0.9f32
+            }
+            // Rising → easier to escalate
+            else if slope < -0.02 {
+                1.1
+            }
+            // Falling → easier to de-escalate
+            else {
+                1.0
+            }
         } else {
             1.0
         };
@@ -447,7 +455,7 @@ impl CognitiveLoopService {
             let oldest_of_4 = error_history[len - 4];
             // Compute linear trend (simple slope)
             let slope = (newest - oldest_of_4) / 3.0; // newest - oldest, normalized
-            // Count sign changes for oscillation detection (index pairs avoid collect→Vec)
+                                                      // Count sign changes for oscillation detection (index pairs avoid collect→Vec)
             let mut sign_changes = 0u32;
             let ref_val = oldest_of_4;
             for i in 0..len.saturating_sub(1) {
@@ -457,7 +465,11 @@ impl CognitiveLoopService {
                     sign_changes += 1;
                 }
             }
-            let oscillation_ratio = if len > 2 { sign_changes as f32 / (len - 1) as f32 } else { 0.0 };
+            let oscillation_ratio = if len > 2 {
+                sign_changes as f32 / (len - 1) as f32
+            } else {
+                0.0
+            };
             // Spike detection: current error > 2× running mean
             let mean_err = error_history.iter().sum::<f32>() / len as f32;
             let is_spike = prediction_error > mean_err * 2.0 && prediction_error > 0.1;
@@ -624,8 +636,7 @@ impl CognitiveLoopService {
             let boost = (resonator_prediction_error - 0.5) * 0.08;
             self.curiosity_drive.exploration_urge =
                 (self.curiosity_drive.exploration_urge + boost).min(1.0);
-            self.prediction_confidence =
-                (self.prediction_confidence - boost * 0.5).clamp(0.0, 1.0);
+            self.prediction_confidence = (self.prediction_confidence - boost * 0.5).clamp(0.0, 1.0);
             self.stats.resonator_error_exploration_count += 1;
             boost
         } else if resonator_prediction_error < 0.2 && resonator_prediction_error > 0.0 {
@@ -677,8 +688,7 @@ impl CognitiveLoopService {
         // Science: noisy priors during turbulent dynamics can destabilize predictions
         // Uses previous cycle's smoothed coherence (updated at line ~646)
         let reflection_thresholds = self.self_reflection.get_thresholds();
-        let resonator_coherence_gate = pre_update_coherence
-            > reflection_thresholds.coherence_gate
+        let resonator_coherence_gate = pre_update_coherence > reflection_thresholds.coherence_gate
             || self.stats.total_cycles < 10; // bypass gate during warmup
         if resonator_coherence_gate && urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
             if let Some(ref mut res_mem) = self.resonator_memory {
@@ -1681,8 +1691,8 @@ impl CognitiveLoopService {
         // Science: Botvinick & Braver (2015) — proactive control anticipates
         // resource depletion before it happens. If midpoint elapsed > 80% budget,
         // preemptively gate expensive subsystems for the remainder of this cycle.
-        let predictive_budget_gated =
-            attention_budget_elapsed_us > (ATTENTION_BUDGET_US * 4 / 5) && !attention_budget_exceeded;
+        let predictive_budget_gated = attention_budget_elapsed_us > (ATTENTION_BUDGET_US * 4 / 5)
+            && !attention_budget_exceeded;
         if predictive_budget_gated {
             self.stats.predictive_budget_gated_count += 1;
         }
@@ -2120,8 +2130,8 @@ impl CognitiveLoopService {
         let pp_emotional_valence = self.emotion_contagion.prosody_valence();
         let pp_phi = self.unification_engine.psi as f32;
         let pp_smoothed_coh = coherence as f64; // Phase 17: use cached post-update value
-        // World model error → resonator storage importance bias
-        // Science: Rescorla-Wagner (1972) — surprising events deserve higher encoding priority
+                                                // World model error → resonator storage importance bias
+                                                // Science: Rescorla-Wagner (1972) — surprising events deserve higher encoding priority
         let pp_wm_importance_boost = self.world_model.avg_error.clamp(0.0, 1.0) * 0.3;
         // Track 4e: Thalamic depth → storage salience
         // Science: Sherman & Guillery (2006) — deep processing warrants durable encoding
@@ -2248,10 +2258,8 @@ impl CognitiveLoopService {
         // adaptive reasoning, epistemic tiers, phi validation, dissipative
         // consciousness, epistemic conflict, consciousness equation v2.
         // ═══════════════════════════════════════════════════════════════════════
-        let consciousness_metrics = self.compute_consciousness_metrics(
-            &cycle_state,
-            &mut module_timings,
-        );
+        let consciousness_metrics =
+            self.compute_consciousness_metrics(&cycle_state, &mut module_timings);
 
         // Destructure consciousness metrics for use by later phases
         let primitive_psi = consciousness_metrics.primitive_psi;
@@ -2365,8 +2373,10 @@ impl CognitiveLoopService {
             // Map [-1, 1] to speech rate multiplier: patience slows, impatience speeds
             let rate_mod = 1.0 - empathic_tone_adj as f32 * 0.1; // [-1,1] → [0.9, 1.1]
             self.adaptive_behavior.speech_rate_multiplier *= rate_mod;
-            self.adaptive_behavior.speech_rate_multiplier =
-                self.adaptive_behavior.speech_rate_multiplier.clamp(0.6, 1.5);
+            self.adaptive_behavior.speech_rate_multiplier = self
+                .adaptive_behavior
+                .speech_rate_multiplier
+                .clamp(0.6, 1.5);
             empathic_tone_adj as f32
         } else {
             0.0
@@ -2424,8 +2434,7 @@ impl CognitiveLoopService {
             reasoning_chain_confidence > 0.7 && reasoning_chain_depth >= 3;
         if reasoning_chain_boosted {
             let chain_boost = (reasoning_chain_confidence - 0.7) * 0.05;
-            self.prediction_confidence =
-                (self.prediction_confidence + chain_boost).clamp(0.0, 1.0);
+            self.prediction_confidence = (self.prediction_confidence + chain_boost).clamp(0.0, 1.0);
             self.stats.reasoning_chain_boost_count += 1;
         }
 
@@ -2459,14 +2468,17 @@ impl CognitiveLoopService {
             && self.stats.total_cycles > 20;
         if causal_urgency_gated {
             // Boost consecutive_low_error to extend Cruise mode
-            self.carryover.urgency.consecutive_low_error =
-                self.carryover.urgency.consecutive_low_error.saturating_add(2);
+            self.carryover.urgency.consecutive_low_error = self
+                .carryover
+                .urgency
+                .consecutive_low_error
+                .saturating_add(2);
             self.stats.causal_urgency_gated_count += 1;
         }
 
         // ── Phase 19: Attention budget gated flag for metadata ───────────────
-        let attention_budget_gated = attention_budget_exceeded
-            && self.stats.attention_budget_exceeded_count > 3;
+        let attention_budget_gated =
+            attention_budget_exceeded && self.stats.attention_budget_exceeded_count > 3;
 
         // ── Track 5a: Epistemic gate → actual information gating ─────────────
         // Science: Kruger & Dunning (1999) — epistemic humility gates downstream integration
@@ -2641,11 +2653,7 @@ impl CognitiveLoopService {
             dream_insights,
             dream_phi_improvement,
             dream_wisdom_count,
-        } = self.run_dream_phase(
-            &cycle_state,
-            &prediction,
-            &mut module_timings,
-        );
+        } = self.run_dream_phase(&cycle_state, &prediction, &mut module_timings);
 
         // 7 (deferred). Send prediction to encoder for next cycle — moved here from step 7
         // so we can move instead of clone (prediction is no longer referenced after this point).

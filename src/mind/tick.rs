@@ -67,10 +67,11 @@ impl ContinuousMind {
             self.stats.peak_consciousness = self.state.consciousness_level;
         }
 
-        // Auto-emit wisdom to mesh + flush bridge (after all processing)
+        // Auto-emit wisdom + heartbeat to mesh, then flush bridge (after all processing)
         #[cfg(feature = "mesh")]
         {
             self.auto_emit_wisdom();
+            self.emit_heartbeat();
             self.sync_mesh_bridge();
         }
 
@@ -207,6 +208,20 @@ impl ContinuousMind {
         let pairs = self.working_memory.len() * (self.working_memory.len() - 1) / 2;
         if pairs > 0 {
             self.state.consciousness_level = (total_integration / pairs as f64).clamp(0.0, 1.0);
+        }
+
+        // Swarm phi boost: networked minds get a consciousness uplift
+        // proportional to the average phi of their mesh peers.
+        // Factor: 1.0 (no peers) to 1.15 (peers at phi=1.0)
+        #[cfg(feature = "mesh")]
+        {
+            let peer_count = self.mesh_peers.peer_count();
+            if peer_count > 0 {
+                let swarm_phi = self.mesh_peers.average_phi() as f64;
+                let boost = 1.0 + 0.15 * swarm_phi;
+                self.state.consciousness_level =
+                    (self.state.consciousness_level * boost).clamp(0.0, 1.0);
+            }
         }
     }
 
@@ -385,6 +400,7 @@ impl ContinuousMind {
         let mut wisdom_count = 0u64;
         let mut heartbeat_count = 0u64;
         let mut affective_count = 0u64;
+        let mut gradient_count = 0u64;
 
         for packet in &inbox {
             // Track all peers in the registry
@@ -416,7 +432,16 @@ impl ContinuousMind {
                     }
                 }
                 crate::swarm::mesh::PayloadType::Gradient => {
-                    // Gradient packets handled by federated learning system
+                    if let Some(gradient_msg) = packet.extract_gradient() {
+                        gradient_count += 1;
+                        tracing::debug!(
+                            target: "symthaea::mind::mesh",
+                            source = crate::swarm::mesh::hex_short(&packet.source_id),
+                            gradients = gradient_msg.gradient_data.len(),
+                            "Routed mesh gradient to federated inbox"
+                        );
+                        self.federated_inbox.push(gradient_msg);
+                    }
                 }
             }
         }
@@ -440,6 +465,7 @@ impl ContinuousMind {
             wisdom = wisdom_count,
             heartbeat = heartbeat_count,
             affective = affective_count,
+            gradient = gradient_count,
             "Processed mesh wisdom packets"
         );
     }
@@ -519,9 +545,7 @@ impl ContinuousMind {
             self.perceive(hv);
 
             // If urgency is Critical (e.g., smoke alarm), broadcast immediately
-            if urgency == crate::swarm::mesh::MeshUrgency::Critical
-                && self.mesh_bridge.is_some()
-            {
+            if urgency == crate::swarm::mesh::MeshUrgency::Critical && self.mesh_bridge.is_some() {
                 let binary = symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(
                     &self.state.current_thought,
                 );

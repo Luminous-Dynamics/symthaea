@@ -106,6 +106,12 @@ pub struct ContinuousMind {
     /// Optional sensor registry for physical environmental inputs.
     #[cfg(feature = "mesh")]
     pub(crate) sensor_registry: Option<crate::swarm::mesh::SensorRegistry>,
+    /// Tick counter for last heartbeat emission.
+    #[cfg(feature = "mesh")]
+    mesh_heartbeat_last_tick: u64,
+    /// Monotonic sequence number for outgoing heartbeat packets.
+    #[cfg(feature = "mesh")]
+    mesh_heartbeat_sequence: u32,
 }
 
 impl ContinuousMind {
@@ -162,6 +168,10 @@ impl ContinuousMind {
             hyperfeel: None,
             #[cfg(feature = "mesh")]
             sensor_registry: None,
+            #[cfg(feature = "mesh")]
+            mesh_heartbeat_last_tick: 0,
+            #[cfg(feature = "mesh")]
+            mesh_heartbeat_sequence: 0,
         }
     }
 
@@ -430,8 +440,9 @@ impl ContinuousMind {
     #[cfg(feature = "mesh")]
     pub fn register_sensor(&mut self, sensor: Box<dyn crate::swarm::mesh::SensorInput>) {
         if self.sensor_registry.is_none() {
-            self.sensor_registry =
-                Some(crate::swarm::mesh::SensorRegistry::new(self.config.dimension));
+            self.sensor_registry = Some(crate::swarm::mesh::SensorRegistry::new(
+                self.config.dimension,
+            ));
         }
         self.sensor_registry.as_mut().unwrap().register(sensor);
     }
@@ -456,9 +467,9 @@ impl ContinuousMind {
 
         // Emission rate gating based on urgency
         let interval = match urgency {
-            CycleUrgency::Critical => 1,   // every cycle (~50Hz)
-            CycleUrgency::Normal => 50,    // ~1/s at 50Hz
-            CycleUrgency::Cruise => 500,   // ~10s at 50Hz
+            CycleUrgency::Critical => 1, // every cycle (~50Hz)
+            CycleUrgency::Normal => 50,  // ~1/s at 50Hz
+            CycleUrgency::Cruise => 500, // ~10s at 50Hz
         };
 
         let ticks_since = self.state.tick.saturating_sub(self.mesh_last_emit_tick);
@@ -498,6 +509,65 @@ impl ContinuousMind {
             urgency = ?urgency,
             phi,
             "Emitted wisdom packet"
+        );
+    }
+
+    /// Get the mesh source_id for this mind (first 8 bytes of node identity).
+    #[cfg(feature = "mesh")]
+    fn mesh_source_id(&self) -> [u8; 8] {
+        let mut source_id = [0u8; 8];
+        let dim_bytes = (self.config.dimension as u64).to_le_bytes();
+        source_id.copy_from_slice(&dim_bytes);
+        source_id
+    }
+
+    /// Emit a lightweight heartbeat packet over the mesh network.
+    ///
+    /// Heartbeats fire every 100 ticks (~2s at 50Hz), keeping the mind
+    /// visible in the mesh peer registry even when wisdom emissions are
+    /// throttled by low urgency. The heartbeat carries the current phi
+    /// but no wisdom vector (zero BinaryHV).
+    #[cfg(feature = "mesh")]
+    pub(crate) fn emit_heartbeat(&mut self) {
+        use crate::swarm::mesh::{MeshOutbound, MeshUrgency, PayloadType, WisdomPacket};
+
+        if self.mesh_bridge.is_none() {
+            return;
+        }
+
+        let interval = 100u64;
+        if self.state.tick.saturating_sub(self.mesh_heartbeat_last_tick) < interval
+            && self.mesh_heartbeat_sequence > 0
+        {
+            return;
+        }
+
+        let source_id = self.mesh_source_id();
+
+        let timestamp_s = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as u32;
+
+        let packet = WisdomPacket {
+            source_id,
+            sequence: self.mesh_heartbeat_sequence,
+            phi: self.state.consciousness_level as f32,
+            urgency: MeshUrgency::Cruise,
+            timestamp_s,
+            payload_type: PayloadType::Heartbeat,
+            wisdom: symthaea_core::hdc::BinaryHV::zero(),
+        };
+
+        self.mesh_outbox.push(MeshOutbound { packet });
+        self.mesh_heartbeat_last_tick = self.state.tick;
+        self.mesh_heartbeat_sequence = self.mesh_heartbeat_sequence.wrapping_add(1);
+
+        tracing::trace!(
+            target: "symthaea::mind::mesh",
+            sequence = self.mesh_heartbeat_sequence.wrapping_sub(1),
+            phi = self.state.consciousness_level as f32,
+            "Emitted heartbeat packet"
         );
     }
 
@@ -1434,13 +1504,16 @@ mod tests {
             "Registry should track 2 peers"
         );
         let avg = mind.mesh_peers().average_phi();
-        assert!((avg - 0.8).abs() < 1e-6, "Average phi should be ~0.8: {avg}");
+        assert!(
+            (avg - 0.8).abs() < 1e-6,
+            "Average phi should be ~0.8: {avg}"
+        );
     }
 
     #[cfg(feature = "mesh")]
     #[test]
     fn test_process_sensors_feeds_working_memory() {
-        use crate::swarm::mesh::{MockSensor, MeshUrgency};
+        use crate::swarm::mesh::{MeshUrgency, MockSensor};
 
         let mut mind = ContinuousMind::default();
         mind.activate();
@@ -1516,6 +1589,236 @@ mod tests {
             sim > 0.1,
             "current_thought should retain prior context: sim={}",
             sim
+        );
+    }
+
+    // ====================================================================
+    // Swarm Phi Boost Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_swarm_phi_boosts_consciousness() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        // Mind without peers
+        let mut mind_solo = ContinuousMind::default();
+        mind_solo.activate();
+        for i in 0..5 {
+            mind_solo.perceive(ContinuousHV::random(512, 42 + i as u64));
+        }
+        for _ in 0..5 {
+            mind_solo.tick();
+        }
+        let solo_consciousness = mind_solo.state.consciousness_level;
+
+        // Mind with peers (inject a high-phi peer into registry)
+        let mut mind_swarm = ContinuousMind::default();
+        mind_swarm.activate();
+        for i in 0..5 {
+            mind_swarm.perceive(ContinuousHV::random(512, 42 + i as u64));
+        }
+        // Inject peer before ticking
+        mind_swarm.mesh_peers.update(&WisdomPacket {
+            source_id: [0xFF; 8],
+            sequence: 1,
+            phi: 0.9,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: BinaryHV([0; 2048]),
+        });
+        for _ in 0..5 {
+            mind_swarm.tick();
+        }
+        let swarm_consciousness = mind_swarm.state.consciousness_level;
+
+        assert!(
+            swarm_consciousness > solo_consciousness,
+            "Swarm mind ({swarm_consciousness}) should have higher consciousness than solo ({solo_consciousness})"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_no_boost_without_peers() {
+        // Verify consciousness is identical when no peers are present
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        for i in 0..3 {
+            mind.perceive(ContinuousHV::random(512, 100 + i as u64));
+        }
+        mind.tick();
+        let level = mind.state.consciousness_level;
+
+        // Peer count should be 0
+        assert_eq!(mind.mesh_peers().peer_count(), 0);
+        // Consciousness should be set purely by pairwise integration
+        assert!(level > 0.0, "Consciousness should be non-zero with perceptions");
+    }
+
+    // ====================================================================
+    // Heartbeat Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_heartbeat_emitted_at_interval() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        // Perceive so current_thought is non-zero
+        mind.perceive(ContinuousHV::random(512, 0xBEA7));
+
+        // Tick 200 times — heartbeats fire every 100 ticks
+        for _ in 0..200 {
+            mind.tick();
+        }
+
+        // At least 2 heartbeat emissions (tick 1 for sequence=0, tick 101)
+        assert!(
+            mind.mesh_heartbeat_sequence >= 2,
+            "Expected ≥2 heartbeat emissions, got {}",
+            mind.mesh_heartbeat_sequence
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_heartbeat_uses_cruise_urgency() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType};
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        mind.perceive(ContinuousHV::random(512, 0xBEA7));
+        mind.state.tick = 1;
+        mind.emit_heartbeat();
+
+        assert_eq!(mind.mesh_outbox.len(), 1);
+        assert_eq!(mind.mesh_outbox[0].packet.urgency, MeshUrgency::Cruise);
+        assert_eq!(mind.mesh_outbox[0].packet.payload_type, PayloadType::Heartbeat);
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_heartbeat_has_current_phi() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        mind.state.consciousness_level = 0.73;
+        mind.state.tick = 1;
+        mind.emit_heartbeat();
+
+        assert_eq!(mind.mesh_outbox.len(), 1);
+        assert!(
+            (mind.mesh_outbox[0].packet.phi - 0.73).abs() < 1e-6,
+            "Heartbeat phi should match consciousness level"
+        );
+    }
+
+    // ====================================================================
+    // Gradient Routing Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_process_mesh_routes_gradients() {
+        use crate::swarm::mesh::WisdomPacket;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // Build a gradient packet
+        let msg = crate::swarm::GradientMessage {
+            source_id: [0u8; 32],
+            gradient_data: vec![0.1, -0.2, 0.3],
+            trust_score: 0.8,
+            noise_scale: 0.0,
+            timestamp: 1_700_000_000_000,
+            sample_count: 50,
+            model_version: 2,
+        };
+        let pkt = WisdomPacket::from_gradient([0xFE; 8], 1, &msg).unwrap();
+        mind.mesh_inbox.push(pkt);
+
+        assert!(mind.federated_inbox.is_empty());
+        mind.tick();
+
+        // Gradient should have been routed to federated_inbox
+        assert_eq!(
+            mind.federated_inbox.len(),
+            1,
+            "Gradient should be routed to federated_inbox"
+        );
+        assert_eq!(mind.federated_inbox[0].gradient_data.len(), 3);
+        assert!((mind.federated_inbox[0].trust_score - 0.8).abs() < 1e-6);
+    }
+
+    // ====================================================================
+    // Mind-to-Mind Integration Test
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[tokio::test]
+    async fn test_mind_to_mind_mesh_roundtrip() {
+        use crate::swarm::mesh::{
+            BiLoopbackTransport, DualLayerMesh, MeshBridgeHandle, MeshReceiver,
+        };
+
+        // Create paired transports (A writes → B reads, B writes → A reads)
+        // Use batman-sized MTU so whole packets fit without fragmentation
+        let (transport_a, transport_b) =
+            BiLoopbackTransport::pair("mind_a", "mind_b", 2100);
+
+        // Build DualLayerMesh for each side
+        let mesh_a = DualLayerMesh::new([0xAA; 32])
+            .with_batman(Box::new(transport_a));
+        let mesh_b = DualLayerMesh::new([0xBB; 32])
+            .with_batman(Box::new(transport_b));
+
+        // Create bridge handles + spawn actors
+        let (handle_a, actor_a) = MeshBridgeHandle::new(64, 64);
+        let (handle_b, actor_b) = MeshBridgeHandle::new(64, 64);
+        let receiver_a = MeshReceiver::new();
+        let receiver_b = MeshReceiver::new();
+        tokio::spawn(actor_a.run(mesh_a, receiver_a));
+        tokio::spawn(actor_b.run(mesh_b, receiver_b));
+
+        // Create two minds
+        let mut mind_a = ContinuousMind::new(MindConfig::default());
+        let mut mind_b = ContinuousMind::new(MindConfig::default());
+        mind_a.set_mesh_bridge(handle_a);
+        mind_b.set_mesh_bridge(handle_b);
+
+        // Feed mind_a a perception so it has a non-zero thought to emit
+        let hv = ContinuousHV::random(mind_a.config.dimension, 42);
+        mind_a.perceive(hv);
+
+        // Tick mind A several times (auto_emit_wisdom fires, sync_mesh_bridge flushes)
+        for _ in 0..10 {
+            mind_a.tick();
+        }
+
+        // Give the async actor time to transport packets
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+        // Tick mind B (sync_mesh_bridge drains inbox, process_mesh dispatches)
+        for _ in 0..5 {
+            mind_b.tick();
+        }
+
+        // Verify mind B saw a peer
+        assert!(
+            mind_b.mesh_peers().peer_count() > 0,
+            "Mind B should see Mind A as a peer"
         );
     }
 }
