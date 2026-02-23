@@ -1,6 +1,6 @@
 //! Humanoid controller: wraps HdcLtcUnifiedNetwork + output projection (16,384D → 21D).
 //!
-//! Uses the full 16,384D HDC-LTC temporal dynamics engine with a 3-layer × 8-neuron
+//! Uses the full 16,384D HDC-LTC temporal dynamics engine with a 4-layer × 12-neuron
 //! architecture (deeper/wider than the drone's 2×4). All 21 actuator outputs use
 //! tanh activation (bipolar [-1, 1] torques — no sigmoid needed).
 
