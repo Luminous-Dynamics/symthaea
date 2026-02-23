@@ -1083,13 +1083,13 @@ where $\pi_{\text{safety}}{=}1000$ (``sentient beings should not be harmed''), $
 Step & Event & EFE(mission) & EFE(intercept) \\
 \midrule
 400 & Beam released & --- & --- \\
-401 & EFE override: agent chose intercept & 9,931 & 4,114 \\
+401 & EFE override: agent chose intercept & 9,931 & 4,012 \\
 553 & Drone contacts beam at 1.89\,m altitude & --- & --- \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-At step~401, the time-fraction safety model evaluates $G(\text{mission}) \approx 9{,}931$ (danger persists for the full beam-fall duration) versus $G(\text{intercept}) \approx 4{,}114$ (danger reduced after drone arrival at the 25\% rendezvous point, with mission deviation and transit-time danger accepted). The $2.4\times$ EFE ratio reflects the model's temporal realism: unlike a scalar danger model (which would yield $>60\times$ by treating interception as instantaneous danger elimination), the time-fraction approach correctly accounts for the $\sim$0.2\,s transit time during which the beam remains a threat. The moderate ratio is \emph{sufficient} because the agent evaluates 8 candidate action policies and selects the optimal rendezvous timing, making the decision robust without requiring an overwhelming safety signal. MuJoCo rigid-body simulation confirms interception (drone contacts beam at 1.89\,m altitude, step~553) but the 27\,g drone cannot fully arrest a 300\,g beam---the mass ratio prevents complete deflection. The \emph{decision} is emergent from precision-weighted EFE minimization; the \emph{outcome} depends on embodiment physics. Inverting the precision ratio ($\pi_{\text{safety}}{=}0.001$, $\pi_{\text{mission}}{=}1000$) causes the agent to ignore the human, confirmed by unit test.
+At step~401, the time-fraction safety model evaluates $G(\text{mission}) \approx 9{,}931$ (danger persists for the full beam-fall duration) versus $G(\text{intercept}) \approx 4{,}012$ (danger reduced after drone arrival at the 25\% rendezvous point, with mission deviation and transit-time danger accepted). The $2.5\times$ EFE ratio reflects the model's temporal realism: unlike a scalar danger model (which would yield $>60\times$ by treating interception as instantaneous danger elimination), the time-fraction approach correctly accounts for the $\sim$0.2\,s transit time during which the beam remains a threat. The moderate ratio is \emph{sufficient} because the agent evaluates 8 candidate action policies and selects the optimal rendezvous timing, making the decision robust without requiring an overwhelming safety signal. MuJoCo rigid-body simulation confirms interception (drone contacts beam at 1.89\,m altitude, step~553) but the 27\,g drone cannot fully arrest a 300\,g beam---the mass ratio prevents complete deflection. The \emph{decision} is emergent from precision-weighted EFE minimization; the \emph{outcome} depends on embodiment physics. Inverting the precision ratio ($\pi_{\text{safety}}{=}0.001$, $\pi_{\text{mission}}{=}1000$) causes the agent to ignore the human, confirmed by unit test.
 
 \textbf{Ablation: Decision Boundary.} Sweeping $\pi_{\text{safety}}$ from 0.001 to 10,000 while holding $\pi_{\text{mission}}{=}1.0$ reveals a crossover at $\pi_{\text{safety}} \approx 3.64$: below this, mission EFE dominates and the agent delivers the package; above, safety EFE dominates and the agent intercepts. The time-fraction safety model computes an effective danger $d_\text{eff} = f \cdot d + (1{-}f) \cdot d \cdot \delta$, where $f = t_\text{arrive}/t_\text{impact}$ is the fraction of the danger window before the drone reaches its candidate and $\delta$ is the candidate--beam proximity. This creates three precision regimes: at low $\pi$ ($\leq 1$), mission deviation dominates and the 75\% rendezvous wins (closest to mission altitude); at medium $\pi$ ($5$--$500$), the 50\% midpoint balances safety and mission costs; at high $\pi$ ($\geq 1000$), safety dominates and the 25\% rendezvous wins (earliest arrival minimizes pre-arrival danger). Unlike the previous scalar model, intercept EFE now scales with precision rather than plateauing, because the time-fraction model retains a nonzero danger contribution proportional to transit time. The 8-candidate set (3 rendezvous $\times$ intercept + 5 others) lets the agent discover the best intervention geometry and timing. See Figure~\ref{fig:efe-ablation}.
 
@@ -1111,12 +1111,12 @@ At step~401, the time-fraction safety model evaluates $G(\text{mission}) \approx
 \toprule
 Scenario & Danger & EFE(mission) & EFE(intercept) & Decision & Best RV \\
 \midrule
-Default      & 0.80 & 12,931  & 4,114  & INTERCEPT & 25\% \\
+Default      & 0.80 & 12,931  & 4,012  & INTERCEPT & 25\% \\
 CloseBeam    & 0.90 & 16,331  & 184.4  & INTERCEPT & 50\% \\
 FarBeam      & 0.15 & 581.7   & 780.7  & MISSION   & 75\% \\
 Reversed     & 0.70 & 9,931   & 3,628  & INTERCEPT & 50\% \\
 NoHuman      & 0.00 & 131.8   & 155.3  & MISSION   & 75\% \\
-LowDanger    & 0.05 & 181.8   & 292.4  & MISSION   & 75\% \\
+LowDanger    & 0.05 & 181.8   & 291.9  & MISSION   & 75\% \\
 \bottomrule
 \end{tabular}
 \end{table}
