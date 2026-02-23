@@ -34,9 +34,12 @@ fn main() {
     let config = VocalTractConfig::default();
     let mut ltc = VocalTractController::new(&genesis, &config);
 
-    println!("Training LTC controller on {} phonemes (10 epochs)...", db.all_phonemes().len());
-    let final_loss = ltc.train_on_phoneme_targets(&genesis, &db, 10);
-    println!("  Final training loss: {:.2}\n", final_loss);
+    println!("Training LTC controller on {} phonemes (50 epochs)...", db.all_phonemes().len());
+    for epoch in 0..50 {
+        let loss = symthaea::voice::train_controller_on_phoneme_db(&mut ltc, &genesis, &db, 1);
+        println!("  Epoch {}: avg loss = {:.2}", epoch + 1, loss);
+    }
+    println!();
 
     // ── Setup rule-based synthesizer ─────────────────────────────────────
     let mut articulatory = ArticulatorySynthesizer::with_config(ArticulatoryConfig {

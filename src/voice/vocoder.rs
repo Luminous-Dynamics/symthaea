@@ -9,17 +9,19 @@
 //! 2. **Filter**: Cascade of resonators modeling vocal tract formants
 //!
 //! ```text
-//! ┌─────────────────┐     ┌─────────────────┐     ┌─────────────┐
-//! │ Glottal Source  │────►│ Formant Filter  │────►│   Output    │
-//! │ (pulse/noise)   │     │ (F1, F2, F3)    │     │   Audio     │
-//! └─────────────────┘     └─────────────────┘     └─────────────┘
+//! ┌─────────────────┐     ┌───────────────────────┐     ┌─────────────┐
+//! │ LF Glottal +   │────►│ Formant Filters       │────►│   Output    │
+//! │ Aspiration +   │     │ (F1–F5, parallel)     │     │   Audio     │
+//! │ Noise          │     └───────────────────────┘     └─────────────┘
+//! └─────────────────┘
 //! ```
 //!
 //! ## Implementation
 //!
-//! - Glottal pulse: Rosenberg C model (smooth, natural)
+//! - Glottal pulse: Liljencrants-Fant (LF) model parameterized by Rd
+//! - Aspiration: White noise during glottal open phase (breathiness)
 //! - Noise: Pink noise for fricatives
-//! - Filters: Second-order IIR resonators (biquads)
+//! - Filters: 5 second-order IIR resonators (F1–F3 articulation, F4/F5 speaker constants)
 
 use crate::voice::articulatory_synthesizer::FormantFrame;
 use serde::{Deserialize, Serialize};
@@ -37,23 +39,38 @@ pub struct VocoderConfig {
     pub num_formants: usize,
     /// Master volume (0.0 to 1.0)
     pub volume: f32,
-    /// Glottal pulse shape (0.0 = sine, 1.0 = impulse)
+    /// Glottal pulse shape (0.0 = breathy, 1.0 = pressed)
     pub glottal_shape: f32,
     /// Noise floor for unvoiced sounds
     pub noise_floor: f32,
     /// Anti-aliasing filter cutoff ratio
     pub aa_cutoff: f32,
+    /// F4 frequency (Hz) — pharyngeal resonance (speaker-dependent constant)
+    pub f4_freq: f32,
+    /// F5 frequency (Hz) — nasal cavity (speaker-dependent constant)
+    pub f5_freq: f32,
+    /// F4 bandwidth (Hz)
+    pub f4_bandwidth: f32,
+    /// F5 bandwidth (Hz)
+    pub f5_bandwidth: f32,
+    /// Aspiration noise level (0.0 to 0.1 typical)
+    pub aspiration_level: f32,
 }
 
 impl Default for VocoderConfig {
     fn default() -> Self {
         Self {
             sample_rate: 24000,
-            num_formants: 3,
+            num_formants: 5,
             volume: 0.8,
             glottal_shape: 0.5,
             noise_floor: 0.02,
             aa_cutoff: 0.45,
+            f4_freq: 3500.0,
+            f5_freq: 4500.0,
+            f4_bandwidth: 250.0,
+            f5_bandwidth: 300.0,
+            aspiration_level: 0.03,
         }
     }
 }
@@ -156,15 +173,20 @@ impl Resonator {
 // GLOTTAL SOURCE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Glottal pulse generator
+/// Glottal pulse generator using the Liljencrants-Fant (LF) model.
 ///
-/// Generates a periodic glottal pulse train for voiced sounds.
-/// Uses Rosenberg C model for natural-sounding pulses.
+/// The LF model is the standard in speech synthesis research, parameterized
+/// by Rd (voice quality descriptor from Fant 1995):
+/// - Rd = 0.3: Pressed voice (tight, bright)
+/// - Rd = 1.0: Modal voice (normal speech)
+/// - Rd = 2.7: Breathy voice (soft, airy)
+///
+/// The `shape` field (0.0–1.0) maps linearly to Rd: `Rd = 0.3 + shape * 2.4`
 #[derive(Debug, Clone)]
 struct GlottalSource {
     phase: f32,
     sample_rate: f32,
-    /// Shape parameter (0 = sine, 1 = impulse-like)
+    /// Shape parameter: 0.0 = pressed (Rd=0.3), 1.0 = breathy (Rd=2.7)
     shape: f32,
 }
 
@@ -177,7 +199,7 @@ impl GlottalSource {
         }
     }
 
-    /// Generate one sample at given fundamental frequency
+    /// Generate one sample at given fundamental frequency using LF model.
     fn tick(&mut self, f0: f32) -> f32 {
         if f0 <= 0.0 {
             return 0.0;
@@ -192,25 +214,49 @@ impl GlottalSource {
             self.phase -= 1.0;
         }
 
-        // Rosenberg C model glottal pulse
-        // Open phase: 0 to 0.4
-        // Closed phase: 0.4 to 1.0
-        let open_ratio = 0.4 + self.shape * 0.2; // 0.4 to 0.6
+        // Map shape (0–1) to Rd (0.3–2.7)
+        let rd = 0.3 + self.shape * 2.4;
 
-        if self.phase < open_ratio {
-            // Opening phase - polynomial rise and fall
-            let t = self.phase / open_ratio;
-            let pulse = 3.0 * t * t - 2.0 * t * t * t; // Smoothstep
+        // Derive LF timing parameters from Rd (Fant 1995)
+        let tp = 0.1 + 0.22 * rd; // Peak position (fraction of period)
+        let te = tp * (1.0 + (5.0 - 4.6 * rd.min(2.7)) * 0.01); // Excitation instant
+        let ta = 0.01 * (0.2 + 3.0 * (rd - 1.0).max(0.0)); // Return time constant
 
-            // LF model: blend pulse shape with its derivative for realistic glottal waveform
-            let derivative = 6.0 * t * (1.0 - t) / open_ratio;
-            // shape controls blend: 0 = pure derivative (breathy), 1 = more pulse (pressed)
-            let blend = self.shape;
-            -(derivative * (1.0 - blend * 0.5)) + pulse * blend * 0.3
+        // Closed phase boundary (fraction of period)
+        let tc = te + ta * 3.0; // ~3 time constants for return phase
+
+        let t = self.phase; // Current position in glottal cycle (0–1)
+
+        if t < te {
+            // Open phase: E(t) = E0 * exp(alpha*t) * sin(omega_g * t)
+            let omega_g = std::f32::consts::PI / tp;
+            let alpha = if te > 0.01 { 1.0 / te } else { 100.0 }; // Growth rate
+
+            let t_scaled = t;
+            let envelope = (alpha * t_scaled * 0.5).exp(); // Gentle exponential growth
+            let oscillation = (omega_g * t_scaled).sin();
+
+            -envelope * oscillation * 0.8 // Negative pressure convention
+        } else if t < tc.min(1.0) {
+            // Return phase: rapid exponential decay
+            let epsilon = if ta > 0.001 { 1.0 / ta } else { 1000.0 };
+            let t_ret = t - te;
+
+            // E(t) = decay from excitation instant
+            let decay = (-epsilon * t_ret * 0.3).exp();
+            -decay * 0.4
         } else {
-            // Closed phase
+            // Closed phase: vocal folds closed, no airflow
             0.0
         }
+    }
+
+    /// Whether the glottal source is in the open phase for the current sample.
+    fn is_open(&self) -> bool {
+        let rd = 0.3 + self.shape * 2.4;
+        let tp = 0.1 + 0.22 * rd;
+        let te = tp * (1.0 + (5.0 - 4.6 * rd.min(2.7)) * 0.01);
+        self.phase < te
     }
 
     fn reset(&mut self) {
@@ -379,22 +425,38 @@ impl FormantVocoder {
                 // Interpolate parameters
                 let current = frame.lerp(next_frame, t);
 
-                // Generate source signal
+                // Generate source signal with LF glottal model
                 let voiced = self.glottal.tick(current.f0) * current.voicing;
                 let unvoiced = self.noise.pink() * (1.0 - current.voicing) * 0.3;
-                let source = (voiced + unvoiced) * 30.0; // Boost source level to audible range
+
+                // Aspiration noise: breathiness during glottal open phase
+                let aspiration = if self.glottal.is_open() {
+                    self.noise.white()
+                        * self.config.aspiration_level
+                        * (1.0 - self.glottal.shape * 0.7)
+                } else {
+                    0.0
+                };
+
+                let source = (voiced + aspiration + unvoiced) * 30.0;
 
                 // Apply formant filters (parallel configuration with weighted sum)
                 let mut filtered = 0.0;
                 if self.resonators.len() >= 3 {
-                    // Parallel formant synthesis with decreasing weights for higher formants
-                    filtered += self.resonators[0].process(source) * 1.0; // F1 (strongest)
-                    filtered += self.resonators[1].process(source) * 0.5; // F2
-                    filtered += self.resonators[2].process(source) * 0.25; // F3 (weakest)
+                    filtered += self.resonators[0].process(source) * 1.0;  // F1 (strongest)
+                    filtered += self.resonators[1].process(source) * 0.5;  // F2
+                    filtered += self.resonators[2].process(source) * 0.25; // F3
                 } else {
                     for res in &mut self.resonators {
                         filtered += res.process(source);
                     }
+                }
+                // F4/F5: speaker-dependent higher formants (subtle presence)
+                if self.resonators.len() >= 4 {
+                    filtered += self.resonators[3].process(source) * 0.1;  // F4
+                }
+                if self.resonators.len() >= 5 {
+                    filtered += self.resonators[4].process(source) * 0.05; // F5
                 }
 
                 // Apply energy envelope
@@ -426,6 +488,63 @@ impl FormantVocoder {
         if self.resonators.len() >= 3 {
             self.resonators[2].set_params(frame.f3, frame.b3, sr);
         }
+        // F4/F5 are speaker-dependent constants (not articulation-dependent)
+        if self.resonators.len() >= 4 {
+            self.resonators[3].set_params(self.config.f4_freq, self.config.f4_bandwidth, sr);
+        }
+        if self.resonators.len() >= 5 {
+            self.resonators[4].set_params(self.config.f5_freq, self.config.f5_bandwidth, sr);
+        }
+    }
+
+    /// Synthesize audio for a single formant frame (streaming mode).
+    ///
+    /// Unlike `synthesize()`, this does NOT reset state between calls — resonator
+    /// and glottal source states carry over for smooth real-time output.
+    /// Call this at your frame rate (e.g., 200Hz) with `samples_per_frame`
+    /// samples per call (e.g., 120 at 24kHz/200Hz).
+    pub fn synthesize_frame(&mut self, frame: &FormantFrame, samples_per_frame: usize) -> Vec<f32> {
+        self.update_resonators(frame);
+        let mut audio = Vec::with_capacity(samples_per_frame);
+
+        for _ in 0..samples_per_frame {
+            let voiced = self.glottal.tick(frame.f0) * frame.voicing;
+            let unvoiced = self.noise.pink() * (1.0 - frame.voicing) * 0.3;
+
+            // Aspiration noise during glottal open phase
+            let aspiration = if self.glottal.is_open() {
+                self.noise.white()
+                    * self.config.aspiration_level
+                    * (1.0 - self.glottal.shape * 0.7)
+            } else {
+                0.0
+            };
+
+            let source = (voiced + aspiration + unvoiced) * 30.0;
+
+            let mut filtered = 0.0;
+            if self.resonators.len() >= 3 {
+                filtered += self.resonators[0].process(source) * 1.0;
+                filtered += self.resonators[1].process(source) * 0.5;
+                filtered += self.resonators[2].process(source) * 0.25;
+            } else {
+                for res in &mut self.resonators {
+                    filtered += res.process(source);
+                }
+            }
+            if self.resonators.len() >= 4 {
+                filtered += self.resonators[3].process(source) * 0.1;
+            }
+            if self.resonators.len() >= 5 {
+                filtered += self.resonators[4].process(source) * 0.05;
+            }
+
+            let output = filtered * frame.energy * self.config.volume;
+            let smoothed = self.lowpass.process(output);
+            audio.push(soft_clip(smoothed));
+        }
+
+        audio
     }
 
     /// Get sample rate
@@ -563,5 +682,92 @@ mod tests {
         assert!((soft_clip(0.3) - 0.3).abs() < 0.01);
         assert!(soft_clip(2.0) < 1.0);
         assert!(soft_clip(-2.0) > -1.0);
+    }
+
+    #[test]
+    fn test_five_formant_synthesis() {
+        // Default config now uses 5 formants
+        let config = VocoderConfig::default();
+        assert_eq!(config.num_formants, 5);
+
+        let mut vocoder = FormantVocoder::with_config(config);
+        assert_eq!(vocoder.resonators.len(), 5);
+
+        let frames = vec![
+            FormantFrame {
+                f1: 730.0, f2: 1090.0, f3: 2440.0,
+                b1: 60.0, b2: 90.0, b3: 150.0,
+                f0: 120.0, energy: 0.8, voicing: 1.0, time: 0.0,
+            },
+            FormantFrame {
+                f1: 730.0, f2: 1090.0, f3: 2440.0,
+                b1: 60.0, b2: 90.0, b3: 150.0,
+                f0: 120.0, energy: 0.8, voicing: 1.0, time: 0.1,
+            },
+        ];
+
+        let audio = vocoder.synthesize(&frames);
+        assert!(!audio.is_empty(), "5-formant synthesis should produce audio");
+        assert!(audio.iter().any(|&s| s.abs() > 0.01), "Should have content");
+        assert!(audio.iter().all(|&s| s.abs() < 1.5), "Should not clip");
+    }
+
+    #[test]
+    fn test_lf_glottal_shape_variation() {
+        // Different shapes (Rd values) should produce different waveforms
+        let mut glottal_pressed = GlottalSource::new(24000.0, 0.0); // Rd=0.3
+        let mut glottal_breathy = GlottalSource::new(24000.0, 1.0); // Rd=2.7
+
+        let mut pressed_samples = Vec::new();
+        let mut breathy_samples = Vec::new();
+        for _ in 0..480 { // 20ms at 24kHz
+            pressed_samples.push(glottal_pressed.tick(120.0));
+            breathy_samples.push(glottal_breathy.tick(120.0));
+        }
+
+        // Both should produce non-zero output
+        assert!(pressed_samples.iter().any(|&s| s.abs() > 0.01), "Pressed should have output");
+        assert!(breathy_samples.iter().any(|&s| s.abs() > 0.01), "Breathy should have output");
+
+        // They should differ (different waveform shapes)
+        let diff: f32 = pressed_samples.iter().zip(&breathy_samples)
+            .map(|(a, b)| (a - b).abs())
+            .sum::<f32>();
+        assert!(diff > 0.1, "Different shapes should produce different waveforms, diff={diff}");
+    }
+
+    #[test]
+    fn test_aspiration_adds_breathiness() {
+        let frame = FormantFrame {
+            f1: 500.0, f2: 1500.0, f3: 2500.0,
+            b1: 60.0, b2: 90.0, b3: 150.0,
+            f0: 120.0, energy: 0.8, voicing: 1.0, time: 0.0,
+        };
+
+        // Synthesize with aspiration
+        let config_with = VocoderConfig {
+            aspiration_level: 0.1,
+            ..VocoderConfig::default()
+        };
+        let mut vocoder_with = FormantVocoder::with_config(config_with);
+        let audio_with = vocoder_with.synthesize_frame(&frame, 480);
+
+        // Synthesize without aspiration
+        let config_without = VocoderConfig {
+            aspiration_level: 0.0,
+            ..VocoderConfig::default()
+        };
+        let mut vocoder_without = FormantVocoder::with_config(config_without);
+        let audio_without = vocoder_without.synthesize_frame(&frame, 480);
+
+        // Aspiration adds high-frequency energy: compute spectral difference
+        // Simple proxy: sum of squared differences should be non-trivial
+        let diff_energy: f32 = audio_with.iter().zip(&audio_without)
+            .map(|(a, b)| (a - b).powi(2))
+            .sum::<f32>();
+        assert!(
+            diff_energy > 0.001,
+            "Aspiration should measurably change the output, diff_energy={diff_energy}"
+        );
     }
 }

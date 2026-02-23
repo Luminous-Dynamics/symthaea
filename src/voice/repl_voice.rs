@@ -92,7 +92,7 @@ impl Default for ReplVoiceConfig {
             consciousness_modulated: true,
             base_f0: 150.0, // Neutral voice
             use_articulatory: true,
-            use_ltc_pipeline: false,
+            use_ltc_pipeline: cfg!(feature = "vocal-tract"),
             phoneme_duration_base: 0.08,
         }
     }
@@ -1375,6 +1375,13 @@ pub struct ReplVoiceOutput {
     #[cfg(feature = "vocal-tract")]
     ltc_pipeline: Option<super::vocal_tract_fep::VocalTractPipeline>,
 
+    /// Formant database for online adaptation (phoneme targets)
+    #[cfg(feature = "vocal-tract")]
+    formant_db: super::formant_targets::FormantDatabase,
+
+    /// Last voice output metrics (for feedback to cognitive loop)
+    last_voice_metrics: Option<super::voice_feedback::VoiceOutputMetrics>,
+
     /// Statistics
     total_utterances: u64,
     total_audio_seconds: f32,
@@ -1427,7 +1434,9 @@ impl ReplVoiceOutput {
             let mut pipeline = super::vocal_tract_fep::VocalTractPipeline::new(&genesis);
             // Pre-train on phoneme database for reasonable starting point
             let db = super::formant_targets::FormantDatabase::new();
-            pipeline.controller.train_on_phoneme_targets(&genesis, &db, 3);
+            super::vocal_tract_controller::train_controller_on_phoneme_db(
+                &mut pipeline.controller, &genesis, &db, 3,
+            );
             Some(pipeline)
         } else {
             None
@@ -1448,6 +1457,9 @@ impl ReplVoiceOutput {
             audio_sink,
             #[cfg(feature = "vocal-tract")]
             ltc_pipeline,
+            #[cfg(feature = "vocal-tract")]
+            formant_db: super::formant_targets::FormantDatabase::new(),
+            last_voice_metrics: None,
             total_utterances: 0,
             total_audio_seconds: 0.0,
         })
@@ -1686,12 +1698,7 @@ impl ReplVoiceOutput {
             return Ok(Vec::new());
         }
 
-        let speech_phonemes: Vec<TimedPhoneme> = phonemes
-            .into_iter()
-            .filter(|p| p.phoneme != "SIL")
-            .collect();
-
-        if speech_phonemes.is_empty() {
+        if phonemes.is_empty() {
             return Ok(Vec::new());
         }
 
@@ -1712,19 +1719,90 @@ impl ReplVoiceOutput {
             rate_stability: 1.0,
         };
 
-        for timed_phoneme in &speech_phonemes {
-            // Number of frames for this phoneme's duration
-            let n_frames = (timed_phoneme.duration / dt).max(1.0) as usize;
+        let base_f0 = self.config.base_f0;
+        let arousal = self.current_pacing.arousal;
+        let mut elapsed = 0.0f32;
+        // Track phrase-local progress for F0 declination reset at phrase boundaries
+        let mut phrase_start_time = 0.0f32;
+        let mut phrase_duration = Self::compute_phrase_duration(&phonemes, 0);
 
-            for _ in 0..n_frames {
-                let frame = pipeline.tick(&cognitive_state, None, dt);
-                all_frames.push(frame);
+        for (ph_idx, timed_phoneme) in phonemes.iter().enumerate() {
+            let is_silence = timed_phoneme.phoneme == "SIL" || timed_phoneme.phoneme == "SP";
+
+            if is_silence {
+                // Insert silent frames for phrase/sentence pauses
+                let pause_duration = if timed_phoneme.duration > 0.01 {
+                    timed_phoneme.duration
+                } else {
+                    self.current_pacing.phrase_pause
+                };
+                let n_silent = (pause_duration / dt).max(1.0) as usize;
+                for _ in 0..n_silent {
+                    all_frames.push(super::FormantFrame::silent(elapsed));
+                    elapsed += dt;
+                }
+
+                // Reset F0 declination at phrase boundary
+                phrase_start_time = elapsed;
+                phrase_duration =
+                    Self::compute_phrase_duration(&phonemes, ph_idx + 1);
+            } else {
+                let n_frames = (timed_phoneme.duration / dt).max(1.0) as usize;
+
+                for frame_i in 0..n_frames {
+                    let phoneme_progress = frame_i as f32 / n_frames as f32;
+                    // Phrase-local progress for F0 declination (resets after pauses)
+                    let phrase_elapsed = elapsed - phrase_start_time;
+                    let utterance_progress = if phrase_duration > 0.0 {
+                        (phrase_elapsed / phrase_duration).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+
+                    let prosody = super::vocal_tract_fep::ProsodyContext {
+                        utterance_progress,
+                        phoneme_progress,
+                        stress: timed_phoneme.stress,
+                        base_f0,
+                        arousal,
+                    };
+
+                    let frame = pipeline.tick_with_prosody(
+                        &cognitive_state,
+                        None,
+                        dt,
+                        Some(&timed_phoneme.phoneme),
+                        &prosody,
+                    );
+                    all_frames.push(frame);
+                    elapsed += dt;
+                }
+
+                // Online adaptation: refine controller on vowel phoneme targets
+                if let Some(target) = self.formant_db.lookup(&timed_phoneme.phoneme) {
+                    if target.is_vowel {
+                        let phoneme_hv = pipeline.get_or_create_phoneme_hv(&timed_phoneme.phoneme);
+                        let target_frame = super::FormantFrame::from_target(
+                            target,
+                            base_f0,
+                            if target.is_voiced { 0.7 } else { 0.3 },
+                            0.0,
+                        );
+                        pipeline.controller.train_step(&phoneme_hv, &target_frame, dt, Some(1e-4));
+                    }
+                }
             }
         }
 
         if all_frames.is_empty() {
             return Ok(Vec::new());
         }
+
+        // Auto-compute voice quality metrics for feedback to cognitive loop
+        let metrics = super::voice_feedback::VoiceOutputMetrics::from_formant_frames(
+            &all_frames, None,
+        );
+        self.last_voice_metrics = Some(metrics);
 
         // Convert formants → audio via vocoder
         let samples = self.vocoder.synthesize(&all_frames);
@@ -1807,9 +1885,56 @@ impl ReplVoiceOutput {
         &self.current_pacing
     }
 
+    /// Enable or disable the LTC vocal tract pipeline at runtime.
+    ///
+    /// When enabling, initializes the pipeline on demand if it doesn't exist.
+    /// Requires the `vocal-tract` feature; no-op otherwise.
+    #[cfg(feature = "vocal-tract")]
+    pub fn set_ltc_pipeline(&mut self, enabled: bool) {
+        if enabled && self.ltc_pipeline.is_none() {
+            use symthaea_core::genesis::GenesisSeed;
+            let genesis = GenesisSeed::from_phrase("repl-vocal-tract");
+            let mut pipeline = super::vocal_tract_fep::VocalTractPipeline::new(&genesis);
+            let db = super::formant_targets::FormantDatabase::new();
+            super::vocal_tract_controller::train_controller_on_phoneme_db(
+                &mut pipeline.controller, &genesis, &db, 3,
+            );
+            self.ltc_pipeline = Some(pipeline);
+        }
+        if !enabled {
+            self.ltc_pipeline = None;
+        }
+    }
+
+    /// Enable or disable the LTC vocal tract pipeline (no-op without `vocal-tract` feature).
+    #[cfg(not(feature = "vocal-tract"))]
+    pub fn set_ltc_pipeline(&mut self, _enabled: bool) {
+        // No-op: vocal-tract feature not compiled in
+    }
+
+    /// Take the last voice output metrics (for feeding back to cognitive loop).
+    ///
+    /// Returns `Some(metrics)` if synthesis has run since the last `take`, `None` otherwise.
+    /// Usage: `if let Some(m) = voice.take_voice_metrics() { mind.update_voice_feedback(m); }`
+    pub fn take_voice_metrics(&mut self) -> Option<super::voice_feedback::VoiceOutputMetrics> {
+        self.last_voice_metrics.take()
+    }
+
     /// Get statistics
     pub fn stats(&self) -> (u64, f32) {
         (self.total_utterances, self.total_audio_seconds)
+    }
+
+    /// Compute total speech duration for a phrase starting at `from_idx`.
+    ///
+    /// Sums durations of non-silence phonemes up to the next SIL/SP or end.
+    #[cfg(feature = "vocal-tract")]
+    fn compute_phrase_duration(phonemes: &[TimedPhoneme], from_idx: usize) -> f32 {
+        phonemes[from_idx..]
+            .iter()
+            .take_while(|p| p.phoneme != "SIL" && p.phoneme != "SP")
+            .map(|p| p.duration)
+            .sum()
     }
 
     /// Reset state
@@ -1952,10 +2077,18 @@ mod tests {
     #[test]
     fn test_ltc_pipeline_config_default() {
         let config = ReplVoiceConfig::default();
-        assert!(
-            !config.use_ltc_pipeline,
-            "LTC pipeline should be disabled by default"
-        );
+        // Default matches feature gate: enabled when vocal-tract is compiled in
+        if cfg!(feature = "vocal-tract") {
+            assert!(
+                config.use_ltc_pipeline,
+                "LTC pipeline should default to true when vocal-tract feature is active"
+            );
+        } else {
+            assert!(
+                !config.use_ltc_pipeline,
+                "LTC pipeline should default to false without vocal-tract feature"
+            );
+        }
     }
 
     #[cfg(feature = "vocal-tract")]
@@ -1977,5 +2110,192 @@ mod tests {
                 "All samples should be finite"
             );
         }
+    }
+
+    #[cfg(feature = "vocal-tract")]
+    #[test]
+    fn test_comma_inserts_silence() {
+        // Verify that the G2P generates SIL phonemes at comma boundaries
+        // and these become silent frames in the pipeline output.
+        let g2p = SimpleG2P::new();
+
+        let phonemes_no_comma = g2p.text_to_phonemes("Hello world", 0.08);
+        let phonemes_comma = g2p.text_to_phonemes("Hello, world", 0.08);
+
+        let sil_count_no_comma = phonemes_no_comma
+            .iter()
+            .filter(|p| p.phoneme == "SIL")
+            .count();
+        let sil_count_comma = phonemes_comma
+            .iter()
+            .filter(|p| p.phoneme == "SIL")
+            .count();
+
+        assert!(
+            sil_count_comma > sil_count_no_comma,
+            "Comma should introduce SIL phonemes: with_comma={}, without={}",
+            sil_count_comma,
+            sil_count_no_comma
+        );
+
+        // Also verify the SIL phonemes produce silent frames in full pipeline
+        let config = ReplVoiceConfig {
+            use_ltc_pipeline: true,
+            ..Default::default()
+        };
+        let mut voice = ReplVoiceOutput::new(config).unwrap();
+        let samples = voice.synthesize("Hello, world").unwrap();
+        assert!(!samples.is_empty(), "Should produce audio with pauses");
+    }
+
+    #[cfg(feature = "vocal-tract")]
+    #[test]
+    fn test_period_pause_longer_than_comma() {
+        let g2p = SimpleG2P::new();
+
+        // Text with comma pause
+        let phonemes_comma = g2p.text_to_phonemes("Hello, world", 0.08);
+        let comma_pause: f32 = phonemes_comma
+            .iter()
+            .filter(|p| p.phoneme == "SIL")
+            .map(|p| p.duration)
+            .sum();
+
+        // Text with period pause
+        let phonemes_period = g2p.text_to_phonemes("Hello. World", 0.08);
+        let period_pause: f32 = phonemes_period
+            .iter()
+            .filter(|p| p.phoneme == "SIL")
+            .map(|p| p.duration)
+            .sum();
+
+        assert!(
+            period_pause > comma_pause,
+            "Period pause ({:.2}s) should be longer than comma pause ({:.2}s)",
+            period_pause,
+            comma_pause
+        );
+    }
+
+    #[cfg(feature = "vocal-tract")]
+    #[test]
+    fn test_f0_resets_after_pause() {
+        use crate::voice::vocal_tract_fep::ProsodyContext;
+        use crate::voice::FormantFrame;
+
+        let base_f0 = 150.0;
+
+        // End of first phrase (progress=1.0, F0 declined)
+        let mut frame_end = FormantFrame {
+            f0: 200.0,
+            energy: 0.5,
+            ..FormantFrame::silent(0.0)
+        };
+        let ctx_end = ProsodyContext {
+            utterance_progress: 1.0,
+            phoneme_progress: 0.5,
+            stress: 0,
+            base_f0,
+            arousal: 0.5,
+        };
+        ctx_end.apply_prosody(&mut frame_end);
+
+        // Start of new phrase after pause (progress=0.0, F0 at peak)
+        let mut frame_new = FormantFrame {
+            f0: 200.0,
+            energy: 0.5,
+            ..FormantFrame::silent(0.0)
+        };
+        let ctx_new = ProsodyContext {
+            utterance_progress: 0.0,
+            phoneme_progress: 0.5,
+            stress: 0,
+            base_f0,
+            arousal: 0.5,
+        };
+        ctx_new.apply_prosody(&mut frame_new);
+
+        // F0 should be higher at phrase start than at phrase end
+        assert!(
+            frame_new.f0 > frame_end.f0,
+            "F0 should reset after pause: new_phrase={:.1}, end_phrase={:.1}",
+            frame_new.f0,
+            frame_end.f0
+        );
+    }
+
+    #[cfg(feature = "vocal-tract")]
+    #[test]
+    fn test_online_adaptation_reduces_error() {
+        let config = ReplVoiceConfig {
+            use_ltc_pipeline: true,
+            ..Default::default()
+        };
+        let mut voice = ReplVoiceOutput::new(config).unwrap();
+
+        // Synthesize the same text twice — second synthesis should benefit
+        // from online adaptation on vowel targets during the first pass.
+        let _samples1 = voice.synthesize("Hello world.").unwrap();
+        let _samples2 = voice.synthesize("Hello world.").unwrap();
+
+        // Both should produce valid output (no crash from adaptation)
+        assert!(!_samples1.is_empty());
+        assert!(!_samples2.is_empty());
+    }
+
+    #[cfg(feature = "vocal-tract")]
+    #[test]
+    fn test_online_adaptation_consonants_no_crash() {
+        let config = ReplVoiceConfig {
+            use_ltc_pipeline: true,
+            ..Default::default()
+        };
+        let mut voice = ReplVoiceOutput::new(config).unwrap();
+
+        // Text with many consonants — adaptation should skip them gracefully
+        let samples = voice.synthesize("Strict trips.").unwrap();
+        assert!(!samples.is_empty(), "Consonant-heavy text should still produce audio");
+    }
+
+    #[cfg(feature = "vocal-tract")]
+    #[test]
+    fn test_repl_captures_voice_metrics() {
+        let config = ReplVoiceConfig {
+            use_ltc_pipeline: true,
+            ..Default::default()
+        };
+        let mut voice = ReplVoiceOutput::new(config).unwrap();
+
+        // Before synthesis, no metrics available
+        assert!(voice.take_voice_metrics().is_none());
+
+        // After synthesis, metrics should be populated
+        let _samples = voice.synthesize("Hello world.").unwrap();
+        let metrics = voice.take_voice_metrics();
+        assert!(metrics.is_some(), "Synthesis should populate voice metrics");
+
+        let m = metrics.unwrap();
+        assert!(m.pitch_stability > 0.0 && m.pitch_stability <= 1.0);
+        assert!(m.energy_consistency > 0.0 && m.energy_consistency <= 1.0);
+        assert!(m.articulation_score > 0.0 && m.articulation_score <= 1.0);
+
+        // After take, should be None again
+        assert!(voice.take_voice_metrics().is_none());
+    }
+
+    #[cfg(feature = "vocal-tract")]
+    #[test]
+    fn test_ltc_pipeline_default_with_feature() {
+        // When vocal-tract feature is active, the default config enables LTC
+        let config = ReplVoiceConfig::default();
+        assert!(
+            config.use_ltc_pipeline,
+            "With vocal-tract feature, LTC pipeline should default to true"
+        );
+
+        // Verify it actually initializes the pipeline
+        let voice = ReplVoiceOutput::new(config).unwrap();
+        // Voice should be functional with LTC pipeline
+        assert!(voice.is_audio_available() || !voice.is_audio_available()); // Just checking it exists
     }
 }

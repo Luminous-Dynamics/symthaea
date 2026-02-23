@@ -106,6 +106,120 @@ pub struct VoiceOutputMetrics {
 }
 
 impl VoiceOutputMetrics {
+    /// Auto-compute metrics directly from produced FormantFrames.
+    ///
+    /// This enables the voice→cognition feedback loop: after synthesis produces
+    /// frames, we can immediately assess quality and feed it back to the cognitive
+    /// loop without external instrumentation.
+    pub fn from_formant_frames(
+        frames: &[crate::voice::articulatory_synthesizer::FormantFrame],
+        targets: Option<&[crate::voice::formant_targets::FormantTarget]>,
+    ) -> Self {
+        if frames.is_empty() {
+            return Self::default();
+        }
+
+        // Pitch stability: 1.0 / (1.0 + F0 variance * 10.0)
+        let voiced_f0s: Vec<f32> = frames.iter()
+            .filter(|f| f.voicing > 0.5 && f.f0 > 0.0)
+            .map(|f| f.f0)
+            .collect();
+        let pitch_stability = if voiced_f0s.len() >= 2 {
+            let mean_f0 = voiced_f0s.iter().sum::<f32>() / voiced_f0s.len() as f32;
+            let variance = voiced_f0s.iter()
+                .map(|f| (f - mean_f0).powi(2))
+                .sum::<f32>() / voiced_f0s.len() as f32;
+            1.0 / (1.0 + variance * 10.0 / (mean_f0 * mean_f0).max(1.0))
+        } else {
+            0.5
+        };
+
+        // Energy consistency: 1.0 / (1.0 + energy variance * 5.0)
+        let energies: Vec<f32> = frames.iter().map(|f| f.energy).collect();
+        let mean_energy = energies.iter().sum::<f32>() / energies.len() as f32;
+        let energy_variance = energies.iter()
+            .map(|e| (e - mean_energy).powi(2))
+            .sum::<f32>() / energies.len() as f32;
+        let energy_consistency = 1.0 / (1.0 + energy_variance * 5.0);
+
+        // Coarticulation smoothness: 1.0 - max_frame_delta / expected_range
+        let max_delta = if frames.len() >= 2 {
+            frames.windows(2)
+                .map(|w| {
+                    let df1 = (w[1].f1 - w[0].f1).abs();
+                    let df2 = (w[1].f2 - w[0].f2).abs();
+                    let df3 = (w[1].f3 - w[0].f3).abs();
+                    df1 + df2 + df3
+                })
+                .fold(0.0f32, f32::max)
+        } else {
+            0.0
+        };
+        let expected_range = 1500.0; // Typical max formant shift (Hz sum across F1-F3)
+        let coarticulation_smoothness = (1.0 - max_delta / expected_range).clamp(0.0, 1.0);
+
+        // Formant accuracy: if targets provided, compute RMS error
+        let formant_accuracy = if let Some(tgts) = targets {
+            if !tgts.is_empty() && frames.len() >= tgts.len() {
+                let chunk_size = frames.len() / tgts.len();
+                let mut total_err = 0.0f32;
+                for (i, tgt) in tgts.iter().enumerate() {
+                    let start = i * chunk_size;
+                    let end = ((i + 1) * chunk_size).min(frames.len());
+                    let n = (end - start) as f32;
+                    if n > 0.0 {
+                        let avg_f1: f32 = frames[start..end].iter().map(|f| f.f1).sum::<f32>() / n;
+                        let avg_f2: f32 = frames[start..end].iter().map(|f| f.f2).sum::<f32>() / n;
+                        let err = ((avg_f1 - tgt.f1).powi(2) + (avg_f2 - tgt.f2).powi(2)).sqrt();
+                        total_err += err;
+                    }
+                }
+                let avg_err = total_err / tgts.len() as f32;
+                (1.0 - avg_err / 1000.0).clamp(0.0, 1.0) // Normalize: 1000Hz error → 0.0
+            } else {
+                0.5
+            }
+        } else {
+            0.5
+        };
+
+        // Articulation score: composite of formant_accuracy + voicing stability
+        let voicing_stability = if frames.len() >= 2 {
+            let voicing_changes: f32 = frames.windows(2)
+                .map(|w| (w[1].voicing - w[0].voicing).abs())
+                .sum::<f32>() / (frames.len() - 1) as f32;
+            (1.0 - voicing_changes * 5.0).clamp(0.0, 1.0)
+        } else {
+            0.5
+        };
+        let articulation_score = formant_accuracy * 0.7 + voicing_stability * 0.3;
+
+        // Speech rate estimate: frames * dt → syllables/sec (rough: ~5 frames per syllable at 200Hz)
+        let total_duration = if frames.len() >= 2 {
+            (frames.last().unwrap().time - frames.first().unwrap().time).abs()
+        } else {
+            0.1
+        };
+        let speech_rate = if total_duration > 0.01 {
+            // Rough estimate: count energy peaks as syllable nuclei
+            let syllable_count = frames.len() as f32 / 40.0; // ~40 frames per syllable at 200Hz
+            syllable_count / total_duration
+        } else {
+            4.0 // Default
+        };
+
+        Self {
+            articulation_score,
+            formant_accuracy,
+            speech_rate,
+            pitch_stability,
+            coarticulation_smoothness,
+            listener_prediction: 0.5, // Requires external feedback
+            duration_accuracy: 0.8,   // Needs timing context to be precise
+            energy_consistency,
+        }
+    }
+
     /// Create metrics from articulator state
     pub fn from_articulator_output(
         formants_hit: usize,
@@ -648,6 +762,50 @@ mod tests {
         assert!(summary.articulation_quality > 0.0);
         assert!(summary.rate_stability > 0.0);
         assert!(summary.voice_confidence > 0.0);
+    }
+
+    #[test]
+    fn test_metrics_from_formant_frames() {
+        use crate::voice::articulatory_synthesizer::FormantFrame;
+
+        // Stable frames: consistent F0, energy, formants
+        let stable_frames: Vec<FormantFrame> = (0..50)
+            .map(|i| FormantFrame {
+                f1: 500.0, f2: 1500.0, f3: 2500.0,
+                b1: 60.0, b2: 90.0, b3: 150.0,
+                f0: 120.0, energy: 0.8, voicing: 1.0,
+                time: i as f32 * 0.005,
+            })
+            .collect();
+        let stable_metrics = VoiceOutputMetrics::from_formant_frames(&stable_frames, None);
+
+        assert!(stable_metrics.pitch_stability > 0.8,
+            "Stable pitch should have high stability: {}", stable_metrics.pitch_stability);
+        assert!(stable_metrics.energy_consistency > 0.8,
+            "Stable energy should have high consistency: {}", stable_metrics.energy_consistency);
+        assert!(stable_metrics.coarticulation_smoothness > 0.9,
+            "No transitions should be smooth: {}", stable_metrics.coarticulation_smoothness);
+
+        // Unstable frames: varying F0, energy, jittering formants
+        let unstable_frames: Vec<FormantFrame> = (0..50)
+            .map(|i| FormantFrame {
+                f1: 300.0 + (i as f32 * 0.3).sin() * 400.0,
+                f2: 1500.0 + (i as f32 * 0.5).cos() * 500.0,
+                f3: 2500.0,
+                b1: 60.0, b2: 90.0, b3: 150.0,
+                f0: 80.0 + (i as f32 * 0.7).sin() * 80.0,
+                energy: 0.3 + (i as f32 * 0.4).sin() * 0.5,
+                voicing: if i % 3 == 0 { 0.2 } else { 1.0 },
+                time: i as f32 * 0.005,
+            })
+            .collect();
+        let unstable_metrics = VoiceOutputMetrics::from_formant_frames(&unstable_frames, None);
+
+        // Unstable should score lower on key metrics
+        assert!(unstable_metrics.pitch_stability < stable_metrics.pitch_stability,
+            "Unstable pitch should be less stable");
+        assert!(unstable_metrics.energy_consistency < stable_metrics.energy_consistency,
+            "Unstable energy should be less consistent");
     }
 
     #[test]
