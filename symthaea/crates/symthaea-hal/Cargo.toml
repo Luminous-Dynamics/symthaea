@@ -19,6 +19,9 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 parking_lot = { workspace = true }
 embedded-hal = "1.0"
+embedded-hal-bus = { version = "0.3", features = ["std"] }
+clap = { version = "4.4", features = ["derive"], optional = true }
+ctrlc = { version = "3.4", optional = true }
 
 [dependencies.linux-embedded-hal]
 version = "0.4"
@@ -26,6 +29,16 @@ optional = true
 default-features = false
 features = ["i2c"]
 
+[dev-dependencies]
+proptest = "1.4"
+
 [features]
 default = []
 linux = ["dep:linux-embedded-hal"]
+calibrate = ["dep:clap"]
+signal = ["dep:ctrlc"]
+
+[[bin]]
+name = "hal-calibrate"
+path = "src/bin/hal_calibrate.rs"
+required-features = ["calibrate"]

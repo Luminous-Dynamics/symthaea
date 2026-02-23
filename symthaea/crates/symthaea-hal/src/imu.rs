@@ -178,3 +178,32 @@ mod tests {
         assert_eq!(i16_from_be(0x80, 0x00), -32768);
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn decode_always_produces_6_finite_f32s(raw in proptest::collection::vec(any::<u8>(), 14..=14)) {
+            let decoder = Mpu6050Decoder;
+            let values = decoder.decode(&raw);
+            prop_assert_eq!(values.len(), 6);
+            for (i, v) in values.iter().enumerate() {
+                prop_assert!(v.is_finite(), "value[{}] = {} is not finite", i, v);
+            }
+        }
+
+        #[test]
+        fn decode_short_buffer_produces_zeros(len in 0usize..14) {
+            let decoder = Mpu6050Decoder;
+            let raw = vec![0u8; len];
+            let values = decoder.decode(&raw);
+            prop_assert_eq!(values.len(), 6);
+            for v in &values {
+                prop_assert!(v.abs() < f32::EPSILON);
+            }
+        }
+    }
+}

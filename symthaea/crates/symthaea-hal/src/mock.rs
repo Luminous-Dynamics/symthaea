@@ -1,5 +1,6 @@
 //! Mock I2C bus and HAL sensor for testing without hardware.
 
+use embedded_hal::digital;
 use embedded_hal::i2c::{self, ErrorType, I2c, Operation};
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -199,6 +200,90 @@ impl HalSensorAdapter for MockHalSensor {
 }
 
 // ============================================================================
+// MOCK GPIO INPUT PIN
+// ============================================================================
+
+/// Mock GPIO pin error.
+#[derive(Debug)]
+pub struct MockPinError;
+
+impl digital::Error for MockPinError {
+    fn kind(&self) -> digital::ErrorKind {
+        digital::ErrorKind::Other
+    }
+}
+
+impl std::fmt::Display for MockPinError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MockPinError")
+    }
+}
+
+/// Mock GPIO input pin for testing [`GpioEstop`](crate::gpio_estop::GpioEstop).
+///
+/// Can be configured to return a fixed state or an error.
+pub struct MockInputPin {
+    is_low: Option<bool>,
+}
+
+impl MockInputPin {
+    /// Create a pin that returns the given low state.
+    pub fn new(is_low: bool) -> Self {
+        Self {
+            is_low: Some(is_low),
+        }
+    }
+
+    /// Create a pin that always returns an error.
+    pub fn with_error() -> Self {
+        Self { is_low: None }
+    }
+}
+
+impl digital::ErrorType for MockInputPin {
+    type Error = MockPinError;
+}
+
+impl digital::InputPin for MockInputPin {
+    fn is_high(&mut self) -> Result<bool, Self::Error> {
+        match self.is_low {
+            Some(low) => Ok(!low),
+            None => Err(MockPinError),
+        }
+    }
+
+    fn is_low(&mut self) -> Result<bool, Self::Error> {
+        match self.is_low {
+            Some(low) => Ok(low),
+            None => Err(MockPinError),
+        }
+    }
+}
+
+// ============================================================================
+// MOCK ESTOP POLLER
+// ============================================================================
+
+/// Mock e-stop poller for testing the runtime without GPIO hardware.
+pub struct MockEstopPoller {
+    /// If `true`, the next `poll()` returns `true` (e-stop triggered).
+    pub triggered: bool,
+}
+
+impl MockEstopPoller {
+    /// Create a mock e-stop poller.
+    pub fn new(triggered: bool) -> Self {
+        Self { triggered }
+    }
+}
+
+impl crate::gpio_estop::EstopPoller for MockEstopPoller {
+    fn poll(&mut self) -> bool {
+        self.triggered
+    }
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
@@ -285,5 +370,29 @@ mod tests {
 
         assert!(!sensor.is_available());
         assert!(sensor.read_raw().is_none());
+    }
+
+    #[test]
+    fn test_mock_input_pin_low() {
+        use embedded_hal::digital::InputPin;
+        let mut pin = MockInputPin::new(true);
+        assert!(pin.is_low().unwrap());
+        assert!(!pin.is_high().unwrap());
+    }
+
+    #[test]
+    fn test_mock_input_pin_high() {
+        use embedded_hal::digital::InputPin;
+        let mut pin = MockInputPin::new(false);
+        assert!(!pin.is_low().unwrap());
+        assert!(pin.is_high().unwrap());
+    }
+
+    #[test]
+    fn test_mock_input_pin_error() {
+        use embedded_hal::digital::InputPin;
+        let mut pin = MockInputPin::with_error();
+        assert!(pin.is_low().is_err());
+        assert!(pin.is_high().is_err());
     }
 }
