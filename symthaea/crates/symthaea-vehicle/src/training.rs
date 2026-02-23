@@ -19,6 +19,7 @@ use crate::encoder::VehicleHdcEncoder;
 use crate::fep_agent::{ActiveInferenceVehicleAgent, VehicleFepConfig};
 use crate::perturbations::{is_critical_failure, PerturbationSchedule};
 use crate::reward;
+use crate::road::Road;
 use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
 use crate::types::*;
 
@@ -63,6 +64,8 @@ pub struct VehicleTrainer {
     initial_controller: Option<VehicleController>,
     /// Perturbation schedule for advanced training phases.
     perturbation_schedule: PerturbationSchedule,
+    /// Road model for computing lateral_offset and curvature_ahead.
+    road: Road,
 }
 
 impl VehicleTrainer {
@@ -75,6 +78,7 @@ impl VehicleTrainer {
             metrics: Vec::new(),
             initial_controller: None,
             perturbation_schedule: PerturbationSchedule::none(),
+            road: Road::straight(),
         }
     }
 
@@ -87,6 +91,7 @@ impl VehicleTrainer {
             metrics: Vec::new(),
             initial_controller: Some(controller),
             perturbation_schedule: PerturbationSchedule::none(),
+            road: Road::straight(),
         }
     }
 
@@ -100,12 +105,19 @@ impl VehicleTrainer {
             metrics: Vec::new(),
             initial_controller: Some(controller),
             perturbation_schedule: PerturbationSchedule::none(),
+            road: Road::straight(),
         })
     }
 
     /// Set a custom perturbation schedule.
     pub fn with_perturbations(mut self, schedule: PerturbationSchedule) -> Self {
         self.perturbation_schedule = schedule;
+        self
+    }
+
+    /// Set the road model for training.
+    pub fn with_road(mut self, road: Road) -> Self {
+        self.road = road;
         self
     }
 
@@ -244,14 +256,17 @@ impl VehicleTrainer {
 
             // -- PHYSICS STEP (every step, 200Hz) --
             let mut state = physics.state().clone();
-            state.apply_straight_road(); // Phase A: straight road model
+            self.road.apply(&mut state);
+
+            let proj = self.road.project(state.position_x, state.position_y);
+            let road_heading = proj.road_heading;
 
             let sensor_hv = encoder.encode(&state);
             let mut command = controller.forward(&sensor_hv, dt as f32);
 
             // Blend with PD teacher during curriculum
             if pd_weight > 0.01 {
-                let pd_cmd = pd_cruise_baseline(&state, target_speed);
+                let pd_cmd = pd_cruise_baseline_with_road(&state, target_speed, road_heading);
                 command = VehicleCommand {
                     steering: pd_weight * pd_cmd.steering + (1.0 - pd_weight) * command.steering,
                     throttle: pd_weight * pd_cmd.throttle + (1.0 - pd_weight) * command.throttle,
@@ -270,12 +285,12 @@ impl VehicleTrainer {
 
             // Track metrics
             let safe_r = reward::safety_reward(&state);
-            let episode_r = reward::episode_reward(&state, &task, target_speed);
+            let episode_r = reward::episode_reward(&state, &task, target_speed, road_heading);
             total_safety_reward += safe_r;
             total_episode_reward += episode_r;
             total_speed += state.speed;
             total_lateral_offset += state.lateral_offset.abs();
-            total_heading_error += state.heading.abs();
+            total_heading_error += (state.heading - road_heading).abs();
             total_control_effort += command.control_effort() as f64;
 
             steps_completed += 1;
@@ -319,7 +334,7 @@ impl VehicleTrainer {
 
             // -- TRAINING (every train_every steps, 50Hz) --
             if step % self.config.train_every == 0 {
-                let target = pd_cruise_baseline(&state, target_speed);
+                let target = pd_cruise_baseline_with_road(&state, target_speed, road_heading);
 
                 // Reward-modulated BPTT: scale gradient by safety reward
                 // so the network learns more when stable (clear signal)
@@ -411,6 +426,21 @@ impl VehicleTrainer {
 
     /// Run the full training curriculum.
     pub fn train(&mut self) -> Vec<EpisodeMetrics> {
+        self.train_inner(None)
+    }
+
+    /// Run training with CSV telemetry output.
+    pub fn train_with_telemetry(&mut self, output_dir: &str) -> Vec<EpisodeMetrics> {
+        self.train_inner(Some(output_dir))
+    }
+
+    /// Shared training implementation. When `telemetry_dir` is Some, writes per-episode
+    /// CSV files and a summary CSV, and saves a controller checkpoint.
+    fn train_inner(&mut self, telemetry_dir: Option<&str>) -> Vec<EpisodeMetrics> {
+        if telemetry_dir.is_some() {
+            self.config.collect_telemetry = true;
+        }
+
         let genesis = self.genesis.clone();
         let num_levels = self.config.num_levels;
         let mut encoder = VehicleHdcEncoder::new(&genesis, num_levels);
@@ -425,17 +455,33 @@ impl VehicleTrainer {
         let warmup_samples: Vec<(ContinuousHV, VehicleCommand)> = (0..20)
             .map(|i| {
                 let mut state = VehicleState::cruising(self.config.effective_target_speed());
-                // Small lateral perturbations to teach lane correction
                 let offset = (i as f64 - 10.0) * 0.1;
                 state.position_y = offset;
-                state.apply_straight_road();
+                self.road.apply(&mut state);
                 let hv = encoder.encode(&state);
-                let target = pd_cruise_baseline(&state, self.config.effective_target_speed());
+                let proj = self.road.project(state.position_x, state.position_y);
+                let target = pd_cruise_baseline_with_road(
+                    &state,
+                    self.config.effective_target_speed(),
+                    proj.road_heading,
+                );
                 (hv, target)
             })
             .collect();
         controller.warmup(&warmup_samples, 100, self.config.learning_rate * 10.0);
         encoder.reset();
+
+        if let Some(dir) = telemetry_dir {
+            let _ = std::fs::create_dir_all(dir);
+        }
+
+        let mut summary = if telemetry_dir.is_some() {
+            Some(String::from(
+                "episode,task,avg_safety_reward,avg_episode_reward,avg_free_energy,avg_speed,avg_lateral_offset,avg_heading_error,avg_control_effort,exploration_count,total_steps\n",
+            ))
+        } else {
+            None
+        };
 
         let mut all_metrics = Vec::with_capacity(self.config.num_episodes);
 
@@ -498,142 +544,62 @@ impl VehicleTrainer {
                 consecutive_low = 0;
             }
 
-            all_metrics.push(metrics);
-            fep_agent.reset();
-        }
-
-        self.metrics = all_metrics.clone();
-        all_metrics
-    }
-
-    /// Run training with CSV telemetry output.
-    pub fn train_with_telemetry(&mut self, output_dir: &str) -> Vec<EpisodeMetrics> {
-        self.config.collect_telemetry = true;
-
-        let genesis = self.genesis.clone();
-        let num_levels = self.config.num_levels;
-        let mut encoder = VehicleHdcEncoder::new(&genesis, num_levels);
-        let mut controller = self
-            .initial_controller
-            .take()
-            .unwrap_or_else(|| VehicleController::new(&genesis, &self.config));
-        let mut fep_agent =
-            ActiveInferenceVehicleAgent::new(VehicleFepConfig::default(), self.config.task);
-
-        let mut all_metrics = Vec::with_capacity(self.config.num_episodes);
-        let _ = std::fs::create_dir_all(output_dir);
-
-        let mut summary = String::from(
-            "episode,task,avg_safety_reward,avg_episode_reward,avg_free_energy,avg_speed,avg_lateral_offset,avg_heading_error,avg_control_effort,exploration_count,total_steps\n",
-        );
-
-        // Best-checkpoint revert state
-        let mut best_reward = f64::NEG_INFINITY;
-        let mut best_weights: Option<(Vec<f32>, Vec<f32>)> = None;
-        let mut consecutive_low = 0u32;
-
-        // Phase-transition detection
-        let mut prev_pd_phase: Option<usize> = None;
-        let mut transition_boost_remaining = 0u32;
-
-        for ep in 0..self.config.num_episodes {
-            let current_phase = if self.config.num_episodes > 1 {
-                let progress = ep as f64 / (self.config.num_episodes - 1) as f64;
-                if progress < 0.4 {
-                    0
-                } else if progress < 0.7 {
-                    1
-                } else if progress < 0.9 {
-                    2
-                } else {
-                    3
-                }
-            } else {
-                0
-            };
-            if let Some(prev) = prev_pd_phase {
-                if prev != current_phase {
-                    transition_boost_remaining = 3;
-                }
-            }
-            prev_pd_phase = Some(current_phase);
-
-            if transition_boost_remaining > 0 {
-                controller.set_learning_rate_scale(3.0);
-                transition_boost_remaining -= 1;
-            } else {
-                controller.set_learning_rate_scale(1.0);
-            }
-
-            let metrics = self.run_episode(&mut encoder, &mut controller, &mut fep_agent, ep);
-
-            // Track best checkpoint and revert on sustained degradation
-            if metrics.avg_episode_reward > best_reward {
-                best_reward = metrics.avg_episode_reward;
-                best_weights = Some(controller.output_projection());
-                consecutive_low = 0;
-            } else if metrics.avg_safety_reward < 0.5 {
-                consecutive_low += 1;
-                if consecutive_low >= 3 {
-                    if let Some((ref weights, ref bias)) = best_weights {
-                        controller.set_output_projection(weights, bias);
-                        consecutive_low = 0;
+            // Write telemetry CSV files when output dir is set
+            if let Some(dir) = telemetry_dir {
+                if !metrics.telemetry.is_empty() {
+                    let step_path = format!("{}/episode_{:04}.csv", dir, ep);
+                    let mut csv = String::from(
+                        "step,time,speed,heading,lateral_offset,tire_slip_front,tire_slip_rear,episode_reward,free_energy,tau_factor,control_effort,mesh_peers\n",
+                    );
+                    for t in &metrics.telemetry {
+                        csv.push_str(&format!(
+                            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{}\n",
+                            t.step,
+                            t.time,
+                            t.speed,
+                            t.heading,
+                            t.lateral_offset,
+                            t.tire_slip_front,
+                            t.tire_slip_rear,
+                            t.episode_reward,
+                            t.free_energy,
+                            t.tau_factor,
+                            t.control_effort,
+                            t.mesh_peers_visible,
+                        ));
                     }
+                    let _ = std::fs::write(&step_path, csv);
                 }
-            } else {
-                consecutive_low = 0;
-            }
 
-            if !metrics.telemetry.is_empty() {
-                let step_path = format!("{}/episode_{:04}.csv", output_dir, ep);
-                let mut csv = String::from(
-                    "step,time,speed,heading,lateral_offset,tire_slip_front,tire_slip_rear,episode_reward,free_energy,tau_factor,control_effort,mesh_peers\n",
-                );
-                for t in &metrics.telemetry {
-                    csv.push_str(&format!(
-                        "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{}\n",
-                        t.step,
-                        t.time,
-                        t.speed,
-                        t.heading,
-                        t.lateral_offset,
-                        t.tire_slip_front,
-                        t.tire_slip_rear,
-                        t.episode_reward,
-                        t.free_energy,
-                        t.tau_factor,
-                        t.control_effort,
-                        t.mesh_peers_visible,
+                if let Some(ref mut s) = summary {
+                    s.push_str(&format!(
+                        "{},{:?},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}\n",
+                        ep,
+                        metrics.task,
+                        metrics.avg_safety_reward,
+                        metrics.avg_episode_reward,
+                        metrics.avg_free_energy,
+                        metrics.avg_speed,
+                        metrics.avg_lateral_offset,
+                        metrics.avg_heading_error,
+                        metrics.avg_control_effort,
+                        metrics.exploration_count,
+                        metrics.total_steps,
                     ));
                 }
-                let _ = std::fs::write(&step_path, csv);
             }
-
-            summary.push_str(&format!(
-                "{},{:?},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}\n",
-                ep,
-                metrics.task,
-                metrics.avg_safety_reward,
-                metrics.avg_episode_reward,
-                metrics.avg_free_energy,
-                metrics.avg_speed,
-                metrics.avg_lateral_offset,
-                metrics.avg_heading_error,
-                metrics.avg_control_effort,
-                metrics.exploration_count,
-                metrics.total_steps,
-            ));
 
             all_metrics.push(metrics);
             fep_agent.reset();
         }
 
-        let summary_path = format!("{}/summary.csv", output_dir);
-        let _ = std::fs::write(&summary_path, summary);
-
-        // Save checkpoint of trained controller
-        let checkpoint_path = format!("{}/checkpoint.json", output_dir);
-        let _ = controller.save_checkpoint(&checkpoint_path, &self.config);
+        // Write summary and checkpoint when telemetry dir is set
+        if let Some(dir) = telemetry_dir {
+            if let Some(s) = summary {
+                let _ = std::fs::write(format!("{}/summary.csv", dir), s);
+            }
+            let _ = controller.save_checkpoint(&format!("{}/checkpoint.json", dir), &self.config);
+        }
 
         self.metrics = all_metrics.clone();
         all_metrics
@@ -882,5 +848,65 @@ mod tests {
         let metrics = trainer.run_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
         assert!(metrics.total_steps > 0);
         assert!(metrics.avg_safety_reward.is_finite());
+    }
+
+    #[test]
+    fn test_training_improves_reward() {
+        let config = VehicleConfig {
+            num_episodes: 20,
+            steps_per_episode: 200,
+            early_termination: false,
+            ..VehicleConfig::default()
+        };
+        let mut trainer = VehicleTrainer::new(config);
+        let metrics = trainer.train();
+
+        assert_eq!(metrics.len(), 20);
+
+        let first_avg: f64 =
+            metrics[..3].iter().map(|m| m.avg_episode_reward).sum::<f64>() / 3.0;
+        let last_avg: f64 = metrics[17..]
+            .iter()
+            .map(|m| m.avg_episode_reward)
+            .sum::<f64>()
+            / 3.0;
+
+        assert!(
+            last_avg > first_avg,
+            "Training should improve reward: first 3 avg={first_avg:.4}, last 3 avg={last_avg:.4}"
+        );
+    }
+
+    #[test]
+    fn test_training_on_road() {
+        use crate::road::Road;
+
+        let config = VehicleConfig {
+            num_episodes: 10,
+            steps_per_episode: 200,
+            early_termination: false,
+            ..VehicleConfig::default()
+        };
+        let mut trainer = VehicleTrainer::new(config).with_road(Road::gentle_highway());
+        let metrics = trainer.train();
+
+        assert_eq!(metrics.len(), 10);
+        for m in &metrics {
+            assert!(
+                m.avg_episode_reward.is_finite(),
+                "Episode {} reward not finite",
+                m.episode
+            );
+            assert!(
+                m.avg_safety_reward.is_finite(),
+                "Episode {} safety not finite",
+                m.episode
+            );
+            assert_eq!(
+                m.total_steps, 200,
+                "Episode {} should complete all steps",
+                m.episode
+            );
+        }
     }
 }

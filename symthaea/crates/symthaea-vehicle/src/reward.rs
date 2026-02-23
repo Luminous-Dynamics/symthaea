@@ -75,11 +75,17 @@ pub fn smoothness_reward(state: &VehicleState) -> f64 {
 /// Combined episode reward for a given task.
 ///
 /// Weighted combination of component rewards, tuned per task.
-pub fn episode_reward(state: &VehicleState, task: &VehicleTask, target_speed: f64) -> f64 {
+/// `target_heading` is the road heading at the vehicle's projected position (0.0 for straight roads).
+pub fn episode_reward(
+    state: &VehicleState,
+    task: &VehicleTask,
+    target_speed: f64,
+    target_heading: f64,
+) -> f64 {
     let safe = safety_reward(state);
     let speed = speed_reward(state, target_speed);
     let lane = lane_reward(state);
-    let heading = heading_reward(state, 0.0); // assume straight road for now
+    let heading = heading_reward(state, target_heading);
     let smooth = smoothness_reward(state);
 
     match task {
@@ -182,7 +188,7 @@ mod tests {
     #[test]
     fn test_episode_reward_range() {
         let state = VehicleState::cruising(13.4);
-        let r = episode_reward(&state, &VehicleTask::LaneKeep, 13.4);
+        let r = episode_reward(&state, &VehicleTask::LaneKeep, 13.4, 0.0);
         assert!(r >= 0.0 && r <= 1.0, "Reward should be in [0,1]: {r}");
         assert!(r > 0.8, "Normal driving should score high: {r}");
     }
@@ -190,7 +196,7 @@ mod tests {
     #[test]
     fn test_episode_reward_emergency_stop() {
         let state = VehicleState::stopped();
-        let r = episode_reward(&state, &VehicleTask::EmergencyStop, 0.0);
+        let r = episode_reward(&state, &VehicleTask::EmergencyStop, 0.0, 0.0);
         assert!(r > 0.8, "Stopped at target 0 should score high: {r}");
     }
 
