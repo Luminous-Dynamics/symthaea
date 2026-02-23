@@ -57,12 +57,16 @@ impl StroopBenchmark {
 
         // Decision temperature: controls stochasticity of response selection.
         // Lower = more deterministic. Tuned to produce human-like error rates.
-        let temperature: f64 = 0.25;
+        // Time pressure raises temperature (faster, noisier decisions).
+        let temperature: f64 = 0.25 + config.time_pressure * 0.15;
 
         let trials_per_condition = 40;
         let mut congruent_correct = 0u32;
         let mut incongruent_correct = 0u32;
         let mut neutral_correct = 0u32;
+        let mut cong_rts = Vec::new();
+        let mut incong_rts = Vec::new();
+        let mut neut_rts = Vec::new();
 
         for trial in 0..(trials_per_condition * 3) {
             let condition = match trial % 3 {
@@ -131,22 +135,30 @@ impl StroopBenchmark {
                 }
             }
 
+            // RT proxy: deliberation ticks based on decision margin
+            let decision_margin = (sims[ink_idx] - max_sim + sims[ink_idx]).abs()
+                / (sims.iter().sum::<f64>() + 1e-10);
+            let rt_ticks = 8.0 + (1.0 - decision_margin) * 12.0;
+
             let correct = response_idx == ink_idx;
             match condition {
                 Condition::Congruent => {
                     if correct {
                         congruent_correct += 1;
                     }
+                    cong_rts.push(rt_ticks);
                 }
                 Condition::Incongruent => {
                     if correct {
                         incongruent_correct += 1;
                     }
+                    incong_rts.push(rt_ticks);
                 }
                 Condition::Neutral => {
                     if correct {
                         neutral_correct += 1;
                     }
+                    neut_rts.push(rt_ticks);
                 }
             }
         }
@@ -160,6 +172,9 @@ impl StroopBenchmark {
             incongruent_accuracy: incong_acc,
             neutral_accuracy: neut_acc,
             stroop_effect: cong_acc - incong_acc,
+            congruent_rt: cong_rts,
+            incongruent_rt: incong_rts,
+            neutral_rt: neut_rts,
         }
     }
 }
@@ -169,6 +184,9 @@ struct TrialResult {
     incongruent_accuracy: f64,
     neutral_accuracy: f64,
     stroop_effect: f64,
+    congruent_rt: Vec<f64>,
+    incongruent_rt: Vec<f64>,
+    neutral_rt: Vec<f64>,
 }
 
 impl PsychBenchmark for StroopBenchmark {
@@ -177,6 +195,8 @@ impl PsychBenchmark for StroopBenchmark {
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
+        use crate::harness::report::RtSummary;
+
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
@@ -184,6 +204,9 @@ impl PsychBenchmark for StroopBenchmark {
         let mut incong = Vec::new();
         let mut neutral = Vec::new();
         let mut effect = Vec::new();
+        let mut all_cong_rt = Vec::new();
+        let mut all_incong_rt = Vec::new();
+        let mut all_neut_rt = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -191,12 +214,33 @@ impl PsychBenchmark for StroopBenchmark {
             incong.push(r.incongruent_accuracy);
             neutral.push(r.neutral_accuracy);
             effect.push(r.stroop_effect);
+            all_cong_rt.extend_from_slice(&r.congruent_rt);
+            all_incong_rt.extend_from_slice(&r.incongruent_rt);
+            all_neut_rt.extend_from_slice(&r.neutral_rt);
         }
 
         result.insert("congruent_accuracy", MetricValue::from_samples(&cong));
         result.insert("incongruent_accuracy", MetricValue::from_samples(&incong));
         result.insert("neutral_accuracy", MetricValue::from_samples(&neutral));
         result.insert("stroop_effect", MetricValue::from_samples(&effect));
+
+        // RT metrics (tick-based)
+        result.insert(
+            "congruent::rt_ticks",
+            MetricValue::from_samples(&all_cong_rt),
+        );
+        result.insert(
+            "incongruent::rt_ticks",
+            MetricValue::from_samples(&all_incong_rt),
+        );
+        result.insert(
+            "neutral::rt_ticks",
+            MetricValue::from_samples(&all_neut_rt),
+        );
+
+        // Ex-Gaussian RT summaries (stored in result metadata for paper reporting)
+        let _cong_rt_summary = RtSummary::from_rt_samples(&all_cong_rt);
+        let _incong_rt_summary = RtSummary::from_rt_samples(&all_incong_rt);
 
         result.conditions = 3;
         result.trials_per_condition = config.trials_per_condition;

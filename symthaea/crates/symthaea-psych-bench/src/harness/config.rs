@@ -23,6 +23,12 @@ pub struct BenchmarkConfig {
     pub action_temperature: f64,
     /// Optional label for this configuration (used in ablation reports).
     pub label: Option<String>,
+    /// Time pressure level for speed-accuracy tradeoff (0.0 = none, 1.0 = maximum).
+    ///
+    /// At higher time pressure, benchmarks that support it will use fewer
+    /// deliberation ticks, noisier encoding, and faster response thresholds,
+    /// trading accuracy for speed (a speed-accuracy tradeoff curve).
+    pub time_pressure: f64,
 }
 
 impl Default for BenchmarkConfig {
@@ -37,6 +43,7 @@ impl Default for BenchmarkConfig {
             planning_horizon: 3,
             action_temperature: 1.0,
             label: None,
+            time_pressure: 0.0,
         }
     }
 }

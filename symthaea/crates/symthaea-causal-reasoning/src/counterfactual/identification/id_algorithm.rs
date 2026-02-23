@@ -869,3 +869,461 @@ impl Default for CausalReferenceHarness {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CausalGraphWithLatents Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_graph_with_latents_construction() {
+        let g = CausalGraphWithLatents::new(
+            vec!["X".into(), "Y".into(), "Z".into()],
+            vec![(0, 1), (1, 2)],
+            vec![(0, 2)],
+        );
+        assert_eq!(g.nodes.len(), 3);
+        assert_eq!(g.directed.len(), 2);
+        assert_eq!(g.bidirected.len(), 1);
+    }
+
+    #[test]
+    fn test_graph_parents_and_children() {
+        let g = CausalGraphWithLatents::new(
+            vec!["A".into(), "B".into(), "C".into()],
+            vec![(0, 1), (0, 2), (1, 2)],
+            vec![],
+        );
+        assert_eq!(g.parents(0), vec![]);
+        assert_eq!(g.parents(1), vec![0]);
+        let mut parents_c = g.parents(2);
+        parents_c.sort();
+        assert_eq!(parents_c, vec![0, 1]);
+
+        let mut children_a = g.children(0);
+        children_a.sort();
+        assert_eq!(children_a, vec![1, 2]);
+        assert_eq!(g.children(2), vec![]);
+    }
+
+    #[test]
+    fn test_graph_ancestors() {
+        // A → B → C → D
+        let g = CausalGraphWithLatents::new(
+            vec!["A".into(), "B".into(), "C".into(), "D".into()],
+            vec![(0, 1), (1, 2), (2, 3)],
+            vec![],
+        );
+        let ancestors_d = g.ancestors(3);
+        assert!(ancestors_d.contains(&0));
+        assert!(ancestors_d.contains(&1));
+        assert!(ancestors_d.contains(&2));
+        assert!(!ancestors_d.contains(&3));
+        assert_eq!(ancestors_d.len(), 3);
+
+        let ancestors_a = g.ancestors(0);
+        assert!(ancestors_a.is_empty());
+    }
+
+    #[test]
+    fn test_bidirected_neighbors() {
+        let g = CausalGraphWithLatents::new(
+            vec!["A".into(), "B".into(), "C".into()],
+            vec![],
+            vec![(0, 1), (1, 2)],
+        );
+        let neighbors_b = g.bidirected_neighbors(1);
+        assert!(neighbors_b.contains(&0));
+        assert!(neighbors_b.contains(&2));
+        assert_eq!(neighbors_b.len(), 2);
+
+        let neighbors_a = g.bidirected_neighbors(0);
+        assert_eq!(neighbors_a.len(), 1);
+        assert!(neighbors_a.contains(&1));
+    }
+
+    #[test]
+    fn test_c_components_disjoint() {
+        // A ↔ B, C ↔ D — two disjoint C-components
+        let g = CausalGraphWithLatents::new(
+            vec!["A".into(), "B".into(), "C".into(), "D".into()],
+            vec![],
+            vec![(0, 1), (2, 3)],
+        );
+        let components = g.c_components();
+        assert_eq!(components.len(), 2);
+    }
+
+    #[test]
+    fn test_c_components_connected_chain() {
+        // A ↔ B ↔ C — one C-component
+        let g = CausalGraphWithLatents::new(
+            vec!["A".into(), "B".into(), "C".into()],
+            vec![],
+            vec![(0, 1), (1, 2)],
+        );
+        let components = g.c_components();
+        assert_eq!(components.len(), 1);
+        assert_eq!(components[0].len(), 3);
+    }
+
+    #[test]
+    fn test_c_components_no_bidirected() {
+        // No bidirected edges — each node is its own C-component
+        let g = CausalGraphWithLatents::new(
+            vec!["A".into(), "B".into(), "C".into()],
+            vec![(0, 1), (1, 2)],
+            vec![],
+        );
+        let components = g.c_components();
+        assert_eq!(components.len(), 3);
+    }
+
+    #[test]
+    fn test_c_component_of() {
+        let g = CausalGraphWithLatents::new(
+            vec!["A".into(), "B".into(), "C".into(), "D".into()],
+            vec![],
+            vec![(0, 1), (2, 3)],
+        );
+        let comp_a = g.c_component_of(0);
+        assert!(comp_a.contains(&0));
+        assert!(comp_a.contains(&1));
+        assert!(!comp_a.contains(&2));
+        assert_eq!(comp_a.len(), 2);
+    }
+
+    #[test]
+    fn test_c_components_restricted() {
+        // Full graph: A ↔ B ↔ C ↔ D
+        // Restrict to {A, B, D} — A ↔ B connected, D isolated
+        let g = CausalGraphWithLatents::new(
+            vec!["A".into(), "B".into(), "C".into(), "D".into()],
+            vec![],
+            vec![(0, 1), (1, 2), (2, 3)],
+        );
+        let subset: HashSet<usize> = [0, 1, 3].iter().copied().collect();
+        let components = g.c_components_restricted(&subset);
+        assert_eq!(components.len(), 2, "Should have 2 restricted C-components");
+    }
+
+    #[test]
+    fn test_subgraph() {
+        let g = CausalGraphWithLatents::new(
+            vec!["A".into(), "B".into(), "C".into(), "D".into()],
+            vec![(0, 1), (1, 2), (2, 3)],
+            vec![(0, 2)],
+        );
+        let subset: HashSet<usize> = [0, 1, 2].iter().copied().collect();
+        let sub = g.subgraph(&subset);
+        assert_eq!(sub.nodes.len(), 3);
+        // D should be removed, so edge (2,3) mapped to nothing
+        assert!(sub.directed.len() <= 2);
+    }
+
+    #[test]
+    fn test_to_dag() {
+        let g = CausalGraphWithLatents::new(
+            vec!["X".into(), "Y".into()],
+            vec![(0, 1)],
+            vec![(0, 1)],
+        );
+        let dag = g.to_dag();
+        assert_eq!(dag.nodes.len(), 2);
+        assert_eq!(dag.edges.len(), 1);
+        assert!(dag.edges.contains(&(0, 1)));
+    }
+
+    #[test]
+    fn test_is_subset() {
+        let small: HashSet<usize> = [1, 2].iter().copied().collect();
+        let big: HashSet<usize> = [0, 1, 2, 3].iter().copied().collect();
+        assert!(CausalGraphWithLatents::is_subset(&small, &big));
+        assert!(!CausalGraphWithLatents::is_subset(&big, &small));
+
+        let empty: HashSet<usize> = HashSet::new();
+        assert!(CausalGraphWithLatents::is_subset(&empty, &big));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // IDAlgorithm Identification Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_id_markovian_always_identifiable() {
+        // No bidirected edges → always identifiable
+        let g = CausalGraphWithLatents::new(
+            vec!["X".into(), "M".into(), "Y".into()],
+            vec![(0, 1), (1, 2)],
+            vec![],
+        );
+        let id = IDAlgorithm::new();
+        let result = id.identify(&g, &[0], &[2]);
+        assert!(result.is_ok(), "Markovian model should always be identifiable");
+    }
+
+    #[test]
+    fn test_id_empty_treatment_returns_probability() {
+        let g = CausalGraphWithLatents::new(
+            vec!["X".into(), "Y".into()],
+            vec![(0, 1)],
+            vec![(0, 1)],
+        );
+        let id = IDAlgorithm::new();
+        // Empty treatment: P(y) should be returned directly
+        let result = id.identify(&g, &[], &[1]);
+        assert!(result.is_ok());
+        if let Ok(CausalExpression::Probability { outcome, conditioning }) = result {
+            assert_eq!(outcome, vec![1]);
+            assert!(conditioning.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_id_bow_graph_not_identifiable() {
+        // X → Y with X ↔ Y (bow graph) — classic non-identifiable
+        let g = CausalGraphWithLatents::new(
+            vec!["X".into(), "Y".into()],
+            vec![(0, 1)],
+            vec![(0, 1)],
+        );
+        let id = IDAlgorithm::new();
+        let result = id.identify(&g, &[0], &[1]);
+        assert!(result.is_err(), "Bow graph should NOT be identifiable");
+        if let Err((hedge, msg)) = result {
+            assert!(!hedge.is_empty());
+            assert!(!msg.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_id_frontdoor_identifiable() {
+        // X → M → Y with X ↔ Y (frontdoor criterion applies)
+        let g = CausalGraphWithLatents::new(
+            vec!["X".into(), "M".into(), "Y".into()],
+            vec![(0, 1), (1, 2)],
+            vec![(0, 2)],
+        );
+        let id = IDAlgorithm::new();
+        let result = id.identify(&g, &[0], &[2]);
+        assert!(result.is_ok(), "Frontdoor structure should be identifiable");
+    }
+
+    #[test]
+    fn test_id_napkin_identifiable() {
+        // Napkin graph: W → X → Y with W ↔ Y
+        // P(y|do(x)) is identifiable via adjustment for W
+        let g = CausalGraphWithLatents::new(
+            vec!["W".into(), "X".into(), "Y".into()],
+            vec![(0, 1), (1, 2)],
+            vec![(0, 2)],
+        );
+        let id = IDAlgorithm::new();
+        let result = id.identify(&g, &[1], &[2]);
+        assert!(result.is_ok(), "Napkin graph should be identifiable");
+    }
+
+    #[test]
+    fn test_id_multiple_c_components_decomposition() {
+        // Graph where V\X has multiple C-components (triggers line 5)
+        // A → B → C, with A ↔ B but not C
+        // do(A), outcome C
+        let g = CausalGraphWithLatents::new(
+            vec!["A".into(), "B".into(), "C".into()],
+            vec![(0, 1), (1, 2)],
+            vec![], // No bidirected — each is own C-component
+        );
+        let id = IDAlgorithm::new();
+        let result = id.identify(&g, &[0], &[2]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_id_default_trait() {
+        let id = IDAlgorithm::default();
+        assert_eq!(id.max_depth, 100);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CausalExpression Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_expression_probability_unconditional() {
+        let nodes = vec!["X".into(), "Y".into()];
+        let expr = CausalExpression::Probability {
+            outcome: vec![1],
+            conditioning: vec![],
+        };
+        let s = expr.to_string(&nodes);
+        assert_eq!(s, "P(Y)");
+    }
+
+    #[test]
+    fn test_expression_probability_conditional() {
+        let nodes = vec!["X".into(), "Y".into(), "Z".into()];
+        let expr = CausalExpression::Probability {
+            outcome: vec![1],
+            conditioning: vec![0, 2],
+        };
+        let s = expr.to_string(&nodes);
+        assert_eq!(s, "P(Y|X,Z)");
+    }
+
+    #[test]
+    fn test_expression_sum() {
+        let nodes = vec!["X".into(), "Y".into(), "Z".into()];
+        let expr = CausalExpression::Sum {
+            sum_over: vec![2],
+            inner: Box::new(CausalExpression::Probability {
+                outcome: vec![1],
+                conditioning: vec![0, 2],
+            }),
+        };
+        let s = expr.to_string(&nodes);
+        assert!(s.contains("Σ_{Z}"));
+        assert!(s.contains("P(Y|X,Z)"));
+    }
+
+    #[test]
+    fn test_expression_product() {
+        let nodes = vec!["X".into(), "Y".into()];
+        let expr = CausalExpression::Product(vec![
+            CausalExpression::Probability {
+                outcome: vec![0],
+                conditioning: vec![],
+            },
+            CausalExpression::Probability {
+                outcome: vec![1],
+                conditioning: vec![0],
+            },
+        ]);
+        let s = expr.to_string(&nodes);
+        assert!(s.contains("P(X)"));
+        assert!(s.contains("P(Y|X)"));
+        assert!(s.contains(" × "));
+    }
+
+    #[test]
+    fn test_expression_fraction() {
+        let nodes = vec!["X".into(), "Y".into()];
+        let expr = CausalExpression::Fraction {
+            numerator: Box::new(CausalExpression::Probability {
+                outcome: vec![0, 1],
+                conditioning: vec![],
+            }),
+            denominator: Box::new(CausalExpression::Probability {
+                outcome: vec![0],
+                conditioning: vec![],
+            }),
+        };
+        let s = expr.to_string(&nodes);
+        assert!(s.contains("P(X,Y)"));
+        assert!(s.contains("P(X)"));
+        assert!(s.contains("/"));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // IDAlgorithm Query Interface Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_id_query_identified() {
+        let g = CausalGraphWithLatents::new(
+            vec!["X".into(), "Y".into()],
+            vec![(0, 1)],
+            vec![],
+        );
+        let id = IDAlgorithm::new();
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+        let result = id.query(&g, &query);
+        assert!(matches!(result, CausalQueryOutcome::Identified { .. }));
+        if let CausalQueryOutcome::Identified { method, confidence, .. } = result {
+            assert_eq!(method, IdentificationMethod::IDAlgorithm);
+            assert!((confidence - 0.95).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn test_id_query_unidentified_returns_hedge() {
+        let g = CausalGraphWithLatents::new(
+            vec!["X".into(), "Y".into()],
+            vec![(0, 1)],
+            vec![(0, 1)],
+        );
+        let id = IDAlgorithm::new();
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+        let result = id.query(&g, &query);
+        assert!(matches!(result, CausalQueryOutcome::Unidentified { .. }));
+        if let CausalQueryOutcome::Unidentified { reason, suggestions, .. } = result {
+            assert!(matches!(reason, UnidentifiedReason::HedgeFound { .. }));
+            assert!(!suggestions.is_empty());
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Reference Harness Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_harness_construction() {
+        let harness = CausalReferenceHarness::new();
+        assert!(harness.test_count() >= 6, "Harness should have at least 6 test cases");
+        assert!((harness.match_threshold - 0.99).abs() < 1e-10);
+        assert!((harness.current_match_rate - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_harness_default() {
+        let harness = CausalReferenceHarness::default();
+        assert!(harness.test_count() >= 6);
+    }
+
+    #[test]
+    fn test_harness_validate() {
+        let reasoner = CounterfactualReasoner::new();
+        let mut harness = CausalReferenceHarness::new();
+        let result = harness.validate(&reasoner);
+        // Our reasoner should identify most standard cases
+        assert!(
+            harness.current_match_rate >= 0.5,
+            "Expected >=50% match rate, got {}",
+            harness.current_match_rate
+        );
+        // Result should be Passed or AutoDowngrade
+        assert!(
+            result == HarnessResult::Passed || result == HarnessResult::AutoDowngrade
+        );
+    }
+
+    #[test]
+    fn test_harness_empty_suite() {
+        let mut harness = CausalReferenceHarness {
+            test_suite: vec![],
+            match_threshold: 0.99,
+            current_match_rate: 0.0,
+        };
+        let reasoner = CounterfactualReasoner::new();
+        let result = harness.validate(&reasoner);
+        assert_eq!(result, HarnessResult::Passed, "Empty suite should pass");
+    }
+
+    #[test]
+    fn test_harness_result_enum() {
+        assert_ne!(HarnessResult::Passed, HarnessResult::AutoDowngrade);
+        let p = HarnessResult::Passed;
+        assert_eq!(p, HarnessResult::Passed);
+    }
+}

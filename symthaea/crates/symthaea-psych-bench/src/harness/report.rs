@@ -4,6 +4,94 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
 
+/// Reaction-time summary (tick-based proxy for processing time).
+///
+/// Fits an ex-Gaussian distribution via method of moments (Heathcote 1996).
+/// The ex-Gaussian is the convolution of a Gaussian (mu, sigma) and an
+/// exponential (tau), commonly used to model RT distributions.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RtSummary {
+    /// Mean RT in ticks.
+    pub mean_ticks: f64,
+    /// Standard deviation of RT in ticks.
+    pub sd_ticks: f64,
+    /// Ex-Gaussian tail parameter (exponential component).
+    /// Captures the slow tail of the RT distribution.
+    pub tau: f64,
+    /// Ex-Gaussian Gaussian mean (mu = mean - tau).
+    pub mu: f64,
+    /// Ex-Gaussian Gaussian SD (sigma = sqrt(variance - tau^2)).
+    pub sigma: f64,
+}
+
+impl RtSummary {
+    /// Fit ex-Gaussian parameters from a slice of RT samples (in ticks).
+    ///
+    /// Uses method of moments (Heathcote, 1996):
+    /// - tau = skewness^(1/3) * sd / cbrt(2)
+    /// - mu = mean - tau
+    /// - sigma = sqrt(variance - tau^2)
+    pub fn from_rt_samples(ticks: &[f64]) -> Self {
+        let n = ticks.len();
+        if n < 3 {
+            let mean = if n > 0 {
+                ticks.iter().sum::<f64>() / n as f64
+            } else {
+                0.0
+            };
+            return Self {
+                mean_ticks: mean,
+                sd_ticks: 0.0,
+                tau: 0.0,
+                mu: mean,
+                sigma: 0.0,
+            };
+        }
+
+        let nf = n as f64;
+        let mean = ticks.iter().sum::<f64>() / nf;
+        let variance = ticks.iter().map(|t| (t - mean).powi(2)).sum::<f64>() / (nf - 1.0);
+        let sd = variance.sqrt();
+
+        // Compute skewness (Fisher's)
+        let m3 = ticks.iter().map(|t| (t - mean).powi(3)).sum::<f64>() / nf;
+        let skewness = if sd.abs() > 1e-15 {
+            m3 / sd.powi(3)
+        } else {
+            0.0
+        };
+
+        // Method of moments: tau from skewness
+        let tau = if skewness > 0.0 {
+            skewness.cbrt() * sd / 2.0f64.cbrt()
+        } else {
+            0.0 // No positive skew → no exponential tail
+        };
+
+        let mu = mean - tau;
+        let sigma_sq = (variance - tau * tau).max(0.0);
+        let sigma = sigma_sq.sqrt();
+
+        Self {
+            mean_ticks: mean,
+            sd_ticks: sd,
+            tau,
+            mu,
+            sigma,
+        }
+    }
+}
+
+impl fmt::Display for RtSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "RT: {:.2} +/- {:.2} ticks (mu={:.2}, sigma={:.2}, tau={:.2})",
+            self.mean_ticks, self.sd_ticks, self.mu, self.sigma, self.tau
+        )
+    }
+}
+
 /// A single metric value with optional confidence interval.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MetricValue {
@@ -263,7 +351,7 @@ impl BenchmarkReport {
     }
 
     /// Find applicable baseline comparisons for a benchmark result.
-    fn find_comparisons(
+    pub fn find_comparisons(
         &self,
         result: &BenchmarkResult,
         bl: &super::baselines::BaselineCollection,
@@ -359,6 +447,46 @@ impl BenchmarkReport {
             ("fluency", "aut_fluency", &bl.creativity),
             ("present_count", "present_count", &bl.butlin),
             ("presence_ratio", "presence_ratio", &bl.butlin),
+            // Go/No-Go (Inhibition)
+            ("go_accuracy", "go_accuracy", &bl.inhibition),
+            ("nogo_accuracy", "nogo_accuracy", &bl.inhibition),
+            (
+                "inhibition_cost",
+                "inhibition_cost",
+                &bl.inhibition,
+            ),
+            ("go_rt_ticks", "go_rt_ticks", &bl.inhibition),
+            // Attentional Blink (Attention)
+            ("t1_accuracy", "t1_accuracy", &bl.attention),
+            (
+                "lag3_t2_accuracy",
+                "lag3_t2_accuracy",
+                &bl.attention,
+            ),
+            (
+                "lag8_t2_accuracy",
+                "lag8_t2_accuracy",
+                &bl.attention,
+            ),
+            (
+                "blink_magnitude",
+                "blink_magnitude",
+                &bl.attention,
+            ),
+            // Prospective Memory (MemoryAgent)
+            ("pm_hit_rate", "pm_hit_rate", &bl.memory_agent),
+            (
+                "pm_ongoing_accuracy",
+                "pm_ongoing_accuracy",
+                &bl.memory_agent,
+            ),
+            ("pm_cost", "pm_cost", &bl.memory_agent),
+            // Emotional Stroop (Affect)
+            (
+                "emotional_interference",
+                "emotional_interference",
+                &bl.affect,
+            ),
         ];
 
         for (metric_key, baseline_key, baselines) in &mappings {
@@ -464,6 +592,14 @@ impl BenchmarkReport {
                 &bl.cogbench,
             );
         }
+        if benchmark.contains("EmotionalStroop") {
+            push_specific("neutral_accuracy", "emotional_neutral_accuracy", &bl.affect);
+            push_specific(
+                "negative_accuracy",
+                "emotional_negative_accuracy",
+                &bl.affect,
+            );
+        }
 
         // Only return comparisons relevant to this benchmark
         if benchmark.contains("WorM")
@@ -475,6 +611,8 @@ impl BenchmarkReport {
             || benchmark.contains("Affect")
             || benchmark.contains("Creativity")
             || benchmark.contains("Butlin")
+            || benchmark.contains("Inhibition")
+            || benchmark.contains("Attention")
         {
             comps
         } else {
@@ -559,18 +697,18 @@ impl BenchmarkReport {
     /// Publication-ready Markdown summary table.
     ///
     /// One row per benchmark, showing key metric, agent value, human baseline,
-    /// % of human, effect size d, z-score, and 95% CI.
+    /// % of human, effect size d, z-score, 95% CI, and RT (if available).
     pub fn paper_summary(&self) -> String {
         use crate::harness::baselines::BaselineCollection;
         let bl = BaselineCollection::all();
 
         let mut lines = Vec::new();
         lines.push(
-            "| Domain | Benchmark | Key Metric | Agent | Human | % Human | d | z | 95% CI |"
+            "| Domain | Benchmark | Key Metric | Agent | Human | % Human | d | z | 95% CI | RT (ticks) |"
                 .to_string(),
         );
         lines.push(
-            "|--------|-----------|------------|-------|-------|---------|---|---|--------|"
+            "|--------|-----------|------------|-------|-------|---------|---|---|--------|------------|"
                 .to_string(),
         );
 
@@ -606,8 +744,11 @@ impl BenchmarkReport {
 
             let ci_str = format!("[{:.3}, {:.3}]", metric.ci_lower, metric.ci_upper);
 
+            // RT column: look for rt_ticks metrics in this result
+            let rt_str = rt_summary_for_result(result);
+
             lines.push(format!(
-                "| {} | {} | {} | {:.3} | {} | {} | {} | {} | {} |",
+                "| {} | {} | {} | {:.3} | {} | {} | {} | {} | {} | {} |",
                 domain,
                 result
                     .benchmark
@@ -621,6 +762,7 @@ impl BenchmarkReport {
                 d_str,
                 z_str,
                 ci_str,
+                rt_str,
             ));
         }
 
@@ -740,8 +882,32 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("MoodCongruent") => "congruence_ratio",
         b if b.contains("RemoteAssociates") => "overall_accuracy",
         b if b.contains("AlternateUses") => "fluency",
+        b if b.contains("GoNoGo") => "nogo_accuracy",
+        b if b.contains("AttentionalBlink") => "blink_magnitude",
+        b if b.contains("ProspectiveMemory") => "pm_hit_rate",
+        b if b.contains("EmotionalStroop") => "emotional_interference",
         _ => "overall_accuracy",
     }
+}
+
+/// Extract a compact RT summary string from a benchmark result.
+///
+/// Looks for metrics ending in `::rt_ticks` or named `go_rt_ticks`.
+/// Returns mean RT across conditions, or "\u{2014}" if no RT data.
+fn rt_summary_for_result(result: &BenchmarkResult) -> String {
+    let rt_metrics: Vec<&MetricValue> = result
+        .metrics
+        .iter()
+        .filter(|(k, _)| k.ends_with("::rt_ticks") || *k == "go_rt_ticks")
+        .map(|(_, v)| v)
+        .collect();
+
+    if rt_metrics.is_empty() {
+        return "\u{2014}".to_string();
+    }
+
+    let mean_rt: f64 = rt_metrics.iter().map(|m| m.mean).sum::<f64>() / rt_metrics.len() as f64;
+    format!("{:.1}", mean_rt)
 }
 
 /// Returns true if a lower metric value is better (inverted scoring).
@@ -932,6 +1098,184 @@ pub struct CompositeScore {
     pub benchmarks: Vec<String>,
 }
 
+/// A single row in a forest plot export.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForestPlotRow {
+    /// Domain (e.g., "WorM", "Executive").
+    pub domain: String,
+    /// Benchmark short name.
+    pub benchmark: String,
+    /// Key metric name.
+    pub metric: String,
+    /// Agent mean value.
+    pub agent_mean: f64,
+    /// Human baseline mean.
+    pub human_mean: f64,
+    /// Human baseline SD (if available).
+    pub human_sd: Option<f64>,
+    /// Cohen's d effect size.
+    pub cohens_d: Option<f64>,
+    /// 95% CI lower bound for agent metric.
+    pub ci_lower: f64,
+    /// 95% CI upper bound for agent metric.
+    pub ci_upper: f64,
+    /// Ratio: agent / human.
+    pub ratio: f64,
+    /// Norm-referenced z-score.
+    pub z_score: Option<f64>,
+}
+
+/// Learning curve data for a single benchmark across blocks.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LearningCurveRow {
+    /// Benchmark name.
+    pub benchmark: String,
+    /// Block index (0-based).
+    pub block: usize,
+    /// Key metric mean for this block.
+    pub metric_mean: f64,
+    /// Key metric SD for this block.
+    pub metric_sd: f64,
+    /// Slope (linear regression coefficient across blocks).
+    pub slope: f64,
+}
+
+impl BenchmarkReport {
+    /// Export forest plot data for all benchmarks with baselines.
+    ///
+    /// Returns one row per benchmark with effect size, CI, and z-score.
+    /// Suitable for rendering as a forest plot or exporting to CSV/JSON.
+    pub fn forest_plot_data(&self) -> Vec<ForestPlotRow> {
+        use crate::harness::baselines::BaselineCollection;
+        let bl = BaselineCollection::all();
+        let mut rows = Vec::new();
+
+        for result in &self.results {
+            let domain = domain_of(&result.benchmark).to_string();
+            let key = key_metric_for_benchmark(&result.benchmark);
+            let metric = match result.metrics.get(key) {
+                Some(m) => m,
+                None => continue,
+            };
+
+            let comparisons = self.find_comparisons(result, &bl);
+            let comp = comparisons.iter().find(|(k, _)| k == key);
+
+            if let Some((_, c)) = comp {
+                rows.push(ForestPlotRow {
+                    domain,
+                    benchmark: result
+                        .benchmark
+                        .split("::")
+                        .last()
+                        .unwrap_or(&result.benchmark)
+                        .to_string(),
+                    metric: key.to_string(),
+                    agent_mean: metric.mean,
+                    human_mean: c.human_value,
+                    human_sd: {
+                        // Look up the baseline SD directly
+                        let baseline_maps = [
+                            &bl.worm, &bl.cogbench, &bl.executive, &bl.tombench,
+                            &bl.memory_agent, &bl.metacognition, &bl.affect, &bl.creativity,
+                            &bl.butlin, &bl.inhibition, &bl.attention,
+                        ];
+                        baseline_maps
+                            .iter()
+                            .find_map(|bm| bm.values().find(|b| (b.value - c.human_value).abs() < 1e-10).and_then(|b| b.sd))
+                    },
+                    cohens_d: c.effect_size,
+                    ci_lower: metric.ci_lower,
+                    ci_upper: metric.ci_upper,
+                    ratio: c.ratio,
+                    z_score: c.z_score,
+                });
+            }
+        }
+
+        rows
+    }
+
+    /// Format forest plot data as CSV.
+    pub fn forest_plot_csv(&self) -> String {
+        let rows = self.forest_plot_data();
+        let mut lines = vec![
+            "domain,benchmark,metric,agent_mean,human_mean,human_sd,cohens_d,ci_lower,ci_upper,ratio,z_score".to_string(),
+        ];
+        for r in &rows {
+            lines.push(format!(
+                "{},{},{},{:.4},{:.4},{},{},{:.4},{:.4},{:.3},{}",
+                r.domain,
+                r.benchmark,
+                r.metric,
+                r.agent_mean,
+                r.human_mean,
+                r.human_sd
+                    .map(|s| format!("{:.4}", s))
+                    .unwrap_or_default(),
+                r.cohens_d
+                    .map(|d| format!("{:.4}", d))
+                    .unwrap_or_default(),
+                r.ci_lower,
+                r.ci_upper,
+                r.ratio,
+                r.z_score
+                    .map(|z| format!("{:+.4}", z))
+                    .unwrap_or_default(),
+            ));
+        }
+        lines.join("\n")
+    }
+
+    /// Format forest plot as an ASCII visualization.
+    pub fn forest_plot_ascii(&self) -> String {
+        let rows = self.forest_plot_data();
+        if rows.is_empty() {
+            return "No baseline comparisons available.".to_string();
+        }
+
+        let mut lines = Vec::new();
+        lines.push(format!(
+            "{:<25} {:>6} {:>6} {:>7}  {}",
+            "Benchmark", "Agent", "Human", "d", "Effect [---------|---------|]"
+        ));
+        lines.push(format!(
+            "{:<25} {:>6} {:>6} {:>7}  {}",
+            "-------------------------", "------", "------", "-------", "  -2   -1    0   +1   +2"
+        ));
+
+        for r in &rows {
+            let d = r.cohens_d.unwrap_or(0.0);
+            let d_str = format!("{:+.2}", d);
+
+            // ASCII bar: map d ∈ [-2, +2] to positions 0..24
+            let bar_width = 24;
+            let center = bar_width / 2;
+            let pos = ((d + 2.0) / 4.0 * bar_width as f64)
+                .round()
+                .clamp(0.0, bar_width as f64) as usize;
+
+            let mut bar: Vec<char> = vec![' '; bar_width + 1];
+            bar[center] = '|'; // zero line
+            if pos <= bar_width {
+                bar[pos] = '*';
+            }
+            let bar_str: String = bar.into_iter().collect();
+
+            lines.push(format!(
+                "{:<25} {:>6.3} {:>6.3} {:>7}  {}",
+                &r.benchmark[..r.benchmark.len().min(25)],
+                r.agent_mean,
+                r.human_mean,
+                d_str,
+                bar_str,
+            ));
+        }
+
+        lines.join("\n")
+    }
+}
+
 impl Default for BenchmarkReport {
     fn default() -> Self {
         Self::new()
@@ -1117,5 +1461,105 @@ mod tests {
         let csv = report.to_csv().unwrap();
         assert!(csv.contains("test_bench"));
         assert!(csv.contains("acc"));
+    }
+
+    #[test]
+    fn test_paper_summary_contains_all_benchmarks() {
+        let mut report = BenchmarkReport::new();
+        let mut r1 = BenchmarkResult::new("WorM::N-back", None);
+        r1.insert(
+            "nback_2::accuracy",
+            MetricValue::from_samples(&[0.85, 0.90]),
+        );
+        report.add(r1);
+        let mut r2 = BenchmarkResult::new("Executive::Stroop", None);
+        r2.insert("stroop_effect", MetricValue::from_samples(&[0.10, 0.12]));
+        report.add(r2);
+
+        let md = report.paper_summary();
+        assert!(md.contains("N-back"), "paper_summary: {}", md);
+        assert!(md.contains("Stroop"), "paper_summary: {}", md);
+        assert!(md.contains("% Human"), "should have header");
+    }
+
+    #[test]
+    fn test_rt_summary_from_samples() {
+        let samples = vec![5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 15.0, 20.0, 25.0];
+        let rt = RtSummary::from_rt_samples(&samples);
+        assert!(rt.mean_ticks.is_finite());
+        assert!(rt.sd_ticks > 0.0);
+        assert!(rt.mu.is_finite());
+        assert!(rt.sigma >= 0.0);
+        assert!(rt.tau >= 0.0, "positively skewed data should have tau >= 0");
+    }
+
+    #[test]
+    fn test_rt_summary_empty() {
+        let rt = RtSummary::from_rt_samples(&[]);
+        assert_eq!(rt.mean_ticks, 0.0);
+        assert_eq!(rt.tau, 0.0);
+    }
+
+    #[test]
+    fn test_rt_summary_symmetric() {
+        // Symmetric data → tau should be ~0
+        let samples = vec![8.0, 9.0, 10.0, 11.0, 12.0];
+        let rt = RtSummary::from_rt_samples(&samples);
+        assert!((rt.mean_ticks - 10.0).abs() < 0.01);
+        // Symmetric → no positive skew → tau = 0
+        assert!(rt.tau.abs() < 1.0, "symmetric data tau should be near 0");
+    }
+
+    #[test]
+    fn test_forest_plot_data_populated() {
+        let mut report = BenchmarkReport::new();
+        let mut r = BenchmarkResult::new("WorM::N-back", None);
+        r.insert(
+            "nback_2::accuracy",
+            MetricValue::from_samples(&[0.85, 0.90, 0.88]),
+        );
+        report.add(r);
+        let rows = report.forest_plot_data();
+        assert!(!rows.is_empty(), "forest plot should have data");
+        assert_eq!(rows[0].domain, "WorM");
+        assert!(rows[0].cohens_d.is_some());
+        assert!(rows[0].ratio > 0.0);
+    }
+
+    #[test]
+    fn test_forest_plot_csv_header() {
+        let mut report = BenchmarkReport::new();
+        let mut r = BenchmarkResult::new("Executive::Stroop", None);
+        r.insert("stroop_effect", MetricValue::from_samples(&[0.10, 0.12]));
+        report.add(r);
+        let csv = report.forest_plot_csv();
+        assert!(csv.starts_with("domain,benchmark,metric"));
+        assert!(csv.contains("Stroop"));
+    }
+
+    #[test]
+    fn test_forest_plot_ascii_format() {
+        let mut report = BenchmarkReport::new();
+        let mut r = BenchmarkResult::new("WorM::DigitSpan", None);
+        r.insert("forward_span", MetricValue::from_samples(&[7.0, 6.5]));
+        report.add(r);
+        let ascii = report.forest_plot_ascii();
+        assert!(ascii.contains("Effect"), "ascii: {}", ascii);
+        assert!(ascii.contains("DigitSpan"), "ascii: {}", ascii);
+    }
+
+    #[test]
+    fn test_paper_summary_latex_valid() {
+        let mut report = BenchmarkReport::new();
+        let mut r = BenchmarkResult::new("WorM::DigitSpan", None);
+        r.insert("forward_span", MetricValue::from_samples(&[7.0, 6.5]));
+        report.add(r);
+
+        let tex = report.paper_summary_latex();
+        assert!(tex.contains(r"\begin{tabular}"), "tex: {}", tex);
+        assert!(tex.contains(r"\toprule"), "tex: {}", tex);
+        assert!(tex.contains(r"\bottomrule"), "tex: {}", tex);
+        assert!(tex.contains(r"\end{tabular}"), "tex: {}", tex);
+        assert!(tex.contains("DigitSpan"), "tex: {}", tex);
     }
 }

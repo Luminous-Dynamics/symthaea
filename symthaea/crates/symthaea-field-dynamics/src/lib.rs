@@ -1,5 +1,8 @@
 #![allow(clippy::manual_clamp)]
 
+pub mod error;
+pub use error::{DynamicsError, DynamicsResult};
+
 // **REVOLUTIONARY IMPROVEMENT #82**: Consciousness Field Dynamics
 // PARADIGM SHIFT: Consciousness is a DYNAMIC FIELD with wave equations!
 //

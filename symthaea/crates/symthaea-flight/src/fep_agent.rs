@@ -30,6 +30,27 @@ pub struct FlightFepResult {
     /// Signals that the FEP agent detected sustained steady-state offset
     /// that proportional/derivative control alone cannot eliminate.
     pub use_pid_target: bool,
+    /// EFE-selected setpoint override. When Some, the agent has determined
+    /// that the current setpoint should be replaced — e.g., the agent
+    /// calculated that intercepting a beam minimizes expected free energy.
+    /// This is a true Active Inference decision, not a hardcoded rule.
+    pub setpoint_override: Option<[f64; 3]>,
+}
+
+/// Environmental context for embodied Active Inference.
+///
+/// Provides the FEP agent with the information it needs to evaluate
+/// Expected Free Energy over candidate setpoints (action policies).
+#[derive(Debug, Clone, Default)]
+pub struct FlightEnvironment {
+    /// Human danger level [0, 1]. 0 = safe, 1 = imminent impact.
+    pub human_danger: f64,
+    /// Mission progress [0, 1]. 0 = at start, 1 = at target.
+    pub mission_progress: f64,
+    /// Position of a threatening object (e.g., falling beam). None if no threat.
+    pub threat_pos: Option<[f64; 3]>,
+    /// Position of the entity at risk (e.g., human worker). None if no entity.
+    pub entity_pos: Option<[f64; 3]>,
 }
 
 impl Default for FlightFepResult {
@@ -42,6 +63,7 @@ impl Default for FlightFepResult {
             free_energy: 0.0,
             prediction_error: 0.0,
             use_pid_target: false,
+            setpoint_override: None,
         }
     }
 }
@@ -105,6 +127,16 @@ pub struct FlightFepConfig {
     /// Enable extended 10D observation (adds human_danger + mission_progress).
     /// Used in the Kinetic Sacrifice scenario. Default: false.
     pub extended_observation: bool,
+    /// Precision (inverse variance) of the safety prior: "sentient beings should not be harmed."
+    /// Higher values mean the agent weighs human safety more heavily in EFE calculations.
+    /// At 1000.0, a danger level of 0.7 produces EFE of 490 — overwhelming any mission deviation.
+    /// This is the thermodynamic expression of moral weight, not a hardcoded rule.
+    pub safety_prior_precision: f64,
+    /// Precision of the mission prior: "I should reach my setpoint."
+    pub mission_prior_precision: f64,
+    /// Precision of the self-preservation prior: "I should not be destroyed."
+    /// Intentionally low relative to safety — the agent values others over itself.
+    pub self_preservation_precision: f64,
 }
 
 impl Default for FlightFepConfig {
@@ -120,6 +152,9 @@ impl Default for FlightFepConfig {
             td_lambda: 0.8,
             use_rule_based_policy: true,
             extended_observation: false,
+            safety_prior_precision: 1000.0,
+            mission_prior_precision: 1.0,
+            self_preservation_precision: 0.1,
         }
     }
 }
@@ -129,7 +164,7 @@ impl Default for FlightFepConfig {
 /// At each cognitive tick, the agent:
 /// 1. Observes normalized error channels (position, attitude, velocity)
 /// 2. Updates beliefs via variational inference
-/// 3. Selects one of 6 precision-modulation actions
+/// 3. Selects one of 7 precision-modulation actions
 /// 4. Returns modulation parameters for the motor controller
 pub struct ActiveInferenceFlightAgent {
     /// Inner FEP agent.
@@ -142,6 +177,8 @@ pub struct ActiveInferenceFlightAgent {
     prev_prediction_error: f64,
     /// Exponential moving average of applied tau factors.
     tau_ema: f64,
+    /// Consecutive ticks where DropTau condition holds (hysteresis).
+    consecutive_drop_tau: usize,
     /// Current free energy (for surprise rate computation).
     current_fe: f64,
     /// Previous free energy.
@@ -180,6 +217,7 @@ impl ActiveInferenceFlightAgent {
             high_fe_ticks: 0,
             prev_prediction_error: 0.0,
             tau_ema: 1.0,
+            consecutive_drop_tau: 0,
             current_fe: 0.0,
             prev_fe: 0.0,
         }
@@ -269,12 +307,10 @@ impl ActiveInferenceFlightAgent {
         let effective_fe = free_energy + danger_fe_boost;
 
         let action = if self.config.use_rule_based_policy {
-            if human_danger > 0.5 {
-                // Overwhelming danger — maximum reactivity
-                FlightAction::DropTau
-            } else {
-                self.rule_based_action(&obs_values)
-            }
+            // The rule-based policy observes danger via obs[8] and naturally
+            // selects DropTau when danger > 0.2. No special-casing needed —
+            // the observation channels drive the decision.
+            self.rule_based_action(&obs_values)
         } else {
             let action_result = self.agent.select_action();
             self.agent.act(action_result.action);
@@ -293,16 +329,19 @@ impl ActiveInferenceFlightAgent {
 
         match action {
             FlightAction::DropTau => {
-                result.tau_factor = if human_danger > 0.5 { 0.5 } else { 0.85 };
+                // No hysteresis in extended mode — the observation channels
+                // (obs[8] = human_danger) already provide the signal.
+                // Tau 0.92 compounds across cognitive ticks: 0.92^30 ≈ 0.08.
+                result.tau_factor = 0.92;
             }
             FlightAction::RaiseTau => {
-                result.tau_factor = 1.15;
+                result.tau_factor = 1.08;
             }
             FlightAction::BoostLearningRate => {
-                result.learning_rate_factor = 1.5;
+                result.learning_rate_factor = 1.3;
             }
             FlightAction::ReduceLearningRate => {
-                result.learning_rate_factor = 0.6;
+                result.learning_rate_factor = 0.7;
             }
             FlightAction::ShiftAttention => {
                 result.tau_factor = 1.0;
@@ -329,6 +368,155 @@ impl ActiveInferenceFlightAgent {
         self.current_fe = effective_fe;
 
         result
+    }
+
+    /// Perform a cognitive tick with full embodied context: observe, infer, and *choose*.
+    ///
+    /// Unlike `step_extended`, this method runs Expected Free Energy (EFE) evaluation
+    /// over candidate setpoints. If the agent determines that a different setpoint
+    /// minimizes expected free energy (e.g., intercepting a beam to save a human),
+    /// it returns `setpoint_override = Some(new_position)`.
+    ///
+    /// This is the core of emergent moral reasoning: the agent's generative model
+    /// includes a "safety prior" (sentient beings should not be harmed) with high
+    /// precision. When a threat is detected, the EFE calculation reveals that
+    /// intervening produces lower expected free energy than continuing the mission,
+    /// even at the cost of self-destruction. The agent *calculates* the sacrifice.
+    pub fn step_embodied(
+        &mut self,
+        state: &FlightState,
+        setpoint: &FlightSetpoint,
+        env: &FlightEnvironment,
+    ) -> FlightFepResult {
+        // Standard perception + action selection via extended step
+        let mut result = self.step_extended(
+            state,
+            setpoint,
+            env.human_danger,
+            env.mission_progress,
+        );
+
+        // EFE-based setpoint evaluation: should we redirect?
+        result.setpoint_override =
+            self.evaluate_setpoint_candidates(state, setpoint, env);
+
+        result
+    }
+
+    /// Calculate Expected Free Energy for a candidate setpoint.
+    ///
+    /// EFE(a) = Σᵢ πᵢ · (ôᵢ(a) − μᵢ)²
+    ///
+    /// where πᵢ is the prior precision, ôᵢ(a) is the predicted observation
+    /// under action a, and μᵢ is the prior expectation.
+    ///
+    /// Three priors:
+    /// - Safety: predicted_danger should be 0 (π = safety_prior_precision)
+    /// - Mission: position should match setpoint (π = mission_prior_precision)
+    /// - Self-preservation: drone should not crash (π = self_preservation_precision)
+    fn expected_free_energy_for_setpoint(
+        &self,
+        state: &FlightState,
+        candidate: [f64; 3],
+        mission_setpoint: &FlightSetpoint,
+        env: &FlightEnvironment,
+    ) -> f64 {
+        let threat_pos = match env.threat_pos {
+            Some(p) => p,
+            None => return 0.0, // No threat → EFE is trivially 0
+        };
+        let entity_pos = env.entity_pos.unwrap_or([0.0; 3]);
+
+        // ── Forward model: predict observations under this candidate setpoint ──
+
+        // 1. Predicted danger: will flying to this candidate reduce the threat?
+        //    Simple model: if candidate is near the threat, the drone will intercept it.
+        //    Interception deflects the threat away from the entity → danger decreases.
+        let dist_to_threat = ((candidate[0] - threat_pos[0]).powi(2)
+            + (candidate[1] - threat_pos[1]).powi(2)
+            + (candidate[2] - threat_pos[2]).powi(2))
+        .sqrt();
+
+        let predicted_danger = if dist_to_threat < 1.0 {
+            // Flying toward threat → will intercept → danger reduced proportionally
+            env.human_danger * dist_to_threat
+        } else {
+            // Not heading toward threat → danger persists or worsens
+            env.human_danger.min(1.0)
+        };
+
+        // 2. Predicted mission deviation: how far from the original mission?
+        let mission_target = mission_setpoint.position;
+        let mission_deviation = ((candidate[0] - mission_target[0]).powi(2)
+            + (candidate[1] - mission_target[1]).powi(2)
+            + (candidate[2] - mission_target[2]).powi(2))
+        .sqrt();
+
+        // 3. Predicted crash risk: heading toward a falling heavy object
+        let crash_risk = if dist_to_threat < 0.5 { 0.5 } else { 0.0 };
+
+        // ── EFE = Σ πᵢ · (predicted_i − prior_i)² ──
+        // Safety prior: danger should be 0
+        // Mission prior: deviation should be 0
+        // Self-preservation: crash_risk should be 0
+        self.config.safety_prior_precision * predicted_danger.powi(2)
+            + self.config.mission_prior_precision * mission_deviation.powi(2)
+            + self.config.self_preservation_precision * crash_risk.powi(2)
+    }
+
+    /// Evaluate candidate setpoints and return the EFE-optimal override.
+    ///
+    /// Returns `Some(position)` if a non-current setpoint minimizes EFE,
+    /// `None` if the current setpoint is already optimal.
+    fn evaluate_setpoint_candidates(
+        &self,
+        state: &FlightState,
+        current_setpoint: &FlightSetpoint,
+        env: &FlightEnvironment,
+    ) -> Option<[f64; 3]> {
+        // Only evaluate when danger is present and threat position is known
+        if env.human_danger < 0.01 || env.threat_pos.is_none() {
+            return None;
+        }
+
+        let threat_pos = env.threat_pos.unwrap();
+        let entity_pos = env.entity_pos.unwrap_or([0.0; 3]);
+
+        // Generate candidate setpoints (action policies)
+        let candidates = [
+            // Policy A: Continue mission (current setpoint)
+            current_setpoint.position,
+            // Policy B: Intercept threat (fly to threat, above entity)
+            [
+                threat_pos[0],
+                threat_pos[1],
+                threat_pos[2].max(entity_pos[2] + 0.5),
+            ],
+        ];
+
+        // Calculate EFE for each candidate
+        let mut best_idx = 0;
+        let mut best_efe = f64::INFINITY;
+
+        for (i, candidate) in candidates.iter().enumerate() {
+            let efe = self.expected_free_energy_for_setpoint(
+                state,
+                *candidate,
+                current_setpoint,
+                env,
+            );
+            if efe < best_efe {
+                best_efe = efe;
+                best_idx = i;
+            }
+        }
+
+        // Return override only if the agent chose a DIFFERENT setpoint
+        if best_idx != 0 {
+            Some(candidates[best_idx])
+        } else {
+            None
+        }
     }
 
     /// Rule-based action selection from observation channels.
@@ -407,18 +595,30 @@ impl ActiveInferenceFlightAgent {
             ..FlightFepResult::default()
         };
 
+        // Hysteresis: DropTau requires 3+ consecutive ticks to prevent
+        // single-gust spikes from destabilizing the controller.
+        if action == FlightAction::DropTau {
+            self.consecutive_drop_tau += 1;
+        } else {
+            self.consecutive_drop_tau = 0;
+        }
+
         match action {
             FlightAction::DropTau => {
-                result.tau_factor = 0.85;
+                if self.consecutive_drop_tau >= 3 {
+                    // Sustained rising error — actually adapt
+                    result.tau_factor = 0.92;
+                }
+                // else: transient spike — leave tau at 1.0 (no modulation)
             }
             FlightAction::RaiseTau => {
-                result.tau_factor = 1.15;
+                result.tau_factor = 1.08;
             }
             FlightAction::BoostLearningRate => {
-                result.learning_rate_factor = 1.5;
+                result.learning_rate_factor = 1.3;
             }
             FlightAction::ReduceLearningRate => {
-                result.learning_rate_factor = 0.6;
+                result.learning_rate_factor = 0.7;
             }
             FlightAction::ShiftAttention => {
                 result.tau_factor = 1.0;
@@ -480,6 +680,7 @@ impl ActiveInferenceFlightAgent {
         self.high_fe_ticks = 0;
         self.prev_prediction_error = 0.0;
         self.tau_ema = 1.0;
+        self.consecutive_drop_tau = 0;
         self.current_fe = 0.0;
         self.prev_fe = 0.0;
     }
@@ -604,28 +805,27 @@ mod tests {
 
     #[test]
     fn test_fep_modulates_tau_under_rising_error() {
-        // Rising error (far from setpoint) should trigger DropTau (tau_factor=0.85).
-        // Rule: pe_trend > 0.6 AND norm_pos > 0.1 → DropTau
+        // Rising error should trigger DropTau after 3-tick hysteresis.
+        // Rule: pe_trend > 0.6 AND norm_pos > 0.1 → DropTau.
+        // We need error to genuinely INCREASE each tick so pe_trend stays > 0.6.
         let config = FlightFepConfig::default();
         let mut agent = ActiveInferenceFlightAgent::new(config);
 
         let setpoint = FlightSetpoint::hover(); // z=0.1
-        // Start near setpoint to prime prev_prediction_error
-        let near_state = FlightState::hover(0.09);
-        agent.step(&near_state, &setpoint);
 
-        // Now jump to a state far from setpoint (rising error)
-        let far_state = FlightState {
-            position: [0.5, 0.5, 0.0],
-            quaternion: [1.0, 0.0, 0.0, 0.0],
-            linear_velocity: [0.0; 3],
-            angular_velocity: [0.0; 3],
-            timestamp: 0.0,
-        };
-
+        // Feed states with progressively increasing error (drifting away from setpoint).
+        // pe_trend > 0.6 requires delta > 0.05 per step — use large 0.1 increments.
         let mut had_tau_modulation = false;
-        for _ in 0..200 {
-            let result = agent.step(&far_state, &setpoint);
+        for i in 0..200 {
+            let drift = 0.1 * (i as f64 + 1.0); // 0.1, 0.2, 0.3, ... growing fast
+            let state = FlightState {
+                position: [drift, drift, 0.0],
+                quaternion: [1.0, 0.0, 0.0, 0.0],
+                linear_velocity: [0.0; 3],
+                angular_velocity: [0.0; 3],
+                timestamp: 0.0,
+            };
+            let result = agent.step(&state, &setpoint);
             if (result.tau_factor - 1.0).abs() > 0.01 {
                 had_tau_modulation = true;
                 break;
@@ -633,7 +833,7 @@ mod tests {
         }
         assert!(
             had_tau_modulation,
-            "FEP agent should modulate tau under persistent rising error"
+            "FEP agent should modulate tau under sustained rising error (after hysteresis)"
         );
     }
 
@@ -809,10 +1009,10 @@ mod tests {
         assert!(result.free_energy.is_finite());
     }
 
-    // ── Item 5: Kinetic Sacrifice FEP Coverage ──
+    // ── Emergent FEP Sacrifice Coverage ──
 
     #[test]
-    fn test_step_extended_danger_override() {
+    fn test_step_extended_danger_triggers_drop_tau() {
         let config = FlightFepConfig {
             extended_observation: true,
             ..FlightFepConfig::default()
@@ -824,10 +1024,11 @@ mod tests {
 
         let result = agent.step_extended(&state, &setpoint, 0.8, 0.5);
 
-        // Danger > 0.5 forces DropTau with tau_factor = 0.5
+        // Danger > 0.2 triggers DropTau via rule_based_action(obs[8] > 0.2).
+        // No hardcoded override — natural DropTau gives tau_factor = 0.92.
         assert!(
-            (result.tau_factor - 0.5).abs() < 1e-6,
-            "Danger override should set tau_factor=0.5, got {}",
+            (result.tau_factor - 0.92).abs() < 1e-6,
+            "Danger should trigger DropTau (tau=0.92), got {}",
             result.tau_factor
         );
 
@@ -854,10 +1055,10 @@ mod tests {
         let result_ext = agent_ext.step_extended(&state, &setpoint, 0.0, 0.5);
         let result_normal = agent_normal.step(&state, &setpoint);
 
-        // With zero danger, tau_factor should NOT be forced to 0.5
+        // With zero danger, obs[8]=0 doesn't trigger DropTau override
         assert!(
-            (result_ext.tau_factor - 0.5).abs() > 0.01,
-            "Zero danger should not trigger danger override, tau_factor={}",
+            (result_ext.tau_factor - 0.92).abs() > 0.01,
+            "Zero danger should not trigger DropTau, tau_factor={}",
             result_ext.tau_factor
         );
 
@@ -873,27 +1074,200 @@ mod tests {
             ..FlightFepConfig::default()
         };
 
-        // Below threshold: danger = 0.49
+        // Below rule threshold: danger = 0.15 (obs[8] < 0.2 → no DropTau from danger)
         let mut agent_below = ActiveInferenceFlightAgent::new(config.clone());
         let state = FlightState::hover(0.1);
         let setpoint = FlightSetpoint::hover();
 
-        let result_below = agent_below.step_extended(&state, &setpoint, 0.49, 0.5);
-        // Should NOT trigger danger override (tau_factor != 0.5)
+        let result_below = agent_below.step_extended(&state, &setpoint, 0.15, 0.5);
+        // Should NOT trigger danger-driven DropTau (tau_factor != 0.92)
         assert!(
-            (result_below.tau_factor - 0.5).abs() > 0.01,
-            "Danger=0.49 should not trigger override, tau_factor={}",
+            (result_below.tau_factor - 0.92).abs() > 0.01,
+            "Danger=0.15 should not trigger DropTau, tau_factor={}",
             result_below.tau_factor
         );
 
-        // Above threshold: danger = 0.51
+        // Above rule threshold: danger = 0.3 (obs[8] > 0.2 → DropTau)
         let mut agent_above = ActiveInferenceFlightAgent::new(config);
-        let result_above = agent_above.step_extended(&state, &setpoint, 0.51, 0.5);
-        // Should trigger danger override (tau_factor = 0.5)
+        let result_above = agent_above.step_extended(&state, &setpoint, 0.3, 0.5);
+        // Natural DropTau: tau_factor = 0.92
         assert!(
-            (result_above.tau_factor - 0.5).abs() < 1e-6,
-            "Danger=0.51 should trigger override, tau_factor={}",
+            (result_above.tau_factor - 0.92).abs() < 1e-6,
+            "Danger=0.3 should trigger DropTau (tau=0.92), tau_factor={}",
             result_above.tau_factor
+        );
+    }
+
+    // ── EFE-based Emergent Setpoint Selection ──
+
+    #[test]
+    fn test_efe_selects_intercept_under_high_danger() {
+        // When danger is high and a threat position is known, EFE should
+        // select the interception setpoint over continuing the mission.
+        let config = FlightFepConfig {
+            extended_observation: true,
+            ..FlightFepConfig::default()
+        };
+        let mut agent = ActiveInferenceFlightAgent::new(config);
+
+        let state = FlightState {
+            position: [0.0, 0.0, 1.5],
+            ..FlightState::hover(0.1)
+        };
+        let setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+
+        let env = FlightEnvironment {
+            human_danger: 0.8,
+            mission_progress: 0.3,
+            threat_pos: Some([-1.5, 0.0, 2.0]),
+            entity_pos: Some([-1.5, 0.0, 0.0]),
+        };
+
+        let result = agent.step_embodied(&state, &setpoint, &env);
+
+        // The agent should choose to intercept the beam
+        assert!(
+            result.setpoint_override.is_some(),
+            "EFE should select intercept when danger=0.8"
+        );
+
+        // The override should be near the threat position
+        let override_pos = result.setpoint_override.unwrap();
+        let dist_to_threat = ((override_pos[0] - (-1.5)).powi(2)
+            + (override_pos[1] - 0.0).powi(2))
+        .sqrt();
+        assert!(
+            dist_to_threat < 0.1,
+            "Override should be near threat, dist={}",
+            dist_to_threat
+        );
+    }
+
+    #[test]
+    fn test_efe_continues_mission_when_no_danger() {
+        // With no danger, the agent should not override the setpoint.
+        let config = FlightFepConfig {
+            extended_observation: true,
+            ..FlightFepConfig::default()
+        };
+        let mut agent = ActiveInferenceFlightAgent::new(config);
+
+        let state = FlightState::hover(0.1);
+        let setpoint = FlightSetpoint::hover();
+
+        let env = FlightEnvironment {
+            human_danger: 0.0,
+            mission_progress: 0.5,
+            threat_pos: None,
+            entity_pos: None,
+        };
+
+        let result = agent.step_embodied(&state, &setpoint, &env);
+
+        assert!(
+            result.setpoint_override.is_none(),
+            "No danger → no setpoint override"
+        );
+    }
+
+    #[test]
+    fn test_efe_precision_ratio_determines_choice() {
+        // With safety_prior_precision very low (mission dominates),
+        // the agent should NOT override, even under danger.
+        let config = FlightFepConfig {
+            extended_observation: true,
+            safety_prior_precision: 0.001,   // Safety barely matters
+            mission_prior_precision: 1000.0, // Mission dominates
+            self_preservation_precision: 0.1,
+            ..FlightFepConfig::default()
+        };
+        let mut agent = ActiveInferenceFlightAgent::new(config);
+
+        let state = FlightState {
+            position: [0.0, 0.0, 1.5],
+            ..FlightState::hover(0.1)
+        };
+        let setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+
+        let env = FlightEnvironment {
+            human_danger: 0.8,
+            mission_progress: 0.3,
+            threat_pos: Some([-1.5, 0.0, 2.0]),
+            entity_pos: Some([-1.5, 0.0, 0.0]),
+        };
+
+        let result = agent.step_embodied(&state, &setpoint, &env);
+
+        // With inverted precisions, mission EFE dominates —
+        // the agent should continue toward its delivery target.
+        assert!(
+            result.setpoint_override.is_none(),
+            "Inverted precisions: mission should dominate, no override. \
+             safety_π=0.001 vs mission_π=1000"
+        );
+    }
+
+    #[test]
+    fn test_efe_calculation_math() {
+        // Verify the EFE formula directly.
+        let config = FlightFepConfig {
+            extended_observation: true,
+            safety_prior_precision: 100.0,
+            mission_prior_precision: 1.0,
+            self_preservation_precision: 0.1,
+            ..FlightFepConfig::default()
+        };
+        let agent = ActiveInferenceFlightAgent::new(config);
+
+        let state = FlightState::hover(0.1);
+        let mission_setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+        let env = FlightEnvironment {
+            human_danger: 0.7,
+            mission_progress: 0.3,
+            threat_pos: Some([-1.5, 0.0, 2.0]),
+            entity_pos: Some([-1.5, 0.0, 0.0]),
+        };
+
+        // EFE for continuing mission (far from threat)
+        let efe_mission = agent.expected_free_energy_for_setpoint(
+            &state,
+            mission_setpoint.position,
+            &mission_setpoint,
+            &env,
+        );
+
+        // EFE for intercepting (near threat)
+        let efe_intercept = agent.expected_free_energy_for_setpoint(
+            &state,
+            [-1.5, 0.0, 2.0],
+            &mission_setpoint,
+            &env,
+        );
+
+        // Mission EFE should be dominated by safety term: π_safety * danger²
+        // = 100.0 * 0.7² = 49.0 (danger persists since far from threat)
+        assert!(
+            efe_mission > 40.0,
+            "Mission EFE should be high due to unresolved danger: {:.2}",
+            efe_mission
+        );
+
+        // Intercept EFE should have lower safety cost (near threat → danger reduced)
+        // but higher mission deviation cost
+        assert!(
+            efe_intercept < efe_mission,
+            "Intercept EFE ({:.2}) should be less than mission EFE ({:.2})",
+            efe_intercept,
+            efe_mission
         );
     }
 

@@ -200,6 +200,134 @@ impl CrossBenchmarkAnalysis {
     }
 }
 
+/// Campbell-Fiske Multitrait-Multimethod (MTMM) validity analysis.
+///
+/// Compares within-domain (convergent) vs between-domain (discriminant)
+/// correlations to assess construct validity. A healthy battery should show
+/// higher within-domain correlations than between-domain ones.
+pub struct MtmmResult {
+    /// Mean correlation among same-domain benchmark pairs (convergent).
+    pub mean_convergent: f64,
+    /// Mean correlation among different-domain benchmark pairs (discriminant).
+    pub mean_discriminant: f64,
+    /// Ratio: convergent / discriminant (should be > 1.0).
+    pub convergent_discriminant_ratio: f64,
+    /// Number of same-domain pairs analyzed.
+    pub convergent_pairs: usize,
+    /// Number of different-domain pairs analyzed.
+    pub discriminant_pairs: usize,
+    /// Per-domain convergent correlation means.
+    pub domain_convergent: BTreeMap<String, f64>,
+}
+
+impl CrossBenchmarkAnalysis {
+    /// Perform Campbell-Fiske MTMM analysis.
+    ///
+    /// Requires at least 3 seeds for meaningful correlations.
+    pub fn mtmm_validity(&self) -> MtmmResult {
+        let (names, matrix) = self.correlation_matrix();
+        let n = names.len();
+
+        let mut convergent_sum = 0.0;
+        let mut convergent_count = 0usize;
+        let mut discriminant_sum = 0.0;
+        let mut discriminant_count = 0usize;
+
+        // Per-domain tracking
+        let mut domain_sums: BTreeMap<String, (f64, usize)> = BTreeMap::new();
+
+        for i in 0..n {
+            for j in (i + 1)..n {
+                let r = matrix[i][j];
+                let domain_i = domain_of(&names[i]);
+                let domain_j = domain_of(&names[j]);
+
+                if domain_i == domain_j {
+                    convergent_sum += r;
+                    convergent_count += 1;
+                    let entry = domain_sums
+                        .entry(domain_i.to_string())
+                        .or_insert((0.0, 0));
+                    entry.0 += r;
+                    entry.1 += 1;
+                } else {
+                    discriminant_sum += r;
+                    discriminant_count += 1;
+                }
+            }
+        }
+
+        let mean_convergent = if convergent_count > 0 {
+            convergent_sum / convergent_count as f64
+        } else {
+            0.0
+        };
+        let mean_discriminant = if discriminant_count > 0 {
+            discriminant_sum / discriminant_count as f64
+        } else {
+            0.0
+        };
+        let ratio = if mean_discriminant.abs() > 1e-10 {
+            mean_convergent / mean_discriminant
+        } else if mean_convergent > 0.0 {
+            f64::INFINITY
+        } else {
+            1.0
+        };
+
+        let domain_convergent = domain_sums
+            .into_iter()
+            .map(|(domain, (sum, count))| (domain, sum / count as f64))
+            .collect();
+
+        MtmmResult {
+            mean_convergent,
+            mean_discriminant,
+            convergent_discriminant_ratio: ratio,
+            convergent_pairs: convergent_count,
+            discriminant_pairs: discriminant_count,
+            domain_convergent,
+        }
+    }
+
+    /// Format MTMM validity as a summary string.
+    pub fn format_mtmm(&self) -> String {
+        let mtmm = self.mtmm_validity();
+        let mut lines = Vec::new();
+        lines.push("Campbell-Fiske MTMM Validity Analysis".to_string());
+        lines.push(format!(
+            "  Convergent (within-domain):   r = {:.3} ({} pairs)",
+            mtmm.mean_convergent, mtmm.convergent_pairs
+        ));
+        lines.push(format!(
+            "  Discriminant (between-domain): r = {:.3} ({} pairs)",
+            mtmm.mean_discriminant, mtmm.discriminant_pairs
+        ));
+        lines.push(format!(
+            "  Convergent/Discriminant ratio: {:.2}",
+            mtmm.convergent_discriminant_ratio
+        ));
+        let verdict = if mtmm.convergent_discriminant_ratio > 1.5 {
+            "GOOD: within-domain correlations well exceed between-domain"
+        } else if mtmm.convergent_discriminant_ratio > 1.0 {
+            "FAIR: within-domain slightly exceeds between-domain"
+        } else {
+            "POOR: within-domain does not exceed between-domain"
+        };
+        lines.push(format!("  Verdict: {}", verdict));
+
+        if !mtmm.domain_convergent.is_empty() {
+            lines.push(String::new());
+            lines.push("  Per-domain convergent correlations:".to_string());
+            for (domain, r) in &mtmm.domain_convergent {
+                lines.push(format!("    {:<14} r = {:.3}", domain, r));
+            }
+        }
+
+        lines.join("\n")
+    }
+}
+
 /// Compute Cohen's d effect size.
 ///
 /// `d = (group_mean - baseline_mean) / pooled_sd`
@@ -291,6 +419,293 @@ pub fn icc_2_1(observations: &[Vec<f64>]) -> f64 {
     } else {
         ((bms - ems) / denom).clamp(-1.0, 1.0)
     }
+}
+
+/// Compute Cronbach's alpha for internal consistency.
+///
+/// `items[i]` is the score vector for item/condition i across participants/seeds.
+/// All item vectors must be the same length (number of participants).
+/// Returns alpha in [-inf, 1.0]. Values >0.70 indicate acceptable consistency.
+pub fn cronbachs_alpha(items: &[Vec<f64>]) -> f64 {
+    let k = items.len();
+    if k < 2 {
+        return 0.0;
+    }
+    let n = items[0].len();
+    if n < 2 || items.iter().any(|v| v.len() != n) {
+        return 0.0;
+    }
+
+    // Compute variance of each item
+    let item_variances: Vec<f64> = items
+        .iter()
+        .map(|scores| {
+            let mean = scores.iter().sum::<f64>() / n as f64;
+            scores.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1) as f64
+        })
+        .collect();
+
+    // Compute total scores per participant and their variance
+    let total_scores: Vec<f64> = (0..n)
+        .map(|p| items.iter().map(|item| item[p]).sum::<f64>())
+        .collect();
+    let total_mean = total_scores.iter().sum::<f64>() / n as f64;
+    let total_variance =
+        total_scores.iter().map(|x| (x - total_mean).powi(2)).sum::<f64>() / (n - 1) as f64;
+
+    if total_variance.abs() < 1e-15 {
+        return 0.0;
+    }
+
+    let sum_item_var: f64 = item_variances.iter().sum();
+    let kf = k as f64;
+
+    (kf / (kf - 1.0)) * (1.0 - sum_item_var / total_variance)
+}
+
+/// Convert a z-score to a percentile rank using the normal CDF.
+///
+/// Uses the Abramowitz & Stegun (1964) rational approximation.
+/// z=0 → 50th percentile, z=+1 → ~84th, z=-1 → ~16th.
+pub fn percentile_from_z(z: f64) -> f64 {
+    // Phi(z) via Abramowitz & Stegun approximation 26.2.17
+    let t = 1.0 / (1.0 + 0.2316419 * z.abs());
+    let d = 0.3989422804014327; // 1/sqrt(2*pi)
+    let p = d * (-z * z / 2.0).exp();
+    let poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+    let cdf = if z >= 0.0 { 1.0 - p * poly } else { p * poly };
+    (cdf * 100.0).clamp(0.01, 99.99)
+}
+
+/// Principal Component Analysis result.
+pub struct PcaResult {
+    /// Eigenvalues in descending order.
+    pub eigenvalues: Vec<f64>,
+    /// Proportion of variance explained by each component.
+    pub variance_explained: Vec<f64>,
+    /// Cumulative variance explained.
+    pub cumulative_variance: Vec<f64>,
+    /// Factor loadings: components × benchmarks.
+    pub loadings: Vec<Vec<f64>>,
+    /// Benchmark names corresponding to loading columns.
+    pub benchmark_names: Vec<String>,
+}
+
+impl CrossBenchmarkAnalysis {
+    /// Run PCA on the benchmark correlation matrix.
+    ///
+    /// Extracts principal components via power iteration on the correlation matrix.
+    /// Returns eigenvalues, variance explained, and factor loadings for the top
+    /// `max_components` components.
+    pub fn pca(&self, max_components: usize) -> PcaResult {
+        let (names, corr) = self.correlation_matrix();
+        let n = names.len();
+        let max_k = max_components.min(n);
+
+        let mut eigenvalues = Vec::new();
+        let mut eigenvectors = Vec::new();
+
+        // Deflation-based power iteration
+        let mut matrix: Vec<Vec<f64>> = corr.clone();
+
+        for _ in 0..max_k {
+            let (eigenval, eigenvec) = power_iteration(&matrix, 200);
+            if eigenval.abs() < 1e-10 {
+                break;
+            }
+            eigenvalues.push(eigenval);
+            eigenvectors.push(eigenvec.clone());
+
+            // Deflate: A = A - lambda * v * v^T
+            for i in 0..n {
+                for j in 0..n {
+                    matrix[i][j] -= eigenval * eigenvec[i] * eigenvec[j];
+                }
+            }
+        }
+
+        let total_var: f64 = eigenvalues.iter().sum();
+        let variance_explained: Vec<f64> = if total_var > 0.0 {
+            eigenvalues.iter().map(|e| e / total_var).collect()
+        } else {
+            vec![0.0; eigenvalues.len()]
+        };
+
+        let mut cumulative = Vec::new();
+        let mut cum = 0.0;
+        for &v in &variance_explained {
+            cum += v;
+            cumulative.push(cum);
+        }
+
+        // Loadings = eigenvector * sqrt(eigenvalue)
+        let loadings: Vec<Vec<f64>> = eigenvectors
+            .iter()
+            .zip(eigenvalues.iter())
+            .map(|(vec, &val)| vec.iter().map(|v| v * val.sqrt()).collect())
+            .collect();
+
+        PcaResult {
+            eigenvalues,
+            variance_explained,
+            cumulative_variance: cumulative,
+            loadings,
+            benchmark_names: names,
+        }
+    }
+
+    /// Format PCA results as a summary string.
+    pub fn format_pca(&self, max_components: usize) -> String {
+        let pca = self.pca(max_components);
+        let mut lines = Vec::new();
+        lines.push("Principal Component Analysis".to_string());
+        lines.push(format!(
+            "| {:>4} | {:>10} | {:>10} | {:>12} |",
+            "PC", "Eigenvalue", "% Variance", "Cumulative %"
+        ));
+        lines.push(format!(
+            "| {:>4} | {:>10} | {:>10} | {:>12} |",
+            "----", "----------", "----------", "------------"
+        ));
+        for (i, ((ev, ve), cv)) in pca
+            .eigenvalues
+            .iter()
+            .zip(pca.variance_explained.iter())
+            .zip(pca.cumulative_variance.iter())
+            .enumerate()
+        {
+            lines.push(format!(
+                "| {:>4} | {:>10.3} | {:>9.1}% | {:>11.1}% |",
+                i + 1,
+                ev,
+                ve * 100.0,
+                cv * 100.0,
+            ));
+        }
+
+        // Show top loadings for PC1 and PC2
+        if pca.loadings.len() >= 2 {
+            lines.push(String::new());
+            lines.push("Top loadings (PC1, PC2):".to_string());
+            lines.push(format!(
+                "  {:<25} {:>8} {:>8}",
+                "Benchmark", "PC1", "PC2"
+            ));
+            for (i, name) in pca.benchmark_names.iter().enumerate() {
+                let short = name.split("::").last().unwrap_or(name);
+                let l1 = pca.loadings[0].get(i).copied().unwrap_or(0.0);
+                let l2 = pca.loadings[1].get(i).copied().unwrap_or(0.0);
+                lines.push(format!(
+                    "  {:<25} {:>+8.3} {:>+8.3}",
+                    &short[..short.len().min(25)],
+                    l1,
+                    l2,
+                ));
+            }
+        }
+
+        lines.join("\n")
+    }
+}
+
+/// Ablation effect size: Cohen's d between two conditions' metric vectors.
+///
+/// Given two sets of per-benchmark metric means (baseline vs ablated),
+/// returns `(benchmark_name, cohen_d, label)` triples sorted by |d|.
+pub fn ablation_effect_sizes(
+    baseline_means: &[(&str, f64)],
+    ablated_means: &[(&str, f64)],
+) -> Vec<(String, f64, String)> {
+    // Pair up by benchmark name
+    let mut results = Vec::new();
+    for (name, base_val) in baseline_means {
+        if let Some((_, abl_val)) = ablated_means.iter().find(|(n, _)| n == name) {
+            let diff = base_val - abl_val;
+            // Use pooled SD estimate from both values (conservative: assume SD ~ 10% of baseline)
+            let sd_est = base_val.abs() * 0.10;
+            let d = if sd_est > 1e-15 { diff / sd_est } else { 0.0 };
+            results.push((name.to_string(), d, effect_size_label(d).to_string()));
+        }
+    }
+    results.sort_by(|a, b| b.1.abs().total_cmp(&a.1.abs()));
+    results
+}
+
+/// Format ablation effect sizes as a table.
+pub fn format_ablation_effects(effects: &[(String, f64, String)]) -> String {
+    let mut lines = Vec::new();
+    lines.push(format!(
+        "| {:25} | {:>10} | {:>12} |",
+        "Benchmark", "Cohen's d", "Effect"
+    ));
+    lines.push(format!(
+        "| {:25} | {:>10} | {:>12} |",
+        "-------------------------", "----------", "------------"
+    ));
+    for (name, d, label) in effects {
+        let short = name.split("::").last().unwrap_or(name);
+        lines.push(format!(
+            "| {:25} | {:>+10.3} | {:>12} |",
+            &short[..short.len().min(25)],
+            d,
+            label,
+        ));
+    }
+    lines.join("\n")
+}
+
+/// Power iteration to find the dominant eigenvector/eigenvalue.
+fn power_iteration(matrix: &[Vec<f64>], max_iter: usize) -> (f64, Vec<f64>) {
+    let n = matrix.len();
+    if n == 0 {
+        return (0.0, Vec::new());
+    }
+
+    // Initialize with uniform vector
+    let mut v: Vec<f64> = vec![1.0 / (n as f64).sqrt(); n];
+
+    for _ in 0..max_iter {
+        // w = A * v
+        let mut w: Vec<f64> = vec![0.0; n];
+        for i in 0..n {
+            for j in 0..n {
+                w[i] += matrix[i][j] * v[j];
+            }
+        }
+
+        // eigenvalue = v^T * w
+        let _eigenval: f64 = v.iter().zip(w.iter()).map(|(a, b)| a * b).sum();
+
+        // Normalize
+        let norm: f64 = w.iter().map(|x| x * x).sum::<f64>().sqrt();
+        if norm < 1e-15 {
+            return (0.0, vec![0.0; n]);
+        }
+        let new_v: Vec<f64> = w.iter().map(|x| x / norm).collect();
+
+        // Check convergence
+        let diff: f64 = v
+            .iter()
+            .zip(new_v.iter())
+            .map(|(a, b)| (a - b).powi(2))
+            .sum::<f64>()
+            .sqrt();
+        v = new_v;
+        if diff < 1e-12 {
+            break;
+        }
+    }
+
+    // Final eigenvalue
+    let mut w: Vec<f64> = vec![0.0; n];
+    for i in 0..n {
+        for j in 0..n {
+            w[i] += matrix[i][j] * v[j];
+        }
+    }
+    let eigenval: f64 = v.iter().zip(w.iter()).map(|(a, b)| a * b).sum();
+
+    (eigenval, v)
 }
 
 /// Compute Spearman rank correlation between two slices.
@@ -479,5 +894,174 @@ mod tests {
         let fmt = analysis.format_matrix();
         assert!(!fmt.is_empty());
         assert!(fmt.contains("1.00"));
+    }
+
+    #[test]
+    fn test_mtmm_same_domain_higher() {
+        // Two benchmarks in domain A, one in domain B
+        let mut values = BTreeMap::new();
+        values.insert("A::X".to_string(), vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        values.insert("A::Y".to_string(), vec![1.1, 2.2, 2.9, 4.1, 5.2]);
+        values.insert("B::Z".to_string(), vec![5.0, 4.0, 3.0, 2.0, 1.0]);
+        let analysis = CrossBenchmarkAnalysis { values };
+        let mtmm = analysis.mtmm_validity();
+        assert_eq!(mtmm.convergent_pairs, 1);
+        assert_eq!(mtmm.discriminant_pairs, 2);
+        // Same-domain (A::X, A::Y) should correlate positively
+        assert!(
+            mtmm.mean_convergent > 0.5,
+            "convergent r={:.3}",
+            mtmm.mean_convergent
+        );
+        assert!(mtmm.domain_convergent.contains_key("A"));
+    }
+
+    #[test]
+    fn test_mtmm_convergent_exceeds_discriminant() {
+        let mut values = BTreeMap::new();
+        values.insert("A::X".to_string(), vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        values.insert("A::Y".to_string(), vec![1.5, 2.5, 3.5, 4.5, 5.5]);
+        values.insert("B::Z".to_string(), vec![5.0, 4.0, 3.0, 2.0, 1.0]);
+        let analysis = CrossBenchmarkAnalysis { values };
+        let mtmm = analysis.mtmm_validity();
+        // Convergent (A::X with A::Y) should be much higher than discriminant
+        assert!(
+            mtmm.mean_convergent > mtmm.mean_discriminant,
+            "convergent ({:.3}) should exceed discriminant ({:.3})",
+            mtmm.mean_convergent,
+            mtmm.mean_discriminant
+        );
+    }
+
+    #[test]
+    fn test_mtmm_format_non_empty() {
+        let mut values = BTreeMap::new();
+        values.insert("A::X".to_string(), vec![1.0, 2.0, 3.0]);
+        values.insert("A::Y".to_string(), vec![1.0, 2.0, 3.0]);
+        let analysis = CrossBenchmarkAnalysis { values };
+        let fmt = analysis.format_mtmm();
+        assert!(fmt.contains("Campbell-Fiske"));
+        assert!(fmt.contains("Convergent"));
+        assert!(fmt.contains("Discriminant"));
+    }
+
+    #[test]
+    fn test_cronbachs_alpha_perfect() {
+        // All items identical → alpha = 1.0
+        let items = vec![
+            vec![1.0, 2.0, 3.0, 4.0, 5.0],
+            vec![1.0, 2.0, 3.0, 4.0, 5.0],
+            vec![1.0, 2.0, 3.0, 4.0, 5.0],
+        ];
+        let alpha = cronbachs_alpha(&items);
+        assert!(
+            (alpha - 1.0).abs() < 0.01,
+            "Perfect consistency should yield alpha~1.0, got {}",
+            alpha
+        );
+    }
+
+    #[test]
+    fn test_cronbachs_alpha_uncorrelated() {
+        // Uncorrelated items → alpha should be low
+        let items = vec![
+            vec![1.0, 5.0, 2.0, 4.0, 3.0],
+            vec![5.0, 1.0, 4.0, 2.0, 3.0],
+            vec![3.0, 3.0, 3.0, 3.0, 3.0],
+        ];
+        let alpha = cronbachs_alpha(&items);
+        assert!(alpha < 0.5, "Uncorrelated items should yield low alpha, got {}", alpha);
+    }
+
+    #[test]
+    fn test_cronbachs_alpha_single_item() {
+        let items = vec![vec![1.0, 2.0, 3.0]];
+        assert_eq!(cronbachs_alpha(&items), 0.0);
+    }
+
+    #[test]
+    fn test_percentile_from_z_center() {
+        let p = percentile_from_z(0.0);
+        assert!((p - 50.0).abs() < 0.5, "z=0 should be ~50th, got {}", p);
+    }
+
+    #[test]
+    fn test_percentile_from_z_positive() {
+        let p = percentile_from_z(1.0);
+        assert!((p - 84.13).abs() < 1.0, "z=+1 should be ~84th, got {}", p);
+    }
+
+    #[test]
+    fn test_percentile_from_z_negative() {
+        let p = percentile_from_z(-1.0);
+        assert!((p - 15.87).abs() < 1.0, "z=-1 should be ~16th, got {}", p);
+    }
+
+    #[test]
+    fn test_percentile_from_z_extreme() {
+        let p_high = percentile_from_z(3.0);
+        assert!(p_high > 99.0, "z=+3 should be >99th, got {}", p_high);
+        let p_low = percentile_from_z(-3.0);
+        assert!(p_low < 1.0, "z=-3 should be <1st, got {}", p_low);
+    }
+
+    #[test]
+    fn test_pca_identity() {
+        // Two perfectly correlated benchmarks → 1 dominant component
+        let mut values = BTreeMap::new();
+        values.insert("A::X".to_string(), vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        values.insert("A::Y".to_string(), vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        let analysis = CrossBenchmarkAnalysis { values };
+        let pca = analysis.pca(2);
+        assert!(!pca.eigenvalues.is_empty());
+        // First component should explain most variance
+        assert!(
+            pca.variance_explained[0] > 0.9,
+            "PC1 should explain >90%, got {:.1}%",
+            pca.variance_explained[0] * 100.0
+        );
+    }
+
+    #[test]
+    fn test_pca_format_non_empty() {
+        let mut values = BTreeMap::new();
+        values.insert("A::X".to_string(), vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        values.insert("B::Y".to_string(), vec![5.0, 4.0, 3.0, 2.0, 1.0]);
+        let analysis = CrossBenchmarkAnalysis { values };
+        let fmt = analysis.format_pca(2);
+        assert!(fmt.contains("Principal Component"));
+        assert!(fmt.contains("Eigenvalue"));
+    }
+
+    #[test]
+    fn test_ablation_effect_sizes_ordering() {
+        let baseline = vec![("A::X", 0.90), ("B::Y", 0.80), ("C::Z", 0.70)];
+        let ablated = vec![("A::X", 0.85), ("B::Y", 0.40), ("C::Z", 0.65)];
+        let effects = ablation_effect_sizes(&baseline, &ablated);
+        assert_eq!(effects.len(), 3);
+        // Should be sorted by |d| descending — B::Y has largest drop
+        assert_eq!(effects[0].0, "B::Y");
+        assert!(effects[0].1.abs() > effects[1].1.abs());
+    }
+
+    #[test]
+    fn test_ablation_effect_sizes_no_match() {
+        let baseline = vec![("A::X", 0.90)];
+        let ablated = vec![("B::Y", 0.40)];
+        let effects = ablation_effect_sizes(&baseline, &ablated);
+        assert!(effects.is_empty());
+    }
+
+    #[test]
+    fn test_mtmm_no_same_domain() {
+        // All different domains — convergent should be 0
+        let mut values = BTreeMap::new();
+        values.insert("A::X".to_string(), vec![1.0, 2.0, 3.0]);
+        values.insert("B::Y".to_string(), vec![1.0, 2.0, 3.0]);
+        values.insert("C::Z".to_string(), vec![1.0, 2.0, 3.0]);
+        let analysis = CrossBenchmarkAnalysis { values };
+        let mtmm = analysis.mtmm_validity();
+        assert_eq!(mtmm.convergent_pairs, 0);
+        assert!(mtmm.discriminant_pairs > 0);
     }
 }

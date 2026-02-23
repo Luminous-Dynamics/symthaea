@@ -124,6 +124,7 @@ impl WisconsinCardSortingBenchmark {
         let mut total_errors = 0u32;
         let mut trials_to_first: Option<u32> = None;
         let mut prev_rule: Option<Rule> = None;
+        let mut rt_ticks = Vec::new();
 
         // Explicit hypothesis testing: 3 rule confidences [color, shape, number]
         let mut rule_confidence = [1.0f64, 0.0, 0.0]; // Start believing color
@@ -176,14 +177,16 @@ impl WisconsinCardSortingBenchmark {
             let candidates = [match_by_color, match_by_shape, match_by_number];
             let _response_hv = encode_card(&response_card);
 
-            // Softmax over rule confidences for stochastic selection
+            // Softmax over rule confidences for stochastic selection.
+            // Time pressure reduces the softmax gain (more random rule selection).
+            let softmax_gain = 1.5 - config.time_pressure * 0.8;
             let max_conf = rule_confidence
                 .iter()
                 .cloned()
                 .fold(f64::NEG_INFINITY, f64::max);
             let exp_conf: Vec<f64> = rule_confidence
                 .iter()
-                .map(|c| ((c - max_conf) * 1.5).exp())
+                .map(|c| ((c - max_conf) * softmax_gain).exp())
                 .collect();
             let exp_sum: f64 = exp_conf.iter().sum();
 
@@ -201,6 +204,15 @@ impl WisconsinCardSortingBenchmark {
                 }
             }
             let chosen_target = candidates[chosen_rule_idx];
+
+            // RT proxy: deliberation ticks based on confidence spread
+            let max_conf = rule_confidence.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let second_conf = rule_confidence.iter().cloned()
+                .filter(|&c| (c - max_conf).abs() > 1e-10)
+                .fold(f64::NEG_INFINITY, f64::max);
+            let conf_margin = if second_conf.is_finite() { max_conf - second_conf } else { max_conf };
+            let ticks = 4.0 + (1.0 - conf_margin.min(1.0).max(0.0)) * 6.0;
+            rt_ticks.push(ticks);
 
             // Determine correct target by current rule
             let correct_target = match current_rule {
@@ -280,6 +292,7 @@ impl WisconsinCardSortingBenchmark {
             non_perseverative_errors,
             total_errors,
             trials_to_first: trials_to_first.unwrap_or(max_trials as u32),
+            rt_ticks,
         }
     }
 }
@@ -290,6 +303,7 @@ struct TrialResult {
     non_perseverative_errors: u32,
     total_errors: u32,
     trials_to_first: u32,
+    rt_ticks: Vec<f64>,
 }
 
 impl PsychBenchmark for WisconsinCardSortingBenchmark {
@@ -306,6 +320,7 @@ impl PsychBenchmark for WisconsinCardSortingBenchmark {
         let mut non_perseverative = Vec::new();
         let mut total_errs = Vec::new();
         let mut trials_first = Vec::new();
+        let mut all_rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -314,6 +329,7 @@ impl PsychBenchmark for WisconsinCardSortingBenchmark {
             non_perseverative.push(r.non_perseverative_errors as f64);
             total_errs.push(r.total_errors as f64);
             trials_first.push(r.trials_to_first as f64);
+            all_rts.extend_from_slice(&r.rt_ticks);
         }
 
         result.insert(
@@ -333,6 +349,7 @@ impl PsychBenchmark for WisconsinCardSortingBenchmark {
             "trials_to_first_category",
             MetricValue::from_samples(&trials_first),
         );
+        result.insert("rt_ticks", MetricValue::from_samples(&all_rts));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

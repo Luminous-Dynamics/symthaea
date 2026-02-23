@@ -227,7 +227,7 @@ impl FlakeParser {
                 follows: None,
                 is_flake: None,
             });
-            info.inputs.last_mut().unwrap()
+            info.inputs.last_mut().expect("just pushed")
         };
 
         if parts.len() == 2 {

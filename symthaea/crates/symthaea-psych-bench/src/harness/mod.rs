@@ -8,7 +8,8 @@ pub mod snapshot;
 
 pub use config::{AblationConfig, AblationPreset, BenchmarkConfig};
 pub use report::{
-    BaselineComparison, BenchmarkReport, BenchmarkResult, CompositeScore, MetricValue,
+    BaselineComparison, BenchmarkReport, BenchmarkResult, CompositeScore, ForestPlotRow,
+    LearningCurveRow, MetricValue, RtSummary,
 };
 pub use snapshot::{
     RegressionReport, RegressionResult, RegressionSeverity, RegressionSnapshot, RegressionSummary,

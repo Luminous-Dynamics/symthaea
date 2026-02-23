@@ -369,15 +369,24 @@ impl RavensProgressiveMatricesBenchmark {
                 };
                 let pred_shape = {
                     let n = ContinuousHV::random(dim, item_seed.wrapping_add(8001));
-                    ContinuousHV::weighted_bundle(&[&pred_shape, &n], &[1.0 - noise_frac, noise_frac])
+                    ContinuousHV::weighted_bundle(
+                        &[&pred_shape, &n],
+                        &[1.0 - noise_frac, noise_frac],
+                    )
                 };
                 let pred_size = {
                     let n = ContinuousHV::random(dim, item_seed.wrapping_add(8002));
-                    ContinuousHV::weighted_bundle(&[&pred_size, &n], &[1.0 - noise_frac, noise_frac])
+                    ContinuousHV::weighted_bundle(
+                        &[&pred_size, &n],
+                        &[1.0 - noise_frac, noise_frac],
+                    )
                 };
                 let pred_color = {
                     let n = ContinuousHV::random(dim, item_seed.wrapping_add(8003));
-                    ContinuousHV::weighted_bundle(&[&pred_color, &n], &[1.0 - noise_frac, noise_frac])
+                    ContinuousHV::weighted_bundle(
+                        &[&pred_color, &n],
+                        &[1.0 - noise_frac, noise_frac],
+                    )
                 };
 
                 // Symbolic rule detection: try to identify exact rule from visible cells

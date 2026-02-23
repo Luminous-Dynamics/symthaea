@@ -19,9 +19,10 @@
 //! some perceptual capabilities are degraded.
 
 use std::collections::HashMap;
+use parking_lot::RwLock;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
-    Arc, RwLock,
+    Arc,
 };
 use std::time::{Duration, Instant};
 
@@ -669,14 +670,14 @@ impl BackgroundLoader {
 
     /// Start tracking a model load
     pub fn start_loading(&self, model: &str) {
-        let mut statuses = self.statuses.write().unwrap();
+        let mut statuses = self.statuses.write();
         statuses.insert(model.to_string(), LoadingStatus::new(model));
         self.active.store(true, Ordering::SeqCst);
     }
 
     /// Update loading progress
     pub fn update_progress(&self, model: &str, progress: f32, message: &str) {
-        let mut statuses = self.statuses.write().unwrap();
+        let mut statuses = self.statuses.write();
         if let Some(status) = statuses.get_mut(model) {
             status.update(progress, message);
         }
@@ -684,7 +685,7 @@ impl BackgroundLoader {
 
     /// Mark model as loaded
     pub fn complete_loading(&self, model: &str) {
-        let mut statuses = self.statuses.write().unwrap();
+        let mut statuses = self.statuses.write();
         if let Some(status) = statuses.get_mut(model) {
             status.complete();
             self.loaded_count.fetch_add(1, Ordering::SeqCst);
@@ -693,7 +694,7 @@ impl BackgroundLoader {
 
     /// Mark model as failed
     pub fn fail_loading(&self, model: &str, error: &str) {
-        let mut statuses = self.statuses.write().unwrap();
+        let mut statuses = self.statuses.write();
         if let Some(status) = statuses.get_mut(model) {
             status.fail(error);
         }
@@ -701,19 +702,19 @@ impl BackgroundLoader {
 
     /// Get current loading status for a model
     pub fn get_status(&self, model: &str) -> Option<LoadingStatus> {
-        let statuses = self.statuses.read().unwrap();
+        let statuses = self.statuses.read();
         statuses.get(model).cloned()
     }
 
     /// Get all loading statuses
     pub fn all_statuses(&self) -> Vec<LoadingStatus> {
-        let statuses = self.statuses.read().unwrap();
+        let statuses = self.statuses.read();
         statuses.values().cloned().collect()
     }
 
     /// Check if any models are still loading
     pub fn is_loading(&self) -> bool {
-        let statuses = self.statuses.read().unwrap();
+        let statuses = self.statuses.read();
         statuses.values().any(|s| !s.complete)
     }
 
@@ -724,7 +725,7 @@ impl BackgroundLoader {
 
     /// Get loading summary
     pub fn summary(&self) -> String {
-        let statuses = self.statuses.read().unwrap();
+        let statuses = self.statuses.read();
         let loading: Vec<_> = statuses.values().filter(|s| !s.complete).collect();
         let complete: Vec<_> = statuses
             .values()
@@ -783,7 +784,7 @@ impl ResilienceManager {
 
     /// Update a capability's availability
     pub fn set_capability(&self, capability: &str, availability: Availability) {
-        let mut caps = self.capabilities.write().unwrap();
+        let mut caps = self.capabilities.write();
         match capability {
             "text_embedding" => caps.text_embedding = availability,
             "image_embedding" => caps.image_embedding = availability,
@@ -799,12 +800,12 @@ impl ResilienceManager {
 
     /// Get current capabilities snapshot
     pub fn capabilities(&self) -> PerceptionCapabilities {
-        self.capabilities.read().unwrap().clone()
+        self.capabilities.read().clone()
     }
 
     /// Check if a specific capability is usable
     pub fn is_usable(&self, capability: &str) -> bool {
-        let caps = self.capabilities.read().unwrap();
+        let caps = self.capabilities.read();
         match capability {
             "text_embedding" => caps.text_embedding.is_usable(),
             "image_embedding" => caps.image_embedding.is_usable(),
@@ -819,10 +820,10 @@ impl ResilienceManager {
 
     /// Check coherence and record result
     pub fn check_coherence(&self, coherence: f32) -> bool {
-        let mut gate = self.coherence_gate.write().unwrap();
+        let mut gate = self.coherence_gate.write();
         let passed = gate.check(coherence);
         if !passed {
-            let mut stats = self.stats.write().unwrap();
+            let mut stats = self.stats.write();
             stats.record_coherence_rejection();
         }
         passed
@@ -830,13 +831,13 @@ impl ResilienceManager {
 
     /// Record a successful inference
     pub fn record_success(&self, duration: Duration) {
-        let mut stats = self.stats.write().unwrap();
+        let mut stats = self.stats.write();
         stats.record_success(duration);
     }
 
     /// Record a fallback
     pub fn record_fallback(&self, reason: &str) {
-        let mut stats = self.stats.write().unwrap();
+        let mut stats = self.stats.write();
         stats.record_fallback(reason);
     }
 
@@ -862,7 +863,7 @@ impl ResilienceManager {
 
     /// Get current stats
     pub fn stats(&self) -> ResilienceStats {
-        self.stats.read().unwrap().clone()
+        self.stats.read().clone()
     }
 
     /// Get full status report

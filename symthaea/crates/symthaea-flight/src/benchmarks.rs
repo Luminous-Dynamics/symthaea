@@ -190,6 +190,7 @@ pub fn run_wind_benchmark_with_backend(
             let mut controller = FlightController::new(&genesis, &config.flight_config);
             let mut fep_agent = ActiveInferenceFlightAgent::new(FlightFepConfig::default());
             let mut fep_result = fep_agent.initial_step(physics.state(), &setpoint);
+            let mut pid_state = PidState::default();
             let mut total_err = 0.0;
 
             // Track recovery after each gust
@@ -234,7 +235,11 @@ pub fn run_wind_benchmark_with_backend(
                 }
 
                 if step % config.flight_config.train_every == 0 {
-                    let target = pd_baseline(&state, &setpoint, &pd_gains);
+                    let target = if fep_result.use_pid_target {
+                        pid_baseline(&state, &setpoint, &pd_gains, &mut pid_state, dt)
+                    } else {
+                        pd_baseline(&state, &setpoint, &pd_gains)
+                    };
                     let lr = config.flight_config.learning_rate * fep_result.learning_rate_factor;
                     controller.train_step(&sensor_hv, &target, dt as f32, Some(lr));
                 }
@@ -418,6 +423,174 @@ pub fn run_perturbation_benchmark(
         free_energy_trace: fe_trace,
         error_trace,
         tau_trace,
+    }
+}
+
+/// Results from a FEP comparison benchmark (with vs without FEP modulation).
+#[cfg(feature = "mujoco")]
+#[derive(Debug, Clone)]
+pub struct FepComparisonResult {
+    /// Result with FEP active (tau/LR modulation).
+    pub fep_active: crate::perturbations::PerturbationBenchmarkResult,
+    /// Result with FEP frozen (tau=1.0, lr_factor=1.0).
+    pub fep_frozen: crate::perturbations::PerturbationBenchmarkResult,
+}
+
+/// Run a perturbation scenario twice: with FEP active vs frozen.
+///
+/// Uses identical initial conditions (same genesis seed) for fair comparison.
+/// The frozen run uses `FlightFepResult::default()` at every step (no modulation).
+#[cfg(feature = "mujoco")]
+pub fn run_perturbation_comparison(
+    config: &FlightConfig,
+    schedule: &crate::perturbations::PerturbationSchedule,
+) -> FepComparisonResult {
+    use crate::perturbations::PerturbationBenchmarkResult;
+
+    let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+    let setpoint = FlightSetpoint::hover();
+    let dt = config.motor_dt();
+    let pd_gains = PdGains::default();
+    let cognitive_interval = config.cognitive_interval();
+
+    // Helper: run one episode with optional FEP
+    let run_episode = |enable_fep: bool| -> PerturbationBenchmarkResult {
+        let mut sim = crate::mujoco_sim::MuJoCoSimulator::from_primitive();
+        sim.reset(0.1);
+
+        let hover_thrust_offset =
+            (sim.body_mass() * 9.81) as f32 - QuadrotorCommand::HOVER_THRUST;
+
+        let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.num_levels);
+        let mut controller = FlightController::new(&genesis, config);
+        let mut fep_agent = ActiveInferenceFlightAgent::new(FlightFepConfig::default());
+        let mut fep_result = fep_agent.initial_step(sim.state(), &setpoint);
+        let mut pid_state = PidState::default();
+
+        let first_trigger = schedule
+            .perturbations()
+            .iter()
+            .map(|p| p.trigger_step())
+            .min()
+            .unwrap_or(config.steps_per_episode);
+
+        let mut pre_errors = Vec::new();
+        let mut peak_error = 0.0f64;
+        let mut min_tau = 1.0f32;
+        let mut recovery_step = None;
+        let mut crashed = false;
+        let mut fe_trace = Vec::with_capacity(config.steps_per_episode);
+        let mut error_trace = Vec::with_capacity(config.steps_per_episode);
+        let mut tau_trace = Vec::with_capacity(config.steps_per_episode);
+
+        let mut thrust_integral = 0.0f64;
+        let integral_gain = 10.0f64;
+        let integral_clamp = 0.2;
+
+        for step in 0..config.steps_per_episode {
+            schedule.apply(step, &mut sim);
+
+            let state = sim.state().clone();
+            let pos_err = setpoint.position_error(&state);
+
+            if thrust_integral != 0.0 && thrust_integral.signum() != pos_err[2].signum() {
+                thrust_integral *= 0.5;
+            }
+            thrust_integral += pos_err[2] * dt;
+            thrust_integral = thrust_integral.clamp(-integral_clamp, integral_clamp);
+
+            let sensor_hv = encoder.encode(&state);
+            let pd_cmd = pid_baseline(&state, &setpoint, &pd_gains, &mut pid_state, dt);
+            let cfc_cmd = controller.forward(&sensor_hv, dt as f32);
+
+            let alpha = 0.5f32;
+            let mut command = QuadrotorCommand {
+                thrust: alpha * pd_cmd.thrust
+                    + (1.0 - alpha) * cfc_cmd.thrust
+                    + hover_thrust_offset
+                    + (integral_gain * thrust_integral) as f32,
+                roll_moment: alpha * pd_cmd.roll_moment
+                    + (1.0 - alpha) * cfc_cmd.roll_moment,
+                pitch_moment: alpha * pd_cmd.pitch_moment
+                    + (1.0 - alpha) * cfc_cmd.pitch_moment,
+                yaw_moment: alpha * pd_cmd.yaw_moment
+                    + (1.0 - alpha) * cfc_cmd.yaw_moment,
+            }
+            .clamped();
+
+            if enable_fep {
+                if let Some(noise) = &fep_result.exploration_noise {
+                    command = command.with_noise(noise);
+                }
+            }
+
+            sim.step(&command, dt);
+
+            let err = setpoint.position_error_magnitude(&state);
+            error_trace.push(err);
+            fe_trace.push(fep_result.free_energy);
+            tau_trace.push(if enable_fep { fep_result.tau_factor } else { 1.0 });
+
+            if step < first_trigger {
+                pre_errors.push(err);
+            } else {
+                peak_error = peak_error.max(err);
+                if recovery_step.is_none() && err < 0.05 && step > first_trigger + 10 {
+                    recovery_step = Some(step - first_trigger);
+                }
+            }
+
+            if state.altitude() <= 0.0 {
+                crashed = true;
+            }
+
+            min_tau = min_tau.min(if enable_fep {
+                fep_result.tau_factor
+            } else {
+                1.0
+            });
+
+            if step % config.train_every == 0 {
+                let target = pid_baseline(&state, &setpoint, &pd_gains, &mut pid_state, dt);
+                let lr = config.learning_rate
+                    * if enable_fep {
+                        fep_result.learning_rate_factor
+                    } else {
+                        1.0
+                    };
+                controller.train_step(&sensor_hv, &target, dt as f32, Some(lr));
+            }
+
+            if enable_fep && step % cognitive_interval == 0 {
+                fep_result = fep_agent.step(sim.state(), &setpoint);
+                if (fep_result.tau_factor - 1.0).abs() > 0.01 {
+                    controller.modulate_tau(fep_result.tau_factor);
+                }
+            }
+        }
+
+        let pre_avg = if pre_errors.is_empty() {
+            0.0
+        } else {
+            pre_errors.iter().sum::<f64>() / pre_errors.len() as f64
+        };
+
+        PerturbationBenchmarkResult {
+            pre_perturbation_error: pre_avg,
+            peak_error,
+            recovery_steps: recovery_step.unwrap_or(config.steps_per_episode),
+            final_error: error_trace.last().cloned().unwrap_or(0.0),
+            min_tau: min_tau as f64,
+            crashed,
+            free_energy_trace: fe_trace,
+            error_trace,
+            tau_trace,
+        }
+    };
+
+    FepComparisonResult {
+        fep_active: run_episode(true),
+        fep_frozen: run_episode(false),
     }
 }
 

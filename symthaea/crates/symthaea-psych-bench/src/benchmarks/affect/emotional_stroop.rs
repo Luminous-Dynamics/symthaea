@@ -1,0 +1,213 @@
+//! Emotional Stroop Task.
+//!
+//! Name the ink color of emotionally valenced words. Negative words slow
+//! responses and reduce accuracy due to attention capture by threat content.
+//!
+//! HDC implementation: word meaning (valence) and ink color encoded as
+//! separate HDC vectors. Negative valence creates interference by partially
+//! activating competing response channels via affect-attention interaction.
+//!
+//! Human baselines (Williams et al. 1996; Bar-Haim et al. 2007):
+//! - neutral_accuracy: 0.95 (SD≈0.03)
+//! - negative_accuracy: 0.88 (SD≈0.06)
+//! - emotional_interference: 0.07 (SD≈0.04)
+
+use crate::harness::config::BenchmarkConfig;
+use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::PsychBenchmark;
+use symthaea_core::hdc::ContinuousHV;
+
+/// Emotional Stroop benchmark.
+pub struct EmotionalStroopBenchmark;
+
+struct TrialResult {
+    neutral_accuracy: f64,
+    negative_accuracy: f64,
+    emotional_interference: f64,
+}
+
+impl EmotionalStroopBenchmark {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
+        let dim = config.dimension;
+        let seed = config.trial_seed("affect", "emotional_stroop", trial_idx);
+        let mut rng = seed ^ 0x9E3779B97F4A7C15;
+
+        let xor_shift = |s: &mut u64| {
+            *s ^= *s << 13;
+            *s ^= *s >> 7;
+            *s ^= *s << 17;
+        };
+
+        // 4 color HVs (the response set)
+        let color_hvs: Vec<ContinuousHV> = (0..4)
+            .map(|i| ContinuousHV::random(dim, seed.wrapping_add(100 + i)))
+            .collect();
+
+        // Valence HVs
+        let _negative_valence = ContinuousHV::random(dim, seed.wrapping_add(500));
+        let _neutral_valence = ContinuousHV::random(dim, seed.wrapping_add(600));
+
+        // Emotional interference: negative valence attracts attention,
+        // partially activating a competing color response
+        let emotional_weight: f32 = 0.35;
+        let temperature: f64 = 0.25;
+        let trials_per_condition = 40;
+
+        let mut neutral_correct = 0u32;
+        let mut negative_correct = 0u32;
+
+        for trial in 0..(trials_per_condition * 2) {
+            let is_negative = trial % 2 == 0;
+
+            // Pick random ink color (correct answer)
+            xor_shift(&mut rng);
+            let ink_idx = (rng % 4) as usize;
+
+            let combined = if is_negative {
+                // Negative word: valence captures attention, interferes with color naming
+                // Pick a random "competing" color activation from emotional capture
+                xor_shift(&mut rng);
+                let mut competing_idx = (rng % 3) as usize;
+                if competing_idx >= ink_idx {
+                    competing_idx += 1;
+                }
+                // combined = ink_color + emotional_weight * competing_color
+                let ink_act = &color_hvs[ink_idx];
+                let competing_act = color_hvs[competing_idx].scale(emotional_weight);
+                ContinuousHV::bundle(&[ink_act, &competing_act])
+            } else {
+                // Neutral word: minimal interference
+                let noise = ContinuousHV::random(dim, seed.wrapping_add(2000 + trial as u64));
+                let noise_act = noise.scale(emotional_weight * 0.2);
+                ContinuousHV::bundle(&[&color_hvs[ink_idx], &noise_act])
+            };
+
+            // Compute similarity to each color candidate
+            let sims: Vec<f64> = color_hvs
+                .iter()
+                .map(|c| combined.similarity(c) as f64)
+                .collect();
+
+            // Softmax response selection
+            let max_sim = sims.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let exp_sims: Vec<f64> = sims
+                .iter()
+                .map(|s| ((s - max_sim) / temperature).exp())
+                .collect();
+            let exp_sum: f64 = exp_sims.iter().sum();
+
+            xor_shift(&mut rng);
+            let r = (rng % 10000) as f64 / 10000.0;
+            let mut cumsum = 0.0;
+            let mut response_idx = 0;
+            for (i, e) in exp_sims.iter().enumerate() {
+                cumsum += e / exp_sum;
+                if r < cumsum {
+                    response_idx = i;
+                    break;
+                }
+            }
+
+            let correct = response_idx == ink_idx;
+            if is_negative {
+                if correct {
+                    negative_correct += 1;
+                }
+            } else if correct {
+                neutral_correct += 1;
+            }
+        }
+
+        let neut_acc = neutral_correct as f64 / trials_per_condition as f64;
+        let neg_acc = negative_correct as f64 / trials_per_condition as f64;
+
+        TrialResult {
+            neutral_accuracy: neut_acc,
+            negative_accuracy: neg_acc,
+            emotional_interference: neut_acc - neg_acc,
+        }
+    }
+}
+
+impl PsychBenchmark for EmotionalStroopBenchmark {
+    fn name(&self) -> &str {
+        "Affect::EmotionalStroop"
+    }
+
+    fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
+        let start = std::time::Instant::now();
+        let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+
+        let mut neutral_accs = Vec::new();
+        let mut negative_accs = Vec::new();
+        let mut interferences = Vec::new();
+
+        for trial in 0..config.trials_per_condition {
+            let r = self.run_trial(config, trial);
+            neutral_accs.push(r.neutral_accuracy);
+            negative_accs.push(r.negative_accuracy);
+            interferences.push(r.emotional_interference);
+        }
+
+        result.insert("neutral_accuracy", MetricValue::from_samples(&neutral_accs));
+        result.insert("negative_accuracy", MetricValue::from_samples(&negative_accs));
+        result.insert(
+            "emotional_interference",
+            MetricValue::from_samples(&interferences),
+        );
+
+        result.conditions = 2;
+        result.trials_per_condition = config.trials_per_condition;
+        result.elapsed_ms = start.elapsed().as_millis() as u64;
+        result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_emotional_stroop_runs() {
+        let config = BenchmarkConfig {
+            dimension: 256,
+            trials_per_condition: 3,
+            ..Default::default()
+        };
+        let result = EmotionalStroopBenchmark.run(&config);
+        assert!(result.metrics.contains_key("neutral_accuracy"));
+        assert!(result.metrics.contains_key("negative_accuracy"));
+        assert!(result.metrics.contains_key("emotional_interference"));
+    }
+
+    #[test]
+    fn test_emotional_stroop_finite_metrics() {
+        let config = BenchmarkConfig {
+            dimension: 128,
+            trials_per_condition: 5,
+            ..Default::default()
+        };
+        let result = EmotionalStroopBenchmark.run(&config);
+        for (key, val) in &result.metrics {
+            assert!(val.mean.is_finite(), "metric {} is not finite", key);
+        }
+    }
+
+    #[test]
+    fn test_emotional_interference_direction() {
+        let config = BenchmarkConfig {
+            dimension: 512,
+            trials_per_condition: 10,
+            ..Default::default()
+        };
+        let result = EmotionalStroopBenchmark.run(&config);
+        let neutral = result.metrics["neutral_accuracy"].mean;
+        let negative = result.metrics["negative_accuracy"].mean;
+        assert!(
+            neutral >= negative - 0.05,
+            "neutral ({:.3}) should be >= negative ({:.3})",
+            neutral,
+            negative
+        );
+    }
+}

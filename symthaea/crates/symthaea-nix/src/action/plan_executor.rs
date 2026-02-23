@@ -79,7 +79,7 @@ impl PlanExecutor {
             critical: true,
             verify: false,
         });
-        self.steps.last_mut().unwrap()
+        self.steps.last_mut().expect("just pushed")
     }
 
     /// Add a non-critical step (failure doesn't trigger rollback).
@@ -91,7 +91,7 @@ impl PlanExecutor {
             critical: false,
             verify: false,
         });
-        self.steps.last_mut().unwrap()
+        self.steps.last_mut().expect("just pushed")
     }
 
     /// Number of steps in the plan.

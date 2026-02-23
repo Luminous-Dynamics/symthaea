@@ -274,26 +274,7 @@ fn measure_indicator(
     }
 }
 
-/// Cosine similarity between two f64 vectors.
-fn cosine_similarity_f64(a: &[f64], b: &[f64]) -> f64 {
-    if a.len() != b.len() || a.is_empty() {
-        return 0.0;
-    }
-    let mut dot = 0.0f64;
-    let mut norm_a = 0.0f64;
-    let mut norm_b = 0.0f64;
-    for (&x, &y) in a.iter().zip(b.iter()) {
-        dot += x * y;
-        norm_a += x * x;
-        norm_b += y * y;
-    }
-    let denom = (norm_a * norm_b).sqrt();
-    if denom > 1e-10 {
-        dot / denom
-    } else {
-        0.0
-    }
-}
+use symthaea_core::math::cosine_similarity_f64;
 
 /// Run the full ablation matrix.
 ///
