@@ -44,8 +44,8 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Full roadmap**: @THE_SUBSTRATE_ROADMAP.md (load when needed)
 
 ### Symthaea (Holographic Liquid Brain)
-- **Path**: `symthaea/` (main crate), `symthaea-core/`, 21 extracted sub-crates in `symthaea/crates/`
-- **Status**: v0.5.0, ~343K LOC Rust, ~5,050 tests (3,356 src + 916 crates + 779 integration), 23 workspace members
+- **Path**: `symthaea/` (main crate), `symthaea-core/`, 28 extracted sub-crates in `symthaea/crates/`
+- **Status**: v0.5.0, ~343K LOC Rust, ~8,690+ tests (3,046 main + 3,544 core + 2,100 sub-crates), 30 workspace members
 - **Core**: HDC (16,384D) + IIT/Phi + LTC/CfC + Active Inference + 12-region Actor Brain
 - **Architecture**: Predictive coding loop — HDC encode → CfC evolve → predict → learn (50Hz)
 - **Key entry points**:
@@ -54,7 +54,7 @@ Full rules: @.claude/rules/DEVELOPMENT.md
   - `symthaea-core/src/hdc/hdc_ltc_unified.rs` — unified HDC-LTC neuron (O(1) closed-form temporal jumps)
 - **Build**: `cargo test --lib` (default features), `cargo test --all-features`
 - **CI**: `symthaea-ci.yml` (GREEN) — fmt, clippy, test, docs, 18 feature matrix, 21 sub-crates
-- **Features**: 48 feature flags (default=[]), key flags: `reasoning_engine`, `identity`, `neural-bridge`, `lancedb-backend`
+- **Features**: 47 feature flags (default=[]), key flags: `reasoning_engine`, `identity`, `neural-bridge`, `lancedb-backend`
 - **Integration status**: Core pipeline fully wired with surprise exploration, prefrontal gating, meta-cognition, reasoning engine (7-step cycle with Phi/gating/planning), moral algebra, CycleMetadata telemetry, social coherence (ToM in Mind module). ~25% of `src/` modules remain structural/disconnected (iroh P2P, some consciousness subsystems).
 - **Sub-crate pattern**: `pub use symthaea_X as module_name;` in consciousness/mod.rs for zero API changes
 

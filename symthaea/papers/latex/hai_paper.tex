@@ -108,6 +108,7 @@ To our knowledge, this is the \textbf{first integration of active inference with
 
 \subsection{Free Energy Principle and Active Inference}
 
+The Free Energy Principle~\citep{friston2010free} and active inference~\citep{parr2022active} provide a unified framework for perception, learning, and action.
 The variational free energy $F$ for an agent with beliefs $q(s)$ over hidden states $s$, given observations $o$, is:
 \begin{equation}
 F = D_{\mathrm{KL}}[q(s) \| p(s)] - \mathbb{E}_q[\ln p(o|s)]
@@ -268,7 +269,7 @@ Idx & Command & Trigger Condition \\
 }
 \end{table}
 
-Action selection uses softmax over negative EFE:
+Action selection uses softmax over negative EFE (Equation~\ref{eq:efe}):
 \begin{equation}
 P(a|s) = \frac{\exp(-G(a)/\tau)}{\sum_{a'}\exp(-G(a')/\tau)}
 \end{equation}
@@ -1095,10 +1096,9 @@ figure generation, statistical analysis, and literature review under human
 direction and supervision. All AI-generated content was critically reviewed,
 edited, and validated by the human author.
 
-\emph{Sacred Trinity Development Model:} This work demonstrates a novel
-human--AI collaborative scientific writing approach, enabling solo researchers
-to produce publication-quality manuscripts while maintaining human oversight
-and accountability.
+This work demonstrates a human--AI collaborative scientific writing approach,
+enabling solo researchers to produce publication-quality manuscripts while
+maintaining human oversight and accountability.
 
 % ============================================================================
 \section*{Ethics Approval}
@@ -1109,8 +1109,12 @@ animal subjects, or clinical data. No ethics approval was required.
 % ============================================================================
 \section*{Competing Interests}
 
-The authors declare no competing interests. This work received no external
-funding.
+The authors declare no competing interests.
+
+% ============================================================================
+\section*{Funding}
+
+This work received no external funding.
 
 % ============================================================================
 \section*{Acknowledgments}
