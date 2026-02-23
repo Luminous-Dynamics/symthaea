@@ -435,9 +435,12 @@ impl TextEncoder {
         // Object bound with patient role
         let object_marked = self.bind_vectors(&object_vec, patient_marker);
 
-        // Bundle: subject + predicate + object (predicate_vec deref to slice for bind)
-        let predicate_owned: Vec<i8> = (*predicate_vec).clone();
-        let result = self.bundle_vectors(&[subject_marked, predicate_owned, object_marked]);
+        // Bundle: subject + predicate + object (all as slices — no 16KB clone)
+        let result = self.bundle_vectors(&[
+            subject_marked.as_slice(),
+            &*predicate_vec,
+            object_marked.as_slice(),
+        ]);
 
         Ok(result)
     }
@@ -533,17 +536,18 @@ impl TextEncoder {
     }
 
     /// Bundle multiple vectors (majority vote)
-    fn bundle_vectors(&self, vectors: &[Vec<i8>]) -> Vec<i8> {
+    fn bundle_vectors<V: AsRef<[i8]>>(&self, vectors: &[V]) -> Vec<i8> {
         if vectors.is_empty() {
             return vec![0i8; self.config.dimension];
         }
 
-        let dim = vectors[0].len();
+        let dim = vectors[0].as_ref().len();
         let mut sums = vec![0i32; dim];
 
         for vec in vectors {
+            let slice = vec.as_ref();
             for i in 0..dim {
-                sums[i] += vec[i] as i32;
+                sums[i] += slice[i] as i32;
             }
         }
 
