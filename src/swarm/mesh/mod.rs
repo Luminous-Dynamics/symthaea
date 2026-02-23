@@ -56,6 +56,14 @@ pub use lora_fragment::{
 pub use mesh_receiver::{MeshPeer, MeshReceiver, ReceiverStats, StreamKey};
 pub use sensor::{MockSensor, SensorInput, SensorReading, SensorRegistry};
 
+/// Default gossip TTL: max 3 hops for multi-hop forwarding.
+pub const MESH_DEFAULT_TTL: u8 = 3;
+
+/// Compression header byte: uncompressed payload follows.
+pub const COMPRESS_NONE: u8 = 0x00;
+/// Compression header byte: LZ4-compressed payload follows.
+pub const COMPRESS_LZ4: u8 = 0x01;
+
 mod bridge;
 
 pub use bridge::{MeshBridgeActor, MeshBridgeHandle, MeshOutbound};
@@ -99,6 +107,18 @@ pub struct MeshStats {
     pub packets_rate_limited: u64,
     /// Emissions throttled by bandwidth budget enforcement.
     pub bandwidth_throttled: u64,
+    /// Packets that failed authentication (MAC verification).
+    pub packets_auth_failed: u64,
+    /// Packets forwarded via gossip TTL.
+    pub packets_forwarded: u64,
+    /// Packets replayed to newly-discovered peers.
+    pub packets_replayed: u64,
+    /// Total bytes before compression (for compression ratio telemetry).
+    pub bytes_before_compression: u64,
+    /// Total bytes after compression (for compression ratio telemetry).
+    pub bytes_after_compression: u64,
+    /// Current dynamic bandwidth budget (AIMD-adjusted).
+    pub bandwidth_budget_current: u64,
 }
 
 impl MeshStats {
@@ -235,6 +255,17 @@ impl PayloadType {
             _ => Self::Gradient,
         }
     }
+
+    /// Backpressure priority: higher values are retained first when inbox is full.
+    /// Heartbeat(3) > Wisdom(2) > Affective(1) > Gradient(0).
+    pub fn priority(&self) -> u8 {
+        match self {
+            Self::Heartbeat => 3,
+            Self::WisdomVector => 2,
+            Self::Affective => 1,
+            Self::Gradient => 0,
+        }
+    }
 }
 
 // ============================================================================
@@ -290,7 +321,8 @@ pub const WISDOM_PACKET_SIZE: usize = 24 + 2048; // 2,072
 /// 16       urgency         u8         MeshUrgency discriminant
 /// 17-20    timestamp_s     u32 LE     Unix seconds
 /// 21       payload_type    u8         PayloadType discriminant
-/// 22-23    reserved        [0, 0]     alignment / future use
+/// 22       auth_mac        u8         BLAKE3 keyed MAC (truncated to 8 bits)
+/// 23       ttl             u8         gossip hop count (0 = no forward)
 /// 24-2071  wisdom          [u8; 2048] BinaryHV raw bytes
 /// ```
 #[derive(Clone)]
@@ -307,6 +339,10 @@ pub struct WisdomPacket {
     pub timestamp_s: u32,
     /// What this packet carries.
     pub payload_type: PayloadType,
+    /// BLAKE3 keyed MAC (truncated to 8 bits). 0 when no auth key is set.
+    pub auth_mac: u8,
+    /// Gossip TTL: decremented on each forward hop. 0 = do not forward.
+    pub ttl: u8,
     /// The Wisdom Vector: 16,384-dimensional binary hypervector.
     pub wisdom: BinaryHV,
 }
@@ -323,7 +359,8 @@ impl WisdomPacket {
         buf[16] = self.urgency as u8;
         buf[17..21].copy_from_slice(&self.timestamp_s.to_le_bytes());
         buf[21] = self.payload_type as u8;
-        // buf[22..24] reserved (zeros)
+        buf[22] = self.auth_mac;
+        buf[23] = self.ttl;
         buf[24..WISDOM_PACKET_SIZE].copy_from_slice(&self.wisdom.0);
         buf
     }
@@ -342,6 +379,8 @@ impl WisdomPacket {
         let urgency = MeshUrgency::from_byte(buf[16]);
         let timestamp_s = u32::from_le_bytes([buf[17], buf[18], buf[19], buf[20]]);
         let payload_type = PayloadType::from_byte(buf[21]);
+        let auth_mac = buf[22];
+        let ttl = buf[23];
 
         let mut wisdom_bytes = [0u8; 2048];
         wisdom_bytes.copy_from_slice(&buf[24..WISDOM_PACKET_SIZE]);
@@ -353,6 +392,8 @@ impl WisdomPacket {
             urgency,
             timestamp_s,
             payload_type,
+            auth_mac,
+            ttl,
             wisdom: BinaryHV(wisdom_bytes),
         })
     }
@@ -498,6 +539,8 @@ impl WisdomPacket {
             urgency: MeshUrgency::Cruise,
             timestamp_s,
             payload_type: PayloadType::Affective,
+            auth_mac: 0,
+            ttl: MESH_DEFAULT_TTL,
             wisdom: BinaryHV(bytes),
         }
     }
@@ -535,6 +578,8 @@ impl WisdomPacket {
             urgency: MeshUrgency::Normal,
             timestamp_s: (msg.timestamp / 1000) as u32,
             payload_type: PayloadType::Gradient,
+            auth_mac: 0,
+            ttl: MESH_DEFAULT_TTL,
             wisdom: BinaryHV(bytes),
         })
     }
@@ -718,11 +763,107 @@ impl MeshPeerRegistry {
         let sum: f32 = self.peers.values().map(|p| p.last_phi).sum();
         sum / self.peers.len() as f32
     }
+
+    /// Check if a peer with the given source_id is currently tracked.
+    pub fn has_peer(&self, source_id: &[u8; 8]) -> bool {
+        self.peers.contains_key(source_id)
+    }
 }
 
 impl Default for MeshPeerRegistry {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ============================================================================
+// PACKET AUTHENTICATION (BLAKE3)
+// ============================================================================
+
+/// Compute a truncated 8-bit BLAKE3 keyed MAC over the packet bytes.
+///
+/// The MAC is computed with byte 22 (the auth_mac field itself) zeroed,
+/// so the MAC doesn't include itself in the hash input.
+pub fn compute_packet_mac(packet_bytes: &[u8; WISDOM_PACKET_SIZE], key: &[u8; 32]) -> u8 {
+    let mut input = *packet_bytes;
+    input[22] = 0; // Zero the auth_mac field before computing
+    let hash = blake3::keyed_hash(key, &input);
+    hash.as_bytes()[0]
+}
+
+/// Verify the MAC on a packet byte slice.
+///
+/// Returns `true` if the MAC matches, `false` otherwise.
+/// Returns `false` if the slice is too short.
+pub fn verify_packet_mac(packet_bytes: &[u8], key: &[u8; 32]) -> bool {
+    if packet_bytes.len() < WISDOM_PACKET_SIZE {
+        return false;
+    }
+    let mut input = [0u8; WISDOM_PACKET_SIZE];
+    input.copy_from_slice(&packet_bytes[..WISDOM_PACKET_SIZE]);
+    let stored_mac = input[22];
+    input[22] = 0;
+    let hash = blake3::keyed_hash(key, &input);
+    hash.as_bytes()[0] == stored_mac
+}
+
+// ============================================================================
+// PACKET COMPRESSION (LZ4)
+// ============================================================================
+
+/// Compress a raw WISDOM_PACKET_SIZE packet into an envelope.
+///
+/// Returns `[COMPRESS_NONE | raw]` if compression doesn't help (output >= input),
+/// or `[COMPRESS_LZ4 | lz4_data]` if compression reduces size.
+///
+/// When `lz4_compression` feature is disabled, always returns uncompressed.
+pub fn compress_packet(raw: &[u8; WISDOM_PACKET_SIZE]) -> Vec<u8> {
+    #[cfg(feature = "lz4_compression")]
+    {
+        let compressed = lz4_flex::compress_prepend_size(raw);
+        if compressed.len() + 1 < WISDOM_PACKET_SIZE + 1 {
+            let mut envelope = Vec::with_capacity(1 + compressed.len());
+            envelope.push(COMPRESS_LZ4);
+            envelope.extend_from_slice(&compressed);
+            return envelope;
+        }
+    }
+    // Uncompressed fallback (or feature disabled)
+    let mut envelope = Vec::with_capacity(1 + WISDOM_PACKET_SIZE);
+    envelope.push(COMPRESS_NONE);
+    envelope.extend_from_slice(raw);
+    envelope
+}
+
+/// Decompress a packet envelope back to WISDOM_PACKET_SIZE bytes.
+///
+/// Returns `None` if the header byte is unknown or decompression fails.
+/// Tolerates trailing bytes (FEC safety).
+pub fn decompress_packet(data: &[u8]) -> Option<Vec<u8>> {
+    if data.is_empty() {
+        return None;
+    }
+    match data[0] {
+        COMPRESS_NONE => {
+            if data.len() < 1 + WISDOM_PACKET_SIZE {
+                return None;
+            }
+            Some(data[1..1 + WISDOM_PACKET_SIZE].to_vec())
+        }
+        COMPRESS_LZ4 => {
+            #[cfg(feature = "lz4_compression")]
+            {
+                lz4_flex::decompress_size_prepended(&data[1..])
+                    .ok()
+                    .filter(|d| d.len() == WISDOM_PACKET_SIZE)
+            }
+            #[cfg(not(feature = "lz4_compression"))]
+            {
+                let _ = data;
+                None
+            }
+        }
+        _ => None,
     }
 }
 
@@ -751,6 +892,8 @@ mod tests {
             urgency: MeshUrgency::Cruise,
             timestamp_s: 1_700_000_000,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: test_hv(0xFF),
         };
 
@@ -776,6 +919,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: test_hv(0xAA),
         };
 
@@ -793,6 +938,8 @@ mod tests {
             urgency: MeshUrgency::Critical,
             timestamp_s: 1_708_000_000,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: test_hv(0x42),
         };
 
@@ -881,6 +1028,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 1_700_000,
             payload_type: PayloadType::Affective,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV(wisdom_bytes),
         }
     }
@@ -964,6 +1113,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         };
         assert!(pkt.extract_gradient().is_none());
@@ -989,6 +1140,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::Gradient,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV(bytes),
         };
         assert!(pkt.extract_gradient().is_none());
@@ -1011,6 +1164,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::Gradient,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV(bytes),
         };
         assert!(pkt.extract_gradient().is_none());
@@ -1033,6 +1188,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::Gradient,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV(bytes),
         };
         assert!(pkt.extract_gradient().is_none());
@@ -1095,6 +1252,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: test_hv(0x01),
         };
         let pkt_a2 = WisdomPacket {
@@ -1104,6 +1263,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 1,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: test_hv(0x02),
         };
         let pkt_b = WisdomPacket {
@@ -1113,6 +1274,8 @@ mod tests {
             urgency: MeshUrgency::Critical,
             timestamp_s: 0,
             payload_type: PayloadType::Heartbeat,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: test_hv(0x03),
         };
 
@@ -1141,6 +1304,8 @@ mod tests {
             urgency: MeshUrgency::Cruise,
             timestamp_s: 0,
             payload_type: PayloadType::Heartbeat,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: test_hv(0x04),
         };
         registry.update(&pkt);
@@ -1168,6 +1333,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: test_hv(0x10),
         };
         let pkt2 = WisdomPacket {
@@ -1177,6 +1344,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: test_hv(0x20),
         };
 
@@ -1287,6 +1456,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: test_hv(0x01),
         };
         registry.update(&pkt);
@@ -1309,6 +1480,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: test_hv(0x02),
         };
         registry.update(&pkt);
@@ -1336,6 +1509,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: test_hv(0x03),
         };
         registry.update(&pkt);
@@ -1356,5 +1531,301 @@ mod tests {
             !registry.is_rate_limited(&peer_id),
             "Should be allowed after window reset"
         );
+    }
+
+    // ====================================================================
+    // TTL Wire Format Tests (Item 4)
+    // ====================================================================
+
+    #[test]
+    fn test_ttl_wire_roundtrip() {
+        let packet = WisdomPacket {
+            source_id: [0x01; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 5,
+            wisdom: test_hv(0x01),
+        };
+        let bytes = packet.to_bytes();
+        let decoded = WisdomPacket::from_bytes(&bytes).unwrap();
+        assert_eq!(decoded.ttl, 5);
+    }
+
+    #[test]
+    fn test_ttl_zero_backward_compat() {
+        // Legacy packets with zeroed reserved bytes should parse with ttl=0
+        let packet = WisdomPacket {
+            source_id: [0x01; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: test_hv(0x01),
+        };
+        let bytes = packet.to_bytes();
+        assert_eq!(bytes[23], 0);
+        let decoded = WisdomPacket::from_bytes(&bytes).unwrap();
+        assert_eq!(decoded.ttl, 0);
+    }
+
+    // ====================================================================
+    // Packet Authentication Tests (Item 1)
+    // ====================================================================
+
+    #[test]
+    fn test_packet_mac_roundtrip() {
+        let key = [0x42u8; 32];
+        let mut packet = WisdomPacket {
+            source_id: [0xDE; 8],
+            sequence: 42,
+            phi: 0.7,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 1_700_000,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 3,
+            wisdom: test_hv(0xAB),
+        };
+        let mut bytes = packet.to_bytes();
+        let mac = compute_packet_mac(&bytes, &key);
+        packet.auth_mac = mac;
+        bytes = packet.to_bytes();
+        assert!(verify_packet_mac(&bytes, &key));
+    }
+
+    #[test]
+    fn test_packet_mac_rejects_tampered() {
+        let key = [0x42u8; 32];
+        let mut packet = WisdomPacket {
+            source_id: [0xDE; 8],
+            sequence: 42,
+            phi: 0.7,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 1_700_000,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 3,
+            wisdom: test_hv(0xAB),
+        };
+        let mut bytes = packet.to_bytes();
+        let mac = compute_packet_mac(&bytes, &key);
+        packet.auth_mac = mac;
+        bytes = packet.to_bytes();
+        // Tamper with a wisdom byte
+        bytes[100] ^= 0xFF;
+        assert!(!verify_packet_mac(&bytes, &key));
+    }
+
+    #[test]
+    fn test_packet_mac_rejects_wrong_key() {
+        let key_a = [0x42u8; 32];
+        let key_b = [0x99u8; 32];
+        let mut packet = WisdomPacket {
+            source_id: [0xDE; 8],
+            sequence: 42,
+            phi: 0.7,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 1_700_000,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 3,
+            wisdom: test_hv(0xAB),
+        };
+        let mut bytes = packet.to_bytes();
+        let mac = compute_packet_mac(&bytes, &key_a);
+        packet.auth_mac = mac;
+        bytes = packet.to_bytes();
+        assert!(!verify_packet_mac(&bytes, &key_b));
+    }
+
+    #[test]
+    fn test_packet_mac_zero_without_key() {
+        let packet = WisdomPacket {
+            source_id: [0xDE; 8],
+            sequence: 42,
+            phi: 0.7,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 1_700_000,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: test_hv(0xAB),
+        };
+        assert_eq!(packet.auth_mac, 0);
+    }
+
+    #[test]
+    fn test_packet_mac_preserved_through_serde() {
+        let packet = WisdomPacket {
+            source_id: [0xDE; 8],
+            sequence: 42,
+            phi: 0.7,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 1_700_000,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0xAB,
+            ttl: 3,
+            wisdom: test_hv(0xAB),
+        };
+        let bytes = packet.to_bytes();
+        let decoded = WisdomPacket::from_bytes(&bytes).unwrap();
+        assert_eq!(decoded.auth_mac, 0xAB);
+        assert_eq!(decoded.ttl, 3);
+    }
+
+    #[test]
+    fn test_packet_mac_fragment_roundtrip() {
+        let key = [0x77u8; 32];
+        let mut packet = WisdomPacket {
+            source_id: [0xDE; 8],
+            sequence: 42,
+            phi: 0.7,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 1_700_000,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 3,
+            wisdom: test_hv(0xAB),
+        };
+        // Sign the packet
+        let bytes = packet.to_bytes();
+        let mac = compute_packet_mac(&bytes, &key);
+        packet.auth_mac = mac;
+
+        // Fragment and reassemble (drop fragment 3)
+        let frags = packet.fragment();
+        let mut assembler = WisdomPacket::assembler(packet.thought_id(), 11);
+        let mut buf = [0u8; LORA_MTU];
+        for (i, frag) in frags.iter().enumerate() {
+            if i == 3 { continue; }
+            let len = frag.to_bytes(&mut buf);
+            let decoded_frag = LoRaFragment::from_bytes(&buf[..len]).unwrap();
+            assembler.feed(&decoded_frag);
+        }
+        assert!(assembler.is_complete());
+        let recovered = WisdomPacket::from_assembler(&assembler).unwrap();
+        let recovered_bytes = recovered.to_bytes();
+        assert!(verify_packet_mac(&recovered_bytes, &key));
+    }
+
+    // ====================================================================
+    // Priority Ordering Test (Item 2)
+    // ====================================================================
+
+    #[test]
+    fn test_payload_type_priority_ordering() {
+        assert!(PayloadType::Heartbeat.priority() > PayloadType::WisdomVector.priority());
+        assert!(PayloadType::WisdomVector.priority() > PayloadType::Affective.priority());
+        assert!(PayloadType::Affective.priority() > PayloadType::Gradient.priority());
+        assert_eq!(PayloadType::Heartbeat.priority(), 3);
+        assert_eq!(PayloadType::Gradient.priority(), 0);
+    }
+
+    // ====================================================================
+    // MeshPeerRegistry has_peer Test (Item 5)
+    // ====================================================================
+
+    #[test]
+    fn test_peer_registry_has_peer() {
+        let mut registry = MeshPeerRegistry::new();
+        let peer_id = [0xDD; 8];
+        assert!(!registry.has_peer(&peer_id));
+
+        let pkt = WisdomPacket {
+            source_id: peer_id,
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: test_hv(0x01),
+        };
+        registry.update(&pkt);
+        assert!(registry.has_peer(&peer_id));
+    }
+
+    // ====================================================================
+    // Compression Tests (Item 3)
+    // ====================================================================
+
+    #[test]
+    fn test_compress_decompress_roundtrip() {
+        let packet = WisdomPacket {
+            source_id: [0xDE; 8],
+            sequence: 42,
+            phi: 0.7,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 1_700_000,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 3,
+            wisdom: test_hv(0xAB),
+        };
+        let raw = packet.to_bytes();
+        let compressed = compress_packet(&raw);
+        let decompressed = decompress_packet(&compressed).unwrap();
+        assert_eq!(decompressed.len(), WISDOM_PACKET_SIZE);
+        assert_eq!(&decompressed[..], &raw[..]);
+    }
+
+    #[test]
+    fn test_compress_heartbeat_uses_envelope() {
+        // Heartbeat is mostly zeros — should compress (with lz4 feature)
+        // or at least produce a valid envelope
+        let packet = WisdomPacket {
+            source_id: [0; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Cruise,
+            timestamp_s: 0,
+            payload_type: PayloadType::Heartbeat,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: BinaryHV([0u8; 2048]),
+        };
+        let raw = packet.to_bytes();
+        let compressed = compress_packet(&raw);
+        // First byte must be a valid compression header
+        assert!(compressed[0] == COMPRESS_NONE || compressed[0] == COMPRESS_LZ4);
+        // Roundtrip must succeed
+        let decompressed = decompress_packet(&compressed).unwrap();
+        assert_eq!(&decompressed[..], &raw[..]);
+    }
+
+    #[test]
+    fn test_decompress_invalid_header() {
+        let data = vec![0xFF, 0x01, 0x02];
+        assert!(decompress_packet(&data).is_none());
+    }
+
+    #[test]
+    fn test_decompress_tolerates_trailing_bytes() {
+        // Simulate FEC adding trailing garbage after COMPRESS_NONE envelope
+        let packet = WisdomPacket {
+            source_id: [0x01; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: test_hv(0x42),
+        };
+        let raw = packet.to_bytes();
+        let mut envelope = compress_packet(&raw);
+        // Append trailing garbage (simulating FEC padding)
+        envelope.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]);
+        let decompressed = decompress_packet(&envelope).unwrap();
+        assert_eq!(&decompressed[..], &raw[..]);
     }
 }

@@ -486,6 +486,8 @@ mod tests {
             urgency,
             timestamp_s: 1_700_000_000,
             payload_type: super::super::PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: test_hv(0xAB),
         }
     }

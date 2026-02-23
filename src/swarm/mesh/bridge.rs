@@ -242,6 +242,8 @@ mod tests {
                     urgency: super::super::MeshUrgency::Normal,
                     timestamp_s: 0,
                     payload_type: super::super::PayloadType::WisdomVector,
+                    auth_mac: 0,
+                    ttl: 0,
                     wisdom: symthaea_core::hdc::BinaryHV([0u8; 2048]),
                 },
             })
