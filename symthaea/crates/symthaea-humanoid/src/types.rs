@@ -353,6 +353,14 @@ pub struct HumanoidConfig {
     pub task: HumanoidTask,
     /// Target speed override (None = use task default).
     pub target_speed: Option<f64>,
+    /// Enable adaptive curriculum (performance-based phase transitions).
+    pub adaptive_curriculum: bool,
+    /// Standing reward threshold to consider standing "mastered".
+    pub standing_mastery_threshold: f64,
+    /// Consecutive qualifying episodes needed to advance curriculum phase.
+    pub mastery_streak_required: usize,
+    /// Exploration decay rate for the FEP agent's leaky accumulator.
+    pub exploration_decay_rate: f64,
 }
 
 impl Default for HumanoidConfig {
@@ -375,6 +383,10 @@ impl Default for HumanoidConfig {
             early_termination: true,
             task: HumanoidTask::Stand,
             target_speed: None,
+            adaptive_curriculum: true,
+            standing_mastery_threshold: 0.85,
+            mastery_streak_required: 3,
+            exploration_decay_rate: 0.5,
         }
     }
 }

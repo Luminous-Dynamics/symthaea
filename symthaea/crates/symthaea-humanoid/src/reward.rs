@@ -38,17 +38,43 @@ pub fn locomotion_reward(state: &HumanoidState, target_speed: f64) -> f64 {
     tolerance_linear(horizontal_speed, target_speed, f64::INFINITY, margin)
 }
 
+/// Gait symmetry reward: incentivizes alternating foot contact.
+///
+/// Returns higher reward when feet are at different heights (one lifted, one grounded),
+/// which indicates proper bipedal gait with swing/stance alternation.
+/// Uses Gaussian tolerance: 1.0 when foot height difference >= 0.03m, decays below.
+pub fn gait_symmetry_reward(state: &HumanoidState) -> f64 {
+    let r_foot_z = state.extremities[8];
+    let l_foot_z = state.extremities[11];
+    let height_diff = (r_foot_z - l_foot_z).abs();
+    // Proper gait lifts one foot ~0.05-0.15m while other is grounded
+    tolerance(height_diff, 0.03, f64::INFINITY, 0.06)
+}
+
+/// Metabolic efficiency reward: penalizes sum of squared torques.
+///
+/// Biological walkers minimize energy expenditure (Cost of Transport).
+/// This reward incentivizes passive dynamics — using gravity and momentum
+/// instead of motor force. Returns 1.0 for zero torque, decays toward 0
+/// for high torque.
+pub fn metabolic_efficiency_reward(cmd: &HumanoidCommand) -> f64 {
+    let sum_sq: f64 = cmd.torques.iter().map(|t| (*t as f64) * (*t as f64)).sum();
+    // Normalize: 21 actuators, max torque 1.0 each → max sum_sq = 21
+    let normalized = sum_sq / 21.0;
+    (-2.0 * normalized).exp()
+}
+
 /// Combined episode reward based on task with curriculum target speed.
 ///
 /// - Stand: standing_reward × small_control
-/// - Walk/Run: 0.6 × standing + 0.4 × locomotion (additive blend)
+/// - Walk/Run: 0.4 × standing + 0.3 × locomotion + 0.15 × symmetry + 0.15 × metabolic
 ///
 /// The additive formulation ensures a gradient signal exists even when
 /// horizontal speed is far from target (multiplicative `stand × locomotion`
 /// collapses to ~0 when either factor is small, starving the learner).
 ///
 /// The `target_speed` parameter allows the curriculum to ramp speed gradually
-/// (e.g., Walk: 0→1 m/s, Run: 1→5 m/s).
+/// (e.g., Walk: 0→1 m/s, Run: 1→3 m/s).
 pub fn episode_reward(
     state: &HumanoidState,
     cmd: &HumanoidCommand,
@@ -59,7 +85,10 @@ pub fn episode_reward(
     match task {
         HumanoidTask::Stand => stand,
         HumanoidTask::Walk | HumanoidTask::Run => {
-            0.6 * stand + 0.4 * locomotion_reward(state, target_speed)
+            let locomotion = locomotion_reward(state, target_speed);
+            let symmetry = gait_symmetry_reward(state);
+            let metabolic = metabolic_efficiency_reward(cmd);
+            0.4 * stand + 0.3 * locomotion + 0.15 * symmetry + 0.15 * metabolic
         }
     }
 }
@@ -215,6 +244,55 @@ mod tests {
         assert!(
             reward > 0.5,
             "Walk with target_speed=0 should reward standing: {reward}"
+        );
+    }
+
+    #[test]
+    fn test_gait_symmetry_feet_alternating() {
+        let mut state = HumanoidState::standing();
+        // One foot lifted 0.1m, other on ground
+        state.extremities[8] = 0.0; // right foot on ground
+        state.extremities[11] = 0.1; // left foot lifted
+        let reward = gait_symmetry_reward(&state);
+        assert!(
+            reward > 0.8,
+            "Alternating feet should give high symmetry reward: {reward}"
+        );
+    }
+
+    #[test]
+    fn test_gait_symmetry_both_grounded() {
+        let mut state = HumanoidState::standing();
+        state.extremities[8] = 0.0;
+        state.extremities[11] = 0.0;
+        let reward = gait_symmetry_reward(&state);
+        assert!(
+            reward < 0.5,
+            "Both feet on ground should give low symmetry reward: {reward}"
+        );
+    }
+
+    #[test]
+    fn test_metabolic_efficiency_zero_torque() {
+        let cmd = HumanoidCommand::zero();
+        let reward = metabolic_efficiency_reward(&cmd);
+        assert!(
+            (reward - 1.0).abs() < 0.01,
+            "Zero torque should give max metabolic reward: {reward}"
+        );
+    }
+
+    #[test]
+    fn test_metabolic_efficiency_high_torque() {
+        let cmd = HumanoidCommand { torques: [0.8; 21] };
+        let reward = metabolic_efficiency_reward(&cmd);
+        assert!(
+            reward < 0.5,
+            "High torque should give low metabolic reward: {reward}"
+        );
+        assert!(
+            reward > 0.0,
+            "Metabolic reward should stay positive: {reward}"
         );
     }
 
