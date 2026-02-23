@@ -400,7 +400,12 @@ impl HumanoidController {
         let network = HdcLtcUnifiedNetwork::from_genesis(net_config, &genesis);
 
         let mut output_bias = [0.0f32; NUM_ACTUATORS];
-        for (i, &v) in checkpoint.output_bias.iter().enumerate().take(NUM_ACTUATORS) {
+        for (i, &v) in checkpoint
+            .output_bias
+            .iter()
+            .enumerate()
+            .take(NUM_ACTUATORS)
+        {
             output_bias[i] = v;
         }
 
