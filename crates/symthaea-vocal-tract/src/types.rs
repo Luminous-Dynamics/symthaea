@@ -5,6 +5,39 @@
 use serde::{Deserialize, Serialize};
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SOURCE TYPE — manner of articulation for vocoder excitation selection
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Manner of articulation for vocoder source selection.
+///
+/// The vocoder uses different excitation signals depending on the phoneme's
+/// manner of articulation:
+/// - **Vowel/Liquid**: Glottal pulse + aspiration + noise mix
+/// - **Stop**: Silence (closure) + noise burst
+/// - **Fricative**: Shaped noise + optional voicing bar
+/// - **Nasal**: Voiced source + nasal anti-formant
+/// - **Affricate**: Closure + burst + frication
+/// - **Silent**: Zero output
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum SourceType {
+    /// Vowels and vowel-like sounds (default excitation)
+    #[default]
+    Vowel,
+    /// Plosive stops (P, T, K, B, D, G) — closure + burst
+    Stop,
+    /// Fricatives (S, SH, F, TH, ...) — shaped noise
+    Fricative,
+    /// Nasals (M, N, NG) — voiced + anti-formant
+    Nasal,
+    /// Affricates (CH, JH) — stop + fricative
+    Affricate,
+    /// Liquids and glides (L, R, W, Y) — vowel-like
+    Liquid,
+    /// Silence
+    Silent,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // FORMANT FRAME
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -31,6 +64,8 @@ pub struct FormantFrame {
     pub voicing: f32,
     /// Timestamp in seconds
     pub time: f32,
+    /// Source excitation type (manner of articulation for vocoder).
+    pub source_type: SourceType,
 }
 
 impl FormantFrame {
@@ -47,6 +82,7 @@ impl FormantFrame {
             energy: 0.0,
             voicing: 0.0,
             time,
+            source_type: SourceType::Silent,
         }
     }
 
@@ -63,6 +99,7 @@ impl FormantFrame {
             energy,
             voicing: if target.is_voiced { 1.0 } else { 0.0 },
             time,
+            source_type: target.manner,
         }
     }
 
@@ -80,6 +117,11 @@ impl FormantFrame {
             energy: self.energy + (other.energy - self.energy) * t,
             voicing: self.voicing + (other.voicing - self.voicing) * t,
             time: self.time + (other.time - self.time) * t,
+            source_type: if t < 0.5 {
+                self.source_type
+            } else {
+                other.source_type
+            },
         }
     }
 }
@@ -115,6 +157,8 @@ pub struct FormantTarget {
     pub is_vowel: bool,
     /// Whether this is voiced
     pub is_voiced: bool,
+    /// Manner of articulation (determines vocoder source type).
+    pub manner: SourceType,
 }
 
 impl FormantTarget {
@@ -130,6 +174,7 @@ impl FormantTarget {
             duration_ms,
             is_vowel: true,
             is_voiced: true,
+            manner: SourceType::Vowel,
         }
     }
 
@@ -145,6 +190,7 @@ impl FormantTarget {
             duration_ms,
             is_vowel: false,
             is_voiced: true,
+            manner: SourceType::Liquid,
         }
     }
 
@@ -160,7 +206,14 @@ impl FormantTarget {
             duration_ms,
             is_vowel: false,
             is_voiced: false,
+            manner: SourceType::Fricative,
         }
+    }
+
+    /// Override the manner of articulation (builder pattern).
+    pub const fn with_manner(mut self, manner: SourceType) -> Self {
+        self.manner = manner;
+        self
     }
 
     /// Interpolate between two formant targets
@@ -183,6 +236,11 @@ impl FormantTarget {
                 self.is_voiced
             } else {
                 other.is_voiced
+            },
+            manner: if t < 0.5 {
+                self.manner
+            } else {
+                other.manner
             },
         }
     }

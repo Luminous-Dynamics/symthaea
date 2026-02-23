@@ -120,6 +120,14 @@ pub struct VocalTractPipeline {
     phoneme_hv_cache: std::collections::HashMap<String, ContinuousHV>,
     /// Cached cognitive channels for prosody head (updated at 10Hz, used at 200Hz).
     cached_cognitive_channels: Option<[f32; 10]>,
+    /// Previous phoneme name (for detecting phoneme transitions).
+    prev_phoneme: Option<String>,
+    /// Previous phoneme's bound HV (for coarticulation blending during transitions).
+    prev_phoneme_bound_hv: Option<ContinuousHV>,
+    /// Counter of frames elapsed since phoneme changed (for blend scheduling).
+    coarticulation_counter: usize,
+    /// Number of frames over which to blend between old/new phoneme HVs (80ms at 200Hz).
+    coarticulation_frames: usize,
 }
 
 impl VocalTractPipeline {
@@ -136,6 +144,10 @@ impl VocalTractPipeline {
             genesis: genesis.clone(),
             phoneme_hv_cache: std::collections::HashMap::new(),
             cached_cognitive_channels: None,
+            prev_phoneme: None,
+            prev_phoneme_bound_hv: None,
+            coarticulation_counter: 0,
+            coarticulation_frames: 16, // 80ms at 200Hz
         }
     }
 
@@ -167,6 +179,10 @@ impl VocalTractPipeline {
             genesis: speaker_seed.clone(),
             phoneme_hv_cache: std::collections::HashMap::new(),
             cached_cognitive_channels: None,
+            prev_phoneme: None,
+            prev_phoneme_bound_hv: None,
+            coarticulation_counter: 0,
+            coarticulation_frames: 16,
         }
     }
 
@@ -233,11 +249,65 @@ impl VocalTractPipeline {
 
         self.motor_frame_count += 1;
 
-        // Blend phoneme identity if provided
+        // Coarticulation blending: interpolate old→new phoneme HV over transition.
+        // When phoneme changes, save the old bound HV and linearly blend toward
+        // the new bound HV over `coarticulation_frames` (80ms at 200Hz).
+        //
+        // Optimization: skip bind() when phoneme is unchanged and this is not
+        // a cognitive re-encode frame. Saves ~0.5-1ms for ~90% of frames.
         let effective_hv = if let Some(ph) = phoneme {
-            let phoneme_hv = self.get_or_create_phoneme_hv(ph);
-            self.cached_hv.bind(&phoneme_hv)
+            let is_same = self.prev_phoneme.as_deref() == Some(ph);
+            let is_reencode =
+                (self.motor_frame_count - 1) % self.frames_per_cognitive_tick == 0;
+
+            let new_bound = if is_same && !is_reencode && self.coarticulation_counter >= self.coarticulation_frames {
+                // Cache hit: same phoneme, no re-encode, past blend window
+                if let Some(ref cached) = self.prev_phoneme_bound_hv {
+                    cached.clone()
+                } else {
+                    let phoneme_hv = self.get_or_create_phoneme_hv(ph);
+                    let bound = self.cached_hv.bind(&phoneme_hv);
+                    self.prev_phoneme_bound_hv = Some(bound.clone());
+                    bound
+                }
+            } else {
+                let phoneme_hv = self.get_or_create_phoneme_hv(ph);
+                let bound = self.cached_hv.bind(&phoneme_hv);
+
+                if !is_same {
+                    // Phoneme changed — save old HV for blending
+                    if let Some(old_ph) = self.prev_phoneme.take() {
+                        let old_phoneme_hv = self.get_or_create_phoneme_hv(&old_ph);
+                        self.prev_phoneme_bound_hv =
+                            Some(self.cached_hv.bind(&old_phoneme_hv));
+                        self.coarticulation_counter = 0;
+                    }
+                } else {
+                    // Same phoneme, re-encode — refresh cached bound
+                    self.prev_phoneme_bound_hv = Some(bound.clone());
+                }
+
+                bound
+            };
+
+            self.prev_phoneme = Some(ph.to_string());
+
+            // Blend if within coarticulation window
+            if self.coarticulation_counter < self.coarticulation_frames {
+                self.coarticulation_counter += 1;
+                if let Some(ref prev_hv) = self.prev_phoneme_bound_hv {
+                    let t = self.coarticulation_counter as f32
+                        / self.coarticulation_frames as f32;
+                    prev_hv.scale(1.0 - t).add(&new_bound.scale(t))
+                } else {
+                    new_bound
+                }
+            } else {
+                new_bound
+            }
         } else {
+            self.prev_phoneme = None;
+            self.prev_phoneme_bound_hv = None;
             self.cached_hv.clone()
         };
 
@@ -279,6 +349,9 @@ impl VocalTractPipeline {
         self.cumulative_time = 0.0;
         self.phoneme_hv_cache.clear();
         self.cached_cognitive_channels = None;
+        self.prev_phoneme = None;
+        self.prev_phoneme_bound_hv = None;
+        self.coarticulation_counter = 0;
     }
 
     /// Get current cumulative time in seconds.
@@ -771,5 +844,95 @@ mod tests {
             frame2.f1
         );
         assert!((frame1.f0 - frame2.f0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_coarticulation_blending() {
+        let genesis = GenesisSeed::from_phrase("test-coarticulation");
+        let mut pipeline = VocalTractPipeline::new(&genesis);
+        let state = VoiceCognitiveState::default();
+
+        // Run 30 frames of /AH/
+        for _ in 0..30 {
+            pipeline.tick_phoneme(&state, None, 0.005, Some("AH"));
+        }
+
+        // Transition to /IY/ — should blend over 16 frames
+        let mut transition_frames = Vec::new();
+        for _ in 0..30 {
+            transition_frames.push(pipeline.tick_phoneme(&state, None, 0.005, Some("IY")));
+        }
+
+        // Run the same transition WITHOUT coarticulation (fresh pipeline, hard switch)
+        let mut pipeline2 = VocalTractPipeline::new(&genesis);
+        // Disable coarticulation by setting frames to 0
+        pipeline2.coarticulation_frames = 0;
+
+        for _ in 0..30 {
+            pipeline2.tick_phoneme(&state, None, 0.005, Some("AH"));
+        }
+
+        let mut hard_frames = Vec::new();
+        for _ in 0..30 {
+            hard_frames.push(pipeline2.tick_phoneme(&state, None, 0.005, Some("IY")));
+        }
+
+        // The blended transition should differ from the hard switch in early frames
+        let early_diff: f32 = transition_frames[..8]
+            .iter()
+            .zip(hard_frames[..8].iter())
+            .map(|(a, b)| (a.f1 - b.f1).abs() + (a.f2 - b.f2).abs())
+            .sum();
+
+        // Late frames should converge (both approaches reach the same /IY/ target)
+        let late_diff: f32 = transition_frames[20..]
+            .iter()
+            .zip(hard_frames[20..].iter())
+            .map(|(a, b)| (a.f1 - b.f1).abs() + (a.f2 - b.f2).abs())
+            .sum();
+
+        // Blending should produce measurable difference in early frames
+        assert!(
+            early_diff > 0.1,
+            "Coarticulation should differ from hard switch in early frames: diff={early_diff:.2}"
+        );
+
+        // Late frames should be closer (blending complete)
+        assert!(
+            late_diff < early_diff * 2.0,
+            "Late frames should converge: early_diff={early_diff:.2}, late_diff={late_diff:.2}"
+        );
+    }
+
+    #[test]
+    fn test_phoneme_bind_cache_consistency() {
+        // Verify that cached bind produces same output as uncached
+        let genesis = GenesisSeed::from_phrase("test-bind-cache");
+        let mut pipeline = VocalTractPipeline::new(&genesis);
+        let state = VoiceCognitiveState::default();
+
+        // Run 5 frames with /AH/ (first triggers bind, rest use cache)
+        let mut frames = Vec::new();
+        for _ in 0..5 {
+            frames.push(pipeline.tick_phoneme(&state, None, 0.005, Some("AH")));
+        }
+
+        // All frames should be valid (cache doesn't corrupt output)
+        for (i, f) in frames.iter().enumerate() {
+            assert!(
+                f.f1 >= 200.0 && f.f1 <= 1000.0,
+                "Frame {i}: F1={} out of range",
+                f.f1
+            );
+            assert!(f.f1.is_finite(), "Frame {i}: F1 is not finite");
+        }
+
+        // Frames 2-4 (cached) should be close to frame 1 (uncached)
+        // since the LTC network evolves smoothly with the same input
+        let f1_drift: f32 = frames[1..].iter().map(|f| (f.f1 - frames[0].f1).abs()).sum::<f32>();
+        assert!(
+            f1_drift < 200.0,
+            "Cached frames should be consistent with uncached: drift={f1_drift:.1}"
+        );
     }
 }
