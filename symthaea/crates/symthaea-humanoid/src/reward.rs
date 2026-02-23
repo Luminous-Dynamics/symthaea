@@ -48,7 +48,8 @@ pub fn gait_symmetry_reward(state: &HumanoidState) -> f64 {
     let l_foot_z = state.extremities[11];
     let height_diff = (r_foot_z - l_foot_z).abs();
     // Proper gait lifts one foot ~0.05-0.15m while other is grounded
-    tolerance(height_diff, 0.03, f64::INFINITY, 0.06)
+    // Tight margin (0.03m) penalizes shuffling harshly: 0.25 when both grounded
+    tolerance(height_diff, 0.05, f64::INFINITY, 0.03)
 }
 
 /// Metabolic efficiency reward: penalizes sum of squared torques.

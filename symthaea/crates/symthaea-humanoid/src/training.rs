@@ -371,7 +371,7 @@ impl HumanoidTrainer {
         // Run: 2.0 Hz at 1 m/s → 2.6 Hz at 3 m/s
         let gait_freq = match task {
             HumanoidTask::Walk => 1.2 + 0.6 * target_speed.min(1.0),
-            HumanoidTask::Run => 2.0 + 0.3 * (target_speed - 1.0).max(0.0).min(2.0),
+            HumanoidTask::Run => 2.0 + 0.3 * (target_speed - 1.0).clamp(0.0, 2.0),
             HumanoidTask::Stand => 0.0,
         };
 
@@ -910,6 +910,9 @@ mod tests {
         assert!((pd - 0.8).abs() < 0.01);
 
         // Simulate mastery: high standing reward for 3 consecutive episodes after min 10
+        // Min duration = 10 episodes (ep 0-9), then mastery can fire at ep 9,10,11
+        // Streak of 3 completes at ep 11 → phase advances
+        let mut advanced_at = None;
         for ep in 0..13 {
             let metrics = EpisodeMetrics {
                 episode: ep,
@@ -925,16 +928,21 @@ mod tests {
                 task: HumanoidTask::Stand,
                 telemetry: Vec::new(),
             };
-            let advanced = trainer.check_phase_advance(ep, &metrics);
-            if ep == 12 {
-                // Episode 12 = 13th episode, streak reaches 3 at episodes 10,11,12
-                assert!(advanced, "Should advance after 3 mastery episodes past min duration");
+            if trainer.check_phase_advance(ep, &metrics) {
+                advanced_at = Some(ep);
+                break;
             }
         }
 
+        assert_eq!(
+            advanced_at,
+            Some(11),
+            "Should advance at ep 11 (min 10 + streak 3 at ep 9,10,11)"
+        );
+
         // After advancement: phase 1 (Stand autonomy ramp)
         assert_eq!(trainer.curriculum_state.phase, 1);
-        let (task, pd, _) = trainer.curriculum(13);
+        let (task, pd, _) = trainer.curriculum(12);
         assert_eq!(task, HumanoidTask::Stand);
         assert!((pd - 0.4).abs() < 0.05, "Phase 1 starts at PD ~0.4: {pd}");
     }
