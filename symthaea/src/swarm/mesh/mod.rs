@@ -163,8 +163,7 @@ impl MeshStats {
         };
 
         // Stability: fewer expired peers relative to total activity → better
-        let stability =
-            1.0 - (self.peers_expired as f32 / (self.peers_expired + recv + 1) as f32);
+        let stability = 1.0 - (self.peers_expired as f32 / (self.peers_expired + recv + 1) as f32);
 
         (connectivity * 0.4 + bidirectionality * 0.4 + stability * 0.2).clamp(0.0, 1.0)
     }
@@ -1401,10 +1400,7 @@ mod tests {
         // Bidirectionality: 0 (no receives) → 0.0
         // Stability: 1 - 0/(0+0+1) = 1.0 → 0.20
         // Total = 0.44
-        assert!(
-            score < 0.5,
-            "Send-only mesh should have low score: {score}"
-        );
+        assert!(score < 0.5, "Send-only mesh should have low score: {score}");
         // But not zero — we do have connectivity
         assert!(score > 0.0, "Score should be > 0 with peers: {score}");
     }
@@ -1704,7 +1700,9 @@ mod tests {
         let mut assembler = WisdomPacket::assembler(packet.thought_id(), 11);
         let mut buf = [0u8; LORA_MTU];
         for (i, frag) in frags.iter().enumerate() {
-            if i == 3 { continue; }
+            if i == 3 {
+                continue;
+            }
             let len = frag.to_bytes(&mut buf);
             let decoded_frag = LoRaFragment::from_bytes(&buf[..len]).unwrap();
             assembler.feed(&decoded_frag);

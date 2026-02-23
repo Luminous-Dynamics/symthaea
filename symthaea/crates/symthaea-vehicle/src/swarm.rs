@@ -420,7 +420,10 @@ mod tests {
 
         swarm.reset_braking();
         for peer in swarm.peers() {
-            assert!(!peer.is_braking, "All peers should stop braking after reset");
+            assert!(
+                !peer.is_braking,
+                "All peers should stop braking after reset"
+            );
         }
     }
 

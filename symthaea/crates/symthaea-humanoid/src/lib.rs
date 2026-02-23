@@ -56,9 +56,9 @@ pub mod transfer;
 pub mod types;
 
 pub use controller::{ControllerCheckpoint, HumanoidController};
-pub use gait::GaitAnalyzer;
 pub use encoder::HumanoidHdcEncoder;
 pub use fep_agent::{ActiveInferenceHumanoidAgent, HumanoidFepConfig};
+pub use gait::GaitAnalyzer;
 pub use perturbations::{HumanoidPerturbation, PerturbationSchedule};
 pub use reward::{clearance_reward, cot_efficiency_reward, episode_reward, standing_reward};
 #[cfg(feature = "mujoco")]

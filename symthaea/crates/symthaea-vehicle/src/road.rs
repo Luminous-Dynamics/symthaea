@@ -265,9 +265,7 @@ impl Road {
                 };
                 return match &seg.kind {
                     RoadSegment::Straight { .. } => seg.start_heading,
-                    RoadSegment::Arc { sweep_angle, .. } => {
-                        seg.start_heading + sweep_angle * frac
-                    }
+                    RoadSegment::Arc { sweep_angle, .. } => seg.start_heading + sweep_angle * frac,
                 };
             }
         }
@@ -301,7 +299,11 @@ impl Road {
                         let sign = sweep_angle.signum();
                         let cx = seg.start_x - sign * seg.start_heading.sin() * radius;
                         let cy = seg.start_y + sign * seg.start_heading.cos() * radius;
-                        let frac = if seg.length > 0.0 { ds / seg.length } else { 0.0 };
+                        let frac = if seg.length > 0.0 {
+                            ds / seg.length
+                        } else {
+                            0.0
+                        };
                         let partial_sweep = sweep_angle * frac;
                         let h = seg.start_heading + partial_sweep;
                         let x = cx + sign * h.sin() * radius;
@@ -569,14 +571,8 @@ mod tests {
         }]);
         // End of 90° left arc: should be at (R, R) heading pi/2
         let (x, y, h) = road.position_at(road.total_length);
-        assert!(
-            (x - r).abs() < 1.0,
-            "Quarter turn end x should be ~R: {x}"
-        );
-        assert!(
-            (y - r).abs() < 1.0,
-            "Quarter turn end y should be ~R: {y}"
-        );
+        assert!((x - r).abs() < 1.0, "Quarter turn end x should be ~R: {x}");
+        assert!((y - r).abs() < 1.0, "Quarter turn end y should be ~R: {y}");
         assert!(
             (h - std::f64::consts::FRAC_PI_2).abs() < 0.01,
             "End heading should be pi/2: {h}"
@@ -589,14 +585,8 @@ mod tests {
         // s=0 and s=total_length should give the same position (closed loop)
         let (x0, y0, h0) = road.position_at(0.0);
         let (xn, yn, hn) = road.position_at(road.total_length);
-        assert!(
-            (x0 - xn).abs() < 1.0,
-            "Oval wrap x: {x0} vs {xn}"
-        );
-        assert!(
-            (y0 - yn).abs() < 1.0,
-            "Oval wrap y: {y0} vs {yn}"
-        );
+        assert!((x0 - xn).abs() < 1.0, "Oval wrap x: {x0} vs {xn}");
+        assert!((y0 - yn).abs() < 1.0, "Oval wrap y: {y0} vs {yn}");
     }
 
     #[test]

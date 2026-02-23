@@ -160,18 +160,8 @@ fn main() {
     let mut pipeline = VocalTractPipeline::new(&genesis);
     populate_manner_map(&mut pipeline);
     // Train pipeline's controller to match the standalone one
-    symthaea::voice::train_controller_on_phoneme_db(
-        &mut pipeline.controller,
-        &genesis,
-        &db,
-        100,
-    );
-    symthaea::voice::train_controller_transitions(
-        &mut pipeline.controller,
-        &genesis,
-        &db,
-        10,
-    );
+    symthaea::voice::train_controller_on_phoneme_db(&mut pipeline.controller, &genesis, &db, 100);
+    symthaea::voice::train_controller_transitions(&mut pipeline.controller, &genesis, &db, 10);
 
     let state = VoiceCognitiveState::default();
     let dt = 0.005;
@@ -229,7 +219,10 @@ fn main() {
         "  Pipeline max F1 delta (steady):     {:.2} Hz/frame",
         pipeline_steady_max
     );
-    println!("  Rule     max F1 delta:              {:.2} Hz/frame", rule_max_delta);
+    println!(
+        "  Rule     max F1 delta:              {:.2} Hz/frame",
+        rule_max_delta
+    );
     println!();
 
     // ── Benchmark 3: Timing ──────────────────────────────────────────────
@@ -283,8 +276,16 @@ fn main() {
     println!("--- Benchmark 4: Consonant Formant Accuracy ---");
     println!(
         "  {:>6} | {:>10} {:>10} {:>10} | {:>10} {:>10} {:>10} | {:>8} {:>8} | {:>10}",
-        "Phon", "LTC-F1", "LTC-F2", "LTC-F3", "Tgt-F1", "Tgt-F2", "Tgt-F3", "LTC-err",
-        "Rule-err", "Manner"
+        "Phon",
+        "LTC-F1",
+        "LTC-F2",
+        "LTC-F3",
+        "Tgt-F1",
+        "Tgt-F2",
+        "Tgt-F3",
+        "LTC-err",
+        "Rule-err",
+        "Manner"
     );
     println!("  {}", "-".repeat(115));
 
@@ -333,10 +334,8 @@ fn main() {
                 let rf1: f32 = stable.iter().map(|f| f.f1).sum::<f32>() / n;
                 let rf2: f32 = stable.iter().map(|f| f.f2).sum::<f32>() / n;
                 let rf3: f32 = stable.iter().map(|f| f.f3).sum::<f32>() / n;
-                ((rf1 - target.f1).powi(2)
-                    + (rf2 - target.f2).powi(2)
-                    + (rf3 - target.f3).powi(2))
-                .sqrt()
+                ((rf1 - target.f1).powi(2) + (rf2 - target.f2).powi(2) + (rf3 - target.f3).powi(2))
+                    .sqrt()
             } else {
                 f32::MAX
             };
@@ -358,7 +357,13 @@ fn main() {
         println!("  {}", "-".repeat(115));
         println!(
             "  {:>6} | {:>10} {:>10} {:>10} | {:>10} {:>10} {:>10} | {:>8.1} {:>8.1}",
-            "AVG", "", "", "", "", "", "",
+            "AVG",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
             cons_ltc_total_err / cons_count as f32,
             cons_rule_total_err / cons_count as f32
         );
@@ -492,8 +497,7 @@ fn main() {
     println!("--- Benchmark 7: Mel-Cepstral Distortion (MCD) ---");
 
     let all_vowels = [
-        "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH",
-        "UW",
+        "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW",
     ];
 
     let mut total_mcd = 0.0f32;
@@ -514,8 +518,7 @@ fn main() {
                 targets.push(target.clone());
             }
 
-            let mcd =
-                symthaea_vocal_tract::metrics::mel_cepstral_distortion(&frames, &targets);
+            let mcd = symthaea_vocal_tract::metrics::mel_cepstral_distortion(&frames, &targets);
             total_mcd += mcd;
             mcd_count += 1;
             println!("  {:>4}: MCD = {:.2} dB", vowel, mcd);
@@ -590,7 +593,11 @@ fn main() {
             }
             let wav_path = audio_dir.join(format!("bench_{}.wav", vowel.to_lowercase()));
             write_wav(&wav_path, &audio, sr);
-            println!("  /{vowel}/ → {} ({:.1}s)", wav_path.display(), audio.len() as f32 / sr as f32);
+            println!(
+                "  /{vowel}/ → {} ({:.1}s)",
+                wav_path.display(),
+                audio.len() as f32 / sr as f32
+            );
         }
 
         // AH→IY transition audio
@@ -607,7 +614,11 @@ fn main() {
         }
         let trans_path = audio_dir.join("bench_transition_ah_iy.wav");
         write_wav(&trans_path, &transition_audio, sr);
-        println!("  AH→IY transition → {} ({:.1}s)", trans_path.display(), transition_audio.len() as f32 / sr as f32);
+        println!(
+            "  AH→IY transition → {} ({:.1}s)",
+            trans_path.display(),
+            transition_audio.len() as f32 / sr as f32
+        );
     }
     println!();
 

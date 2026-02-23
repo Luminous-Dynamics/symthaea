@@ -173,8 +173,16 @@ impl TelemetryAccumulator {
             deadline_misses: self.deadline_misses,
             mean_tick_us: if n > 0.0 { self.total_tick_us / n } else { 0.0 },
             max_tick_us: self.max_tick_us,
-            mean_sensor_us: if n > 0.0 { self.total_sensor_us / n } else { 0.0 },
-            mean_callback_us: if n > 0.0 { self.total_callback_us / n } else { 0.0 },
+            mean_sensor_us: if n > 0.0 {
+                self.total_sensor_us / n
+            } else {
+                0.0
+            },
+            mean_callback_us: if n > 0.0 {
+                self.total_callback_us / n
+            } else {
+                0.0
+            },
             actual_hz,
             p50_tick_us: p50,
             p95_tick_us: p95,
@@ -711,7 +719,10 @@ impl<I: I2c> HalRuntime<I> {
         });
 
         let period = Duration::from_secs_f64(1.0 / self.tick_hz);
-        info!(hz = self.tick_hz, "HAL runtime starting (with signal handler)");
+        info!(
+            hz = self.tick_hz,
+            "HAL runtime starting (with signal handler)"
+        );
 
         let result = loop {
             // Check shutdown signal

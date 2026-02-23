@@ -259,7 +259,9 @@ impl ContinuousMind {
             #[cfg(feature = "mesh")]
             mesh_auth_key: None,
             #[cfg(feature = "mesh")]
-            mesh_replay_buffer: std::collections::VecDeque::with_capacity(MESH_REPLAY_BUFFER_CAPACITY),
+            mesh_replay_buffer: std::collections::VecDeque::with_capacity(
+                MESH_REPLAY_BUFFER_CAPACITY,
+            ),
             #[cfg(feature = "mesh")]
             mesh_bandwidth_budget: MESH_BANDWIDTH_INITIAL,
             #[cfg(feature = "mesh")]
@@ -554,7 +556,10 @@ impl ContinuousMind {
 
     /// Populate mesh telemetry fields in a CycleMetadata struct.
     #[cfg(feature = "mesh")]
-    pub fn populate_mesh_metadata(&self, metadata: &mut crate::cognitive_loop::types::CycleMetadata) {
+    pub fn populate_mesh_metadata(
+        &self,
+        metadata: &mut crate::cognitive_loop::types::CycleMetadata,
+    ) {
         let peer_count = self.mesh_peers.peer_count();
         metadata.mesh_health_score = self.mesh_stats.health_score(peer_count);
         metadata.mesh_peer_count = peer_count as u32;
@@ -727,8 +732,9 @@ impl ContinuousMind {
             self.mesh_bandwidth_budget = new.max(MESH_BANDWIDTH_MIN);
         } else if health > 0.5 {
             // Additive increase
-            self.mesh_bandwidth_budget =
-                (self.mesh_bandwidth_budget + MESH_BANDWIDTH_ADDITIVE_INCREASE).min(MESH_BANDWIDTH_MAX);
+            self.mesh_bandwidth_budget = (self.mesh_bandwidth_budget
+                + MESH_BANDWIDTH_ADDITIVE_INCREASE)
+                .min(MESH_BANDWIDTH_MAX);
         }
         // health in [0.3, 0.5] or 0.0 (idle): hold steady
         self.mesh_stats.bandwidth_budget_current = self.mesh_bandwidth_budget;
@@ -749,7 +755,11 @@ impl ContinuousMind {
         }
 
         let interval = 100u64;
-        if self.state.tick.saturating_sub(self.mesh_heartbeat_last_tick) < interval
+        if self
+            .state
+            .tick
+            .saturating_sub(self.mesh_heartbeat_last_tick)
+            < interval
             && self.mesh_heartbeat_sequence > 0
         {
             return;
@@ -1887,7 +1897,10 @@ mod tests {
         // Peer count should be 0
         assert_eq!(mind.mesh_peers().peer_count(), 0);
         // Consciousness should be set purely by pairwise integration
-        assert!(level > 0.0, "Consciousness should be non-zero with perceptions");
+        assert!(
+            level > 0.0,
+            "Consciousness should be non-zero with perceptions"
+        );
     }
 
     // ====================================================================
@@ -1937,7 +1950,10 @@ mod tests {
 
         assert_eq!(mind.mesh_outbox.len(), 1);
         assert_eq!(mind.mesh_outbox[0].packet.urgency, MeshUrgency::Cruise);
-        assert_eq!(mind.mesh_outbox[0].packet.payload_type, PayloadType::Heartbeat);
+        assert_eq!(
+            mind.mesh_outbox[0].packet.payload_type,
+            PayloadType::Heartbeat
+        );
     }
 
     #[cfg(feature = "mesh")]
@@ -2010,14 +2026,11 @@ mod tests {
 
         // Create paired transports (A writes → B reads, B writes → A reads)
         // Use batman-sized MTU so whole packets fit without fragmentation
-        let (transport_a, transport_b) =
-            BiLoopbackTransport::pair("mind_a", "mind_b", 2100);
+        let (transport_a, transport_b) = BiLoopbackTransport::pair("mind_a", "mind_b", 2100);
 
         // Build DualLayerMesh for each side
-        let mesh_a = DualLayerMesh::new([0xAA; 32])
-            .with_batman(Box::new(transport_a));
-        let mesh_b = DualLayerMesh::new([0xBB; 32])
-            .with_batman(Box::new(transport_b));
+        let mesh_a = DualLayerMesh::new([0xAA; 32]).with_batman(Box::new(transport_a));
+        let mesh_b = DualLayerMesh::new([0xBB; 32]).with_batman(Box::new(transport_b));
 
         // Create bridge handles + spawn actors
         let (handle_a, actor_a) = MeshBridgeHandle::new(64, 64);
@@ -2269,7 +2282,8 @@ mod tests {
         mind.tick();
 
         assert_eq!(
-            mind.mesh_stats().wisdom_received, 1,
+            mind.mesh_stats().wisdom_received,
+            1,
             "wisdom_received should be 1"
         );
     }
@@ -2288,8 +2302,9 @@ mod tests {
         mind.activate();
 
         // Use a very short stale timeout
-        mind.mesh_peers =
-            crate::swarm::mesh::MeshPeerRegistry::with_timeout(std::time::Duration::from_millis(10));
+        mind.mesh_peers = crate::swarm::mesh::MeshPeerRegistry::with_timeout(
+            std::time::Duration::from_millis(10),
+        );
 
         // Inject a peer packet so it gets tracked + modeled in social coherence
         let peer_id = [0xEE; 8];
@@ -2309,7 +2324,10 @@ mod tests {
 
         let peer_hex = crate::swarm::mesh::hex_short(&peer_id);
         assert!(
-            mind.social_coherence().unwrap().get_mental_model(&peer_hex).is_some(),
+            mind.social_coherence()
+                .unwrap()
+                .get_mental_model(&peer_hex)
+                .is_some(),
             "Peer should be modeled after tick"
         );
         assert_eq!(mind.mesh_peers().peer_count(), 1);
@@ -2327,7 +2345,10 @@ mod tests {
             "Stale peer should be expired"
         );
         assert!(
-            mind.social_coherence().unwrap().get_mental_model(&peer_hex).is_none(),
+            mind.social_coherence()
+                .unwrap()
+                .get_mental_model(&peer_hex)
+                .is_none(),
             "Social model for expired peer should be removed"
         );
         assert!(
@@ -2348,14 +2369,11 @@ mod tests {
         };
 
         // Create paired transports at LoRa MTU (222 bytes — forces fragmentation)
-        let (transport_a, transport_b) =
-            BiLoopbackTransport::pair("lora_a", "lora_b", LORA_MTU);
+        let (transport_a, transport_b) = BiLoopbackTransport::pair("lora_a", "lora_b", LORA_MTU);
 
         // Build DualLayerMesh for each side — LoRa only
-        let mesh_a = DualLayerMesh::new([0xAA; 32])
-            .with_lora(Box::new(transport_a));
-        let mesh_b = DualLayerMesh::new([0xBB; 32])
-            .with_lora(Box::new(transport_b));
+        let mesh_a = DualLayerMesh::new([0xAA; 32]).with_lora(Box::new(transport_a));
+        let mesh_b = DualLayerMesh::new([0xBB; 32]).with_lora(Box::new(transport_b));
 
         // Create bridge handles + spawn actors
         let (handle_a, actor_a) = MeshBridgeHandle::new(64, 64);
@@ -3452,7 +3470,8 @@ mod tests {
         mind.tick();
 
         assert_eq!(
-            mind.mesh_stats().packets_auth_failed, 1,
+            mind.mesh_stats().packets_auth_failed,
+            1,
             "Unsigned packet should fail auth"
         );
     }
@@ -3487,7 +3506,8 @@ mod tests {
         mind.tick();
 
         assert_eq!(
-            mind.mesh_stats().packets_auth_failed, 0,
+            mind.mesh_stats().packets_auth_failed,
+            0,
             "Signed packet should pass auth"
         );
         assert_eq!(mind.mesh_peers().peer_count(), 1);
@@ -3518,7 +3538,8 @@ mod tests {
         mind.tick();
 
         assert_eq!(
-            mind.mesh_stats().packets_auth_failed, 0,
+            mind.mesh_stats().packets_auth_failed,
+            0,
             "No auth key = all packets pass"
         );
         assert_eq!(mind.mesh_peers().peer_count(), 1);
@@ -3675,12 +3696,16 @@ mod tests {
 
         // Should have forwarded with ttl=2
         assert_eq!(
-            mind.mesh_stats().packets_forwarded, 1,
+            mind.mesh_stats().packets_forwarded,
+            1,
             "Packet with ttl=3 should be forwarded"
         );
         // Check the forwarded packet in outbox
         assert!(!mind.mesh_outbox.is_empty());
-        let fwd = mind.mesh_outbox.iter().find(|o| o.packet.source_id == [0xAA; 8]);
+        let fwd = mind
+            .mesh_outbox
+            .iter()
+            .find(|o| o.packet.source_id == [0xAA; 8]);
         assert!(fwd.is_some(), "Forwarded packet should be in outbox");
         assert_eq!(fwd.unwrap().packet.ttl, 2);
     }
@@ -3709,7 +3734,8 @@ mod tests {
         mind.tick();
 
         assert_eq!(
-            mind.mesh_stats().packets_forwarded, 0,
+            mind.mesh_stats().packets_forwarded,
+            0,
             "Packet with ttl=0 should NOT be forwarded"
         );
     }
@@ -3738,7 +3764,8 @@ mod tests {
         mind.tick();
 
         assert_eq!(
-            mind.mesh_stats().packets_forwarded, 0,
+            mind.mesh_stats().packets_forwarded,
+            0,
             "Packet with ttl=1 should NOT be forwarded (last hop)"
         );
     }
@@ -3825,7 +3852,8 @@ mod tests {
 
         // Should have replayed 3 packets to outbox
         assert_eq!(
-            mind.mesh_stats().packets_replayed, 3,
+            mind.mesh_stats().packets_replayed,
+            3,
             "Should replay 3 packets for new peer"
         );
     }
@@ -3875,7 +3903,8 @@ mod tests {
         mind.tick();
 
         assert_eq!(
-            mind.mesh_stats().packets_replayed, 0,
+            mind.mesh_stats().packets_replayed,
+            0,
             "Known peer should NOT trigger replay"
         );
     }

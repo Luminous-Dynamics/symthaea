@@ -440,7 +440,8 @@ impl ContinuousMind {
         if self.mesh_inbox.len() > super::MAX_OUTBOX_SIZE {
             let excess = self.mesh_inbox.len() - super::MAX_OUTBOX_SIZE;
             // Sort by priority ascending (lowest-priority first), stable to preserve order within tier
-            self.mesh_inbox.sort_by(|a, b| a.payload_type.priority().cmp(&b.payload_type.priority()));
+            self.mesh_inbox
+                .sort_by(|a, b| a.payload_type.priority().cmp(&b.payload_type.priority()));
             self.mesh_inbox.drain(..excess);
             self.mesh_stats.packets_dropped += excess as u64;
         }
@@ -521,10 +522,9 @@ impl ContinuousMind {
 
             if is_new_peer {
                 for replay_pkt in self.mesh_replay_buffer.iter() {
-                    self.mesh_outbox
-                        .push(crate::swarm::mesh::MeshOutbound {
-                            packet: replay_pkt.clone(),
-                        });
+                    self.mesh_outbox.push(crate::swarm::mesh::MeshOutbound {
+                        packet: replay_pkt.clone(),
+                    });
                 }
                 self.mesh_stats.packets_replayed += self.mesh_replay_buffer.len() as u64;
             }
@@ -747,7 +747,11 @@ impl ContinuousMind {
         }
 
         let interval = 50u64;
-        if self.state.tick.saturating_sub(self.mesh_affective_last_tick) < interval
+        if self
+            .state
+            .tick
+            .saturating_sub(self.mesh_affective_last_tick)
+            < interval
             && self.mesh_affective_sequence > 0
         {
             return;

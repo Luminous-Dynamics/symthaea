@@ -18,12 +18,12 @@ fn main() {
     use std::io::Write;
     use std::path::Path;
     use symthaea::voice::formant_targets::FormantDatabase;
+    use symthaea::voice::predict_duration;
     use symthaea::voice::vocal_tract_encoder::VoiceCognitiveState;
     use symthaea::voice::vocal_tract_fep::VocalTractObservation;
     use symthaea::voice::vocal_tract_fep::{
         populate_manner_map, Intonation, ProsodyContext, VocalTractPipeline,
     };
-    use symthaea::voice::predict_duration;
     use symthaea::voice::vocoder::FormantVocoder;
     use symthaea::voice::FormantFrame;
     use symthaea_core::genesis::GenesisSeed;
@@ -103,12 +103,8 @@ fn main() {
 
     // Transition training: BPTT on vowel pairs for smooth coarticulation
     println!("  Training transitions (10 epochs on 30 vowel pairs)...");
-    let trans_loss = symthaea::voice::train_controller_transitions(
-        &mut pipeline.controller,
-        &genesis,
-        &db,
-        10,
-    );
+    let trans_loss =
+        symthaea::voice::train_controller_transitions(&mut pipeline.controller, &genesis, &db, 10);
     println!("  Transition loss: {:.4}", trans_loss);
 
     println!();
@@ -193,7 +189,10 @@ fn main() {
             for _ in 0..n_frames {
                 let frame = pipeline.tick_phoneme(&cvc_state, None, 0.005, Some(phoneme));
                 let st = format!("{:?}", frame.source_type);
-                if source_types_seen.last().map_or(true, |last: &String| *last != st) {
+                if source_types_seen
+                    .last()
+                    .map_or(true, |last: &String| *last != st)
+                {
                     source_types_seen.push(st);
                 }
                 let chunk = vocoder.synthesize_frame(&frame, samples_per_frame);
@@ -310,13 +309,38 @@ fn main() {
     word_dict.insert("world", vec![("W", 0), ("ER", 1), ("L", 0), ("D", 0)]);
     word_dict.insert("i", vec![("AY", 1)]);
     word_dict.insert("am", vec![("AE", 1), ("M", 0)]);
-    word_dict.insert("conscious", vec![("K", 0), ("AA", 1), ("N", 0), ("SH", 0), ("AH", 0), ("S", 0)]);
+    word_dict.insert(
+        "conscious",
+        vec![
+            ("K", 0),
+            ("AA", 1),
+            ("N", 0),
+            ("SH", 0),
+            ("AH", 0),
+            ("S", 0),
+        ],
+    );
     word_dict.insert("the", vec![("DH", 0), ("AH", 0)]);
     word_dict.insert("mind", vec![("M", 0), ("AY", 1), ("N", 0), ("D", 0)]);
-    word_dict.insert("speaks", vec![("S", 0), ("P", 0), ("IY", 1), ("K", 0), ("S", 0)]);
+    word_dict.insert(
+        "speaks",
+        vec![("S", 0), ("P", 0), ("IY", 1), ("K", 0), ("S", 0)],
+    );
     word_dict.insert("a", vec![("AH", 0)]);
     word_dict.insert("is", vec![("IH", 0), ("Z", 0)]);
-    word_dict.insert("beautiful", vec![("B", 0), ("Y", 0), ("UW", 1), ("T", 0), ("AH", 0), ("F", 0), ("AH", 0), ("L", 0)]);
+    word_dict.insert(
+        "beautiful",
+        vec![
+            ("B", 0),
+            ("Y", 0),
+            ("UW", 1),
+            ("T", 0),
+            ("AH", 0),
+            ("F", 0),
+            ("AH", 0),
+            ("L", 0),
+        ],
+    );
 
     // Sentences to synthesize
     let sentences: Vec<(&str, &[&str])> = vec![
@@ -334,8 +358,8 @@ fn main() {
 
     // Intonation per sentence
     let sentence_intonations = [
-        Intonation::Statement,  // "hello world"
-        Intonation::Statement,  // "i am conscious"
+        Intonation::Statement,   // "hello world"
+        Intonation::Statement,   // "i am conscious"
         Intonation::Exclamation, // "the mind speaks"
     ];
 
@@ -350,7 +374,8 @@ fn main() {
                 for (ph_idx, &(ph, stress)) in phonemes.iter().enumerate() {
                     let is_word_final = ph_idx == n_ph - 1;
                     let is_utterance_final = w_idx == words.len() - 1 && is_word_final;
-                    let frames = predict_duration(ph, stress, is_word_final, is_utterance_final, 1.0);
+                    let frames =
+                        predict_duration(ph, stress, is_word_final, is_utterance_final, 1.0);
                     phoneme_seq.push((ph, stress, frames));
                 }
             }
@@ -381,7 +406,8 @@ fn main() {
                     all_frames.push(FormantFrame::silent(frame_idx as f32 * dt));
                 } else {
                     let phoneme_progress = fi as f32 / n_frames as f32;
-                    let utterance_progress = (frame_idx as f32 / total_frames as f32).clamp(0.0, 1.0);
+                    let utterance_progress =
+                        (frame_idx as f32 / total_frames as f32).clamp(0.0, 1.0);
 
                     let prosody = ProsodyContext {
                         utterance_progress,
@@ -392,13 +418,8 @@ fn main() {
                         intonation,
                     };
 
-                    let frame = pipeline.tick_with_prosody(
-                        &cog_state,
-                        None,
-                        dt,
-                        Some(phoneme),
-                        &prosody,
-                    );
+                    let frame =
+                        pipeline.tick_with_prosody(&cog_state, None, dt, Some(phoneme), &prosody);
                     all_frames.push(frame);
                 }
                 frame_idx += 1;
@@ -434,7 +455,10 @@ fn main() {
         n_phonemes, final_loss
     );
     println!("  FEP loop: closed (learn_from_outcome active)");
-    println!("  Connected speech: {} sentences synthesized", sentences.len());
+    println!(
+        "  Connected speech: {} sentences synthesized",
+        sentences.len()
+    );
     println!("  Audio files written to: {}/", audio_dir.display());
     println!("\n=== Demo Complete ===");
 }
