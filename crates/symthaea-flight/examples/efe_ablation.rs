@@ -50,10 +50,10 @@ fn main() {
 
     // Print table
     println!(
-        "{:<12} {:>14} {:>14} {:>10}",
-        "safety_π", "EFE(mission)", "EFE(intercept)", "Decision"
+        "{:<12} {:>14} {:>14} {:>10} {:>8}",
+        "safety_π", "EFE(mission)", "EFE(intercept)", "Decision", "RV frac"
     );
-    println!("{}", "─".repeat(54));
+    println!("{}", "─".repeat(68));
 
     for point in &result.points {
         let decision = if point.chose_intercept {
@@ -61,9 +61,13 @@ fn main() {
         } else {
             "MISSION"
         };
+        let frac_str = match point.best_rendezvous_frac {
+            Some(f) => format!("{:.0}%", f * 100.0),
+            None => "—".to_string(),
+        };
         println!(
-            "{:<12.3} {:>14.4} {:>14.4} {:>10}",
-            point.safety_precision, point.efe_mission, point.efe_intercept, decision
+            "{:<12.3} {:>14.4} {:>14.4} {:>10} {:>8}",
+            point.safety_precision, point.efe_mission, point.efe_intercept, decision, frac_str
         );
     }
 
@@ -77,16 +81,34 @@ fn main() {
         println!("No crossover found in the tested range.");
     }
 
+    // Rendezvous analysis
+    println!("\n── Rendezvous Time Analysis ──");
+    for point in &result.points {
+        if let Some(frac) = point.best_rendezvous_frac {
+            println!(
+                "  π={:<8.3} → best RV at {:.0}% of impact time",
+                point.safety_precision,
+                frac * 100.0
+            );
+        }
+    }
+
     // Write CSV
     let csv_path = "efe_ablation.csv";
-    let mut csv = String::from("safety_precision,efe_mission,efe_intercept,chose_intercept\n");
+    let mut csv =
+        String::from("safety_precision,efe_mission,efe_intercept,chose_intercept,best_rv_frac\n");
     for point in &result.points {
+        let frac_str = match point.best_rendezvous_frac {
+            Some(f) => format!("{:.2}", f),
+            None => String::new(),
+        };
         csv.push_str(&format!(
-            "{},{},{},{}\n",
+            "{},{},{},{},{}\n",
             point.safety_precision,
             point.efe_mission,
             point.efe_intercept,
-            point.chose_intercept as u8
+            point.chose_intercept as u8,
+            frac_str
         ));
     }
     std::fs::write(csv_path, &csv).expect("Failed to write CSV");
