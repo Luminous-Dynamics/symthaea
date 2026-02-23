@@ -25,9 +25,10 @@ fn main() {
     let mut flight_ctrl = FlightController::new(&flight_genesis, &flight_config);
     let mut flight_encoder = QuadrotorHdcEncoder::new(&flight_genesis, flight_config.num_levels);
 
-    // Simulate hover training: feed encoder → evolve → train for 200 steps
+    // Simulate hover training: feed encoder → evolve → train for 500 steps
+    // (longer training produces more stable temporal dynamics for transfer)
     let hover_state = FlightState::hover(1.0);
-    for step in 0..200 {
+    for step in 0..500 {
         let sensor_hv = flight_encoder.encode(&hover_state);
         let cmd = flight_ctrl.forward(&sensor_hv, 0.002);
 
@@ -35,7 +36,7 @@ fn main() {
         let target = QuadrotorCommand::hover();
         flight_ctrl.train_step(&sensor_hv, &target, 0.002, None);
 
-        if step % 50 == 0 {
+        if step % 100 == 0 {
             println!("  Step {step:>3}: thrust = {:.4}, moments = ({:.5}, {:.5}, {:.5})",
                 cmd.thrust, cmd.roll_moment, cmd.pitch_moment, cmd.yaw_moment);
         }
@@ -63,11 +64,11 @@ fn main() {
 
     // ── Phase 3: Transfer comparison benchmark ──
     println!("Phase 3: Transfer vs Random training comparison...");
-    println!("  Training 5 episodes each (200 steps/episode)...");
+    println!("  Training 10 episodes each (300 steps/episode)...");
     println!();
 
     let (transfer_metrics, random_metrics) =
-        transfer_learning_comparison(flight_ctrl.network(), 5);
+        transfer_learning_comparison(flight_ctrl.network(), 10);
 
     println!(
         "{:<8} {:>12} {:>12} {:>12} {:>10}",

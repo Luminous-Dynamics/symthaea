@@ -103,7 +103,7 @@ fn main() {
         QuadrotorHdcEncoder::new(&flight_genesis, flight_config.num_levels);
 
     let hover_state = FlightState::hover(1.0);
-    for _ in 0..200 {
+    for _ in 0..500 {
         let sensor_hv = flight_encoder.encode(&hover_state);
         flight_ctrl.forward(&sensor_hv, 0.002);
         let target = QuadrotorCommand::hover();
@@ -117,7 +117,7 @@ fn main() {
     );
     println!("  Blend factor: {}", transfer.blend_factor());
 
-    let n_episodes = 5;
+    let n_episodes = 10;
     let (transfer_metrics, random_metrics) =
         transfer_learning_comparison(flight_ctrl.network(), n_episodes);
 

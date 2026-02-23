@@ -72,65 +72,72 @@ impl MorphologicalTransfer {
     /// - Linear velocity: flight vel_xyz (7-9) → humanoid root_linear_velocity (26-28)
     /// - Angular velocity: flight angvel_xyz (10-12) → humanoid root_angular_velocity (29-31)
     pub fn flight_to_humanoid() -> Self {
+        // Channel weights reflect information content for bipedal control:
+        // - Orientation is most critical (4D quaternion encodes full body attitude)
+        // - Altitude/height is essential for standing reward
+        // - Angular velocity carries learned stabilization dynamics
+        // - Linear velocity is less informative (flight ≠ walking kinematics)
         let channel_mapping = vec![
-            // Altitude
+            // Altitude: high weight — directly maps to standing reward
             ChannelMapping {
                 source_ch: 2,
                 target_ch: 0,
-                weight: 1.5,
+                weight: 1.8,
             },
-            // Orientation (4 channels)
+            // Orientation (4 channels): highest weight — attitude control is the core
+            // shared skill between hovering and standing
             ChannelMapping {
                 source_ch: 3,
                 target_ch: 1,
-                weight: 1.0,
+                weight: 2.0,
             },
             ChannelMapping {
                 source_ch: 4,
                 target_ch: 2,
-                weight: 1.0,
+                weight: 2.0,
             },
             ChannelMapping {
                 source_ch: 5,
                 target_ch: 3,
-                weight: 1.0,
+                weight: 2.0,
             },
             ChannelMapping {
                 source_ch: 6,
                 target_ch: 4,
-                weight: 1.0,
+                weight: 2.0,
             },
-            // Linear velocity (3 channels)
+            // Linear velocity (3 channels): moderate weight
             ChannelMapping {
                 source_ch: 7,
                 target_ch: 26,
-                weight: 1.0,
+                weight: 0.8,
             },
             ChannelMapping {
                 source_ch: 8,
                 target_ch: 27,
-                weight: 1.0,
+                weight: 0.8,
             },
             ChannelMapping {
                 source_ch: 9,
                 target_ch: 28,
-                weight: 1.0,
+                weight: 0.8,
             },
-            // Angular velocity (3 channels)
+            // Angular velocity (3 channels): high weight — stabilization dynamics
+            // are the key transferable skill from hover control
             ChannelMapping {
                 source_ch: 10,
                 target_ch: 29,
-                weight: 1.0,
+                weight: 1.5,
             },
             ChannelMapping {
                 source_ch: 11,
                 target_ch: 30,
-                weight: 1.0,
+                weight: 1.5,
             },
             ChannelMapping {
                 source_ch: 12,
                 target_ch: 31,
-                weight: 1.0,
+                weight: 1.5,
             },
         ];
 
@@ -295,6 +302,8 @@ impl MorphologicalTransfer {
 /// Trains two humanoid controllers (one transfer-initialized, one random genesis)
 /// for `n_episodes` each and returns their metrics side-by-side.
 ///
+/// Uses 300 steps/episode (7.5s) for more reliable convergence data.
+///
 /// Returns `(transfer_metrics, random_metrics)`.
 pub fn transfer_learning_comparison(
     source_network: &HdcLtcUnifiedNetwork,
@@ -302,7 +311,7 @@ pub fn transfer_learning_comparison(
 ) -> (Vec<EpisodeMetrics>, Vec<EpisodeMetrics>) {
     let config = HumanoidConfig {
         num_episodes: n_episodes,
-        steps_per_episode: 200,
+        steps_per_episode: 300,
         ..HumanoidConfig::default()
     };
 
