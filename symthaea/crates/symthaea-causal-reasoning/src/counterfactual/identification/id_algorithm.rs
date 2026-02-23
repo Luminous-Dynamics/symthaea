@@ -1027,11 +1027,8 @@ mod tests {
 
     #[test]
     fn test_to_dag() {
-        let g = CausalGraphWithLatents::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-            vec![(0, 1)],
-        );
+        let g =
+            CausalGraphWithLatents::new(vec!["X".into(), "Y".into()], vec![(0, 1)], vec![(0, 1)]);
         let dag = g.to_dag();
         assert_eq!(dag.nodes.len(), 2);
         assert_eq!(dag.edges.len(), 1);
@@ -1063,21 +1060,25 @@ mod tests {
         );
         let id = IDAlgorithm::new();
         let result = id.identify(&g, &[0], &[2]);
-        assert!(result.is_ok(), "Markovian model should always be identifiable");
+        assert!(
+            result.is_ok(),
+            "Markovian model should always be identifiable"
+        );
     }
 
     #[test]
     fn test_id_empty_treatment_returns_probability() {
-        let g = CausalGraphWithLatents::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-            vec![(0, 1)],
-        );
+        let g =
+            CausalGraphWithLatents::new(vec!["X".into(), "Y".into()], vec![(0, 1)], vec![(0, 1)]);
         let id = IDAlgorithm::new();
         // Empty treatment: P(y) should be returned directly
         let result = id.identify(&g, &[], &[1]);
         assert!(result.is_ok());
-        if let Ok(CausalExpression::Probability { outcome, conditioning }) = result {
+        if let Ok(CausalExpression::Probability {
+            outcome,
+            conditioning,
+        }) = result
+        {
             assert_eq!(outcome, vec![1]);
             assert!(conditioning.is_empty());
         }
@@ -1086,11 +1087,8 @@ mod tests {
     #[test]
     fn test_id_bow_graph_not_identifiable() {
         // X → Y with X ↔ Y (bow graph) — classic non-identifiable
-        let g = CausalGraphWithLatents::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-            vec![(0, 1)],
-        );
+        let g =
+            CausalGraphWithLatents::new(vec!["X".into(), "Y".into()], vec![(0, 1)], vec![(0, 1)]);
         let id = IDAlgorithm::new();
         let result = id.identify(&g, &[0], &[1]);
         assert!(result.is_err(), "Bow graph should NOT be identifiable");
@@ -1233,11 +1231,7 @@ mod tests {
 
     #[test]
     fn test_id_query_identified() {
-        let g = CausalGraphWithLatents::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-            vec![],
-        );
+        let g = CausalGraphWithLatents::new(vec!["X".into(), "Y".into()], vec![(0, 1)], vec![]);
         let id = IDAlgorithm::new();
         let query = CausalQuery {
             treatment: 0,
@@ -1246,7 +1240,10 @@ mod tests {
         };
         let result = id.query(&g, &query);
         assert!(matches!(result, CausalQueryOutcome::Identified { .. }));
-        if let CausalQueryOutcome::Identified { method, confidence, .. } = result {
+        if let CausalQueryOutcome::Identified {
+            method, confidence, ..
+        } = result
+        {
             assert_eq!(method, IdentificationMethod::IDAlgorithm);
             assert!((confidence - 0.95).abs() < 1e-10);
         }
@@ -1254,11 +1251,8 @@ mod tests {
 
     #[test]
     fn test_id_query_unidentified_returns_hedge() {
-        let g = CausalGraphWithLatents::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-            vec![(0, 1)],
-        );
+        let g =
+            CausalGraphWithLatents::new(vec!["X".into(), "Y".into()], vec![(0, 1)], vec![(0, 1)]);
         let id = IDAlgorithm::new();
         let query = CausalQuery {
             treatment: 0,
@@ -1267,7 +1261,12 @@ mod tests {
         };
         let result = id.query(&g, &query);
         assert!(matches!(result, CausalQueryOutcome::Unidentified { .. }));
-        if let CausalQueryOutcome::Unidentified { reason, suggestions, .. } = result {
+        if let CausalQueryOutcome::Unidentified {
+            reason,
+            suggestions,
+            ..
+        } = result
+        {
             assert!(matches!(reason, UnidentifiedReason::HedgeFound { .. }));
             assert!(!suggestions.is_empty());
         }
@@ -1280,7 +1279,10 @@ mod tests {
     #[test]
     fn test_harness_construction() {
         let harness = CausalReferenceHarness::new();
-        assert!(harness.test_count() >= 6, "Harness should have at least 6 test cases");
+        assert!(
+            harness.test_count() >= 6,
+            "Harness should have at least 6 test cases"
+        );
         assert!((harness.match_threshold - 0.99).abs() < 1e-10);
         assert!((harness.current_match_rate - 0.0).abs() < 1e-10);
     }
@@ -1303,9 +1305,7 @@ mod tests {
             harness.current_match_rate
         );
         // Result should be Passed or AutoDowngrade
-        assert!(
-            result == HarnessResult::Passed || result == HarnessResult::AutoDowngrade
-        );
+        assert!(result == HarnessResult::Passed || result == HarnessResult::AutoDowngrade);
     }
 
     #[test]

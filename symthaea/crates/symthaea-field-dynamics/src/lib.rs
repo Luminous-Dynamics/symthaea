@@ -1353,7 +1353,12 @@ mod tests {
         };
         let close = packet.evaluate(&[0.0; 7], 0.0).abs();
         let far = packet.evaluate(&[5.0; 7], 0.0).abs();
-        assert!(close >= far, "Packet should decay away from center: close={}, far={}", close, far);
+        assert!(
+            close >= far,
+            "Packet should decay away from center: close={}, far={}",
+            close,
+            far
+        );
     }
 
     // ── StandingWave ────────────────────────────────────────────────────
@@ -1483,8 +1488,16 @@ mod tests {
         }
         let trajectory = analyzer.evolve(50);
         for pt in &trajectory {
-            assert!(pt.amplitude >= 0.0, "Amplitude should be non-negative: {}", pt.amplitude);
-            assert!(pt.amplitude <= 1.0, "Amplitude should be <= 1.0: {}", pt.amplitude);
+            assert!(
+                pt.amplitude >= 0.0,
+                "Amplitude should be non-negative: {}",
+                pt.amplitude
+            );
+            assert!(
+                pt.amplitude <= 1.0,
+                "Amplitude should be <= 1.0: {}",
+                pt.amplitude
+            );
         }
     }
 
@@ -1495,7 +1508,10 @@ mod tests {
             analyzer.observe([0.5; 7]);
         }
         let modes = analyzer.identify_standing_waves();
-        assert!(modes.is_empty(), "Too few observations for standing wave detection");
+        assert!(
+            modes.is_empty(),
+            "Too few observations for standing wave detection"
+        );
     }
 
     #[test]

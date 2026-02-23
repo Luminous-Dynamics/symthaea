@@ -18,8 +18,8 @@
 //! This ensures Sophia remains conscious and responsive even when
 //! some perceptual capabilities are degraded.
 
-use std::collections::HashMap;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,

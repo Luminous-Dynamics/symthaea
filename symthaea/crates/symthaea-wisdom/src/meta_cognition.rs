@@ -475,10 +475,16 @@ mod tests {
         let mut meta = MetaCognitiveLayer::new();
         meta.accuracy = 0.8;
         let model = meta.recursive_model();
-        assert!(model.can_model_deeper, "High accuracy should allow deeper modeling");
+        assert!(
+            model.can_model_deeper,
+            "High accuracy should allow deeper modeling"
+        );
 
         meta.accuracy = 0.3;
         let model = meta.recursive_model();
-        assert!(!model.can_model_deeper, "Low accuracy should not allow deeper modeling");
+        assert!(
+            !model.can_model_deeper,
+            "Low accuracy should not allow deeper modeling"
+        );
     }
 }

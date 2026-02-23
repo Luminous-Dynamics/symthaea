@@ -1276,7 +1276,11 @@ mod tests {
         let mut fg = two_node_chain();
         fg.run_bp(&BPConfig::default());
         let fe = fg.bethe_free_energy();
-        assert!(fe.is_finite(), "Bethe free energy should be finite, got {}", fe);
+        assert!(
+            fe.is_finite(),
+            "Bethe free energy should be finite, got {}",
+            fe
+        );
     }
 
     #[test]

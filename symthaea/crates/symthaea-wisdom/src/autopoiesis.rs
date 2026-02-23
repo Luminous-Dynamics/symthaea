@@ -374,7 +374,12 @@ mod tests {
         let before = monitor.closure();
         monitor.record_boundary_violation();
         let after = monitor.closure();
-        assert!(after < before, "Violation should reduce closure: {} -> {}", before, after);
+        assert!(
+            after < before,
+            "Violation should reduce closure: {} -> {}",
+            before,
+            after
+        );
     }
 
     #[test]
