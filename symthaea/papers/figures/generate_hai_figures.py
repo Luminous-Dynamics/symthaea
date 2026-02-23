@@ -517,6 +517,7 @@ def fig7_efe_ablation():
     precisions = [float(r['safety_precision']) for r in rows]
     efe_mission = [float(r['efe_mission']) for r in rows]
     efe_intercept = [float(r['efe_intercept']) for r in rows]
+    rv_fracs = [float(r['best_rv_frac']) if r.get('best_rv_frac') else None for r in rows]
 
     # Find crossover via linear interpolation
     crossover = None
@@ -537,7 +538,20 @@ def fig7_efe_ablation():
     fig, ax = plt.subplots(1, 1, figsize=(7, 4.5))
 
     ax.plot(precisions, efe_mission, 'r-o', linewidth=2, markersize=5, label='EFE(mission)', zorder=3)
-    ax.plot(precisions, efe_intercept, 'b-s', linewidth=2, markersize=5, label='EFE(intercept)', zorder=3)
+
+    # Plot intercept line, then overlay color-coded markers by rendezvous fraction
+    ax.plot(precisions, efe_intercept, 'b-', linewidth=2, label='EFE(intercept)', zorder=3)
+    frac_colors = {0.25: '#2ca02c', 0.50: '#1f77b4', 0.75: '#ff7f0e'}
+    frac_labels_added = set()
+    for i, frac in enumerate(rv_fracs):
+        if frac is not None:
+            color = frac_colors.get(frac, '#1f77b4')
+            label = f'RV {int(frac*100)}%' if frac not in frac_labels_added else None
+            frac_labels_added.add(frac)
+            ax.plot(precisions[i], efe_intercept[i], 's', color=color, markersize=6,
+                    label=label, zorder=4)
+        else:
+            ax.plot(precisions[i], efe_intercept[i], 's', color='gray', markersize=5, zorder=4)
 
     ax.set_xscale('log')
     ax.set_xlabel('Safety Prior Precision ($\\pi_{\\mathrm{safety}}$)')
