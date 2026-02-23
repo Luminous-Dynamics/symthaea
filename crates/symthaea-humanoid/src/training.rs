@@ -1,15 +1,15 @@
-//! Humanoid training: multi-rate loop with PD baseline targets and curriculum.
+//! Humanoid training: multi-rate loop with PD baseline targets and adaptive curriculum.
 //!
 //! The trainer runs a multi-rate control loop:
 //! - Physics at 40Hz: encode -> evolve -> project -> command
 //! - Training at 20Hz: BPTT from PD baseline targets
 //! - Cognitive tick at 10Hz: FEP agent modulates tau/LR/precision
 //!
-//! Curriculum:
-//! 1. Episodes 0-25%: Stand (PD teacher 80%→40%)
-//! 2. Episodes 25-40%: Stand (PD decays 40%→10%, autonomy ramp)
-//! 3. Episodes 40-90%: Walk (PD 10%→5%, speed 0→1 m/s)
-//! 4. Episodes 90-100%: Run (PD 5%→0%, speed 1→3 m/s)
+//! Adaptive curriculum (advances early on mastery, falls back to fixed schedule):
+//! - Phase 0 (max 25%): Stand, PD 80%→40% — mastery: standing_reward > threshold
+//! - Phase 1 (max 15%): Stand, PD 40%→10% — mastery: reward > 0.90, uprightness > 0.95
+//! - Phase 2 (max 50%): Walk, PD 10%→5%, speed 0→1 m/s — mastery: episode_reward > 0.70
+//! - Phase 3 (remainder): Run, PD 5%→0%, speed 1→3 m/s
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
@@ -50,6 +50,27 @@ pub struct EpisodeMetrics {
     pub telemetry: Vec<HumanoidTelemetry>,
 }
 
+/// Tracks adaptive curriculum state for performance-based phase transitions.
+#[derive(Debug, Clone)]
+struct CurriculumState {
+    /// Current phase: 0=Stand PD↓, 1=Stand autonomy, 2=Walk, 3=Run.
+    phase: usize,
+    /// Episode where the current phase began.
+    phase_start_ep: usize,
+    /// Consecutive episodes meeting mastery criteria.
+    mastery_streak: usize,
+}
+
+impl CurriculumState {
+    fn new() -> Self {
+        Self {
+            phase: 0,
+            phase_start_ep: 0,
+            mastery_streak: 0,
+        }
+    }
+}
+
 /// Humanoid trainer with multi-rate control loop and curriculum.
 pub struct HumanoidTrainer {
     /// Configuration.
@@ -62,6 +83,8 @@ pub struct HumanoidTrainer {
     pub metrics: Vec<EpisodeMetrics>,
     /// Optional pre-initialized controller (e.g., from morphological transfer).
     initial_controller: Option<HumanoidController>,
+    /// Adaptive curriculum state.
+    curriculum_state: CurriculumState,
 }
 
 impl HumanoidTrainer {
@@ -74,6 +97,7 @@ impl HumanoidTrainer {
             pd_gains: HumanoidPdGains::default(),
             metrics: Vec::new(),
             initial_controller: None,
+            curriculum_state: CurriculumState::new(),
         }
     }
 
@@ -86,6 +110,7 @@ impl HumanoidTrainer {
             pd_gains: HumanoidPdGains::default(),
             metrics: Vec::new(),
             initial_controller: Some(controller),
+            curriculum_state: CurriculumState::new(),
         }
     }
 
@@ -103,6 +128,7 @@ impl HumanoidTrainer {
             pd_gains: HumanoidPdGains::default(),
             metrics: Vec::new(),
             initial_controller: Some(controller),
+            curriculum_state: CurriculumState::new(),
         })
     }
 
@@ -115,49 +141,163 @@ impl HumanoidTrainer {
             pd_gains: gains,
             metrics: Vec::new(),
             initial_controller: None,
+            curriculum_state: CurriculumState::new(),
         }
     }
 
-    /// Determine the task and PD teacher weight for a given episode (curriculum).
+    /// Determine the task and PD teacher weight for a given episode.
     ///
-    /// Returns (task, pd_weight, target_speed) with smooth transitions:
-    /// - Phase 1 (0-25%):  Stand, PD 80%→40%
-    /// - Phase 2 (25-40%): Stand, PD 40%→10% (autonomy ramp)
-    /// - Phase 3 (40-90%): Walk, PD 10%→5%, speed 0→1 m/s (50 episodes)
-    /// - Phase 4 (90-100%): Run, PD 5%→0%, speed 1→3 m/s (10 episodes)
+    /// When `adaptive_curriculum` is enabled, uses performance-based phase
+    /// transitions (early advancement on mastery). Otherwise falls back to
+    /// fixed schedule based on episode progress.
     fn curriculum(&self, episode: usize) -> (HumanoidTask, f32, f64) {
         let total = self.config.num_episodes;
         if total <= 1 {
             return (self.config.task, 0.8, self.config.effective_target_speed());
         }
 
+        if self.config.adaptive_curriculum {
+            self.curriculum_adaptive(episode)
+        } else {
+            self.curriculum_fixed(episode)
+        }
+    }
+
+    /// Fixed curriculum: phase boundaries at 25%/40%/90%/100%.
+    fn curriculum_fixed(&self, episode: usize) -> (HumanoidTask, f32, f64) {
+        let total = self.config.num_episodes;
         let progress = episode as f64 / (total - 1) as f64;
 
         if progress < 0.25 {
-            // Phase 1: Stand with PD guidance decaying 80%→40%
             let phase_progress = progress / 0.25;
             let pd_weight = 0.8 - 0.4 * phase_progress as f32;
             (HumanoidTask::Stand, pd_weight, 0.0)
         } else if progress < 0.40 {
-            // Phase 2: Stand with PD decaying 40%→10% (autonomy ramp)
             let phase_progress = (progress - 0.25) / 0.15;
             let pd_weight = 0.4 - 0.3 * phase_progress as f32;
             (HumanoidTask::Stand, pd_weight, 0.0)
         } else if progress < 0.90 {
-            // Phase 3: Walk, PD 10%→5%, speed ramps 0→1 m/s
-            // Extended to 50% of training for longer Walk practice
             let phase_progress = (progress - 0.40) / 0.50;
             let pd_weight = 0.10 - 0.05 * phase_progress as f32;
-            let target_speed = phase_progress * 1.0;
+            let target_speed = phase_progress;
             (HumanoidTask::Walk, pd_weight, target_speed)
         } else {
-            // Phase 4: Run, PD 5%→0%, speed ramps 1→3 m/s
-            // 10% of training with gentler speed cap (3 m/s)
             let phase_progress = (progress - 0.90) / 0.10;
             let pd_weight = 0.05 * (1.0 - phase_progress as f32);
             let target_speed = 1.0 + phase_progress * 2.0;
             (HumanoidTask::Run, pd_weight, target_speed)
         }
+    }
+
+    /// Adaptive curriculum: uses CurriculumState for phase-aware progress.
+    ///
+    /// Each phase has a max duration (same as fixed boundaries). Progress
+    /// within phase = episodes_in_phase / max_duration_for_phase, clamped to [0,1].
+    /// Phase transitions happen via `check_phase_advance()` after each episode.
+    fn curriculum_adaptive(&self, episode: usize) -> (HumanoidTask, f32, f64) {
+        let total = self.config.num_episodes;
+        let cs = &self.curriculum_state;
+
+        // Max durations per phase (in episodes)
+        let max_durations = [
+            (total as f64 * 0.25).ceil() as usize, // Phase 0: Stand PD↓
+            (total as f64 * 0.15).ceil() as usize, // Phase 1: Stand autonomy
+            (total as f64 * 0.50).ceil() as usize, // Phase 2: Walk
+            total.saturating_sub(cs.phase_start_ep), // Phase 3: Run (remainder)
+        ];
+
+        let episodes_in_phase = episode.saturating_sub(cs.phase_start_ep);
+        let max_dur = max_durations[cs.phase.min(3)].max(1);
+        let phase_progress = (episodes_in_phase as f64 / max_dur as f64).min(1.0);
+
+        match cs.phase {
+            0 => {
+                let pd_weight = 0.8 - 0.4 * phase_progress as f32;
+                (HumanoidTask::Stand, pd_weight, 0.0)
+            }
+            1 => {
+                let pd_weight = 0.4 - 0.3 * phase_progress as f32;
+                (HumanoidTask::Stand, pd_weight, 0.0)
+            }
+            2 => {
+                let pd_weight = 0.10 - 0.05 * phase_progress as f32;
+                let target_speed = phase_progress;
+                (HumanoidTask::Walk, pd_weight, target_speed)
+            }
+            _ => {
+                let pd_weight = 0.05 * (1.0 - phase_progress as f32);
+                let target_speed = 1.0 + phase_progress * 2.0;
+                (HumanoidTask::Run, pd_weight, target_speed)
+            }
+        }
+    }
+
+    /// Check whether the current phase should advance based on episode metrics.
+    ///
+    /// Advances when: (a) max duration exceeded, or (b) mastery criteria met
+    /// for `mastery_streak_required` consecutive episodes after minimum duration.
+    /// Returns true if phase advanced.
+    fn check_phase_advance(&mut self, ep: usize, metrics: &EpisodeMetrics) -> bool {
+        if !self.config.adaptive_curriculum || self.curriculum_state.phase >= 3 {
+            return false;
+        }
+
+        let total = self.config.num_episodes;
+        let min_durations = [10usize, 5, 15, total];
+        let max_durations = [
+            (total as f64 * 0.25).ceil() as usize,
+            (total as f64 * 0.15).ceil() as usize,
+            (total as f64 * 0.50).ceil() as usize,
+            total,
+        ];
+
+        let phase = self.curriculum_state.phase;
+        let episodes_in_phase = ep.saturating_sub(self.curriculum_state.phase_start_ep) + 1;
+
+        // Force advance if max duration exceeded
+        if episodes_in_phase >= max_durations[phase] {
+            self.curriculum_state.phase += 1;
+            self.curriculum_state.phase_start_ep = ep + 1;
+            self.curriculum_state.mastery_streak = 0;
+            return true;
+        }
+
+        // Check mastery only if min duration met
+        if episodes_in_phase < min_durations[phase] {
+            return false;
+        }
+
+        let full_episode = metrics.total_steps == self.config.steps_per_episode;
+        let mastered = match phase {
+            0 => {
+                metrics.avg_standing_reward > self.config.standing_mastery_threshold && full_episode
+            }
+            1 => {
+                metrics.avg_standing_reward > 0.90
+                    && metrics.avg_uprightness > 0.95
+                    && full_episode
+            }
+            2 => {
+                let (_, _, target_speed) = self.curriculum_adaptive(ep);
+                metrics.avg_episode_reward > 0.70
+                    && metrics.avg_horizontal_speed > target_speed * 0.5
+            }
+            _ => false,
+        };
+
+        if mastered {
+            self.curriculum_state.mastery_streak += 1;
+            if self.curriculum_state.mastery_streak >= self.config.mastery_streak_required {
+                self.curriculum_state.phase += 1;
+                self.curriculum_state.phase_start_ep = ep + 1;
+                self.curriculum_state.mastery_streak = 0;
+                return true;
+            }
+        } else {
+            self.curriculum_state.mastery_streak = 0;
+        }
+
+        false
     }
 
     /// Run a single training episode with any physics simulator.
@@ -226,11 +366,12 @@ impl HumanoidTrainer {
             1.0f32
         };
 
-        // Gait phase for locomotion baselines (advances each physics step)
-        // Walk: ~1.5 Hz gait cycle, Run: ~2.5 Hz gait cycle
+        // Speed-dependent gait frequency (biomechanical: cadence increases with speed)
+        // Walk: 1.2 Hz at 0 m/s → 1.8 Hz at 1 m/s
+        // Run: 2.0 Hz at 1 m/s → 2.6 Hz at 3 m/s
         let gait_freq = match task {
-            HumanoidTask::Walk => 1.5,
-            HumanoidTask::Run => 2.5,
+            HumanoidTask::Walk => 1.2 + 0.6 * target_speed.min(1.0),
+            HumanoidTask::Run => 2.0 + 0.3 * (target_speed - 1.0).max(0.0).min(2.0),
             HumanoidTask::Stand => 0.0,
         };
 
@@ -414,6 +555,8 @@ impl HumanoidTrainer {
 
     /// Run the full training curriculum.
     pub fn train(&mut self) -> Vec<EpisodeMetrics> {
+        self.curriculum_state = CurriculumState::new();
+
         let genesis = self.genesis.clone();
         let num_levels = self.config.num_levels;
         let mut encoder = HumanoidHdcEncoder::new(&genesis, num_levels);
@@ -421,8 +564,12 @@ impl HumanoidTrainer {
             .initial_controller
             .take()
             .unwrap_or_else(|| HumanoidController::new(&genesis, &self.config));
+        let fep_config = HumanoidFepConfig {
+            exploration_decay_rate: self.config.exploration_decay_rate,
+            ..HumanoidFepConfig::default()
+        };
         let mut fep_agent =
-            ActiveInferenceHumanoidAgent::new(HumanoidFepConfig::default(), self.config.task);
+            ActiveInferenceHumanoidAgent::new(fep_config, self.config.task);
 
         // Warmup: pre-train on static standing samples
         let warmup_samples: Vec<(ContinuousHV, HumanoidCommand)> = (0..20)
@@ -487,6 +634,9 @@ impl HumanoidTrainer {
                 consecutive_low = 0;
             }
 
+            // Adaptive curriculum: check for early phase advancement
+            self.check_phase_advance(ep, &metrics);
+
             all_metrics.push(metrics.clone());
             fep_agent.reset();
         }
@@ -498,6 +648,7 @@ impl HumanoidTrainer {
     /// Run training with CSV telemetry output.
     pub fn train_with_telemetry(&mut self, output_dir: &str) -> Vec<EpisodeMetrics> {
         self.config.collect_telemetry = true;
+        self.curriculum_state = CurriculumState::new();
 
         let genesis = self.genesis.clone();
         let num_levels = self.config.num_levels;
@@ -506,8 +657,12 @@ impl HumanoidTrainer {
             .initial_controller
             .take()
             .unwrap_or_else(|| HumanoidController::new(&genesis, &self.config));
+        let fep_config = HumanoidFepConfig {
+            exploration_decay_rate: self.config.exploration_decay_rate,
+            ..HumanoidFepConfig::default()
+        };
         let mut fep_agent =
-            ActiveInferenceHumanoidAgent::new(HumanoidFepConfig::default(), self.config.task);
+            ActiveInferenceHumanoidAgent::new(fep_config, self.config.task);
 
         let mut all_metrics = Vec::with_capacity(self.config.num_episodes);
         let _ = std::fs::create_dir_all(output_dir);
@@ -559,6 +714,9 @@ impl HumanoidTrainer {
             } else {
                 consecutive_low = 0;
             }
+
+            // Adaptive curriculum: check for early phase advancement
+            self.check_phase_advance(ep, &metrics);
 
             if !metrics.telemetry.is_empty() {
                 let step_path = format!("{}/episode_{:04}.csv", output_dir, ep);
@@ -684,10 +842,11 @@ mod tests {
     }
 
     #[test]
-    fn test_curriculum_phases() {
+    fn test_curriculum_phases_fixed() {
         let config = HumanoidConfig {
             num_episodes: 100,
             steps_per_episode: 10,
+            adaptive_curriculum: false,
             ..HumanoidConfig::default()
         };
         let trainer = HumanoidTrainer::new(config);
@@ -731,6 +890,84 @@ mod tests {
             speed99 <= 3.01,
             "Run speed should be capped at ~3 m/s: {speed99}"
         );
+    }
+
+    #[test]
+    fn test_adaptive_curriculum_phase_advance() {
+        let config = HumanoidConfig {
+            num_episodes: 100,
+            steps_per_episode: 50,
+            adaptive_curriculum: true,
+            standing_mastery_threshold: 0.85,
+            mastery_streak_required: 3,
+            ..HumanoidConfig::default()
+        };
+        let mut trainer = HumanoidTrainer::new(config.clone());
+
+        // Phase 0 at start
+        let (task, pd, _) = trainer.curriculum(0);
+        assert_eq!(task, HumanoidTask::Stand);
+        assert!((pd - 0.8).abs() < 0.01);
+
+        // Simulate mastery: high standing reward for 3 consecutive episodes after min 10
+        for ep in 0..13 {
+            let metrics = EpisodeMetrics {
+                episode: ep,
+                avg_standing_reward: 0.90,
+                avg_episode_reward: 0.90,
+                avg_free_energy: 0.5,
+                avg_head_height: 1.38,
+                avg_uprightness: 0.97,
+                avg_horizontal_speed: 0.0,
+                avg_control_effort: 0.3,
+                exploration_count: 0,
+                total_steps: config.steps_per_episode, // Full episode (no early term)
+                task: HumanoidTask::Stand,
+                telemetry: Vec::new(),
+            };
+            let advanced = trainer.check_phase_advance(ep, &metrics);
+            if ep == 12 {
+                // Episode 12 = 13th episode, streak reaches 3 at episodes 10,11,12
+                assert!(advanced, "Should advance after 3 mastery episodes past min duration");
+            }
+        }
+
+        // After advancement: phase 1 (Stand autonomy ramp)
+        assert_eq!(trainer.curriculum_state.phase, 1);
+        let (task, pd, _) = trainer.curriculum(13);
+        assert_eq!(task, HumanoidTask::Stand);
+        assert!((pd - 0.4).abs() < 0.05, "Phase 1 starts at PD ~0.4: {pd}");
+    }
+
+    #[test]
+    fn test_adaptive_curriculum_respects_minimum() {
+        let config = HumanoidConfig {
+            num_episodes: 100,
+            steps_per_episode: 50,
+            adaptive_curriculum: true,
+            mastery_streak_required: 1,
+            ..HumanoidConfig::default()
+        };
+        let mut trainer = HumanoidTrainer::new(config.clone());
+
+        // Try to advance at episode 5 (below min=10) — should NOT advance
+        let metrics = EpisodeMetrics {
+            episode: 5,
+            avg_standing_reward: 0.99,
+            avg_episode_reward: 0.99,
+            avg_free_energy: 0.1,
+            avg_head_height: 1.4,
+            avg_uprightness: 0.99,
+            avg_horizontal_speed: 0.0,
+            avg_control_effort: 0.1,
+            exploration_count: 0,
+            total_steps: config.steps_per_episode,
+            task: HumanoidTask::Stand,
+            telemetry: Vec::new(),
+        };
+        let advanced = trainer.check_phase_advance(5, &metrics);
+        assert!(!advanced, "Should not advance before min duration (10 episodes)");
+        assert_eq!(trainer.curriculum_state.phase, 0);
     }
 
     #[test]
