@@ -175,6 +175,26 @@ fn validate_create_transfer(
     _action: EntryCreationAction,
     transfer: Transfer,
 ) -> ExternResult<ValidateCallbackResult> {
+    // --- Empty string checks (required fields) ---
+    if transfer.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Transfer id cannot be empty".into()));
+    }
+    if transfer.property_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Transfer property_id cannot be empty".into()));
+    }
+    // --- String length limits ---
+    if transfer.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Transfer id too long (max 64 chars)".into()));
+    }
+    if transfer.property_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Transfer property_id too long (max 64 chars)".into()));
+    }
+    if let Some(ref currency) = transfer.currency {
+        if currency.len() > 16 {
+            return Ok(ValidateCallbackResult::Invalid("Transfer currency too long (max 16 chars)".into()));
+        }
+    }
+    // --- Existing validation ---
     if !transfer.from_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Seller must be a valid DID".into()));
     }
@@ -199,6 +219,29 @@ fn validate_create_escrow(
     _action: EntryCreationAction,
     escrow: Escrow,
 ) -> ExternResult<ValidateCallbackResult> {
+    // --- Empty string checks (required fields) ---
+    if escrow.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Escrow id cannot be empty".into()));
+    }
+    if escrow.transfer_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Escrow transfer_id cannot be empty".into()));
+    }
+    // --- String length limits ---
+    if escrow.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Escrow id too long (max 64 chars)".into()));
+    }
+    if escrow.transfer_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Escrow transfer_id too long (max 64 chars)".into()));
+    }
+    if escrow.currency.len() > 16 {
+        return Ok(ValidateCallbackResult::Invalid("Escrow currency too long (max 16 chars)".into()));
+    }
+    for condition in &escrow.release_conditions {
+        if condition.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid("Escrow release condition too long (max 4096 chars)".into()));
+        }
+    }
+    // --- Existing validation ---
     if !escrow.amount.is_finite() {
         return Ok(ValidateCallbackResult::Invalid("Escrow amount must be a finite number".into()));
     }
@@ -1003,5 +1046,141 @@ mod tests {
         assert_eq!(escrow.id, deserialized.id);
         assert_eq!(escrow.amount, deserialized.amount);
         assert_eq!(escrow.currency, deserialized.currency);
+    }
+
+    // ========================================================================
+    // String Length & Empty Validation Tests
+    // ========================================================================
+
+    // --- Transfer ---
+
+    #[test]
+    fn test_transfer_empty_id() {
+        let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+        transfer.id = "".to_string();
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_transfer_whitespace_id() {
+        let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+        transfer.id = "   ".to_string();
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_transfer_id_too_long() {
+        let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+        transfer.id = "x".repeat(65);
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_transfer_id_at_limit() {
+        let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+        transfer.id = "x".repeat(64);
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_transfer_empty_property_id() {
+        let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+        transfer.property_id = "".to_string();
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_transfer_property_id_too_long() {
+        let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+        transfer.property_id = "x".repeat(65);
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_transfer_currency_too_long() {
+        let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+        transfer.currency = Some("x".repeat(17));
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_transfer_currency_at_limit() {
+        let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+        transfer.currency = Some("x".repeat(16));
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    // --- Escrow ---
+
+    #[test]
+    fn test_escrow_empty_id() {
+        let mut escrow = create_test_escrow(1000.0);
+        escrow.id = "".to_string();
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_escrow_whitespace_id() {
+        let mut escrow = create_test_escrow(1000.0);
+        escrow.id = "   ".to_string();
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_escrow_id_too_long() {
+        let mut escrow = create_test_escrow(1000.0);
+        escrow.id = "x".repeat(65);
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_escrow_empty_transfer_id() {
+        let mut escrow = create_test_escrow(1000.0);
+        escrow.transfer_id = "".to_string();
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_escrow_transfer_id_too_long() {
+        let mut escrow = create_test_escrow(1000.0);
+        escrow.transfer_id = "x".repeat(65);
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_escrow_currency_too_long() {
+        let mut escrow = create_test_escrow(1000.0);
+        escrow.currency = "x".repeat(17);
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_escrow_release_condition_too_long() {
+        let mut escrow = create_test_escrow(1000.0);
+        escrow.release_conditions = vec!["x".repeat(4097)];
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_escrow_release_condition_at_limit() {
+        let mut escrow = create_test_escrow(1000.0);
+        escrow.release_conditions = vec!["x".repeat(4096)];
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
     }
 }

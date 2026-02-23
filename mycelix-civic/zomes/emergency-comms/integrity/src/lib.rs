@@ -254,6 +254,11 @@ fn validate_create_channel(
             "Channel name cannot be empty".into(),
         ));
     }
+    if channel.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Channel name too long (max 256 chars)".into(),
+        ));
+    }
     if channel.participants.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Channel must have at least one participant".into(),
@@ -269,6 +274,11 @@ fn validate_create_broadcast(
     if broadcast.content.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Broadcast content cannot be empty".into(),
+        ));
+    }
+    if broadcast.content.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Broadcast content too long (max 4096 bytes)".into(),
         ));
     }
     let (lat, lon, radius) = broadcast.target_area;
@@ -881,11 +891,46 @@ mod tests {
     }
 
     #[test]
-    fn create_channel_long_name_passes() {
+    fn create_channel_name_at_limit_passes() {
+        let mut ch = make_channel();
+        ch.name = "A".repeat(256);
+        let result = validate_create_channel(fake_create(), ch);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_channel_name_over_limit_rejected() {
+        let mut ch = make_channel();
+        ch.name = "A".repeat(257);
+        let result = validate_create_channel(fake_create(), ch);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Channel name too long (max 256 chars)");
+    }
+
+    #[test]
+    fn create_channel_very_long_name_rejected() {
         let mut ch = make_channel();
         ch.name = "A".repeat(1000);
         let result = validate_create_channel(fake_create(), ch);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Channel name too long (max 256 chars)");
+    }
+
+    #[test]
+    fn create_broadcast_content_at_limit_passes() {
+        let mut b = make_broadcast();
+        b.content = "c".repeat(4096);
+        let result = validate_create_broadcast(fake_create(), b);
         assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_broadcast_content_over_limit_rejected() {
+        let mut b = make_broadcast();
+        b.content = "c".repeat(4097);
+        let result = validate_create_broadcast(fake_create(), b);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Broadcast content too long (max 4096 bytes)");
     }
 
     // ========================================================================

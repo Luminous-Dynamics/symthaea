@@ -208,14 +208,40 @@ fn validate_create_fact_check(
     if check.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("FactCheck ID cannot be empty".into()));
     }
+    if check.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("FactCheck ID too long (max 64 chars)".into()));
+    }
     if check.publication_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("FactCheck publication_id cannot be empty".into()));
+    }
+    if check.publication_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("FactCheck publication_id too long (max 64 chars)".into()));
     }
     if !check.checker_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Checker must be a valid DID".into()));
     }
+    if check.checker_did.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Checker DID too long (max 256 chars)".into()));
+    }
     if check.claim_text.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Claim text required".into()));
+    }
+    if check.claim_text.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid("Claim text too long (max 4096 chars)".into()));
+    }
+    if check.claim_location.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Claim location too long (max 256 chars)".into()));
+    }
+    // Validate evidence items
+    for item in &check.evidence {
+        if item.description.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid("Evidence description too long (max 4096 chars)".into()));
+        }
+        if let Some(ref url) = item.source_url {
+            if url.len() > 2048 {
+                return Ok(ValidateCallbackResult::Invalid("Evidence source URL too long (max 2048 chars)".into()));
+            }
+        }
     }
     let ep = &check.epistemic_position;
     if !ep.empirical.is_finite() || !ep.normative.is_finite() || !ep.mythic.is_finite() {
@@ -233,6 +259,9 @@ fn validate_create_source_credibility(
 ) -> ExternResult<ValidateCallbackResult> {
     if source.source_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("SourceCredibility source_id cannot be empty".into()));
+    }
+    if source.source_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("SourceCredibility source_id too long (max 64 chars)".into()));
     }
     if !source.credibility_score.is_finite() {
         return Ok(ValidateCallbackResult::Invalid("credibility_score must be a finite number".into()));
@@ -263,14 +292,26 @@ fn validate_create_fact_check_dispute(
     if dispute.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Dispute ID cannot be empty".into()));
     }
+    if dispute.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Dispute ID too long (max 64 chars)".into()));
+    }
     if dispute.fact_check_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Dispute fact_check_id cannot be empty".into()));
+    }
+    if dispute.fact_check_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Dispute fact_check_id too long (max 64 chars)".into()));
     }
     if !dispute.disputer_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Disputer must be a valid DID".into()));
     }
+    if dispute.disputer_did.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Disputer DID too long (max 256 chars)".into()));
+    }
     if dispute.reason.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Dispute reason required".into()));
+    }
+    if dispute.reason.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid("Dispute reason too long (max 4096 chars)".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -940,6 +981,212 @@ mod tests {
         let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
         assert!(is_invalid(&result));
         assert_eq!(invalid_msg(&result), "Disputer must be a valid DID");
+    }
+
+    // ========================================================================
+    // STRING LENGTH LIMIT TESTS
+    // ========================================================================
+
+    #[test]
+    fn fact_check_id_at_limit_passes() {
+        let mut fc = make_fact_check();
+        fc.id = "i".repeat(64);
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn fact_check_id_over_limit_rejected() {
+        let mut fc = make_fact_check();
+        fc.id = "i".repeat(65);
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "FactCheck ID too long (max 64 chars)");
+    }
+
+    #[test]
+    fn fact_check_publication_id_at_limit_passes() {
+        let mut fc = make_fact_check();
+        fc.publication_id = "p".repeat(64);
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn fact_check_publication_id_over_limit_rejected() {
+        let mut fc = make_fact_check();
+        fc.publication_id = "p".repeat(65);
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "FactCheck publication_id too long (max 64 chars)");
+    }
+
+    #[test]
+    fn fact_check_checker_did_at_limit_passes() {
+        let mut fc = make_fact_check();
+        fc.checker_did = format!("did:{}", "x".repeat(252));
+        assert_eq!(fc.checker_did.len(), 256);
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn fact_check_checker_did_over_limit_rejected() {
+        let mut fc = make_fact_check();
+        fc.checker_did = format!("did:{}", "x".repeat(253));
+        assert_eq!(fc.checker_did.len(), 257);
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Checker DID too long (max 256 chars)");
+    }
+
+    #[test]
+    fn fact_check_claim_text_at_limit_passes() {
+        let mut fc = make_fact_check();
+        fc.claim_text = "t".repeat(4096);
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn fact_check_claim_text_over_limit_rejected() {
+        let mut fc = make_fact_check();
+        fc.claim_text = "t".repeat(4097);
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Claim text too long (max 4096 chars)");
+    }
+
+    #[test]
+    fn fact_check_claim_location_at_limit_passes() {
+        let mut fc = make_fact_check();
+        fc.claim_location = "l".repeat(256);
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn fact_check_claim_location_over_limit_rejected() {
+        let mut fc = make_fact_check();
+        fc.claim_location = "l".repeat(257);
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Claim location too long (max 256 chars)");
+    }
+
+    #[test]
+    fn fact_check_evidence_description_over_limit_rejected() {
+        let mut fc = make_fact_check();
+        fc.evidence = vec![EvidenceItem {
+            source_type: SourceType::PrimarySource,
+            source_url: None,
+            source_did: None,
+            description: "d".repeat(4097),
+            supports_claim: true,
+        }];
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Evidence description too long (max 4096 chars)");
+    }
+
+    #[test]
+    fn fact_check_evidence_source_url_over_limit_rejected() {
+        let mut fc = make_fact_check();
+        fc.evidence = vec![EvidenceItem {
+            source_type: SourceType::PrimarySource,
+            source_url: Some("u".repeat(2049)),
+            source_did: None,
+            description: "ok".into(),
+            supports_claim: true,
+        }];
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Evidence source URL too long (max 2048 chars)");
+    }
+
+    #[test]
+    fn source_credibility_source_id_at_limit_passes() {
+        let mut sc = make_source_credibility();
+        sc.source_id = "s".repeat(64);
+        let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn source_credibility_source_id_over_limit_rejected() {
+        let mut sc = make_source_credibility();
+        sc.source_id = "s".repeat(65);
+        let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "SourceCredibility source_id too long (max 64 chars)");
+    }
+
+    #[test]
+    fn dispute_id_at_limit_passes() {
+        let mut dispute = make_dispute();
+        dispute.id = "d".repeat(64);
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn dispute_id_over_limit_rejected() {
+        let mut dispute = make_dispute();
+        dispute.id = "d".repeat(65);
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Dispute ID too long (max 64 chars)");
+    }
+
+    #[test]
+    fn dispute_fact_check_id_at_limit_passes() {
+        let mut dispute = make_dispute();
+        dispute.fact_check_id = "f".repeat(64);
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn dispute_fact_check_id_over_limit_rejected() {
+        let mut dispute = make_dispute();
+        dispute.fact_check_id = "f".repeat(65);
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Dispute fact_check_id too long (max 64 chars)");
+    }
+
+    #[test]
+    fn dispute_disputer_did_at_limit_passes() {
+        let mut dispute = make_dispute();
+        dispute.disputer_did = format!("did:{}", "x".repeat(252));
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn dispute_disputer_did_over_limit_rejected() {
+        let mut dispute = make_dispute();
+        dispute.disputer_did = format!("did:{}", "x".repeat(253));
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Disputer DID too long (max 256 chars)");
+    }
+
+    #[test]
+    fn dispute_reason_at_limit_passes() {
+        let mut dispute = make_dispute();
+        dispute.reason = "r".repeat(4096);
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn dispute_reason_over_limit_rejected() {
+        let mut dispute = make_dispute();
+        dispute.reason = "r".repeat(4097);
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Dispute reason too long (max 4096 chars)");
     }
 
     // ========================================================================

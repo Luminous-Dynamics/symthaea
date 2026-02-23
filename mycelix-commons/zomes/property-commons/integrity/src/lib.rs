@@ -198,6 +198,27 @@ fn validate_create_common_resource(
     _action: EntryCreationAction,
     resource: CommonResource,
 ) -> ExternResult<ValidateCallbackResult> {
+    // --- Empty string checks (required fields) ---
+    if resource.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Resource id cannot be empty".into()));
+    }
+    if resource.name.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Resource name cannot be empty".into()));
+    }
+    if resource.description.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Resource description cannot be empty".into()));
+    }
+    // --- String length limits ---
+    if resource.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Resource id too long (max 64 chars)".into()));
+    }
+    if resource.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Resource name too long (max 256 chars)".into()));
+    }
+    if resource.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid("Resource description too long (max 4096 chars)".into()));
+    }
+    // --- Existing validation ---
     if resource.stewards.is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Resource must have at least one steward".into()));
     }
@@ -226,6 +247,21 @@ fn validate_create_usage_right(
     _action: EntryCreationAction,
     right: UsageRight,
 ) -> ExternResult<ValidateCallbackResult> {
+    // --- Empty string checks (required fields) ---
+    if right.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("UsageRight id cannot be empty".into()));
+    }
+    if right.resource_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("UsageRight resource_id cannot be empty".into()));
+    }
+    // --- String length limits ---
+    if right.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("UsageRight id too long (max 64 chars)".into()));
+    }
+    if right.resource_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("UsageRight resource_id too long (max 64 chars)".into()));
+    }
+    // --- Existing validation ---
     if !right.holder_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Holder must be a valid DID".into()));
     }
@@ -244,6 +280,33 @@ fn validate_create_usage_log(
     _action: EntryCreationAction,
     log: UsageLog,
 ) -> ExternResult<ValidateCallbackResult> {
+    // --- Empty string checks (required fields) ---
+    if log.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("UsageLog id cannot be empty".into()));
+    }
+    if log.resource_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("UsageLog resource_id cannot be empty".into()));
+    }
+    if log.usage_type.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("UsageLog usage_type cannot be empty".into()));
+    }
+    if log.unit.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("UsageLog unit cannot be empty".into()));
+    }
+    // --- String length limits ---
+    if log.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("UsageLog id too long (max 64 chars)".into()));
+    }
+    if log.resource_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("UsageLog resource_id too long (max 64 chars)".into()));
+    }
+    if log.usage_type.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid("UsageLog usage_type too long (max 128 chars)".into()));
+    }
+    if log.unit.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid("UsageLog unit too long (max 128 chars)".into()));
+    }
+    // --- Existing validation ---
     if !log.user_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("User must be a valid DID".into()));
     }
@@ -923,5 +986,231 @@ mod tests {
         let action = create_entry_creation_action();
         let result = validate_create_usage_log(action, log).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    // ========================================
+    // String Length & Empty Validation Tests
+    // ========================================
+
+    // --- CommonResource ---
+
+    #[test]
+    fn test_common_resource_empty_id() {
+        let mut resource = create_common_resource();
+        resource.id = "".to_string();
+        let action = create_entry_creation_action();
+        let result = validate_create_common_resource(action, resource).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_common_resource_whitespace_id() {
+        let mut resource = create_common_resource();
+        resource.id = "   ".to_string();
+        let action = create_entry_creation_action();
+        let result = validate_create_common_resource(action, resource).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_common_resource_id_too_long() {
+        let mut resource = create_common_resource();
+        resource.id = "x".repeat(65);
+        let action = create_entry_creation_action();
+        let result = validate_create_common_resource(action, resource).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_common_resource_id_at_limit() {
+        let mut resource = create_common_resource();
+        resource.id = "x".repeat(64);
+        let action = create_entry_creation_action();
+        let result = validate_create_common_resource(action, resource).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_common_resource_empty_name() {
+        let mut resource = create_common_resource();
+        resource.name = "".to_string();
+        let action = create_entry_creation_action();
+        let result = validate_create_common_resource(action, resource).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_common_resource_name_too_long() {
+        let mut resource = create_common_resource();
+        resource.name = "x".repeat(257);
+        let action = create_entry_creation_action();
+        let result = validate_create_common_resource(action, resource).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_common_resource_name_at_limit() {
+        let mut resource = create_common_resource();
+        resource.name = "x".repeat(256);
+        let action = create_entry_creation_action();
+        let result = validate_create_common_resource(action, resource).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_common_resource_empty_description() {
+        let mut resource = create_common_resource();
+        resource.description = "".to_string();
+        let action = create_entry_creation_action();
+        let result = validate_create_common_resource(action, resource).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_common_resource_description_too_long() {
+        let mut resource = create_common_resource();
+        resource.description = "x".repeat(4097);
+        let action = create_entry_creation_action();
+        let result = validate_create_common_resource(action, resource).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_common_resource_description_at_limit() {
+        let mut resource = create_common_resource();
+        resource.description = "x".repeat(4096);
+        let action = create_entry_creation_action();
+        let result = validate_create_common_resource(action, resource).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    // --- UsageRight ---
+
+    #[test]
+    fn test_usage_right_empty_id() {
+        let mut right = create_usage_right();
+        right.id = "".to_string();
+        let action = create_entry_creation_action();
+        let result = validate_create_usage_right(action, right).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_usage_right_whitespace_id() {
+        let mut right = create_usage_right();
+        right.id = "   ".to_string();
+        let action = create_entry_creation_action();
+        let result = validate_create_usage_right(action, right).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_usage_right_id_too_long() {
+        let mut right = create_usage_right();
+        right.id = "x".repeat(65);
+        let action = create_entry_creation_action();
+        let result = validate_create_usage_right(action, right).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_usage_right_empty_resource_id() {
+        let mut right = create_usage_right();
+        right.resource_id = "".to_string();
+        let action = create_entry_creation_action();
+        let result = validate_create_usage_right(action, right).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_usage_right_resource_id_too_long() {
+        let mut right = create_usage_right();
+        right.resource_id = "x".repeat(65);
+        let action = create_entry_creation_action();
+        let result = validate_create_usage_right(action, right).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // --- UsageLog ---
+
+    #[test]
+    fn test_usage_log_empty_id() {
+        let mut log = create_usage_log();
+        log.id = "".to_string();
+        let action = create_entry_creation_action();
+        let result = validate_create_usage_log(action, log).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_usage_log_whitespace_id() {
+        let mut log = create_usage_log();
+        log.id = "   ".to_string();
+        let action = create_entry_creation_action();
+        let result = validate_create_usage_log(action, log).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_usage_log_id_too_long() {
+        let mut log = create_usage_log();
+        log.id = "x".repeat(65);
+        let action = create_entry_creation_action();
+        let result = validate_create_usage_log(action, log).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_usage_log_empty_resource_id() {
+        let mut log = create_usage_log();
+        log.resource_id = "".to_string();
+        let action = create_entry_creation_action();
+        let result = validate_create_usage_log(action, log).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_usage_log_resource_id_too_long() {
+        let mut log = create_usage_log();
+        log.resource_id = "x".repeat(65);
+        let action = create_entry_creation_action();
+        let result = validate_create_usage_log(action, log).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_usage_log_empty_usage_type() {
+        let mut log = create_usage_log();
+        log.usage_type = "".to_string();
+        let action = create_entry_creation_action();
+        let result = validate_create_usage_log(action, log).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_usage_log_usage_type_too_long() {
+        let mut log = create_usage_log();
+        log.usage_type = "x".repeat(129);
+        let action = create_entry_creation_action();
+        let result = validate_create_usage_log(action, log).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_usage_log_empty_unit() {
+        let mut log = create_usage_log();
+        log.unit = "".to_string();
+        let action = create_entry_creation_action();
+        let result = validate_create_usage_log(action, log).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_usage_log_unit_too_long() {
+        let mut log = create_usage_log();
+        log.unit = "x".repeat(129);
+        let action = create_entry_creation_action();
+        let result = validate_create_usage_log(action, log).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

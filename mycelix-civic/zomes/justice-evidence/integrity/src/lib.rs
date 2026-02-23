@@ -71,8 +71,29 @@ fn validate_evidence(evidence: &Evidence) -> ExternResult<ValidateCallbackResult
     if !evidence.submitter.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Submitter must be a valid DID".into()));
     }
+    if evidence.submitter.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Submitter DID too long (max 256 chars)".into()));
+    }
     if evidence.content_hash.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Content hash required".into()));
+    }
+    if evidence.content_hash.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Content hash too long (max 256 chars)".into()));
+    }
+    if evidence.description.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Description cannot be empty".into()));
+    }
+    if evidence.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid("Description too long (max 4096 chars)".into()));
+    }
+    if evidence.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Evidence ID too long (max 64 chars)".into()));
+    }
+    if evidence.complaint_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Complaint ID too long (max 64 chars)".into()));
+    }
+    if evidence.title.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Title too long (max 256 chars)".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -81,8 +102,22 @@ fn validate_evidence_verification(v: &EvidenceVerification) -> ExternResult<Vali
     if !v.verifier.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Verifier must be a valid DID".into()));
     }
+    if v.verifier.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Verifier DID too long (max 256 chars)".into()));
+    }
     if v.evidence_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Evidence ID required".into()));
+    }
+    if v.evidence_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Evidence ID too long (max 64 chars)".into()));
+    }
+    if v.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Verification ID too long (max 64 chars)".into()));
+    }
+    if let Some(ref notes) = v.notes {
+        if notes.len() > 8192 {
+            return Ok(ValidateCallbackResult::Invalid("Notes too long (max 8192 chars)".into()));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -91,11 +126,23 @@ fn validate_evidence_dispute(d: &EvidenceDispute) -> ExternResult<ValidateCallba
     if !d.disputant.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Disputant must be a valid DID".into()));
     }
+    if d.disputant.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Disputant DID too long (max 256 chars)".into()));
+    }
     if d.evidence_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Evidence ID required".into()));
     }
+    if d.evidence_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Evidence ID too long (max 64 chars)".into()));
+    }
     if d.reason.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Dispute reason required".into()));
+    }
+    if d.reason.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid("Dispute reason too long (max 4096 chars)".into()));
+    }
+    if d.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Dispute ID too long (max 64 chars)".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -575,35 +622,176 @@ mod tests {
     // ========================================================================
 
     #[test]
-    fn evidence_very_long_content_hash_passes() {
+    fn evidence_very_long_content_hash_rejected() {
         let mut ev = make_evidence();
         ev.content_hash = "a".repeat(10_000);
         let result = validate_evidence(&ev);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Content hash too long (max 256 chars)");
     }
 
     #[test]
-    fn evidence_very_long_submitter_did_passes() {
+    fn evidence_content_hash_at_limit_passes() {
         let mut ev = make_evidence();
-        ev.submitter = format!("did:example:{}", "x".repeat(10_000));
+        ev.content_hash = "a".repeat(256);
         let result = validate_evidence(&ev);
         assert!(is_valid(&result));
     }
 
     #[test]
-    fn dispute_very_long_reason_passes() {
+    fn evidence_content_hash_over_limit_rejected() {
+        let mut ev = make_evidence();
+        ev.content_hash = "a".repeat(257);
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Content hash too long (max 256 chars)");
+    }
+
+    #[test]
+    fn evidence_very_long_submitter_did_rejected() {
+        let mut ev = make_evidence();
+        ev.submitter = format!("did:example:{}", "x".repeat(10_000));
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Submitter DID too long (max 256 chars)");
+    }
+
+    #[test]
+    fn evidence_submitter_did_at_limit_passes() {
+        let mut ev = make_evidence();
+        ev.submitter = format!("did:{}", "x".repeat(252));
+        assert_eq!(ev.submitter.len(), 256);
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_description_empty_rejected() {
+        let mut ev = make_evidence();
+        ev.description = "".into();
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Description cannot be empty");
+    }
+
+    #[test]
+    fn evidence_description_whitespace_only_rejected() {
+        let mut ev = make_evidence();
+        ev.description = "   ".into();
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Description cannot be empty");
+    }
+
+    #[test]
+    fn evidence_description_at_limit_passes() {
+        let mut ev = make_evidence();
+        ev.description = "d".repeat(4096);
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_description_over_limit_rejected() {
+        let mut ev = make_evidence();
+        ev.description = "d".repeat(4097);
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Description too long (max 4096 chars)");
+    }
+
+    #[test]
+    fn evidence_title_at_limit_passes() {
+        let mut ev = make_evidence();
+        ev.title = "t".repeat(256);
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_title_over_limit_rejected() {
+        let mut ev = make_evidence();
+        ev.title = "t".repeat(257);
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Title too long (max 256 chars)");
+    }
+
+    #[test]
+    fn dispute_very_long_reason_rejected() {
         let mut d = make_dispute();
         d.reason = "x".repeat(100_000);
+        let result = validate_evidence_dispute(&d);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Dispute reason too long (max 4096 chars)");
+    }
+
+    #[test]
+    fn dispute_reason_at_limit_passes() {
+        let mut d = make_dispute();
+        d.reason = "r".repeat(4096);
         let result = validate_evidence_dispute(&d);
         assert!(is_valid(&result));
     }
 
     #[test]
-    fn verification_very_long_evidence_id_passes() {
+    fn dispute_reason_over_limit_rejected() {
+        let mut d = make_dispute();
+        d.reason = "r".repeat(4097);
+        let result = validate_evidence_dispute(&d);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Dispute reason too long (max 4096 chars)");
+    }
+
+    #[test]
+    fn dispute_evidence_id_at_limit_passes() {
+        let mut d = make_dispute();
+        d.evidence_id = "e".repeat(64);
+        let result = validate_evidence_dispute(&d);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn dispute_evidence_id_over_limit_rejected() {
+        let mut d = make_dispute();
+        d.evidence_id = "e".repeat(65);
+        let result = validate_evidence_dispute(&d);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Evidence ID too long (max 64 chars)");
+    }
+
+    #[test]
+    fn verification_very_long_evidence_id_rejected() {
         let mut v = make_verification();
         v.evidence_id = "ev-".to_string() + &"9".repeat(10_000);
         let result = validate_evidence_verification(&v);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Evidence ID too long (max 64 chars)");
+    }
+
+    #[test]
+    fn verification_evidence_id_at_limit_passes() {
+        let mut v = make_verification();
+        v.evidence_id = "e".repeat(64);
+        let result = validate_evidence_verification(&v);
         assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn verification_notes_at_limit_passes() {
+        let mut v = make_verification();
+        v.notes = Some("n".repeat(8192));
+        let result = validate_evidence_verification(&v);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn verification_notes_over_limit_rejected() {
+        let mut v = make_verification();
+        v.notes = Some("n".repeat(8193));
+        let result = validate_evidence_verification(&v);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Notes too long (max 8192 chars)");
     }
 
     // ========================================================================
@@ -638,13 +826,12 @@ mod tests {
     }
 
     #[test]
-    fn evidence_empty_description_still_passes() {
-        // description is not validated (no trim check in this zome)
-        // Note: unlike justice-cases, this zome does not check description
+    fn evidence_empty_description_rejected() {
         let mut ev = make_evidence();
         ev.description = "".into();
         let result = validate_evidence(&ev);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Description cannot be empty");
     }
 
     #[test]

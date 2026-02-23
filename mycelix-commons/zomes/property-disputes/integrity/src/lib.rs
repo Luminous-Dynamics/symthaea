@@ -174,6 +174,37 @@ fn validate_create_property_dispute(
     _action: EntryCreationAction,
     dispute: PropertyDispute,
 ) -> ExternResult<ValidateCallbackResult> {
+    // --- Empty string checks (required fields) ---
+    if dispute.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("PropertyDispute id cannot be empty".into()));
+    }
+    if dispute.property_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("PropertyDispute property_id cannot be empty".into()));
+    }
+    if dispute.description.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("PropertyDispute description cannot be empty".into()));
+    }
+    // --- String length limits ---
+    if dispute.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("PropertyDispute id too long (max 64 chars)".into()));
+    }
+    if dispute.property_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("PropertyDispute property_id too long (max 64 chars)".into()));
+    }
+    if dispute.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid("PropertyDispute description too long (max 4096 chars)".into()));
+    }
+    for evidence_id in &dispute.evidence_ids {
+        if evidence_id.len() > 64 {
+            return Ok(ValidateCallbackResult::Invalid("PropertyDispute evidence_id too long (max 64 chars)".into()));
+        }
+    }
+    if let Some(ref justice_case_id) = dispute.justice_case_id {
+        if justice_case_id.len() > 64 {
+            return Ok(ValidateCallbackResult::Invalid("PropertyDispute justice_case_id too long (max 64 chars)".into()));
+        }
+    }
+    // --- Existing validation ---
     if !dispute.claimant_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Claimant must be a valid DID".into()));
     }
@@ -775,5 +806,126 @@ mod tests {
         };
         assert_eq!(claim.supporting_documents.len(), 3);
         assert_eq!(claim.status, ClaimStatus::Validated);
+    }
+
+    // ============================================================================
+    // String Length & Empty Validation Tests
+    // ============================================================================
+
+    #[test]
+    fn test_property_dispute_empty_id() {
+        let mut dispute = factory_property_dispute("did:key:abc123", "did:key:def456");
+        dispute.id = "".to_string();
+        let action = EntryCreationAction::Create(mock_create_action());
+        let result = validate_create_property_dispute(action, dispute).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_property_dispute_whitespace_id() {
+        let mut dispute = factory_property_dispute("did:key:abc123", "did:key:def456");
+        dispute.id = "   ".to_string();
+        let action = EntryCreationAction::Create(mock_create_action());
+        let result = validate_create_property_dispute(action, dispute).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_property_dispute_id_too_long() {
+        let mut dispute = factory_property_dispute("did:key:abc123", "did:key:def456");
+        dispute.id = "x".repeat(65);
+        let action = EntryCreationAction::Create(mock_create_action());
+        let result = validate_create_property_dispute(action, dispute).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_property_dispute_id_at_limit() {
+        let mut dispute = factory_property_dispute("did:key:abc123", "did:key:def456");
+        dispute.id = "x".repeat(64);
+        let action = EntryCreationAction::Create(mock_create_action());
+        let result = validate_create_property_dispute(action, dispute).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_property_dispute_empty_property_id() {
+        let mut dispute = factory_property_dispute("did:key:abc123", "did:key:def456");
+        dispute.property_id = "".to_string();
+        let action = EntryCreationAction::Create(mock_create_action());
+        let result = validate_create_property_dispute(action, dispute).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_property_dispute_property_id_too_long() {
+        let mut dispute = factory_property_dispute("did:key:abc123", "did:key:def456");
+        dispute.property_id = "x".repeat(65);
+        let action = EntryCreationAction::Create(mock_create_action());
+        let result = validate_create_property_dispute(action, dispute).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_property_dispute_empty_description() {
+        let mut dispute = factory_property_dispute("did:key:abc123", "did:key:def456");
+        dispute.description = "".to_string();
+        let action = EntryCreationAction::Create(mock_create_action());
+        let result = validate_create_property_dispute(action, dispute).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_property_dispute_description_too_long() {
+        let mut dispute = factory_property_dispute("did:key:abc123", "did:key:def456");
+        dispute.description = "x".repeat(4097);
+        let action = EntryCreationAction::Create(mock_create_action());
+        let result = validate_create_property_dispute(action, dispute).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_property_dispute_description_at_limit() {
+        let mut dispute = factory_property_dispute("did:key:abc123", "did:key:def456");
+        dispute.description = "x".repeat(4096);
+        let action = EntryCreationAction::Create(mock_create_action());
+        let result = validate_create_property_dispute(action, dispute).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_property_dispute_evidence_id_too_long() {
+        let mut dispute = factory_property_dispute("did:key:abc123", "did:key:def456");
+        dispute.evidence_ids = vec!["x".repeat(65)];
+        let action = EntryCreationAction::Create(mock_create_action());
+        let result = validate_create_property_dispute(action, dispute).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_property_dispute_evidence_id_at_limit() {
+        let mut dispute = factory_property_dispute("did:key:abc123", "did:key:def456");
+        dispute.evidence_ids = vec!["x".repeat(64)];
+        let action = EntryCreationAction::Create(mock_create_action());
+        let result = validate_create_property_dispute(action, dispute).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_property_dispute_justice_case_id_too_long() {
+        let mut dispute = factory_property_dispute("did:key:abc123", "did:key:def456");
+        dispute.justice_case_id = Some("x".repeat(65));
+        let action = EntryCreationAction::Create(mock_create_action());
+        let result = validate_create_property_dispute(action, dispute).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_property_dispute_justice_case_id_at_limit() {
+        let mut dispute = factory_property_dispute("did:key:abc123", "did:key:def456");
+        dispute.justice_case_id = Some("x".repeat(64));
+        let action = EntryCreationAction::Create(mock_create_action());
+        let result = validate_create_property_dispute(action, dispute).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
     }
 }

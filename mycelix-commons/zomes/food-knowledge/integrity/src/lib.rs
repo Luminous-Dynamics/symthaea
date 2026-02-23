@@ -302,8 +302,14 @@ fn validate_seed(s: SeedVariety) -> ExternResult<ValidateCallbackResult> {
     if s.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Seed name cannot be empty".into()));
     }
+    if s.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Seed name too long (max 256 chars)".into()));
+    }
     if s.species.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Species cannot be empty".into()));
+    }
+    if s.species.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid("Species too long (max 128 chars)".into()));
     }
     if s.days_to_maturity == 0 {
         return Ok(ValidateCallbackResult::Invalid("Days to maturity must be positive".into()));
@@ -315,8 +321,14 @@ fn validate_practice(p: TraditionalPractice) -> ExternResult<ValidateCallbackRes
     if p.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Practice name cannot be empty".into()));
     }
+    if p.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Practice name too long (max 256 chars)".into()));
+    }
     if p.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Description cannot be empty".into()));
+    }
+    if p.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid("Description too long (max 4096 chars)".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -325,11 +337,17 @@ fn validate_recipe(r: Recipe) -> ExternResult<ValidateCallbackResult> {
     if r.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Recipe name cannot be empty".into()));
     }
+    if r.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Recipe name too long (max 256 chars)".into()));
+    }
     if r.ingredients.is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Must have at least one ingredient".into()));
     }
     if r.instructions.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Instructions cannot be empty".into()));
+    }
+    if r.instructions.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid("Instructions too long (max 4096 chars)".into()));
     }
     if r.servings == 0 {
         return Ok(ValidateCallbackResult::Invalid("Servings must be positive".into()));
@@ -613,6 +631,22 @@ mod tests {
         assert_invalid(validate_seed(s), "Seed name cannot be empty");
     }
 
+    // ── validate_seed: name length ────────────────────────────────────
+
+    #[test]
+    fn seed_name_too_long_rejected() {
+        let mut s = valid_seed();
+        s.name = "x".repeat(257);
+        assert_invalid(validate_seed(s), "Seed name too long (max 256 chars)");
+    }
+
+    #[test]
+    fn seed_name_at_max_valid() {
+        let mut s = valid_seed();
+        s.name = "x".repeat(256);
+        assert_valid(validate_seed(s));
+    }
+
     // ── validate_seed: species ──────────────────────────────────────────
 
     #[test]
@@ -627,6 +661,22 @@ mod tests {
         let mut s = valid_seed();
         s.species = "  ".into();
         assert_invalid(validate_seed(s), "Species cannot be empty");
+    }
+
+    // ── validate_seed: species length ─────────────────────────────────
+
+    #[test]
+    fn seed_species_too_long_rejected() {
+        let mut s = valid_seed();
+        s.species = "x".repeat(129);
+        assert_invalid(validate_seed(s), "Species too long (max 128 chars)");
+    }
+
+    #[test]
+    fn seed_species_at_max_valid() {
+        let mut s = valid_seed();
+        s.species = "x".repeat(128);
+        assert_valid(validate_seed(s));
     }
 
     // ── validate_seed: days_to_maturity ─────────────────────────────────
@@ -728,6 +778,22 @@ mod tests {
         assert_invalid(validate_practice(p), "Practice name cannot be empty");
     }
 
+    // ── validate_practice: name length ────────────────────────────────
+
+    #[test]
+    fn practice_name_too_long_rejected() {
+        let mut p = valid_practice();
+        p.name = "x".repeat(257);
+        assert_invalid(validate_practice(p), "Practice name too long (max 256 chars)");
+    }
+
+    #[test]
+    fn practice_name_at_max_valid() {
+        let mut p = valid_practice();
+        p.name = "x".repeat(256);
+        assert_valid(validate_practice(p));
+    }
+
     // ── validate_practice: description ──────────────────────────────────
 
     #[test]
@@ -742,6 +808,22 @@ mod tests {
         let mut p = valid_practice();
         p.description = "  ".into();
         assert_invalid(validate_practice(p), "Description cannot be empty");
+    }
+
+    // ── validate_practice: description length ─────────────────────────
+
+    #[test]
+    fn practice_description_too_long_rejected() {
+        let mut p = valid_practice();
+        p.description = "x".repeat(4097);
+        assert_invalid(validate_practice(p), "Description too long (max 4096 chars)");
+    }
+
+    #[test]
+    fn practice_description_at_max_valid() {
+        let mut p = valid_practice();
+        p.description = "x".repeat(4096);
+        assert_valid(validate_practice(p));
     }
 
     // ── validate_practice: category variants ────────────────────────────
@@ -811,6 +893,22 @@ mod tests {
         assert_invalid(validate_recipe(r), "Recipe name cannot be empty");
     }
 
+    // ── validate_recipe: name length ──────────────────────────────────
+
+    #[test]
+    fn recipe_name_too_long_rejected() {
+        let mut r = valid_recipe();
+        r.name = "x".repeat(257);
+        assert_invalid(validate_recipe(r), "Recipe name too long (max 256 chars)");
+    }
+
+    #[test]
+    fn recipe_name_at_max_valid() {
+        let mut r = valid_recipe();
+        r.name = "x".repeat(256);
+        assert_valid(validate_recipe(r));
+    }
+
     // ── validate_recipe: ingredients ────────────────────────────────────
 
     #[test]
@@ -848,6 +946,22 @@ mod tests {
         let mut r = valid_recipe();
         r.instructions = " ".into();
         assert_invalid(validate_recipe(r), "Instructions cannot be empty");
+    }
+
+    // ── validate_recipe: instructions length ──────────────────────────
+
+    #[test]
+    fn recipe_instructions_too_long_rejected() {
+        let mut r = valid_recipe();
+        r.instructions = "x".repeat(4097);
+        assert_invalid(validate_recipe(r), "Instructions too long (max 4096 chars)");
+    }
+
+    #[test]
+    fn recipe_instructions_at_max_valid() {
+        let mut r = valid_recipe();
+        r.instructions = "x".repeat(4096);
+        assert_valid(validate_recipe(r));
     }
 
     // ── validate_recipe: servings ───────────────────────────────────────

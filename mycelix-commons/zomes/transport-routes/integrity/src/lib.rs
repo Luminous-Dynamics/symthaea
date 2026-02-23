@@ -276,6 +276,9 @@ fn validate_vehicle(v: Vehicle) -> ExternResult<ValidateCallbackResult> {
     if v.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Vehicle ID cannot be empty".into()));
     }
+    if v.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Vehicle ID too long (max 64 chars)".into()));
+    }
     if !v.capacity_kg.is_finite() {
         return Ok(ValidateCallbackResult::Invalid("capacity_kg must be a finite number".into()));
     }
@@ -289,8 +292,14 @@ fn validate_route(r: Route) -> ExternResult<ValidateCallbackResult> {
     if r.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Route ID cannot be empty".into()));
     }
+    if r.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Route ID too long (max 64 chars)".into()));
+    }
     if r.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Route name cannot be empty".into()));
+    }
+    if r.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Route name too long (max 256 chars)".into()));
     }
     if r.waypoints.len() < 2 {
         return Ok(ValidateCallbackResult::Invalid("Route must have at least 2 waypoints".into()));
@@ -322,6 +331,9 @@ fn validate_stop(s: Stop) -> ExternResult<ValidateCallbackResult> {
     if s.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Stop name cannot be empty".into()));
     }
+    if s.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Stop name too long (max 256 chars)".into()));
+    }
     if !s.location_lat.is_finite() {
         return Ok(ValidateCallbackResult::Invalid("location_lat must be a finite number".into()));
     }
@@ -341,8 +353,8 @@ fn validate_maintenance(m: MaintenanceRecord) -> ExternResult<ValidateCallbackRe
     if m.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Maintenance ID cannot be empty".into()));
     }
-    if m.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Maintenance ID too long (max 256 chars)".into()));
+    if m.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Maintenance ID too long (max 64 chars)".into()));
     }
     if m.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Description cannot be empty".into()));
@@ -356,8 +368,11 @@ fn validate_maintenance(m: MaintenanceRecord) -> ExternResult<ValidateCallbackRe
     if m.cost < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Cost cannot be negative".into()));
     }
-    if m.mechanic_notes.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Mechanic notes too long (max 4096 chars)".into()));
+    if m.mechanic_notes.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Mechanic notes cannot be empty".into()));
+    }
+    if m.mechanic_notes.len() > 8192 {
+        return Ok(ValidateCallbackResult::Invalid("Mechanic notes too long (max 8192 chars)".into()));
     }
     if let Some(next_due) = m.next_due {
         if next_due <= m.completed_at {
@@ -562,6 +577,22 @@ mod tests {
         assert_invalid(validate_vehicle(v), "Vehicle ID cannot be empty");
     }
 
+    // ── validate_vehicle: id length ──────────────────────────────────
+
+    #[test]
+    fn vehicle_id_too_long_rejected() {
+        let mut v = valid_vehicle();
+        v.id = "x".repeat(65);
+        assert_invalid(validate_vehicle(v), "Vehicle ID too long (max 64 chars)");
+    }
+
+    #[test]
+    fn vehicle_id_at_max_valid() {
+        let mut v = valid_vehicle();
+        v.id = "x".repeat(64);
+        assert_valid(validate_vehicle(v));
+    }
+
     // ── validate_vehicle: capacity_kg ───────────────────────────────────
 
     #[test]
@@ -661,6 +692,22 @@ mod tests {
         assert_invalid(validate_route(r), "Route ID cannot be empty");
     }
 
+    // ── validate_route: id length ────────────────────────────────────
+
+    #[test]
+    fn route_id_too_long_rejected() {
+        let mut r = valid_route();
+        r.id = "x".repeat(65);
+        assert_invalid(validate_route(r), "Route ID too long (max 64 chars)");
+    }
+
+    #[test]
+    fn route_id_at_max_valid() {
+        let mut r = valid_route();
+        r.id = "x".repeat(64);
+        assert_valid(validate_route(r));
+    }
+
     // ── validate_route: name ────────────────────────────────────────────
 
     #[test]
@@ -675,6 +722,22 @@ mod tests {
         let mut r = valid_route();
         r.name = "  ".into();
         assert_invalid(validate_route(r), "Route name cannot be empty");
+    }
+
+    // ── validate_route: name length ──────────────────────────────────
+
+    #[test]
+    fn route_name_too_long_rejected() {
+        let mut r = valid_route();
+        r.name = "x".repeat(257);
+        assert_invalid(validate_route(r), "Route name too long (max 256 chars)");
+    }
+
+    #[test]
+    fn route_name_at_max_valid() {
+        let mut r = valid_route();
+        r.name = "x".repeat(256);
+        assert_valid(validate_route(r));
     }
 
     // ── validate_route: waypoints ───────────────────────────────────────
@@ -804,6 +867,22 @@ mod tests {
         let mut s = valid_stop();
         s.name = " ".into();
         assert_invalid(validate_stop(s), "Stop name cannot be empty");
+    }
+
+    // ── validate_stop: name length ───────────────────────────────────
+
+    #[test]
+    fn stop_name_too_long_rejected() {
+        let mut s = valid_stop();
+        s.name = "x".repeat(257);
+        assert_invalid(validate_stop(s), "Stop name too long (max 256 chars)");
+    }
+
+    #[test]
+    fn stop_name_at_max_valid() {
+        let mut s = valid_stop();
+        s.name = "x".repeat(256);
+        assert_valid(validate_stop(s));
     }
 
     // ── validate_stop: latitude ─────────────────────────────────────────
@@ -1125,14 +1204,14 @@ mod tests {
     #[test]
     fn maintenance_id_too_long_rejected() {
         let mut m = valid_maintenance();
-        m.id = "x".repeat(257);
-        assert_invalid(validate_maintenance(m), "Maintenance ID too long");
+        m.id = "x".repeat(65);
+        assert_invalid(validate_maintenance(m), "Maintenance ID too long (max 64 chars)");
     }
 
     #[test]
     fn maintenance_id_at_max_valid() {
         let mut m = valid_maintenance();
-        m.id = "x".repeat(256);
+        m.id = "x".repeat(64);
         assert_valid(validate_maintenance(m));
     }
 
@@ -1179,16 +1258,30 @@ mod tests {
     }
 
     #[test]
+    fn maintenance_mechanic_notes_empty_rejected() {
+        let mut m = valid_maintenance();
+        m.mechanic_notes = String::new();
+        assert_invalid(validate_maintenance(m), "Mechanic notes cannot be empty");
+    }
+
+    #[test]
+    fn maintenance_mechanic_notes_whitespace_rejected() {
+        let mut m = valid_maintenance();
+        m.mechanic_notes = "   ".into();
+        assert_invalid(validate_maintenance(m), "Mechanic notes cannot be empty");
+    }
+
+    #[test]
     fn maintenance_mechanic_notes_too_long_rejected() {
         let mut m = valid_maintenance();
-        m.mechanic_notes = "x".repeat(4097);
-        assert_invalid(validate_maintenance(m), "Mechanic notes too long");
+        m.mechanic_notes = "x".repeat(8193);
+        assert_invalid(validate_maintenance(m), "Mechanic notes too long (max 8192 chars)");
     }
 
     #[test]
     fn maintenance_mechanic_notes_at_max_valid() {
         let mut m = valid_maintenance();
-        m.mechanic_notes = "x".repeat(4096);
+        m.mechanic_notes = "x".repeat(8192);
         assert_valid(validate_maintenance(m));
     }
 

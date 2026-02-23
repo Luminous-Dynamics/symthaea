@@ -236,14 +236,29 @@ fn validate_create_trust(
             "Trust ID cannot be empty".into(),
         ));
     }
+    if trust.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Trust ID must be at most 64 characters".into(),
+        ));
+    }
     if trust.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Trust name cannot be empty".into(),
         ));
     }
+    if trust.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Trust name must be at most 256 characters".into(),
+        ));
+    }
     if trust.mission.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Trust mission cannot be empty".into(),
+        ));
+    }
+    if trust.mission.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Trust mission must be at most 4096 characters".into(),
         ));
     }
     if trust.boundary.len() < 3 {
@@ -610,6 +625,57 @@ mod tests {
         assert_invalid(
             validate_create_trust(fake_create(), t),
             "Trust mission cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_trust_id_at_max_length() {
+        let mut t = valid_land_trust();
+        t.id = "a".repeat(64);
+        assert_valid(validate_create_trust(fake_create(), t));
+    }
+
+    #[test]
+    fn create_trust_id_over_max_length() {
+        let mut t = valid_land_trust();
+        t.id = "a".repeat(65);
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Trust ID must be at most 64 characters",
+        );
+    }
+
+    #[test]
+    fn create_trust_name_at_max_length() {
+        let mut t = valid_land_trust();
+        t.name = "a".repeat(256);
+        assert_valid(validate_create_trust(fake_create(), t));
+    }
+
+    #[test]
+    fn create_trust_name_over_max_length() {
+        let mut t = valid_land_trust();
+        t.name = "a".repeat(257);
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Trust name must be at most 256 characters",
+        );
+    }
+
+    #[test]
+    fn create_trust_mission_at_max_length() {
+        let mut t = valid_land_trust();
+        t.mission = "a".repeat(4096);
+        assert_valid(validate_create_trust(fake_create(), t));
+    }
+
+    #[test]
+    fn create_trust_mission_over_max_length() {
+        let mut t = valid_land_trust();
+        t.mission = "a".repeat(4097);
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Trust mission must be at most 4096 characters",
         );
     }
 

@@ -189,6 +189,9 @@ fn validate_batch(b: PreservationBatch) -> ExternResult<ValidateCallbackResult> 
     if b.method.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Method cannot be empty".into()));
     }
+    if b.method.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid("Method too long (max 128 chars)".into()));
+    }
     if !b.quantity_kg.is_finite() {
         return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
     }
@@ -228,8 +231,14 @@ fn validate_method(m: PreservationMethod) -> ExternResult<ValidateCallbackResult
     if m.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Method name cannot be empty".into()));
     }
+    if m.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Method name too long (max 256 chars)".into()));
+    }
     if m.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Description cannot be empty".into()));
+    }
+    if m.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid("Description too long (max 4096 chars)".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -238,8 +247,14 @@ fn validate_storage(s: StorageUnit) -> ExternResult<ValidateCallbackResult> {
     if s.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Storage ID cannot be empty".into()));
     }
+    if s.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Storage ID too long (max 64 chars)".into()));
+    }
     if s.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Storage name cannot be empty".into()));
+    }
+    if s.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Storage name too long (max 256 chars)".into()));
     }
     if !s.capacity_kg.is_finite() {
         return Ok(ValidateCallbackResult::Invalid("Capacity must be a finite number".into()));
@@ -429,6 +444,22 @@ mod tests {
         assert_invalid(validate_batch(b), "Method cannot be empty");
     }
 
+    // ── validate_batch: method length ─────────────────────────────────
+
+    #[test]
+    fn batch_method_too_long_rejected() {
+        let mut b = valid_batch();
+        b.method = "x".repeat(129);
+        assert_invalid(validate_batch(b), "Method too long (max 128 chars)");
+    }
+
+    #[test]
+    fn batch_method_at_max_valid() {
+        let mut b = valid_batch();
+        b.method = "x".repeat(128);
+        assert_valid(validate_batch(b));
+    }
+
     // ── validate_batch: quantity_kg ─────────────────────────────────────
 
     #[test]
@@ -524,6 +555,22 @@ mod tests {
         assert_invalid(validate_method(m), "Method name cannot be empty");
     }
 
+    // ── validate_method: name length ──────────────────────────────────
+
+    #[test]
+    fn method_name_too_long_rejected() {
+        let mut m = valid_method();
+        m.name = "x".repeat(257);
+        assert_invalid(validate_method(m), "Method name too long (max 256 chars)");
+    }
+
+    #[test]
+    fn method_name_at_max_valid() {
+        let mut m = valid_method();
+        m.name = "x".repeat(256);
+        assert_valid(validate_method(m));
+    }
+
     // ── validate_method: description ────────────────────────────────────
 
     #[test]
@@ -538,6 +585,22 @@ mod tests {
         let mut m = valid_method();
         m.description = " ".into();
         assert_invalid(validate_method(m), "Description cannot be empty");
+    }
+
+    // ── validate_method: description length ────────────────────────────
+
+    #[test]
+    fn method_description_too_long_rejected() {
+        let mut m = valid_method();
+        m.description = "x".repeat(4097);
+        assert_invalid(validate_method(m), "Description too long (max 4096 chars)");
+    }
+
+    #[test]
+    fn method_description_at_max_valid() {
+        let mut m = valid_method();
+        m.description = "x".repeat(4096);
+        assert_valid(validate_method(m));
     }
 
     // ── validate_method: skill levels ───────────────────────────────────
@@ -595,6 +658,22 @@ mod tests {
         assert_invalid(validate_storage(s), "Storage ID cannot be empty");
     }
 
+    // ── validate_storage: id length ──────────────────────────────────
+
+    #[test]
+    fn storage_id_too_long_rejected() {
+        let mut s = valid_storage();
+        s.id = "x".repeat(65);
+        assert_invalid(validate_storage(s), "Storage ID too long (max 64 chars)");
+    }
+
+    #[test]
+    fn storage_id_at_max_valid() {
+        let mut s = valid_storage();
+        s.id = "x".repeat(64);
+        assert_valid(validate_storage(s));
+    }
+
     // ── validate_storage: name ──────────────────────────────────────────
 
     #[test]
@@ -609,6 +688,22 @@ mod tests {
         let mut s = valid_storage();
         s.name = "  ".into();
         assert_invalid(validate_storage(s), "Storage name cannot be empty");
+    }
+
+    // ── validate_storage: name length ────────────────────────────────
+
+    #[test]
+    fn storage_name_too_long_rejected() {
+        let mut s = valid_storage();
+        s.name = "x".repeat(257);
+        assert_invalid(validate_storage(s), "Storage name too long (max 256 chars)");
+    }
+
+    #[test]
+    fn storage_name_at_max_valid() {
+        let mut s = valid_storage();
+        s.name = "x".repeat(256);
+        assert_valid(validate_storage(s));
     }
 
     // ── validate_storage: capacity_kg ───────────────────────────────────

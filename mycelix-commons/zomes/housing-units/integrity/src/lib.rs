@@ -203,14 +203,29 @@ fn validate_create_building(
             "Building ID cannot be empty".into(),
         ));
     }
+    if building.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Building ID must be at most 64 characters".into(),
+        ));
+    }
     if building.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Building name cannot be empty".into(),
         ));
     }
+    if building.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Building name must be at most 256 characters".into(),
+        ));
+    }
     if building.address.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Building address cannot be empty".into(),
+        ));
+    }
+    if building.address.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Building address must be at most 256 characters".into(),
         ));
     }
     if !building.location_lat.is_finite() {
@@ -254,6 +269,11 @@ fn validate_create_unit(_action: Create, unit: Unit) -> ExternResult<ValidateCal
             "Unit number cannot be empty".into(),
         ));
     }
+    if unit.unit_number.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Unit number must be at most 128 characters".into(),
+        ));
+    }
     if unit.square_meters == 0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Square meters must be greater than 0".into(),
@@ -271,6 +291,11 @@ fn validate_update_unit(unit: Unit) -> ExternResult<ValidateCallbackResult> {
     if unit.unit_number.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Unit number cannot be empty".into(),
+        ));
+    }
+    if unit.unit_number.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Unit number must be at most 128 characters".into(),
         ));
     }
     if unit.square_meters == 0 {
@@ -554,6 +579,77 @@ mod tests {
         }
     }
 
+    // ========== Building Length Limit Tests ==========
+
+    #[test]
+    fn test_building_id_at_max_length() {
+        let mut building = valid_building();
+        building.id = "a".repeat(64);
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_building_id_over_max_length() {
+        let mut building = valid_building();
+        building.id = "a".repeat(65);
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Building ID must be at most 64 characters");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_building_name_at_max_length() {
+        let mut building = valid_building();
+        building.name = "a".repeat(256);
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_building_name_over_max_length() {
+        let mut building = valid_building();
+        building.name = "a".repeat(257);
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Building name must be at most 256 characters");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_building_address_at_max_length() {
+        let mut building = valid_building();
+        building.address = "a".repeat(256);
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_building_address_over_max_length() {
+        let mut building = valid_building();
+        building.address = "a".repeat(257);
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Building address must be at most 256 characters");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
     // ========== Unit Create Validation Tests ==========
 
     #[test]
@@ -573,6 +669,52 @@ mod tests {
         match result.unwrap() {
             ValidateCallbackResult::Invalid(msg) => {
                 assert_eq!(msg, "Unit number cannot be empty");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_unit_number_at_max_length() {
+        let mut unit = valid_unit();
+        unit.unit_number = "a".repeat(128);
+        let result = validate_create_unit(mock_create_action(), unit);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_unit_number_over_max_length() {
+        let mut unit = valid_unit();
+        unit.unit_number = "a".repeat(129);
+        let result = validate_create_unit(mock_create_action(), unit);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Unit number must be at most 128 characters");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_update_unit_number_at_max_length() {
+        let mut unit = valid_unit();
+        unit.unit_number = "a".repeat(128);
+        let result = validate_update_unit(unit);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_unit_number_over_max_length() {
+        let mut unit = valid_unit();
+        unit.unit_number = "a".repeat(129);
+        let result = validate_update_unit(unit);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Unit number must be at most 128 characters");
             }
             _ => panic!("Expected Invalid result"),
         }

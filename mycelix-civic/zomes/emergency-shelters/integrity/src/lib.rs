@@ -195,14 +195,29 @@ fn validate_create_shelter(
             "Shelter ID cannot be empty".into(),
         ));
     }
+    if shelter.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Shelter ID too long (max 64 chars)".into(),
+        ));
+    }
     if shelter.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Shelter name cannot be empty".into(),
         ));
     }
+    if shelter.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Shelter name too long (max 256 chars)".into(),
+        ));
+    }
     if shelter.address.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Shelter address cannot be empty".into(),
+        ));
+    }
+    if shelter.address.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Shelter address too long (max 256 chars)".into(),
         ));
     }
     if shelter.capacity == 0 {
@@ -240,6 +255,11 @@ fn validate_create_shelter(
             "Contact information cannot be empty".into(),
         ));
     }
+    if shelter.contact.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Contact too long (max 256 chars)".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -247,6 +267,11 @@ fn validate_update_shelter(shelter: Shelter) -> ExternResult<ValidateCallbackRes
     if shelter.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Shelter ID cannot be empty".into(),
+        ));
+    }
+    if shelter.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Shelter ID too long (max 64 chars)".into(),
         ));
     }
     if shelter.current_occupancy > shelter.capacity {
@@ -265,6 +290,30 @@ fn validate_create_registration(
         return Ok(ValidateCallbackResult::Invalid(
             "Person name cannot be empty".into(),
         ));
+    }
+    if reg.person_name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Person name too long (max 256 chars)".into(),
+        ));
+    }
+    if let Some(ref pid) = reg.person_id {
+        if pid.len() > 64 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Person ID too long (max 64 chars)".into(),
+            ));
+        }
+    }
+    if reg.special_needs.len() > 100 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many special needs entries (max 100)".into(),
+        ));
+    }
+    for need in &reg.special_needs {
+        if need.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Special need entry too long (max 256 chars)".into(),
+            ));
+        }
     }
     if reg.party_size == 0 {
         return Ok(ValidateCallbackResult::Invalid(
@@ -691,6 +740,155 @@ mod tests {
         reg.party_size = u8::MAX; // 255
         let result = validate_create_registration(fake_create(), reg);
         assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // STRING LENGTH LIMIT TESTS
+    // ========================================================================
+
+    #[test]
+    fn create_shelter_id_at_limit_passes() {
+        let mut s = make_shelter();
+        s.id = "i".repeat(64);
+        let result = validate_create_shelter(fake_create(), s);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_shelter_id_over_limit_rejected() {
+        let mut s = make_shelter();
+        s.id = "i".repeat(65);
+        let result = validate_create_shelter(fake_create(), s);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Shelter ID too long (max 64 chars)");
+    }
+
+    #[test]
+    fn create_shelter_name_at_limit_passes() {
+        let mut s = make_shelter();
+        s.name = "n".repeat(256);
+        let result = validate_create_shelter(fake_create(), s);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_shelter_name_over_limit_rejected() {
+        let mut s = make_shelter();
+        s.name = "n".repeat(257);
+        let result = validate_create_shelter(fake_create(), s);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Shelter name too long (max 256 chars)");
+    }
+
+    #[test]
+    fn create_shelter_address_at_limit_passes() {
+        let mut s = make_shelter();
+        s.address = "a".repeat(256);
+        let result = validate_create_shelter(fake_create(), s);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_shelter_address_over_limit_rejected() {
+        let mut s = make_shelter();
+        s.address = "a".repeat(257);
+        let result = validate_create_shelter(fake_create(), s);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Shelter address too long (max 256 chars)");
+    }
+
+    #[test]
+    fn create_shelter_contact_at_limit_passes() {
+        let mut s = make_shelter();
+        s.contact = "c".repeat(256);
+        let result = validate_create_shelter(fake_create(), s);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_shelter_contact_over_limit_rejected() {
+        let mut s = make_shelter();
+        s.contact = "c".repeat(257);
+        let result = validate_create_shelter(fake_create(), s);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Contact too long (max 256 chars)");
+    }
+
+    #[test]
+    fn create_registration_person_name_at_limit_passes() {
+        let mut reg = make_registration();
+        reg.person_name = "p".repeat(256);
+        let result = validate_create_registration(fake_create(), reg);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_registration_person_name_over_limit_rejected() {
+        let mut reg = make_registration();
+        reg.person_name = "p".repeat(257);
+        let result = validate_create_registration(fake_create(), reg);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Person name too long (max 256 chars)");
+    }
+
+    #[test]
+    fn create_registration_person_id_at_limit_passes() {
+        let mut reg = make_registration();
+        reg.person_id = Some("x".repeat(64));
+        let result = validate_create_registration(fake_create(), reg);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_registration_person_id_over_limit_rejected() {
+        let mut reg = make_registration();
+        reg.person_id = Some("x".repeat(65));
+        let result = validate_create_registration(fake_create(), reg);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Person ID too long (max 64 chars)");
+    }
+
+    #[test]
+    fn create_registration_special_needs_item_at_limit_passes() {
+        let mut reg = make_registration();
+        reg.special_needs = vec!["n".repeat(256)];
+        let result = validate_create_registration(fake_create(), reg);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_registration_special_needs_item_over_limit_rejected() {
+        let mut reg = make_registration();
+        reg.special_needs = vec!["n".repeat(257)];
+        let result = validate_create_registration(fake_create(), reg);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Special need entry too long (max 256 chars)");
+    }
+
+    #[test]
+    fn create_registration_special_needs_count_at_limit_passes() {
+        let mut reg = make_registration();
+        reg.special_needs = (0..100).map(|i| format!("need-{}", i)).collect();
+        let result = validate_create_registration(fake_create(), reg);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn create_registration_special_needs_count_over_limit_rejected() {
+        let mut reg = make_registration();
+        reg.special_needs = (0..101).map(|i| format!("need-{}", i)).collect();
+        let result = validate_create_registration(fake_create(), reg);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Too many special needs entries (max 100)");
+    }
+
+    #[test]
+    fn update_shelter_id_over_limit_rejected() {
+        let mut s = make_shelter();
+        s.id = "i".repeat(65);
+        let result = validate_update_shelter(s);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Shelter ID too long (max 64 chars)");
     }
 
     // ========================================================================

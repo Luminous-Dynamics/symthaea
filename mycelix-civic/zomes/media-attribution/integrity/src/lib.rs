@@ -198,8 +198,23 @@ fn validate_create_attribution(
     _action: EntryCreationAction,
     attribution: Attribution,
 ) -> ExternResult<ValidateCallbackResult> {
+    if attribution.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Attribution ID cannot be empty".into()));
+    }
+    if attribution.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Attribution ID too long (max 64 chars)".into()));
+    }
+    if attribution.publication_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Attribution publication_id cannot be empty".into()));
+    }
+    if attribution.publication_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Attribution publication_id too long (max 64 chars)".into()));
+    }
     if !attribution.contributor_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Contributor must be a valid DID".into()));
+    }
+    if attribution.contributor_did.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Contributor DID too long (max 256 chars)".into()));
     }
     if !attribution.share_percentage.is_finite() {
         return Ok(ValidateCallbackResult::Invalid("share_percentage must be a finite number".into()));
@@ -227,6 +242,24 @@ fn validate_create_royalty_rule(
     _action: EntryCreationAction,
     rule: RoyaltyRule,
 ) -> ExternResult<ValidateCallbackResult> {
+    if rule.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("RoyaltyRule ID cannot be empty".into()));
+    }
+    if rule.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("RoyaltyRule ID too long (max 64 chars)".into()));
+    }
+    if rule.publication_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("RoyaltyRule publication_id cannot be empty".into()));
+    }
+    if rule.publication_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("RoyaltyRule publication_id too long (max 64 chars)".into()));
+    }
+    if rule.currency.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Currency cannot be empty".into()));
+    }
+    if rule.currency.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid("Currency too long (max 128 chars)".into()));
+    }
     if !rule.percentage.is_finite() {
         return Ok(ValidateCallbackResult::Invalid("percentage must be a finite number".into()));
     }
@@ -266,8 +299,14 @@ fn validate_create_usage_record(
     if record.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Usage record ID cannot be empty".into()));
     }
+    if record.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Usage record ID too long (max 64 chars)".into()));
+    }
     if record.publication_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Usage record publication_id cannot be empty".into()));
+    }
+    if record.publication_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Usage record publication_id too long (max 64 chars)".into()));
     }
     if let Some(ref did) = record.user_did {
         if !did.trim().is_empty() && !did.starts_with("did:") {
@@ -1021,19 +1060,178 @@ mod tests {
     }
 
     #[test]
-    fn attribution_with_very_long_id() {
+    fn attribution_with_very_long_id_rejected() {
         let mut attr = valid_attribution();
         attr.id = "a".repeat(10_000);
+        let result = validate_create_attribution(create_action(), attr);
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "Attribution ID too long (max 64 chars)");
+    }
+
+    #[test]
+    fn attribution_id_at_limit_passes() {
+        let mut attr = valid_attribution();
+        attr.id = "a".repeat(64);
         let result = validate_create_attribution(create_action(), attr);
         assert!(is_valid(&result));
     }
 
     #[test]
-    fn royalty_rule_with_very_long_publication_id() {
+    fn attribution_id_over_limit_rejected() {
+        let mut attr = valid_attribution();
+        attr.id = "a".repeat(65);
+        let result = validate_create_attribution(create_action(), attr);
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "Attribution ID too long (max 64 chars)");
+    }
+
+    #[test]
+    fn attribution_empty_id_rejected() {
+        let mut attr = valid_attribution();
+        attr.id = "".into();
+        let result = validate_create_attribution(create_action(), attr);
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "Attribution ID cannot be empty");
+    }
+
+    #[test]
+    fn attribution_empty_publication_id_rejected() {
+        let mut attr = valid_attribution();
+        attr.publication_id = "".into();
+        let result = validate_create_attribution(create_action(), attr);
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "Attribution publication_id cannot be empty");
+    }
+
+    #[test]
+    fn attribution_publication_id_at_limit_passes() {
+        let mut attr = valid_attribution();
+        attr.publication_id = "p".repeat(64);
+        let result = validate_create_attribution(create_action(), attr);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn attribution_publication_id_over_limit_rejected() {
+        let mut attr = valid_attribution();
+        attr.publication_id = "p".repeat(65);
+        let result = validate_create_attribution(create_action(), attr);
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "Attribution publication_id too long (max 64 chars)");
+    }
+
+    #[test]
+    fn attribution_contributor_did_at_limit_passes() {
+        let mut attr = valid_attribution();
+        attr.contributor_did = format!("did:{}", "x".repeat(252));
+        assert_eq!(attr.contributor_did.len(), 256);
+        let result = validate_create_attribution(create_action(), attr);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn attribution_contributor_did_over_limit_rejected() {
+        let mut attr = valid_attribution();
+        attr.contributor_did = format!("did:{}", "x".repeat(253));
+        assert_eq!(attr.contributor_did.len(), 257);
+        let result = validate_create_attribution(create_action(), attr);
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "Contributor DID too long (max 256 chars)");
+    }
+
+    #[test]
+    fn royalty_rule_with_very_long_publication_id_rejected() {
         let mut rule = valid_royalty_rule();
         rule.publication_id = "x".repeat(10_000);
         let result = validate_create_royalty_rule(create_action(), rule);
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "RoyaltyRule publication_id too long (max 64 chars)");
+    }
+
+    #[test]
+    fn royalty_rule_id_at_limit_passes() {
+        let mut rule = valid_royalty_rule();
+        rule.id = "r".repeat(64);
+        let result = validate_create_royalty_rule(create_action(), rule);
         assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn royalty_rule_id_over_limit_rejected() {
+        let mut rule = valid_royalty_rule();
+        rule.id = "r".repeat(65);
+        let result = validate_create_royalty_rule(create_action(), rule);
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "RoyaltyRule ID too long (max 64 chars)");
+    }
+
+    #[test]
+    fn royalty_rule_empty_id_rejected() {
+        let mut rule = valid_royalty_rule();
+        rule.id = "".into();
+        let result = validate_create_royalty_rule(create_action(), rule);
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "RoyaltyRule ID cannot be empty");
+    }
+
+    #[test]
+    fn royalty_rule_empty_publication_id_rejected() {
+        let mut rule = valid_royalty_rule();
+        rule.publication_id = "".into();
+        let result = validate_create_royalty_rule(create_action(), rule);
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "RoyaltyRule publication_id cannot be empty");
+    }
+
+    #[test]
+    fn royalty_rule_currency_at_limit_passes() {
+        let mut rule = valid_royalty_rule();
+        rule.currency = "C".repeat(128);
+        let result = validate_create_royalty_rule(create_action(), rule);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn royalty_rule_currency_over_limit_rejected() {
+        let mut rule = valid_royalty_rule();
+        rule.currency = "C".repeat(129);
+        let result = validate_create_royalty_rule(create_action(), rule);
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "Currency too long (max 128 chars)");
+    }
+
+    #[test]
+    fn usage_record_id_at_limit_passes() {
+        let mut record = valid_usage_record();
+        record.id = "u".repeat(64);
+        let result = validate_create_usage_record(create_action(), record);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn usage_record_id_over_limit_rejected() {
+        let mut record = valid_usage_record();
+        record.id = "u".repeat(65);
+        let result = validate_create_usage_record(create_action(), record);
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "Usage record ID too long (max 64 chars)");
+    }
+
+    #[test]
+    fn usage_record_publication_id_at_limit_passes() {
+        let mut record = valid_usage_record();
+        record.publication_id = "p".repeat(64);
+        let result = validate_create_usage_record(create_action(), record);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn usage_record_publication_id_over_limit_rejected() {
+        let mut record = valid_usage_record();
+        record.publication_id = "p".repeat(65);
+        let result = validate_create_usage_record(create_action(), record);
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "Usage record publication_id too long (max 64 chars)");
     }
 
     #[test]
@@ -1150,8 +1348,8 @@ mod tests {
     // ========================================================================
 
     #[test]
-    fn attribution_both_errors_did_checked_first() {
-        // When both DID and share are invalid, DID error fires first
+    fn attribution_both_errors_did_checked_after_ids() {
+        // When DID and share are invalid but id/publication_id valid, DID error fires first
         let mut attr = valid_attribution();
         attr.contributor_did = "invalid".into();
         attr.share_percentage = -5.0;
@@ -1159,6 +1357,19 @@ mod tests {
         assert_eq!(
             get_invalid_reason(result),
             "Contributor must be a valid DID"
+        );
+    }
+
+    #[test]
+    fn attribution_empty_id_checked_before_did() {
+        // When id is empty and DID is also bad, id check fires first
+        let mut attr = valid_attribution();
+        attr.id = "".into();
+        attr.contributor_did = "invalid".into();
+        let result = validate_create_attribution(create_action(), attr);
+        assert_eq!(
+            get_invalid_reason(result),
+            "Attribution ID cannot be empty"
         );
     }
 
@@ -1191,21 +1402,21 @@ mod tests {
     }
 
     #[test]
-    fn royalty_rule_with_empty_currency_passes() {
-        // No validation on currency field
+    fn royalty_rule_with_empty_currency_rejected() {
         let mut rule = valid_royalty_rule();
         rule.currency = "".into();
         let result = validate_create_royalty_rule(create_action(), rule);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "Currency cannot be empty");
     }
 
     #[test]
-    fn royalty_rule_with_empty_id_passes() {
-        // No validation on id field
+    fn royalty_rule_with_empty_id_rejected() {
         let mut rule = valid_royalty_rule();
         rule.id = "".into();
         let result = validate_create_royalty_rule(create_action(), rule);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(get_invalid_reason(result), "RoyaltyRule ID cannot be empty");
     }
 
     #[test]

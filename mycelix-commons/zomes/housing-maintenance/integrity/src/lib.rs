@@ -236,6 +236,11 @@ fn validate_create_request(
             "Request description cannot be empty".into(),
         ));
     }
+    if req.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request description must be at most 4096 characters".into(),
+        ));
+    }
     if req.status != MaintenanceStatus::Reported {
         return Ok(ValidateCallbackResult::Invalid(
             "New requests must have Reported status".into(),
@@ -253,9 +258,24 @@ fn validate_create_work_order(
             "Work order must be assigned to someone".into(),
         ));
     }
+    if order.assigned_to.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Work order assigned_to must be at most 256 characters".into(),
+        ));
+    }
     if order.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Work order description cannot be empty".into(),
+        ));
+    }
+    if order.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Work order description must be at most 4096 characters".into(),
+        ));
+    }
+    if order.notes.len() > 8192 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Work order notes must be at most 8192 characters".into(),
         ));
     }
     if order.completed_date.is_some() {
@@ -270,6 +290,21 @@ fn validate_update_work_order(order: WorkOrder) -> ExternResult<ValidateCallback
     if order.assigned_to.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Work order must be assigned to someone".into(),
+        ));
+    }
+    if order.assigned_to.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Work order assigned_to must be at most 256 characters".into(),
+        ));
+    }
+    if order.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Work order description must be at most 4096 characters".into(),
+        ));
+    }
+    if order.notes.len() > 8192 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Work order notes must be at most 8192 characters".into(),
         ));
     }
     if let (Some(actual), Some(estimated)) = (order.actual_cost_cents, order.estimated_cost_cents) {
@@ -296,6 +331,11 @@ fn validate_create_inspection(
         if finding.trim().is_empty() {
             return Ok(ValidateCallbackResult::Invalid(
                 "Inspection findings cannot be empty strings".into(),
+            ));
+        }
+        if finding.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each inspection finding must be at most 4096 characters".into(),
             ));
         }
     }
@@ -873,11 +913,19 @@ mod tests {
     // ==================== Edge Case Tests ====================
 
     #[test]
-    fn test_request_large_description_valid() {
+    fn test_request_description_at_max_length() {
         let mut req = valid_request();
-        req.description = "a".repeat(10000);
+        req.description = "a".repeat(4096);
         let result = validate_create_request(test_create_action(), req);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_request_description_over_max_length_rejected() {
+        let mut req = valid_request();
+        req.description = "a".repeat(4097);
+        let result = validate_create_request(test_create_action(), req);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 
     #[test]
@@ -913,6 +961,96 @@ mod tests {
         order.estimated_cost_cents = Some(100);
         order.actual_cost_cents = Some(201);
         let result = validate_update_work_order(order);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // ==================== Length Limit Tests ====================
+
+    #[test]
+    fn test_work_order_assigned_to_at_max_length() {
+        let mut order = valid_work_order();
+        order.assigned_to = "a".repeat(256);
+        let result = validate_create_work_order(test_create_action(), order);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_work_order_assigned_to_over_max_length_rejected() {
+        let mut order = valid_work_order();
+        order.assigned_to = "a".repeat(257);
+        let result = validate_create_work_order(test_create_action(), order);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_work_order_description_at_max_length() {
+        let mut order = valid_work_order();
+        order.description = "a".repeat(4096);
+        let result = validate_create_work_order(test_create_action(), order);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_work_order_description_over_max_length_rejected() {
+        let mut order = valid_work_order();
+        order.description = "a".repeat(4097);
+        let result = validate_create_work_order(test_create_action(), order);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_work_order_notes_at_max_length() {
+        let mut order = valid_work_order();
+        order.notes = "a".repeat(8192);
+        let result = validate_create_work_order(test_create_action(), order);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_work_order_notes_over_max_length_rejected() {
+        let mut order = valid_work_order();
+        order.notes = "a".repeat(8193);
+        let result = validate_create_work_order(test_create_action(), order);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_work_order_update_assigned_to_over_max_length_rejected() {
+        let mut order = valid_work_order();
+        order.assigned_to = "a".repeat(257);
+        let result = validate_update_work_order(order);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_work_order_update_description_over_max_length_rejected() {
+        let mut order = valid_work_order();
+        order.description = "a".repeat(4097);
+        let result = validate_update_work_order(order);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_work_order_update_notes_over_max_length_rejected() {
+        let mut order = valid_work_order();
+        order.notes = "a".repeat(8193);
+        let result = validate_update_work_order(order);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_inspection_finding_at_max_length() {
+        let mut inspection = valid_inspection();
+        inspection.findings = vec!["a".repeat(4096)];
+        let result = validate_create_inspection(test_create_action(), inspection);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_inspection_finding_over_max_length_rejected() {
+        let mut inspection = valid_inspection();
+        inspection.findings = vec!["a".repeat(4097)];
+        let result = validate_create_inspection(test_create_action(), inspection);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 
