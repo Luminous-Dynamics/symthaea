@@ -143,7 +143,7 @@ impl MeshReceiver {
             recently_completed: Vec::new(),
             peers: HashMap::new(),
             timeout: Duration::from_secs(30),
-            expected_payload_size: WISDOM_PACKET_SIZE,
+            expected_payload_size: WISDOM_PACKET_SIZE + 64,
             max_pending: 64,
             max_recent: 32,
             stats: ReceiverStats::default(),
@@ -231,7 +231,16 @@ impl MeshReceiver {
             let assembly = self.pending.remove(&key).unwrap();
             let used_fec = assembly.assembler.used_fec_recovery();
 
-            if let Some(packet) = WisdomPacket::from_assembler(&assembly.assembler) {
+            // Try decompression first (compressed envelope), then fall back to
+            // raw WisdomPacket::from_bytes for backward compatibility with
+            // uncompressed legacy fragments.
+            let packet = assembly.assembler.assemble().and_then(|assembled| {
+                super::decompress_packet(&assembled)
+                    .and_then(|raw| WisdomPacket::from_bytes(&raw))
+                    .or_else(|| WisdomPacket::from_bytes(&assembled))
+            });
+
+            if let Some(packet) = packet {
                 self.stats.packets_complete += 1;
                 if used_fec {
                     self.stats.packets_recovered += 1;
@@ -251,9 +260,15 @@ impl MeshReceiver {
 
     /// Process a whole WisdomPacket from B.A.T.M.A.N. or Yggdrasil.
     ///
-    /// No fragmentation — the entire packet arrives in one frame.
+    /// Handles both compressed envelopes (1-byte header + payload) and
+    /// raw legacy packets for backward compatibility.
     pub fn receive_whole(&mut self, raw: &[u8]) -> Option<WisdomPacket> {
-        let packet = WisdomPacket::from_bytes(raw)?;
+        // Try decompression first (compressed envelope), then fall back to
+        // raw WisdomPacket::from_bytes for backward compatibility.
+        let packet = super::decompress_packet(raw)
+            .and_then(|decompressed| WisdomPacket::from_bytes(&decompressed))
+            .or_else(|| WisdomPacket::from_bytes(raw))?;
+
         self.stats.whole_packets += 1;
         self.stats.packets_complete += 1;
 
