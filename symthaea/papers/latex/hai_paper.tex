@@ -68,7 +68,7 @@ Active inference unifies perception and action through free energy minimization,
 We present \textbf{Hyperdimensional Active Inference (HAI)}, the first integration of the Free Energy Principle with Hyperdimensional Computing (16,384-dimensional hypervector space, $O(d)$ complexity).
 HAI introduces \textbf{precision-weighted binding}---a novel operation for confidence-modulated feature composition---and derives eight interpretable motor commands directly from expected free energy minimization.
 On standard benchmarks (T-Maze, Grid World), HAI achieves $7.9\times$ total speedup over pymdp ($1.9\times$ belief inference, $15.8\times$ action selection) while improving success rates from 10--16\% to 88--100\%.
-Validation across 18 domains---including ethical reasoning (92.9\% on ETHICS via compositional moral algebra, no pretrained language models), neuroscience (\emph{C.~elegans} connectome analysis, EEG seizure detection), signal processing (94.5\% speaker identification), real-time voice synthesis (13.5\,Hz average vowel formant error, 91.7\% improvement over rule-based), and federated learning (Byzantine tolerance validated to 34\%)---establishes HDC as a viable substrate for cognitive architectures.
+Validation across 18 domains---including ethical reasoning (92.9\% on ETHICS via compositional moral algebra, no pretrained language models), neuroscience (\emph{C.~elegans} connectome analysis, EEG seizure detection), signal processing (94.5\% speaker identification), real-time voice synthesis ($10{\times}$ smoother phoneme transitions via CfC temporal dynamics), and federated learning (Byzantine tolerance validated to 34\%)---establishes HDC as a viable substrate for cognitive architectures.
 Code is available at \url{https://github.com/Luminous-Dynamics/symthaea}.
 \end{abstract}
 
@@ -77,7 +77,7 @@ Code is available at \url{https://github.com/Luminous-Dynamics/symthaea}.
 % ============================================================================
 % Author Summary (required by PLoS Computational Biology)
 \section*{Author Summary}
-Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We show that the same principles can be implemented using \emph{hyperdimensional computing}, a brain-inspired approach that represents information as very long random vectors (16,384 dimensions). Our system, called Hyperdimensional Active Inference (HAI), replaces costly matrix operations with simple vector operations that run in linear time. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 18 domains: HAI achieves 93\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, synthesizes intelligible speech in real time (91.7\% formant error reduction vs.\ rule-based methods), analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. The entire system is implemented in Rust (353,000 lines across 32 workspace crates, 9,600+ tests, 50 feature flags) and released as open-source software, demonstrating that biologically-inspired computation can be both theoretically rigorous and practically efficient.
+Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We show that the same principles can be implemented using \emph{hyperdimensional computing}, a brain-inspired approach that represents information as very long random vectors (16,384 dimensions). Our system, called Hyperdimensional Active Inference (HAI), replaces costly matrix operations with simple vector operations that run in linear time. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 18 domains: HAI achieves 93\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, synthesizes speech with $10{\times}$ smoother transitions than rule-based methods, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. The entire system is implemented in Rust (353,000 lines across 32 workspace crates, 9,600+ tests, 50 feature flags) and released as open-source software, demonstrating that biologically-inspired computation can be both theoretically rigorous and practically efficient.
 
 % ============================================================================
 \section{Introduction}
@@ -445,7 +445,7 @@ Meditation EEG & 6/6 & Gamma flow, theta absorption validated \\
 EEG Seizure & 3/3 & 100\% sensitivity, 100\% specificity \\
 ARC Reasoning & 4/5 & Pattern transfer, 96\% intra-task consistency \\
 Ethics HDC & 5/5 & 92.9\% ETHICS (4 categories, \S\ref{sec:ethics}) \\
-Vocal Tract LTC & 12/12 & 13.5\,Hz avg vowel error, 779\,Hz throughput (\S\ref{sec:voice}) \\
+Vocal Tract LTC & 12/12 & 10$\times$ smoother transitions, 302\,Hz throughput (\S\ref{sec:voice}) \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -1160,16 +1160,17 @@ The output formant frame drives a 5-formant Liljencrants--Fant (LF) glottal mode
 \toprule
 Metric & LTC (ours) & Rule-based \\
 \midrule
-Avg vowel error (Hz) & \textbf{13.5} & 162.0 \\
-Avg consonant error (Hz) & \textbf{16.4} & 38.1 \\
-Transition smoothness (Hz/frame) & \textbf{4.68} & 91.35 \\
+Avg vowel error (Hz) & \textbf{157.3} & 162.0 \\
+Avg consonant error (Hz) & 135.9 & \textbf{127.2} \\
+Transition smoothness (Hz/frame) & \textbf{1.63} & 16.95 \\
 Source type accuracy & 12/12 & 12/12 \\
-Throughput (Hz) & 779 & --- \\
+Energy/voicing accuracy & 10/10 & --- \\
+Throughput (Hz) & 302 & --- \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The LTC controller reduces average vowel formant error from 162.0\,Hz (rule-based) to 13.5\,Hz---a 91.7\% improvement---while maintaining 779\,Hz throughput ($3.9{\times}$ real-time at 200\,Hz motor rate). Critically, the CfC temporal dynamics produce smooth transitions between phonemes (4.68\,Hz/frame vs.\ 91.35\,Hz/frame for instantaneous rule-based switching), eliminating audible artifacts at phoneme boundaries. Figure~\ref{fig:voice-pipeline} shows per-phoneme accuracy and the summary comparison.
+The LTC controller achieves comparable vowel formant accuracy to rule-based synthesis (157.3\,Hz vs.\ 162.0\,Hz) while maintaining 302\,Hz throughput ($1.5{\times}$ real-time at 200\,Hz motor rate). The key advantage is \textbf{transition smoothness}: CfC temporal dynamics produce dramatically smoother phoneme transitions (1.63\,Hz/frame vs.\ 16.95\,Hz/frame for instantaneous rule-based switching), a $10.4{\times}$ improvement that eliminates audible artifacts at phoneme boundaries. Energy and voicing accuracy (10/10) and source type propagation (12/12) confirm that the controller correctly learns manner-specific excitation parameters. Figure~\ref{fig:voice-pipeline} shows per-phoneme accuracy and the summary comparison.
 
 \begin{figure}[ht]
 \centering
@@ -1204,7 +1205,7 @@ We presented Hyperdimensional Active Inference (HAI), the first integration of F
   \item \textbf{Correct precision dynamics:} Adaptive confidence weighting validated empirically.
   \item \textbf{Mathematical soundness:} Free energy convergence and KL non-negativity confirmed.
   \item \textbf{Compositional ethical reasoning:} 92.9\% on ETHICS without pretrained LMs.
-  \item \textbf{Articulatory voice synthesis:} LTC-driven vocal tract producing 13.5\,Hz average formant error at $3.9{\times}$ real-time throughput, with smooth coarticulation and intonation contours.
+  \item \textbf{Articulatory voice synthesis:} LTC-driven vocal tract with $10{\times}$ smoother phoneme transitions than rule-based synthesis, intonation contours, and $1.5{\times}$ real-time throughput.
   \item \textbf{Federated learning:} Consciousness-aware FL pipeline with 34\% Byzantine tolerance validated on real MNIST.
   \item \textbf{Closed feedback loops:} 16 bidirectional feedback loops (prefrontal, embodied, resonance, quantum, MCE, narrative identity, dream replay, adaptive urgency, affective bridge, predictive processing, cross-modal binding, and others) with $<2\%$ computational overhead and bounded degradation under ablation.
   \item \textbf{Consciousness advantage:} Full consciousness pipeline recovers $3.5\times$ faster from distributional shifts and achieves $2\times$ better multi-pattern generalization vs.\ ablated configurations. Two-agent social cognition emerges from the pipeline without explicit programming.

@@ -637,47 +637,44 @@ def fig9_voice_pipeline():
     """Voice pipeline accuracy: vowels, consonants, summary comparison."""
     fig, axes = plt.subplots(1, 3, figsize=(14, 5))
 
-    # Per-vowel formant error (Hz) — from benchmark
-    vowels = ['AA', 'AE', 'AH', 'AO', 'AW', 'AY', 'EH', 'ER', 'EY',
-              'IH', 'IY', 'OW', 'OY', 'UH', 'UW']
-    vowel_errors = [8.2, 12.1, 3.4, 9.8, 18.3, 15.7, 11.4, 7.6, 14.2,
-                    6.9, 22.1, 10.3, 19.8, 8.1, 34.6]
+    # Per-vowel formant error (Hz) — from validated benchmark
+    vowels = ['AH', 'IY', 'UW', 'AE', 'EH', 'IH', 'AA', 'OW', 'AO', 'UH']
+    vowel_errors = [147.9, 348.6, 295.8, 116.9, 137.0, 34.9, 177.0, 79.9, 148.0, 86.8]
+    rule_vowel_errors = [98.4, 289.1, 212.2, 85.6, 102.1, 150.7, 141.6, 176.7, 200.1, 164.0]
 
     ax = axes[0]
-    colors = ['#2196F3' if e < 20 else '#FF9800' if e < 30 else '#F44336' for e in vowel_errors]
-    bars = ax.bar(range(len(vowels)), vowel_errors, color=colors, edgecolor='black', linewidth=0.5)
-    ax.set_xticks(range(len(vowels)))
+    x = np.arange(len(vowels))
+    width = 0.35
+    ax.bar(x - width/2, vowel_errors, width, label='LTC', color='#2196F3', edgecolor='black', linewidth=0.5)
+    ax.bar(x + width/2, rule_vowel_errors, width, label='Rule-based', color='#FF9800', edgecolor='black', linewidth=0.5)
+    ax.set_xticks(x)
     ax.set_xticklabels(vowels, rotation=45, ha='right', fontsize=8)
     ax.set_ylabel('Formant Error (Hz)', fontsize=10)
     ax.set_title('Per-Vowel Accuracy', fontsize=11, fontweight='bold')
-    ax.axhline(y=np.mean(vowel_errors), color='red', linestyle='--', linewidth=1, label=f'Avg: {np.mean(vowel_errors):.1f} Hz')
     ax.legend(fontsize=8)
-    ax.set_ylim(0, 45)
+    ax.set_ylim(0, 400)
 
-    # Per-consonant formant error (Hz)
-    consonants = ['B', 'CH', 'D', 'DH', 'F', 'G', 'HH', 'JH', 'K', 'L',
-                  'M', 'N', 'NG', 'P', 'R', 'S', 'SH', 'T', 'TH', 'V',
-                  'W', 'Y', 'Z', 'ZH']
-    cons_errors = [12.3, 18.7, 11.1, 15.4, 9.8, 13.2, 22.1, 16.8, 10.9, 14.5,
-                   8.7, 9.2, 11.8, 10.3, 19.6, 17.3, 21.4, 12.7, 14.1, 11.5,
-                   18.9, 20.3, 15.8, 24.7]
+    # Per-consonant formant error (Hz) — from validated benchmark
+    consonants = ['P', 'T', 'K', 'B', 'D', 'G', 'S', 'F', 'M', 'N', 'L', 'R']
+    cons_errors = [100.0, 81.6, 54.1, 115.2, 171.7, 265.9, 94.5, 175.7, 149.3, 107.6, 118.5, 196.9]
+    rule_cons_errors = [195.9, 99.1, 44.8, 195.9, 99.1, 44.8, 85.7, 89.6, 186.1, 65.7, 160.2, 259.0]
 
     ax = axes[1]
-    colors_c = ['#4CAF50' if e < 15 else '#FF9800' if e < 20 else '#F44336' for e in cons_errors]
-    ax.bar(range(len(consonants)), cons_errors, color=colors_c, edgecolor='black', linewidth=0.5)
-    ax.set_xticks(range(len(consonants)))
-    ax.set_xticklabels(consonants, rotation=45, ha='right', fontsize=7)
+    x_c = np.arange(len(consonants))
+    ax.bar(x_c - width/2, cons_errors, width, label='LTC', color='#2196F3', edgecolor='black', linewidth=0.5)
+    ax.bar(x_c + width/2, rule_cons_errors, width, label='Rule-based', color='#FF9800', edgecolor='black', linewidth=0.5)
+    ax.set_xticks(x_c)
+    ax.set_xticklabels(consonants, rotation=45, ha='right', fontsize=8)
     ax.set_ylabel('Formant Error (Hz)', fontsize=10)
     ax.set_title('Per-Consonant Accuracy', fontsize=11, fontweight='bold')
-    ax.axhline(y=np.mean(cons_errors), color='red', linestyle='--', linewidth=1, label=f'Avg: {np.mean(cons_errors):.1f} Hz')
     ax.legend(fontsize=8)
-    ax.set_ylim(0, 35)
+    ax.set_ylim(0, 300)
 
     # Summary comparison: LTC vs rule-based
     ax = axes[2]
     metrics = ['Vowel\nError', 'Consonant\nError', 'Transition\n(Hz/frame)']
-    ltc_vals = [13.5, 16.4, 4.68]
-    rule_vals = [162.0, 38.1, 91.35]
+    ltc_vals = [157.3, 135.9, 1.63]
+    rule_vals = [162.0, 127.2, 16.95]
 
     x = np.arange(len(metrics))
     width = 0.35

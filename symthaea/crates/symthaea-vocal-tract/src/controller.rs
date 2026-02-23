@@ -695,15 +695,15 @@ impl VocalTractController {
         // - 20 warmup steps for LTC neurons to reach differentiated steady states
         // - Distance-weighted LR: extreme vowels get up to 3× the LR
         // - Adaptive gradient steps: outlier phonemes get 20 steps vs 10 for near-schwa
-        // - Cosine LR annealing: high LR early (fast separation), low LR late (fine-tune)
-        // - Vowel-first curriculum: first half of epochs trains vowels only
+        // - Cosine LR annealing with high floor (30×→20×) for sustained gradient strength
         // - No weight decay during supervised training (prevents erosion)
         const WARMUP_STEPS: usize = 20;
 
-        // Cosine annealing: peak LR = 30× base, decays to 3× base over the schedule.
-        // This gives strong early gradients for vowel separation, then fine-tunes.
+        // Cosine annealing: peak LR = 30× base, decays to 20× base.
+        // Narrow range keeps gradients strong throughout (extreme vowels need sustained
+        // high LR) while providing slight late-stage fine-tuning.
         let lr_peak = self.learning_rate * 30.0;
-        let lr_min = self.learning_rate * 3.0;
+        let lr_min = self.learning_rate * 20.0;
 
         for epoch in 0..epochs {
             // Cosine annealing schedule
@@ -713,15 +713,7 @@ impl VocalTractController {
 
             let mut epoch_loss = 0.0;
 
-            // Curriculum: first half = vowels only, second half = all phonemes
-            let use_all = epoch >= epochs / 2;
-
             for (idx, (_, hv, target)) in phoneme_hvs.iter().enumerate() {
-                // Skip non-vowels in vowel-only phase
-                if !use_all && !phoneme_targets[idx].1.is_vowel {
-                    continue;
-                }
-
                 // Reset network state to isolate each phoneme (prevents state bleed)
                 self.reset();
 
