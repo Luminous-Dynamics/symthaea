@@ -76,11 +76,12 @@ impl TemporalDiscountingBenchmark {
         ]
     }
 
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, Vec<f64>) {
         let choices = Self::choice_set();
         let mut patient_count = 0u64;
         let seed = config.trial_seed("cogbench", "discounting", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
+        let mut rt_ticks = Vec::new();
 
         for choice in choices.iter() {
             let agent_config = ActiveInferenceAgentConfig {
@@ -88,7 +89,9 @@ impl TemporalDiscountingBenchmark {
                 obs_dim: 4,
                 num_actions: 2, // 0 = smaller-sooner, 1 = larger-later
                 planning_horizon: config.planning_horizon,
-                action_temperature: config.action_temperature,
+                // Time pressure: +0.15/unit raises choice temperature, modeling impulsive preference
+                // for smaller-sooner rewards under deadline (Bickel et al., 2007; Wickelgren, 1977 SAT).
+                action_temperature: config.action_temperature + config.time_pressure * 0.15,
                 ..Default::default()
             };
             let mut agent = ActiveInferenceAgent::new(agent_config);
@@ -111,6 +114,15 @@ impl TemporalDiscountingBenchmark {
 
             let action_result = agent.select_action();
 
+            // RT proxy: choice difficulty from subjective value similarity — when
+            // discounted values are close, deliberation takes longer (Bickel et al., 2007).
+            let small_sv = choice.small_amount / (1.0 + 0.1 * choice.small_delay as f64);
+            let large_sv = choice.large_amount / (1.0 + 0.1 * choice.large_delay as f64);
+            let sv_diff = (small_sv - large_sv).abs();
+            let max_sv = choice.large_amount; // upper bound for normalization
+            let ticks = 5.0 + (1.0 - (sv_diff / max_sv).min(1.0)) * 8.0;
+            rt_ticks.push(ticks);
+
             // Stochastic sampling; action 1 = patient (larger-later)
             let chosen = sample_action(&action_result.action_probabilities, &mut rng_state);
             if chosen == 1 {
@@ -119,7 +131,7 @@ impl TemporalDiscountingBenchmark {
         }
 
         // Discounting score S: proportion of patient choices
-        patient_count as f64 / choices.len() as f64
+        (patient_count as f64 / choices.len() as f64, rt_ticks)
     }
 }
 
@@ -133,13 +145,16 @@ impl PsychBenchmark for TemporalDiscountingBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
         let mut scores = Vec::new();
+        let mut all_rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
-            let s = self.run_trial(config, trial);
+            let (s, rts) = self.run_trial(config, trial);
             scores.push(s);
+            all_rts.extend_from_slice(&rts);
         }
 
         result.insert("discounting_score_S", MetricValue::from_samples(&scores));
+        result.insert("rt_ticks", MetricValue::from_samples(&all_rts));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

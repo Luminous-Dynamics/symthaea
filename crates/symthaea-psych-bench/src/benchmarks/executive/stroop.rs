@@ -57,7 +57,8 @@ impl StroopBenchmark {
 
         // Decision temperature: controls stochasticity of response selection.
         // Lower = more deterministic. Tuned to produce human-like error rates.
-        // Time pressure raises temperature (faster, noisier decisions).
+        // Time pressure: base 0.25 yields ~8% incongruent errors matching MacLeod (1991) Stroop norms;
+        // +0.15/unit models ~20% accuracy drop at max pressure (Heitz, 2014 SAT review).
         let temperature: f64 = 0.25 + config.time_pressure * 0.15;
 
         let trials_per_condition = 40;

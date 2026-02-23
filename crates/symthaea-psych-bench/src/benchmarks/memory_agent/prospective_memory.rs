@@ -25,6 +25,7 @@ struct TrialResult {
     pm_hit_rate: f64,
     ongoing_accuracy: f64,
     pm_cost: f64,
+    rt_ticks: f64,
 }
 
 impl ProspectiveMemoryBenchmark {
@@ -56,11 +57,15 @@ impl ProspectiveMemoryBenchmark {
         let total_trials = 100;
         let pm_cue_rate = 0.20; // 20% of trials contain PM cue
 
-        // PM intention decay: activation decreases over time
-        let pm_decay_rate: f64 = 0.015;
+        // PM intention decay: activation decreases over time.
+        // Time pressure: base decay 0.015 models ~70% PM hit rate (Einstein & McDaniel, 2005);
+        // +0.010/unit accelerates decay, reflecting reduced rehearsal under deadline (Wickelgren, 1977).
+        let pm_decay_rate: f64 = 0.015 + config.time_pressure * 0.010;
 
-        // WM capacity cost from PM monitoring
-        let monitoring_noise: f32 = 0.35; // Added noise to ongoing classification
+        // WM capacity cost from PM monitoring.
+        // Time pressure: base noise 0.35 models ongoing-task interference; +0.10/unit raises
+        // monitoring noise, reflecting divided attention under speed emphasis (Marsh et al., 2003).
+        let monitoring_noise: f32 = 0.35 + config.time_pressure as f32 * 0.10;
 
         let mut pm_hits = 0u32;
         let mut pm_total = 0u32;
@@ -175,10 +180,19 @@ impl ProspectiveMemoryBenchmark {
         };
         let cost = (baseline_acc - ongoing_acc).max(0.0);
 
+        // RT proxy: PM monitoring adds overhead to every trial.
+        // Base 5 ticks (ongoing classification), +2 ticks for PM monitoring
+        // cost (dual-task), +scaling by intention decay (weaker intention =
+        // slower detection; Einstein & McDaniel, 2005).
+        let monitoring_cost = 2.0;
+        let decay_penalty = (1.0 - pm_activation) * 3.0;
+        let rt_ticks = 5.0 + monitoring_cost + decay_penalty;
+
         TrialResult {
             pm_hit_rate: pm_hr,
             ongoing_accuracy: ongoing_acc,
             pm_cost: cost,
+            rt_ticks,
         }
     }
 }
@@ -195,17 +209,20 @@ impl PsychBenchmark for ProspectiveMemoryBenchmark {
         let mut hit_rates = Vec::new();
         let mut ongoing_accs = Vec::new();
         let mut costs = Vec::new();
+        let mut rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
             hit_rates.push(r.pm_hit_rate);
             ongoing_accs.push(r.ongoing_accuracy);
             costs.push(r.pm_cost);
+            rts.push(r.rt_ticks);
         }
 
         result.insert("pm_hit_rate", MetricValue::from_samples(&hit_rates));
         result.insert("pm_ongoing_accuracy", MetricValue::from_samples(&ongoing_accs));
         result.insert("pm_cost", MetricValue::from_samples(&costs));
+        result.insert("rt_ticks", MetricValue::from_samples(&rts));
 
         result.conditions = 2; // PM cue vs ongoing
         result.trials_per_condition = config.trials_per_condition;

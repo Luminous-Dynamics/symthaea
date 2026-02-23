@@ -20,7 +20,7 @@ impl AccurateRetrievalBenchmark {
         delay_ticks: usize,
         config: &BenchmarkConfig,
         _trial_idx: usize,
-    ) -> f64 {
+    ) -> (f64, f64) {
         let dim = config.dimension;
         let adapter = ScenarioAdapter;
 
@@ -66,12 +66,34 @@ impl AccurateRetrievalBenchmark {
                 .map(|item| item.similarity(&query_hv))
                 .fold(0.0f32, f32::max);
 
-            if max_sim > 0.3 {
+            // Time pressure: base 0.3 yields ~85% retrieval; +0.10/unit raises criterion,
+            // modeling truncated memory search under deadline (Ratcliff & McKoon, 2008 DDM).
+            let threshold = 0.3 + config.time_pressure as f32 * 0.10;
+            if max_sim > threshold {
                 retrieved += 1;
             }
         }
 
-        retrieved as f64 / active_facts.len() as f64
+        // RT proxy: encoding ticks scale with num_facts, delay adds retention
+        // interval cost, and retrieval decision margin modulates deliberation.
+        // Base 3 ticks (motor + perceptual), +0.8/fact encoding, +0.3/delay tick.
+        let retrieval_margin = if !contents.is_empty() {
+            let query_hv = adapter.encode(&Scenario::new(active_facts[0]), dim);
+            let max_sim = contents
+                .iter()
+                .map(|item| item.similarity(&query_hv))
+                .fold(0.0f32, f32::max) as f64;
+            max_sim.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let rt_ticks = 3.0
+            + num_facts as f64 * 0.8
+            + delay_ticks as f64 * 0.3
+            + (1.0 - retrieval_margin) * 4.0;
+
+        let accuracy = retrieved as f64 / active_facts.len() as f64;
+        (accuracy, rt_ticks)
     }
 }
 
@@ -84,21 +106,38 @@ impl PsychBenchmark for AccurateRetrievalBenchmark {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
+        let mut all_rts = Vec::new();
+
         for (num_facts, delay) in [(3, 2), (5, 5), (7, 10)] {
             let mut accuracies = Vec::new();
+            let mut rts = Vec::new();
             for trial in 0..config.trials_per_condition {
-                let acc = self.run_trial(num_facts, delay, config, trial);
+                let (acc, rt) = self.run_trial(num_facts, delay, config, trial);
                 accuracies.push(acc);
+                rts.push(rt);
             }
 
             result.insert(
                 format!("facts_{}_delay_{}::accuracy", num_facts, delay),
                 MetricValue::from_samples(&accuracies),
             );
+            result.insert(
+                format!("facts_{}_delay_{}::rt_ticks", num_facts, delay),
+                MetricValue::from_samples(&rts),
+            );
+            all_rts.extend_from_slice(&rts);
         }
 
+        // Overall RT across all conditions
+        result.insert("rt_ticks", MetricValue::from_samples(&all_rts));
+
         // Compute overall retrieval accuracy (mean of all condition accuracies)
-        let all_accuracies: Vec<f64> = result.metrics.values().map(|m| m.mean).collect();
+        let all_accuracies: Vec<f64> = result
+            .metrics
+            .iter()
+            .filter(|(k, _)| k.ends_with("::accuracy"))
+            .map(|(_, m)| m.mean)
+            .collect();
         if !all_accuracies.is_empty() {
             let overall = all_accuracies.iter().sum::<f64>() / all_accuracies.len() as f64;
             result.insert(

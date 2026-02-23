@@ -11,13 +11,15 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
 use crate::wm::{WmConfig, WorkingMemory};
 
+use symthaea_core::hdc::ContinuousHV;
+
 /// Binding benchmark testing feature-conjunction WM.
 pub struct BindingBenchmark;
 
 impl BindingBenchmark {
     /// Run a single trial.
-    /// Returns (binding_correct, feature_only_correct).
-    fn run_trial(&self, set_size: usize, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+    /// Returns (binding_correct, feature_only_correct, rt_ticks).
+    fn run_trial(&self, set_size: usize, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64) {
         let dim = config.dimension;
         let seed = config.trial_seed("worm", &format!("binding_{}", set_size), trial_idx);
         let adapter = VisualObjectAdapter::default();
@@ -43,9 +45,17 @@ impl BindingBenchmark {
             ));
         }
 
-        // Present study objects
-        for obj in &objects {
+        // Time pressure: 0.15/unit encoding noise models degraded feature integration under
+        // speed emphasis (Treisman, 1996 FIT); rushed binding produces illusory conjunctions.
+        let tp_noise_frac = config.time_pressure as f32 * 0.15;
+        for (pos, obj) in objects.iter().enumerate() {
             let hv = adapter.encode(obj, dim);
+            let hv = if tp_noise_frac > 0.01 {
+                let noise = ContinuousHV::random(dim, seed.wrapping_add(800 + pos as u64));
+                ContinuousHV::weighted_bundle(&[&hv, &noise], &[1.0 - tp_noise_frac, tp_noise_frac])
+            } else {
+                hv
+            };
             wm.perceive(hv);
             wm.tick();
         }
@@ -102,7 +112,14 @@ impl BindingBenchmark {
         // Feature-only accuracy: correctly distinguish target from novel
         let feature_correct = if binding_sim > novel_sim { 1.0 } else { 0.0 };
 
-        (binding_correct, feature_correct)
+        // RT proxy: deliberation ticks based on binding decision difficulty.
+        // Smaller margin between target and lure → harder discrimination → longer RT
+        // (Luck & Vogel, 1997; Wheeler & Treisman, 2002).
+        let decision_margin =
+            ((binding_sim - lure_sim).abs() as f64).min(1.0);
+        let rt_ticks = 4.0 + (1.0 - decision_margin) * 6.0;
+
+        (binding_correct, feature_correct, rt_ticks)
     }
 }
 
@@ -118,11 +135,13 @@ impl PsychBenchmark for BindingBenchmark {
         for k in [2, 4, 6] {
             let mut binding_accs = Vec::new();
             let mut feature_accs = Vec::new();
+            let mut rts = Vec::new();
 
             for trial in 0..config.trials_per_condition {
-                let (bind, feat) = self.run_trial(k, config, trial);
+                let (bind, feat, rt) = self.run_trial(k, config, trial);
                 binding_accs.push(bind);
                 feature_accs.push(feat);
+                rts.push(rt);
             }
 
             result.insert(
@@ -143,6 +162,10 @@ impl PsychBenchmark for BindingBenchmark {
             result.insert(
                 format!("set_{}::binding_deficit", k),
                 MetricValue::from_samples(&deficits),
+            );
+            result.insert(
+                format!("set_{}::rt_ticks", k),
+                MetricValue::from_samples(&rts),
             );
         }
 

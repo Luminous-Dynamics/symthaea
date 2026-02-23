@@ -18,7 +18,7 @@ use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation
 pub struct BartBenchmark;
 
 impl BartBenchmark {
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64) {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64, Vec<f64>) {
         let seed = config.trial_seed("cogbench", "bart", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
         let num_balloons = 20;
@@ -73,6 +73,7 @@ impl BartBenchmark {
         let mut total_pumps = 0u64;
         let mut total_earnings = 0.0f64;
         let mut pops = 0u64;
+        let mut rt_ticks = Vec::new();
 
         #[allow(clippy::explicit_counter_loop)]
         // experienced_balloons tracks cumulative state across pops, not just loop iteration
@@ -154,11 +155,14 @@ impl BartBenchmark {
                 .max(1)
                 .min(max_pumps);
 
-            // Small noise (+/- 3 pumps)
+            // Small noise (+/- 3 pumps); time pressure widens noise band
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
             rng_state ^= rng_state << 17;
-            let noise = (rng_state % 7) as i64 - 3;
+            // Time pressure: base noise 7 pumps; +6/unit widens decision jitter, modeling impulsive
+            // pump-to-target estimation under urgency (Lejuez et al., 2002 BART; Heitz, 2014 SAT).
+            let noise_range = 7 + (config.time_pressure * 6.0) as u64;
+            let noise = (rng_state % noise_range) as i64 - (noise_range as i64 / 2);
             let final_target = (adjusted_target as i64 + noise)
                 .max(1)
                 .min(max_pumps as i64) as usize;
@@ -177,6 +181,10 @@ impl BartBenchmark {
                     break;
                 }
             }
+
+            // RT proxy: pumps per balloon reflect deliberation length —
+            // more pumps = longer risk-assessment process (Lejuez et al., 2002).
+            rt_ticks.push(pumps as f64);
 
             experienced_balloons += 1;
             if !popped {
@@ -197,7 +205,7 @@ impl BartBenchmark {
         let pop_rate = pops as f64 / num_balloons as f64;
         let avg_earnings = total_earnings / num_balloons as f64;
 
-        (avg_pumps, pop_rate, avg_earnings)
+        (avg_pumps, pop_rate, avg_earnings, rt_ticks)
     }
 }
 
@@ -213,17 +221,20 @@ impl PsychBenchmark for BartBenchmark {
         let mut pumps = Vec::new();
         let mut pop_rates = Vec::new();
         let mut earnings = Vec::new();
+        let mut all_rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
-            let (p, pr, e) = self.run_trial(config, trial);
+            let (p, pr, e, rts) = self.run_trial(config, trial);
             pumps.push(p);
             pop_rates.push(pr);
             earnings.push(e);
+            all_rts.extend_from_slice(&rts);
         }
 
         result.insert("average_pumps", MetricValue::from_samples(&pumps));
         result.insert("pop_rate", MetricValue::from_samples(&pop_rates));
         result.insert("average_earnings", MetricValue::from_samples(&earnings));
+        result.insert("rt_ticks", MetricValue::from_samples(&all_rts));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

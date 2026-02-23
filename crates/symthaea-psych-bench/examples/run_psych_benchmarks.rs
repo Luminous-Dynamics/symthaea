@@ -16,6 +16,7 @@
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --percentiles
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --pca
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --ablation-effects
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --correlation-matrix
 
 use std::path::PathBuf;
 use symthaea_psych_bench::benchmarks::affect::{
@@ -88,6 +89,7 @@ fn main() {
     let percentiles_mode = args.iter().any(|a| a == "--percentiles");
     let pca_mode = args.iter().any(|a| a == "--pca");
     let ablation_effects = args.iter().any(|a| a == "--ablation-effects");
+    let correlation_matrix = args.iter().any(|a| a == "--correlation-matrix");
 
     let config = BenchmarkConfig {
         dimension: 512,
@@ -680,6 +682,50 @@ fn main() {
         let analysis = CrossBenchmarkAnalysis::from_multi_seed_reports(&reports);
         println!("\n--- Principal Component Analysis ---");
         println!("{}", analysis.format_pca(5));
+        return;
+    }
+
+    // Correlation matrix: run battery with 5 seeds, print matrix + construct validity
+    if correlation_matrix {
+        let seeds = [42, 137, 256, 512, 1024];
+        eprintln!("\nRunning correlation matrix with {} seeds...", seeds.len());
+
+        let mut reports = vec![report.clone()];
+        for &seed in &seeds[1..] {
+            let seed_config = BenchmarkConfig {
+                dimension: 512,
+                trials_per_condition: 10,
+                seed,
+                ..Default::default()
+            };
+            let mut seed_report = BenchmarkReport::new();
+            for bench in &benchmarks {
+                if let Some(ref f) = filter {
+                    if !bench.name().to_lowercase().contains(f) {
+                        continue;
+                    }
+                }
+                let result = bench.run(&seed_config);
+                seed_report.add(result);
+            }
+            reports.push(seed_report);
+        }
+
+        let analysis = CrossBenchmarkAnalysis::from_multi_seed_reports(&reports);
+        println!("\n--- Correlation Matrix ---");
+        println!("{}", analysis.format_matrix());
+
+        let validity = analysis.construct_validity();
+        println!("\n--- Construct Validity ---");
+        println!(
+            "Same-domain pairs: {}, Convergent (r>0.3): {}, Mean within-domain r: {:.3}",
+            validity.same_domain_pairs,
+            validity.convergent_pairs,
+            validity.mean_within_correlation,
+        );
+
+        println!("\n--- MTMM Validity ---");
+        println!("{}", analysis.format_mtmm());
         return;
     }
 

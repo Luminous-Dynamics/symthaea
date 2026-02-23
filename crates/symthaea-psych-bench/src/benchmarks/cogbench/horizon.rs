@@ -26,7 +26,7 @@ impl HorizonBenchmark {
         horizon: usize,
         config: &BenchmarkConfig,
         trial_idx: usize,
-    ) -> (f64, f64, f64) {
+    ) -> (f64, f64, f64, Vec<f64>) {
         let seed = config.trial_seed("cogbench", &format!("horizon_{}", horizon), trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
 
@@ -54,6 +54,7 @@ impl HorizonBenchmark {
         let mut directed_exploration_count = 0u64;
         let mut total_entropy = 0.0f64;
         let mut good_arm_choices = 0u64;
+        let mut rt_ticks = Vec::new();
         let num_choices = horizon.max(1);
 
         for choice_idx in 0..num_choices {
@@ -68,13 +69,21 @@ impl HorizonBenchmark {
             let score0 = arm_mean[0] + exploration_bonus(arm_count[0]);
             let score1 = arm_mean[1] + exploration_bonus(arm_count[1]);
 
-            // Softmax action selection
-            let temp = config.action_temperature.max(0.1) * 0.35;
+            // Softmax action selection; time pressure: +0.10/unit adds exploration noise, modeling
+            // reduced deliberation in explore-exploit tradeoffs under deadline (Wilson et al., 2014 horizon task).
+            let temp = config.action_temperature.max(0.1) * 0.35 + config.time_pressure * 0.10;
             let max_s = score0.max(score1);
             let e0 = ((score0 - max_s) / temp).exp();
             let e1 = ((score1 - max_s) / temp).exp();
             let total = e0 + e1;
             let p1 = e1 / total;
+
+            // RT proxy: decision difficulty from score similarity — closer scores
+            // mean harder deliberation (Wilson et al., 2014 horizon task).
+            let score_diff = (score0 - score1).abs();
+            let max_score_range = 1.0;
+            let ticks = 5.0 + (1.0 - (score_diff / max_score_range).min(1.0)) * 8.0;
+            rt_ticks.push(ticks);
 
             // Stochastic choice
             rng_state ^= rng_state << 13;
@@ -120,7 +129,7 @@ impl HorizonBenchmark {
         let avg_entropy = total_entropy / num_choices as f64;
         let exploit_rate = good_arm_choices as f64 / num_choices as f64;
 
-        (directed_rate, avg_entropy, exploit_rate)
+        (directed_rate, avg_entropy, exploit_rate, rt_ticks)
     }
 }
 
@@ -137,12 +146,14 @@ impl PsychBenchmark for HorizonBenchmark {
             let mut directed = Vec::new();
             let mut random = Vec::new();
             let mut exploit = Vec::new();
+            let mut all_rts = Vec::new();
 
             for trial in 0..config.trials_per_condition {
-                let (d, r, e) = self.run_trial(horizon, config, trial);
+                let (d, r, e, rts) = self.run_trial(horizon, config, trial);
                 directed.push(d);
                 random.push(r);
                 exploit.push(e);
+                all_rts.extend_from_slice(&rts);
             }
 
             result.insert(
@@ -156,6 +167,10 @@ impl PsychBenchmark for HorizonBenchmark {
             result.insert(
                 format!("horizon_{}::exploitation_rate", horizon),
                 MetricValue::from_samples(&exploit),
+            );
+            result.insert(
+                format!("horizon_{}::rt_ticks", horizon),
+                MetricValue::from_samples(&all_rts),
             );
         }
 

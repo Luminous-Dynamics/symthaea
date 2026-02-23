@@ -14,15 +14,18 @@ use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation
 pub struct ProbabilisticReasoningBenchmark;
 
 impl ProbabilisticReasoningBenchmark {
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64) {
         let seed = config.trial_seed("cogbench", "probabilistic", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
 
+        // Time pressure: base LR 0.15 matches human belief updating rate (Behrens et al., 2007);
+        // +0.10/unit increases recency bias under deadline (Busemeyer & Townsend, 1993 DFT).
+        let lr = 0.15 + config.time_pressure * 0.10;
         let agent_config = ActiveInferenceAgentConfig {
             state_dim: 4,
             obs_dim: 4,
             num_actions: 4,
-            belief_learning_rate: 0.15,
+            belief_learning_rate: lr,
             ..Default::default()
         };
         let mut agent = ActiveInferenceAgent::new(agent_config);
@@ -41,7 +44,10 @@ impl ProbabilisticReasoningBenchmark {
         rng_state ^= rng_state << 17;
         let _rng_state = rng_state;
         let conflicting_value = 0.3;
-        let obs = Observation::new(vec![conflicting_value; 4], 1.0, "cognitive");
+        // Time pressure: -0.10/unit precision loss models degraded evidence accumulation
+        // under speed emphasis (Ratcliff & McKoon, 2008 DDM: drift rate reduction).
+        let precision = (1.0 - config.time_pressure * 0.10).max(0.1);
+        let obs = Observation::new(vec![conflicting_value; 4], precision, "cognitive");
         let result = agent.perceive(&obs);
 
         // beta1 (prior weight): how much belief stayed near the prior
@@ -66,7 +72,13 @@ impl ProbabilisticReasoningBenchmark {
             0.5
         };
 
-        (beta1, beta2)
+        // RT proxy: evidence integration difficulty — larger prior-likelihood conflict
+        // requires more deliberation (Behrens et al., 2007; Busemeyer & Townsend, 1993 DFT).
+        // When beta1 and beta2 are close (≈0.5 each), the conflict is maximal.
+        let conflict = 1.0 - (beta1 - beta2).abs();
+        let rt = 6.0 + conflict * 8.0;
+
+        (beta1, beta2, rt)
     }
 }
 
@@ -81,11 +93,13 @@ impl PsychBenchmark for ProbabilisticReasoningBenchmark {
 
         let mut beta1s = Vec::new();
         let mut beta2s = Vec::new();
+        let mut all_rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
-            let (b1, b2) = self.run_trial(config, trial);
+            let (b1, b2, rt) = self.run_trial(config, trial);
             beta1s.push(b1);
             beta2s.push(b2);
+            all_rts.push(rt);
         }
 
         result.insert("beta1_prior_weight", MetricValue::from_samples(&beta1s));
@@ -93,6 +107,7 @@ impl PsychBenchmark for ProbabilisticReasoningBenchmark {
             "beta2_likelihood_weight",
             MetricValue::from_samples(&beta2s),
         );
+        result.insert("rt_ticks", MetricValue::from_samples(&all_rts));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;
@@ -115,9 +130,11 @@ mod tests {
         let result = ProbabilisticReasoningBenchmark.run(&config);
         assert!(result.metrics.contains_key("beta1_prior_weight"));
         assert!(result.metrics.contains_key("beta2_likelihood_weight"));
-        for (_, val) in &result.metrics {
+        for (key, val) in &result.metrics {
             assert!(val.mean.is_finite());
-            assert!(val.mean >= 0.0 && val.mean <= 1.0);
+            if !key.contains("rt_ticks") {
+                assert!(val.mean >= 0.0 && val.mean <= 1.0);
+            }
         }
     }
 }

@@ -21,7 +21,7 @@ fn next_seed(state: &mut u64) -> u64 {
 }
 
 impl MoodCongruentRecallBenchmark {
-    fn run_trial(&self, mood: &str, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
+    fn run_trial(&self, mood: &str, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
         let dim = config.dimension;
         let seed = config.trial_seed("affect", &format!("mood_{}", mood), trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -53,7 +53,12 @@ impl MoodCongruentRecallBenchmark {
             // Low valence weight (15%) ensures mood is a weak signal amidst
             // strong object identity — modeling the subtlety of affective
             // encoding in human memory (Blaney, 1986; Bower, 1981).
-            let item = ContinuousHV::weighted_bundle(&[&object_hv, valence_proto], &[0.85, 0.15]);
+            // Time pressure: 0.05/unit reduces valence weight, modeling weakened mood-congruent
+            // encoding under rushed study (Blaney, 1986; Bower, 1981 associative network theory).
+            let pressure_penalty = config.time_pressure * 0.05;
+            let valence_w = (0.15 - pressure_penalty) as f32;
+            let object_w = (0.85 + pressure_penalty) as f32;
+            let item = ContinuousHV::weighted_bundle(&[&object_hv, valence_proto], &[object_w, valence_w]);
             wm.perceive(item);
             wm.tick();
             item_valences.push(is_positive);
@@ -75,7 +80,7 @@ impl MoodCongruentRecallBenchmark {
         // Probe: measure similarity of WM contents to mood prototype
         let contents = wm.contents();
         if contents.is_empty() {
-            return 0.5;
+            return (0.5, 10.0); // max RT when empty
         }
 
         // Sort by similarity to mood, take top-5 as "recalled"
@@ -107,7 +112,16 @@ impl MoodCongruentRecallBenchmark {
             }
         }
 
-        congruent as f64 / recall_count as f64
+        let congruence = congruent as f64 / recall_count as f64;
+
+        // RT proxy: based on retrieval similarity — weaker signal = longer RT
+        let best_sim = sims[0].1 as f64;
+        let margin = best_sim.abs();
+        let base = 4.0;
+        let range = 6.0;
+        let rt = base + (1.0 - margin.min(1.0)) * range;
+
+        (congruence, rt)
     }
 }
 
@@ -120,11 +134,13 @@ impl PsychBenchmark for MoodCongruentRecallBenchmark {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
+        let mut all_rts = Vec::new();
         for mood in ["positive", "negative"] {
             let mut congruences = Vec::new();
             for trial in 0..config.trials_per_condition {
-                let c = self.run_trial(mood, config, trial);
+                let (c, rt) = self.run_trial(mood, config, trial);
                 congruences.push(c);
+                all_rts.push(rt);
             }
             result.insert(
                 format!("{}_mood::congruence_ratio", mood),
@@ -132,8 +148,15 @@ impl PsychBenchmark for MoodCongruentRecallBenchmark {
             );
         }
 
+        result.insert("rt_ticks", MetricValue::from_samples(&all_rts));
+
         // Overall congruence
-        let all: Vec<f64> = result.metrics.values().map(|m| m.mean).collect();
+        let all: Vec<f64> = result
+            .metrics
+            .iter()
+            .filter(|(k, _)| k.ends_with("congruence_ratio"))
+            .map(|(_, m)| m.mean)
+            .collect();
         let overall = if all.is_empty() {
             0.0
         } else {

@@ -24,6 +24,8 @@ struct TrialResult {
     neutral_accuracy: f64,
     negative_accuracy: f64,
     emotional_interference: f64,
+    neutral_rts: Vec<f64>,
+    negative_rts: Vec<f64>,
 }
 
 impl EmotionalStroopBenchmark {
@@ -50,11 +52,15 @@ impl EmotionalStroopBenchmark {
         // Emotional interference: negative valence attracts attention,
         // partially activating a competing color response
         let emotional_weight: f32 = 0.35;
-        let temperature: f64 = 0.25;
+        // Time pressure: base 0.25 yields ~10% emotional interference (Williams et al., 1996);
+        // +0.15/unit raises temperature, modeling noisier color selection under SAT (Heitz, 2014).
+        let temperature: f64 = 0.25 + config.time_pressure * 0.15;
         let trials_per_condition = 40;
 
         let mut neutral_correct = 0u32;
         let mut negative_correct = 0u32;
+        let mut neutral_rts = Vec::new();
+        let mut negative_rts = Vec::new();
 
         for trial in 0..(trials_per_condition * 2) {
             let is_negative = trial % 2 == 0;
@@ -108,13 +114,24 @@ impl EmotionalStroopBenchmark {
                 }
             }
 
+            // RT proxy: deliberation ticks based on decision margin
+            let probs: Vec<f64> = exp_sims.iter().map(|e| e / exp_sum).collect();
+            let mut sorted_probs = probs.clone();
+            sorted_probs.sort_by(|a, b| b.total_cmp(a));
+            let decision_margin = (sorted_probs[0] - sorted_probs[1]).clamp(0.0, 1.0);
+            let rt_ticks = 8.0 + (1.0 - decision_margin) * 12.0;
+
             let correct = response_idx == ink_idx;
             if is_negative {
                 if correct {
                     negative_correct += 1;
                 }
-            } else if correct {
-                neutral_correct += 1;
+                negative_rts.push(rt_ticks);
+            } else {
+                if correct {
+                    neutral_correct += 1;
+                }
+                neutral_rts.push(rt_ticks);
             }
         }
 
@@ -125,6 +142,8 @@ impl EmotionalStroopBenchmark {
             neutral_accuracy: neut_acc,
             negative_accuracy: neg_acc,
             emotional_interference: neut_acc - neg_acc,
+            neutral_rts,
+            negative_rts,
         }
     }
 }
@@ -141,12 +160,16 @@ impl PsychBenchmark for EmotionalStroopBenchmark {
         let mut neutral_accs = Vec::new();
         let mut negative_accs = Vec::new();
         let mut interferences = Vec::new();
+        let mut all_neutral_rts = Vec::new();
+        let mut all_negative_rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
             neutral_accs.push(r.neutral_accuracy);
             negative_accs.push(r.negative_accuracy);
             interferences.push(r.emotional_interference);
+            all_neutral_rts.extend_from_slice(&r.neutral_rts);
+            all_negative_rts.extend_from_slice(&r.negative_rts);
         }
 
         result.insert("neutral_accuracy", MetricValue::from_samples(&neutral_accs));
@@ -154,6 +177,14 @@ impl PsychBenchmark for EmotionalStroopBenchmark {
         result.insert(
             "emotional_interference",
             MetricValue::from_samples(&interferences),
+        );
+        result.insert(
+            "neutral::rt_ticks",
+            MetricValue::from_samples(&all_neutral_rts),
+        );
+        result.insert(
+            "negative::rt_ticks",
+            MetricValue::from_samples(&all_negative_rts),
         );
 
         result.conditions = 2;

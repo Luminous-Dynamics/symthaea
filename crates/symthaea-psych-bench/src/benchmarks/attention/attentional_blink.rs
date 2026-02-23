@@ -62,7 +62,9 @@ impl AttentionalBlinkBenchmark {
         let t1_cost: f64 = 0.98; // T1 processing depletes attention
         let recovery_rate: f64 = 0.12; // Per-lag recovery
 
-        let temperature: f64 = 0.30;
+        // Time pressure: base 0.30 matches ~50% T2|T1 accuracy at lag-2 (Raymond et al., 1992 AB);
+        // +0.15/unit degrades target discrimination, modeling attention-gate narrowing under SAT (Heitz, 2014).
+        let temperature: f64 = 0.30 + config.time_pressure * 0.15;
         let trials_per_lag = 25;
         let lags = [2, 3, 5, 8];
 

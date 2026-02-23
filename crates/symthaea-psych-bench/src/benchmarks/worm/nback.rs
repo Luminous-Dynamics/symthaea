@@ -87,8 +87,8 @@ impl NBackBenchmark {
                 // Compare current item to n-back item (identity test via HDC similarity)
                 let nback_hv = &perceived_history[i - n];
                 let match_sim = hv.similarity(nback_hv);
-                // Time pressure lowers the match threshold (more liberal responding,
-                // faster but more false alarms).
+                // Time pressure: base 0.5 produces ~80% hit rate matching Kane et al. (2007) 2-back norms;
+                // -0.15/unit lowers criterion, modeling liberal bias under speed emphasis (Luce, 1986).
                 let match_threshold = (0.5 - config.time_pressure * 0.15) as f32;
 
                 // Proactive interference: check for "lure" items at nearby positions

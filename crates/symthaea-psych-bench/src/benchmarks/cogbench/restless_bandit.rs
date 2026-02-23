@@ -13,7 +13,7 @@ use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation
 pub struct RestlessBanditBenchmark;
 
 impl RestlessBanditBenchmark {
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, Vec<f64>) {
         let seed = config.trial_seed("cogbench", "restless", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
         let num_arms = 4;
@@ -50,6 +50,7 @@ impl RestlessBanditBenchmark {
         let ema_alpha = 0.6; // High alpha = fast drift tracking
                              // Track pull count per arm (UCB-style exploration bonus)
         let mut arm_pulls: Vec<u64> = vec![0; num_arms];
+        let mut rt_ticks = Vec::new();
 
         for trial in 0..num_trials {
             // Drift arm values (restless)
@@ -81,7 +82,9 @@ impl RestlessBanditBenchmark {
                         } else {
                             f64::MAX
                         };
-                        (i, ema + bonus * 0.15) // Scale bonus down for restless setting
+                        // Time pressure: base UCB scale 0.15; +0.10/unit inflates exploration bonus,
+                        // modeling noisier value estimation under deadline (Daw et al., 2006 restless bandit).
+                        (i, ema + bonus * (0.15 + config.time_pressure * 0.10))
                     })
                     .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i)
@@ -89,6 +92,19 @@ impl RestlessBanditBenchmark {
             };
 
             arm_pulls[chosen_arm] += 1;
+
+            // RT proxy: decision difficulty from EMA margin between best and
+            // second-best arm — smaller margin = harder deliberation (Daw et al., 2006).
+            let chosen_val = arm_ema[chosen_arm];
+            let best_alt = arm_ema
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i != chosen_arm)
+                .map(|(_, v)| *v)
+                .fold(f64::NEG_INFINITY, f64::max);
+            let margin = (chosen_val - best_alt).abs();
+            let ticks = 5.0 + (1.0 - (margin * 5.0).min(1.0)) * 8.0;
+            rt_ticks.push(ticks);
 
             // Was the choice optimal?
             let best_arm = arm_values
@@ -161,7 +177,7 @@ impl RestlessBanditBenchmark {
 
         let overall_accuracy = correct_count as f64 / num_trials as f64;
 
-        (qsr, overall_accuracy)
+        (qsr, overall_accuracy, rt_ticks)
     }
 }
 
@@ -176,11 +192,13 @@ impl PsychBenchmark for RestlessBanditBenchmark {
 
         let mut qsrs = Vec::new();
         let mut accuracies = Vec::new();
+        let mut all_rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
-            let (qsr, acc) = self.run_trial(config, trial);
+            let (qsr, acc, rts) = self.run_trial(config, trial);
             qsrs.push(qsr);
             accuracies.push(acc);
+            all_rts.extend_from_slice(&rts);
         }
 
         result.insert(
@@ -188,6 +206,7 @@ impl PsychBenchmark for RestlessBanditBenchmark {
             MetricValue::from_samples(&qsrs),
         );
         result.insert("overall_accuracy", MetricValue::from_samples(&accuracies));
+        result.insert("rt_ticks", MetricValue::from_samples(&all_rts));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

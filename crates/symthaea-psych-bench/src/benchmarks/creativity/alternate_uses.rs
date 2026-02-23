@@ -52,7 +52,7 @@ impl AlternateUsesBenchmark {
         ]
     }
 
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64) {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64, f64) {
         let dim = config.dimension;
         let objects = Self::objects();
         let obj = &objects[trial_idx % objects.len()];
@@ -92,6 +92,10 @@ impl AlternateUsesBenchmark {
         // Track "categories" for flexibility: group by which feature was unbound
         let mut categories_used = std::collections::HashSet::new();
 
+        // RT tracking: attempts between each accepted use (search time per idea)
+        let mut attempts_since_last = 0u32;
+        let mut search_rts = Vec::new();
+
         for attempt in 0..max_attempts {
             // Cycle through features first (guarantees coverage), then random
             let feat_idx = if attempt < obj.feature_count {
@@ -118,10 +122,18 @@ impl AlternateUsesBenchmark {
             // Accept if in moderate range: not copying original, not nonsense.
             // Tighter band (vs 0.01-0.70) models the semantic plausibility
             // constraint: uses must be functionally grounded (Silvia et al., 2008).
-            if sim > 0.04 && sim < 0.55 {
+            // Time pressure: -0.02/unit lowers minimum originality, +0.10/unit raises max similarity;
+            // models relaxed quality criteria under deadline (Silvia et al., 2008; Beaty et al., 2014 AUT).
+            let lower_bound = (0.04 - config.time_pressure * 0.02) as f32;
+            let upper_bound = (0.55 + config.time_pressure * 0.10) as f32;
+            attempts_since_last += 1;
+            if sim > lower_bound && sim < upper_bound {
                 accepted_uses.push(use_hv);
                 use_sims.push(sim);
                 categories_used.insert(feat_idx);
+                // RT: number of attempts to find this use (search ticks)
+                search_rts.push(attempts_since_last as f64);
+                attempts_since_last = 0;
             }
 
             let _ = attempt; // used for loop control
@@ -142,7 +154,14 @@ impl AlternateUsesBenchmark {
         // Flexibility: number of distinct feature categories explored
         let flexibility = categories_used.len() as f64;
 
-        (fluency, originality, flexibility)
+        // RT: mean search ticks per accepted use
+        let mean_search_rt = if search_rts.is_empty() {
+            max_attempts as f64
+        } else {
+            search_rts.iter().sum::<f64>() / search_rts.len() as f64
+        };
+
+        (fluency, originality, flexibility, mean_search_rt)
     }
 }
 
@@ -158,17 +177,20 @@ impl PsychBenchmark for AlternateUsesBenchmark {
         let mut fluencies = Vec::new();
         let mut originalities = Vec::new();
         let mut flexibilities = Vec::new();
+        let mut rt_ticks = Vec::new();
 
         for trial in 0..config.trials_per_condition {
-            let (f, o, flex) = self.run_trial(config, trial);
+            let (f, o, flex, rt) = self.run_trial(config, trial);
             fluencies.push(f);
             originalities.push(o);
             flexibilities.push(flex);
+            rt_ticks.push(rt);
         }
 
         result.insert("fluency", MetricValue::from_samples(&fluencies));
         result.insert("originality", MetricValue::from_samples(&originalities));
         result.insert("flexibility", MetricValue::from_samples(&flexibilities));
+        result.insert("rt_ticks", MetricValue::from_samples(&rt_ticks));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

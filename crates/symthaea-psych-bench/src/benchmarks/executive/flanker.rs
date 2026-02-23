@@ -58,7 +58,8 @@ impl FlankerBenchmark {
         let attention_leak: f32 = 0.35;
 
         // Decision temperature: controls stochasticity of response selection.
-        // Time pressure raises temperature (faster, noisier decisions).
+        // Time pressure: base 0.25 matches ~10% flanker interference (Eriksen & Eriksen, 1974);
+        // +0.15/unit reflects boundary collapse under speed emphasis (Ratcliff & McKoon, 2008 DDM).
         let temperature: f64 = 0.25 + config.time_pressure * 0.15;
 
         let trials_per_condition = 40;

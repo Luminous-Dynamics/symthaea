@@ -21,7 +21,7 @@ fn next_seed(state: &mut u64) -> u64 {
 }
 
 impl ValenceClassificationBenchmark {
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> [f64; 4] {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> ([f64; 4], f64) {
         let dim = config.dimension;
         let seed = config.trial_seed("affect", "valence", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -36,6 +36,7 @@ impl ValenceClassificationBenchmark {
         // Generate 30 stimuli (10 per valence)
         let mut correct = [0usize; 3]; // positive, negative, neutral
         let mut total = [0usize; 3];
+        let mut trial_rts = Vec::new();
 
         for valence in 0..3 {
             for _item in 0..10 {
@@ -44,9 +45,14 @@ impl ValenceClassificationBenchmark {
                 // Create object HV
                 let object_hv = ContinuousHV::random(dim, next_seed(&mut rng));
 
-                // Blend: 60% object + 40% valence prototype
+                // Blend: 60% object + 40% valence prototype.
+                // Time pressure: 0.15/unit shifts weight from valence to object, modeling degraded
+                // affective encoding under speed emphasis (Pessoa, 2009 dual-competition model).
+                let noise_weight = config.time_pressure * 0.15;
+                let valence_weight = (0.4 - noise_weight) as f32;
+                let object_weight = (0.6 + noise_weight) as f32;
                 let stimulus =
-                    ContinuousHV::weighted_bundle(&[&object_hv, protos[valence]], &[0.6, 0.4]);
+                    ContinuousHV::weighted_bundle(&[&object_hv, protos[valence]], &[object_weight, valence_weight]);
 
                 // Classify by max similarity to prototypes
                 let sims: Vec<f32> = protos.iter().map(|p| stimulus.similarity(p)).collect();
@@ -60,6 +66,15 @@ impl ValenceClassificationBenchmark {
                 if predicted == valence {
                     correct[valence] += 1;
                 }
+
+                // RT proxy: margin between best and second-best similarity
+                let mut sorted_sims = sims.clone();
+                sorted_sims.sort_by(|a, b| b.total_cmp(a));
+                let margin = (sorted_sims[0] - sorted_sims[1]) as f64;
+                let base = 3.0;
+                let range = 6.0;
+                let rt = base + (1.0 - margin.min(1.0)) * range;
+                trial_rts.push(rt);
             }
         }
 
@@ -69,7 +84,8 @@ impl ValenceClassificationBenchmark {
         let overall =
             (correct[0] + correct[1] + correct[2]) as f64 / (total[0] + total[1] + total[2]) as f64;
 
-        [overall, pos_acc, neg_acc, neu_acc]
+        let mean_rt = trial_rts.iter().sum::<f64>() / trial_rts.len().max(1) as f64;
+        ([overall, pos_acc, neg_acc, neu_acc], mean_rt)
     }
 }
 
@@ -86,19 +102,22 @@ impl PsychBenchmark for ValenceClassificationBenchmark {
         let mut pos_accs = Vec::new();
         let mut neg_accs = Vec::new();
         let mut neu_accs = Vec::new();
+        let mut rt_ticks = Vec::new();
 
         for trial in 0..config.trials_per_condition {
-            let [overall, pos, neg, neu] = self.run_trial(config, trial);
+            let ([overall, pos, neg, neu], rt) = self.run_trial(config, trial);
             overall_accs.push(overall);
             pos_accs.push(pos);
             neg_accs.push(neg);
             neu_accs.push(neu);
+            rt_ticks.push(rt);
         }
 
         result.insert("valence_accuracy", MetricValue::from_samples(&overall_accs));
         result.insert("positive_accuracy", MetricValue::from_samples(&pos_accs));
         result.insert("negative_accuracy", MetricValue::from_samples(&neg_accs));
         result.insert("neutral_accuracy", MetricValue::from_samples(&neu_accs));
+        result.insert("rt_ticks", MetricValue::from_samples(&rt_ticks));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

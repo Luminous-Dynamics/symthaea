@@ -64,6 +64,7 @@ impl ReversalLearningBenchmark {
         let mut win_total = 0u32;
         let mut lose_shift_count = 0u32;
         let mut lose_total = 0u32;
+        let mut rt_ticks = Vec::new();
 
         for _trial in 0..max_trials {
             trials_since_event += 1;
@@ -74,11 +75,20 @@ impl ReversalLearningBenchmark {
 
             // Softmax action selection — wider temperature allows more exploration
             // post-reversal, reducing perseveration
-            let temp = config.action_temperature.max(0.1) * 0.08;
+            // Time pressure: +0.10/unit raises choice noise, modeling impaired reversal detection
+            // under deadline (Cools et al., 2002 reversal learning; Heitz, 2014 SAT).
+            let temp = config.action_temperature.max(0.1) * 0.08 + config.time_pressure * 0.10;
             let max_score = score_a.max(score_b);
             let exp_a = ((score_a - max_score) / temp).exp();
             let exp_b = ((score_b - max_score) / temp).exp();
             let total = exp_a + exp_b;
+
+            // RT proxy: decision difficulty from score margin — closer scores = harder
+            // choice, especially post-reversal when associations are uncertain
+            // (Cools et al., 2002; Heitz, 2014 SAT).
+            let score_margin = (score_a - score_b).abs();
+            let ticks = 5.0 + (1.0 - score_margin.min(1.0)) * 8.0;
+            rt_ticks.push(ticks);
 
             rng ^= rng << 13;
             rng ^= rng >> 7;
@@ -218,6 +228,7 @@ impl ReversalLearningBenchmark {
             win_stay_rate,
             lose_shift_rate,
             reversal_cost,
+            rt_ticks,
         }
     }
 }
@@ -231,6 +242,7 @@ struct TrialResult {
     win_stay_rate: f64,
     lose_shift_rate: f64,
     reversal_cost: f64,
+    rt_ticks: Vec<f64>,
 }
 
 impl PsychBenchmark for ReversalLearningBenchmark {
@@ -250,6 +262,7 @@ impl PsychBenchmark for ReversalLearningBenchmark {
         let mut win_stays = Vec::new();
         let mut lose_shifts = Vec::new();
         let mut costs = Vec::new();
+        let mut all_rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -261,6 +274,7 @@ impl PsychBenchmark for ReversalLearningBenchmark {
             win_stays.push(r.win_stay_rate);
             lose_shifts.push(r.lose_shift_rate);
             costs.push(r.reversal_cost);
+            all_rts.extend_from_slice(&r.rt_ticks);
         }
 
         result.insert(
@@ -277,6 +291,7 @@ impl PsychBenchmark for ReversalLearningBenchmark {
         result.insert("win_stay_rate", MetricValue::from_samples(&win_stays));
         result.insert("lose_shift_rate", MetricValue::from_samples(&lose_shifts));
         result.insert("reversal_cost", MetricValue::from_samples(&costs));
+        result.insert("rt_ticks", MetricValue::from_samples(&all_rts));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

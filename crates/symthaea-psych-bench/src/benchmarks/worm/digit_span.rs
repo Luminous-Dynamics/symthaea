@@ -20,7 +20,7 @@ use crate::wm::{WmConfig, WorkingMemory};
 pub struct DigitSpanBenchmark;
 
 impl DigitSpanBenchmark {
-    /// Run a single trial. Returns (forward_span, backward_span, fwd_acc_at_7).
+    /// Run a single trial. Returns (forward_span, backward_span, fwd_acc_at_7, fwd_rt, bwd_rt).
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
         let dim = config.dimension;
         let seed = config.trial_seed("worm", "digit_span", trial_idx);
@@ -32,6 +32,10 @@ impl DigitSpanBenchmark {
         let mut forward_span = 0u32;
         let mut backward_span = 0u32;
         let mut fwd_accuracy_at_7 = 0.0f64;
+        let mut fwd_rt_sum = 0.0f64;
+        let mut bwd_rt_sum = 0.0f64;
+        let mut fwd_rt_count = 0u32;
+        let mut bwd_rt_count = 0u32;
 
         for span_len in 3..=10usize {
             // Generate a unique digit sequence (no repeats) via Fisher-Yates shuffle.
@@ -50,14 +54,17 @@ impl DigitSpanBenchmark {
                 .collect();
 
             // ── Forward recall ──
-            let fwd_correct = self.test_recall(
+            let (fwd_correct, fwd_rt) = self.test_recall(
                 &sequence,
                 &sequence, // recall in presentation order
                 dim,
                 config.working_memory_capacity,
                 &adapter,
                 false, // not backward
+                config.time_pressure,
             );
+            fwd_rt_sum += fwd_rt;
+            fwd_rt_count += 1;
 
             // Digit span criterion: ALL items must be correctly recalled
             // (standard Wechsler administration; Woods et al., 2011)
@@ -71,29 +78,45 @@ impl DigitSpanBenchmark {
 
             // ── Backward recall ──
             let reversed: Vec<SequenceItem> = sequence.iter().rev().copied().collect();
-            let bwd_correct = self.test_recall(
+            let (bwd_correct, bwd_rt) = self.test_recall(
                 &sequence,
                 &reversed, // recall in reverse order
                 dim,
                 config.working_memory_capacity,
                 &adapter,
                 true, // backward: adds output interference
+                config.time_pressure,
             );
+            bwd_rt_sum += bwd_rt;
+            bwd_rt_count += 1;
 
             if bwd_correct == span_len as u32 {
                 backward_span = span_len as u32;
             }
         }
 
+        let mean_fwd_rt = if fwd_rt_count > 0 {
+            fwd_rt_sum / fwd_rt_count as f64
+        } else {
+            0.0
+        };
+        let mean_bwd_rt = if bwd_rt_count > 0 {
+            bwd_rt_sum / bwd_rt_count as f64
+        } else {
+            0.0
+        };
+
         TrialResult {
             forward_span,
             backward_span,
             fwd_accuracy_at_7,
+            forward_rt: mean_fwd_rt,
+            backward_rt: mean_bwd_rt,
         }
     }
 
     /// Present a sequence to WM, then test recall of expected items.
-    /// Returns count of correctly recalled positions.
+    /// Returns (count of correctly recalled positions, mean_rt_ticks).
     ///
     /// For backward recall, each retrieval incurs a tick (output interference)
     /// and requires higher similarity, modeling the cognitive cost of
@@ -106,7 +129,8 @@ impl DigitSpanBenchmark {
         capacity: usize,
         adapter: &SequenceAdapter,
         is_backward: bool,
-    ) -> u32 {
+        time_pressure: f64,
+    ) -> (u32, f64) {
         let mut wm = WorkingMemory::new(WmConfig {
             dimension: dim,
             capacity,
@@ -126,6 +150,7 @@ impl DigitSpanBenchmark {
         // to retrieve when probed last (reversed order). Output interference
         // (1 tick per retrieval) further degrades earlier items.
         let mut correct = 0u32;
+        let mut rt_sum = 0.0f64;
         for expected in expected_recall {
             let target_hv = adapter.encode(expected, dim);
 
@@ -140,10 +165,25 @@ impl DigitSpanBenchmark {
                     .fold(f32::NEG_INFINITY, f32::max)
             };
 
-            let threshold = if is_backward { 0.60 } else { 0.5 };
+            // Time pressure: +0.10/unit raises recall threshold, modeling reduced retrieval search
+            // under deadline (Woods et al., 2011 digit span norms; Wickelgren, 1977 SAT framework).
+            let tp_penalty = time_pressure as f32 * 0.10;
+            let threshold = if is_backward {
+                0.60 + tp_penalty
+            } else {
+                0.5 + tp_penalty
+            };
             if recall_score > threshold {
                 correct += 1;
             }
+
+            // RT proxy: deliberation ticks based on retrieval difficulty.
+            // Margin between recall_score and threshold → harder retrieval → longer RT
+            // (Sternberg, 1966 serial search; Wickelgren, 1977 SAT).
+            let decision_margin =
+                ((recall_score as f64 - threshold as f64).abs()).min(1.0);
+            let rt_ticks = 3.0 + (1.0 - decision_margin) * 5.0;
+            rt_sum += rt_ticks;
 
             // Output interference: backward recall takes time per item
             if is_backward {
@@ -151,7 +191,12 @@ impl DigitSpanBenchmark {
             }
         }
 
-        correct
+        let mean_rt = if expected_recall.is_empty() {
+            0.0
+        } else {
+            rt_sum / expected_recall.len() as f64
+        };
+        (correct, mean_rt)
     }
 }
 
@@ -159,6 +204,8 @@ struct TrialResult {
     forward_span: u32,
     backward_span: u32,
     fwd_accuracy_at_7: f64,
+    forward_rt: f64,
+    backward_rt: f64,
 }
 
 impl PsychBenchmark for DigitSpanBenchmark {
@@ -173,12 +220,16 @@ impl PsychBenchmark for DigitSpanBenchmark {
         let mut fwd_spans = Vec::new();
         let mut bwd_spans = Vec::new();
         let mut fwd_acc_7 = Vec::new();
+        let mut fwd_rts = Vec::new();
+        let mut bwd_rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
             fwd_spans.push(r.forward_span as f64);
             bwd_spans.push(r.backward_span as f64);
             fwd_acc_7.push(r.fwd_accuracy_at_7);
+            fwd_rts.push(r.forward_rt);
+            bwd_rts.push(r.backward_rt);
         }
 
         result.insert("forward_span", MetricValue::from_samples(&fwd_spans));
@@ -187,6 +238,8 @@ impl PsychBenchmark for DigitSpanBenchmark {
             "forward_accuracy_at_7",
             MetricValue::from_samples(&fwd_acc_7),
         );
+        result.insert("forward::rt_ticks", MetricValue::from_samples(&fwd_rts));
+        result.insert("backward::rt_ticks", MetricValue::from_samples(&bwd_rts));
 
         result.conditions = 2; // forward + backward
         result.trials_per_condition = config.trials_per_condition;

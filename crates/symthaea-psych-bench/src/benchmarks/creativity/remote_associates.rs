@@ -154,7 +154,7 @@ impl RemoteAssociatesBenchmark {
         config: &BenchmarkConfig,
         trial_idx: usize,
         adapter: &SemanticScenarioAdapter,
-    ) -> (f64, f64, f64) {
+    ) -> (f64, f64, f64, f64) {
         let dim = config.dimension;
         let triads = Self::triads();
         let triad = &triads[trial_idx % triads.len()];
@@ -175,11 +175,16 @@ impl RemoteAssociatesBenchmark {
             .map(|d| adapter.encode(&Word(d.to_string()), dim))
             .collect();
 
-        // Score all candidates by similarity to bundle
+        // Score all candidates by similarity to bundle.
+        // Time pressure: 0.08/unit noise disrupts similarity ranking, modeling reduced search
+        // depth in associative retrieval under deadline (Mednick, 1962 RAT; Luce, 1986).
+        let pressure_noise = config.time_pressure as f32 * 0.08;
         let solution_sim = bundle.similarity(&solution_hv);
         let mut all_sims: Vec<(usize, f32)> = vec![(0, solution_sim)]; // index 0 = solution
         for (i, dhv) in distractor_hvs.iter().enumerate() {
-            all_sims.push((i + 1, bundle.similarity(dhv)));
+            // Alternating noise sign disrupts ranking under pressure
+            let noise = if i % 2 == 0 { pressure_noise } else { -pressure_noise };
+            all_sims.push((i + 1, bundle.similarity(dhv) + noise));
         }
         all_sims.sort_by(|(_, a), (_, b)| b.total_cmp(a));
 
@@ -201,7 +206,18 @@ impl RemoteAssociatesBenchmark {
             0.0
         };
 
-        (accuracy, mean_rank, binding_accuracy)
+        // RT proxy: gap between solution and best distractor similarity
+        let best_distractor_sim = all_sims
+            .iter()
+            .filter(|(idx, _)| *idx != 0)
+            .map(|(_, s)| *s)
+            .fold(f32::NEG_INFINITY, f32::max);
+        let margin = (solution_sim - best_distractor_sim).abs() as f64;
+        let base = 4.0;
+        let range = 7.0;
+        let rt = base + (1.0 - margin.min(1.0)) * range;
+
+        (accuracy, mean_rank, binding_accuracy, rt)
     }
 }
 
@@ -220,17 +236,20 @@ impl PsychBenchmark for RemoteAssociatesBenchmark {
         let mut accuracies = Vec::new();
         let mut ranks = Vec::new();
         let mut binding_accs = Vec::new();
+        let mut rt_ticks = Vec::new();
 
         for trial in 0..config.trials_per_condition {
-            let (acc, rank, bind_acc) = self.run_trial(config, trial, &adapter);
+            let (acc, rank, bind_acc, rt) = self.run_trial(config, trial, &adapter);
             accuracies.push(acc);
             ranks.push(rank);
             binding_accs.push(bind_acc);
+            rt_ticks.push(rt);
         }
 
         result.insert("overall_accuracy", MetricValue::from_samples(&accuracies));
         result.insert("mean_solution_rank", MetricValue::from_samples(&ranks));
         result.insert("binding_accuracy", MetricValue::from_samples(&binding_accs));
+        result.insert("rt_ticks", MetricValue::from_samples(&rt_ticks));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

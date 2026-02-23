@@ -14,7 +14,7 @@ use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation
 pub struct InstrumentalLearningBenchmark;
 
 impl InstrumentalLearningBenchmark {
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64, f64) {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64, f64, Vec<f64>) {
         let seed = config.trial_seed("cogbench", "instrumental", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
 
@@ -35,6 +35,7 @@ impl InstrumentalLearningBenchmark {
         // Track contingency sensitivity: proportion of correct choices
         // (action 0 is always the higher-reward action)
         let mut late_correct = 0u32;
+        let mut rt_ticks = Vec::new();
 
         // Phase 1: Win condition (action 0 = 80% reward, action 1 = 20% reward)
         let mut win_errors = Vec::new();
@@ -43,7 +44,9 @@ impl InstrumentalLearningBenchmark {
 
             // Blend FEP probs with explicit reward-based probs
             let fep_probs = &action_result.action_probabilities;
-            let rv_temp = 0.15;
+            // Time pressure: base 0.15 yields ~85% optimal choice rate; +0.10/unit flattens
+            // reward discrimination, modeling hasty valuation under SAT (Wickelgren, 1977).
+            let rv_temp = 0.15 + config.time_pressure * 0.10;
             let rv_max = action_reward[0].max(action_reward[1]);
             let rv_exp: Vec<f64> = action_reward
                 .iter()
@@ -60,6 +63,12 @@ impl InstrumentalLearningBenchmark {
             let final_probs: Vec<f64> = blended.iter().map(|p| p / bsum).collect();
 
             let chosen = sample_action(&final_probs, &mut rng_state);
+
+            // RT proxy: decision difficulty from value certainty — smaller difference
+            // between action values means harder choice (Wickelgren, 1977 SAT).
+            let value_diff = (action_reward[0] - action_reward[1]).abs();
+            let ticks = 5.0 + (1.0 - value_diff.min(1.0)) * 8.0;
+            rt_ticks.push(ticks);
 
             // Track contingency sensitivity in last 10 trials (after learning)
             if trial >= 10 && chosen == 0 {
@@ -96,7 +105,8 @@ impl InstrumentalLearningBenchmark {
             let action_result = agent.select_action();
 
             let fep_probs = &action_result.action_probabilities;
-            let rv_temp = 0.15;
+            // Time pressure: same SAT scaling as win phase (Wickelgren, 1977).
+            let rv_temp = 0.15 + config.time_pressure * 0.10;
             let rv_max = action_reward[0].max(action_reward[1]);
             let rv_exp: Vec<f64> = action_reward
                 .iter()
@@ -113,6 +123,11 @@ impl InstrumentalLearningBenchmark {
             let final_probs: Vec<f64> = blended.iter().map(|p| p / bsum).collect();
 
             let chosen = sample_action(&final_probs, &mut rng_state);
+
+            // RT proxy: same value-certainty model as win phase
+            let value_diff = (action_reward[0] - action_reward[1]).abs();
+            let ticks = 5.0 + (1.0 - value_diff.min(1.0)) * 8.0;
+            rt_ticks.push(ticks);
 
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
@@ -164,6 +179,7 @@ impl InstrumentalLearningBenchmark {
             optimism_bias,
             agent.stats.exploration_rate,
             contingency_sensitivity,
+            rt_ticks,
         )
     }
 }
@@ -181,13 +197,15 @@ impl PsychBenchmark for InstrumentalLearningBenchmark {
         let mut biases = Vec::new();
         let mut exploration_rates = Vec::new();
         let mut sensitivities = Vec::new();
+        let mut all_rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
-            let (lr, bias, er, cs) = self.run_trial(config, trial);
+            let (lr, bias, er, cs, rts) = self.run_trial(config, trial);
             lrs.push(lr);
             biases.push(bias);
             exploration_rates.push(er);
             sensitivities.push(cs);
+            all_rts.extend_from_slice(&rts);
         }
 
         result.insert("learning_rate", MetricValue::from_samples(&lrs));
@@ -200,6 +218,7 @@ impl PsychBenchmark for InstrumentalLearningBenchmark {
             "contingency_sensitivity",
             MetricValue::from_samples(&sensitivities),
         );
+        result.insert("rt_ticks", MetricValue::from_samples(&all_rts));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

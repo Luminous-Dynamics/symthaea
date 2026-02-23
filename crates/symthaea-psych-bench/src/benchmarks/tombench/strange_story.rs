@@ -18,7 +18,6 @@ use symthaea_core::hdc::ContinuousHV;
 /// Strange story benchmark for non-literal language comprehension.
 pub struct StrangeStoryBenchmark;
 
-#[allow(dead_code)]
 struct StrangeStoryScenario {
     context: Vec<&'static str>,
     literal_meaning: &'static str,
@@ -218,7 +217,10 @@ impl StrangeStoryBenchmark {
 
         // Combined: keyword-dominant, geometric as tiebreaker
         let combined = keyword_signal + geo_signal * 0.1;
-        let detected_nonliteral = combined > 0.0;
+        // Time pressure: 0.25/unit raises detection threshold, modeling reduced narrative
+        // integration under deadline (Happe, 1994 Strange Stories; Wickelgren, 1977 SAT).
+        let threshold = config.time_pressure * 0.25;
+        let detected_nonliteral = combined > threshold;
 
         // Non-literal detection = correct for these scenarios (all are non-literal)
         let correct = if detected_nonliteral { 1.0 } else { 0.0 };
@@ -274,8 +276,32 @@ impl StrangeStoryBenchmark {
     }
 
     #[cfg(not(feature = "symthaea-backend"))]
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, &'static str) {
-        self.run_trial_lightweight(config, trial_idx)
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, &'static str, f64) {
+        let (accuracy, stype) = self.run_trial_lightweight(config, trial_idx);
+
+        // RT proxy: re-derive geometric signal to estimate decision difficulty.
+        let dim = config.dimension;
+        let adapter = ScenarioAdapter;
+        let scenarios = Self::scenarios();
+        let scenario = &scenarios[trial_idx % scenarios.len()];
+
+        let context_hvs: Vec<ContinuousHV> = scenario
+            .context
+            .iter()
+            .map(|s| adapter.encode(&Scenario::new(*s), dim))
+            .collect();
+        let context_bundle = ContinuousHV::bundle_owned(&context_hvs);
+        let literal_hv = adapter.encode(&Scenario::new(scenario.literal_meaning), dim);
+        let intended_hv = adapter.encode(&Scenario::new(scenario.intended_meaning), dim);
+        let literal_sim = context_bundle.similarity(&literal_hv);
+        let intended_sim = context_bundle.similarity(&intended_hv);
+        let margin = (intended_sim - literal_sim).abs() as f64;
+
+        let base = 4.0;
+        let range = 7.0;
+        let rt = base + (1.0 - margin.min(1.0)) * range;
+
+        (accuracy, stype, rt)
     }
 }
 
@@ -289,6 +315,7 @@ impl PsychBenchmark for StrangeStoryBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
         let mut accuracies = Vec::new();
+        let mut rt_ticks = Vec::new();
         let mut type_accs: std::collections::HashMap<&str, Vec<f64>> =
             std::collections::HashMap::new();
         #[cfg(feature = "symthaea-backend")]
@@ -304,13 +331,17 @@ impl PsychBenchmark for StrangeStoryBenchmark {
             }
             #[cfg(not(feature = "symthaea-backend"))]
             {
-                let (acc, stype) = self.run_trial(config, trial);
+                let (acc, stype, rt) = self.run_trial(config, trial);
                 accuracies.push(acc);
+                rt_ticks.push(rt);
                 type_accs.entry(stype).or_default().push(acc);
             }
         }
 
         result.insert("overall_accuracy", MetricValue::from_samples(&accuracies));
+        if !rt_ticks.is_empty() {
+            result.insert("rt_ticks", MetricValue::from_samples(&rt_ticks));
+        }
         #[cfg(feature = "symthaea-backend")]
         result.insert("action_confidence", MetricValue::from_samples(&confidences));
         for (stype, accs) in &type_accs {
