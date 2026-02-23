@@ -49,6 +49,8 @@ pub struct HumanoidController {
     output_bias: [f32; NUM_ACTUATORS],
     /// Current learning rate (modulated by FEP agent).
     learning_rate: f32,
+    /// Temporary LR multiplier (e.g., 3.0 during phase transitions).
+    lr_scale: f32,
 }
 
 impl HumanoidController {
@@ -87,6 +89,7 @@ impl HumanoidController {
             output_weights,
             output_bias,
             learning_rate: config.learning_rate,
+            lr_scale: 1.0,
         }
     }
 
@@ -108,6 +111,7 @@ impl HumanoidController {
             output_weights,
             output_bias,
             learning_rate: 0.0005,
+            lr_scale: 1.0,
         }
     }
 
@@ -288,9 +292,35 @@ impl HumanoidController {
         self.learning_rate = lr.clamp(1e-6, 0.1);
     }
 
-    /// Get current learning rate.
+    /// Get current effective learning rate (base × scale).
     pub fn learning_rate(&self) -> f32 {
-        self.learning_rate
+        self.learning_rate * self.lr_scale
+    }
+
+    /// Set a temporary learning rate multiplier (e.g., 3.0 during phase transitions).
+    ///
+    /// Scales the effective LR returned by `learning_rate()` without modifying
+    /// the base rate. Set to 1.0 to restore normal LR.
+    pub fn set_learning_rate_scale(&mut self, scale: f32) {
+        self.lr_scale = scale.max(0.0);
+    }
+
+    /// Get a copy of the current output projection (weights, bias).
+    ///
+    /// Used for best-checkpoint tracking during training.
+    pub fn output_projection(&self) -> (Vec<f32>, Vec<f32>) {
+        (self.output_weights.clone(), self.output_bias.to_vec())
+    }
+
+    /// Restore the output projection from a saved copy.
+    ///
+    /// Used for best-checkpoint revert during training.
+    pub fn set_output_projection(&mut self, weights: &[f32], bias: &[f32]) {
+        if weights.len() == self.output_weights.len() {
+            self.output_weights.copy_from_slice(weights);
+        }
+        let n = bias.len().min(NUM_ACTUATORS);
+        self.output_bias[..n].copy_from_slice(&bias[..n]);
     }
 
     /// Reset network state (for new episode).
@@ -379,6 +409,7 @@ impl HumanoidController {
             output_weights: checkpoint.output_weights,
             output_bias,
             learning_rate: checkpoint.learning_rate,
+            lr_scale: 1.0,
         })
     }
 }

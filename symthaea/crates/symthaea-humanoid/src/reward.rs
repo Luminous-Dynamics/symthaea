@@ -41,12 +41,14 @@ pub fn locomotion_reward(state: &HumanoidState, target_speed: f64) -> f64 {
 /// Combined episode reward based on task with curriculum target speed.
 ///
 /// - Stand: standing_reward × small_control
-/// - Walk: standing_reward × small_control × locomotion(target_speed)
-/// - Run: standing_reward × small_control × locomotion(target_speed)
+/// - Walk/Run: 0.6 × standing + 0.4 × locomotion (additive blend)
+///
+/// The additive formulation ensures a gradient signal exists even when
+/// horizontal speed is far from target (multiplicative `stand × locomotion`
+/// collapses to ~0 when either factor is small, starving the learner).
 ///
 /// The `target_speed` parameter allows the curriculum to ramp speed gradually
-/// (e.g., Walk: 0→1 m/s, Run: 1→10 m/s). This prevents the reward from
-/// collapsing to 0 at task transitions.
+/// (e.g., Walk: 0→1 m/s, Run: 1→5 m/s).
 pub fn episode_reward(
     state: &HumanoidState,
     cmd: &HumanoidCommand,
@@ -56,7 +58,9 @@ pub fn episode_reward(
     let stand = standing_reward(state) * small_control(cmd);
     match task {
         HumanoidTask::Stand => stand,
-        HumanoidTask::Walk | HumanoidTask::Run => stand * locomotion_reward(state, target_speed),
+        HumanoidTask::Walk | HumanoidTask::Run => {
+            0.6 * stand + 0.4 * locomotion_reward(state, target_speed)
+        }
     }
 }
 
