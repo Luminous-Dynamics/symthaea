@@ -1,7 +1,7 @@
-//! Multi-Scenario EFE Evaluation: Test 6 geometry variants.
+//! Multi-Scenario EFE Evaluation: Test 7 geometry variants.
 //!
 //! Evaluates EFE-based decision making across different threat geometries:
-//! Default, CloseBeam, FarBeam, ReversedGeometry, NoHuman, LowDanger.
+//! Default, CloseBeam, FarBeam, ReversedGeometry, NoHuman, LowDanger, StaticThreat.
 //!
 //! No MuJoCo required — purely analytical.
 //!
@@ -11,7 +11,7 @@ use symthaea_flight::benchmarks::{evaluate_scenario_variants, ScenarioVariant};
 
 fn main() {
     println!("═══════════════════════════════════════════════════════════════");
-    println!("  Multi-Scenario EFE Evaluation: 6 Geometry Variants");
+    println!("  Multi-Scenario EFE Evaluation: 7 Geometry Variants");
     println!("═══════════════════════════════════════════════════════════════\n");
 
     let results = evaluate_scenario_variants();

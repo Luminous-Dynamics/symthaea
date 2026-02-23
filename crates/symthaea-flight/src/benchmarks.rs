@@ -10,7 +10,10 @@ use symthaea_core::genesis::GenesisSeed;
 
 use crate::controller::FlightController;
 use crate::encoder::QuadrotorHdcEncoder;
-use crate::fep_agent::{ActiveInferenceFlightAgent, FlightFepConfig, FlightFepResult};
+use crate::fep_agent::{
+    ActiveInferenceFlightAgent, FlightFepConfig, FlightFepResult, INTERCEPT_Z_MARGIN_STATIC,
+    INTERCEPT_Z_MARGIN_VEL, RENDEZVOUS_FRACS,
+};
 use crate::simulator::{PhysicsSimulator, SimplePhysicsSimulator};
 use crate::types::*;
 
@@ -653,17 +656,16 @@ pub fn run_efe_ablation(
     let entity_pos = env.entity_pos.unwrap_or([0.0; 3]);
 
     // Pre-compute rendezvous intercept candidates (reused for each precision)
-    let rendezvous_fracs = [0.25, 0.50, 0.75];
     let intercept_candidates: Vec<([f64; 3], Option<f64>)> = if let Some(vel) = env.threat_vel {
         let impact_t = crate::fep_agent::predict_impact_time_z(threat_pos, vel, entity_pos[2]);
         if impact_t.is_finite() && impact_t > 0.0 {
-            rendezvous_fracs
+            RENDEZVOUS_FRACS
                 .iter()
                 .map(|&frac| {
                     let rv_t = impact_t * frac;
                     let beam = crate::fep_agent::predict_falling_position(threat_pos, vel, rv_t);
                     (
-                        [beam[0], beam[1], beam[2].max(entity_pos[2] + 0.3)],
+                        [beam[0], beam[1], beam[2].max(entity_pos[2] + INTERCEPT_Z_MARGIN_VEL)],
                         Some(frac),
                     )
                 })
@@ -673,7 +675,7 @@ pub fn run_efe_ablation(
                 [
                     threat_pos[0],
                     threat_pos[1],
-                    threat_pos[2].max(entity_pos[2] + 0.5),
+                    threat_pos[2].max(entity_pos[2] + INTERCEPT_Z_MARGIN_STATIC),
                 ],
                 None,
             )]
@@ -784,6 +786,8 @@ pub enum ScenarioVariant {
     NoHuman,
     /// Beam far from human → expected: MISSION (low threat)
     LowDanger,
+    /// No velocity data → instantaneous EFE fallback, expected: INTERCEPT
+    StaticThreat,
 }
 
 impl ScenarioVariant {
@@ -796,6 +800,7 @@ impl ScenarioVariant {
             ScenarioVariant::ReversedGeometry,
             ScenarioVariant::NoHuman,
             ScenarioVariant::LowDanger,
+            ScenarioVariant::StaticThreat,
         ]
     }
 
@@ -808,6 +813,7 @@ impl ScenarioVariant {
             ScenarioVariant::ReversedGeometry => "ReversedGeometry",
             ScenarioVariant::NoHuman => "NoHuman",
             ScenarioVariant::LowDanger => "LowDanger",
+            ScenarioVariant::StaticThreat => "StaticThreat",
         }
     }
 
@@ -820,6 +826,7 @@ impl ScenarioVariant {
             ScenarioVariant::ReversedGeometry => "INTERCEPT",
             ScenarioVariant::NoHuman => "MISSION",
             ScenarioVariant::LowDanger => "MISSION",
+            ScenarioVariant::StaticThreat => "INTERCEPT",
         }
     }
 
@@ -876,6 +883,13 @@ impl ScenarioVariant {
                 threat_pos: Some([3.0, 3.0, 2.0]),
                 threat_vel: Some([0.0, 0.0, -1.0]),
                 entity_pos: Some([-1.5, 0.0, 0.0]), // Human far from beam
+            },
+            ScenarioVariant::StaticThreat => FlightEnvironment {
+                human_danger: 0.8,
+                mission_progress: 0.3,
+                threat_pos: Some([-1.5, 0.0, 2.0]),
+                threat_vel: None, // No velocity → instantaneous EFE fallback
+                entity_pos: Some([-1.5, 0.0, 0.0]),
             },
         };
 
@@ -939,17 +953,17 @@ pub fn evaluate_scenario_variants() -> Vec<ScenarioVariantResult> {
         };
 
         // Evaluate all 3 rendezvous candidates (25%, 50%, 75%) and find the best
-        let rendezvous_fracs = [0.25, 0.50, 0.75];
         let mut best_intercept_efe = f64::INFINITY;
         let mut best_frac: Option<f64> = None;
 
         if let Some(vel) = env.threat_vel {
             let impact_t = crate::fep_agent::predict_impact_time_z(threat_pos, vel, entity_pos[2]);
             if impact_t.is_finite() && impact_t > 0.0 {
-                for &frac in &rendezvous_fracs {
+                for &frac in &RENDEZVOUS_FRACS {
                     let rv_t = impact_t * frac;
                     let beam = crate::fep_agent::predict_falling_position(threat_pos, vel, rv_t);
-                    let candidate = [beam[0], beam[1], beam[2].max(entity_pos[2] + 0.3)];
+                    let candidate =
+                        [beam[0], beam[1], beam[2].max(entity_pos[2] + INTERCEPT_Z_MARGIN_VEL)];
                     let efe =
                         agent.trajectory_efe(&drone_state, candidate, &mission_setpoint, &env);
                     if efe < best_intercept_efe {
@@ -962,7 +976,7 @@ pub fn evaluate_scenario_variants() -> Vec<ScenarioVariantResult> {
                 let static_candidate = [
                     threat_pos[0],
                     threat_pos[1],
-                    threat_pos[2].max(entity_pos[2] + 0.5),
+                    threat_pos[2].max(entity_pos[2] + INTERCEPT_Z_MARGIN_STATIC),
                 ];
                 best_intercept_efe =
                     agent.trajectory_efe(&drone_state, static_candidate, &mission_setpoint, &env);
@@ -1255,7 +1269,7 @@ mod tests {
     #[test]
     fn test_all_scenarios_match_expected() {
         let results = evaluate_scenario_variants();
-        assert_eq!(results.len(), 6, "Should have 6 scenario variants");
+        assert_eq!(results.len(), 7, "Should have 7 scenario variants");
         for r in &results {
             assert!(
                 r.matches_expected,
