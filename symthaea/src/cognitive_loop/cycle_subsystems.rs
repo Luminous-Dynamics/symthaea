@@ -55,6 +55,18 @@ impl CognitiveLoopService {
         let prediction_error = state.prediction_error;
         let phi_attention_weight = state.phi_attention_weight;
         let _compressed_state = state.compressed_state;
+
+        // ── Phase 19: Attention budget gating ────────────────────────────────
+        // Science: Kahneman (1973) — when attention budget is exceeded for 3+
+        // consecutive cycles, double amortization intervals for expensive optional
+        // subsystems to recover time budget. The urgency scheduler still handles
+        // Critical-mode overrides via should_run().
+        let budget_gated = state.attention_budget_exceeded
+            && self.stats.attention_budget_exceeded_count > 3;
+        let budget_interval_mult: usize = if budget_gated { 2 } else { 1 };
+        if budget_gated {
+            self.stats.attention_budget_gated_count += 1;
+        }
         let input = state.input;
         // ═══════════════════════════════════════════════════════════════════════
         // HIERARCHICAL LTC: Distributed temporal processing with local circuits

@@ -88,3 +88,6 @@ LibriSpeech-Alignments.zip
 papers/latex/*.aux
 papers/latex/*.blg
 papers/latex/*.out
+
+# Telemetry output
+*_telemetry.csv
