@@ -218,8 +218,14 @@ mod tests {
         );
 
         // Ordering preserved
-        assert!(result[2] > result[1], "Higher logit should get higher probability");
-        assert!(result[1] > result[0], "Middle logit should beat lower logit");
+        assert!(
+            result[2] > result[1],
+            "Higher logit should get higher probability"
+        );
+        assert!(
+            result[1] > result[0],
+            "Middle logit should beat lower logit"
+        );
 
         // Approximate known values: softmax([1,2,3]) ~ [0.0900, 0.2447, 0.6652]
         assert!(
@@ -303,7 +309,12 @@ mod tests {
 
         // All values should be finite and positive
         for (i, &p) in result.iter().enumerate() {
-            assert!(p.is_finite() && p >= 0.0, "Element {} should be finite and non-negative, got {}", i, p);
+            assert!(
+                p.is_finite() && p >= 0.0,
+                "Element {} should be finite and non-negative, got {}",
+                i,
+                p
+            );
         }
     }
 
