@@ -1096,7 +1096,7 @@ At step~401, trajectory EFE with physics-based beam rollout evaluates $G(\text{m
 \begin{figure}[ht]
 \centering
 \includegraphics[width=\columnwidth]{fig7_efe_ablation.pdf}
-\caption{EFE ablation: sweeping safety precision reveals a sharp decision boundary at $\pi_{\text{safety}} \approx 2.40$. Below the crossover, mission EFE dominates (red); above, the agent chooses interception (blue). Trajectory EFE with physics rollout lowers the crossover compared to instantaneous evaluation, as the multi-step model more accurately captures danger reduction from interception.}
+\caption{EFE ablation: sweeping safety precision reveals a sharp decision boundary at $\pi_{\text{safety}} \approx 2.40$. Below the crossover, mission EFE dominates (red); above, the agent chooses interception (blue). Marker color indicates the winning rendezvous fraction: orange = 75\% of impact time (favored at low $\pi$), blue = 50\% (favored at high $\pi$). Note that $G(\text{intercept})$ plateaus at high precision because successful interception eliminates danger ($\hat{d} \approx 0$), making $\pi_\text{safety} \cdot \hat{d}^2 \approx 0$ regardless of $\pi$.}
 \label{fig:efe-ablation}
 \end{figure}
 
@@ -1115,8 +1115,8 @@ Default      & 0.80 & 12,931  & 156.6  & INTERCEPT \\
 CloseBeam    & 0.90 & 16,331  & 184.4  & INTERCEPT \\
 FarBeam      & 0.15 & 581.7   & 658.2  & MISSION \\
 Reversed     & 0.70 & 9,931   & 229.5  & INTERCEPT \\
-NoHuman      & 0.00 & ---     & ---    & MISSION \\
-LowDanger    & 0.05 & 181.8   & 262.2  & MISSION \\
+NoHuman      & 0.00 & 131.8   & 155.3  & MISSION \\
+LowDanger    & 0.05 & 181.8   & 260.7  & MISSION \\
 \bottomrule
 \end{tabular}
 \end{table}
