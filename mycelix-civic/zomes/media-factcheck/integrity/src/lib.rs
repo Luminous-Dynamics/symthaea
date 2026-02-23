@@ -218,6 +218,9 @@ fn validate_create_fact_check(
         return Ok(ValidateCallbackResult::Invalid("Claim text required".into()));
     }
     let ep = &check.epistemic_position;
+    if !ep.empirical.is_finite() || !ep.normative.is_finite() || !ep.mythic.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("epistemic position values must be a finite number".into()));
+    }
     if ep.empirical < 0.0 || ep.empirical > 1.0 || ep.normative < 0.0 || ep.normative > 1.0 || ep.mythic < 0.0 || ep.mythic > 1.0 {
         return Ok(ValidateCallbackResult::Invalid("Epistemic values must be 0-1".into()));
     }
@@ -231,6 +234,9 @@ fn validate_create_source_credibility(
     if source.source_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("SourceCredibility source_id cannot be empty".into()));
     }
+    if !source.credibility_score.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("credibility_score must be a finite number".into()));
+    }
     if source.credibility_score < 0.0 || source.credibility_score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid("Credibility must be 0-1".into()));
     }
@@ -241,6 +247,9 @@ fn validate_update_source_credibility(
     _action: Update,
     source: SourceCredibility,
 ) -> ExternResult<ValidateCallbackResult> {
+    if !source.credibility_score.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("credibility_score must be a finite number".into()));
+    }
     if source.credibility_score < 0.0 || source.credibility_score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid("Credibility must be 0-1".into()));
     }

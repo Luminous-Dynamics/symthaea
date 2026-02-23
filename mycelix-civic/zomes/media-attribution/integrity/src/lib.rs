@@ -201,6 +201,9 @@ fn validate_create_attribution(
     if !attribution.contributor_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Contributor must be a valid DID".into()));
     }
+    if !attribution.share_percentage.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("share_percentage must be a finite number".into()));
+    }
     if attribution.share_percentage < 0.0 || attribution.share_percentage > 100.0 {
         return Ok(ValidateCallbackResult::Invalid("Share must be 0-100%".into()));
     }
@@ -211,6 +214,9 @@ fn validate_update_attribution(
     _action: Update,
     attribution: Attribution,
 ) -> ExternResult<ValidateCallbackResult> {
+    if !attribution.share_percentage.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("share_percentage must be a finite number".into()));
+    }
     if attribution.share_percentage < 0.0 || attribution.share_percentage > 100.0 {
         return Ok(ValidateCallbackResult::Invalid("Share must be 0-100%".into()));
     }
@@ -221,8 +227,16 @@ fn validate_create_royalty_rule(
     _action: EntryCreationAction,
     rule: RoyaltyRule,
 ) -> ExternResult<ValidateCallbackResult> {
+    if !rule.percentage.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("percentage must be a finite number".into()));
+    }
     if rule.percentage < 0.0 || rule.percentage > 100.0 {
         return Ok(ValidateCallbackResult::Invalid("Percentage must be 0-100".into()));
+    }
+    if let Some(min) = rule.minimum_amount {
+        if !min.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid("minimum_amount must be a finite number".into()));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -231,8 +245,16 @@ fn validate_update_royalty_rule(
     _action: Update,
     rule: RoyaltyRule,
 ) -> ExternResult<ValidateCallbackResult> {
+    if !rule.percentage.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("percentage must be a finite number".into()));
+    }
     if rule.percentage < 0.0 || rule.percentage > 100.0 {
         return Ok(ValidateCallbackResult::Invalid("Percentage must be 0-100".into()));
+    }
+    if let Some(min) = rule.minimum_amount {
+        if !min.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid("minimum_amount must be a finite number".into()));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -253,6 +275,9 @@ fn validate_create_usage_record(
         }
     }
     if let Some(paid) = record.royalty_paid {
+        if !paid.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid("royalty_paid must be a finite number".into()));
+        }
         if paid < 0.0 {
             return Ok(ValidateCallbackResult::Invalid("Royalty paid cannot be negative".into()));
         }
@@ -944,10 +969,11 @@ mod tests {
         let mut attr = valid_attribution();
         attr.share_percentage = f64::NAN;
         let result = validate_create_attribution(create_action(), attr);
-        // NaN comparisons: NaN < 0.0 is false, NaN > 100.0 is false
-        // So the condition `share < 0.0 || share > 100.0` is false for NaN
-        // This means NaN passes -- documenting actual behavior
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(
+            get_invalid_reason(result),
+            "share_percentage must be a finite number"
+        );
     }
 
     #[test]
@@ -971,8 +997,11 @@ mod tests {
         let mut rule = valid_royalty_rule();
         rule.percentage = f64::NAN;
         let result = validate_create_royalty_rule(create_action(), rule);
-        // Same NaN behavior as attribution -- NaN passes the range check
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(
+            get_invalid_reason(result),
+            "percentage must be a finite number"
+        );
     }
 
     #[test]

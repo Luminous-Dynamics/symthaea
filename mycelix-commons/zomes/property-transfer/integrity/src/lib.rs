@@ -199,6 +199,9 @@ fn validate_create_escrow(
     _action: EntryCreationAction,
     escrow: Escrow,
 ) -> ExternResult<ValidateCallbackResult> {
+    if !escrow.amount.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Escrow amount must be a finite number".into()));
+    }
     if escrow.amount <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Escrow amount must be positive".into()));
     }
@@ -209,6 +212,9 @@ fn validate_update_escrow(
     _action: Update,
     escrow: Escrow,
 ) -> ExternResult<ValidateCallbackResult> {
+    if !escrow.amount.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Escrow amount must be a finite number".into()));
+    }
     if escrow.amount <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Escrow amount must be positive".into()));
     }

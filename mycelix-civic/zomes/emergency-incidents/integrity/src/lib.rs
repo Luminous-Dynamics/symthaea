@@ -303,14 +303,29 @@ fn validate_create_disaster(
             "Disaster description too long (max 4096)".into(),
         ));
     }
+    if !disaster.affected_area.radius_km.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "radius_km must be a finite number".into(),
+        ));
+    }
     if disaster.affected_area.radius_km <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Affected area radius must be positive".into(),
         ));
     }
+    if !disaster.affected_area.center_lat.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "center_lat must be a finite number".into(),
+        ));
+    }
     if disaster.affected_area.center_lat < -90.0 || disaster.affected_area.center_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Latitude must be between -90 and 90".into(),
+        ));
+    }
+    if !disaster.affected_area.center_lon.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "center_lon must be a finite number".into(),
         ));
     }
     if disaster.affected_area.center_lon < -180.0 || disaster.affected_area.center_lon > 180.0 {
@@ -324,6 +339,13 @@ fn validate_create_disaster(
             return Ok(ValidateCallbackResult::Invalid(
                 "Affected area boundary too many points (max 2000)".into(),
             ));
+        }
+        for &(lat, lon) in boundary {
+            if !lat.is_finite() || !lon.is_finite() {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "boundary coordinates must be a finite number".into(),
+                ));
+            }
         }
     }
     if disaster.affected_area.zones.len() > 50 {
@@ -384,6 +406,13 @@ fn validate_update_disaster(disaster: Disaster) -> ExternResult<ValidateCallback
             return Ok(ValidateCallbackResult::Invalid(
                 "Affected area boundary too many points (max 2000)".into(),
             ));
+        }
+        for &(lat, lon) in boundary {
+            if !lat.is_finite() || !lon.is_finite() {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "boundary coordinates must be a finite number".into(),
+                ));
+            }
         }
     }
     if disaster.affected_area.zones.len() > 50 {

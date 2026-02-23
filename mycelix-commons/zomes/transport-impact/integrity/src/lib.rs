@@ -171,8 +171,17 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_trip(t: TripLog) -> ExternResult<ValidateCallbackResult> {
+    if !t.distance_km.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("distance_km must be a finite number".into()));
+    }
     if t.distance_km <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Distance must be positive".into()));
+    }
+    if !t.cargo_kg.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("cargo_kg must be a finite number".into()));
+    }
+    if !t.emissions_kg_co2.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("emissions_kg_co2 must be a finite number".into()));
     }
     if t.emissions_kg_co2 < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Emissions cannot be negative".into()));
@@ -181,6 +190,9 @@ fn validate_trip(t: TripLog) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_credit(c: CarbonCredit) -> ExternResult<ValidateCallbackResult> {
+    if !c.credits_kg_co2.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("credits_kg_co2 must be a finite number".into()));
+    }
     if c.credits_kg_co2 <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Credits must be positive".into()));
     }
@@ -188,6 +200,9 @@ fn validate_credit(c: CarbonCredit) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_redemption(r: CreditRedemption) -> ExternResult<ValidateCallbackResult> {
+    if !r.credits_redeemed.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("credits_redeemed must be a finite number".into()));
+    }
     if r.credits_redeemed <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Credits redeemed must be positive".into()));
     }
@@ -735,5 +750,98 @@ mod tests {
         let mut r = valid_redemption();
         r.redeemed_for = "x".repeat(1024);
         assert_valid(validate_redemption(r));
+    }
+
+    // ── NaN/Infinity bypass hardening tests ────────────────────────────
+
+    #[test]
+    fn trip_nan_distance_rejected() {
+        let mut t = valid_trip();
+        t.distance_km = f64::NAN;
+        assert_invalid(validate_trip(t), "distance_km must be a finite number");
+    }
+
+    #[test]
+    fn trip_infinity_distance_rejected() {
+        let mut t = valid_trip();
+        t.distance_km = f64::INFINITY;
+        assert_invalid(validate_trip(t), "distance_km must be a finite number");
+    }
+
+    #[test]
+    fn trip_neg_infinity_distance_rejected() {
+        let mut t = valid_trip();
+        t.distance_km = f64::NEG_INFINITY;
+        assert_invalid(validate_trip(t), "distance_km must be a finite number");
+    }
+
+    #[test]
+    fn trip_nan_cargo_rejected() {
+        let mut t = valid_trip();
+        t.cargo_kg = f64::NAN;
+        assert_invalid(validate_trip(t), "cargo_kg must be a finite number");
+    }
+
+    #[test]
+    fn trip_infinity_cargo_rejected() {
+        let mut t = valid_trip();
+        t.cargo_kg = f64::INFINITY;
+        assert_invalid(validate_trip(t), "cargo_kg must be a finite number");
+    }
+
+    #[test]
+    fn trip_nan_emissions_rejected() {
+        let mut t = valid_trip();
+        t.emissions_kg_co2 = f64::NAN;
+        assert_invalid(validate_trip(t), "emissions_kg_co2 must be a finite number");
+    }
+
+    #[test]
+    fn trip_infinity_emissions_rejected() {
+        let mut t = valid_trip();
+        t.emissions_kg_co2 = f64::INFINITY;
+        assert_invalid(validate_trip(t), "emissions_kg_co2 must be a finite number");
+    }
+
+    #[test]
+    fn credit_nan_rejected() {
+        let mut c = valid_carbon_credit();
+        c.credits_kg_co2 = f64::NAN;
+        assert_invalid(validate_credit(c), "credits_kg_co2 must be a finite number");
+    }
+
+    #[test]
+    fn credit_infinity_rejected() {
+        let mut c = valid_carbon_credit();
+        c.credits_kg_co2 = f64::INFINITY;
+        assert_invalid(validate_credit(c), "credits_kg_co2 must be a finite number");
+    }
+
+    #[test]
+    fn credit_neg_infinity_rejected() {
+        let mut c = valid_carbon_credit();
+        c.credits_kg_co2 = f64::NEG_INFINITY;
+        assert_invalid(validate_credit(c), "credits_kg_co2 must be a finite number");
+    }
+
+    #[test]
+    fn redemption_nan_credits_rejected() {
+        let mut r = valid_redemption();
+        r.credits_redeemed = f64::NAN;
+        assert_invalid(validate_redemption(r), "credits_redeemed must be a finite number");
+    }
+
+    #[test]
+    fn redemption_infinity_credits_rejected() {
+        let mut r = valid_redemption();
+        r.credits_redeemed = f64::INFINITY;
+        assert_invalid(validate_redemption(r), "credits_redeemed must be a finite number");
+    }
+
+    #[test]
+    fn redemption_neg_infinity_credits_rejected() {
+        let mut r = valid_redemption();
+        r.credits_redeemed = f64::NEG_INFINITY;
+        assert_invalid(validate_redemption(r), "credits_redeemed must be a finite number");
     }
 }

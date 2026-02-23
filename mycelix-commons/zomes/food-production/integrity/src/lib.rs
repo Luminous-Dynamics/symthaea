@@ -282,11 +282,20 @@ fn validate_plot(plot: Plot) -> ExternResult<ValidateCallbackResult> {
     if plot.name.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid("Plot name must be 256 characters or fewer".into()));
     }
+    if !plot.area_sqm.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Area must be a finite number".into()));
+    }
     if plot.area_sqm <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Area must be positive".into()));
     }
+    if !plot.location_lat.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Latitude must be a finite number".into()));
+    }
     if plot.location_lat < -90.0 || plot.location_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
+    }
+    if !plot.location_lon.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Longitude must be a finite number".into()));
     }
     if plot.location_lon < -180.0 || plot.location_lon > 180.0 {
         return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
@@ -322,6 +331,9 @@ fn validate_crop(crop: Crop) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_yield(yr: YieldRecord) -> ExternResult<ValidateCallbackResult> {
+    if !yr.quantity_kg.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
+    }
     if yr.quantity_kg <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Yield quantity must be positive".into()));
     }
@@ -1371,6 +1383,71 @@ mod tests {
         let mut m = valid_garden_membership();
         m.joined_at = 0;
         assert_invalid(validate_garden_membership(m), "GardenMembership joined_at cannot be zero");
+    }
+
+    // ── NaN/Infinity bypass hardening tests ────────────────────────────
+
+    #[test]
+    fn plot_nan_area_rejected() {
+        let mut p = valid_plot();
+        p.area_sqm = f64::NAN;
+        assert_invalid(validate_plot(p), "Area must be a finite number");
+    }
+
+    #[test]
+    fn plot_infinity_area_rejected() {
+        let mut p = valid_plot();
+        p.area_sqm = f64::INFINITY;
+        assert_invalid(validate_plot(p), "Area must be a finite number");
+    }
+
+    #[test]
+    fn plot_neg_infinity_area_rejected() {
+        let mut p = valid_plot();
+        p.area_sqm = f64::NEG_INFINITY;
+        assert_invalid(validate_plot(p), "Area must be a finite number");
+    }
+
+    #[test]
+    fn plot_nan_lat_rejected() {
+        let mut p = valid_plot();
+        p.location_lat = f64::NAN;
+        assert_invalid(validate_plot(p), "Latitude must be a finite number");
+    }
+
+    #[test]
+    fn plot_infinity_lat_rejected() {
+        let mut p = valid_plot();
+        p.location_lat = f64::INFINITY;
+        assert_invalid(validate_plot(p), "Latitude must be a finite number");
+    }
+
+    #[test]
+    fn plot_nan_lon_rejected() {
+        let mut p = valid_plot();
+        p.location_lon = f64::NAN;
+        assert_invalid(validate_plot(p), "Longitude must be a finite number");
+    }
+
+    #[test]
+    fn plot_infinity_lon_rejected() {
+        let mut p = valid_plot();
+        p.location_lon = f64::INFINITY;
+        assert_invalid(validate_plot(p), "Longitude must be a finite number");
+    }
+
+    #[test]
+    fn yield_nan_quantity_rejected() {
+        let mut yr = valid_yield_record();
+        yr.quantity_kg = f64::NAN;
+        assert_invalid(validate_yield(yr), "Quantity must be a finite number");
+    }
+
+    #[test]
+    fn yield_infinity_quantity_rejected() {
+        let mut yr = valid_yield_record();
+        yr.quantity_kg = f64::INFINITY;
+        assert_invalid(validate_yield(yr), "Quantity must be a finite number");
     }
 
     #[test]

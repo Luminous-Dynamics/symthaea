@@ -206,6 +206,11 @@ fn validate_create_common_resource(
             return Ok(ValidateCallbackResult::Invalid("Stewards must be valid DIDs".into()));
         }
     }
+    for limit in &resource.governance_rules.usage_limits {
+        if !limit.max_per_period.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid("Usage limit max_per_period must be a finite number".into()));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -241,6 +246,9 @@ fn validate_create_usage_log(
 ) -> ExternResult<ValidateCallbackResult> {
     if !log.user_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("User must be a valid DID".into()));
+    }
+    if !log.quantity.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
     }
     if log.quantity < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Quantity cannot be negative".into()));

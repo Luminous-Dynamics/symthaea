@@ -182,8 +182,14 @@ fn validate_market(m: Market) -> ExternResult<ValidateCallbackResult> {
     if m.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Market name cannot be empty".into()));
     }
+    if !m.location_lat.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Latitude must be a finite number".into()));
+    }
     if m.location_lat < -90.0 || m.location_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
+    }
+    if !m.location_lon.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Longitude must be a finite number".into()));
     }
     if m.location_lon < -180.0 || m.location_lon > 180.0 {
         return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
@@ -195,8 +201,14 @@ fn validate_listing(l: Listing) -> ExternResult<ValidateCallbackResult> {
     if l.product_name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Product name cannot be empty".into()));
     }
+    if !l.quantity_kg.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
+    }
     if l.quantity_kg <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Quantity must be positive".into()));
+    }
+    if !l.price_per_kg.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Price must be a finite number".into()));
     }
     if l.price_per_kg < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Price cannot be negative".into()));
@@ -229,6 +241,9 @@ fn validate_listing(l: Listing) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_order(o: Order) -> ExternResult<ValidateCallbackResult> {
+    if !o.quantity_kg.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
+    }
     if o.quantity_kg <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Order quantity must be positive".into()));
     }
@@ -772,6 +787,78 @@ mod tests {
     fn test_link_listing_to_order_tag_over_max_rejected() {
         let result = validate_link_tag(&LinkTypes::ListingToOrder, 257);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── NaN/Infinity bypass hardening tests ────────────────────────────
+
+    #[test]
+    fn market_nan_lat_rejected() {
+        let mut m = valid_market();
+        m.location_lat = f64::NAN;
+        assert_invalid(validate_market(m), "Latitude must be a finite number");
+    }
+
+    #[test]
+    fn market_infinity_lat_rejected() {
+        let mut m = valid_market();
+        m.location_lat = f64::INFINITY;
+        assert_invalid(validate_market(m), "Latitude must be a finite number");
+    }
+
+    #[test]
+    fn market_nan_lon_rejected() {
+        let mut m = valid_market();
+        m.location_lon = f64::NAN;
+        assert_invalid(validate_market(m), "Longitude must be a finite number");
+    }
+
+    #[test]
+    fn market_infinity_lon_rejected() {
+        let mut m = valid_market();
+        m.location_lon = f64::INFINITY;
+        assert_invalid(validate_market(m), "Longitude must be a finite number");
+    }
+
+    #[test]
+    fn listing_nan_quantity_rejected() {
+        let mut l = valid_listing();
+        l.quantity_kg = f64::NAN;
+        assert_invalid(validate_listing(l), "Quantity must be a finite number");
+    }
+
+    #[test]
+    fn listing_infinity_quantity_rejected() {
+        let mut l = valid_listing();
+        l.quantity_kg = f64::INFINITY;
+        assert_invalid(validate_listing(l), "Quantity must be a finite number");
+    }
+
+    #[test]
+    fn listing_nan_price_rejected() {
+        let mut l = valid_listing();
+        l.price_per_kg = f64::NAN;
+        assert_invalid(validate_listing(l), "Price must be a finite number");
+    }
+
+    #[test]
+    fn listing_infinity_price_rejected() {
+        let mut l = valid_listing();
+        l.price_per_kg = f64::INFINITY;
+        assert_invalid(validate_listing(l), "Price must be a finite number");
+    }
+
+    #[test]
+    fn order_nan_quantity_rejected() {
+        let mut o = valid_order();
+        o.quantity_kg = f64::NAN;
+        assert_invalid(validate_order(o), "Quantity must be a finite number");
+    }
+
+    #[test]
+    fn order_infinity_quantity_rejected() {
+        let mut o = valid_order();
+        o.quantity_kg = f64::INFINITY;
+        assert_invalid(validate_order(o), "Quantity must be a finite number");
     }
 
     // ── Serde roundtrip: Listing with new fields ────────────────────────

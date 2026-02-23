@@ -276,6 +276,9 @@ fn validate_vehicle(v: Vehicle) -> ExternResult<ValidateCallbackResult> {
     if v.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Vehicle ID cannot be empty".into()));
     }
+    if !v.capacity_kg.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("capacity_kg must be a finite number".into()));
+    }
     if v.capacity_kg < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Capacity cannot be negative".into()));
     }
@@ -292,6 +295,23 @@ fn validate_route(r: Route) -> ExternResult<ValidateCallbackResult> {
     if r.waypoints.len() < 2 {
         return Ok(ValidateCallbackResult::Invalid("Route must have at least 2 waypoints".into()));
     }
+    for wp in &r.waypoints {
+        if !wp.lat.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid("Waypoint lat must be a finite number".into()));
+        }
+        if !wp.lon.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid("Waypoint lon must be a finite number".into()));
+        }
+        if wp.lat < -90.0 || wp.lat > 90.0 {
+            return Ok(ValidateCallbackResult::Invalid("Waypoint latitude must be between -90 and 90".into()));
+        }
+        if wp.lon < -180.0 || wp.lon > 180.0 {
+            return Ok(ValidateCallbackResult::Invalid("Waypoint longitude must be between -180 and 180".into()));
+        }
+    }
+    if !r.distance_km.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("distance_km must be a finite number".into()));
+    }
     if r.distance_km <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Distance must be positive".into()));
     }
@@ -301,6 +321,12 @@ fn validate_route(r: Route) -> ExternResult<ValidateCallbackResult> {
 fn validate_stop(s: Stop) -> ExternResult<ValidateCallbackResult> {
     if s.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Stop name cannot be empty".into()));
+    }
+    if !s.location_lat.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("location_lat must be a finite number".into()));
+    }
+    if !s.location_lon.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("location_lon must be a finite number".into()));
     }
     if s.location_lat < -90.0 || s.location_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
@@ -323,6 +349,9 @@ fn validate_maintenance(m: MaintenanceRecord) -> ExternResult<ValidateCallbackRe
     }
     if m.description.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid("Description too long (max 4096 chars)".into()));
+    }
+    if !m.cost.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("cost must be a finite number".into()));
     }
     if m.cost < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Cost cannot be negative".into()));
@@ -1201,5 +1230,119 @@ mod tests {
             m.maintenance_type = mt;
             assert_valid(validate_maintenance(m));
         }
+    }
+
+    // ── NaN/Infinity bypass hardening tests ────────────────────────────
+
+    #[test]
+    fn vehicle_nan_capacity_rejected() {
+        let mut v = valid_vehicle();
+        v.capacity_kg = f64::NAN;
+        assert_invalid(validate_vehicle(v), "capacity_kg must be a finite number");
+    }
+
+    #[test]
+    fn vehicle_infinity_capacity_rejected() {
+        let mut v = valid_vehicle();
+        v.capacity_kg = f64::INFINITY;
+        assert_invalid(validate_vehicle(v), "capacity_kg must be a finite number");
+    }
+
+    #[test]
+    fn vehicle_neg_infinity_capacity_rejected() {
+        let mut v = valid_vehicle();
+        v.capacity_kg = f64::NEG_INFINITY;
+        assert_invalid(validate_vehicle(v), "capacity_kg must be a finite number");
+    }
+
+    #[test]
+    fn route_nan_distance_rejected() {
+        let mut r = valid_route();
+        r.distance_km = f64::NAN;
+        assert_invalid(validate_route(r), "distance_km must be a finite number");
+    }
+
+    #[test]
+    fn route_infinity_distance_rejected() {
+        let mut r = valid_route();
+        r.distance_km = f64::INFINITY;
+        assert_invalid(validate_route(r), "distance_km must be a finite number");
+    }
+
+    #[test]
+    fn route_waypoint_nan_lat_rejected() {
+        let mut r = valid_route();
+        r.waypoints[0].lat = f64::NAN;
+        assert_invalid(validate_route(r), "Waypoint lat must be a finite number");
+    }
+
+    #[test]
+    fn route_waypoint_infinity_lon_rejected() {
+        let mut r = valid_route();
+        r.waypoints[1].lon = f64::INFINITY;
+        assert_invalid(validate_route(r), "Waypoint lon must be a finite number");
+    }
+
+    #[test]
+    fn route_waypoint_lat_out_of_range_rejected() {
+        let mut r = valid_route();
+        r.waypoints[0].lat = 91.0;
+        assert_invalid(validate_route(r), "Waypoint latitude must be between -90 and 90");
+    }
+
+    #[test]
+    fn route_waypoint_lon_out_of_range_rejected() {
+        let mut r = valid_route();
+        r.waypoints[0].lon = -181.0;
+        assert_invalid(validate_route(r), "Waypoint longitude must be between -180 and 180");
+    }
+
+    #[test]
+    fn stop_nan_lat_rejected() {
+        let mut s = valid_stop();
+        s.location_lat = f64::NAN;
+        assert_invalid(validate_stop(s), "location_lat must be a finite number");
+    }
+
+    #[test]
+    fn stop_infinity_lat_rejected() {
+        let mut s = valid_stop();
+        s.location_lat = f64::INFINITY;
+        assert_invalid(validate_stop(s), "location_lat must be a finite number");
+    }
+
+    #[test]
+    fn stop_nan_lon_rejected() {
+        let mut s = valid_stop();
+        s.location_lon = f64::NAN;
+        assert_invalid(validate_stop(s), "location_lon must be a finite number");
+    }
+
+    #[test]
+    fn stop_neg_infinity_lon_rejected() {
+        let mut s = valid_stop();
+        s.location_lon = f64::NEG_INFINITY;
+        assert_invalid(validate_stop(s), "location_lon must be a finite number");
+    }
+
+    #[test]
+    fn maintenance_nan_cost_rejected() {
+        let mut m = valid_maintenance();
+        m.cost = f64::NAN;
+        assert_invalid(validate_maintenance(m), "cost must be a finite number");
+    }
+
+    #[test]
+    fn maintenance_infinity_cost_rejected() {
+        let mut m = valid_maintenance();
+        m.cost = f64::INFINITY;
+        assert_invalid(validate_maintenance(m), "cost must be a finite number");
+    }
+
+    #[test]
+    fn maintenance_neg_infinity_cost_rejected() {
+        let mut m = valid_maintenance();
+        m.cost = f64::NEG_INFINITY;
+        assert_invalid(validate_maintenance(m), "cost must be a finite number");
     }
 }

@@ -338,6 +338,9 @@ fn validate_recipe(r: Recipe) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_seed_stock(s: SeedStock) -> ExternResult<ValidateCallbackResult> {
+    if !s.quantity_grams.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
+    }
     if s.quantity_grams <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("SeedStock quantity must be positive".into()));
     }
@@ -348,6 +351,9 @@ fn validate_seed_stock(s: SeedStock) -> ExternResult<ValidateCallbackResult> {
         return Ok(ValidateCallbackResult::Invalid("SeedStock location too long (max 512 chars)".into()));
     }
     if let Some(rate) = s.germination_rate_pct {
+        if !rate.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid("Germination rate must be a finite number".into()));
+        }
         if rate < 0.0 || rate > 100.0 {
             return Ok(ValidateCallbackResult::Invalid("Germination rate must be between 0 and 100".into()));
         }
@@ -366,6 +372,9 @@ fn validate_seed_request(r: SeedRequest) -> ExternResult<ValidateCallbackResult>
     }
     if r.wanted_variety.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid("SeedRequest wanted_variety too long (max 256 chars)".into()));
+    }
+    if !r.quantity_grams.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
     }
     if r.quantity_grams <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("SeedRequest quantity must be positive".into()));
@@ -400,17 +409,32 @@ fn validate_nutrient_profile(n: NutrientProfile) -> ExternResult<ValidateCallbac
     if n.crop_name.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid("NutrientProfile crop_name too long (max 256 chars)".into()));
     }
+    if !n.calories_per_100g.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Calories must be a finite number".into()));
+    }
     if n.calories_per_100g < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Calories cannot be negative".into()));
+    }
+    if !n.protein_g.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Protein must be a finite number".into()));
     }
     if n.protein_g < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Protein cannot be negative".into()));
     }
+    if !n.carbs_g.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Carbs must be a finite number".into()));
+    }
     if n.carbs_g < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Carbs cannot be negative".into()));
     }
+    if !n.fat_g.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Fat must be a finite number".into()));
+    }
     if n.fat_g < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Fat cannot be negative".into()));
+    }
+    if !n.fiber_g.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Fiber must be a finite number".into()));
     }
     if n.fiber_g < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Fiber cannot be negative".into()));
@@ -1497,6 +1521,92 @@ mod tests {
             key_minerals: vec![],
         };
         assert_valid(validate_nutrient_profile(n));
+    }
+
+    // ── NaN/Infinity bypass hardening tests ────────────────────────────
+
+    #[test]
+    fn seed_stock_nan_quantity_rejected() {
+        let mut s = valid_seed_stock();
+        s.quantity_grams = f64::NAN;
+        assert_invalid(validate_seed_stock(s), "Quantity must be a finite number");
+    }
+
+    #[test]
+    fn seed_stock_infinity_quantity_rejected() {
+        let mut s = valid_seed_stock();
+        s.quantity_grams = f64::INFINITY;
+        assert_invalid(validate_seed_stock(s), "Quantity must be a finite number");
+    }
+
+    #[test]
+    fn seed_stock_nan_germination_rejected() {
+        let mut s = valid_seed_stock();
+        s.germination_rate_pct = Some(f64::NAN);
+        assert_invalid(validate_seed_stock(s), "Germination rate must be a finite number");
+    }
+
+    #[test]
+    fn seed_stock_infinity_germination_rejected() {
+        let mut s = valid_seed_stock();
+        s.germination_rate_pct = Some(f64::INFINITY);
+        assert_invalid(validate_seed_stock(s), "Germination rate must be a finite number");
+    }
+
+    #[test]
+    fn seed_request_nan_quantity_rejected() {
+        let mut r = valid_seed_request();
+        r.quantity_grams = f64::NAN;
+        assert_invalid(validate_seed_request(r), "Quantity must be a finite number");
+    }
+
+    #[test]
+    fn seed_request_infinity_quantity_rejected() {
+        let mut r = valid_seed_request();
+        r.quantity_grams = f64::INFINITY;
+        assert_invalid(validate_seed_request(r), "Quantity must be a finite number");
+    }
+
+    #[test]
+    fn nutrient_profile_nan_calories_rejected() {
+        let mut n = valid_nutrient_profile();
+        n.calories_per_100g = f64::NAN;
+        assert_invalid(validate_nutrient_profile(n), "Calories must be a finite number");
+    }
+
+    #[test]
+    fn nutrient_profile_infinity_calories_rejected() {
+        let mut n = valid_nutrient_profile();
+        n.calories_per_100g = f64::INFINITY;
+        assert_invalid(validate_nutrient_profile(n), "Calories must be a finite number");
+    }
+
+    #[test]
+    fn nutrient_profile_nan_protein_rejected() {
+        let mut n = valid_nutrient_profile();
+        n.protein_g = f64::NAN;
+        assert_invalid(validate_nutrient_profile(n), "Protein must be a finite number");
+    }
+
+    #[test]
+    fn nutrient_profile_nan_carbs_rejected() {
+        let mut n = valid_nutrient_profile();
+        n.carbs_g = f64::NAN;
+        assert_invalid(validate_nutrient_profile(n), "Carbs must be a finite number");
+    }
+
+    #[test]
+    fn nutrient_profile_nan_fat_rejected() {
+        let mut n = valid_nutrient_profile();
+        n.fat_g = f64::NAN;
+        assert_invalid(validate_nutrient_profile(n), "Fat must be a finite number");
+    }
+
+    #[test]
+    fn nutrient_profile_nan_fiber_rejected() {
+        let mut n = valid_nutrient_profile();
+        n.fiber_g = f64::NAN;
+        assert_invalid(validate_nutrient_profile(n), "Fiber must be a finite number");
     }
 
     #[test]

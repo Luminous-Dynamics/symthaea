@@ -247,6 +247,9 @@ fn validate_ride_offer(o: RideOffer) -> ExternResult<ValidateCallbackResult> {
     if o.seats_available == 0 {
         return Ok(ValidateCallbackResult::Invalid("Must offer at least 1 seat".into()));
     }
+    if !o.price_per_seat.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("price_per_seat must be a finite number".into()));
+    }
     if o.price_per_seat < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Price cannot be negative".into()));
     }
@@ -256,6 +259,12 @@ fn validate_ride_offer(o: RideOffer) -> ExternResult<ValidateCallbackResult> {
 fn validate_ride_request(r: RideRequest) -> ExternResult<ValidateCallbackResult> {
     if r.passengers == 0 {
         return Ok(ValidateCallbackResult::Invalid("Must request at least 1 passenger".into()));
+    }
+    if !r.origin_lat.is_finite() || !r.destination_lat.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("origin_lat/destination_lat must be a finite number".into()));
+    }
+    if !r.origin_lon.is_finite() || !r.destination_lon.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("origin_lon/destination_lon must be a finite number".into()));
     }
     if r.origin_lat < -90.0 || r.origin_lat > 90.0 || r.destination_lat < -90.0 || r.destination_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
@@ -280,11 +289,23 @@ fn validate_ride_review(rev: RideReview) -> ExternResult<ValidateCallbackResult>
 }
 
 fn validate_cargo_offer(c: CargoOffer) -> ExternResult<ValidateCallbackResult> {
+    if !c.capacity_kg.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("capacity_kg must be a finite number".into()));
+    }
     if c.capacity_kg <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Cargo capacity must be positive".into()));
     }
+    if !c.price_per_kg.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("price_per_kg must be a finite number".into()));
+    }
     if c.price_per_kg < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Price cannot be negative".into()));
+    }
+    if !c.origin_lat.is_finite() || !c.destination_lat.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("origin_lat/destination_lat must be a finite number".into()));
+    }
+    if !c.origin_lon.is_finite() || !c.destination_lon.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("origin_lon/destination_lon must be a finite number".into()));
     }
     if c.origin_lat < -90.0 || c.origin_lat > 90.0 || c.destination_lat < -90.0 || c.destination_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
@@ -1157,5 +1178,98 @@ mod tests {
         let mut rev = valid_ride_review();
         rev.safety_concern = true;
         assert_valid(validate_ride_review(rev));
+    }
+
+    // ── NaN/Infinity bypass hardening tests ────────────────────────────
+
+    #[test]
+    fn ride_offer_nan_price_rejected() {
+        let mut o = valid_ride_offer();
+        o.price_per_seat = f64::NAN;
+        assert_invalid(validate_ride_offer(o), "price_per_seat must be a finite number");
+    }
+
+    #[test]
+    fn ride_offer_infinity_price_rejected() {
+        let mut o = valid_ride_offer();
+        o.price_per_seat = f64::INFINITY;
+        assert_invalid(validate_ride_offer(o), "price_per_seat must be a finite number");
+    }
+
+    #[test]
+    fn ride_offer_neg_infinity_price_rejected() {
+        let mut o = valid_ride_offer();
+        o.price_per_seat = f64::NEG_INFINITY;
+        assert_invalid(validate_ride_offer(o), "price_per_seat must be a finite number");
+    }
+
+    #[test]
+    fn ride_request_nan_origin_lat_rejected() {
+        let mut r = valid_ride_request();
+        r.origin_lat = f64::NAN;
+        assert_invalid(validate_ride_request(r), "must be a finite number");
+    }
+
+    #[test]
+    fn ride_request_infinity_origin_lon_rejected() {
+        let mut r = valid_ride_request();
+        r.origin_lon = f64::INFINITY;
+        assert_invalid(validate_ride_request(r), "must be a finite number");
+    }
+
+    #[test]
+    fn ride_request_nan_dest_lat_rejected() {
+        let mut r = valid_ride_request();
+        r.destination_lat = f64::NAN;
+        assert_invalid(validate_ride_request(r), "must be a finite number");
+    }
+
+    #[test]
+    fn ride_request_neg_infinity_dest_lon_rejected() {
+        let mut r = valid_ride_request();
+        r.destination_lon = f64::NEG_INFINITY;
+        assert_invalid(validate_ride_request(r), "must be a finite number");
+    }
+
+    #[test]
+    fn cargo_offer_nan_capacity_rejected() {
+        let mut c = valid_cargo_offer();
+        c.capacity_kg = f64::NAN;
+        assert_invalid(validate_cargo_offer(c), "capacity_kg must be a finite number");
+    }
+
+    #[test]
+    fn cargo_offer_infinity_capacity_rejected() {
+        let mut c = valid_cargo_offer();
+        c.capacity_kg = f64::INFINITY;
+        assert_invalid(validate_cargo_offer(c), "capacity_kg must be a finite number");
+    }
+
+    #[test]
+    fn cargo_offer_nan_price_rejected() {
+        let mut c = valid_cargo_offer();
+        c.price_per_kg = f64::NAN;
+        assert_invalid(validate_cargo_offer(c), "price_per_kg must be a finite number");
+    }
+
+    #[test]
+    fn cargo_offer_infinity_price_rejected() {
+        let mut c = valid_cargo_offer();
+        c.price_per_kg = f64::INFINITY;
+        assert_invalid(validate_cargo_offer(c), "price_per_kg must be a finite number");
+    }
+
+    #[test]
+    fn cargo_offer_nan_origin_lat_rejected() {
+        let mut c = valid_cargo_offer();
+        c.origin_lat = f64::NAN;
+        assert_invalid(validate_cargo_offer(c), "must be a finite number");
+    }
+
+    #[test]
+    fn cargo_offer_infinity_dest_lon_rejected() {
+        let mut c = valid_cargo_offer();
+        c.destination_lon = f64::INFINITY;
+        assert_invalid(validate_cargo_offer(c), "must be a finite number");
     }
 }

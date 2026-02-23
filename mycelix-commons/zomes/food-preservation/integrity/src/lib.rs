@@ -189,6 +189,9 @@ fn validate_batch(b: PreservationBatch) -> ExternResult<ValidateCallbackResult> 
     if b.method.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Method cannot be empty".into()));
     }
+    if !b.quantity_kg.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
+    }
     if b.quantity_kg <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Quantity must be positive".into()));
     }
@@ -237,6 +240,9 @@ fn validate_storage(s: StorageUnit) -> ExternResult<ValidateCallbackResult> {
     }
     if s.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Storage name cannot be empty".into()));
+    }
+    if !s.capacity_kg.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("Capacity must be a finite number".into()));
     }
     if s.capacity_kg <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Capacity must be positive".into()));
@@ -784,6 +790,36 @@ mod tests {
     fn test_link_agent_to_batch_tag_over_max_rejected() {
         let result = validate_link_tag(&LinkTypes::AgentToBatch, 257);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── NaN/Infinity bypass hardening tests ────────────────────────────
+
+    #[test]
+    fn batch_nan_quantity_rejected() {
+        let mut b = valid_batch();
+        b.quantity_kg = f64::NAN;
+        assert_invalid(validate_batch(b), "Quantity must be a finite number");
+    }
+
+    #[test]
+    fn batch_infinity_quantity_rejected() {
+        let mut b = valid_batch();
+        b.quantity_kg = f64::INFINITY;
+        assert_invalid(validate_batch(b), "Quantity must be a finite number");
+    }
+
+    #[test]
+    fn storage_nan_capacity_rejected() {
+        let mut s = valid_storage();
+        s.capacity_kg = f64::NAN;
+        assert_invalid(validate_storage(s), "Capacity must be a finite number");
+    }
+
+    #[test]
+    fn storage_infinity_capacity_rejected() {
+        let mut s = valid_storage();
+        s.capacity_kg = f64::INFINITY;
+        assert_invalid(validate_storage(s), "Capacity must be a finite number");
     }
 
     // ── Serde roundtrip: batch with allergens ──────────────────────────

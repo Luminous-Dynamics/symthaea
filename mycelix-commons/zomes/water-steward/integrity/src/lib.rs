@@ -363,6 +363,11 @@ fn validate_create_watershed(
             "Watershed boundary must have at least 3 points".into(),
         ));
     }
+    if !ws.area_sq_km.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Area must be a finite number".into(),
+        ));
+    }
     if ws.area_sq_km <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Watershed area must be positive".into(),

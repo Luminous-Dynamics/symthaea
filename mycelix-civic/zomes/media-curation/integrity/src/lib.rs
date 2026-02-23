@@ -232,11 +232,20 @@ fn validate_create_quality_score(
     if score.publication_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("QualityScore publication_id cannot be empty".into()));
     }
+    if !score.score.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("score must be a finite number".into()));
+    }
     if score.score < 0.0 || score.score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid("Score must be 0-1".into()));
     }
+    if !score.fact_check_score.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("fact_check_score must be a finite number".into()));
+    }
     if score.fact_check_score < 0.0 || score.fact_check_score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid("Fact check score must be 0-1".into()));
+    }
+    if !score.author_reputation.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("author_reputation must be a finite number".into()));
     }
     if score.author_reputation < 0.0 || score.author_reputation > 1.0 {
         return Ok(ValidateCallbackResult::Invalid("Author reputation must be 0-1".into()));
@@ -248,6 +257,9 @@ fn validate_update_quality_score(
     _action: Update,
     score: QualityScore,
 ) -> ExternResult<ValidateCallbackResult> {
+    if !score.score.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid("score must be a finite number".into()));
+    }
     if score.score < 0.0 || score.score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid("Score must be 0-1".into()));
     }

@@ -221,6 +221,16 @@ fn validate_create_message(
         ));
     }
     if let Some((lat, lon)) = msg.location {
+        if !lat.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "location latitude must be a finite number".into(),
+            ));
+        }
+        if !lon.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "location longitude must be a finite number".into(),
+            ));
+        }
         if !(-90.0..=90.0).contains(&lat) {
             return Ok(ValidateCallbackResult::Invalid(
                 "Latitude must be between -90 and 90".into(),
@@ -262,6 +272,21 @@ fn validate_create_broadcast(
         ));
     }
     let (lat, lon, radius) = broadcast.target_area;
+    if !lat.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "target_area latitude must be a finite number".into(),
+        ));
+    }
+    if !lon.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "target_area longitude must be a finite number".into(),
+        ));
+    }
+    if !radius.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "target_area radius must be a finite number".into(),
+        ));
+    }
     if !(-90.0..=90.0).contains(&lat) {
         return Ok(ValidateCallbackResult::Invalid(
             "Target area latitude must be between -90 and 90".into(),
@@ -1110,13 +1135,14 @@ mod tests {
 
     #[test]
     fn create_broadcast_nan_radius_rejected() {
-        // NaN <= 0.0 is false, so NaN passes the radius check!
-        // This documents the current behavior -- NaN is neither <= 0 nor > 0
         let mut b = make_broadcast();
         b.target_area = (0.0, 0.0, f32::NAN);
         let result = validate_create_broadcast(fake_create(), b);
-        // NaN fails `<= 0.0` (false), so validation passes to Valid
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "target_area radius must be a finite number"
+        );
     }
 
     // ========================================================================

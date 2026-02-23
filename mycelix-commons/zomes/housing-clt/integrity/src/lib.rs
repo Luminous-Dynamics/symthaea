@@ -252,9 +252,19 @@ fn validate_create_trust(
         ));
     }
     for (lat, lon) in &trust.boundary {
+        if !lat.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Boundary latitude must be a finite number".into(),
+            ));
+        }
         if *lat < -90.0 || *lat > 90.0 {
             return Ok(ValidateCallbackResult::Invalid(
                 "Boundary latitude must be between -90 and 90".into(),
+            ));
+        }
+        if !lon.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Boundary longitude must be a finite number".into(),
             ));
         }
         if *lon < -180.0 || *lon > 180.0 {
@@ -361,6 +371,11 @@ fn validate_affordability_report(
     if report.affordable_units > report.total_units {
         return Ok(ValidateCallbackResult::Invalid(
             "Affordable units cannot exceed total units".into(),
+        ));
+    }
+    if !report.affordability_ratio.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Affordability ratio must be a finite number".into(),
         ));
     }
     if report.affordability_ratio < 0.0 || report.affordability_ratio > 1.0 {
@@ -1327,18 +1342,20 @@ mod tests {
     fn create_trust_boundary_lat_nan_is_invalid() {
         let mut t = valid_land_trust();
         t.boundary = vec![(f64::NAN, 0.0), (1.0, 0.0), (0.0, 1.0)];
-        // NaN comparisons: NaN < -90.0 is false, NaN > 90.0 is false
-        // So NaN passes the lat check, then NaN lon check also passes
-        // This documents current behavior: NaN values pass validation
-        assert_valid(validate_create_trust(fake_create(), t));
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Boundary latitude must be a finite number",
+        );
     }
 
     #[test]
-    fn create_trust_boundary_lon_nan_passes() {
+    fn create_trust_boundary_lon_nan_is_invalid() {
         let mut t = valid_land_trust();
         t.boundary = vec![(0.0, f64::NAN), (1.0, 0.0), (0.0, 1.0)];
-        // NaN comparisons all return false, so NaN passes both checks
-        assert_valid(validate_create_trust(fake_create(), t));
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Boundary longitude must be a finite number",
+        );
     }
 
     #[test]
@@ -1347,7 +1364,7 @@ mod tests {
         t.boundary = vec![(f64::INFINITY, 0.0), (1.0, 0.0), (0.0, 1.0)];
         assert_invalid(
             validate_create_trust(fake_create(), t),
-            "Boundary latitude must be between -90 and 90",
+            "Boundary latitude must be a finite number",
         );
     }
 
@@ -1357,7 +1374,7 @@ mod tests {
         t.boundary = vec![(f64::NEG_INFINITY, 0.0), (1.0, 0.0), (0.0, 1.0)];
         assert_invalid(
             validate_create_trust(fake_create(), t),
-            "Boundary latitude must be between -90 and 90",
+            "Boundary latitude must be a finite number",
         );
     }
 
@@ -1367,7 +1384,7 @@ mod tests {
         t.boundary = vec![(0.0, f64::INFINITY), (1.0, 0.0), (0.0, 1.0)];
         assert_invalid(
             validate_create_trust(fake_create(), t),
-            "Boundary longitude must be between -180 and 180",
+            "Boundary longitude must be a finite number",
         );
     }
 
@@ -1377,7 +1394,7 @@ mod tests {
         t.boundary = vec![(0.0, f64::NEG_INFINITY), (1.0, 0.0), (0.0, 1.0)];
         assert_invalid(
             validate_create_trust(fake_create(), t),
-            "Boundary longitude must be between -180 and 180",
+            "Boundary longitude must be a finite number",
         );
     }
 
@@ -1562,9 +1579,10 @@ mod tests {
     fn create_affordability_report_ratio_nan_is_invalid() {
         let mut r = valid_affordability_report();
         r.affordability_ratio = f32::NAN;
-        // NAN < 0.0 is false and NAN > 1.0 is false, so NaN passes the check
-        // This documents current behavior
-        assert_valid(validate_affordability_report(fake_create(), r));
+        assert_invalid(
+            validate_affordability_report(fake_create(), r),
+            "Affordability ratio must be a finite number",
+        );
     }
 
     #[test]
@@ -1573,7 +1591,7 @@ mod tests {
         r.affordability_ratio = f32::INFINITY;
         assert_invalid(
             validate_affordability_report(fake_create(), r),
-            "Affordability ratio must be between 0 and 1",
+            "Affordability ratio must be a finite number",
         );
     }
 
@@ -1583,7 +1601,7 @@ mod tests {
         r.affordability_ratio = f32::NEG_INFINITY;
         assert_invalid(
             validate_affordability_report(fake_create(), r),
-            "Affordability ratio must be between 0 and 1",
+            "Affordability ratio must be a finite number",
         );
     }
 

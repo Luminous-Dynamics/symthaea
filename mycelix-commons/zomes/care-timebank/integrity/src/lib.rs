@@ -357,6 +357,11 @@ fn validate_create_offer(
             "Offer description must be 4096 characters or fewer".into(),
         ));
     }
+    if !offer.hours_available.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours available must be a finite number".into(),
+        ));
+    }
     if offer.hours_available <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Hours available must be positive".into(),
@@ -421,6 +426,11 @@ fn validate_create_request(
             "Request description must be 4096 characters or fewer".into(),
         ));
     }
+    if !request.hours_needed.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours needed must be a finite number".into(),
+        ));
+    }
     if request.hours_needed <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Hours needed must be positive".into(),
@@ -453,6 +463,11 @@ fn validate_create_exchange(
     _action: Create,
     exchange: TimeExchange,
 ) -> ExternResult<ValidateCallbackResult> {
+    if !exchange.hours.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours must be a finite number".into(),
+        ));
+    }
     if exchange.hours <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Exchange hours must be positive".into(),
@@ -494,9 +509,24 @@ fn validate_create_credit(
     _action: Create,
     credit: TimeCredit,
 ) -> ExternResult<ValidateCallbackResult> {
+    if !credit.balance.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Balance must be a finite number".into(),
+        ));
+    }
+    if !credit.total_earned.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Total earned must be a finite number".into(),
+        ));
+    }
     if credit.total_earned < 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Total earned cannot be negative".into(),
+        ));
+    }
+    if !credit.total_spent.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Total spent must be a finite number".into(),
         ));
     }
     if credit.total_spent < 0.0 {
@@ -545,6 +575,11 @@ fn validate_update_offer(offer: ServiceOffer) -> ExternResult<ValidateCallbackRe
             ));
         }
     }
+    if !offer.hours_available.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours available must be a finite number".into(),
+        ));
+    }
     if offer.hours_available < 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Hours available cannot be negative".into(),
@@ -579,6 +614,11 @@ fn validate_update_request(request: ServiceRequest) -> ExternResult<ValidateCall
             "Preferred schedule must be 512 characters or fewer".into(),
         ));
     }
+    if !request.hours_needed.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours needed must be a finite number".into(),
+        ));
+    }
     if request.hours_needed < 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Hours needed cannot be negative".into(),
@@ -588,6 +628,11 @@ fn validate_update_request(request: ServiceRequest) -> ExternResult<ValidateCall
 }
 
 fn validate_update_exchange(exchange: TimeExchange) -> ExternResult<ValidateCallbackResult> {
+    if !exchange.hours.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours must be a finite number".into(),
+        ));
+    }
     if exchange.hours <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Exchange hours must be positive".into(),

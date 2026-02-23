@@ -287,7 +287,12 @@ fn validate_create_reading(
     _action: Create,
     reading: QualityReading,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Potability score must be in [0, 1]
+    // Potability score must be finite and in [0, 1]
+    if !reading.potability_score.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Potability score must be a finite number".into(),
+        ));
+    }
     if reading.potability_score < 0.0 || reading.potability_score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Potability score must be between 0.0 and 1.0".into(),
@@ -338,9 +343,19 @@ fn validate_create_alert(
             "Contaminant name must be 256 characters or fewer".into(),
         ));
     }
+    if !alert.measured_value.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Measured value must be a finite number".into(),
+        ));
+    }
     if alert.measured_value < 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Measured value cannot be negative".into(),
+        ));
+    }
+    if !alert.threshold_value.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Threshold value must be a finite number".into(),
         ));
     }
     if alert.threshold_value < 0.0 {

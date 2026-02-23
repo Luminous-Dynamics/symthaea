@@ -213,9 +213,19 @@ fn validate_create_building(
             "Building address cannot be empty".into(),
         ));
     }
+    if !building.location_lat.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be a finite number".into(),
+        ));
+    }
     if building.location_lat < -90.0 || building.location_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Latitude must be between -90 and 90".into(),
+        ));
+    }
+    if !building.location_lon.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be a finite number".into(),
         ));
     }
     if building.location_lon < -180.0 || building.location_lon > 180.0 {

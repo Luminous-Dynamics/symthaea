@@ -215,9 +215,19 @@ fn validate_create_shelter(
             "Occupancy cannot exceed capacity".into(),
         ));
     }
+    if !shelter.location_lat.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "location_lat must be a finite number".into(),
+        ));
+    }
     if shelter.location_lat < -90.0 || shelter.location_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Latitude must be between -90 and 90".into(),
+        ));
+    }
+    if !shelter.location_lon.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "location_lon must be a finite number".into(),
         ));
     }
     if shelter.location_lon < -180.0 || shelter.location_lon > 180.0 {

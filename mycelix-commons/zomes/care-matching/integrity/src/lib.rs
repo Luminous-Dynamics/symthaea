@@ -166,9 +166,19 @@ fn validate_create_match(
     _action: Create,
     care_match: CareMatch,
 ) -> ExternResult<ValidateCallbackResult> {
+    if !care_match.score.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Score must be a finite number".into(),
+        ));
+    }
     if care_match.score < 0.0 || care_match.score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Match score must be between 0.0 and 1.0".into(),
+        ));
+    }
+    if !care_match.factors.proximity_score.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Proximity score must be a finite number".into(),
         ));
     }
     if care_match.factors.proximity_score < 0.0 || care_match.factors.proximity_score > 1.0 {
@@ -176,9 +186,19 @@ fn validate_create_match(
             "Proximity score must be between 0.0 and 1.0".into(),
         ));
     }
+    if !care_match.factors.skill_alignment.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Skill alignment must be a finite number".into(),
+        ));
+    }
     if care_match.factors.skill_alignment < 0.0 || care_match.factors.skill_alignment > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Skill alignment must be between 0.0 and 1.0".into(),
+        ));
+    }
+    if !care_match.factors.schedule_compatibility.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schedule compatibility must be a finite number".into(),
         ));
     }
     if care_match.factors.schedule_compatibility < 0.0
@@ -186,6 +206,11 @@ fn validate_create_match(
     {
         return Ok(ValidateCallbackResult::Invalid(
             "Schedule compatibility must be between 0.0 and 1.0".into(),
+        ));
+    }
+    if !care_match.factors.trust_score.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Trust score must be a finite number".into(),
         ));
     }
     if care_match.factors.trust_score < 0.0 || care_match.factors.trust_score > 1.0 {
@@ -202,6 +227,11 @@ fn validate_create_match(
 }
 
 fn validate_update_match(care_match: CareMatch) -> ExternResult<ValidateCallbackResult> {
+    if !care_match.score.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Score must be a finite number".into(),
+        ));
+    }
     if care_match.score < 0.0 || care_match.score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Match score must be between 0.0 and 1.0".into(),

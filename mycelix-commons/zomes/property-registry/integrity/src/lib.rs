@@ -319,8 +319,14 @@ fn validate_create_property(
     }
     // Geolocation validation
     if let Some(ref geo) = property.geolocation {
+        if !geo.latitude.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid("Latitude must be a finite number".into()));
+        }
         if geo.latitude < -90.0 || geo.latitude > 90.0 {
             return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
+        }
+        if !geo.longitude.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid("Longitude must be a finite number".into()));
         }
         if geo.longitude < -180.0 || geo.longitude > 180.0 {
             return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
@@ -331,12 +337,18 @@ fn validate_create_property(
             }
         }
         if let Some(area) = geo.area_sqm {
+            if !area.is_finite() {
+                return Ok(ValidateCallbackResult::Invalid("Area must be a finite number".into()));
+            }
             if area <= 0.0 {
                 return Ok(ValidateCallbackResult::Invalid("Area must be positive".into()));
             }
         }
     }
     if let Some(ref meta) = property.metadata.appraised_value {
+        if !meta.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid("Appraised value must be a finite number".into()));
+        }
         if *meta < 0.0 {
             return Ok(ValidateCallbackResult::Invalid("Appraised value cannot be negative".into()));
         }
@@ -348,6 +360,9 @@ fn validate_create_property(
         }
         if co_owner.did.len() > 256 {
             return Ok(ValidateCallbackResult::Invalid("Co-owner DID must be 256 characters or fewer".into()));
+        }
+        if !co_owner.share_percentage.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid("Share percentage must be a finite number".into()));
         }
         if co_owner.share_percentage <= 0.0 || co_owner.share_percentage > 100.0 {
             return Ok(ValidateCallbackResult::Invalid("Share must be between 0 and 100".into()));

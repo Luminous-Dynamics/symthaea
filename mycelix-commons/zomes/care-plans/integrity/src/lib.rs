@@ -272,6 +272,11 @@ fn validate_create_plan(_action: Create, plan: CarePlan) -> ExternResult<Validat
             "Cannot have more than 50 caregivers".into(),
         ));
     }
+    if !plan.hours_per_week.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours per week must be a finite number".into(),
+        ));
+    }
     if plan.hours_per_week <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Hours per week must be positive".into(),
@@ -308,6 +313,11 @@ fn validate_create_session(
     _action: Create,
     session: CareSession,
 ) -> ExternResult<ValidateCallbackResult> {
+    if !session.hours.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours must be a finite number".into(),
+        ));
+    }
     if session.hours <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Session hours must be positive".into(),

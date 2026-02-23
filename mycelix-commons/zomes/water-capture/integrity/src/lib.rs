@@ -353,9 +353,19 @@ fn validate_create_harvest_system(
             "Efficiency percent cannot exceed 100".into(),
         ));
     }
+    if !system.location_lat.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be a finite number".into(),
+        ));
+    }
     if system.location_lat < -90.0 || system.location_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Latitude must be between -90 and 90".into(),
+        ));
+    }
+    if !system.location_lon.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be a finite number".into(),
         ));
     }
     if system.location_lon < -180.0 || system.location_lon > 180.0 {
@@ -400,9 +410,19 @@ fn validate_create_storage_tank(
             "Current level cannot exceed capacity".into(),
         ));
     }
+    if !tank.location_lat.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be a finite number".into(),
+        ));
+    }
     if tank.location_lat < -90.0 || tank.location_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Latitude must be between -90 and 90".into(),
+        ));
+    }
+    if !tank.location_lon.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be a finite number".into(),
         ));
     }
     if tank.location_lon < -180.0 || tank.location_lon > 180.0 {
@@ -476,9 +496,19 @@ fn validate_create_recharge_project(
             "Recharge capacity must be greater than zero".into(),
         ));
     }
+    if !project.location_lat.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be a finite number".into(),
+        ));
+    }
     if project.location_lat < -90.0 || project.location_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Latitude must be between -90 and 90".into(),
+        ));
+    }
+    if !project.location_lon.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be a finite number".into(),
         ));
     }
     if project.location_lon < -180.0 || project.location_lon > 180.0 {
