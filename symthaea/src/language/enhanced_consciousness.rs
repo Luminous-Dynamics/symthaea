@@ -52,7 +52,7 @@ use crate::consciousness::consciousness_unification::{
     ConsciousnessPhiProvider, EmotionalBridge, PhiComponent, PhiMethod, PhiProvenance, PhiSource,
     UnifiedEmotionalState,
 };
-use crate::language::emotional_core::{CoreEmotion, EmotionalCore, EmotionalState};
+use crate::language::emotional_core::{CoreEmotion, EmotionalCore, EmotionalCoreConfig};
 use crate::language::multi_theory_consciousness::{
     AttentionCategory, AttentionSchema, EmbodiedState, GlobalWorkspace, MultiTheoryConsciousness,
     MultiTheoryMetrics, MultiTheoryResult, PredictionError, PredictiveProcessor, ProcessingPass,
@@ -61,6 +61,40 @@ use crate::language::multi_theory_consciousness::{
 use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, Instant, SystemTime};
 use symthaea_core::hdc::universal_semantics::SemanticPrime;
+
+// ============================================================================
+// LOCAL TYPES (formerly from emotional_core, removed during consolidation)
+// ============================================================================
+
+/// Simple emotional state for the enhanced consciousness module.
+/// Maps valence/arousal/dominance with a primary emotion label.
+#[derive(Debug, Clone)]
+pub struct EmotionalState {
+    /// Primary emotion category
+    pub primary: CoreEmotion,
+    /// Valence: -1.0 to 1.0
+    pub valence: f32,
+    /// Arousal: 0.0 to 1.0
+    pub arousal: f32,
+}
+
+impl EmotionalState {
+    pub fn new(emotion: CoreEmotion, arousal: f32) -> Self {
+        Self {
+            primary: emotion,
+            valence: 0.0,
+            arousal,
+        }
+    }
+
+    pub fn neutral() -> Self {
+        Self {
+            primary: CoreEmotion::Peace,
+            valence: 0.0,
+            arousal: 0.3,
+        }
+    }
+}
 
 // ============================================================================
 // A. CROSS-THEORY INTEGRATION
@@ -1493,7 +1527,7 @@ impl Default for EnhancedConsciousness {
             user_model: UserMentalModel::new(),
             narrative: NarrativeEngine::new(),
             emotional_bridge: EmotionalBridge::new(),
-            emotional_core: EmotionalCore::new(),
+            emotional_core: EmotionalCore::new(EmotionalCoreConfig::default()),
             #[cfg(feature = "reasoning_engine")]
             conflict_detector: crate::consciousness::epistemic_conflict::ConflictDetector::new(),
             #[cfg(feature = "reasoning_engine")]
@@ -1661,26 +1695,27 @@ impl EnhancedConsciousness {
     /// Sync emotional state from EmotionalCore to EmotionalBridge
     /// This connects the isolated EmotionalCore to the unified emotional system
     pub fn sync_emotional_state(&mut self) {
-        let state = self.emotional_core.current_state();
+        // Use a neutral probe to get current emotional state
+        let analysis = self.emotional_core.analyze("");
         self.emotional_bridge.update_from_emotional_core(
-            state.valence as f64,
-            state.arousal as f64,
-            &format!("{:?}", state.primary),
+            analysis.valence as f64,
+            analysis.arousal as f64,
+            &analysis.primary_emotion,
         );
     }
 
     /// Process emotional input through EmotionalCore and sync to bridge
     pub fn process_emotion(&mut self, input: &str) {
-        let response = self.emotional_core.process(input);
+        let analysis = self.emotional_core.analyze(input);
         self.emotional_bridge.update_from_emotional_core(
-            response.my_state.valence as f64,
-            response.my_state.arousal as f64,
-            &format!("{:?}", response.my_state.primary),
+            analysis.valence as f64,
+            analysis.arousal as f64,
+            &analysis.primary_emotion,
         );
 
         // Also update phenomenal state from emotional response
-        self.phenomenal.valence = response.my_state.valence as f64;
-        self.phenomenal.arousal = response.my_state.arousal as f64;
+        self.phenomenal.valence = analysis.valence as f64;
+        self.phenomenal.arousal = analysis.arousal as f64;
     }
 
     /// Get unified emotional state

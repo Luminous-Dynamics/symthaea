@@ -62,6 +62,99 @@ pub use bridge::{MeshBridgeActor, MeshBridgeHandle, MeshOutbound};
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::BinaryHV;
 
+// ============================================================================
+// MESH TELEMETRY
+// ============================================================================
+
+/// Aggregate counters for mesh packet flow (observability).
+#[derive(Debug, Clone, Default)]
+pub struct MeshStats {
+    /// Wisdom vectors emitted to mesh.
+    pub wisdom_sent: u64,
+    /// Heartbeat packets emitted to mesh.
+    pub heartbeats_sent: u64,
+    /// Affective state packets emitted to mesh.
+    pub affective_sent: u64,
+    /// Gradient packets emitted to mesh.
+    pub gradients_sent: u64,
+    /// Wisdom vectors received from mesh peers.
+    pub wisdom_received: u64,
+    /// Heartbeat packets received from mesh peers.
+    pub heartbeats_received: u64,
+    /// Affective packets received from mesh peers.
+    pub affective_received: u64,
+    /// Gradient packets received from mesh peers.
+    pub gradients_received: u64,
+    /// Number of peers removed by expiry.
+    pub peers_expired: u64,
+    /// Total bytes sent over mesh (estimated from packet count × WISDOM_PACKET_SIZE).
+    pub bytes_sent: u64,
+    /// Total bytes received from mesh (estimated from packet count × WISDOM_PACKET_SIZE).
+    pub bytes_received: u64,
+}
+
+impl MeshStats {
+    /// Total packets sent across all types.
+    fn total_sent(&self) -> u64 {
+        self.wisdom_sent + self.heartbeats_sent + self.affective_sent + self.gradients_sent
+    }
+
+    /// Total packets received across all types.
+    fn total_received(&self) -> u64 {
+        self.wisdom_received
+            + self.heartbeats_received
+            + self.affective_received
+            + self.gradients_received
+    }
+
+    /// Compute a composite health score for the mesh network.
+    ///
+    /// Returns a value in `[0.0, 1.0]` combining:
+    /// - **Connectivity** (40%): saturates at 5 peers
+    /// - **Bidirectionality** (40%): balanced send/recv ratio → 1.0, one-sided → 0.0
+    /// - **Stability** (20%): fewer expired peers relative to activity → higher score
+    ///
+    /// Returns 0.0 if no packets have been sent or received.
+    pub fn health_score(&self, peer_count: usize) -> f32 {
+        let sent = self.total_sent();
+        let recv = self.total_received();
+        if sent == 0 && recv == 0 {
+            return 0.0;
+        }
+
+        // Connectivity: saturates at 5 peers
+        let connectivity = (peer_count as f32 / 5.0).clamp(0.0, 1.0);
+
+        // Bidirectionality: ratio of min/max → 1.0 when balanced, 0.0 when one-sided
+        let bidirectionality = if sent == 0 || recv == 0 {
+            0.0
+        } else {
+            let min = sent.min(recv) as f32;
+            let max = sent.max(recv) as f32;
+            min / max
+        };
+
+        // Stability: fewer expired peers relative to total activity → better
+        let stability =
+            1.0 - (self.peers_expired as f32 / (self.peers_expired + recv + 1) as f32);
+
+        (connectivity * 0.4 + bidirectionality * 0.4 + stability * 0.2).clamp(0.0, 1.0)
+    }
+}
+
+/// Structured snapshot of mesh network telemetry at a point in time.
+#[derive(Debug, Clone, Default)]
+pub struct MeshTelemetry {
+    /// Aggregate packet counters.
+    pub stats: MeshStats,
+    /// Number of currently tracked peers.
+    pub peer_count: usize,
+    /// Average Phi across tracked peers.
+    pub avg_phi: f32,
+    /// Composite health score (0.0–1.0).
+    pub health_score: f32,
+}
+
 use crate::cognitive_loop::types::CycleUrgency;
 
 // ============================================================================
@@ -371,6 +464,36 @@ impl WisdomPacket {
         })
     }
 
+    /// Create an Affective-type WisdomPacket from an [`AffectiveState`](crate::swarm::AffectiveState).
+    ///
+    /// Encodes valence/arousal/dominance/intensity/confidence into the first 20
+    /// bytes of the wisdom field, mirroring [`extract_affective()`](Self::extract_affective)
+    /// for a perfect roundtrip.
+    pub fn from_affective(
+        source_id: [u8; 8],
+        sequence: u32,
+        state: &crate::swarm::AffectiveState,
+    ) -> Self {
+        let mut bytes = [0u8; 2048];
+        bytes[0..4].copy_from_slice(&state.valence.to_le_bytes());
+        bytes[4..8].copy_from_slice(&state.arousal.to_le_bytes());
+        bytes[8..12].copy_from_slice(&state.dominance.to_le_bytes());
+        bytes[12..16].copy_from_slice(&state.intensity.to_le_bytes());
+        bytes[16..20].copy_from_slice(&state.confidence.to_le_bytes());
+
+        let timestamp_s = (state.timestamp_ms / 1000) as u32;
+
+        Self {
+            source_id,
+            sequence,
+            phi: 0.0,
+            urgency: MeshUrgency::Cruise,
+            timestamp_s,
+            payload_type: PayloadType::Affective,
+            wisdom: BinaryHV(bytes),
+        }
+    }
+
     /// Create a Gradient-type WisdomPacket from a [`GradientMessage`](crate::swarm::GradientMessage).
     ///
     /// Returns `None` if the gradient data exceeds the 2,048-byte wisdom capacity
@@ -494,6 +617,14 @@ impl MeshPeerRegistry {
         }
     }
 
+    /// Create a new registry with a custom stale timeout (useful for tests).
+    pub fn with_timeout(timeout: std::time::Duration) -> Self {
+        Self {
+            peers: std::collections::HashMap::new(),
+            stale_timeout: timeout,
+        }
+    }
+
     /// Update the registry with a received packet.
     pub fn update(&mut self, packet: &WisdomPacket) {
         let entry = self
@@ -516,12 +647,19 @@ impl MeshPeerRegistry {
 
     /// Remove peers not seen within the stale timeout.
     ///
-    /// Returns the number of peers removed.
-    pub fn expire_stale(&mut self) -> usize {
+    /// Returns the `source_id`s of expired peers (empty if none expired).
+    pub fn expire_stale(&mut self) -> Vec<[u8; 8]> {
         let cutoff = std::time::Instant::now() - self.stale_timeout;
-        let before = self.peers.len();
-        self.peers.retain(|_, entry| entry.last_seen > cutoff);
-        before - self.peers.len()
+        let expired: Vec<[u8; 8]> = self
+            .peers
+            .iter()
+            .filter(|(_, entry)| entry.last_seen <= cutoff)
+            .map(|(id, _)| *id)
+            .collect();
+        for id in &expired {
+            self.peers.remove(id);
+        }
+        expired
     }
 
     /// Get all active (non-expired) peers.
@@ -956,10 +1094,7 @@ mod tests {
 
     #[test]
     fn test_peer_registry_expire_stale() {
-        let mut registry = MeshPeerRegistry {
-            peers: std::collections::HashMap::new(),
-            stale_timeout: std::time::Duration::from_millis(10),
-        };
+        let mut registry = MeshPeerRegistry::with_timeout(std::time::Duration::from_millis(10));
 
         let pkt = WisdomPacket {
             source_id: [0xCC; 8],
@@ -975,8 +1110,9 @@ mod tests {
 
         // Wait for entry to become stale
         std::thread::sleep(std::time::Duration::from_millis(20));
-        let removed = registry.expire_stale();
-        assert_eq!(removed, 1);
+        let expired = registry.expire_stale();
+        assert_eq!(expired.len(), 1);
+        assert_eq!(expired[0], [0xCC; 8]);
         assert_eq!(registry.peer_count(), 0);
     }
 
@@ -1011,5 +1147,88 @@ mod tests {
 
         let avg = registry.average_phi();
         assert!((avg - 0.6).abs() < 1e-6, "Expected ~0.6, got {avg}");
+    }
+
+    // ====================================================================
+    // from_affective Roundtrip Test
+    // ====================================================================
+
+    // ====================================================================
+    // Health Score Tests
+    // ====================================================================
+
+    #[test]
+    fn test_health_score_no_activity() {
+        let stats = MeshStats::default();
+        assert_eq!(stats.health_score(0), 0.0);
+        assert_eq!(stats.health_score(5), 0.0);
+    }
+
+    #[test]
+    fn test_health_score_healthy_mesh() {
+        let stats = MeshStats {
+            wisdom_sent: 50,
+            wisdom_received: 48,
+            heartbeats_sent: 20,
+            heartbeats_received: 18,
+            peers_expired: 1,
+            ..Default::default()
+        };
+        let score = stats.health_score(5);
+        // Connectivity: 5/5 = 1.0 → 0.40
+        // Bidirectionality: min(70,66)/max(70,66) = 66/70 ≈ 0.943 → 0.377
+        // Stability: 1 - 1/(1+66+1) ≈ 0.985 → 0.197
+        // Total ≈ 0.97+
+        assert!(score > 0.9, "Healthy mesh score should be high: {score}");
+    }
+
+    #[test]
+    fn test_health_score_send_only() {
+        let stats = MeshStats {
+            wisdom_sent: 100,
+            heartbeats_sent: 50,
+            ..Default::default()
+        };
+        let score = stats.health_score(3);
+        // Connectivity: 3/5 = 0.6 → 0.24
+        // Bidirectionality: 0 (no receives) → 0.0
+        // Stability: 1 - 0/(0+0+1) = 1.0 → 0.20
+        // Total = 0.44
+        assert!(
+            score < 0.5,
+            "Send-only mesh should have low score: {score}"
+        );
+        // But not zero — we do have connectivity
+        assert!(score > 0.0, "Score should be > 0 with peers: {score}");
+    }
+
+    // ====================================================================
+    // from_affective Roundtrip Test
+    // ====================================================================
+
+    #[test]
+    fn test_from_affective_roundtrip() {
+        let affect = crate::swarm::AffectiveState {
+            valence: 0.6,
+            arousal: 0.8,
+            dominance: -0.3,
+            intensity: 0.7,
+            confidence: 0.95,
+            timestamp_ms: 1_700_000_000,
+            sequence: 42,
+        };
+
+        let pkt = WisdomPacket::from_affective([0xAF; 8], 42, &affect);
+        assert_eq!(pkt.payload_type, PayloadType::Affective);
+        assert_eq!(pkt.sequence, 42);
+
+        let extracted = pkt.extract_affective().unwrap();
+        assert!((extracted.valence - 0.6).abs() < 1e-6);
+        assert!((extracted.arousal - 0.8).abs() < 1e-6);
+        assert!((extracted.dominance - (-0.3)).abs() < 1e-6);
+        assert!((extracted.intensity - 0.7).abs() < 1e-6);
+        assert!((extracted.confidence - 0.95).abs() < 1e-6);
+        assert_eq!(extracted.timestamp_ms, 1_700_000_000);
+        assert_eq!(extracted.sequence, 42);
     }
 }
