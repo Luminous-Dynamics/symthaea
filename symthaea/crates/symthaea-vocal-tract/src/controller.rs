@@ -58,8 +58,10 @@ impl Default for VocalTractConfig {
     fn default() -> Self {
         Self {
             network_layers: 2,
-            neurons_per_layer: 4,
-            // 8 total neurons — restored for vowel accuracy (AA/IY). Throughput ~240Hz.
+            neurons_per_layer: 6,
+            // 12 total neurons — increased for extreme vowel accuracy (IY/UW/AA).
+            // 4 neurons → 4D output manifold was too small for 44 phonemes.
+            // 6 neurons → 6D gives ~50% more expressiveness. Throughput ~200Hz.
             learning_rate: 0.001,
             base_f0: 120.0,
             f0_range: 200.0,
@@ -699,11 +701,11 @@ impl VocalTractController {
         // - No weight decay during supervised training (prevents erosion)
         const WARMUP_STEPS: usize = 20;
 
-        // Cosine annealing: peak LR = 30× base, decays to 20× base.
-        // Narrow range keeps gradients strong throughout (extreme vowels need sustained
-        // high LR) while providing slight late-stage fine-tuning.
+        // Cosine annealing: peak LR = 30× base, decays to 5× base.
+        // Wide range: early epochs drive large formant shifts (IY needs +790 Hz F2),
+        // later epochs fine-tune with 6× lower LR to avoid oscillation.
         let lr_peak = self.learning_rate * 30.0;
-        let lr_min = self.learning_rate * 20.0;
+        let lr_min = self.learning_rate * 5.0;
 
         for epoch in 0..epochs {
             // Cosine annealing schedule
