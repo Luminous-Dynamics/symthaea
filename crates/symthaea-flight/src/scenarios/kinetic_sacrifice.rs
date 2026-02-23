@@ -194,8 +194,7 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
     let pd_gains = PdGains::default();
 
     // Auto-calibrate hover thrust from MuJoCo model mass
-    let hover_thrust_offset =
-        (sim.body_mass() * 9.81) as f32 - QuadrotorCommand::HOVER_THRUST;
+    let hover_thrust_offset = (sim.body_mass() * 9.81) as f32 - QuadrotorCommand::HOVER_THRUST;
 
     let mut fep_result = fep_agent.initial_step(sim.state(), &setpoint);
     let mut pid_state = PidState::default();
@@ -276,7 +275,8 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
         // Blend: PD provides reactive position tracking, CfC provides learned dynamics
         let alpha = 0.5f32;
         let mut command = QuadrotorCommand {
-            thrust: alpha * pd_cmd.thrust + (1.0 - alpha) * cfc_cmd.thrust
+            thrust: alpha * pd_cmd.thrust
+                + (1.0 - alpha) * cfc_cmd.thrust
                 + hover_thrust_offset
                 + (integral_gain * thrust_integral) as f32,
             roll_moment: alpha * pd_cmd.roll_moment + (1.0 - alpha) * cfc_cmd.roll_moment,

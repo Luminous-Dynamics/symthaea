@@ -5,7 +5,9 @@
 //!
 //! Run: `cargo run -p symthaea-flight --features mujoco --example mujoco_kinetic_sacrifice --release`
 
-use symthaea_flight::scenarios::kinetic_sacrifice::{run_kinetic_sacrifice, KineticSacrificeConfig};
+use symthaea_flight::scenarios::kinetic_sacrifice::{
+    run_kinetic_sacrifice, KineticSacrificeConfig,
+};
 
 fn main() {
     println!("=== Kinetic Sacrifice Scenario ===\n");

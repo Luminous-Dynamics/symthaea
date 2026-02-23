@@ -480,7 +480,9 @@ fn test_regression_pid_vs_pd() {
 #[test]
 #[ignore] // Requires MuJoCo library: cargo test -p symthaea-flight --features mujoco -- --ignored --nocapture diagnostic_kinetic_sacrifice
 fn diagnostic_kinetic_sacrifice() {
-    use symthaea_flight::scenarios::kinetic_sacrifice::{run_kinetic_sacrifice, KineticSacrificeConfig};
+    use symthaea_flight::scenarios::kinetic_sacrifice::{
+        run_kinetic_sacrifice, KineticSacrificeConfig,
+    };
 
     println!("\n{}", "=".repeat(80));
     println!("=== DIAGNOSTIC: Kinetic Sacrifice (FEP moral reasoning) ===");

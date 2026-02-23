@@ -39,7 +39,10 @@ fn main() {
 
     println!("--- Results ---");
     println!("Total experiences:  {}", result.total_experiences);
-    println!("Buffer utilization: {:.1}%", result.buffer_utilization * 100.0);
+    println!(
+        "Buffer utilization: {:.1}%",
+        result.buffer_utilization * 100.0
+    );
     println!("Mean final error:   {:.4}m", result.mean_final_error);
     println!("Best final error:   {:.4}m", result.best_final_error);
     println!("Episodes recorded:  {}", result.metrics.len());
@@ -49,7 +52,10 @@ fn main() {
     let mut failed = 0;
 
     // Check 1: All metrics finite
-    let all_finite = result.metrics.iter().all(|m| m.final_position_error.is_finite());
+    let all_finite = result
+        .metrics
+        .iter()
+        .all(|m| m.final_position_error.is_finite());
     if all_finite {
         println!("\n[PASS] All metrics are finite");
         passed += 1;
@@ -60,7 +66,10 @@ fn main() {
 
     // Check 2: Buffer was populated
     if result.total_experiences > 0 {
-        println!("[PASS] Experience buffer populated ({} entries)", result.total_experiences);
+        println!(
+            "[PASS] Experience buffer populated ({} entries)",
+            result.total_experiences
+        );
         passed += 1;
     } else {
         println!("[FAIL] Experience buffer is empty");
@@ -69,16 +78,25 @@ fn main() {
 
     // Check 3: Mean error bounded (< 5m — generous for short training)
     if result.mean_final_error < 5.0 {
-        println!("[PASS] Mean final error bounded ({:.4}m < 5.0m)", result.mean_final_error);
+        println!(
+            "[PASS] Mean final error bounded ({:.4}m < 5.0m)",
+            result.mean_final_error
+        );
         passed += 1;
     } else {
-        println!("[FAIL] Mean final error too high ({:.4}m)", result.mean_final_error);
+        println!(
+            "[FAIL] Mean final error too high ({:.4}m)",
+            result.mean_final_error
+        );
         failed += 1;
     }
 
     // Check 4: Buffer utilization > 0
     if result.buffer_utilization > 0.0 {
-        println!("[PASS] Buffer utilization > 0 ({:.1}%)", result.buffer_utilization * 100.0);
+        println!(
+            "[PASS] Buffer utilization > 0 ({:.1}%)",
+            result.buffer_utilization * 100.0
+        );
         passed += 1;
     } else {
         println!("[FAIL] Buffer utilization is 0");

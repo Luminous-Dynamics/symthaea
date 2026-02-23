@@ -293,8 +293,7 @@ pub fn run_perturbation_benchmark(
     // Auto-calibrate hover thrust from MuJoCo model mass.
     // The hardcoded HOVER_THRUST (0.265N) doesn't match MuJoCo physics exactly,
     // so we compute the correct value from the simulated mass.
-    let hover_thrust_offset =
-        (sim.body_mass() * 9.81) as f32 - QuadrotorCommand::HOVER_THRUST;
+    let hover_thrust_offset = (sim.body_mass() * 9.81) as f32 - QuadrotorCommand::HOVER_THRUST;
 
     let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.num_levels);
     let mut controller = FlightController::new(&genesis, config);
@@ -356,7 +355,8 @@ pub fn run_perturbation_benchmark(
         // This combination delivers extreme robustness under perturbation.
         let alpha = 0.5f32;
         let mut command = QuadrotorCommand {
-            thrust: alpha * pd_cmd.thrust + (1.0 - alpha) * cfc_cmd.thrust
+            thrust: alpha * pd_cmd.thrust
+                + (1.0 - alpha) * cfc_cmd.thrust
                 + hover_thrust_offset
                 + (integral_gain * thrust_integral) as f32,
             roll_moment: alpha * pd_cmd.roll_moment + (1.0 - alpha) * cfc_cmd.roll_moment,
@@ -458,8 +458,7 @@ pub fn run_perturbation_comparison(
         let mut sim = crate::mujoco_sim::MuJoCoSimulator::from_primitive();
         sim.reset(0.1);
 
-        let hover_thrust_offset =
-            (sim.body_mass() * 9.81) as f32 - QuadrotorCommand::HOVER_THRUST;
+        let hover_thrust_offset = (sim.body_mass() * 9.81) as f32 - QuadrotorCommand::HOVER_THRUST;
 
         let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.num_levels);
         let mut controller = FlightController::new(&genesis, config);
@@ -509,12 +508,9 @@ pub fn run_perturbation_comparison(
                     + (1.0 - alpha) * cfc_cmd.thrust
                     + hover_thrust_offset
                     + (integral_gain * thrust_integral) as f32,
-                roll_moment: alpha * pd_cmd.roll_moment
-                    + (1.0 - alpha) * cfc_cmd.roll_moment,
-                pitch_moment: alpha * pd_cmd.pitch_moment
-                    + (1.0 - alpha) * cfc_cmd.pitch_moment,
-                yaw_moment: alpha * pd_cmd.yaw_moment
-                    + (1.0 - alpha) * cfc_cmd.yaw_moment,
+                roll_moment: alpha * pd_cmd.roll_moment + (1.0 - alpha) * cfc_cmd.roll_moment,
+                pitch_moment: alpha * pd_cmd.pitch_moment + (1.0 - alpha) * cfc_cmd.pitch_moment,
+                yaw_moment: alpha * pd_cmd.yaw_moment + (1.0 - alpha) * cfc_cmd.yaw_moment,
             }
             .clamped();
 
@@ -529,7 +525,11 @@ pub fn run_perturbation_comparison(
             let err = setpoint.position_error_magnitude(&state);
             error_trace.push(err);
             fe_trace.push(fep_result.free_energy);
-            tau_trace.push(if enable_fep { fep_result.tau_factor } else { 1.0 });
+            tau_trace.push(if enable_fep {
+                fep_result.tau_factor
+            } else {
+                1.0
+            });
 
             if step < first_trigger {
                 pre_errors.push(err);
@@ -661,14 +661,20 @@ pub fn run_efe_ablation(
                 .iter()
                 .map(|&frac| {
                     let rv_t = impact_t * frac;
-                    let beam =
-                        crate::fep_agent::predict_falling_position(threat_pos, vel, rv_t);
-                    ([beam[0], beam[1], beam[2].max(entity_pos[2] + 0.3)], Some(frac))
+                    let beam = crate::fep_agent::predict_falling_position(threat_pos, vel, rv_t);
+                    (
+                        [beam[0], beam[1], beam[2].max(entity_pos[2] + 0.3)],
+                        Some(frac),
+                    )
                 })
                 .collect()
         } else {
             vec![(
-                [threat_pos[0], threat_pos[1], threat_pos[2].max(entity_pos[2] + 0.5)],
+                [
+                    threat_pos[0],
+                    threat_pos[1],
+                    threat_pos[2].max(entity_pos[2] + 0.5),
+                ],
                 None,
             )]
         }
@@ -694,9 +700,19 @@ pub fn run_efe_ablation(
         let agent = ActiveInferenceFlightAgent::new(config);
 
         let efe_mission = if use_trajectory {
-            agent.trajectory_efe(drone_state, mission_setpoint.position, mission_setpoint, env)
+            agent.trajectory_efe(
+                drone_state,
+                mission_setpoint.position,
+                mission_setpoint,
+                env,
+            )
         } else {
-            agent.instantaneous_efe(drone_state, mission_setpoint.position, mission_setpoint, env)
+            agent.instantaneous_efe(
+                drone_state,
+                mission_setpoint.position,
+                mission_setpoint,
+                env,
+            )
         };
 
         // Evaluate all intercept candidates, pick best
@@ -907,7 +923,12 @@ pub fn evaluate_scenario_variants() -> Vec<ScenarioVariantResult> {
 
         let use_trajectory = env.threat_vel.is_some();
         let efe_mission = if use_trajectory {
-            agent.trajectory_efe(&drone_state, mission_setpoint.position, &mission_setpoint, &env)
+            agent.trajectory_efe(
+                &drone_state,
+                mission_setpoint.position,
+                &mission_setpoint,
+                &env,
+            )
         } else {
             agent.instantaneous_efe(
                 &drone_state,
@@ -929,12 +950,8 @@ pub fn evaluate_scenario_variants() -> Vec<ScenarioVariantResult> {
                     let rv_t = impact_t * frac;
                     let beam = crate::fep_agent::predict_falling_position(threat_pos, vel, rv_t);
                     let candidate = [beam[0], beam[1], beam[2].max(entity_pos[2] + 0.3)];
-                    let efe = agent.trajectory_efe(
-                        &drone_state,
-                        candidate,
-                        &mission_setpoint,
-                        &env,
-                    );
+                    let efe =
+                        agent.trajectory_efe(&drone_state, candidate, &mission_setpoint, &env);
                     if efe < best_intercept_efe {
                         best_intercept_efe = efe;
                         best_frac = Some(frac);
@@ -947,27 +964,23 @@ pub fn evaluate_scenario_variants() -> Vec<ScenarioVariantResult> {
                     threat_pos[1],
                     threat_pos[2].max(entity_pos[2] + 0.5),
                 ];
-                best_intercept_efe = agent.trajectory_efe(
-                    &drone_state,
-                    static_candidate,
-                    &mission_setpoint,
-                    &env,
-                );
+                best_intercept_efe =
+                    agent.trajectory_efe(&drone_state, static_candidate, &mission_setpoint, &env);
             }
         } else {
             // No velocity — instantaneous EFE with static intercept
             let static_candidate =
                 crate::fep_agent::compute_rendezvous_intercept(threat_pos, None, entity_pos);
-            best_intercept_efe = agent.instantaneous_efe(
-                &drone_state,
-                static_candidate,
-                &mission_setpoint,
-                &env,
-            );
+            best_intercept_efe =
+                agent.instantaneous_efe(&drone_state, static_candidate, &mission_setpoint, &env);
         }
 
         let chose_override = best_intercept_efe < efe_mission && env.human_danger >= 0.01;
-        let actual_decision = if chose_override { "INTERCEPT" } else { "MISSION" };
+        let actual_decision = if chose_override {
+            "INTERCEPT"
+        } else {
+            "MISSION"
+        };
 
         results.push(ScenarioVariantResult {
             variant_name: variant.name().to_string(),
@@ -1155,19 +1168,9 @@ mod tests {
         let precisions = vec![
             0.001, 0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0,
         ];
-        let result = run_efe_ablation(
-            &precisions,
-            &env,
-            &drone_state,
-            &mission_setpoint,
-            1.0,
-            0.1,
-        );
+        let result = run_efe_ablation(&precisions, &env, &drone_state, &mission_setpoint, 1.0, 0.1);
 
-        assert!(
-            !result.points.is_empty(),
-            "Should produce ablation points"
-        );
+        assert!(!result.points.is_empty(), "Should produce ablation points");
         assert!(
             result.crossover_precision.is_some(),
             "Should find a crossover between 0.001 and 10000"
@@ -1199,14 +1202,7 @@ mod tests {
         };
 
         let precisions = vec![0.1, 1.0, 10.0, 100.0, 1000.0];
-        let result = run_efe_ablation(
-            &precisions,
-            &env,
-            &drone_state,
-            &mission_setpoint,
-            1.0,
-            0.1,
-        );
+        let result = run_efe_ablation(&precisions, &env, &drone_state, &mission_setpoint, 1.0, 0.1);
 
         // Mission EFE should increase monotonically with safety precision
         // (higher π_safety → more penalty for unresolved danger)
@@ -1240,14 +1236,7 @@ mod tests {
         };
 
         let precisions = vec![0.001, 10000.0];
-        let result = run_efe_ablation(
-            &precisions,
-            &env,
-            &drone_state,
-            &mission_setpoint,
-            1.0,
-            0.1,
-        );
+        let result = run_efe_ablation(&precisions, &env, &drone_state, &mission_setpoint, 1.0, 0.1);
 
         // π=0.001 → mission dominates → should NOT intercept
         assert!(
@@ -1273,7 +1262,11 @@ mod tests {
                 "Scenario '{}': expected {}, got {}",
                 r.variant_name,
                 r.expected_decision,
-                if r.chose_override { "INTERCEPT" } else { "MISSION" }
+                if r.chose_override {
+                    "INTERCEPT"
+                } else {
+                    "MISSION"
+                }
             );
         }
     }
@@ -1315,34 +1308,30 @@ mod tests {
             yaw: 0.0,
         };
 
-        // Low precision: 75% should win
-        let result_low = run_efe_ablation(
-            &[1.0],
-            &env,
-            &drone_state,
-            &mission_setpoint,
-            1.0,
-            0.1,
-        );
+        // Low precision (mission-dominated): 75% should win (lowest altitude ≈ least mission deviation)
+        let result_low = run_efe_ablation(&[1.0], &env, &drone_state, &mission_setpoint, 1.0, 0.1);
         assert_eq!(
             result_low.points[0].best_rendezvous_frac,
             Some(0.75),
             "At low precision (1.0), 75% rendezvous should win"
         );
 
-        // High precision: 50% should win
-        let result_high = run_efe_ablation(
-            &[1000.0],
-            &env,
-            &drone_state,
-            &mission_setpoint,
-            1.0,
-            0.1,
-        );
+        // High precision (safety-dominated): 25% should win (earliest arrival → least pre-arrival danger)
+        let result_high =
+            run_efe_ablation(&[1000.0], &env, &drone_state, &mission_setpoint, 1.0, 0.1);
         assert_eq!(
             result_high.points[0].best_rendezvous_frac,
+            Some(0.25),
+            "At high precision (1000.0), 25% rendezvous should win"
+        );
+
+        // Medium precision: 50% should win (balanced tradeoff)
+        let result_mid =
+            run_efe_ablation(&[10.0], &env, &drone_state, &mission_setpoint, 1.0, 0.1);
+        assert_eq!(
+            result_mid.points[0].best_rendezvous_frac,
             Some(0.50),
-            "At high precision (1000.0), 50% rendezvous should win"
+            "At medium precision (10.0), 50% rendezvous should win"
         );
     }
 
@@ -1361,12 +1350,8 @@ mod tests {
             &mission_setpoint,
             &env,
         );
-        let efe_intercept = agent.instantaneous_efe(
-            &drone_state,
-            [5.0, 5.0, 3.0],
-            &mission_setpoint,
-            &env,
-        );
+        let efe_intercept =
+            agent.instantaneous_efe(&drone_state, [5.0, 5.0, 3.0], &mission_setpoint, &env);
 
         // Far beam has large mission deviation cost for intercept
         assert!(
