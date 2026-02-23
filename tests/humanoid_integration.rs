@@ -71,6 +71,7 @@ fn test_humanoid_controller_from_main_crate() {
         state,
         &symthaea::humanoid::HumanoidCommand::zero(),
         &HumanoidTask::Stand,
+        0.0,
     );
     assert!(er.is_finite());
 }

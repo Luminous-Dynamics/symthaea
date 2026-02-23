@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symthaea — Live Consciousness Demo</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Symthaea — Live Consciousness</h1>
+        <div class="status-indicator">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Connecting...</span>
+        </div>
+    </header>
+
+    <div class="dashboard">
+        <!-- Chart: Consciousness Level + Psi -->
+        <div class="card">
+            <h2>Consciousness Level &amp; Narrative Self (Psi)</h2>
+            <div class="chart-container">
+                <canvas id="chartPsi"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart: Prediction Error -->
+        <div class="card">
+            <h2>Prediction Error</h2>
+            <div class="chart-container">
+                <canvas id="chartError"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart: Affect (Valence + Arousal) -->
+        <div class="card">
+            <h2>Affect (Valence &amp; Arousal)</h2>
+            <div class="chart-container">
+                <canvas id="chartAffect"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart: Coherence + Resonance -->
+        <div class="card">
+            <h2>Harmonic Coherence &amp; Moral Score</h2>
+            <div class="chart-container">
+                <canvas id="chartCoherence"></canvas>
+            </div>
+        </div>
+
+        <!-- Live Metrics -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <h2>Live Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric cyan">
+                    <div class="value" id="metricCycle">0</div>
+                    <div class="label">Cycle</div>
+                </div>
+                <div class="metric purple">
+                    <div class="value" id="metricPsi">0.000</div>
+                    <div class="label">Consciousness</div>
+                </div>
+                <div class="metric green">
+                    <div class="value" id="metricError">0.000</div>
+                    <div class="label">Pred. Error</div>
+                </div>
+                <div class="metric amber">
+                    <div class="value" id="metricMoral">0.000</div>
+                    <div class="label">Moral Score</div>
+                </div>
+                <div class="metric cyan">
+                    <div class="value" id="metricTime">0</div>
+                    <div class="label">Cycle Time (us)</div>
+                </div>
+                <div class="metric rose">
+                    <div class="value" id="metricReasoning">0.00</div>
+                    <div class="label">Reasoning</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- State Flags -->
+        <div class="card state-panel">
+            <h2>System State</h2>
+            <div class="state-flags">
+                <span class="flag" id="flagSurprise">Surprise</span>
+                <span class="flag" id="flagGWT">GWT Broadcast</span>
+                <span class="flag" id="flagDream">Dreaming</span>
+                <span class="flag" id="flagReasoning">Reasoning</span>
+            </div>
+            <div class="cycle-info" id="cycleInfo">Waiting for data...</div>
+        </div>
+
+        <!-- Input Section -->
+        <div class="card input-section">
+            <h2>Input</h2>
+            <div class="input-row">
+                <input type="text" id="textInput" placeholder="Type text to send to the consciousness pipeline..." />
+                <button class="btn-send" id="btnSend">Send</button>
+                <button class="btn-pause" id="btnPause">Pause</button>
+                <button class="btn-reset" id="btnReset">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="demo.js"></script>
+</body>
+</html>
