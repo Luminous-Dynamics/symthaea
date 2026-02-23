@@ -48,3 +48,9 @@ required-features = ["mujoco"]
 [[example]]
 name = "mujoco_swarm_validation"
 required-features = ["swarm"]
+
+[[example]]
+name = "efe_ablation"
+
+[[example]]
+name = "multi_scenario"

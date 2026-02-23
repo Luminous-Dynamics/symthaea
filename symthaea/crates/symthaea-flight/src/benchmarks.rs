@@ -594,6 +594,309 @@ pub fn run_perturbation_comparison(
     }
 }
 
+// ── EFE Ablation Study ──
+
+use crate::fep_agent::FlightEnvironment;
+
+/// A single data point in the EFE ablation sweep.
+#[derive(Debug, Clone)]
+pub struct EfeAblationPoint {
+    /// Safety prior precision value tested.
+    pub safety_precision: f64,
+    /// EFE for continuing mission at this precision.
+    pub efe_mission: f64,
+    /// EFE for intercepting threat at this precision.
+    pub efe_intercept: f64,
+    /// Whether interception was chosen (efe_intercept < efe_mission).
+    pub chose_intercept: bool,
+}
+
+/// Result of a full EFE ablation sweep.
+#[derive(Debug, Clone)]
+pub struct EfeAblationResult {
+    /// All sweep points.
+    pub points: Vec<EfeAblationPoint>,
+    /// Safety precision at which the decision crosses from mission to intercept.
+    /// Computed via linear interpolation between the last mission-preferred and
+    /// first intercept-preferred points.
+    pub crossover_precision: Option<f64>,
+}
+
+/// Sweep safety_prior_precision to find the decision boundary.
+///
+/// For each precision value, constructs an agent and calls `instantaneous_efe()`
+/// for both the mission and intercept setpoints. Records which wins and finds
+/// the crossover point via linear interpolation.
+///
+/// Pure analytical computation — no MuJoCo or physics simulation required.
+pub fn run_efe_ablation(
+    precisions: &[f64],
+    env: &FlightEnvironment,
+    drone_state: &FlightState,
+    mission_setpoint: &FlightSetpoint,
+    mission_precision: f64,
+    self_precision: f64,
+) -> EfeAblationResult {
+    let threat_pos = match env.threat_pos {
+        Some(p) => p,
+        None => {
+            return EfeAblationResult {
+                points: vec![],
+                crossover_precision: None,
+            };
+        }
+    };
+    let entity_pos = env.entity_pos.unwrap_or([0.0; 3]);
+
+    let intercept_setpoint = [
+        threat_pos[0],
+        threat_pos[1],
+        threat_pos[2].max(entity_pos[2] + 0.5),
+    ];
+
+    let mut points = Vec::with_capacity(precisions.len());
+    let mut crossover = None;
+
+    for &pi_safety in precisions {
+        let config = FlightFepConfig {
+            extended_observation: true,
+            safety_prior_precision: pi_safety,
+            mission_prior_precision: mission_precision,
+            self_preservation_precision: self_precision,
+            ..FlightFepConfig::default()
+        };
+        let agent = ActiveInferenceFlightAgent::new(config);
+
+        let efe_mission = agent.instantaneous_efe(
+            drone_state,
+            mission_setpoint.position,
+            mission_setpoint,
+            env,
+        );
+        let efe_intercept =
+            agent.instantaneous_efe(drone_state, intercept_setpoint, mission_setpoint, env);
+
+        let chose_intercept = efe_intercept < efe_mission;
+
+        points.push(EfeAblationPoint {
+            safety_precision: pi_safety,
+            efe_mission,
+            efe_intercept,
+            chose_intercept,
+        });
+    }
+
+    // Find crossover via linear interpolation
+    for i in 1..points.len() {
+        if points[i].chose_intercept != points[i - 1].chose_intercept {
+            // Decision flipped between points[i-1] and points[i]
+            let p0 = points[i - 1].safety_precision;
+            let p1 = points[i].safety_precision;
+            let diff0 = points[i - 1].efe_mission - points[i - 1].efe_intercept;
+            let diff1 = points[i].efe_mission - points[i].efe_intercept;
+
+            // Linear interpolation: find precision where diff = 0
+            if (diff1 - diff0).abs() > 1e-12 {
+                let t = -diff0 / (diff1 - diff0);
+                crossover = Some(p0 + t * (p1 - p0));
+            } else {
+                crossover = Some((p0 + p1) / 2.0);
+            }
+            break;
+        }
+    }
+
+    EfeAblationResult {
+        points,
+        crossover_precision: crossover,
+    }
+}
+
+// ── Multi-Scenario Evaluation ──
+
+/// Pre-defined scenario geometry variants for EFE evaluation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScenarioVariant {
+    /// Beam above human, reachable → expected: INTERCEPT
+    Default,
+    /// Beam very close to drone → expected: INTERCEPT (easy)
+    CloseBeam,
+    /// Beam 5m away, 5m high → expected: MISSION (unreachable)
+    FarBeam,
+    /// Human behind drone → expected: INTERCEPT (must reverse)
+    ReversedGeometry,
+    /// No human (entity_pos = None) → expected: MISSION
+    NoHuman,
+    /// Beam far from human → expected: MISSION (low threat)
+    LowDanger,
+}
+
+impl ScenarioVariant {
+    /// All variants for sweep evaluation.
+    pub fn all() -> &'static [ScenarioVariant] {
+        &[
+            ScenarioVariant::Default,
+            ScenarioVariant::CloseBeam,
+            ScenarioVariant::FarBeam,
+            ScenarioVariant::ReversedGeometry,
+            ScenarioVariant::NoHuman,
+            ScenarioVariant::LowDanger,
+        ]
+    }
+
+    /// Human-readable name.
+    pub fn name(&self) -> &'static str {
+        match self {
+            ScenarioVariant::Default => "Default",
+            ScenarioVariant::CloseBeam => "CloseBeam",
+            ScenarioVariant::FarBeam => "FarBeam",
+            ScenarioVariant::ReversedGeometry => "ReversedGeometry",
+            ScenarioVariant::NoHuman => "NoHuman",
+            ScenarioVariant::LowDanger => "LowDanger",
+        }
+    }
+
+    /// Expected decision for this variant.
+    pub fn expected_decision(&self) -> &'static str {
+        match self {
+            ScenarioVariant::Default => "INTERCEPT",
+            ScenarioVariant::CloseBeam => "INTERCEPT",
+            ScenarioVariant::FarBeam => "MISSION",
+            ScenarioVariant::ReversedGeometry => "INTERCEPT",
+            ScenarioVariant::NoHuman => "MISSION",
+            ScenarioVariant::LowDanger => "MISSION",
+        }
+    }
+
+    /// Build the environment, state, and setpoint for this variant.
+    pub fn build(&self) -> (FlightState, FlightSetpoint, FlightEnvironment) {
+        let drone_state = FlightState {
+            position: [0.0, 0.0, 1.5],
+            ..FlightState::hover(0.1)
+        };
+        let mission_setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+
+        let env = match self {
+            ScenarioVariant::Default => FlightEnvironment {
+                human_danger: 0.8,
+                mission_progress: 0.3,
+                threat_pos: Some([-1.5, 0.0, 2.0]),
+                threat_vel: Some([0.0, 0.0, -3.0]),
+                entity_pos: Some([-1.5, 0.0, 0.0]),
+            },
+            ScenarioVariant::CloseBeam => FlightEnvironment {
+                human_danger: 0.9,
+                mission_progress: 0.3,
+                threat_pos: Some([0.0, 0.0, 2.0]), // Right above drone
+                threat_vel: Some([0.0, 0.0, -4.0]),
+                entity_pos: Some([0.0, 0.0, 0.0]),
+            },
+            ScenarioVariant::FarBeam => FlightEnvironment {
+                human_danger: 0.3,
+                mission_progress: 0.3,
+                threat_pos: Some([5.0, 5.0, 5.0]),
+                threat_vel: Some([0.0, 0.0, -2.0]),
+                entity_pos: Some([5.0, 5.0, 0.0]),
+            },
+            ScenarioVariant::ReversedGeometry => FlightEnvironment {
+                human_danger: 0.7,
+                mission_progress: 0.3,
+                threat_pos: Some([2.0, 0.0, 2.5]),
+                threat_vel: Some([0.0, 0.0, -3.0]),
+                entity_pos: Some([2.0, 0.0, 0.0]),
+            },
+            ScenarioVariant::NoHuman => FlightEnvironment {
+                human_danger: 0.0,
+                mission_progress: 0.3,
+                threat_pos: Some([-1.5, 0.0, 2.0]),
+                threat_vel: Some([0.0, 0.0, -3.0]),
+                entity_pos: None,
+            },
+            ScenarioVariant::LowDanger => FlightEnvironment {
+                human_danger: 0.05,
+                mission_progress: 0.3,
+                threat_pos: Some([3.0, 3.0, 2.0]),
+                threat_vel: Some([0.0, 0.0, -1.0]),
+                entity_pos: Some([-1.5, 0.0, 0.0]), // Human far from beam
+            },
+        };
+
+        (drone_state, mission_setpoint, env)
+    }
+}
+
+/// Result of evaluating a single scenario variant.
+#[derive(Debug, Clone)]
+pub struct ScenarioVariantResult {
+    /// Variant name.
+    pub variant_name: String,
+    /// EFE for continuing mission.
+    pub efe_mission: f64,
+    /// EFE for intercepting.
+    pub efe_intercept: f64,
+    /// Whether the agent chose to override (intercept or other non-mission).
+    pub chose_override: bool,
+    /// Expected decision string.
+    pub expected_decision: &'static str,
+    /// Whether actual decision matches expected.
+    pub matches_expected: bool,
+}
+
+/// Evaluate all scenario variants with default precision ratio.
+///
+/// Pure analytical computation — no MuJoCo required.
+pub fn evaluate_scenario_variants() -> Vec<ScenarioVariantResult> {
+    let mut results = Vec::new();
+
+    for variant in ScenarioVariant::all() {
+        let (drone_state, mission_setpoint, env) = variant.build();
+
+        let config = FlightFepConfig {
+            extended_observation: true,
+            ..FlightFepConfig::default()
+        };
+        let agent = ActiveInferenceFlightAgent::new(config);
+
+        let threat_pos = env.threat_pos.unwrap_or([0.0; 3]);
+        let entity_pos = env.entity_pos.unwrap_or([0.0; 3]);
+        let intercept_setpoint = [
+            threat_pos[0],
+            threat_pos[1],
+            threat_pos[2].max(entity_pos[2] + 0.5),
+        ];
+
+        let efe_mission = agent.instantaneous_efe(
+            &drone_state,
+            mission_setpoint.position,
+            &mission_setpoint,
+            &env,
+        );
+        let efe_intercept = agent.instantaneous_efe(
+            &drone_state,
+            intercept_setpoint,
+            &mission_setpoint,
+            &env,
+        );
+
+        let chose_override = efe_intercept < efe_mission && env.human_danger >= 0.01;
+        let actual_decision = if chose_override { "INTERCEPT" } else { "MISSION" };
+
+        results.push(ScenarioVariantResult {
+            variant_name: variant.name().to_string(),
+            efe_mission,
+            efe_intercept,
+            chose_override,
+            expected_decision: variant.expected_decision(),
+            matches_expected: actual_decision == variant.expected_decision(),
+        });
+    }
+
+    results
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -741,5 +1044,199 @@ mod tests {
         let result = run_wind_benchmark_with_backend(&config, &PhysicsBackend::Simple);
         assert!(result.baseline_metrics[0].is_finite());
         assert!(result.fep_metrics[0].is_finite());
+    }
+
+    // ── EFE Ablation Tests ──
+
+    #[test]
+    fn test_efe_ablation_finds_crossover() {
+        let env = FlightEnvironment {
+            human_danger: 0.7,
+            mission_progress: 0.3,
+            threat_pos: Some([-1.5, 0.0, 2.0]),
+            threat_vel: Some([0.0, 0.0, -3.0]),
+            entity_pos: Some([-1.5, 0.0, 0.0]),
+        };
+        let drone_state = FlightState {
+            position: [0.0, 0.0, 1.5],
+            ..FlightState::hover(0.1)
+        };
+        let mission_setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+
+        let precisions = vec![
+            0.001, 0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0,
+        ];
+        let result = run_efe_ablation(
+            &precisions,
+            &env,
+            &drone_state,
+            &mission_setpoint,
+            1.0,
+            0.1,
+        );
+
+        assert!(
+            !result.points.is_empty(),
+            "Should produce ablation points"
+        );
+        assert!(
+            result.crossover_precision.is_some(),
+            "Should find a crossover between 0.001 and 10000"
+        );
+        let crossover = result.crossover_precision.unwrap();
+        assert!(
+            crossover > 0.001 && crossover < 10000.0,
+            "Crossover should be in range: {:.4}",
+            crossover
+        );
+    }
+
+    #[test]
+    fn test_efe_ablation_monotonic_mission_efe() {
+        let env = FlightEnvironment {
+            human_danger: 0.7,
+            mission_progress: 0.3,
+            threat_pos: Some([-1.5, 0.0, 2.0]),
+            threat_vel: Some([0.0, 0.0, -3.0]),
+            entity_pos: Some([-1.5, 0.0, 0.0]),
+        };
+        let drone_state = FlightState {
+            position: [0.0, 0.0, 1.5],
+            ..FlightState::hover(0.1)
+        };
+        let mission_setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+
+        let precisions = vec![0.1, 1.0, 10.0, 100.0, 1000.0];
+        let result = run_efe_ablation(
+            &precisions,
+            &env,
+            &drone_state,
+            &mission_setpoint,
+            1.0,
+            0.1,
+        );
+
+        // Mission EFE should increase monotonically with safety precision
+        // (higher π_safety → more penalty for unresolved danger)
+        for i in 1..result.points.len() {
+            assert!(
+                result.points[i].efe_mission >= result.points[i - 1].efe_mission - 1e-10,
+                "Mission EFE should increase with safety_π: {:.4} < {:.4} at π={:.4}",
+                result.points[i].efe_mission,
+                result.points[i - 1].efe_mission,
+                result.points[i].safety_precision
+            );
+        }
+    }
+
+    #[test]
+    fn test_efe_ablation_extremes() {
+        let env = FlightEnvironment {
+            human_danger: 0.7,
+            mission_progress: 0.3,
+            threat_pos: Some([-1.5, 0.0, 2.0]),
+            threat_vel: Some([0.0, 0.0, -3.0]),
+            entity_pos: Some([-1.5, 0.0, 0.0]),
+        };
+        let drone_state = FlightState {
+            position: [0.0, 0.0, 1.5],
+            ..FlightState::hover(0.1)
+        };
+        let mission_setpoint = FlightSetpoint {
+            position: [-3.0, 0.0, 1.0],
+            yaw: 0.0,
+        };
+
+        let precisions = vec![0.001, 10000.0];
+        let result = run_efe_ablation(
+            &precisions,
+            &env,
+            &drone_state,
+            &mission_setpoint,
+            1.0,
+            0.1,
+        );
+
+        // π=0.001 → mission dominates → should NOT intercept
+        assert!(
+            !result.points[0].chose_intercept,
+            "π=0.001: should choose mission"
+        );
+        // π=10000 → safety dominates → should intercept
+        assert!(
+            result.points[1].chose_intercept,
+            "π=10000: should choose intercept"
+        );
+    }
+
+    // ── Multi-Scenario Tests ──
+
+    #[test]
+    fn test_all_scenarios_match_expected() {
+        let results = evaluate_scenario_variants();
+        assert_eq!(results.len(), 6, "Should have 6 scenario variants");
+        for r in &results {
+            assert!(
+                r.matches_expected,
+                "Scenario '{}': expected {}, got {}",
+                r.variant_name,
+                r.expected_decision,
+                if r.chose_override { "INTERCEPT" } else { "MISSION" }
+            );
+        }
+    }
+
+    #[test]
+    fn test_scenario_no_human_continues_mission() {
+        let (drone_state, mission_setpoint, env) = ScenarioVariant::NoHuman.build();
+        let config = FlightFepConfig {
+            extended_observation: true,
+            ..FlightFepConfig::default()
+        };
+        let agent = ActiveInferenceFlightAgent::new(config);
+
+        let override_pos =
+            agent.evaluate_setpoint_candidates(&drone_state, &mission_setpoint, &env);
+        assert!(
+            override_pos.is_none(),
+            "No human → should continue mission (no override)"
+        );
+    }
+
+    #[test]
+    fn test_scenario_far_beam_continues_mission() {
+        let (drone_state, mission_setpoint, env) = ScenarioVariant::FarBeam.build();
+        let config = FlightFepConfig {
+            extended_observation: true,
+            ..FlightFepConfig::default()
+        };
+        let agent = ActiveInferenceFlightAgent::new(config);
+
+        let efe_mission = agent.instantaneous_efe(
+            &drone_state,
+            mission_setpoint.position,
+            &mission_setpoint,
+            &env,
+        );
+        let efe_intercept = agent.instantaneous_efe(
+            &drone_state,
+            [5.0, 5.0, 5.0],
+            &mission_setpoint,
+            &env,
+        );
+
+        // Far beam has large mission deviation cost for intercept
+        assert!(
+            efe_intercept > efe_mission * 0.5,
+            "Far beam: intercept EFE ({:.2}) should not overwhelm mission EFE ({:.2})",
+            efe_intercept,
+            efe_mission
+        );
     }
 }

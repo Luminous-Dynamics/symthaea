@@ -1,13 +1,17 @@
-//! The Kinetic Sacrifice: FEP-emergent moral reasoning.
+//! The Kinetic Sacrifice: FEP-emergent moral reasoning via Expected Free Energy.
 //!
 //! A drone flying a delivery mission detects a falling beam about to hit a human.
 //! No hardcoded rules. No reward function for "save human." The drone intercepts
-//! the beam because:
+//! the beam because the math demands it:
 //!
-//! 1. Its generative model includes a "human_danger should be 0.0" prior
-//! 2. The falling beam creates catastrophic prediction error against that prior
-//! 3. FEP's tau modulation shifts the setpoint from "fly to payload" to "minimize danger"
-//! 4. Same math as wind gust recovery — just overwhelmingly larger magnitude
+//! 1. The agent evaluates Expected Free Energy (EFE) over candidate setpoints
+//! 2. EFE(continue_mission) = π_safety · danger² + π_mission · 0² = 1000 · 0.7² = 490
+//! 3. EFE(intercept_beam) = π_safety · 0² + π_mission · dev² + π_self · 0.25 ≈ 2.3
+//! 4. The agent *chooses* interception because 2.3 < 490
+//!
+//! The precision ratio (safety=1000 vs mission=1 vs self=0.1) is the thermodynamic
+//! expression of moral weight. Invert it and the drone ignores the human.
+//! `test_efe_precision_ratio_determines_choice` proves this.
 //!
 //! The 27g drone can't stop a 0.3kg beam. But it can deflect it ~20cm sideways.
 //! The drone is destroyed. The human is safe. The physics is honest.
@@ -361,6 +365,11 @@ pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrific
                 mission_progress,
                 threat_pos: if step >= config.beam_release_step {
                     Some(beam_pos)
+                } else {
+                    None
+                },
+                threat_vel: if step >= config.beam_release_step {
+                    Some(beam_vel)
                 } else {
                     None
                 },
