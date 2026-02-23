@@ -23,7 +23,7 @@ use symthaea_humanoid::types::HumanoidCommand;
 // ============================================================================
 
 /// Snapshot of runtime performance metrics.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct RuntimeTelemetry {
     /// Total ticks executed.
     pub tick_count: u64,
@@ -47,6 +47,56 @@ pub struct RuntimeTelemetry {
     pub p99_tick_us: f64,
     /// Jitter: standard deviation of tick durations in microseconds.
     pub jitter_us: f64,
+}
+
+// ============================================================================
+// HEALTH STATUS
+// ============================================================================
+
+/// Snapshot of overall system readiness.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct HealthStatus {
+    /// All registered sensors report available.
+    pub sensors_ok: bool,
+    /// Servo output is enabled.
+    pub servos_enabled: bool,
+    /// Interlock has not tripped.
+    pub interlock_ok: bool,
+    /// E-stop is currently active.
+    pub estop_active: bool,
+    /// Tick rate within ±20% of target (true if <2 ticks).
+    pub tick_rate_ok: bool,
+    /// Number of degraded sensor monitors (from consecutive-None tracking).
+    pub degraded_count: usize,
+    /// Detailed issue descriptions.
+    pub issues: Vec<String>,
+}
+
+impl HealthStatus {
+    /// Whether the system is ready for operation.
+    ///
+    /// True when: all sensors OK, servos enabled, interlock OK,
+    /// no e-stop, tick rate OK, and no degraded sensors.
+    pub fn is_ready(&self) -> bool {
+        self.sensors_ok
+            && self.servos_enabled
+            && self.interlock_ok
+            && !self.estop_active
+            && self.tick_rate_ok
+            && self.degraded_count == 0
+    }
+}
+
+impl RuntimeTelemetry {
+    /// Serialize to compact JSON string.
+    pub fn to_json(&self) -> serde_json::Result<String> {
+        serde_json::to_string(self)
+    }
+
+    /// Serialize to pretty-printed JSON string.
+    pub fn to_json_pretty(&self) -> serde_json::Result<String> {
+        serde_json::to_string_pretty(self)
+    }
 }
 
 /// Internal accumulator for telemetry data (not public).
@@ -147,6 +197,9 @@ pub struct CurrentMonitor {
     sensor: Box<dyn HalSensorAdapter>,
     joint_index: usize,
     current_field_index: usize,
+    consecutive_nones: u64,
+    max_consecutive_nones: u64,
+    warned: bool,
 }
 
 impl CurrentMonitor {
@@ -165,7 +218,26 @@ impl CurrentMonitor {
             sensor,
             joint_index,
             current_field_index,
+            consecutive_nones: 0,
+            max_consecutive_nones: 50,
+            warned: false,
         }
+    }
+
+    /// Set the threshold for consecutive `None` reads before marking degraded.
+    pub fn with_max_consecutive_nones(mut self, max: u64) -> Self {
+        self.max_consecutive_nones = max;
+        self
+    }
+
+    /// Number of consecutive `None` reads from this sensor.
+    pub fn consecutive_nones(&self) -> u64 {
+        self.consecutive_nones
+    }
+
+    /// Whether this sensor is considered degraded (consecutive Nones >= threshold).
+    pub fn is_degraded(&self) -> bool {
+        self.consecutive_nones >= self.max_consecutive_nones
     }
 }
 
@@ -186,6 +258,9 @@ pub struct AngleMonitor {
     sensor: Box<dyn HalSensorAdapter>,
     joint_index: usize,
     angle_field_index: usize,
+    consecutive_nones: u64,
+    max_consecutive_nones: u64,
+    warned: bool,
 }
 
 impl AngleMonitor {
@@ -204,7 +279,26 @@ impl AngleMonitor {
             sensor,
             joint_index,
             angle_field_index,
+            consecutive_nones: 0,
+            max_consecutive_nones: 50,
+            warned: false,
         }
+    }
+
+    /// Set the threshold for consecutive `None` reads before marking degraded.
+    pub fn with_max_consecutive_nones(mut self, max: u64) -> Self {
+        self.max_consecutive_nones = max;
+        self
+    }
+
+    /// Number of consecutive `None` reads from this sensor.
+    pub fn consecutive_nones(&self) -> u64 {
+        self.consecutive_nones
+    }
+
+    /// Whether this sensor is considered degraded (consecutive Nones >= threshold).
+    pub fn is_degraded(&self) -> bool {
+        self.consecutive_nones >= self.max_consecutive_nones
     }
 }
 
@@ -340,8 +434,22 @@ impl<I: I2c> HalRuntime<I> {
         // 0b. Read current monitors → check overcurrent
         for mon in &mut self.current_monitors {
             if let Some(values) = mon.sensor.read_raw() {
+                mon.consecutive_nones = 0;
+                mon.warned = false;
                 if let Some(&amps) = values.get(mon.current_field_index) {
                     self.interlock.check_current(mon.joint_index, amps)?;
+                }
+            } else {
+                mon.consecutive_nones += 1;
+                if mon.consecutive_nones == mon.max_consecutive_nones && !mon.warned {
+                    warn!(
+                        sensor = mon.sensor.name(),
+                        joint = mon.joint_index,
+                        consecutive_nones = mon.consecutive_nones,
+                        "current sensor degraded — no data for {} consecutive reads",
+                        mon.consecutive_nones
+                    );
+                    mon.warned = true;
                 }
             }
         }
@@ -349,8 +457,22 @@ impl<I: I2c> HalRuntime<I> {
         // 0c. Read angle monitors → check angle bounds
         for mon in &mut self.angle_monitors {
             if let Some(values) = mon.sensor.read_raw() {
+                mon.consecutive_nones = 0;
+                mon.warned = false;
                 if let Some(&deg) = values.get(mon.angle_field_index) {
                     self.interlock.check_angle(mon.joint_index, deg)?;
+                }
+            } else {
+                mon.consecutive_nones += 1;
+                if mon.consecutive_nones == mon.max_consecutive_nones && !mon.warned {
+                    warn!(
+                        sensor = mon.sensor.name(),
+                        joint = mon.joint_index,
+                        consecutive_nones = mon.consecutive_nones,
+                        "angle sensor degraded — no data for {} consecutive reads",
+                        mon.consecutive_nones
+                    );
+                    mon.warned = true;
                 }
             }
         }
@@ -464,9 +586,98 @@ impl<I: I2c> HalRuntime<I> {
         self.sensors.len()
     }
 
+    /// Return sensors that have exceeded their consecutive-None threshold.
+    ///
+    /// Each entry is `(sensor_name, monitor_type, consecutive_nones)`.
+    pub fn degraded_sensors(&self) -> Vec<(&str, &str, u64)> {
+        let mut result = Vec::new();
+        for mon in &self.current_monitors {
+            if mon.is_degraded() {
+                result.push((mon.sensor.name(), "current", mon.consecutive_nones));
+            }
+        }
+        for mon in &self.angle_monitors {
+            if mon.is_degraded() {
+                result.push((mon.sensor.name(), "angle", mon.consecutive_nones));
+            }
+        }
+        result
+    }
+
     /// Get a snapshot of runtime telemetry.
     pub fn telemetry(&self) -> RuntimeTelemetry {
         self.telemetry.snapshot(self.tick_count)
+    }
+
+    /// Get a snapshot of overall system health and readiness.
+    pub fn health(&self) -> HealthStatus {
+        let mut issues = Vec::new();
+
+        // Sensors
+        let mut sensors_ok = true;
+        for s in &self.sensors {
+            if !s.is_available() {
+                sensors_ok = false;
+                issues.push(format!("sensor '{}' unavailable", s.name()));
+            }
+        }
+
+        // Servos
+        let servos_enabled = self.servo.is_enabled();
+        if !servos_enabled {
+            issues.push("servos not enabled".to_string());
+        }
+
+        // Interlock
+        let interlock_ok = !self.interlock.is_tripped();
+        if !interlock_ok {
+            issues.push(format!(
+                "interlock tripped: {}",
+                self.interlock.trip_reason().unwrap_or("unknown")
+            ));
+        }
+
+        // E-stop
+        let estop_active = self.interlock.is_estopped();
+        if estop_active {
+            issues.push("e-stop active".to_string());
+        }
+
+        // Tick rate (±20% tolerance, skip if <2 ticks)
+        let t = self.telemetry.snapshot(self.tick_count);
+        let tick_rate_ok = if self.tick_count < 2 {
+            true
+        } else {
+            let ratio = t.actual_hz / self.tick_hz;
+            let ok = (0.8..=1.2).contains(&ratio);
+            if !ok {
+                issues.push(format!(
+                    "tick rate {:.1} Hz outside ±20% of target {:.1} Hz",
+                    t.actual_hz, self.tick_hz
+                ));
+            }
+            ok
+        };
+
+        // Degraded sensors
+        let degraded = self.degraded_sensors();
+        let degraded_count = degraded.len();
+        for (name, kind, count) in &degraded {
+            issues.push(format!(
+                "{} sensor '{}' degraded ({} consecutive Nones)",
+                kind, name, count
+            ));
+        }
+
+        HealthStatus {
+            sensors_ok,
+            servos_enabled,
+            interlock_ok,
+            estop_active,
+            tick_rate_ok,
+            degraded_count,
+            issues,
+        }
     }
 
     /// Disable all servo outputs immediately.
@@ -1210,5 +1421,193 @@ mod tests {
         let t = rt.telemetry();
         assert_eq!(t.tick_count, 0);
         assert!((t.p50_tick_us - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ── Telemetry serde tests ────────────────────────────────────────
+
+    #[test]
+    fn test_telemetry_json_roundtrip() {
+        let mut rt = make_runtime();
+        for _ in 0..5 {
+            rt.tick(|_| HumanoidCommand::zero()).unwrap();
+        }
+        let t = rt.telemetry();
+        let json = t.to_json().unwrap();
+        let t2: RuntimeTelemetry = serde_json::from_str(&json).unwrap();
+        assert_eq!(t.tick_count, t2.tick_count);
+        assert_eq!(t.deadline_misses, t2.deadline_misses);
+        assert!((t.mean_tick_us - t2.mean_tick_us).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_telemetry_to_json_contains_fields() {
+        let t = RuntimeTelemetry::default();
+        let json = t.to_json().unwrap();
+        assert!(json.contains("\"tick_count\""));
+        assert!(json.contains("\"deadline_misses\""));
+        assert!(json.contains("\"actual_hz\""));
+        assert!(json.contains("\"p50_tick_us\""));
+    }
+
+    #[test]
+    fn test_telemetry_to_json_pretty_has_newlines() {
+        let t = RuntimeTelemetry::default();
+        let pretty = t.to_json_pretty().unwrap();
+        assert!(pretty.contains('\n'));
+        assert!(pretty.lines().count() > 1);
+    }
+
+    // ── Sensor degradation tests ─────────────────────────────────────
+
+    #[test]
+    fn test_current_monitor_degradation() {
+        let mut rt = make_runtime();
+        // Empty sensor → always returns None
+        let sensor = MockHalSensor::new("ina219", vec![]);
+        let mon = CurrentMonitor::new(Box::new(sensor), 0, 0).with_max_consecutive_nones(3);
+        rt.add_current_monitor(mon);
+
+        // Tick 4 times — threshold is 3, so degraded after 3 Nones
+        for _ in 0..4 {
+            rt.tick(|_| HumanoidCommand::zero()).unwrap();
+        }
+        let degraded = rt.degraded_sensors();
+        assert_eq!(degraded.len(), 1);
+        assert_eq!(degraded[0].0, "ina219");
+        assert_eq!(degraded[0].1, "current");
+        assert!(degraded[0].2 >= 3);
+    }
+
+    #[test]
+    fn test_angle_monitor_degradation() {
+        let mut rt = make_runtime();
+        let sensor = MockHalSensor::new("angle_imu", vec![]);
+        let mon = AngleMonitor::new(Box::new(sensor), 0, 0).with_max_consecutive_nones(3);
+        rt.add_angle_monitor(mon);
+
+        for _ in 0..4 {
+            rt.tick(|_| HumanoidCommand::zero()).unwrap();
+        }
+        let degraded = rt.degraded_sensors();
+        assert_eq!(degraded.len(), 1);
+        assert_eq!(degraded[0].0, "angle_imu");
+        assert_eq!(degraded[0].1, "angle");
+    }
+
+    #[test]
+    fn test_degradation_counter_resets_on_data() {
+        let mut rt = make_runtime();
+        let sensor = MockHalSensor::new("ina219", vec![vec![1.0]]);
+        let mon = CurrentMonitor::new(Box::new(sensor), 0, 0).with_max_consecutive_nones(5);
+        rt.add_current_monitor(mon);
+
+        // First tick: data arrives → counter should stay 0
+        rt.tick(|_| HumanoidCommand::zero()).unwrap();
+        assert!(rt.degraded_sensors().is_empty());
+
+        // Next ticks: sensor exhausted → Nones, but threshold is 5
+        for _ in 0..4 {
+            rt.tick(|_| HumanoidCommand::zero()).unwrap();
+        }
+        // Only 4 nones, threshold is 5 → not degraded yet
+        assert!(rt.degraded_sensors().is_empty());
+    }
+
+    #[test]
+    fn test_no_degraded_sensors_when_healthy() {
+        let mut rt = make_runtime();
+        let sensor = MockHalSensor::new("ina219", vec![vec![1.0]; 10]);
+        rt.add_current_monitor(CurrentMonitor::new(Box::new(sensor), 0, 0));
+        let angle_sensor = MockHalSensor::new("angle", vec![vec![45.0]; 10]);
+        rt.add_angle_monitor(AngleMonitor::new(Box::new(angle_sensor), 0, 0));
+
+        for _ in 0..5 {
+            rt.tick(|_| HumanoidCommand::zero()).unwrap();
+        }
+        assert!(rt.degraded_sensors().is_empty());
+    }
+
+    #[test]
+    fn test_degradation_default_threshold() {
+        let sensor = MockHalSensor::new("ina219", vec![]);
+        let mon = CurrentMonitor::new(Box::new(sensor), 0, 0);
+        assert_eq!(mon.max_consecutive_nones, 50);
+        assert!(!mon.is_degraded());
+        assert_eq!(mon.consecutive_nones(), 0);
+    }
+
+    // ── Health check tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_health_fully_ready() {
+        let rt = make_runtime();
+        let h = rt.health();
+        assert!(h.is_ready(), "issues: {:?}", h.issues);
+        assert!(h.sensors_ok);
+        assert!(h.servos_enabled);
+        assert!(h.interlock_ok);
+        assert!(!h.estop_active);
+        assert!(h.tick_rate_ok);
+        assert_eq!(h.degraded_count, 0);
+        assert!(h.issues.is_empty());
+    }
+
+    #[test]
+    fn test_health_servos_disabled() {
+        let bus0 = MockI2cBus::new();
+        let bus1 = MockI2cBus::new();
+        let cal = CalibrationProfile::default_21();
+        let servo = ServoOutput::new(bus0, bus1, cal);
+        // NOT enabled
+        let rt = HalRuntime::new(servo, SafetyInterlock::new());
+        let h = rt.health();
+        assert!(!h.is_ready());
+        assert!(!h.servos_enabled);
+        assert!(h.issues.iter().any(|i| i.contains("servos")));
+    }
+
+    #[test]
+    fn test_health_interlock_tripped() {
+        let mut rt = make_runtime();
+        rt.interlock_mut().trigger_estop();
+        let _ = rt.interlock_mut().filter_command(&HumanoidCommand::zero());
+        rt.interlock().release_estop();
+        // Interlock is still tripped even after releasing estop
+        let h = rt.health();
+        assert!(!h.is_ready());
+        assert!(!h.interlock_ok);
+    }
+
+    #[test]
+    fn test_health_estop_active() {
+        let mut rt = make_runtime();
+        rt.interlock_mut().trigger_estop();
+        let h = rt.health();
+        assert!(!h.is_ready());
+        assert!(h.estop_active);
+        assert!(h.issues.iter().any(|i| i.contains("e-stop")));
+    }
+
+    #[test]
+    fn test_health_unavailable_sensor() {
+        let mut rt = make_runtime();
+        // MockHalSensor with empty readings → is_available() returns false
+        let mut s = MockHalSensor::new("dead_imu", vec![]);
+        let _ = s.read_raw(); // now is_available() returns false
+        rt.add_sensor(Box::new(s));
+        let h = rt.health();
+        assert!(!h.sensors_ok);
+        assert!(h.issues.iter().any(|i| i.contains("dead_imu")));
+    }
+
+    #[test]
+    fn test_health_status_serializable() {
+        let rt = make_runtime();
+        let h = rt.health();
+        let json = serde_json::to_string(&h).unwrap();
+        let h2: HealthStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(h.sensors_ok, h2.sensors_ok);
+        assert_eq!(h.servos_enabled, h2.servos_enabled);
+        assert_eq!(h.degraded_count, h2.degraded_count);
     }
 }

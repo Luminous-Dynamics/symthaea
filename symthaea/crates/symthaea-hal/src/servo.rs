@@ -162,6 +162,42 @@ impl<I: I2c> ServoOutput<I> {
     pub fn calibration(&self) -> &CalibrationProfile {
         &self.calibration
     }
+
+    /// Read back the OFF counts for all 21 servo channels across both boards.
+    ///
+    /// Returns an array of 21 OFF counts (12-bit). This is a diagnostic
+    /// operation (21 I2C reads), not intended for per-tick use.
+    pub fn read_positions(&mut self) -> HalResult<[u16; NUM_ACTUATORS]> {
+        let mut counts = [0u16; NUM_ACTUATORS];
+        for (i, count) in counts.iter_mut().enumerate().take(CHANNELS) {
+            let (_on, off) = self.board0.read_channel(i as u8)?;
+            *count = off;
+        }
+        for i in 0..(NUM_ACTUATORS - CHANNELS) {
+            let (_on, off) = self.board1.read_channel(i as u8)?;
+            counts[CHANNELS + i] = off;
+        }
+        Ok(counts)
+    }
+
+    /// Compare last commanded pulses against actual readback from PCA9685.
+    ///
+    /// Returns a list of mismatches: `(joint_index, commanded_pulse_us, actual_off_count)`.
+    /// An empty vector means all positions match. This is a diagnostic
+    /// operation (21 I2C reads), not intended for per-tick use.
+    pub fn verify_positions(&mut self) -> HalResult<Vec<(usize, u16, u16)>> {
+        let actual = self.read_positions()?;
+        let period_us = self.board0.period_us();
+        let mut mismatches = Vec::new();
+        for (i, &pulse) in self.last_pulses.iter().enumerate() {
+            let expected_count = ((pulse as f64 / period_us) * 4096.0).round() as u16;
+            let expected_count = expected_count.min(4095);
+            if actual[i] != expected_count {
+                mismatches.push((i, pulse, actual[i]));
+            }
+        }
+        Ok(mismatches)
+    }
 }
 
 // ============================================================================
@@ -332,6 +368,37 @@ mod tests {
         for &p in servo.last_pulses() {
             assert_eq!(p, 1500);
         }
+    }
+
+    // ── Position readback tests ──────────────────────────────────────
+
+    #[test]
+    fn test_read_positions_returns_21_elements() {
+        let mut servo = make_servo();
+        servo.init(50.0).unwrap();
+        let positions = servo.read_positions().unwrap();
+        assert_eq!(positions.len(), NUM_ACTUATORS);
+    }
+
+    #[test]
+    fn test_verify_positions_detects_mismatches() {
+        let mut servo = make_servo();
+        servo.init(50.0).unwrap();
+        servo.enable();
+
+        // Apply zero command → last_pulses = 1500
+        let cmd = HumanoidCommand::zero();
+        servo.apply(&cmd).unwrap();
+        assert_eq!(servo.last_pulses()[0], 1500);
+
+        // Mock returns 0 for all reads → mismatch with commanded 1500
+        let mismatches = servo.verify_positions().unwrap();
+        // 1500µs at 50Hz → count ≈ 307, mock returns 0
+        assert!(!mismatches.is_empty(), "should detect mismatches");
+        // All 21 joints should mismatch (all commanded 1500, all read 0)
+        assert_eq!(mismatches.len(), NUM_ACTUATORS);
+        assert_eq!(mismatches[0].1, 1500); // commanded pulse
+        assert_eq!(mismatches[0].2, 0); // actual off count from mock
     }
 
     #[test]
