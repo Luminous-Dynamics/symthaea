@@ -691,6 +691,9 @@ impl VocalTractController {
             .map(|d| if *d > median_dist { 20 } else { 10 })
             .collect();
 
+        // Curriculum: track which phonemes are vowels for two-phase training
+        let is_vowel: Vec<bool> = phoneme_targets.iter().map(|(_, t)| t.is_vowel).collect();
+
         let mut last_epoch_loss = 0.0;
 
         // Convergence-critical parameters:
@@ -715,7 +718,16 @@ impl VocalTractController {
 
             let mut epoch_loss = 0.0;
 
+            // Two-phase curriculum: first half = vowels only (uncontested gradient space
+            // for the hardest targets like IY/UW/AA), second half = all phonemes.
+            let train_all = epoch >= epochs / 2;
+
             for (idx, (_, hv, target)) in phoneme_hvs.iter().enumerate() {
+                // Skip non-vowels in the vowel-only phase
+                if !train_all && !is_vowel[idx] {
+                    continue;
+                }
+
                 // Reset network state to isolate each phoneme (prevents state bleed)
                 self.reset();
 
@@ -739,7 +751,12 @@ impl VocalTractController {
                 }
             }
 
-            last_epoch_loss = epoch_loss / phoneme_hvs.len() as f32;
+            let n_trained = if train_all {
+                phoneme_hvs.len()
+            } else {
+                is_vowel.iter().filter(|v| **v).count()
+            };
+            last_epoch_loss = epoch_loss / n_trained.max(1) as f32;
         }
 
         last_epoch_loss

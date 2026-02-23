@@ -440,14 +440,12 @@ impl TextEncoder {
         for (pos, word) in words.iter().enumerate().take(self.config.max_length) {
             let normalized = word.to_lowercase();
 
-            // Both branches produce &[i8] via Arc -- zero allocation on cache hit:
-            // - Primitive path: Arc<Vec<i8>> from pre-computed cache (O(1) clone)
+            // Both branches produce &[i8] — zero allocation on cache hit:
+            // - Primitive path: borrow directly from pre-computed cache (no Arc::clone)
             // - Fallback path: Arc<Vec<i8>> from encode_word() (O(1) cache hit)
-            let prim_arc;
             let word_arc;
             let word_slice: &[i8] = if let Some(cached) = primitive_cache.get(&normalized) {
-                prim_arc = Arc::clone(cached);
-                &prim_arc
+                cached.as_ref()
             } else {
                 word_arc = self.encode_word(word)?;
                 &word_arc
