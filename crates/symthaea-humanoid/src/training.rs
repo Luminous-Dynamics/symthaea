@@ -89,6 +89,23 @@ impl HumanoidTrainer {
         }
     }
 
+    /// Create a trainer that resumes from a saved checkpoint.
+    ///
+    /// Loads the controller's output projection from a JSON checkpoint file,
+    /// reconstructing the network backbone from the stored genesis phrase.
+    /// Training continues from the checkpoint's learned state.
+    pub fn with_checkpoint(config: HumanoidConfig, checkpoint_path: &str) -> std::io::Result<Self> {
+        let controller = HumanoidController::load_checkpoint(checkpoint_path)?;
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        Ok(Self {
+            config,
+            genesis,
+            pd_gains: HumanoidPdGains::default(),
+            metrics: Vec::new(),
+            initial_controller: Some(controller),
+        })
+    }
+
     /// Create a trainer with custom PD gains.
     pub fn with_pd_gains(config: HumanoidConfig, gains: HumanoidPdGains) -> Self {
         let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
@@ -405,7 +422,10 @@ impl HumanoidTrainer {
         let genesis = self.genesis.clone();
         let num_levels = self.config.num_levels;
         let mut encoder = HumanoidHdcEncoder::new(&genesis, num_levels);
-        let mut controller = HumanoidController::new(&genesis, &self.config);
+        let mut controller = self
+            .initial_controller
+            .take()
+            .unwrap_or_else(|| HumanoidController::new(&genesis, &self.config));
         let mut fep_agent =
             ActiveInferenceHumanoidAgent::new(HumanoidFepConfig::default(), self.config.task);
 
@@ -637,6 +657,41 @@ mod tests {
             assert!(m.avg_episode_reward.is_finite());
             assert!(m.avg_head_height.is_finite());
         }
+    }
+
+    #[test]
+    fn test_checkpoint_resume_training() {
+        let config = HumanoidConfig {
+            num_episodes: 3,
+            steps_per_episode: 50,
+            ..HumanoidConfig::default()
+        };
+        let dir = "/tmp/symthaea_humanoid_test_resume";
+        let _ = std::fs::remove_dir_all(dir);
+
+        // Phase 1: Train and save checkpoint
+        let mut trainer1 = HumanoidTrainer::new(config.clone());
+        let _ = trainer1.train_with_telemetry(dir);
+
+        let checkpoint_path = format!("{}/checkpoint.json", dir);
+        assert!(std::path::Path::new(&checkpoint_path).exists());
+
+        // Phase 2: Resume from checkpoint
+        let resume_config = HumanoidConfig {
+            num_episodes: 2,
+            steps_per_episode: 50,
+            ..HumanoidConfig::default()
+        };
+        let mut trainer2 = HumanoidTrainer::with_checkpoint(resume_config, &checkpoint_path)
+            .expect("checkpoint should load");
+        let metrics = trainer2.train();
+
+        assert_eq!(metrics.len(), 2);
+        for m in &metrics {
+            assert!(m.avg_standing_reward.is_finite());
+        }
+
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
