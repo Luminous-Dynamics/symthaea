@@ -1796,6 +1796,7 @@ impl ReplVoiceOutput {
                         stress: timed_phoneme.stress,
                         base_f0,
                         arousal,
+                        ..Default::default()
                     };
 
                     let frame = pipeline.tick_with_prosody(

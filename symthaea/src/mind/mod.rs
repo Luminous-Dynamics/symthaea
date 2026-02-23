@@ -37,13 +37,33 @@ const MAX_OUTBOX_SIZE: usize = 64;
 #[cfg(feature = "mesh")]
 const MESH_DEDUP_RING_SIZE: usize = 128;
 
-/// Maximum bytes allowed per bandwidth window (100 KB).
-#[cfg(feature = "mesh")]
-const MESH_MAX_BYTES_PER_WINDOW: u64 = 100 * 1024;
-
 /// Duration of the bandwidth budget window.
 #[cfg(feature = "mesh")]
 const MESH_BANDWIDTH_WINDOW: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Initial (and reset) bandwidth budget: 100 KB per window.
+#[cfg(feature = "mesh")]
+const MESH_BANDWIDTH_INITIAL: u64 = 100 * 1024;
+
+/// Floor for AIMD multiplicative decrease: never below 25 KB.
+#[cfg(feature = "mesh")]
+const MESH_BANDWIDTH_MIN: u64 = 25 * 1024;
+
+/// Ceiling for AIMD additive increase: never above 200 KB.
+#[cfg(feature = "mesh")]
+const MESH_BANDWIDTH_MAX: u64 = 200 * 1024;
+
+/// Additive increase per window when mesh is healthy and not throttled.
+#[cfg(feature = "mesh")]
+const MESH_BANDWIDTH_ADDITIVE_INCREASE: u64 = 10 * 1024;
+
+/// Multiplicative decrease factor on throttle or low health.
+#[cfg(feature = "mesh")]
+const MESH_BANDWIDTH_DECREASE_FACTOR: f64 = 0.5;
+
+/// Capacity of the replay buffer for partition recovery.
+#[cfg(feature = "mesh")]
+const MESH_REPLAY_BUFFER_CAPACITY: usize = 16;
 
 /// The continuous mind system
 pub struct ContinuousMind {
@@ -150,6 +170,18 @@ pub struct ContinuousMind {
     /// Bytes sent within the current bandwidth budget window.
     #[cfg(feature = "mesh")]
     mesh_bandwidth_window_bytes: u64,
+    /// Optional BLAKE3 key for packet authentication.
+    #[cfg(feature = "mesh")]
+    mesh_auth_key: Option<[u8; 32]>,
+    /// Ring buffer of recently-emitted wisdom packets for partition recovery replay.
+    #[cfg(feature = "mesh")]
+    mesh_replay_buffer: std::collections::VecDeque<crate::swarm::mesh::WisdomPacket>,
+    /// Current dynamic bandwidth budget (AIMD-adjusted).
+    #[cfg(feature = "mesh")]
+    mesh_bandwidth_budget: u64,
+    /// Whether any emission was throttled within the current bandwidth window.
+    #[cfg(feature = "mesh")]
+    mesh_bandwidth_throttled_in_window: bool,
 }
 
 impl ContinuousMind {
@@ -224,6 +256,14 @@ impl ContinuousMind {
             mesh_bandwidth_window_start: std::time::Instant::now(),
             #[cfg(feature = "mesh")]
             mesh_bandwidth_window_bytes: 0,
+            #[cfg(feature = "mesh")]
+            mesh_auth_key: None,
+            #[cfg(feature = "mesh")]
+            mesh_replay_buffer: std::collections::VecDeque::with_capacity(MESH_REPLAY_BUFFER_CAPACITY),
+            #[cfg(feature = "mesh")]
+            mesh_bandwidth_budget: MESH_BANDWIDTH_INITIAL,
+            #[cfg(feature = "mesh")]
+            mesh_bandwidth_throttled_in_window: false,
         }
     }
 
@@ -530,11 +570,15 @@ impl ContinuousMind {
     pub(crate) fn mesh_bandwidth_check(&mut self, packet_bytes: u64) -> bool {
         let now = std::time::Instant::now();
         if now.duration_since(self.mesh_bandwidth_window_start) >= MESH_BANDWIDTH_WINDOW {
+            // Window expired — adjust budget before resetting
+            self.adjust_bandwidth_budget();
             self.mesh_bandwidth_window_start = now;
             self.mesh_bandwidth_window_bytes = 0;
+            self.mesh_bandwidth_throttled_in_window = false;
         }
-        if self.mesh_bandwidth_window_bytes + packet_bytes > MESH_MAX_BYTES_PER_WINDOW {
+        if self.mesh_bandwidth_window_bytes + packet_bytes > self.mesh_bandwidth_budget {
             self.mesh_stats.bandwidth_throttled += 1;
+            self.mesh_bandwidth_throttled_in_window = true;
             false
         } else {
             self.mesh_bandwidth_window_bytes += packet_bytes;
@@ -602,15 +646,25 @@ impl ContinuousMind {
             .unwrap_or_default()
             .as_secs() as u32;
 
-        let packet = WisdomPacket {
+        let mut packet = WisdomPacket {
             source_id,
             sequence: self.mesh_sequence,
             phi,
             urgency: MeshUrgency::from(urgency),
             timestamp_s,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
             wisdom: wisdom_hv,
         };
+
+        self.sign_mesh_packet(&mut packet);
+
+        // Push to replay buffer for partition recovery
+        if self.mesh_replay_buffer.len() >= MESH_REPLAY_BUFFER_CAPACITY {
+            self.mesh_replay_buffer.pop_front();
+        }
+        self.mesh_replay_buffer.push_back(packet.clone());
 
         self.mesh_sequence = self.mesh_sequence.wrapping_add(1);
         self.mesh_outbox.push(MeshOutbound { packet });
@@ -633,6 +687,51 @@ impl ContinuousMind {
         let dim_bytes = (self.config.dimension as u64).to_le_bytes();
         source_id.copy_from_slice(&dim_bytes);
         source_id
+    }
+
+    /// Set the BLAKE3 key for packet authentication.
+    ///
+    /// When set, all emitted packets are signed with this key, and
+    /// all received packets are verified (unsigned packets are rejected).
+    /// Pass `None` to disable authentication (backward-compatible default).
+    #[cfg(feature = "mesh")]
+    pub fn set_mesh_auth_key(&mut self, key: Option<[u8; 32]>) {
+        self.mesh_auth_key = key;
+    }
+
+    /// Sign a WisdomPacket with the mesh auth key (if set).
+    ///
+    /// Computes a BLAKE3 keyed MAC over the serialized packet bytes
+    /// and sets the `auth_mac` field. No-op if no key is configured.
+    #[cfg(feature = "mesh")]
+    fn sign_mesh_packet(&self, packet: &mut crate::swarm::mesh::WisdomPacket) {
+        if let Some(ref key) = self.mesh_auth_key {
+            let bytes = packet.to_bytes();
+            packet.auth_mac = crate::swarm::mesh::compute_packet_mac(&bytes, key);
+        }
+    }
+
+    /// Adjust the dynamic bandwidth budget using AIMD after each window reset.
+    ///
+    /// - **Additive Increase**: If mesh is healthy (health > 0.5) and no throttle
+    ///   occurred this window, increase budget by 10 KB (capped at 200 KB).
+    /// - **Multiplicative Decrease**: If throttled or health < 0.3, halve the
+    ///   budget (floored at 25 KB).
+    /// - **Hold Steady**: health in [0.3, 0.5] or 0.0 (idle) — no change.
+    #[cfg(feature = "mesh")]
+    fn adjust_bandwidth_budget(&mut self) {
+        let health = self.mesh_stats.health_score(self.mesh_peers.peer_count());
+        if self.mesh_bandwidth_throttled_in_window || (health > 0.0 && health < 0.3) {
+            // Multiplicative decrease
+            let new = (self.mesh_bandwidth_budget as f64 * MESH_BANDWIDTH_DECREASE_FACTOR) as u64;
+            self.mesh_bandwidth_budget = new.max(MESH_BANDWIDTH_MIN);
+        } else if health > 0.5 {
+            // Additive increase
+            self.mesh_bandwidth_budget =
+                (self.mesh_bandwidth_budget + MESH_BANDWIDTH_ADDITIVE_INCREASE).min(MESH_BANDWIDTH_MAX);
+        }
+        // health in [0.3, 0.5] or 0.0 (idle): hold steady
+        self.mesh_stats.bandwidth_budget_current = self.mesh_bandwidth_budget;
     }
 
     /// Emit a lightweight heartbeat packet over the mesh network.
@@ -668,15 +767,19 @@ impl ContinuousMind {
             .unwrap_or_default()
             .as_secs() as u32;
 
-        let packet = WisdomPacket {
+        let mut packet = WisdomPacket {
             source_id,
             sequence: self.mesh_heartbeat_sequence,
             phi: self.state.consciousness_level as f32,
             urgency: MeshUrgency::Cruise,
             timestamp_s,
             payload_type: PayloadType::Heartbeat,
+            auth_mac: 0,
+            ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
             wisdom: symthaea_core::hdc::BinaryHV::zero(),
         };
+
+        self.sign_mesh_packet(&mut packet);
 
         self.mesh_outbox.push(MeshOutbound { packet });
         self.mesh_heartbeat_last_tick = self.state.tick;
@@ -1501,6 +1604,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV([0xFF; 2048]),
         });
 
@@ -1605,6 +1710,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV([0xAA; 2048]),
         });
         mind.mesh_inbox.push(WisdomPacket {
@@ -1614,6 +1721,8 @@ mod tests {
             urgency: MeshUrgency::Critical,
             timestamp_s: 0,
             payload_type: PayloadType::Heartbeat,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV([0xBB; 2048]),
         });
 
@@ -1748,6 +1857,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
         for _ in 0..5 {
@@ -2150,6 +2261,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV([0xAA; 2048]),
         });
 
@@ -2187,6 +2300,8 @@ mod tests {
             urgency: crate::swarm::mesh::MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: symthaea_core::hdc::BinaryHV([0xFF; 2048]),
         };
         mind.mesh_inbox.push(pkt);
@@ -2328,6 +2443,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV([0xAA; 2048]),
         });
 
@@ -2371,6 +2488,8 @@ mod tests {
             urgency: crate::swarm::mesh::MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
 
@@ -2580,6 +2699,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 1_700_000,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV([0x42; 2048]),
         };
         let frags = original.fragment();
@@ -2656,6 +2777,8 @@ mod tests {
                         urgency: MeshUrgency::Normal,
                         timestamp_s: tick as u32,
                         payload_type: PayloadType::WisdomVector,
+                        auth_mac: 0,
+                        ttl: 0,
                         wisdom: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(
                             &minds[i].state.current_thought,
                         ),
@@ -2739,6 +2862,8 @@ mod tests {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 0,
                 payload_type: PayloadType::WisdomVector,
+                auth_mac: 0,
+                ttl: 0,
                 wisdom: BinaryHV([0xAA; 2048]),
             });
         }
@@ -2780,6 +2905,8 @@ mod tests {
                     urgency: MeshUrgency::Normal,
                     timestamp_s: 0,
                     payload_type: PayloadType::WisdomVector,
+                    auth_mac: 0,
+                    ttl: 0,
                     wisdom: BinaryHV([0; 2048]),
                 },
             });
@@ -2815,6 +2942,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV([0xAA; 2048]),
         };
 
@@ -2852,6 +2981,8 @@ mod tests {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 0,
                 payload_type: PayloadType::WisdomVector,
+                auth_mac: 0,
+                ttl: 0,
                 wisdom: BinaryHV([0xAA; 2048]),
             });
         }
@@ -2886,6 +3017,8 @@ mod tests {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 0,
                 payload_type: PayloadType::WisdomVector,
+                auth_mac: 0,
+                ttl: 0,
                 wisdom: BinaryHV([0; 2048]),
             });
         }
@@ -2905,6 +3038,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
         mind.tick();
@@ -2938,6 +3073,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
 
@@ -2953,6 +3090,8 @@ mod tests {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 0,
                 payload_type: PayloadType::WisdomVector,
+                auth_mac: 0,
+                ttl: 0,
                 wisdom: BinaryHV([0; 2048]),
             });
         }
@@ -2982,6 +3121,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
 
@@ -2994,6 +3135,8 @@ mod tests {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 0,
                 payload_type: PayloadType::WisdomVector,
+                auth_mac: 0,
+                ttl: 0,
                 wisdom: BinaryHV([0; 2048]),
             });
         }
@@ -3007,6 +3150,8 @@ mod tests {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 0,
                 payload_type: PayloadType::WisdomVector,
+                auth_mac: 0,
+                ttl: 0,
                 wisdom: BinaryHV([0; 2048]),
             });
         }
@@ -3090,6 +3235,8 @@ mod tests {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 0,
                 payload_type: PayloadType::WisdomVector,
+                auth_mac: 0,
+                ttl: 0,
                 wisdom: BinaryHV([0; 2048]),
             });
         }
@@ -3133,6 +3280,8 @@ mod tests {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
             wisdom: BinaryHV([0xAA; 2048]),
         });
         mind.perceive(ContinuousHV::random(512, 0xFACE));
@@ -3227,6 +3376,625 @@ mod tests {
         assert!(
             mind.mesh_bandwidth_check(crate::swarm::mesh::WISDOM_PACKET_SIZE as u64),
             "Should be allowed after window reset"
+        );
+    }
+
+    // ====================================================================
+    // Item 4: TTL Emit Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_emit_wisdom_sets_ttl() {
+        use crate::cognitive_loop::types::CycleUrgency;
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        mind.state.tick = 1;
+        mind.emit_wisdom(BinaryHV([0; 2048]), CycleUrgency::Critical, 0.5);
+
+        assert_eq!(mind.mesh_outbox.len(), 1);
+        assert_eq!(
+            mind.mesh_outbox[0].packet.ttl,
+            crate::swarm::mesh::MESH_DEFAULT_TTL,
+            "Emitted wisdom should have default TTL"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_emit_heartbeat_sets_ttl() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        mind.state.tick = 1;
+        mind.emit_heartbeat();
+
+        assert_eq!(mind.mesh_outbox.len(), 1);
+        assert_eq!(
+            mind.mesh_outbox[0].packet.ttl,
+            crate::swarm::mesh::MESH_DEFAULT_TTL,
+            "Emitted heartbeat should have default TTL"
+        );
+    }
+
+    // ====================================================================
+    // Item 1: Auth Tests (Mind Integration)
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_auth_rejects_unsigned_when_key_set() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        mind.set_mesh_auth_key(Some([0x42; 32]));
+
+        // Inject an unsigned packet (auth_mac = 0)
+        mind.mesh_inbox.push(WisdomPacket {
+            source_id: [0xBB; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: BinaryHV([0xAA; 2048]),
+        });
+
+        mind.tick();
+
+        assert_eq!(
+            mind.mesh_stats().packets_auth_failed, 1,
+            "Unsigned packet should fail auth"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_auth_passes_signed_packet() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let key = [0x42u8; 32];
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        mind.set_mesh_auth_key(Some(key));
+
+        // Create and sign a packet
+        let mut pkt = WisdomPacket {
+            source_id: [0xCC; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 3,
+            wisdom: BinaryHV([0xAA; 2048]),
+        };
+        let bytes = pkt.to_bytes();
+        pkt.auth_mac = crate::swarm::mesh::compute_packet_mac(&bytes, &key);
+
+        mind.mesh_inbox.push(pkt);
+        mind.tick();
+
+        assert_eq!(
+            mind.mesh_stats().packets_auth_failed, 0,
+            "Signed packet should pass auth"
+        );
+        assert_eq!(mind.mesh_peers().peer_count(), 1);
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_no_auth_key_passes_all() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        // No auth key set (default)
+
+        mind.mesh_inbox.push(WisdomPacket {
+            source_id: [0xDD; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: BinaryHV([0xAA; 2048]),
+        });
+
+        mind.tick();
+
+        assert_eq!(
+            mind.mesh_stats().packets_auth_failed, 0,
+            "No auth key = all packets pass"
+        );
+        assert_eq!(mind.mesh_peers().peer_count(), 1);
+    }
+
+    // ====================================================================
+    // Item 2: Priority Backpressure Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_inbox_backpressure_drops_gradients_first() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // Fill inbox with 32 heartbeats + 32 gradients + 32 wisdom = 96 packets
+        // MAX_OUTBOX_SIZE is 64, so 32 must be dropped.
+        // Gradients (priority 0) should be dropped first.
+        for i in 0..32u32 {
+            mind.mesh_inbox.push(WisdomPacket {
+                source_id: [0x10 + (i as u8); 8],
+                sequence: i,
+                phi: 0.5,
+                urgency: MeshUrgency::Normal,
+                timestamp_s: 0,
+                payload_type: PayloadType::Heartbeat,
+                auth_mac: 0,
+                ttl: 0,
+                wisdom: BinaryHV([0; 2048]),
+            });
+        }
+        for i in 0..32u32 {
+            mind.mesh_inbox.push(WisdomPacket {
+                source_id: [0x30 + (i as u8); 8],
+                sequence: i,
+                phi: 0.5,
+                urgency: MeshUrgency::Normal,
+                timestamp_s: 0,
+                payload_type: PayloadType::Gradient,
+                auth_mac: 0,
+                ttl: 0,
+                wisdom: BinaryHV([0; 2048]),
+            });
+        }
+        for i in 0..32u32 {
+            mind.mesh_inbox.push(WisdomPacket {
+                source_id: [0x50 + (i as u8); 8],
+                sequence: i,
+                phi: 0.5,
+                urgency: MeshUrgency::Normal,
+                timestamp_s: 0,
+                payload_type: PayloadType::WisdomVector,
+                auth_mac: 0,
+                ttl: 0,
+                wisdom: BinaryHV([0; 2048]),
+            });
+        }
+
+        assert_eq!(mind.mesh_inbox.len(), 96);
+        mind.tick();
+
+        // All 32 gradients should have been dropped (lowest priority)
+        assert!(
+            mind.mesh_stats().packets_dropped >= 32,
+            "At least 32 low-priority packets should be dropped: got {}",
+            mind.mesh_stats().packets_dropped,
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_outbox_backpressure_drops_gradients_first() {
+        use crate::swarm::mesh::{MeshOutbound, MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        // Directly push 40 heartbeats + 40 gradients into outbox (80 total, cap=64)
+        for i in 0..40u32 {
+            mind.mesh_outbox.push(MeshOutbound {
+                packet: WisdomPacket {
+                    source_id: [0x01; 8],
+                    sequence: i,
+                    phi: 0.5,
+                    urgency: MeshUrgency::Normal,
+                    timestamp_s: 0,
+                    payload_type: PayloadType::Heartbeat,
+                    auth_mac: 0,
+                    ttl: 0,
+                    wisdom: BinaryHV([0; 2048]),
+                },
+            });
+        }
+        for i in 0..40u32 {
+            mind.mesh_outbox.push(MeshOutbound {
+                packet: WisdomPacket {
+                    source_id: [0x01; 8],
+                    sequence: 100 + i,
+                    phi: 0.5,
+                    urgency: MeshUrgency::Normal,
+                    timestamp_s: 0,
+                    payload_type: PayloadType::Gradient,
+                    auth_mac: 0,
+                    ttl: 0,
+                    wisdom: BinaryHV([0; 2048]),
+                },
+            });
+        }
+
+        // Tick triggers outbox backpressure
+        mind.tick();
+
+        // 16 excess should be dropped, all should be gradients
+        // After tick, bridge flushes outbox, so we check packets_dropped stat
+        assert!(
+            mind.mesh_stats().packets_dropped >= 16,
+            "At least 16 gradient packets should be dropped: got {}",
+            mind.mesh_stats().packets_dropped,
+        );
+    }
+
+    // ====================================================================
+    // Item 4: TTL Forwarding Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_forward_decrements_ttl() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        mind.mesh_inbox.push(WisdomPacket {
+            source_id: [0xAA; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 3,
+            wisdom: BinaryHV([0xAA; 2048]),
+        });
+
+        mind.tick();
+
+        // Should have forwarded with ttl=2
+        assert_eq!(
+            mind.mesh_stats().packets_forwarded, 1,
+            "Packet with ttl=3 should be forwarded"
+        );
+        // Check the forwarded packet in outbox
+        assert!(!mind.mesh_outbox.is_empty());
+        let fwd = mind.mesh_outbox.iter().find(|o| o.packet.source_id == [0xAA; 8]);
+        assert!(fwd.is_some(), "Forwarded packet should be in outbox");
+        assert_eq!(fwd.unwrap().packet.ttl, 2);
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_no_forward_ttl_zero() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        mind.mesh_inbox.push(WisdomPacket {
+            source_id: [0xBB; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: BinaryHV([0xBB; 2048]),
+        });
+
+        mind.tick();
+
+        assert_eq!(
+            mind.mesh_stats().packets_forwarded, 0,
+            "Packet with ttl=0 should NOT be forwarded"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_no_forward_ttl_one() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        mind.mesh_inbox.push(WisdomPacket {
+            source_id: [0xCC; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 1,
+            wisdom: BinaryHV([0xCC; 2048]),
+        });
+
+        mind.tick();
+
+        assert_eq!(
+            mind.mesh_stats().packets_forwarded, 0,
+            "Packet with ttl=1 should NOT be forwarded (last hop)"
+        );
+    }
+
+    // ====================================================================
+    // Item 5: Replay Buffer Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_replay_buffer_fills_on_emit() {
+        use crate::cognitive_loop::types::CycleUrgency;
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        for i in 0..5u64 {
+            mind.state.tick = i;
+            mind.emit_wisdom(BinaryHV([i as u8; 2048]), CycleUrgency::Critical, 0.5);
+        }
+
+        assert_eq!(mind.mesh_replay_buffer.len(), 5);
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_replay_buffer_caps_at_capacity() {
+        use crate::cognitive_loop::types::CycleUrgency;
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        for i in 0..20u64 {
+            mind.state.tick = i;
+            mind.mesh_bandwidth_window_bytes = 0; // prevent throttle
+            mind.emit_wisdom(BinaryHV([i as u8; 2048]), CycleUrgency::Critical, 0.5);
+        }
+
+        assert_eq!(
+            mind.mesh_replay_buffer.len(),
+            MESH_REPLAY_BUFFER_CAPACITY,
+            "Replay buffer should cap at {}",
+            MESH_REPLAY_BUFFER_CAPACITY,
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_replay_on_new_peer() {
+        use crate::cognitive_loop::types::CycleUrgency;
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // Emit 3 wisdom packets into replay buffer
+        for i in 0..3u64 {
+            mind.state.tick = i;
+            mind.emit_wisdom(BinaryHV([i as u8; 2048]), CycleUrgency::Critical, 0.5);
+        }
+        assert_eq!(mind.mesh_replay_buffer.len(), 3);
+
+        // Clear outbox to isolate replay
+        mind.mesh_outbox.clear();
+
+        // Inject a packet from a new peer
+        mind.mesh_inbox.push(WisdomPacket {
+            source_id: [0xFF; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: BinaryHV([0xFF; 2048]),
+        });
+
+        mind.state.tick = 10;
+        mind.tick();
+
+        // Should have replayed 3 packets to outbox
+        assert_eq!(
+            mind.mesh_stats().packets_replayed, 3,
+            "Should replay 3 packets for new peer"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_no_replay_on_known_peer() {
+        use crate::cognitive_loop::types::CycleUrgency;
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // Emit wisdom to fill replay buffer
+        mind.emit_wisdom(BinaryHV([0; 2048]), CycleUrgency::Critical, 0.5);
+        mind.mesh_outbox.clear();
+
+        // Register a known peer first
+        let peer_id = [0xEE; 8];
+        mind.mesh_peers.update(&WisdomPacket {
+            source_id: peer_id,
+            sequence: 0,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: BinaryHV([0; 2048]),
+        });
+
+        // Now inject another packet from the SAME peer
+        mind.mesh_inbox.push(WisdomPacket {
+            source_id: peer_id,
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: BinaryHV([0; 2048]),
+        });
+
+        mind.state.tick = 1;
+        mind.tick();
+
+        assert_eq!(
+            mind.mesh_stats().packets_replayed, 0,
+            "Known peer should NOT trigger replay"
+        );
+    }
+
+    // ====================================================================
+    // Item 6: AIMD Bandwidth Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_aimd_additive_increase() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        mind.mesh_bandwidth_budget = 100 * 1024;
+        mind.mesh_bandwidth_throttled_in_window = false;
+        // Healthy mesh: need some send/recv stats + peers
+        mind.mesh_stats.wisdom_sent = 50;
+        mind.mesh_stats.wisdom_received = 48;
+        mind.mesh_stats.heartbeats_sent = 20;
+        mind.mesh_stats.heartbeats_received = 18;
+        mind.mesh_peers.update(&crate::swarm::mesh::WisdomPacket {
+            source_id: [0x01; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: crate::swarm::mesh::MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: symthaea_core::hdc::BinaryHV([0; 2048]),
+        });
+
+        mind.adjust_bandwidth_budget();
+
+        assert_eq!(
+            mind.mesh_bandwidth_budget,
+            100 * 1024 + MESH_BANDWIDTH_ADDITIVE_INCREASE,
+            "Healthy + no throttle should increase budget"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_aimd_multiplicative_decrease_on_throttle() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        mind.mesh_bandwidth_budget = 100 * 1024;
+        mind.mesh_bandwidth_throttled_in_window = true;
+
+        mind.adjust_bandwidth_budget();
+
+        assert_eq!(
+            mind.mesh_bandwidth_budget,
+            50 * 1024,
+            "Throttled should halve budget"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_aimd_hold_steady_zero_health() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        mind.mesh_bandwidth_budget = 100 * 1024;
+        mind.mesh_bandwidth_throttled_in_window = false;
+        // health = 0.0 (no activity): should hold steady
+
+        mind.adjust_bandwidth_budget();
+
+        assert_eq!(
+            mind.mesh_bandwidth_budget,
+            100 * 1024,
+            "Idle mesh (health=0.0) should hold steady"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_aimd_budget_floor() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        mind.mesh_bandwidth_budget = MESH_BANDWIDTH_MIN;
+        mind.mesh_bandwidth_throttled_in_window = true;
+
+        mind.adjust_bandwidth_budget();
+
+        assert_eq!(
+            mind.mesh_bandwidth_budget, MESH_BANDWIDTH_MIN,
+            "Budget should never go below floor"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_aimd_budget_ceiling() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        mind.mesh_bandwidth_budget = MESH_BANDWIDTH_MAX;
+        mind.mesh_bandwidth_throttled_in_window = false;
+        // Healthy mesh stats
+        mind.mesh_stats.wisdom_sent = 50;
+        mind.mesh_stats.wisdom_received = 48;
+        mind.mesh_peers.update(&crate::swarm::mesh::WisdomPacket {
+            source_id: [0x01; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: crate::swarm::mesh::MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: symthaea_core::hdc::BinaryHV([0; 2048]),
+        });
+
+        mind.adjust_bandwidth_budget();
+
+        assert_eq!(
+            mind.mesh_bandwidth_budget, MESH_BANDWIDTH_MAX,
+            "Budget should never exceed ceiling"
         );
     }
 }

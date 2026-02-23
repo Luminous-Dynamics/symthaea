@@ -108,7 +108,9 @@ pub use vocal_tract_controller::{
 };
 pub use vocal_tract_encoder::{VocalTractHdcEncoder, VoiceCognitiveState};
 #[cfg(feature = "vocal-tract")]
-pub use vocal_tract_fep::{ProsodyContext, StreamingVocalTract, VocalTractPipeline};
+pub use vocal_tract_fep::{
+    predict_duration, Intonation, ProsodyContext, StreamingVocalTract, VocalTractPipeline,
+};
 pub use vocal_tract_fep::{
     VocalAction, VocalTractFepAgent, VocalTractFepResult, VocalTractObservation,
 };

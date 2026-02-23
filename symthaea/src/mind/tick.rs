@@ -38,9 +38,15 @@ impl ContinuousMind {
             self.emit_gradients();
             self.emit_affective();
 
-            // Outbox backpressure: drop oldest packets when outbox exceeds cap
+            // Priority-aware outbox backpressure: drop lowest-priority packets first
             if self.mesh_outbox.len() > super::MAX_OUTBOX_SIZE {
                 let excess = self.mesh_outbox.len() - super::MAX_OUTBOX_SIZE;
+                self.mesh_outbox.sort_by(|a, b| {
+                    a.packet
+                        .payload_type
+                        .priority()
+                        .cmp(&b.packet.payload_type.priority())
+                });
                 self.mesh_outbox.drain(..excess);
                 self.mesh_stats.packets_dropped += excess as u64;
             }
@@ -430,9 +436,11 @@ impl ContinuousMind {
             }
         }
 
-        // Inbox backpressure: drop oldest packets when inbox exceeds cap
+        // Priority-aware inbox backpressure: drop lowest-priority packets first
         if self.mesh_inbox.len() > super::MAX_OUTBOX_SIZE {
             let excess = self.mesh_inbox.len() - super::MAX_OUTBOX_SIZE;
+            // Sort by priority ascending (lowest-priority first), stable to preserve order within tier
+            self.mesh_inbox.sort_by(|a, b| a.payload_type.priority().cmp(&b.payload_type.priority()));
             self.mesh_inbox.drain(..excess);
             self.mesh_stats.packets_dropped += excess as u64;
         }
@@ -487,8 +495,39 @@ impl ContinuousMind {
                 continue;
             }
 
+            // MAC verification (Item 1): reject if key is set and MAC doesn't match
+            if let Some(ref key) = self.mesh_auth_key {
+                let pkt_bytes = packet.to_bytes();
+                if !crate::swarm::mesh::verify_packet_mac(&pkt_bytes, key) {
+                    self.mesh_stats.packets_auth_failed += 1;
+                    continue;
+                }
+            }
+
+            // TTL forwarding (Item 4): rebroadcast with decremented TTL
+            if packet.ttl > 1 {
+                let mut fwd = packet.clone();
+                fwd.ttl -= 1;
+                self.mesh_outbox
+                    .push(crate::swarm::mesh::MeshOutbound { packet: fwd });
+                self.mesh_stats.packets_forwarded += 1;
+            }
+
+            // Partition recovery (Item 5): replay buffer to newly-discovered peers
+            let is_new_peer = !self.mesh_peers.has_peer(&packet.source_id);
+
             // Track all peers in the registry
             self.mesh_peers.update(packet);
+
+            if is_new_peer {
+                for replay_pkt in self.mesh_replay_buffer.iter() {
+                    self.mesh_outbox
+                        .push(crate::swarm::mesh::MeshOutbound {
+                            packet: replay_pkt.clone(),
+                        });
+                }
+                self.mesh_stats.packets_replayed += self.mesh_replay_buffer.len() as u64;
+            }
 
             match packet.payload_type {
                 crate::swarm::mesh::PayloadType::WisdomVector => {
@@ -677,7 +716,8 @@ impl ContinuousMind {
                 self.mesh_gradient_sequence,
                 msg,
             ) {
-                Some(packet) => {
+                Some(mut packet) => {
+                    self.sign_mesh_packet(&mut packet);
                     self.mesh_outbox
                         .push(crate::swarm::mesh::MeshOutbound { packet });
                     self.mesh_gradient_sequence = self.mesh_gradient_sequence.wrapping_add(1);
@@ -736,11 +776,13 @@ impl ContinuousMind {
             sequence: self.mesh_affective_sequence as u64,
         };
 
-        let packet = crate::swarm::mesh::WisdomPacket::from_affective(
+        let mut packet = crate::swarm::mesh::WisdomPacket::from_affective(
             source_id,
             self.mesh_affective_sequence,
             &affect,
         );
+
+        self.sign_mesh_packet(&mut packet);
 
         self.mesh_outbox
             .push(crate::swarm::mesh::MeshOutbound { packet });
