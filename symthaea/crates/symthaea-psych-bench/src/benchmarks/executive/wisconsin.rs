@@ -221,7 +221,7 @@ impl WisconsinCardSortingBenchmark {
             } else {
                 max_conf
             };
-            let ticks = 4.0 + (1.0 - conf_margin.min(1.0).max(0.0)) * 6.0;
+            let ticks = 4.0 + (1.0 - conf_margin.clamp(0.0, 1.0)) * 6.0;
             rt_ticks.push(ticks);
 
             // Determine correct target by current rule

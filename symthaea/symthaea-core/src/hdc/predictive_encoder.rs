@@ -154,7 +154,7 @@ pub struct PredictiveHdcEncoder {
     /// Pre-allocated buffer for bipolar→real conversion (avoids 64KB alloc per cycle)
     conversion_buffer: Vec<f32>,
 
-    /// Pre-allocated buffer for detected primitives (avoids Vec<String> alloc per cycle)
+    /// Pre-allocated buffer for detected primitives (avoids `Vec<String>` alloc per cycle)
     detected_buffer: Vec<String>,
 
     /// Pre-computed i8 bipolar encodings for all primitives (keyed by lowercase name).
