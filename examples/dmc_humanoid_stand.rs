@@ -19,14 +19,26 @@ fn main() {
     };
 
     println!("Config:");
-    println!("  Physics rate:   {:.0} Hz ({:.3}s timestep)", config.physics_hz, config.physics_dt());
-    println!("  Cognitive rate: {:.0} Hz (every {} physics steps)", config.cognitive_hz, config.cognitive_interval());
+    println!(
+        "  Physics rate:   {:.0} Hz ({:.3}s timestep)",
+        config.physics_hz,
+        config.physics_dt()
+    );
+    println!(
+        "  Cognitive rate: {:.0} Hz (every {} physics steps)",
+        config.cognitive_hz,
+        config.cognitive_interval()
+    );
     println!(
         "  Network:        {}×{} neurons (16384D each)",
         config.network_layers, config.neurons_per_layer
     );
     println!("  Episodes:       {}", config.num_episodes);
-    println!("  Steps/episode:  {} ({:.1}s)", config.steps_per_episode, config.steps_per_episode as f64 * config.physics_dt());
+    println!(
+        "  Steps/episode:  {} ({:.1}s)",
+        config.steps_per_episode,
+        config.steps_per_episode as f64 * config.physics_dt()
+    );
     println!("  Learning rate:  {}", config.learning_rate);
     println!("  Task:           {:?}", config.task);
     println!();
@@ -56,7 +68,8 @@ fn main() {
     println!();
     if let (Some(first), Some(last)) = (metrics.first(), metrics.last()) {
         let reward_improvement = if first.avg_standing_reward > 0.0 {
-            ((last.avg_standing_reward - first.avg_standing_reward) / first.avg_standing_reward) * 100.0
+            ((last.avg_standing_reward - first.avg_standing_reward) / first.avg_standing_reward)
+                * 100.0
         } else {
             0.0
         };

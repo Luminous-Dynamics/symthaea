@@ -11,7 +11,9 @@
 #[cfg(not(feature = "vocal-tract"))]
 fn main() {
     eprintln!("This example requires the `vocal-tract` feature.");
-    eprintln!("Run with: cargo run --example vocal_tract_benchmark --features vocal-tract --release");
+    eprintln!(
+        "Run with: cargo run --example vocal_tract_benchmark --features vocal-tract --release"
+    );
 }
 
 #[cfg(feature = "vocal-tract")]
@@ -19,9 +21,7 @@ fn main() {
     use std::time::Instant;
     use symthaea::voice::formant_targets::FormantDatabase;
     use symthaea::voice::vocal_tract_controller::{VocalTractConfig, VocalTractController};
-    use symthaea::voice::{
-        ArticulatoryConfig, ArticulatorySynthesizer, LTCPacing, TimedPhoneme,
-    };
+    use symthaea::voice::{ArticulatoryConfig, ArticulatorySynthesizer, LTCPacing, TimedPhoneme};
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_core::hdc::HDC_DIMENSION;
 
@@ -34,7 +34,10 @@ fn main() {
     let config = VocalTractConfig::default();
     let mut ltc = VocalTractController::new(&genesis, &config);
 
-    println!("Training LTC controller on {} phonemes (50 epochs)...", db.all_phonemes().len());
+    println!(
+        "Training LTC controller on {} phonemes (50 epochs)...",
+        db.all_phonemes().len()
+    );
     for epoch in 0..50 {
         let loss = symthaea::voice::train_controller_on_phoneme_db(&mut ltc, &genesis, &db, 1);
         println!("  Epoch {}: avg loss = {:.2}", epoch + 1, loss);
@@ -89,7 +92,7 @@ fn main() {
             let ltc_err = ((ltc_f1 - target.f1).powi(2)
                 + (ltc_f2 - target.f2).powi(2)
                 + (ltc_f3 - target.f3).powi(2))
-                .sqrt();
+            .sqrt();
 
             // Rule-based prediction: synthesize the vowel phoneme
             let pacing = LTCPacing::default();
@@ -111,7 +114,7 @@ fn main() {
                 let err = ((rf1 - target.f1).powi(2)
                     + (rf2 - target.f2).powi(2)
                     + (rf3 - target.f3).powi(2))
-                    .sqrt();
+                .sqrt();
                 (rf1, rf2, rf3, err)
             } else {
                 (0.0, 0.0, 0.0, f32::MAX)
@@ -132,7 +135,13 @@ fn main() {
         println!("  {}", "-".repeat(100));
         println!(
             "  {:>6} | {:>10} {:>10} {:>10} | {:>10} {:>10} {:>10} | {:>8.1} {:>8.1}",
-            "AVG", "", "", "", "", "", "",
+            "AVG",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
             ltc_total_err / vowel_count as f32,
             rule_total_err / vowel_count as f32
         );
@@ -188,7 +197,11 @@ fn main() {
     println!("  Rule max F1 delta: {:.2} Hz/frame", rule_max_delta);
     println!(
         "  Winner: {}",
-        if ltc_max_delta < rule_max_delta { "LTC (smoother)" } else { "Rule-based (smoother)" }
+        if ltc_max_delta < rule_max_delta {
+            "LTC (smoother)"
+        } else {
+            "Rule-based (smoother)"
+        }
     );
     println!();
 
@@ -227,8 +240,14 @@ fn main() {
         0.0
     };
 
-    println!("  LTC:  {:.1} us/frame ({} frames)", ltc_us_per_frame, n_frames);
-    println!("  Rule: {:.1} us/frame (~{} frames)", rule_us_per_frame, rule_frames_total);
+    println!(
+        "  LTC:  {:.1} us/frame ({} frames)",
+        ltc_us_per_frame, n_frames
+    );
+    println!(
+        "  Rule: {:.1} us/frame (~{} frames)",
+        rule_us_per_frame, rule_frames_total
+    );
     let ltc_hz = 1_000_000.0 / ltc_us_per_frame;
     println!("  LTC throughput: {:.0} Hz (target: 200Hz)", ltc_hz);
     println!();
