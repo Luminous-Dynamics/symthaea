@@ -162,7 +162,7 @@ impl VocalTractController {
         let weight_hv = genesis.hv("vocal_tract::output_weights", total_weights);
         let mut output_weights = weight_hv.values;
         for w in &mut output_weights {
-            *w *= 0.01;
+            *w *= 0.05; // Larger init → stronger phoneme differentiation from start
         }
 
         // Bias initialized to schwa (neutral vowel) defaults
@@ -254,6 +254,21 @@ impl VocalTractController {
         lr_override: Option<f32>,
     ) {
         let lr = lr_override.unwrap_or(self.learning_rate);
+        self.train_step_impl(cognitive_hv, target, dt, lr, 1e-4);
+    }
+
+    /// Internal training step with configurable weight decay.
+    ///
+    /// Separated from `train_step()` so supervised training can disable weight decay
+    /// (which erodes learned weights during multi-epoch phoneme training).
+    fn train_step_impl(
+        &mut self,
+        cognitive_hv: &ContinuousHV,
+        target: &FormantFrame,
+        dt: f32,
+        lr: f32,
+        weight_decay: f32,
+    ) {
         let output_lr = lr * (HDC_DIMENSION as f32).sqrt();
 
         // Forward pass to get current output
@@ -330,11 +345,12 @@ impl VocalTractController {
             *g = g.clamp(-GRAD_CLIP, GRAD_CLIP);
         }
 
-        // Weight decay
-        const WEIGHT_DECAY: f32 = 1e-4;
-        let decay = 1.0 - WEIGHT_DECAY;
-        for w in self.output_weights.iter_mut() {
-            *w *= decay;
+        // Conditional weight decay (disabled during supervised phoneme training)
+        if weight_decay > 0.0 {
+            let decay = 1.0 - weight_decay;
+            for w in self.output_weights.iter_mut() {
+                *w *= decay;
+            }
         }
 
         // Update output weights
@@ -517,7 +533,14 @@ impl VocalTractController {
 
         let mut last_epoch_loss = 0.0;
 
-        const WARMUP_STEPS: usize = 5;
+        // Convergence-critical parameters:
+        // - 20 warmup steps for LTC neurons to reach differentiated steady states
+        // - 10 gradient steps per phoneme per epoch (was 1 → 10× more signal)
+        // - 10× learning rate during supervised training
+        // - No weight decay (prevents erosion of learned weights across epochs)
+        const WARMUP_STEPS: usize = 20;
+        const TRAIN_STEPS: usize = 10;
+        let supervised_lr = self.learning_rate * 10.0;
 
         for _epoch in 0..epochs {
             let mut epoch_loss = 0.0;
@@ -534,12 +557,15 @@ impl VocalTractController {
                 // Forward to get prediction from settled state
                 let pred = self.forward(hv, 0.005);
 
-                // Accumulate loss
+                // Accumulate loss (measured before training to track progress)
                 let loss = formant_mse(&pred, target);
                 epoch_loss += loss;
 
-                // Train step
-                self.train_step(hv, target, 0.005, None);
+                // Multiple gradient steps with no weight decay for faster convergence
+                for _ in 0..TRAIN_STEPS {
+                    self.forward(hv, 0.005);
+                    self.train_step_impl(hv, target, 0.005, supervised_lr, 0.0);
+                }
             }
 
             last_epoch_loss = epoch_loss / phoneme_hvs.len() as f32;
