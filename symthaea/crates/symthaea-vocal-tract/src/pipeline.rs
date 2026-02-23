@@ -15,10 +15,22 @@ use symthaea_core::genesis::{GenesisCovenant, GenesisSeed};
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PROSODY CONTEXT
+// INTONATION & PROSODY
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Context for prosody post-processing: F0 declination, stress boost, energy envelope.
+/// Intonation contour type for F0 shaping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Intonation {
+    /// Falling contour: 1.05 → 0.80 (declarative sentences).
+    #[default]
+    Statement,
+    /// Rising contour: dip to 0.90, then rise to 1.25 (yes/no questions).
+    Question,
+    /// Peak contour: rise to 1.30 at 30%, then fall to 0.85 (exclamations).
+    Exclamation,
+}
+
+/// Context for prosody post-processing: F0 intonation, stress boost, energy envelope.
 #[derive(Debug, Clone, Copy)]
 pub struct ProsodyContext {
     /// Progress through the entire utterance (0.0 → 1.0).
@@ -31,6 +43,8 @@ pub struct ProsodyContext {
     pub base_f0: f32,
     /// Emotional arousal (0.0–1.0) — maps to F0 range expansion.
     pub arousal: f32,
+    /// Intonation contour type.
+    pub intonation: Intonation,
 }
 
 impl Default for ProsodyContext {
@@ -41,6 +55,7 @@ impl Default for ProsodyContext {
             stress: 0,
             base_f0: 120.0,
             arousal: 0.5,
+            intonation: Intonation::Statement,
         }
     }
 }
@@ -48,11 +63,34 @@ impl Default for ProsodyContext {
 impl ProsodyContext {
     /// Apply prosody post-processing to a FormantFrame.
     ///
-    /// - **F0**: declination (0.85→1.0 over utterance) × stress boost × arousal range
+    /// - **F0**: intonation contour × stress boost × arousal range
     /// - **Energy**: ASR envelope (10% attack, sustain, 15% release) × stress factor
     pub fn apply_prosody(&self, frame: &mut FormantFrame) {
-        // F0 declination: starts at 1.0, falls to 0.85 by end of utterance
-        let declination = 1.0 - 0.15 * self.utterance_progress;
+        let t = self.utterance_progress;
+
+        // Intonation-specific F0 contour
+        let contour = match self.intonation {
+            Intonation::Statement => {
+                // Falling: 1.05 at start → 0.80 at end
+                1.05 - 0.25 * t
+            }
+            Intonation::Question => {
+                // Rising: dip to 0.90 at midpoint, rise to 1.25 at end
+                if t < 0.5 {
+                    1.0 - 0.10 * (t / 0.5) // 1.00 → 0.90
+                } else {
+                    0.90 + 0.35 * ((t - 0.5) / 0.5) // 0.90 → 1.25
+                }
+            }
+            Intonation::Exclamation => {
+                // Peak at 30%: rise to 1.30, then fall to 0.85
+                if t < 0.3 {
+                    1.0 + 0.30 * (t / 0.3) // 1.00 → 1.30
+                } else {
+                    1.30 - 0.45 * ((t - 0.3) / 0.7) // 1.30 → 0.85
+                }
+            }
+        };
 
         // Stress boost: primary=1.10×, secondary=1.05×, none=1.0×
         let stress_f0_boost = match self.stress {
@@ -64,7 +102,7 @@ impl ProsodyContext {
         // Arousal maps to F0 range (more arousal = wider pitch swings)
         let arousal_factor = 0.9 + 0.2 * self.arousal;
 
-        frame.f0 = self.base_f0 * declination * stress_f0_boost * arousal_factor;
+        frame.f0 = self.base_f0 * contour * stress_f0_boost * arousal_factor;
         frame.f0 = frame.f0.clamp(50.0, 500.0);
 
         // Energy ASR envelope within the phoneme
@@ -88,6 +126,101 @@ impl ProsodyContext {
 
         frame.energy = (frame.energy * asr_envelope * stress_energy).clamp(0.0, 1.0);
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHONEME DURATION MODEL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Manner of articulation classes for duration prediction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MannerClass {
+    Vowel,
+    Stop,
+    Fricative,
+    Nasal,
+    Liquid,
+    Affricate,
+    Glide,
+    Silence,
+}
+
+/// Classify an ARPABET phoneme into its manner of articulation.
+pub fn phoneme_manner_class(phoneme: &str) -> MannerClass {
+    // Strip stress digit (e.g., "AH0" → "AH")
+    let base = phoneme.trim_end_matches(|c: char| c.is_ascii_digit());
+    match base {
+        // Vowels
+        "AA" | "AE" | "AH" | "AO" | "AW" | "AY" | "EH" | "ER" | "EY" | "IH" | "IY" | "OW"
+        | "OY" | "UH" | "UW" => MannerClass::Vowel,
+        // Stops
+        "B" | "D" | "G" | "K" | "P" | "T" => MannerClass::Stop,
+        // Fricatives
+        "CH" | "DH" | "F" | "HH" | "S" | "SH" | "TH" | "V" | "Z" | "ZH" => {
+            MannerClass::Fricative
+        }
+        // Nasals
+        "M" | "N" | "NG" => MannerClass::Nasal,
+        // Liquids
+        "L" | "R" => MannerClass::Liquid,
+        // Affricates
+        "JH" => MannerClass::Affricate,
+        // Glides
+        "W" | "Y" => MannerClass::Glide,
+        // Silence / unknown
+        _ => MannerClass::Silence,
+    }
+}
+
+/// Predict phoneme duration in motor frames (at 200Hz = 5ms/frame).
+///
+/// Uses linguistic rules: manner-based base duration, stress lengthening,
+/// position-dependent lengthening, and speaking rate scaling.
+///
+/// Returns duration in frames (minimum 2).
+pub fn predict_duration(
+    phoneme: &str,
+    stress: u8,
+    is_word_final: bool,
+    is_utterance_final: bool,
+    speaking_rate: f32,
+) -> usize {
+    // Base duration in frames (at 200Hz): manner class → typical ms / 5
+    let base = match phoneme_manner_class(phoneme) {
+        MannerClass::Vowel => 16,     // 80ms
+        MannerClass::Stop => 6,       // 30ms
+        MannerClass::Fricative => 10, // 50ms
+        MannerClass::Nasal => 8,      // 40ms
+        MannerClass::Liquid => 10,    // 50ms
+        MannerClass::Affricate => 8,  // 40ms
+        MannerClass::Glide => 6,      // 30ms
+        MannerClass::Silence => 4,    // 20ms
+    };
+
+    let mut dur = base as f32;
+
+    // Stress lengthening (vowels only)
+    if phoneme_manner_class(phoneme) == MannerClass::Vowel {
+        dur *= match stress {
+            1 => 1.5, // primary stress: 50% longer
+            2 => 1.2, // secondary stress: 20% longer
+            _ => 1.0,
+        };
+    }
+
+    // Position-dependent lengthening
+    if is_utterance_final {
+        dur *= 1.4; // phrase-final lengthening
+    } else if is_word_final {
+        dur *= 1.15; // word-final lengthening
+    }
+
+    // Speaking rate scaling (rate=1.0 is normal)
+    let rate = speaking_rate.clamp(0.5, 3.0);
+    dur /= rate;
+
+    // Minimum 2 frames (10ms)
+    (dur.round() as usize).max(2)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -669,6 +802,7 @@ mod tests {
             stress: 0,
             base_f0,
             arousal: 0.5,
+            ..ProsodyContext::default()
         };
         ctx_start.apply_prosody(&mut frame_start);
 
@@ -684,6 +818,7 @@ mod tests {
             stress: 0,
             base_f0,
             arousal: 0.5,
+            ..ProsodyContext::default()
         };
         ctx_end.apply_prosody(&mut frame_end);
 
@@ -695,11 +830,11 @@ mod tests {
             frame_end.f0
         );
 
-        // Declination magnitude: 15% over full utterance
+        // Statement contour: 1.05→0.80, ratio ≈ 0.762
         let ratio = frame_end.f0 / frame_start.f0;
         assert!(
-            (ratio - 0.85).abs() < 0.05,
-            "Expected ~15% declination, got ratio={ratio:.3}"
+            ratio < 0.85,
+            "Expected significant F0 declination (Statement), got ratio={ratio:.3}"
         );
     }
 
@@ -712,6 +847,7 @@ mod tests {
             stress,
             base_f0,
             arousal: 0.5,
+            ..ProsodyContext::default()
         };
 
         let mut frame_unstressed = FormantFrame {
@@ -764,6 +900,7 @@ mod tests {
             stress: 1,
             base_f0: 120.0,
             arousal: 0.5,
+            ..ProsodyContext::default()
         };
 
         // Attack phase (near start)
@@ -1095,5 +1232,133 @@ mod tests {
             SourceType::Silent,
             "No phoneme should keep controller default (Silent)"
         );
+    }
+
+    #[test]
+    fn test_intonation_f0_contours() {
+        let base_f0 = 120.0;
+
+        // Statement: falling (1.05 → 0.80)
+        let mut f_start = FormantFrame::silent(0.0);
+        ProsodyContext {
+            utterance_progress: 0.0,
+            base_f0,
+            intonation: Intonation::Statement,
+            ..Default::default()
+        }
+        .apply_prosody(&mut f_start);
+
+        let mut f_end = FormantFrame::silent(0.0);
+        ProsodyContext {
+            utterance_progress: 1.0,
+            base_f0,
+            intonation: Intonation::Statement,
+            ..Default::default()
+        }
+        .apply_prosody(&mut f_end);
+
+        assert!(
+            f_start.f0 > f_end.f0,
+            "Statement should fall: start={:.1}, end={:.1}",
+            f_start.f0,
+            f_end.f0
+        );
+
+        // Question: rising at end (> start)
+        let mut q_start = FormantFrame::silent(0.0);
+        ProsodyContext {
+            utterance_progress: 0.0,
+            base_f0,
+            intonation: Intonation::Question,
+            ..Default::default()
+        }
+        .apply_prosody(&mut q_start);
+
+        let mut q_end = FormantFrame::silent(0.0);
+        ProsodyContext {
+            utterance_progress: 1.0,
+            base_f0,
+            intonation: Intonation::Question,
+            ..Default::default()
+        }
+        .apply_prosody(&mut q_end);
+
+        assert!(
+            q_end.f0 > q_start.f0,
+            "Question should rise: start={:.1}, end={:.1}",
+            q_start.f0,
+            q_end.f0
+        );
+
+        // Exclamation: peak in middle, falls below start by end
+        let mut e_mid = FormantFrame::silent(0.0);
+        ProsodyContext {
+            utterance_progress: 0.3,
+            base_f0,
+            intonation: Intonation::Exclamation,
+            ..Default::default()
+        }
+        .apply_prosody(&mut e_mid);
+
+        let mut e_end = FormantFrame::silent(0.0);
+        ProsodyContext {
+            utterance_progress: 1.0,
+            base_f0,
+            intonation: Intonation::Exclamation,
+            ..Default::default()
+        }
+        .apply_prosody(&mut e_end);
+
+        assert!(
+            e_mid.f0 > e_end.f0,
+            "Exclamation peak should exceed end: peak={:.1}, end={:.1}",
+            e_mid.f0,
+            e_end.f0
+        );
+    }
+
+    #[test]
+    fn test_duration_model() {
+        // Vowel with primary stress
+        let dur = predict_duration("AH", 1, false, false, 1.0);
+        assert_eq!(dur, 24, "AH + primary stress: 16 × 1.5 = 24"); // 16 * 1.5
+
+        // Unstressed vowel
+        let dur = predict_duration("AH", 0, false, false, 1.0);
+        assert_eq!(dur, 16, "AH unstressed: base 16");
+
+        // Utterance-final vowel with primary stress
+        let dur = predict_duration("IY", 1, false, true, 1.0);
+        assert_eq!(dur, 34, "IY + primary + utt-final: 16 × 1.5 × 1.4 ≈ 34");
+
+        // Stop consonant (stress doesn't lengthen consonants)
+        let dur_s0 = predict_duration("P", 0, false, false, 1.0);
+        let dur_s1 = predict_duration("P", 1, false, false, 1.0);
+        assert_eq!(dur_s0, dur_s1, "Stress shouldn't affect stop duration");
+        assert_eq!(dur_s0, 6, "Stop base: 6 frames");
+
+        // Speaking rate: faster = shorter
+        let dur_fast = predict_duration("AH", 0, false, false, 2.0);
+        let dur_slow = predict_duration("AH", 0, false, false, 0.5);
+        assert!(
+            dur_fast < dur_slow,
+            "Faster rate should be shorter: fast={dur_fast}, slow={dur_slow}"
+        );
+
+        // Minimum duration
+        let dur_min = predict_duration("W", 0, false, false, 3.0);
+        assert!(dur_min >= 2, "Minimum duration is 2 frames");
+
+        // Manner classification
+        assert_eq!(phoneme_manner_class("AH"), MannerClass::Vowel);
+        assert_eq!(phoneme_manner_class("P"), MannerClass::Stop);
+        assert_eq!(phoneme_manner_class("S"), MannerClass::Fricative);
+        assert_eq!(phoneme_manner_class("M"), MannerClass::Nasal);
+        assert_eq!(phoneme_manner_class("L"), MannerClass::Liquid);
+        assert_eq!(phoneme_manner_class("JH"), MannerClass::Affricate);
+        assert_eq!(phoneme_manner_class("W"), MannerClass::Glide);
+        // With stress digit
+        assert_eq!(phoneme_manner_class("AH0"), MannerClass::Vowel);
+        assert_eq!(phoneme_manner_class("IY1"), MannerClass::Vowel);
     }
 }

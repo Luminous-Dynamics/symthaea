@@ -40,10 +40,13 @@ fn main() {
         "Training LTC controller on {} phonemes (100 epochs)...",
         db.all_phonemes().len()
     );
-    for epoch in 0..100 {
-        let loss = symthaea::voice::train_controller_on_phoneme_db(&mut ltc, &genesis, &db, 1);
-        println!("  Epoch {}: avg loss = {:.2}", epoch + 1, loss);
-    }
+    let final_loss = symthaea::voice::train_controller_on_phoneme_db(&mut ltc, &genesis, &db, 100);
+    println!("  Final loss (100 epochs): {:.4}", final_loss);
+
+    // Transition training: BPTT on vowel pairs for smooth coarticulation
+    println!("  Training transitions (10 epochs on 30 vowel pairs)...");
+    let trans_loss = symthaea::voice::train_controller_transitions(&mut ltc, &genesis, &db, 10);
+    println!("  Transition loss: {:.4}", trans_loss);
     println!();
 
     // ── Setup rule-based synthesizer ─────────────────────────────────────
@@ -162,6 +165,12 @@ fn main() {
         &genesis,
         &db,
         100,
+    );
+    symthaea::voice::train_controller_transitions(
+        &mut pipeline.controller,
+        &genesis,
+        &db,
+        10,
     );
 
     let state = VoiceCognitiveState::default();
@@ -400,6 +409,206 @@ fn main() {
         "\n  Source type verification: {}/{} passed",
         pass_count, total
     );
+    println!();
+
+    // ── Benchmark 6: Manner-Aware Energy/Voicing ─────────────────────────
+    println!("--- Benchmark 6: Manner-Aware Energy/Voicing ---");
+    println!(
+        "  {:>6} | {:>8} {:>8} | {:>8} {:>8} | {:>10}",
+        "Phon", "Energy", "Voicing", "E-pass", "V-pass", "Manner"
+    );
+    println!("  {}", "-".repeat(70));
+
+    // (phoneme, energy_min, energy_max, voicing_min, voicing_max)
+    let manner_tests: Vec<(&str, f32, f32, f32, f32)> = vec![
+        // Vowels: energy > 0.6, voicing > 0.8
+        ("AH", 0.6, 1.0, 0.8, 1.0),
+        ("IY", 0.6, 1.0, 0.8, 1.0),
+        ("UW", 0.6, 1.0, 0.8, 1.0),
+        // Unvoiced stops: energy < 0.4, voicing < 0.3
+        ("P", 0.0, 0.4, 0.0, 0.3),
+        ("T", 0.0, 0.4, 0.0, 0.3),
+        ("K", 0.0, 0.4, 0.0, 0.3),
+        // Fricatives: energy 0.2-0.7
+        ("S", 0.2, 0.7, 0.0, 0.3),
+        ("F", 0.2, 0.7, 0.0, 0.3),
+        // Nasals: voicing > 0.8
+        ("M", 0.3, 0.8, 0.8, 1.0),
+        ("N", 0.3, 0.8, 0.8, 1.0),
+    ];
+
+    let mut manner_pass = 0;
+    let manner_total = manner_tests.len();
+
+    for (phoneme, e_min, e_max, v_min, v_max) in &manner_tests {
+        ltc.reset();
+        let phoneme_hv = genesis.hv(&format!("phoneme::{}", phoneme), HDC_DIMENSION);
+
+        // Warmup
+        for _ in 0..20 {
+            ltc.forward(&phoneme_hv, 0.005);
+        }
+
+        // Average over 10 steady-state frames
+        let mut energy_sum = 0.0f32;
+        let mut voicing_sum = 0.0f32;
+        for _ in 0..10 {
+            let frame = ltc.forward(&phoneme_hv, 0.005);
+            energy_sum += frame.energy;
+            voicing_sum += frame.voicing;
+        }
+        let avg_energy = energy_sum / 10.0;
+        let avg_voicing = voicing_sum / 10.0;
+
+        let e_ok = avg_energy >= *e_min && avg_energy <= *e_max;
+        let v_ok = avg_voicing >= *v_min && avg_voicing <= *v_max;
+        let both_ok = e_ok && v_ok;
+        if both_ok {
+            manner_pass += 1;
+        }
+
+        let manner_str = db
+            .lookup(phoneme)
+            .map(|t| format!("{:?}", t.manner))
+            .unwrap_or_default();
+        println!(
+            "  {:>6} | {:>8.3} {:>8.3} | {:>8} {:>8} | {:>10}",
+            phoneme,
+            avg_energy,
+            avg_voicing,
+            if e_ok { "PASS" } else { "FAIL" },
+            if v_ok { "PASS" } else { "FAIL" },
+            manner_str
+        );
+    }
+
+    println!(
+        "\n  Manner energy/voicing: {}/{} passed",
+        manner_pass, manner_total
+    );
+    println!();
+
+    // ── Benchmark 7: Mel-Cepstral Distortion ───────────────────────────
+    println!("--- Benchmark 7: Mel-Cepstral Distortion (MCD) ---");
+
+    let all_vowels = [
+        "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH",
+        "UW",
+    ];
+
+    let mut total_mcd = 0.0f32;
+    let mut mcd_count = 0;
+
+    for vowel in &all_vowels {
+        if let Some(target) = db.lookup(vowel) {
+            ltc.reset();
+            let phoneme_hv = genesis.hv(&format!("phoneme::{vowel}"), HDC_DIMENSION);
+            for _ in 0..20 {
+                ltc.forward(&phoneme_hv, 0.005);
+            }
+
+            let mut frames = Vec::new();
+            let mut targets = Vec::new();
+            for _ in 0..10 {
+                frames.push(ltc.forward(&phoneme_hv, 0.005));
+                targets.push(target.clone());
+            }
+
+            let mcd =
+                symthaea_vocal_tract::metrics::mel_cepstral_distortion(&frames, &targets);
+            total_mcd += mcd;
+            mcd_count += 1;
+            println!("  {:>4}: MCD = {:.2} dB", vowel, mcd);
+        }
+    }
+
+    if mcd_count > 0 {
+        let avg_mcd = total_mcd / mcd_count as f32;
+        println!("\n  Average MCD: {:.2} dB", avg_mcd);
+        println!(
+            "  Rating: {}",
+            if avg_mcd < 5.0 {
+                "Excellent (<5 dB)"
+            } else if avg_mcd < 8.0 {
+                "Good (5-8 dB)"
+            } else {
+                "Needs improvement (>8 dB)"
+            }
+        );
+    }
+    println!();
+
+    // ── Benchmark 8: WAV Audio Output ────────────────────────────────
+    println!("--- Benchmark 8: WAV Audio Output ---");
+    {
+        use std::fs;
+        use std::io::Write;
+        use std::path::Path;
+        use symthaea::voice::vocoder::FormantVocoder;
+
+        let audio_dir = Path::new("audio_output");
+        fs::create_dir_all(audio_dir).expect("Failed to create audio_output/");
+        let mut vocoder = FormantVocoder::new();
+        let sr = vocoder.sample_rate();
+        let spf = (sr as f32 / 200.0) as usize;
+
+        // Write 16-bit PCM mono WAV
+        let write_wav = |path: &Path, samples: &[f32], sample_rate: u32| {
+            let num_samples = samples.len() as u32;
+            let data_size = num_samples * 2;
+            let file_size = 36 + data_size;
+            let mut buf = Vec::with_capacity(44 + data_size as usize);
+            buf.extend_from_slice(b"RIFF");
+            buf.extend_from_slice(&file_size.to_le_bytes());
+            buf.extend_from_slice(b"WAVE");
+            buf.extend_from_slice(b"fmt ");
+            buf.extend_from_slice(&16u32.to_le_bytes());
+            buf.extend_from_slice(&1u16.to_le_bytes());
+            buf.extend_from_slice(&1u16.to_le_bytes());
+            buf.extend_from_slice(&sample_rate.to_le_bytes());
+            buf.extend_from_slice(&(sample_rate * 2).to_le_bytes());
+            buf.extend_from_slice(&2u16.to_le_bytes());
+            buf.extend_from_slice(&16u16.to_le_bytes());
+            buf.extend_from_slice(b"data");
+            buf.extend_from_slice(&data_size.to_le_bytes());
+            for &s in samples {
+                buf.extend_from_slice(&((s.clamp(-1.0, 1.0) * 32767.0) as i16).to_le_bytes());
+            }
+            let mut file = fs::File::create(path).expect("Failed to create WAV");
+            file.write_all(&buf).expect("Failed to write WAV");
+        };
+
+        // Per-vowel audio
+        for vowel in &["AH", "IY", "UW", "AE", "EH"] {
+            ltc.reset();
+            vocoder.reset();
+            let phoneme_hv = genesis.hv(&format!("phoneme::{vowel}"), HDC_DIMENSION);
+            let mut audio = Vec::new();
+            for _ in 0..100 {
+                let frame = ltc.forward(&phoneme_hv, 0.005);
+                audio.extend(vocoder.synthesize_frame(&frame, spf));
+            }
+            let wav_path = audio_dir.join(format!("bench_{}.wav", vowel.to_lowercase()));
+            write_wav(&wav_path, &audio, sr);
+            println!("  /{vowel}/ → {} ({:.1}s)", wav_path.display(), audio.len() as f32 / sr as f32);
+        }
+
+        // AH→IY transition audio
+        pipeline.reset();
+        vocoder.reset();
+        let mut transition_audio = Vec::new();
+        for _ in 0..60 {
+            let frame = pipeline.tick_phoneme(&state, None, dt, Some("AH"));
+            transition_audio.extend(vocoder.synthesize_frame(&frame, spf));
+        }
+        for _ in 0..60 {
+            let frame = pipeline.tick_phoneme(&state, None, dt, Some("IY"));
+            transition_audio.extend(vocoder.synthesize_frame(&frame, spf));
+        }
+        let trans_path = audio_dir.join("bench_transition_ah_iy.wav");
+        write_wav(&trans_path, &transition_audio, sr);
+        println!("  AH→IY transition → {} ({:.1}s)", trans_path.display(), transition_audio.len() as f32 / sr as f32);
+    }
     println!();
 
     // ── Summary ──────────────────────────────────────────────────────────
