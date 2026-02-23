@@ -146,6 +146,7 @@ jobs:
           - "code_generation"
           - "flight"
           - "mesh"
+          - "swarm"
     steps:
       - uses: actions/checkout@v4
 
@@ -220,6 +221,7 @@ jobs:
           - "full_consciousness,reasoning_engine"
           - "flight,humanoid"
           - "mesh,full_consciousness"
+          - "swarm,full_consciousness"
     steps:
       - uses: actions/checkout@v4
 
