@@ -42,16 +42,16 @@ const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
 
 /// Channel ranges [min, max] for normalization to [0, 1].
 const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
-    [0.0, 2.0],   // prediction_error
-    [-1.0, 1.0],  // emotional_valence
-    [0.0, 1.0],   // emotional_arousal
-    [0.0, 1.0],   // unified_quality
-    [0.0, 1.0],   // epistemic_confidence
-    [-1.0, 1.0],  // coherence_velocity
-    [0.0, 1.0],   // cross_agreement
-    [0.0, 1.0],   // consciousness_level
-    [0.0, 1.0],   // articulation_quality
-    [0.0, 1.0],   // rate_stability
+    [0.0, 2.0],  // prediction_error
+    [-1.0, 1.0], // emotional_valence
+    [0.0, 1.0],  // emotional_arousal
+    [0.0, 1.0],  // unified_quality
+    [0.0, 1.0],  // epistemic_confidence
+    [-1.0, 1.0], // coherence_velocity
+    [0.0, 1.0],  // cross_agreement
+    [0.0, 1.0],  // consciousness_level
+    [0.0, 1.0],  // articulation_quality
+    [0.0, 1.0],  // rate_stability
 ];
 
 /// Cognitive voice state: 10 channels driving the vocal tract controller.
@@ -392,6 +392,9 @@ mod tests {
             sim < 0.99,
             "Different consciousness levels should produce different HVs: sim={sim}"
         );
-        assert!(sim > 0.0, "Should share structure from other channels: sim={sim}");
+        assert!(
+            sim > 0.0,
+            "Should share structure from other channels: sim={sim}"
+        );
     }
 }

@@ -24,8 +24,7 @@
 //! duration_accuracy, energy_consistency
 
 use symthaea_fep::{
-    ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation,
-    TemporalDifferenceLearningConfig,
+    ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation, TemporalDifferenceLearningConfig,
 };
 
 /// Vocal tract quality observation for the FEP agent (6D).
@@ -216,10 +215,7 @@ impl VocalTractFepAgent {
 
     /// Get current free energy.
     pub fn free_energy(&self) -> Option<f64> {
-        self.agent
-            .last_fe_components
-            .as_ref()
-            .map(|fe| fe.total)
+        self.agent.last_fe_components.as_ref().map(|fe| fe.total)
     }
 
     /// Get tick count.
@@ -344,7 +340,10 @@ mod tests {
         }
 
         // TD learning should have received updates
-        assert!(agent.stats().td_updates > 0, "TD learner should have received updates");
+        assert!(
+            agent.stats().td_updates > 0,
+            "TD learner should have received updates"
+        );
         assert_eq!(agent.tick_count(), 5);
     }
 }

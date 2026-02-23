@@ -182,7 +182,11 @@ mod tests {
         let metrics = VocalTractMetrics::compute(&frames, &targets, 120.0);
 
         assert_eq!(metrics.num_frames, 10);
-        assert!(metrics.mean_f1_error < 20.0, "F1 error should be small: {}", metrics.mean_f1_error);
+        assert!(
+            metrics.mean_f1_error < 20.0,
+            "F1 error should be small: {}",
+            metrics.mean_f1_error
+        );
         assert!(metrics.max_f1_delta < 5.0, "F1 delta should be smooth");
         assert!(metrics.f0_rmse < 5.0, "F0 RMSE should be small");
     }

@@ -178,7 +178,9 @@ impl VocalTractPipeline {
         if let Some(hv) = self.phoneme_hv_cache.get(phoneme) {
             return hv.clone();
         }
-        let hv = self.genesis.hv(&format!("phoneme::{phoneme}"), HDC_DIMENSION);
+        let hv = self
+            .genesis
+            .hv(&format!("phoneme::{phoneme}"), HDC_DIMENSION);
         self.phoneme_hv_cache
             .insert(phoneme.to_string(), hv.clone());
         hv
