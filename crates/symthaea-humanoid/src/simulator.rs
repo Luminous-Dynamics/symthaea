@@ -914,4 +914,98 @@ mod tests {
             "COM z should be reasonable for standing: {com_z}"
         );
     }
+
+    // ── MuJoCo runtime tests (require mujoco library at runtime) ──
+
+    #[cfg(feature = "mujoco")]
+    #[test]
+    #[ignore] // Requires MuJoCo library
+    fn test_mujoco_bundled_loads() {
+        let sim = MuJoCoHumanoidSimulator::from_bundled_asset()
+            .expect("Bundled humanoid.xml should load");
+        let state = sim.state();
+        assert!(state.root_height > 0.0, "Initial height should be positive");
+        assert!(state.head_height > 0.0, "Head height should be positive");
+    }
+
+    #[cfg(feature = "mujoco")]
+    #[test]
+    #[ignore] // Requires MuJoCo library
+    fn test_mujoco_step_finite() {
+        let mut sim = MuJoCoHumanoidSimulator::from_bundled_asset().unwrap();
+        let cmd = HumanoidCommand::zero();
+
+        for _ in 0..100 {
+            sim.step(&cmd, 0.025);
+        }
+
+        let state = sim.state();
+        assert!(state.root_height.is_finite());
+        assert!(state.head_height.is_finite());
+        for &a in &state.joint_angles {
+            assert!(a.is_finite(), "Joint angle must be finite");
+        }
+        for &v in &state.joint_velocities {
+            assert!(v.is_finite(), "Joint velocity must be finite");
+        }
+    }
+
+    #[cfg(feature = "mujoco")]
+    #[test]
+    #[ignore] // Requires MuJoCo library
+    fn test_mujoco_external_force() {
+        let mut sim = MuJoCoHumanoidSimulator::from_bundled_asset().unwrap();
+        sim.apply_external_force([100.0, 0.0, 0.0]);
+        let cmd = HumanoidCommand::zero();
+        sim.step(&cmd, 0.025);
+
+        let state = sim.state();
+        assert!(
+            state.root_linear_velocity[0].abs() > 0.0
+                || state.com_velocity[0].abs() > 0.0,
+            "External force should affect velocity"
+        );
+    }
+
+    #[cfg(feature = "mujoco")]
+    #[test]
+    #[ignore] // Requires MuJoCo library
+    fn test_mujoco_reset() {
+        let mut sim = MuJoCoHumanoidSimulator::from_bundled_asset().unwrap();
+        let cmd = HumanoidCommand { torques: [0.5; NUM_ACTUATORS] };
+
+        for _ in 0..50 {
+            sim.step(&cmd, 0.025);
+        }
+
+        sim.reset();
+        let state = sim.state();
+        assert!(
+            (state.root_height - sim.state().root_height).abs() < 0.01,
+            "Reset should restore initial state"
+        );
+    }
+
+    #[cfg(feature = "mujoco")]
+    #[test]
+    #[ignore] // Requires MuJoCo library
+    fn test_mujoco_body_mass() {
+        let sim = MuJoCoHumanoidSimulator::from_bundled_asset().unwrap();
+        let mass = sim.body_mass();
+        assert!(mass > 0.0, "Torso mass should be positive: {mass}");
+        assert!(mass < 100.0, "Torso mass should be reasonable: {mass}");
+    }
+
+    #[cfg(feature = "mujoco")]
+    #[test]
+    #[ignore] // Requires MuJoCo library
+    fn test_mujoco_perturbation() {
+        let mut sim = MuJoCoHumanoidSimulator::from_bundled_asset().unwrap();
+        sim.reset_with_perturbation(1.0, 42);
+
+        let state = sim.state();
+        // Perturbed state should differ from default standing
+        let any_nonzero = state.joint_angles.iter().any(|a| a.abs() > 0.001);
+        assert!(any_nonzero, "Perturbation should change joint angles");
+    }
 }

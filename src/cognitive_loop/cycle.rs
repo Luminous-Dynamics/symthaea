@@ -1581,7 +1581,7 @@ impl CognitiveLoopService {
         // Science: Kahneman (1973) — attention is a limited-capacity resource.
         // Track cumulative cycle time; if we've exceeded budget, flag for
         // downstream subsystems to respect (skip expensive optional modules).
-        let attention_budget_us = 50_000u64; // 50ms budget (~20Hz target)
+        let attention_budget_us = ATTENTION_BUDGET_US;
         let attention_budget_elapsed_us = cycle_start.elapsed().as_micros() as u64;
         let attention_budget_exceeded = attention_budget_elapsed_us > attention_budget_us;
         if attention_budget_exceeded {
@@ -2146,6 +2146,7 @@ impl CognitiveLoopService {
             hv16_cached: &hv16_cached,
             input,
             urgency,
+            attention_budget_exceeded,
         };
 
         // ═══════════════════════════════════════════════════════════════════════
