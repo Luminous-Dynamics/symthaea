@@ -14,7 +14,7 @@ use crate::wm::{WmConfig, WorkingMemory};
 pub struct LongRangeBenchmark;
 
 impl LongRangeBenchmark {
-    fn run_trial(&self, delay_cycles: usize, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
+    fn run_trial(&self, delay_cycles: usize, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
         let dim = config.dimension;
         let adapter = ScenarioAdapter;
         let seed = config.trial_seed("memory_agent", &format!("long_{}", delay_cycles), trial_idx);
@@ -65,11 +65,18 @@ impl LongRangeBenchmark {
 
         // For long delays, the fact may have been evicted but should be
         // in episodic memory; here we test WM persistence directly
-        if max_sim > 0.2 {
-            1.0
-        } else {
-            0.0
-        }
+        // Time pressure: base 0.2 threshold for long-range retrieval; +0.10/unit raises criterion,
+        // modeling truncated memory search under deadline (Ratcliff & McKoon, 2008 DDM).
+        let threshold = 0.2 + config.time_pressure as f32 * 0.10;
+        let accuracy = if max_sim > threshold { 1.0 } else { 0.0 };
+
+        // RT proxy: delay ticks add retention interval cost, retrieval
+        // decision margin modulates deliberation. Base 4 ticks (warmup +
+        // encoding + motor), +0.15/delay cycle, weaker match = longer search.
+        let retrieval_margin = (max_sim as f64).clamp(0.0, 1.0);
+        let rt_ticks = 4.0 + delay_cycles as f64 * 0.15 + (1.0 - retrieval_margin) * 5.0;
+
+        (accuracy, rt_ticks)
     }
 }
 
@@ -84,14 +91,20 @@ impl PsychBenchmark for LongRangeBenchmark {
 
         for delay in [5, 20, 50, 100] {
             let mut accuracies = Vec::new();
+            let mut rts = Vec::new();
             for trial in 0..config.trials_per_condition {
-                let acc = self.run_trial(delay, config, trial);
+                let (acc, rt) = self.run_trial(delay, config, trial);
                 accuracies.push(acc);
+                rts.push(rt);
             }
 
             result.insert(
                 format!("delay_{}::retention", delay),
                 MetricValue::from_samples(&accuracies),
+            );
+            result.insert(
+                format!("delay_{}::rt_ticks", delay),
+                MetricValue::from_samples(&rts),
             );
         }
 

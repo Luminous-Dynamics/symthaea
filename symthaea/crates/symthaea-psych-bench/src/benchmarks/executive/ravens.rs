@@ -310,6 +310,7 @@ impl RavensProgressiveMatricesBenchmark {
         let mut easy_correct = 0u32;
         let mut medium_correct = 0u32;
         let mut hard_correct = 0u32;
+        let mut rt_ticks = Vec::new();
 
         for difficulty in 0..3 {
             for item_idx in 0..items_per_tier {
@@ -362,10 +363,13 @@ impl RavensProgressiveMatricesBenchmark {
                 // At harder levels, rule extraction is noisier — analogous to
                 // increased cognitive load (Carpenter et al., 1990). This
                 // prevents ceiling effects where HDC analogy is too precise.
+                // Time pressure: +0.15/unit adds perceptual noise, modeling reduced encoding fidelity
+                // under speed emphasis (Carpenter et al., 1990; Wickelgren, 1977 SAT: ~25ms RT cost/unit).
+                let tp_noise = config.time_pressure as f32 * 0.15;
                 let noise_frac = match difficulty {
-                    0 => 0.20f32,
-                    1 => 0.40,
-                    _ => 0.55,
+                    0 => 0.20f32 + tp_noise,
+                    1 => 0.40 + tp_noise,
+                    _ => 0.55 + tp_noise,
                 };
                 let pred_shape = {
                     let n = ContinuousHV::random(dim, item_seed.wrapping_add(8001));
@@ -430,6 +434,14 @@ impl RavensProgressiveMatricesBenchmark {
                     }
                 }
 
+                // RT proxy: decision difficulty from answer vs best distractor margin.
+                // Harder items (smaller margin) require longer deliberation.
+                // Per-item RT: base 4 ticks + up to 7 ticks for close competition
+                // (Carpenter et al., 1990 — Ravens completion time).
+                let sim_margin = (answer_sim - best_distractor_sim).abs() as f64;
+                let item_rt = 4.0 + (1.0 - sim_margin.min(1.0)) * 7.0;
+                rt_ticks.push(item_rt);
+
                 if answer_sim > best_distractor_sim {
                     match difficulty {
                         0 => easy_correct += 1,
@@ -452,6 +464,7 @@ impl RavensProgressiveMatricesBenchmark {
             hard_accuracy: hard_acc,
             overall_accuracy: overall,
             difficulty_gradient: easy_acc - hard_acc,
+            rt_ticks,
         }
     }
 }
@@ -462,6 +475,7 @@ struct RpmResult {
     hard_accuracy: f64,
     overall_accuracy: f64,
     difficulty_gradient: f64,
+    rt_ticks: Vec<f64>,
 }
 
 impl PsychBenchmark for RavensProgressiveMatricesBenchmark {
@@ -478,6 +492,7 @@ impl PsychBenchmark for RavensProgressiveMatricesBenchmark {
         let mut hard = Vec::new();
         let mut overall = Vec::new();
         let mut gradient = Vec::new();
+        let mut all_rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -486,6 +501,7 @@ impl PsychBenchmark for RavensProgressiveMatricesBenchmark {
             hard.push(r.hard_accuracy);
             overall.push(r.overall_accuracy);
             gradient.push(r.difficulty_gradient);
+            all_rts.extend_from_slice(&r.rt_ticks);
         }
 
         result.insert("easy_accuracy", MetricValue::from_samples(&easy));
@@ -493,6 +509,7 @@ impl PsychBenchmark for RavensProgressiveMatricesBenchmark {
         result.insert("hard_accuracy", MetricValue::from_samples(&hard));
         result.insert("overall_accuracy", MetricValue::from_samples(&overall));
         result.insert("difficulty_gradient", MetricValue::from_samples(&gradient));
+        result.insert("rt_ticks", MetricValue::from_samples(&all_rts));
 
         result.conditions = 3;
         result.trials_per_condition = config.trials_per_condition;

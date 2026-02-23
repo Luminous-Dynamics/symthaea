@@ -15,7 +15,8 @@ pub struct SpatialUpdatingBenchmark;
 
 impl SpatialUpdatingBenchmark {
     /// Run a single trial: start at a position, apply N moves, check final position.
-    fn run_trial(&self, num_updates: usize, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
+    /// Returns (accuracy, rt_ticks).
+    fn run_trial(&self, num_updates: usize, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
         let dim = config.dimension;
         let seed = config.trial_seed("worm", &format!("spatial_{}", num_updates), trial_idx);
         let adapter = SpatialAdapter::default();
@@ -69,11 +70,19 @@ impl SpatialUpdatingBenchmark {
             .map(|wm_item| wm_item.similarity(&target_hv))
             .fold(0.0f32, f32::max);
 
-        if max_sim > 0.3 {
-            1.0
-        } else {
-            0.0
-        }
+        // Time pressure: base 0.3 threshold yields ~75% spatial recall; +0.10/unit raises criterion,
+        // modeling reduced search depth under speed emphasis (Luce, 1986 sequential sampling).
+        let threshold = 0.3 + config.time_pressure as f32 * 0.10;
+
+        // RT proxy: deliberation ticks based on spatial match confidence.
+        // Smaller margin between max_sim and threshold → harder discrimination → longer RT
+        // (Luce, 1986; Ratcliff, 1978 diffusion model).
+        let decision_margin =
+            ((max_sim - threshold).abs() as f64).min(1.0);
+        let rt_ticks = 4.0 + (1.0 - decision_margin) * 6.0;
+
+        let acc = if max_sim > threshold { 1.0 } else { 0.0 };
+        (acc, rt_ticks)
     }
 }
 
@@ -88,15 +97,21 @@ impl PsychBenchmark for SpatialUpdatingBenchmark {
 
         for num_updates in [3, 5, 7, 10] {
             let mut accuracies = Vec::new();
+            let mut rts = Vec::new();
 
             for trial in 0..config.trials_per_condition {
-                let acc = self.run_trial(num_updates, config, trial);
+                let (acc, rt) = self.run_trial(num_updates, config, trial);
                 accuracies.push(acc);
+                rts.push(rt);
             }
 
             result.insert(
                 format!("updates_{}::accuracy", num_updates),
                 MetricValue::from_samples(&accuracies),
+            );
+            result.insert(
+                format!("updates_{}::rt_ticks", num_updates),
+                MetricValue::from_samples(&rts),
             );
         }
 

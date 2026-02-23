@@ -24,7 +24,6 @@ use symthaea_core::hdc::ContinuousHV;
 pub struct FalseBeliefBenchmark;
 
 /// A single false-belief scenario.
-#[allow(dead_code)]
 struct FalseBeliefScenario {
     /// Setup sentences (agent observes object location).
     setup: Vec<&'static str>,
@@ -199,7 +198,10 @@ impl FalseBeliefBenchmark {
         };
         let belief_sim = agent.similarity(&belief_hv);
         let reality_sim = agent.similarity(&reality_hv);
-        let geo_signal = (belief_sim - reality_sim) as f64;
+        // Time pressure: 0.15/unit attenuates belief-reality discrimination, modeling reality bias
+        // under cognitive load (Birch & Bloom, 2007 curse of knowledge; Wickelgren, 1977 SAT).
+        let pressure_noise = config.time_pressure * 0.15;
+        let geo_signal = (belief_sim - reality_sim) as f64 * (1.0 - pressure_noise);
 
         // --- Combined: structural tracking is primary, HDC is tiebreaker ---
         let combined = structural_score * 0.8 + geo_signal * 0.2;
@@ -249,8 +251,36 @@ impl FalseBeliefBenchmark {
     }
 
     #[cfg(not(feature = "symthaea-backend"))]
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
-        self.run_trial_lightweight(config, trial_idx)
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+        let dim = config.dimension;
+        let accuracy = self.run_trial_lightweight(config, trial_idx);
+
+        // RT proxy: compute decision difficulty from belief vs reality similarity margin.
+        // Recompute the geometric signal for RT (lightweight path already computed it
+        // but didn't return it). Harder decisions (smaller margin) take longer.
+        let adapter = ScenarioAdapter;
+        let scenarios = Self::scenarios();
+        let scenario = &scenarios[trial_idx % scenarios.len()];
+        let mut agent_belief: Option<ContinuousHV> = None;
+        for sentence in &scenario.setup {
+            let hv = adapter.encode(&Scenario::new(*sentence), dim);
+            agent_belief = Some(match agent_belief {
+                Some(prev) => ContinuousHV::bundle_owned(&[prev, hv.clone()]),
+                None => hv.clone(),
+            });
+        }
+        let belief_hv = adapter.encode(&Scenario::new(scenario.belief_location), dim);
+        let reality_hv = adapter.encode(&Scenario::new(scenario.reality_location), dim);
+        let margin = if let Some(ref agent) = agent_belief {
+            (agent.similarity(&belief_hv) - agent.similarity(&reality_hv)).abs() as f64
+        } else {
+            0.5
+        };
+        let base = 4.0;
+        let range = 6.0;
+        let rt = base + (1.0 - margin.min(1.0)) * range;
+
+        (accuracy, rt)
     }
 }
 
@@ -264,6 +294,7 @@ impl PsychBenchmark for FalseBeliefBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
         let mut accuracies = Vec::new();
+        let mut rt_ticks = Vec::new();
         #[cfg(feature = "symthaea-backend")]
         let mut confidences = Vec::new();
 
@@ -276,7 +307,9 @@ impl PsychBenchmark for FalseBeliefBenchmark {
             }
             #[cfg(not(feature = "symthaea-backend"))]
             {
-                accuracies.push(self.run_trial(config, trial));
+                let (acc, rt) = self.run_trial(config, trial);
+                accuracies.push(acc);
+                rt_ticks.push(rt);
             }
         }
 
@@ -284,6 +317,9 @@ impl PsychBenchmark for FalseBeliefBenchmark {
             "false_belief_accuracy",
             MetricValue::from_samples(&accuracies),
         );
+        if !rt_ticks.is_empty() {
+            result.insert("rt_ticks", MetricValue::from_samples(&rt_ticks));
+        }
         #[cfg(feature = "symthaea-backend")]
         result.insert("action_confidence", MetricValue::from_samples(&confidences));
 

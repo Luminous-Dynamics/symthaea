@@ -41,7 +41,7 @@ impl TestTimeLearningBenchmark {
         ]
     }
 
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
         let dim = config.dimension;
         let adapter = ScenarioAdapter;
         let pairs = Self::pairs();
@@ -87,8 +87,10 @@ impl TestTimeLearningBenchmark {
         // deterministic. The correction has a recency advantage but retrieval
         // competition, source confusion, and decision noise prevent perfect
         // updating (Karpicke & Roediger 2008 — testing effect).
-        // β controls discriminability: lower β → more noise → more errors.
-        let beta = 4.0;
+        // beta controls discriminability: lower beta = more noise = more errors.
+        // Time pressure: base beta=4.0 yields ~85% correction retrieval (Karpicke & Roediger, 2008);
+        // -1.5/unit reduces discriminability, modeling source confusion under SAT (Luce, 1986).
+        let beta = 4.0 - config.time_pressure * 1.5;
         let p_correction =
             (beta * corr_sim).exp() / ((beta * corr_sim).exp() + (beta * orig_sim).exp());
 
@@ -99,11 +101,16 @@ impl TestTimeLearningBenchmark {
         ns ^= ns << 17;
         let roll = (ns % 10000) as f64 / 10000.0;
 
-        if roll < p_correction {
-            1.0
-        } else {
-            0.0
-        }
+        let accuracy = if roll < p_correction { 1.0 } else { 0.0 };
+
+        // RT proxy: retrieval difficulty drives deliberation.
+        // Base 4 ticks (encoding + filler + correction presentation),
+        // closer competition between original and correction = longer
+        // deliberation (Karpicke & Roediger, 2008 — testing effect).
+        let decision_margin = (corr_sim - orig_sim).abs().clamp(0.0, 1.0);
+        let rt_ticks = 4.0 + (1.0 - decision_margin) * 6.0;
+
+        (accuracy, rt_ticks)
     }
 }
 
@@ -117,14 +124,18 @@ impl PsychBenchmark for TestTimeLearningBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
         let mut accuracies = Vec::new();
+        let mut rts = Vec::new();
         for trial in 0..config.trials_per_condition {
-            accuracies.push(self.run_trial(config, trial));
+            let (acc, rt) = self.run_trial(config, trial);
+            accuracies.push(acc);
+            rts.push(rt);
         }
 
         result.insert(
             "correction_accuracy",
             MetricValue::from_samples(&accuracies),
         );
+        result.insert("rt_ticks", MetricValue::from_samples(&rts));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

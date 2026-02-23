@@ -15,7 +15,7 @@ use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation
 pub struct TwoStepBenchmark;
 
 impl TwoStepBenchmark {
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, Vec<f64>) {
         let seed = config.trial_seed("cogbench", "two_step", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
         let num_episodes = 40;
@@ -52,6 +52,7 @@ impl TwoStepBenchmark {
                                                       // Reward model: EMA of rewards in each state
         let mut state_reward = [0.5f64; 2]; // prior: 0.5
         let reward_lr = 0.5;
+        let mut rt_ticks = Vec::new();
 
         for ep in 0..num_episodes {
             // Stage 1: blend FEP action selection with model-based values.
@@ -70,7 +71,9 @@ impl TwoStepBenchmark {
                 .collect();
 
             // Softmax over model-based values — low temp makes MB signal decisive
-            let mb_temp = 0.1;
+            // Time pressure: base 0.1 preserves model-based control (Daw et al., 2011 two-step);
+            // +0.10/unit degrades MB signal, shifting toward model-free under SAT (Heitz, 2014).
+            let mb_temp = 0.1 + config.time_pressure * 0.10;
             let mb_max = mb_values[0].max(mb_values[1]);
             let mb_exp: Vec<f64> = mb_values
                 .iter()
@@ -88,6 +91,12 @@ impl TwoStepBenchmark {
                 .collect();
             let prob_sum: f64 = blended_probs.iter().sum();
             let final_probs: Vec<f64> = blended_probs.iter().map(|p| p / prob_sum).collect();
+
+            // RT proxy: stage-1 decision difficulty from model-based value margin —
+            // closer MB values = harder deliberation (Daw et al., 2011 two-step task).
+            let mb_diff = (mb_values[0] - mb_values[1]).abs();
+            let ticks = 5.0 + (1.0 - mb_diff.min(1.0)) * 8.0;
+            rt_ticks.push(ticks);
 
             let stage1_action = sample_action(&final_probs, &mut rng_state);
 
@@ -176,7 +185,7 @@ impl TwoStepBenchmark {
         // beta3 = model-basedness index
         let model_basedness = interaction.abs().min(1.0);
 
-        (model_basedness, reward_effect)
+        (model_basedness, reward_effect, rt_ticks)
     }
 }
 
@@ -199,11 +208,13 @@ impl PsychBenchmark for TwoStepBenchmark {
 
         let mut model_basedness = Vec::new();
         let mut reward_effects = Vec::new();
+        let mut all_rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
-            let (mb, re) = self.run_trial(config, trial);
+            let (mb, re, rts) = self.run_trial(config, trial);
             model_basedness.push(mb);
             reward_effects.push(re);
+            all_rts.extend_from_slice(&rts);
         }
 
         result.insert(
@@ -211,6 +222,7 @@ impl PsychBenchmark for TwoStepBenchmark {
             MetricValue::from_samples(&model_basedness),
         );
         result.insert("reward_effect", MetricValue::from_samples(&reward_effects));
+        result.insert("rt_ticks", MetricValue::from_samples(&all_rts));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

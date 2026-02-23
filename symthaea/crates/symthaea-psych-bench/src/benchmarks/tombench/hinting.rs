@@ -19,7 +19,6 @@ use symthaea_core::hdc::ContinuousHV;
 /// Hinting task benchmark.
 pub struct HintingBenchmark;
 
-#[allow(dead_code)]
 struct HintingScenario {
     context: Vec<&'static str>,
     correct_inference: &'static str,
@@ -196,7 +195,10 @@ impl HintingBenchmark {
         // Even healthy adults make ~20% errors on hinting tasks (Corcoran
         // et al., 1995). The sigmoid + stochastic sampling models the
         // inherent uncertainty in ToM inference.
-        let p_correct = 1.0 / (1.0 + (-combined * 0.25).exp());
+        // Time pressure: -0.4/unit flattens sigmoid gain, modeling hasty pragmatic inference;
+        // at max pressure, ~20% accuracy drop matches ToM under cognitive load (Lin et al., 2010).
+        let sigmoid_gain = 0.25 * (1.0 - config.time_pressure * 0.4);
+        let p_correct = 1.0 / (1.0 + (-combined * sigmoid_gain).exp());
         let seed = config.trial_seed("tombench", "hinting_noise", trial_idx);
         let mut noise_rng = seed ^ 0x9E3779B97F4A7C15;
         noise_rng ^= noise_rng << 13;
@@ -247,8 +249,74 @@ impl HintingBenchmark {
     }
 
     #[cfg(not(feature = "symthaea-backend"))]
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
-        self.run_trial_lightweight(config, trial_idx)
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+        // Re-derive combined score and p_correct for RT computation.
+        let dim = config.dimension;
+        let adapter = ScenarioAdapter;
+        let scenarios = Self::scenarios();
+        let scenario = &scenarios[trial_idx % scenarios.len()];
+
+        let correct_lower = scenario.correct_inference.to_lowercase();
+        let wrong_lower = scenario.wrong_inference.to_lowercase();
+        let context_text: String = scenario
+            .context
+            .iter()
+            .map(|s| s.to_lowercase())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let desire_words = [
+            "wants", "want", "help", "buy", "pay", "leave", "give", "need", "wish", "hope", "get",
+            "lend", "offer",
+        ];
+        let literal_words = [
+            "commenting", "describing", "telling", "observing", "noting", "reporting",
+            "mentioning", "stating", "information", "design", "prices", "time",
+        ];
+        let behavioral_cues = [
+            "shivers", "yawns", "forgot", "tired", "looks at", "pulls", "thin",
+            "sitting down", "long drive", "more expensive", "piling up",
+        ];
+
+        let correct_desire: f64 = desire_words.iter().filter(|k| correct_lower.contains(*k)).count() as f64;
+        let wrong_desire: f64 = desire_words.iter().filter(|k| wrong_lower.contains(*k)).count() as f64;
+        let correct_literal: f64 = literal_words.iter().filter(|k| correct_lower.contains(*k)).count() as f64;
+        let wrong_literal: f64 = literal_words.iter().filter(|k| wrong_lower.contains(*k)).count() as f64;
+        let behavioral_count: f64 = behavioral_cues.iter().filter(|k| context_text.contains(*k)).count() as f64;
+
+        let correct_desire_signal = correct_desire - correct_literal;
+        let wrong_desire_signal = wrong_desire - wrong_literal;
+        let keyword_score = (correct_desire_signal - wrong_desire_signal) + behavioral_count * 0.3;
+
+        let context_hvs: Vec<ContinuousHV> = scenario.context.iter().enumerate().map(|(i, s)| {
+            let mut hv = adapter.encode(&Scenario::new(*s), dim);
+            let weight = 1.0 + 0.5 * i as f32;
+            for v in hv.values.iter_mut() { *v *= weight; }
+            hv
+        }).collect();
+        let context_bundle = ContinuousHV::bundle_owned(&context_hvs);
+        let desire_marker = adapter.encode(&Scenario::new("wants needs desires wishes hopes for"), dim);
+        let correct_hv = adapter.encode(&Scenario::new(scenario.correct_inference), dim);
+        let wrong_hv = adapter.encode(&Scenario::new(scenario.wrong_inference), dim);
+        let correct_context_sim = context_bundle.similarity(&correct_hv);
+        let wrong_context_sim = context_bundle.similarity(&wrong_hv);
+        let correct_desire_sim = desire_marker.similarity(&correct_hv);
+        let wrong_desire_sim = desire_marker.similarity(&wrong_hv);
+        let geo_signal = (correct_context_sim - wrong_context_sim) as f64
+            + (correct_desire_sim - wrong_desire_sim) as f64 * 0.3;
+        let combined = keyword_score * 0.8 + geo_signal * 0.2;
+        // Same SAT sigmoid gain as lightweight path (Lin et al., 2010).
+        let sigmoid_gain = 0.25 * (1.0 - config.time_pressure * 0.4);
+        let p_correct = 1.0 / (1.0 + (-combined * sigmoid_gain).exp());
+
+        // RT proxy: decisions near p=0.5 are hardest (most uncertain)
+        let margin = (p_correct - 0.5).abs() * 2.0; // 0 = hardest, 1 = easiest
+        let base = 4.0;
+        let range = 7.0;
+        let rt = base + (1.0 - margin.min(1.0)) * range;
+
+        let accuracy = self.run_trial_lightweight(config, trial_idx);
+        (accuracy, rt)
     }
 }
 
@@ -262,6 +330,7 @@ impl PsychBenchmark for HintingBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
         let mut accuracies = Vec::new();
+        let mut rt_ticks = Vec::new();
         #[cfg(feature = "symthaea-backend")]
         let mut confidences = Vec::new();
 
@@ -274,11 +343,16 @@ impl PsychBenchmark for HintingBenchmark {
             }
             #[cfg(not(feature = "symthaea-backend"))]
             {
-                accuracies.push(self.run_trial(config, trial));
+                let (acc, rt) = self.run_trial(config, trial);
+                accuracies.push(acc);
+                rt_ticks.push(rt);
             }
         }
 
         result.insert("hinting_accuracy", MetricValue::from_samples(&accuracies));
+        if !rt_ticks.is_empty() {
+            result.insert("rt_ticks", MetricValue::from_samples(&rt_ticks));
+        }
         #[cfg(feature = "symthaea-backend")]
         result.insert("action_confidence", MetricValue::from_samples(&confidences));
 

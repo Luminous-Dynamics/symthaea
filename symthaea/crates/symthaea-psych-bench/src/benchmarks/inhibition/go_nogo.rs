@@ -54,13 +54,14 @@ impl GoNoGoBenchmark {
         let nogo_proto =
             ContinuousHV::weighted_bundle(&[&nogo_unique, &shared], &[1.0 - overlap, overlap]);
 
-        // Prepotent bias: Go threshold is lower (easier to trigger)
-        // Time pressure lowers both thresholds (more impulsive responding)
-        // and raises temperature (noisier decisions).
+        // Prepotent bias: Go threshold is lower (easier to trigger).
+        // Time pressure models boundary collapse in sequential sampling (Ratcliff & McKoon, 2008 DDM):
+        // go_threshold -0.06/unit lowers response criterion; nogo_threshold -0.10/unit reduces
+        // inhibitory control (Verbruggen & Logan, 2008 stop-signal); temp +0.15/unit adds noise.
         let pressure = config.time_pressure;
-        let go_threshold: f64 = 0.12 - pressure * 0.06;
-        let nogo_threshold: f64 = 0.32 - pressure * 0.10;
-        let temperature: f64 = 0.25 + pressure * 0.15;
+        let go_threshold: f64 = 0.12 - pressure * 0.06; // TP: lowers go trigger (range 0.12–0.06)
+        let nogo_threshold: f64 = 0.32 - pressure * 0.10; // TP: lowers inhibition bar (range 0.32–0.22)
+        let temperature: f64 = 0.25 + pressure * 0.15; // TP: noisier decisions (range 0.25–0.40)
 
         let total_trials = 100;
         let go_ratio = 0.70; // 70% Go, 30% No-Go

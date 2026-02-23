@@ -524,7 +524,7 @@ impl BenchmarkReport {
         if benchmark.contains("StrangeStory") {
             push_specific("overall_accuracy", "strange_story_accuracy", &bl.tombench);
         }
-        if benchmark.contains("Stroop") {
+        if benchmark.contains("Stroop") && !benchmark.contains("Emotional") {
             push_specific(
                 "congruent_accuracy",
                 "stroop_congruent_accuracy",
@@ -533,6 +533,16 @@ impl BenchmarkReport {
             push_specific(
                 "incongruent_accuracy",
                 "stroop_incongruent_accuracy",
+                &bl.executive,
+            );
+            push_specific(
+                "congruent::rt_ticks",
+                "stroop_congruent_rt_ticks",
+                &bl.executive,
+            );
+            push_specific(
+                "incongruent::rt_ticks",
+                "stroop_incongruent_rt_ticks",
                 &bl.executive,
             );
         }
@@ -547,6 +557,16 @@ impl BenchmarkReport {
                 "flanker_incongruent_accuracy",
                 &bl.executive,
             );
+            push_specific(
+                "congruent::rt_ticks",
+                "flanker_congruent_rt_ticks",
+                &bl.executive,
+            );
+            push_specific(
+                "incongruent::rt_ticks",
+                "flanker_incongruent_rt_ticks",
+                &bl.executive,
+            );
         }
         if benchmark.contains("Wisconsin") {
             push_specific(
@@ -554,6 +574,7 @@ impl BenchmarkReport {
                 "wcst_perseverative_errors",
                 &bl.executive,
             );
+            push_specific("rt_ticks", "wcst_rt_ticks", &bl.executive);
         }
         if benchmark.contains("Reversal") {
             push_specific(
@@ -599,6 +620,117 @@ impl BenchmarkReport {
                 "emotional_negative_accuracy",
                 &bl.affect,
             );
+        }
+        // RT baselines for specific benchmarks
+        if benchmark.contains("Iowa") || benchmark.contains("IGT") {
+            push_specific("rt_ticks", "igt_rt_ticks", &bl.executive);
+        }
+        if benchmark.contains("NBack") || benchmark.contains("N-back") {
+            push_specific("nback_1::rt_ticks", "nback_1_rt_ticks", &bl.worm);
+            push_specific("nback_2::rt_ticks", "nback_2_rt_ticks", &bl.worm);
+            push_specific("nback_3::rt_ticks", "nback_3_rt_ticks", &bl.worm);
+        }
+        if benchmark.contains("AttentionalBlink") {
+            push_specific("t1::rt_ticks", "attblink_t1_rt_ticks", &bl.attention);
+            push_specific("lag3::rt_ticks", "attblink_lag3_rt_ticks", &bl.attention);
+            push_specific("lag8::rt_ticks", "attblink_lag8_rt_ticks", &bl.attention);
+        }
+        // CogBench RT mappings
+        if benchmark.contains("BART") {
+            push_specific("rt_ticks", "bart_rt_ticks", &bl.cogbench);
+        }
+        if benchmark.contains("Reversal") {
+            push_specific("rt_ticks", "reversal_rt_ticks", &bl.cogbench);
+        }
+        if benchmark.contains("TwoStep") {
+            push_specific("rt_ticks", "two_step_rt_ticks", &bl.cogbench);
+        }
+        if benchmark.contains("RestlessBandit") {
+            push_specific("rt_ticks", "restless_bandit_rt_ticks", &bl.cogbench);
+        }
+        if benchmark.contains("Instrumental") {
+            push_specific("rt_ticks", "instrumental_rt_ticks", &bl.cogbench);
+        }
+        if benchmark.contains("TemporalDiscounting") {
+            push_specific("rt_ticks", "temporal_discounting_rt_ticks", &bl.cogbench);
+        }
+        if benchmark.contains("Horizon") {
+            push_specific("horizon_1::rt_ticks", "horizon_rt_ticks", &bl.cogbench);
+            push_specific("horizon_6::rt_ticks", "horizon_rt_ticks", &bl.cogbench);
+        }
+        if benchmark.contains("Probabilistic") {
+            push_specific("rt_ticks", "probabilistic_rt_ticks", &bl.cogbench);
+        }
+        // WorM RT mappings
+        if benchmark.contains("ChangeDetection") {
+            push_specific("rt_ticks", "change_detection_rt_ticks", &bl.worm);
+        }
+        if benchmark.contains("DigitSpan") {
+            push_specific("forward::rt_ticks", "digit_span_forward_rt_ticks", &bl.worm);
+            push_specific("backward::rt_ticks", "digit_span_backward_rt_ticks", &bl.worm);
+        }
+        if benchmark.contains("Binding") {
+            push_specific("rt_ticks", "binding_rt_ticks", &bl.worm);
+        }
+        if benchmark.contains("SerialRecall") {
+            push_specific("rt_ticks", "serial_recall_rt_ticks", &bl.worm);
+        }
+        if benchmark.contains("SpatialUpdating") {
+            push_specific("rt_ticks", "spatial_updating_rt_ticks", &bl.worm);
+        }
+        // ToMBench RT mappings
+        if benchmark.contains("FalseBelief") {
+            push_specific("rt_ticks", "tombench_rt_ticks", &bl.tombench);
+        }
+        if benchmark.contains("FauxPas") {
+            push_specific("rt_ticks", "tombench_rt_ticks", &bl.tombench);
+        }
+        if benchmark.contains("Hinting") {
+            push_specific("rt_ticks", "tombench_rt_ticks", &bl.tombench);
+        }
+        if benchmark.contains("StrangeStory") {
+            push_specific("rt_ticks", "tombench_rt_ticks", &bl.tombench);
+        }
+        if benchmark.contains("Persuasion") {
+            push_specific("rt_ticks", "tombench_rt_ticks", &bl.tombench);
+        }
+        // Affect RT mappings
+        if benchmark.contains("EmotionalStroop") {
+            push_specific("neutral::rt_ticks", "emotional_stroop_neutral_rt_ticks", &bl.affect);
+            push_specific("negative::rt_ticks", "emotional_stroop_negative_rt_ticks", &bl.affect);
+        }
+        if benchmark.contains("ValenceClassification") {
+            push_specific("rt_ticks", "valence_rt_ticks", &bl.affect);
+        }
+        if benchmark.contains("MoodCongruent") {
+            push_specific("rt_ticks", "mood_congruent_rt_ticks", &bl.affect);
+        }
+        // MemoryAgent RT mappings
+        if benchmark.contains("AccurateRetrieval") {
+            push_specific("rt_ticks", "accurate_retrieval_rt_ticks", &bl.memory_agent);
+        }
+        if benchmark.contains("ConflictResolution") {
+            push_specific("rt_ticks", "conflict_resolution_rt_ticks", &bl.memory_agent);
+        }
+        if benchmark.contains("LongRange") {
+            push_specific("rt_ticks", "long_range_rt_ticks", &bl.memory_agent);
+        }
+        if benchmark.contains("ProspectiveMemory") {
+            push_specific("rt_ticks", "prospective_memory_rt_ticks", &bl.memory_agent);
+        }
+        if benchmark.contains("TestTimeLearning") {
+            push_specific("rt_ticks", "test_time_learning_rt_ticks", &bl.memory_agent);
+        }
+        // Metacognition RT mapping
+        if benchmark.contains("Calibration") {
+            push_specific("rt_ticks", "calibration_rt_ticks", &bl.metacognition);
+        }
+        // Creativity RT mappings
+        if benchmark.contains("AlternateUses") {
+            push_specific("rt_ticks", "aut_rt_ticks", &bl.creativity);
+        }
+        if benchmark.contains("RemoteAssociates") {
+            push_specific("rt_ticks", "rat_rt_ticks", &bl.creativity);
         }
 
         // Only return comparisons relevant to this benchmark
@@ -898,7 +1030,7 @@ fn rt_summary_for_result(result: &BenchmarkResult) -> String {
     let rt_metrics: Vec<&MetricValue> = result
         .metrics
         .iter()
-        .filter(|(k, _)| k.ends_with("::rt_ticks") || *k == "go_rt_ticks")
+        .filter(|(k, _)| k.ends_with("::rt_ticks") || *k == "go_rt_ticks" || *k == "rt_ticks")
         .map(|(_, v)| v)
         .collect();
 

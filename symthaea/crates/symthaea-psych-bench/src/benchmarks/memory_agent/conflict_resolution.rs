@@ -42,7 +42,7 @@ impl ConflictResolutionBenchmark {
         ]
     }
 
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64) {
         let dim = config.dimension;
         let seed = config.trial_seed("memory_agent", "conflict", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -82,7 +82,9 @@ impl ConflictResolutionBenchmark {
         let a_sim = wm.activation_weighted_similarity(&a_hv) as f64;
         let b_sim = wm.activation_weighted_similarity(&b_hv) as f64;
 
-        let temperature = 0.25;
+        // Time pressure: base 0.25 yields ~65% recency preference (Oberauer, 2002 WM updating);
+        // +0.15/unit adds retrieval noise, modeling noisier competition under SAT (Heitz, 2014).
+        let temperature = 0.25 + config.time_pressure * 0.15;
         let max_sim = a_sim.max(b_sim);
         let a_weight = ((a_sim - max_sim) / temperature).exp();
         let b_weight = ((b_sim - max_sim) / temperature).exp();
@@ -97,7 +99,13 @@ impl ConflictResolutionBenchmark {
         // Consistency: the margin between the two
         let consistency = (b_sim - a_sim).abs();
 
-        (recency_correct, consistency)
+        // RT proxy: conflict difficulty drives deliberation time.
+        // Base 4 ticks (encoding + filler + retrieval), closer competing
+        // memories (smaller margin) require more deliberation (Oberauer, 2002).
+        let margin = consistency.clamp(0.0, 1.0);
+        let rt_ticks = 4.0 + (1.0 - margin) * 6.0;
+
+        (recency_correct, consistency, rt_ticks)
     }
 }
 
@@ -112,11 +120,13 @@ impl PsychBenchmark for ConflictResolutionBenchmark {
 
         let mut recency_accs = Vec::new();
         let mut consistencies = Vec::new();
+        let mut rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
-            let (rec, con) = self.run_trial(config, trial);
+            let (rec, con, rt) = self.run_trial(config, trial);
             recency_accs.push(rec);
             consistencies.push(con);
+            rts.push(rt);
         }
 
         result.insert(
@@ -127,6 +137,7 @@ impl PsychBenchmark for ConflictResolutionBenchmark {
             "resolution_consistency",
             MetricValue::from_samples(&consistencies),
         );
+        result.insert("rt_ticks", MetricValue::from_samples(&rts));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

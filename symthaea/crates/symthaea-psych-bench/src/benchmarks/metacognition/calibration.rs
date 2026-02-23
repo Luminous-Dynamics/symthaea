@@ -68,6 +68,7 @@ impl MetacognitiveCalibrationBenchmark {
 
         let mut all_confidences = Vec::new();
         let mut all_accuracies = Vec::new();
+        let mut all_rts = Vec::new();
         let items_per_difficulty = 15;
 
         // Generate category prototypes — items within a category are confusable.
@@ -235,15 +236,37 @@ impl MetacognitiveCalibrationBenchmark {
                 rng ^= rng << 13;
                 rng ^= rng >> 7;
                 rng ^= rng << 17;
-                let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * 0.50;
+                // Time pressure: base noise 0.50 yields ECE ~0.18 matching human miscalibration norms;
+                // +0.20/unit models reduced introspective access under SAT (Lichtenstein et al., 1982).
+                let noise_range = 0.50 + config.time_pressure * 0.20;
+                let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * noise_range;
                 let confidence = (raw_confidence + noise).clamp(0.0, 1.0);
+
+                // RT proxy: confidence judgment deliberation time.
+                // Base 5 ticks (retrieval + comparison), intermediate
+                // confidence (near 0.5) requires more deliberation than
+                // extreme confidence (near 0 or 1) — inverted-U model
+                // (Festinger, 1943; Petrusic & Baranski, 2003).
+                let uncertainty = 1.0 - (2.0 * confidence - 1.0).abs(); // peaks at 0.5
+                let item_rt = 5.0
+                    + diff.num_items as f64 * 0.5
+                    + diff.delay as f64 * 0.3
+                    + uncertainty * 4.0;
+                all_rts.push(item_rt);
 
                 all_confidences.push(confidence);
                 all_accuracies.push(if correct { 1.0 } else { 0.0 });
             }
         }
 
-        compute_calibration_metrics(&all_confidences, &all_accuracies)
+        let mut cal = compute_calibration_metrics(&all_confidences, &all_accuracies);
+        // Mean RT across all difficulty levels and items
+        cal.rt_ticks = if all_rts.is_empty() {
+            0.0
+        } else {
+            all_rts.iter().sum::<f64>() / all_rts.len() as f64
+        };
+        cal
     }
 }
 
@@ -256,6 +279,7 @@ fn compute_calibration_metrics(confidences: &[f64], accuracies: &[f64]) -> Calib
             discrimination: 0.0,
             overconfidence: 0.0,
             resolution: 0.0,
+            rt_ticks: 0.0,
         };
     }
 
@@ -343,6 +367,7 @@ fn compute_calibration_metrics(confidences: &[f64], accuracies: &[f64]) -> Calib
         discrimination: gamma,
         overconfidence,
         resolution,
+        rt_ticks: 0.0, // populated by caller
     }
 }
 
@@ -351,6 +376,7 @@ struct CalibrationResult {
     discrimination: f64,
     overconfidence: f64,
     resolution: f64,
+    rt_ticks: f64,
 }
 
 impl PsychBenchmark for MetacognitiveCalibrationBenchmark {
@@ -366,6 +392,7 @@ impl PsychBenchmark for MetacognitiveCalibrationBenchmark {
         let mut gammas = Vec::new();
         let mut overconfs = Vec::new();
         let mut resolutions = Vec::new();
+        let mut rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -373,12 +400,14 @@ impl PsychBenchmark for MetacognitiveCalibrationBenchmark {
             gammas.push(r.discrimination);
             overconfs.push(r.overconfidence);
             resolutions.push(r.resolution);
+            rts.push(r.rt_ticks);
         }
 
         result.insert("calibration_error_ece", MetricValue::from_samples(&eces));
         result.insert("discrimination_gamma", MetricValue::from_samples(&gammas));
         result.insert("overconfidence", MetricValue::from_samples(&overconfs));
         result.insert("resolution", MetricValue::from_samples(&resolutions));
+        result.insert("rt_ticks", MetricValue::from_samples(&rts));
 
         result.conditions = 5; // easy, medium_low, medium, medium_high, hard
         result.trials_per_condition = config.trials_per_condition;

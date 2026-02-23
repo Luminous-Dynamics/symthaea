@@ -271,7 +271,9 @@ impl TowerOfLondonBenchmark {
         // Calibrated so (1-err)^k matches human optimal rates across difficulties:
         //   easy (2.5 avg moves): ~72%, medium (4): ~60%, hard (5): ~53% → overall ~62%
         // Science: Kaller et al. (2016), Newman & Pittman (2007)
-        let error_rate: f64 = 0.35;
+        // Time pressure: base 0.35 matches ~62% optimal-move rate in untimed ToL (Shallice, 1982);
+        // +0.20/unit models truncated look-ahead under deadline (Heitz, 2014: ~15-25% accuracy loss).
+        let error_rate: f64 = 0.35 + config.time_pressure * 0.20;
 
         // Generate problems for each difficulty tier
         let easy = generate_problems(seed.wrapping_add(1000), 2, 5);
@@ -285,6 +287,7 @@ impl TowerOfLondonBenchmark {
         let mut total_problems = 0u32;
         let mut total_optimal_moves = 0u32;
         let mut total_actual_moves = 0u32;
+        let mut rt_ticks = Vec::new();
 
         let max_search_depth = 15;
 
@@ -419,6 +422,15 @@ impl TowerOfLondonBenchmark {
                 } else {
                     total_actual_moves += max_search_depth as u32;
                 }
+
+                // RT proxy: planning time scales with problem difficulty (optimal moves)
+                // and excess moves (planning errors). Base 3 ticks + 2 per optimal move
+                // + 1.5 per excess move (Shallice, 1982; Kaller et al., 2016 — RT increases
+                // ~linearly with minimum moves).
+                let problem_rt = 3.0
+                    + problem.optimal_moves as f64 * 2.0
+                    + excess * 1.5;
+                rt_ticks.push(problem_rt);
             }
         }
 
@@ -446,6 +458,7 @@ impl TowerOfLondonBenchmark {
             planning_efficiency: efficiency,
             avg_excess_moves: avg_excess,
             difficulty_gradient: easy_rate - hard_rate,
+            rt_ticks,
         }
     }
 }
@@ -458,6 +471,7 @@ struct TrialResult {
     planning_efficiency: f64,
     avg_excess_moves: f64,
     difficulty_gradient: f64,
+    rt_ticks: Vec<f64>,
 }
 
 impl PsychBenchmark for TowerOfLondonBenchmark {
@@ -476,6 +490,7 @@ impl PsychBenchmark for TowerOfLondonBenchmark {
         let mut efficiency = Vec::new();
         let mut excess = Vec::new();
         let mut gradient = Vec::new();
+        let mut all_rts = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -486,6 +501,7 @@ impl PsychBenchmark for TowerOfLondonBenchmark {
             efficiency.push(r.planning_efficiency);
             excess.push(r.avg_excess_moves);
             gradient.push(r.difficulty_gradient);
+            all_rts.extend_from_slice(&r.rt_ticks);
         }
 
         result.insert("easy_optimal_rate", MetricValue::from_samples(&easy));
@@ -498,6 +514,7 @@ impl PsychBenchmark for TowerOfLondonBenchmark {
         );
         result.insert("avg_excess_moves", MetricValue::from_samples(&excess));
         result.insert("difficulty_gradient", MetricValue::from_samples(&gradient));
+        result.insert("rt_ticks", MetricValue::from_samples(&all_rts));
 
         result.conditions = 3;
         result.trials_per_condition = config.trials_per_condition;

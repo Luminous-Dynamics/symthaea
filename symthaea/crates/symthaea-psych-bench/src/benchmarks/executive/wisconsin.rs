@@ -178,7 +178,8 @@ impl WisconsinCardSortingBenchmark {
             let _response_hv = encode_card(&response_card);
 
             // Softmax over rule confidences for stochastic selection.
-            // Time pressure reduces the softmax gain (more random rule selection).
+            // Time pressure: gain 1.5 produces ~15% perseverative errors (Heaton, 1993 WCST norms);
+            // -0.8/unit flattens selection toward chance, modeling impaired set-shifting under SAT (Heitz, 2014).
             let softmax_gain = 1.5 - config.time_pressure * 0.8;
             let max_conf = rule_confidence
                 .iter()

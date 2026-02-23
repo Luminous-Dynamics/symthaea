@@ -16,8 +16,8 @@ pub struct SerialRecallBenchmark;
 
 impl SerialRecallBenchmark {
     /// Run a single trial: present a list, then probe each position.
-    /// Returns accuracy per serial position.
-    fn run_trial(&self, list_len: usize, config: &BenchmarkConfig, trial_idx: usize) -> Vec<f64> {
+    /// Returns (accuracy per serial position, mean_rt_ticks).
+    fn run_trial(&self, list_len: usize, config: &BenchmarkConfig, trial_idx: usize) -> (Vec<f64>, f64) {
         let dim = config.dimension;
         let seed = config.trial_seed("worm", &format!("serial_{}", list_len), trial_idx);
         let adapter = SequenceAdapter;
@@ -43,7 +43,10 @@ impl SerialRecallBenchmark {
         // the end — producing the classic U-shaped serial position curve.
         for (pos, item) in items.iter().enumerate() {
             let hv = adapter.encode(item, dim);
-            let pi_strength = 0.80 * (1.0 - (-0.42 * pos as f32).exp());
+            // Time pressure: base 0.80 PI produces U-shaped serial curve (Keppel & Underwood, 1962);
+            // +0.10/unit amplifies interference, modeling reduced rehearsal under deadline (Wickelgren, 1977).
+            let pi_base = 0.80 + config.time_pressure as f32 * 0.10;
+            let pi_strength = pi_base * (1.0 - (-0.42 * pos as f32).exp());
             let noisy_hv = if pi_strength > 0.01 {
                 let noise = ContinuousHV::random(dim, seed.wrapping_add(500 + pos as u64));
                 ContinuousHV::weighted_bundle(&[&hv, &noise], &[1.0 - pi_strength, pi_strength])
@@ -64,14 +67,27 @@ impl SerialRecallBenchmark {
         // (degraded by PI for later items) with activation decay
         // (lower for earlier items), producing the U-curve.
         let mut position_accuracy = Vec::with_capacity(list_len);
+        let mut rt_sum = 0.0f64;
 
         for item in &items {
             let target_hv = adapter.encode(item, dim);
             let recall_strength = wm.activation_weighted_similarity(&target_hv) as f64;
             position_accuracy.push(recall_strength);
+
+            // RT proxy: deliberation ticks based on recall retrieval difficulty.
+            // Lower recall_strength → harder retrieval → longer RT
+            // (Sternberg, 1966; Ratcliff, 1978 diffusion model).
+            let decision_margin = recall_strength.abs().min(1.0);
+            let rt_ticks = 3.0 + (1.0 - decision_margin) * 6.0;
+            rt_sum += rt_ticks;
         }
 
-        position_accuracy
+        let mean_rt = if items.is_empty() {
+            0.0
+        } else {
+            rt_sum / items.len() as f64
+        };
+        (position_accuracy, mean_rt)
     }
 }
 
@@ -87,12 +103,14 @@ impl PsychBenchmark for SerialRecallBenchmark {
         for list_len in [5, 7, 9] {
             // Collect accuracy per position across trials
             let mut position_samples: Vec<Vec<f64>> = vec![Vec::new(); list_len];
+            let mut rts = Vec::new();
 
             for trial in 0..config.trials_per_condition {
-                let pos_acc = self.run_trial(list_len, config, trial);
+                let (pos_acc, rt) = self.run_trial(list_len, config, trial);
                 for (pos, &acc) in pos_acc.iter().enumerate() {
                     position_samples[pos].push(acc);
                 }
+                rts.push(rt);
             }
 
             // Report per-position accuracy
@@ -136,6 +154,10 @@ impl PsychBenchmark for SerialRecallBenchmark {
             result.insert(
                 format!("list_{}::recency_index", list_len),
                 MetricValue::from_samples(&[recency_mean - mid_mean]),
+            );
+            result.insert(
+                format!("list_{}::rt_ticks", list_len),
+                MetricValue::from_samples(&rts),
             );
         }
 

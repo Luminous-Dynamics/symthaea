@@ -17,7 +17,6 @@ use crate::harness::PsychBenchmark;
 /// Faux-pas recognition benchmark.
 pub struct FauxPasBenchmark;
 
-#[allow(dead_code)]
 struct FauxPasScenario {
     /// The statement made by the speaker.
     statement: &'static str,
@@ -186,8 +185,11 @@ impl FauxPasBenchmark {
         let statement_signal = crit_hits * 0.5;
         let keyword_signal = reaction_signal + statement_signal;
 
-        // Combined: keyword-dominant with geometric as tiebreaker
-        let combined = geometric_divergence as f64 * 0.2 + keyword_signal * 0.8;
+        // Combined: keyword-dominant with geometric as tiebreaker.
+        // Time pressure: 0.3/unit noise injection models degraded social cue integration
+        // under speed emphasis (Baron-Cohen et al., 1999 faux pas; Heitz, 2014 SAT).
+        let pressure_noise = config.time_pressure * 0.3;
+        let combined = geometric_divergence as f64 * 0.2 + keyword_signal * 0.8 + pressure_noise * (0.5 - (trial_idx as f64 % 2.0));
         let detected_faux_pas = combined > 0.0;
 
         if detected_faux_pas == scenario.is_faux_pas {
@@ -250,8 +252,32 @@ impl FauxPasBenchmark {
     }
 
     #[cfg(not(feature = "symthaea-backend"))]
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
-        self.run_trial_lightweight(config, trial_idx)
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+        let accuracy = self.run_trial_lightweight(config, trial_idx);
+
+        // RT proxy: harder detections (smaller signal magnitude) take longer.
+        // Re-derive the combined signal to estimate decision difficulty.
+        let dim = config.dimension;
+        let adapter = ScenarioAdapter;
+        let scenarios = Self::scenarios();
+        let scenario = &scenarios[trial_idx % scenarios.len()];
+
+        let statement_hv = adapter.encode(&Scenario::new(scenario.statement), dim);
+        let reaction_hv = adapter.encode(&Scenario::new(scenario.reaction), dim);
+        let positive_marker = adapter.encode(&Scenario::new("happy pleased grateful smiles"), dim);
+        let negative_marker =
+            adapter.encode(&Scenario::new("disappointed embarrassed hurt upset"), dim);
+        let reaction_neg = reaction_hv.similarity(&negative_marker);
+        let reaction_pos = reaction_hv.similarity(&positive_marker);
+        let statement_neg = statement_hv.similarity(&negative_marker);
+        let geometric_divergence = reaction_neg - reaction_pos + statement_neg * 0.3;
+        let margin = (geometric_divergence as f64).abs();
+
+        let base = 4.0;
+        let range = 6.0;
+        let rt = base + (1.0 - margin.min(1.0)) * range;
+
+        (accuracy, rt)
     }
 }
 
@@ -265,6 +291,7 @@ impl PsychBenchmark for FauxPasBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
         let mut accuracies = Vec::new();
+        let mut rt_ticks = Vec::new();
         #[cfg(feature = "symthaea-backend")]
         let mut confidences = Vec::new();
 
@@ -277,11 +304,16 @@ impl PsychBenchmark for FauxPasBenchmark {
             }
             #[cfg(not(feature = "symthaea-backend"))]
             {
-                accuracies.push(self.run_trial(config, trial));
+                let (acc, rt) = self.run_trial(config, trial);
+                accuracies.push(acc);
+                rt_ticks.push(rt);
             }
         }
 
         result.insert("faux_pas_accuracy", MetricValue::from_samples(&accuracies));
+        if !rt_ticks.is_empty() {
+            result.insert("rt_ticks", MetricValue::from_samples(&rt_ticks));
+        }
         #[cfg(feature = "symthaea-backend")]
         result.insert("action_confidence", MetricValue::from_samples(&confidences));
 

@@ -468,6 +468,9 @@ pub fn cronbachs_alpha(items: &[Vec<f64>]) -> f64 {
 /// Uses the Abramowitz & Stegun (1964) rational approximation.
 /// z=0 → 50th percentile, z=+1 → ~84th, z=-1 → ~16th.
 pub fn percentile_from_z(z: f64) -> f64 {
+    if !z.is_finite() {
+        return 50.0; // NaN or Inf → return median as safe default
+    }
     // Phi(z) via Abramowitz & Stegun approximation 26.2.17
     let t = 1.0 / (1.0 + 0.2316419 * z.abs());
     let d = 0.3989422804014327; // 1/sqrt(2*pi)
@@ -1063,5 +1066,227 @@ mod tests {
         let mtmm = analysis.mtmm_validity();
         assert_eq!(mtmm.convergent_pairs, 0);
         assert!(mtmm.discriminant_pairs > 0);
+    }
+
+    // ──── Edge-case stress tests for analysis functions ────
+
+    #[test]
+    fn stress_spearman_all_identical() {
+        // All identical values → zero variance → should return 0.0 (not NaN/panic)
+        let x = [5.0, 5.0, 5.0, 5.0, 5.0];
+        let y = [3.0, 3.0, 3.0, 3.0, 3.0];
+        let r = spearman_correlation(&x, &y);
+        assert!(r.is_finite(), "spearman with all-identical should be finite, got {}", r);
+        assert!((r - 0.0).abs() < 1e-10, "all-identical should yield r=0");
+    }
+
+    #[test]
+    fn stress_spearman_two_elements() {
+        // n=2 → below minimum threshold → should return 0.0
+        let x = [1.0, 2.0];
+        let y = [2.0, 1.0];
+        let r = spearman_correlation(&x, &y);
+        assert_eq!(r, 0.0, "n<3 should return 0.0");
+    }
+
+    #[test]
+    fn stress_spearman_with_ties() {
+        // Tied values should use fractional ranks
+        let x = [1.0, 2.0, 2.0, 3.0, 4.0];
+        let y = [1.0, 3.0, 2.0, 4.0, 5.0];
+        let r = spearman_correlation(&x, &y);
+        assert!(r.is_finite());
+        assert!(r > 0.5, "positively correlated with ties should have r>0.5, got {}", r);
+    }
+
+    #[test]
+    fn stress_spearman_large_values() {
+        // Very large values should not cause overflow
+        let x = [1e15, 2e15, 3e15, 4e15, 5e15];
+        let y = [5e15, 4e15, 3e15, 2e15, 1e15];
+        let r = spearman_correlation(&x, &y);
+        assert!((r - (-1.0)).abs() < 1e-10, "large values should still give -1.0");
+    }
+
+    #[test]
+    fn stress_icc_single_subject() {
+        // n=1 subject → degenerate → should return 0.0
+        let obs = vec![vec![5.0], vec![5.0]];
+        let icc = icc_2_1(&obs);
+        assert_eq!(icc, 0.0, "single subject ICC should be 0.0");
+    }
+
+    #[test]
+    fn stress_icc_zero_variance() {
+        // All scores identical across all judges and subjects → degenerate
+        let obs = vec![
+            vec![3.0, 3.0, 3.0, 3.0],
+            vec![3.0, 3.0, 3.0, 3.0],
+        ];
+        let icc = icc_2_1(&obs);
+        assert!(icc.is_finite(), "zero-variance ICC should be finite");
+    }
+
+    #[test]
+    fn stress_icc_unequal_lengths() {
+        // Jagged observations → should return 0.0
+        let obs = vec![vec![1.0, 2.0, 3.0], vec![1.0, 2.0]];
+        let icc = icc_2_1(&obs);
+        assert_eq!(icc, 0.0, "unequal lengths should return 0.0");
+    }
+
+    #[test]
+    fn stress_icc_negative_agreement() {
+        // Anti-correlated judges → ICC should be negative
+        let obs = vec![
+            vec![1.0, 2.0, 3.0, 4.0, 5.0],
+            vec![5.0, 4.0, 3.0, 2.0, 1.0],
+            vec![1.0, 2.0, 3.0, 4.0, 5.0],
+        ];
+        let icc = icc_2_1(&obs);
+        assert!(icc.is_finite());
+        assert!(icc >= -1.0 && icc <= 1.0, "ICC should be clamped to [-1,1], got {}", icc);
+    }
+
+    #[test]
+    fn stress_cronbachs_alpha_zero_variance() {
+        // All items have zero variance → should return 0.0
+        let items = vec![
+            vec![5.0, 5.0, 5.0, 5.0],
+            vec![3.0, 3.0, 3.0, 3.0],
+        ];
+        let alpha = cronbachs_alpha(&items);
+        assert!(alpha.is_finite(), "zero-variance alpha should be finite");
+    }
+
+    #[test]
+    fn stress_cronbachs_alpha_two_participants() {
+        // Minimum viable: 2 participants, 2 items
+        let items = vec![
+            vec![1.0, 2.0],
+            vec![1.0, 2.0],
+        ];
+        let alpha = cronbachs_alpha(&items);
+        assert!(alpha.is_finite());
+        assert!((alpha - 1.0).abs() < 0.01, "perfectly correlated 2×2 should yield ~1.0, got {}", alpha);
+    }
+
+    #[test]
+    fn stress_cronbachs_alpha_negative() {
+        // Negatively correlated items → alpha can be negative
+        let items = vec![
+            vec![1.0, 5.0, 1.0, 5.0],
+            vec![5.0, 1.0, 5.0, 1.0],
+        ];
+        let alpha = cronbachs_alpha(&items);
+        assert!(alpha.is_finite(), "negative alpha should be finite, got {}", alpha);
+    }
+
+    #[test]
+    fn stress_percentile_extreme_z() {
+        // z = ±10 should clamp to near 0 and near 100
+        let p_high = percentile_from_z(10.0);
+        assert!(p_high >= 99.0, "z=+10 should be near 100, got {}", p_high);
+        let p_low = percentile_from_z(-10.0);
+        assert!(p_low <= 1.0, "z=-10 should be near 0, got {}", p_low);
+    }
+
+    #[test]
+    fn stress_percentile_nan_guard() {
+        // NaN z-score should not panic, returns 50th percentile as safe default
+        let p = percentile_from_z(f64::NAN);
+        assert!((p - 50.0).abs() < 0.01, "NaN z should return 50th percentile, got {}", p);
+        // Infinity should also be safe
+        let p_inf = percentile_from_z(f64::INFINITY);
+        assert!((p_inf - 50.0).abs() < 0.01, "Inf z should return 50th percentile, got {}", p_inf);
+    }
+
+    #[test]
+    fn stress_pca_single_benchmark() {
+        // Single benchmark → single component
+        let mut values = BTreeMap::new();
+        values.insert("A::X".to_string(), vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        let analysis = CrossBenchmarkAnalysis { values };
+        let pca = analysis.pca(3);
+        assert!(!pca.eigenvalues.is_empty());
+        assert!(pca.eigenvalues[0].is_finite());
+    }
+
+    #[test]
+    fn stress_pca_empty() {
+        // No benchmarks → empty PCA
+        let values = BTreeMap::new();
+        let analysis = CrossBenchmarkAnalysis { values };
+        let pca = analysis.pca(3);
+        assert!(pca.eigenvalues.is_empty());
+    }
+
+    #[test]
+    fn stress_pca_zero_variance() {
+        // All identical values → zero-variance correlation matrix
+        let mut values = BTreeMap::new();
+        values.insert("A::X".to_string(), vec![5.0, 5.0, 5.0, 5.0, 5.0]);
+        values.insert("A::Y".to_string(), vec![3.0, 3.0, 3.0, 3.0, 3.0]);
+        let analysis = CrossBenchmarkAnalysis { values };
+        let pca = analysis.pca(2);
+        // Should not panic, eigenvalues should be finite
+        for ev in &pca.eigenvalues {
+            assert!(ev.is_finite(), "eigenvalue should be finite, got {}", ev);
+        }
+    }
+
+    #[test]
+    fn stress_ablation_empty_inputs() {
+        let baseline: Vec<(&str, f64)> = vec![];
+        let ablated: Vec<(&str, f64)> = vec![];
+        let effects = ablation_effect_sizes(&baseline, &ablated);
+        assert!(effects.is_empty());
+    }
+
+    #[test]
+    fn stress_ablation_zero_baseline() {
+        // Baseline value = 0 → SD estimate = 0 → d should be 0
+        let baseline = vec![("A::X", 0.0)];
+        let ablated = vec![("A::X", 0.5)];
+        let effects = ablation_effect_sizes(&baseline, &ablated);
+        assert_eq!(effects.len(), 1);
+        assert_eq!(effects[0].1, 0.0, "zero baseline should yield d=0");
+    }
+
+    #[test]
+    fn stress_cohens_d_extreme_values() {
+        let d = cohens_d(1e15, 0.0, 1.0);
+        assert!(d.is_finite(), "extreme values should produce finite d");
+        assert!(d > 0.0);
+    }
+
+    #[test]
+    fn stress_ranks_all_identical() {
+        let data = [7.0, 7.0, 7.0, 7.0];
+        let r = ranks(&data);
+        // All should have the same average rank = 2.5
+        for rank in &r {
+            assert!((rank - 2.5).abs() < 1e-10, "identical values should have avg rank 2.5, got {}", rank);
+        }
+    }
+
+    #[test]
+    fn stress_construct_validity_no_benchmarks() {
+        let values = BTreeMap::new();
+        let analysis = CrossBenchmarkAnalysis { values };
+        let cv = analysis.construct_validity();
+        assert_eq!(cv.same_domain_pairs, 0);
+        assert_eq!(cv.convergent_pairs, 0);
+        assert_eq!(cv.mean_within_correlation, 0.0);
+    }
+
+    #[test]
+    fn stress_test_retest_insufficient_seeds() {
+        // Only 2 seed values → below minimum (4) → reliability = 0.0
+        let mut values = BTreeMap::new();
+        values.insert("A::X".to_string(), vec![1.0, 2.0]);
+        let analysis = CrossBenchmarkAnalysis { values };
+        let rel = analysis.test_retest_reliability();
+        assert_eq!(rel["A::X"], 0.0, "insufficient seeds should return 0.0");
     }
 }

@@ -190,7 +190,10 @@ impl PersuasionBenchmark {
 
         // Combined: structure-dominant, geometric as tiebreaker
         let combined = structure_score + geo_signal * 0.1;
-        let detected_persuasion = combined > 0.3;
+        // Time pressure: base 0.3 threshold yields ~75% persuasion detection; +0.20/unit raises
+        // criterion, modeling reduced ToM inference depth under deadline (Apperly et al., 2006).
+        let threshold = 0.3 + config.time_pressure * 0.2;
+        let detected_persuasion = combined > threshold;
 
         if detected_persuasion == scenario.has_persuasion {
             1.0
@@ -249,8 +252,38 @@ impl PersuasionBenchmark {
     }
 
     #[cfg(not(feature = "symthaea-backend"))]
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
-        self.run_trial_lightweight(config, trial_idx)
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+        let accuracy = self.run_trial_lightweight(config, trial_idx);
+
+        // RT proxy: re-derive combined signal to estimate decision difficulty.
+        let dim = config.dimension;
+        let adapter = ScenarioAdapter;
+        let scenarios = Self::scenarios();
+        let scenario = &scenarios[trial_idx % scenarios.len()];
+
+        let context_hvs: Vec<ContinuousHV> = scenario
+            .setup
+            .iter()
+            .map(|s| adapter.encode(&Scenario::new(*s), dim))
+            .collect();
+        let context_bundle = ContinuousHV::bundle_owned(&context_hvs);
+        let persuasion_marker = adapter.encode(
+            &Scenario::new("wants convince persuade influence change mind bonus promises offers"),
+            dim,
+        );
+        let neutral_marker = adapter.encode(
+            &Scenario::new("inform share tell describe mention explains shows discusses"),
+            dim,
+        );
+        let persuasion_sim = context_bundle.similarity(&persuasion_marker);
+        let neutral_sim = context_bundle.similarity(&neutral_marker);
+        let margin = (persuasion_sim - neutral_sim).abs() as f64;
+
+        let base = 4.0;
+        let range = 6.0;
+        let rt = base + (1.0 - margin.min(1.0)) * range;
+
+        (accuracy, rt)
     }
 }
 
@@ -264,6 +297,7 @@ impl PsychBenchmark for PersuasionBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
         let mut accuracies = Vec::new();
+        let mut rt_ticks = Vec::new();
         #[cfg(feature = "symthaea-backend")]
         let mut confidences = Vec::new();
 
@@ -276,7 +310,9 @@ impl PsychBenchmark for PersuasionBenchmark {
             }
             #[cfg(not(feature = "symthaea-backend"))]
             {
-                accuracies.push(self.run_trial(config, trial));
+                let (acc, rt) = self.run_trial(config, trial);
+                accuracies.push(acc);
+                rt_ticks.push(rt);
             }
         }
 
@@ -284,6 +320,9 @@ impl PsychBenchmark for PersuasionBenchmark {
             "persuasion_detection",
             MetricValue::from_samples(&accuracies),
         );
+        if !rt_ticks.is_empty() {
+            result.insert("rt_ticks", MetricValue::from_samples(&rt_ticks));
+        }
         #[cfg(feature = "symthaea-backend")]
         result.insert("action_confidence", MetricValue::from_samples(&confidences));
 

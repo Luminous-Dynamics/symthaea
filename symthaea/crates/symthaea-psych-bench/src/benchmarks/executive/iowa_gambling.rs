@@ -95,8 +95,10 @@ impl IowaGamblingBenchmark {
                 })
                 .collect();
 
-            // Softmax selection — warm enough for human-like exploration noise
-            let temp = 0.55f32;
+            // Softmax selection — warm enough for human-like exploration noise.
+            // Time pressure: base 0.55 matches ~60% advantageous deck preference (Bechara et al., 1994);
+            // +0.25/unit captures somatic marker bypass under urgency (Damasio, 1996; Luce, 1986 RT model).
+            let temp = 0.55f32 + config.time_pressure as f32 * 0.25;
             let max_score = deck_scores
                 .iter()
                 .cloned()
