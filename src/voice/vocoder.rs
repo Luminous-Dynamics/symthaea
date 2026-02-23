@@ -443,8 +443,8 @@ impl FormantVocoder {
                 // Apply formant filters (parallel configuration with weighted sum)
                 let mut filtered = 0.0;
                 if self.resonators.len() >= 3 {
-                    filtered += self.resonators[0].process(source) * 1.0;  // F1 (strongest)
-                    filtered += self.resonators[1].process(source) * 0.5;  // F2
+                    filtered += self.resonators[0].process(source) * 1.0; // F1 (strongest)
+                    filtered += self.resonators[1].process(source) * 0.5; // F2
                     filtered += self.resonators[2].process(source) * 0.25; // F3
                 } else {
                     for res in &mut self.resonators {
@@ -453,7 +453,7 @@ impl FormantVocoder {
                 }
                 // F4/F5: speaker-dependent higher formants (subtle presence)
                 if self.resonators.len() >= 4 {
-                    filtered += self.resonators[3].process(source) * 0.1;  // F4
+                    filtered += self.resonators[3].process(source) * 0.1; // F4
                 }
                 if self.resonators.len() >= 5 {
                     filtered += self.resonators[4].process(source) * 0.05; // F5
@@ -513,9 +513,7 @@ impl FormantVocoder {
 
             // Aspiration noise during glottal open phase
             let aspiration = if self.glottal.is_open() {
-                self.noise.white()
-                    * self.config.aspiration_level
-                    * (1.0 - self.glottal.shape * 0.7)
+                self.noise.white() * self.config.aspiration_level * (1.0 - self.glottal.shape * 0.7)
             } else {
                 0.0
             };
@@ -695,19 +693,36 @@ mod tests {
 
         let frames = vec![
             FormantFrame {
-                f1: 730.0, f2: 1090.0, f3: 2440.0,
-                b1: 60.0, b2: 90.0, b3: 150.0,
-                f0: 120.0, energy: 0.8, voicing: 1.0, time: 0.0,
+                f1: 730.0,
+                f2: 1090.0,
+                f3: 2440.0,
+                b1: 60.0,
+                b2: 90.0,
+                b3: 150.0,
+                f0: 120.0,
+                energy: 0.8,
+                voicing: 1.0,
+                time: 0.0,
             },
             FormantFrame {
-                f1: 730.0, f2: 1090.0, f3: 2440.0,
-                b1: 60.0, b2: 90.0, b3: 150.0,
-                f0: 120.0, energy: 0.8, voicing: 1.0, time: 0.1,
+                f1: 730.0,
+                f2: 1090.0,
+                f3: 2440.0,
+                b1: 60.0,
+                b2: 90.0,
+                b3: 150.0,
+                f0: 120.0,
+                energy: 0.8,
+                voicing: 1.0,
+                time: 0.1,
             },
         ];
 
         let audio = vocoder.synthesize(&frames);
-        assert!(!audio.is_empty(), "5-formant synthesis should produce audio");
+        assert!(
+            !audio.is_empty(),
+            "5-formant synthesis should produce audio"
+        );
         assert!(audio.iter().any(|&s| s.abs() > 0.01), "Should have content");
         assert!(audio.iter().all(|&s| s.abs() < 1.5), "Should not clip");
     }
@@ -720,28 +735,47 @@ mod tests {
 
         let mut pressed_samples = Vec::new();
         let mut breathy_samples = Vec::new();
-        for _ in 0..480 { // 20ms at 24kHz
+        for _ in 0..480 {
+            // 20ms at 24kHz
             pressed_samples.push(glottal_pressed.tick(120.0));
             breathy_samples.push(glottal_breathy.tick(120.0));
         }
 
         // Both should produce non-zero output
-        assert!(pressed_samples.iter().any(|&s| s.abs() > 0.01), "Pressed should have output");
-        assert!(breathy_samples.iter().any(|&s| s.abs() > 0.01), "Breathy should have output");
+        assert!(
+            pressed_samples.iter().any(|&s| s.abs() > 0.01),
+            "Pressed should have output"
+        );
+        assert!(
+            breathy_samples.iter().any(|&s| s.abs() > 0.01),
+            "Breathy should have output"
+        );
 
         // They should differ (different waveform shapes)
-        let diff: f32 = pressed_samples.iter().zip(&breathy_samples)
+        let diff: f32 = pressed_samples
+            .iter()
+            .zip(&breathy_samples)
             .map(|(a, b)| (a - b).abs())
             .sum::<f32>();
-        assert!(diff > 0.1, "Different shapes should produce different waveforms, diff={diff}");
+        assert!(
+            diff > 0.1,
+            "Different shapes should produce different waveforms, diff={diff}"
+        );
     }
 
     #[test]
     fn test_aspiration_adds_breathiness() {
         let frame = FormantFrame {
-            f1: 500.0, f2: 1500.0, f3: 2500.0,
-            b1: 60.0, b2: 90.0, b3: 150.0,
-            f0: 120.0, energy: 0.8, voicing: 1.0, time: 0.0,
+            f1: 500.0,
+            f2: 1500.0,
+            f3: 2500.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            f0: 120.0,
+            energy: 0.8,
+            voicing: 1.0,
+            time: 0.0,
         };
 
         // Synthesize with aspiration
@@ -762,7 +796,9 @@ mod tests {
 
         // Aspiration adds high-frequency energy: compute spectral difference
         // Simple proxy: sum of squared differences should be non-trivial
-        let diff_energy: f32 = audio_with.iter().zip(&audio_without)
+        let diff_energy: f32 = audio_with
+            .iter()
+            .zip(&audio_without)
             .map(|(a, b)| (a - b).powi(2))
             .sum::<f32>();
         assert!(

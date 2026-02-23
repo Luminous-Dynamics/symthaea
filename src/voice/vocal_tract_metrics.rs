@@ -3,4 +3,4 @@
 //! See `crates/symthaea-vocal-tract/src/metrics.rs` for the canonical implementation.
 
 #[cfg(feature = "vocal-tract")]
-pub use symthaea_vocal_tract::metrics::{VocalTractMetrics, save_wav, load_wav};
+pub use symthaea_vocal_tract::metrics::{load_wav, save_wav, VocalTractMetrics};

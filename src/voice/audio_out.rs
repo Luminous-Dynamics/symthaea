@@ -16,9 +16,12 @@ use ringbuf::{
 };
 
 /// Real-time audio output via cpal + ring buffer.
+///
+/// Can be in either `Live` mode (real audio device) or `Dummy` mode
+/// (for headless/CI use with `speak_to_file()`).
 pub struct AudioOutput {
-    _stream: cpal::Stream,
-    producer: ringbuf::HeapProd<f32>,
+    _stream: Option<cpal::Stream>,
+    producer: Option<ringbuf::HeapProd<f32>>,
     sample_rate: u32,
     channels: u16,
     buffer_capacity: usize,
@@ -49,6 +52,19 @@ impl AudioOutput {
             })
             .with_context(|| format!("No output device matching '{device_name}'"))?;
         Self::from_device(device)
+    }
+
+    /// Create a dummy output (no device). `push_samples()` discards all data.
+    ///
+    /// Used by [`super::live_voice::LiveVoice::new_headless()`] for `speak_to_file()`.
+    pub fn new_dummy(sample_rate: u32) -> Self {
+        Self {
+            _stream: None,
+            producer: None,
+            sample_rate,
+            channels: 1,
+            buffer_capacity: 0,
+        }
     }
 
     fn from_device(device: cpal::Device) -> Result<Self> {
@@ -90,8 +106,8 @@ impl AudioOutput {
         stream.play().context("Failed to start output stream")?;
 
         Ok(Self {
-            _stream: stream,
-            producer,
+            _stream: Some(stream),
+            producer: Some(producer),
             sample_rate,
             channels,
             buffer_capacity,
@@ -101,11 +117,15 @@ impl AudioOutput {
     /// Push audio samples into the ring buffer (non-blocking).
     ///
     /// Returns the number of samples actually written. If the buffer is full,
-    /// remaining samples are dropped (caller should use backpressure).
+    /// remaining samples are dropped. Returns 0 on dummy output.
     pub fn push_samples(&mut self, samples: &[f32]) -> usize {
+        let producer = match &mut self.producer {
+            Some(p) => p,
+            None => return 0,
+        };
         let mut written = 0;
         for &s in samples {
-            if self.producer.try_push(s).is_ok() {
+            if producer.try_push(s).is_ok() {
                 written += 1;
             } else {
                 break;
@@ -114,7 +134,15 @@ impl AudioOutput {
         written
     }
 
-    /// Audio sample rate negotiated with the device.
+    /// Take the ring buffer producer for use on a background thread.
+    ///
+    /// After calling this, `push_samples()` becomes a no-op until a new
+    /// AudioOutput is created. Returns `None` if already taken or dummy.
+    pub fn take_producer(&mut self) -> Option<ringbuf::HeapProd<f32>> {
+        self.producer.take()
+    }
+
+    /// Audio sample rate negotiated with the device (or headless default).
     pub fn sample_rate(&self) -> u32 {
         self.sample_rate
     }
@@ -129,9 +157,17 @@ impl AudioOutput {
         self.buffer_capacity
     }
 
-    /// Approximate space remaining in the ring buffer.
+    /// Approximate space remaining in the ring buffer. Returns 0 on dummy output.
     pub fn available_space(&self) -> usize {
-        self.producer.vacant_len()
+        match &self.producer {
+            Some(p) => p.vacant_len(),
+            None => 0,
+        }
+    }
+
+    /// Whether this is a live audio device (not dummy).
+    pub fn is_live(&self) -> bool {
+        self._stream.is_some()
     }
 }
 
@@ -141,20 +177,36 @@ mod tests {
 
     #[test]
     fn test_buffer_capacity_calculation() {
-        // Verify the capacity formula: sample_rate * 2
         let sample_rate: u32 = 48000;
         let expected_capacity = sample_rate as usize * 2;
         assert_eq!(expected_capacity, 96000);
     }
 
     #[test]
+    fn test_dummy_output() {
+        let mut dummy = AudioOutput::new_dummy(24000);
+        assert_eq!(dummy.sample_rate(), 24000);
+        assert_eq!(dummy.channels(), 1);
+        assert_eq!(dummy.available_space(), 0);
+        assert!(!dummy.is_live());
+
+        // push_samples on dummy returns 0
+        let samples = vec![0.5f32; 100];
+        assert_eq!(dummy.push_samples(&samples), 0);
+    }
+
+    #[test]
     #[ignore] // Requires audio device
     fn test_audio_output_creation() {
         let output = AudioOutput::new();
-        assert!(output.is_ok(), "AudioOutput should create on a system with audio");
+        assert!(
+            output.is_ok(),
+            "AudioOutput should create on a system with audio"
+        );
         let output = output.unwrap();
         assert!(output.sample_rate() > 0);
         assert!(output.channels() > 0);
         assert!(output.available_space() > 0);
+        assert!(output.is_live());
     }
 }

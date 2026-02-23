@@ -87,8 +87,11 @@ impl StreamingVocalTract {
         dt: f32,
         phoneme: Option<&str>,
     ) -> Vec<f32> {
-        let frame = self.pipeline.tick_phoneme(cognitive_state, metrics, dt, phoneme);
-        self.vocoder.synthesize_frame(&frame, self.samples_per_frame)
+        let frame = self
+            .pipeline
+            .tick_phoneme(cognitive_state, metrics, dt, phoneme);
+        self.vocoder
+            .synthesize_frame(&frame, self.samples_per_frame)
     }
 
     /// Run one motor frame with prosody and produce audio samples.
@@ -100,8 +103,11 @@ impl StreamingVocalTract {
         phoneme: Option<&str>,
         prosody: &ProsodyContext,
     ) -> Vec<f32> {
-        let frame = self.pipeline.tick_with_prosody(cognitive_state, metrics, dt, phoneme, prosody);
-        self.vocoder.synthesize_frame(&frame, self.samples_per_frame)
+        let frame = self
+            .pipeline
+            .tick_with_prosody(cognitive_state, metrics, dt, phoneme, prosody);
+        self.vocoder
+            .synthesize_frame(&frame, self.samples_per_frame)
     }
 
     /// Get the number of audio samples per motor frame.
@@ -226,7 +232,7 @@ mod tests {
         }
 
         assert_eq!(audio.len(), 2400); // 20 frames × 120 samples
-        // Should have non-trivial audio content
+                                       // Should have non-trivial audio content
         let rms: f32 = (audio.iter().map(|s| s * s).sum::<f32>() / audio.len() as f32).sqrt();
         assert!(
             rms > 1e-6,

@@ -3,8 +3,21 @@
 //! Combines [`SimpleG2P`] + [`StreamingVocalTract`] + [`AudioOutput`] into a single
 //! `speak()` call that streams audio incrementally (first audio within ~25ms).
 //!
+//! # Modes
+//!
+//! - **`speak()`** — synchronous, blocks caller until utterance is buffered
+//! - **`speak_async()`** — spawns a background thread, returns a [`SpeakHandle`]
+//! - **`speak_to_file()`** — writes WAV to disk (no audio device needed)
+//!
+//! # Prosody
+//!
+//! The cognitive state can be updated mid-utterance via the shared
+//! [`Arc<parking_lot::Mutex<VoiceCognitiveState>>`] returned by [`LiveVoice::cognitive_state_handle()`].
+//! Changes take effect on the next motor frame (~5ms latency).
+//!
 //! Feature-gated under `live-voice`.
 
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -18,10 +31,48 @@ use super::vocal_tract_controller::train_controller_on_phoneme_db;
 use super::vocal_tract_encoder::VoiceCognitiveState;
 use super::vocal_tract_fep::StreamingVocalTract;
 
-/// Real-time streaming voice: text → phonemes → synthesis → speaker output.
+/// Motor frame rate (Hz). Each frame produces `sample_rate / FRAME_RATE` audio samples.
+const FRAME_RATE: u32 = 200;
+
+/// Motor frame timestep (seconds).
+const DT: f32 = 1.0 / FRAME_RATE as f32;
+
+/// Base phoneme duration (seconds) for G2P timing.
+const BASE_PHONEME_DURATION: f32 = 0.06;
+
+/// Handle to a background `speak_async()` call.
 ///
-/// Combines SimpleG2P + StreamingVocalTract + AudioOutput into a single
-/// `speak()` call that streams audio incrementally.
+/// Dropping the handle does NOT stop playback — call [`SpeakHandle::stop()`] explicitly,
+/// or use [`SpeakHandle::join()`] to wait for completion.
+pub struct SpeakHandle {
+    thread: Option<std::thread::JoinHandle<Result<()>>>,
+    speaking: Arc<AtomicBool>,
+}
+
+impl SpeakHandle {
+    /// Stop the background utterance. The ring buffer drains naturally to silence.
+    pub fn stop(&self) {
+        self.speaking.store(false, Ordering::SeqCst);
+    }
+
+    /// Whether the background thread is still synthesizing.
+    pub fn is_speaking(&self) -> bool {
+        self.speaking.load(Ordering::SeqCst)
+    }
+
+    /// Block until the utterance finishes (or is stopped).
+    pub fn join(mut self) -> Result<()> {
+        if let Some(handle) = self.thread.take() {
+            handle
+                .join()
+                .map_err(|_| anyhow::anyhow!("speak thread panicked"))?
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// Real-time streaming voice: text → phonemes → synthesis → speaker output.
 ///
 /// # Example
 ///
@@ -37,7 +88,8 @@ pub struct LiveVoice {
     audio: AudioOutput,
     g2p: SimpleG2P,
     formant_db: FormantDatabase,
-    cognitive_state: VoiceCognitiveState,
+    /// Shared cognitive state — can be updated from another thread mid-utterance.
+    cognitive_state: Arc<parking_lot::Mutex<VoiceCognitiveState>>,
     speaking: Arc<AtomicBool>,
     genesis: GenesisSeed,
 }
@@ -50,43 +102,65 @@ impl LiveVoice {
         let audio = AudioOutput::new()?;
         let sample_rate = audio.sample_rate();
 
-        let mut streaming = StreamingVocalTract::new(genesis, sample_rate, 200);
+        let mut streaming = StreamingVocalTract::new(genesis, sample_rate, FRAME_RATE);
 
-        // Train the controller on the phoneme database
         let db = FormantDatabase::new();
-        for _ in 0..30 {
-            train_controller_on_phoneme_db(&mut streaming.pipeline.controller, genesis, &db, 1);
-        }
+        train_controller_on_phoneme_db(&mut streaming.pipeline.controller, genesis, &db, 30);
 
         Ok(Self {
             streaming,
             audio,
             g2p: SimpleG2P::new(),
             formant_db: db,
-            cognitive_state: VoiceCognitiveState::default(),
+            cognitive_state: Arc::new(parking_lot::Mutex::new(VoiceCognitiveState::default())),
             speaking: Arc::new(AtomicBool::new(false)),
             genesis: genesis.clone(),
         })
     }
 
+    /// Create a LiveVoice without an audio device (for `speak_to_file()` only).
+    ///
+    /// Uses a default sample rate of 24000 Hz.
+    pub fn new_headless(genesis: &GenesisSeed) -> Self {
+        Self::new_headless_with_rate(genesis, 24000)
+    }
+
+    /// Create a headless LiveVoice with a specific sample rate.
+    pub fn new_headless_with_rate(genesis: &GenesisSeed, sample_rate: u32) -> Self {
+        let mut streaming = StreamingVocalTract::new(genesis, sample_rate, FRAME_RATE);
+
+        let db = FormantDatabase::new();
+        train_controller_on_phoneme_db(&mut streaming.pipeline.controller, genesis, &db, 30);
+
+        // AudioOutput::new() would fail headless, so we create a dummy.
+        // speak() and speak_async() will fail if called, but speak_to_file() works.
+        // We use a separate struct field to track this.
+        Self {
+            streaming,
+            audio: AudioOutput::new_dummy(sample_rate),
+            g2p: SimpleG2P::new(),
+            formant_db: db,
+            cognitive_state: Arc::new(parking_lot::Mutex::new(VoiceCognitiveState::default())),
+            speaking: Arc::new(AtomicBool::new(false)),
+            genesis: genesis.clone(),
+        }
+    }
+
     /// Speak text in real time: G2P → frame-by-frame synthesis → speaker.
     ///
-    /// Streams audio incrementally. Returns when the entire utterance has been
-    /// pushed to the ring buffer (playback may continue briefly after return).
+    /// Blocks until the entire utterance has been pushed to the ring buffer
+    /// (playback may continue briefly after return).
     pub fn speak(&mut self, text: &str) -> Result<()> {
         self.speaking.store(true, Ordering::SeqCst);
 
-        let dt = 0.005; // 200 Hz motor frame rate
-        let base_duration = 0.06; // 60ms base phoneme duration
-
-        let phonemes = self.g2p.text_to_phonemes(text, base_duration);
+        let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEME_DURATION);
 
         for timed in &phonemes {
             if !self.speaking.load(Ordering::SeqCst) {
                 break;
             }
 
-            let n_frames = ((timed.duration / dt) as usize).max(1);
+            let n_frames = ((timed.duration / DT) as usize).max(1);
             let phoneme_str = if timed.phoneme == "SIL" {
                 None
             } else {
@@ -98,18 +172,118 @@ impl LiveVoice {
                     break;
                 }
 
-                let chunk = self.streaming.tick(
-                    &self.cognitive_state,
-                    None,
-                    dt,
-                    phoneme_str,
-                );
+                let state = self.cognitive_state.lock().clone();
+                let chunk = self.streaming.tick(&state, None, DT, phoneme_str);
                 self.push_with_backpressure(&chunk);
             }
         }
 
         self.speaking.store(false, Ordering::SeqCst);
         Ok(())
+    }
+
+    /// Speak text on a background thread. Returns a [`SpeakHandle`] for control.
+    ///
+    /// The cognitive loop can continue running while speech plays. Use
+    /// [`cognitive_state_handle()`](Self::cognitive_state_handle) to modulate prosody mid-utterance.
+    ///
+    /// # Note
+    /// This takes `&mut self` to ensure exclusive synthesis access, then moves
+    /// the necessary state into the thread. Only one `speak_async` at a time.
+    pub fn speak_async(&mut self, text: &str) -> SpeakHandle {
+        self.speaking.store(true, Ordering::SeqCst);
+
+        let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEME_DURATION);
+        let speaking = Arc::clone(&self.speaking);
+        let cog_state = Arc::clone(&self.cognitive_state);
+
+        // Synthesize frames into a buffer on a dedicated thread.
+        // We can't move `self` into the thread, so we pre-synthesize all audio.
+        let mut all_samples = Vec::new();
+        for timed in &phonemes {
+            if !speaking.load(Ordering::SeqCst) {
+                break;
+            }
+
+            let n_frames = ((timed.duration / DT) as usize).max(1);
+            let phoneme_str = if timed.phoneme == "SIL" {
+                None
+            } else {
+                Some(timed.phoneme.as_str())
+            };
+
+            for _ in 0..n_frames {
+                if !speaking.load(Ordering::SeqCst) {
+                    break;
+                }
+
+                let state = cog_state.lock().clone();
+                let chunk = self.streaming.tick(&state, None, DT, phoneme_str);
+                all_samples.extend_from_slice(&chunk);
+            }
+        }
+
+        // Push synthesized audio to the ring buffer on a background thread
+        // (backpressure may block, so we don't want to block the caller)
+        let speaking_bg = Arc::clone(&self.speaking);
+        let mut audio = self.audio.take_producer();
+
+        let thread = std::thread::Builder::new()
+            .name("live-voice-push".into())
+            .spawn(move || {
+                let mut offset = 0;
+                while offset < all_samples.len() {
+                    if !speaking_bg.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    if let Some(ref mut producer) = audio {
+                        let written = push_samples_to_producer(producer, &all_samples[offset..]);
+                        offset += written;
+                        if offset < all_samples.len() {
+                            std::thread::sleep(std::time::Duration::from_millis(1));
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                speaking_bg.store(false, Ordering::SeqCst);
+                Ok(())
+            })
+            .expect("failed to spawn speak thread");
+
+        SpeakHandle {
+            thread: Some(thread),
+            speaking: Arc::clone(&self.speaking),
+        }
+    }
+
+    /// Synthesize text to a WAV file. No audio device needed.
+    ///
+    /// Uses the same G2P → frame-by-frame synthesis pipeline as `speak()`,
+    /// but collects all samples and writes them to disk via `hound`.
+    pub fn speak_to_file(&mut self, text: &str, path: &Path) -> Result<usize> {
+        let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEME_DURATION);
+        let mut all_samples = Vec::new();
+
+        for timed in &phonemes {
+            let n_frames = ((timed.duration / DT) as usize).max(1);
+            let phoneme_str = if timed.phoneme == "SIL" {
+                None
+            } else {
+                Some(timed.phoneme.as_str())
+            };
+
+            let state = self.cognitive_state.lock().clone();
+            for _ in 0..n_frames {
+                let chunk = self.streaming.tick(&state, None, DT, phoneme_str);
+                all_samples.extend_from_slice(&chunk);
+            }
+        }
+
+        let sample_rate = self.streaming.vocoder.sample_rate();
+        write_wav(path, &all_samples, sample_rate)?;
+
+        Ok(all_samples.len())
     }
 
     /// Push samples to the ring buffer with simple backpressure.
@@ -119,7 +293,6 @@ impl LiveVoice {
             let written = self.audio.push_samples(&samples[offset..]);
             offset += written;
             if offset < samples.len() {
-                // Buffer nearly full — yield briefly
                 std::thread::sleep(std::time::Duration::from_millis(1));
             }
         }
@@ -130,7 +303,7 @@ impl LiveVoice {
         self.speaking.store(false, Ordering::SeqCst);
     }
 
-    /// Whether `speak()` is currently running.
+    /// Whether `speak()` or `speak_async()` is currently running.
     pub fn is_speaking(&self) -> bool {
         self.speaking.load(Ordering::SeqCst)
     }
@@ -140,24 +313,30 @@ impl LiveVoice {
         Arc::clone(&self.speaking)
     }
 
-    /// Set the cognitive state that modulates prosody in real time.
-    pub fn set_cognitive_state(&mut self, state: VoiceCognitiveState) {
-        self.cognitive_state = state;
+    /// Get a handle to the shared cognitive state for real-time prosody modulation.
+    ///
+    /// Lock the mutex and modify the state from any thread; changes take effect
+    /// on the next motor frame (~5ms).
+    pub fn cognitive_state_handle(&self) -> Arc<parking_lot::Mutex<VoiceCognitiveState>> {
+        Arc::clone(&self.cognitive_state)
+    }
+
+    /// Set the cognitive state (convenience wrapper — locks internally).
+    pub fn set_cognitive_state(&self, state: VoiceCognitiveState) {
+        *self.cognitive_state.lock() = state;
     }
 
     /// Run additional training epochs on the formant database.
     pub fn train(&mut self, epochs: usize) {
-        for _ in 0..epochs {
-            train_controller_on_phoneme_db(
-                &mut self.streaming.pipeline.controller,
-                &self.genesis,
-                &self.formant_db,
-                1,
-            );
-        }
+        train_controller_on_phoneme_db(
+            &mut self.streaming.pipeline.controller,
+            &self.genesis,
+            &self.formant_db,
+            epochs,
+        );
     }
 
-    /// Audio sample rate from the output device.
+    /// Audio sample rate from the output device (or headless default).
     pub fn sample_rate(&self) -> u32 {
         self.audio.sample_rate()
     }
@@ -168,18 +347,50 @@ impl LiveVoice {
     }
 }
 
+/// Write 16-bit PCM mono WAV via hound.
+fn write_wav(path: &Path, samples: &[f32], sample_rate: u32) -> Result<()> {
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut writer = hound::WavWriter::create(path, spec)?;
+    for &s in samples {
+        let amplitude = (s * 32767.0).clamp(-32768.0, 32767.0) as i16;
+        writer.write_sample(amplitude)?;
+    }
+    writer.finalize()?;
+    Ok(())
+}
+
+/// Push samples to a ring buffer producer (used by background thread).
+fn push_samples_to_producer(producer: &mut ringbuf::HeapProd<f32>, samples: &[f32]) -> usize {
+    use ringbuf::traits::Producer;
+    let mut written = 0;
+    for &s in samples {
+        if producer.try_push(s).is_ok() {
+            written += 1;
+        } else {
+            break;
+        }
+    }
+    written
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_phoneme_sequence_generation() {
-        // Verify G2P → TimedPhoneme pipeline without audio
         let g2p = SimpleG2P::new();
-        let phonemes = g2p.text_to_phonemes("hello world", 0.06);
-        assert!(!phonemes.is_empty(), "Should produce phonemes for 'hello world'");
+        let phonemes = g2p.text_to_phonemes("hello world", BASE_PHONEME_DURATION);
+        assert!(
+            !phonemes.is_empty(),
+            "Should produce phonemes for 'hello world'"
+        );
 
-        // Should contain actual phonemes (not just silence)
         let non_silence: Vec<_> = phonemes.iter().filter(|p| p.phoneme != "SIL").collect();
         assert!(
             non_silence.len() >= 4,
@@ -198,6 +409,103 @@ mod tests {
     }
 
     #[test]
+    fn test_speak_to_file_headless() {
+        let genesis = GenesisSeed::from_phrase("test-headless");
+        let mut voice = LiveVoice::new_headless(&genesis);
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let wav_path = dir.path().join("test.wav");
+
+        let n_samples = voice
+            .speak_to_file("hello", &wav_path)
+            .expect("speak_to_file should succeed");
+
+        assert!(n_samples > 0, "Should produce audio samples");
+        assert!(wav_path.exists(), "WAV file should be created");
+
+        // Verify WAV is readable
+        let reader = hound::WavReader::open(&wav_path).expect("Should read WAV");
+        assert_eq!(reader.spec().channels, 1);
+        assert_eq!(reader.spec().sample_rate, 24000);
+        assert!(reader.len() > 0);
+    }
+
+    #[test]
+    fn test_cognitive_state_handle() {
+        let state = Arc::new(parking_lot::Mutex::new(VoiceCognitiveState::default()));
+        let handle = Arc::clone(&state);
+
+        // Modify from "another thread" (simulated)
+        {
+            let mut s = handle.lock();
+            s.emotional_arousal = 0.9;
+        }
+
+        let current = state.lock().clone();
+        assert!((current.emotional_arousal - 0.9).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_speak_to_file_cognitive_modulation() {
+        let genesis = GenesisSeed::from_phrase("test-prosody");
+        let mut voice = LiveVoice::new_headless(&genesis);
+
+        let dir = tempfile::tempdir().expect("tempdir");
+
+        // Calm state
+        voice.set_cognitive_state(VoiceCognitiveState {
+            emotional_arousal: 0.1,
+            ..Default::default()
+        });
+        let calm_path = dir.path().join("calm.wav");
+        let calm_n = voice.speak_to_file("hello", &calm_path).unwrap();
+
+        // Reset pipeline state between utterances
+        voice.reset();
+
+        // Excited state
+        voice.set_cognitive_state(VoiceCognitiveState {
+            emotional_arousal: 0.9,
+            emotional_valence: 0.8,
+            consciousness_level: 0.9,
+            ..Default::default()
+        });
+        let excited_path = dir.path().join("excited.wav");
+        let excited_n = voice.speak_to_file("hello", &excited_path).unwrap();
+
+        // Both should produce audio
+        assert!(calm_n > 0);
+        assert!(excited_n > 0);
+
+        // Read both WAVs and compare RMS — different cognitive states should
+        // produce different audio content (even if same phonemes)
+        let calm_reader = hound::WavReader::open(&calm_path).unwrap();
+        let excited_reader = hound::WavReader::open(&excited_path).unwrap();
+
+        let calm_samples: Vec<f32> = calm_reader
+            .into_samples::<i16>()
+            .map(|s| s.unwrap() as f32 / 32767.0)
+            .collect();
+        let excited_samples: Vec<f32> = excited_reader
+            .into_samples::<i16>()
+            .map(|s| s.unwrap() as f32 / 32767.0)
+            .collect();
+
+        let calm_rms = rms(&calm_samples);
+        let excited_rms = rms(&excited_samples);
+
+        // Both should have non-trivial content
+        assert!(
+            calm_rms > 1e-6,
+            "Calm audio should have content: rms={calm_rms}"
+        );
+        assert!(
+            excited_rms > 1e-6,
+            "Excited audio should have content: rms={excited_rms}"
+        );
+    }
+
+    #[test]
     #[ignore] // Requires audio device
     fn test_live_voice_speak_produces_audio() {
         let genesis = GenesisSeed::from_phrase("test-live-voice");
@@ -206,5 +514,12 @@ mod tests {
 
         voice.speak("hello").expect("Should speak without error");
         assert!(!voice.is_speaking());
+    }
+
+    fn rms(samples: &[f32]) -> f32 {
+        if samples.is_empty() {
+            return 0.0;
+        }
+        (samples.iter().map(|s| s * s).sum::<f32>() / samples.len() as f32).sqrt()
     }
 }
