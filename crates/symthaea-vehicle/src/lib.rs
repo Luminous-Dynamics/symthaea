@@ -80,7 +80,7 @@ pub use encoder::VehicleHdcEncoder;
 pub use fep_agent::{ActiveInferenceVehicleAgent, VehicleFepConfig, VehicleFepResult};
 pub use perturbations::{PerturbationSchedule, VehiclePerturbation};
 pub use reward::{episode_reward, safety_reward, speed_reward};
-pub use road::Road;
+pub use road::{Road, RoadSegment};
 pub use simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
 pub use swarm::{SwarmConfig, SwarmSimulator};
 pub use training::{EpisodeMetrics, VehicleTrainer};

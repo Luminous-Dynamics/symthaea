@@ -314,7 +314,7 @@ impl VehicleController {
             neurons_per_layer: config.neurons_per_layer,
         };
         let json = serde_json::to_string_pretty(&checkpoint)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            .map_err(std::io::Error::other)?;
         std::fs::write(path, json)
     }
 
@@ -322,7 +322,7 @@ impl VehicleController {
     pub fn load_checkpoint(path: &str) -> std::io::Result<Self> {
         let json = std::fs::read_to_string(path)?;
         let checkpoint: ControllerCheckpoint = serde_json::from_str(&json)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            .map_err(std::io::Error::other)?;
 
         let genesis = GenesisSeed::from_phrase(&checkpoint.genesis_phrase);
         let config = VehicleConfig {
