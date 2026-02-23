@@ -265,9 +265,19 @@ fn validate_create_practice(
             "Practice ID cannot be empty".into(),
         ));
     }
+    if practice.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Practice ID must be 256 characters or fewer".into(),
+        ));
+    }
     if practice.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Practice title cannot be empty".into(),
+        ));
+    }
+    if practice.title.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Practice title must be 512 characters or fewer".into(),
         ));
     }
     if practice.description.trim().is_empty() {
@@ -275,14 +285,29 @@ fn validate_create_practice(
             "Practice description cannot be empty".into(),
         ));
     }
+    if practice.description.len() > 16384 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Practice description must be 16384 characters or fewer".into(),
+        ));
+    }
     if practice.region.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Region cannot be empty".into(),
         ));
     }
+    if practice.region.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Region must be 512 characters or fewer".into(),
+        ));
+    }
     if practice.culture_or_community.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Culture or community cannot be empty".into(),
+        ));
+    }
+    if practice.culture_or_community.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Culture or community must be 512 characters or fewer".into(),
         ));
     }
     if let Some(rating) = practice.effectiveness_rating {
@@ -1372,5 +1397,114 @@ mod tests {
             .collect();
         let result = validate_create_conservation_method(fake_create(), m);
         assert!(is_valid(&result));
+    }
+
+    // --- String length limit hardening tests ---
+
+    #[test]
+    fn practice_id_too_long_rejected() {
+        let mut p = make_practice();
+        p.id = "A".repeat(257);
+        let result = validate_create_practice(fake_create(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn practice_id_at_limit_accepted() {
+        let mut p = make_practice();
+        p.id = "A".repeat(256);
+        let result = validate_create_practice(fake_create(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn practice_title_too_long_rejected() {
+        let mut p = make_practice();
+        p.title = "A".repeat(513);
+        let result = validate_create_practice(fake_create(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn practice_title_at_limit_accepted() {
+        let mut p = make_practice();
+        p.title = "A".repeat(512);
+        let result = validate_create_practice(fake_create(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn practice_description_too_long_rejected() {
+        let mut p = make_practice();
+        p.description = "A".repeat(16385);
+        let result = validate_create_practice(fake_create(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn practice_description_at_limit_accepted() {
+        let mut p = make_practice();
+        p.description = "A".repeat(16384);
+        let result = validate_create_practice(fake_create(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn practice_region_too_long_rejected() {
+        let mut p = make_practice();
+        p.region = "A".repeat(513);
+        let result = validate_create_practice(fake_create(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn practice_culture_too_long_rejected() {
+        let mut p = make_practice();
+        p.culture_or_community = "A".repeat(513);
+        let result = validate_create_practice(fake_create(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn practice_sacred_access_level_accepted() {
+        let mut p = make_practice();
+        p.access_level = AccessLevel::Sacred;
+        let result = validate_create_practice(fake_create(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn practice_all_access_levels_valid() {
+        for level in [
+            AccessLevel::Public,
+            AccessLevel::CommunityOnly,
+            AccessLevel::ElderApproved,
+            AccessLevel::Sacred,
+        ] {
+            let mut p = make_practice();
+            p.access_level = level;
+            let result = validate_create_practice(fake_create(), p);
+            assert!(is_valid(&result));
+        }
+    }
+
+    #[test]
+    fn practice_multibyte_unicode_title_at_byte_limit() {
+        let mut p = make_practice();
+        // 4-byte emoji x 128 = 512 bytes
+        p.title = "\u{1f4a7}".repeat(128);
+        assert_eq!(p.title.len(), 512);
+        let result = validate_create_practice(fake_create(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn practice_multibyte_unicode_title_over_byte_limit() {
+        let mut p = make_practice();
+        // 4-byte emoji x 129 = 516 bytes > 512
+        p.title = "\u{1f4a7}".repeat(129);
+        assert!(p.title.len() > 512);
+        let result = validate_create_practice(fake_create(), p);
+        assert!(is_invalid(&result));
     }
 }

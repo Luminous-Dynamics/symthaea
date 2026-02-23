@@ -148,33 +148,61 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
-fn validate_create_triage(
-    _action: Create,
-    record: TriageRecord,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_triage_fields(record: &TriageRecord, require_location: bool) -> ExternResult<ValidateCallbackResult> {
     if record.patient_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Patient ID cannot be empty".into(),
         ));
     }
-    if record.location.trim().is_empty() {
+    if record.patient_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Patient ID must be 256 characters or fewer".into(),
+        ));
+    }
+    if require_location && record.location.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Location cannot be empty".into(),
         ));
     }
+    if record.location.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Location must be 512 characters or fewer".into(),
+        ));
+    }
+    if record.injuries.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Injuries description must be 4096 characters or fewer".into(),
+        ));
+    }
+    if record.notes.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Notes must be 4096 characters or fewer".into(),
+        ));
+    }
+    // Transport priority consistency: Dead patients should not have Urgent transport
+    if record.category == TriageCategory::Dead
+        && record.transport_priority == TransportPriority::Urgent
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Dead patients cannot have Urgent transport priority".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_create_triage(
+    _action: Create,
+    record: TriageRecord,
+) -> ExternResult<ValidateCallbackResult> {
+    validate_triage_fields(&record, true)
 }
 
 fn validate_update_triage(
     _action: Update,
     record: TriageRecord,
 ) -> ExternResult<ValidateCallbackResult> {
-    if record.patient_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Patient ID cannot be empty".into(),
-        ));
-    }
-    Ok(ValidateCallbackResult::Valid)
+    // Updates allow empty location (field may be cleared or unknown during re-triage)
+    validate_triage_fields(&record, false)
 }
 
 #[cfg(test)]
@@ -373,6 +401,10 @@ mod tests {
 
         for category in categories {
             let mut record = valid_triage_record();
+            // Dead + Urgent is invalid, so use None for Dead
+            if category == TriageCategory::Dead {
+                record.transport_priority = TransportPriority::None;
+            }
             record.category = category.clone();
             let result = validate_create_triage(fake_create(), record);
             assert!(
@@ -495,6 +527,10 @@ mod tests {
 
         for category in categories {
             let mut record = valid_triage_record();
+            // Dead + Urgent is invalid, so use None for Dead
+            if category == TriageCategory::Dead {
+                record.transport_priority = TransportPriority::None;
+            }
             record.category = category.clone();
             let result = validate_update_triage(fake_update(), record);
             assert!(
@@ -586,7 +622,7 @@ mod tests {
         let mut record = valid_triage_record();
         record.patient_id = "P".repeat(10000);
         let result = validate_create_triage(fake_create(), record);
-        assert!(is_valid(result));
+        assert!(is_invalid(result));
     }
 
     #[test]
@@ -594,7 +630,7 @@ mod tests {
         let mut record = valid_triage_record();
         record.location = "L".repeat(10000);
         let result = validate_create_triage(fake_create(), record);
-        assert!(is_valid(result));
+        assert!(is_invalid(result));
     }
 
     #[test]
@@ -602,7 +638,7 @@ mod tests {
         let mut record = valid_triage_record();
         record.injuries = "Detailed injury description. ".repeat(500);
         let result = validate_create_triage(fake_create(), record);
-        assert!(is_valid(result));
+        assert!(is_invalid(result));
     }
 
     #[test]
@@ -610,7 +646,7 @@ mod tests {
         let mut record = valid_triage_record();
         record.notes = "Note. ".repeat(5000);
         let result = validate_create_triage(fake_create(), record);
-        assert!(is_valid(result));
+        assert!(is_invalid(result));
     }
 
     // ── Edge cases: Whitespace-only strings ───────────────────────────
@@ -899,12 +935,20 @@ mod tests {
                 record.category = cat.clone();
                 record.transport_priority = prio.clone();
                 let result = validate_create_triage(fake_create(), record);
-                assert!(
-                    is_valid(result),
-                    "Expected valid for {:?} x {:?}",
-                    cat,
-                    prio
-                );
+                // Dead + Urgent is the only invalid combination
+                if *cat == TriageCategory::Dead && *prio == TransportPriority::Urgent {
+                    assert!(
+                        is_invalid(result),
+                        "Expected invalid for Dead x Urgent"
+                    );
+                } else {
+                    assert!(
+                        is_valid(result),
+                        "Expected valid for {:?} x {:?}",
+                        cat,
+                        prio
+                    );
+                }
             }
         }
     }
@@ -1047,5 +1091,106 @@ mod tests {
         let tag = LinkTag::new(vec![0u8; 257]);
         let result = validate_delete_link_tag(&tag);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // --- Triage hardening tests ---
+
+    #[test]
+    fn triage_dead_patient_urgent_transport_rejected() {
+        let mut r = valid_triage_record();
+        r.category = TriageCategory::Dead;
+        r.transport_priority = TransportPriority::Urgent;
+        let result = validate_create_triage(fake_create(), r);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn triage_dead_patient_none_transport_accepted() {
+        let mut r = valid_triage_record();
+        r.category = TriageCategory::Dead;
+        r.transport_priority = TransportPriority::None;
+        let result = validate_create_triage(fake_create(), r);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn triage_immediate_patient_urgent_transport_accepted() {
+        let mut r = valid_triage_record();
+        r.category = TriageCategory::Immediate;
+        r.transport_priority = TransportPriority::Urgent;
+        let result = validate_create_triage(fake_create(), r);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn triage_patient_id_too_long_rejected() {
+        let mut r = valid_triage_record();
+        r.patient_id = "A".repeat(257);
+        let result = validate_create_triage(fake_create(), r);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn triage_patient_id_at_limit_accepted() {
+        let mut r = valid_triage_record();
+        r.patient_id = "A".repeat(256);
+        let result = validate_create_triage(fake_create(), r);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn triage_location_too_long_rejected() {
+        let mut r = valid_triage_record();
+        r.location = "A".repeat(513);
+        let result = validate_create_triage(fake_create(), r);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn triage_injuries_too_long_rejected() {
+        let mut r = valid_triage_record();
+        r.injuries = "A".repeat(4097);
+        let result = validate_create_triage(fake_create(), r);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn triage_notes_too_long_rejected() {
+        let mut r = valid_triage_record();
+        r.notes = "A".repeat(4097);
+        let result = validate_create_triage(fake_create(), r);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn triage_notes_at_limit_accepted() {
+        let mut r = valid_triage_record();
+        r.notes = "A".repeat(4096);
+        let result = validate_create_triage(fake_create(), r);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn triage_empty_injuries_accepted() {
+        let mut r = valid_triage_record();
+        r.injuries = String::new();
+        let result = validate_create_triage(fake_create(), r);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn triage_expectant_with_all_transport_priorities() {
+        for prio in [
+            TransportPriority::Urgent,
+            TransportPriority::Priority,
+            TransportPriority::Routine,
+            TransportPriority::None,
+        ] {
+            let mut r = valid_triage_record();
+            r.category = TriageCategory::Expectant;
+            r.transport_priority = prio;
+            let result = validate_create_triage(fake_create(), r);
+            assert!(is_valid(result));
+        }
     }
 }
