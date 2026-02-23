@@ -268,9 +268,19 @@ fn validate_create_team(_action: Create, team: Team) -> ExternResult<ValidateCal
             "Team ID cannot be empty".into(),
         ));
     }
+    if team.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Team ID must be 256 characters or fewer".into(),
+        ));
+    }
     if team.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Team name cannot be empty".into(),
+        ));
+    }
+    if team.name.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Team name must be 512 characters or fewer".into(),
         ));
     }
     if team.members.is_empty() {
@@ -295,6 +305,11 @@ fn validate_create_assignment(
             "Assignment objective cannot be empty".into(),
         ));
     }
+    if assignment.objective.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Assignment objective must be 4096 characters or fewer".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -307,6 +322,11 @@ fn validate_create_sitrep(
             "SITREP conditions cannot be empty".into(),
         ));
     }
+    if sitrep.conditions.len() > 8192 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "SITREP conditions must be 8192 characters or fewer".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -314,6 +334,17 @@ fn validate_create_checkpoint(
     _action: Create,
     checkpoint: Checkpoint,
 ) -> ExternResult<ValidateCallbackResult> {
+    // NaN/Infinity guard: NaN comparisons silently pass range checks
+    if !checkpoint.lat.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be a finite number".into(),
+        ));
+    }
+    if !checkpoint.lon.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be a finite number".into(),
+        ));
+    }
     if checkpoint.lat < -90.0 || checkpoint.lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Latitude must be between -90 and 90".into(),
@@ -1111,19 +1142,19 @@ mod tests {
     }
 
     #[test]
-    fn assignment_long_objective_passes() {
+    fn assignment_long_objective_rejected() {
         let mut assignment = make_assignment();
         assignment.objective = "A".repeat(10_000);
         let result = validate_create_assignment(fake_create(), assignment);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
     }
 
     #[test]
-    fn sitrep_long_conditions_passes() {
+    fn sitrep_long_conditions_rejected() {
         let mut sitrep = make_sitrep();
-        sitrep.conditions = "Flooding ".repeat(1_000);
+        sitrep.conditions = "Flooding ".repeat(1_000); // 9,000 chars > 8192 limit
         let result = validate_create_sitrep(fake_create(), sitrep);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
     }
 
     // ========================================================================
@@ -1144,12 +1175,8 @@ mod tests {
         let mut cp = make_checkpoint();
         cp.lat = f64::NAN;
         let result = validate_create_checkpoint(fake_create(), cp);
-        // NaN comparisons: NaN < -90.0 is false, NaN > 90.0 is false, so
-        // the lat check passes. Then NaN lon would also pass. This documents
-        // current behavior; NaN bypasses range checks.
-        // Actually, cp.lon is valid (the default -96.7299), only lat is NaN.
-        // NaN < -90.0 => false, NaN > 90.0 => false, so it falls through.
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Latitude must be a finite number");
     }
 
     #[test]
@@ -1157,8 +1184,8 @@ mod tests {
         let mut cp = make_checkpoint();
         cp.lon = f64::NAN;
         let result = validate_create_checkpoint(fake_create(), cp);
-        // Same NaN bypass: NaN < -180.0 => false, NaN > 180.0 => false
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Longitude must be a finite number");
     }
 
     #[test]
@@ -1167,10 +1194,7 @@ mod tests {
         cp.lat = f64::INFINITY;
         let result = validate_create_checkpoint(fake_create(), cp);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be a finite number");
     }
 
     #[test]
@@ -1179,10 +1203,7 @@ mod tests {
         cp.lat = f64::NEG_INFINITY;
         let result = validate_create_checkpoint(fake_create(), cp);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be a finite number");
     }
 
     #[test]
@@ -1191,10 +1212,7 @@ mod tests {
         cp.lon = f64::INFINITY;
         let result = validate_create_checkpoint(fake_create(), cp);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Longitude must be between -180 and 180"
-        );
+        assert_eq!(invalid_msg(&result), "Longitude must be a finite number");
     }
 
     #[test]
@@ -1203,10 +1221,7 @@ mod tests {
         cp.lon = f64::NEG_INFINITY;
         let result = validate_create_checkpoint(fake_create(), cp);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Longitude must be between -180 and 180"
-        );
+        assert_eq!(invalid_msg(&result), "Longitude must be a finite number");
     }
 
     #[test]
@@ -1494,5 +1509,94 @@ mod tests {
     fn delete_link_tag_over_limit() {
         let result = validate_delete_link_tag(vec![0u8; 257]);
         assert!(is_invalid(&result));
+    }
+
+    // ========================================================================
+    // HARDENING: STRING LENGTH LIMITS
+    // ========================================================================
+
+    #[test]
+    fn team_id_too_long_rejected() {
+        let mut team = make_team();
+        team.id = "T".repeat(257);
+        let result = validate_create_team(fake_create(), team);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Team ID must be 256 characters or fewer");
+    }
+
+    #[test]
+    fn team_id_at_limit_accepted() {
+        let mut team = make_team();
+        team.id = "T".repeat(256);
+        let result = validate_create_team(fake_create(), team);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn team_name_too_long_rejected() {
+        let mut team = make_team();
+        team.name = "N".repeat(513);
+        let result = validate_create_team(fake_create(), team);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Team name must be 512 characters or fewer");
+    }
+
+    #[test]
+    fn team_name_at_limit_accepted() {
+        let mut team = make_team();
+        team.name = "N".repeat(512);
+        let result = validate_create_team(fake_create(), team);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn assignment_objective_too_long_rejected() {
+        let mut assignment = make_assignment();
+        assignment.objective = "O".repeat(4097);
+        let result = validate_create_assignment(fake_create(), assignment);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Assignment objective must be 4096 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn assignment_objective_at_limit_accepted() {
+        let mut assignment = make_assignment();
+        assignment.objective = "O".repeat(4096);
+        let result = validate_create_assignment(fake_create(), assignment);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn sitrep_conditions_too_long_rejected() {
+        let mut sitrep = make_sitrep();
+        sitrep.conditions = "C".repeat(8193);
+        let result = validate_create_sitrep(fake_create(), sitrep);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "SITREP conditions must be 8192 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn sitrep_conditions_at_limit_accepted() {
+        let mut sitrep = make_sitrep();
+        sitrep.conditions = "C".repeat(8192);
+        let result = validate_create_sitrep(fake_create(), sitrep);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn checkpoint_both_nan_rejected() {
+        let mut cp = make_checkpoint();
+        cp.lat = f64::NAN;
+        cp.lon = f64::NAN;
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_invalid(&result));
+        // Lat check comes first
+        assert_eq!(invalid_msg(&result), "Latitude must be a finite number");
     }
 }
