@@ -16,7 +16,9 @@
 //! 12–13   GYRO_ZOUT       Gyroscope Z
 //! ```
 
-use crate::sensor::SensorDecoder;
+use std::time::Instant;
+
+use crate::sensor::{HalSensorAdapter, SensorDecoder};
 
 /// MPU6050 I2C address (AD0 pin low).
 const MPU6050_ADDR: u8 = 0x68;
@@ -90,12 +92,117 @@ fn i16_from_be(high: u8, low: u8) -> i16 {
 }
 
 // ============================================================================
+// COMPLEMENTARY FILTER
+// ============================================================================
+
+/// Complementary filter: fuses accelerometer + gyroscope into roll/pitch angles.
+///
+/// Wraps any [`HalSensorAdapter`] that produces 6-element readings
+/// `[ax, ay, az, gx, gy, gz]` (accel in g, gyro in °/s) and outputs
+/// `[roll_deg, pitch_deg]`.
+///
+/// **Yaw is not computed** — requires a magnetometer, unavailable on MPU6050.
+///
+/// Filter formula:
+/// `angle = alpha * (angle + gyro * dt) + (1 - alpha) * atan2(accel)`
+pub struct ComplementaryFilter {
+    inner: Box<dyn HalSensorAdapter>,
+    alpha: f32,
+    roll: f32,
+    pitch: f32,
+    last_time: Option<Instant>,
+    initialized: bool,
+}
+
+impl ComplementaryFilter {
+    /// Create a new complementary filter wrapping a 6-axis IMU sensor.
+    ///
+    /// Default alpha = 0.98 (heavy gyro weighting for smooth output).
+    pub fn new(inner: Box<dyn HalSensorAdapter>) -> Self {
+        Self {
+            inner,
+            alpha: 0.98,
+            roll: 0.0,
+            pitch: 0.0,
+            last_time: None,
+            initialized: false,
+        }
+    }
+
+    /// Set the complementary filter coefficient (0.0–1.0).
+    ///
+    /// Higher alpha → more gyro trust, less accel noise.
+    /// Lower alpha → faster convergence to accelerometer angle.
+    pub fn with_alpha(mut self, alpha: f32) -> Self {
+        self.alpha = alpha.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Compute roll angle from accelerometer (degrees).
+    fn accel_roll(ay: f32, az: f32) -> f32 {
+        ay.atan2(az).to_degrees()
+    }
+
+    /// Compute pitch angle from accelerometer (degrees).
+    fn accel_pitch(ax: f32, ay: f32, az: f32) -> f32 {
+        (-ax).atan2((ay * ay + az * az).sqrt()).to_degrees()
+    }
+}
+
+impl HalSensorAdapter for ComplementaryFilter {
+    fn name(&self) -> &str {
+        "complementary_filter"
+    }
+
+    fn read_raw(&mut self) -> Option<Vec<f32>> {
+        let values = self.inner.read_raw()?;
+        if values.len() < 6 {
+            return None;
+        }
+
+        let (ax, ay, az) = (values[0], values[1], values[2]);
+        let (gx, gy, _gz) = (values[3], values[4], values[5]);
+
+        let accel_roll = Self::accel_roll(ay, az);
+        let accel_pitch = Self::accel_pitch(ax, ay, az);
+
+        if !self.initialized {
+            // First reading: initialize from accel only
+            self.roll = accel_roll;
+            self.pitch = accel_pitch;
+            self.last_time = Some(Instant::now());
+            self.initialized = true;
+            return Some(vec![self.roll, self.pitch]);
+        }
+
+        let now = Instant::now();
+        let dt = if let Some(last) = self.last_time {
+            now.duration_since(last).as_secs_f32()
+        } else {
+            0.0
+        };
+        self.last_time = Some(now);
+
+        // Complementary filter fusion
+        self.roll = self.alpha * (self.roll + gx * dt) + (1.0 - self.alpha) * accel_roll;
+        self.pitch = self.alpha * (self.pitch + gy * dt) + (1.0 - self.alpha) * accel_pitch;
+
+        Some(vec![self.roll, self.pitch])
+    }
+
+    fn is_available(&self) -> bool {
+        self.inner.is_available()
+    }
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mock::MockHalSensor;
 
     #[test]
     fn test_mpu6050_decode_zeros() {
@@ -176,6 +283,86 @@ mod tests {
         assert_eq!(i16_from_be(0xFF, 0xFF), -1);
         assert_eq!(i16_from_be(0x40, 0x00), 16384);
         assert_eq!(i16_from_be(0x80, 0x00), -32768);
+    }
+
+    // ── Complementary filter tests ───────────────────────────────────
+
+    #[test]
+    fn test_complementary_filter_level() {
+        // Gravity along Z → roll≈0, pitch≈0
+        let readings = vec![vec![0.0, 0.0, 1.0, 0.0, 0.0, 0.0]; 3];
+        let sensor = MockHalSensor::new("mpu", readings);
+        let mut filter = ComplementaryFilter::new(Box::new(sensor));
+
+        let out = filter.read_raw().unwrap();
+        assert_eq!(out.len(), 2);
+        assert!(out[0].abs() < 1.0, "roll should be ~0, got {}", out[0]);
+        assert!(out[1].abs() < 1.0, "pitch should be ~0, got {}", out[1]);
+    }
+
+    #[test]
+    fn test_complementary_filter_roll_90() {
+        // Gravity along Y → roll ≈ 90°
+        let readings = vec![vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0]; 3];
+        let sensor = MockHalSensor::new("mpu", readings);
+        let mut filter = ComplementaryFilter::new(Box::new(sensor));
+
+        let out = filter.read_raw().unwrap();
+        assert!(
+            (out[0] - 90.0).abs() < 1.0,
+            "roll should be ~90, got {}",
+            out[0]
+        );
+    }
+
+    #[test]
+    fn test_complementary_filter_pitch_90() {
+        // Gravity along -X → pitch ≈ 90°
+        let readings = vec![vec![-1.0, 0.0, 0.0, 0.0, 0.0, 0.0]; 3];
+        let sensor = MockHalSensor::new("mpu", readings);
+        let mut filter = ComplementaryFilter::new(Box::new(sensor));
+
+        let out = filter.read_raw().unwrap();
+        assert!(
+            (out[1] - 90.0).abs() < 1.0,
+            "pitch should be ~90, got {}",
+            out[1]
+        );
+    }
+
+    #[test]
+    fn test_complementary_filter_gyro_fusion() {
+        // Two reads exercise the gyro integration path
+        let readings = vec![
+            vec![0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+            vec![0.0, 0.0, 1.0, 10.0, 10.0, 0.0], // some gyro rotation
+        ];
+        let sensor = MockHalSensor::new("mpu", readings);
+        let mut filter = ComplementaryFilter::new(Box::new(sensor));
+
+        let _first = filter.read_raw().unwrap();
+        let second = filter.read_raw().unwrap();
+        // Just verify it produces finite output — exact value depends on dt
+        assert!(second[0].is_finite());
+        assert!(second[1].is_finite());
+    }
+
+    #[test]
+    fn test_complementary_filter_config_and_metadata() {
+        let sensor = MockHalSensor::new("mpu", vec![vec![0.0; 6]; 3]);
+        let filter = ComplementaryFilter::new(Box::new(sensor)).with_alpha(0.95);
+        assert_eq!(filter.name(), "complementary_filter");
+        assert!(filter.is_available());
+        assert!((filter.alpha - 0.95).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_complementary_filter_short_reading() {
+        // Only 4 values — should return None (need 6)
+        let readings = vec![vec![1.0, 2.0, 3.0, 4.0]];
+        let sensor = MockHalSensor::new("mpu", readings);
+        let mut filter = ComplementaryFilter::new(Box::new(sensor));
+        assert!(filter.read_raw().is_none());
     }
 }
 

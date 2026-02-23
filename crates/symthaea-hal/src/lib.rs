@@ -63,6 +63,7 @@ pub mod ina219;
 pub mod interlock;
 pub mod mock;
 pub mod pca9685;
+pub mod recording;
 pub mod runtime;
 pub mod sensor;
 pub mod servo;
@@ -72,11 +73,14 @@ pub mod servo;
 pub use calibration::{CalibrationProfile, JointCalibration};
 pub use error::{HalError, HalResult};
 pub use gpio_estop::{EstopPoller, GpioEstop};
-pub use imu::Mpu6050Decoder;
+pub use imu::{ComplementaryFilter, Mpu6050Decoder};
 pub use ina219::Ina219Decoder;
 pub use interlock::{SafetyConfig, SafetyInterlock};
 pub use pca9685::Pca9685;
-pub use runtime::{AngleMonitor, CurrentMonitor, HalRuntime, HalRuntimeBuilder, RuntimeTelemetry};
+pub use recording::{RecordingAdapter, ReplayAdapter, SensorRecording};
+pub use runtime::{
+    AngleMonitor, CurrentMonitor, HalRuntime, HalRuntimeBuilder, HealthStatus, RuntimeTelemetry,
+};
 pub use sensor::{EmbeddedSensor, HalSensorAdapter, SensorDecoder};
 pub use servo::ServoOutput;
 

@@ -174,6 +174,32 @@ impl<I: I2c> Pca9685<I> {
         1_000_000.0 / freq
     }
 
+    /// Read back the ON and OFF counts for a single channel.
+    ///
+    /// Returns `(on_count, off_count)` — both 12-bit values (0–4095).
+    /// Uses the auto-increment read from `LED0_ON_L + 4*channel`.
+    ///
+    /// This is a diagnostic operation (I2C read per channel), not for per-tick use.
+    pub fn read_channel(&mut self, channel: u8) -> HalResult<(u16, u16)> {
+        if channel >= CHANNELS as u8 {
+            return Err(HalError::Pca9685 {
+                address: self.address,
+                detail: format!("channel {} out of range (0–15)", channel),
+            });
+        }
+        let base = reg::LED0_ON_L + 4 * channel;
+        let mut buf = [0u8; 4];
+        self.bus
+            .write_read(self.address, &[base], &mut buf)
+            .map_err(|e| HalError::I2c {
+                bus: format!("0x{:02X}", self.address),
+                detail: i2c_error_detail(embedded_hal::i2c::Error::kind(&e)),
+            })?;
+        let on = u16::from(buf[0]) | (u16::from(buf[1]) << 8);
+        let off = u16::from(buf[2]) | (u16::from(buf[3]) << 8);
+        Ok((on & 0x0FFF, off & 0x0FFF))
+    }
+
     /// Consume the driver and return the I2C bus.
     pub fn release(self) -> I {
         self.bus
@@ -213,7 +239,7 @@ impl<I: I2c> Pca9685<I> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::MockI2cBus;
+    use crate::mock::{I2cTransaction, MockI2cBus};
 
     #[test]
     fn test_init_writes_prescale() {
@@ -312,6 +338,40 @@ mod tests {
         let bus = MockI2cBus::new();
         let pca = Pca9685::new(bus, 0x40);
         let _bus = pca.release();
+    }
+
+    // ── read_channel tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_read_channel_parses_on_off() {
+        // Pre-load 4-byte response: ON_L=0x33, ON_H=0x01, OFF_L=0x44, OFF_H=0x02
+        let bus = MockI2cBus::new().with_responses(vec![vec![0x33, 0x01, 0x44, 0x02]]);
+        let mut pca = Pca9685::new(bus, 0x40);
+        let (on, off) = pca.read_channel(0).unwrap();
+        assert_eq!(on, 0x0133);
+        assert_eq!(off, 0x0244);
+    }
+
+    #[test]
+    fn test_read_channel_out_of_range() {
+        let bus = MockI2cBus::new();
+        let mut pca = Pca9685::new(bus, 0x40);
+        let result = pca.read_channel(16);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_channel_register_address() {
+        // Channel 5 → base = LED0_ON_L + 4*5 = 0x06 + 20 = 0x1A
+        let bus = MockI2cBus::new().with_responses(vec![vec![0, 0, 0, 0]]);
+        let mut pca = Pca9685::new(bus, 0x40);
+        pca.read_channel(5).unwrap();
+        // Verify the write portion sent the correct register
+        let txns = pca.bus.transactions();
+        // write_read produces Write + Read in our mock
+        if let I2cTransaction::Write { data, .. } = &txns[0] {
+            assert_eq!(data[0], 0x1A, "expected register 0x1A for channel 5");
+        }
     }
 }
 
