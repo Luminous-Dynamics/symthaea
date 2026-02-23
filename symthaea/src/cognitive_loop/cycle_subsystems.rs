@@ -170,7 +170,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (holographic_unity, holographic_binding) =
             if let Some(ref mut ha) = self.holographic_analyzer {
-                if self.stats.total_cycles % (19 * budget_interval_mult as usize) == 0 {
+                if self.stats.total_cycles % (19 * budget_interval_mult) == 0 {
                     let content: Vec<f64> = (0..64)
                         .map(|i| {
                             if hv16_cached.get_bit(i) != 0 {
@@ -216,7 +216,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (consciousness_gradient_magnitude, consciousness_limiting_component) =
             if let Some(ref dc) = self.differentiable_consciousness {
-                if self.stats.total_cycles % (23 * budget_interval_mult as usize) == 0
+                if self.stats.total_cycles % (23 * budget_interval_mult) == 0
                     && self.stats.total_cycles > 0
                 {
                     use crate::consciousness::consciousness_equation_v2::{
@@ -274,7 +274,7 @@ impl CognitiveLoopService {
         let (affect_cons_valence, affect_cons_arousal) =
             if let Some(ref mut ac) = self.affective_consciousness {
                 ac.decay(0.05);
-                if self.stats.total_cycles % (11 * budget_interval_mult as usize) == 0 {
+                if self.stats.total_cycles % (11 * budget_interval_mult) == 0 {
                     let valence = 1.0 - 2.0 * prediction_error;
                     let base_affect = crate::consciousness::affective_consciousness::CoreAffect {
                         valence,

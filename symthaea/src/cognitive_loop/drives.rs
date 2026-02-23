@@ -344,6 +344,7 @@ impl CuriosityDrive {
     }
 
     /// Get action hint based on curiosity state
+    #[allow(dead_code)]
     pub fn action_hint(&self) -> Option<ActionHint> {
         if self.should_explore() {
             Some(ActionHint::Explore)
@@ -365,6 +366,7 @@ impl CuriosityDrive {
     }
 
     /// Get exploration probability (for stochastic exploration)
+    #[allow(dead_code)]
     pub fn exploration_probability(&self) -> f32 {
         (self.exploration_urge * 0.5 + self.boredom * 0.3).min(0.8)
     }
@@ -479,7 +481,7 @@ pub enum SelfAssessment {
 
 /// Recommendation from self-reflection
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct Recommendation {
+pub struct Recommendation {
     /// What to adjust
     pub target: RecommendationTarget,
     /// Direction of adjustment
@@ -492,7 +494,7 @@ pub(crate) struct Recommendation {
 
 /// What the recommendation targets
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum RecommendationTarget {
+pub enum RecommendationTarget {
     FlowThreshold,
     BoredomThreshold,
     TrustThreshold,
@@ -505,7 +507,7 @@ pub(crate) enum RecommendationTarget {
 
 /// Direction of adjustment
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum AdjustmentDirection {
+pub enum AdjustmentDirection {
     Increase,
     Decrease,
     NoChange,
@@ -873,11 +875,13 @@ impl SelfReflection {
     }
 
     /// Get historical average error (EMA)
+    #[allow(dead_code)]
     pub fn historical_error(&self) -> f32 {
         self.historical_error
     }
 
     /// Get historical average confidence (EMA)
+    #[allow(dead_code)]
     pub fn historical_confidence(&self) -> f32 {
         self.historical_confidence
     }
@@ -899,6 +903,7 @@ impl SelfReflection {
     }
 
     /// Full reset including learned thresholds
+    #[allow(dead_code)]
     pub fn full_reset(&mut self) {
         *self = Self::default();
     }
@@ -914,7 +919,7 @@ impl SelfReflection {
 
 /// Thresholds from self-reflection for use by other components
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct ReflectionThresholds {
+pub struct ReflectionThresholds {
     pub flow_error: f32,
     pub flow_coherence: f32,
     pub boredom: f32,
@@ -927,7 +932,8 @@ pub(crate) struct ReflectionThresholds {
 
 /// Summary of self-reflection state
 #[derive(Debug, Clone)]
-pub(crate) struct ReflectionSummary {
+#[allow(dead_code)]
+pub struct ReflectionSummary {
     pub assessment: SelfAssessment,
     pub reflection_count: u64,
     pub adjustments_made: u32,

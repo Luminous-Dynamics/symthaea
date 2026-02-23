@@ -9,6 +9,7 @@ use crate::shell::ipc_server::{CommandExecutor, ExecutionResult, ValidationResul
 /// CommandExecutor implementation for CognitiveLoopService
 ///
 /// Wraps the cognitive loop to provide command execution with Phi-gating.
+#[allow(dead_code)]
 pub(crate) struct CognitiveLoopExecutor {
     /// Reference to cognitive loop for Phi checks
     min_phi: f64,
@@ -16,6 +17,7 @@ pub(crate) struct CognitiveLoopExecutor {
     current_phi: f64,
 }
 
+#[allow(dead_code)]
 impl CognitiveLoopExecutor {
     pub fn new(min_phi: f64) -> Self {
         Self {
