@@ -31,6 +31,8 @@ members = [
     "crates/symthaea-humanoid",
     "crates/symthaea-physics",
     "crates/symthaea-vocal-tract",
+    "crates/symthaea-vehicle",
+    "crates/symthaea-hal",
 ]
 
 
@@ -133,6 +135,9 @@ symthaea-flight = { path = "crates/symthaea-flight", optional = true }
 
 # Symthaea Humanoid - HDC-LTC + FEP Active Inference DMC Humanoid bipedal control
 symthaea-humanoid = { path = "crates/symthaea-humanoid", optional = true }
+
+# Symthaea HAL - Hardware abstraction layer (PCA9685 servo, I2C sensors, safety)
+symthaea-hal = { path = "crates/symthaea-hal", optional = true }
 
 # Symthaea Vocal Tract - LTC-driven articulatory synthesis (encoder, controller, FEP, pipeline, metrics)
 symthaea-vocal-tract = { path = "crates/symthaea-vocal-tract", default-features = false }
@@ -351,6 +356,7 @@ flight = ["dep:symthaea-flight"]            # HDC-LTC quadrotor flight control v
 flight-mujoco = ["flight", "symthaea-flight/mujoco"]   # Flight control with MuJoCo physics
 flight-swarm = ["flight", "symthaea-flight/swarm"]     # Parallel swarm training via MuJoCo + rayon
 humanoid = ["dep:symthaea-humanoid"]       # HDC-LTC bipedal humanoid control via FEP Active Inference (DMC benchmark)
+hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 servos, I2C sensors, safety interlocks)
 humanoid-mujoco = ["humanoid", "symthaea-humanoid/mujoco"]  # Humanoid with MuJoCo physics
 humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid with MuJoCo viewer
 

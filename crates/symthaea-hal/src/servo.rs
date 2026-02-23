@@ -1,0 +1,274 @@
+//! Servo output: `HumanoidCommand` → PCA9685 batch write with slew-rate limiting.
+//!
+//! [`ServoOutput`] bridges the cognitive loop's 21-float torque vector to
+//! two PCA9685 boards via calibrated pulse-width conversion and slew-rate
+//! limiting for smooth, safe motion.
+//!
+//! # Board Layout
+//!
+//! ```text
+//! Board 0 (0x40): joints  0–15  (abdomen + legs + right_shoulder1)
+//! Board 1 (0x41): joints 16–20  (remaining arms, channels 0–4)
+//! ```
+
+use embedded_hal::i2c::I2c;
+use symthaea_humanoid::types::{HumanoidCommand, NUM_ACTUATORS};
+use tracing::debug;
+
+use crate::calibration::CalibrationProfile;
+use crate::error::HalResult;
+use crate::pca9685::{Pca9685, CHANNELS};
+
+// ============================================================================
+// SERVO OUTPUT
+// ============================================================================
+
+/// Maximum slew rate in µs per tick (limits how fast servos move per update).
+const DEFAULT_SLEW_RATE_US: u16 = 100;
+
+/// Servo output controller for 21-joint humanoid.
+///
+/// Owns two PCA9685 boards and a calibration profile. Each `apply()` call:
+/// 1. Converts torques → pulse widths via calibration
+/// 2. Applies slew-rate limiting
+/// 3. Batch-writes to the PCA9685 boards
+pub struct ServoOutput<I> {
+    board0: Pca9685<I>,
+    board1: Pca9685<I>,
+    calibration: CalibrationProfile,
+    /// Last commanded pulse widths (for slew-rate limiting).
+    last_pulses: [u16; NUM_ACTUATORS],
+    /// Maximum change in µs per update cycle.
+    slew_rate_us: u16,
+    /// Whether servo output is enabled.
+    enabled: bool,
+}
+
+impl<I: I2c> ServoOutput<I> {
+    /// Create a new servo output with two I2C buses (or the same bus) and calibration.
+    ///
+    /// - `bus0`: I2C bus for board 0 (address 0x40, joints 0–15)
+    /// - `bus1`: I2C bus for board 1 (address 0x41, joints 16–20)
+    pub fn new(bus0: I, bus1: I, calibration: CalibrationProfile) -> Self {
+        let center = calibration.joints[0].center_pulse_us();
+        Self {
+            board0: Pca9685::new(bus0, 0x40),
+            board1: Pca9685::new(bus1, 0x41),
+            calibration,
+            last_pulses: [center; NUM_ACTUATORS],
+            slew_rate_us: DEFAULT_SLEW_RATE_US,
+            enabled: false,
+        }
+    }
+
+    /// Initialize both PCA9685 boards at the given PWM frequency (typically 50 Hz).
+    pub fn init(&mut self, frequency_hz: f64) -> HalResult<()> {
+        self.board0.init(frequency_hz)?;
+        self.board1.init(frequency_hz)?;
+        debug!("servo output initialized at {}Hz", frequency_hz);
+        Ok(())
+    }
+
+    /// Enable servo output (allows `apply()` to write to hardware).
+    pub fn enable(&mut self) {
+        self.enabled = true;
+        debug!("servo output enabled");
+    }
+
+    /// Disable servo output and turn off all channels.
+    pub fn disable(&mut self) -> HalResult<()> {
+        self.enabled = false;
+        self.board0.all_off()?;
+        self.board1.all_off()?;
+        debug!("servo output disabled");
+        Ok(())
+    }
+
+    /// Whether output is currently enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// Set the maximum slew rate (µs per update tick).
+    pub fn set_slew_rate(&mut self, us_per_tick: u16) {
+        self.slew_rate_us = us_per_tick;
+    }
+
+    /// Set the calibration profile.
+    pub fn set_calibration(&mut self, cal: CalibrationProfile) {
+        self.calibration = cal;
+    }
+
+    /// Apply a `HumanoidCommand` to the servos.
+    ///
+    /// Returns `Ok(())` if disabled (no-op). On enabled, converts torques
+    /// to pulses, applies slew-rate limiting, and writes to both boards.
+    pub fn apply(&mut self, command: &HumanoidCommand) -> HalResult<()> {
+        if !self.enabled {
+            return Ok(());
+        }
+
+        // 1. Convert torques → target pulse widths
+        let targets = self.calibration.torques_to_pulses(&command.torques);
+
+        // 2. Slew-rate limiting
+        let mut pulses = [0u16; NUM_ACTUATORS];
+        for i in 0..NUM_ACTUATORS {
+            pulses[i] = slew_limit(self.last_pulses[i], targets[i], self.slew_rate_us);
+        }
+        self.last_pulses = pulses;
+
+        // 3. Write to board 0 (joints 0–15)
+        let board0_pulses: Vec<u16> = pulses[..CHANNELS].to_vec();
+        self.board0.set_pulse_batch(0, &board0_pulses)?;
+
+        // 4. Write to board 1 (joints 16–20, mapped to channels 0–4)
+        let board1_pulses: Vec<u16> = pulses[CHANNELS..].to_vec();
+        self.board1.set_pulse_batch(0, &board1_pulses)?;
+
+        Ok(())
+    }
+
+    /// Get the last commanded pulse widths.
+    pub fn last_pulses(&self) -> &[u16; NUM_ACTUATORS] {
+        &self.last_pulses
+    }
+
+    /// Move all servos to their center (neutral) position.
+    pub fn center_all(&mut self) -> HalResult<()> {
+        let zero = HumanoidCommand::zero();
+        // Temporarily bypass slew-rate for immediate centering
+        let saved = self.slew_rate_us;
+        self.slew_rate_us = u16::MAX;
+        let result = self.apply(&zero);
+        self.slew_rate_us = saved;
+        result
+    }
+
+    /// Get a reference to the calibration profile.
+    pub fn calibration(&self) -> &CalibrationProfile {
+        &self.calibration
+    }
+}
+
+// ============================================================================
+// SLEW-RATE LIMITER
+// ============================================================================
+
+/// Limit the step from `current` to `target` by at most `max_step` µs.
+fn slew_limit(current: u16, target: u16, max_step: u16) -> u16 {
+    if target > current {
+        let delta = target - current;
+        if delta > max_step {
+            current + max_step
+        } else {
+            target
+        }
+    } else {
+        let delta = current - target;
+        if delta > max_step {
+            current - max_step
+        } else {
+            target
+        }
+    }
+}
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mock::MockI2cBus;
+
+    fn make_servo() -> ServoOutput<MockI2cBus> {
+        let bus0 = MockI2cBus::new();
+        let bus1 = MockI2cBus::new();
+        let cal = CalibrationProfile::default_21();
+        ServoOutput::new(bus0, bus1, cal)
+    }
+
+    #[test]
+    fn test_servo_disabled_noop() {
+        let mut servo = make_servo();
+        assert!(!servo.is_enabled());
+        let cmd = HumanoidCommand::zero();
+        servo.apply(&cmd).unwrap(); // no-op, no error
+    }
+
+    #[test]
+    fn test_servo_enable_apply() {
+        let mut servo = make_servo();
+        servo.init(50.0).unwrap();
+        servo.enable();
+        assert!(servo.is_enabled());
+
+        let cmd = HumanoidCommand::zero();
+        servo.apply(&cmd).unwrap();
+
+        // All pulses should be center (1500)
+        for &p in servo.last_pulses() {
+            assert_eq!(p, 1500);
+        }
+    }
+
+    #[test]
+    fn test_servo_disable_turns_off() {
+        let mut servo = make_servo();
+        servo.init(50.0).unwrap();
+        servo.enable();
+        servo.disable().unwrap();
+        assert!(!servo.is_enabled());
+    }
+
+    #[test]
+    fn test_slew_rate_limiting() {
+        // From 1500 to 2500 with max step 100 → 1600
+        assert_eq!(slew_limit(1500, 2500, 100), 1600);
+        // From 1500 to 500 with max step 100 → 1400
+        assert_eq!(slew_limit(1500, 500, 100), 1400);
+        // Within range: no limiting
+        assert_eq!(slew_limit(1500, 1550, 100), 1550);
+        // Exact match
+        assert_eq!(slew_limit(1500, 1500, 100), 1500);
+    }
+
+    #[test]
+    fn test_servo_slew_rate_applied() {
+        let mut servo = make_servo();
+        servo.init(50.0).unwrap();
+        servo.enable();
+        servo.set_slew_rate(50); // very slow
+
+        // Command full +1 → target 2500, but slew from 1500 limits to 1550
+        let mut cmd = HumanoidCommand::zero();
+        cmd.torques[0] = 1.0;
+        servo.apply(&cmd).unwrap();
+        assert_eq!(servo.last_pulses()[0], 1550);
+
+        // Second apply: 1550 → 1600
+        servo.apply(&cmd).unwrap();
+        assert_eq!(servo.last_pulses()[0], 1600);
+    }
+
+    #[test]
+    fn test_center_all() {
+        let mut servo = make_servo();
+        servo.init(50.0).unwrap();
+        servo.enable();
+
+        // Move away from center first
+        let mut cmd = HumanoidCommand::zero();
+        cmd.torques[0] = 1.0;
+        servo.set_slew_rate(u16::MAX);
+        servo.apply(&cmd).unwrap();
+        assert_eq!(servo.last_pulses()[0], 2500);
+
+        // Center all should return to 1500 immediately
+        servo.set_slew_rate(50);
+        servo.center_all().unwrap();
+        assert_eq!(servo.last_pulses()[0], 1500);
+    }
+}
