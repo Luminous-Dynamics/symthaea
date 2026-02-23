@@ -499,6 +499,18 @@ impl SocialCoherence {
         self.self_model.last_updated = self.timestamp;
     }
 
+    /// Remove an agent's mental model and relationship.
+    ///
+    /// Returns `true` if the agent was present (model or relationship removed).
+    pub fn remove_agent(&mut self, agent_id: &str) -> bool {
+        let model_removed = self.mental_models.remove(agent_id).is_some();
+        let rel_removed = self.relationships.remove(agent_id).is_some();
+        if model_removed || rel_removed {
+            self.stats.agents_modeled = self.mental_models.len() as u64;
+        }
+        model_removed || rel_removed
+    }
+
     /// Get statistics
     pub fn stats(&self) -> &SocialCoherenceStats {
         &self.stats
@@ -696,6 +708,38 @@ mod tests {
 
         // Unknown agent should return None
         assert!(sc.predict_response("nonexistent", &action).is_none());
+    }
+
+    #[test]
+    fn test_remove_agent() {
+        let mut sc = SocialCoherence::default();
+
+        // Observe agent and record interaction so both model and relationship exist
+        let behavior = ContinuousHV::random(512, 0xDEAD_0001);
+        let context = ContinuousHV::random(512, 0xDEAD_0002);
+        sc.observe_agent("ephemeral", &behavior, &context);
+        sc.record_interaction(
+            "ephemeral",
+            InteractionType::Cooperation,
+            0.5,
+            context,
+            "helped",
+            "thanked",
+        );
+        assert!(sc.get_mental_model("ephemeral").is_some());
+        assert!(sc.get_relationship("ephemeral").is_some());
+
+        let removed = sc.remove_agent("ephemeral");
+        assert!(removed);
+        assert!(sc.get_mental_model("ephemeral").is_none());
+        assert!(sc.get_relationship("ephemeral").is_none());
+        assert_eq!(sc.stats().agents_modeled, 0);
+    }
+
+    #[test]
+    fn test_remove_agent_unknown() {
+        let mut sc = SocialCoherence::default();
+        assert!(!sc.remove_agent("nonexistent"));
     }
 
     #[test]

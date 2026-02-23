@@ -3279,6 +3279,11 @@ impl CognitiveLoopService {
             causal_urgency_gated,
             epistemic_semantic_lr_mod,
             predictive_budget_gated,
+            // Mesh network telemetry (populated by Mind module post-cycle)
+            mesh_health_score: 0.0,
+            mesh_peer_count: 0,
+            mesh_bytes_sent: 0,
+            mesh_bytes_received: 0,
         };
 
         // Update cumulative stats for resonator-memory loop diagnostics

@@ -28,6 +28,23 @@ pub use utils::{
 use std::collections::HashMap;
 use symthaea_core::hdc::ContinuousHV;
 
+/// Maximum number of messages retained in unbounded outboxes (federated, social, mesh).
+/// Oldest messages are drained when the cap is exceeded, preventing unbounded growth
+/// when no bridge or consumer is attached.
+const MAX_OUTBOX_SIZE: usize = 64;
+
+/// Size of the packet deduplication ring buffer (source_id + sequence pairs).
+#[cfg(feature = "mesh")]
+const MESH_DEDUP_RING_SIZE: usize = 128;
+
+/// Maximum bytes allowed per bandwidth window (100 KB).
+#[cfg(feature = "mesh")]
+const MESH_MAX_BYTES_PER_WINDOW: u64 = 100 * 1024;
+
+/// Duration of the bandwidth budget window.
+#[cfg(feature = "mesh")]
+const MESH_BANDWIDTH_WINDOW: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// The continuous mind system
 pub struct ContinuousMind {
     /// Configuration
@@ -112,6 +129,27 @@ pub struct ContinuousMind {
     /// Monotonic sequence number for outgoing heartbeat packets.
     #[cfg(feature = "mesh")]
     mesh_heartbeat_sequence: u32,
+    /// Monotonic sequence number for outgoing gradient packets.
+    #[cfg(feature = "mesh")]
+    mesh_gradient_sequence: u32,
+    /// Tick counter for last affective emission.
+    #[cfg(feature = "mesh")]
+    mesh_affective_last_tick: u64,
+    /// Monotonic sequence number for outgoing affective packets.
+    #[cfg(feature = "mesh")]
+    mesh_affective_sequence: u32,
+    /// Aggregate mesh telemetry counters.
+    #[cfg(feature = "mesh")]
+    pub(crate) mesh_stats: crate::swarm::mesh::MeshStats,
+    /// Ring buffer of recently seen (source_id, sequence) pairs for deduplication.
+    #[cfg(feature = "mesh")]
+    mesh_seen_packets: Vec<([u8; 8], u32)>,
+    /// Start of the current bandwidth budget window.
+    #[cfg(feature = "mesh")]
+    mesh_bandwidth_window_start: std::time::Instant,
+    /// Bytes sent within the current bandwidth budget window.
+    #[cfg(feature = "mesh")]
+    mesh_bandwidth_window_bytes: u64,
 }
 
 impl ContinuousMind {
@@ -172,6 +210,20 @@ impl ContinuousMind {
             mesh_heartbeat_last_tick: 0,
             #[cfg(feature = "mesh")]
             mesh_heartbeat_sequence: 0,
+            #[cfg(feature = "mesh")]
+            mesh_gradient_sequence: 0,
+            #[cfg(feature = "mesh")]
+            mesh_affective_last_tick: 0,
+            #[cfg(feature = "mesh")]
+            mesh_affective_sequence: 0,
+            #[cfg(feature = "mesh")]
+            mesh_stats: crate::swarm::mesh::MeshStats::default(),
+            #[cfg(feature = "mesh")]
+            mesh_seen_packets: Vec::with_capacity(128),
+            #[cfg(feature = "mesh")]
+            mesh_bandwidth_window_start: std::time::Instant::now(),
+            #[cfg(feature = "mesh")]
+            mesh_bandwidth_window_bytes: 0,
         }
     }
 
@@ -300,6 +352,10 @@ impl ContinuousMind {
             (state.consciousness_level * 0.7 + state.memory_utilization as f64 * 0.3).min(1.0);
         state.cognitive_load = state.memory_utilization as f64;
         state.is_conscious = state.consciousness_level >= self.config.min_consciousness;
+        #[cfg(feature = "mesh")]
+        {
+            state.mesh_telemetry = Some(self.mesh_telemetry());
+        }
         state
     }
 
@@ -424,6 +480,26 @@ impl ContinuousMind {
         &self.mesh_peers
     }
 
+    /// Get a reference to the mesh telemetry counters.
+    #[cfg(feature = "mesh")]
+    pub fn mesh_stats(&self) -> &crate::swarm::mesh::MeshStats {
+        &self.mesh_stats
+    }
+
+    /// Build a structured mesh telemetry snapshot from current state.
+    #[cfg(feature = "mesh")]
+    pub fn mesh_telemetry(&self) -> crate::swarm::mesh::MeshTelemetry {
+        let peer_count = self.mesh_peers.peer_count();
+        let avg_phi = self.mesh_peers.average_phi();
+        let health_score = self.mesh_stats.health_score(peer_count);
+        crate::swarm::mesh::MeshTelemetry {
+            stats: self.mesh_stats.clone(),
+            peer_count,
+            avg_phi,
+            health_score,
+        }
+    }
+
     /// Attach a Hyperfeel engine for affective mesh payload processing.
     #[cfg(feature = "mesh")]
     pub fn set_hyperfeel(&mut self, hf: crate::swarm::Hyperfeel) {
@@ -434,6 +510,36 @@ impl ContinuousMind {
     #[cfg(feature = "mesh")]
     pub fn set_sensor_registry(&mut self, registry: crate::swarm::mesh::SensorRegistry) {
         self.sensor_registry = Some(registry);
+    }
+
+    /// Populate mesh telemetry fields in a CycleMetadata struct.
+    #[cfg(feature = "mesh")]
+    pub fn populate_mesh_metadata(&self, metadata: &mut crate::cognitive_loop::types::CycleMetadata) {
+        let peer_count = self.mesh_peers.peer_count();
+        metadata.mesh_health_score = self.mesh_stats.health_score(peer_count);
+        metadata.mesh_peer_count = peer_count as u32;
+        metadata.mesh_bytes_sent = self.mesh_stats.bytes_sent;
+        metadata.mesh_bytes_received = self.mesh_stats.bytes_received;
+    }
+
+    /// Check if the bandwidth budget allows sending `packet_bytes`.
+    ///
+    /// Returns `true` if the budget allows it (and deducts the bytes),
+    /// `false` if throttled (increments `bandwidth_throttled` stat).
+    #[cfg(feature = "mesh")]
+    pub(crate) fn mesh_bandwidth_check(&mut self, packet_bytes: u64) -> bool {
+        let now = std::time::Instant::now();
+        if now.duration_since(self.mesh_bandwidth_window_start) >= MESH_BANDWIDTH_WINDOW {
+            self.mesh_bandwidth_window_start = now;
+            self.mesh_bandwidth_window_bytes = 0;
+        }
+        if self.mesh_bandwidth_window_bytes + packet_bytes > MESH_MAX_BYTES_PER_WINDOW {
+            self.mesh_stats.bandwidth_throttled += 1;
+            false
+        } else {
+            self.mesh_bandwidth_window_bytes += packet_bytes;
+            true
+        }
     }
 
     /// Register a single sensor (creates registry if needed).
@@ -477,6 +583,12 @@ impl ContinuousMind {
         if ticks_since < interval && self.mesh_sequence > 0 {
             return;
         }
+
+        // Bandwidth budget check
+        if !self.mesh_bandwidth_check(crate::swarm::mesh::WISDOM_PACKET_SIZE as u64) {
+            return;
+        }
+
         self.mesh_last_emit_tick = self.state.tick;
 
         // Construct source_id from config dimension as a stand-in node identity
@@ -502,6 +614,8 @@ impl ContinuousMind {
 
         self.mesh_sequence = self.mesh_sequence.wrapping_add(1);
         self.mesh_outbox.push(MeshOutbound { packet });
+        self.mesh_stats.wisdom_sent += 1;
+        self.mesh_stats.bytes_sent += crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
 
         tracing::trace!(
             target: "symthaea::mind::mesh",
@@ -542,6 +656,11 @@ impl ContinuousMind {
             return;
         }
 
+        // Bandwidth budget check
+        if !self.mesh_bandwidth_check(crate::swarm::mesh::WISDOM_PACKET_SIZE as u64) {
+            return;
+        }
+
         let source_id = self.mesh_source_id();
 
         let timestamp_s = std::time::SystemTime::now()
@@ -562,6 +681,8 @@ impl ContinuousMind {
         self.mesh_outbox.push(MeshOutbound { packet });
         self.mesh_heartbeat_last_tick = self.state.tick;
         self.mesh_heartbeat_sequence = self.mesh_heartbeat_sequence.wrapping_add(1);
+        self.mesh_stats.heartbeats_sent += 1;
+        self.mesh_stats.bytes_sent += crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
 
         tracing::trace!(
             target: "symthaea::mind::mesh",
@@ -1674,7 +1795,10 @@ mod tests {
         mind.perceive(ContinuousHV::random(512, 0xBEA7));
 
         // Tick 200 times — heartbeats fire every 100 ticks
+        // Reset bandwidth budget each tick to prevent throttling from
+        // exhausting the budget (this test targets interval gating, not bandwidth).
         for _ in 0..200 {
+            mind.mesh_bandwidth_window_bytes = 0;
             mind.tick();
         }
 
@@ -1819,6 +1943,1289 @@ mod tests {
         assert!(
             mind_b.mesh_peers().peer_count() > 0,
             "Mind B should see Mind A as a peer"
+        );
+    }
+
+    // ====================================================================
+    // Gradient Emission Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_emit_gradients_via_mesh() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+        mind.enable_federated(vec![0.0; 10]);
+
+        // Tick 5 times — process_federated exports gradient to outbox every 5 ticks
+        for _ in 0..5 {
+            mind.tick();
+        }
+
+        // emit_gradients should have consumed outbox and emitted packets
+        assert!(
+            mind.mesh_gradient_sequence > 0,
+            "Gradient sequence should have incremented: got {}",
+            mind.mesh_gradient_sequence
+        );
+        assert!(
+            mind.mesh_stats.gradients_sent > 0,
+            "gradients_sent stat should be > 0"
+        );
+        // federated_outbox should be empty (consumed by emit_gradients)
+        assert!(
+            mind.federated_outbox.is_empty(),
+            "federated_outbox should be drained by emit_gradients"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_emit_gradients_no_bridge_noop() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        mind.enable_federated(vec![0.0; 10]);
+
+        // No bridge attached — gradient outbox should be preserved
+        for _ in 0..5 {
+            mind.tick();
+        }
+
+        assert_eq!(
+            mind.mesh_gradient_sequence, 0,
+            "No gradient emissions without bridge"
+        );
+        // federated_outbox should still contain gradients (not consumed)
+        assert!(
+            !mind.federated_outbox.is_empty(),
+            "federated_outbox should be preserved without bridge"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_emit_gradients_oversized_skipped() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        // Inject an oversized gradient (505 > 504 max)
+        mind.federated_outbox.push(crate::swarm::GradientMessage {
+            source_id: [0u8; 32],
+            gradient_data: vec![0.0; 505],
+            trust_score: 0.5,
+            noise_scale: 0.0,
+            timestamp: 0,
+            sample_count: 1,
+            model_version: 1,
+        });
+
+        mind.tick();
+
+        assert_eq!(
+            mind.mesh_gradient_sequence, 0,
+            "Oversized gradient should be skipped, sequence stays 0"
+        );
+        assert_eq!(
+            mind.mesh_stats.gradients_sent, 0,
+            "No gradient stats for skipped oversized"
+        );
+    }
+
+    // ====================================================================
+    // Affective Emission Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_affective_emitted_at_interval() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        mind.perceive(ContinuousHV::random(512, 0xAFFE));
+
+        // Tick 100 times — affective fires every 50 ticks
+        // Reset bandwidth budget each tick to isolate interval gating.
+        for _ in 0..100 {
+            mind.mesh_bandwidth_window_bytes = 0;
+            mind.tick();
+        }
+
+        assert!(
+            mind.mesh_affective_sequence >= 2,
+            "Expected ≥2 affective emissions, got {}",
+            mind.mesh_affective_sequence
+        );
+        assert!(
+            mind.mesh_stats.affective_sent >= 2,
+            "affective_sent should be ≥2"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_affective_uses_mind_emotional_state() {
+        use crate::swarm::mesh::PayloadType;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        mind.state.emotional_valence = 0.7;
+        mind.state.arousal = 0.85;
+        mind.state.tick = 1;
+        mind.emit_affective();
+
+        assert_eq!(mind.mesh_outbox.len(), 1);
+        let pkt = &mind.mesh_outbox[0].packet;
+        assert_eq!(pkt.payload_type, PayloadType::Affective);
+
+        let affect = pkt.extract_affective().unwrap();
+        assert!(
+            (affect.valence - 0.7).abs() < 1e-6,
+            "Valence should match mind state"
+        );
+        assert!(
+            (affect.arousal - 0.85).abs() < 1e-6,
+            "Arousal should match mind state"
+        );
+        assert!(
+            (affect.intensity - 0.85).abs() < 1e-6,
+            "Intensity should be abs(arousal)"
+        );
+    }
+
+    // ====================================================================
+    // MeshStats Telemetry Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_stats_count_emissions() {
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        // Emit wisdom
+        mind.state.tick = 1;
+        mind.emit_wisdom(
+            BinaryHV([0; 2048]),
+            crate::cognitive_loop::types::CycleUrgency::Critical,
+            0.5,
+        );
+        assert_eq!(mind.mesh_stats().wisdom_sent, 1);
+
+        // Emit heartbeat
+        mind.emit_heartbeat();
+        assert_eq!(mind.mesh_stats().heartbeats_sent, 1);
+
+        // Emit affective
+        mind.emit_affective();
+        assert_eq!(mind.mesh_stats().affective_sent, 1);
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_stats_count_receives() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // Inject one wisdom packet
+        mind.mesh_inbox.push(WisdomPacket {
+            source_id: [0x11; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: BinaryHV([0xAA; 2048]),
+        });
+
+        mind.tick();
+
+        assert_eq!(
+            mind.mesh_stats().wisdom_received, 1,
+            "wisdom_received should be 1"
+        );
+    }
+
+    // ====================================================================
+    // Peer Expiry → Social Coherence Cleanup Test
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_peer_expiry_cleans_social_coherence() {
+        let mut mind = ContinuousMind::new(MindConfig {
+            enable_social_coherence: true,
+            ..Default::default()
+        });
+        mind.activate();
+
+        // Use a very short stale timeout
+        mind.mesh_peers =
+            crate::swarm::mesh::MeshPeerRegistry::with_timeout(std::time::Duration::from_millis(10));
+
+        // Inject a peer packet so it gets tracked + modeled in social coherence
+        let peer_id = [0xEE; 8];
+        let pkt = crate::swarm::mesh::WisdomPacket {
+            source_id: peer_id,
+            sequence: 1,
+            phi: 0.6,
+            urgency: crate::swarm::mesh::MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
+            wisdom: symthaea_core::hdc::BinaryHV([0xFF; 2048]),
+        };
+        mind.mesh_inbox.push(pkt);
+        mind.tick(); // process_mesh: registers peer + observes in social coherence
+
+        let peer_hex = crate::swarm::mesh::hex_short(&peer_id);
+        assert!(
+            mind.social_coherence().unwrap().get_mental_model(&peer_hex).is_some(),
+            "Peer should be modeled after tick"
+        );
+        assert_eq!(mind.mesh_peers().peer_count(), 1);
+
+        // Wait for peer to become stale
+        std::thread::sleep(std::time::Duration::from_millis(20));
+
+        // Tick at a multiple of 100 so expire_stale runs
+        mind.state.tick = 99; // next tick will be 100
+        mind.tick();
+
+        assert_eq!(
+            mind.mesh_peers().peer_count(),
+            0,
+            "Stale peer should be expired"
+        );
+        assert!(
+            mind.social_coherence().unwrap().get_mental_model(&peer_hex).is_none(),
+            "Social model for expired peer should be removed"
+        );
+        assert!(
+            mind.mesh_stats().peers_expired >= 1,
+            "peers_expired stat should be ≥1"
+        );
+    }
+
+    // ====================================================================
+    // LoRa Fragmentation Integration Test
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[tokio::test]
+    async fn test_mind_to_mind_lora_fragmentation_roundtrip() {
+        use crate::swarm::mesh::{
+            BiLoopbackTransport, DualLayerMesh, MeshBridgeHandle, MeshReceiver, LORA_MTU,
+        };
+
+        // Create paired transports at LoRa MTU (222 bytes — forces fragmentation)
+        let (transport_a, transport_b) =
+            BiLoopbackTransport::pair("lora_a", "lora_b", LORA_MTU);
+
+        // Build DualLayerMesh for each side — LoRa only
+        let mesh_a = DualLayerMesh::new([0xAA; 32])
+            .with_lora(Box::new(transport_a));
+        let mesh_b = DualLayerMesh::new([0xBB; 32])
+            .with_lora(Box::new(transport_b));
+
+        // Create bridge handles + spawn actors
+        let (handle_a, actor_a) = MeshBridgeHandle::new(64, 64);
+        let (handle_b, actor_b) = MeshBridgeHandle::new(64, 64);
+        let receiver_a = MeshReceiver::new();
+        let receiver_b = MeshReceiver::new();
+        tokio::spawn(actor_a.run(mesh_a, receiver_a));
+        tokio::spawn(actor_b.run(mesh_b, receiver_b));
+
+        // Create two minds
+        let mut mind_a = ContinuousMind::new(MindConfig::default());
+        let mut mind_b = ContinuousMind::new(MindConfig::default());
+        mind_a.set_mesh_bridge(handle_a);
+        mind_b.set_mesh_bridge(handle_b);
+
+        // Feed mind_a a perception so it has a non-zero thought to emit
+        let hv = ContinuousHV::random(mind_a.config.dimension, 42);
+        mind_a.perceive(hv);
+
+        // Tick mind A several times — auto-emit fires, sync flushes fragments
+        for _ in 0..10 {
+            mind_a.tick();
+        }
+
+        // LoRa: 11 fragments at 50ms poll interval → need ~550ms for reassembly
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+        // Tick mind B to drain inbox and process
+        for _ in 0..5 {
+            mind_b.tick();
+        }
+
+        // Verify mind B saw mind A as a peer after fragmentation/reassembly
+        assert!(
+            mind_b.mesh_peers().peer_count() > 0,
+            "Mind B should see Mind A as a peer via LoRa fragmentation"
+        );
+    }
+
+    // ====================================================================
+    // Bandwidth Metering Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_bandwidth_metering_emit() {
+        use crate::swarm::mesh::WISDOM_PACKET_SIZE;
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        // Emit wisdom
+        mind.state.tick = 1;
+        mind.emit_wisdom(
+            BinaryHV([0; 2048]),
+            crate::cognitive_loop::types::CycleUrgency::Critical,
+            0.5,
+        );
+        // Emit heartbeat
+        mind.emit_heartbeat();
+
+        assert_eq!(
+            mind.mesh_stats().bytes_sent,
+            2 * WISDOM_PACKET_SIZE as u64,
+            "bytes_sent should be 2 × WISDOM_PACKET_SIZE after wisdom + heartbeat"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_bandwidth_metering_receive() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket, WISDOM_PACKET_SIZE};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        mind.mesh_inbox.push(WisdomPacket {
+            source_id: [0x11; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: BinaryHV([0xAA; 2048]),
+        });
+
+        mind.tick();
+
+        assert_eq!(
+            mind.mesh_stats().bytes_received,
+            WISDOM_PACKET_SIZE as u64,
+            "bytes_received should be WISDOM_PACKET_SIZE after one packet"
+        );
+    }
+
+    // ====================================================================
+    // MeshTelemetry Snapshot Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_telemetry_snapshot() {
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        // Emit a wisdom packet and heartbeat
+        mind.state.tick = 1;
+        mind.emit_wisdom(
+            BinaryHV([0; 2048]),
+            crate::cognitive_loop::types::CycleUrgency::Critical,
+            0.5,
+        );
+        mind.emit_heartbeat();
+
+        // Inject a peer packet
+        mind.mesh_peers.update(&crate::swarm::mesh::WisdomPacket {
+            source_id: [0xFF; 8],
+            sequence: 1,
+            phi: 0.9,
+            urgency: crate::swarm::mesh::MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
+            wisdom: BinaryHV([0; 2048]),
+        });
+
+        let t = mind.mesh_telemetry();
+        assert_eq!(t.stats.wisdom_sent, 1);
+        assert_eq!(t.stats.heartbeats_sent, 1);
+        assert_eq!(t.peer_count, 1);
+        assert!((t.avg_phi - 0.9).abs() < 1e-6);
+        assert!(t.health_score > 0.0, "Health score should be > 0");
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_telemetry_in_mindstate() {
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        // Emit something to populate stats
+        mind.state.tick = 1;
+        mind.emit_wisdom(
+            BinaryHV([0; 2048]),
+            crate::cognitive_loop::types::CycleUrgency::Critical,
+            0.5,
+        );
+
+        let snap = mind.snapshot();
+        assert!(
+            snap.mesh_telemetry.is_some(),
+            "snapshot() should populate mesh_telemetry"
+        );
+        let t = snap.mesh_telemetry.unwrap();
+        assert_eq!(t.stats.wisdom_sent, 1);
+    }
+
+    // ====================================================================
+    // Outbox Backpressure Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_federated_outbox_capped() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        mind.enable_federated(vec![0.0; 10]);
+
+        // Tick 1000 times — exports gradient every 5 ticks = 200 pushes
+        for _ in 0..1000 {
+            mind.tick();
+        }
+
+        assert!(
+            mind.federated_outbox.len() <= super::MAX_OUTBOX_SIZE,
+            "federated_outbox should be capped at {}: got {}",
+            super::MAX_OUTBOX_SIZE,
+            mind.federated_outbox.len()
+        );
+    }
+
+    #[test]
+    fn test_social_outbox_capped() {
+        let mut mind = ContinuousMind::new(MindConfig {
+            enable_social_coherence: true,
+            ..Default::default()
+        });
+        mind.activate();
+
+        // Tick 1000 times — exports social every 5 ticks = 200 pushes
+        for _ in 0..1000 {
+            mind.tick();
+        }
+
+        assert!(
+            mind.social_outbox.len() <= super::MAX_OUTBOX_SIZE,
+            "social_outbox should be capped at {}: got {}",
+            super::MAX_OUTBOX_SIZE,
+            mind.social_outbox.len()
+        );
+    }
+
+    // ====================================================================
+    // Gradient + Affective Roundtrip Integration Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[tokio::test]
+    async fn test_mind_to_mind_gradient_roundtrip() {
+        use crate::swarm::mesh::{
+            BiLoopbackTransport, DualLayerMesh, MeshBridgeHandle, MeshReceiver,
+        };
+
+        let (transport_a, transport_b) = BiLoopbackTransport::pair("grad_a", "grad_b", 2100);
+        let mesh_a = DualLayerMesh::new([0xAA; 32]).with_batman(Box::new(transport_a));
+        let mesh_b = DualLayerMesh::new([0xBB; 32]).with_batman(Box::new(transport_b));
+
+        let (handle_a, actor_a) = MeshBridgeHandle::new(64, 64);
+        let (handle_b, actor_b) = MeshBridgeHandle::new(64, 64);
+        tokio::spawn(actor_a.run(mesh_a, MeshReceiver::new()));
+        tokio::spawn(actor_b.run(mesh_b, MeshReceiver::new()));
+
+        // Mind A: federated enabled, will produce gradients
+        let mut mind_a = ContinuousMind::new(MindConfig::default());
+        mind_a.set_mesh_bridge(handle_a);
+        mind_a.activate();
+        mind_a.enable_federated(vec![0.0; 10]);
+        mind_a.perceive(ContinuousHV::random(512, 0xFACE));
+
+        // Tick mind A — export gradient + emit over mesh
+        // Reset bandwidth budget each tick to prevent throttling (testing transport, not budget)
+        for _ in 0..5 {
+            mind_a.mesh_bandwidth_window_bytes = 0;
+            mind_a.tick();
+        }
+
+        // Give async actor time to transport
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+        // Mind B: tick to drain inbox
+        let mut mind_b = ContinuousMind::new(MindConfig::default());
+        mind_b.set_mesh_bridge(handle_b);
+        mind_b.activate();
+        for _ in 0..5 {
+            mind_b.mesh_bandwidth_window_bytes = 0;
+            mind_b.tick();
+        }
+
+        assert!(
+            !mind_b.federated_inbox.is_empty(),
+            "Mind B should have received gradient(s) from Mind A: got {}",
+            mind_b.federated_inbox.len()
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[tokio::test]
+    async fn test_mind_to_mind_affective_roundtrip() {
+        use crate::swarm::mesh::{
+            BiLoopbackTransport, DualLayerMesh, MeshBridgeHandle, MeshReceiver,
+        };
+
+        let (transport_a, transport_b) = BiLoopbackTransport::pair("aff_a", "aff_b", 2100);
+        let mesh_a = DualLayerMesh::new([0xAA; 32]).with_batman(Box::new(transport_a));
+        let mesh_b = DualLayerMesh::new([0xBB; 32]).with_batman(Box::new(transport_b));
+
+        let (handle_a, actor_a) = MeshBridgeHandle::new(64, 64);
+        let (handle_b, actor_b) = MeshBridgeHandle::new(64, 64);
+        tokio::spawn(actor_a.run(mesh_a, MeshReceiver::new()));
+        tokio::spawn(actor_b.run(mesh_b, MeshReceiver::new()));
+
+        // Mind A: set emotional state, tick to emit affective
+        let mut mind_a = ContinuousMind::new(MindConfig::default());
+        mind_a.set_mesh_bridge(handle_a);
+        mind_a.activate();
+        mind_a.state.emotional_valence = 0.7;
+        mind_a.state.arousal = 0.8;
+        mind_a.perceive(ContinuousHV::random(512, 0xAFFE));
+
+        // Tick 50× — affective emission fires every 50 ticks
+        // Reset bandwidth budget each tick to prevent throttling (testing transport, not budget)
+        for _ in 0..50 {
+            mind_a.mesh_bandwidth_window_bytes = 0;
+            mind_a.tick();
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+        // Mind B: attach Hyperfeel, tick to process
+        let mut mind_b = ContinuousMind::new(MindConfig::default());
+        mind_b.set_mesh_bridge(handle_b);
+        mind_b.activate();
+        mind_b.set_hyperfeel(crate::swarm::Hyperfeel::new(
+            crate::swarm::HyperfeelConfig::default(),
+        ));
+
+        for _ in 0..5 {
+            mind_b.mesh_bandwidth_window_bytes = 0;
+            mind_b.tick();
+        }
+
+        assert!(
+            mind_b.hyperfeel.as_ref().unwrap().peer_count() > 0,
+            "Mind B's Hyperfeel should see at least one affective peer"
+        );
+    }
+
+    // ====================================================================
+    // LoRa Multi-Loss Resilience Test
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_lora_double_loss_graceful() {
+        use crate::swarm::mesh::{
+            FragmentAssembler, MeshUrgency, PayloadType, WisdomPacket, LORA_MTU, WISDOM_PACKET_SIZE,
+        };
+        use symthaea_core::hdc::BinaryHV;
+
+        // Build a WisdomPacket and fragment it
+        let original = WisdomPacket {
+            source_id: [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE],
+            sequence: 42,
+            phi: 0.7,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 1_700_000,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: BinaryHV([0x42; 2048]),
+        };
+        let frags = original.fragment();
+        assert_eq!(frags.len(), 11, "Should produce 11 fragments");
+
+        // Feed only 9 fragments (drop indices 3 and 7) — two losses
+        let mut assembler = WisdomPacket::assembler(original.thought_id(), 11);
+        let mut buf = [0u8; LORA_MTU];
+        for (i, frag) in frags.iter().enumerate() {
+            if i == 3 || i == 7 {
+                continue; // simulate double loss
+            }
+            let len = frag.to_bytes(&mut buf);
+            let decoded = crate::swarm::mesh::LoRaFragment::from_bytes(&buf[..len]).unwrap();
+            assembler.feed(&decoded);
+        }
+
+        // XOR parity can only recover 1 loss — 2 is unrecoverable
+        assert!(
+            !assembler.is_complete(),
+            "Assembler should NOT be complete with 2 losses"
+        );
+        assert!(
+            assembler.assemble().is_none(),
+            "Assembly should fail with 2 losses"
+        );
+
+        // Verify Mind-level semantics: no peer tracked, no wisdom received
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        // Don't inject any packets (assembly failed)
+        mind.tick();
+        assert_eq!(mind.mesh_peers().peer_count(), 0);
+        assert_eq!(mind.mesh_stats().wisdom_received, 0);
+    }
+
+    // ====================================================================
+    // Multi-Mind Stress Test
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_four_minds_mesh_stress() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        // Create 4 minds with social coherence
+        let mut minds: Vec<ContinuousMind> = (0..4)
+            .map(|i| {
+                let mut m = ContinuousMind::new(MindConfig {
+                    enable_social_coherence: true,
+                    ..Default::default()
+                });
+                m.activate();
+                // Each mind perceives a unique HV
+                m.perceive(ContinuousHV::random(512, 1000 + i as u64));
+                m
+            })
+            .collect();
+
+        // Source IDs for each mind
+        let source_ids: Vec<[u8; 8]> = (0..4u8).map(|i| [i + 1; 8]).collect();
+
+        // Run 60 ticks with manual packet injection every 10 ticks
+        for tick in 0..60 {
+            // Every 10 ticks, inject wisdom packets from each mind to all others
+            if tick > 0 && tick % 10 == 0 {
+                // Collect packets from each mind (snapshot their current thought as BinaryHV)
+                let packets: Vec<WisdomPacket> = (0..4)
+                    .map(|i| WisdomPacket {
+                        source_id: source_ids[i],
+                        sequence: (tick / 10) as u32,
+                        phi: minds[i].state.consciousness_level as f32,
+                        urgency: MeshUrgency::Normal,
+                        timestamp_s: tick as u32,
+                        payload_type: PayloadType::WisdomVector,
+                        wisdom: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(
+                            &minds[i].state.current_thought,
+                        ),
+                    })
+                    .collect();
+
+                // Inject each mind's packet into all other minds' inboxes
+                for (sender_idx, pkt) in packets.iter().enumerate() {
+                    for (receiver_idx, mind) in minds.iter_mut().enumerate() {
+                        if sender_idx != receiver_idx {
+                            mind.mesh_inbox.push(pkt.clone());
+                        }
+                    }
+                }
+            }
+
+            // Tick all minds
+            for mind in minds.iter_mut() {
+                mind.tick();
+            }
+        }
+
+        // Assertions
+        for (i, mind) in minds.iter().enumerate() {
+            // Each mind should see 3 peers
+            assert_eq!(
+                mind.mesh_peers().peer_count(),
+                3,
+                "Mind {i} should see 3 peers, got {}",
+                mind.mesh_peers().peer_count()
+            );
+
+            // Consciousness should be finite and > 0
+            assert!(
+                mind.state.consciousness_level.is_finite() && mind.state.consciousness_level > 0.0,
+                "Mind {i} consciousness should be finite and > 0: {}",
+                mind.state.consciousness_level
+            );
+
+            // Social coherence should model ≥3 agents
+            let sc = mind.social_coherence().unwrap();
+            let stats = sc.stats();
+            assert!(
+                stats.agents_modeled >= 3,
+                "Mind {i} should model ≥3 agents, got {}",
+                stats.agents_modeled
+            );
+        }
+
+        // Average phi across all minds should be > 0.1
+        let avg_phi: f64 = minds
+            .iter()
+            .map(|m| m.state.consciousness_level)
+            .sum::<f64>()
+            / 4.0;
+        assert!(
+            avg_phi > 0.1,
+            "Average phi across 4 minds should be > 0.1: {avg_phi}"
+        );
+    }
+
+    // ====================================================================
+    // Item 1: Mesh Inbox/Outbox Backpressure Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_inbox_backpressure() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // Push 100 packets into mesh_inbox (cap is 64)
+        for i in 0..100u32 {
+            mind.mesh_inbox.push(WisdomPacket {
+                source_id: [(i % 256) as u8; 8],
+                sequence: i,
+                phi: 0.5,
+                urgency: MeshUrgency::Normal,
+                timestamp_s: 0,
+                payload_type: PayloadType::WisdomVector,
+                wisdom: BinaryHV([0xAA; 2048]),
+            });
+        }
+
+        mind.tick();
+
+        // 100 - 64 = 36 packets should be dropped
+        assert_eq!(
+            mind.mesh_stats.packets_dropped, 36,
+            "Should drop 36 excess inbox packets"
+        );
+        // The 64 remaining packets were processed
+        assert!(
+            mind.mesh_stats.wisdom_received > 0,
+            "Should have processed some wisdom packets"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_outbox_backpressure() {
+        use crate::swarm::mesh::{MeshOutbound, MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        // Attach bridge so auto-emit fires
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+        mind.perceive(ContinuousHV::random(512, 0xDEAD));
+
+        // Pre-fill outbox with 100 packets (exceeds cap of 64)
+        for i in 0..100u32 {
+            mind.mesh_outbox.push(MeshOutbound {
+                packet: WisdomPacket {
+                    source_id: [0x01; 8],
+                    sequence: i,
+                    phi: 0.5,
+                    urgency: MeshUrgency::Normal,
+                    timestamp_s: 0,
+                    payload_type: PayloadType::WisdomVector,
+                    wisdom: BinaryHV([0; 2048]),
+                },
+            });
+        }
+
+        mind.tick();
+
+        // At least 36 packets should have been dropped from the outbox
+        assert!(
+            mind.mesh_stats.packets_dropped >= 36,
+            "Should drop excess outbox packets: got {}",
+            mind.mesh_stats.packets_dropped
+        );
+    }
+
+    // ====================================================================
+    // Item 2: Packet Deduplication Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_dedup_same_packet() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        let pkt = WisdomPacket {
+            source_id: [0xDE; 8],
+            sequence: 42,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: BinaryHV([0xAA; 2048]),
+        };
+
+        // Push same packet twice
+        mind.mesh_inbox.push(pkt.clone());
+        mind.mesh_inbox.push(pkt);
+
+        mind.tick();
+
+        assert_eq!(
+            mind.mesh_stats.packets_deduplicated, 1,
+            "Second identical packet should be deduplicated"
+        );
+        assert_eq!(
+            mind.mesh_stats.wisdom_received, 1,
+            "Only one packet should be processed"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_dedup_different_sequence() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // Same source, different sequences
+        for seq in 0..2u32 {
+            mind.mesh_inbox.push(WisdomPacket {
+                source_id: [0xDE; 8],
+                sequence: seq,
+                phi: 0.5,
+                urgency: MeshUrgency::Normal,
+                timestamp_s: 0,
+                payload_type: PayloadType::WisdomVector,
+                wisdom: BinaryHV([0xAA; 2048]),
+            });
+        }
+
+        mind.tick();
+
+        assert_eq!(
+            mind.mesh_stats.packets_deduplicated, 0,
+            "Different sequences should not be deduplicated"
+        );
+        assert_eq!(
+            mind.mesh_stats.wisdom_received, 2,
+            "Both packets should be processed"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_dedup_ring_eviction() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // Push 129 unique packets (exceeds ring size of 128)
+        for seq in 0..129u32 {
+            mind.mesh_inbox.push(WisdomPacket {
+                source_id: [0xAA; 8],
+                sequence: seq,
+                phi: 0.5,
+                urgency: MeshUrgency::Normal,
+                timestamp_s: 0,
+                payload_type: PayloadType::WisdomVector,
+                wisdom: BinaryHV([0; 2048]),
+            });
+        }
+        mind.tick();
+
+        // All should be unique (no dedup on first pass) — but inbox was capped at 64
+        // so only 64 packets were processed, ring has 64 entries
+        let first_dedup = mind.mesh_stats.packets_deduplicated;
+
+        // Now push the first packet again (sequence 0) — it was evicted if >128 entries
+        // Since only 64 were processed, seq 0 was dropped by inbox backpressure,
+        // and seqs 65..128 were processed. seq 0 was never seen, so not in ring.
+        mind.mesh_inbox.push(WisdomPacket {
+            source_id: [0xAA; 8],
+            sequence: 0,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: BinaryHV([0; 2048]),
+        });
+        mind.tick();
+
+        // seq 0 was never seen (dropped by backpressure), so it should NOT be deduplicated
+        assert_eq!(
+            mind.mesh_stats.packets_deduplicated, first_dedup,
+            "Evicted/unseen packet should not be deduplicated"
+        );
+    }
+
+    // ====================================================================
+    // Item 3: Per-Peer Rate Limiting (Mind-level) Test
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_mesh_process_rate_limits_flood() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        let source = [0xFF; 8];
+        // Pre-register the peer so rate limiting works
+        mind.mesh_peers.update(&WisdomPacket {
+            source_id: source,
+            sequence: 0,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: BinaryHV([0; 2048]),
+        });
+
+        // Push 110 packets from same source with unique sequences
+        // (rate limit is 100 per window, but the registry update above
+        // already consumed 0 in the rate limiter — the pre-register via
+        // update() doesn't touch the rate limiter window_count)
+        for seq in 1..=110u32 {
+            mind.mesh_inbox.push(WisdomPacket {
+                source_id: source,
+                sequence: seq,
+                phi: 0.5,
+                urgency: MeshUrgency::Normal,
+                timestamp_s: 0,
+                payload_type: PayloadType::WisdomVector,
+                wisdom: BinaryHV([0; 2048]),
+            });
+        }
+
+        mind.tick();
+
+        // Inbox backpressure drops 110 - 64 = 46 packets first,
+        // then 64 packets are processed. Rate limit is 100 per window,
+        // so for 64 unique packets from same source, all should pass rate limiter.
+        // But dedup: all unique sequences, so no dedup.
+        // Rate limit check: is_rate_limited increments window_count.
+        // After 64 checks, window_count = 64 < 100, so none rate limited.
+        // Let's verify with larger inbox — need to increase cap or test differently.
+        // Actually, let's push exactly 64 packets (at cap), and test with >100
+        // by doing multiple ticks.
+
+        // For a meaningful rate limit test, let's do it differently:
+        // Clear state and re-test with direct rate limit checking
+        let mut mind2 = ContinuousMind::default();
+        mind2.activate();
+
+        // Register peer
+        mind2.mesh_peers.update(&WisdomPacket {
+            source_id: source,
+            sequence: 0,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: BinaryHV([0; 2048]),
+        });
+
+        // Push 64 packets per tick, tick 2 times = 128 unique packets
+        for seq in 1..=64u32 {
+            mind2.mesh_inbox.push(WisdomPacket {
+                source_id: source,
+                sequence: seq,
+                phi: 0.5,
+                urgency: MeshUrgency::Normal,
+                timestamp_s: 0,
+                payload_type: PayloadType::WisdomVector,
+                wisdom: BinaryHV([0; 2048]),
+            });
+        }
+        mind2.tick();
+
+        for seq in 65..=128u32 {
+            mind2.mesh_inbox.push(WisdomPacket {
+                source_id: source,
+                sequence: seq,
+                phi: 0.5,
+                urgency: MeshUrgency::Normal,
+                timestamp_s: 0,
+                payload_type: PayloadType::WisdomVector,
+                wisdom: BinaryHV([0; 2048]),
+            });
+        }
+        mind2.tick();
+
+        // After 128 rate limit checks (64+64), window_count > 100
+        // So packets_rate_limited should be > 0
+        assert!(
+            mind2.mesh_stats.packets_rate_limited > 0,
+            "Should have rate-limited some packets from flood: got {}",
+            mind2.mesh_stats.packets_rate_limited
+        );
+    }
+
+    // ====================================================================
+    // Item 4: Health-Driven Urgency Escalation Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_health_urgency_critical_on_degraded() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        // Give mind a non-zero thought (needed for wisdom emission)
+        mind.state.current_thought = ContinuousHV::random(512, 0xDEAD);
+
+        // Create send-only stats (health < 0.3): many sends, no receives, no peers
+        // connectivity = 0.0, bidirectionality = 0.0, stability = 1.0 → 0.2
+        // Total = 0.2 → health < 0.3
+        mind.mesh_stats.wisdom_sent = 50;
+        mind.mesh_stats.heartbeats_sent = 20;
+
+        // Low arousal (would normally be Cruise urgency) — bypasses biorhythm
+        // by calling auto_emit_wisdom directly instead of tick()
+        mind.state.arousal = 0.1;
+        mind.state.tick = 1;
+        mind.auto_emit_wisdom(); // First emission (sequence=0) + Critical override
+
+        mind.state.tick = 2;
+        mind.auto_emit_wisdom(); // Critical interval=1, ticks_since=1 ≥ 1 → emit
+
+        // With Critical urgency (health < 0.3 override), both calls should have emitted
+        assert_eq!(
+            mind.mesh_sequence, 2,
+            "Critical urgency should emit every tick: got {} emissions",
+            mind.mesh_sequence
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_health_urgency_allows_cruise_when_healthy() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+        mind.perceive(ContinuousHV::random(512, 0xBEEF));
+
+        // Give mind a non-zero thought (needed for wisdom emission)
+        mind.state.current_thought = ContinuousHV::random(512, 0xBEEF);
+
+        // Create healthy stats: balanced sends/receives + 5 peers
+        mind.mesh_stats.wisdom_sent = 50;
+        mind.mesh_stats.wisdom_received = 48;
+        mind.mesh_stats.heartbeats_sent = 20;
+        mind.mesh_stats.heartbeats_received = 18;
+        mind.mesh_stats.peers_expired = 1;
+
+        // Register 5 peers
+        for i in 0..5u8 {
+            mind.mesh_peers.update(&WisdomPacket {
+                source_id: [i + 1; 8],
+                sequence: 1,
+                phi: 0.8,
+                urgency: MeshUrgency::Normal,
+                timestamp_s: 0,
+                payload_type: PayloadType::WisdomVector,
+                wisdom: BinaryHV([0; 2048]),
+            });
+        }
+
+        // Low arousal → Cruise urgency (health > 0.8 → no override)
+        // Call auto_emit_wisdom directly to bypass biorhythm arousal override in tick()
+        mind.state.arousal = 0.1;
+        mind.state.tick = 1;
+        mind.auto_emit_wisdom(); // First emission (sequence=0 always allowed) → Cruise
+
+        mind.state.tick = 2;
+        mind.auto_emit_wisdom(); // Cruise interval=500, ticks_since=1 < 500 → no emit
+
+        assert_eq!(
+            mind.mesh_sequence, 1,
+            "Healthy mesh with low arousal should use Cruise (1 emission): got {}",
+            mind.mesh_sequence
+        );
+    }
+
+    // ====================================================================
+    // Item 5: CycleMetadata Mesh Wiring Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_populate_mesh_metadata() {
+        use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+        mind.set_mesh_bridge(handle);
+
+        // Inject a peer
+        mind.mesh_inbox.push(WisdomPacket {
+            source_id: [0x11; 8],
+            sequence: 1,
+            phi: 0.7,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            wisdom: BinaryHV([0xAA; 2048]),
+        });
+        mind.perceive(ContinuousHV::random(512, 0xFACE));
+        mind.tick(); // Process inbox + emit
+
+        let mut metadata = crate::cognitive_loop::types::CycleMetadata::default();
+        mind.populate_mesh_metadata(&mut metadata);
+
+        assert!(
+            metadata.mesh_health_score > 0.0,
+            "mesh_health_score should be > 0"
+        );
+        assert_eq!(metadata.mesh_peer_count, 1, "Should have 1 peer");
+        assert!(
+            metadata.mesh_bytes_sent > 0,
+            "mesh_bytes_sent should be > 0"
+        );
+        assert!(
+            metadata.mesh_bytes_received > 0,
+            "mesh_bytes_received should be > 0"
+        );
+    }
+
+    #[test]
+    fn test_cycle_metadata_mesh_defaults_zero() {
+        let metadata = crate::cognitive_loop::types::CycleMetadata::default();
+        assert_eq!(metadata.mesh_health_score, 0.0);
+        assert_eq!(metadata.mesh_peer_count, 0);
+        assert_eq!(metadata.mesh_bytes_sent, 0);
+        assert_eq!(metadata.mesh_bytes_received, 0);
+    }
+
+    // ====================================================================
+    // Item 6: Bandwidth Budget Enforcement Tests
+    // ====================================================================
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_bandwidth_budget_allows_under_limit() {
+        let mut mind = ContinuousMind::default();
+
+        // 48 × 2072 = 99,456 < 100 KB (102,400)
+        for _ in 0..48 {
+            assert!(
+                mind.mesh_bandwidth_check(crate::swarm::mesh::WISDOM_PACKET_SIZE as u64),
+                "Should be under bandwidth budget"
+            );
+        }
+        assert_eq!(mind.mesh_stats.bandwidth_throttled, 0);
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_bandwidth_budget_blocks_over_limit() {
+        let mut mind = ContinuousMind::default();
+
+        // Keep sending until budget is exhausted
+        let mut passed = 0u64;
+        let mut blocked = 0u64;
+        for _ in 0..60 {
+            if mind.mesh_bandwidth_check(crate::swarm::mesh::WISDOM_PACKET_SIZE as u64) {
+                passed += 1;
+            } else {
+                blocked += 1;
+            }
+        }
+
+        assert!(passed > 0, "Some packets should pass");
+        assert!(blocked > 0, "Some packets should be blocked");
+        assert!(
+            mind.mesh_stats.bandwidth_throttled > 0,
+            "bandwidth_throttled should be > 0"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
+    #[test]
+    fn test_bandwidth_budget_window_resets() {
+        let mut mind = ContinuousMind::default();
+
+        // Exhaust budget
+        for _ in 0..60 {
+            mind.mesh_bandwidth_check(crate::swarm::mesh::WISDOM_PACKET_SIZE as u64);
+        }
+        assert!(mind.mesh_stats.bandwidth_throttled > 0);
+
+        // Simulate window expiry by resetting window_start to 11s ago
+        mind.mesh_bandwidth_window_start =
+            std::time::Instant::now() - std::time::Duration::from_secs(11);
+
+        // Next check should pass (window resets)
+        assert!(
+            mind.mesh_bandwidth_check(crate::swarm::mesh::WISDOM_PACKET_SIZE as u64),
+            "Should be allowed after window reset"
         );
     }
 }

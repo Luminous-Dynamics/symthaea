@@ -67,11 +67,21 @@ impl ContinuousMind {
             self.stats.peak_consciousness = self.state.consciousness_level;
         }
 
-        // Auto-emit wisdom + heartbeat to mesh, then flush bridge (after all processing)
+        // Auto-emit wisdom + heartbeat + gradients + affective to mesh, then flush bridge
         #[cfg(feature = "mesh")]
         {
             self.auto_emit_wisdom();
             self.emit_heartbeat();
+            self.emit_gradients();
+            self.emit_affective();
+
+            // Outbox backpressure: drop oldest packets when outbox exceeds cap
+            if self.mesh_outbox.len() > super::MAX_OUTBOX_SIZE {
+                let excess = self.mesh_outbox.len() - super::MAX_OUTBOX_SIZE;
+                self.mesh_outbox.drain(..excess);
+                self.mesh_stats.packets_dropped += excess as u64;
+            }
+
             self.sync_mesh_bridge();
         }
 
@@ -341,6 +351,12 @@ impl ContinuousMind {
                 context: self.state.current_thought.clone(),
                 interaction_outcome: None,
             });
+
+            // Cap outbox to prevent unbounded growth
+            if self.social_outbox.len() > super::MAX_OUTBOX_SIZE {
+                let excess = self.social_outbox.len() - super::MAX_OUTBOX_SIZE;
+                self.social_outbox.drain(..excess);
+            }
         }
     }
 
@@ -391,7 +407,61 @@ impl ContinuousMind {
     /// Drains `mesh_inbox` and logs received packets. WisdomVector payloads
     /// represent a peer's cognitive state and can be fed into social coherence
     /// for cross-node consciousness integration.
+    ///
+    /// Also periodically expires stale peers (even when inbox is empty).
     fn process_mesh(&mut self) {
+        // Periodically expire stale peers (every 100 ticks) — runs even if no packets arrived
+        if self.state.tick.is_multiple_of(100) {
+            let expired_ids = self.mesh_peers.expire_stale();
+            if !expired_ids.is_empty() {
+                self.mesh_stats.peers_expired += expired_ids.len() as u64;
+
+                // Clean up social coherence models for expired peers
+                if let Some(ref mut sc) = self.social_coherence {
+                    for id in &expired_ids {
+                        let peer_id = crate::swarm::mesh::hex_short(id);
+                        sc.remove_agent(&peer_id);
+                    }
+                }
+
+                tracing::debug!(
+                    target: "symthaea::mind::mesh",
+                    expired = expired_ids.len(),
+                    remaining = self.mesh_peers.peer_count(),
+                    "Expired stale mesh peers"
+                );
+            }
+        }
+
+        // Inbox backpressure: drop oldest packets when inbox exceeds cap
+        if self.mesh_inbox.len() > super::MAX_OUTBOX_SIZE {
+            let excess = self.mesh_inbox.len() - super::MAX_OUTBOX_SIZE;
+            self.mesh_inbox.drain(..excess);
+            self.mesh_stats.packets_dropped += excess as u64;
+        }
+
+        // Periodic telemetry logging (every 500 ticks, ~10s at 50Hz)
+        if self.state.tick.is_multiple_of(500) && self.mesh_bridge.is_some() {
+            let t = self.mesh_telemetry();
+            tracing::info!(
+                target: "symthaea::mind::mesh::stats",
+                peers = t.peer_count,
+                health = format!("{:.2}", t.health_score),
+                wisdom_tx = t.stats.wisdom_sent,
+                wisdom_rx = t.stats.wisdom_received,
+                heartbeat_tx = t.stats.heartbeats_sent,
+                heartbeat_rx = t.stats.heartbeats_received,
+                affective_tx = t.stats.affective_sent,
+                affective_rx = t.stats.affective_received,
+                gradient_tx = t.stats.gradients_sent,
+                gradient_rx = t.stats.gradients_received,
+                bytes_tx = t.stats.bytes_sent,
+                bytes_rx = t.stats.bytes_received,
+                avg_phi = format!("{:.3}", t.avg_phi),
+                "Mesh telemetry"
+            );
+        }
+
         let inbox = std::mem::take(&mut self.mesh_inbox);
         if inbox.is_empty() {
             return;
@@ -403,6 +473,23 @@ impl ContinuousMind {
         let mut gradient_count = 0u64;
 
         for packet in &inbox {
+            // Dedup check: skip if we've already seen this (source_id, sequence) pair
+            let key = (packet.source_id, packet.sequence);
+            if self.mesh_seen_packets.contains(&key) {
+                self.mesh_stats.packets_deduplicated += 1;
+                continue;
+            }
+            if self.mesh_seen_packets.len() >= super::MESH_DEDUP_RING_SIZE {
+                self.mesh_seen_packets.remove(0);
+            }
+            self.mesh_seen_packets.push(key);
+
+            // Per-peer rate limit check
+            if self.mesh_peers.is_rate_limited(&packet.source_id) {
+                self.mesh_stats.packets_rate_limited += 1;
+                continue;
+            }
+
             // Track all peers in the registry
             self.mesh_peers.update(packet);
 
@@ -446,18 +533,13 @@ impl ContinuousMind {
             }
         }
 
-        // Periodically expire stale peers (every 100 ticks)
-        if self.state.tick.is_multiple_of(100) {
-            let expired = self.mesh_peers.expire_stale();
-            if expired > 0 {
-                tracing::debug!(
-                    target: "symthaea::mind::mesh",
-                    expired,
-                    remaining = self.mesh_peers.peer_count(),
-                    "Expired stale mesh peers"
-                );
-            }
-        }
+        // Update receive-side telemetry
+        self.mesh_stats.wisdom_received += wisdom_count;
+        self.mesh_stats.heartbeats_received += heartbeat_count;
+        self.mesh_stats.affective_received += affective_count;
+        self.mesh_stats.gradients_received += gradient_count;
+        self.mesh_stats.bytes_received +=
+            inbox.len() as u64 * crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
 
         tracing::debug!(
             target: "symthaea::mind::mesh",
@@ -567,19 +649,149 @@ impl ContinuousMind {
     }
 
     #[cfg(feature = "mesh")]
+    /// Emit pending federated gradients over the mesh network.
+    ///
+    /// Drains `federated_outbox` and converts each `GradientMessage` into a
+    /// mesh `WisdomPacket` (Gradient type). Oversized gradients (>504 f32s)
+    /// are skipped with a warning since they exceed the 2,048-byte wisdom field.
+    ///
+    /// When no mesh bridge is attached, returns immediately — the outbox is
+    /// preserved for `drain_outbox()` callers.
+    pub(crate) fn emit_gradients(&mut self) {
+        if self.mesh_bridge.is_none() {
+            return;
+        }
+
+        let outbox = std::mem::take(&mut self.federated_outbox);
+        if outbox.is_empty() {
+            return;
+        }
+
+        let source_id = self.mesh_source_id();
+
+        for msg in &outbox {
+            // Bandwidth budget check (per-packet in loop)
+            if !self.mesh_bandwidth_check(crate::swarm::mesh::WISDOM_PACKET_SIZE as u64) {
+                continue;
+            }
+
+            match crate::swarm::mesh::WisdomPacket::from_gradient(
+                source_id,
+                self.mesh_gradient_sequence,
+                msg,
+            ) {
+                Some(packet) => {
+                    self.mesh_outbox
+                        .push(crate::swarm::mesh::MeshOutbound { packet });
+                    self.mesh_gradient_sequence = self.mesh_gradient_sequence.wrapping_add(1);
+                    self.mesh_stats.gradients_sent += 1;
+                    self.mesh_stats.bytes_sent += crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
+                }
+                None => {
+                    tracing::warn!(
+                        target: "symthaea::mind::mesh",
+                        gradients = msg.gradient_data.len(),
+                        "Skipped oversized gradient (max 504 f32s)"
+                    );
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "mesh")]
+    /// Emit the mind's affective state over the mesh network.
+    ///
+    /// Fires every 50 ticks (~1s at 50Hz) — emotional state changes slowly
+    /// compared to cognitive state. Maps the mind's `emotional_valence` and
+    /// `arousal` into the VAD affective wire format.
+    pub(crate) fn emit_affective(&mut self) {
+        if self.mesh_bridge.is_none() {
+            return;
+        }
+
+        let interval = 50u64;
+        if self.state.tick.saturating_sub(self.mesh_affective_last_tick) < interval
+            && self.mesh_affective_sequence > 0
+        {
+            return;
+        }
+
+        // Bandwidth budget check
+        if !self.mesh_bandwidth_check(crate::swarm::mesh::WISDOM_PACKET_SIZE as u64) {
+            return;
+        }
+
+        let source_id = self.mesh_source_id();
+
+        let timestamp_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+
+        let arousal = self.state.arousal;
+        let affect = crate::swarm::AffectiveState {
+            valence: self.state.emotional_valence,
+            arousal,
+            dominance: 0.0,
+            intensity: arousal.abs(),
+            confidence: 1.0,
+            timestamp_ms,
+            sequence: self.mesh_affective_sequence as u64,
+        };
+
+        let packet = crate::swarm::mesh::WisdomPacket::from_affective(
+            source_id,
+            self.mesh_affective_sequence,
+            &affect,
+        );
+
+        self.mesh_outbox
+            .push(crate::swarm::mesh::MeshOutbound { packet });
+        self.mesh_affective_last_tick = self.state.tick;
+        self.mesh_affective_sequence = self.mesh_affective_sequence.wrapping_add(1);
+        self.mesh_stats.affective_sent += 1;
+        self.mesh_stats.bytes_sent += crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
+
+        tracing::trace!(
+            target: "symthaea::mind::mesh",
+            sequence = self.mesh_affective_sequence.wrapping_sub(1),
+            valence = self.state.emotional_valence,
+            arousal,
+            "Emitted affective packet"
+        );
+    }
+
+    #[cfg(feature = "mesh")]
     /// Auto-emit wisdom to mesh if a bridge is attached.
     ///
     /// Called at the end of every waking tick (after `generate_output()`),
     /// so the mesh always carries the mind's most up-to-date cognitive state.
-    /// Emission frequency is still gated by `emit_wisdom()`'s urgency throttle.
+    /// Emission frequency is gated by `emit_wisdom()`'s urgency throttle,
+    /// with health-driven urgency override for mesh recovery.
     fn auto_emit_wisdom(&mut self) {
         if self.mesh_bridge.is_some() {
             let wisdom_hv = symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(
                 &self.state.current_thought,
             );
-            let urgency =
-                crate::cognitive_loop::types::CycleUrgency::from_arousal(self.state.arousal);
             let phi = self.state.consciousness_level as f32;
+
+            // Base urgency from arousal
+            let mut urgency =
+                crate::cognitive_loop::types::CycleUrgency::from_arousal(self.state.arousal);
+
+            // Health-driven override
+            let health = self.mesh_stats.health_score(self.mesh_peers.peer_count());
+            if health < 0.3 && health > 0.0 {
+                // Degraded mesh — blast to recover
+                urgency = crate::cognitive_loop::types::CycleUrgency::Critical;
+            } else if health <= 0.8 && health > 0.0 {
+                // Suboptimal — prevent Cruise throttling
+                if matches!(urgency, crate::cognitive_loop::types::CycleUrgency::Cruise) {
+                    urgency = crate::cognitive_loop::types::CycleUrgency::Normal;
+                }
+            }
+            // health > 0.8 or 0.0 (no activity): arousal-based, no override
+
             self.emit_wisdom(wisdom_hv, urgency, phi);
         }
     }
@@ -631,6 +843,12 @@ impl ContinuousMind {
         if self.state.tick.is_multiple_of(5) {
             let msg = federated.export_local_gradient(0.0);
             self.federated_outbox.push(msg);
+
+            // Cap outbox to prevent unbounded growth
+            if self.federated_outbox.len() > super::MAX_OUTBOX_SIZE {
+                let excess = self.federated_outbox.len() - super::MAX_OUTBOX_SIZE;
+                self.federated_outbox.drain(..excess);
+            }
         }
     }
 }

@@ -184,4 +184,86 @@ impl MotorBridge {
         let safe_cmd = safety.filter_command(&self.last_command)?;
         servo.apply(&safe_cmd)
     }
+
+    /// Translate sensor readings + cognitive state into a motor command.
+    ///
+    /// Intended for use with [`HalRuntime::run()`](symthaea_hal::HalRuntime::run).
+    /// The `readings` parameter matches the sensor layout from the runtime's
+    /// registered sensors. Currently, sensor readings are reserved for future
+    /// proprioceptive integration; the motor command is derived from `thought_hv`.
+    ///
+    /// ```rust,ignore
+    /// // In the runtime loop:
+    /// runtime.run(Some(1000), |readings| {
+    ///     bridge.step_from_readings(readings, &thought_hv)
+    /// })?;
+    /// ```
+    #[cfg(feature = "hal")]
+    pub fn step_from_readings(
+        &mut self,
+        _readings: &[Option<Vec<f32>>],
+        thought_hv: &ContinuousHV,
+    ) -> HumanoidCommand {
+        let (command, _) = self.step(thought_hv);
+        command
+    }
+
+    /// Create a closure suitable for [`HalRuntime::run()`](symthaea_hal::HalRuntime::run).
+    ///
+    /// Returns an `FnMut` that calls `step_from_readings` on each tick,
+    /// translating the cognitive thought vector into motor commands.
+    ///
+    /// ```rust,ignore
+    /// let thought_hv = cognitive_loop.current_thought();
+    /// runtime.run(Some(1000), bridge.hal_callback(&thought_hv))?;
+    /// ```
+    #[cfg(feature = "hal")]
+    pub fn hal_callback<'a>(
+        &'a mut self,
+        thought_hv: &'a ContinuousHV,
+    ) -> impl FnMut(&[Option<Vec<f32>>]) -> HumanoidCommand + 'a {
+        move |readings| self.step_from_readings(readings, thought_hv)
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "hal")]
+mod hal_tests {
+    use super::*;
+
+    fn make_bridge() -> MotorBridge {
+        let genesis = GenesisSeed::from_phrase("test");
+        MotorBridge::new(&genesis)
+    }
+
+    #[test]
+    fn test_step_from_readings_basic() {
+        let mut bridge = make_bridge();
+        let hv = ContinuousHV::zero(16384);
+        let cmd = bridge.step_from_readings(&[], &hv);
+        // Should produce a valid command (all finite)
+        for &t in &cmd.torques {
+            assert!(t.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_step_from_readings_increments_steps() {
+        let mut bridge = make_bridge();
+        let hv = ContinuousHV::zero(16384);
+        assert_eq!(bridge.total_steps(), 0);
+        let _ = bridge.step_from_readings(&[], &hv);
+        assert_eq!(bridge.total_steps(), 1);
+    }
+
+    #[test]
+    fn test_hal_callback_works() {
+        let mut bridge = make_bridge();
+        let hv = ContinuousHV::zero(16384);
+        let mut cb = bridge.hal_callback(&hv);
+        let cmd = cb(&[]);
+        for &t in &cmd.torques {
+            assert!(t.is_finite());
+        }
+    }
 }

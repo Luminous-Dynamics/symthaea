@@ -80,6 +80,9 @@ pub struct MindState {
     pub biorhythm: Option<Biorhythm>,
     /// Is the mind currently dreaming?
     pub is_dreaming: bool,
+    /// Mesh network telemetry snapshot (only available with `mesh` feature).
+    #[cfg(feature = "mesh")]
+    pub mesh_telemetry: Option<crate::swarm::mesh::MeshTelemetry>,
 }
 
 impl Default for MindState {
@@ -103,6 +106,8 @@ impl Default for MindState {
             processing_latency_ms: 0.0,
             biorhythm: None,
             is_dreaming: false,
+            #[cfg(feature = "mesh")]
+            mesh_telemetry: None,
         }
     }
 }
