@@ -50,7 +50,7 @@ fn test_soul_custom_config() {
 #[test]
 fn test_alignment_produces_valid_scores() {
     let soul = Soul::default();
-    let random_hv = ContinuousHV::random(512);
+    let random_hv = ContinuousHV::random(512, 42);
     let result = soul.evaluate_alignment(&random_hv);
 
     assert!(
@@ -86,7 +86,7 @@ fn test_experience_integration_updates_stats() {
     let mut soul = Soul::default();
     for i in 0..3 {
         soul.integrate_experience(Experience {
-            embedding: ContinuousHV::random(512),
+            embedding: ContinuousHV::random(512, 100 + i),
             value_alignment: 0.5,
             emotional_valence: 0.3,
             lessons: vec![format!("lesson_{i}")],
@@ -108,7 +108,7 @@ fn test_experience_integration_many() {
     let mut soul = Soul::default();
     for i in 0..50 {
         soul.integrate_experience(Experience {
-            embedding: ContinuousHV::random(512),
+            embedding: ContinuousHV::random(512, 200 + i),
             value_alignment: (i as f32) / 50.0,
             emotional_valence: 0.0,
             lessons: vec![],
@@ -130,7 +130,7 @@ fn test_update_value_blends_embedding() {
     let mut soul = Soul::default();
     let original = soul.get_value("resonance").unwrap().embedding.clone();
 
-    let new_hv = ContinuousHV::random(512);
+    let new_hv = ContinuousHV::random(512, 999);
     soul.update_value("resonance", new_hv);
 
     assert_eq!(soul.stats().value_updates, 1, "Should record 1 value update");
