@@ -1,311 +1,266 @@
-\begin{thebibliography}{46}
-\providecommand{\natexlab}[1]{#1}
-\providecommand{\url}[1]{\texttt{#1}}
-\expandafter\ifx\csname urlstyle\endcsname\relax
-  \providecommand{\doi}[1]{doi: #1}\else
-  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+\begin{thebibliography}{10}
 
-\bibitem[Albantakis et~al.(2023)Albantakis, Barbosa, Findlay,
-  et~al.]{albantakis2023integrated}
-Larissa Albantakis, Leonardo Barbosa, Graham Findlay, et~al.
-\newblock Integrated information theory ({IIT}) 4.0: Formulating the properties
-  of phenomenal existence in physical terms.
-\newblock \emph{PLoS Computational Biology}, 19\penalty0 (10):\penalty0
-  e1011465, 2023.
+\bibitem{friston2010free}
+Friston K.
+\newblock The free-energy principle: a unified brain theory?
+\newblock Nature Reviews Neuroscience. 2010;11(2):127--138.
 
-\bibitem[Baars(1988)]{baars1988cognitive}
-Bernard~J Baars.
-\newblock \emph{A Cognitive Theory of Consciousness}.
-\newblock Cambridge University Press, 1988.
+\bibitem{friston2017active}
+Friston K, FitzGerald T, Rigoli F, Schwartenbeck P, Pezzulo G.
+\newblock Active inference: a process theory.
+\newblock Neural Computation. 2017;29(1):1--49.
 
-\bibitem[Barth-Maron et~al.(2018)Barth-Maron, Hoffman, Budden, Dabney, Horgan,
-  Tb, Muldal, Heess, and Lillicrap]{barth2018distributed}
-Gabriel Barth-Maron, Matthew~W Hoffman, David Budden, Will Dabney, Dan Horgan,
-  Dhruva Tb, Alistair Muldal, Nicolas Heess, and Timothy Lillicrap.
-\newblock Distributed distributional deterministic policy gradients.
-\newblock \emph{arXiv preprint arXiv:1804.08617}, 2018.
+\bibitem{kanerva2009hyperdimensional}
+Kanerva P.
+\newblock Hyperdimensional computing: An introduction to computing in
+  distributed representation with high-dimensional random vectors.
+\newblock Cognitive Computation. 2009;1(2):139--159.
 
-\bibitem[Butlin et~al.(2023)Butlin, Long, Elmoznino, Bengio, Birch, Constant,
-  Deane, Fleming, Frith, Ji, et~al.]{butlin2023consciousness}
-Patrick Butlin, Robert Long, Eric Elmoznino, Yoshua Bengio, Jonathan Birch,
-  Axel Constant, George Deane, Stephen~M Fleming, Chris Frith, Xu~Ji, et~al.
+\bibitem{parr2022active}
+Parr T, Pezzulo G, Friston KJ.
+\newblock Active Inference: The Free Energy Principle in Mind, Brain, and
+  Behavior.
+\newblock MIT Press; 2022.
+
+\bibitem{feldman2010attention}
+Feldman H, Friston KJ.
+\newblock Attention, uncertainty, and free-energy.
+\newblock Frontiers in Human Neuroscience. 2010;4:215.
+
+\bibitem{heins2022pymdp}
+Heins C, Millidge B, Da~Costa L, et~al.
+\newblock pymdp: A {Python} library for active inference in discrete state
+  spaces.
+\newblock Journal of Open Source Software. 2022;7(73):4098.
+
+\bibitem{cohen1988statistical}
+Cohen J.
+\newblock Statistical Power Analysis for the Behavioral Sciences.
+\newblock 2nd ed. Lawrence Erlbaum Associates; 1988.
+
+\bibitem{butlin2023consciousness}
+Butlin P, Long R, Elmoznino E, Bengio Y, Birch J, Constant A, et~al.
 \newblock Consciousness in artificial intelligence: Insights from the science
   of consciousness.
-\newblock \emph{arXiv preprint arXiv:2308.08708}, 2023.
+\newblock arXiv preprint arXiv:230808708. 2023;.
 
-\bibitem[Buzs{\'a}ki(2006)]{buzsaki2006rhythms}
-Gy{\"o}rgy Buzs{\'a}ki.
-\newblock \emph{Rhythms of the Brain}.
-\newblock Oxford University Press, 2006.
+\bibitem{wheeler2002binding}
+Wheeler ME, Treisman AM.
+\newblock Binding in short-term visual memory.
+\newblock Journal of Experimental Psychology: General. 2002;131(1):48--64.
 
-\bibitem[Casali et~al.(2013)Casali, Gosseries, Rosanova,
-  et~al.]{casali2013consciousness}
-Adenauer~G Casali, Olivia Gosseries, Mario Rosanova, et~al.
-\newblock A theoretically based index of consciousness independent of sensory
-  processing and behavior.
-\newblock \emph{Science Translational Medicine}, 5\penalty0 (198):\penalty0
-  198ra105, 2013.
-
-\bibitem[{\c{C}}atal et~al.(2020){\c{C}}atal, Wauthier, De~Boom, Verbelen, and
-  Dhoedt]{catal2020learning}
-Ozan {\c{C}}atal, Samuel Wauthier, Cedric De~Boom, Tim Verbelen, and Bart
-  Dhoedt.
-\newblock Learning perception and planning with deep active inference.
-\newblock \emph{arXiv preprint arXiv:2001.11841}, 2020.
-
-\bibitem[Clark(2013)]{clark2013whatever}
-Andy Clark.
-\newblock Whatever next? predictive brains, situated agents, and the future of
-  cognitive science.
-\newblock \emph{Behavioral and Brain Sciences}, 36\penalty0 (3):\penalty0
-  181--204, 2013.
-
-\bibitem[Cohen(1988)]{cohen1988statistical}
-Jacob Cohen.
-\newblock \emph{Statistical Power Analysis for the Behavioral Sciences}.
-\newblock Lawrence Erlbaum Associates, 2nd edition, 1988.
-
-\bibitem[Cowan(2001)]{cowan2001magical}
-Nelson Cowan.
+\bibitem{cowan2001magical}
+Cowan N.
 \newblock The magical number 4 in short-term memory: A reconsideration of
   mental storage capacity.
-\newblock \emph{Behavioral and Brain Sciences}, 24\penalty0 (1):\penalty0
-  87--114, 2001.
+\newblock Behavioral and Brain Sciences. 2001;24(1):87--114.
 
-\bibitem[Damasio(1999)]{damasio1999feeling}
-Antonio~R Damasio.
-\newblock \emph{The Feeling of What Happens: Body and Emotion in the Making of
-  Consciousness}.
-\newblock Harcourt Brace, 1999.
-
-\bibitem[Dehaene(2014)]{dehaene2014consciousness}
-Stanislas Dehaene.
-\newblock \emph{Consciousness and the Brain: Deciphering How the Brain Codes
-  Our Thoughts}.
-\newblock Viking Press, 2014.
-
-\bibitem[Diekelmann and Born(2010)]{diekelmann2010memory}
-Susanne Diekelmann and Jan Born.
-\newblock The memory function of sleep.
-\newblock \emph{Nature Reviews Neuroscience}, 11\penalty0 (2):\penalty0
-  114--126, 2010.
-
-\bibitem[Feldman and Friston(2010)]{feldman2010attention}
-Harriet Feldman and Karl~J Friston.
-\newblock Attention, uncertainty, and free-energy.
-\newblock \emph{Frontiers in Human Neuroscience}, 4:\penalty0 215, 2010.
-
-\bibitem[Forbes et~al.(2020)Forbes, Hwang, Shwartz, Sap, and
-  Choi]{forbes2020social}
-Maxwell Forbes, Jena~D Hwang, Vered Shwartz, Maarten Sap, and Yejin Choi.
-\newblock Social chemistry 101: Learning to reason about social and moral
-  norms.
-\newblock In \emph{Proceedings of the 2020 Conference on Empirical Methods in
-  Natural Language Processing}, 2020.
-
-\bibitem[Fountas et~al.(2020)Fountas, Sajid, Mediano, and
-  Friston]{fountas2020deep}
-Zafeirios Fountas, Noor Sajid, Pedro A~M Mediano, and Karl Friston.
+\bibitem{fountas2020deep}
+Fountas Z, Sajid N, Mediano PAM, Friston K.
 \newblock Deep active inference agents using {Monte-Carlo} methods.
-\newblock In \emph{Advances in Neural Information Processing Systems},
-  volume~33, pages 11662--11675, 2020.
+\newblock In: Advances in Neural Information Processing Systems. vol.~33; 2020.
+  p. 11662--11675.
 
-\bibitem[Friston(2010)]{friston2010free}
-Karl Friston.
-\newblock The free-energy principle: a unified brain theory?
-\newblock \emph{Nature Reviews Neuroscience}, 11\penalty0 (2):\penalty0
-  127--138, 2010.
+\bibitem{catal2020learning}
+{\c{C}}atal O, Wauthier S, De~Boom C, Verbelen T, Dhoedt B.
+\newblock Learning perception and planning with deep active inference.
+\newblock arXiv preprint arXiv:200111841. 2020;.
 
-\bibitem[Friston et~al.(2017)Friston, FitzGerald, Rigoli, Schwartenbeck, and
-  Pezzulo]{friston2017active}
-Karl Friston, Thomas FitzGerald, Francesco Rigoli, Philipp Schwartenbeck, and
-  Giovanni Pezzulo.
-\newblock Active inference: a process theory.
-\newblock \emph{Neural Computation}, 29\penalty0 (1):\penalty0 1--49, 2017.
+\bibitem{rahimi2016robust}
+Rahimi A, Kanerva P, Recht B.
+\newblock A robust and energy-efficient classifier using brain-inspired
+  hyperdimensional computing.
+\newblock In: ISLPED; 2016. p. 64--69.
 
-\bibitem[Fujimoto et~al.(2018)Fujimoto, Hoof, and
-  Meger]{fujimoto2018addressing}
-Scott Fujimoto, Herke Hoof, and David Meger.
-\newblock Addressing function approximation error in actor-critic methods.
-\newblock In \emph{International Conference on Machine Learning}, pages
-  1587--1596. PMLR, 2018.
+\bibitem{imani2019hierarchical}
+Imani M, Duan Y, Rosing T.
+\newblock Hierarchical hyperdimensional computing for energy-efficient
+  classification.
+\newblock In: DAC; 2019. p. 1--6.
 
-\bibitem[Gallagher(2000)]{gallagher2000philosophical}
-Shaun Gallagher.
-\newblock \emph{The inordinance of time}.
-\newblock Northwestern University Press, 2000.
+\bibitem{joshi2016language}
+Joshi A, Halseth JT, Kanerva P.
+\newblock Language geometry using random indexing.
+\newblock In: International Conference on Quantum Interaction; 2016. .
+
+\bibitem{neubert2019introduction}
+Neubert P, Schubert S, Protzel P.
+\newblock An introduction to hyperdimensional computing for robotics.
+\newblock KI-K{\"u}nstliche Intelligenz. 2019;33(4):319--330.
+
+\bibitem{kim2020hdc}
+Kim Y, Duan Y, Imani M, et~al.
+\newblock {HDC} for {DNA} sequence classification with error-resilient
+  encoding.
+\newblock In: DAC; 2020. p. 1--6.
+
+\bibitem{hersche2023neurovsa}
+Hersche M, Terzic B, Kleyko D, et~al.
+\newblock A neuro-vector-symbolic architecture for solving {Raven}'s
+  progressive matrices.
+\newblock Nature Machine Intelligence. 2023;5(4):363--375.
+
+\bibitem{hasani2021liquid}
+Hasani R, Lechner M, Amini A, Liebenwein L, Ray A, Tschaikowski M, et~al.
+\newblock Liquid time-constant networks.
+\newblock In: AAAI. vol.~35; 2021. p. 7657--7666.
+
+\bibitem{hasani2022closed}
+Hasani R, Lechner M, Amini A, Liebenwein L, Tschaikowski M, Teschl G, et~al.
+\newblock Closed-form continuous-time neural networks.
+\newblock Nature Machine Intelligence. 2022;4(11):992--1003.
+
+\bibitem{albantakis2023integrated}
+Albantakis L, Barbosa L, Findlay G, et~al.
+\newblock Integrated information theory ({IIT}) 4.0: Formulating the properties
+  of phenomenal existence in physical terms.
+\newblock PLoS Computational Biology. 2023;19(10):e1011465.
+
+\bibitem{tononi2016integrated}
+Tononi G, Boly M, Massimini M, Koch C.
+\newblock Integrated information theory: from consciousness to its physical
+  substrate.
+\newblock Nature Reviews Neuroscience. 2016;17(7):450--461.
+
+\bibitem{toker2019information}
+Toker D, Sommer FT.
+\newblock Information integration in large brain networks.
+\newblock PLoS Computational Biology. 2019;15(2):e1006807.
+
+\bibitem{garcez2020neurosymbolic}
+Garcez A, Lamb LC.
+\newblock Neurosymbolic {AI}: The 3rd wave.
+\newblock arXiv preprint arXiv:201205876. 2020;.
+
+\bibitem{manhaeve2018deepproblog}
+Manhaeve R, Dumancic S, Kimmig A, Demeester T, De~Raedt L.
+\newblock {DeepProbLog}: Neural probabilistic logic programming.
+\newblock In: Advances in Neural Information Processing Systems. vol.~31; 2018.
+  p. 3749--3759.
+
+\bibitem{riegel2020logical}
+Riegel R, Gray A, Luus F, et~al.
+\newblock Logical neural networks.
+\newblock arXiv preprint arXiv:200613155. 2020;.
+
+\bibitem{li2023scallop}
+Li Z, Huang J, Naik M.
+\newblock Scallop: A language for neurosymbolic programming.
+\newblock Proceedings of the ACM on Programming Languages.
+  2023;7(PLDI):1463--1487.
+
+\bibitem{mao2019neuro}
+Mao J, Gan C, Kohli P, Tenenbaum JB, Wu J.
+\newblock The neuro-symbolic concept learner: Interpreting scenes, words, and
+  sentences from natural supervision.
+\newblock In: International Conference on Learning Representations; 2019. .
+
+\bibitem{miller2001integrative}
+Miller EK, Cohen JD.
+\newblock An integrative theory of prefrontal cortex function.
+\newblock Annual Review of Neuroscience. 2001;24(1):167--202.
+
+\bibitem{clark2013whatever}
+Clark A.
+\newblock Whatever next? Predictive brains, situated agents, and the future of
+  cognitive science.
+\newblock Behavioral and Brain Sciences. 2013;36(3):181--204.
+
+\bibitem{graziano2013consciousness}
+Graziano MS.
+\newblock Consciousness and the attention schema: Why it has to be right.
+\newblock Cognitive Neuropsychology. 2013;30(4):224--233.
+
+\bibitem{baars1988cognitive}
+Baars BJ.
+\newblock A Cognitive Theory of Consciousness.
+\newblock Cambridge University Press; 1988.
+
+\bibitem{varela1999present}
+Varela FJ.
+\newblock The Specious Present: A Neurophenomenology of Time Consciousness.
+\newblock MIT Press; 1999.
+\newblock In: Petitot et al. (Eds.), Naturalizing Phenomenology, pp. 266--314.
+
+\bibitem{damasio1999feeling}
+Damasio AR.
+\newblock The Feeling of What Happens: Body and Emotion in the Making of
+  Consciousness.
+\newblock Harcourt Brace; 1999.
+
+\bibitem{buzsaki2006rhythms}
+Buzs{\'a}ki G.
+\newblock Rhythms of the Brain.
+\newblock Oxford University Press; 2006.
+
+\bibitem{dehaene2014consciousness}
+Dehaene S.
+\newblock Consciousness and the Brain: Deciphering How the Brain Codes Our
+  Thoughts.
+\newblock Viking Press; 2014.
+
+\bibitem{gallagher2000philosophical}
+Gallagher S.
+\newblock The inordinance of time.
+\newblock Northwestern University Press; 2000.
 \newblock See also: Gallagher, S. (2000). Philosophical conceptions of the
   self. Trends in Cognitive Sciences, 4(1), 14--21.
 
-\bibitem[Garcez and Lamb(2020)]{garcez2020neurosymbolic}
-Artur Garcez and Luis~C Lamb.
-\newblock Neurosymbolic {AI}: The 3rd wave.
-\newblock \emph{arXiv preprint arXiv:2012.05876}, 2020.
+\bibitem{diekelmann2010memory}
+Diekelmann S, Born J.
+\newblock The memory function of sleep.
+\newblock Nature Reviews Neuroscience. 2010;11(2):114--126.
 
-\bibitem[Graziano(2013)]{graziano2013consciousness}
-Michael~SA Graziano.
-\newblock Consciousness and the attention schema: Why it has to be right.
-\newblock \emph{Cognitive Neuropsychology}, 30\penalty0 (4):\penalty0 224--233,
-  2013.
-
-\bibitem[Haarnoja et~al.(2018)Haarnoja, Zhou, Abbeel, and
-  Levine]{haarnoja2018soft}
-Tuomas Haarnoja, Aurick Zhou, Pieter Abbeel, and Sergey Levine.
-\newblock Soft actor-critic: Off-policy maximum entropy deep reinforcement
-  learning with a stochastic actor.
-\newblock In \emph{International Conference on Machine Learning}, pages
-  1861--1870. PMLR, 2018.
-
-\bibitem[Hasani et~al.(2021)Hasani, Lechner, Amini, Liebenwein, Ray,
-  Tschaikowski, Teschl, and Rus]{hasani2021liquid}
-Ramin Hasani, Mathias Lechner, Alexander Amini, Lucas Liebenwein, Aaron Ray,
-  Max Tschaikowski, Gerald Teschl, and Daniela Rus.
-\newblock Liquid time-constant networks.
-\newblock In \emph{AAAI}, volume~35, pages 7657--7666, 2021.
-
-\bibitem[Hasani et~al.(2022)Hasani, Lechner, Amini, Liebenwein, Tschaikowski,
-  Teschl, and Rus]{hasani2022closed}
-Ramin Hasani, Mathias Lechner, Alexander Amini, Lucas Liebenwein, Max
-  Tschaikowski, Gerald Teschl, and Daniela Rus.
-\newblock Closed-form continuous-time neural networks.
-\newblock \emph{Nature Machine Intelligence}, 4\penalty0 (11):\penalty0
-  992--1003, 2022.
-
-\bibitem[Heins et~al.(2022)Heins, Millidge, Da~Costa, et~al.]{heins2022pymdp}
-Conor Heins, Beren Millidge, Lancelot Da~Costa, et~al.
-\newblock pymdp: A {Python} library for active inference in discrete state
-  spaces.
-\newblock \emph{Journal of Open Source Software}, 7\penalty0 (73):\penalty0
-  4098, 2022.
-
-\bibitem[Hendrycks et~al.(2021)Hendrycks, Burns, Basart, Critch, Li, Song, and
-  Steinhardt]{hendrycks2021aligning}
-Dan Hendrycks, Collin Burns, Steven Basart, Andrew Critch, Jerry Li, Dawn Song,
-  and Jacob Steinhardt.
-\newblock Aligning {AI} with shared human values.
-\newblock In \emph{International Conference on Learning Representations}, 2021.
-
-\bibitem[Hersche et~al.(2023)Hersche, Terzic, Kleyko,
-  et~al.]{hersche2023neurovsa}
-Michael Hersche, Bojan Terzic, Denis Kleyko, et~al.
-\newblock A neuro-vector-symbolic architecture for solving {Raven}'s
-  progressive matrices.
-\newblock \emph{Nature Machine Intelligence}, 5\penalty0 (4):\penalty0
-  363--375, 2023.
-
-\bibitem[Imani et~al.(2019)Imani, Duan, and Rosing]{imani2019hierarchical}
-Mohsen Imani, Yeseong Duan, and Tajana Rosing.
-\newblock Hierarchical hyperdimensional computing for energy-efficient
-  classification.
-\newblock In \emph{DAC}, pages 1--6, 2019.
-
-\bibitem[Joshi et~al.(2016)Joshi, Halseth, and Kanerva]{joshi2016language}
-Aditya Joshi, Johan~T Halseth, and Pentti Kanerva.
-\newblock Language geometry using random indexing.
-\newblock In \emph{International Conference on Quantum Interaction}, 2016.
-
-\bibitem[Kanerva(2009)]{kanerva2009hyperdimensional}
-Pentti Kanerva.
-\newblock Hyperdimensional computing: An introduction to computing in
-  distributed representation with high-dimensional random vectors.
-\newblock \emph{Cognitive Computation}, 1\penalty0 (2):\penalty0 139--159,
-  2009.
-
-\bibitem[Kim et~al.(2020)Kim, Duan, Imani, et~al.]{kim2020hdc}
-Yeseong Kim, Yeseong Duan, Mohsen Imani, et~al.
-\newblock {HDC} for {DNA} sequence classification with error-resilient
-  encoding.
-\newblock In \emph{DAC}, pages 1--6, 2020.
-
-\bibitem[Li et~al.(2023)Li, Huang, and Naik]{li2023scallop}
-Ziyang Li, Jiani Huang, and Mayur Naik.
-\newblock Scallop: A language for neurosymbolic programming.
-\newblock \emph{Proceedings of the ACM on Programming Languages}, 7\penalty0
-  (PLDI):\penalty0 1463--1487, 2023.
-
-\bibitem[Manhaeve et~al.(2018)Manhaeve, Dumancic, Kimmig, Demeester, and
-  De~Raedt]{manhaeve2018deepproblog}
-Robin Manhaeve, Sebastijan Dumancic, Angelika Kimmig, Thomas Demeester, and Luc
-  De~Raedt.
-\newblock {DeepProbLog}: Neural probabilistic logic programming.
-\newblock In \emph{Advances in Neural Information Processing Systems},
-  volume~31, pages 3749--3759, 2018.
-
-\bibitem[Mao et~al.(2019)Mao, Gan, Kohli, Tenenbaum, and Wu]{mao2019neuro}
-Jiayuan Mao, Chuang Gan, Pushmeet Kohli, Joshua~B Tenenbaum, and Jiajun Wu.
-\newblock The neuro-symbolic concept learner: Interpreting scenes, words, and
-  sentences from natural supervision.
-\newblock In \emph{International Conference on Learning Representations}, 2019.
-
-\bibitem[Miller and Cohen(2001)]{miller2001integrative}
-Earl~K Miller and Jonathan~D Cohen.
-\newblock An integrative theory of prefrontal cortex function.
-\newblock \emph{Annual Review of Neuroscience}, 24\penalty0 (1):\penalty0
-  167--202, 2001.
-
-\bibitem[Neubert et~al.(2019)Neubert, Schubert, and
-  Protzel]{neubert2019introduction}
-Peer Neubert, Stefan Schubert, and Peter Protzel.
-\newblock An introduction to hyperdimensional computing for robotics.
-\newblock \emph{KI-K{\"u}nstliche Intelligenz}, 33\penalty0 (4):\penalty0
-  319--330, 2019.
-
-\bibitem[Parr et~al.(2022)Parr, Pezzulo, and Friston]{parr2022active}
-Thomas Parr, Giovanni Pezzulo, and Karl~J Friston.
-\newblock \emph{Active Inference: The Free Energy Principle in Mind, Brain, and
-  Behavior}.
-\newblock MIT Press, 2022.
-
-\bibitem[Rahimi et~al.(2016)Rahimi, Kanerva, and Recht]{rahimi2016robust}
-Abbas Rahimi, Pentti Kanerva, and Benjamin Recht.
-\newblock A robust and energy-efficient classifier using brain-inspired
-  hyperdimensional computing.
-\newblock In \emph{ISLPED}, pages 64--69, 2016.
-
-\bibitem[Riegel et~al.(2020)Riegel, Gray, Luus, et~al.]{riegel2020logical}
-Ryan Riegel, Alexander Gray, Francois Luus, et~al.
-\newblock Logical neural networks.
-\newblock \emph{arXiv preprint arXiv:2006.13155}, 2020.
-
-\bibitem[Tassa et~al.(2018)Tassa, Doron, Muldal, Erez, Li, de~Las~Casas,
-  Budden, Abdolmaleki, Merel, Lefrancq, Lillicrap, and
-  Riedmiller]{tassa2018deepmind}
-Yuval Tassa, Yotam Doron, Alistair Muldal, Tom Erez, Yazhe Li, Diego
-  de~Las~Casas, David Budden, Abbas Abdolmaleki, Josh Merel, Andrew Lefrancq,
-  Timothy Lillicrap, and Martin Riedmiller.
-\newblock {DeepMind} control suite.
-\newblock In \emph{arXiv preprint arXiv:1801.00690}, 2018.
-
-\bibitem[Toker and Sommer(2019)]{toker2019information}
-Daniel Toker and Friedrich~T Sommer.
-\newblock Information integration in large brain networks.
-\newblock \emph{PLoS Computational Biology}, 15\penalty0 (2):\penalty0
-  e1006807, 2019.
-
-\bibitem[Tononi(2004)]{tononi2004information}
-Giulio Tononi.
+\bibitem{tononi2004information}
+Tononi G.
 \newblock An information integration theory of consciousness.
-\newblock \emph{BMC Neuroscience}, 5\penalty0 (1):\penalty0 42, 2004.
+\newblock BMC Neuroscience. 2004;5(1):42.
 
-\bibitem[Tononi et~al.(2016)Tononi, Boly, Massimini, and
-  Koch]{tononi2016integrated}
-Giulio Tononi, Melanie Boly, Marcello Massimini, and Christof Koch.
-\newblock Integrated information theory: from consciousness to its physical
-  substrate.
-\newblock \emph{Nature Reviews Neuroscience}, 17\penalty0 (7):\penalty0
-  450--461, 2016.
+\bibitem{casali2013consciousness}
+Casali AG, Gosseries O, Rosanova M, et~al.
+\newblock A theoretically based index of consciousness independent of sensory
+  processing and behavior.
+\newblock Science Translational Medicine. 2013;5(198):198ra105.
 
-\bibitem[Varela(1999)]{varela1999present}
-Francisco~J Varela.
-\newblock \emph{The Specious Present: A Neurophenomenology of Time
-  Consciousness}.
-\newblock MIT Press, 1999.
-\newblock In: Petitot et al. (Eds.), Naturalizing Phenomenology, pp. 266--314.
+\bibitem{hendrycks2021aligning}
+Hendrycks D, Burns C, Basart S, Critch A, Li J, Song D, et~al.
+\newblock Aligning {AI} with shared human values.
+\newblock In: International Conference on Learning Representations; 2021. .
 
-\bibitem[Wheeler and Treisman(2002)]{wheeler2002binding}
-Mark~E Wheeler and Anne~M Treisman.
-\newblock Binding in short-term visual memory.
-\newblock \emph{Journal of Experimental Psychology: General}, 131\penalty0
-  (1):\penalty0 48--64, 2002.
+\bibitem{forbes2020social}
+Forbes M, Hwang JD, Shwartz V, Sap M, Choi Y.
+\newblock Social chemistry 101: Learning to reason about social and moral
+  norms.
+\newblock In: Proceedings of the 2020 Conference on Empirical Methods in
+  Natural Language Processing; 2020. .
+
+\bibitem{tassa2018deepmind}
+Tassa Y, Doron Y, Muldal A, Erez T, Li Y, de~Las~Casas D, et~al.
+\newblock {DeepMind} Control Suite.
+\newblock In: arXiv preprint arXiv:1801.00690; 2018. .
+
+\bibitem{haarnoja2018soft}
+Haarnoja T, Zhou A, Abbeel P, Levine S.
+\newblock Soft Actor-Critic: Off-Policy Maximum Entropy Deep Reinforcement
+  Learning with a Stochastic Actor.
+\newblock In: International Conference on Machine Learning. PMLR; 2018. p.
+  1861--1870.
+
+\bibitem{barth2018distributed}
+Barth-Maron G, Hoffman MW, Budden D, Dabney W, Horgan D, Tb D, et~al.
+\newblock Distributed Distributional Deterministic Policy Gradients.
+\newblock arXiv preprint arXiv:180408617. 2018;.
+
+\bibitem{fujimoto2018addressing}
+Fujimoto S, Hoof H, Meger D.
+\newblock Addressing Function Approximation Error in Actor-Critic Methods.
+\newblock In: International Conference on Machine Learning. PMLR; 2018. p.
+  1587--1596.
+
+\bibitem{todorov2012mujoco}
+Todorov E, Erez T, Tassa Y.
+\newblock {MuJoCo}: A physics engine for model-based control.
+\newblock In: IEEE/RSJ International Conference on Intelligent Robots and
+  Systems. IEEE; 2012. p. 5026--5033.
 
 \end{thebibliography}

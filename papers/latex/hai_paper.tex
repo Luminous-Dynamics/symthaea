@@ -21,7 +21,7 @@
 \usepackage{microtype}
 \usepackage{xcolor}
 \usepackage{graphicx}
-\usepackage{natbib}
+\usepackage[numbers]{natbib}
 \usepackage{caption}
 % subcaption not required for current figure layout
 \usepackage{multirow}
@@ -1210,10 +1210,8 @@ Chemistry~\citep{forbes2020social}. Raw benchmark data are archived in the
 repository under \texttt{data/benchmarks/}.
 
 % ============================================================================
-% PLoS uses numbered Vancouver-style references.
-% For final submission, switch to plos2015.bst from the PLOS LaTeX template.
-% plainnat is retained here for preview builds.
-\bibliographystyle{plainnat}
+% PLoS uses numbered Vancouver-style references (Vancouver/ICMJE).
+\bibliographystyle{plos2015}
 \bibliography{references}
 
 % ============================================================================
