@@ -218,7 +218,6 @@ impl VirtualBody {
     pub fn interoceptive_state(&self) -> &InteroceptiveState {
         &self.state
     }
-
 }
 
 #[cfg(test)]

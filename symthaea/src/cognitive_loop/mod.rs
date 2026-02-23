@@ -104,8 +104,8 @@ pub mod goal_world;
 pub use goal_world::*;
 
 pub mod types;
-pub use types::*;
 pub(crate) use types::CycleState;
+pub use types::*;
 
 pub mod stats;
 pub use stats::*;

@@ -91,9 +91,21 @@ mod tests {
     #[test]
     fn test_biorhythm_current_returns_valid_modifiers() {
         let bio = Biorhythm::current();
-        assert!(bio.arousal_mod >= 0.1 && bio.arousal_mod <= 1.5, "arousal_mod out of range: {}", bio.arousal_mod);
-        assert!(bio.plasticity_mod >= 0.1 && bio.plasticity_mod <= 1.5, "plasticity_mod out of range: {}", bio.plasticity_mod);
-        assert!(bio.creativity_mod >= 0.1 && bio.creativity_mod <= 1.5, "creativity_mod out of range: {}", bio.creativity_mod);
+        assert!(
+            bio.arousal_mod >= 0.1 && bio.arousal_mod <= 1.5,
+            "arousal_mod out of range: {}",
+            bio.arousal_mod
+        );
+        assert!(
+            bio.plasticity_mod >= 0.1 && bio.plasticity_mod <= 1.5,
+            "plasticity_mod out of range: {}",
+            bio.plasticity_mod
+        );
+        assert!(
+            bio.creativity_mod >= 0.1 && bio.creativity_mod <= 1.5,
+            "creativity_mod out of range: {}",
+            bio.creativity_mod
+        );
     }
 
     #[test]
@@ -111,28 +123,44 @@ mod tests {
     #[test]
     fn test_dawn_phase_boundaries() {
         for h in [5.0, 6.0, 7.0, 8.0] {
-            assert_eq!(Biorhythm::for_hour(h).phase, CircadianPhase::Dawn, "hour {h}");
+            assert_eq!(
+                Biorhythm::for_hour(h).phase,
+                CircadianPhase::Dawn,
+                "hour {h}"
+            );
         }
     }
 
     #[test]
     fn test_day_phase_boundaries() {
         for h in [9.0, 12.0, 15.0, 19.0, 20.0] {
-            assert_eq!(Biorhythm::for_hour(h).phase, CircadianPhase::Day, "hour {h}");
+            assert_eq!(
+                Biorhythm::for_hour(h).phase,
+                CircadianPhase::Day,
+                "hour {h}"
+            );
         }
     }
 
     #[test]
     fn test_dusk_phase_boundaries() {
         for h in [21.0, 22.0, 23.0] {
-            assert_eq!(Biorhythm::for_hour(h).phase, CircadianPhase::Dusk, "hour {h}");
+            assert_eq!(
+                Biorhythm::for_hour(h).phase,
+                CircadianPhase::Dusk,
+                "hour {h}"
+            );
         }
     }
 
     #[test]
     fn test_night_phase_boundaries() {
         for h in [0.0, 1.0, 2.0, 3.0, 4.0, 24.0] {
-            assert_eq!(Biorhythm::for_hour(h).phase, CircadianPhase::Night, "hour {h}");
+            assert_eq!(
+                Biorhythm::for_hour(h).phase,
+                CircadianPhase::Night,
+                "hour {h}"
+            );
         }
     }
 
@@ -143,13 +171,18 @@ mod tests {
         assert!(
             afternoon.arousal_mod > night.arousal_mod,
             "afternoon arousal ({}) should exceed night arousal ({})",
-            afternoon.arousal_mod, night.arousal_mod
+            afternoon.arousal_mod,
+            night.arousal_mod
         );
     }
 
     #[test]
     fn test_trough_arousal_at_night() {
         let bio = Biorhythm::for_hour(2.0);
-        assert!(bio.arousal_mod < 0.5, "night arousal should be < 0.5, got {}", bio.arousal_mod);
+        assert!(
+            bio.arousal_mod < 0.5,
+            "night arousal should be < 0.5, got {}",
+            bio.arousal_mod
+        );
     }
 }

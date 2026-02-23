@@ -991,7 +991,11 @@ impl CognitiveLoopService {
             1.0
         };
 
-        (value_evaluator_score, value_evaluator_decision, value_gate_factor)
+        (
+            value_evaluator_score,
+            value_evaluator_decision,
+            value_gate_factor,
+        )
     }
 
     /// Fiduciary Harmonics: Seven Harmonies field coherence + interference detection.

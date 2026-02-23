@@ -18,8 +18,8 @@ use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::humanoid::{
-    HumanoidCommand, HumanoidConfig, HumanoidController, HumanoidHdcEncoder, HumanoidState,
-    SimpleHumanoidSimulator, HumanoidPhysicsSimulator,
+    HumanoidCommand, HumanoidConfig, HumanoidController, HumanoidHdcEncoder,
+    HumanoidPhysicsSimulator, HumanoidState, SimpleHumanoidSimulator,
 };
 
 /// Bridge between cognitive loop and humanoid motor system.
@@ -169,5 +169,19 @@ impl MotorBridge {
     /// Total physics steps executed.
     pub fn total_steps(&self) -> usize {
         self.total_steps
+    }
+
+    /// Write the last motor command to physical hardware via the HAL.
+    ///
+    /// Runs the command through the [`SafetyInterlock`](symthaea_hal::SafetyInterlock)
+    /// and then applies it to the [`ServoOutput`](symthaea_hal::ServoOutput).
+    #[cfg(feature = "hal")]
+    pub fn write_to_hardware<I: symthaea_hal::I2cBus>(
+        &self,
+        safety: &mut symthaea_hal::SafetyInterlock,
+        servo: &mut symthaea_hal::ServoOutput<I>,
+    ) -> Result<(), symthaea_hal::HalError> {
+        let safe_cmd = safety.filter_command(&self.last_command)?;
+        servo.apply(&safe_cmd)
     }
 }

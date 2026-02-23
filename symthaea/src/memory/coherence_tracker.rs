@@ -64,7 +64,8 @@ impl ConversationCoherenceTracker {
 
         // Update EMA
         let prev_ema = self.ema_coherence;
-        self.ema_coherence = symthaea_core::math::ema_update(self.ema_coherence, coherence, self.alpha);
+        self.ema_coherence =
+            symthaea_core::math::ema_update(self.ema_coherence, coherence, self.alpha);
 
         // Track variance via running sum of squared differences from EMA
         let diff = coherence - self.ema_coherence;
