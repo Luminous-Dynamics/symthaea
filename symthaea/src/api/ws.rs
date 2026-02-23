@@ -51,10 +51,7 @@ pub enum ClientMessage {
 }
 
 /// WebSocket upgrade handler.
-pub async fn ws_handler(
-    ws: WebSocketUpgrade,
-    runner: Arc<Mutex<DemoRunner>>,
-) -> impl IntoResponse {
+pub async fn ws_handler(ws: WebSocketUpgrade, runner: Arc<Mutex<DemoRunner>>) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_socket(socket, runner))
 }
 
