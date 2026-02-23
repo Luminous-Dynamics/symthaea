@@ -334,6 +334,54 @@ impl NoiseSource {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ORNSTEIN-UHLENBECK PROCESS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Ornstein-Uhlenbeck process: mean-reverting, temporally correlated noise.
+///
+/// `dx = θ(μ - x)dt + σ dW`
+///
+/// Unlike white noise, OU produces smooth, biologically realistic perturbations
+/// that drift away from and return to a mean value. Used for F0 jitter and
+/// amplitude shimmer that sounds natural rather than harsh.
+#[derive(Debug, Clone)]
+struct OrnsteinUhlenbeck {
+    /// Current state.
+    x: f32,
+    /// Mean-reversion rate (higher = faster return to mu).
+    theta: f32,
+    /// Long-term mean.
+    mu: f32,
+    /// Diffusion coefficient (noise amplitude).
+    sigma: f32,
+    /// White noise source.
+    noise: NoiseSource,
+}
+
+impl OrnsteinUhlenbeck {
+    fn new(theta: f32, mu: f32, sigma: f32, seed: u64) -> Self {
+        Self {
+            x: mu,
+            theta,
+            mu,
+            sigma,
+            noise: NoiseSource::new(seed),
+        }
+    }
+
+    /// Advance one step at the given timestep (dt = 1/sample_rate).
+    fn tick(&mut self, dt: f32) -> f32 {
+        let dw = self.noise.white() * dt.sqrt();
+        self.x += self.theta * (self.mu - self.x) * dt + self.sigma * dw;
+        self.x
+    }
+
+    fn reset(&mut self) {
+        self.x = self.mu;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // FORMANT VOCODER
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -359,10 +407,12 @@ pub struct FormantVocoder {
     tilt_state: f32,
     /// Current shimmer factor for this glottal cycle (1.0 ± shimmer)
     shimmer_factor: f32,
-    /// Jitter noise source (separate from main noise to avoid correlation)
-    jitter_noise: NoiseSource,
     /// Nasal anti-resonator (~300 Hz / 100 Hz BW) — subtracted for nasal phonemes.
     nasal_antires: Resonator,
+    /// Ornstein-Uhlenbeck process for F0 jitter (temporally correlated pitch perturbation).
+    ou_jitter: OrnsteinUhlenbeck,
+    /// Ornstein-Uhlenbeck process for amplitude shimmer (temporally correlated energy perturbation).
+    ou_shimmer: OrnsteinUhlenbeck,
 }
 
 impl FormantVocoder {
@@ -388,10 +438,28 @@ impl FormantVocoder {
         let mut nasal_antires = Resonator::new();
         nasal_antires.set_params(300.0, 100.0, config.sample_rate as f32);
 
+        // OU parameters tuned for biological voice quality.
+        // Continuous-time OU: dx = θ(μ−x)dt + σ√dt dW
+        // Stationary stddev = σ / √(2θ), so σ = desired_stddev × √(2θ).
+        //
+        // Jitter (per-sample): θ=100, stddev→config.jitter (e.g. 1% pitch variation)
+        // Shimmer (per-glottal-cycle): θ=50, stddev→config.shimmer (e.g. 2% amplitude variation)
+        let ou_jitter = OrnsteinUhlenbeck::new(
+            100.0,
+            1.0,
+            config.jitter * (2.0 * 100.0_f32).sqrt(),   // σ so stddev = config.jitter
+            0xF0F0CAFE,
+        );
+        let ou_shimmer = OrnsteinUhlenbeck::new(
+            50.0,
+            1.0,
+            config.shimmer * (2.0 * 50.0_f32).sqrt(),   // σ so stddev = config.shimmer
+            0xBEEF1234,
+        );
+
         Self {
             glottal: GlottalSource::new(config.sample_rate as f32, config.glottal_shape),
             noise: NoiseSource::new(0xDEADBEEF),
-            jitter_noise: NoiseSource::new(0xCAFEBABE),
             resonators,
             lowpass,
             config,
@@ -400,6 +468,8 @@ impl FormantVocoder {
             tilt_state: 0.0,
             shimmer_factor: 1.0,
             nasal_antires,
+            ou_jitter,
+            ou_shimmer,
         }
     }
 
@@ -411,6 +481,8 @@ impl FormantVocoder {
         }
         self.lowpass.reset();
         self.nasal_antires.reset();
+        self.ou_jitter.reset();
+        self.ou_shimmer.reset();
         self.frame_idx = 0;
         self.samples_in_frame = 0;
         self.tilt_state = 0.0;
@@ -488,14 +560,18 @@ impl FormantVocoder {
         match current.source_type {
             SourceType::Vowel | SourceType::Liquid => {
                 // Standard: glottal pulse + aspiration + unvoiced noise
-                let f0_jittered =
-                    current.f0 * (1.0 + self.config.jitter * self.jitter_noise.white());
+                // OU jitter: temporally correlated pitch perturbation (biological realism)
+                let dt = 1.0 / self.config.sample_rate as f32;
+                let jitter_factor = self.ou_jitter.tick(dt);
+                let f0_jittered = current.f0 * jitter_factor;
 
                 let prev_phase = self.glottal.phase;
                 let voiced = self.glottal.tick(f0_jittered) * current.voicing;
                 if self.glottal.phase < prev_phase {
-                    self.shimmer_factor =
-                        1.0 + self.config.shimmer * self.jitter_noise.white();
+                    // OU shimmer: temporally correlated amplitude perturbation
+                    // Use glottal period (1/f0) as dt since shimmer updates per-cycle
+                    let shimmer_dt = 1.0 / current.f0.max(50.0);
+                    self.shimmer_factor = self.ou_shimmer.tick(shimmer_dt);
                 }
                 let unvoiced = self.noise.pink() * (1.0 - current.voicing) * 0.3;
                 let aspiration = if self.glottal.is_open() {

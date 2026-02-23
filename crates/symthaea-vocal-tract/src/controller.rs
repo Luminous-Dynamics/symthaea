@@ -45,19 +45,28 @@ pub struct VocalTractConfig {
     /// EMA smoothing factor for formant frequencies/bandwidths (0.0 = no smoothing, 1.0 = frozen).
     /// Only applied to F1-F3, B1-B3 — prosody (F0/energy/voicing) passes through unsmoothed.
     pub smoothing_alpha: f32,
+    /// Maximum formant frequency change per frame (Hz). Rate-limits F1-F3 on top of EMA
+    /// smoothing to prevent discontinuities. Rule-based systems achieve ~17 Hz/frame.
+    pub max_formant_delta: f32,
+    /// Max formant delta during steady state (Hz/frame). Used by pipeline adaptive logic.
+    pub steady_max_delta: f32,
+    /// Max formant delta during transitions (Hz/frame). Used by pipeline adaptive logic.
+    pub transition_max_delta: f32,
 }
 
 impl Default for VocalTractConfig {
     fn default() -> Self {
         Self {
             network_layers: 2,
-            neurons_per_layer: 2,
-            // 4 total neurons (was 8) — halves network evolve cost (~1.5-2ms savings).
-            // Combined with phoneme bind caching and EMA smoothing, targets 200Hz throughput.
+            neurons_per_layer: 4,
+            // 8 total neurons — restored for vowel accuracy (AA/IY). Throughput ~240Hz.
             learning_rate: 0.001,
             base_f0: 120.0,
             f0_range: 200.0,
             smoothing_alpha: 0.3,
+            max_formant_delta: 25.0,
+            steady_max_delta: 12.0,
+            transition_max_delta: 20.0,
         }
     }
 }
@@ -145,6 +154,11 @@ pub struct VocalTractController {
     prev_frame: Option<FormantFrame>,
     /// EMA smoothing factor (cached from config).
     smoothing_alpha: f32,
+    /// Maximum formant frequency delta per frame (Hz).
+    max_formant_delta: f32,
+    /// Cached cognitive channels from the pipeline (updated at 10Hz, used at 200Hz).
+    /// Index 7 = consciousness_level, used for bandwidth modulation.
+    cached_cognitive_channels: Option<[f32; 12]>,
 }
 
 impl VocalTractController {
@@ -202,6 +216,8 @@ impl VocalTractController {
             prosody_head,
             prev_frame: None,
             smoothing_alpha: config.smoothing_alpha,
+            max_formant_delta: config.max_formant_delta,
+            cached_cognitive_channels: None,
         }
     }
 
@@ -244,16 +260,26 @@ impl VocalTractController {
         let energy = sigmoid(raw[7]);
         let voicing = sigmoid(raw[8]);
 
-        // EMA post-filter: smooth F1-F3, B1-B3 only (prosody passes through)
+        // EMA post-filter + rate limiter: smooth F1-F3, B1-B3 only
+        // (prosody F0/energy/voicing passes through unsmoothed).
         let alpha = self.smoothing_alpha;
+        let max_d = self.max_formant_delta;
         let smoothed = if let Some(ref prev) = self.prev_frame {
+            // EMA step
+            let ema_f1 = prev.f1 + (f1 - prev.f1) * (1.0 - alpha);
+            let ema_f2 = prev.f2 + (f2 - prev.f2) * (1.0 - alpha);
+            let ema_f3 = prev.f3 + (f3 - prev.f3) * (1.0 - alpha);
+            let ema_b1 = prev.b1 + (b1 - prev.b1) * (1.0 - alpha);
+            let ema_b2 = prev.b2 + (b2 - prev.b2) * (1.0 - alpha);
+            let ema_b3 = prev.b3 + (b3 - prev.b3) * (1.0 - alpha);
+            // Rate limiter: clamp delta to ±max_formant_delta per frame
             FormantFrame {
-                f1: prev.f1 + (f1 - prev.f1) * (1.0 - alpha),
-                f2: prev.f2 + (f2 - prev.f2) * (1.0 - alpha),
-                f3: prev.f3 + (f3 - prev.f3) * (1.0 - alpha),
-                b1: prev.b1 + (b1 - prev.b1) * (1.0 - alpha),
-                b2: prev.b2 + (b2 - prev.b2) * (1.0 - alpha),
-                b3: prev.b3 + (b3 - prev.b3) * (1.0 - alpha),
+                f1: prev.f1 + (ema_f1 - prev.f1).clamp(-max_d, max_d),
+                f2: prev.f2 + (ema_f2 - prev.f2).clamp(-max_d, max_d),
+                f3: prev.f3 + (ema_f3 - prev.f3).clamp(-max_d, max_d),
+                b1: prev.b1 + (ema_b1 - prev.b1).clamp(-max_d, max_d),
+                b2: prev.b2 + (ema_b2 - prev.b2).clamp(-max_d, max_d),
+                b3: prev.b3 + (ema_b3 - prev.b3).clamp(-max_d, max_d),
                 f0,
                 energy,
                 voicing,
@@ -276,7 +302,20 @@ impl VocalTractController {
             }
         };
         self.prev_frame = Some(smoothed);
-        smoothed
+
+        // Consciousness-modulated bandwidths: higher consciousness → tighter (smaller)
+        // bandwidths (clearer vowels), lower consciousness → wider (more mumbled).
+        // Scale: 1.2 at consciousness=0, 0.8 at consciousness=1.
+        let mut frame = smoothed;
+        if let Some(ref channels) = self.cached_cognitive_channels {
+            let consciousness_level = channels[7].clamp(0.0, 1.0);
+            let bandwidth_scale = 1.2 - 0.4 * consciousness_level;
+            frame.b1 *= bandwidth_scale;
+            frame.b2 *= bandwidth_scale;
+            frame.b3 *= bandwidth_scale;
+        }
+
+        frame
     }
 
     /// Train the output projection via BPTT.
@@ -367,8 +406,8 @@ impl VocalTractController {
         // Without normalization, GRAD_CLIP kills formant gradients (naturally 100–1000 Hz)
         // causing all vowels to converge to schwa.
         const ERROR_SCALE: [f32; OUTPUT_DIM] = [
-            500.0,  // F1: range ~200-1000 Hz
-            1000.0, // F2: range ~600-3000 Hz
+            400.0,  // F1: range ~200-1000 Hz (reduced from 500 for 25% stronger F1 gradient)
+            750.0,  // F2: range ~600-3000 Hz (boosted from 1000 for front vowel accuracy)
             1500.0, // F3: range ~1500-5000 Hz
             100.0,  // B1: range ~30-300 Hz
             150.0,  // B2: range ~30-400 Hz
@@ -463,10 +502,18 @@ impl VocalTractController {
         }
     }
 
+    /// Set cached cognitive channels (called by the pipeline at 10Hz).
+    ///
+    /// Channel index 7 = consciousness_level, used for bandwidth modulation in `forward()`.
+    pub fn set_cognitive_channels(&mut self, channels: Option<[f32; 12]>) {
+        self.cached_cognitive_channels = channels;
+    }
+
     /// Reset network state.
     pub fn reset(&mut self) {
         self.network.reset();
         self.prev_frame = None;
+        self.cached_cognitive_channels = None;
     }
 
     /// Set the learning rate directly.
@@ -477,6 +524,16 @@ impl VocalTractController {
     /// Get current learning rate.
     pub fn learning_rate(&self) -> f32 {
         self.learning_rate
+    }
+
+    /// Set the maximum formant delta per frame (Hz). Clamped to [1.0, 50.0].
+    pub fn set_max_formant_delta(&mut self, delta: f32) {
+        self.max_formant_delta = delta.clamp(1.0, 50.0);
+    }
+
+    /// Get current maximum formant delta per frame (Hz).
+    pub fn max_formant_delta(&self) -> f32 {
+        self.max_formant_delta
     }
 
     /// Get configuration.
@@ -492,7 +549,7 @@ impl VocalTractController {
         &mut self,
         cognitive_hv: &ContinuousHV,
         dt: f32,
-        channels: Option<&[f32; 10]>,
+        channels: Option<&[f32; 12]>,
     ) -> FormantFrame {
         let mut frame = self.forward(cognitive_hv, dt);
 
@@ -518,9 +575,10 @@ impl VocalTractController {
     }
 
     /// Train the prosody head given target prosody values and current predictions.
+    #[allow(clippy::too_many_arguments)]
     pub fn train_prosody(
         &mut self,
-        channels: &[f32; 10],
+        channels: &[f32; 12],
         target_f0: f32,
         target_energy: f32,
         target_voicing: f32,
@@ -627,6 +685,75 @@ impl VocalTractController {
 
         last_epoch_loss
     }
+
+    /// Train on phoneme transitions (BPTT sequence training).
+    ///
+    /// Unlike `train_on_phoneme_targets()` which resets between phonemes, this
+    /// method trains the LTC network to smoothly transition between phoneme pairs.
+    /// For each (from, to) pair:
+    /// 1. Warmup on "from" phoneme (settle network state)
+    /// 2. Switch to "to" phoneme HV and train over N transition frames
+    /// 3. Target at each frame is linearly interpolated between "from" and "to" formants
+    ///
+    /// This teaches the network to produce smooth formant trajectories during transitions,
+    /// reducing the max delta from ~90 Hz/frame toward the rule-based ~17 Hz/frame target.
+    pub fn train_on_transitions(
+        &mut self,
+        genesis: &GenesisSeed,
+        transition_pairs: &[(&str, &crate::types::FormantTarget, &str, &crate::types::FormantTarget)],
+        epochs: usize,
+    ) -> f32 {
+        if transition_pairs.is_empty() {
+            return 0.0;
+        }
+
+        const WARMUP_STEPS: usize = 20;
+        const TRANSITION_STEPS: usize = 16; // 80ms at 200Hz — matches coarticulation_frames
+
+        let lr = self.learning_rate * 10.0;
+        let mut last_epoch_loss = 0.0;
+
+        // Pre-compute HVs and target frames
+        let pairs: Vec<(ContinuousHV, FormantFrame, ContinuousHV, FormantFrame)> = transition_pairs
+            .iter()
+            .map(|(from_name, from_target, to_name, to_target)| {
+                let from_hv = genesis.hv(&format!("phoneme::{from_name}"), HDC_DIMENSION);
+                let to_hv = genesis.hv(&format!("phoneme::{to_name}"), HDC_DIMENSION);
+                let from_frame = FormantFrame::from_target(from_target, self.config.base_f0, 0.7, 0.0);
+                let to_frame = FormantFrame::from_target(to_target, self.config.base_f0, 0.7, 0.0);
+                (from_hv, from_frame, to_hv, to_frame)
+            })
+            .collect();
+
+        for _epoch in 0..epochs {
+            let mut epoch_loss = 0.0;
+
+            for (from_hv, from_frame, to_hv, to_frame) in &pairs {
+                self.reset();
+
+                // Warmup: settle on "from" phoneme
+                for _ in 0..WARMUP_STEPS {
+                    self.forward(from_hv, 0.005);
+                }
+
+                // Transition: switch to "to" HV, train with interpolated targets
+                for step in 0..TRANSITION_STEPS {
+                    let t = (step + 1) as f32 / TRANSITION_STEPS as f32;
+                    let target = from_frame.lerp(to_frame, t);
+
+                    let pred = self.forward(to_hv, 0.005);
+                    epoch_loss += formant_mse(&pred, &target);
+
+                    // Train toward interpolated target (no weight decay)
+                    self.train_step_impl(to_hv, &target, 0.005, lr, 0.0);
+                }
+            }
+
+            last_epoch_loss = epoch_loss / (pairs.len() * TRANSITION_STEPS) as f32;
+        }
+
+        last_epoch_loss
+    }
 }
 
 /// Normalized mean squared error between two FormantFrames.
@@ -681,14 +808,17 @@ pub struct ProsodyCorrection {
     pub delta_voicing: f32,
 }
 
-/// Lightweight MLP (10→8→3) mapping cognitive voice channels directly to prosody corrections.
+/// Lightweight MLP (12→8→3) mapping cognitive voice channels directly to prosody corrections.
 ///
 /// Prosody (F0, energy, voicing) should respond more quickly and directly to consciousness
 /// state than formants, which have articulatory inertia. This head bypasses the 16,384D
 /// HDC bottleneck for prosody-specific modulation.
+///
+/// 12 input channels include Phi (integrated information) and EFE (expected free energy)
+/// for affective prosody: consciousness state directly modulates voice quality.
 pub struct ProsodyHead {
-    /// Hidden layer weights: 10 inputs × 8 hidden (flat row-major).
-    w1: [f32; 80],
+    /// Hidden layer weights: 12 inputs × 8 hidden (flat row-major).
+    w1: [f32; 96],
     /// Hidden layer bias (8D).
     b1: [f32; 8],
     /// Output layer weights: 8 hidden × 3 outputs (flat row-major).
@@ -701,18 +831,21 @@ pub struct ProsodyHead {
 
 impl ProsodyHead {
     /// Create from genesis seed with hand-tuned initial weights.
+    #[allow(clippy::erasing_op, clippy::identity_op)]
     ///
-    /// Neurons 0–3 are pre-wired with psychoacoustically meaningful mappings:
+    /// Neurons 0–5 are pre-wired with psychoacoustically meaningful mappings:
     /// - Neuron 0: arousal (ch2) → F0 raise (high arousal = higher pitch)
     /// - Neuron 1: arousal (ch2) → energy boost (high arousal = louder)
     /// - Neuron 2: consciousness (ch7) → energy modulation
     /// - Neuron 3: prediction_error (ch0) → F0 drop (uncertainty = lower pitch)
+    /// - Neuron 4: Phi (ch10) → F0 lift (high integration = more expressive pitch)
+    /// - Neuron 5: EFE (ch11) → energy drop (high surprise = deliberate, quieter)
     ///
-    /// Neurons 4–7 retain small random init for online learning.
+    /// Neurons 6–7 retain small random init for online learning.
     pub fn from_genesis(genesis: &GenesisSeed, lr: f32) -> Self {
-        let w1_hv = genesis.hv("prosody_head::w1", 80);
-        let mut w1 = [0.0f32; 80];
-        for (i, v) in w1_hv.values.iter().enumerate().take(80) {
+        let w1_hv = genesis.hv("prosody_head::w1", 96);
+        let mut w1 = [0.0f32; 96];
+        for (i, v) in w1_hv.values.iter().enumerate().take(96) {
             w1[i] = v * 0.05; // Small random init for all
         }
 
@@ -728,34 +861,51 @@ impl ProsodyHead {
             w2[i] = v * 0.05; // Small random init for all
         }
 
-        // ── Hand-tuned neurons 0–3 ──────────────────────────────────────────
-        // Channel indices: 0=prediction_error, 2=arousal, 7=consciousness_level
+        // ── Hand-tuned neurons 0–5 ──────────────────────────────────────────
+        // Channel indices: 0=prediction_error, 2=arousal, 7=consciousness_level,
+        //                  10=integrated_phi, 11=expected_free_energy
         // Output indices: 0=delta_f0, 1=delta_energy, 2=delta_voicing
-        // w1 layout: w1[hidden_idx * 10 + input_idx]
+        // w1 layout: w1[hidden_idx * 12 + input_idx]
         // w2 layout: w2[output_idx * 8 + hidden_idx]
 
         // Neuron 0: arousal → F0 raise
         // At arousal=0.5 (neutral): tanh(2.0*0.5 - 1.0) = tanh(0) = 0 → no correction
         // At arousal=0.9 (excited): tanh(0.8) ≈ 0.66 → +26 Hz
         // At arousal=0.1 (calm):    tanh(-0.8) ≈ -0.66 → -26 Hz
-        w1[0 * 10 + 2] = 2.0;
+        w1[0 * 12 + 2] = 2.0;
         b1[0] = -1.0;
         w2[0 * 8 + 0] = 40.0;
 
         // Neuron 1: arousal → energy boost
-        w1[1 * 10 + 2] = 1.5;
+        w1[1 * 12 + 2] = 1.5;
         b1[1] = -0.75;
         w2[1 * 8 + 1] = 0.8;
 
         // Neuron 2: consciousness_level → energy modulation
-        w1[2 * 10 + 7] = 1.5;
+        w1[2 * 12 + 7] = 1.5;
         b1[2] = -0.75;
         w2[1 * 8 + 2] = 0.5;
 
         // Neuron 3: prediction_error → F0 drop (uncertainty lowers pitch)
-        w1[3 * 10 + 0] = -1.5;
+        w1[3 * 12 + 0] = -1.5;
         b1[3] = 0.0;
         w2[0 * 8 + 3] = 20.0;
+
+        // Neuron 4: Phi → F0 lift (higher integration = more expressive pitch)
+        // At Phi=0.5 (default): tanh(2.0*0.25 - 1.0) = tanh(-0.5) ≈ -0.46 → -11.5 Hz (subdued)
+        // At Phi=1.5 (high):    tanh(2.0*0.75 - 1.0) = tanh(0.5) ≈ 0.46 → +11.5 Hz (expressive)
+        // At Phi=0.0 (none):    tanh(-1.0) ≈ -0.76 → -19 Hz (flat, disconnected)
+        w1[4 * 12 + 10] = 2.0; // Phi channel (normalized to [0,1] from [0,2])
+        b1[4] = -1.0;
+        w2[0 * 8 + 4] = 25.0; // F0 lift
+
+        // Neuron 5: EFE → energy drop (high surprise = deliberate, quieter speech)
+        // At EFE=1.0 (default): tanh(-1.0*0.2 + 0.5) = tanh(0.3) ≈ 0.29 (slight boost)
+        // At EFE=4.0 (high):    tanh(-1.0*0.8 + 0.5) = tanh(-0.3) ≈ -0.29 (energy drop)
+        // At EFE=0.0 (none):    tanh(0.5) ≈ 0.46 (confident, full energy)
+        w1[5 * 12 + 11] = -1.0; // EFE channel (normalized to [0,1] from [0,5])
+        b1[5] = 0.5;
+        w2[1 * 8 + 5] = 0.6; // Energy modulation
 
         // Zero output bias → hand-tuned weights alone set initial behavior
         let b2 = [0.0f32; 3];
@@ -763,14 +913,14 @@ impl ProsodyHead {
         Self { w1, b1, w2, b2, lr }
     }
 
-    /// Forward pass: 10D channels → tanh hidden → linear output → clamped corrections.
-    pub fn forward(&self, channels: &[f32; 10]) -> ProsodyCorrection {
+    /// Forward pass: 12D channels → tanh hidden → linear output → clamped corrections.
+    pub fn forward(&self, channels: &[f32; 12]) -> ProsodyCorrection {
         // Hidden layer: h = tanh(W1 @ x + b1)
         let mut hidden = [0.0f32; 8];
         for i in 0..8 {
             let mut sum = self.b1[i];
-            for j in 0..10 {
-                sum += self.w1[i * 10 + j] * channels[j];
+            for j in 0..12 {
+                sum += self.w1[i * 12 + j] * channels[j];
             }
             hidden[i] = sum.tanh();
         }
@@ -793,14 +943,14 @@ impl ProsodyHead {
     }
 
     /// Train via backprop: compute gradients from target corrections and update weights.
-    pub fn train_step(&mut self, channels: &[f32; 10], target: &ProsodyCorrection) {
+    pub fn train_step(&mut self, channels: &[f32; 12], target: &ProsodyCorrection) {
         // Forward pass (save intermediates)
         let mut hidden_pre = [0.0f32; 8];
         let mut hidden = [0.0f32; 8];
         for i in 0..8 {
             let mut sum = self.b1[i];
-            for j in 0..10 {
-                sum += self.w1[i * 10 + j] * channels[j];
+            for j in 0..12 {
+                sum += self.w1[i * 12 + j] * channels[j];
             }
             hidden_pre[i] = sum;
             hidden[i] = sum.tanh();
@@ -840,8 +990,8 @@ impl ProsodyHead {
         for i in 0..8 {
             let dtanh = 1.0 - hidden[i] * hidden[i];
             let d_pre = d_hidden[i] * dtanh;
-            for j in 0..10 {
-                self.w1[i * 10 + j] -= self.lr * d_pre * channels[j];
+            for j in 0..12 {
+                self.w1[i * 12 + j] -= self.lr * d_pre * channels[j];
             }
             self.b1[i] -= self.lr * d_pre;
         }
@@ -1235,7 +1385,7 @@ mod tests {
         let hv = ContinuousHV::random(HDC_DIMENSION, 42);
 
         // Default cognitive channels
-        let channels: [f32; 10] = [0.0, 0.0, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 0.8, 0.8];
+        let channels: [f32; 12] = [0.0, 0.0, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 0.8, 0.8, 0.5, 1.0];
 
         let frame_without = ctrl.forward(&hv, 0.005);
         ctrl.reset();
@@ -1258,12 +1408,12 @@ mod tests {
         let hv = ContinuousHV::random(HDC_DIMENSION, 42);
 
         // Low arousal channels
-        let low_arousal: [f32; 10] = [0.0, 0.0, 0.1, 1.0, 0.5, 0.0, 1.0, 0.3, 0.8, 0.8];
+        let low_arousal: [f32; 12] = [0.0, 0.0, 0.1, 1.0, 0.5, 0.0, 1.0, 0.3, 0.8, 0.8, 0.5, 1.0];
         ctrl.reset();
         let frame_low = ctrl.forward_with_prosody(&hv, 0.005, Some(&low_arousal));
 
         // High arousal channels
-        let high_arousal: [f32; 10] = [0.0, 0.0, 0.9, 1.0, 0.5, 0.0, 1.0, 0.9, 0.8, 0.8];
+        let high_arousal: [f32; 12] = [0.0, 0.0, 0.9, 1.0, 0.5, 0.0, 1.0, 0.9, 0.8, 0.8, 0.5, 1.0];
         ctrl.reset();
         let frame_high = ctrl.forward_with_prosody(&hv, 0.005, Some(&high_arousal));
 
@@ -1305,6 +1455,57 @@ mod tests {
     }
 
     #[test]
+    fn test_affective_prosody_phi_modulates_f0() {
+        let genesis = test_genesis();
+        let config = VocalTractConfig::default();
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+        let hv = ContinuousHV::random(HDC_DIMENSION, 42);
+
+        // Low Phi (disconnected, flat voice)
+        // ch: [pred_err, val, arou, unif, epist, coh_v, cross, cons, artic, rate, phi, efe]
+        let low_phi: [f32; 12] = [0.0, 0.0, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 0.8, 0.8, 0.0, 1.0];
+        ctrl.reset();
+        let frame_low = ctrl.forward_with_prosody(&hv, 0.005, Some(&low_phi));
+
+        // High Phi (integrated, expressive voice)
+        let high_phi: [f32; 12] = [0.0, 0.0, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 0.8, 0.8, 1.8, 1.0];
+        ctrl.reset();
+        let frame_high = ctrl.forward_with_prosody(&hv, 0.005, Some(&high_phi));
+
+        // Higher Phi should produce higher F0 (neuron 4: Phi → F0 lift)
+        assert!(
+            frame_high.f0 > frame_low.f0,
+            "High Phi should raise F0: high={:.1}, low={:.1}",
+            frame_high.f0, frame_low.f0
+        );
+    }
+
+    #[test]
+    fn test_affective_prosody_efe_modulates_energy() {
+        let genesis = test_genesis();
+        let config = VocalTractConfig::default();
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+        let hv = ContinuousHV::random(HDC_DIMENSION, 42);
+
+        // Low EFE (confident, full energy)
+        let low_efe: [f32; 12] = [0.0, 0.0, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 0.8, 0.8, 0.5, 0.0];
+        ctrl.reset();
+        let frame_low = ctrl.forward_with_prosody(&hv, 0.005, Some(&low_efe));
+
+        // High EFE (uncertain, deliberate/quieter)
+        let high_efe: [f32; 12] = [0.0, 0.0, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 0.8, 0.8, 0.5, 4.5];
+        ctrl.reset();
+        let frame_high = ctrl.forward_with_prosody(&hv, 0.005, Some(&high_efe));
+
+        // Higher EFE should produce lower energy (neuron 5: EFE → energy drop)
+        assert!(
+            frame_low.energy > frame_high.energy,
+            "High EFE should reduce energy: low_efe={:.3}, high_efe={:.3}",
+            frame_low.energy, frame_high.energy
+        );
+    }
+
+    #[test]
     fn test_ema_smoothing_reduces_delta() {
         let genesis = test_genesis();
         let config = VocalTractConfig {
@@ -1337,10 +1538,112 @@ mod tests {
             .map(|w| (w[1] - w[0]).abs())
             .fold(0.0f32, f32::max);
 
-        // With EMA alpha=0.3, max delta should be well under 50 Hz
+        // With EMA alpha=0.3 + rate limiter 25 Hz/frame, max delta should be ≤25 Hz
         assert!(
-            max_delta < 50.0,
-            "EMA smoothing should limit F1 delta: max_delta={max_delta:.1} Hz"
+            max_delta <= 25.5,
+            "EMA + rate limiter should cap F1 delta at ~25 Hz: max_delta={max_delta:.1} Hz"
+        );
+    }
+
+    #[test]
+    fn test_bandwidth_consciousness_modulation() {
+        let genesis = test_genesis();
+        let config = VocalTractConfig::default();
+
+        let hv = ContinuousHV::random(HDC_DIMENSION, 42);
+
+        // High consciousness (channel 7 = 1.0) → bandwidth_scale = 0.8
+        let mut ctrl_high = VocalTractController::new(&genesis, &config);
+        let mut high_channels = [0.0f32; 12];
+        high_channels[7] = 1.0; // consciousness_level = 1.0
+        ctrl_high.set_cognitive_channels(Some(high_channels));
+        let frame_high = ctrl_high.forward(&hv, 0.005);
+
+        // Low consciousness (channel 7 = 0.0) → bandwidth_scale = 1.2
+        let mut ctrl_low = VocalTractController::new(&genesis, &config);
+        let mut low_channels = [0.0f32; 12];
+        low_channels[7] = 0.0; // consciousness_level = 0.0
+        ctrl_low.set_cognitive_channels(Some(low_channels));
+        let frame_low = ctrl_low.forward(&hv, 0.005);
+
+        // High consciousness should produce tighter (smaller) bandwidths
+        assert!(
+            frame_high.b1 < frame_low.b1,
+            "High consciousness should tighten B1: high={:.1}, low={:.1}",
+            frame_high.b1, frame_low.b1
+        );
+        assert!(
+            frame_high.b2 < frame_low.b2,
+            "High consciousness should tighten B2: high={:.1}, low={:.1}",
+            frame_high.b2, frame_low.b2
+        );
+        assert!(
+            frame_high.b3 < frame_low.b3,
+            "High consciousness should tighten B3: high={:.1}, low={:.1}",
+            frame_high.b3, frame_low.b3
+        );
+
+        // Verify the expected ratio: high/low should be 0.8/1.2 = 2/3
+        let ratio = frame_high.b1 / frame_low.b1;
+        let expected_ratio = 0.8 / 1.2;
+        assert!(
+            (ratio - expected_ratio).abs() < 0.01,
+            "B1 ratio should be ~{expected_ratio:.4}: got {ratio:.4}"
+        );
+
+        // F1/F2/F3 should be UNCHANGED (same genesis, same HV, same first frame)
+        assert!(
+            (frame_high.f1 - frame_low.f1).abs() < 1e-4,
+            "F1 should be unaffected: high={:.1}, low={:.1}",
+            frame_high.f1, frame_low.f1
+        );
+        assert!(
+            (frame_high.f2 - frame_low.f2).abs() < 1e-4,
+            "F2 should be unaffected: high={:.1}, low={:.1}",
+            frame_high.f2, frame_low.f2
+        );
+        assert!(
+            (frame_high.f3 - frame_low.f3).abs() < 1e-4,
+            "F3 should be unaffected: high={:.1}, low={:.1}",
+            frame_high.f3, frame_low.f3
+        );
+    }
+
+    #[test]
+    fn test_set_max_formant_delta() {
+        let genesis = test_genesis();
+        let config = VocalTractConfig::default();
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+
+        // Default should be 25.0
+        assert!(
+            (ctrl.max_formant_delta() - 25.0).abs() < 1e-4,
+            "Default max_formant_delta should be 25.0: got {}",
+            ctrl.max_formant_delta()
+        );
+
+        // Set to a new value
+        ctrl.set_max_formant_delta(12.0);
+        assert!(
+            (ctrl.max_formant_delta() - 12.0).abs() < 1e-4,
+            "Should be 12.0: got {}",
+            ctrl.max_formant_delta()
+        );
+
+        // Clamp low
+        ctrl.set_max_formant_delta(0.1);
+        assert!(
+            (ctrl.max_formant_delta() - 1.0).abs() < 1e-4,
+            "Should clamp to 1.0: got {}",
+            ctrl.max_formant_delta()
+        );
+
+        // Clamp high
+        ctrl.set_max_formant_delta(100.0);
+        assert!(
+            (ctrl.max_formant_delta() - 50.0).abs() < 1e-4,
+            "Should clamp to 50.0: got {}",
+            ctrl.max_formant_delta()
         );
     }
 
@@ -1373,5 +1676,59 @@ mod tests {
         );
         assert!((frame1.f2 - frame2.f2).abs() < 1e-4);
         assert!((frame1.f3 - frame2.f3).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_transition_training_reduces_delta() {
+        use crate::types::FormantTarget;
+
+        let genesis = test_genesis();
+        let mut ctrl = VocalTractController::new(&genesis, &VocalTractConfig::default());
+
+        let ah_target = FormantTarget::vowel(520.0, 1190.0, 2390.0, 80.0);
+        let iy_target = FormantTarget::vowel(270.0, 2290.0, 3010.0, 100.0);
+
+        // First: train static phoneme targets so controller knows both vowels
+        let targets: Vec<(&str, &FormantTarget)> = vec![("AH", &ah_target), ("IY", &iy_target)];
+        ctrl.train_on_phoneme_targets(&genesis, &targets, 20);
+
+        // Measure pre-transition max delta (AH → IY)
+        ctrl.reset();
+        let ah_hv = genesis.hv("phoneme::AH", HDC_DIMENSION);
+        let iy_hv = genesis.hv("phoneme::IY", HDC_DIMENSION);
+
+        for _ in 0..20 {
+            ctrl.forward(&ah_hv, 0.005);
+        }
+        let mut prev_f1 = ctrl.forward(&ah_hv, 0.005).f1;
+        let mut max_delta_before = 0.0f32;
+        for _ in 0..16 {
+            let frame = ctrl.forward(&iy_hv, 0.005);
+            max_delta_before = max_delta_before.max((frame.f1 - prev_f1).abs());
+            prev_f1 = frame.f1;
+        }
+
+        // Now train transitions
+        let pairs = vec![("AH", &ah_target, "IY", &iy_target)];
+        ctrl.train_on_transitions(&genesis, &pairs, 10);
+
+        // Measure post-transition max delta
+        ctrl.reset();
+        for _ in 0..20 {
+            ctrl.forward(&ah_hv, 0.005);
+        }
+        let mut prev_f1 = ctrl.forward(&ah_hv, 0.005).f1;
+        let mut max_delta_after = 0.0f32;
+        for _ in 0..16 {
+            let frame = ctrl.forward(&iy_hv, 0.005);
+            max_delta_after = max_delta_after.max((frame.f1 - prev_f1).abs());
+            prev_f1 = frame.f1;
+        }
+
+        // Transition training should reduce max delta (or at least not increase it much)
+        assert!(
+            max_delta_after < max_delta_before * 1.5,
+            "Transition training shouldn't increase delta: before={max_delta_before:.1}, after={max_delta_after:.1}"
+        );
     }
 }

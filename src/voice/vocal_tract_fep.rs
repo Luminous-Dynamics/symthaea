@@ -70,8 +70,10 @@ impl StreamingVocalTract {
             sample_rate,
             ..Default::default()
         };
+        let mut pipeline = VocalTractPipeline::new(genesis);
+        populate_manner_map(&mut pipeline);
         Self {
-            pipeline: VocalTractPipeline::new(genesis),
+            pipeline,
             vocoder: super::vocoder::FormantVocoder::with_config(vocoder_config),
             samples_per_frame: (sample_rate / frame_rate) as usize,
         }
@@ -120,6 +122,20 @@ impl StreamingVocalTract {
         self.pipeline.reset();
         self.vocoder.reset();
     }
+}
+
+/// Populate a pipeline's manner map from the ARPABET formant database.
+///
+/// This wires phoneme names to their manner of articulation so `tick_phoneme()`
+/// can set `source_type` on output frames for proper vocoder excitation.
+#[cfg(feature = "vocal-tract")]
+pub fn populate_manner_map(pipeline: &mut VocalTractPipeline) {
+    let db = super::formant_targets::get_formant_database();
+    let manner_map: std::collections::HashMap<String, _> = db
+        .iter()
+        .map(|(name, target)| (name.clone(), target.manner))
+        .collect();
+    pipeline.set_manner_map(manner_map);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

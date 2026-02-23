@@ -102,7 +102,7 @@ pub use voice_feedback::{
 };
 
 // Re-export vocal tract types (Phase 17)
-pub use vocal_tract_controller::train_controller_on_phoneme_db;
+pub use vocal_tract_controller::{train_controller_on_phoneme_db, train_controller_transitions};
 pub use vocal_tract_controller::{
     ProsodyCorrection, ProsodyHead, SpeakerProfile, VocalTractConfig, VocalTractController,
 };

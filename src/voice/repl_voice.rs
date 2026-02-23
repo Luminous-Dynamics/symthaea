@@ -1444,6 +1444,8 @@ impl ReplVoiceOutput {
                 &db,
                 3,
             );
+            // Populate manner map for source_type propagation to vocoder
+            super::vocal_tract_fep::populate_manner_map(&mut pipeline);
             Some(pipeline)
         } else {
             None
@@ -1746,6 +1748,7 @@ impl ReplVoiceOutput {
             consciousness_level: 0.6,
             articulation_quality: 0.7,
             rate_stability: 1.0,
+            ..Default::default()
         };
 
         let base_f0 = self.config.base_f0;
@@ -1954,6 +1957,7 @@ impl ReplVoiceOutput {
                 &db,
                 3,
             );
+            super::vocal_tract_fep::populate_manner_map(&mut pipeline);
             self.ltc_pipeline = Some(pipeline);
         }
         if !enabled {

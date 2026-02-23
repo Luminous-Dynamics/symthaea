@@ -10,7 +10,7 @@
 use crate::controller::{SpeakerProfile, VocalTractConfig, VocalTractController};
 use crate::encoder::{VocalTractHdcEncoder, VoiceCognitiveState};
 use crate::fep::{VocalTractFepAgent, VocalTractObservation};
-use crate::types::FormantFrame;
+use crate::types::{FormantFrame, SourceType};
 use symthaea_core::genesis::{GenesisCovenant, GenesisSeed};
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
@@ -119,7 +119,7 @@ pub struct VocalTractPipeline {
     /// Cache of phoneme identity HVs (phoneme name → HV).
     phoneme_hv_cache: std::collections::HashMap<String, ContinuousHV>,
     /// Cached cognitive channels for prosody head (updated at 10Hz, used at 200Hz).
-    cached_cognitive_channels: Option<[f32; 10]>,
+    cached_cognitive_channels: Option<[f32; 12]>,
     /// Previous phoneme name (for detecting phoneme transitions).
     prev_phoneme: Option<String>,
     /// Previous phoneme's bound HV (for coarticulation blending during transitions).
@@ -128,6 +128,8 @@ pub struct VocalTractPipeline {
     coarticulation_counter: usize,
     /// Number of frames over which to blend between old/new phoneme HVs (80ms at 200Hz).
     coarticulation_frames: usize,
+    /// Phoneme name → manner of articulation (for setting source_type on output frames).
+    phoneme_manner_map: std::collections::HashMap<String, SourceType>,
 }
 
 impl VocalTractPipeline {
@@ -148,6 +150,7 @@ impl VocalTractPipeline {
             prev_phoneme_bound_hv: None,
             coarticulation_counter: 0,
             coarticulation_frames: 16, // 80ms at 200Hz
+            phoneme_manner_map: std::collections::HashMap::new(),
         }
     }
 
@@ -183,7 +186,23 @@ impl VocalTractPipeline {
             prev_phoneme_bound_hv: None,
             coarticulation_counter: 0,
             coarticulation_frames: 16,
+            phoneme_manner_map: std::collections::HashMap::new(),
         }
+    }
+
+    /// Set the phoneme manner map for source_type propagation.
+    ///
+    /// Maps phoneme names (ARPABET) to their manner of articulation. When
+    /// `tick_phoneme()` produces a frame, it sets `frame.source_type` from
+    /// this map so the vocoder uses the correct excitation signal.
+    pub fn set_manner_map(&mut self, map: std::collections::HashMap<String, SourceType>) {
+        self.phoneme_manner_map = map;
+    }
+
+    /// Register a single phoneme's manner of articulation.
+    pub fn register_phoneme_manner(&mut self, phoneme: &str, manner: SourceType) {
+        self.phoneme_manner_map
+            .insert(phoneme.to_string(), manner);
     }
 
     /// Get or create a cached phoneme identity HV.
@@ -311,6 +330,15 @@ impl VocalTractPipeline {
             self.cached_hv.clone()
         };
 
+        // Adaptive rate limiting: tighter during steady state, looser during transitions
+        if phoneme.is_some() && self.coarticulation_counter < self.coarticulation_frames {
+            self.controller
+                .set_max_formant_delta(self.controller.config().transition_max_delta);
+        } else {
+            self.controller
+                .set_max_formant_delta(self.controller.config().steady_max_delta);
+        }
+
         // Motor tick (200Hz): evolve network + produce formants with prosody head
         let mut frame = self.controller.forward_with_prosody(
             &effective_hv,
@@ -319,6 +347,14 @@ impl VocalTractPipeline {
         );
         frame.time = self.cumulative_time;
         self.cumulative_time += dt;
+
+        // Set source_type from phoneme manner map (vocoder uses this for excitation)
+        if let Some(ph) = phoneme {
+            if let Some(&manner) = self.phoneme_manner_map.get(ph) {
+                frame.source_type = manner;
+            }
+        }
+
         frame
     }
 
@@ -933,6 +969,131 @@ mod tests {
         assert!(
             f1_drift < 200.0,
             "Cached frames should be consistent with uncached: drift={f1_drift:.1}"
+        );
+    }
+
+    #[test]
+    fn test_adaptive_rate_limiting() {
+        let genesis = GenesisSeed::from_phrase("test-adaptive-rate");
+        let mut pipeline = VocalTractPipeline::new(&genesis);
+        let state = VoiceCognitiveState::default();
+
+        // Verify config defaults
+        assert!(
+            (pipeline.controller.config().steady_max_delta - 12.0).abs() < 1e-4,
+            "steady_max_delta should default to 12.0"
+        );
+        assert!(
+            (pipeline.controller.config().transition_max_delta - 20.0).abs() < 1e-4,
+            "transition_max_delta should default to 20.0"
+        );
+
+        // Train briefly so the network can distinguish AH vs IY
+        let targets = vec![
+            ("AH", crate::types::FormantTarget::vowel(520.0, 1190.0, 2390.0, 80.0)),
+            ("IY", crate::types::FormantTarget::vowel(270.0, 2290.0, 3010.0, 100.0)),
+        ];
+        let target_refs: Vec<(&str, &crate::types::FormantTarget)> =
+            targets.iter().map(|(name, t)| (*name, t)).collect();
+        pipeline
+            .controller
+            .train_on_phoneme_targets(&genesis, &target_refs, 20);
+
+        // Run 40 frames of /AH/ to establish steady state
+        for _ in 0..40 {
+            pipeline.tick_phoneme(&state, None, 0.005, Some("AH"));
+        }
+
+        // Collect steady-state frames (still /AH/)
+        let mut steady_f1 = Vec::new();
+        for _ in 0..20 {
+            let frame = pipeline.tick_phoneme(&state, None, 0.005, Some("AH"));
+            steady_f1.push(frame.f1);
+        }
+
+        // Transition to /IY/ — collect transition frames
+        let mut transition_f1 = Vec::new();
+        for _ in 0..20 {
+            let frame = pipeline.tick_phoneme(&state, None, 0.005, Some("IY"));
+            transition_f1.push(frame.f1);
+        }
+
+        // Verify steady-state delta respects 12.0 Hz/frame limit
+        let steady_max: f32 = steady_f1
+            .windows(2)
+            .map(|w| (w[1] - w[0]).abs())
+            .fold(0.0f32, f32::max);
+        assert!(
+            steady_max <= 12.5,
+            "Steady-state F1 delta should be ≤12 Hz/frame: got {:.2}",
+            steady_max
+        );
+
+        // Verify transition delta respects 20.0 Hz/frame limit
+        let transition_max: f32 = transition_f1
+            .windows(2)
+            .map(|w| (w[1] - w[0]).abs())
+            .fold(0.0f32, f32::max);
+        assert!(
+            transition_max <= 20.5,
+            "Transition F1 delta should be ≤20 Hz/frame: got {:.2}",
+            transition_max
+        );
+    }
+
+    #[test]
+    fn test_source_type_propagation() {
+        use crate::types::SourceType;
+
+        let genesis = GenesisSeed::from_phrase("test-source-type");
+        let mut pipeline = VocalTractPipeline::new(&genesis);
+        let state = VoiceCognitiveState::default();
+
+        // Register manner for specific phonemes
+        pipeline.register_phoneme_manner("P", SourceType::Stop);
+        pipeline.register_phoneme_manner("S", SourceType::Fricative);
+        pipeline.register_phoneme_manner("M", SourceType::Nasal);
+        pipeline.register_phoneme_manner("AH", SourceType::Vowel);
+
+        // Stop consonant
+        let frame_p = pipeline.tick_phoneme(&state, None, 0.005, Some("P"));
+        assert_eq!(
+            frame_p.source_type,
+            SourceType::Stop,
+            "P should produce Stop source type"
+        );
+
+        // Fricative
+        let frame_s = pipeline.tick_phoneme(&state, None, 0.005, Some("S"));
+        assert_eq!(
+            frame_s.source_type,
+            SourceType::Fricative,
+            "S should produce Fricative source type"
+        );
+
+        // Nasal
+        let frame_m = pipeline.tick_phoneme(&state, None, 0.005, Some("M"));
+        assert_eq!(
+            frame_m.source_type,
+            SourceType::Nasal,
+            "M should produce Nasal source type"
+        );
+
+        // Vowel
+        let frame_ah = pipeline.tick_phoneme(&state, None, 0.005, Some("AH"));
+        assert_eq!(
+            frame_ah.source_type,
+            SourceType::Vowel,
+            "AH should produce Vowel source type"
+        );
+
+        // No phoneme → keeps controller default (Silent from ..Default::default())
+        pipeline.reset();
+        let frame_none = pipeline.tick_phoneme(&state, None, 0.005, None);
+        assert_eq!(
+            frame_none.source_type,
+            SourceType::Silent,
+            "No phoneme should keep controller default (Silent)"
         );
     }
 }
