@@ -86,8 +86,16 @@ LibriSpeech-Alignments.zip
 
 # LaTeX byproducts
 papers/latex/*.aux
+papers/latex/*.bbl
 papers/latex/*.blg
 papers/latex/*.out
+papers/latex/*.toc
+papers/latex/*.lof
+papers/latex/*.lot
+
+# Example run artifacts (copies live in papers/figures/)
+efe_ablation.csv
+multi_scenario.csv
 
 # Telemetry output
 *_telemetry.csv
