@@ -77,7 +77,7 @@ Code is available at \url{https://github.com/Luminous-Dynamics/symthaea}.
 % ============================================================================
 % Author Summary (required by PLoS Computational Biology)
 \section*{Author Summary}
-Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We show that the same principles can be implemented using \emph{hyperdimensional computing}, a brain-inspired approach that represents information as very long random vectors (16,384 dimensions). Our system, called Hyperdimensional Active Inference (HAI), replaces costly matrix operations with simple vector operations that run in linear time. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 17 domains: HAI achieves 93\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. The entire system is implemented in Rust (343,000 lines across 30 workspace crates, 9,600+ tests, 47 feature flags) and released as open-source software, demonstrating that biologically-inspired computation can be both theoretically rigorous and practically efficient.
+Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We show that the same principles can be implemented using \emph{hyperdimensional computing}, a brain-inspired approach that represents information as very long random vectors (16,384 dimensions). Our system, called Hyperdimensional Active Inference (HAI), replaces costly matrix operations with simple vector operations that run in linear time. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 17 domains: HAI achieves 93\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. The entire system is implemented in Rust (353,000 lines across 32 workspace crates, 9,600+ tests, 50 feature flags) and released as open-source software, demonstrating that biologically-inspired computation can be both theoretically rigorous and practically efficient.
 
 % ============================================================================
 \section{Introduction}
@@ -310,7 +310,7 @@ where intrinsic reward is negative prediction error. The value function is $V_\t
 
 \subsection{Experimental Setup}
 
-\textbf{Implementation:} Rust, ${\sim}343$K LOC main crate (30 workspace crates, 28 extracted sub-crates), 3,700+ lines core FEP.
+\textbf{Implementation:} Rust, ${\sim}353$K LOC main crate (32 workspace crates, 30 extracted sub-crates), 3,700+ lines core FEP.
 \textbf{Test suite:} 9,600+ tests pass (3,014 main + 3,555 core + ${\sim}3{,}060$ integration/sub-crate), 0 failures, 11 ignored (see Figure~\ref{fig:radar} for full validation radar).
 \textbf{HDC Dimension:} $d = 16{,}384$ (configurable).
 \textbf{Baseline:} pymdp v0.0.8~\citep{heins2022pymdp}.
@@ -445,6 +445,7 @@ Meditation EEG & 6/6 & Gamma flow, theta absorption validated \\
 EEG Seizure & 3/3 & 100\% sensitivity, 100\% specificity \\
 ARC Reasoning & 4/5 & Pattern transfer, 96\% intra-task consistency \\
 Ethics HDC & 5/5 & 92.9\% ETHICS (4 categories, \S\ref{sec:ethics}) \\
+Vocal Tract LTC & 12/12 & 13.5\,Hz avg vowel error, 779\,Hz throughput (\S\ref{sec:voice}) \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -1137,6 +1138,46 @@ All seven scenarios match expected decisions (7/7). The StaticThreat variant val
 
 \textbf{Experiment 3: Swarm Replay.} Three drones replay the sacrifice scenario via recorded setpoint replay, validating that the EFE decision mechanism scales to multi-agent coordination without inter-agent communication.
 
+\subsection{Voice Synthesis: LTC-Driven Articulatory Control}
+\label{sec:voice}
+
+We apply the HDC-LTC-FEP architecture to real-time articulatory speech synthesis, demonstrating that the same computational substrate used for humanoid balance and flight control produces accurate formant trajectories for vowels and consonants. The controller maps 16,384-D phoneme-bound cognitive hypervectors to 9-dimensional formant frames (F1--F3, B1--B3, F0, energy, voicing) through a $2{\times}4$ CfC network at 200\,Hz motor rate, with FEP precision modulation at 10\,Hz.
+
+\textbf{Architecture.} Phoneme identity is injected via HDC binding: a cognitive state hypervector $\mathbf{h}_{\text{cog}}$ is element-wise multiplied with a genesis-seeded phoneme identity vector $\mathbf{h}_{\text{ph}}$, producing a bound vector $\mathbf{h}_{\text{cog}} \otimes \mathbf{h}_{\text{ph}}$ that preserves temporal dynamics while encoding articulatory targets. Coarticulation arises naturally from 80\,ms linear blending between successive bound hypervectors during phoneme transitions.
+
+The output formant frame drives a 5-formant Liljencrants--Fant (LF) glottal model vocoder that produces audio at 24\,kHz. Prosody post-processing applies intonation-specific F0 contours (statement: falling 1.05$\to$0.80; question: rising 0.90$\to$1.25; exclamation: peak at 30\%) and ASR energy envelopes.
+
+\textbf{Training.} Supervised training on the ARPABET formant database (39 phonemes) uses cosine-annealed learning rates with distance-weighted scaling: phonemes far from schwa bias (F1=500, F2=1500, F3=2500\,Hz) receive up to $3{\times}$ the base learning rate. A vowel-first curriculum dedicates the first half of training epochs exclusively to vowels before introducing consonants, preventing near-schwa targets from dominating the gradient landscape.
+
+\textbf{Results.} Table~\ref{tab:voice-results} summarizes accuracy across 15 vowels and 24 consonants, benchmarked against a rule-based baseline that maps phoneme labels directly to target formants.
+
+\begin{table}[ht]
+\centering
+\caption{Voice synthesis accuracy: LTC controller vs.\ rule-based baseline. Error is Euclidean distance across F1--F3 (Hz). Throughput measured at 200\,Hz motor rate.}
+\label{tab:voice-results}
+\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Metric & LTC (ours) & Rule-based \\
+\midrule
+Avg vowel error (Hz) & \textbf{13.5} & 162.0 \\
+Avg consonant error (Hz) & \textbf{16.4} & 38.1 \\
+Transition smoothness (Hz/frame) & \textbf{4.68} & 91.35 \\
+Source type accuracy & 12/12 & 12/12 \\
+Throughput (Hz) & 779 & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The LTC controller reduces average vowel formant error from 162.0\,Hz (rule-based) to 13.5\,Hz---a 91.7\% improvement---while maintaining 779\,Hz throughput ($3.9{\times}$ real-time at 200\,Hz motor rate). Critically, the CfC temporal dynamics produce smooth transitions between phonemes (4.68\,Hz/frame vs.\ 91.35\,Hz/frame for instantaneous rule-based switching), eliminating audible artifacts at phoneme boundaries. Figure~\ref{fig:voice-pipeline} shows per-phoneme accuracy and the summary comparison.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\columnwidth]{fig9_voice_pipeline.pdf}
+\caption{\textbf{Voice pipeline accuracy.} Left: per-vowel formant error (Hz). Center: per-consonant error. Right: summary metrics comparing LTC vs.\ rule-based baseline.}
+\label{fig:voice-pipeline}
+\end{figure}
+
 \subsection{Ethical Considerations}
 
 The Byzantine detection capabilities in the FL pipeline could be misused for participant exclusion. We recommend transparent disclosure of detection criteria and appeals processes. The ethical reasoning system is trained on existing moral norms and may encode societal biases present in the ETHICS and Social Chemistry datasets.
@@ -1229,7 +1270,7 @@ repository under \texttt{data/benchmarks/}.
 \textbf{Repository:} \url{https://github.com/Luminous-Dynamics/symthaea}\par
 \textbf{Language:} Rust (Edition 2021)\par
 \textbf{Dependencies:} ndarray, nalgebra, rand, burn (optional GPU), duckdb\par
-\textbf{Lines of code:} ${\sim}343$K main crate (30 workspace crates, 28 extracted sub-crates), ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
+\textbf{Lines of code:} ${\sim}353$K main crate (32 workspace crates, 30 extracted sub-crates), ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
 \textbf{Test suite:} 9,600+ tests (3,014 main lib + 3,555 core lib + ${\sim}3{,}060$ integration/sub-crate), 11 ignored, 0 failures\par
 \textbf{SIMD:} AVX2+FMA continuous HV acceleration enabled by default; runtime-dispatched AVX-512/AVX2/SSE4.1 for binary HV operations\par
 \textbf{Feature flags:} 47 (41 with cfg gates in source; remainder are binary-build bundles and meta-groups)\par
