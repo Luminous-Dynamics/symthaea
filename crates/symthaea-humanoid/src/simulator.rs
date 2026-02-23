@@ -358,9 +358,10 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             + self.body.segment_lengths[SEG_HEAD] * uprightness;
 
         // 5. Horizontal dynamics
-        // Torso lean drives forward/lateral COM acceleration (inverted pendulum model).
-        // Forward (x) from sagittal tilt, lateral (y) from coronal tilt.
-        // Only when upright enough to push off the ground (uprightness > 0.3).
+        // Two mechanisms: (a) torso lean (inverted pendulum) and (b) stance-phase
+        // ground reaction force from leg pushoff.
+        //
+        // (a) Lean-driven acceleration: forward from sagittal tilt, lateral from coronal.
         let lean_accel_scale = if uprightness > 0.3 {
             g * 0.4 * (uprightness - 0.3).min(0.7) / 0.7
         } else {
@@ -369,13 +370,41 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
         let forward_accel = tilt_sagittal * lean_accel_scale;
         let lateral_accel = tilt_coronal * lean_accel_scale;
 
+        // (b) Stance-phase ground reaction force: when a foot is on the ground
+        // and the hip is extending (positive hip_y velocity = leg pushing back),
+        // add a forward pushoff impulse. This simulates the stance phase of gait
+        // where ground contact converts leg extension into forward propulsion.
+        let r_foot_z = (self.state.root_height - right_leg_len).max(0.0);
+        let l_foot_z = (self.state.root_height - left_leg_len).max(0.0);
+
+        let ground_threshold = 0.05; // foot within 5cm of ground = contact
+        let pushoff_gain = 1.5; // N·s per (rad/s) of hip extension
+
+        let mut pushoff_accel = 0.0;
+
+        // Right leg: hip_y velocity > 0 = extending backward = pushoff
+        if r_foot_z < ground_threshold && uprightness > 0.4 {
+            let r_hip_vel = self.state.joint_velocities[5];
+            if r_hip_vel > 0.0 {
+                pushoff_accel += r_hip_vel * pushoff_gain;
+            }
+        }
+
+        // Left leg: hip_y velocity > 0 = extending backward = pushoff
+        if l_foot_z < ground_threshold && uprightness > 0.4 {
+            let l_hip_vel = self.state.joint_velocities[11];
+            if l_hip_vel > 0.0 {
+                pushoff_accel += l_hip_vel * pushoff_gain;
+            }
+        }
+
         self.state.root_linear_velocity[0] +=
-            (forward_accel + self.external_force[0] / self.body.total_mass) * dt;
+            (forward_accel + pushoff_accel + self.external_force[0] / self.body.total_mass) * dt;
         self.state.root_linear_velocity[1] +=
             (lateral_accel + self.external_force[1] / self.body.total_mass) * dt;
 
-        // Ground friction drag (higher than air drag — feet on ground)
-        let drag = 2.0;
+        // Ground friction drag
+        let drag = 1.0;
         self.state.root_linear_velocity[0] *= (1.0 - drag * dt).max(0.0);
         self.state.root_linear_velocity[1] *= (1.0 - drag * dt).max(0.0);
 
@@ -899,6 +928,23 @@ mod tests {
         assert!(
             knee_angle >= -2.80,
             "Knee should respect lower limit -2.79: got {knee_angle}"
+        );
+    }
+
+    #[test]
+    fn test_stance_pushoff_increases_speed() {
+        let mut sim = SimpleHumanoidSimulator::new();
+        // Apply positive hip_y torque to right leg (extending backward = pushoff)
+        let mut cmd = HumanoidCommand::zero();
+        cmd.torques[5] = 0.5; // right_hip_y: positive = extend back
+        cmd.torques[0] = 0.1; // slight forward lean to keep upright
+        for _ in 0..50 {
+            sim.step(&cmd, 0.025);
+        }
+        let speed = sim.state().horizontal_speed();
+        assert!(
+            speed > 0.01,
+            "Hip extension pushoff should produce forward speed: got {speed}"
         );
     }
 

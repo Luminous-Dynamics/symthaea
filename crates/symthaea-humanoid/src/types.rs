@@ -456,6 +456,125 @@ pub fn pd_standing_baseline(state: &HumanoidState, gains: &HumanoidPdGains) -> H
     HumanoidCommand { torques }
 }
 
+/// Compute PD walking baseline: forward lean + alternating leg swing.
+///
+/// Target angles include:
+/// - Abdomen forward lean (sagittal tilt for forward COM shift)
+/// - Cyclic hip/knee flexion (simple sinusoidal gait pattern)
+/// - Arms swing opposite to legs (natural counterbalance)
+///
+/// The `phase` parameter (0.0..1.0) drives the gait cycle.
+/// `target_speed` scales the amplitude of the gait pattern.
+pub fn pd_walking_baseline(
+    state: &HumanoidState,
+    gains: &HumanoidPdGains,
+    phase: f64,
+    target_speed: f64,
+) -> HumanoidCommand {
+    let mut target_angles = [0.0f64; NUM_ACTUATORS];
+
+    // Scale gait amplitude with target speed (0 at speed=0, full at speed=1+)
+    let amplitude = (target_speed / 1.0).clamp(0.0, 1.0);
+    let cycle = (phase * 2.0 * std::f64::consts::PI).sin();
+    let half_cycle = ((phase * 2.0 * std::f64::consts::PI) + std::f64::consts::FRAC_PI_2).sin();
+
+    // Abdomen: forward lean for COM shift (sagittal tilt)
+    target_angles[0] = 0.15 * amplitude; // abdomen_y: forward lean
+    target_angles[1] = 0.0; // abdomen_z: no yaw
+    target_angles[2] = 0.0; // abdomen_x: no lateral lean
+
+    // Right leg: hip flexion/extension + knee bend
+    target_angles[3] = 0.0; // right_hip_x: abduction (minimal)
+    target_angles[4] = 0.0; // right_hip_z: rotation (minimal)
+    target_angles[5] = 0.3 * amplitude * cycle; // right_hip_y: sagittal swing
+    target_angles[6] = -0.4 * amplitude * half_cycle.max(0.0); // right_knee: flexion during swing
+    target_angles[7] = -0.1 * amplitude * cycle; // right_ankle_x
+    target_angles[8] = 0.05 * amplitude; // right_ankle_y: slight dorsiflexion
+
+    // Left leg: opposite phase
+    target_angles[9] = 0.0; // left_hip_x
+    target_angles[10] = 0.0; // left_hip_z
+    target_angles[11] = -0.3 * amplitude * cycle; // left_hip_y: opposite phase
+    target_angles[12] = -0.4 * amplitude * (-half_cycle).max(0.0); // left_knee
+    target_angles[13] = 0.1 * amplitude * cycle; // left_ankle_x
+    target_angles[14] = 0.05 * amplitude; // left_ankle_y
+
+    // Arms: opposite swing to legs (natural counterbalance)
+    target_angles[15] = -0.2 * amplitude * cycle; // right_shoulder1: opposite to right leg
+    target_angles[16] = 0.0;
+    target_angles[17] = -0.3 * amplitude; // right_elbow: slight bend
+    target_angles[18] = 0.2 * amplitude * cycle; // left_shoulder1: opposite to left leg
+    target_angles[19] = 0.0;
+    target_angles[20] = -0.3 * amplitude; // left_elbow
+
+    let mut torques = [0.0f32; NUM_ACTUATORS];
+    for i in 0..NUM_ACTUATORS {
+        let angle_error = target_angles[i] - state.joint_angles[i];
+        let vel_damping = state.joint_velocities[i];
+        torques[i] = (gains.kp[i] * angle_error - gains.kd[i] * vel_damping) as f32;
+        torques[i] = torques[i].clamp(-1.0, 1.0);
+    }
+    HumanoidCommand { torques }
+}
+
+/// Compute PD running baseline: deeper lean + larger stride + faster cycle.
+///
+/// Amplified version of walking baseline with:
+/// - Steeper forward lean
+/// - Larger hip swing amplitude
+/// - Higher knee lift
+/// - More aggressive arm swing
+pub fn pd_running_baseline(
+    state: &HumanoidState,
+    gains: &HumanoidPdGains,
+    phase: f64,
+    target_speed: f64,
+) -> HumanoidCommand {
+    let mut target_angles = [0.0f64; NUM_ACTUATORS];
+
+    let amplitude = (target_speed / 3.0).clamp(0.0, 1.0);
+    let cycle = (phase * 2.0 * std::f64::consts::PI).sin();
+    let half_cycle = ((phase * 2.0 * std::f64::consts::PI) + std::f64::consts::FRAC_PI_2).sin();
+
+    // Deeper forward lean for running
+    target_angles[0] = 0.25 * amplitude; // abdomen_y: steeper lean
+    target_angles[1] = 0.0;
+    target_angles[2] = 0.0;
+
+    // Right leg: larger stride
+    target_angles[3] = 0.0;
+    target_angles[4] = 0.0;
+    target_angles[5] = 0.5 * amplitude * cycle; // right_hip_y: bigger swing
+    target_angles[6] = -0.7 * amplitude * half_cycle.max(0.0); // right_knee: higher lift
+    target_angles[7] = -0.15 * amplitude * cycle;
+    target_angles[8] = 0.08 * amplitude;
+
+    // Left leg
+    target_angles[9] = 0.0;
+    target_angles[10] = 0.0;
+    target_angles[11] = -0.5 * amplitude * cycle;
+    target_angles[12] = -0.7 * amplitude * (-half_cycle).max(0.0);
+    target_angles[13] = 0.15 * amplitude * cycle;
+    target_angles[14] = 0.08 * amplitude;
+
+    // Arms: more aggressive swing
+    target_angles[15] = -0.4 * amplitude * cycle;
+    target_angles[16] = 0.0;
+    target_angles[17] = -0.5 * amplitude;
+    target_angles[18] = 0.4 * amplitude * cycle;
+    target_angles[19] = 0.0;
+    target_angles[20] = -0.5 * amplitude;
+
+    let mut torques = [0.0f32; NUM_ACTUATORS];
+    for i in 0..NUM_ACTUATORS {
+        let angle_error = target_angles[i] - state.joint_angles[i];
+        let vel_damping = state.joint_velocities[i];
+        torques[i] = (gains.kp[i] * angle_error - gains.kd[i] * vel_damping) as f32;
+        torques[i] = torques[i].clamp(-1.0, 1.0);
+    }
+    HumanoidCommand { torques }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -627,5 +746,82 @@ mod tests {
     #[test]
     fn test_joint_names_count() {
         assert_eq!(JOINT_NAMES.len(), NUM_ACTUATORS);
+    }
+
+    #[test]
+    fn test_pd_walking_baseline_produces_forward_lean() {
+        let state = HumanoidState::standing();
+        let gains = HumanoidPdGains::default();
+        let cmd = pd_walking_baseline(&state, &gains, 0.0, 1.0);
+        // Abdomen_y (joint 0) should have positive torque for forward lean
+        assert!(
+            cmd.torques[0] > 0.01,
+            "Walking should produce forward lean torque: {}",
+            cmd.torques[0]
+        );
+    }
+
+    #[test]
+    fn test_pd_walking_baseline_cyclic() {
+        let state = HumanoidState::standing();
+        let gains = HumanoidPdGains::default();
+        let cmd_0 = pd_walking_baseline(&state, &gains, 0.0, 1.0);
+        let cmd_quarter = pd_walking_baseline(&state, &gains, 0.25, 1.0);
+
+        // Phase 0 (sin=0) vs phase 0.25 (sin=1): hip_y targets differ
+        assert!(
+            (cmd_0.torques[5] - cmd_quarter.torques[5]).abs() > 0.01,
+            "Gait should be cyclic: phase 0 vs 0.25 should differ: {} vs {}",
+            cmd_0.torques[5],
+            cmd_quarter.torques[5]
+        );
+        // At phase 0.25 (peak), legs should be in anti-phase
+        assert!(
+            (cmd_quarter.torques[5].signum() != cmd_quarter.torques[11].signum()),
+            "Legs should be in anti-phase at peak: right={} left={}",
+            cmd_quarter.torques[5],
+            cmd_quarter.torques[11]
+        );
+    }
+
+    #[test]
+    fn test_pd_walking_baseline_zero_speed() {
+        let state = HumanoidState::standing();
+        let gains = HumanoidPdGains::default();
+        let cmd = pd_walking_baseline(&state, &gains, 0.0, 0.0);
+        // At zero speed, amplitude = 0, so all torques should be ~0
+        for &t in &cmd.torques {
+            assert!(
+                t.abs() < 0.01,
+                "Zero speed should give near-zero torques: {t}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_pd_running_baseline_stronger_than_walking() {
+        // At a non-zero phase, running should command more joints to non-zero targets
+        // than walking (bigger arm swing, deeper knee lift, steeper lean).
+        // We test at a state near the walking target, so residual errors reveal the
+        // difference in amplitude that would otherwise be hidden by clamping.
+        let mut state = HumanoidState::standing();
+        // Set joints to walking-phase-0.25 targets (approx)
+        state.joint_angles[0] = 0.15; // abdomen lean (walk amplitude at speed=1)
+        state.joint_angles[5] = 0.3; // right_hip_y
+        state.joint_angles[17] = -0.3; // right elbow
+
+        let gains = HumanoidPdGains::default();
+        let walk = pd_walking_baseline(&state, &gains, 0.25, 1.0);
+        let run = pd_running_baseline(&state, &gains, 0.25, 3.0);
+
+        // Running targets are larger than walking targets, so when state is AT
+        // walking targets, running has positive residual torque and walking has ~0.
+        // Abdomen: run wants 0.25, state is at 0.15 → run pushes forward more
+        assert!(
+            run.torques[0] > walk.torques[0],
+            "Running should push abdomen further: run={} walk={}",
+            run.torques[0],
+            walk.torques[0]
+        );
     }
 }

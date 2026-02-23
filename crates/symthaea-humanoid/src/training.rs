@@ -123,8 +123,8 @@ impl HumanoidTrainer {
     /// Returns (task, pd_weight, target_speed) with smooth transitions:
     /// - Phase 1 (0-40%):  Stand, PD 80%→40%
     /// - Phase 2 (40-60%): Stand, PD 40%→10% (autonomy ramp)
-    /// - Phase 3 (60-85%): Walk, PD 10%→5%, speed 0→1 m/s
-    /// - Phase 4 (85-100%): Run, PD 5%→0%, speed 1→10 m/s
+    /// - Phase 3 (60-95%): Walk, PD 10%→5%, speed 0→1 m/s (35 episodes)
+    /// - Phase 4 (95-100%): Run, PD 5%→0%, speed 1→3 m/s (5 episodes)
     fn curriculum(&self, episode: usize) -> (HumanoidTask, f32, f64) {
         let total = self.config.num_episodes;
         if total <= 1 {
@@ -143,18 +143,19 @@ impl HumanoidTrainer {
             let phase_progress = (progress - 0.4) / 0.2;
             let pd_weight = 0.4 - 0.3 * phase_progress as f32;
             (HumanoidTask::Stand, pd_weight, 0.0)
-        } else if progress < 0.85 {
+        } else if progress < 0.95 {
             // Phase 3: Walk, PD 10%→5%, speed ramps 0→1 m/s
-            let phase_progress = (progress - 0.6) / 0.25;
+            // Extended to 35% of training (was 25%) for longer Walk practice
+            let phase_progress = (progress - 0.6) / 0.35;
             let pd_weight = 0.10 - 0.05 * phase_progress as f32;
             let target_speed = phase_progress * 1.0;
             (HumanoidTask::Walk, pd_weight, target_speed)
         } else {
-            // Phase 4: Run, PD 5%→0%, speed ramps 1→5 m/s
-            // Capped at 5 m/s (10 m/s destabilizes the simple simulator)
-            let phase_progress = (progress - 0.85) / 0.15;
+            // Phase 4: Run, PD 5%→0%, speed ramps 1→3 m/s
+            // Shortened to 5% (was 15%) with gentler speed cap (3 m/s vs 5 m/s)
+            let phase_progress = (progress - 0.95) / 0.05;
             let pd_weight = 0.05 * (1.0 - phase_progress as f32);
-            let target_speed = 1.0 + phase_progress * 4.0;
+            let target_speed = 1.0 + phase_progress * 2.0;
             (HumanoidTask::Run, pd_weight, target_speed)
         }
     }
@@ -225,15 +226,34 @@ impl HumanoidTrainer {
             1.0f32
         };
 
+        // Gait phase for locomotion baselines (advances each physics step)
+        // Walk: ~1.5 Hz gait cycle, Run: ~2.5 Hz gait cycle
+        let gait_freq = match task {
+            HumanoidTask::Walk => 1.5,
+            HumanoidTask::Run => 2.5,
+            HumanoidTask::Stand => 0.0,
+        };
+
         for step in 0..self.config.steps_per_episode {
             // -- PHYSICS STEP (every step, 40Hz) --
             let state = physics.state().clone();
             let sensor_hv = encoder.encode(&state);
             let mut command = controller.forward(&sensor_hv, dt as f32);
 
-            // Blend with PD teacher during curriculum
+            // Gait phase: fraction of gait cycle at this timestep
+            let gait_phase = (step as f64 * dt * gait_freq).fract();
+
+            // Blend with PD teacher during curriculum (task-appropriate baseline)
             if pd_weight > 0.01 {
-                let pd_cmd = pd_standing_baseline(&state, &self.pd_gains);
+                let pd_cmd = match task {
+                    HumanoidTask::Stand => pd_standing_baseline(&state, &self.pd_gains),
+                    HumanoidTask::Walk => {
+                        pd_walking_baseline(&state, &self.pd_gains, gait_phase, target_speed)
+                    }
+                    HumanoidTask::Run => {
+                        pd_running_baseline(&state, &self.pd_gains, gait_phase, target_speed)
+                    }
+                };
                 for i in 0..NUM_ACTUATORS {
                     command.torques[i] =
                         pd_weight * pd_cmd.torques[i] + (1.0 - pd_weight) * command.torques[i];
@@ -296,7 +316,15 @@ impl HumanoidTrainer {
 
             // -- TRAINING (every train_every steps, 20Hz) --
             if step % self.config.train_every == 0 {
-                let target = pd_standing_baseline(&state, &self.pd_gains);
+                let target = match task {
+                    HumanoidTask::Stand => pd_standing_baseline(&state, &self.pd_gains),
+                    HumanoidTask::Walk => {
+                        pd_walking_baseline(&state, &self.pd_gains, gait_phase, target_speed)
+                    }
+                    HumanoidTask::Run => {
+                        pd_running_baseline(&state, &self.pd_gains, gait_phase, target_speed)
+                    }
+                };
                 let lr = self.config.learning_rate * fep_result.learning_rate_factor * lr_scale;
 
                 controller.train_step(&sensor_hv, &target, dt as f32, Some(lr));
@@ -405,8 +433,53 @@ impl HumanoidTrainer {
 
         let mut all_metrics = Vec::with_capacity(self.config.num_episodes);
 
+        // Best-checkpoint revert state
+        let mut best_reward = f64::NEG_INFINITY;
+        let mut best_weights: Option<(Vec<f32>, Vec<f32>)> = None;
+        let mut consecutive_low = 0u32;
+
+        // Phase-transition LR boost: track previous task to detect transitions
+        let mut prev_task: Option<HumanoidTask> = None;
+        let mut transition_boost_remaining = 0u32;
+
         for ep in 0..self.config.num_episodes {
+            // Detect phase transitions and apply LR boost
+            let (current_task, _, _) = self.curriculum(ep);
+            if let Some(prev) = prev_task {
+                if prev != current_task {
+                    // Phase transition: boost LR for 3 episodes
+                    transition_boost_remaining = 3;
+                }
+            }
+            prev_task = Some(current_task);
+
+            if transition_boost_remaining > 0 {
+                controller.set_learning_rate_scale(3.0);
+                transition_boost_remaining -= 1;
+            } else {
+                controller.set_learning_rate_scale(1.0);
+            }
+
             let metrics = self.run_episode(&mut encoder, &mut controller, &mut fep_agent, ep);
+
+            // Track best checkpoint (output projection weights)
+            if metrics.avg_standing_reward > best_reward {
+                best_reward = metrics.avg_standing_reward;
+                best_weights = Some(controller.output_projection());
+                consecutive_low = 0;
+            } else if metrics.avg_standing_reward < 0.5 {
+                consecutive_low += 1;
+                // Revert to best checkpoint if 3 consecutive low-reward episodes
+                if consecutive_low >= 3 {
+                    if let Some((ref weights, ref bias)) = best_weights {
+                        controller.set_output_projection(weights, bias);
+                        consecutive_low = 0;
+                    }
+                }
+            } else {
+                consecutive_low = 0;
+            }
+
             all_metrics.push(metrics.clone());
             fep_agent.reset();
         }
@@ -436,8 +509,49 @@ impl HumanoidTrainer {
             "episode,task,avg_standing_reward,avg_episode_reward,avg_free_energy,avg_head_height,avg_uprightness,avg_horizontal_speed,avg_control_effort,exploration_count,total_steps\n",
         );
 
+        // Best-checkpoint revert state
+        let mut best_reward = f64::NEG_INFINITY;
+        let mut best_weights: Option<(Vec<f32>, Vec<f32>)> = None;
+        let mut consecutive_low = 0u32;
+
+        // Phase-transition LR boost
+        let mut prev_task: Option<HumanoidTask> = None;
+        let mut transition_boost_remaining = 0u32;
+
         for ep in 0..self.config.num_episodes {
+            let (current_task, _, _) = self.curriculum(ep);
+            if let Some(prev) = prev_task {
+                if prev != current_task {
+                    transition_boost_remaining = 3;
+                }
+            }
+            prev_task = Some(current_task);
+
+            if transition_boost_remaining > 0 {
+                controller.set_learning_rate_scale(3.0);
+                transition_boost_remaining -= 1;
+            } else {
+                controller.set_learning_rate_scale(1.0);
+            }
+
             let metrics = self.run_episode(&mut encoder, &mut controller, &mut fep_agent, ep);
+
+            // Track best checkpoint and revert on sustained degradation
+            if metrics.avg_standing_reward > best_reward {
+                best_reward = metrics.avg_standing_reward;
+                best_weights = Some(controller.output_projection());
+                consecutive_low = 0;
+            } else if metrics.avg_standing_reward < 0.5 {
+                consecutive_low += 1;
+                if consecutive_low >= 3 {
+                    if let Some((ref weights, ref bias)) = best_weights {
+                        controller.set_output_projection(weights, bias);
+                        consecutive_low = 0;
+                    }
+                }
+            } else {
+                consecutive_low = 0;
+            }
 
             if !metrics.telemetry.is_empty() {
                 let step_path = format!("{}/episode_{:04}.csv", output_dir, ep);
@@ -587,17 +701,22 @@ mod tests {
         assert_eq!(task70, HumanoidTask::Walk);
         assert!(speed70 > 0.0 && speed70 < 1.0, "Walk speed ramping: {speed70}");
 
-        // Phase 4: Run (episode 90 = progress 0.909)
-        let (task90, pd90, speed90) = trainer.curriculum(90);
-        assert_eq!(task90, HumanoidTask::Run);
-        assert!(pd90 < 0.05, "PD nearly zero in Run: {pd90}");
-        assert!(speed90 > 1.0, "Run speed > 1 m/s: {speed90}");
+        // Phase 3 still: Walk extends to 95% (episode 90 = progress 0.909)
+        let (task90, _pd90, speed90) = trainer.curriculum(90);
+        assert_eq!(task90, HumanoidTask::Walk);
+        assert!(speed90 > 0.5 && speed90 <= 1.0, "Walk speed near end: {speed90}");
 
-        // Final episode: speed capped at 5 m/s (not 10)
+        // Phase 4: Run (episode 96 = progress 0.969)
+        let (task96, pd96, speed96) = trainer.curriculum(96);
+        assert_eq!(task96, HumanoidTask::Run);
+        assert!(pd96 < 0.05, "PD nearly zero in Run: {pd96}");
+        assert!(speed96 > 1.0, "Run speed > 1 m/s: {speed96}");
+
+        // Final episode: speed capped at 3 m/s
         let (_task99, _pd99, speed99) = trainer.curriculum(99);
         assert!(
-            speed99 <= 5.01,
-            "Run speed should be capped at ~5 m/s: {speed99}"
+            speed99 <= 3.01,
+            "Run speed should be capped at ~3 m/s: {speed99}"
         );
     }
 
