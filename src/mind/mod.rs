@@ -105,6 +105,10 @@ pub struct ContinuousMind {
     /// Consuming code can drain this via `take_evicted()` and route items
     /// to episodic memory or the MemoryCoordinator for graduation.
     evicted_items: Vec<(ContinuousHV, u64)>,
+    /// Relational Ψ from the partnership module's Φ_dyad computation.
+    /// Fed back each cycle to modulate consciousness: higher relational Ψ
+    /// boosts integration when the partnership is healthy.
+    pub(crate) relational_psi: f64,
     /// Optional social coherence (theory of mind) system.
     /// When enabled, the mind models other agents' mental states and
     /// uses social reasoning to inform cooperation decisions.
@@ -218,6 +222,7 @@ impl ContinuousMind {
             federated_inbox: Vec::new(),
             federated_outbox: Vec::new(),
             evicted_items: Vec::new(),
+            relational_psi: 0.0,
             social_coherence: social,
             social_inbox: Vec::new(),
             social_outbox: Vec::new(),
@@ -300,6 +305,20 @@ impl ContinuousMind {
     /// Call this before `tick()` to enable HDC-based intent inference.
     pub fn set_input_text(&mut self, text: impl Into<String>) {
         self.last_input_text = Some(text.into());
+    }
+
+    /// Set relational Ψ (Phi-dyad from partnership module).
+    ///
+    /// Higher relational Ψ boosts consciousness integration when the
+    /// partnership is healthy, reflecting the IIT principle that
+    /// consciousness can emerge *between* interacting systems.
+    pub fn set_relational_psi(&mut self, psi: f64) {
+        self.relational_psi = psi.clamp(0.0, 1.0);
+    }
+
+    /// Current relational Ψ value.
+    pub fn relational_psi(&self) -> f64 {
+        self.relational_psi
     }
 
     /// Perceive with text context for better classification.

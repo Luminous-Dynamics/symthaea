@@ -137,6 +137,8 @@ pub struct Symthaea {
     dyad_calculator: PhiDyadCalculator,
     /// Recent AI states for dyad computation (ring buffer).
     recent_ai_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
+    /// Last computed Φ_dyad — fed back into mind as relational Ψ on next cycle.
+    last_phi_dyad: f64,
     /// Domain plugin registry for multi-domain awareness.
     plugin_registry: PluginRegistry,
     /// Cross-session learning persistence (thresholds, patterns).
@@ -266,6 +268,7 @@ impl Symthaea {
             trajectory: RelationshipTrajectory::default(),
             dyad_calculator: PhiDyadCalculator::new(),
             recent_ai_states: Vec::new(),
+            last_phi_dyad: 0.0,
             plugin_registry,
             #[cfg(feature = "full_language")]
             learning_persistence,
@@ -439,6 +442,7 @@ impl Symthaea {
             trajectory: state.trajectory,
             dyad_calculator: PhiDyadCalculator::new(),
             recent_ai_states: state.recent_ai_states,
+            last_phi_dyad: 0.0,
             plugin_registry,
             #[cfg(feature = "full_language")]
             learning_persistence,
@@ -511,6 +515,11 @@ impl Symthaea {
         // PHASE 2: COGNITION (Mind tick - HDC+LTC THINKS)
         // ====================================================================
         let phase2_start = Instant::now();
+
+        // Feed relational Ψ from previous cycle's Φ_dyad into the mind.
+        // This closes the feedback loop: partnership quality → consciousness boost.
+        self.mind.set_relational_psi(self.last_phi_dyad);
+
         self.mind.tick();
 
         // Update coordinator signals with current consciousness state
@@ -1448,9 +1457,10 @@ impl Symthaea {
         self.partner.update_from_assessment(&assessment);
         self.partner.advance_stage_if_ready();
 
-        // Record trajectory point
+        // Record trajectory point and store for next-cycle feedback
         let phi_dyad = self.compute_phi_dyad();
         self.trajectory.record(now, self.partner.stage, phi_dyad);
+        self.last_phi_dyad = phi_dyad;
     }
 
     // ========================================================================
