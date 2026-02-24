@@ -892,11 +892,6 @@ fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + (-x).exp())
 }
 
-/// HTK mel scale: mel = 2595 * log10(1 + f/700).
-fn hz_to_mel(f: f32) -> f32 {
-    2595.0 * (1.0 + f.max(1.0) / 700.0).log10()
-}
-
 /// Inverse sigmoid (logit): maps p ∈ (0, 1) to ℝ.
 fn logit(p: f32) -> f32 {
     let p = p.clamp(1e-6, 1.0 - 1e-6);
