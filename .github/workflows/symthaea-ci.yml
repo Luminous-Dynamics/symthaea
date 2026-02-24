@@ -296,7 +296,7 @@ jobs:
             ${{ runner.os }}-cargo-subcrates-
       - name: Test sub-crates (fast path)
         run: |
-          for crate in symthaea-dream symthaea-phi-search symthaea-narrative-self symthaea-fep symthaea-causal-reasoning symthaea-field-dynamics symthaea-hodge symthaea-factor-graph symthaea-enactive symthaea-sensorimotor symthaea-consciousness-topology symthaea-exploration symthaea-wisdom symthaea-types symthaea-seven-harmonies symthaea-consciousness-resonance symthaea-embeddings symthaea-observability symthaea-dynamics symthaea-sentinel symthaea-perception symthaea-stt symthaea-physics symthaea-flight; do
+          for crate in symthaea-dream symthaea-phi-search symthaea-narrative-self symthaea-fep symthaea-causal-reasoning symthaea-field-dynamics symthaea-hodge symthaea-factor-graph symthaea-enactive symthaea-sensorimotor symthaea-consciousness-topology symthaea-exploration symthaea-wisdom symthaea-types symthaea-seven-harmonies symthaea-consciousness-resonance symthaea-embeddings symthaea-observability symthaea-dynamics symthaea-sentinel symthaea-perception symthaea-stt symthaea-physics symthaea-flight symthaea-hal symthaea-humanoid symthaea-vehicle symthaea-vocal-tract; do
             echo "::group::$crate"
             cargo clippy -p $crate --lib -- -D warnings
             cargo test -p $crate --lib
@@ -362,3 +362,34 @@ jobs:
         run: |
           cargo check -p symthaea-core --no-default-features --features simd
           cargo check -p symthaea-core --no-default-features --features duck
+
+  examples:
+    name: Example Compilation
+    runs-on: ubuntu-latest
+    needs: [check]
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-cargo-examples-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-examples-
+      - name: Check examples (default features)
+        run: cargo check --examples
+      - name: Check featured examples
+        run: |
+          cargo check --example hal_demo --features hal
+          cargo check --example vocal_tract_demo --features vocal-tract
+          cargo check --example vocal_tract_benchmark --features vocal-tract
+          cargo check --example conscious_reasoning_demo --features reasoning_engine
