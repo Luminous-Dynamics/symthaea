@@ -1019,14 +1019,15 @@ impl CognitiveLoopService {
         // 5. Get multi-scale predictions using CfC's O(1) predict_forward
         // This is the key advantage: instant prediction at any future time
         let _t_core = Instant::now();
-        let prediction = self.get_multi_scale_prediction(&input_array);
+        let (prediction, raw_predictions) = self.get_multi_scale_prediction(&input_array);
 
         // ── Phase 15: Multi-horizon prediction coherence ─────────────────────
         // Science: Bar (2009) — temporal prediction consistency signals model quality.
         // Low coherence → predictions at different horizons disagree → model uncertain.
-        // Computed every 11 cycles (co-prime amortization, lightweight: 3 predict_forward calls).
+        // Computed every 11 cycles (co-prime amortization). Uses cached predictions from above
+        // to avoid redundant predict_forward calls (~300µs saved per coherence check).
         let prediction_coherence = if self.stats.total_cycles % 11 == 0 {
-            let coh = self.compute_prediction_coherence(&input_array);
+            let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
             self.stats.avg_prediction_coherence =
                 self.stats.avg_prediction_coherence * 0.9 + coh * 0.1;
             // Low coherence → dampen confidence (predictions unreliable)

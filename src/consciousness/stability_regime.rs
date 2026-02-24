@@ -376,8 +376,8 @@ pub struct StabilityRegimeProcessor {
     inner: ConsciousnessPrimitiveProcessor,
     /// Current consciousness state
     current_state: Option<PrimitiveConsciousnessState>,
-    /// State history
-    history: Vec<PrimitiveConsciousnessState>,
+    /// State history (VecDeque for O(1) eviction at front)
+    history: VecDeque<PrimitiveConsciousnessState>,
     /// Global cycle counter for decrystallization tracking
     global_cycle: usize,
 }
@@ -423,7 +423,7 @@ impl StabilityRegimeProcessor {
             coherence_bridge,
             inner,
             current_state: None,
-            history: Vec::new(),
+            history: VecDeque::new(),
             global_cycle: 0,
         }
     }
@@ -448,7 +448,7 @@ impl StabilityRegimeProcessor {
         // Advance global cycle
         self.global_cycle += 1;
         let cycle = self.global_cycle;
-        let config_clone = self.config.clone();
+        let config_ref = &self.config;
 
         // 2 & 3. Evolve all primitives in parallel, update activation, track counts, transition regimes
         // Each primitive is independent (no cross-primitive data deps), so rayon can process
@@ -458,7 +458,7 @@ impl StabilityRegimeProcessor {
             .primitives
             .par_iter_mut()
             .filter_map(|(_name, cfc)| {
-                let params = config_clone.params(cfc.regime).clone();
+                let params = config_ref.params(cfc.regime);
 
                 // Adaptive culling: skip evolution for dormant primitives
                 // (inactive + near-zero activation + idle for 5+ cycles)
@@ -483,8 +483,8 @@ impl StabilityRegimeProcessor {
                 }
 
                 // Dynamic regime transitions (and decrystallization)
-                let transition = cfc.update_regime(cycle, &config_clone);
-                cfc.record_history(timestamp, config_clone.history_len);
+                let transition = cfc.update_regime(cycle, config_ref);
+                cfc.record_history(timestamp, config_ref.history_len);
                 transition
             })
             .collect();
@@ -519,8 +519,8 @@ impl StabilityRegimeProcessor {
         let lr = self.coherence_bridge.effective_learning_rate();
         for cfc in self.primitives.values_mut() {
             if cfc.is_active {
-                let params = self.config.params(cfc.regime).clone();
-                cfc.learn(&continuous_input, &params, lr);
+                let params = self.config.params(cfc.regime);
+                cfc.learn(&continuous_input, params, lr);
             }
         }
 
@@ -546,10 +546,10 @@ impl StabilityRegimeProcessor {
             state.phi += self.coherence_bridge.phi_contribution() as f64;
         }
 
-        // Store history
-        self.history.push(state.clone());
+        // Store history (VecDeque: O(1) push_back + O(1) pop_front)
+        self.history.push_back(state.clone());
         if self.history.len() > 100 {
-            self.history.remove(0);
+            self.history.pop_front();
         }
         self.current_state = Some(state.clone());
 
@@ -588,7 +588,7 @@ impl StabilityRegimeProcessor {
     }
 
     /// Get state history
-    pub fn history(&self) -> &[PrimitiveConsciousnessState] {
+    pub fn history(&self) -> &VecDeque<PrimitiveConsciousnessState> {
         &self.history
     }
 
