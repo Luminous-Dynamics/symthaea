@@ -44,16 +44,16 @@ Butlin P, Long R, Elmoznino E, Bengio Y, Birch J, Constant A, et~al.
   of consciousness.
 \newblock arXiv preprint arXiv:230808708. 2023;.
 
-\bibitem{wheeler2002binding}
-Wheeler ME, Treisman AM.
-\newblock Binding in short-term visual memory.
-\newblock Journal of Experimental Psychology: General. 2002;131(1):48--64.
-
 \bibitem{cowan2001magical}
 Cowan N.
 \newblock The magical number 4 in short-term memory: A reconsideration of
   mental storage capacity.
 \newblock Behavioral and Brain Sciences. 2001;24(1):87--114.
+
+\bibitem{wheeler2002binding}
+Wheeler ME, Treisman AM.
+\newblock Binding in short-term visual memory.
+\newblock Journal of Experimental Psychology: General. 2002;131(1):48--64.
 
 \bibitem{fountas2020deep}
 Fountas Z, Sajid N, Mediano PAM, Friston K.
@@ -154,62 +154,6 @@ Mao J, Gan C, Kohli P, Tenenbaum JB, Wu J.
 \newblock The neuro-symbolic concept learner: Interpreting scenes, words, and
   sentences from natural supervision.
 \newblock In: International Conference on Learning Representations; 2019. .
-
-\bibitem{miller2001integrative}
-Miller EK, Cohen JD.
-\newblock An integrative theory of prefrontal cortex function.
-\newblock Annual Review of Neuroscience. 2001;24(1):167--202.
-
-\bibitem{clark2013whatever}
-Clark A.
-\newblock Whatever next? Predictive brains, situated agents, and the future of
-  cognitive science.
-\newblock Behavioral and Brain Sciences. 2013;36(3):181--204.
-
-\bibitem{graziano2013consciousness}
-Graziano MS.
-\newblock Consciousness and the attention schema: Why it has to be right.
-\newblock Cognitive Neuropsychology. 2013;30(4):224--233.
-
-\bibitem{baars1988cognitive}
-Baars BJ.
-\newblock A Cognitive Theory of Consciousness.
-\newblock Cambridge University Press; 1988.
-
-\bibitem{varela1999present}
-Varela FJ.
-\newblock The Specious Present: A Neurophenomenology of Time Consciousness.
-\newblock MIT Press; 1999.
-\newblock In: Petitot et al. (Eds.), Naturalizing Phenomenology, pp. 266--314.
-
-\bibitem{damasio1999feeling}
-Damasio AR.
-\newblock The Feeling of What Happens: Body and Emotion in the Making of
-  Consciousness.
-\newblock Harcourt Brace; 1999.
-
-\bibitem{buzsaki2006rhythms}
-Buzs{\'a}ki G.
-\newblock Rhythms of the Brain.
-\newblock Oxford University Press; 2006.
-
-\bibitem{dehaene2014consciousness}
-Dehaene S.
-\newblock Consciousness and the Brain: Deciphering How the Brain Codes Our
-  Thoughts.
-\newblock Viking Press; 2014.
-
-\bibitem{gallagher2000philosophical}
-Gallagher S.
-\newblock The inordinance of time.
-\newblock Northwestern University Press; 2000.
-\newblock See also: Gallagher, S. (2000). Philosophical conceptions of the
-  self. Trends in Cognitive Sciences, 4(1), 14--21.
-
-\bibitem{diekelmann2010memory}
-Diekelmann S, Born J.
-\newblock The memory function of sleep.
-\newblock Nature Reviews Neuroscience. 2010;11(2):114--126.
 
 \bibitem{tononi2004information}
 Tononi G.
