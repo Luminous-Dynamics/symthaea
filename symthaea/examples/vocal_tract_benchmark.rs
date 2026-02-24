@@ -37,11 +37,11 @@ fn main() {
     let mut ltc = VocalTractController::new(&genesis, &config);
 
     println!(
-        "Training LTC controller on {} phonemes (200 epochs)...",
+        "Training LTC controller on {} phonemes (100 epochs + 50 vowel finetune)...",
         db.all_phonemes().len()
     );
-    let final_loss = symthaea::voice::train_controller_on_phoneme_db(&mut ltc, &genesis, &db, 200);
-    println!("  Final loss (200 epochs): {:.4}", final_loss);
+    let final_loss = symthaea::voice::train_controller_on_phoneme_db(&mut ltc, &genesis, &db, 100);
+    println!("  Final loss: {:.4}", final_loss);
 
     // Transition training: BPTT on vowel pairs for smooth coarticulation
     println!("  Training transitions (10 epochs on 30 vowel pairs)...");
@@ -160,7 +160,7 @@ fn main() {
     let mut pipeline = VocalTractPipeline::new(&genesis);
     populate_manner_map(&mut pipeline);
     // Train pipeline's controller to match the standalone one
-    symthaea::voice::train_controller_on_phoneme_db(&mut pipeline.controller, &genesis, &db, 200);
+    symthaea::voice::train_controller_on_phoneme_db(&mut pipeline.controller, &genesis, &db, 100);
     symthaea::voice::train_controller_transitions(&mut pipeline.controller, &genesis, &db, 10);
 
     let state = VoiceCognitiveState::default();
