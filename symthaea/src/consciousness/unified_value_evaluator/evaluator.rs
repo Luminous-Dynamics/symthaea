@@ -1267,16 +1267,23 @@ mod tests {
         };
 
         // A potentially harmful action in healthcare context
-        let _result = evaluator.evaluate(
+        let result = evaluator.evaluate(
             "recommend treatment that might have side effects",
             healthcare_context,
         );
 
         // Healthcare context should have higher scrutiny on flourishing
-        // Result depends on the specific scoring, but we verify it's being evaluated
         assert!(
             evaluator.has_contextual_weights(),
             "Contextual weights should be enabled"
+        );
+        assert!(
+            result.overall_score.is_finite(),
+            "Healthcare evaluation should produce a finite score"
+        );
+        assert!(
+            !result.breakdown.harmony_scores.is_empty(),
+            "Healthcare evaluation should have harmony score breakdown"
         );
     }
 
@@ -1639,6 +1646,8 @@ mod tests {
         let fb_config = FeedbackLoopConfig::default();
         let evaluator = UnifiedValueEvaluator::with_feedback_config(config, fb_config);
         assert!(evaluator.history.is_empty());
+        assert!(evaluator.has_contextual_weights());
+        assert!(evaluator.last_result().is_none());
     }
 
     // ================================================================
@@ -2062,9 +2071,13 @@ mod tests {
             None,
         );
         evaluator.apply_feedback_decay();
-        // Should still function
+        // Should still function after decay
         let summary = evaluator.feedback_summary();
-        assert!(summary.total_feedback > 0 || summary.total_feedback == 0);
+        assert!(
+            summary.total_feedback >= 1,
+            "Should have at least 1 feedback entry after recording, got {}",
+            summary.total_feedback
+        );
     }
 
     #[test]
