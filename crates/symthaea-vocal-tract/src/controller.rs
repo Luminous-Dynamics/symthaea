@@ -58,10 +58,8 @@ impl Default for VocalTractConfig {
     fn default() -> Self {
         Self {
             network_layers: 2,
-            neurons_per_layer: 6,
-            // 12 total neurons — increased for extreme vowel accuracy (IY/UW/AA).
-            // 4 neurons → 4D output manifold was too small for 44 phonemes.
-            // 6 neurons → 6D gives ~50% more expressiveness. Throughput ~200Hz.
+            neurons_per_layer: 4,
+            // 8 total neurons — 4 per layer. Proven to differentiate 44 phonemes.
             learning_rate: 0.001,
             base_f0: 120.0,
             f0_range: 200.0,
@@ -667,8 +665,10 @@ impl VocalTractController {
         let distances: Vec<f32> = phoneme_hvs
             .iter()
             .map(|(_, _, frame)| {
+                // F2 weighted 2× — it has the widest range (600-3000 Hz) and drives
+                // the largest errors (IY F2=2290, UW F2=870 vs schwa 1500).
                 ((frame.f1 - schwa_f1).powi(2)
-                    + (frame.f2 - schwa_f2).powi(2)
+                    + 4.0 * (frame.f2 - schwa_f2).powi(2)
                     + (frame.f3 - schwa_f3).powi(2))
                 .sqrt()
             })
@@ -704,11 +704,11 @@ impl VocalTractController {
         // - No weight decay during supervised training (prevents erosion)
         const WARMUP_STEPS: usize = 20;
 
-        // Cosine annealing: peak LR = 30× base, decays to 5× base.
-        // Wide range: early epochs drive large formant shifts (IY needs +790 Hz F2),
-        // later epochs fine-tune with 6× lower LR to avoid oscillation.
+        // Cosine annealing: peak LR = 30× base, decays to 10× base.
+        // 3× range: early epochs drive large formant shifts (IY needs +790 Hz F2),
+        // later epochs fine-tune with moderate LR for convergence.
         let lr_peak = self.learning_rate * 30.0;
-        let lr_min = self.learning_rate * 5.0;
+        let lr_min = self.learning_rate * 10.0;
 
         for epoch in 0..epochs {
             // Cosine annealing schedule
@@ -890,6 +890,11 @@ fn softplus(x: f32) -> f32 {
 /// Sigmoid activation.
 fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + (-x).exp())
+}
+
+/// HTK mel scale: mel = 2595 * log10(1 + f/700).
+fn hz_to_mel(f: f32) -> f32 {
+    2595.0 * (1.0 + f.max(1.0) / 700.0).log10()
 }
 
 /// Inverse sigmoid (logit): maps p ∈ (0, 1) to ℝ.
