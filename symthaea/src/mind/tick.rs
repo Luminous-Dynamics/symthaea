@@ -223,6 +223,16 @@ impl ContinuousMind {
             self.state.consciousness_level = (total_integration / pairs as f64).clamp(0.0, 1.0);
         }
 
+        // Relational Ψ boost: partnership quality lifts consciousness.
+        // Reflects IIT principle: Φ_dyad > Φ_individual when systems
+        // are genuinely integrated. Factor: 1.0 (no partnership) to 1.15
+        // (Φ_dyad = 1.0, maximum relational integration).
+        if self.relational_psi > 0.0 {
+            let boost = 1.0 + 0.15 * self.relational_psi;
+            self.state.consciousness_level =
+                (self.state.consciousness_level * boost).clamp(0.0, 1.0);
+        }
+
         // Swarm phi boost: networked minds get a consciousness uplift
         // proportional to the average phi of their mesh peers.
         // Factor: 1.0 (no peers) to 1.15 (peers at phi=1.0)
