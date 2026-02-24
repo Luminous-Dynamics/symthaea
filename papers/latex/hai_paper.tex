@@ -117,7 +117,7 @@ Code is available at \url{https://github.com/Luminous-Dynamics/symthaea}.
 % ============================================================================
 % Author Summary (required by PLoS Computational Biology)
 \section*{Author Summary}
-Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We show that the same principles can be implemented using \emph{hyperdimensional computing}, a brain-inspired approach that represents information as very long random vectors (16,384 dimensions). Our system, called Hyperdimensional Active Inference (HAI), replaces costly matrix operations with simple vector operations that run in linear time. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 18 domains: HAI achieves 93\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, synthesizes speech with $10{\times}$ smoother transitions than rule-based methods, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. The entire system is implemented in Rust (353,000 lines across 32 workspace crates, 9,600+ tests, 50 feature flags) and released as open-source software, demonstrating that biologically-inspired computation can be both theoretically rigorous and practically efficient.
+Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We show that the same principles can be implemented using \emph{hyperdimensional computing}, a brain-inspired approach that represents information as very long random vectors (16,384 dimensions). Our system, called Hyperdimensional Active Inference (HAI), replaces costly matrix operations with simple vector operations that run in linear time. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 18 domains: HAI achieves 92.9\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, synthesizes speech with $10{\times}$ smoother transitions than rule-based methods, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. The entire system is implemented in Rust (353,000 lines across 32 workspace crates, 9,600+ tests, 47 feature flags) and released as open-source software, demonstrating that biologically-inspired computation can be both theoretically rigorous and practically efficient.
 
 % ============================================================================
 \section{Introduction}
@@ -671,9 +671,9 @@ Our results suggest HDC similarity metrics can substitute for probabilistic dive
 
 \subsection{Cognitive Architecture Implications}
 
-The eight motor command types provide an interpretable action vocabulary for cognitive systems: attention, learning rate, and exploration as \emph{cognitive actions}, with direct mapping from variational inference to executable commands. The full cognitive loop integrates surprise-driven exploration, prefrontal executive control (capacity-7 buffer), social coherence (Theory of Mind), reasoning engine feedback, counterfactual dream replay~\citep{diekelmann2010memory}, and adaptive urgency throttling (Critical/Normal/Cruise tiers), operating at ${\sim}4$~Hz sustained throughput.
+The eight motor command types provide an interpretable action vocabulary for cognitive systems: attention, learning rate, and exploration as \emph{cognitive actions}, with direct mapping from variational inference to executable commands. The full cognitive loop integrates surprise-driven exploration, prefrontal executive control (capacity-7 buffer), social coherence (Theory of Mind), reasoning engine feedback, counterfactual dream replay~\cite{diekelmann2010memory}, and adaptive urgency throttling (Critical/Normal/Cruise tiers), operating at ${\sim}4$~Hz sustained throughput.
 
-\textbf{Closed feedback loops.} 16 subsystems form closed loops where previous-cycle outputs modulate current-cycle processing, including prefrontal veto~\citep{miller2001integrative}, predictive self-model confidence~\citep{clark2013whatever}, attention schema~\citep{graziano2013consciousness}, GWT broadcast~\citep{baars1988cognitive}, embodied phi modulation~\citep{damasio1999feeling}, resonance frequency modulation of CfC time constants~\citep{buzsaki2006rhythms}, MCE consciousness-level learning rate boost~\citep{dehaene2014consciousness}, and cross-modal binding. Single-module ablation shows $\leq 5\%$ degradation; multi-module synergy stays within $30\%$ of baseline with $<2\%$ computational overhead.
+\textbf{Closed feedback loops.} 16 subsystems form closed loops where previous-cycle outputs modulate current-cycle processing, including prefrontal veto~\cite{miller2001integrative}, predictive self-model confidence~\cite{clark2013whatever}, attention schema~\cite{graziano2013consciousness}, GWT broadcast~\cite{baars1988cognitive}, embodied phi modulation~\cite{damasio1999feeling}, resonance frequency modulation of CfC time constants~\cite{buzsaki2006rhythms}, MCE consciousness-level learning rate boost~\cite{dehaene2014consciousness}, and cross-modal binding. Single-module ablation shows $\leq 5\%$ degradation; multi-module synergy stays within $30\%$ of baseline with $<2\%$ computational overhead.
 
 \textbf{Multi-agent social cognition.} An Iroh QUIC transport bridge connects the 50~Hz cognitive loop to asynchronous P2P networks via bounded channels (${\sim}20$~ms delay). Two-agent cooperation demos demonstrate emergent trust dynamics (0.5$\to$0.95 confidence) and cooperative decision-making without explicit social programming.
 
@@ -966,6 +966,29 @@ External datasets used: Sleep-EDF (PhysioNet, CC-BY-4.0), LibriSpeech
 (OpenSLR), ETHICS~\cite{hendrycks2021aligning} (MIT License), Social
 Chemistry~\cite{forbes2020social}. Raw benchmark data are archived in the
 repository under \texttt{data/benchmarks/}.
+
+% ============================================================================
+\section*{Supporting Information}
+
+\paragraph*{S1 Data.}
+\label{s1-data}
+{EFE ablation sweep results (CSV). Contains expected free energy values across
+48 threat distances (1--100\,m) for full-EFE, no-epistemic, no-pragmatic, and
+no-urgency ablation conditions. File:
+\texttt{papers/figures/efe\_ablation.csv}.}
+
+\paragraph*{S2 Data.}
+\label{s2-data}
+{Multi-scenario evaluation results (CSV). Contains per-scenario EFE values,
+intercept distances, and human safety outcomes for six threat geometries
+(vertical drop, diagonal, high-altitude, low-fast, lateral crossing,
+coordinated swarm). File: \texttt{papers/figures/multi\_scenario.csv}.}
+
+\paragraph*{S3 Code.}
+\label{s3-code}
+{Figure generation script (Python). Reproduces all paper figures from raw CSV
+data using NumPy, Matplotlib, and SciPy. File:
+\texttt{papers/figures/generate\_hai\_figures.py}.}
 
 % ============================================================================
 % PLoS uses numbered Vancouver-style references (Vancouver/ICMJE).
