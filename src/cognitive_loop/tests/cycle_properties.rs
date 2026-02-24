@@ -301,9 +301,13 @@ fn test_cycle_counter_survives_varied_inputs() {
 #[test]
 fn test_biorhythm_refresh_fires_at_97_cycles() {
     let mut service = minimal_service();
-    // Run 96 cycles — biorhythm_refresh_counter should be 96
+    // Smoke test: run 96 warm-up cycles to reach biorhythm trigger at 97
     for i in 0..96 {
-        service.cycle(&format!("bio {i}"));
+        let r = service.cycle(&format!("bio {i}"));
+        // Spot-check every 20th cycle to avoid per-iteration overhead
+        if i % 20 == 0 {
+            assert!(r.prediction_error.is_finite(), "cycle {i} prediction_error not finite");
+        }
     }
     // The 97th cycle triggers refresh, counter resets to 0, then increments to 1
     // on the 98th call. We just verify no panic and phase is reported.
@@ -344,7 +348,8 @@ fn test_carryover_urgency_persists() {
     let mut service = minimal_service();
     // Run a few cycles to establish urgency state
     for _ in 0..5 {
-        service.cycle("carryover test");
+        let r = service.cycle("carryover test");
+        assert!(r.prediction_error.is_finite());
     }
     let urgency_after_5 = service.cycle("check urgency").metadata.urgency;
     // Urgency should be a valid variant
@@ -361,8 +366,10 @@ fn test_carryover_urgency_persists() {
 #[test]
 fn test_carryover_learning_state_updated() {
     let mut service = learning_service();
-    let _initial_conf = service.prediction_confidence();
-    service.cycle("first cycle");
+    let initial_conf = service.prediction_confidence();
+    assert!((0.0..=1.0).contains(&initial_conf), "Initial confidence should be in [0, 1]: {initial_conf}");
+    let first = service.cycle("first cycle");
+    assert!(first.prediction_error.is_finite());
     // After one cycle, the carryover learning prediction_confidence should have been
     // set to the pre-cycle value at the start of the next cycle
     let next_result = service.cycle("second cycle");
@@ -529,7 +536,10 @@ fn test_error_history_bounded() {
     let mut service = minimal_service();
     // Run 150 cycles — error_history capacity is 100
     for i in 0..150 {
-        service.cycle(&format!("error hist {i}"));
+        let r = service.cycle(&format!("error hist {i}"));
+        if i % 30 == 0 {
+            assert!(r.prediction_error.is_finite(), "cycle {i} prediction_error not finite");
+        }
     }
     // error_history is private, but avg_prediction_error is derived from it
     // and should be finite (not accumulating unbounded data)
@@ -546,7 +556,10 @@ fn test_recent_hvs_bounded() {
     // recent_hvs capacity is 4 (VecDeque in CycleHistory)
     // Run many cycles with primitive consciousness enabled
     for i in 0..30 {
-        service.cycle(&format!("recent hvs {i}"));
+        let r = service.cycle(&format!("recent hvs {i}"));
+        if i % 10 == 0 {
+            assert!(r.prediction_error.is_finite(), "cycle {i} prediction_error not finite");
+        }
     }
     // If capacity weren't bounded, we'd see memory growth.
     // We can verify the system is still functioning correctly.
@@ -570,7 +583,10 @@ fn test_psi_attestation_buffer_bounded() {
 
     // Run more cycles than buffer capacity
     for i in 0..50 {
-        service.cycle(&format!("attestation {i}"));
+        let r = service.cycle(&format!("attestation {i}"));
+        if i % 10 == 0 {
+            assert!(r.prediction_error.is_finite(), "cycle {i} prediction_error not finite");
+        }
     }
 
     // Buffer should not exceed capacity
@@ -592,7 +608,8 @@ fn test_psi_attestation_drain() {
     .unwrap();
 
     for i in 0..10 {
-        service.cycle(&format!("drain test {i}"));
+        let r = service.cycle(&format!("drain test {i}"));
+        assert!(r.prediction_error.is_finite());
     }
 
     let records = service.drain_psi_attestations();
@@ -828,7 +845,8 @@ fn test_try_cycle_matches_cycle() {
 fn test_reset_clears_state() {
     let mut service = minimal_service();
     for _ in 0..10 {
-        service.cycle("pre-reset");
+        let r = service.cycle("pre-reset");
+        assert!(r.prediction_error.is_finite());
     }
     assert_eq!(service.stats().total_cycles, 10);
 
@@ -851,7 +869,8 @@ fn test_stats_learning_cycles_consistent() {
     .unwrap();
 
     for _ in 0..20 {
-        service.cycle("learning test");
+        let r = service.cycle("learning test");
+        assert!(r.prediction_error.is_finite());
     }
 
     // Learning cycles should not exceed total cycles

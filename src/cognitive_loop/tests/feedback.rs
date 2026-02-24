@@ -14,7 +14,8 @@ fn test_prefrontal_veto_suppresses_exploration() {
 
     // Run enough cycles to fill working memory (capacity=7) and trigger veto
     for _ in 0..12 {
-        service.cycle("different unique input each time to fill working memory quickly");
+        let r = service.cycle("different unique input each time to fill working memory quickly");
+        assert!(r.prediction_error.is_finite());
     }
 
     // After filling WM, prefrontal veto should suppress exploration_urge to 0
@@ -30,7 +31,16 @@ fn test_prefrontal_veto_suppresses_exploration() {
         );
     }
     // Even if veto didn't trigger this exact cycle, verify the mechanism exists
-    // by checking the service didn't panic with the new code path
+    // and the cycle produced valid output
+    assert!(
+        result.prediction_error.is_finite(),
+        "Prediction error should be finite with prefrontal veto enabled"
+    );
+    assert!(
+        (0.0..=1.0).contains(&service.curiosity_drive().exploration_urge),
+        "Exploration urge should be in [0, 1]: {}",
+        service.curiosity_drive().exploration_urge
+    );
 }
 
 #[test]
@@ -45,7 +55,8 @@ fn test_predictive_self_reduces_lr_when_uncertain() {
 
     // Run a few cycles — predictive_self starts with low confidence
     for _ in 0..5 {
-        service.cycle("predictive self uncertainty test");
+        let r = service.cycle("predictive self uncertainty test");
+        assert!(r.prediction_error.is_finite());
     }
 
     let result = service.cycle("check lr");
@@ -57,8 +68,13 @@ fn test_predictive_self_reduces_lr_when_uncertain() {
         "Learning rate should be finite and non-negative: {lr}"
     );
     // If safety was < 0.4, the LR should be reduced (but we can't guarantee exact value
-    // since many factors contribute). Just verify the code path doesn't break.
-    let _ = result.metadata.predictive_self_safety;
+    // since many factors contribute). Verify the safety value is in valid range.
+    assert!(
+        result.metadata.predictive_self_safety.is_finite(),
+        "predictive_self_safety should be finite: {}",
+        result.metadata.predictive_self_safety
+    );
+    assert!(result.prediction_error.is_finite());
 }
 
 #[test]
@@ -72,7 +88,8 @@ fn test_attention_schema_bidirectional() {
 
     // Run many cycles to accumulate attention schema state
     for _ in 0..20 {
-        service.cycle("high salience attention input with strong patterns");
+        let r = service.cycle("high salience attention input with strong patterns");
+        assert!(r.prediction_error.is_finite());
     }
 
     // With the new bidirectional gain (up to +30%), the attention_sensitivity
@@ -105,6 +122,7 @@ fn test_gwt_broadcast_boosts_confidence() {
     let mut any_broadcast = false;
     for _ in 0..20 {
         let result = service.cycle("gwt broadcast confidence boost test");
+        assert!(result.prediction_error.is_finite());
         if result.metadata.gwt_broadcast {
             any_broadcast = true;
         }
@@ -137,14 +155,16 @@ fn test_temporal_discontinuity_resets_confidence() {
 
     // Build up stable state with consistent input
     for _ in 0..15 {
-        service.cycle("stable consistent temporal input");
+        let r = service.cycle("stable consistent temporal input");
+        assert!(r.prediction_error.is_finite());
     }
 
     let pre_switch_confidence = service.prediction_confidence();
 
     // Abrupt input change should trigger temporal discontinuity
     for _ in 0..5 {
-        service.cycle("completely different unexpected novel stimulus pattern");
+        let r = service.cycle("completely different unexpected novel stimulus pattern");
+        assert!(r.prediction_error.is_finite());
     }
 
     let post_switch_confidence = service.prediction_confidence();
@@ -156,9 +176,15 @@ fn test_temporal_discontinuity_resets_confidence() {
         post_switch_confidence.is_finite(),
         "Post-switch confidence should be finite"
     );
-    // The system should not have increased confidence dramatically after a context shift
-    // (lenient check — many factors influence confidence)
-    let _ = pre_switch_confidence;
+    // Both confidence values should be in valid range
+    assert!(
+        (0.0..=1.0).contains(&pre_switch_confidence),
+        "Pre-switch confidence should be in [0, 1]: {pre_switch_confidence}"
+    );
+    assert!(
+        (0.0..=1.0).contains(&post_switch_confidence),
+        "Post-switch confidence should be in [0, 1]: {post_switch_confidence}"
+    );
 }
 
 #[test]
@@ -184,8 +210,10 @@ fn test_embodied_phi_modulation_affects_unified_psi() {
 
     // Run both for 20 cycles
     for _ in 0..20 {
-        baseline.cycle("embodied phi comparison test input");
-        with_embodied.cycle("embodied phi comparison test input");
+        let rb = baseline.cycle("embodied phi comparison test input");
+        let re = with_embodied.cycle("embodied phi comparison test input");
+        assert!(rb.prediction_error.is_finite());
+        assert!(re.prediction_error.is_finite());
     }
 
     // The embodied version feeds prev_embodied_phi_modulation into unified_psi
@@ -214,19 +242,20 @@ fn test_narrative_gwt_veto_suppresses_learning() {
 
     // Run several cycles to let narrative-GWT stabilize
     for _ in 0..10 {
-        service.cycle("narrative gwt veto learning test");
+        let r = service.cycle("narrative gwt veto learning test");
+        assert!(r.prediction_error.is_finite());
     }
 
     // Check if any veto occurred — if so, verify learning was suppressed next cycle
     let mut veto_seen = false;
     for i in 0..20 {
         let result = service.cycle(&format!("veto test cycle {i}"));
+        assert!(result.prediction_error.is_finite(), "cycle {i} prediction_error not finite");
         if veto_seen {
             // This cycle should have had learning suppressed by the veto
             // (narrative_veto_active was set to true from previous cycle's veto)
             // We can't guarantee learning_occurred==false because the veto is one of
-            // several conditions, but we verify the mechanism exists
-            let _ = result.learning_occurred;
+            // several conditions, but we verify the mechanism exists and cycle is valid
             break;
         }
         if result.metadata.narrative_gwt_veto {
@@ -279,7 +308,8 @@ fn test_quantum_coherence_boosts_exploration() {
 
     // Run 20 cycles — quantum coherence > 0.5 should boost exploration_urge
     for _ in 0..20 {
-        service.cycle("quantum coherence exploration boost test");
+        let r = service.cycle("quantum coherence exploration boost test");
+        assert!(r.prediction_error.is_finite());
     }
 
     // Exploration urge should be within valid range
@@ -300,7 +330,8 @@ fn test_mce_consciousness_boosts_learning_rate() {
 
     // Run 10+ cycles to trigger MCE (fires at total_cycles % 10 == 0)
     for _ in 0..15 {
-        service.cycle("mce learning rate boost test");
+        let r = service.cycle("mce learning rate boost test");
+        assert!(r.prediction_error.is_finite());
     }
 
     // Effective learning rate should be finite and non-negative
@@ -322,7 +353,8 @@ fn test_narrative_self_psi_modulates_confidence() {
 
     // Run 15 cycles to let narrative self accumulate phi
     for _ in 0..15 {
-        service.cycle("narrative identity coherence confidence test");
+        let r = service.cycle("narrative identity coherence confidence test");
+        assert!(r.prediction_error.is_finite());
     }
 
     // Prediction confidence should be in valid range
@@ -395,7 +427,8 @@ fn test_cycle_with_affective_bridge() {
     .unwrap();
 
     for _ in 0..10 {
-        service.cycle("affective bridge integration test");
+        let r = service.cycle("affective bridge integration test");
+        assert!(r.prediction_error.is_finite());
     }
 
     let result = service.cycle("affective check");
@@ -423,7 +456,8 @@ fn test_cycle_with_predictive_processing() {
     .unwrap();
 
     for _ in 0..10 {
-        service.cycle("predictive processing hierarchy test");
+        let r = service.cycle("predictive processing hierarchy test");
+        assert!(r.prediction_error.is_finite());
     }
 
     let result = service.cycle("predictive check");
@@ -449,7 +483,8 @@ fn test_cycle_with_cross_modal_binding() {
     .unwrap();
 
     for _ in 0..10 {
-        service.cycle("cross modal binding integration test");
+        let r = service.cycle("cross modal binding integration test");
+        assert!(r.prediction_error.is_finite());
     }
 
     let result = service.cycle("binding check");
@@ -506,8 +541,10 @@ fn test_v063_affective_curiosity_feedback() {
     // Run enough cycles for affective bridge to produce positive valence
     // (low prediction error → positive valence → boredom *= 1.05)
     let initial_boredom = service.curiosity_drive().boredom;
+    assert!(initial_boredom.is_finite(), "Initial boredom should be finite");
     for _ in 0..15 {
-        service.cycle("positive affect broadens exploration");
+        let r = service.cycle("positive affect broadens exploration");
+        assert!(r.prediction_error.is_finite());
     }
 
     // Boredom should have been modulated by affective feedback
@@ -516,8 +553,10 @@ fn test_v063_affective_curiosity_feedback() {
         final_boredom.is_finite(),
         "Boredom should be finite: {final_boredom}"
     );
-    // The affective feedback mechanism exists and doesn't panic
-    let _ = initial_boredom;
+    assert!(
+        (0.0..=1.0).contains(&final_boredom),
+        "Boredom should be in [0, 1]: {final_boredom}"
+    );
 }
 
 #[test]
@@ -531,7 +570,8 @@ fn test_v063_predictive_lr_feedback() {
 
     // Run cycles — predictive phi_modulation should feed back into effective LR
     for _ in 0..15 {
-        service.cycle("predictive processing lr modulation test");
+        let r = service.cycle("predictive processing lr modulation test");
+        assert!(r.prediction_error.is_finite());
     }
 
     let lr = service.stats().effective_learning_rate;
@@ -557,12 +597,17 @@ fn test_social_signals_modulate_affect() {
     let mut result = service.cycle("social modulation test");
     for _ in 0..9 {
         result = service.cycle("social modulation test");
+        assert!(result.prediction_error.is_finite());
     }
 
     // With high trust (0.9) and cooperation (0.8), affect should be active
     assert!(
         result.metadata.affective_valence.is_finite(),
         "Affective valence should be finite with social signals"
+    );
+    assert!(
+        result.metadata.affective_arousal.is_finite(),
+        "Affective arousal should be finite with social signals"
     );
 }
 
@@ -580,6 +625,7 @@ fn test_predictive_crossmodal_bidirectional_feedback() {
     let mut result = service.cycle("bidirectional feedback test");
     for _ in 0..19 {
         result = service.cycle("bidirectional feedback test");
+        assert!(result.prediction_error.is_finite());
     }
 
     assert!(
@@ -658,7 +704,8 @@ fn test_cycle_with_hv_different_inputs() {
 #[test]
 fn test_psi_attestation_disabled_by_default() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    let _ = service.cycle("test");
+    let result = service.cycle("test");
+    assert!(result.prediction_error.is_finite());
     assert_eq!(
         service.psi_attestation_count(),
         0,
@@ -677,7 +724,8 @@ fn test_psi_attestation_enabled_produces_records() {
 
     // Run 3 cycles
     for _ in 0..3 {
-        let _ = service.cycle("test input");
+        let r = service.cycle("test input");
+        assert!(r.prediction_error.is_finite());
     }
 
     assert_eq!(
@@ -709,7 +757,8 @@ fn test_psi_attestation_drain() {
     .unwrap();
 
     for _ in 0..5 {
-        let _ = service.cycle("test");
+        let r = service.cycle("test");
+        assert!(r.prediction_error.is_finite());
     }
 
     let records = service.drain_psi_attestations();
@@ -741,7 +790,8 @@ fn test_psi_attestation_buffer_capacity() {
     .unwrap();
 
     for _ in 0..10 {
-        let _ = service.cycle("test");
+        let r = service.cycle("test");
+        assert!(r.prediction_error.is_finite());
     }
 
     assert_eq!(
@@ -782,7 +832,8 @@ fn test_psi_attestation_skipped_without_agent_did() {
     })
     .unwrap();
 
-    let _ = service.cycle("test");
+    let result = service.cycle("test");
+    assert!(result.prediction_error.is_finite());
     assert_eq!(
         service.psi_attestation_count(),
         0,
@@ -807,7 +858,8 @@ fn test_module_timings_populated_for_enabled_modules() {
 
     // Run 3 cycles to warm up
     for _ in 0..3 {
-        let _ = service.cycle("testing module timings");
+        let r = service.cycle("testing module timings");
+        assert!(r.prediction_error.is_finite());
     }
     let result = service.cycle("testing module timings");
     let t = &result.metadata.module_timings_us;
@@ -882,14 +934,16 @@ fn test_user_state_integration_with_cognitive_loop() {
     assert!(service.user_state().is_some(), "USI should be initialized");
 
     // Run cycles with different inputs
-    let _ = service.cycle("how do I configure the system?");
+    let result = service.cycle("how do I configure the system?");
+    assert!(result.prediction_error.is_finite());
     let state = service.user_state().unwrap();
     assert!(state.engagement >= 0.0 && state.engagement <= 1.0);
     assert!(state.frustration >= 0.0 && state.frustration <= 1.0);
 
     // Error-inducing input should increase frustration over time
     for _ in 0..5 {
-        let _ = service.cycle("error error error broken failing crash");
+        let r = service.cycle("error error error broken failing crash");
+        assert!(r.prediction_error.is_finite());
     }
     let state_after = service.user_state().unwrap();
     assert!(
@@ -944,6 +998,7 @@ fn test_consciousness_monitor_feedback_loops() {
             "surprise! unexpected input shift"
         };
         let result = service.cycle(input);
+        assert!(result.prediction_error.is_finite());
 
         if result.metadata.resonance_frequency > 0.0 {
             had_nonzero_resonance = true;
@@ -995,6 +1050,7 @@ fn test_consciousness_thermodynamics_integration() {
             "surprise! unexpected shift"
         };
         let result = service.cycle(input);
+        assert!(result.prediction_error.is_finite());
 
         if result.metadata.thermodynamic_entropy > 0.0 {
             had_nonzero_entropy = true;
@@ -1032,6 +1088,7 @@ fn test_phenomenal_binding_integration() {
             "chaotic fragmented surprise"
         };
         let result = service.cycle(input);
+        assert!(result.prediction_error.is_finite());
 
         if result.metadata.phenomenal_binding_strength > 0.0 {
             had_nonzero_binding = true;
@@ -1061,6 +1118,7 @@ fn test_hierarchical_free_energy_integration() {
             "novel surprising observation"
         };
         let result = service.cycle(input);
+        assert!(result.prediction_error.is_finite());
 
         if result.metadata.hierarchical_total_free_energy.abs() > 0.0 {
             had_nonzero_fe = true;
