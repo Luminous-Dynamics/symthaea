@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 #![allow(clippy::needless_range_loop, clippy::manual_clamp)]
 //! Consciousness Resonance Theory - Harmonic Foundations of Awareness
 //!

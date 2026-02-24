@@ -38,6 +38,7 @@
 //! // println!("Detected: {} ({:.1}%)", result.detected_pattern, result.confidence * 100.0);
 //! ```
 
+#![deny(unsafe_code)]
 #![allow(clippy::needless_range_loop)]
 #![allow(clippy::manual_clamp)]
 #![allow(clippy::manual_memcpy)]

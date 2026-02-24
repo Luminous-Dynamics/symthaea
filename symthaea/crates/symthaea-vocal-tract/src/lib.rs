@@ -27,6 +27,7 @@
 //!
 //! - `hound` — WAV file I/O for offline analysis (metrics module)
 
+#![deny(unsafe_code)]
 #![allow(clippy::needless_range_loop)]
 
 pub mod controller;

@@ -6,6 +6,7 @@
 //! - [`causal_emergence`]: Hoel's Effective Information and causal emergence measurement
 //! - [`counterfactual`]: Backdoor/frontdoor identification, HDC graph surgery, semantic roles
 
+#![deny(unsafe_code)]
 #![allow(clippy::needless_range_loop)]
 
 pub mod causal_calculus;

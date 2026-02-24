@@ -49,6 +49,8 @@
 //! 4. **Prospective Self**: Future-oriented self-projection for planning
 //! 5. **Self-Φ**: Integrated information specific to self-representation
 
+#![deny(unsafe_code)]
+
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::Instant;

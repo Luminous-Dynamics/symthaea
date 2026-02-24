@@ -62,6 +62,7 @@
 //! - **Mesh Spoof**: Byzantine false brake signals (must detect + ignore)
 //! - **Gauntlet**: All perturbations at staggered intervals
 
+#![deny(unsafe_code)]
 #![allow(clippy::needless_range_loop)]
 
 pub mod controller;

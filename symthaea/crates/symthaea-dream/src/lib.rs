@@ -32,6 +32,8 @@ println!("Gained {} insights from dreaming", insights);
 ```
 */
 
+#![deny(unsafe_code)]
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 

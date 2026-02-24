@@ -37,6 +37,8 @@
 //! println!("{}", result.summary());
 //! ```
 
+#![deny(unsafe_code)]
+
 pub mod adapter;
 pub mod benchmarks;
 pub mod harness;

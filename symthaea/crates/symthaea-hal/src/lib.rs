@@ -55,6 +55,8 @@
 //! servo.apply(&safe_cmd).unwrap();
 //! ```
 
+#![deny(unsafe_code)]
+
 pub mod calibration;
 pub mod error;
 pub mod gpio_estop;

@@ -59,6 +59,8 @@
 //! - Simplicial sets in algebraic topology
 //! - Consciousness as information geometry (Balduzzi, Tononi)
 
+#![deny(unsafe_code)]
+
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Instant;
 

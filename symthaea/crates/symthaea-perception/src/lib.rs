@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 #![allow(clippy::needless_range_loop)]
 #![allow(clippy::new_without_default)]
 #![allow(clippy::derivable_impls)]

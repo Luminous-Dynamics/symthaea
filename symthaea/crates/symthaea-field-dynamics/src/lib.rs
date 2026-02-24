@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 #![allow(clippy::manual_clamp)]
 
 pub mod error;

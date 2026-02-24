@@ -20,6 +20,8 @@
 //! - Integration with PlasmaHdcEncoder for Phi monitoring
 //! - Synthetic data generation for testing
 
+#![deny(unsafe_code)]
+
 pub mod cmod_adapter;
 pub mod plasma_control;
 pub mod plasma_hdc_encoder;

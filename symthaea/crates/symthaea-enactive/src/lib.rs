@@ -55,6 +55,8 @@
 //! └─────────────────────────────────────────────────────────────┘
 //! ```
 
+#![deny(unsafe_code)]
+
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;

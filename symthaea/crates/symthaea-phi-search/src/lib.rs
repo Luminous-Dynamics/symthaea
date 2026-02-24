@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 #![allow(clippy::needless_range_loop)]
 
 //! # Phi-Guided Architecture Search
