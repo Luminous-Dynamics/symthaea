@@ -81,7 +81,8 @@ Imani M, Duan Y, Rosing T.
 \bibitem{joshi2016language}
 Joshi A, Halseth JT, Kanerva P.
 \newblock Language geometry using random indexing.
-\newblock In: International Conference on Quantum Interaction; 2016. .
+\newblock In: International Conference on Quantum Interaction. Springer; 2016.
+  p. 261--274.
 
 \bibitem{neubert2019introduction}
 Neubert P, Schubert S, Protzel P.
@@ -153,7 +154,51 @@ Li Z, Huang J, Naik M.
 Mao J, Gan C, Kohli P, Tenenbaum JB, Wu J.
 \newblock The neuro-symbolic concept learner: Interpreting scenes, words, and
   sentences from natural supervision.
-\newblock In: International Conference on Learning Representations; 2019. .
+\newblock In: International Conference on Learning Representations; 2019. p.
+  1--28.
+
+\bibitem{diekelmann2010memory}
+Diekelmann S, Born J.
+\newblock The memory function of sleep.
+\newblock Nature Reviews Neuroscience. 2010;11(2):114--126.
+
+\bibitem{miller2001integrative}
+Miller EK, Cohen JD.
+\newblock An integrative theory of prefrontal cortex function.
+\newblock Annual Review of Neuroscience. 2001;24(1):167--202.
+
+\bibitem{clark2013whatever}
+Clark A.
+\newblock Whatever next? Predictive brains, situated agents, and the future of
+  cognitive science.
+\newblock Behavioral and Brain Sciences. 2013;36(3):181--204.
+
+\bibitem{graziano2013consciousness}
+Graziano MS.
+\newblock Consciousness and the attention schema: Why it has to be right.
+\newblock Cognitive Neuropsychology. 2013;30(4):224--233.
+
+\bibitem{baars1988cognitive}
+Baars BJ.
+\newblock A Cognitive Theory of Consciousness.
+\newblock Cambridge University Press; 1988.
+
+\bibitem{damasio1999feeling}
+Damasio AR.
+\newblock The Feeling of What Happens: Body and Emotion in the Making of
+  Consciousness.
+\newblock Harcourt Brace; 1999.
+
+\bibitem{buzsaki2006rhythms}
+Buzs{\'a}ki G.
+\newblock Rhythms of the Brain.
+\newblock Oxford University Press; 2006.
+
+\bibitem{dehaene2014consciousness}
+Dehaene S.
+\newblock Consciousness and the Brain: Deciphering How the Brain Codes Our
+  Thoughts.
+\newblock Viking Press; 2014.
 
 \bibitem{tononi2004information}
 Tononi G.
@@ -169,19 +214,20 @@ Casali AG, Gosseries O, Rosanova M, et~al.
 \bibitem{hendrycks2021aligning}
 Hendrycks D, Burns C, Basart S, Critch A, Li J, Song D, et~al.
 \newblock Aligning {AI} with shared human values.
-\newblock In: International Conference on Learning Representations; 2021. .
+\newblock In: International Conference on Learning Representations; 2021. p.
+  1--29.
 
 \bibitem{forbes2020social}
 Forbes M, Hwang JD, Shwartz V, Sap M, Choi Y.
 \newblock Social chemistry 101: Learning to reason about social and moral
   norms.
 \newblock In: Proceedings of the 2020 Conference on Empirical Methods in
-  Natural Language Processing; 2020. .
+  Natural Language Processing; 2020. p. 653--670.
 
 \bibitem{tassa2018deepmind}
 Tassa Y, Doron Y, Muldal A, Erez T, Li Y, de~Las~Casas D, et~al.
 \newblock {DeepMind} Control Suite.
-\newblock In: arXiv preprint arXiv:1801.00690; 2018. .
+\newblock arXiv preprint arXiv:180100690. 2018;.
 
 \bibitem{haarnoja2018soft}
 Haarnoja T, Zhou A, Abbeel P, Levine S.

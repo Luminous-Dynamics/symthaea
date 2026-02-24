@@ -708,7 +708,7 @@ impl VocalTractController {
         // 3× range: early epochs drive large formant shifts (IY needs +790 Hz F2),
         // later epochs fine-tune with moderate LR for convergence.
         let lr_peak = self.learning_rate * 30.0;
-        let lr_min = self.learning_rate * 10.0;
+        let lr_min = self.learning_rate * 20.0;
 
         for epoch in 0..epochs {
             // Cosine annealing schedule

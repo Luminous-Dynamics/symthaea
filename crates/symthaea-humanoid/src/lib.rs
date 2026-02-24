@@ -41,6 +41,7 @@
 //!
 //! - `viewer` — Interactive MuJoCo 3D viewer
 
+#![deny(unsafe_code)]
 #![allow(clippy::needless_range_loop, clippy::io_other_error)]
 
 pub mod benchmarks;

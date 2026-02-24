@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 #![allow(clippy::needless_range_loop, clippy::new_without_default)]
 
 //! Hodge Laplacian for Simplicial Complexes

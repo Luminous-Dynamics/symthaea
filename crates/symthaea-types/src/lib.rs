@@ -9,6 +9,8 @@
 //! The [`Harmony`] enum represents the Seven Primary Harmonies of the Kosmic Song,
 //! used for value alignment, epistemic analysis, and consciousness evaluation.
 
+#![deny(unsafe_code)]
+
 use serde::{Deserialize, Serialize};
 
 /// The Seven Primary Harmonies of Infinite Love

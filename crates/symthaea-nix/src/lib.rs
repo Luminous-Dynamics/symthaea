@@ -16,6 +16,7 @@
 //! 7. **CLI** — Command-line interface
 //! 8. **TUI** — Terminal UI with consciousness visualization
 
+#![deny(unsafe_code)]
 #![allow(deprecated)]
 
 /// Local trait and type definitions for symthaea-nix.

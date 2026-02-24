@@ -25,6 +25,8 @@
 //! The Seven Harmonies aren't just tracked values; they are reasoning modes
 //! that bias thought in specific directions.
 
+#![deny(unsafe_code)]
+
 pub mod autopoiesis;
 pub mod harmonics;
 pub mod meta_cognition;

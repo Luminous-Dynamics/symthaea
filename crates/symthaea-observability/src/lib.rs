@@ -8,6 +8,8 @@
 //! - Performance metrics and statistics
 //! - Counterfactual reasoning with uncertainty propagation
 
+#![deny(unsafe_code)]
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
