@@ -95,7 +95,7 @@ impl CognitiveLoopService {
         let _ = self.temporal_network.step(&input_array, delta_t);
 
         // 5. Multi-scale prediction
-        let prediction = self.get_multi_scale_prediction(&input_array);
+        let (prediction, _raw_predictions) = self.get_multi_scale_prediction(&input_array);
 
         // 6. Read CfC output state
         let output = self
@@ -200,7 +200,7 @@ impl CognitiveLoopService {
         let _ = self.temporal_network.step(&input_array, delta_t);
 
         // 3. Multi-scale prediction
-        let prediction = self.get_multi_scale_prediction(&input_array);
+        let (prediction, _raw_predictions) = self.get_multi_scale_prediction(&input_array);
 
         // 4. Read CfC output state
         let output = self

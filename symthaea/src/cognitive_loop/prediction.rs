@@ -9,20 +9,28 @@ use ndarray::Array1;
 use super::CognitiveLoopService;
 
 impl CognitiveLoopService {
-    /// Get multi-scale prediction by averaging predictions at different time horizons
+    /// Get multi-scale prediction by averaging predictions at different time horizons.
     ///
     /// This uses CfC's O(1) predict_forward to instantly query multiple future times,
     /// forcing the network to learn temporal "rules" rather than just noise patterns.
-    pub(super) fn get_multi_scale_prediction(&mut self, input: &Array1<f32>) -> Vec<f32> {
+    ///
+    /// Returns `(averaged_prediction, raw_predictions)`. The raw predictions are retained
+    /// so `compute_prediction_coherence_from_cache` can reuse them without re-calling
+    /// predict_forward (saving ~300µs every 11 cycles).
+    pub(super) fn get_multi_scale_prediction(
+        &mut self,
+        input: &Array1<f32>,
+    ) -> (Vec<f32>, Vec<Array1<f32>>) {
         let horizons = &self.config.cfc_config.prediction_horizons;
 
         if horizons.is_empty() {
             // Fallback: single-step prediction
-            return self
+            let pred = self
                 .temporal_network
                 .predict_forward(input, self.config.cfc_config.delta_t)
                 .map(|arr| arr.to_vec())
                 .unwrap_or_else(|_| vec![0.0; self.config.cfc_config.input_dim]);
+            return (pred, Vec::new());
         }
 
         // Collect predictions at multiple time horizons
@@ -35,7 +43,7 @@ impl CognitiveLoopService {
         }
 
         if predictions.is_empty() {
-            return vec![0.0; self.config.cfc_config.input_dim];
+            return (vec![0.0; self.config.cfc_config.input_dim], Vec::new());
         }
 
         // Average the multi-scale predictions
@@ -53,27 +61,16 @@ impl CognitiveLoopService {
             }
         }
 
-        result
+        (result, predictions)
     }
 
-    /// Compute coherence between multi-horizon predictions (0.0 = divergent, 1.0 = identical).
+    /// Compute coherence from cached predictions (avoids re-calling predict_forward).
     ///
-    /// Science: Bar (2009) — predictions at multiple time horizons should cohere when the
-    /// model has captured genuine temporal structure (vs noise).
+    /// Takes the raw predictions already computed by `get_multi_scale_prediction`.
     /// Computes average pairwise cosine similarity across prediction horizons.
-    pub(super) fn compute_prediction_coherence(&mut self, input: &Array1<f32>) -> f32 {
-        let horizons = &self.config.cfc_config.prediction_horizons;
-        if horizons.len() < 2 {
-            return 1.0; // single horizon is trivially coherent
-        }
-
-        let mut predictions: Vec<Vec<f32>> = Vec::with_capacity(horizons.len());
-        for &horizon in horizons {
-            if let Ok(pred) = self.temporal_network.predict_forward(input, horizon) {
-                predictions.push(pred.to_vec());
-            }
-        }
-
+    pub(super) fn compute_prediction_coherence_from_cache(
+        predictions: &[Array1<f32>],
+    ) -> f32 {
         if predictions.len() < 2 {
             return 1.0;
         }
