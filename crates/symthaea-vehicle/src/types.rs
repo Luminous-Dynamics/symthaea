@@ -237,6 +237,38 @@ impl VehicleState {
         self.lateral_offset = self.position_y;
         self.curvature_ahead = 0.0;
     }
+
+    /// Apply sensor blindness: zero out the first `n` proprioceptive channels.
+    ///
+    /// Simulates camera/LiDAR degradation from rain, fog, or sensor failure.
+    /// Channels are zeroed in order: speed, lateral_velocity, yaw_rate, heading,
+    /// position_x/y, steering_angle, throttle/brake, accel, tire slip, pitch.
+    pub fn apply_sensor_blindness(&mut self, n: usize) {
+        if n >= 1 { self.speed = 0.0; }
+        if n >= 2 { self.lateral_velocity = 0.0; }
+        if n >= 3 { self.yaw_rate = 0.0; }
+        if n >= 4 { self.heading = 0.0; }
+        if n >= 5 { self.position_x = 0.0; }
+        if n >= 6 { self.position_y = 0.0; }
+        if n >= 7 { self.steering_angle = 0.0; }
+        if n >= 8 { self.throttle_position = 0.0; }
+        if n >= 9 { self.brake_pressure = 0.0; }
+        if n >= 10 { self.longitudinal_accel = 0.0; }
+        if n >= 11 { self.lateral_accel = 0.0; }
+        if n >= 12 { self.tire_slip_front = 0.0; }
+        if n >= 13 { self.tire_slip_rear = 0.0; }
+        if n >= 14 { self.pitch = 0.0; }
+    }
+
+    /// Apply mesh spoof: inject false brake signals from spoofed peers.
+    ///
+    /// Each spoofed peer adds 0.25 to brake density (capped at 1.0) and
+    /// inflates mesh_confidence (spoofed data claims high confidence).
+    pub fn apply_mesh_spoof(&mut self, num_spoofed_peers: usize) {
+        let spoof_fraction = (num_spoofed_peers as f64 * 0.25).min(1.0);
+        self.mesh_brake_density = (self.mesh_brake_density + spoof_fraction).min(1.0);
+        self.mesh_confidence = (self.mesh_confidence + spoof_fraction * 0.5).min(1.0);
+    }
 }
 
 /// Motor command output (3D): steering, throttle, brake.
@@ -797,6 +829,76 @@ mod tests {
             cmd.steering < 0.0,
             "Left offset → steer right (negative): {}",
             cmd.steering
+        );
+    }
+
+    #[test]
+    fn test_sensor_blindness_zeros_channels() {
+        let mut state = VehicleState::cruising(13.4);
+        state.lateral_velocity = 1.0;
+        state.yaw_rate = 0.5;
+        state.heading = 0.3;
+
+        state.apply_sensor_blindness(4);
+
+        assert!((state.speed - 0.0).abs() < 1e-10, "speed should be zeroed");
+        assert!((state.lateral_velocity - 0.0).abs() < 1e-10, "lat_vel should be zeroed");
+        assert!((state.yaw_rate - 0.0).abs() < 1e-10, "yaw_rate should be zeroed");
+        assert!((state.heading - 0.0).abs() < 1e-10, "heading should be zeroed");
+        // position_x should NOT be zeroed (only 4 channels)
+        assert!((state.position_x - 0.0).abs() < 1e-10); // was already 0
+        // mesh channels should be untouched
+        assert!((state.nearest_peer_distance - 200.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_sensor_blindness_clamps_to_14() {
+        let mut state = VehicleState::cruising(13.4);
+        state.nearest_peer_distance = 50.0;
+        state.mesh_brake_density = 0.5;
+
+        state.apply_sensor_blindness(20); // more than 14 → clamped
+
+        assert!((state.speed - 0.0).abs() < 1e-10, "all proprioceptive zeroed");
+        assert!((state.pitch - 0.0).abs() < 1e-10, "pitch zeroed (channel 13)");
+        // Road and mesh channels should be untouched
+        assert!((state.nearest_peer_distance - 50.0).abs() < 1e-10, "mesh untouched");
+        assert!((state.mesh_brake_density - 0.5).abs() < 1e-10, "mesh untouched");
+    }
+
+    #[test]
+    fn test_mesh_spoof_inflates_brake_density() {
+        let mut state = VehicleState::cruising(13.4);
+        state.mesh_brake_density = 0.1;
+        state.mesh_confidence = 0.3;
+
+        state.apply_mesh_spoof(2);
+
+        // 2 spoofed peers → 0.25*2 = 0.5 added to brake_density
+        assert!(
+            (state.mesh_brake_density - 0.6).abs() < 1e-10,
+            "brake_density: {}",
+            state.mesh_brake_density
+        );
+        // confidence inflated by 0.5 * 0.5 = 0.25
+        assert!(
+            (state.mesh_confidence - 0.55).abs() < 1e-10,
+            "confidence: {}",
+            state.mesh_confidence
+        );
+    }
+
+    #[test]
+    fn test_mesh_spoof_caps_at_one() {
+        let mut state = VehicleState::cruising(13.4);
+        state.mesh_brake_density = 0.8;
+
+        state.apply_mesh_spoof(4); // 4*0.25 = 1.0 added
+
+        assert!(
+            (state.mesh_brake_density - 1.0).abs() < 1e-10,
+            "should cap at 1.0: {}",
+            state.mesh_brake_density
         );
     }
 
