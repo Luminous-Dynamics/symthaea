@@ -117,6 +117,45 @@ impl PerturbationSchedule {
         }
     }
 
+    /// Sensor blindness at step 300: 4 proprioceptive channels degraded.
+    pub fn sensor_blindness() -> Self {
+        Self {
+            events: vec![(
+                300,
+                VehiclePerturbation::SensorBlindness {
+                    affected_channels: 4,
+                },
+            )],
+            clear_step: Some(800),
+        }
+    }
+
+    /// Mesh spoof at step 200: 2 spoofed peers injecting false brake signals.
+    pub fn mesh_spoof() -> Self {
+        Self {
+            events: vec![(
+                200,
+                VehiclePerturbation::MeshSpoof {
+                    num_spoofed_peers: 2,
+                },
+            )],
+            clear_step: Some(800),
+        }
+    }
+
+    /// Road impulse (speed bump / pothole) at step 150: 5 m/s² deceleration.
+    pub fn road_impulse() -> Self {
+        Self {
+            events: vec![(
+                150,
+                VehiclePerturbation::RoadImpulse {
+                    decel_impulse: 5.0,
+                },
+            )],
+            clear_step: None,
+        }
+    }
+
     /// Combined crucible: ice + blindness + crosswind at staggered intervals.
     pub fn gauntlet() -> Self {
         Self {
@@ -159,6 +198,7 @@ impl PerturbationSchedule {
                         sim.apply_external_force([0.0, *force_n]);
                     }
                     VehiclePerturbation::RoadImpulse { decel_impulse } => {
+                        // F = m*a; using default ChassisParams mass (1500 kg)
                         sim.apply_external_force([-decel_impulse * 1500.0, 0.0]);
                     }
                     VehiclePerturbation::TireBlowout {
@@ -178,9 +218,10 @@ impl PerturbationSchedule {
                         };
                         sim.set_axle_friction(front, rear);
                     }
-                    // SensorBlindness and MeshSpoof are handled at the
-                    // encoder/controller level, not the physics level.
-                    _ => {}
+                    // SensorBlindness and MeshSpoof are applied at the state level
+                    // via apply_to_state(), not at the physics simulator level.
+                    VehiclePerturbation::SensorBlindness { .. }
+                    | VehiclePerturbation::MeshSpoof { .. } => {}
                 }
             }
         }
@@ -191,6 +232,37 @@ impl PerturbationSchedule {
                 let clear = self.clear_step.unwrap_or(usize::MAX);
                 if step > *event_step && step < clear {
                     sim.apply_external_force([0.0, *force_n]);
+                }
+            }
+        }
+    }
+
+    /// Apply state-level perturbations for the given step.
+    ///
+    /// Unlike `apply()` which modifies the physics simulator, this modifies
+    /// the vehicle state directly — handling perturbations that operate at
+    /// the sensor/encoder level rather than the physics level.
+    /// SensorBlindness and MeshSpoof are sustained: active from trigger step until clear.
+    pub fn apply_to_state(&self, step: usize, state: &mut VehicleState) {
+        let clear = self.clear_step.unwrap_or(usize::MAX);
+        if step >= clear {
+            return;
+        }
+
+        for (event_step, perturbation) in &self.events {
+            if step >= *event_step {
+                match perturbation {
+                    VehiclePerturbation::SensorBlindness {
+                        affected_channels,
+                    } => {
+                        state.apply_sensor_blindness(*affected_channels);
+                    }
+                    VehiclePerturbation::MeshSpoof {
+                        num_spoofed_peers,
+                    } => {
+                        state.apply_mesh_spoof(*num_spoofed_peers);
+                    }
+                    _ => {}
                 }
             }
         }
@@ -355,6 +427,125 @@ mod tests {
                 || sim.state().yaw_rate.abs() > 0.001
                 || sim.state().heading.abs() > 0.001,
             "Sustained crosswind should affect dynamics"
+        );
+    }
+
+    #[test]
+    fn test_sensor_blindness_schedule() {
+        let schedule = PerturbationSchedule::sensor_blindness();
+        assert_eq!(schedule.events.len(), 1);
+        assert_eq!(schedule.clear_step, Some(800));
+    }
+
+    #[test]
+    fn test_sensor_blindness_apply_to_state() {
+        let schedule = PerturbationSchedule::sensor_blindness();
+        let mut state = VehicleState::cruising(13.4);
+        state.lateral_velocity = 2.0;
+        state.yaw_rate = 0.5;
+        state.heading = 0.3;
+
+        // Before trigger: no effect
+        schedule.apply_to_state(200, &mut state);
+        assert!(
+            (state.speed - 13.4).abs() < 1e-10,
+            "Before trigger: speed unchanged"
+        );
+
+        // At trigger (step 300): channels zeroed
+        state = VehicleState::cruising(13.4);
+        state.lateral_velocity = 2.0;
+        schedule.apply_to_state(300, &mut state);
+        assert!(
+            (state.speed - 0.0).abs() < 1e-10,
+            "At trigger: speed zeroed"
+        );
+        assert!(
+            (state.lateral_velocity - 0.0).abs() < 1e-10,
+            "At trigger: lat_vel zeroed"
+        );
+
+        // Sustained (step 500): still active
+        state = VehicleState::cruising(13.4);
+        schedule.apply_to_state(500, &mut state);
+        assert!(
+            (state.speed - 0.0).abs() < 1e-10,
+            "Sustained: speed still zeroed"
+        );
+
+        // After clear (step 800): no effect
+        state = VehicleState::cruising(13.4);
+        schedule.apply_to_state(800, &mut state);
+        assert!(
+            (state.speed - 13.4).abs() < 1e-10,
+            "After clear: speed restored"
+        );
+    }
+
+    #[test]
+    fn test_mesh_spoof_schedule() {
+        let schedule = PerturbationSchedule::mesh_spoof();
+        assert_eq!(schedule.events.len(), 1);
+        assert_eq!(schedule.clear_step, Some(800));
+    }
+
+    #[test]
+    fn test_mesh_spoof_apply_to_state() {
+        let schedule = PerturbationSchedule::mesh_spoof();
+        let mut state = VehicleState::cruising(13.4);
+        state.mesh_brake_density = 0.0;
+        state.mesh_confidence = 0.3;
+
+        // Before trigger: no effect
+        schedule.apply_to_state(100, &mut state);
+        assert!(
+            (state.mesh_brake_density - 0.0).abs() < 1e-10,
+            "Before trigger: no spoof"
+        );
+
+        // At trigger (step 200): spoofed
+        schedule.apply_to_state(200, &mut state);
+        assert!(
+            state.mesh_brake_density > 0.4,
+            "At trigger: brake density inflated: {}",
+            state.mesh_brake_density
+        );
+
+        // After clear: no effect
+        state.mesh_brake_density = 0.0;
+        state.mesh_confidence = 0.3;
+        schedule.apply_to_state(800, &mut state);
+        assert!(
+            (state.mesh_brake_density - 0.0).abs() < 1e-10,
+            "After clear: no spoof"
+        );
+    }
+
+    #[test]
+    fn test_road_impulse_schedule() {
+        let schedule = PerturbationSchedule::road_impulse();
+        assert_eq!(schedule.events.len(), 1);
+        assert!(schedule.clear_step.is_none());
+    }
+
+    #[test]
+    fn test_road_impulse_applies_force() {
+        let mut sim = BicycleModelSimulator::at_speed(13.4);
+        let schedule = PerturbationSchedule::road_impulse();
+        let cmd = crate::types::VehicleCommand {
+            steering: 0.0,
+            throttle: 0.3,
+            brake: 0.0,
+        };
+
+        let speed_before = sim.state().speed;
+        schedule.apply(150, &mut sim);
+        sim.step(&cmd, 0.005);
+
+        assert!(
+            sim.state().speed < speed_before,
+            "Road impulse should decelerate: before={speed_before}, after={}",
+            sim.state().speed
         );
     }
 }

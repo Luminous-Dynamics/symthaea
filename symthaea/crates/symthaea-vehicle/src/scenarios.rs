@@ -207,6 +207,39 @@ pub fn default_scenarios() -> Vec<ScenarioConfig> {
             num_episodes: ep,
             steps_per_episode: steps,
         },
+        // 10. LaneKeep with sensor blindness
+        ScenarioConfig {
+            name: "lanekeep_sensor_blind".into(),
+            task: VehicleTask::LaneKeep,
+            road: Road::straight(),
+            swarm: None,
+            perturbation: PerturbationSchedule::sensor_blindness(),
+            training_perturbations: vec![],
+            num_episodes: ep,
+            steps_per_episode: steps,
+        },
+        // 11. Follow with mesh spoof attack
+        ScenarioConfig {
+            name: "follow_mesh_spoof".into(),
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            road: Road::straight(),
+            swarm: Some(SwarmConfig::convoy_straight(3)),
+            perturbation: PerturbationSchedule::mesh_spoof(),
+            training_perturbations: vec![],
+            num_episodes: ep,
+            steps_per_episode: steps,
+        },
+        // 12. LaneKeep with road impulse (pothole)
+        ScenarioConfig {
+            name: "lanekeep_road_impulse".into(),
+            task: VehicleTask::LaneKeep,
+            road: Road::straight(),
+            swarm: None,
+            perturbation: PerturbationSchedule::road_impulse(),
+            training_perturbations: vec![],
+            num_episodes: ep,
+            steps_per_episode: steps,
+        },
     ]
 }
 
@@ -244,7 +277,7 @@ mod tests {
     #[test]
     fn test_default_scenarios_count() {
         let scenarios = default_scenarios();
-        assert_eq!(scenarios.len(), 9);
+        assert_eq!(scenarios.len(), 12);
     }
 
     #[test]
@@ -274,7 +307,7 @@ mod tests {
         let scenarios = default_scenarios();
         let results = run_all_scenarios(&scenarios);
 
-        assert_eq!(results.len(), 9);
+        assert_eq!(results.len(), 12);
         for r in &results {
             assert!(r.all_finite, "Scenario '{}' has non-finite metrics", r.name);
             assert!(

@@ -336,6 +336,11 @@ impl VehicleTrainer {
                 sw.aggregate_mesh(&mut state);
             }
 
+            // -- STATE-LEVEL PERTURBATIONS (sensor blindness, mesh spoof) --
+            if use_perturbations {
+                self.perturbation_schedule.apply_to_state(step, &mut state);
+            }
+
             let proj = self.road.project(state.position_x, state.position_y);
             let road_heading = proj.road_heading;
 
