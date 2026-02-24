@@ -152,10 +152,7 @@ impl MuJoCoSimulator {
     /// Write a QuadrotorCommand into MuJoCo ctrl array.
     fn write_ctrl(&mut self, cmd: &QuadrotorCommand) {
         let ctrl_vals = cmd.to_ctrl();
-        let ctrl = self.data.ctrl_mut();
-        for i in 0..4 {
-            ctrl[i] = ctrl_vals[i];
-        }
+        self.data.ctrl_mut()[..4].copy_from_slice(&ctrl_vals);
     }
 
     /// Apply accumulated external force to the drone body via xfrc_applied.
