@@ -77,7 +77,27 @@ impl DreamableAction for ActionIR {
                 }
                 ActionIR::Sequence(new_actions)
             }
-            _ => self.clone(),
+            ActionIR::ReadSensor { sensor_id, channels } => ActionIR::ReadSensor { 
+                sensor_id: sensor_id.clone(), 
+                channels: channels.clone() 
+            },
+            ActionIR::WriteServo { servo_id, value } => ActionIR::WriteServo { 
+                servo_id: *servo_id, 
+                value: value + ((seed % 10) as f32 / 100.0) 
+            },
+            ActionIR::SwarmGossip { topic, payload } => ActionIR::SwarmGossip { 
+                topic: topic.clone(), 
+                payload: payload.clone() 
+            },
+            ActionIR::WasmSandbox { module_path, function_name, input_data } => ActionIR::WasmSandbox {
+                module_path: module_path.clone(),
+                function_name: function_name.clone(),
+                input_data: input_data.clone(),
+            },
+            ActionIR::NoOp => ActionIR::NoOp,
+            ActionIR::ReadFile { path, encoding } => ActionIR::ReadFile { path: path.clone(), encoding: encoding.clone() },
+            ActionIR::CreateDirectory { path, recursive } => ActionIR::CreateDirectory { path: path.clone(), recursive: *recursive },
+            ActionIR::ListDirectory { path, recursive } => ActionIR::ListDirectory { path: path.clone(), recursive: *recursive },
         }
     }
 
@@ -308,6 +328,27 @@ pub enum ActionIR {
         env: BTreeMap<String, String>,
         working_dir: Option<PathBuf>,
     },
+    /// HAL: Read from a physical sensor (IMU, Power, etc.)
+    ReadSensor {
+        sensor_id: String,
+        channels: Vec<String>,
+    },
+    /// HAL: Write to a physical servo or PWM channel
+    WriteServo {
+        servo_id: u32,
+        value: f32,
+    },
+    /// Swarm: Broadcast a message (optimization, research, or curriculum) to the swarm.
+    SwarmGossip {
+        topic: String,
+        payload: Vec<u8>,
+    },
+    /// Forge: Execute a pre-compiled .wasm optimization in a sandbox for verification.
+    WasmSandbox {
+        module_path: PathBuf,
+        function_name: String,
+        input_data: Vec<u8>,
+    },
     Sequence(Vec<ActionIR>),
     NoOp,
 }
@@ -322,6 +363,10 @@ impl ActionIR {
             ActionIR::WriteFile { .. } => true,
             ActionIR::DeleteFile { .. } => true,
             ActionIR::CreateDirectory { .. } => true,
+            ActionIR::ReadSensor { .. } => true,
+            ActionIR::WriteServo { .. } => true,
+            ActionIR::SwarmGossip { .. } => true,
+            ActionIR::WasmSandbox { .. } => true,
             ActionIR::Sequence(actions) => actions.iter().all(|a| a.is_reversible()),
             ActionIR::RunCommand { .. } => false,
         }
@@ -330,13 +375,17 @@ impl ActionIR {
     /// Classify risk tier for budgeting/logging.
     pub fn risk_tier(&self) -> RiskTier {
         match self {
-            ActionIR::ReadFile { .. } | ActionIR::ListDirectory { .. } | ActionIR::NoOp => {
-                RiskTier::Low
-            }
+            ActionIR::ReadFile { .. }
+            | ActionIR::ListDirectory { .. }
+            | ActionIR::NoOp
+            | ActionIR::ReadSensor { .. }
+            | ActionIR::WasmSandbox { .. } => RiskTier::Low,
             ActionIR::WriteFile { .. }
             | ActionIR::DeleteFile { .. }
             | ActionIR::CreateDirectory { .. } => RiskTier::Medium,
-            ActionIR::RunCommand { .. } => RiskTier::High,
+            ActionIR::WriteServo { .. }
+            | ActionIR::SwarmGossip { .. }
+            | ActionIR::RunCommand { .. } => RiskTier::High,
             ActionIR::Sequence(actions) => actions
                 .iter()
                 .map(|a| a.risk_tier())
@@ -350,13 +399,18 @@ impl ActionIR {
     /// reversible, needs-confirmation, and destructive operations.
     pub fn destructiveness(&self) -> DestructivenessLevel {
         match self {
-            ActionIR::ReadFile { .. } | ActionIR::ListDirectory { .. } | ActionIR::NoOp => {
-                DestructivenessLevel::ReadOnly
-            }
+            ActionIR::ReadFile { .. }
+            | ActionIR::ListDirectory { .. }
+            | ActionIR::NoOp
+            | ActionIR::ReadSensor { .. }
+            | ActionIR::WasmSandbox { .. } => DestructivenessLevel::ReadOnly,
             ActionIR::WriteFile { .. } | ActionIR::CreateDirectory { .. } => {
                 DestructivenessLevel::Reversible
             }
             ActionIR::DeleteFile { .. } => DestructivenessLevel::Destructive,
+            ActionIR::WriteServo { .. } | ActionIR::SwarmGossip { .. } => {
+                DestructivenessLevel::NeedsConfirmation
+            }
             ActionIR::RunCommand { program, args, .. } => {
                 classify_command_destructiveness(program, args)
             }
@@ -428,6 +482,9 @@ impl ActionIR {
                     sandbox,
                     AccessKind::Write,
                 )?;
+            }
+            ActionIR::ReadSensor { .. } | ActionIR::WriteServo { .. } | ActionIR::SwarmGossip { .. } | ActionIR::WasmSandbox { .. } => {
+                // HAL, Swarm, and Forge primitives are currently allowed by default if they pass the global Phi gate
             }
             ActionIR::RunCommand {
                 program,
@@ -627,13 +684,24 @@ fn normalize_path(path: &Path) -> PathBuf {
 }
 
 /// Outcome of executing an action.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ActionOutcome {
     Success,
     FileContent(Vec<u8>),
     DirectoryListing(Vec<PathBuf>),
-    SimulatedCommand {
-        program: String,
+    SensorData {
+        sensor_id: String,
+        values: BTreeMap<String, f32>,
+    },
+    ServoStatus {
+        servo_id: u32,
+        current_value: f32,
+    },
+    WasmResult {
+        output: Vec<u8>,
+        logs: Vec<String>,
+    },
+    SimulatedCommand {        program: String,
         args: Vec<String>,
     },
     CommandOutput {
@@ -806,6 +874,25 @@ impl SimpleExecutor {
             (action.clone(), false)
         };
 
+        // 0.5. PRECOGNITION (The "Causal Veto")
+        // Before executing, simulate the outcome in working memory.
+        let state_dummy = vec![0.0; 64]; 
+        let prediction = self.dream_engine.predict_outcome_distribution(&state_dummy, &final_action);
+        
+        if prediction.failure_probability > 0.8 {
+            tracing::warn!(target: "symthaea::action", 
+                "CAUSAL VETO: Simulation predicts {:.1}% failure probability. Aborting action.", 
+                prediction.failure_probability * 100.0);
+            return Err(ExecutionError::Unsupported(format!(
+                "Causal Veto: Predicted failure probability {:.1}% is too high.", 
+                prediction.failure_probability * 100.0
+            )));
+        } else if prediction.failure_probability > 0.4 {
+            tracing::info!(target: "symthaea::action", 
+                "PRECOGNITION: Proceeding with caution. Predicted failure probability: {:.1}%", 
+                prediction.failure_probability * 100.0);
+        }
+
         // 1. Validate
         final_action.validate(policy, sandbox, current_phi)?;
 
@@ -872,6 +959,75 @@ impl SimpleExecutor {
                 }
                 ActionOutcome::DirectoryListing(entries)
             }
+            ActionIR::ReadSensor { sensor_id, channels } => match self.mode {
+                ExecutionMode::Simulated => {
+                    let mut values = BTreeMap::new();
+                    for chan in channels {
+                        values.insert(chan.clone(), 0.0);
+                    }
+                    ActionOutcome::SensorData {
+                        sensor_id: sensor_id.clone(),
+                        values,
+                    }
+                }
+                ExecutionMode::Real => {
+                    // Placeholder for real HAL call
+                    ActionOutcome::Success
+                }
+            },
+            ActionIR::WriteServo { servo_id, value } => match self.mode {
+                ExecutionMode::Simulated => ActionOutcome::ServoStatus {
+                    servo_id: *servo_id,
+                    current_value: *value,
+                },
+                ExecutionMode::Real => {
+                    // Placeholder for real HAL call
+                    ActionOutcome::Success
+                }
+            },
+            ActionIR::SwarmGossip { topic, .. } => match self.mode {
+                ExecutionMode::Simulated => {
+                    println!("📢 Swarm Gossip: Broadcasted to topic '{}'", topic);
+                    ActionOutcome::Success
+                }
+                ExecutionMode::Real => {
+                    // Placeholder for real Swarm call (Iroh/Holochain)
+                    ActionOutcome::Success
+                }
+            },
+            ActionIR::WasmSandbox { module_path, function_name, input_data } => match self.mode {
+                ExecutionMode::Simulated => {
+                    println!("🧪 WASM Sandbox: Simulating verification of module {:?}::{}()", module_path, function_name);
+                    ActionOutcome::WasmResult {
+                        output: vec![1], // 1 = success in our protocol
+                        logs: vec!["Simulation: Verification successful.".to_string()],
+                    }
+                }
+                ExecutionMode::Real => {
+                    #[cfg(feature = "wasm-sandbox")]
+                    {
+                        use wasmtime::*;
+                        let engine = Engine::default();
+                        let module = Module::from_file(&engine, module_path).map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
+                        let mut store = Store::new(&engine, ());
+                        let instance = Instance::new(&mut store, &module, &[]).map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
+                        let func = instance.get_typed_func::<(), i32>(&mut store, function_name).map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
+                        let res = func.call(&mut store, ()).map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
+                        
+                        ActionOutcome::WasmResult {
+                            output: vec![res as u8],
+                            logs: vec![format!("Wasmtime: Function {} returned {}", function_name, res)],
+                        }
+                    }
+                    #[cfg(not(feature = "wasm-sandbox"))]
+                    {
+                        ActionOutcome::WasmResult {
+                            output: vec![0],
+                            logs: vec!["Error: wasm-sandbox feature not enabled.".to_string()],
+                        }
+                    }
+                }
+            },
             ActionIR::RunCommand {
                 program,
                 args,
@@ -943,6 +1099,8 @@ impl SimpleExecutor {
             ActionOutcome::Success => 1.0,
             ActionOutcome::FileContent(_) => 0.9,
             ActionOutcome::DirectoryListing(_) => 0.8,
+            ActionOutcome::SensorData { .. } => 0.85,
+            ActionOutcome::ServoStatus { .. } => 0.7,
             ActionOutcome::SimulatedCommand { program, .. } => {
                 if program == "ls" || program == "cat" || program == "nix" {
                     0.8
@@ -954,6 +1112,9 @@ impl SimpleExecutor {
             }
             ActionOutcome::CommandOutput { exit_code, .. } => {
                 if *exit_code == 0 { 1.0 } else { 0.1 }
+            }
+            ActionOutcome::WasmResult { output, .. } => {
+                if !output.is_empty() && output[0] == 1 { 1.0 } else { 0.2 }
             }
         };
         vec![score; 64]
@@ -1023,7 +1184,13 @@ impl SimpleExecutor {
                 self.budget.check_file_write_budget(1, 0, policy)?;
                 self.budget.record_file_write(0);
             }
-            ActionIR::Sequence(_) | ActionIR::ReadFile { .. } | ActionIR::ListDirectory { .. } => {}
+            ActionIR::Sequence(_)
+            | ActionIR::ReadFile { .. }
+            | ActionIR::ListDirectory { .. }
+            | ActionIR::ReadSensor { .. }
+            | ActionIR::WriteServo { .. }
+            | ActionIR::SwarmGossip { .. }
+            | ActionIR::WasmSandbox { .. } => {}
             ActionIR::NoOp => {}
         }
         Ok(())

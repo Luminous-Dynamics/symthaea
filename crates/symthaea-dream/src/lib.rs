@@ -170,6 +170,14 @@ pub struct Wisdom<A: DreamableAction> {
     pub confidence: f32,
 }
 
+/// Distribution of predicted outcomes for precognition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutcomeDistribution {
+    pub expected_phi: f32,
+    pub failure_probability: f32,
+    pub confidence: f32,
+}
+
 /// A simple associative world model that learns from experience
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TransitionMemory {
@@ -398,6 +406,36 @@ impl<A: DreamableAction> DreamEngine<A> {
     /// Clear processed events from memory
     pub fn clear_memory(&mut self) {
         self.memory.clear();
+    }
+
+    /// PRECOGNITION: Predict outcome distribution for an action
+    ///
+    /// Runs counterfactual simulations to estimate the likelihood of failure
+    /// and the expected outcome before taking an action.
+    pub fn predict_outcome_distribution(&self, state: &[f32], action: &A) -> OutcomeDistribution {
+        let mut simulations = Vec::with_capacity(self.config.counterfactual_count);
+        let mut failure_count = 0;
+        let mut total_phi = 0.0;
+
+        for i in 0..self.config.counterfactual_count {
+            // Generate a slightly perturbed action to account for environmental noise
+            let perturbed = action.perturb(i as u64);
+            let outcome = self.simulate_outcome(state, &perturbed);
+            let phi = Self::estimate_phi(&outcome);
+            
+            total_phi += phi;
+            // Failure heuristic: Phi < 0.2 is considered a failure
+            if phi < 0.2 {
+                failure_count += 1;
+            }
+            simulations.push(outcome);
+        }
+
+        OutcomeDistribution {
+            expected_phi: total_phi / self.config.counterfactual_count as f32,
+            failure_probability: failure_count as f32 / self.config.counterfactual_count as f32,
+            confidence: 1.0 - (failure_count as f32 / self.config.counterfactual_count as f32),
+        }
     }
 
     /// Get accumulated wisdom

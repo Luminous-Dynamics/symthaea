@@ -185,6 +185,34 @@ impl ActionRegistry {
                     working_dir: None,
                 })
             })
+            .register("READ_SENSOR", |ctx| {
+                let sensor_id = ctx.args.get(0).cloned().unwrap_or_else(|| "ina219".into());
+                let channels = if ctx.args.len() > 1 {
+                    ctx.args[1..].to_vec()
+                } else {
+                    vec!["voltage".into(), "current".into()]
+                };
+                Ok(ActionIR::ReadSensor { sensor_id, channels })
+            })
+            .register("WRITE_SERVO", |ctx| {
+                let id = ctx.args.get(0).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+                let val = ctx.args.get(1).and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.0);
+                Ok(ActionIR::WriteServo { servo_id: id, value: val })
+            })
+            .register("SWARM_GOSSIP", |ctx| {
+                let topic = ctx.args.get(0).cloned().unwrap_or_else(|| "optimization".into());
+                let payload = ctx.content.clone().unwrap_or_default().into_bytes();
+                Ok(ActionIR::SwarmGossip { topic, payload })
+            })
+            .register("WASM_VERIFY", |ctx| {
+                let path = ctx.target_path.clone().ok_or_else(|| ActionError::ValidationFailed("WASM_VERIFY requires target_path".into()))?;
+                let func = ctx.args.get(0).cloned().unwrap_or_else(|| "verify".into());
+                Ok(ActionIR::WasmSandbox {
+                    module_path: path,
+                    function_name: func,
+                    input_data: vec![],
+                })
+            })
     }
 }
 

@@ -47,6 +47,23 @@
 
 pub use super::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+/// Global Cognitive Stride (Adaptive SSM Principle).
+/// 1 = Full resolution (High Power)
+/// 4 = Standard (Balanced)
+/// 8+ = Low resolution (Power Saving)
+pub static STRIDE: AtomicUsize = AtomicUsize::new(4);
+
+/// Set the global cognitive stride for similarity calculations.
+pub fn set_cognitive_stride(stride: usize) {
+    STRIDE.store(stride.max(1), Ordering::Relaxed);
+}
+
+/// Get the current cognitive stride.
+pub fn get_cognitive_stride() -> usize {
+    STRIDE.load(Ordering::Relaxed)
+}
 
 /// Standard HDC dimension (2^14 = 16,384)
 /// This is SIMD-optimized and matches research consensus.
@@ -330,10 +347,11 @@ impl ContinuousHV {
             let mut norm_a_sq = 0.0f32;
             let mut norm_b_sq = 0.0f32;
 
-            // SSM Selective Scan: We stride the dimension to prioritize 
-            // computational efficiency while preserving semantic resonance.
-            // striding every 4th element reduces FPU ops by 75%.
-            for i in (0..self.values.len()).step_by(4) {
+            // SSM Selective Scan: We use the global dynamic STRIDE for
+            // biological homeostasis (Cognitive Throttle).
+            let stride = STRIDE.load(Ordering::Relaxed);
+            
+            for i in (0..self.values.len()).step_by(stride) {
                 let a = self.values[i];
                 let b = other.values[i];
                 dot += a * b;
