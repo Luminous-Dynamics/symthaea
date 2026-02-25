@@ -188,6 +188,7 @@ fn main() {
     let high_stress = HormoneState {
         cortisol: 0.9, // Very high stress
         dopamine: 0.3, // Normal dopamine
+        acetylcholine: 0.2,
         oxytocin: 0.3, // Low connection
         norepinephrine: 0.6,
         serotonin: 0.5,
@@ -215,6 +216,7 @@ fn main() {
     let optimal_state = HormoneState {
         cortisol: 0.2, // Low stress
         dopamine: 0.9, // High reward
+        acetylcholine: 0.7,
         oxytocin: 0.8, // High connection
         norepinephrine: 0.6,
         serotonin: 0.7,
@@ -311,8 +313,8 @@ fn main() {
 
         println!("  Learned: {}", name);
         println!(
-            "    Closure: {:.2} | Cycles: {} | Errors: {}",
-            closure.closure_level, metrics.production_cycles, metrics.prediction_errors
+            "    Closure: {:.2} | Cycles: {} | Avg Error: {:.2}",
+            closure.closure_level, metrics.total_cycles, metrics.average_prediction_error
         );
 
         if result.virtuous_cycle_active {
@@ -326,18 +328,19 @@ fn main() {
     let final_metrics = bridged.self_production_metrics();
     let closure = bridged.operational_closure();
 
-    println!("  Production cycles: {}", final_metrics.production_cycles);
-    println!("  Prediction errors: {}", final_metrics.prediction_errors);
-    println!("  Coherence mean: {:.2}", final_metrics.coherence_mean);
+    println!("  Production cycles: {}", final_metrics.total_cycles);
     println!(
-        "  Coherence stability: {:.2}",
-        final_metrics.coherence_stability
+        "  Avg prediction error: {:.2}",
+        final_metrics.average_prediction_error
     );
+    println!("  Avg coherence: {:.2}", final_metrics.average_coherence);
+    println!("  Boundary integrity: {:.2}", closure.boundary_integrity);
+    println!("  Self-production rate: {:.2}", closure.self_production_rate);
     println!();
     println!("  Operational Closure: {:.2}", closure.closure_level);
     println!(
         "  Boundary Intact: {}",
-        if closure.boundary_intact {
+        if closure.boundary_integrity > 0.5 {
             "✓"
         } else {
             "✗"
@@ -345,7 +348,7 @@ fn main() {
     );
     println!(
         "  Self-Producing: {}",
-        if closure.self_producing {
+        if closure.self_production_rate > 0.5 {
             "✓"
         } else {
             "Not yet"
@@ -353,7 +356,11 @@ fn main() {
     );
     println!(
         "  Autonomous: {}",
-        if closure.autonomous { "✓" } else { "Not yet" }
+        if closure.is_maintaining() && closure.self_production_rate > 0.5 {
+            "✓"
+        } else {
+            "Not yet"
+        }
     );
     println!();
     println!(

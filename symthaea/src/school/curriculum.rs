@@ -4,7 +4,151 @@
 //! prerequisite relationships, enabling coherent learning progressions.
 
 use super::objective::{Difficulty, Domain, LearningObjective};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SCHEMA FOR LLM GENERATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Lightweight schema for learning objectives, optimized for LLM generation.
+/// Does not contain the large HDC vector; the vector is generated deterministically
+/// from the ID and Domain upon conversion.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObjectiveSchema {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    #[serde(default = "default_domain")]
+    pub domain: String,     // String to allow flexible parsing into Domain enum
+    #[serde(default = "default_difficulty")]
+    pub difficulty: f32,    // 0.0 - 1.0
+    #[serde(default)]
+    pub prerequisites: Vec<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default = "default_minutes")]
+    pub estimated_minutes: u32,
+}
+
+fn default_domain() -> String { "Custom".to_string() }
+fn default_difficulty() -> f32 { 0.5 }
+fn default_minutes() -> u32 { 30 }
+
+/// Schema for a full curriculum extension
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurriculumSchema {
+    pub name: String,
+    pub description: String,
+    pub objectives: Vec<ObjectiveSchema>,
+}
+
+#[derive(Debug)]
+pub enum CurriculumSchemaError {
+    EmptyName,
+    EmptyDescription,
+    EmptyObjectives,
+    EmptyObjectiveField { field: &'static str, index: usize },
+    DuplicateObjectiveId { id: String },
+    InvalidDifficulty { id: String, difficulty: f32 },
+}
+
+impl std::fmt::Display for CurriculumSchemaError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CurriculumSchemaError::EmptyName => write!(f, "Curriculum name cannot be empty"),
+            CurriculumSchemaError::EmptyDescription => {
+                write!(f, "Curriculum description cannot be empty")
+            }
+            CurriculumSchemaError::EmptyObjectives => {
+                write!(f, "Curriculum must contain at least one objective")
+            }
+            CurriculumSchemaError::EmptyObjectiveField { field, index } => write!(
+                f,
+                "Objective at index {} has empty field '{}'",
+                index, field
+            ),
+            CurriculumSchemaError::DuplicateObjectiveId { id } => {
+                write!(f, "Duplicate objective id '{}'", id)
+            }
+            CurriculumSchemaError::InvalidDifficulty { id, difficulty } => write!(
+                f,
+                "Objective '{}' has invalid difficulty {} (expected 0.0..=1.0)",
+                id, difficulty
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CurriculumSchemaError {}
+
+impl CurriculumSchema {
+    pub fn validate_basic(&self) -> Result<(), CurriculumSchemaError> {
+        if self.name.trim().is_empty() {
+            return Err(CurriculumSchemaError::EmptyName);
+        }
+        if self.description.trim().is_empty() {
+            return Err(CurriculumSchemaError::EmptyDescription);
+        }
+        if self.objectives.is_empty() {
+            return Err(CurriculumSchemaError::EmptyObjectives);
+        }
+
+        let mut ids = HashSet::new();
+        for (index, obj) in self.objectives.iter().enumerate() {
+            if obj.id.trim().is_empty() {
+                return Err(CurriculumSchemaError::EmptyObjectiveField {
+                    field: "id",
+                    index,
+                });
+            }
+            if obj.name.trim().is_empty() {
+                return Err(CurriculumSchemaError::EmptyObjectiveField {
+                    field: "name",
+                    index,
+                });
+            }
+            if obj.description.trim().is_empty() {
+                return Err(CurriculumSchemaError::EmptyObjectiveField {
+                    field: "description",
+                    index,
+                });
+            }
+            if obj.domain.trim().is_empty() {
+                return Err(CurriculumSchemaError::EmptyObjectiveField {
+                    field: "domain",
+                    index,
+                });
+            }
+            if !(0.0..=1.0).contains(&obj.difficulty) {
+                return Err(CurriculumSchemaError::InvalidDifficulty {
+                    id: obj.id.clone(),
+                    difficulty: obj.difficulty,
+                });
+            }
+            if !ids.insert(obj.id.clone()) {
+                return Err(CurriculumSchemaError::DuplicateObjectiveId {
+                    id: obj.id.clone(),
+                });
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl From<ObjectiveSchema> for LearningObjective {
+    fn from(schema: ObjectiveSchema) -> Self {
+        super::objective::ObjectiveBuilder::new(&schema.id, &schema.name)
+            .with_description(&schema.description)
+            .with_domain(Domain::from(schema.domain.as_str()))
+            .with_difficulty(Difficulty::from_f32(schema.difficulty))
+            .with_prerequisites(&schema.prerequisites.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+            .with_tags(&schema.tags.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+            .with_estimated_minutes(schema.estimated_minutes)
+            .build()
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CURRICULUM TYPES
@@ -159,6 +303,85 @@ impl Curriculum {
     /// Get an objective by ID
     pub fn get(&self, id: &str) -> Option<&LearningObjective> {
         self.objectives.iter().find(|obj| obj.id == id)
+    }
+
+    /// Extend the curriculum with new objectives from a JSON schema
+    ///
+    /// This is the "Neural Bridge" entry point: LLMs generate the JSON,
+    /// and Symthaea integrates it into its knowledge graph.
+    pub fn extend_from_json(&mut self, json: &str, dimension: usize) -> Result<(), Box<dyn std::error::Error>> {
+        let schema: CurriculumSchema = serde_json::from_str(json)?;
+        schema.validate_basic()?;
+
+        let mut updated = self.clone();
+        updated.apply_schema(schema, dimension);
+        updated
+            .validate()
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        *self = updated;
+
+        Ok(())
+    }
+
+    fn apply_schema(&mut self, schema: CurriculumSchema, dimension: usize) {
+        // Convert schema objectives to full LearningObjectives (generating HDC vectors)
+        let new_objectives: Vec<LearningObjective> = schema
+            .objectives
+            .into_iter()
+            .map(|obj_schema| {
+                super::objective::ObjectiveBuilder::new(&obj_schema.id, &obj_schema.name)
+                    .with_description(&obj_schema.description)
+                    .with_domain(Domain::from(obj_schema.domain.as_str()))
+                    .with_difficulty(Difficulty::from_f32(obj_schema.difficulty))
+                    .with_dimension(dimension)
+                    .with_prerequisites(
+                        &obj_schema
+                            .prerequisites
+                            .iter()
+                            .map(|s| s.as_str())
+                            .collect::<Vec<_>>(),
+                    )
+                    .with_tags(
+                        &obj_schema
+                            .tags
+                            .iter()
+                            .map(|s| s.as_str())
+                            .collect::<Vec<_>>(),
+                    )
+                    .with_estimated_minutes(obj_schema.estimated_minutes)
+                    .build()
+            })
+            .collect();
+
+        // Add to curriculum, avoiding duplicates by ID
+        for obj in new_objectives {
+            if self.get(&obj.id).is_none() {
+                self.objectives.push(obj);
+            }
+        }
+
+        // Auto-heal missing prerequisites: create stubs for anything not found
+        let mut missing_prereqs = Vec::new();
+        let existing_ids: HashSet<String> = self.objectives.iter().map(|o| o.id.clone()).collect();
+
+        for obj in &self.objectives {
+            for prereq in &obj.prerequisites {
+                if !existing_ids.contains(prereq) {
+                    missing_prereqs.push(prereq.clone());
+                }
+            }
+        }
+
+        for missing_id in missing_prereqs {
+            if self.get(&missing_id).is_none() {
+                let stub = LearningObjective::new(&missing_id, &format!("Implicit: {}", missing_id))
+                    .with_description("Automatically created prerequisite stub.")
+                    .with_difficulty(Difficulty::Beginner)
+                    .with_dimension(dimension)
+                    .build();
+                self.objectives.push(stub);
+            }
+        }
     }
 
     /// Validate the curriculum (check for cycles, missing prerequisites)
@@ -1057,6 +1280,38 @@ mod tests {
 
         assert_eq!(curriculum.objectives.len(), 2);
         assert!(curriculum.validate().is_ok());
+    }
+
+    #[test]
+    fn test_extend_from_json_dimension_and_auto_heal() {
+        let mut curriculum = Curriculum::new("test", "Test Curriculum").build();
+        let json = r#"{
+            "name": "Meta Study",
+            "description": "Test curriculum extension",
+            "objectives": [
+                {
+                    "id": "ssm-basics",
+                    "name": "SSM Basics",
+                    "description": "Intro to state space models",
+                    "domain": "Math",
+                    "difficulty": 0.3,
+                    "prerequisites": ["linear-algebra"],
+                    "tags": ["ssm", "math"],
+                    "estimated_minutes": 45
+                }
+            ]
+        }"#;
+
+        let dimension = 512;
+        curriculum.extend_from_json(json, dimension).unwrap();
+
+        let ssm = curriculum.get("ssm-basics").expect("ssm-basics missing");
+        assert_eq!(ssm.encoding.values.len(), dimension);
+
+        let prereq = curriculum
+            .get("linear-algebra")
+            .expect("auto-healed prerequisite missing");
+        assert_eq!(prereq.encoding.values.len(), dimension);
     }
 
     #[test]
