@@ -112,6 +112,8 @@ impl Default for MindState {
     }
 }
 
+use crate::memory::memory_coordinator::MemorySource;
+
 /// Input to the mind
 #[derive(Debug, Clone)]
 pub struct MindInput {
@@ -123,6 +125,36 @@ pub struct MindInput {
     pub priority: f32,
     /// Metadata
     pub metadata: HashMap<String, String>,
+    /// Source of the input
+    pub source: MemorySource,
+    /// Whether the information has been verified
+    pub is_verified: bool,
+}
+
+impl MindInput {
+    /// Create a new mind input
+    pub fn new(input_type: InputType, content: ContinuousHV) -> Self {
+        Self {
+            input_type,
+            content,
+            priority: 0.5,
+            metadata: HashMap::new(),
+            source: MemorySource::Internal,
+            is_verified: false,
+        }
+    }
+
+    /// Set the source
+    pub fn with_source(mut self, source: MemorySource) -> Self {
+        self.source = source;
+        self
+    }
+
+    /// Set verification status
+    pub fn with_verification(mut self, verified: bool) -> Self {
+        self.is_verified = verified;
+        self
+    }
 }
 
 /// Type of input

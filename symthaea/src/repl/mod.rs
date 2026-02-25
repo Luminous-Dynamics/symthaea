@@ -852,7 +852,7 @@ impl ReplSession {
 
         // Validate against policy
         if let Some(ref sandbox) = self.sandbox {
-            if let Err(e) = action.validate(&self.policy, sandbox) {
+            if let Err(e) = action.validate(&self.policy, sandbox, consciousness.unified_psi as f64) {
                 self.stats.actions_blocked += 1;
                 return Ok(ActionResult {
                     command: command.clone(),
@@ -912,7 +912,7 @@ impl ReplSession {
             ExecutionMode::Real => {
                 // Real execution through sandbox
                 if let Some(ref sandbox) = self.sandbox {
-                    match self.executor.execute(&action, &self.policy, sandbox) {
+                    match self.executor.execute(&action, &self.policy, sandbox, consciousness.unified_psi as f64) {
                         Ok(outcome) => {
                             self.stats.actions_executed += 1;
                             let output_str = match &outcome.outcome {

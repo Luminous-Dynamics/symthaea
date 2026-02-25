@@ -104,8 +104,27 @@ impl ContinuousMind {
                     ]);
                     self.working_memory[i] = bundled;
                     self.working_memory.remove(i + 1);
+                    
                     // Keep earliest arrival tick for the merged item
                     let _merged_tick = self.working_memory_ticks.remove(i + 1);
+                    
+                    // Consolidate source: Feedback > WebResearch > Direct > Internal
+                    let s1 = self.working_memory_sources[i];
+                    let s2 = self.working_memory_sources.remove(i + 1);
+                    
+                    use crate::memory::memory_coordinator::MemorySource;
+                    self.working_memory_sources[i] = match (s1, s2) {
+                        (MemorySource::ActionFeedback, _) | (_, MemorySource::ActionFeedback) => MemorySource::ActionFeedback,
+                        (MemorySource::WebResearch, _) | (_, MemorySource::WebResearch) => MemorySource::WebResearch,
+                        (MemorySource::UserInteraction, _) | (_, MemorySource::UserInteraction) => MemorySource::UserInteraction,
+                        _ => MemorySource::Internal,
+                    };
+
+                    // Set verified if either is verified
+                    let v1 = self.working_memory_verified[i];
+                    let v2 = self.working_memory_verified.remove(i + 1);
+                    self.working_memory_verified[i] = v1 || v2;
+
                     return Some(MindOutput {
                         output_type: OutputType::Memorize,
                         content: "Dreaming: Consolidating memories...".to_string(),
@@ -153,13 +172,21 @@ impl ContinuousMind {
             if self.working_memory.len() < self.config.working_memory_capacity {
                 self.working_memory.push(input.content.clone());
                 self.working_memory_ticks.push(self.state.tick);
+                self.working_memory_sources.push(input.source);
+                self.working_memory_verified.push(input.is_verified);
             } else {
                 let evicted = self.working_memory.remove(0);
                 let arrival_tick = self.working_memory_ticks.remove(0);
+                let source = self.working_memory_sources.remove(0);
+                let verified = self.working_memory_verified.remove(0);
+                
                 let steps_survived = self.state.tick.saturating_sub(arrival_tick);
-                self.evicted_items.push((evicted, steps_survived));
+                self.evicted_items.push((evicted, steps_survived, source, verified));
+                
                 self.working_memory.push(input.content.clone());
                 self.working_memory_ticks.push(self.state.tick);
+                self.working_memory_sources.push(input.source);
+                self.working_memory_verified.push(input.is_verified);
             }
 
             // Update current thought via EMA blend (not bind — bind is multiply,

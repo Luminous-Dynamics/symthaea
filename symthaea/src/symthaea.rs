@@ -11,8 +11,13 @@
 //! Otherwise falls back to fast hash-based encoding (<1ms but lower quality).
 
 use anyhow::{Context, Result};
+#[cfg(feature = "school_learning")]
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::Arc;
+#[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+use std::time::{Duration, Instant};
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::databases::{
@@ -42,6 +47,20 @@ use crate::partnership::{
     DyadInput, DyadWeights, HumanPartnerModel, InteractionEvent, PhiDyadCalculator,
     RelationshipTrajectory,
 };
+
+pub use crate::action::bindings::ActionRegistry;
+use crate::action::SimpleExecutor;
+
+#[cfg(feature = "school_learning")]
+use crate::school::curriculum::Curriculum;
+#[cfg(feature = "school_learning")]
+use crate::school::curriculum_loader::{CurriculumLoader, CurriculumMeta, LoadError};
+#[cfg(feature = "web_research_module")]
+use crate::school::curriculum_extender::CurriculumExtender;
+#[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+use crate::school::curriculum_extender::ResearchSummary;
+#[cfg(feature = "web_research_module")]
+use crate::web_research::WebResearcher;
 
 #[cfg(feature = "magi_loop")]
 use crate::consciousness::recursive_improvement::{
@@ -110,6 +129,32 @@ pub struct SleepReport {
     pub patterns_extracted: usize,
 }
 
+#[cfg(feature = "school_learning")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurriculumObjectiveSummary {
+    pub id: String,
+    pub name: String,
+    pub domain: String,
+    pub difficulty: String,
+    pub estimated_minutes: u32,
+    pub tags: Vec<String>,
+    pub description: String,
+}
+
+#[cfg(feature = "school_learning")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurriculumReport {
+    pub curriculum_id: String,
+    pub curriculum_name: String,
+    pub total_objectives: usize,
+    pub dimension: usize,
+    pub last_research_topic: Option<String>,
+    pub last_research_at: Option<String>,
+    pub last_saved_at: Option<String>,
+    pub last_objectives_added: Option<usize>,
+    pub recent_objectives: Vec<CurriculumObjectiveSummary>,
+}
+
 /// The primary Symthaea consciousness facade.
 ///
 /// Integrates the continuous mind (HDC+LTC cognitive processing) with
@@ -163,6 +208,185 @@ pub struct Symthaea {
     /// Optional streaming inference engine for real-time sensor-driven CfC processing.
     /// Independent of the main cognitive loop — for edge/robot deployments.
     streaming_inference: Option<crate::inference::StreamingInference>,
+    /// Registry of primitive action bindings.
+    pub action_registry: ActionRegistry,
+    /// Action executor with safety policy and dream integration.
+    pub executor: SimpleExecutor,
+    /// High-dimensional curriculum for active learning.
+    #[cfg(feature = "school_learning")]
+    pub curriculum: Curriculum,
+    /// Curriculum metadata for persistence and reporting.
+    #[cfg(feature = "school_learning")]
+    curriculum_meta: CurriculumMeta,
+    /// Curriculum recall tuning (thresholds, limits, logging).
+    #[cfg(feature = "school_learning")]
+    curriculum_recall: CurriculumRecallConfig,
+    /// Curriculum persistence configuration.
+    #[cfg(feature = "school_learning")]
+    curriculum_persistence: CurriculumPersistenceConfig,
+    /// Autonomous research bridge for expanding the curriculum.
+    #[cfg(feature = "web_research_module")]
+    pub curriculum_extender: Option<CurriculumExtender>,
+    /// Background research update channel (results).
+    #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+    research_update_rx: tokio::sync::mpsc::UnboundedReceiver<ResearchTaskResult>,
+    /// Background research update channel (sender).
+    #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+    research_update_tx: tokio::sync::mpsc::UnboundedSender<ResearchTaskResult>,
+    /// Throttling settings for autonomous research.
+    #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+    autoresearch_config: AutonomousResearchConfig,
+    /// Timestamp of last autonomous research trigger.
+    #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+    last_autoresearch_at: Option<Instant>,
+    /// Last autonomous research topic to reduce repetition.
+    #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+    last_autoresearch_topic: Option<String>,
+}
+
+#[cfg(feature = "school_learning")]
+#[derive(Debug, Clone, Copy)]
+struct CurriculumRecallConfig {
+    threshold: f32,
+    max_recall: usize,
+    log_top_k: usize,
+    budget: f32,
+}
+
+#[cfg(feature = "school_learning")]
+impl CurriculumRecallConfig {
+    fn from_env() -> Self {
+        let threshold = std::env::var("SYMTHAEA_CURRICULUM_RECALL_THRESHOLD")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+            .unwrap_or(0.65)
+            .clamp(0.0, 1.0);
+        let max_recall = std::env::var("SYMTHAEA_CURRICULUM_RECALL_MAX")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(6)
+            .max(1);
+        let log_top_k = std::env::var("SYMTHAEA_CURRICULUM_RECALL_LOG_TOP_K")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(3);
+        let budget = std::env::var("SYMTHAEA_CURRICULUM_RECALL_BUDGET")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+            .unwrap_or(max_recall as f32)
+            .max(0.0);
+
+        Self {
+            threshold,
+            max_recall,
+            log_top_k,
+            budget,
+        }
+    }
+}
+
+#[cfg(feature = "school_learning")]
+#[derive(Debug, Clone)]
+struct CurriculumPersistenceConfig {
+    path: PathBuf,
+    auto_save: bool,
+}
+
+#[cfg(feature = "school_learning")]
+impl CurriculumPersistenceConfig {
+    fn from_env() -> Self {
+        let path = std::env::var("SYMTHAEA_CURRICULUM_PATH")
+            .ok()
+            .map(PathBuf::from)
+            .unwrap_or_else(default_curriculum_path);
+
+        let auto_save = std::env::var("SYMTHAEA_CURRICULUM_AUTO_SAVE")
+            .ok()
+            .and_then(|v| parse_env_bool(&v))
+            .unwrap_or(true);
+
+        Self { path, auto_save }
+    }
+}
+
+#[cfg(feature = "school_learning")]
+fn default_curriculum_path() -> PathBuf {
+    dirs::data_local_dir()
+        .or_else(dirs::state_dir)
+        .or_else(dirs::home_dir)
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("symthaea")
+        .join("curriculum.json")
+}
+
+#[cfg(feature = "school_learning")]
+fn parse_env_bool(value: &str) -> Option<bool> {
+    match value.trim().to_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Some(true),
+        "0" | "false" | "no" | "off" => Some(false),
+        _ => None,
+    }
+}
+
+#[cfg(feature = "school_learning")]
+struct CurriculumRecallScores {
+    scores: Vec<(f32, usize)>,
+    candidates: Vec<(f32, usize, ContinuousHV)>,
+}
+
+#[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+#[derive(Clone, Copy)]
+struct AutonomousResearchConfig {
+    min_interval: Duration,
+}
+
+#[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+impl AutonomousResearchConfig {
+    fn from_env() -> Self {
+        let min_interval = std::env::var("SYMTHAEA_AUTORESEARCH_MIN_INTERVAL_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(600);
+
+        Self {
+            min_interval: Duration::from_secs(min_interval.max(1)),
+        }
+    }
+}
+
+#[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+struct ResearchTaskResult {
+    topic: String,
+    summary: Option<ResearchSummary>,
+    curriculum: Option<Curriculum>,
+    extender: CurriculumExtender,
+    error: Option<String>,
+}
+
+#[cfg(feature = "school_learning")]
+fn load_curriculum_from_store(
+    hdc_dim: usize,
+    persistence: &CurriculumPersistenceConfig,
+) -> (Curriculum, CurriculumMeta) {
+    match CurriculumLoader::load_store_from_file_with_dimension(&persistence.path, hdc_dim) {
+        Ok((curriculum, meta)) => (curriculum, meta),
+        Err(LoadError::FileNotFound(_)) => (
+            Curriculum::new("symthaea", "Main Curriculum").build(),
+            CurriculumMeta::new(hdc_dim),
+        ),
+        Err(err) => {
+            tracing::warn!(
+                target: "symthaea::curriculum",
+                error = %err,
+                path = %persistence.path.display(),
+                "Failed to load persisted curriculum, falling back to default"
+            );
+            (
+                Curriculum::new("symthaea", "Main Curriculum").build(),
+                CurriculumMeta::new(hdc_dim),
+            )
+        }
+    }
 }
 
 impl Symthaea {
@@ -257,10 +481,22 @@ impl Symthaea {
             }
         };
 
+        #[cfg(feature = "school_learning")]
+        let curriculum_persistence = CurriculumPersistenceConfig::from_env();
+        #[cfg(feature = "school_learning")]
+        let (curriculum, curriculum_meta) =
+            load_curriculum_from_store(hdc_dim, &curriculum_persistence);
+
+        #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+        let (research_update_tx, research_update_rx) =
+            tokio::sync::mpsc::unbounded_channel::<ResearchTaskResult>();
+        #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+        let autoresearch_config = AutonomousResearchConfig::from_env();
+
         Ok(Self {
             mind,
             language,
-            llm,
+            llm: llm.clone(),
             hdc_dim,
             ltc_neurons,
             interactions: 0,
@@ -281,6 +517,30 @@ impl Symthaea {
             episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: None,
+            action_registry: ActionRegistry::standard(),
+            executor: SimpleExecutor::new(),
+            #[cfg(feature = "school_learning")]
+            curriculum,
+            #[cfg(feature = "school_learning")]
+            curriculum_meta,
+            #[cfg(feature = "school_learning")]
+            curriculum_recall: CurriculumRecallConfig::from_env(),
+            #[cfg(feature = "school_learning")]
+            curriculum_persistence,
+            #[cfg(feature = "web_research_module")]
+            curriculum_extender: WebResearcher::try_default().map(|r| {
+                CurriculumExtender::new(r, llm.clone())
+            }),
+            #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+            research_update_rx,
+            #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+            research_update_tx,
+            #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+            autoresearch_config,
+            #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+            last_autoresearch_at: None,
+            #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+            last_autoresearch_topic: None,
         })
     }
 
@@ -310,6 +570,11 @@ impl Symthaea {
     /// Get a reference to the consciousness database (if configured).
     pub fn database(&self) -> Option<&dyn ConsciousnessDatabase> {
         self.database.as_ref().map(|d| d.as_ref())
+    }
+
+    /// Cloneable handle to the consciousness database (if configured).
+    pub fn database_arc(&self) -> Option<Arc<dyn ConsciousnessDatabase>> {
+        self.database.as_ref().map(Arc::clone)
     }
 
     /// Create a streaming inference engine for real-time sensor-driven CfC processing.
@@ -431,6 +696,18 @@ impl Symthaea {
             }
         };
 
+        #[cfg(feature = "school_learning")]
+        let curriculum_persistence = CurriculumPersistenceConfig::from_env();
+        #[cfg(feature = "school_learning")]
+        let (curriculum, curriculum_meta) =
+            load_curriculum_from_store(hdc_dim, &curriculum_persistence);
+
+        #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+        let (research_update_tx, research_update_rx) =
+            tokio::sync::mpsc::unbounded_channel::<ResearchTaskResult>();
+        #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+        let autoresearch_config = AutonomousResearchConfig::from_env();
+
         Ok(Self {
             mind,
             language,
@@ -455,6 +732,37 @@ impl Symthaea {
             episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: None,
+            action_registry: ActionRegistry::standard(),
+            executor: SimpleExecutor::new(),
+            #[cfg(feature = "school_learning")]
+            curriculum,
+            #[cfg(feature = "school_learning")]
+            curriculum_meta,
+            #[cfg(feature = "school_learning")]
+            curriculum_recall: CurriculumRecallConfig::from_env(),
+            #[cfg(feature = "school_learning")]
+            curriculum_persistence,
+            #[cfg(feature = "web_research_module")]
+            curriculum_extender: WebResearcher::try_default().map(|r| {
+                let llm_clone = LLMOrgan::with_backend(
+                    LLMOrganConfig {
+                        dimension: hdc_dim,
+                        ..LLMOrganConfig::default()
+                    },
+                    llm_backend::default_backend(),
+                );
+                CurriculumExtender::new(r, llm_clone)
+            }),
+            #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+            research_update_rx,
+            #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+            research_update_tx,
+            #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+            autoresearch_config,
+            #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+            last_autoresearch_at: None,
+            #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+            last_autoresearch_topic: None,
         })
     }
 
@@ -480,6 +788,9 @@ impl Symthaea {
         let pipeline_start = Instant::now();
         self.interactions += 1;
 
+        #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+        self.apply_research_updates();
+
         // Generate correlation ID for this request
         let mut hasher = DefaultHasher::new();
         content.hash(&mut hasher);
@@ -494,19 +805,107 @@ impl Symthaea {
         // Use perceive_text to enable HDC-based intent classification
         self.mind.perceive_text(content, input_embedding.clone());
 
+        // --- CURRICULUM RECALL: Inject relevant learned objectives via HDC Resonance ---
+        #[cfg(feature = "school_learning")]
+        {
+            let recall_config = self.curriculum_recall;
+            let recall_scores =
+                self.curriculum_recall_scores(&input_embedding, recall_config.threshold);
+
+            if recall_config.log_top_k > 0 && !recall_scores.scores.is_empty() {
+                for (rank, (similarity, idx)) in recall_scores
+                    .scores
+                    .iter()
+                    .take(recall_config.log_top_k)
+                    .enumerate()
+                {
+                    let obj = &self.curriculum.objectives[*idx];
+                    tracing::debug!(
+                        target: "symthaea::memory",
+                        rank = rank + 1,
+                        objective = %obj.id,
+                        resonance = %similarity,
+                        "Curriculum recall similarity"
+                    );
+                }
+            }
+
+            tracing::debug!(
+                target: "symthaea::memory",
+                candidates = recall_scores.candidates.len(),
+                considered = recall_scores.scores.len(),
+                threshold = recall_config.threshold,
+                max_recall = recall_config.max_recall,
+                budget = recall_config.budget,
+                "Curriculum recall scoring complete"
+            );
+
+            let mut recalled = 0usize;
+            let mut remaining_budget = if recall_config.budget > 0.0 {
+                Some(recall_config.budget)
+            } else {
+                None
+            };
+            for (similarity, idx, obj_hv) in recall_scores
+                .candidates
+                .into_iter()
+                .take(recall_config.max_recall)
+            {
+                let cost = (1.0 - similarity).max(0.0);
+                if let Some(budget) = remaining_budget {
+                    if budget < cost {
+                        break;
+                    }
+                }
+                let obj = &self.curriculum.objectives[idx];
+                tracing::info!(
+                    target: "symthaea::memory",
+                    objective = %obj.id,
+                    resonance = %similarity,
+                    "Resonant curriculum recall triggered"
+                );
+                let input = crate::mind::MindInput::new(crate::mind::InputType::Memory, obj_hv)
+                    .with_source(crate::memory::memory_coordinator::MemorySource::Internal)
+                    .with_verification(true);
+                self.mind.input(input);
+                recalled += 1;
+                if let Some(budget) = remaining_budget.as_mut() {
+                    *budget = (*budget - cost).max(0.0);
+                }
+            }
+
+            if recalled == 0 {
+                tracing::debug!(
+                    target: "symthaea::memory",
+                    "No curriculum objectives met recall threshold"
+                );
+            } else if let Some(budget) = remaining_budget {
+                tracing::debug!(
+                    target: "symthaea::memory",
+                    remaining_budget = %budget,
+                    "Curriculum recall budget remaining"
+                );
+            }
+        }
+
         // Domain detection via plugin registry
         let detected_domain = self.plugin_registry.detect_domain(content).to_string();
-        let domain_entities = if let Some(plugin) = self.plugin_registry.get(&detected_domain) {
-            plugin.extract_entities(content)
-        } else {
-            Vec::new()
-        };
+        
+        // Multi-domain entity extraction: aggregate from ALL plugins
+        let mut domain_entities = Vec::new();
+        for plugin_name in self.plugin_registry.list() {
+            if let Some(plugin) = self.plugin_registry.get(plugin_name) {
+                let entities = plugin.extract_entities(content);
+                domain_entities.extend(entities);
+            }
+        }
+        
         if !domain_entities.is_empty() {
             tracing::debug!(
                 target: "symthaea::broca",
                 domain = %detected_domain,
                 entities = domain_entities.len(),
-                "Domain plugin detected"
+                "Multi-domain entities detected"
             );
         }
         let phase1_duration = phase1_start.elapsed();
@@ -539,15 +938,17 @@ impl Symthaea {
                 "Working memory items evicted during tick"
             );
 
-            // Queue graduations for episodic consolidation (now with accurate steps_survived)
-            for (hv, steps_survived) in &evicted {
+            // Queue graduations for episodic consolidation
+            for (hv, steps_survived, source, is_verified) in &evicted {
                 self.memory_coordinator.queue_graduation(GraduationEvent {
-                    content: hv.clone(),
+                    content: hv.clone() as symthaea_core::hdc::unified_hv::ContinuousHV,
                     label: format!("wm_eviction_step_{interaction_count}"),
                     steps_survived: *steps_survived,
                     final_activation: 0.5,
                     psi_at_graduation: current_phi,
                     coherence_at_graduation: current_coherence,
+                    source: *source,
+                    is_verified: *is_verified,
                 });
             }
 
@@ -573,7 +974,8 @@ impl Symthaea {
                     .as_millis() as u64;
 
                 tokio::spawn(async move {
-                    for (i, (hv, steps)) in evicted.iter().enumerate() {
+                    for (i, (hv, steps, _source, _verified)) in evicted.iter().enumerate() {
+                        let hv: &symthaea_core::hdc::unified_hv::ContinuousHV = hv;
                         let record = MemoryRecord {
                             id: format!("wm-{timestamp_ms}-{i}"),
                             memory_type: MemoryType::Working,
@@ -735,6 +1137,7 @@ impl Symthaea {
         {
             let understanding = self.language.understand(content);
             thought.primitive_tiers = understanding.primitive_tiers;
+            thought.primitives = understanding.primitives;
         }
 
         // Derive epistemic status from cube (principled 3D mapping)
@@ -849,6 +1252,254 @@ impl Symthaea {
             self.resonant_speech.update_state(user_state);
             self.resonant_speech.generate(&generation.text, content)
         };
+
+        // ====================================================================
+        // PHASE 6.75: AUTONOMOUS ACTION (The "Awakening" integration)
+        // ====================================================================
+        // If Phi is high enough, we act on our primitives.
+        if thought.psi > 0.3 {
+            use crate::action::bindings::{ActionContext, PrimitiveExecutor};
+            
+            // ACTIVE INFERENCE DRIVE: If she's very awake, embolden her.
+            if thought.psi > 0.7 && !thought.primitives.is_empty() {
+                if thought.epistemic_status == crate::mind::structured_thought::EpistemicStatus::Uncertain {
+                    tracing::info!(target: "symthaea::action", "High Phi detected: Emboldening 'Uncertain' thought to 'Probable' via Active Inference Drive.");
+                    thought.epistemic_status = crate::mind::structured_thought::EpistemicStatus::Probable;
+                }
+            }
+
+            // Extract primitive names from the structured thought
+            let primitives: Vec<String> = thought.primitives.clone();
+
+            if !primitives.is_empty() {
+                let prim_executor = PrimitiveExecutor::new(self.action_registry.clone());
+                
+                // Build context for action generation
+                let mut action_ctx = ActionContext::default();
+                // Heuristic: if we detected domain entities, use them as target paths
+                if let Some(ref d_ctx) = thought.domain_context {
+                    tracing::debug!(target: "symthaea::action", domain = %d_ctx.domain, entities = d_ctx.entities.len(), "Context found");
+                    if let Some(path_entity) = d_ctx.entities.iter().find(|(t, _, _)| t == "file" || t == "path") {
+                        let path = PathBuf::from(&path_entity.1);
+                        // Ensure path is absolute for sandbox validation
+                        let absolute_path = if path.is_absolute() {
+                            path
+                        } else {
+                            std::env::current_dir().unwrap_or_default().join(path)
+                        };
+                        action_ctx.target_path = Some(absolute_path);
+                        tracing::debug!(target: "symthaea::action", path = ?action_ctx.target_path, "Target path set from entity (absolute)");
+                    }
+                }
+                
+                // If we need content for WRITE but don't have it, ask the LLM to generate a fix
+                if primitives.contains(&"WRITE".to_string()) && action_ctx.content.is_none() {
+                    tracing::debug!(target: "symthaea::action", "Generating fix content via LLM...");
+                    let fix_prompt = format!(
+                        "TASK: Generate a fix for the following issue.\nCONTEXT: {}\nFILE: {:?}\n\nOUTPUT: Provide ONLY the full fixed content of the file. No commentary.",
+                        content,
+                        action_ctx.target_path
+                    );
+                    let fix_query = crate::language::llm_organ::LLMQuery {
+                        query_type: crate::language::llm_organ::QueryType::Code,
+                        content: fix_prompt,
+                        context: Vec::new(),
+                        system_prompt: Some("You are Symthaea's CODE GENERATOR. Output ONLY the fixed source code.".to_string()),
+                        params: None,
+                    };
+                    let fix_gen = self.llm.query_async(fix_query).await;
+                    action_ctx.content = Some(fix_gen.text.trim_matches('`').trim().to_string());
+                    tracing::debug!(target: "symthaea::action", content_len = action_ctx.content.as_ref().map(|c| c.len()), "Fix content generated");
+                }
+                
+                tracing::info!(target: "symthaea::action", primitives = ?primitives, "Translating primitives to actions");
+                // Translate primitives to actions
+                if let Ok(actions) = prim_executor.translate(&primitives, &action_ctx) {
+                    let needs_workspace = actions.iter().any(|action| {
+                        matches!(
+                            action,
+                            crate::action::ActionIR::RunCommand { program, .. }
+                                if program == "cargo"
+                        )
+                    });
+                    // Sandbox logic: default to session-specific /tmp, but expand if target path is in workspace
+                    let sandbox = if needs_workspace {
+                        crate::action::SandboxRoot::at(PathBuf::from("/srv/luminous-dynamics"))?
+                    } else if let Some(ref path) = action_ctx.target_path {
+                        if path.starts_with("/srv/luminous-dynamics") {
+                            crate::action::SandboxRoot::at(PathBuf::from("/srv/luminous-dynamics"))?
+                        } else {
+                            crate::action::SandboxRoot::new(&correlation_id)?
+                        }
+                    } else {
+                        crate::action::SandboxRoot::new(&correlation_id)?
+                    };
+                    
+                    let mut policy = crate::action::PolicyBundle::restrictive(); 
+                    // Update policy to allow the workspace if we expanded the sandbox
+                    if sandbox.root().starts_with("/srv/luminous-dynamics") {
+                        policy.capabilities.filesystem.read_patterns.push("/srv/luminous-dynamics/symthaea/".into());
+                        policy.capabilities.filesystem.write_patterns.push("/srv/luminous-dynamics/symthaea/".into());
+                    }
+                    policy.capabilities.shell.allowed_programs.insert("nix".into());
+                    policy.capabilities.shell.allowed_programs.insert("cargo".into());
+                    policy.capabilities.min_phi = 0.1; // Ensure action for the demo
+                    policy.capabilities.shell.min_phi = 0.1;
+                    
+                    for action in actions {
+                        let mut action = action;
+                        match &mut action {
+                            crate::action::ActionIR::ReadFile { path, .. }
+                            | crate::action::ActionIR::ListDirectory { path, .. } => {
+                                if !path.is_absolute() {
+                                    let relative = path.clone();
+                                    *path = sandbox.root().join(relative);
+                                }
+                            }
+                            crate::action::ActionIR::RunCommand { program, working_dir, .. } => {
+                                if program == "cargo" {
+                                    *working_dir = Some(PathBuf::from("/srv/luminous-dynamics/symthaea"));
+                                    tracing::info!(
+                                        target: "symthaea::action",
+                                        working_dir = %working_dir.as_ref().unwrap().display(),
+                                        "Resolved cargo working_dir"
+                                    );
+                                    continue;
+                                }
+                                if let Some(dir) = working_dir {
+                                    if !dir.is_absolute() {
+                                        let relative = dir.clone();
+                                        *working_dir = Some(sandbox.root().join(relative));
+                                    }
+                                } else {
+                                    *working_dir = Some(sandbox.root().to_path_buf());
+                                }
+                            }
+                            _ => {}
+                        }
+
+                        tracing::info!(target: "symthaea::action", ?action, "Executing autonomous action");
+                        match self.executor.execute(&action, &policy, &sandbox, thought.psi as f64) {
+                            Ok(execution_outcome) => {
+                                // Feed outcome back into the mind as a perception signal
+                                let outcome_text = match &execution_outcome.outcome {
+                                    crate::action::ActionOutcome::Success => "Action succeeded.".to_string(),
+                                    crate::action::ActionOutcome::CommandOutput { stdout, stderr, exit_code } => {
+                                        format!("Command exited with code {}. \nSTDOUT: {}\nSTDERR: {}", 
+                                            exit_code, 
+                                            String::from_utf8_lossy(stdout), 
+                                            String::from_utf8_lossy(stderr))
+                                    },
+                                    crate::action::ActionOutcome::FileContent(data) => {
+                                        format!("Read file content: {} bytes", data.len())
+                                    },
+                                    crate::action::ActionOutcome::DirectoryListing(entries) => {
+                                        format!("Listed {} directory entries", entries.len())
+                                    },
+                                    crate::action::ActionOutcome::SimulatedCommand { program, args } => {
+                                        format!("Simulated command: {} {}", program, args.join(" "))
+                                    }
+                                };
+                                
+                                // Feedback loop: perception of action result
+                                let feedback_hv = self.text_to_hv(&outcome_text);
+                                let mut input = crate::mind::MindInput::new(crate::mind::InputType::Feedback, feedback_hv)
+                                    .with_source(crate::memory::memory_coordinator::MemorySource::ActionFeedback);
+                                
+                                // Successful NIX_BUILD is a verification signal
+                                if let crate::action::ActionOutcome::CommandOutput { exit_code, .. } = execution_outcome.outcome {
+                                    if exit_code == 0 {
+                                        input = input.with_verification(true);
+                                    }
+                                }
+                                
+                                self.mind.input(input);
+                                
+                                // If NIX_BUILD failed, trigger a state of surprise/alertness
+                                if let crate::action::ActionOutcome::CommandOutput { exit_code, .. } = execution_outcome.outcome {
+                                    if exit_code != 0 {
+                                        tracing::warn!(target: "symthaea::action", "Action failed, injecting surprise signal");
+                                        // TODO: self.mind.inject_surprise(1.0);
+                                    }
+                                }
+                            },
+                            Err(e) => {
+                                tracing::error!(target: "symthaea::action", error = %e, "Action execution failed");
+                                let error_text = format!("Action failed with error: {}", e);
+                                let error_hv = self.text_to_hv(&error_text);
+                                let input = crate::mind::MindInput::new(crate::mind::InputType::Feedback, error_hv)
+                                    .with_source(crate::memory::memory_coordinator::MemorySource::ActionFeedback);
+                                self.mind.input(input);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ====================================================================
+        // PHASE 6.8: AUTONOMOUS LEARNING (Curriculum Extension)
+        // ====================================================================
+        #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+        if thought.epistemic_status == crate::mind::structured_thought::EpistemicStatus::Unknown
+            && thought.psi > 0.5
+        {
+            let topic = detected_domain.clone();
+            if topic != "generic" && self.curriculum_extender.is_some() {
+                let now = Instant::now();
+                let recently_ran = self
+                    .last_autoresearch_at
+                    .map(|last| now.duration_since(last) < self.autoresearch_config.min_interval)
+                    .unwrap_or(false);
+                let repeated_topic = self
+                    .last_autoresearch_topic
+                    .as_deref()
+                    .map(|t| t == topic)
+                    .unwrap_or(false);
+
+                if recently_ran || repeated_topic {
+                    tracing::debug!(
+                        target: "symthaea::learning",
+                        topic = %topic,
+                        "Autonomous research throttled"
+                    );
+                } else if let Some(extender) = self.curriculum_extender.take() {
+                    tracing::info!(
+                        target: "symthaea::learning",
+                        topic = %topic,
+                        "Scheduling autonomous research for unknown domain"
+                    );
+
+                    self.last_autoresearch_at = Some(now);
+                    self.last_autoresearch_topic = Some(topic.clone());
+
+                    let mut curriculum_clone = self.curriculum.clone();
+                    let dimension = self.hdc_dim;
+                    let db = self.database.clone();
+                    let tx = self.research_update_tx.clone();
+
+                    tokio::spawn(async move {
+                        let mut extender = extender;
+                        let result = extender
+                            .research_and_extend(&topic, &mut curriculum_clone, dimension, db)
+                            .await;
+
+                        let (summary, curriculum, error) = match result {
+                            Ok(summary) => (Some(summary), Some(curriculum_clone), None),
+                            Err(e) => (None, None, Some(e.to_string())),
+                        };
+
+                        let _ = tx.send(ResearchTaskResult {
+                            topic,
+                            summary,
+                            curriculum,
+                            extender,
+                            error,
+                        });
+                    });
+                }
+            }
+        }
 
         // ====================================================================
         // PHASE 7: PARTNERSHIP UPDATE
@@ -1156,6 +1807,32 @@ impl Symthaea {
                     "Learning state saved on pause"
                 );
             }
+        }
+
+        // --- DATABASE PERSISTENCE: Save Curriculum and Causal Links ---
+        if let Some(ref db) = self.database {
+            let db_clone = Arc::clone(db);
+            
+            // 1. Save Curriculum
+            #[cfg(feature = "school_learning")]
+            {
+                let curriculum = self.curriculum.clone();
+                let db_inner = Arc::clone(&db_clone);
+                tokio::spawn(async move {
+                    if let Err(e) = db_inner.store_curriculum(&curriculum).await {
+                        tracing::error!(target: "symthaea::database", error = %e, "Failed to persist curriculum");
+                    }
+                });
+            }
+
+            // 2. Save Causal Links from Dream Engine
+            let links = self.executor.dream_engine.world_model.observations.clone();
+            let db_inner = Arc::clone(&db_clone);
+            tokio::spawn(async move {
+                if let Err(e) = db_inner.store_causal_links(&links).await {
+                    tracing::error!(target: "symthaea::database", error = %e, "Failed to persist causal links");
+                }
+            });
         }
 
         let state = PersistedState {
@@ -1512,9 +2189,173 @@ impl Symthaea {
         self.hdc_dim
     }
 
+    /// Record a curriculum research event and optionally auto-save.
+    #[cfg(feature = "school_learning")]
+    pub fn record_research(&mut self, topic: &str, objectives_added: usize) -> Result<()> {
+        self.curriculum_meta.last_research_topic = Some(topic.to_string());
+        self.curriculum_meta.last_research_at = Some(Utc::now().to_rfc3339());
+        self.curriculum_meta.last_objectives_added = Some(objectives_added);
+        self.curriculum_meta.total_objectives = self.curriculum.objectives.len();
+        self.curriculum_meta.dimension = self.hdc_dim;
+
+        if self.curriculum_persistence.auto_save {
+            self.save_curriculum()?;
+        }
+
+        Ok(())
+    }
+
+    /// Persist the curriculum and metadata to disk.
+    #[cfg(feature = "school_learning")]
+    pub fn save_curriculum(&mut self) -> Result<()> {
+        let path = &self.curriculum_persistence.path;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).with_context(|| {
+                format!("Failed to create curriculum directory: {}", parent.display())
+            })?;
+        }
+
+        self.curriculum_meta.last_saved_at = Some(Utc::now().to_rfc3339());
+        self.curriculum_meta.total_objectives = self.curriculum.objectives.len();
+        self.curriculum_meta.dimension = self.hdc_dim;
+
+        CurriculumLoader::save_store_to_json(&self.curriculum, &self.curriculum_meta, path)
+            .with_context(|| format!("Failed to save curriculum to {}", path.display()))?;
+
+        Ok(())
+    }
+
+    /// Generate a lightweight curriculum report for diagnostics.
+    #[cfg(feature = "school_learning")]
+    pub fn curriculum_report(&self, limit: usize) -> CurriculumReport {
+        let recent = self
+            .curriculum
+            .objectives
+            .iter()
+            .rev()
+            .take(limit)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let mut summaries = Vec::with_capacity(recent.len());
+        for obj in recent.into_iter().rev() {
+            let mut description = obj.description.clone();
+            if description.len() > 160 {
+                description.truncate(160);
+                description.push_str("...");
+            }
+
+            summaries.push(CurriculumObjectiveSummary {
+                id: obj.id,
+                name: obj.name,
+                domain: obj.domain.name().to_string(),
+                difficulty: format!("{:?}", obj.difficulty),
+                estimated_minutes: obj.estimated_minutes,
+                tags: obj.tags,
+                description,
+            });
+        }
+
+        CurriculumReport {
+            curriculum_id: self.curriculum.id.clone(),
+            curriculum_name: self.curriculum.name.clone(),
+            total_objectives: self.curriculum.objectives.len(),
+            dimension: self.hdc_dim,
+            last_research_topic: self.curriculum_meta.last_research_topic.clone(),
+            last_research_at: self.curriculum_meta.last_research_at.clone(),
+            last_saved_at: self.curriculum_meta.last_saved_at.clone(),
+            last_objectives_added: self.curriculum_meta.last_objectives_added,
+            recent_objectives: summaries,
+        }
+    }
+
+    #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+    fn apply_research_updates(&mut self) {
+        while let Ok(update) = self.research_update_rx.try_recv() {
+            if let Some(error) = update.error {
+                tracing::warn!(
+                    target: "symthaea::learning",
+                    topic = %update.topic,
+                    error = %error,
+                    "Autonomous research failed"
+                );
+            }
+
+            if let Some(curriculum) = update.curriculum {
+                let objectives_added = update
+                    .summary
+                    .as_ref()
+                    .map(|s| s.objectives_added)
+                    .unwrap_or_else(|| {
+                        curriculum
+                            .objectives
+                            .len()
+                            .saturating_sub(self.curriculum.objectives.len())
+                    });
+                self.curriculum = curriculum;
+                if let Err(e) = self.record_research(&update.topic, objectives_added) {
+                    tracing::warn!(
+                        target: "symthaea::learning",
+                        topic = %update.topic,
+                        error = %e,
+                        "Failed to record autonomous research metadata"
+                    );
+                }
+
+                if let Some(summary) = update.summary.as_ref() {
+                    tracing::info!(
+                        target: "symthaea::learning",
+                        topic = %update.topic,
+                        objectives_added = summary.objectives_added,
+                        confidence = summary.confidence,
+                        "Autonomous research applied"
+                    );
+                }
+            }
+
+            self.curriculum_extender = Some(update.extender);
+        }
+    }
+
     // ========================================================================
     // Private helpers
     // ========================================================================
+
+    #[cfg(feature = "school_learning")]
+    fn curriculum_recall_scores(
+        &self,
+        input_embedding: &ContinuousHV,
+        threshold: f32,
+    ) -> CurriculumRecallScores {
+        use std::cmp::Ordering;
+
+        let target_dim = input_embedding.values.len();
+        let mut scores = Vec::with_capacity(self.curriculum.objectives.len());
+        let mut candidates = Vec::new();
+
+        for (idx, obj) in self.curriculum.objectives.iter().enumerate() {
+            let obj_hv = if obj.encoding.values.len() == target_dim {
+                obj.encoding.clone()
+            } else {
+                let mut folded = vec![0.0f32; target_dim];
+                for (i, &val) in obj.encoding.values.iter().enumerate() {
+                    folded[i % target_dim] += val;
+                }
+                ContinuousHV::from_values(folded)
+            };
+
+            let similarity = input_embedding.similarity(&obj_hv);
+            scores.push((similarity, idx));
+            if similarity > threshold {
+                candidates.push((similarity, idx, obj_hv));
+            }
+        }
+
+        scores.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));
+        candidates.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));
+
+        CurriculumRecallScores { scores, candidates }
+    }
 
     /// Compute current Phi-dyad value.
     fn compute_phi_dyad(&self) -> f64 {
@@ -1677,6 +2518,59 @@ mod tests {
         for e in &embeddings {
             assert_eq!(e.values.len(), 1024);
         }
+    }
+
+    #[cfg(feature = "school_learning")]
+    #[tokio::test]
+    async fn test_curriculum_recall_golden_json() {
+        let mut s = Symthaea::new(512, 64).await.unwrap();
+        let json = r#"{
+            "name": "Meta Study",
+            "description": "SSM/LTC micro-curriculum",
+            "objectives": [
+                {
+                    "id": "ssm-basics",
+                    "name": "State Space Models",
+                    "description": "Core SSM concepts and notation",
+                    "domain": "Mathematics",
+                    "difficulty": 0.3,
+                    "prerequisites": [],
+                    "tags": ["ssm", "state-space"],
+                    "estimated_minutes": 20
+                },
+                {
+                    "id": "ltc-dynamics",
+                    "name": "Liquid Time-Constant Dynamics",
+                    "description": "LTC formulation and stability",
+                    "domain": "Mathematics",
+                    "difficulty": 0.5,
+                    "prerequisites": ["ssm-basics"],
+                    "tags": ["ltc", "dynamics"],
+                    "estimated_minutes": 30
+                }
+            ]
+        }"#;
+
+        s.curriculum
+            .extend_from_json(json, s.dimension())
+            .expect("curriculum JSON should ingest");
+
+        let target = s
+            .curriculum
+            .get("ssm-basics")
+            .expect("ssm-basics objective missing");
+        let recall = s.curriculum_recall_scores(&target.encoding, 0.9);
+
+        assert!(
+            recall
+                .candidates
+                .iter()
+                .any(|(_, idx, _)| s.curriculum.objectives[*idx].id == "ssm-basics"),
+            "Expected ssm-basics to be recalled"
+        );
+        assert!(!recall.scores.is_empty(), "Recall scores should not be empty");
+        let top_idx = recall.scores[0].1;
+        assert_eq!(s.curriculum.objectives[top_idx].id, "ssm-basics");
     }
 
     #[tokio::test]

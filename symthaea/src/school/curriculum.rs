@@ -4,6 +4,7 @@
 //! prerequisite relationships, enabling coherent learning progressions.
 
 use super::objective::{Difficulty, Domain, LearningObjective};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -240,7 +241,7 @@ impl CurriculumType {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// A structured curriculum containing learning objectives
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Curriculum {
     /// Unique identifier
     pub id: String,
@@ -309,15 +310,13 @@ impl Curriculum {
     ///
     /// This is the "Neural Bridge" entry point: LLMs generate the JSON,
     /// and Symthaea integrates it into its knowledge graph.
-    pub fn extend_from_json(&mut self, json: &str, dimension: usize) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn extend_from_json(&mut self, json: &str, dimension: usize) -> Result<()> {
         let schema: CurriculumSchema = serde_json::from_str(json)?;
         schema.validate_basic()?;
 
         let mut updated = self.clone();
         updated.apply_schema(schema, dimension);
-        updated
-            .validate()
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        updated.validate()?;
         *self = updated;
 
         Ok(())

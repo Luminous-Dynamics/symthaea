@@ -298,8 +298,23 @@ pub struct SimulatedBackend;
 #[async_trait::async_trait]
 impl LLMBackend for SimulatedBackend {
     async fn generate(&self, prompt: &str, _params: &GenerationParams) -> Result<String> {
+        let lower = prompt.to_lowercase();
         // Produce a simple response based on the prompt
-        let response = if prompt.contains("translate") || prompt.contains("Translate") {
+        let response = if lower.contains("fix") && (lower.contains("flake") || lower.contains("nix")) {
+            // Return a fixed Nix flake for the demo
+            r#"{
+  description = "A fixed flake for Symthaea";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  outputs = { self, nixpkgs }: {
+    devShells.x86_64-linux.default = nixpkgs.legacyPackages.x86_64-linux.mkShell {
+      buildInputs = [ 
+        nixpkgs.legacyPackages.x86_64-linux.hello
+      ];
+      shellHook = "hello"; 
+    };
+  };
+}"#.to_string()
+        } else if prompt.contains("translate") || prompt.contains("Translate") {
             format!("I understand your input. {}", summarize_prompt(prompt))
         } else if prompt.contains('?') {
             format!("Regarding your question: {}", summarize_prompt(prompt))
@@ -318,14 +333,16 @@ impl LLMBackend for SimulatedBackend {
     }
 }
 
+use std::sync::Arc;
+
 /// Create the default backend: tries Ollama first, falls back to simulated.
-pub fn default_backend() -> Box<dyn LLMBackend> {
-    Box::new(OllamaBackend::new())
+pub fn default_backend() -> Arc<dyn LLMBackend> {
+    Arc::new(OllamaBackend::new())
 }
 
 /// Create a simulated-only backend (for testing or offline use).
-pub fn simulated_backend() -> Box<dyn LLMBackend> {
-    Box::new(SimulatedBackend)
+pub fn simulated_backend() -> Arc<dyn LLMBackend> {
+    Arc::new(SimulatedBackend)
 }
 
 /// Create a backend based on environment configuration.
@@ -335,26 +352,26 @@ pub fn simulated_backend() -> Box<dyn LLMBackend> {
 /// 2. OpenAI (if `OPENAI_API_KEY` is set)
 /// 3. Anthropic (if `ANTHROPIC_API_KEY` is set)
 /// 4. Ollama (default, works offline with local models)
-pub fn create_backend_from_env() -> Box<dyn LLMBackend> {
+pub fn create_backend_from_env() -> Arc<dyn LLMBackend> {
     if let Ok(provider) = std::env::var("SYMTHAEA_LLM_PROVIDER") {
         match provider.to_lowercase().as_str() {
             "openai" => {
                 if let Some(backend) = super::openai_backend::OpenAiBackend::from_env() {
-                    return Box::new(backend);
+                    return Arc::new(backend);
                 }
                 tracing::warn!("SYMTHAEA_LLM_PROVIDER=openai but OPENAI_API_KEY not set, falling back to Ollama");
             }
             "anthropic" => {
                 if let Some(backend) = super::anthropic_backend::AnthropicBackend::from_env() {
-                    return Box::new(backend);
+                    return Arc::new(backend);
                 }
                 tracing::warn!("SYMTHAEA_LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY not set, falling back to Ollama");
             }
             "ollama" => {
-                return Box::new(OllamaBackend::new());
+                return Arc::new(OllamaBackend::new());
             }
             "simulated" => {
-                return Box::new(SimulatedBackend);
+                return Arc::new(SimulatedBackend);
             }
             other => {
                 tracing::warn!("Unknown LLM provider '{}', falling back to Ollama", other);
@@ -364,12 +381,12 @@ pub fn create_backend_from_env() -> Box<dyn LLMBackend> {
 
     // Auto-detect: try API keys first, then Ollama
     if let Some(backend) = super::openai_backend::OpenAiBackend::from_env() {
-        return Box::new(backend);
+        return Arc::new(backend);
     }
     if let Some(backend) = super::anthropic_backend::AnthropicBackend::from_env() {
-        return Box::new(backend);
+        return Arc::new(backend);
     }
-    Box::new(OllamaBackend::new())
+    Arc::new(OllamaBackend::new())
 }
 
 /// Summarize a prompt to ~20 words for simulated responses.

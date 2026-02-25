@@ -7,6 +7,7 @@
 //!
 //! - `nixos_patterns`: NixOS-specific command patterns with rollback support
 
+pub mod bindings;
 pub mod nixos_patterns;
 
 pub use nixos_patterns::{
@@ -15,11 +16,97 @@ pub use nixos_patterns::{
     SafetyLevel,
 };
 
+pub use symthaea_dream::CausalLink;
+use symthaea_dream::{DreamEngine, DreamEngineConfig, DreamableAction};
 use serde::{Deserialize, Serialize};
+
+impl DreamableAction for ActionIR {
+    fn perturb(&self, seed: u64) -> Self {
+        match self {
+            ActionIR::RunCommand { program, args, env, working_dir } => {
+                let mut new_args = args.clone();
+                if seed % 2 == 0 {
+                    if new_args.is_empty() {
+                        new_args.push("--help".to_string());
+                    } else if program == "rm" {
+                        return ActionIR::RunCommand {
+                            program: "ls".to_string(),
+                            args: new_args,
+                            env: env.clone(),
+                            working_dir: working_dir.clone(),
+                        };
+                    }
+                }
+                
+                ActionIR::RunCommand {
+                    program: program.clone(),
+                    args: new_args,
+                    env: env.clone(),
+                    working_dir: working_dir.clone(),
+                }
+            }
+            ActionIR::WriteFile { path, content, create_dirs } => {
+                let mut new_path = path.clone();
+                if let Some(ext) = path.extension() {
+                    let mut new_ext = ext.to_os_string();
+                    new_ext.push(".dream");
+                    new_path.set_extension(new_ext);
+                } else {
+                    new_path.set_extension("dream");
+                }
+                
+                ActionIR::WriteFile {
+                    path: new_path,
+                    content: content.clone(),
+                    create_dirs: *create_dirs,
+                }
+            }
+            ActionIR::DeleteFile { path } => {
+                ActionIR::RunCommand { 
+                    program: "ls".to_string(), 
+                    args: vec!["-l".to_string(), path.to_string_lossy().to_string()],
+                    env: BTreeMap::new(),
+                    working_dir: None
+                }
+            }
+            ActionIR::Sequence(actions) => {
+                let idx = (seed as usize) % actions.len().max(1);
+                let mut new_actions = actions.clone();
+                if !new_actions.is_empty() {
+                    new_actions[idx] = new_actions[idx].perturb(seed.wrapping_add(1));
+                }
+                ActionIR::Sequence(new_actions)
+            }
+            _ => self.clone(),
+        }
+    }
+
+    fn predict_outcome(&self, state: &[f32]) -> Vec<f32> {
+        let score = match self.destructiveness() {
+            DestructivenessLevel::ReadOnly => 0.8,
+            DestructivenessLevel::Reversible => 0.6,
+            DestructivenessLevel::NeedsConfirmation => 0.4,
+            DestructivenessLevel::Destructive => 0.1,
+        };
+        // Mix with current state context
+        state.iter().map(|&s| (s * 0.5 + score * 0.5).clamp(-1.0, 1.0)).collect()
+    }
+
+    fn magnitude(&self) -> f32 {
+        match self.destructiveness() {
+            DestructivenessLevel::Destructive => 1.0,
+            DestructivenessLevel::NeedsConfirmation => 0.7,
+            DestructivenessLevel::Reversible => 0.3,
+            DestructivenessLevel::ReadOnly => 0.05,
+        }
+    }
+}
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{Duration, Instant};
 use thiserror::Error;
 
 /// Complete security policy bundle (TOML-ready).
@@ -46,6 +133,7 @@ impl PolicyBundle {
                     blocked_programs: BTreeSet::new(),
                     budget_per_hour: 100,
                     allowed_env: BTreeMap::new(),
+                    min_phi: 0.5,
                 },
                 filesystem: FilesystemCapabilities {
                     read_patterns: vec!["/tmp/symthaea/".into()],
@@ -57,6 +145,7 @@ impl PolicyBundle {
                     allowed_ports: vec![],
                     enabled: false,
                 },
+                min_phi: 0.3,
             },
             budgets: Budgets {
                 shell_commands_per_session: 100,
@@ -72,7 +161,12 @@ pub struct Capabilities {
     pub shell: ShellCapabilities,
     pub filesystem: FilesystemCapabilities,
     pub network: NetworkCapabilities,
+    /// Minimum Phi level required for any non-readonly action.
+    #[serde(default = "default_min_phi")]
+    pub min_phi: f64,
 }
+
+fn default_min_phi() -> f64 { 0.3 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShellCapabilities {
@@ -80,7 +174,12 @@ pub struct ShellCapabilities {
     pub blocked_programs: BTreeSet<String>,
     pub budget_per_hour: u32,
     pub allowed_env: BTreeMap<String, String>,
+    /// Minimum Phi level required for shell execution.
+    #[serde(default = "default_shell_phi")]
+    pub min_phi: f64,
 }
+
+fn default_shell_phi() -> f64 { 0.5 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FilesystemCapabilities {
@@ -113,6 +212,13 @@ impl SandboxRoot {
     /// Create a sandbox rooted at `/tmp/symthaea/{session}`.
     pub fn new(session_id: &str) -> std::io::Result<Self> {
         let path = PathBuf::from(format!("/tmp/symthaea/{session_id}"));
+        std::fs::create_dir_all(&path)?;
+        let canonical = path.canonicalize()?;
+        Ok(Self { root: canonical })
+    }
+
+    /// Create a sandbox at a specific path.
+    pub fn at(path: PathBuf) -> std::io::Result<Self> {
         std::fs::create_dir_all(&path)?;
         let canonical = path.canonicalize()?;
         Ok(Self { root: canonical })
@@ -282,7 +388,16 @@ impl ActionIR {
         &self,
         policy: &PolicyBundle,
         sandbox: &SandboxRoot,
+        current_phi: f64,
     ) -> Result<(), PolicyViolation> {
+        // Consciousness Gate: Check global min_phi for any mutation
+        if self.risk_tier() > RiskTier::Low && current_phi < policy.capabilities.min_phi {
+            return Err(PolicyViolation::PhiTooLow { 
+                required: policy.capabilities.min_phi, 
+                actual: current_phi 
+            });
+        }
+
         match self {
             ActionIR::ReadFile { path, .. } | ActionIR::ListDirectory { path, .. } => {
                 let canonical = sandbox.validate(path)?;
@@ -314,17 +429,40 @@ impl ActionIR {
                     AccessKind::Write,
                 )?;
             }
-            ActionIR::RunCommand { program, .. } => {
+            ActionIR::RunCommand {
+                program,
+                env,
+                working_dir,
+                ..
+            } => {
+                // Specific gate for shell execution
+                if current_phi < policy.capabilities.shell.min_phi {
+                    return Err(PolicyViolation::PhiTooLow { 
+                        required: policy.capabilities.shell.min_phi, 
+                        actual: current_phi 
+                    });
+                }
+
                 if policy.capabilities.shell.blocked_programs.contains(program) {
                     return Err(PolicyViolation::ProgramBlocked(program.clone()));
                 }
                 if !policy.capabilities.shell.allowed_programs.contains(program) {
                     return Err(PolicyViolation::ProgramNotAllowed(program.clone()));
                 }
+                validate_env_overrides(env, &policy.capabilities.shell.allowed_env)?;
+                if let Some(dir) = working_dir {
+                    let canonical = sandbox.validate(dir)?;
+                    ensure_pattern(
+                        &canonical,
+                        &policy.capabilities.filesystem.read_patterns,
+                        sandbox,
+                        AccessKind::Read,
+                    )?;
+                }
             }
             ActionIR::Sequence(actions) => {
                 for action in actions {
-                    action.validate(policy, sandbox)?;
+                    action.validate(policy, sandbox, current_phi)?;
                 }
             }
             ActionIR::NoOp => {}
@@ -387,6 +525,17 @@ pub enum PolicyViolation {
     WriteTooLarge(usize),
     ProgramBlocked(String),
     ProgramNotAllowed(String),
+    EnvNotAllowed(String),
+    EnvValueMismatch {
+        key: String,
+        expected: String,
+        actual: String,
+    },
+    ShellBudgetExceeded { allowed: u32, attempted: u32 },
+    ShellHourlyBudgetExceeded { allowed: u32, attempted: u32 },
+    FileWriteBudgetExceeded { allowed: u32, attempted: u32 },
+    BytesWrittenBudgetExceeded { allowed: u64, attempted: u64 },
+    PhiTooLow { required: f64, actual: f64 },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -427,6 +576,37 @@ fn ensure_pattern(
             AccessKind::Write => Err(PolicyViolation::WriteNotAllowed(path.to_path_buf())),
         }
     }
+}
+
+fn validate_env_overrides(
+    env: &BTreeMap<String, String>,
+    allowed: &BTreeMap<String, String>,
+) -> Result<(), PolicyViolation> {
+    if env.is_empty() {
+        return Ok(());
+    }
+
+    if allowed.is_empty() {
+        return Err(PolicyViolation::EnvNotAllowed(
+            "environment overrides disabled by policy".to_string(),
+        ));
+    }
+
+    for (key, value) in env {
+        match allowed.get(key) {
+            Some(allowed_value) if allowed_value == "*" || allowed_value == value => {}
+            Some(allowed_value) => {
+                return Err(PolicyViolation::EnvValueMismatch {
+                    key: key.clone(),
+                    expected: allowed_value.clone(),
+                    actual: value.clone(),
+                });
+            }
+            None => return Err(PolicyViolation::EnvNotAllowed(key.clone())),
+        }
+    }
+
+    Ok(())
 }
 
 fn normalize_path(path: &Path) -> PathBuf {
@@ -527,6 +707,8 @@ pub struct ExecutionOutcome {
 pub struct SimpleExecutor {
     mode: ExecutionMode,
     log: Vec<ExecutionRecord>,
+    budget: BudgetTracker,
+    pub dream_engine: DreamEngine<ActionIR>,
 }
 
 impl SimpleExecutor {
@@ -535,6 +717,8 @@ impl SimpleExecutor {
         Self {
             mode: ExecutionMode::Simulated,
             log: Vec::new(),
+            budget: BudgetTracker::new(),
+            dream_engine: DreamEngine::new(DreamEngineConfig::default()),
         }
     }
 
@@ -543,6 +727,8 @@ impl SimpleExecutor {
         Self {
             mode: ExecutionMode::Real,
             log: Vec::new(),
+            budget: BudgetTracker::new(),
+            dream_engine: DreamEngine::new(DreamEngineConfig::default()),
         }
     }
 
@@ -552,10 +738,14 @@ impl SimpleExecutor {
             Ok(val) if val == "1" => Self {
                 mode: ExecutionMode::Real,
                 log: Vec::new(),
+                budget: BudgetTracker::new(),
+                dream_engine: DreamEngine::new(DreamEngineConfig::default()),
             },
             _ => Self {
                 mode: ExecutionMode::Simulated,
                 log: Vec::new(),
+                budget: BudgetTracker::new(),
+                dream_engine: DreamEngine::new(DreamEngineConfig::default()),
             },
         }
     }
@@ -582,18 +772,48 @@ impl SimpleExecutor {
         Ok(())
     }
 
+    /// Check if accumulated wisdom suggests a better action
+    pub fn consult_wisdom(&self, _action: &ActionIR) -> Option<ActionIR> {
+        let current_context = vec![0.0; 64];
+        
+        for w in self.dream_engine.wisdom() {
+            if w.context_state == current_context {
+                if w.confidence > 0.3 {
+                    return Some(w.better_action.clone());
+                } else {
+                    println!("   (Wisdom found but confidence {:.2} <= 0.3)", w.confidence);
+                }
+            } else {
+                println!("   (Wisdom found but context mismatch: len={})", w.context_state.len());
+            }
+        }
+        None
+    }
+
     pub fn execute(
         &mut self,
         action: &ActionIR,
         policy: &PolicyBundle,
         sandbox: &SandboxRoot,
+        current_phi: f64,
     ) -> Result<ExecutionOutcome, ExecutionError> {
-        // Validate first
-        action.validate(policy, sandbox)?;
+        // 0. Consult Wisdom (The "Pre-flight Check")
+        // If the dream engine suggests a better path, we take it.
+        let (final_action, wisdom_used) = if let Some(better_action) = self.consult_wisdom(action) {
+            println!("✨ Wisdom Intervention: Substituted dangerous action with safer alternative.");
+            (better_action, true)
+        } else {
+            (action.clone(), false)
+        };
 
-        let rollback = Self::prepare_rollback(action);
+        // 1. Validate
+        final_action.validate(policy, sandbox, current_phi)?;
 
-        let outcome: ActionOutcome = match action {
+        self.enforce_budgets(&final_action, policy)?;
+
+        let rollback = Self::prepare_rollback(&final_action);
+
+        let outcome: ActionOutcome = match &final_action {
             ActionIR::ReadFile { path, .. } => {
                 let canonical = sandbox.validate(path).map_err(ExecutionError::Policy)?;
                 let data = std::fs::read(&canonical)?;
@@ -667,7 +887,8 @@ impl SimpleExecutor {
                     cmd.args(args);
                     cmd.envs(env);
                     if let Some(dir) = working_dir {
-                        cmd.current_dir(dir);
+                        let canonical = sandbox.validate(dir).map_err(ExecutionError::Policy)?;
+                        cmd.current_dir(canonical);
                     }
                     let output = cmd.output()?;
                     ActionOutcome::CommandOutput {
@@ -680,7 +901,7 @@ impl SimpleExecutor {
             ActionIR::Sequence(actions) => {
                 let mut last = ActionOutcome::Success;
                 for act in actions {
-                    last = self.execute(act, policy, sandbox)?.outcome;
+                    last = self.execute(act, policy, sandbox, current_phi)?.outcome;
                 }
                 last
             }
@@ -688,17 +909,54 @@ impl SimpleExecutor {
         };
 
         let record = ExecutionRecord {
-            action: action.clone(),
+            action: final_action.clone(),
             outcome: outcome.clone(),
             rollback,
         };
         self.log.push(record.clone());
+
+        // Record to dream engine (learning from experience)
+        // We use a dummy state because SimpleExecutor is stateless,
+        // but this allows the DreamEngine to start accumulating action-outcome pairs.
+        let state_dummy = vec![0.0; 64]; 
+        let outcome_vec = self.vectorize_outcome(&outcome);
+        // Surprise heuristic: 0.0 for success, 1.0 for error or dangerous simulated command
+        let surprise = match &outcome {
+            ActionOutcome::CommandOutput { exit_code, .. } if *exit_code != 0 => 1.0,
+            ActionOutcome::SimulatedCommand { program, .. } if program == "rm" => 1.0,
+            _ => 0.0,
+        };
+        // Only record if we didn't just use wisdom (prevent circular reinforcement)
+        if !wisdom_used {
+            self.dream_engine.record(&state_dummy, final_action.clone(), &outcome_vec, surprise);
+        }
 
         Ok(ExecutionOutcome {
             action: record.action,
             outcome: record.outcome,
             rollback: record.rollback,
         })
+    }
+
+    fn vectorize_outcome(&self, outcome: &ActionOutcome) -> Vec<f32> {
+        let score = match outcome {
+            ActionOutcome::Success => 1.0,
+            ActionOutcome::FileContent(_) => 0.9,
+            ActionOutcome::DirectoryListing(_) => 0.8,
+            ActionOutcome::SimulatedCommand { program, .. } => {
+                if program == "ls" || program == "cat" || program == "nix" {
+                    0.8
+                } else if program == "rm" {
+                    0.2
+                } else {
+                    0.5
+                }
+            }
+            ActionOutcome::CommandOutput { exit_code, .. } => {
+                if *exit_code == 0 { 1.0 } else { 0.1 }
+            }
+        };
+        vec![score; 64]
     }
 
     fn prepare_rollback(action: &ActionIR) -> Option<RollbackStep> {
@@ -744,6 +1002,117 @@ impl SimpleExecutor {
             }
         }
         Ok(())
+    }
+
+    fn enforce_budgets(
+        &mut self,
+        action: &ActionIR,
+        policy: &PolicyBundle,
+    ) -> Result<(), ExecutionError> {
+        match action {
+            ActionIR::RunCommand { .. } => {
+                self.budget.check_shell_budget(policy)?;
+                self.budget.record_shell_command();
+            }
+            ActionIR::WriteFile { content, .. } => {
+                self.budget
+                    .check_file_write_budget(1, content.len() as u64, policy)?;
+                self.budget.record_file_write(content.len() as u64);
+            }
+            ActionIR::DeleteFile { .. } | ActionIR::CreateDirectory { .. } => {
+                self.budget.check_file_write_budget(1, 0, policy)?;
+                self.budget.record_file_write(0);
+            }
+            ActionIR::Sequence(_) | ActionIR::ReadFile { .. } | ActionIR::ListDirectory { .. } => {}
+            ActionIR::NoOp => {}
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct BudgetTracker {
+    shell_commands_used: u32,
+    shell_window_start: Instant,
+    shell_window_used: u32,
+    file_writes_used: u32,
+    bytes_written: u64,
+}
+
+impl BudgetTracker {
+    fn new() -> Self {
+        Self {
+            shell_commands_used: 0,
+            shell_window_start: Instant::now(),
+            shell_window_used: 0,
+            file_writes_used: 0,
+            bytes_written: 0,
+        }
+    }
+
+    fn check_shell_budget(&mut self, policy: &PolicyBundle) -> Result<(), ExecutionError> {
+        let allowed = policy.budgets.shell_commands_per_session;
+        let attempted = self.shell_commands_used.saturating_add(1);
+        if allowed > 0 && attempted > allowed {
+            return Err(ExecutionError::Policy(PolicyViolation::ShellBudgetExceeded {
+                allowed,
+                attempted,
+            }));
+        }
+
+        if self.shell_window_start.elapsed() >= Duration::from_secs(3600) {
+            self.shell_window_start = Instant::now();
+            self.shell_window_used = 0;
+        }
+        let hourly_allowed = policy.capabilities.shell.budget_per_hour;
+        let hourly_attempted = self.shell_window_used.saturating_add(1);
+        if hourly_allowed > 0 && hourly_attempted > hourly_allowed {
+            return Err(ExecutionError::Policy(
+                PolicyViolation::ShellHourlyBudgetExceeded {
+                    allowed: hourly_allowed,
+                    attempted: hourly_attempted,
+                },
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn record_shell_command(&mut self) {
+        self.shell_commands_used = self.shell_commands_used.saturating_add(1);
+        self.shell_window_used = self.shell_window_used.saturating_add(1);
+    }
+
+    fn check_file_write_budget(
+        &self,
+        write_ops: u32,
+        bytes: u64,
+        policy: &PolicyBundle,
+    ) -> Result<(), ExecutionError> {
+        let allowed_ops = policy.budgets.file_writes_per_session;
+        let attempted_ops = self.file_writes_used.saturating_add(write_ops);
+        if allowed_ops > 0 && attempted_ops > allowed_ops {
+            return Err(ExecutionError::Policy(PolicyViolation::FileWriteBudgetExceeded {
+                allowed: allowed_ops,
+                attempted: attempted_ops,
+            }));
+        }
+
+        let allowed_bytes = policy.budgets.bytes_written_per_session;
+        let attempted_bytes = self.bytes_written.saturating_add(bytes);
+        if allowed_bytes > 0 && attempted_bytes > allowed_bytes {
+            return Err(ExecutionError::Policy(PolicyViolation::BytesWrittenBudgetExceeded {
+                allowed: allowed_bytes,
+                attempted: attempted_bytes,
+            }));
+        }
+
+        Ok(())
+    }
+
+    fn record_file_write(&mut self, bytes: u64) {
+        self.file_writes_used = self.file_writes_used.saturating_add(1);
+        self.bytes_written = self.bytes_written.saturating_add(bytes);
     }
 }
 
@@ -934,7 +1303,7 @@ mod tests {
             path: path.clone(),
             encoding: None,
         };
-        assert!(action.validate(&policy, &sandbox).is_ok());
+        assert!(action.validate(&policy, &sandbox, 1.0).is_ok());
     }
 
     #[test]
@@ -945,7 +1314,7 @@ mod tests {
             path: PathBuf::from("/etc/passwd"),
             encoding: None,
         };
-        let err = action.validate(&policy, &sandbox).unwrap_err();
+        let err = action.validate(&policy, &sandbox, 1.0).unwrap_err();
         matches!(
             err,
             PolicyViolation::SandboxEscape(_) | PolicyViolation::ReadNotAllowed(_)
@@ -963,7 +1332,7 @@ mod tests {
             env: BTreeMap::new(),
             working_dir: None,
         };
-        assert!(allowed.validate(&policy, &sandbox).is_ok());
+        assert!(allowed.validate(&policy, &sandbox, 1.0).is_ok());
 
         let blocked = ActionIR::RunCommand {
             program: "rm".into(),
@@ -971,7 +1340,23 @@ mod tests {
             env: BTreeMap::new(),
             working_dir: None,
         };
-        assert!(blocked.validate(&policy, &sandbox).is_err());
+        assert!(blocked.validate(&policy, &sandbox, 1.0).is_err());
+    }
+
+    #[test]
+    fn command_validation_blocks_env_overrides() {
+        let policy = PolicyBundle::restrictive();
+        let sandbox = SandboxRoot::new("test_env").unwrap();
+
+        let mut env = BTreeMap::new();
+        env.insert("PATH".to_string(), "/tmp/symthaea/bin".to_string());
+        let action = ActionIR::RunCommand {
+            program: "echo".into(),
+            args: vec!["hi".into()],
+            env,
+            working_dir: None,
+        };
+        assert!(action.validate(&policy, &sandbox, 1.0).is_err());
     }
 
     #[test]
@@ -985,7 +1370,7 @@ mod tests {
             content: b"ok".to_vec(),
             create_dirs: true,
         };
-        assert!(action.validate(&policy, &sandbox).is_ok());
+        assert!(action.validate(&policy, &sandbox, 1.0).is_ok());
     }
 
     #[test]
@@ -998,7 +1383,7 @@ mod tests {
             path: escaped,
             encoding: None,
         };
-        assert!(action.validate(&policy, &sandbox).is_err());
+        assert!(action.validate(&policy, &sandbox, 1.0).is_err());
     }
 
     #[test]
@@ -1015,7 +1400,7 @@ mod tests {
             create_dirs: true,
         };
         executor
-            .execute(&write, &policy, &sandbox)
+            .execute(&write, &policy, &sandbox, 1.0)
             .map_err(|e| ActionError::ValidationFailed(e.to_string()))?;
 
         let read = ActionIR::ReadFile {
@@ -1023,7 +1408,7 @@ mod tests {
             encoding: None,
         };
         let result = executor
-            .execute(&read, &policy, &sandbox)
+            .execute(&read, &policy, &sandbox, 1.0)
             .map_err(|e| ActionError::ValidationFailed(e.to_string()))?;
         match result.outcome {
             ActionOutcome::FileContent(data) => {
@@ -1049,7 +1434,7 @@ mod tests {
         };
 
         let outcome = executor
-            .execute(&action, &policy, &sandbox)
+            .execute(&action, &policy, &sandbox, 1.0)
             .map_err(|e| ActionError::ValidationFailed(e.to_string()))?;
         match outcome.outcome {
             ActionOutcome::SimulatedCommand { program, args } => {
@@ -1062,5 +1447,27 @@ mod tests {
                 actual: format!("{:?}", other),
             }),
         }
+    }
+
+    #[test]
+    fn simple_executor_enforces_shell_budget() {
+        let mut policy = PolicyBundle::restrictive();
+        policy.budgets.shell_commands_per_session = 1;
+        let sandbox = SandboxRoot::new("test_exec_budget").unwrap();
+        let mut executor = SimpleExecutor::new();
+
+        let action = ActionIR::RunCommand {
+            program: "echo".into(),
+            args: vec!["first".into()],
+            env: BTreeMap::new(),
+            working_dir: None,
+        };
+
+        assert!(executor.execute(&action, &policy, &sandbox, 1.0).is_ok());
+        let err = executor.execute(&action, &policy, &sandbox, 1.0).unwrap_err();
+        assert!(matches!(
+            err,
+            ExecutionError::Policy(PolicyViolation::ShellBudgetExceeded { .. })
+        ));
     }
 }

@@ -729,6 +729,9 @@ pub struct ConsciousUnderstandingResult {
     /// Maps the semantic intent to ontological primitive tiers, providing
     /// a bridge between language understanding and primitive-based reasoning.
     pub primitive_tiers: Vec<String>,
+
+    /// Concrete executable primitives (the "Hands").
+    pub primitives: Vec<String>,
 }
 
 impl Default for ConsciousUnderstandingResult {
@@ -752,6 +755,7 @@ impl Default for ConsciousUnderstandingResult {
             clarifying_questions: Vec::new(),
             intent_classification: None,
             primitive_tiers: Vec::new(),
+            primitives: Vec::new(),
         }
     }
 }
@@ -953,6 +957,9 @@ impl ConsciousnessLanguageCore {
         // This bridges language understanding with the 9-tier primitive system.
         let primitive_tiers = Self::ground_to_primitive_tiers(&intent_classification);
 
+        // Concrete executable primitives: determine what actions to take
+        let primitives = Self::ground_to_primitives(input, &intent_classification);
+
         ConsciousUnderstandingResult {
             nixos: nix_understanding.clone(),
             nix_understanding,
@@ -970,7 +977,47 @@ impl ConsciousnessLanguageCore {
             clarifying_questions,
             intent_classification: Some(intent_classification),
             primitive_tiers,
+            primitives,
         }
+    }
+
+    /// Map a semantic intent and input text to concrete executable primitives.
+    fn ground_to_primitives(input: &str, classification: &IntentClassification) -> Vec<String> {
+        let mut primitives = Vec::new();
+        let lower = input.to_lowercase();
+
+        // 1. Detection of Fix/Update/Optimize intent
+        if classification.category == IntentCategory::NixOS || classification.category == IntentCategory::Programming {
+            let evolution_keywords = ["fix", "broken", "missing", "repair", "optimize", "implementation", "propose", "improve", "refactor"];
+            if evolution_keywords.iter().any(|k| lower.contains(k)) || lower.contains("look at") {
+                primitives.push("READ".to_string());
+                primitives.push("WRITE".to_string());
+                if lower.contains("nix") {
+                    primitives.push("NIX_BUILD".to_string());
+                }
+            } else {
+                primitives.push("CARGO_CHECK".to_string());
+            }
+        }
+
+        // 2. Explicit action keywords (only add if not already present)
+        if (lower.contains("build") || lower.contains("compile")) && !primitives.contains(&"NIX_BUILD".to_string()) {
+            primitives.push("NIX_BUILD".to_string());
+        }
+        if (lower.contains("commit") || lower.contains("persist")) && !primitives.contains(&"GIT_COMMIT".to_string()) {
+            primitives.push("GIT_COMMIT".to_string());
+        }
+        if (lower.contains("search") || lower.contains("look up") || lower.contains("research")) && !primitives.contains(&"WEB_SEARCH".to_string()) {
+            primitives.push("WEB_SEARCH".to_string());
+        }
+        if (lower.contains("list") || lower.contains("ls")) && !primitives.contains(&"LIST".to_string()) {
+            primitives.push("LIST".to_string());
+        }
+        if (lower.contains("read") || lower.contains("cat")) && !primitives.contains(&"READ".to_string()) {
+            primitives.push("READ".to_string());
+        }
+
+        primitives
     }
 
     /// Map a semantic intent classification to likely active primitive tiers.

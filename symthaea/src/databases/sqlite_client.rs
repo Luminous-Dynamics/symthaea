@@ -73,11 +73,13 @@ use super::{
     SearchResult,
 };
 use crate::infrastructure::lock_guard::ResilientMutex;
+use crate::school::Curriculum;
 use async_trait::async_trait;
 use rusqlite::{params, Connection};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use symthaea_core::hdc::binary_hv::BinaryHV;
+use symthaea_dream::CausalLink;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LSH CONSTANTS
@@ -242,6 +244,21 @@ impl SqliteMemory {
             CREATE INDEX IF NOT EXISTS idx_memories_timestamp ON memories(timestamp_ms);
             CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(memory_type);
             CREATE INDEX IF NOT EXISTS idx_memories_phi ON memories(phi);
+
+            CREATE TABLE IF NOT EXISTS curricula (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                data TEXT NOT NULL -- JSON blob of full Curriculum
+            );
+
+            CREATE TABLE IF NOT EXISTS causal_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                action_fingerprint INTEGER NOT NULL,
+                state_context BLOB NOT NULL,
+                outcome BLOB NOT NULL,
+                weight REAL NOT NULL
+            );
         "#,
         )
         .map_err(|e| DatabaseError::QueryFailed(format!("Schema creation failed: {e}")))?;
@@ -318,14 +335,17 @@ impl SqliteMemory {
 
     /// Deserialize bytes to BinaryHV.
     #[doc(hidden)]
-    fn bytes_to_hv(bytes: &[u8]) -> BinaryHV {
-        if bytes.len() >= BinaryHV::BYTES {
-            let mut arr = [0u8; BinaryHV::BYTES];
-            arr.copy_from_slice(&bytes[..BinaryHV::BYTES]);
-            BinaryHV(arr)
-        } else {
-            BinaryHV::zero()
+    fn bytes_to_hv(bytes: &[u8]) -> DbResult<BinaryHV> {
+        if bytes.len() < BinaryHV::BYTES {
+            return Err(DatabaseError::QueryFailed(format!(
+                "Encoding length {} is smaller than expected {}",
+                bytes.len(),
+                BinaryHV::BYTES
+            )));
         }
+        let mut arr = [0u8; BinaryHV::BYTES];
+        arr.copy_from_slice(&bytes[..BinaryHV::BYTES]);
+        Ok(BinaryHV(arr))
     }
 
     /// Convert MemoryType to database string representation.
@@ -341,13 +361,15 @@ impl SqliteMemory {
 
     /// Convert database string to MemoryType.
     #[doc(hidden)]
-    fn str_to_memory_type(s: &str) -> MemoryType {
+    fn str_to_memory_type(s: &str) -> DbResult<MemoryType> {
         match s {
-            "episodic" => MemoryType::Episodic,
-            "semantic" => MemoryType::Semantic,
-            "procedural" => MemoryType::Procedural,
-            "working" => MemoryType::Working,
-            _ => MemoryType::Episodic,
+            "episodic" => Ok(MemoryType::Episodic),
+            "semantic" => Ok(MemoryType::Semantic),
+            "procedural" => Ok(MemoryType::Procedural),
+            "working" => Ok(MemoryType::Working),
+            _ => Err(DatabaseError::QueryFailed(format!(
+                "Unknown memory_type value: {s}"
+            ))),
         }
     }
 
@@ -439,9 +461,25 @@ impl SqliteMemory {
             }
         };
 
+        let encoding = Self::bytes_to_hv(&encoding_bytes).map_err(|e| {
+            rusqlite::Error::FromSqlConversionFailure(
+                1,
+                rusqlite::types::Type::Blob,
+                Box::new(e),
+            )
+        })?;
+        let memory_type_raw: String = row.get(3)?;
+        let memory_type = Self::str_to_memory_type(&memory_type_raw).map_err(|e| {
+            rusqlite::Error::FromSqlConversionFailure(
+                3,
+                rusqlite::types::Type::Text,
+                Box::new(e),
+            )
+        })?;
+
         Ok(MemoryRecord {
             id: row.get(0)?,
-            encoding: Self::bytes_to_hv(&encoding_bytes),
+            encoding,
             timestamp_ms: {
                 let ts = row.get::<_, i64>(2)?;
                 if ts < 0 {
@@ -451,7 +489,7 @@ impl SqliteMemory {
                     ts as u64
                 }
             },
-            memory_type: Self::str_to_memory_type(&row.get::<_, String>(3)?),
+            memory_type,
             content: row.get(4)?,
             valence: row.get::<_, f64>(5)? as f32,
             arousal: row.get::<_, f64>(6)? as f32,
@@ -476,7 +514,8 @@ impl SqliteMemory {
             .query_map([limit as i64], Self::row_to_record)
             .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {e}")))?;
 
-        Ok(rows.filter_map(|r| r.ok()).collect())
+        let records: Result<Vec<_>, _> = rows.collect();
+        records.map_err(|e| DatabaseError::QueryFailed(format!("Row decode failed: {e}")))
     }
 
     /// Fetch records by a set of IDs (LSH-filtered path).
@@ -513,7 +552,10 @@ impl SqliteMemory {
                 .query_map(params.as_slice(), Self::row_to_record)
                 .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {e}")))?;
 
-            records.extend(rows.filter_map(|r| r.ok()));
+            let chunk_records: Result<Vec<_>, _> = rows.collect();
+            let chunk_records =
+                chunk_records.map_err(|e| DatabaseError::QueryFailed(format!("Row decode failed: {e}")))?;
+            records.extend(chunk_records);
         }
 
         Ok(records)
@@ -526,17 +568,18 @@ impl SqliteMemory {
             "SELECT id, encoding FROM memories WHERE id NOT IN (SELECT DISTINCT memory_id FROM vector_lsh)"
         ).map_err(|e| DatabaseError::QueryFailed(format!("LSH backfill query failed: {e}")))?;
 
-        let rows: Vec<(String, Vec<u8>)> = stmt
+        let rows_iter = stmt
             .query_map([], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
             })
-            .map_err(|e| DatabaseError::QueryFailed(format!("LSH backfill failed: {e}")))?
-            .filter_map(|r| r.ok())
-            .collect();
+            .map_err(|e| DatabaseError::QueryFailed(format!("LSH backfill failed: {e}")))?;
+        let rows: Vec<(String, Vec<u8>)> = rows_iter
+            .collect::<Result<_, _>>()
+            .map_err(|e| DatabaseError::QueryFailed(format!("LSH backfill decode failed: {e}")))?;
 
         let count = rows.len();
         for (id, encoding_bytes) in rows {
-            let hv = Self::bytes_to_hv(&encoding_bytes);
+            let hv = Self::bytes_to_hv(&encoding_bytes)?;
             Self::insert_lsh_entries(conn, &id, &hv)?;
         }
 
@@ -940,8 +983,91 @@ impl ConsciousnessDatabase for SqliteMemory {
         })
         .await
     }
-}
 
+    async fn store_curriculum(&self, curriculum: &Curriculum) -> DbResult<()> {
+        let curriculum = curriculum.clone();
+        self.with_connection(move |conn| {
+            let data = serde_json::to_string(&curriculum)
+                .map_err(|e| DatabaseError::Other(format!("Serialization failed: {e}")))?;
+            
+            conn.execute(
+                "INSERT OR REPLACE INTO curricula (id, name, description, data) VALUES (?1, ?2, ?3, ?4)",
+                params![curriculum.id, curriculum.name, curriculum.description, data],
+            ).map_err(|e| DatabaseError::InsertFailed(format!("Curriculum store failed: {e}")))?;
+            
+            Ok(())
+        }).await
+    }
+
+    async fn get_curricula(&self) -> DbResult<Vec<Curriculum>> {
+        self.with_connection(|conn| {
+            let mut stmt = conn.prepare("SELECT data FROM curricula")
+                .map_err(|e| DatabaseError::QueryFailed(format!("Curricula query failed: {e}")))?;
+            
+            let rows = stmt.query_map([], |row| {
+                let data: String = row.get(0)?;
+                serde_json::from_str::<Curriculum>(&data)
+                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e)))
+            }).map_err(|e| DatabaseError::QueryFailed(format!("Curricula map failed: {e}")))?;
+            
+            let mut curricula = Vec::new();
+            for row in rows {
+                curricula.push(row.map_err(|e| DatabaseError::QueryFailed(format!("Curriculum decode failed: {e}")))?);
+            }
+            Ok(curricula)
+        }).await
+    }
+
+    async fn store_causal_links(&self, links: &[CausalLink]) -> DbResult<()> {
+        let links = links.to_vec();
+        self.with_connection(move |conn| {
+            for link in links {
+                let state_bytes = bincode::serialize(&link.state_context)
+                    .map_err(|e| DatabaseError::Other(format!("State serialization failed: {e}")))?;
+                let outcome_bytes = bincode::serialize(&link.outcome)
+                    .map_err(|e| DatabaseError::Other(format!("Outcome serialization failed: {e}")))?;
+                
+                conn.execute(
+                    "INSERT INTO causal_links (action_fingerprint, state_context, outcome, weight) VALUES (?1, ?2, ?3, ?4)",
+                    params![link.action_fingerprint as i64, state_bytes, outcome_bytes, link.weight as f64],
+                ).map_err(|e| DatabaseError::InsertFailed(format!("Causal link store failed: {e}")))?;
+            }
+            Ok(())
+        }).await
+    }
+
+    async fn get_causal_links(&self) -> DbResult<Vec<CausalLink>> {
+        self.with_connection(|conn| {
+            let mut stmt = conn.prepare("SELECT action_fingerprint, state_context, outcome, weight FROM causal_links")
+                .map_err(|e| DatabaseError::QueryFailed(format!("Causal links query failed: {e}")))?;
+            
+            let rows = stmt.query_map([], |row| {
+                let fingerprint: i64 = row.get(0)?;
+                let state_bytes: Vec<u8> = row.get(1)?;
+                let outcome_bytes: Vec<u8> = row.get(2)?;
+                let weight: f64 = row.get(3)?;
+                
+                let state_context: Vec<f32> = bincode::deserialize(&state_bytes)
+                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(1, rusqlite::types::Type::Blob, Box::new(e)))?;
+                let outcome: Vec<f32> = bincode::deserialize(&outcome_bytes)
+                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(2, rusqlite::types::Type::Blob, Box::new(e)))?;
+                
+                Ok(CausalLink {
+                    action_fingerprint: fingerprint as u64,
+                    state_context,
+                    outcome,
+                    weight: weight as f32,
+                })
+            }).map_err(|e| DatabaseError::QueryFailed(format!("Causal links map failed: {e}")))?;
+            
+            let mut links = Vec::new();
+            for row in rows {
+                links.push(row.map_err(|e| DatabaseError::QueryFailed(format!("Causal link decode failed: {e}")))?);
+            }
+            Ok(links)
+        }).await
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1689,7 +1815,7 @@ mod tests {
 
         use crate::memory::episodic_replay::{EpisodicMemory, EpisodicReplayConfig};
         use crate::memory::memory_coordinator::{
-            CoordinatorConfig, GraduationEvent, MemoryCoordinator,
+            CoordinatorConfig, GraduationEvent, MemoryCoordinator, MemorySource,
         };
         use symthaea_core::hdc::unified_hv::ContinuousHV;
 
@@ -1713,6 +1839,8 @@ mod tests {
                 final_activation: 0.4,
                 psi_at_graduation: 0.7,
                 coherence_at_graduation: 0.8,
+                source: MemorySource::Internal,
+                is_verified: false,
             });
         }
 
@@ -2823,16 +2951,14 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // 26. bytes_to_hv with undersized input returns zero vector
+    // 26. bytes_to_hv with undersized input returns error
     // -----------------------------------------------------------------------
     #[test]
-    fn test_bytes_to_hv_undersized_returns_zero() {
+    fn test_bytes_to_hv_undersized_returns_error() {
         let short_bytes = vec![0xFFu8; 100]; // Much smaller than BYTES=2048
-        let hv = SqliteMemory::bytes_to_hv(&short_bytes);
-        assert_eq!(
-            hv.0,
-            [0u8; BinaryHV::BYTES],
-            "Undersized input should produce zero vector"
+        assert!(
+            SqliteMemory::bytes_to_hv(&short_bytes).is_err(),
+            "Undersized input should fail decoding"
         );
     }
 
@@ -2843,7 +2969,7 @@ mod tests {
     fn test_hv_bytes_roundtrip_symmetry() {
         let original = BinaryHV::random(12345);
         let bytes = SqliteMemory::hv_to_bytes(&original);
-        let restored = SqliteMemory::bytes_to_hv(&bytes);
+        let restored = SqliteMemory::bytes_to_hv(&bytes).expect("HV bytes decode should succeed");
         assert_eq!(original.0, restored.0, "HV -> bytes -> HV must be identity");
     }
 
@@ -2859,7 +2985,7 @@ mod tests {
             MemoryType::Working,
         ] {
             let s = SqliteMemory::memory_type_to_str(mt);
-            let restored = SqliteMemory::str_to_memory_type(s);
+            let restored = SqliteMemory::str_to_memory_type(s).expect("memory_type decode");
             assert_eq!(
                 mt, restored,
                 "MemoryType {:?} should survive string round-trip",
@@ -2869,15 +2995,12 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // 29. Unknown memory_type string defaults to Episodic
+    // 29. Unknown memory_type string returns error
     // -----------------------------------------------------------------------
     #[test]
-    fn test_unknown_memory_type_defaults_to_episodic() {
-        assert_eq!(
-            SqliteMemory::str_to_memory_type("unknown_garbage"),
-            MemoryType::Episodic
-        );
-        assert_eq!(SqliteMemory::str_to_memory_type(""), MemoryType::Episodic);
+    fn test_unknown_memory_type_returns_error() {
+        assert!(SqliteMemory::str_to_memory_type("unknown_garbage").is_err());
+        assert!(SqliteMemory::str_to_memory_type("").is_err());
     }
 
     // -----------------------------------------------------------------------
