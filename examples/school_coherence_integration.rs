@@ -113,7 +113,7 @@ fn main() {
         bridged.coherence_level() * 100.0
     );
 
-    let objective2 = LearningObjective::new("advanced", "NixOS Advanced Concepts")
+    let _objective2 = LearningObjective::new("advanced", "NixOS Advanced Concepts")
         .with_difficulty(Difficulty::Intermediate)
         .with_domain(Domain::NixOS)
         .build();

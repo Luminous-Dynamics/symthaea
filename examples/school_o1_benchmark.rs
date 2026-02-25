@@ -22,9 +22,7 @@
 use std::time::{Duration, Instant};
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
-use symthaea::school::{
-    Curriculum, CurriculumType, Difficulty, Domain, LearningObjective, School, SchoolConfig,
-};
+use symthaea::school::{Difficulty, Domain, LearningObjective, School, SchoolConfig};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NAIVE O(N) EVALUATOR (FOR COMPARISON)
@@ -34,6 +32,7 @@ use symthaea::school::{
 ///
 /// This models a more realistic RNN-style evaluation where each timestep
 /// requires matrix operations proportional to the network size.
+#[allow(dead_code)]
 struct NaiveEvaluator {
     /// Number of simulation steps per evaluation
     n_steps: usize,
@@ -45,6 +44,7 @@ struct NaiveEvaluator {
     weights: Vec<Vec<f32>>,
 }
 
+#[allow(dead_code)]
 impl NaiveEvaluator {
     fn new(n_steps: usize, dt: f32, neurons: usize) -> Self {
         // Create a random weight matrix for realistic RNN simulation
