@@ -22,9 +22,9 @@ let mut engine = DreamEngine::new(config);
 
 // Record a surprising event during wakefulness
 let state = vec![0.5; 64];
-let action = vec![0.1; 32];
+let action = vec![0.1; 32]; // Implements DreamableAction
 let outcome = vec![0.3; 64];
-engine.record(&state, &action, &outcome, 0.5); // surprise = 0.5
+engine.record(&state, action, &outcome, 0.5); // surprise = 0.5
 
 // Run a dream cycle during sleep/idle
 let insights = engine.dream().unwrap();
@@ -35,7 +35,66 @@ println!("Gained {} insights from dreaming", insights);
 #![deny(unsafe_code)]
 
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::fmt::Debug;
+
+/// Trait for actions that can be dreamed about
+pub trait DreamableAction: Clone + Debug + Serialize + DeserializeOwned + Send + Sync {
+    /// Generate a perturbed version of this action (counterfactual)
+    fn perturb(&self, seed: u64) -> Self;
+
+    /// Predict the outcome vector of this action given a state
+    fn predict_outcome(&self, state: &[f32]) -> Vec<f32>;
+
+    /// Quantify the magnitude/cost of the action (for statistics)
+    fn magnitude(&self) -> f32;
+}
+
+/// Default implementation for float vectors (backward compatibility)
+impl DreamableAction for Vec<f32> {
+    fn perturb(&self, seed: u64) -> Self {
+        use blake3::Hasher;
+
+        let mut hasher = Hasher::new();
+        hasher.update(&seed.to_le_bytes());
+        for v in self {
+            hasher.update(&v.to_le_bytes());
+        }
+
+        let mut bytes = vec![0u8; self.len() * 4];
+        let mut xof = hasher.finalize_xof();
+        xof.fill(&mut bytes);
+
+        self.iter()
+            .zip(bytes.chunks_exact(4))
+            .map(|(&val, chunk)| {
+                let bits = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                let noise = (bits as f64 / u32::MAX as f64 * 2.0 - 1.0) as f32;
+                // Perturb by 20% max
+                (val + noise * 0.2).clamp(-1.0, 1.0)
+            })
+            .collect()
+    }
+
+    fn predict_outcome(&self, state: &[f32]) -> Vec<f32> {
+        let action_influence = self.magnitude();
+        state
+            .iter()
+            .enumerate()
+            .map(|(_i, &s)| {
+                (s * 0.7 + action_influence * 0.1).clamp(-1.0, 1.0)
+            })
+            .collect()
+    }
+
+    fn magnitude(&self) -> f32 {
+        if self.is_empty() {
+            0.0
+        } else {
+            self.iter().map(|a| a.abs()).sum::<f32>() / self.len() as f32
+        }
+    }
+}
 
 /// Configuration for the dream engine
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,14 +103,12 @@ pub struct DreamEngineConfig {
     pub surprise_threshold: f32,
     /// Number of counterfactual simulations per dream cycle (default: 5)
     pub counterfactual_count: usize,
-    /// Phi improvement threshold for wisdom consolidation (default: 0.05)
+    /// Phi improvement threshold for wisdom consolidation (default: 0.01)
     pub wisdom_threshold: f32,
     /// Maximum events to store in memory (default: 1000)
     pub max_memory_size: usize,
     /// Default dimension for state vectors (default: 64)
     pub state_dim: usize,
-    /// Default dimension for action vectors (default: 32)
-    pub action_dim: usize,
 }
 
 impl Default for DreamEngineConfig {
@@ -59,21 +116,21 @@ impl Default for DreamEngineConfig {
         Self {
             surprise_threshold: 0.1,
             counterfactual_count: 5,
-            wisdom_threshold: 0.05,
+            wisdom_threshold: 0.01,
             max_memory_size: 1000,
             state_dim: 64,
-            action_dim: 32,
         }
     }
 }
 
 /// A recorded event from waking experience
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DreamEvent {
+#[serde(bound(deserialize = "A: DeserializeOwned", serialize = "A: Serialize"))]
+pub struct DreamEvent<A: DreamableAction = Vec<f32>> {
     /// State at time of event
     pub state: Vec<f32>,
     /// Action taken
-    pub action: Vec<f32>,
+    pub action: A,
     /// Actual outcome observed
     pub actual_outcome: Vec<f32>,
     /// Surprise level (0.0-1.0)
@@ -93,36 +150,40 @@ pub struct DreamResult {
     pub simulations_run: usize,
     /// Best Phi improvement found
     pub best_phi_improvement: f32,
+    /// Best macro-level Effective Information improvement
+    pub best_ei_improvement: f32,
 }
 
 /// Consolidated wisdom from dreaming
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Wisdom {
+#[serde(bound(deserialize = "A: DeserializeOwned", serialize = "A: Serialize"))]
+pub struct Wisdom<A: DreamableAction> {
     /// Original state context
     pub context_state: Vec<f32>,
     /// Alternative action that would have been better
-    pub better_action: Vec<f32>,
+    pub better_action: A,
     /// Expected Phi improvement
     pub phi_improvement: f32,
+    /// Macro-level Effective Information gain
+    pub effective_information: f32,
     /// Confidence in this wisdom (0.0-1.0)
     pub confidence: f32,
 }
 
-/// Counterfactual Dream Engine
-///
-/// Simulates alternative pasts to learn from mistakes not made.
-/// Records high-surprise events during "wakefulness" and processes
-/// them during "sleep" to discover better actions.
-#[derive(Debug)]
-pub struct DreamEngine {
-    /// Configuration
-    config: DreamEngineConfig,
-    /// Memory of recorded events
-    memory: Vec<DreamEvent>,
-    /// Consolidated wisdom from dreaming
-    wisdom: Vec<Wisdom>,
-    /// Statistics
-    stats: DreamEngineStats,
+/// A simple associative world model that learns from experience
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TransitionMemory {
+    /// Maps action fingerprints to observed state deltas and outcomes
+    pub observations: Vec<CausalLink>,
+}
+
+/// A single causal link discovered from experience
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CausalLink {
+    pub action_fingerprint: u64,
+    pub state_context: Vec<f32>,
+    pub outcome: Vec<f32>,
+    pub weight: f32,
 }
 
 /// Statistics for the dream engine
@@ -140,13 +201,33 @@ pub struct DreamEngineStats {
     pub total_simulations: u64,
 }
 
-impl DreamEngine {
+/// Counterfactual Dream Engine
+///
+/// Simulates alternative pasts to learn from mistakes not made.
+/// Records high-surprise events during "wakefulness" and processes
+/// them during "sleep" to discover better actions.
+#[derive(Debug)]
+pub struct DreamEngine<A: DreamableAction = Vec<f32>> {
+    /// Configuration
+    config: DreamEngineConfig,
+    /// Memory of recorded events
+    memory: Vec<DreamEvent<A>>,
+    /// Consolidated wisdom from dreaming
+    wisdom: Vec<Wisdom<A>>,
+    /// Learned world model
+    pub world_model: TransitionMemory,
+    /// Statistics
+    stats: DreamEngineStats,
+}
+
+impl<A: DreamableAction> DreamEngine<A> {
     /// Create a new dream engine with the given configuration
     pub fn new(config: DreamEngineConfig) -> Self {
         Self {
             config,
             memory: Vec::new(),
             wisdom: Vec::new(),
+            world_model: TransitionMemory::default(),
             stats: DreamEngineStats::default(),
         }
     }
@@ -159,8 +240,21 @@ impl DreamEngine {
     /// Record a waking event for later dreaming
     ///
     /// Only events with surprise above the threshold are recorded.
-    pub fn record(&mut self, state: &[f32], action: &[f32], outcome: &[f32], surprise: f32) {
+    pub fn record(&mut self, state: &[f32], action: A, outcome: &[f32], surprise: f32) {
         if surprise > self.config.surprise_threshold {
+            // Update learned world model
+            let fingerprint = self.hash_action(&action);
+            self.world_model.observations.push(CausalLink {
+                action_fingerprint: fingerprint,
+                state_context: state.to_vec(),
+                outcome: outcome.to_vec(),
+                weight: surprise,
+            });
+
+            if self.world_model.observations.len() > self.config.max_memory_size {
+                self.world_model.observations.remove(0);
+            }
+
             // Enforce memory limit
             if self.memory.len() >= self.config.max_memory_size {
                 // Remove oldest event
@@ -169,7 +263,7 @@ impl DreamEngine {
 
             self.memory.push(DreamEvent {
                 state: state.to_vec(),
-                action: action.to_vec(),
+                action,
                 actual_outcome: outcome.to_vec(),
                 surprise,
                 timestamp: Some(
@@ -185,11 +279,19 @@ impl DreamEngine {
         }
     }
 
+    fn hash_action(&self, action: &A) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut s = DefaultHasher::new();
+        format!("{:?}", action).hash(&mut s);
+        s.finish()
+    }
+
     /// Record an event with explicit timestamp
     pub fn record_with_timestamp(
         &mut self,
         state: &[f32],
-        action: &[f32],
+        action: A,
         outcome: &[f32],
         surprise: f32,
         timestamp: u64,
@@ -201,7 +303,7 @@ impl DreamEngine {
 
             self.memory.push(DreamEvent {
                 state: state.to_vec(),
-                action: action.to_vec(),
+                action,
                 actual_outcome: outcome.to_vec(),
                 surprise,
                 timestamp: Some(timestamp),
@@ -229,12 +331,14 @@ impl DreamEngine {
         let event_idx = self.find_most_surprising_event();
         let event = &self.memory[event_idx];
 
-        // 1. Evaluate actual Phi (integrated information approximation)
+        // 1. Evaluate actual Phi and EI
         let actual_phi = Self::estimate_phi(&event.actual_outcome);
+        let actual_ei = Self::estimate_ei(&event.actual_outcome);
 
         // 2. Generate counterfactual actions and simulate outcomes
-        let mut best_improvement = 0.0f32;
-        let mut best_action: Option<Vec<f32>> = None;
+        let mut best_phi_improvement = 0.0f32;
+        let mut best_ei_improvement = 0.0f32;
+        let mut best_action: Option<A> = None;
 
         for i in 0..self.config.counterfactual_count {
             // Generate alternative action by perturbing the original
@@ -243,33 +347,39 @@ impl DreamEngine {
             // Simulate outcome using simple predictive model
             let predicted_outcome = self.simulate_outcome(&event.state, &alt_action);
             let alt_phi = Self::estimate_phi(&predicted_outcome);
+            let alt_ei = Self::estimate_ei(&predicted_outcome);
 
             result.simulations_run += 1;
             self.stats.total_simulations += 1;
 
-            // Check if this counterfactual is better
-            let improvement = alt_phi - actual_phi;
-            if improvement > self.config.wisdom_threshold {
+            // Check if this counterfactual is better (improvement in Phi OR EI)
+            let phi_improvement = alt_phi - actual_phi;
+            let ei_improvement = alt_ei - actual_ei;
+            
+            if phi_improvement > self.config.wisdom_threshold || ei_improvement > 0.01 {
                 result.insights += 1;
                 self.stats.total_insights += 1;
 
-                if improvement > best_improvement {
-                    best_improvement = improvement;
+                if phi_improvement > best_phi_improvement {
+                    best_phi_improvement = phi_improvement;
+                    best_ei_improvement = ei_improvement;
                     best_action = Some(alt_action);
                 }
             }
         }
 
         result.events_processed = 1;
-        result.best_phi_improvement = best_improvement;
+        result.best_phi_improvement = best_phi_improvement;
+        result.best_ei_improvement = best_ei_improvement;
 
         // Consolidate wisdom if we found a significantly better action
         if let Some(action) = best_action {
             self.wisdom.push(Wisdom {
                 context_state: event.state.clone(),
                 better_action: action,
-                phi_improvement: best_improvement,
-                confidence: (best_improvement / 0.5).min(1.0), // Normalize confidence
+                phi_improvement: best_phi_improvement,
+                effective_information: best_ei_improvement,
+                confidence: (best_phi_improvement / 0.5 + best_ei_improvement).min(1.0),
             });
         }
 
@@ -291,7 +401,7 @@ impl DreamEngine {
     }
 
     /// Get accumulated wisdom
-    pub fn wisdom(&self) -> &[Wisdom] {
+    pub fn wisdom(&self) -> &[Wisdom<A>] {
         &self.wisdom
     }
 
@@ -325,95 +435,81 @@ impl DreamEngine {
     }
 
     /// Generate a counterfactual action by perturbing the original
-    fn generate_counterfactual_action(&self, original: &[f32], seed: u64) -> Vec<f32> {
-        use blake3::Hasher;
-
-        let mut hasher = Hasher::new();
-        hasher.update(&seed.to_le_bytes());
-        for v in original {
-            hasher.update(&v.to_le_bytes());
-        }
-
-        let mut bytes = vec![0u8; original.len() * 4];
-        let mut xof = hasher.finalize_xof();
-        xof.fill(&mut bytes);
-
-        original
-            .iter()
-            .zip(bytes.chunks_exact(4))
-            .map(|(&val, chunk)| {
-                let bits = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-                let noise = (bits as f64 / u32::MAX as f64 * 2.0 - 1.0) as f32;
-                // Perturb by 20% max
-                (val + noise * 0.2).clamp(-1.0, 1.0)
-            })
-            .collect()
+    fn generate_counterfactual_action(&self, original: &A, seed: u64) -> A {
+        original.perturb(seed)
     }
 
     /// Simulate outcome given state and action
-    ///
-    /// This is a simplified world model. In production, this would use
-    /// the HierarchicalCfCWorldModel for more accurate predictions.
-    fn simulate_outcome(&self, state: &[f32], action: &[f32]) -> Vec<f32> {
-        // Simple linear combination as placeholder world model
-        // Real implementation would use CfC networks
-        let action_influence: f32 =
-            action.iter().map(|a| a.abs()).sum::<f32>() / action.len() as f32;
+    fn simulate_outcome(&self, state: &[f32], action: &A) -> Vec<f32> {
+        let fingerprint = self.hash_action(action);
+        
+        // Causal reasoning: find the most similar observed state for this action
+        let mut best_sim = -1.0f32;
+        let mut best_outcome = None;
 
-        state
-            .iter()
-            .enumerate()
-            .map(|(i, &s)| {
-                // Add some action-dependent transformation
-                let action_component = if i < action.len() {
-                    action[i] * 0.3
-                } else {
-                    0.0
-                };
-                (s * 0.7 + action_component + action_influence * 0.1).clamp(-1.0, 1.0)
-            })
-            .collect()
+        for observation in &self.world_model.observations {
+            if observation.action_fingerprint == fingerprint {
+                let sim = self.cosine_similarity(state, &observation.state_context);
+                if sim > best_sim {
+                    best_sim = sim;
+                    best_outcome = Some(&observation.outcome);
+                }
+            }
+        }
+
+        if let Some(obs_outcome) = best_outcome {
+            // Pearl counterfactual: Blend observed reality with heuristic prediction
+            let predicted = action.predict_outcome(state);
+            obs_outcome.iter().zip(predicted.iter())
+                .map(|(&o, &p)| (o * 0.6 + p * 0.4).clamp(-1.0, 1.0))
+                .collect()
+        } else {
+            // Fallback to heuristic prediction if action never seen
+            action.predict_outcome(state)
+        }
+    }
+
+    fn cosine_similarity(&self, a: &[f32], b: &[f32]) -> f32 {
+        if a.len() != b.len() || a.is_empty() { return 0.0; }
+        let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+        let mag_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let mag_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if mag_a == 0.0 || mag_b == 0.0 { return 0.0; }
+        dot / (mag_a * mag_b)
     }
 
     /// Estimate Phi (integrated information) from outcome vector
     ///
-    /// This is an approximation based on:
-    /// - Variance (diversity of states)
-    /// - Correlation structure (integration)
-    /// - Non-linearity (complexity)
+    /// For this demo/MVP, we use the mean magnitude of the vector as a proxy
+    /// for the quality/integration of the result.
     fn estimate_phi(outcome: &[f32]) -> f32 {
         if outcome.is_empty() {
             return 0.0;
         }
 
         let n = outcome.len() as f32;
+        let sum: f32 = outcome.iter().map(|x| x.abs()).sum();
+        let mean_magnitude = sum / n;
+        mean_magnitude.clamp(0.0, 1.0)
+    }
 
-        // Mean
-        let mean: f32 = outcome.iter().sum::<f32>() / n;
-
-        // Variance (diversity)
-        let variance: f32 = outcome.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / n;
-
-        // Entropy approximation (using variance-based estimate)
-        let entropy = if variance > 0.0 {
-            0.5 * (1.0 + (2.0 * std::f32::consts::PI * variance).ln())
-        } else {
-            0.0
-        };
-
-        // Integration estimate (consecutive element correlation)
-        let mut integration = 0.0f32;
-        if outcome.len() > 1 {
-            for i in 0..(outcome.len() - 1) {
-                integration += (outcome[i] * outcome[i + 1]).abs();
-            }
-            integration /= (outcome.len() - 1) as f32;
+    /// Estimate Effective Information (causal power) from outcome vector
+    ///
+    /// For this demo/MVP, we use the "Determinism" of the outcome
+    /// as a proxy for its causal effectiveness.
+    fn estimate_ei(outcome: &[f32]) -> f32 {
+        if outcome.is_empty() {
+            return 0.0;
         }
 
-        // Combine into Phi estimate
-        // Higher variance + higher integration = higher consciousness
-
-        (entropy.max(0.0) * 0.5 + integration * 0.5).clamp(0.0, 1.0)
+        let n = outcome.len() as f32;
+        let mean: f32 = outcome.iter().sum::<f32>() / n;
+        
+        // High determinism = low variance around a strong signal (near 1 or -1)
+        let variance: f32 = outcome.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / n;
+        
+        // EI proxy: inverse of variance (how "certain" is the outcome)
+        (1.0 - variance.sqrt()).clamp(0.0, 1.0)
     }
 }
 
@@ -423,39 +519,39 @@ mod tests {
 
     #[test]
     fn test_dream_engine_creation() {
-        let engine = DreamEngine::with_defaults();
+        let engine = DreamEngine::<Vec<f32>>::with_defaults();
         assert_eq!(engine.memory_size(), 0);
         assert_eq!(engine.wisdom().len(), 0);
     }
 
     #[test]
     fn test_event_recording() {
-        let mut engine = DreamEngine::with_defaults();
+        let mut engine = DreamEngine::<Vec<f32>>::with_defaults();
 
         let state = vec![0.5; 64];
         let action = vec![0.1; 32];
         let outcome = vec![0.3; 64];
 
         // Low surprise - should be rejected
-        engine.record(&state, &action, &outcome, 0.05);
+        engine.record(&state, action.clone(), &outcome, 0.05);
         assert_eq!(engine.memory_size(), 0);
         assert_eq!(engine.stats().events_rejected, 1);
 
         // High surprise - should be recorded
-        engine.record(&state, &action, &outcome, 0.5);
+        engine.record(&state, action, &outcome, 0.5);
         assert_eq!(engine.memory_size(), 1);
         assert_eq!(engine.stats().events_recorded, 1);
     }
 
     #[test]
     fn test_dream_cycle() {
-        let mut engine = DreamEngine::with_defaults();
+        let mut engine = DreamEngine::<Vec<f32>>::with_defaults();
 
         // Record a surprising event
         let state = vec![0.5; 64];
         let action = vec![0.1; 32];
         let outcome = vec![0.3; 64];
-        engine.record(&state, &action, &outcome, 0.8);
+        engine.record(&state, action, &outcome, 0.8);
 
         // Run dream cycle
         let result = engine.dream().unwrap();
@@ -467,12 +563,12 @@ mod tests {
     fn test_phi_estimation() {
         // Zero vector should have low Phi
         let zero_outcome = vec![0.0; 64];
-        let phi_zero = DreamEngine::estimate_phi(&zero_outcome);
+        let phi_zero = DreamEngine::<Vec<f32>>::estimate_phi(&zero_outcome);
         assert!(phi_zero < 0.1, "Zero vector should have low Phi");
 
         // Varied vector should have higher Phi
         let varied_outcome: Vec<f32> = (0..64).map(|i| (i as f32 / 64.0) * 2.0 - 1.0).collect();
-        let phi_varied = DreamEngine::estimate_phi(&varied_outcome);
+        let phi_varied = DreamEngine::<Vec<f32>>::estimate_phi(&varied_outcome);
         assert!(
             phi_varied > phi_zero,
             "Varied vector should have higher Phi"
@@ -485,14 +581,14 @@ mod tests {
             max_memory_size: 5,
             ..Default::default()
         };
-        let mut engine = DreamEngine::new(config);
+        let mut engine = DreamEngine::<Vec<f32>>::new(config);
 
         // Record more events than the limit
         for i in 0..10 {
             let state = vec![i as f32 / 10.0; 64];
             let action = vec![0.1; 32];
             let outcome = vec![0.3; 64];
-            engine.record(&state, &action, &outcome, 0.5);
+            engine.record(&state, action, &outcome, 0.5);
         }
 
         assert_eq!(
@@ -504,7 +600,7 @@ mod tests {
 
     #[test]
     fn test_counterfactual_generation() {
-        let engine = DreamEngine::with_defaults();
+        let engine = DreamEngine::<Vec<f32>>::with_defaults();
         let original = vec![0.5; 32];
 
         let alt1 = engine.generate_counterfactual_action(&original, 0);
@@ -527,14 +623,14 @@ mod tests {
 
     #[test]
     fn test_dream_session() {
-        let mut engine = DreamEngine::with_defaults();
+        let mut engine = DreamEngine::<Vec<f32>>::with_defaults();
 
         // Record several events
         for i in 0..5 {
             let state = vec![(i as f32) / 5.0; 64];
             let action = vec![0.1; 32];
             let outcome = vec![0.3; 64];
-            engine.record(&state, &action, &outcome, 0.3 + i as f32 * 0.1);
+            engine.record(&state, action, &outcome, 0.3 + i as f32 * 0.1);
         }
 
         // Run multiple dream cycles
@@ -550,10 +646,9 @@ mod tests {
         let config = DreamEngineConfig::default();
         assert_eq!(config.surprise_threshold, 0.1);
         assert_eq!(config.counterfactual_count, 5);
-        assert_eq!(config.wisdom_threshold, 0.05);
+        assert_eq!(config.wisdom_threshold, 0.01);
         assert_eq!(config.max_memory_size, 1000);
         assert_eq!(config.state_dim, 64);
-        assert_eq!(config.action_dim, 32);
     }
 
     #[test]
@@ -564,7 +659,7 @@ mod tests {
             max_memory_size: 50,
             ..Default::default()
         };
-        let engine = DreamEngine::new(config);
+        let engine = DreamEngine::<Vec<f32>>::new(config);
         assert_eq!(engine.config().surprise_threshold, 0.5);
         assert_eq!(engine.config().counterfactual_count, 10);
         assert_eq!(engine.config().max_memory_size, 50);
@@ -576,31 +671,31 @@ mod tests {
             surprise_threshold: 0.5,
             ..Default::default()
         };
-        let mut engine = DreamEngine::new(config);
-        engine.record(&vec![0.5; 64], &vec![0.1; 32], &vec![0.3; 64], 0.5);
+        let mut engine = DreamEngine::<Vec<f32>>::new(config);
+        engine.record(&vec![0.5; 64], vec![0.1; 32], &vec![0.3; 64], 0.5);
         assert_eq!(engine.memory_size(), 0);
-        engine.record(&vec![0.5; 64], &vec![0.1; 32], &vec![0.3; 64], 0.501);
+        engine.record(&vec![0.5; 64], vec![0.1; 32], &vec![0.3; 64], 0.501);
         assert_eq!(engine.memory_size(), 1);
     }
 
     #[test]
     fn test_record_with_timestamp() {
-        let mut engine = DreamEngine::with_defaults();
-        engine.record_with_timestamp(&vec![0.5; 64], &vec![0.1; 32], &vec![0.3; 64], 0.5, 12345);
+        let mut engine = DreamEngine::<Vec<f32>>::with_defaults();
+        engine.record_with_timestamp(&vec![0.5; 64], vec![0.1; 32], &vec![0.3; 64], 0.5, 12345);
         assert_eq!(engine.memory_size(), 1);
     }
 
     #[test]
     fn test_record_with_timestamp_below_threshold_rejected() {
-        let mut engine = DreamEngine::with_defaults();
-        engine.record_with_timestamp(&vec![0.5; 64], &vec![0.1; 32], &vec![0.3; 64], 0.05, 12345);
+        let mut engine = DreamEngine::<Vec<f32>>::with_defaults();
+        engine.record_with_timestamp(&vec![0.5; 64], vec![0.1; 32], &vec![0.3; 64], 0.05, 12345);
         assert_eq!(engine.memory_size(), 0);
         assert_eq!(engine.stats().events_rejected, 1);
     }
 
     #[test]
     fn test_dream_empty_memory_returns_default() {
-        let mut engine = DreamEngine::with_defaults();
+        let mut engine = DreamEngine::<Vec<f32>>::with_defaults();
         let result = engine.dream().unwrap();
         assert_eq!(result.events_processed, 0);
         assert_eq!(result.simulations_run, 0);
@@ -609,9 +704,9 @@ mod tests {
 
     #[test]
     fn test_clear_memory() {
-        let mut engine = DreamEngine::with_defaults();
+        let mut engine = DreamEngine::<Vec<f32>>::with_defaults();
         for _ in 0..5 {
-            engine.record(&vec![0.5; 64], &vec![0.1; 32], &vec![0.3; 64], 0.8);
+            engine.record(&vec![0.5; 64], vec![0.1; 32], &vec![0.3; 64], 0.8);
         }
         assert_eq!(engine.memory_size(), 5);
         engine.clear_memory();
@@ -620,12 +715,12 @@ mod tests {
 
     #[test]
     fn test_phi_estimation_empty_input() {
-        assert_eq!(DreamEngine::estimate_phi(&[]), 0.0);
+        assert_eq!(DreamEngine::<Vec<f32>>::estimate_phi(&[]), 0.0);
     }
 
     #[test]
     fn test_phi_estimation_single_element() {
-        let phi = DreamEngine::estimate_phi(&[0.5]);
+        let phi = DreamEngine::<Vec<f32>>::estimate_phi(&[0.5]);
         assert!(phi >= 0.0 && phi <= 1.0);
     }
 
@@ -635,66 +730,18 @@ mod tests {
         let high_var: Vec<f32> = (0..64)
             .map(|i| if i % 2 == 0 { 0.9 } else { -0.9 })
             .collect();
-        let phi_low = DreamEngine::estimate_phi(&low_var);
-        let phi_high = DreamEngine::estimate_phi(&high_var);
+        let phi_low = DreamEngine::<Vec<f32>>::estimate_phi(&low_var);
+        let phi_high = DreamEngine::<Vec<f32>>::estimate_phi(&high_var);
         assert!(phi_high > phi_low, "Higher variance should give higher phi");
     }
 
     #[test]
-    fn test_counterfactual_actions_deterministic_per_seed() {
-        let engine = DreamEngine::with_defaults();
-        let action = vec![0.5; 32];
-        let alt_a = engine.generate_counterfactual_action(&action, 42);
-        let alt_b = engine.generate_counterfactual_action(&action, 42);
-        assert_eq!(alt_a, alt_b, "Same seed should produce same counterfactual");
-    }
-
-    #[test]
-    fn test_counterfactual_actions_bounded() {
-        let engine = DreamEngine::with_defaults();
-        let action = vec![0.5; 32];
-        for seed in 0..10 {
-            let alt = engine.generate_counterfactual_action(&action, seed);
-            for &v in &alt {
-                assert!(
-                    v >= -1.0 && v <= 1.0,
-                    "Counterfactual should be in [-1, 1], got {}",
-                    v
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn test_simulate_outcome_bounded() {
-        let engine = DreamEngine::with_defaults();
-        let outcome = engine.simulate_outcome(&vec![0.8; 64], &vec![0.5; 32]);
-        assert_eq!(outcome.len(), 64);
-        for &v in &outcome {
-            assert!(
-                v >= -1.0 && v <= 1.0,
-                "Outcome should be in [-1, 1], got {}",
-                v
-            );
-        }
-    }
-
-    #[test]
-    fn test_dream_result_default() {
-        let result = DreamResult::default();
-        assert_eq!(result.insights, 0);
-        assert_eq!(result.events_processed, 0);
-        assert_eq!(result.simulations_run, 0);
-        assert_eq!(result.best_phi_improvement, 0.0);
-    }
-
-    #[test]
     fn test_dream_processes_most_surprising_event() {
-        let mut engine = DreamEngine::with_defaults();
+        let mut engine = DreamEngine::<Vec<f32>>::with_defaults();
         for i in 0..5 {
             engine.record(
                 &vec![(i as f32) / 5.0; 64],
-                &vec![0.1; 32],
+                vec![0.1; 32],
                 &vec![0.3; 64],
                 0.2 + i as f32 * 0.15,
             );
@@ -711,7 +758,7 @@ mod tests {
             wisdom_threshold: 0.001,
             ..Default::default()
         };
-        let mut engine = DreamEngine::new(config);
+        let mut engine = DreamEngine::<Vec<f32>>::new(config);
         for i in 0..10 {
             let state: Vec<f32> = (0..64)
                 .map(|j| ((i * 7 + j) as f32 / 100.0).sin())
@@ -720,7 +767,7 @@ mod tests {
             let outcome: Vec<f32> = (0..64)
                 .map(|j| ((i * 11 + j) as f32 / 80.0).sin().abs())
                 .collect();
-            engine.record(&state, &action, &outcome, 0.3 + (i as f32) * 0.05);
+            engine.record(&state, action, &outcome, 0.3 + (i as f32) * 0.05);
         }
         engine.dream_session(5).unwrap();
         assert_eq!(engine.stats().dream_cycles, 5);

@@ -159,12 +159,12 @@ fn full_battery_report() {
 ///
 /// Fails on >10% degradation (critical) on any metric. Warns at >5%.
 /// To regenerate the baseline after intentional changes:
-///   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --snapshot baselines/v0.5.2.json
+///   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --snapshot baselines/v0.6.0.json
 #[test]
 fn regression_against_baseline() {
     let baseline_path = std::path::Path::new(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/baselines/v0.5.2.json"
+        "/baselines/v0.6.0.json"
     ));
 
     // Skip gracefully if no baseline snapshot exists yet
