@@ -50,6 +50,7 @@ use crate::partnership::{
 
 pub use crate::action::bindings::ActionRegistry;
 use crate::action::SimpleExecutor;
+use crate::consciousness::interoception::InteroceptionTag;
 
 #[cfg(feature = "school_learning")]
 use crate::school::curriculum::Curriculum;
@@ -59,6 +60,10 @@ use crate::school::curriculum_loader::{CurriculumLoader, CurriculumMeta, LoadErr
 use crate::school::curriculum_extender::CurriculumExtender;
 #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
 use crate::school::curriculum_extender::ResearchSummary;
+#[cfg(feature = "ssm-power")]
+use crate::ssm::power::PowerSsmSensor;
+#[cfg(feature = "school_learning")]
+use crate::school::polymath_drive::run_polymath_collisions;
 #[cfg(feature = "web_research_module")]
 use crate::web_research::WebResearcher;
 
@@ -328,6 +333,18 @@ fn parse_env_bool(value: &str) -> Option<bool> {
     }
 }
 
+#[cfg(feature = "ssm-power")]
+fn ssm_power_enabled() -> bool {
+    std::env::var("SYMTHAEA_POWER_SSM")
+        .ok()
+        .and_then(|v| match v.trim().to_lowercase().as_str() {
+            "1" | "true" | "yes" | "on" => Some(true),
+            "0" | "false" | "no" | "off" => Some(false),
+            _ => None,
+        })
+        .unwrap_or(false)
+}
+
 #[cfg(feature = "school_learning")]
 struct CurriculumRecallScores {
     scores: Vec<(f32, usize)>,
@@ -493,7 +510,7 @@ impl Symthaea {
         #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
         let autoresearch_config = AutonomousResearchConfig::from_env();
 
-        Ok(Self {
+        let mut instance = Self {
             mind,
             language,
             llm: llm.clone(),
@@ -541,7 +558,14 @@ impl Symthaea {
             last_autoresearch_at: None,
             #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
             last_autoresearch_topic: None,
-        })
+        };
+
+        #[cfg(feature = "ssm-power")]
+        if ssm_power_enabled() {
+            instance.attach_power_ssm_sensor()?;
+        }
+
+        Ok(instance)
     }
 
     /// Create a Symthaea instance with persistent database storage.
@@ -575,6 +599,14 @@ impl Symthaea {
     /// Cloneable handle to the consciousness database (if configured).
     pub fn database_arc(&self) -> Option<Arc<dyn ConsciousnessDatabase>> {
         self.database.as_ref().map(Arc::clone)
+    }
+
+    /// Attach the power SSM sensor (INA219 or simulated) to the sensor registry.
+    #[cfg(feature = "ssm-power")]
+    pub fn attach_power_ssm_sensor(&mut self) -> Result<()> {
+        let sensor = PowerSsmSensor::from_env()?;
+        self.mind.register_sensor(Box::new(sensor));
+        Ok(())
     }
 
     /// Create a streaming inference engine for real-time sensor-driven CfC processing.
@@ -908,6 +940,50 @@ impl Symthaea {
                 "Multi-domain entities detected"
             );
         }
+
+        // Interoceptive recall: pull thermodynamic load memories when relevant.
+        if let Some(ref db) = self.database {
+            if Self::should_recall_interoception(content) {
+                match db.list_all().await {
+                    Ok(records) => {
+                        let mut matches: Vec<_> = records
+                            .into_iter()
+                            .filter(|r| {
+                                r.topics
+                                    .iter()
+                                    .any(|t| t == InteroceptionTag::ThermodynamicLoad.as_topic())
+                            })
+                            .collect();
+                        matches.sort_by_key(|r| r.timestamp_ms);
+                        let mut recalled = 0usize;
+                        for record in matches.into_iter().rev().take(3) {
+                            let input = crate::mind::MindInput::new(
+                                crate::mind::InputType::Memory,
+                                record.encoding.to_continuous(),
+                            )
+                            .with_source(crate::memory::memory_coordinator::MemorySource::Internal)
+                            .with_verification(true);
+                            self.mind.input(input);
+                            recalled += 1;
+                        }
+                        if recalled > 0 {
+                            tracing::info!(
+                                target: "symthaea::memory",
+                                recalled,
+                                "Interoceptive recall injected thermodynamic load memories"
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        tracing::debug!(
+                            target: "symthaea::memory",
+                            error = %e,
+                            "Interoceptive recall skipped"
+                        );
+                    }
+                }
+            }
+        }
         let phase1_duration = phase1_start.elapsed();
 
         // ====================================================================
@@ -927,7 +1003,7 @@ impl Symthaea {
             .update_signals(snapshot.consciousness_level, snapshot.meta_awareness);
 
         // Drain evicted working memory items for graduation + persistence
-        let evicted = self.mind.take_evicted();
+        let evicted = self.mind.take_evicted_tagged();
         if !evicted.is_empty() {
             let current_phi = snapshot.consciousness_level;
             let current_coherence = snapshot.meta_awareness;
@@ -939,16 +1015,16 @@ impl Symthaea {
             );
 
             // Queue graduations for episodic consolidation
-            for (hv, steps_survived, source, is_verified) in &evicted {
+            for item in &evicted {
                 self.memory_coordinator.queue_graduation(GraduationEvent {
-                    content: hv.clone() as symthaea_core::hdc::unified_hv::ContinuousHV,
+                    content: item.content.clone() as symthaea_core::hdc::unified_hv::ContinuousHV,
                     label: format!("wm_eviction_step_{interaction_count}"),
-                    steps_survived: *steps_survived,
+                    steps_survived: item.steps_survived,
                     final_activation: 0.5,
                     psi_at_graduation: current_phi,
                     coherence_at_graduation: current_coherence,
-                    source: *source,
-                    is_verified: *is_verified,
+                    source: item.source,
+                    is_verified: item.is_verified,
                 });
             }
 
@@ -974,21 +1050,63 @@ impl Symthaea {
                     .as_millis() as u64;
 
                 tokio::spawn(async move {
-                    for (i, (hv, steps, _source, _verified)) in evicted.iter().enumerate() {
-                        let hv: &symthaea_core::hdc::unified_hv::ContinuousHV = hv;
+                    for (i, item) in evicted.iter().enumerate() {
+                        let hv = &item.content;
+                        let mut topics = item
+                            .metadata
+                            .get("topics")
+                            .and_then(|raw| serde_json::from_str::<Vec<String>>(raw).ok())
+                            .unwrap_or_default();
+                        let is_thermo = topics
+                            .iter()
+                            .any(|t| t == InteroceptionTag::ThermodynamicLoad.as_topic())
+                            || item
+                                .metadata
+                                .get("interoception_tag")
+                                .map(|t| t == InteroceptionTag::ThermodynamicLoad.as_topic())
+                                .unwrap_or(false);
+                        if is_thermo && !topics.iter().any(|t| t == InteroceptionTag::ThermodynamicLoad.as_topic()) {
+                            topics.push(InteroceptionTag::ThermodynamicLoad.as_topic().to_string());
+                        }
+                        let mut metadata = item.metadata.clone();
+                        metadata.remove("topics");
+                        metadata.insert(
+                            "steps_survived".to_string(),
+                            item.steps_survived.to_string(),
+                        );
+                        let metadata_json =
+                            serde_json::to_string(&metadata).unwrap_or_else(|_| "{}".to_string());
+                        let content = if is_thermo {
+                            let watts = item
+                                .metadata
+                                .get("watts")
+                                .cloned()
+                                .unwrap_or_else(|| "unknown".to_string());
+                            let ssm = item
+                                .metadata
+                                .get("ssm_output")
+                                .cloned()
+                                .unwrap_or_else(|| "unknown".to_string());
+                            format!(
+                                "Thermodynamic load reading: watts={watts}, ssm_output={ssm}"
+                            )
+                        } else {
+                            format!(
+                                "Working memory eviction at step {interaction_count} (survived {} ticks)",
+                                item.steps_survived
+                            )
+                        };
                         let record = MemoryRecord {
                             id: format!("wm-{timestamp_ms}-{i}"),
                             memory_type: MemoryType::Working,
                             encoding: hv.to_binary(0.0),
-                            content: format!(
-                                "Working memory eviction at step {interaction_count} (survived {steps} ticks)"
-                            ),
+                            content,
                             timestamp_ms,
                             valence: 0.0,
                             arousal: 0.0,
                             psi: current_phi,
-                            topics: vec![],
-                            metadata: format!("{{\"steps_survived\":{steps}}}"),
+                            topics,
+                            metadata: metadata_json,
                             consolidation_strength: 0.0,
                             retrieval_count: 0,
                         };
@@ -1396,9 +1514,17 @@ impl Symthaea {
                                     crate::action::ActionOutcome::DirectoryListing(entries) => {
                                         format!("Listed {} directory entries", entries.len())
                                     },
-                                    crate::action::ActionOutcome::SimulatedCommand { program, args } => {
-                                        format!("Simulated command: {} {}", program, args.join(" "))
-                                    }
+                                    crate::action::ActionOutcome::SensorData { sensor_id, values } => {
+                                        format!("Read sensor {} with {} channel(s)", sensor_id, values.len())
+                                    },
+                                    crate::action::ActionOutcome::ServoStatus { servo_id, current_value } => {
+                                        format!("Servo {} moved to {}", servo_id, current_value)
+                                    },
+                                    crate::action::ActionOutcome::WasmResult { output, logs } => {
+                                        let status = if !output.is_empty() && output[0] == 1 { "SUCCESS" } else { "FAILURE" };
+                                        format!("WASM Verification {}: {}", status, logs.join("; "))
+                                    },
+                                    _ => "Action completed".to_string(),
                                 };
                                 
                                 // Feedback loop: perception of action result
@@ -1775,6 +1901,19 @@ impl Symthaea {
             self.mind.tick();
         }
 
+        #[cfg(feature = "school_learning")]
+        {
+            if let Err(e) = run_polymath_collisions(
+                &mut self.llm,
+                &self.curriculum,
+                self.database.clone(),
+            )
+            .await
+            {
+                tracing::warn!(error = %e, "Polymath Drive collision synthesis failed");
+            }
+        }
+
         let after_count = self.mind.working_memory().len();
         let consolidated = before_count.saturating_sub(after_count);
 
@@ -1877,6 +2016,11 @@ impl Symthaea {
     /// working memory, seeding status, and internal state.
     pub fn mind(&self) -> &ContinuousMind {
         &self.mind
+    }
+
+    /// Get a mutable reference to the mind for manual ticking/debug flows.
+    pub fn mind_mut(&mut self) -> &mut ContinuousMind {
+        &mut self.mind
     }
 
     /// Extract current social signals (trust, cooperation_rate) from Mind's SocialCoherence.
@@ -2357,6 +2501,17 @@ impl Symthaea {
         CurriculumRecallScores { scores, candidates }
     }
 
+    fn should_recall_interoception(content: &str) -> bool {
+        let lower = content.to_lowercase();
+        lower.contains("watt")
+            || lower.contains("joule")
+            || lower.contains("power")
+            || lower.contains("energy")
+            || lower.contains("thermodynamic")
+            || lower.contains("ina219")
+            || lower.contains("interoception")
+    }
+
     /// Compute current Phi-dyad value.
     fn compute_phi_dyad(&self) -> f64 {
         if self.recent_ai_states.is_empty() {
@@ -2401,6 +2556,73 @@ impl Symthaea {
         };
 
         self.dyad_calculator.compute(&input).phi_dyad
+    }
+
+    /// RECEIVE SWARM MESSAGE (Immune System Constraint)
+    ///
+    /// When a node receives a broadcasted optimization, it MUST NOT merge it 
+    /// directly into its core DNA. Instead, it is saved as a 'Candidate Objective'
+    /// for local verification.
+    pub async fn receive_swarm_message(&mut self, topic: &str, payload: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+        if topic == "optimization" {
+            let content = String::from_utf8_lossy(payload);
+            tracing::info!(target: "symthaea::swarm", "Received swarm optimization: {}. Storing as Candidate for local verification.", content);
+
+            // THE FORGE: If the payload is a path to a .wasm file, trigger verification loop
+            if content.ends_with(".wasm") {
+                let wasm_path = PathBuf::from(content.to_string());
+                tracing::info!(target: "symthaea::forge", "WASM Binary detected: {:?}. Initiating autonomous verification.", wasm_path);
+                
+                // Trigger internal autonomous command
+                let verify_cmd = format!("Verify the WASM optimization at {:?} in the sandbox. If successful, promote to Verified and hot-load the DNA.", wasm_path);
+                let _ = self.process(&verify_cmd).await?;
+            }
+
+            let description = format!("Swarm optimization candidate: {content}");
+            let hv = self.text_to_hv(&description);
+
+            if let Some(db) = &self.database {
+                let record = MemoryRecord {
+                    id: format!("swarm_{}", uuid::Uuid::new_v4()),
+                    memory_type: MemoryType::Semantic,
+                    encoding: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(&hv),
+                    content: description.clone(),
+                    timestamp_ms: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as u64,
+                    valence: 0.1,
+                    arousal: 0.4,
+                    psi: self.mind.snapshot().consciousness_level as f64,
+                    topics: vec!["swarm".to_string(), "optimization".to_string()],
+                    metadata: format!("{{\"topic\":\"{}\"}}", topic),
+                    consolidation_strength: 0.0,
+                    retrieval_count: 0,
+                };
+                db.store(record).await?;
+            }
+
+            self.mind.perceive(hv);
+        }
+        
+        Ok(())
+    }
+
+    /// APPLY COGNITIVE HOMEOSTASIS (The Biological Throttle)
+    ///
+    /// Adjust the cognitive stride based on power consumption.
+    pub fn apply_homeostasis(&mut self, current_power_watts: f32) {
+        use symthaea_core::hdc::unified_hv::set_cognitive_stride;
+
+        if current_power_watts > 5.0 {
+            tracing::warn!(target: "symthaea::homeostasis", "Power spike detected ({:.2}W). Throttling cognitive resolution (Stride 8).", current_power_watts);
+            set_cognitive_stride(8);
+        } else if current_power_watts < 3.0 {
+            tracing::info!(target: "symthaea::homeostasis", "Power stable ({:.2}W). Increasing cognitive resolution (Stride 1).", current_power_watts);
+            set_cognitive_stride(1);
+        } else {
+            set_cognitive_stride(4); // Balanced resolution
+        }
     }
 }
 

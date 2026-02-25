@@ -1017,6 +1017,22 @@ impl ConsciousnessLanguageCore {
             primitives.push("READ".to_string());
         }
 
+        // 3. HAL Primitives grounding
+        if lower.contains("power") || lower.contains("sensor") || lower.contains("voltage") || lower.contains("ina219") {
+            primitives.push("READ_SENSOR".to_string());
+        }
+        if lower.contains("servo") || lower.contains("joint") || lower.contains("move") || lower.contains("actuator") {
+            primitives.push("WRITE_SERVO".to_string());
+        }
+
+        if lower.contains("share") || lower.contains("broadcast") || lower.contains("tell the others") || lower.contains("swarm") || lower.contains("gossip") {
+            primitives.push("SWARM_GOSSIP".to_string());
+        }
+
+        if lower.contains("wasm") || lower.contains("sandbox") || lower.contains("verify") || lower.contains("binary") {
+            primitives.push("WASM_VERIFY".to_string());
+        }
+
         primitives
     }
 
