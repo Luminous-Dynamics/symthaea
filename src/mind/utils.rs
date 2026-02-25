@@ -2,9 +2,8 @@
 
 use symthaea_core::hdc::ContinuousHV;
 
-/// Epsilon for floating-point comparisons.
-/// Used to avoid direct equality comparisons on f32/f64 values.
-pub const EPSILON: f64 = 1e-9;
+/// Floating point epsilon for comparisons
+pub const EPSILON: f64 = 1e-10;
 pub const EPSILON_F32: f32 = 1e-6;
 
 /// Check if two f64 values are approximately equal within epsilon tolerance.

@@ -362,6 +362,9 @@ pub struct DatabaseStats {
 // Database Trait
 // ============================================================================
 
+use crate::school::curriculum::Curriculum;
+use symthaea_dream::CausalLink;
+
 /// Trait for consciousness database backends.
 ///
 /// Defines the interface that all database implementations must provide.
@@ -433,6 +436,26 @@ pub trait ConsciousnessDatabase: Send + Sync {
     /// Default implementation returns an empty vec. Backends should override
     /// this to provide a full scan without similarity computation.
     async fn list_all(&self) -> DbResult<Vec<MemoryRecord>> {
+        Ok(Vec::new())
+    }
+
+    /// Store a curriculum into the database.
+    async fn store_curriculum(&self, _curriculum: &Curriculum) -> DbResult<()> {
+        Ok(())
+    }
+
+    /// Retrieve all curricula from the database.
+    async fn get_curricula(&self) -> DbResult<Vec<Curriculum>> {
+        Ok(Vec::new())
+    }
+
+    /// Store causal links into the database.
+    async fn store_causal_links(&self, _links: &[CausalLink]) -> DbResult<()> {
+        Ok(())
+    }
+
+    /// Retrieve all causal links from the database.
+    async fn get_causal_links(&self) -> DbResult<Vec<CausalLink>> {
         Ok(Vec::new())
     }
 }

@@ -67,7 +67,7 @@ rayon = "1.10"
 
 [package]
 name = "symthaea"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Symthaea: Holographic Liquid Brain lineage - Consciousness-first AI in Rust"
@@ -260,6 +260,7 @@ image = "0.24"       # Image loading and processing
 tree-sitter = { workspace = true }
 syn = { version = "2.0", features = ["full", "visit"] }  # Rust syntax parsing (self-analysis)
 ignore = "0.4"       # .gitignore-aware file walking
+urlencoding = "2.1"
 
 # Week 12 Phase 2a: Voice Output (Larynx) - Kokoro TTS (optional)
 # Also used for Qwen3-Embedding and SigLIP vision models
@@ -311,6 +312,9 @@ wait-timeout = "0.2"
 
 [features]
 default = []
+
+# ── Test Scopes ────────────────────────────────────────────────────
+integration-tests = []                      # Enable heavier integration/e2e test suites
 
 # ── Binary build gates ──────────────────────────────────────────────
 # These enable optional dependencies for specific binaries.
@@ -895,6 +899,23 @@ required-features = ["vocal-tract"]
 [[example]]
 name = "vocal_tract_benchmark"
 required-features = ["vocal-tract"]
+
+[[example]]
+name = "awakening_demo"
+
+[[example]]
+name = "real_world_test"
+
+[[example]]
+name = "meta_study"
+required-features = ["web_research_module", "school_learning"]
+
+[[example]]
+name = "evolutionary_audit"
+
+[[example]]
+name = "curriculum_research_bench"
+required-features = ["web_research_module", "school_learning"]
 
 # Benchmarks
 # Quick suite for CI (~5 min)

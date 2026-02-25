@@ -99,21 +99,29 @@
 //! | Reality check | <1μs | Simple comparison |
 //! | Full learn cycle | ~1ms | Including Φ measurement |
 
-mod assessment;
-mod curriculum;
-mod curriculum_loader;
-mod objective;
-mod reality_check;
+pub mod assessment;
+pub mod curriculum;
+#[cfg(feature = "web_research_module")]
+pub mod curriculum_extender;
+pub mod curriculum_loader;
+pub mod objective;
+pub mod reality_check;
 
-mod coherence_bridge;
-mod lookahead;
+pub mod coherence_bridge;
+pub mod lookahead;
 
 pub use assessment::{
     AssessmentStats, AssessmentTracker, CurriculumProgress, MasteryDistribution, MasteryLevel,
     ObjectiveProgress,
 };
 pub use curriculum::{Curriculum, CurriculumBuilder, CurriculumType};
-pub use curriculum_loader::{CurriculumLoader, CurriculumSpec, LoadError, ObjectiveSpec};
+#[cfg(feature = "web_research_module")]
+pub use curriculum_extender::{
+    CurriculumExtender, ResearchSummary, CURRICULUM_ARCHITECT_PROMPT,
+};
+pub use curriculum_loader::{
+    CurriculumLoader, CurriculumMeta, CurriculumSpec, CurriculumStore, LoadError, ObjectiveSpec,
+};
 pub use objective::{Difficulty, Domain, LearningObjective, ObjectiveBuilder};
 pub use reality_check::{CorrectionStrategy, RealityCheckResult, RealityChecker};
 

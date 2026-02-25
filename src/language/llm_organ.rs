@@ -227,7 +227,10 @@ pub struct LLMQueryParams {
     pub stop_sequences: Vec<String>,
 }
 
+use std::sync::Arc;
+
 /// The LLM organ system
+#[derive(Clone)]
 pub struct LLMOrgan {
     /// Configuration
     config: LLMOrganConfig,
@@ -238,7 +241,7 @@ pub struct LLMOrgan {
     /// Statistics
     stats: LLMOrganStats,
     /// Optional LLM backend for real generation
-    backend: Option<Box<dyn super::llm_backend::LLMBackend>>,
+    backend: Option<Arc<dyn super::llm_backend::LLMBackend>>,
 }
 
 impl std::fmt::Debug for LLMOrgan {
@@ -286,7 +289,7 @@ impl LLMOrgan {
     /// Create a new LLM organ with a backend for real generation.
     pub fn with_backend(
         config: LLMOrganConfig,
-        backend: Box<dyn super::llm_backend::LLMBackend>,
+        backend: Arc<dyn super::llm_backend::LLMBackend>,
     ) -> Self {
         Self {
             config,

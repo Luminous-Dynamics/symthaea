@@ -25,7 +25,7 @@ pub use utils::{
     float_eq, float_eq_f32, is_nonzero, is_nonzero_f32, is_zero, is_zero_f32, EPSILON, EPSILON_F32,
 };
 
-use std::collections::HashMap;
+use crate::memory::memory_coordinator::MemorySource;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Maximum number of messages retained in unbounded outboxes (federated, social, mesh).
@@ -76,6 +76,10 @@ pub struct ContinuousMind {
     /// Arrival tick for each working memory item (parallel array).
     /// Used to compute accurate `steps_survived` on eviction.
     pub(crate) working_memory_ticks: Vec<u64>,
+    /// Source of each working memory item.
+    pub(crate) working_memory_sources: Vec<MemorySource>,
+    /// Verification status of each working memory item.
+    pub(crate) working_memory_verified: Vec<bool>,
     /// Goal stack
     pub(crate) goals: Vec<Goal>,
     /// Input queue
@@ -100,11 +104,8 @@ pub struct ContinuousMind {
     /// Outgoing gradient messages to broadcast to peers.
     pub(crate) federated_outbox: Vec<crate::swarm::GradientMessage>,
     /// Buffer of items evicted from working memory when capacity is exceeded.
-    /// Each entry is `(hypervector, steps_survived)` where `steps_survived`
-    /// is `current_tick - arrival_tick` at the moment of eviction.
-    /// Consuming code can drain this via `take_evicted()` and route items
-    /// to episodic memory or the MemoryCoordinator for graduation.
-    evicted_items: Vec<(ContinuousHV, u64)>,
+    /// Each entry is `(hypervector, steps_survived, source, is_verified)`
+    evicted_items: Vec<(ContinuousHV, u64, MemorySource, bool)>,
     /// Relational Ψ from the partnership module's Φ_dyad computation.
     /// Fed back each cycle to modulate consciousness: higher relational Ψ
     /// boosts integration when the partnership is healthy.
@@ -211,6 +212,8 @@ impl ContinuousMind {
             },
             working_memory: Vec::new(),
             working_memory_ticks: Vec::new(),
+            working_memory_sources: Vec::new(),
+            working_memory_verified: Vec::new(),
             goals: Vec::new(),
             input_queue: Vec::new(),
             stats: MindStats::default(),
@@ -292,12 +295,7 @@ impl ContinuousMind {
 
     /// Add a perception input
     pub fn perceive(&mut self, content: ContinuousHV) {
-        self.input(MindInput {
-            input_type: InputType::Perception,
-            content,
-            priority: 0.5,
-            metadata: HashMap::new(),
-        });
+        self.input(MindInput::new(InputType::Perception, content));
     }
 
     /// Set the original input text for intent classification.
@@ -326,7 +324,9 @@ impl ContinuousMind {
     /// Combines HDC encoding with text-based intent classification.
     pub fn perceive_text(&mut self, text: &str, embedding: ContinuousHV) {
         self.last_input_text = Some(text.to_string());
-        self.perceive(embedding);
+        let input = MindInput::new(InputType::Language, embedding)
+            .with_source(MemorySource::UserInteraction);
+        self.input(input);
     }
 
     /// Set a goal
@@ -336,15 +336,11 @@ impl ContinuousMind {
         embedding: ContinuousHV,
         priority: f32,
     ) {
-        let mut metadata = HashMap::new();
-        metadata.insert("description".to_string(), description.into());
+        let mut input = MindInput::new(InputType::Goal, embedding);
+        input.priority = priority;
+        input.metadata.insert("description".to_string(), description.into());
 
-        self.input(MindInput {
-            input_type: InputType::Goal,
-            content: embedding,
-            priority,
-            metadata,
-        });
+        self.input(input);
     }
 
     /// Activate the mind
@@ -384,10 +380,8 @@ impl ContinuousMind {
 
     /// Drain items evicted from working memory since the last call.
     ///
-    /// Returns `(hypervector, steps_survived)` pairs. `steps_survived` is the
-    /// number of ticks the item spent in working memory before eviction.
-    /// These can be routed to the MemoryCoordinator for graduation.
-    pub fn take_evicted(&mut self) -> Vec<(ContinuousHV, u64)> {
+    /// Returns `(hypervector, steps_survived, source, is_verified)` tuples.
+    pub fn take_evicted(&mut self) -> Vec<(ContinuousHV, u64, MemorySource, bool)> {
         std::mem::take(&mut self.evicted_items)
     }
 
@@ -864,6 +858,8 @@ impl ContinuousMind {
             // Store in working memory (tick 0 = genesis seeding)
             self.working_memory.push(hv);
             self.working_memory_ticks.push(0);
+            self.working_memory_sources.push(MemorySource::Internal);
+            self.working_memory_verified.push(true);
 
             tracing::debug!(
                 target: "symthaea::mind::seeding",
@@ -995,6 +991,7 @@ impl ContinuousMind {
             constraints: Vec::new(),
             original_input: None,
             primitive_tiers: Vec::new(), // Populated by Symthaea facade from language grounding
+            primitives: Vec::new(),      // Populated by Symthaea facade from language grounding
         }
     }
 

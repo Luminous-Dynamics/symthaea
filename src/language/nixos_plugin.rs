@@ -207,6 +207,19 @@ impl DomainPlugin for NixOsPlugin {
             }
         }
 
+        // Extract File Paths (absolute or relative with extensions)
+        let path_re = regex::Regex::new(r"(/[a-zA-Z0-9._\-/]+)|([a-zA-Z0-9._\-]+/[a-zA-Z0-9._\-/]+\.[a-z]+)").unwrap();
+        for mat in path_re.find_iter(text) {
+            let path = mat.as_str();
+            // Basic sanity check: must contain a dot (for extension) or a slash
+            if path.contains('.') || path.contains('/') {
+                entities.push(
+                    Entity::new("file", path, mat.start(), mat.end())
+                        .with_confidence(0.8)
+                );
+            }
+        }
+
         // Keyword-based concept extraction for common NixOS topics.
         // This ensures natural language queries like "How do I enable nginx?"
         // produce entities even when no structured syntax (pkgs., services.) appears.

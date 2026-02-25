@@ -5,6 +5,8 @@
 //! entry point for autonomous web research.
 
 use anyhow::{Context, Result};
+use serde_json::Value;
+use std::collections::HashSet;
 use std::time::Duration;
 
 use super::extractor::{ContentExtractor, ContentType};
@@ -167,39 +169,256 @@ impl WebResearcher {
             queries.push(format!("{} site:docs.python.org", query));
         }
 
+        if lower.contains("state space")
+            || lower.contains("ssm")
+            || lower.contains("liquid time")
+            || lower.contains("mamba")
+            || lower.contains("selective scan")
+        {
+            queries.push(format!("{} arxiv", query));
+            queries.push(format!("{} research paper", query));
+            queries.push(format!("{} openreview", query));
+        }
+
         queries
     }
 
     /// Fetch search results for a query
     ///
     /// Returns URLs to fetch. In production, this would use a search API.
-    /// Currently returns mock results for demonstration.
+    /// Improved heuristic targeting high-quality technical domains.
     async fn fetch_search_results(&self, query: &str) -> Result<Vec<String>> {
-        // In a real implementation, this would call a search API
-        // For now, we construct likely URLs based on the query
         let mut urls = Vec::new();
         let query_lower = query.to_lowercase();
+        let encoded_query = urlencoding::encode(query);
 
-        // Add domain-specific URLs based on query content
+        // 0. External search provider (optional)
+        if let Ok(provider_urls) = self.search_with_provider(query).await {
+            urls.extend(provider_urls);
+        }
+
+        if self.config.enable_arxiv_api
+            && (query_lower.contains("arxiv")
+                || query_lower.contains("paper")
+                || query_lower.contains("research")
+                || query_lower.contains("state space")
+                || query_lower.contains("ssm")
+                || query_lower.contains("liquid time")
+                || query_lower.contains("mamba")
+                || query_lower.contains("selective scan"))
+        {
+            if let Ok(arxiv_urls) = self.search_arxiv_api(query).await {
+                urls.extend(arxiv_urls);
+            }
+        }
+
+        if self.config.enable_openreview_api
+            && (query_lower.contains("openreview")
+                || query_lower.contains("paper")
+                || query_lower.contains("research")
+                || query_lower.contains("state space")
+                || query_lower.contains("ssm")
+                || query_lower.contains("liquid time")
+                || query_lower.contains("mamba")
+                || query_lower.contains("selective scan"))
+        {
+            if let Ok(or_urls) = self.search_openreview_api(query).await {
+                urls.extend(or_urls);
+            }
+        }
+
+        // 1. Target high-authority technical domains
         if query_lower.contains("rust") {
             urls.push("https://doc.rust-lang.org/book/".to_string());
-            urls.push("https://rust-lang.org/".to_string());
+            urls.push("https://docs.rs/".to_string());
+            urls.push(format!("https://github.com/search?q={}+language%3ARust", encoded_query));
         }
 
         if query_lower.contains("nix") || query_lower.contains("nixos") {
             urls.push("https://nixos.org/manual/nixos/stable/".to_string());
             urls.push("https://nixos.wiki/".to_string());
+            urls.push("https://search.nixos.org/packages".to_string());
+        }
+
+        if query_lower.contains("hdc") || query_lower.contains("hypervector") {
+            urls.push("https://en.wikipedia.org/wiki/Hyperdimensional_computing".to_string());
+            urls.push("https://arxiv.org/abs/2112.15425".to_string()); // Standard HDC reference
         }
 
         if query_lower.contains("python") {
             urls.push("https://docs.python.org/3/".to_string());
+            urls.push("https://pypi.org/".to_string());
         }
 
-        // Always include Wikipedia as a baseline
+        if query_lower.contains("science") || query_lower.contains("research") || query_lower.contains("paper") {
+            urls.push("https://arxiv.org/search/".to_string());
+            urls.push("https://scholar.google.com/".to_string());
+        }
+
+        if query_lower.contains("kernel") || query_lower.contains("linux") {
+            urls.push("https://www.kernel.org/doc/html/latest/".to_string());
+        }
+
+        if query_lower.contains("state space")
+            || query_lower.contains("ssm")
+            || query_lower.contains("liquid time")
+            || query_lower.contains("mamba")
+            || query_lower.contains("selective scan")
+        {
+            urls.push(format!(
+                "https://arxiv.org/search/?query={}&searchtype=all&source=header",
+                encoded_query
+            ));
+            urls.push(format!(
+                "https://openreview.net/search?term={}",
+                encoded_query
+            ));
+        }
+
+        // 2. Add DuckDuckGo Search Link (for extraction-based crawling if supported)
+        urls.push(format!("https://duckduckgo.com/?q={}", encoded_query));
+
+        // 3. Always include Wikipedia and StackOverflow search
         let wiki_query = query.replace(' ', "_");
         urls.push(format!("https://en.wikipedia.org/wiki/{}", wiki_query));
+        urls.push(format!("https://stackoverflow.com/search?q={}", encoded_query));
+
+        let mut seen = HashSet::new();
+        urls.retain(|url| seen.insert(url.clone()));
 
         Ok(urls)
+    }
+
+    async fn search_with_provider(&self, query: &str) -> Result<Vec<String>> {
+        let provider = match self.config.search_provider.as_deref() {
+            Some(provider) => provider.trim().to_lowercase(),
+            None => return Ok(Vec::new()),
+        };
+
+        match provider.as_str() {
+            "serper" => self.search_serper(query).await,
+            "brave" => self.search_brave(query).await,
+            "searxng" | "searx" => self.search_searxng(query).await,
+            _ => Ok(Vec::new()),
+        }
+    }
+
+    async fn search_serper(&self, query: &str) -> Result<Vec<String>> {
+        let api_key = match self.config.search_api_key.as_deref() {
+            Some(key) if !key.is_empty() => key,
+            _ => return Ok(Vec::new()),
+        };
+        let endpoint = self
+            .config
+            .search_endpoint
+            .as_deref()
+            .unwrap_or("https://google.serper.dev/search");
+
+        let body = serde_json::json!({
+            "q": query,
+            "num": 10
+        });
+
+        let response = self
+            .client
+            .post(endpoint)
+            .header("X-API-KEY", api_key)
+            .header("Accept", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .context("Serper search request failed")?;
+
+        let json: Value = response.json().await.context("Serper JSON parse failed")?;
+        Ok(extract_links(&json, &["organic"], "link"))
+    }
+
+    async fn search_brave(&self, query: &str) -> Result<Vec<String>> {
+        let api_key = match self.config.search_api_key.as_deref() {
+            Some(key) if !key.is_empty() => key,
+            _ => return Ok(Vec::new()),
+        };
+        let endpoint = self
+            .config
+            .search_endpoint
+            .as_deref()
+            .unwrap_or("https://api.search.brave.com/res/v1/web/search");
+        let url = format!("{endpoint}?q={}", urlencoding::encode(query));
+
+        let response = self
+            .client
+            .get(url)
+            .header("X-Subscription-Token", api_key)
+            .header("Accept", "application/json")
+            .send()
+            .await
+            .context("Brave search request failed")?;
+
+        let json: Value = response.json().await.context("Brave JSON parse failed")?;
+        Ok(extract_links(&json, &["web", "results"], "url"))
+    }
+
+    async fn search_searxng(&self, query: &str) -> Result<Vec<String>> {
+        let endpoint = self
+            .config
+            .search_endpoint
+            .as_deref()
+            .unwrap_or("https://searx.be");
+        let endpoint = endpoint.trim_end_matches('/');
+        let url = format!(
+            "{}/search?q={}&format=json",
+            endpoint,
+            urlencoding::encode(query)
+        );
+
+        let response = self
+            .client
+            .get(url)
+            .header("Accept", "application/json")
+            .send()
+            .await
+            .context("SearXNG search request failed")?;
+
+        let json: Value = response.json().await.context("SearXNG JSON parse failed")?;
+        Ok(extract_links(&json, &["results"], "url"))
+    }
+
+    async fn search_arxiv_api(&self, query: &str) -> Result<Vec<String>> {
+        let search_query = format!("all:{}", query);
+        let encoded_query = urlencoding::encode(&search_query);
+        let url = format!(
+            "{}?search_query={}&start=0&max_results=8",
+            self.config.arxiv_endpoint, encoded_query
+        );
+
+        let response = self
+            .client
+            .get(url)
+            .send()
+            .await
+            .context("arXiv API request failed")?;
+
+        let body = response.text().await.context("arXiv API read failed")?;
+        Ok(extract_arxiv_ids(&body))
+    }
+
+    async fn search_openreview_api(&self, query: &str) -> Result<Vec<String>> {
+        let endpoint = self.config.openreview_endpoint.trim_end_matches('/');
+        let encoded_query = urlencoding::encode(query);
+        let url = format!("{endpoint}?term={encoded_query}");
+
+        let mut request = self.client.get(url).header("Accept", "application/json");
+        if let Some(token) = self.config.openreview_token.as_deref() {
+            request = request.header("Cookie", format!("openreview.accessToken={token}"));
+        }
+
+        let response = request.send().await.context("OpenReview search failed")?;
+        let json: Value = response
+            .json()
+            .await
+            .context("OpenReview JSON parse failed")?;
+
+        Ok(extract_openreview_ids(&json))
     }
 
     /// Fetch and extract content from a URL
@@ -373,6 +592,72 @@ impl WebResearcher {
     pub fn verifier_mut(&mut self) -> &mut EpistemicVerifier {
         &mut self.verifier
     }
+}
+
+fn extract_links(json: &Value, path: &[&str], key: &str) -> Vec<String> {
+    let mut cursor = json;
+    for segment in path {
+        if let Some(next) = cursor.get(*segment) {
+            cursor = next;
+        } else {
+            return Vec::new();
+        }
+    }
+
+    let mut urls = Vec::new();
+    if let Some(entries) = cursor.as_array() {
+        for entry in entries {
+            if let Some(url) = entry.get(key).and_then(|v| v.as_str()) {
+                urls.push(url.to_string());
+            }
+        }
+    }
+
+    urls
+}
+
+fn extract_arxiv_ids(feed: &str) -> Vec<String> {
+    let mut urls = Vec::new();
+    for chunk in feed.split("<entry>").skip(1) {
+        if let Some(start) = chunk.find("<id>") {
+            if let Some(end) = chunk[start + 4..].find("</id>") {
+                let raw = &chunk[start + 4..start + 4 + end];
+                let trimmed = raw.trim();
+                if trimmed.contains("arxiv.org/abs/") {
+                    let url = trimmed.replace("http://", "https://");
+                    urls.push(url);
+                }
+            }
+        }
+    }
+    urls
+}
+
+fn extract_openreview_ids(json: &Value) -> Vec<String> {
+    let mut urls = Vec::new();
+
+    let candidates = if let Some(notes) = json.get("notes").and_then(|v| v.as_array()) {
+        notes
+    } else if let Some(data) = json.get("data").and_then(|v| v.as_array()) {
+        data
+    } else if let Some(arr) = json.as_array() {
+        arr
+    } else {
+        return urls;
+    };
+
+    for entry in candidates {
+        let id = entry
+            .get("id")
+            .and_then(|v| v.as_str())
+            .or_else(|| entry.get("note").and_then(|v| v.get("id")).and_then(|v| v.as_str()))
+            .or_else(|| entry.get("forum").and_then(|v| v.as_str()));
+        if let Some(id) = id {
+            urls.push(format!("https://openreview.net/forum?id={id}"));
+        }
+    }
+
+    urls
 }
 
 /// Error returned when WebResearcher creation fails
