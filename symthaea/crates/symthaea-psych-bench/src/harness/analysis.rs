@@ -748,6 +748,213 @@ pub fn spearman_correlation(x: &[f64], y: &[f64]) -> f64 {
     }
 }
 
+/// Simple xorshift64 PRNG for bootstrap resampling.
+///
+/// Deterministic given a seed; avoids pulling in `rand` for resampling.
+fn xorshift64(state: &mut u64) -> u64 {
+    let mut s = *state;
+    // Guard against seed-0 fixed point
+    if s == 0 {
+        s ^= 0x9E3779B97F4A7C15;
+    }
+    s ^= s << 13;
+    s ^= s >> 7;
+    s ^= s << 17;
+    *state = s;
+    s
+}
+
+/// Compute a bootstrap confidence interval for the mean.
+///
+/// Resamples `samples` with replacement `n_resamples` times, computes the mean
+/// of each resample, and returns the `(alpha/2, 1-alpha/2)` percentiles of the
+/// bootstrap distribution as the CI bounds.
+///
+/// # Arguments
+/// - `samples`: observed data
+/// - `n_resamples`: number of bootstrap resamples (default: 2000)
+/// - `alpha`: significance level (e.g. 0.05 for 95% CI)
+/// - `seed`: RNG seed for reproducibility
+pub fn bootstrap_ci(samples: &[f64], n_resamples: usize, alpha: f64, seed: u64) -> (f64, f64) {
+    let n = samples.len();
+    if n == 0 {
+        return (0.0, 0.0);
+    }
+    if n == 1 {
+        return (samples[0], samples[0]);
+    }
+
+    let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
+    let mut boot_means = Vec::with_capacity(n_resamples);
+
+    for _ in 0..n_resamples {
+        let mut sum = 0.0;
+        for _ in 0..n {
+            let idx = (xorshift64(&mut rng_state) as usize) % n;
+            sum += samples[idx];
+        }
+        boot_means.push(sum / n as f64);
+    }
+
+    boot_means.sort_by(|a, b| a.total_cmp(b));
+
+    let lo_idx = ((alpha / 2.0) * boot_means.len() as f64).floor() as usize;
+    let hi_idx = ((1.0 - alpha / 2.0) * boot_means.len() as f64).ceil() as usize;
+    let lo_idx = lo_idx.min(boot_means.len().saturating_sub(1));
+    let hi_idx = hi_idx.min(boot_means.len().saturating_sub(1));
+
+    (boot_means[lo_idx], boot_means[hi_idx])
+}
+
+/// Compute a BCa (bias-corrected and accelerated) bootstrap confidence interval.
+///
+/// BCa adjusts for both bias and skewness in the bootstrap distribution via
+/// jackknife-estimated acceleration and bias-correction factors.
+///
+/// Reference: Efron & Tibshirani (1993), "An Introduction to the Bootstrap", Ch. 14.
+///
+/// # Arguments
+/// - `samples`: observed data
+/// - `n_resamples`: number of bootstrap resamples (default: 2000)
+/// - `alpha`: significance level (e.g. 0.05 for 95% CI)
+/// - `seed`: RNG seed for reproducibility
+pub fn bootstrap_ci_bca(samples: &[f64], n_resamples: usize, alpha: f64, seed: u64) -> (f64, f64) {
+    let n = samples.len();
+    if n == 0 {
+        return (0.0, 0.0);
+    }
+    if n == 1 {
+        return (samples[0], samples[0]);
+    }
+
+    let observed_mean = samples.iter().sum::<f64>() / n as f64;
+
+    // Generate bootstrap distribution
+    let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
+    let mut boot_means = Vec::with_capacity(n_resamples);
+
+    for _ in 0..n_resamples {
+        let mut sum = 0.0;
+        for _ in 0..n {
+            let idx = (xorshift64(&mut rng_state) as usize) % n;
+            sum += samples[idx];
+        }
+        boot_means.push(sum / n as f64);
+    }
+
+    boot_means.sort_by(|a, b| a.total_cmp(b));
+
+    // Bias correction factor (z0): proportion of bootstrap means < observed mean
+    let below_count = boot_means.iter().filter(|&&x| x < observed_mean).count();
+    let p = below_count as f64 / n_resamples as f64;
+    let z0 = inv_normal_cdf(p.clamp(0.001, 0.999));
+
+    // Acceleration factor (a): jackknife estimate
+    let nf = n as f64;
+    let jackknife_means: Vec<f64> = (0..n)
+        .map(|i| {
+            let sum: f64 = samples.iter().enumerate()
+                .filter(|&(j, _)| j != i)
+                .map(|(_, &x)| x)
+                .sum();
+            sum / (nf - 1.0)
+        })
+        .collect();
+    let jack_mean = jackknife_means.iter().sum::<f64>() / nf;
+    let num: f64 = jackknife_means.iter().map(|&x| (jack_mean - x).powi(3)).sum();
+    let den: f64 = jackknife_means.iter().map(|&x| (jack_mean - x).powi(2)).sum();
+    let a = if den.abs() > 1e-15 {
+        num / (6.0 * den.powf(1.5))
+    } else {
+        0.0
+    };
+
+    // Adjusted percentiles
+    let z_alpha_lo = inv_normal_cdf(alpha / 2.0);
+    let z_alpha_hi = inv_normal_cdf(1.0 - alpha / 2.0);
+
+    let adj_lo = normal_cdf(z0 + (z0 + z_alpha_lo) / (1.0 - a * (z0 + z_alpha_lo)));
+    let adj_hi = normal_cdf(z0 + (z0 + z_alpha_hi) / (1.0 - a * (z0 + z_alpha_hi)));
+
+    let lo_idx = (adj_lo * boot_means.len() as f64).floor() as usize;
+    let hi_idx = (adj_hi * boot_means.len() as f64).ceil() as usize;
+    let lo_idx = lo_idx.min(boot_means.len().saturating_sub(1));
+    let hi_idx = hi_idx.min(boot_means.len().saturating_sub(1));
+
+    (boot_means[lo_idx], boot_means[hi_idx])
+}
+
+/// Standard normal CDF (Abramowitz & Stegun approximation).
+fn normal_cdf(z: f64) -> f64 {
+    if !z.is_finite() {
+        return if z > 0.0 { 1.0 } else { 0.0 };
+    }
+    let t = 1.0 / (1.0 + 0.2316419 * z.abs());
+    let d = 0.3989422804014327; // 1/sqrt(2*pi)
+    let p = d * (-z * z / 2.0).exp();
+    let poly = t
+        * (0.319381530
+            + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+    if z >= 0.0 { 1.0 - p * poly } else { p * poly }
+}
+
+/// Inverse standard normal CDF (rational approximation).
+///
+/// Abramowitz & Stegun 26.2.23 approximation for p in (0,1).
+fn inv_normal_cdf(p: f64) -> f64 {
+    if p <= 0.0 { return -3.0; }
+    if p >= 1.0 { return 3.0; }
+
+    // Rational approximation (Peter Acklam's algorithm)
+    let a = [
+        -3.969683028665376e+01,
+         2.209460984245205e+02,
+        -2.759285104469687e+02,
+         1.383577518672690e+02,
+        -3.066479806614716e+01,
+         2.506628277459239e+00,
+    ];
+    let b = [
+        -5.447609879822406e+01,
+         1.615858368580409e+02,
+        -1.556989798598866e+02,
+         6.680131188771972e+01,
+        -1.328068155288572e+01,
+    ];
+    let c = [
+        -7.784894002430293e-03,
+        -3.223964580411365e-01,
+        -2.400758277161838e+00,
+        -2.549732539343734e+00,
+         4.374664141464968e+00,
+         2.938163982698783e+00,
+    ];
+    let d = [
+         7.784695709041462e-03,
+         3.224671290700398e-01,
+         2.445134137142996e+00,
+         3.754408661907416e+00,
+    ];
+
+    let p_low = 0.02425;
+    let p_high = 1.0 - p_low;
+
+    if p < p_low {
+        let q = (-2.0 * p.ln()).sqrt();
+        (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
+        ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1.0)
+    } else if p <= p_high {
+        let q = p - 0.5;
+        let r = q * q;
+        (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q /
+        (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1.0)
+    } else {
+        let q = (-2.0 * (1.0 - p).ln()).sqrt();
+        -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
+        ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1.0)
+    }
+}
+
 /// Compute fractional ranks (average rank for ties).
 fn ranks(data: &[f64]) -> Vec<f64> {
     let n = data.len();
@@ -1315,5 +1522,57 @@ mod tests {
         let analysis = CrossBenchmarkAnalysis { values };
         let rel = analysis.test_retest_reliability();
         assert_eq!(rel["A::X"], 0.0, "insufficient seeds should return 0.0");
+    }
+
+    // ──── Bootstrap CI tests ────
+
+    #[test]
+    fn test_bootstrap_ci_contains_true_mean() {
+        // N(5.0, 1.0) — true mean should be within CI
+        let samples: Vec<f64> = (0..100).map(|i| 5.0 + (i as f64 - 50.0) * 0.02).collect();
+        let (lo, hi) = bootstrap_ci(&samples, 2000, 0.05, 42);
+        assert!(lo <= 5.0 && hi >= 5.0,
+            "CI [{:.4}, {:.4}] should contain true mean 5.0", lo, hi);
+    }
+
+    #[test]
+    fn test_bootstrap_ci_narrows_with_n() {
+        let small: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let large: Vec<f64> = (0..100).map(|i| 3.0 + (i as f64 - 50.0) * 0.04).collect();
+        let (lo_s, hi_s) = bootstrap_ci(&small, 2000, 0.05, 42);
+        let (lo_l, hi_l) = bootstrap_ci(&large, 2000, 0.05, 42);
+        let width_s = hi_s - lo_s;
+        let width_l = hi_l - lo_l;
+        assert!(width_l < width_s,
+            "large sample width ({:.4}) should be < small sample width ({:.4})", width_l, width_s);
+    }
+
+    #[test]
+    fn test_bootstrap_bca_skewed() {
+        // Right-skewed (exponential-like) data — BCa should adjust bounds
+        let samples: Vec<f64> = (0..50).map(|i| (i as f64 * 0.1).exp()).collect();
+        let (lo, hi) = bootstrap_ci_bca(&samples, 2000, 0.05, 42);
+        let mean = samples.iter().sum::<f64>() / samples.len() as f64;
+        assert!(lo < mean && hi > mean,
+            "BCa CI [{:.4}, {:.4}] should bracket mean {:.4}", lo, hi, mean);
+        // For right-skewed data, upper tail should extend further
+        assert!(hi - mean > mean - lo,
+            "BCa should show asymmetry for skewed data");
+    }
+
+    #[test]
+    fn test_bootstrap_single_sample() {
+        let (lo, hi) = bootstrap_ci(&[42.0], 2000, 0.05, 42);
+        assert!((lo - 42.0).abs() < 1e-10 && (hi - 42.0).abs() < 1e-10,
+            "single sample CI should be (x, x), got ({}, {})", lo, hi);
+    }
+
+    #[test]
+    fn test_bootstrap_deterministic() {
+        let samples = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let (lo1, hi1) = bootstrap_ci(&samples, 2000, 0.05, 42);
+        let (lo2, hi2) = bootstrap_ci(&samples, 2000, 0.05, 42);
+        assert!((lo1 - lo2).abs() < 1e-10 && (hi1 - hi2).abs() < 1e-10,
+            "same seed should produce identical CIs");
     }
 }

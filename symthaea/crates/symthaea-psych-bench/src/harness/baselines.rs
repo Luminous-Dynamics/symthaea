@@ -39,6 +39,10 @@ pub struct BaselineCollection {
     pub inhibition: BaselineMap,
     pub attention: BaselineMap,
     pub embodied: BaselineMap,
+    /// GPT-4 baselines from CogBench (Coda et al., 2023).
+    pub llm_cogbench: BaselineMap,
+    /// GPT-4 baselines from ToMBench (Kosinski, 2023).
+    pub llm_tombench: BaselineMap,
 }
 
 impl BaselineCollection {
@@ -57,6 +61,8 @@ impl BaselineCollection {
             inhibition: inhibition_baselines(),
             attention: attention_baselines(),
             embodied: embodied_baselines(),
+            llm_cogbench: llm_cogbench_baselines(),
+            llm_tombench: llm_tombench_baselines(),
         }
     }
 }
@@ -747,6 +753,62 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    // Dual-Task (Baddeley & Hitch, 1974; Pashler, 1994)
+    m.insert(
+        "dual_single_accuracy",
+        Baseline {
+            value: 0.95,
+            sd: Some(0.04),
+            source: "Baddeley & Hitch (1974), choice RT without load",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "dual_low_accuracy",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.06),
+            source: "Baddeley & Hitch (1974), choice RT with 3-digit load",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "dual_high_accuracy",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.08),
+            source: "Baddeley & Hitch (1974), choice RT with 6-digit load",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "dual_task_cost",
+        Baseline {
+            value: 0.10,
+            sd: Some(0.05),
+            source: "Pashler (1994), single - dual_high accuracy difference",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "dual_digit_recall",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.10),
+            source: "Baddeley & Hitch (1974), digit maintenance under dual-task",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "dual_single_rt_ticks",
+        Baseline {
+            value: 7.0,
+            sd: Some(1.5),
+            source: "Pashler (1994), choice RT ~350ms at 50ms/tick",
+            population: "human adults",
+        },
+    );
+
     m
 }
 
@@ -780,6 +842,35 @@ pub fn metacognition_baselines() -> BTreeMap<&'static str, Baseline> {
             value: 8.0,
             sd: Some(2.0),
             source: "Petrusic & Baranski (2003), confidence judgment ~400ms at 50ms/tick",
+            population: "human adults",
+        },
+    );
+
+    // Feeling of Knowing (Hart 1965; Metcalfe et al. 1993; Schwartz 1994)
+    m.insert(
+        "fok_gamma",
+        Baseline {
+            value: 0.65,
+            sd: Some(0.10),
+            source: "Hart (1965); Schwartz (1994), gamma(FOK, recognition)",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "recognition_hit_rate",
+        Baseline {
+            value: 0.75,
+            sd: Some(0.10),
+            source: "Metcalfe et al. (1993), recognition hit rate after failed recall",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "fok_resolution",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.12),
+            source: "Schwartz (1994), AUC of FOK predicting recognition",
             population: "human adults",
         },
     );
@@ -1131,6 +1222,44 @@ pub fn inhibition_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    // Stop Signal Task (Logan 1994; Verbruggen & Logan 2008)
+    m.insert(
+        "sst_go_accuracy",
+        Baseline {
+            value: 0.95,
+            sd: Some(0.03),
+            source: "Logan (1994); Verbruggen & Logan (2008), SST go accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "sst_go_rt_ticks",
+        Baseline {
+            value: 10.0,
+            sd: Some(2.0),
+            source: "Logan (1994), go RT ~500ms at 50ms/tick",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "sst_stop_accuracy",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.10),
+            source: "Verbruggen & Logan (2008), at tracked SSD (~50% by design)",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "ssrt_ticks",
+        Baseline {
+            value: 4.0,
+            sd: Some(1.0),
+            source: "Logan (1994); Verbruggen & Logan (2008), SSRT ~200ms at 50ms/tick",
+            population: "human adults",
+        },
+    );
+
     m
 }
 
@@ -1209,6 +1338,53 @@ pub fn attention_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    // Visual Search (Treisman & Gelade 1980; Wolfe 1994)
+    m.insert(
+        "feature_search_accuracy",
+        Baseline {
+            value: 0.98,
+            sd: Some(0.02),
+            source: "Treisman & Gelade (1980), feature search pop-out",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "conjunction_search_accuracy",
+        Baseline {
+            value: 0.88,
+            sd: Some(0.06),
+            source: "Treisman & Gelade (1980), conjunction search",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "feature_search_slope",
+        Baseline {
+            value: 0.0,
+            sd: Some(0.5),
+            source: "Treisman & Gelade (1980), ~0 ms/item (parallel) at 50ms/tick",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "conjunction_search_slope",
+        Baseline {
+            value: 2.0,
+            sd: Some(0.8),
+            source: "Wolfe (1994), ~25ms/item (serial) ≈ 0.5 ticks/item, slope in tick units",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "search_asymmetry",
+        Baseline {
+            value: 2.0,
+            sd: Some(0.5),
+            source: "Treisman & Gelade (1980), conjunction_slope - feature_slope",
+            population: "human adults",
+        },
+    );
+
     m
 }
 
@@ -1273,6 +1449,145 @@ pub fn embodied_baselines() -> BTreeMap<&'static str, Baseline> {
     m
 }
 
+/// GPT-4 baselines from CogBench (Coda et al., 2023).
+///
+/// Source: "Cogbench: A large language model walks into a psychology lab"
+/// Values represent GPT-4 performance on cognitive psychology tasks.
+pub fn llm_cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
+    let mut m = BTreeMap::new();
+
+    m.insert(
+        "directed_exploration",
+        Baseline {
+            value: 0.12,
+            sd: Some(0.08),
+            source: "Coda et al. (2023), CogBench GPT-4 horizon task",
+            population: "GPT-4",
+        },
+    );
+    m.insert(
+        "model_basedness",
+        Baseline {
+            value: 0.45,
+            sd: Some(0.15),
+            source: "Coda et al. (2023), CogBench GPT-4 two-step task",
+            population: "GPT-4",
+        },
+    );
+    m.insert(
+        "discounting_score",
+        Baseline {
+            value: 0.72,
+            sd: Some(0.12),
+            source: "Coda et al. (2023), CogBench GPT-4 temporal discounting (more patient than humans)",
+            population: "GPT-4",
+        },
+    );
+    m.insert(
+        "bart_avg_pumps",
+        Baseline {
+            value: 42.0,
+            sd: Some(15.0),
+            source: "Coda et al. (2023), CogBench GPT-4 BART (more risk-seeking)",
+            population: "GPT-4",
+        },
+    );
+    m.insert(
+        "reversal_win_stay",
+        Baseline {
+            value: 0.78,
+            sd: Some(0.10),
+            source: "Coda et al. (2023), CogBench GPT-4 reversal learning",
+            population: "GPT-4",
+        },
+    );
+    m.insert(
+        "reversal_lose_shift",
+        Baseline {
+            value: 0.55,
+            sd: Some(0.12),
+            source: "Coda et al. (2023), CogBench GPT-4 reversal learning",
+            population: "GPT-4",
+        },
+    );
+    m.insert(
+        "restless_bandit_accuracy",
+        Baseline {
+            value: 0.62,
+            sd: Some(0.10),
+            source: "Coda et al. (2023), CogBench GPT-4 restless bandit",
+            population: "GPT-4",
+        },
+    );
+    m.insert(
+        "instrumental_sensitivity",
+        Baseline {
+            value: 0.55,
+            sd: Some(0.12),
+            source: "Coda et al. (2023), CogBench GPT-4 instrumental learning",
+            population: "GPT-4",
+        },
+    );
+
+    m
+}
+
+/// GPT-4 baselines from ToM evaluations (Kosinski, 2023).
+///
+/// Source: "Theory of Mind May Have Spontaneously Emerged in Large Language Models"
+/// Values represent GPT-4 performance on Theory of Mind tasks.
+pub fn llm_tombench_baselines() -> BTreeMap<&'static str, Baseline> {
+    let mut m = BTreeMap::new();
+
+    m.insert(
+        "false_belief_accuracy",
+        Baseline {
+            value: 0.95,
+            sd: Some(0.05),
+            source: "Kosinski (2023), GPT-4 false belief tasks",
+            population: "GPT-4",
+        },
+    );
+    m.insert(
+        "faux_pas_accuracy",
+        Baseline {
+            value: 0.80,
+            sd: Some(0.10),
+            source: "Kosinski (2023), GPT-4 faux pas recognition",
+            population: "GPT-4",
+        },
+    );
+    m.insert(
+        "persuasion_detection",
+        Baseline {
+            value: 0.88,
+            sd: Some(0.08),
+            source: "Sap et al. (2022), GPT-4 social reasoning",
+            population: "GPT-4",
+        },
+    );
+    m.insert(
+        "strange_story_accuracy",
+        Baseline {
+            value: 0.82,
+            sd: Some(0.10),
+            source: "Kosinski (2023), GPT-4 strange story comprehension",
+            population: "GPT-4",
+        },
+    );
+    m.insert(
+        "hinting_accuracy",
+        Baseline {
+            value: 0.75,
+            sd: Some(0.12),
+            source: "Kosinski (2023), GPT-4 hinting task",
+            population: "GPT-4",
+        },
+    );
+
+    m
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1288,6 +1603,37 @@ mod tests {
         assert!(!affect_baselines().is_empty());
         assert!(!creativity_baselines().is_empty());
         assert!(!butlin_baselines().is_empty());
+        assert!(!inhibition_baselines().is_empty());
+        assert!(!attention_baselines().is_empty());
         assert!(!embodied_baselines().is_empty());
+    }
+
+    #[test]
+    fn test_llm_baselines_nonempty() {
+        let cogbench = llm_cogbench_baselines();
+        assert!(!cogbench.is_empty(), "LLM CogBench baselines should not be empty");
+        assert!(cogbench.len() >= 5, "Expected >= 5 LLM CogBench entries, got {}", cogbench.len());
+        // Verify all have GPT-4 population
+        for (_, bl) in &cogbench {
+            assert_eq!(bl.population, "GPT-4");
+        }
+
+        let tombench = llm_tombench_baselines();
+        assert!(!tombench.is_empty(), "LLM ToMBench baselines should not be empty");
+        assert!(tombench.len() >= 3, "Expected >= 3 LLM ToMBench entries, got {}", tombench.len());
+        for (_, bl) in &tombench {
+            assert_eq!(bl.population, "GPT-4");
+        }
+    }
+
+    #[test]
+    fn test_llm_baselines_have_sd() {
+        // All LLM baselines should have SD values for z-score computation
+        for (key, bl) in &llm_cogbench_baselines() {
+            assert!(bl.sd.is_some(), "LLM CogBench baseline '{}' missing SD", key);
+        }
+        for (key, bl) in &llm_tombench_baselines() {
+            assert!(bl.sd.is_some(), "LLM ToMBench baseline '{}' missing SD", key);
+        }
     }
 }

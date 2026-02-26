@@ -3,6 +3,7 @@
 pub mod analysis;
 pub mod baselines;
 pub mod config;
+pub mod html;
 pub mod report;
 pub mod snapshot;
 
