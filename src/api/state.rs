@@ -2,7 +2,7 @@
 
 use crate::api::models::*;
 use std::collections::HashMap;
-use std::sync::RwLock;
+use tokio::sync::{RwLock, Semaphore};
 use symthaea_core::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
     spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
@@ -19,6 +19,8 @@ pub struct AppState {
     pub baselines: HashMap<String, BaselineTopology>,
     /// Spectral connectivity calculator (lambda2, not IIT Phi)
     pub phi_calculator: ConnectivityCalculator,
+    /// Concurrency limiter for request processing.
+    pub request_semaphore: Semaphore,
     /// Optional bearer token for authenticated endpoints
     bearer_token: Option<String>,
 }
@@ -69,6 +71,7 @@ impl AppState {
             results: RwLock::new(HashMap::new()),
             baselines,
             phi_calculator,
+            request_semaphore: Semaphore::new(32),
             bearer_token: None,
         }
     }
@@ -77,6 +80,7 @@ impl AppState {
     pub fn new_with_config(config: &crate::api::ApiConfig) -> Self {
         let mut state = Self::new();
         state.bearer_token = config.bearer_token.clone();
+        state.request_semaphore = Semaphore::new(config.max_in_flight_requests);
         state
     }
 
@@ -161,11 +165,11 @@ impl AppState {
     }
 
     /// Get leaderboard entries (sorted by Φ)
-    pub fn get_leaderboard(&self, limit: usize, offset: usize) -> Vec<LeaderboardEntry> {
+    pub async fn get_leaderboard(&self, limit: usize, offset: usize) -> Vec<LeaderboardEntry> {
         let results: Vec<EvaluationResult> = self
             .results
             .read()
-            .expect("results RwLock poisoned")
+            .await
             .values()
             .cloned()
             .collect();

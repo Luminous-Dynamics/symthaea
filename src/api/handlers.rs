@@ -16,6 +16,10 @@ use symthaea_core::hdc::{
 };
 use uuid::Uuid;
 
+const MAX_TOPOLOGY_NODES: usize = 256;
+const MAX_CUSTOM_NODES: usize = 128;
+const MAX_CUSTOM_EDGES: usize = 50_000;
+
 /// Health check endpoint
 pub async fn health_check() -> Json<serde_json::Value> {
     Json(serde_json::json!({
@@ -67,6 +71,11 @@ fn custom_input(request: &SubmissionRequest) -> Result<Option<CustomInput<'_>>, 
     }
 
     if let Some(node_representations) = request.node_representations.as_ref() {
+        if node_representations.len() > MAX_CUSTOM_NODES {
+            return Err(ApiError::bad_request(&format!(
+                "node_representations exceeds max nodes ({MAX_CUSTOM_NODES})"
+            )));
+        }
         if node_representations.len() < 2 {
             return Err(ApiError::bad_request(
                 "node_representations must have at least 2 nodes",
@@ -87,6 +96,11 @@ fn custom_input(request: &SubmissionRequest) -> Result<Option<CustomInput<'_>>, 
     }
 
     if let Some(adjacency_matrix) = request.adjacency_matrix.as_ref() {
+        if adjacency_matrix.len() > MAX_CUSTOM_NODES {
+            return Err(ApiError::bad_request(&format!(
+                "adjacency_matrix exceeds max nodes ({MAX_CUSTOM_NODES})"
+            )));
+        }
         if adjacency_matrix.len() < 2 {
             return Err(ApiError::bad_request(
                 "adjacency_matrix must be at least 2x2",
@@ -107,6 +121,11 @@ fn custom_input(request: &SubmissionRequest) -> Result<Option<CustomInput<'_>>, 
     }
 
     if let Some(edge_list) = request.edge_list.as_ref() {
+        if edge_list.len() > MAX_CUSTOM_EDGES {
+            return Err(ApiError::bad_request(&format!(
+                "edge_list exceeds max edges ({MAX_CUSTOM_EDGES})"
+            )));
+        }
         if edge_list.is_empty() {
             return Err(ApiError::bad_request("edge_list must not be empty"));
         }
@@ -120,6 +139,11 @@ fn custom_input(request: &SubmissionRequest) -> Result<Option<CustomInput<'_>>, 
             return Err(ApiError::bad_request(
                 "edge_list must include at least 2 nodes",
             ));
+        }
+        if n_nodes > MAX_CUSTOM_NODES {
+            return Err(ApiError::bad_request(&format!(
+                "edge_list exceeds max nodes ({MAX_CUSTOM_NODES})"
+            )));
         }
         if max_index >= n_nodes {
             return Err(ApiError::bad_request("edge_list index exceeds n_nodes"));
@@ -253,6 +277,17 @@ pub async fn submit_model(
     State(state): State<Arc<AppState>>,
     Json(request): Json<SubmissionRequest>,
 ) -> Result<(StatusCode, Json<SubmissionResponse>), (StatusCode, Json<ApiError>)> {
+    let _permit = state
+        .request_semaphore
+        .acquire()
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ApiError::service_unavailable("server is busy")),
+            )
+        })?;
+
     // Validate request
     if request.model_name.is_empty() {
         return Err((
@@ -302,6 +337,14 @@ pub async fn submit_model(
                 return Err((
                     StatusCode::BAD_REQUEST,
                     Json(ApiError::bad_request("n_nodes must be at least 2")),
+                ));
+            }
+            if n_nodes > MAX_TOPOLOGY_NODES {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(ApiError::bad_request(&format!(
+                        "n_nodes exceeds max allowed ({MAX_TOPOLOGY_NODES})"
+                    ))),
                 ));
             }
             if matches!(
@@ -355,7 +398,7 @@ pub async fn submit_model(
     state
         .submissions
         .write()
-        .expect("submissions RwLock poisoned")
+        .await
         .insert(submission_id, submission);
 
     // Estimate processing time based on node count
@@ -376,7 +419,7 @@ pub async fn submit_model(
         if let Some(submission) = state
             .submissions
             .write()
-            .expect("submissions RwLock poisoned")
+            .await
             .get_mut(&submission_id)
         {
             submission.status = SubmissionStatus::Processing;
@@ -393,7 +436,7 @@ pub async fn submit_model(
     let queue_position = state
         .submissions
         .read()
-        .expect("submissions RwLock poisoned")
+        .await
         .values()
         .filter(|s| s.status == SubmissionStatus::Queued)
         .count() as u32;
@@ -424,8 +467,7 @@ fn process_submission_inline(state: &AppState, submission_id: Uuid, request: &Su
         Err(_) => {
             if let Some(submission) = state
                 .submissions
-                .write()
-                .expect("submissions RwLock poisoned")
+                .blocking_write()
                 .get_mut(&submission_id)
             {
                 submission.status = SubmissionStatus::Failed;
@@ -461,7 +503,7 @@ fn process_submission_inline(state: &AppState, submission_id: Uuid, request: &Su
         standard_deviation: 0.002,
         n_samples: 10,
         rank: 1, // Will be updated when leaderboard is queried
-        total_submissions: state.results.read().expect("results RwLock poisoned").len() as u32 + 1,
+        total_submissions: state.results.blocking_read().len() as u32 + 1,
         percentile: 50.0,
         comparison_vs_baselines: {
             let mut comparisons = std::collections::HashMap::new();
@@ -479,8 +521,7 @@ fn process_submission_inline(state: &AppState, submission_id: Uuid, request: &Su
         detailed_metrics: None,
         created_at: state
             .submissions
-            .read()
-            .expect("submissions RwLock poisoned")
+            .blocking_read()
             .get(&submission_id)
             .map(|s| s.created_at)
             .unwrap_or(now),
@@ -491,15 +532,13 @@ fn process_submission_inline(state: &AppState, submission_id: Uuid, request: &Su
     // Store result
     state
         .results
-        .write()
-        .expect("results RwLock poisoned")
+        .blocking_write()
         .insert(submission_id, result);
 
     // Update submission status
     if let Some(sub) = state
         .submissions
-        .write()
-        .expect("submissions RwLock poisoned")
+        .blocking_write()
         .get_mut(&submission_id)
     {
         sub.status = SubmissionStatus::Completed;
@@ -516,7 +555,7 @@ pub async fn get_results(
     if let Some(result) = state
         .results
         .read()
-        .expect("results RwLock poisoned")
+        .await
         .get(&submission_id)
     {
         return Ok(Json(result.clone()));
@@ -526,7 +565,7 @@ pub async fn get_results(
     if let Some(submission) = state
         .submissions
         .read()
-        .expect("submissions RwLock poisoned")
+        .await
         .get(&submission_id)
     {
         if submission.status == SubmissionStatus::Failed {
@@ -577,9 +616,8 @@ pub async fn get_leaderboard(
     let limit = params.limit.unwrap_or(20).min(100);
     let offset = params.offset.unwrap_or(0);
 
-    let entries = state.get_leaderboard(limit, offset);
-    let total =
-        state.results.read().expect("results RwLock poisoned").len() + state.baselines.len();
+    let entries = state.get_leaderboard(limit, offset).await;
+    let total = state.results.read().await.len() + state.baselines.len();
 
     Json(LeaderboardResponse {
         total_submissions: total as u32,
@@ -688,9 +726,20 @@ pub async fn compare_models(
     State(state): State<Arc<AppState>>,
     Json(request): Json<ComparisonRequest>,
 ) -> Result<Json<ComparisonResult>, (StatusCode, Json<ApiError>)> {
+    let _permit = state
+        .request_semaphore
+        .acquire()
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ApiError::service_unavailable("server is busy")),
+            )
+        })?;
+
     // Get model A info
-    let model_a = get_model_info(&state, &request.model_a)?;
-    let model_b = get_model_info(&state, &request.model_b)?;
+    let model_a = get_model_info(&state, &request.model_a).await?;
+    let model_b = get_model_info(&state, &request.model_b).await?;
 
     // Compute comparison
     let diff = model_a.phi - model_b.phi;
@@ -754,7 +803,7 @@ pub async fn compare_models(
     }))
 }
 
-fn get_model_info(
+async fn get_model_info(
     state: &AppState,
     reference: &ModelReference,
 ) -> Result<ModelInfo, (StatusCode, Json<ApiError>)> {
@@ -763,7 +812,7 @@ fn get_model_info(
             if let Some(result) = state
                 .results
                 .read()
-                .expect("results RwLock poisoned")
+                .await
                 .get(id)
             {
                 Ok(ModelInfo {
@@ -803,6 +852,17 @@ pub async fn dimensional_sweep(
     State(state): State<Arc<AppState>>,
     Json(request): Json<DimensionalSweepRequest>,
 ) -> Result<(StatusCode, Json<SubmissionResponse>), (StatusCode, Json<ApiError>)> {
+    let _permit = state
+        .request_semaphore
+        .acquire()
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ApiError::service_unavailable("server is busy")),
+            )
+        })?;
+
     let submission_id = Uuid::new_v4();
     let now = chrono::Utc::now();
 

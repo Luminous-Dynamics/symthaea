@@ -294,4 +294,12 @@ impl ApiError {
             details: None,
         }
     }
+
+    pub fn service_unavailable(message: &str) -> Self {
+        Self {
+            code: "SERVICE_UNAVAILABLE".to_string(),
+            message: message.to_string(),
+            details: None,
+        }
+    }
 }
