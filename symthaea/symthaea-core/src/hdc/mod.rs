@@ -52,20 +52,14 @@ All HV types support the core HDC algebra:
 // =============================================================================
 
 /// Default HDC dimension: 16,384 (2^14)
-///
-/// **16,384 dimensions** chosen for:
-/// - **SIMD optimization**: Power of 2 aligns perfectly with vector registers
-/// - **Memory alignment**: Natural 64-byte cache line boundaries
-/// - **Orthogonality**: Higher dimensions = better near-orthogonality of random vectors
-/// - **Capacity**: More bits = more distinct concepts before saturation
-/// - **Balance**: Good accuracy vs memory tradeoff for most use cases
-///
-/// # Usage
-/// ```rust,ignore
-/// use symthaea::hdc::HDC_DIMENSION;
-/// let vector = vec![0i8; HDC_DIMENSION];
-/// ```
 pub const HDC_DIMENSION: usize = 16_384;
+
+/// Rest HDC dimension: 8,192 (2^13)
+///
+/// **8K dimensions** for:
+/// - **Deep Rest**: Near-zero power draw for background metabolism
+/// - **Fast Consolidation**: High-speed memory pruning
+pub const HDC_DIMENSION_REST: usize = 8_192;
 
 /// Extended HDC dimension: 32,768 (2^15)
 ///
@@ -109,6 +103,8 @@ pub const HDC_DIMENSION_64K: usize = 65_536;
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum HdcDimensionality {
+    /// Rest 8,192 dimensions (2^13) - ultra-low power recovery mode
+    Rest,
     /// Standard 16,384 dimensions (2^14) - good balance of accuracy and memory
     #[default]
     Standard,
@@ -124,6 +120,7 @@ impl HdcDimensionality {
     /// Get the numeric dimension value
     pub const fn dimension(&self) -> usize {
         match self {
+            Self::Rest => HDC_DIMENSION_REST,
             Self::Standard => HDC_DIMENSION,
             Self::Extended => HDC_DIMENSION_32K,
             Self::Ultra => HDC_DIMENSION_64K,
@@ -137,6 +134,7 @@ impl HdcDimensionality {
     /// otherwise creates Custom variant.
     pub const fn from_dimension(dim: usize) -> Self {
         match dim {
+            8_192 => Self::Rest,
             16_384 => Self::Standard,
             32_768 => Self::Extended,
             65_536 => Self::Ultra,
