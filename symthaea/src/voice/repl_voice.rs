@@ -1648,7 +1648,9 @@ impl ReplVoiceOutput {
             }
             #[cfg(not(feature = "vocal-tract"))]
             {
-                unreachable!()
+                return Err(anyhow::anyhow!(
+                    "LTC pipeline selected but vocal-tract feature not enabled"
+                ));
             }
         } else if self.config.use_articulatory {
             self.synthesize_articulatory(text)?

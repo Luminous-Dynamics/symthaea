@@ -1050,11 +1050,12 @@ impl TensorNetwork {
     ///
     /// Returns the final tensor after all contractions.
     ///
-    /// # Panics
-    ///
-    /// Panics if the network has no nodes.
-    pub fn contract(&self) -> Tensor {
-        assert!(!self.nodes.is_empty(), "Cannot contract empty network");
+    /// Returns the final tensor after all contractions, or `None` if
+    /// the network is empty or contraction produced no surviving tensor.
+    pub fn contract(&self) -> Option<Tensor> {
+        if self.nodes.is_empty() {
+            return None;
+        }
 
         if self.edges.is_empty() {
             // No edges: return the tensor product of all nodes
@@ -1062,7 +1063,7 @@ impl TensorNetwork {
             for node in &self.nodes[1..] {
                 result = result.tensor_product(&node.tensor);
             }
-            return result;
+            return Some(result);
         }
 
         // Clone the network state so we can mutate
@@ -1078,20 +1079,21 @@ impl TensorNetwork {
 
             if from_id == to_id {
                 // Both endpoints are in the same tensor: do a trace contraction
-                let t = tensors[from_id]
-                    .take()
-                    .expect("tensor node must not be consumed twice");
+                let Some(t) = tensors[from_id].take() else {
+                    tracing::warn!("Tensor node consumed twice during contraction");
+                    continue;
+                };
                 let result = t.contract((edge.from.1, edge.to.1));
                 tensors[from_id] = Some(result);
                 continue;
             }
 
-            let t_from = tensors[from_id]
-                .take()
-                .expect("tensor node must not be consumed twice");
-            let t_to = tensors[to_id]
-                .take()
-                .expect("tensor node must not be consumed twice");
+            let (Some(t_from), Some(t_to)) =
+                (tensors[from_id].take(), tensors[to_id].take())
+            else {
+                tracing::warn!("Tensor node consumed twice during contraction");
+                continue;
+            };
 
             // Compute the tensor product, then contract the appropriate axes
             let product = t_from.tensor_product(&t_to);
@@ -1121,11 +1123,7 @@ impl TensorNetwork {
         }
 
         // Return the first remaining tensor
-        if let Some(tensor) = tensors.into_iter().flatten().next() {
-            return tensor;
-        }
-
-        unreachable!("Network had nodes but no tensor survived contraction")
+        tensors.into_iter().flatten().next()
     }
 }
 
@@ -1506,7 +1504,7 @@ mod tests {
         // Contract matrix axis 1 (columns) with vector axis 0
         net.add_edge((mat_id, 1), (vec_id, 0));
 
-        let result = net.contract();
+        let result = net.contract().expect("contraction should produce a tensor");
 
         // Expected: [1*1 + 2*0 + 3*1, 4*1 + 5*0 + 6*1] = [4, 10]
         assert_eq!(result.shape.iter().product::<usize>(), 2);
@@ -1532,7 +1530,7 @@ mod tests {
         net.add_node(a);
         net.add_node(b);
 
-        let result = net.contract();
+        let result = net.contract().expect("contraction should produce a tensor");
 
         // Should be outer product: [1*3, 1*4, 2*3, 2*4] = [3, 4, 6, 8]
         assert_eq!(result.shape, vec![2, 2]);

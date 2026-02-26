@@ -133,6 +133,43 @@ impl<T> ResilientMutex<T> for Mutex<T> {
     }
 }
 
+/// Extension: lock_resilient with pain channel reporting.
+///
+/// When a lock poison is detected, reports the error through the
+/// pain channel so the organism *feels* the infrastructure damage.
+pub trait ResilientMutexWithPain<T> {
+    /// Acquire the lock, recovering from poison and reporting pain.
+    fn lock_with_pain(
+        &self,
+        context: &'static str,
+        pain_tx: &super::somatic_error_bridge::PainSender,
+    ) -> MutexGuard<'_, T>;
+}
+
+impl<T> ResilientMutexWithPain<T> for Mutex<T> {
+    fn lock_with_pain(
+        &self,
+        context: &'static str,
+        pain_tx: &super::somatic_error_bridge::PainSender,
+    ) -> MutexGuard<'_, T> {
+        match self.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                warn!(
+                    context = context,
+                    "Mutex poisoned - recovering data and reporting pain."
+                );
+                let _ = pain_tx.send(
+                    super::somatic_error_bridge::InfrastructureError::LockPoisoned {
+                        subsystem: context,
+                    },
+                );
+                poisoned.into_inner()
+            }
+        }
+    }
+}
+
 /// Extension trait for resilient RwLock locking.
 pub trait ResilientRwLock<T> {
     /// Acquire read lock, recovering from poison if necessary.
@@ -221,6 +258,23 @@ macro_rules! write_lock {
     };
     ($rwlock:expr, $context:expr) => {
         $crate::infrastructure::lock_guard::ResilientRwLock::write_resilient(&$rwlock, $context)
+    };
+}
+
+/// Macro for lock acquisition with pain channel reporting.
+///
+/// # Usage
+/// ```rust,ignore
+/// let guard = lock_with_pain!(mutex, "sqlite_client", &pain_tx);
+/// ```
+#[macro_export]
+macro_rules! lock_with_pain {
+    ($mutex:expr, $context:expr, $pain_tx:expr) => {
+        $crate::infrastructure::lock_guard::ResilientMutexWithPain::lock_with_pain(
+            &$mutex,
+            $context,
+            $pain_tx,
+        )
     };
 }
 

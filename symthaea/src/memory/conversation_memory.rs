@@ -257,8 +257,14 @@ impl ConversationMemory {
         self.turn_count += 1;
 
         // Serialize embedding if provided
-        let embedding_blob: Option<Vec<u8>> =
-            embedding.and_then(|e| bincode::serialize(&e.values).ok());
+        let embedding_blob: Option<Vec<u8>> = embedding.and_then(|e| {
+            bincode::serialize(&e.values)
+                .map_err(|err| {
+                    tracing::warn!(error = %err, "Failed to serialize conversation embedding — storing without vector");
+                    err
+                })
+                .ok()
+        });
 
         self.conn.execute(
             r#"
@@ -332,7 +338,12 @@ impl ConversationMemory {
             })?
             .filter_map(|r| r.ok())
             .filter_map(|(id, blob)| {
-                let values: Vec<f32> = bincode::deserialize(&blob).ok()?;
+                let values: Vec<f32> = bincode::deserialize(&blob)
+                    .map_err(|e| {
+                        tracing::warn!(conversation_id = %id, error = %e, "Corrupted embedding BLOB in conversation — skipping");
+                        e
+                    })
+                    .ok()?;
                 let hv = ContinuousHV { values };
                 let sim = query_embedding.similarity(&hv);
                 Some((id, sim))

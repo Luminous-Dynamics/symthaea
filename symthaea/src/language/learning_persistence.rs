@@ -289,13 +289,23 @@ impl LearningPersistence {
             let old_path = self.config.backup_path(i);
             let new_path = self.config.backup_path(i + 1);
             if old_path.exists() {
-                let _ = fs::rename(&old_path, &new_path);
+                if let Err(e) = fs::rename(&old_path, &new_path) {
+                    tracing::warn!(
+                        from = %old_path.display(), to = %new_path.display(),
+                        error = %e, "Backup rotation rename failed"
+                    );
+                }
             }
         }
 
         // Current -> .1.bak
         let first_backup = self.config.backup_path(1);
-        let _ = fs::copy(&main_path, &first_backup);
+        if let Err(e) = fs::copy(&main_path, &first_backup) {
+            tracing::warn!(
+                from = %main_path.display(), to = %first_backup.display(),
+                error = %e, "Backup copy failed"
+            );
+        }
 
         Ok(())
     }

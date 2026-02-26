@@ -1075,7 +1075,10 @@ impl Symthaea {
                             item.steps_survived.to_string(),
                         );
                         let metadata_json =
-                            serde_json::to_string(&metadata).unwrap_or_else(|_| "{}".to_string());
+                            serde_json::to_string(&metadata).unwrap_or_else(|e| {
+                                tracing::warn!(error = %e, "Failed to serialize eviction metadata — storing empty object");
+                                "{}".to_string()
+                            });
                         let content = if is_thermo {
                             let watts = item
                                 .metadata

@@ -89,7 +89,14 @@ fn record_to_batch(record: &MemoryRecord) -> DbResult<RecordBatch> {
         .append_value(record.encoding.0.as_slice())
         .map_err(|e| DatabaseError::InsertFailed(format!("Encoding serialization failed: {e}")))?;
 
-    let topics_json = serde_json::to_string(&record.topics).unwrap_or_else(|_| "[]".to_string());
+    let topics_json = serde_json::to_string(&record.topics).unwrap_or_else(|e| {
+        tracing::warn!(
+            record_id = %record.id,
+            error = %e,
+            "Failed to serialize topics for LanceDB record — storing empty array"
+        );
+        "[]".to_string()
+    });
 
     RecordBatch::try_new(
         schema,
@@ -170,7 +177,15 @@ fn batch_to_records(batch: &RecordBatch) -> Vec<MemoryRecord> {
                 arr.copy_from_slice(&encoding_bytes[..BinaryHV::BYTES]);
             }
 
-            let topics: Vec<String> = serde_json::from_str(topics_col.value(i)).unwrap_or_default();
+            let topics: Vec<String> = serde_json::from_str(topics_col.value(i)).unwrap_or_else(|e| {
+                tracing::warn!(
+                    row = i,
+                    raw = topics_col.value(i),
+                    error = %e,
+                    "Corrupted topics JSON in LanceDB record — defaulting to empty"
+                );
+                Vec::new()
+            });
 
             let ts = ts_col.value(i);
 

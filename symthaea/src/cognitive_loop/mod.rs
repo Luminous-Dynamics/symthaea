@@ -113,8 +113,6 @@ pub use stats::*;
 pub mod builder;
 pub use builder::*;
 
-pub mod executor;
-
 // ── Private submodules ──────────────────────────────────────────────────────
 mod training;
 use training::AsyncTrainerHandle;
@@ -853,6 +851,14 @@ pub struct CognitiveLoopService {
 
     /// Affective bias: cognitive temperature (0.0 to 2.0).
     pub(crate) mood_temperature: f32,
+
+    /// Somatic error bridge: converts infrastructure failures into felt stress.
+    /// Lock poisoning, task panics, DB errors → arousal, thermodynamic load, tau slowdown.
+    pub(crate) somatic_bridge: crate::infrastructure::somatic_error_bridge::SomaticErrorBridge,
+
+    /// Pain channel sender for distributing to subsystems.
+    /// Subsystems clone this to report infrastructure errors.
+    pub(crate) pain_tx: Option<crate::infrastructure::somatic_error_bridge::PainSender>,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

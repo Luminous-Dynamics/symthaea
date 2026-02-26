@@ -23,6 +23,7 @@ pub mod code_primitives;
 pub mod compositionality;
 pub mod consciousness_unification;
 pub mod cross_modal_binding;
+pub mod interoception;
 pub use symthaea_fep as fep_active_inference;
 pub mod harmonies_integration;
 pub mod master_consciousness_equation;
@@ -107,10 +108,10 @@ pub mod reasoning_engine;
 // | tool_gate                     | Wired        | reasoning_engine      | Used in reasoning engine                         |
 // | empathic_unification          | Wired        | full_consciousness    | Stub provided when feature disabled              |
 // | recursive_improvement         | Wired        | full_consciousness    | Dream feedback loop wired into cognitive cycle   |
-// | consciousness_driven_evolution| Dead         | (none)                | Commented out, zero callers                      |
-// | unified_intelligence          | Standalone   | full_consciousness    | Compiles, tested; meta_reasoning available       |
-// | mycelix_bridge                | Structural   | (none)                | Compiled but not called from cognitive loop       |
-// | byzantine_collective          | Standalone   | full_consciousness    | Compiles, tested; multi-agent trust scoring      |
+// | consciousness_driven_evolution| DELETED      | —                     | Zero callers, removed in Great Refactor          |
+// | unified_intelligence          | Standalone   | multi_agent           | Compiles, tested; meta_reasoning available       |
+// | mycelix_bridge                | Structural   | mycelix               | Compiled but not called from cognitive loop       |
+// | byzantine_collective          | Standalone   | multi_agent           | Compiles, tested; multi-agent trust scoring      |
 // | unified_living_mind           | Standalone   | full_consciousness    | Compiles, tested; depends on LifeState           |
 // | iroh P2P                      | Wired        | swarm                 | sync_iroh_bridge() called every mind tick        |
 // | vocal_tract                   | Wired        | voice-tts             | Controller/encoder/FEP active in voice pipeline  |
@@ -342,7 +343,7 @@ pub mod metacognitive_monitoring;
 pub mod harmonics;
 
 /// Unified Emergent Intelligence — collective + context-aware + meta-cognitive
-#[cfg(feature = "full_consciousness")]
+#[cfg(feature = "multi_agent")]
 pub mod unified_intelligence;
 
 // Recursive improvement (needs internal API alignment - cfg-gated)
@@ -483,12 +484,8 @@ pub mod context_aware_evolution;
 pub mod temporal_consciousness;
 pub mod unified_consciousness_pipeline;
 
-// DEAD CODE: consciousness_driven_evolution - Phi-guided architecture evolution.
-// Depends on recursive_improvement::{gradient_optimizer, recursive_optimizer} which are
-// now commented out (zero external callers). Only referenced internally, never wired
-// into cognitive_loop. Candidate for removal.
-// #[cfg(feature = "full_consciousness")]
-// pub mod consciousness_driven_evolution;
+// consciousness_driven_evolution — DELETED (Great Refactor Phase 0.1)
+// Was 986 LOC, zero callers. Depended on commented-out recursive_improvement optimizers.
 
 /// Gated: depends on autopoietic_consciousness::LifeState (not in src version)
 #[cfg(feature = "full_consciousness")]
@@ -498,16 +495,16 @@ pub mod unified_living_mind;
 pub mod differentiable;
 pub mod meta_reasoning;
 
-/// Gated: depends on unified_intelligence (gated behind full_consciousness)
-#[cfg(feature = "full_consciousness")]
+/// Gated: multi-agent trust scoring (depends on unified_intelligence)
+#[cfg(feature = "multi_agent")]
 pub mod byzantine_collective;
 
-/// Gated: depends on byzantine_collective (gated)
-#[cfg(feature = "full_consciousness")]
+/// Gated: multi-agent meta-learning (depends on byzantine_collective)
+#[cfg(feature = "multi_agent")]
 pub mod meta_learning_byzantine;
 
-/// Gated: depends on meta_learning_byzantine (gated)
-#[cfg(feature = "full_consciousness")]
+/// Gated: multi-agent causal consensus (depends on meta_learning_byzantine)
+#[cfg(feature = "multi_agent")]
 pub mod causal_byzantine;
 
 /// GWT integration — Global Workspace Theory processor (observability is optional)
@@ -517,6 +514,7 @@ pub mod gwt_integration;
 pub mod narrative_gwt_integration;
 
 /// Mycelix bridge — consciousness-gated governance
+#[cfg(feature = "mycelix")]
 pub mod mycelix_bridge;
 
 /// Value system tests — calibration and validation

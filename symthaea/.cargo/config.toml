@@ -5,4 +5,5 @@ rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 RUST_TEST_THREADS = "8"
 
 [profile.dev]
-split-debuginfo = "unpacked"
+# "packed" = single .dwp file vs "unpacked" = thousands of .dwo files (~80GB savings)
+split-debuginfo = "packed"

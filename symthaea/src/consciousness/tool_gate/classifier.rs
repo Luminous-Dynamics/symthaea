@@ -171,7 +171,13 @@ fn select_fallback(
         GateDecision::InsufficientConfidence { .. } => FallbackStrategy::RequestHumanConfirmation {
             reason: "Plan confidence is too low for this risk level".to_string(),
         },
-        GateDecision::Allowed => unreachable!("Fallback should not be computed for Allowed"),
+        GateDecision::Allowed => {
+            // Caller guards against this, but degrade gracefully if reached
+            tracing::warn!("select_fallback called for Allowed decision — returning no-op");
+            FallbackStrategy::RequestHumanConfirmation {
+                reason: "Unexpected: fallback requested for already-allowed gate decision".to_string(),
+            }
+        }
     }
 }
 

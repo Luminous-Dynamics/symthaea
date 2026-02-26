@@ -98,6 +98,71 @@ impl From<DatabaseError> for SymthaeaError {
     }
 }
 
+// -- Infrastructure errors (somatic error bridge) --
+
+impl From<crate::infrastructure::somatic_error_bridge::InfrastructureError> for SymthaeaError {
+    fn from(err: crate::infrastructure::somatic_error_bridge::InfrastructureError) -> Self {
+        Self::Runtime(format!("infrastructure: {err:?}"))
+    }
+}
+
+// -- Swarm / Network errors (always available) --
+
+impl From<crate::swarm::NetworkError> for SymthaeaError {
+    fn from(err: crate::swarm::NetworkError) -> Self {
+        Self::Network(err.to_string())
+    }
+}
+
+impl From<crate::swarm::SwarmError> for SymthaeaError {
+    fn from(err: crate::swarm::SwarmError) -> Self {
+        Self::Network(err.to_string())
+    }
+}
+
+impl From<crate::swarm::HandshakeError> for SymthaeaError {
+    fn from(err: crate::swarm::HandshakeError) -> Self {
+        Self::Network(err.to_string())
+    }
+}
+
+// -- Action errors (always available) --
+
+impl From<crate::action::ExecutionError> for SymthaeaError {
+    fn from(err: crate::action::ExecutionError) -> Self {
+        Self::Runtime(err.to_string())
+    }
+}
+
+impl From<crate::action::ActionError> for SymthaeaError {
+    fn from(err: crate::action::ActionError) -> Self {
+        Self::Runtime(err.to_string())
+    }
+}
+
+// -- Feature-gated error bridges --
+
+#[cfg(feature = "school_learning")]
+impl From<crate::school::curriculum_loader::LoadError> for SymthaeaError {
+    fn from(err: crate::school::curriculum_loader::LoadError) -> Self {
+        Self::Config(err.to_string())
+    }
+}
+
+#[cfg(feature = "full_language")]
+impl From<crate::language::learning_persistence::LearningPersistenceError> for SymthaeaError {
+    fn from(err: crate::language::learning_persistence::LearningPersistenceError) -> Self {
+        Self::Language(err.to_string())
+    }
+}
+
+#[cfg(feature = "web_research_module")]
+impl From<crate::web_research::researcher::WebResearcherCreationError> for SymthaeaError {
+    fn from(err: crate::web_research::researcher::WebResearcherCreationError) -> Self {
+        Self::Runtime(err.to_string())
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Convenience type alias
 // ---------------------------------------------------------------------------
@@ -317,5 +382,82 @@ mod tests {
         );
         assert_eq!(ctx_err.context.cycle, Some(42));
         assert_eq!(ctx_err.context.severity, ErrorSeverity::Fatal);
+    }
+
+    #[test]
+    fn test_from_network_error() {
+        use crate::swarm::NetworkError;
+        let err: SymthaeaError = NetworkError::Timeout {
+            operation: "ping".into(),
+            timeout_ms: 5000,
+        }
+        .into();
+        match &err {
+            SymthaeaError::Network(msg) => assert!(msg.contains("ping"), "got: {msg}"),
+            other => panic!("expected Network variant, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_from_swarm_error() {
+        use crate::swarm::SwarmError;
+        let err: SymthaeaError = SwarmError::NotInitialized.into();
+        match &err {
+            SymthaeaError::Network(msg) => {
+                assert!(!msg.is_empty(), "swarm error message should not be empty")
+            }
+            other => panic!("expected Network variant, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_from_handshake_error() {
+        use crate::swarm::HandshakeError;
+        let err: SymthaeaError = HandshakeError::ProtocolViolation {
+            message: "bad nonce".into(),
+        }
+        .into();
+        match &err {
+            SymthaeaError::Network(msg) => assert!(msg.contains("bad nonce"), "got: {msg}"),
+            other => panic!("expected Network variant, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_from_execution_error() {
+        use crate::action::ExecutionError;
+        let err: SymthaeaError = ExecutionError::Unsupported("nope".into()).into();
+        match &err {
+            SymthaeaError::Runtime(msg) => assert!(msg.contains("nope"), "got: {msg}"),
+            other => panic!("expected Runtime variant, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_from_action_error() {
+        use crate::action::ActionError;
+        let err: SymthaeaError =
+            ActionError::ValidationFailed("missing param".into()).into();
+        match &err {
+            SymthaeaError::Runtime(msg) => {
+                assert!(msg.contains("missing param"), "got: {msg}")
+            }
+            other => panic!("expected Runtime variant, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_from_infrastructure_error() {
+        use crate::infrastructure::somatic_error_bridge::InfrastructureError;
+        let err: SymthaeaError = InfrastructureError::AsyncTaskPanicked {
+            task_name: "heartbeat".into(),
+        }
+        .into();
+        match &err {
+            SymthaeaError::Runtime(msg) => {
+                assert!(msg.contains("heartbeat"), "got: {msg}")
+            }
+            other => panic!("expected Runtime variant, got: {other:?}"),
+        }
     }
 }

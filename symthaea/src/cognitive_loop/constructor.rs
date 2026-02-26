@@ -625,6 +625,10 @@ impl CognitiveLoopService {
         let resonator_cfc_input_dim = config.cfc_config.input_dim;
         let resonator_genesis_phrase = config.genesis_phrase.clone();
 
+        // Somatic error bridge: infrastructure errors → felt interoceptive signals
+        let (somatic_bridge_instance, pain_sender) =
+            crate::infrastructure::somatic_error_bridge::SomaticErrorBridge::new();
+
         Ok(Self {
             config,
             encoder,
@@ -913,6 +917,8 @@ impl CognitiveLoopService {
             causal_consciousness,
             thermodynamic_load: 0.0,
             mood_temperature: 1.0,
+            somatic_bridge: somatic_bridge_instance,
+            pain_tx: Some(pain_sender),
         })
     }
 

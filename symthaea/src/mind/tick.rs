@@ -63,10 +63,11 @@ impl ContinuousMind {
 
         if self.state.is_dreaming {
             // Periodic Causal Pruning during dreaming (every 100 dream ticks)
-            if self.state.tick % 100 == 0 {
-                let load = self.state.thermodynamic_load;
-                self.memory_coordinator.prune_memories(&mut self.episodic_memory, load);
-            }
+            // TODO: Wire memory_coordinator + episodic_memory fields into ContinuousMind
+            // if self.state.tick % 100 == 0 {
+            //     let load = self.state.thermodynamic_load;
+            //     self.memory_coordinator.prune_memories(&mut self.episodic_memory, load);
+            // }
             return self.process_dream();
         }
 
@@ -322,7 +323,7 @@ impl ContinuousMind {
                 .unwrap_or_default()
                 .as_secs();
 
-            let insight = crate::swarm::holochain::EpigeneticInsight {
+            let insight = crate::swarm::EpigeneticInsight {
                 agent_key: crate::swarm::AgentPubKey::new("self"),
                 mutation_id: format!("insight_cycle_{}", self.state.tick),
                 tau_scale: self.state.holocell.tau,
@@ -766,7 +767,10 @@ impl ContinuousMind {
                 .metadata
                 .insert("timestamp_s".to_string(), reading.timestamp_s.to_string());
             if !reading.tags.is_empty() {
-                let tags_json = serde_json::to_string(&reading.tags).unwrap_or_else(|_| "[]".to_string());
+                let tags_json = serde_json::to_string(&reading.tags).unwrap_or_else(|e| {
+                    tracing::warn!(sensor = %sensor_id, error = %e, "Failed to serialize sensor tags");
+                    "[]".to_string()
+                });
                 input.metadata.insert("topics".to_string(), tags_json);
             }
             for (key, value) in reading.metadata {
