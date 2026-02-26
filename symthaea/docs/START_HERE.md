@@ -119,6 +119,45 @@ cargo bench --bench consciousness
 cargo build --release --features service
 ```
 
+### Configure the API server
+
+`ApiConfig` now includes request limits and backpressure controls. Defaults:
+- `max_body_bytes`: 16 MiB
+- `max_in_flight_requests`: 32
+
+Example:
+
+```rust
+use symthaea::api::{serve_with_config, ApiConfig};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ApiConfig {
+        allowed_origins: vec!["https://example.com".to_string()],
+        bearer_token: Some("secret-token".to_string()),
+        max_body_bytes: 8 * 1024 * 1024,
+        max_in_flight_requests: 16,
+    };
+
+    serve_with_config("0.0.0.0:8080", config).await
+}
+```
+
+### Audit or repair the SQLite memory store
+
+Use the audit tool to find invalid encodings or memory_type values.
+
+```bash
+# Audit only
+cargo run --bin symthaea-db-audit -- ./data/memories.db
+
+# Quarantine invalid rows
+cargo run --bin symthaea-db-audit -- ./data/memories.db --repair --repair-mode quarantine
+
+# Normalize invalid memory_type values (quarantines invalid encodings)
+cargo run --bin symthaea-db-audit -- ./data/memories.db --repair --repair-mode normalize
+```
+
 ---
 
 ## Critical Concepts

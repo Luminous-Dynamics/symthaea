@@ -61,6 +61,7 @@ results/
 zenodo-dataset/
 studies/
 sentinel-demo/
+benchmarks/external/**/data/
 
 # Datasets subdirectory (large files)
 datasets/

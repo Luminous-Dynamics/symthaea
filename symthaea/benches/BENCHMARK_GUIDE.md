@@ -24,6 +24,20 @@ cargo bench --bench ethics
 
 ---
 
+## External Benchmarks
+
+External evaluation suites (ARC-AGI-2, GAIA, OSWorld-Verified, SWE-bench Verified, HELM)
+are registered in `benchmarks/manifest.json` and executed via:
+
+```bash
+python benchmarks/external/run_external.py --list
+python benchmarks/external/run_external.py --bench arc-agi-2
+```
+
+See `benchmarks/REPRO.md` for the reviewer path.
+
+---
+
 ## Benchmark Suites
 
 ### 1. Quick Suite (`quick.rs`)

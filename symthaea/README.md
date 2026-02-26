@@ -74,6 +74,7 @@ cargo run --example full_pipeline --release
 - **[Architecture](docs/architecture/)** - System design
 - **[Research Papers](papers/)** - Scientific foundations
 - **[Honest Status](docs/HONEST_STATUS.md)** - What works, what doesn't
+- **[Testing](docs/TESTING.md)** - Test tiers, ignored tests, and env notes
 
 ## Feature Flags
 

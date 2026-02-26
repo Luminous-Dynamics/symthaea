@@ -89,10 +89,15 @@ Word-level semantic alignment using BLAKE3 hashing:
 - **Voice/Perception**: Feature-gated, requires explicit enablement
 
 ### Potential Improvements
-- Full PolicyBundle enforcement in ActionIR
+- PolicyBundle enforcement is now strict on command env overrides, working_dir paths, and execution budgets (shell + file writes). Remaining gaps: read/list budgeting and richer env allowlists.
 - Real database connections (currently mocks for testing)
 - Temporal encoder integration with runtime inputs
 - Hardware salience feeding into memory selection
+
+### Action Policy Notes
+- `allowed_env` is an allowlist: if empty, all env overrides are rejected.
+- An allowed value of `"*"` permits any value for that key; otherwise the value must match exactly.
+- `working_dir` must resolve inside the sandbox and satisfy read allowlist patterns.
 
 ## Testing Status
 
