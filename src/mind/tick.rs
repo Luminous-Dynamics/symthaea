@@ -289,6 +289,19 @@ impl ContinuousMind {
                 self.state.consciousness_level =
                     (self.state.consciousness_level * boost).clamp(0.0, 1.0);
             }
+
+            // v1.4.0 AFFECTIVE MIRRORING:
+            // If we have hyperfeel enabled, we sympathetically mirror peer load.
+            if let Some(ref hf) = self.hyperfeel {
+                let mirrored = hf.mirrored_state();
+                // If peers are stressed (>0.7), our local load sympathetically rises
+                if mirrored.thermodynamic_load > 0.7 {
+                    let sympathy_boost = (mirrored.thermodynamic_load - 0.7) * 0.2;
+                    self.state.thermodynamic_load = (self.state.thermodynamic_load + sympathy_boost).min(1.0);
+                    // Update mood temperature accordingly
+                    self.state.mood_temperature = 0.5 + (self.state.thermodynamic_load * 1.5);
+                }
+            }
         }
     }
 
@@ -860,11 +873,12 @@ impl ContinuousMind {
             .as_millis() as u64;
 
         let arousal = self.state.arousal;
-        let affect = crate::swarm::AffectiveState {
+        let mut affect = crate::swarm::AffectiveState {
             valence: self.state.emotional_valence,
             arousal,
             dominance: 0.0,
             intensity: arousal.abs(),
+            thermodynamic_load: self.state.thermodynamic_load,
             confidence: 1.0,
             timestamp_ms,
             sequence: self.mesh_affective_sequence as u64,

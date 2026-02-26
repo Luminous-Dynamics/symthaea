@@ -68,6 +68,9 @@ pub struct AffectiveState {
     /// Emotional intensity (0.0 to 1.0)
     pub intensity: f32,
 
+    /// Thermodynamic load (0.0 to 1.0, where 1.0 = 6W limit reached)
+    pub thermodynamic_load: f32,
+
     /// Confidence in this reading (0.0 to 1.0)
     pub confidence: f32,
 
@@ -94,6 +97,7 @@ impl AffectiveState {
             arousal: arousal.clamp(0.0, 1.0),
             dominance: dominance.clamp(-1.0, 1.0),
             intensity,
+            thermodynamic_load: 0.0, // Default to zero, will be set via local sync
             confidence: 1.0,
             timestamp_ms: now,
             sequence: 0,
@@ -110,7 +114,8 @@ impl AffectiveState {
         let dv = self.valence - other.valence;
         let da = self.arousal - other.arousal;
         let dd = self.dominance - other.dominance;
-        (dv * dv + da * da + dd * dd).sqrt()
+        let dt = self.thermodynamic_load - other.thermodynamic_load;
+        (dv * dv + da * da + dd * dd + dt * dt).sqrt()
     }
 
     /// Blend with another state
@@ -121,6 +126,7 @@ impl AffectiveState {
             arousal: self.arousal * (1.0 - w) + other.arousal * w,
             dominance: self.dominance * (1.0 - w) + other.dominance * w,
             intensity: self.intensity * (1.0 - w) + other.intensity * w,
+            thermodynamic_load: self.thermodynamic_load * (1.0 - w) + other.thermodynamic_load * w,
             confidence: self.confidence * (1.0 - w) + other.confidence * w,
             timestamp_ms: other.timestamp_ms,
             sequence: other.sequence,
