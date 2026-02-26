@@ -973,6 +973,16 @@ pub struct CycleMetadata {
     /// Adaptive memoization threshold from codebook diversity.
     pub adaptive_memo_threshold: f32,
 
+    // ── Neuromodulator Bath ────────────────────────────────────────────
+    /// Effective dopamine signal (reward/learning drive, 0.0–2.0).
+    pub dopamine_effective: f32,
+    /// Effective noradrenaline signal (arousal/exploration, 0.0–2.0).
+    pub noradrenaline_effective: f32,
+    /// Effective serotonin signal (satisfaction/confidence, 0.0–2.0).
+    pub serotonin_effective: f32,
+    /// Effective acetylcholine signal (attention/precision, 0.0–2.0).
+    pub acetylcholine_effective: f32,
+
     // ── Liquid-Mamba Fusion Telemetry ────────────────────────────────
     /// Semantic prediction error from Liquid-Mamba round-trip (0.0–1.0, 0.0 when off).
     /// Measures `1 - cosine(thought_hv, bundled_output_hvs)`.

@@ -133,6 +133,7 @@ mod cycle_subsystems;
 mod helpers;
 mod moral;
 mod prediction;
+pub(crate) mod neuromodulators;
 pub(crate) mod virtual_body;
 
 #[cfg(feature = "humanoid")]
@@ -851,6 +852,11 @@ pub struct CognitiveLoopService {
 
     /// Affective bias: cognitive temperature (0.0 to 2.0).
     pub(crate) mood_temperature: f32,
+
+    /// Neuromodulator bath — DA/NE/5-HT/ACh chemical signaling.
+    /// Unifies 44+ scattered modulation sites under a coherent biological model.
+    /// Science: Doya (2002) — "Metalearning and neuromodulation"
+    neuromodulator_bath: neuromodulators::NeuromodulatorBath,
 
     /// Somatic error bridge: converts infrastructure failures into felt stress.
     /// Lock poisoning, task panics, DB errors → arousal, thermodynamic load, tau slowdown.

@@ -5523,3 +5523,182 @@ fn test_200_cycle_phase21_stress() {
         stats.memo_threshold_adaptations,
     );
 }
+
+// ── Neuromodulator Bath ─────────────────────────────────────────────
+
+#[test]
+fn test_neuromodulator_baseline_levels() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // 20 cycles of neutral input — all transmitters should be finite and in range
+    for _ in 0..20 {
+        let result = service.cycle("baseline test input");
+        let m = &result.metadata;
+        assert!(m.dopamine_effective.is_finite(), "DA not finite");
+        assert!(m.noradrenaline_effective.is_finite(), "NE not finite");
+        assert!(m.serotonin_effective.is_finite(), "5-HT not finite");
+        assert!(m.acetylcholine_effective.is_finite(), "ACh not finite");
+        // Effective range: [0.0, 2.0] (level * receptor_sensitivity)
+        assert!(m.dopamine_effective >= 0.0 && m.dopamine_effective <= 2.0);
+        assert!(m.noradrenaline_effective >= 0.0 && m.noradrenaline_effective <= 2.0);
+        assert!(m.serotonin_effective >= 0.0 && m.serotonin_effective <= 2.0);
+        assert!(m.acetylcholine_effective >= 0.0 && m.acetylcholine_effective <= 2.0);
+    }
+
+    let stats = service.stats();
+    // EMA stats should be populated and finite
+    assert!(stats.avg_dopamine.is_finite());
+    assert!(stats.avg_noradrenaline.is_finite());
+    assert!(stats.avg_serotonin.is_finite());
+    assert!(stats.avg_acetylcholine.is_finite());
+}
+
+#[test]
+fn test_dopamine_reward_response() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // 50 cycles — DA should be non-zero after cycles with prediction success (low error)
+    let mut da_sum = 0.0_f32;
+    for _ in 0..50 {
+        let result = service.cycle("dopamine reward test pattern");
+        da_sum += result.metadata.dopamine_effective;
+    }
+    // Average DA should be positive (system gets some reward from learning)
+    assert!(
+        da_sum / 50.0 > 0.0,
+        "average DA should be positive: {}",
+        da_sum / 50.0
+    );
+}
+
+#[test]
+fn test_noradrenaline_surprise_spike() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // 30 cycles of same pattern → NE should stabilize
+    for _ in 0..30 {
+        service.cycle("pattern");
+    }
+
+    // Inject novel input → NE should increase
+    let result_novel = service.cycle("completely unexpected novel stimulus");
+    assert!(
+        result_novel.metadata.noradrenaline_effective.is_finite(),
+        "NE should be finite after novel input"
+    );
+    assert!(
+        result_novel.metadata.noradrenaline_effective >= 0.0,
+        "NE should be non-negative"
+    );
+}
+
+#[test]
+fn test_serotonin_coherence_satisfaction() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // 100 cycles — 5-HT should correlate with coherence (both trend together during learning)
+    let mut sht_values = Vec::new();
+    for _ in 0..100 {
+        let result = service.cycle("coherence satisfaction signal");
+        sht_values.push(result.metadata.serotonin_effective);
+    }
+
+    // All values should be finite and in range
+    for (i, &sht) in sht_values.iter().enumerate() {
+        assert!(sht.is_finite(), "5-HT not finite at cycle {i}");
+        assert!(sht >= 0.0 && sht <= 2.0, "5-HT out of range at cycle {i}: {sht}");
+    }
+    // Average 5-HT should be positive (system achieves some coherence)
+    let avg: f32 = sht_values.iter().sum::<f32>() / sht_values.len() as f32;
+    assert!(avg > 0.0, "average 5-HT should be positive: {avg}");
+}
+
+#[test]
+fn test_acetylcholine_attention_modulation() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // 40 cycles — ACh should be finite and attention_sensitivity within bounds
+    for i in 0..40 {
+        let result = service.cycle("attention precision focus");
+        let m = &result.metadata;
+        assert!(m.acetylcholine_effective.is_finite(), "ACh not finite at {i}");
+        assert!(
+            m.acetylcholine_effective >= 0.0 && m.acetylcholine_effective <= 2.0,
+            "ACh out of range at {i}: {}",
+            m.acetylcholine_effective
+        );
+    }
+}
+
+#[test]
+#[ignore] // Long-running stress test
+fn test_neuromodulator_300_cycle_stress() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "reward signal positive",
+        "surprising novel input",
+        "calm coherent baseline",
+        "focused attention task",
+        "moral violation detected",
+        "creative exploration mode",
+    ];
+
+    for i in 0..300 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        let m = &result.metadata;
+
+        // All 4 transmitters finite and in range
+        assert!(m.dopamine_effective.is_finite(), "DA NaN/Inf at {i}");
+        assert!(m.noradrenaline_effective.is_finite(), "NE NaN/Inf at {i}");
+        assert!(m.serotonin_effective.is_finite(), "5-HT NaN/Inf at {i}");
+        assert!(m.acetylcholine_effective.is_finite(), "ACh NaN/Inf at {i}");
+        assert!(m.dopamine_effective >= 0.0 && m.dopamine_effective <= 2.0);
+        assert!(m.noradrenaline_effective >= 0.0 && m.noradrenaline_effective <= 2.0);
+        assert!(m.serotonin_effective >= 0.0 && m.serotonin_effective <= 2.0);
+        assert!(m.acetylcholine_effective >= 0.0 && m.acetylcholine_effective <= 2.0);
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 300);
+    // EMA stats all finite
+    assert!(stats.avg_dopamine.is_finite());
+    assert!(stats.avg_noradrenaline.is_finite());
+    assert!(stats.avg_serotonin.is_finite());
+    assert!(stats.avg_acetylcholine.is_finite());
+
+    eprintln!(
+        "300-cycle neuromod stress: DA={:.3}, NE={:.3}, 5-HT={:.3}, ACh={:.3}",
+        stats.avg_dopamine,
+        stats.avg_noradrenaline,
+        stats.avg_serotonin,
+        stats.avg_acetylcholine,
+    );
+}

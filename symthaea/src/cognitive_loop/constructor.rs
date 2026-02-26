@@ -917,6 +917,7 @@ impl CognitiveLoopService {
             causal_consciousness,
             thermodynamic_load: 0.0,
             mood_temperature: 1.0,
+            neuromodulator_bath: super::neuromodulators::NeuromodulatorBath::default(),
             somatic_bridge: somatic_bridge_instance,
             pain_tx: Some(pain_sender),
         })
