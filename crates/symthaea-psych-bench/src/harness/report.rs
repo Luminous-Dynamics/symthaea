@@ -829,6 +829,13 @@ impl BenchmarkReport {
         if benchmark.contains("ArcFluid") {
             push_specific("rt_ticks", "arc_rt_ticks", &bl.reasoning);
         }
+        // ARC Compositional Reasoning
+        if benchmark.contains("ArcCompositional") {
+            push_specific("compositional_accuracy", "arc_compositional_accuracy", &bl.reasoning);
+            push_specific("size_generalization", "arc_size_generalization", &bl.reasoning);
+            push_specific("symmetry_detection", "arc_symmetry_detection", &bl.reasoning);
+            push_specific("compositional_rt_ticks", "arc_compositional_rt_ticks", &bl.reasoning);
+        }
         // SART (Sustained Attention)
         if benchmark.contains("SART") {
             push_specific("commission_errors", "commission_errors", &bl.sustained_attention);

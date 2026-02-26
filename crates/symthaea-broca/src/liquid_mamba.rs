@@ -168,6 +168,8 @@ impl LiquidMambaGenerator {
                     eos_terminated: false,
                     veto_triggered: false,
                     final_coherence: 0.0,
+                    output_hvs: Vec::new(),
+                    semantic_pe: 0.0,
                 }
             }
         }
@@ -208,18 +210,19 @@ impl LiquidMambaGenerator {
         let mut text = String::new();
         let mut veto_triggered = false;
         let mut prev_token = eos_id; // Start with EOS as BOS-equivalent
+        let mut output_hvs: Vec<ContinuousHV> = Vec::new();
 
         for pos in 0..max_tokens {
-            // 5a. Biological delta modulation
+            // 7a. Biological delta modulation
             if self.config.enable_liquid_delta {
                 let scale = self.biological_state_scale();
                 self.mamba.scale_hidden_states(scale)?;
             }
 
-            // 5b. Forward one token through Mamba
+            // 7b. Forward one token through Mamba
             let mut logits = self.mamba.forward_one_token(prev_token)?;
 
-            // 5c. Epistemic gating (apply to Mamba's large vocab logits)
+            // 7c. Epistemic gating (apply to Mamba's large vocab logits)
             if self.config.enable_gating {
                 // Apply gating to the first N tokens that overlap with Broca vocab
                 // Mamba vocab >> Broca vocab, so we gate on the Broca-sized prefix
@@ -230,7 +233,7 @@ impl LiquidMambaGenerator {
                 );
             }
 
-            // 5d. Emotional modulation
+            // 7d. Emotional modulation
             if self.config.enable_gating {
                 let gate_len = logits.len().min(512);
                 self.emotional_modulator.apply(
@@ -240,16 +243,18 @@ impl LiquidMambaGenerator {
                 );
             }
 
-            // 5e. Top-k sampling
+            // 7e. Top-k sampling
             let next_token = top_k_sample(&logits, self.config.top_k, self.config.temperature);
 
-            // 5f-h. Back-project token and monitor coherence
+            // 7f. Back-project token to HDC (unconditional — for distillation + veto)
+            let token_emb = self.mamba.embedding_vector(next_token)?;
+            let token_hdc = self.projection.project_to_hdc(&token_emb);
+            output_hvs.push(token_hdc.clone());
+
+            // 7g. Coherence monitoring + semantic veto
             if self.config.enable_veto {
-                let token_emb = self.mamba.embedding_vector(next_token)?;
-                let token_hdc = self.projection.project_to_hdc(&token_emb);
                 coherence_monitor.push(token_hdc);
 
-                // 5i. Semantic veto check
                 if coherence_monitor.should_veto() && pos > 2 {
                     veto_triggered = true;
                     text.push_str(&self.config.veto_hesitation);
@@ -264,8 +269,9 @@ impl LiquidMambaGenerator {
                 }
             }
 
-            // 5j. Decode token
+            // 7h. Decode token
             if next_token == eos_id {
+                let semantic_pe = self.semantic_prediction_error(&thought_hv, &output_hvs);
                 return Ok(GenerationResult {
                     text,
                     token_ids: tokens,
@@ -273,6 +279,8 @@ impl LiquidMambaGenerator {
                     eos_terminated: true,
                     veto_triggered,
                     final_coherence: coherence_monitor.current_coherence(),
+                    output_hvs,
+                    semantic_pe,
                 });
             }
 
@@ -284,6 +292,7 @@ impl LiquidMambaGenerator {
             prev_token = next_token;
         }
 
+        let semantic_pe = self.semantic_prediction_error(&thought_hv, &output_hvs);
         Ok(GenerationResult {
             text,
             token_ids: tokens.clone(),
@@ -291,6 +300,8 @@ impl LiquidMambaGenerator {
             eos_terminated: false,
             veto_triggered,
             final_coherence: coherence_monitor.current_coherence(),
+            output_hvs,
+            semantic_pe,
         })
     }
 

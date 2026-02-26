@@ -454,8 +454,8 @@ mod tests {
         let thought_hv = encoder.encode(&channels);
 
         // Project HDC → SSM space
-        let mut projection = HdcSsmProjection::new(&genesis);
-        let ssm_context = projection.hdc_to_ssm(&thought_hv);
+        let mut projection = HdcSsmProjection::new(&genesis, 16384, 256, 768);
+        let ssm_context = projection.project_to_ssm(&thought_hv);
 
         // Inject context into Mamba
         wrapper.inject_initial_context(&ssm_context)

@@ -246,7 +246,7 @@ pub struct LLMOrgan {
     backend: Option<Arc<dyn super::llm_backend::LLMBackend>>,
     /// Distillation data collector (active when SYMTHAEA_DISTILL_PATH is set)
     #[cfg(feature = "ssm_language")]
-    distillation_collector: Option<super::distillation::DistillationCollector>,
+    distillation_collector: Option<Arc<super::distillation::DistillationCollector>>,
 }
 
 impl std::fmt::Debug for LLMOrgan {
@@ -284,7 +284,7 @@ impl LLMOrgan {
             stats: LLMOrganStats::default(),
             backend: None,
             #[cfg(feature = "ssm_language")]
-            distillation_collector: super::distillation::DistillationCollector::from_env(),
+            distillation_collector: super::distillation::DistillationCollector::from_env().map(Arc::new),
         }
     }
 
@@ -305,7 +305,7 @@ impl LLMOrgan {
             stats: LLMOrganStats::default(),
             backend: Some(backend),
             #[cfg(feature = "ssm_language")]
-            distillation_collector: super::distillation::DistillationCollector::from_env(),
+            distillation_collector: super::distillation::DistillationCollector::from_env().map(Arc::new),
         }
     }
 

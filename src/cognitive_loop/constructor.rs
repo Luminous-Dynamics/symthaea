@@ -601,6 +601,19 @@ impl CognitiveLoopService {
             None
         };
 
+        // Build optional grid encoder for spatial reasoning (co-gated with primitive consciousness)
+        let grid_encoder = if primitive_processor.is_some() {
+            Some(symthaea_core::hdc::grid_encoder::GridEncoder::new(
+                config.cfc_config.input_dim,
+                30,  // max grid rows
+                30,  // max grid cols
+                10,  // num colors
+                0x9E3779B9_7F4A7C15, // golden ratio seed
+            ))
+        } else {
+            None
+        };
+
         // Build optional multi-objective evolution (co-gated with primitive consciousness)
         let multi_objective_evolution = if primitive_processor.is_some() {
             crate::consciousness::multi_objective_evolution::MultiObjectiveEvolution::new(
@@ -844,6 +857,7 @@ impl CognitiveLoopService {
             code_primitive_router,
             empathic_unification,
             multi_objective_evolution,
+            grid_encoder,
             holographic_analyzer,
             differentiable_consciousness,
             affective_consciousness,

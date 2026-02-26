@@ -43,7 +43,21 @@ license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 [bans]
 multiple-versions = "warn"
 wildcards = "allow"
-highlight = "all"
+highlight = "lowest-version"
+# Known acceptable duplicates (transitive, can't consolidate without major bumps)
+skip = [
+    # png (via image 0.24) pulls bitflags 1.x; rest of ecosystem uses 2.x
+    { name = "bitflags", version = "=1.3.2" },
+    # rand 0.8 (ours) vs rand 0.9 (some transitive deps)
+    { name = "rand", version = ">=0.9, <1.0" },
+    { name = "rand_core", version = ">=0.9, <1.0" },
+    { name = "rand_chacha", version = ">=0.9, <1.0" },
+    { name = "getrandom", version = ">=0.3, <1.0" },
+    # hashbrown versions from different deps (rusqlite, lru, indexmap)
+    { name = "hashbrown", version = "=0.14" },
+    { name = "hashbrown", version = "=0.16" },
+    { name = "foldhash", version = ">=0.2, <1.0" },
+]
 
 [sources]
 unknown-registry = "warn"

@@ -128,7 +128,7 @@ jobs:
         run: cargo test --all-features
 
   test-feature-matrix-critical:
-    name: Test Feature Matrix (core/web_research/integration)
+    name: Test Feature Matrix (core/web_research/pathology)
     runs-on: ubuntu-latest
     needs: test
     strategy:
@@ -139,8 +139,8 @@ jobs:
             cmd: cargo test -p symthaea
           - name: web_research
             cmd: cargo test -p symthaea --features "web_research_module school_learning"
-          - name: integration_tests
-            cmd: cargo test -p symthaea --features integration-tests
+          - name: pathology_resilience
+            cmd: cargo test --test pathology_resilience -- --nocapture
     steps:
       - uses: actions/checkout@v4
 
@@ -291,6 +291,18 @@ jobs:
 
       - name: Check feature combination ${{ matrix.features }}
         run: cargo check --features "${{ matrix.features }}"
+
+  deny:
+    name: Dependency Audit (cargo-deny)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --all-features
 
   audit:
     name: Security Audit

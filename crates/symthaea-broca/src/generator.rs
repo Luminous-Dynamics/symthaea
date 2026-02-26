@@ -86,6 +86,12 @@ pub struct GenerationResult {
     pub veto_triggered: bool,
     /// Final coherence score.
     pub final_coherence: f32,
+    /// Back-projected HDC vectors for each generated token (Liquid-Mamba only).
+    #[cfg(feature = "mamba")]
+    pub output_hvs: Vec<symthaea_core::hdc::ContinuousHV>,
+    /// Semantic prediction error: round-trip reconstruction loss (Liquid-Mamba only).
+    #[cfg(feature = "mamba")]
+    pub semantic_pe: f32,
 }
 
 /// Broca generator: autoregressive thought-to-text.
@@ -236,6 +242,10 @@ impl BrocaGenerator {
             eos_terminated,
             veto_triggered,
             final_coherence,
+            #[cfg(feature = "mamba")]
+            output_hvs: Vec::new(),
+            #[cfg(feature = "mamba")]
+            semantic_pe: 0.0,
         }
     }
 

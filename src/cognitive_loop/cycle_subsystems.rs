@@ -36,6 +36,8 @@ pub(crate) struct SubsystemMetrics {
     pub empathic_compassion: f64,
     pub empathic_tone_adj: f64,
     pub multi_obj_frontier_size: usize,
+    pub grid_encoding_norm: f32,
+    pub grid_spatial_complexity: f32,
 }
 
 impl CognitiveLoopService {
@@ -441,6 +443,55 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
+        // GRID ENCODER: Spatial reasoning via HDC grid encoding.
+        // Encodes the current input as a 2D grid (treating bytes as color indices)
+        // to extract spatial structure metrics (norm + complexity).
+        // Science: Chollet (2019) — Abstraction and Reasoning Corpus.
+        // Amortized: every 13 cycles (lightweight but not needed every tick).
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (grid_encoding_norm, grid_spatial_complexity) =
+            if let Some(ref encoder) = self.grid_encoder {
+                if self.stats.total_cycles % 13 == 0 {
+                    // Interpret input bytes as a small grid (up to 8x8)
+                    let input_bytes = input.as_bytes();
+                    let side = (input_bytes.len() as f32).sqrt().ceil() as usize;
+                    let side = side.clamp(1, 8);
+                    let num_colors = encoder.num_colors();
+                    let mut grid = vec![vec![0u8; side]; side];
+                    for (i, &b) in input_bytes.iter().take(side * side).enumerate() {
+                        grid[i / side][i % side] = b % num_colors as u8;
+                    }
+                    let hv = encoder.encode_grid(&grid);
+                    let norm = hv.as_slice().iter().map(|x| x * x).sum::<f32>().sqrt();
+
+                    // Spatial complexity: ratio of unique colors used to total possible
+                    let mut seen = [false; 16];
+                    for row in &grid {
+                        for &c in row {
+                            if (c as usize) < seen.len() {
+                                seen[c as usize] = true;
+                            }
+                        }
+                    }
+                    let unique = seen.iter().filter(|&&x| x).count() as f32;
+                    let complexity = (unique / num_colors.max(1) as f32).clamp(0.0, 1.0);
+
+                    self.carryover.quality.last_grid_norm = norm;
+                    self.carryover.quality.last_grid_complexity = complexity;
+                    (norm, complexity)
+                } else {
+                    (
+                        self.carryover.quality.last_grid_norm,
+                        self.carryover.quality.last_grid_complexity,
+                    )
+                }
+            } else {
+                (0.0, 0.0)
+            };
+        module_timings.grid_encoder = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
         // PRIMITIVE VALIDATION: One-shot empirical Φ validation at cycle 500
         // Runs StandardExperiments::tier1_mathematical() once to validate that
         // primitives genuinely improve consciousness (Φ) vs baseline.
@@ -691,6 +742,8 @@ impl CognitiveLoopService {
             empathic_compassion,
             empathic_tone_adj,
             multi_obj_frontier_size,
+            grid_encoding_norm,
+            grid_spatial_complexity,
         }
     }
 }

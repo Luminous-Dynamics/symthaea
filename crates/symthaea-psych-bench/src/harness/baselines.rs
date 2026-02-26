@@ -1490,6 +1490,31 @@ pub fn reasoning_baselines() -> BaselineMap {
         source: "Johnson et al. (2021), deliberation time estimate (1 tick ≈ 50ms)",
         population: "human adults",
     });
+    // ARC Compositional baselines (estimated from harder ARC subsets)
+    m.insert("arc_compositional_accuracy", Baseline {
+        value: 0.65,
+        sd: Some(0.15),
+        source: "Johnson et al. (2021), estimated for chained transforms",
+        population: "human adults",
+    });
+    m.insert("arc_size_generalization", Baseline {
+        value: 0.70,
+        sd: Some(0.12),
+        source: "Johnson et al. (2021), cross-size transfer estimate",
+        population: "human adults",
+    });
+    m.insert("arc_symmetry_detection", Baseline {
+        value: 0.90,
+        sd: Some(0.08),
+        source: "Treder (2010), symmetry detection in visual arrays",
+        population: "human adults",
+    });
+    m.insert("arc_compositional_rt_ticks", Baseline {
+        value: 8.0,
+        sd: Some(3.0),
+        source: "Johnson et al. (2021), harder tasks deliberation estimate",
+        population: "human adults",
+    });
     m
 }
 

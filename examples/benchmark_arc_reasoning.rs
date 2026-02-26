@@ -4,7 +4,7 @@
 //! (Chollet 2019), which evaluates abstract reasoning and generalization.
 //!
 //! ## Method
-//! 1. Encode each ARC grid as an HDC vector using spatial+color encoding
+//! 1. Encode each ARC grid as an HDC vector using GridEncoder (spatial+color binding)
 //! 2. Encode input→output transformation as a "rule vector" (bind input with output)
 //! 3. For each test task, compute similarity between training rule vectors
 //! 4. Measure task-level consistency and cross-task generalization
@@ -24,13 +24,13 @@
 //! cargo run --example benchmark_arc_reasoning --release
 //! ```
 
-use std::fs;
 use std::env;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use symthaea::hdc::unified_hv::ContinuousHV;
+use symthaea::hdc::grid_encoder::GridEncoder;
 
 fn arc_data_dir() -> PathBuf {
     env::var("SYMTHAEA_ARC_DATA_DIR")
@@ -42,118 +42,6 @@ fn arc_results_path() -> PathBuf {
     env::var("SYMTHAEA_ARC_RESULTS_PATH")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("data/benchmarks/arc/results.json"))
-}
-
-/// ARC grid encoder using HDC spatial composition
-struct ArcHdcEncoder {
-    dim: usize,
-    /// Color HVs (10 colors: 0-9)
-    color_hvs: Vec<ContinuousHV>,
-    /// Position HVs for (row, col) - up to 30x30
-    row_hvs: Vec<ContinuousHV>,
-    col_hvs: Vec<ContinuousHV>,
-}
-
-impl ArcHdcEncoder {
-    fn new(dim: usize) -> Self {
-        let color_hvs: Vec<ContinuousHV> = (0..10)
-            .map(|c| ContinuousHV::random(dim, 50000 + c as u64))
-            .collect();
-
-        let row_hvs: Vec<ContinuousHV> = (0..30)
-            .map(|r| ContinuousHV::random(dim, 60000 + r as u64))
-            .collect();
-
-        let col_hvs: Vec<ContinuousHV> = (0..30)
-            .map(|c| ContinuousHV::random(dim, 70000 + c as u64))
-            .collect();
-
-        Self {
-            dim,
-            color_hvs,
-            row_hvs,
-            col_hvs,
-        }
-    }
-
-    /// Encode a 2D grid into an HDC vector
-    /// Grid encoding: bundle(bind(row_hv, col_hv, color_hv) for each cell)
-    fn encode_grid(&self, grid: &[Vec<u8>]) -> ContinuousHV {
-        let mut accumulator = vec![0.0f32; self.dim];
-        let mut cell_count = 0;
-
-        for (r, row) in grid.iter().enumerate() {
-            for (c, &color) in row.iter().enumerate() {
-                if r >= 30 || c >= 30 || color as usize >= 10 {
-                    continue;
-                }
-                // bind(row, col, color) - triple binding for spatial+semantic
-                let pos = self.row_hvs[r].bind(&self.col_hvs[c]);
-                let cell = pos.bind(&self.color_hvs[color as usize]);
-
-                for (acc, &val) in accumulator.iter_mut().zip(cell.values.iter()) {
-                    *acc += val;
-                }
-                cell_count += 1;
-            }
-        }
-
-        // Normalize
-        if cell_count > 0 {
-            let norm: f32 = accumulator.iter().map(|x| x * x).sum::<f32>().sqrt();
-            if norm > 0.0 {
-                for v in &mut accumulator {
-                    *v /= norm;
-                }
-            }
-        }
-
-        ContinuousHV::from_vec(accumulator)
-    }
-
-    /// Encode a transformation (input→output pair) as a "rule vector"
-    /// Rule = bind(input_encoding, output_encoding)
-    fn encode_rule(&self, input: &[Vec<u8>], output: &[Vec<u8>]) -> ContinuousHV {
-        let input_hv = self.encode_grid(input);
-        let output_hv = self.encode_grid(output);
-        input_hv.bind(&output_hv)
-    }
-
-    /// Compute grid metadata features
-    #[allow(dead_code)]
-    fn grid_features(grid: &[Vec<u8>]) -> GridFeatures {
-        let rows = grid.len();
-        let cols = if rows > 0 { grid[0].len() } else { 0 };
-
-        let mut color_counts = [0usize; 10];
-        for row in grid {
-            for &c in row {
-                if (c as usize) < 10 {
-                    color_counts[c as usize] += 1;
-                }
-            }
-        }
-
-        let n_colors = color_counts.iter().filter(|&&c| c > 0).count();
-        let non_bg = color_counts[1..].iter().sum::<usize>();
-
-        GridFeatures {
-            rows,
-            cols,
-            n_colors,
-            non_background_cells: non_bg,
-            total_cells: rows * cols,
-        }
-    }
-}
-
-#[allow(dead_code)]
-struct GridFeatures {
-    rows: usize,
-    cols: usize,
-    n_colors: usize,
-    non_background_cells: usize,
-    total_cells: usize,
 }
 
 /// Parse ARC JSON task file
@@ -235,7 +123,8 @@ fn main() {
     println!("Found {} training tasks\n", task_files.len());
 
     let dim = 4096;
-    let encoder = ArcHdcEncoder::new(dim);
+    // Use GridEncoder with same seed offsets as the original PoC (50k/60k/70k)
+    let encoder = GridEncoder::new(dim, 30, 30, 10, 0);
 
     // ═══════════════════════════════════════════════════════════════
     // Test 1: Rule Consistency within tasks
@@ -260,11 +149,15 @@ fn main() {
             continue;
         }
 
-        // Encode all training rules
-        let rule_hvs: Vec<ContinuousHV> = task
+        // Encode all training rules using GridEncoder
+        let rule_hvs: Vec<_> = task
             .train
             .iter()
-            .map(|(inp, out)| encoder.encode_rule(inp, out))
+            .map(|(inp, out)| {
+                let in_hv = encoder.encode_grid(inp);
+                let out_hv = encoder.encode_grid(out);
+                encoder.encode_rule(&in_hv, &out_hv)
+            })
             .collect();
 
         // Average pairwise similarity
@@ -312,12 +205,13 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let t = Instant::now();
-    // Collect one rule per task (first training example)
     let mut task_rules = Vec::new();
     for task_path in task_files.iter().take(100) {
         if let Some(task) = parse_task(task_path) {
             let (inp, out) = &task.train[0];
-            task_rules.push(encoder.encode_rule(inp, out));
+            let in_hv = encoder.encode_grid(inp);
+            let out_hv = encoder.encode_grid(out);
+            task_rules.push(encoder.encode_rule(&in_hv, &out_hv));
         }
     }
 
@@ -347,8 +241,7 @@ fn main() {
 
     // ═══════════════════════════════════════════════════════════════
     // Test 3: Grid Encoding Quality
-    // Identical grids should have similarity ≈ 1.0
-    // Different grids should have lower similarity
+    // Uses GridEncoder transformation algebra for systematic comparisons
     // ═══════════════════════════════════════════════════════════════
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("Test 3: Grid Encoding Fidelity");
@@ -356,7 +249,6 @@ fn main() {
 
     let t = Instant::now();
 
-    // Self-similarity (encode same grid twice → should be identical)
     let test_grid = vec![
         vec![0, 0, 1, 0, 0],
         vec![0, 1, 2, 1, 0],
@@ -368,29 +260,23 @@ fn main() {
     let enc2 = encoder.encode_grid(&test_grid);
     let self_sim = enc1.similarity(&enc2);
 
-    // Translated grid (shift right by 1)
-    let translated = vec![
-        vec![0, 0, 0, 1, 0],
-        vec![0, 0, 1, 2, 1],
-        vec![0, 1, 2, 3, 2],
-        vec![0, 0, 1, 2, 1],
-        vec![0, 0, 0, 1, 0],
-    ];
+    // Use GridEncoder transforms instead of hand-crafted grids
+    let translated = GridEncoder::translate_grid(&test_grid, 1, 0, 0);
     let trans_enc = encoder.encode_grid(&translated);
     let trans_sim = enc1.similarity(&trans_enc);
 
-    // Color-swapped grid (1↔2)
-    let color_swapped = vec![
-        vec![0, 0, 2, 0, 0],
-        vec![0, 2, 1, 2, 0],
-        vec![2, 1, 3, 1, 2],
-        vec![0, 2, 1, 2, 0],
-        vec![0, 0, 2, 0, 0],
-    ];
+    let color_swapped = GridEncoder::color_replace(&test_grid, 1, 2);
     let swap_enc = encoder.encode_grid(&color_swapped);
     let swap_sim = enc1.similarity(&swap_enc);
 
-    // Random grid
+    let reflected = GridEncoder::reflect_x(&test_grid);
+    let reflect_enc = encoder.encode_grid(&reflected);
+    let reflect_sim = enc1.similarity(&reflect_enc);
+
+    let rotated = GridEncoder::rotate_90(&test_grid);
+    let rotate_enc = encoder.encode_grid(&rotated);
+    let rotate_sim = enc1.similarity(&rotate_enc);
+
     let random_grid = vec![
         vec![5, 3, 8, 1, 9],
         vec![2, 7, 0, 4, 6],
@@ -410,12 +296,20 @@ fn main() {
         "  Color-swapped sim:      {:.4} (expected: moderate)",
         swap_sim
     );
+    println!(
+        "  Reflected similarity:   {:.4} (expected: moderate)",
+        reflect_sim
+    );
+    println!(
+        "  Rotated similarity:     {:.4} (expected: moderate)",
+        rotate_sim
+    );
     println!("  Random grid sim:        {:.4} (expected: ~0.0)", rand_sim);
     println!("  Time: {:.1}s\n", t.elapsed().as_secs_f64());
 
     // ═══════════════════════════════════════════════════════════════
     // Test 4: Nearest-Rule Transfer Accuracy
-    // Can we predict the test output by applying the most similar training rule?
+    // Can we predict the test output by applying the bundled training rule?
     // ═══════════════════════════════════════════════════════════════
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("Test 4: Rule Transfer (output similarity)");
@@ -435,31 +329,24 @@ fn main() {
             continue;
         }
 
-        // Bundle all training rule vectors
-        let rule_bundle = {
-            let mut acc = vec![0.0f32; dim];
-            for (inp, out) in &task.train {
-                let rule = encoder.encode_rule(inp, out);
-                for (a, &v) in acc.iter_mut().zip(rule.values.iter()) {
-                    *a += v;
-                }
-            }
-            let norm: f32 = acc.iter().map(|x| x * x).sum::<f32>().sqrt();
-            if norm > 0.0 {
-                for v in &mut acc {
-                    *v /= norm;
-                }
-            }
-            ContinuousHV::from_vec(acc)
-        };
+        // Encode training rules and bundle them via GridEncoder
+        let rules: Vec<_> = task
+            .train
+            .iter()
+            .map(|(inp, out)| {
+                let in_hv = encoder.encode_grid(inp);
+                let out_hv = encoder.encode_grid(out);
+                encoder.encode_rule(&in_hv, &out_hv)
+            })
+            .collect();
+        let rule_bundle = encoder.bundle_rules(&rules);
 
-        // Test: encode test input, apply bundled rule, compare with actual test output
+        // Test: apply bundled rule to test input, compare with actual test output
         let (test_input, test_output) = &task.test[0];
         let test_input_enc = encoder.encode_grid(test_input);
         let test_output_enc = encoder.encode_grid(test_output);
 
-        // "Apply" rule: bind(test_input, rule_bundle) → predicted output representation
-        let predicted = test_input_enc.bind(&rule_bundle);
+        let predicted = encoder.apply_rule(&test_input_enc, &rule_bundle);
         let output_sim = predicted.similarity(&test_output_enc);
         output_sims.push(output_sim);
         tasks_evaluated += 1;
@@ -478,7 +365,6 @@ fn main() {
     );
     println!("  Time: {:.1}s\n", t.elapsed().as_secs_f64());
 
-    // Also load and test evaluation set
     let n_eval = if eval_dir.exists() {
         fs::read_dir(&eval_dir)
             .map(|rd| rd.filter_map(|e| e.ok()).count())
@@ -552,6 +438,8 @@ fn main() {
                 "self_similarity": self_sim,
                 "translated_similarity": trans_sim,
                 "color_swap_similarity": swap_sim,
+                "reflected_similarity": reflect_sim,
+                "rotated_similarity": rotate_sim,
                 "random_similarity": rand_sim,
                 "mean_output_similarity": mean_output_sim,
                 "positive_transfer_pct": positive_transfer as f64 / tasks_evaluated.max(1) as f64,
