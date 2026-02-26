@@ -1,8 +1,9 @@
 {
   "name": "baseline",
-  "timestamp": "2026-02-26T12:58:05.836982417+00:00",
-  "git_hash": "01d300df",
+  "timestamp": "2026-02-26T15:56:27.017878106+00:00",
+  "git_hash": "db39d55a",
   "config_summary": "dim=512, trials=10, seed=42",
+  "schema_version": "1.1",
   "metrics": {
     "Affect::EmotionalStroop": {
       "emotional_interference": {
@@ -1321,39 +1322,39 @@
     },
     "Metacognition::FeelingOfKnowing": {
       "fok_gamma": {
-        "mean": 0.07142857142857142,
-        "std_dev": 0.22587697572631285,
+        "mean": 0.6807764378478665,
+        "std_dev": 0.23751027023676638,
         "n": 10,
-        "ci_lower": -0.09014285714285716,
-        "ci_upper": 0.233
+        "ci_lower": 0.510883629875097,
+        "ci_upper": 0.850669245820636
       },
       "fok_resolution": {
-        "mean": 0.025,
-        "std_dev": 0.07905694150420949,
+        "mean": 0.4436706349206349,
+        "std_dev": 0.17913272675071656,
         "n": 10,
-        "ci_lower": -0.031549999999999995,
-        "ci_upper": 0.08155
+        "ci_lower": 0.31553570451463586,
+        "ci_upper": 0.571805565326634
       },
       "recall_rate": {
-        "mean": 0.625,
-        "std_dev": 0.07607257743127305,
+        "mean": 0.49000000000000005,
+        "std_dev": 0.04458311699497529,
         "n": 10,
-        "ci_lower": 0.5705847371288778,
-        "ci_upper": 0.6794152628711222
+        "ci_lower": 0.4581093751150036,
+        "ci_upper": 0.5218906248849965
       },
       "recognition_hit_rate": {
-        "mean": 0.9875,
-        "std_dev": 0.039528470752104736,
+        "mean": 0.7213760042618497,
+        "std_dev": 0.06568295892896438,
         "n": 10,
-        "ci_lower": 0.959225,
-        "ci_upper": 1.015775
+        "ci_lower": 0.6743925103806051,
+        "ci_upper": 0.7683594981430942
       },
       "rt_ticks": {
-        "mean": 7.208061668276787,
-        "std_dev": 0.05126091139261662,
+        "mean": 7.249521735608576,
+        "std_dev": 0.06359100660385407,
         "n": 10,
-        "ci_lower": 7.171394368934095,
-        "ci_upper": 7.244728967619478
+        "ci_lower": 7.204034630301619,
+        "ci_upper": 7.295008840915534
       }
     },
     "ToMBench::FalseBelief": {
