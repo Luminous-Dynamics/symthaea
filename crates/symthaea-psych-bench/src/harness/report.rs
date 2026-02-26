@@ -108,6 +108,41 @@ pub struct MetricValue {
 }
 
 impl MetricValue {
+    /// Compute from a slice of samples using BCa bootstrap confidence intervals.
+    ///
+    /// Uses 2000 resamples with the BCa (bias-corrected and accelerated) method
+    /// for more accurate CIs on skewed or small-sample distributions.
+    ///
+    /// Reference: Efron & Tibshirani (1993), "An Introduction to the Bootstrap".
+    pub fn from_samples_bootstrap(samples: &[f64], seed: u64) -> Self {
+        let n = samples.len();
+        if n == 0 {
+            return Self {
+                mean: 0.0,
+                std_dev: 0.0,
+                n: 0,
+                ci_lower: 0.0,
+                ci_upper: 0.0,
+            };
+        }
+        let mean = samples.iter().sum::<f64>() / n as f64;
+        let variance = if n > 1 {
+            samples.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1) as f64
+        } else {
+            0.0
+        };
+        let std_dev = variance.sqrt();
+        let (ci_lower, ci_upper) =
+            super::analysis::bootstrap_ci_bca(samples, 2000, 0.05, seed);
+        Self {
+            mean,
+            std_dev,
+            n,
+            ci_lower,
+            ci_upper,
+        }
+    }
+
     /// Compute from a slice of samples.
     ///
     /// Uses proper t-distribution critical values for the 95% CI when n < 30,
@@ -728,6 +763,56 @@ impl BenchmarkReport {
         if benchmark.contains("RemoteAssociates") {
             push_specific("rt_ticks", "rat_rt_ticks", &bl.creativity);
         }
+        // Stop Signal Task (Inhibition)
+        if benchmark.contains("StopSignal") {
+            push_specific("sst_go_accuracy", "sst_go_accuracy", &bl.inhibition);
+            push_specific("sst_go_rt_ticks", "sst_go_rt_ticks", &bl.inhibition);
+            push_specific("sst_stop_accuracy", "sst_stop_accuracy", &bl.inhibition);
+            push_specific("ssrt_ticks", "ssrt_ticks", &bl.inhibition);
+        }
+        // Visual Search (Attention)
+        if benchmark.contains("VisualSearch") {
+            push_specific(
+                "feature_search_accuracy",
+                "feature_search_accuracy",
+                &bl.attention,
+            );
+            push_specific(
+                "conjunction_search_accuracy",
+                "conjunction_search_accuracy",
+                &bl.attention,
+            );
+            push_specific(
+                "feature_search_slope",
+                "feature_search_slope",
+                &bl.attention,
+            );
+            push_specific(
+                "conjunction_search_slope",
+                "conjunction_search_slope",
+                &bl.attention,
+            );
+            push_specific("search_asymmetry", "search_asymmetry", &bl.attention);
+        }
+        // Dual-Task (Executive)
+        if benchmark.contains("DualTask") {
+            push_specific("single_accuracy", "dual_single_accuracy", &bl.executive);
+            push_specific("dual_low_accuracy", "dual_low_accuracy", &bl.executive);
+            push_specific("dual_high_accuracy", "dual_high_accuracy", &bl.executive);
+            push_specific("dual_task_cost", "dual_task_cost", &bl.executive);
+            push_specific("digit_recall_accuracy", "dual_digit_recall", &bl.executive);
+            push_specific("single::rt_ticks", "dual_single_rt_ticks", &bl.executive);
+        }
+        // Feeling of Knowing (Metacognition)
+        if benchmark.contains("FeelingOfKnowing") {
+            push_specific("fok_gamma", "fok_gamma", &bl.metacognition);
+            push_specific(
+                "recognition_hit_rate",
+                "recognition_hit_rate",
+                &bl.metacognition,
+            );
+            push_specific("fok_resolution", "fok_resolution", &bl.metacognition);
+        }
 
         // Only return comparisons relevant to this benchmark
         if benchmark.contains("WorM")
@@ -746,6 +831,68 @@ impl BenchmarkReport {
         } else {
             Vec::new()
         }
+    }
+
+    /// Find applicable LLM (GPT-4) baseline comparisons for a benchmark result.
+    ///
+    /// Parallels `find_comparisons()` but uses LLM-specific baselines from
+    /// CogBench (Coda et al., 2023) and ToMBench (Kosinski, 2023).
+    pub fn find_llm_comparisons(
+        &self,
+        result: &BenchmarkResult,
+        bl: &super::baselines::BaselineCollection,
+    ) -> Vec<(String, BaselineComparison)> {
+        let mut comps = Vec::new();
+        let benchmark = result.benchmark.as_str();
+
+        // CogBench LLM mappings
+        let cogbench_mappings: Vec<(&str, &str)> = vec![
+            ("horizon_6::directed_exploration", "directed_exploration"),
+            ("beta3_model_basedness", "model_basedness"),
+            ("discounting_score_S", "discounting_score"),
+            ("average_pumps", "bart_avg_pumps"),
+            ("win_stay_rate", "reversal_win_stay"),
+            ("lose_shift_rate", "reversal_lose_shift"),
+            ("overall_accuracy", "restless_bandit_accuracy"),
+            ("contingency_sensitivity", "instrumental_sensitivity"),
+        ];
+
+        if benchmark.contains("CogBench") {
+            for (metric_key, baseline_key) in &cogbench_mappings {
+                if let Some(metric) = result.metrics.get(*metric_key) {
+                    if let Some(baseline) = bl.llm_cogbench.get(baseline_key) {
+                        comps.push((
+                            metric_key.to_string(),
+                            Self::make_comparison(metric, baseline),
+                        ));
+                    }
+                }
+            }
+        }
+
+        // ToMBench LLM mappings
+        let tombench_mappings: Vec<(&str, &str)> = vec![
+            ("false_belief_accuracy", "false_belief_accuracy"),
+            ("faux_pas_accuracy", "faux_pas_accuracy"),
+            ("persuasion_detection", "persuasion_detection"),
+            ("overall_accuracy", "strange_story_accuracy"),
+            ("hinting_accuracy", "hinting_accuracy"),
+        ];
+
+        if benchmark.contains("ToM") {
+            for (metric_key, baseline_key) in &tombench_mappings {
+                if let Some(metric) = result.metrics.get(*metric_key) {
+                    if let Some(baseline) = bl.llm_tombench.get(baseline_key) {
+                        comps.push((
+                            metric_key.to_string(),
+                            Self::make_comparison(metric, baseline),
+                        ));
+                    }
+                }
+            }
+        }
+
+        comps
     }
 
     /// Build a BaselineComparison from a metric and its baseline.
@@ -1014,6 +1161,10 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("AttentionalBlink") => "blink_magnitude",
         b if b.contains("ProspectiveMemory") => "pm_hit_rate",
         b if b.contains("EmotionalStroop") => "emotional_interference",
+        b if b.contains("StopSignal") => "ssrt_ticks",
+        b if b.contains("VisualSearch") => "search_asymmetry",
+        b if b.contains("FeelingOfKnowing") => "fok_gamma",
+        b if b.contains("DualTask") => "dual_task_cost",
         _ => "overall_accuracy",
     }
 }
@@ -1678,6 +1829,50 @@ mod tests {
         let ascii = report.forest_plot_ascii();
         assert!(ascii.contains("Effect"), "ascii: {}", ascii);
         assert!(ascii.contains("DigitSpan"), "ascii: {}", ascii);
+    }
+
+    #[test]
+    fn test_llm_comparison_populated() {
+        let mut report = BenchmarkReport::new();
+        let mut r = BenchmarkResult::new("CogBench::Reversal", None);
+        r.insert("win_stay_rate", MetricValue::from_samples(&[0.80, 0.82]));
+        r.insert("lose_shift_rate", MetricValue::from_samples(&[0.60, 0.65]));
+        report.add(r);
+
+        use crate::harness::baselines::BaselineCollection;
+        let bl = BaselineCollection::all();
+        let llm_comps = report.find_llm_comparisons(&report.results[0], &bl);
+        assert!(!llm_comps.is_empty(), "LLM comparisons should be populated for CogBench");
+        // Verify population is GPT-4
+        for (_, comp) in &llm_comps {
+            assert_eq!(comp.population, "GPT-4");
+        }
+    }
+
+    #[test]
+    fn test_multi_population_comparisons() {
+        let mut report = BenchmarkReport::new();
+        let mut r = BenchmarkResult::new("CogBench::Reversal", None);
+        r.insert("win_stay_rate", MetricValue::from_samples(&[0.80, 0.82]));
+        r.insert("lose_shift_rate", MetricValue::from_samples(&[0.60, 0.65]));
+        report.add(r);
+
+        use crate::harness::baselines::BaselineCollection;
+        let bl = BaselineCollection::all();
+
+        let human_comps = report.find_comparisons(&report.results[0], &bl);
+        let llm_comps = report.find_llm_comparisons(&report.results[0], &bl);
+
+        // Both should be non-empty
+        assert!(!human_comps.is_empty(), "human comparisons should exist");
+        assert!(!llm_comps.is_empty(), "LLM comparisons should exist");
+        // Human and LLM populations should differ
+        if let Some((_, h)) = human_comps.first() {
+            if let Some((_, l)) = llm_comps.first() {
+                assert_ne!(h.population, l.population,
+                    "populations should differ: {} vs {}", h.population, l.population);
+            }
+        }
     }
 
     #[test]

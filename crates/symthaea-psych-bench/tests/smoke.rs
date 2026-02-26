@@ -21,7 +21,11 @@ use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
     TestTimeLearningBenchmark,
 };
-use symthaea_psych_bench::benchmarks::metacognition::MetacognitiveCalibrationBenchmark;
+use symthaea_psych_bench::benchmarks::attention::VisualSearchBenchmark;
+use symthaea_psych_bench::benchmarks::inhibition::StopSignalBenchmark;
+use symthaea_psych_bench::benchmarks::metacognition::{
+    FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark,
+};
 use symthaea_psych_bench::benchmarks::tombench::{
     FalseBeliefBenchmark, FauxPasBenchmark, HintingBenchmark, PersuasionBenchmark,
     StrangeStoryBenchmark,
@@ -304,6 +308,27 @@ fn smoke_creativity_remote_associates() {
 #[test]
 fn smoke_creativity_alternate_uses() {
     let result = AlternateUsesBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_inhibition_stop_signal() {
+    let result = StopSignalBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_attention_visual_search() {
+    let result = VisualSearchBenchmark.run(&smoke_config());
+    assert!(!result.metrics.is_empty());
+    assert_metrics_finite(&result);
+}
+
+#[test]
+fn smoke_metacognition_feeling_of_knowing() {
+    let result = FeelingOfKnowingBenchmark.run(&smoke_config());
     assert!(!result.metrics.is_empty());
     assert_metrics_finite(&result);
 }

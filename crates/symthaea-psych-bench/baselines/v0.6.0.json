@@ -1,7 +1,7 @@
 {
   "name": "baseline",
-  "timestamp": "2026-02-25T05:35:41.550338670+00:00",
-  "git_hash": "d5def73a",
+  "timestamp": "2026-02-26T11:20:18.128142162+00:00",
+  "git_hash": "dc69cae6",
   "config_summary": "dim=512, trials=10, seed=42",
   "metrics": {
     "Affect::EmotionalStroop": {
@@ -157,6 +157,50 @@
         "n": 10,
         "ci_lower": 0.8997914892820916,
         "ci_upper": 0.9382085107179082
+      }
+    },
+    "Attention::VisualSearch": {
+      "conjunction_search_accuracy": {
+        "mean": 0.8450000000000001,
+        "std_dev": 0.03593976442141303,
+        "n": 10,
+        "ci_lower": 0.8192920275011818,
+        "ci_upper": 0.8707079724988184
+      },
+      "conjunction_search_slope": {
+        "mean": 0.23442796610169497,
+        "std_dev": 0.0425222766551583,
+        "n": 10,
+        "ci_lower": 0.2040114751636897,
+        "ci_upper": 0.2648444570397003
+      },
+      "feature_search_accuracy": {
+        "mean": 0.87375,
+        "std_dev": 0.03356689010187138,
+        "n": 10,
+        "ci_lower": 0.8497393616026145,
+        "ci_upper": 0.8977606383973855
+      },
+      "feature_search_slope": {
+        "mean": -0.0005318267276446832,
+        "std_dev": 0.007592324897581695,
+        "n": 10,
+        "ci_lower": -0.005962671442721142,
+        "ci_upper": 0.0048990179874317755
+      },
+      "rt_ticks": {
+        "mean": 5.15010313513223,
+        "std_dev": 3.1279497500474176,
+        "n": 1600,
+        "ci_lower": 4.996833597379907,
+        "ci_upper": 5.303372672884554
+      },
+      "search_asymmetry": {
+        "mean": 0.2349597928293397,
+        "std_dev": 0.04201543247673725,
+        "n": 10,
+        "ci_lower": 0.2049058511848482,
+        "ci_upper": 0.26501373447383125
       }
     },
     "Butlin::ConsciousnessIndicators": {
@@ -615,6 +659,78 @@
         "ci_upper": 10.999036208297541
       }
     },
+    "Executive::DualTask": {
+      "digit_recall_accuracy": {
+        "mean": 0.5,
+        "std_dev": 0.7071067811865476,
+        "n": 2,
+        "ci_lower": -5.853,
+        "ci_upper": 6.853
+      },
+      "dual_high::rt_ticks": {
+        "mean": 7.041319795754921,
+        "std_dev": 0.690762071372453,
+        "n": 10,
+        "ci_lower": 6.547212707966403,
+        "ci_upper": 7.5354268835434395
+      },
+      "dual_high_accuracy": {
+        "mean": 0.4,
+        "std_dev": 0.5163977794943222,
+        "n": 10,
+        "ci_lower": 0.030616946788296795,
+        "ci_upper": 0.7693830532117032
+      },
+      "dual_high_recall": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "dual_low::rt_ticks": {
+        "mean": 5.068008957647256,
+        "std_dev": 0.41401550938599735,
+        "n": 10,
+        "ci_lower": 4.771860680085424,
+        "ci_upper": 5.364157235209087
+      },
+      "dual_low_accuracy": {
+        "mean": 0.7,
+        "std_dev": 0.48304589153964794,
+        "n": 10,
+        "ci_lower": 0.35447379260032963,
+        "ci_upper": 1.0455262073996703
+      },
+      "dual_low_recall": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "dual_task_cost": {
+        "mean": 0.6,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.6,
+        "ci_upper": 0.6
+      },
+      "single::rt_ticks": {
+        "mean": 3.9503678831764146,
+        "std_dev": 0.6239642002249204,
+        "n": 10,
+        "ci_lower": 3.504041794013954,
+        "ci_upper": 4.396693972338875
+      },
+      "single_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
     "Executive::Flanker": {
       "congruent::rt_ticks": {
         "mean": 5.1656479796092025,
@@ -937,6 +1053,50 @@
         "ci_upper": 4.683094246989354
       }
     },
+    "Inhibition::StopSignal": {
+      "rt_ticks": {
+        "mean": 4.181408400055968,
+        "std_dev": 0.006880896816738659,
+        "n": 10,
+        "ci_lower": 4.176486444974189,
+        "ci_upper": 4.1863303551377475
+      },
+      "ssd_mean": {
+        "mean": 3.1060773996892594,
+        "std_dev": 0.5745635718632912,
+        "n": 10,
+        "ci_lower": 2.695087936010867,
+        "ci_upper": 3.517066863367652
+      },
+      "ssrt_ticks": {
+        "mean": 1.0934549602127033,
+        "std_dev": 0.5321412452929418,
+        "n": 10,
+        "ci_lower": 0.7128104924563388,
+        "ci_upper": 1.4740994279690678
+      },
+      "sst_go_accuracy": {
+        "mean": 0.9433693404926015,
+        "std_dev": 0.018781228726387426,
+        "n": 10,
+        "ci_lower": 0.9299349922333704,
+        "ci_upper": 0.9568036887518325
+      },
+      "sst_go_rt_ticks": {
+        "mean": 4.181514244249661,
+        "std_dev": 0.0069970420567472946,
+        "n": 10,
+        "ci_lower": 4.176509209640677,
+        "ci_upper": 4.186519278858646
+      },
+      "sst_stop_accuracy": {
+        "mean": 0.45542632669317307,
+        "std_dev": 0.047323196582893266,
+        "n": 10,
+        "ci_lower": 0.4215757031319249,
+        "ci_upper": 0.48927695025442125
+      }
+    },
     "MemoryAgent::AccurateRetrieval": {
       "facts_3_delay_2::accuracy": {
         "mean": 1.0,
@@ -1157,6 +1317,43 @@
         "n": 10,
         "ci_lower": 11.04289495233503,
         "ci_upper": 11.143776550675868
+      }
+    },
+    "Metacognition::FeelingOfKnowing": {
+      "fok_gamma": {
+        "mean": 0.19627591706539074,
+        "std_dev": 0.2741395699430386,
+        "n": 10,
+        "ci_lower": 0.0001819070352483687,
+        "ci_upper": 0.3923699270955331
+      },
+      "fok_resolution": {
+        "mean": 0.10681818181818181,
+        "std_dev": 0.08780110928893851,
+        "n": 10,
+        "ci_lower": 0.04401341558490808,
+        "ci_upper": 0.16962294805145556
+      },
+      "recall_rate": {
+        "mean": 0.23333333333333334,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.23333333333333334,
+        "ci_upper": 0.23333333333333334
+      },
+      "recognition_hit_rate": {
+        "mean": 0.21739130434782608,
+        "std_dev": 0.07938008079785017,
+        "n": 10,
+        "ci_lower": 0.16061016048230722,
+        "ci_upper": 0.2741724482133449
+      },
+      "rt_ticks": {
+        "mean": 9.702636395732624,
+        "std_dev": 0.03852314828782411,
+        "n": 10,
+        "ci_lower": 9.67508051013641,
+        "ci_upper": 9.730192281328836
       }
     },
     "ToMBench::FalseBelief": {

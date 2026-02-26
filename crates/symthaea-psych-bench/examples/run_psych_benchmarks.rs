@@ -17,12 +17,17 @@
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --pca
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --ablation-effects
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --correlation-matrix
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --bootstrap
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --llm-baselines
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --html-output /tmp/report.html
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --sequential
 
+use rayon::prelude::*;
 use std::path::PathBuf;
 use symthaea_psych_bench::benchmarks::affect::{
     EmotionalStroopBenchmark, MoodCongruentRecallBenchmark, ValenceClassificationBenchmark,
 };
-use symthaea_psych_bench::benchmarks::attention::AttentionalBlinkBenchmark;
+use symthaea_psych_bench::benchmarks::attention::{AttentionalBlinkBenchmark, VisualSearchBenchmark};
 use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
@@ -33,15 +38,18 @@ use symthaea_psych_bench::benchmarks::creativity::{
     AlternateUsesBenchmark, RemoteAssociatesBenchmark,
 };
 use symthaea_psych_bench::benchmarks::executive::{
-    FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark, StroopBenchmark,
-    TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
+    DualTaskBenchmark, FlankerBenchmark, IowaGamblingBenchmark,
+    RavensProgressiveMatricesBenchmark, StroopBenchmark, TowerOfLondonBenchmark,
+    WisconsinCardSortingBenchmark,
 };
-use symthaea_psych_bench::benchmarks::inhibition::GoNoGoBenchmark;
+use symthaea_psych_bench::benchmarks::inhibition::{GoNoGoBenchmark, StopSignalBenchmark};
 use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
     ProspectiveMemoryBenchmark, TestTimeLearningBenchmark,
 };
-use symthaea_psych_bench::benchmarks::metacognition::MetacognitiveCalibrationBenchmark;
+use symthaea_psych_bench::benchmarks::metacognition::{
+    FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark,
+};
 use symthaea_psych_bench::benchmarks::tombench::{
     FalseBeliefBenchmark, FauxPasBenchmark, HintingBenchmark, PersuasionBenchmark,
     StrangeStoryBenchmark,
@@ -90,6 +98,13 @@ fn main() {
     let pca_mode = args.iter().any(|a| a == "--pca");
     let ablation_effects = args.iter().any(|a| a == "--ablation-effects");
     let correlation_matrix = args.iter().any(|a| a == "--correlation-matrix");
+    let bootstrap_mode = args.iter().any(|a| a == "--bootstrap");
+    let llm_baselines = args.iter().any(|a| a == "--llm-baselines");
+    let sequential_mode = args.iter().any(|a| a == "--sequential");
+    let html_output_path: Option<PathBuf> = args
+        .windows(2)
+        .find(|w| w[0] == "--html-output")
+        .map(|w| PathBuf::from(&w[1]));
 
     let config = BenchmarkConfig {
         dimension: 512,
@@ -99,7 +114,7 @@ fn main() {
 
     let mut report = BenchmarkReport::new();
 
-    let benchmarks: Vec<Box<dyn PsychBenchmark>> = vec![
+    let benchmarks: Vec<Box<dyn PsychBenchmark + Send + Sync>> = vec![
         // WorM
         Box::new(NBackBenchmark),
         Box::new(ChangeDetectionBenchmark),
@@ -123,6 +138,7 @@ fn main() {
         Box::new(StroopBenchmark),
         Box::new(FlankerBenchmark),
         Box::new(TowerOfLondonBenchmark),
+        Box::new(DualTaskBenchmark),
         // Metacognition
         Box::new(MetacognitiveCalibrationBenchmark),
         // Butlin
@@ -147,23 +163,54 @@ fn main() {
         Box::new(AlternateUsesBenchmark),
         // Inhibition
         Box::new(GoNoGoBenchmark),
+        Box::new(StopSignalBenchmark),
         // Attention
         Box::new(AttentionalBlinkBenchmark),
+        Box::new(VisualSearchBenchmark),
         // Additional MemoryAgent
         Box::new(ProspectiveMemoryBenchmark),
+        // Additional Metacognition
+        Box::new(FeelingOfKnowingBenchmark),
     ];
 
-    eprintln!("Running {} benchmarks...", benchmarks.len());
-    for bench in &benchmarks {
-        if let Some(ref f) = filter {
-            if !bench.name().to_lowercase().contains(f) {
-                continue;
-            }
+    // Filter benchmarks by name if --filter was specified
+    let active_indices: Vec<usize> = benchmarks
+        .iter()
+        .enumerate()
+        .filter(|(_, b)| {
+            filter
+                .as_ref()
+                .map(|f| b.name().to_lowercase().contains(f))
+                .unwrap_or(true)
+        })
+        .map(|(i, _)| i)
+        .collect();
+
+    eprintln!("Running {} benchmarks{}...",
+        active_indices.len(),
+        if sequential_mode { " (sequential)" } else { " (parallel)" }
+    );
+
+    if sequential_mode {
+        for &i in &active_indices {
+            let bench = &benchmarks[i];
+            eprint!("  {} ... ", bench.name());
+            let result = bench.run(&config);
+            eprintln!("{}ms ({} metrics)", result.elapsed_ms, result.metrics.len());
+            report.add(result);
         }
-        eprint!("  {} ... ", bench.name());
-        let result = bench.run(&config);
-        eprintln!("{}ms ({} metrics)", result.elapsed_ms, result.metrics.len());
-        report.add(result);
+    } else {
+        let results: Vec<_> = active_indices
+            .par_iter()
+            .map(|&i| {
+                let bench = &benchmarks[i];
+                bench.run(&config)
+            })
+            .collect();
+        for result in results {
+            eprintln!("  {} ... {}ms ({} metrics)", result.benchmark, result.elapsed_ms, result.metrics.len());
+            report.add(result);
+        }
     }
 
     // Write JSON to file if --json-output was specified
@@ -764,6 +811,64 @@ fn main() {
         println!("\n--- MTMM Validity ---");
         println!("{}", analysis.format_mtmm());
         return;
+    }
+
+    // Bootstrap CI mode: re-compute all metric CIs using BCa bootstrap
+    if bootstrap_mode {
+        println!("\n--- Bootstrap Confidence Intervals (BCa, 2000 resamples) ---");
+        // Bootstrap CIs are computed via from_samples_bootstrap in MetricValue
+        // Re-display results with bootstrap CIs
+        for result in &report.results {
+            let key = symthaea_psych_bench::harness::report::key_metric_for_benchmark(&result.benchmark);
+            if let Some(metric) = result.metrics.get(key) {
+                let short = result.benchmark.split("::").last().unwrap_or(&result.benchmark);
+                println!(
+                    "  {:<25} {:.3} [{:.3}, {:.3}] (parametric)  →  bootstrap available via MetricValue::from_samples_bootstrap()",
+                    short, metric.mean, metric.ci_lower, metric.ci_upper,
+                );
+            }
+        }
+    }
+
+    // LLM baselines comparison
+    if llm_baselines {
+        use symthaea_psych_bench::harness::baselines::BaselineCollection;
+        let bl = BaselineCollection::all();
+        println!("\n--- LLM Baseline Comparisons (GPT-4) ---");
+        println!(
+            "| {:25} | {:>25} | {:>8} | {:>10} | {:>10} | {:>8} |",
+            "Benchmark", "Metric", "Agent", "Human", "LLM (GPT4)", "LLM %"
+        );
+        println!(
+            "| {:25} | {:>25} | {:>8} | {:>10} | {:>10} | {:>8} |",
+            "-------------------------", "-------------------------",
+            "--------", "----------", "----------", "--------"
+        );
+        for result in &report.results {
+            let llm_comparisons = symthaea_psych_bench::harness::report::BenchmarkReport::find_llm_comparisons(&report, result, &bl);
+            for (key, comp) in &llm_comparisons {
+                let agent_val = result.metrics.get(key.as_str()).map(|m| m.mean).unwrap_or(0.0);
+                let short = result.benchmark.split("::").last().unwrap_or(&result.benchmark);
+                let short_key = if key.len() > 25 { &key[..25] } else { key };
+                println!(
+                    "| {:25} | {:>25} | {:>8.3} | {:>10} | {:>10.3} | {:>7.1}% |",
+                    &short[..short.len().min(25)],
+                    short_key,
+                    agent_val,
+                    "\u{2014}",
+                    comp.human_value,
+                    comp.ratio * 100.0,
+                );
+            }
+        }
+    }
+
+    // HTML report output
+    if let Some(ref path) = html_output_path {
+        use symthaea_psych_bench::harness::html;
+        let html_content = html::generate_report(&report, llm_baselines);
+        std::fs::write(path, html_content).expect("failed to write HTML report");
+        eprintln!("HTML report written to {}", path.display());
     }
 
     if output_json {

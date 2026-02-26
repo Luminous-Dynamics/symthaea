@@ -6,7 +6,9 @@
 //! - **Stroop** — Color-Word Interference (inhibitory control, selective attention)
 //! - **Flanker** — Eriksen Flanker Task (spatial attention filtering, response inhibition)
 //! - **Tower of London** — Multi-step planning (executive planning, lookahead depth)
+//! - **Dual-Task** — Concurrent memory load + choice RT (resource sharing)
 
+pub mod dual_task;
 pub mod flanker;
 pub mod iowa_gambling;
 pub mod ravens;
@@ -14,6 +16,7 @@ pub mod stroop;
 pub mod tower_of_london;
 pub mod wisconsin;
 
+pub use dual_task::DualTaskBenchmark;
 pub use flanker::FlankerBenchmark;
 pub use iowa_gambling::IowaGamblingBenchmark;
 pub use ravens::RavensProgressiveMatricesBenchmark;

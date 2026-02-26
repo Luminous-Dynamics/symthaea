@@ -7,7 +7,7 @@ use symthaea_psych_bench::benchmarks::{
     affect::{
         EmotionalStroopBenchmark, MoodCongruentRecallBenchmark, ValenceClassificationBenchmark,
     },
-    attention::AttentionalBlinkBenchmark,
+    attention::{AttentionalBlinkBenchmark, VisualSearchBenchmark},
     butlin::ButlinIndicatorSuite,
     cogbench::{
         BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
@@ -16,15 +16,16 @@ use symthaea_psych_bench::benchmarks::{
     },
     creativity::{AlternateUsesBenchmark, RemoteAssociatesBenchmark},
     executive::{
-        FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark,
-        StroopBenchmark, TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
+        DualTaskBenchmark, FlankerBenchmark, IowaGamblingBenchmark,
+        RavensProgressiveMatricesBenchmark, StroopBenchmark, TowerOfLondonBenchmark,
+        WisconsinCardSortingBenchmark,
     },
-    inhibition::GoNoGoBenchmark,
+    inhibition::{GoNoGoBenchmark, StopSignalBenchmark},
     memory_agent::{
         AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
         ProspectiveMemoryBenchmark, TestTimeLearningBenchmark,
     },
-    metacognition::MetacognitiveCalibrationBenchmark,
+    metacognition::{FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark},
     tombench::{
         FalseBeliefBenchmark, FauxPasBenchmark, HintingBenchmark, PersuasionBenchmark,
         StrangeStoryBenchmark,
@@ -75,6 +76,7 @@ fn full_battery_report() {
     report.add(IowaGamblingBenchmark.run(&config));
     report.add(RavensProgressiveMatricesBenchmark.run(&config));
     report.add(TowerOfLondonBenchmark.run(&config));
+    report.add(DualTaskBenchmark.run(&config));
 
     // ── CogBench (Cognitive Psychology via FEP) ──
     report.add(ProbabilisticReasoningBenchmark.run(&config));
@@ -116,18 +118,23 @@ fn full_battery_report() {
 
     // ── Inhibition ──
     report.add(GoNoGoBenchmark.run(&config));
+    report.add(StopSignalBenchmark.run(&config));
 
     // ── Attention ──
     report.add(AttentionalBlinkBenchmark.run(&config));
+    report.add(VisualSearchBenchmark.run(&config));
 
     // ── Additional MemoryAgent ──
     report.add(ProspectiveMemoryBenchmark.run(&config));
 
-    // Verify all 39 benchmarks produced results
+    // ── Additional Metacognition ──
+    report.add(FeelingOfKnowingBenchmark.run(&config));
+
+    // Verify all 43 benchmarks produced results
     assert_eq!(
         report.results.len(),
-        39,
-        "Expected 39 benchmark results, got {}",
+        43,
+        "Expected 43 benchmark results, got {}",
         report.results.len()
     );
 
@@ -200,6 +207,7 @@ fn regression_against_baseline() {
     report.add(IowaGamblingBenchmark.run(&config));
     report.add(RavensProgressiveMatricesBenchmark.run(&config));
     report.add(TowerOfLondonBenchmark.run(&config));
+    report.add(DualTaskBenchmark.run(&config));
     report.add(ProbabilisticReasoningBenchmark.run(&config));
     report.add(HorizonBenchmark.run(&config));
     report.add(RestlessBanditBenchmark.run(&config));
@@ -225,8 +233,11 @@ fn regression_against_baseline() {
     report.add(AlternateUsesBenchmark.run(&config));
     report.add(ButlinIndicatorSuite.run(&config));
     report.add(GoNoGoBenchmark.run(&config));
+    report.add(StopSignalBenchmark.run(&config));
     report.add(AttentionalBlinkBenchmark.run(&config));
+    report.add(VisualSearchBenchmark.run(&config));
     report.add(ProspectiveMemoryBenchmark.run(&config));
+    report.add(FeelingOfKnowingBenchmark.run(&config));
 
     let current = RegressionSnapshot::from_report(&report, "current");
     let regression = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
