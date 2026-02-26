@@ -317,7 +317,7 @@ impl StabilityAnalyzer {
 
     /// Reduce a matrix to upper Hessenberg form using Householder reflections.
     /// H is upper Hessenberg if h_{ij} = 0 for i > j + 1.
-    fn hessenberg_reduce(&self, h: &mut Vec<Vec<f64>>) {
+    fn hessenberg_reduce(&self, h: &mut [Vec<f64>]) {
         let n = h.len();
         if n <= 2 {
             return;
@@ -367,7 +367,7 @@ impl StabilityAnalyzer {
     }
 
     /// Implicit QR iteration with Wilkinson shift on an upper Hessenberg matrix.
-    fn qr_iteration(&self, h: &mut Vec<Vec<f64>>) {
+    fn qr_iteration(&self, h: &mut [Vec<f64>]) {
         let n = h.len();
         let tol = self.config.qr_tolerance;
         let max_iter = 200 * n; // Generous iteration budget
@@ -431,7 +431,7 @@ impl StabilityAnalyzer {
     }
 
     /// Single implicit QR step using Givens rotations with shift `mu`.
-    fn qr_step_givens(&self, h: &mut Vec<Vec<f64>>, p: usize, mu: f64) {
+    fn qr_step_givens(&self, h: &mut [Vec<f64>], p: usize, mu: f64) {
         let n = h.len();
 
         for k in 0..p - 1 {
@@ -623,7 +623,7 @@ impl StabilityAnalyzer {
 
     /// Modified Gram-Schmidt QR decomposition in-place.
     /// Orthogonalizes the columns of `q` and returns the diagonal of R.
-    fn gram_schmidt_qr(&self, q: &mut Vec<Vec<f64>>) -> Vec<f64> {
+    fn gram_schmidt_qr(&self, q: &mut [Vec<f64>]) -> Vec<f64> {
         let n = q[0].len(); // number of columns
         let m = q.len(); // number of rows
         let mut r_diag = vec![0.0; n];

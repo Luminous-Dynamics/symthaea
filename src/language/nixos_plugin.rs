@@ -268,52 +268,6 @@ impl DomainPlugin for NixOsPlugin {
     }
 
     fn intent_prototypes(&self) -> IntentPrototypes {
-        let mut prototypes = IntentPrototypes::default();
-
-        // NixOS-specific command intents
-        prototypes.command = vec![
-            "install",
-            "remove",
-            "uninstall",
-            "update",
-            "upgrade",
-            "rebuild",
-            "switch",
-            "rollback",
-            "configure",
-            "enable",
-            "disable",
-            "search",
-            "build",
-            "develop",
-            "shell",
-            "collect-garbage",
-            "optimize-store",
-            "channel",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-
-        // NixOS-specific question intents
-        prototypes.question.extend(vec![
-            "what package".to_string(),
-            "how to configure".to_string(),
-            "which option".to_string(),
-            "where is the config".to_string(),
-            "nix expression".to_string(),
-        ]);
-
-        // NixOS-specific complaint intents
-        prototypes.complaint.extend(vec![
-            "build failed".to_string(),
-            "hash mismatch".to_string(),
-            "undefined variable".to_string(),
-            "infinite recursion".to_string(),
-            "collision".to_string(),
-            "syntax error".to_string(),
-        ]);
-
         // Custom intents for NixOS
         let mut custom = HashMap::new();
         custom.insert(
@@ -338,7 +292,54 @@ impl DomainPlugin for NixOsPlugin {
                 "generation".to_string(),
             ],
         );
-        prototypes.custom = custom;
+
+        let mut prototypes = IntentPrototypes {
+            // NixOS-specific command intents
+            command: vec![
+                "install",
+                "remove",
+                "uninstall",
+                "update",
+                "upgrade",
+                "rebuild",
+                "switch",
+                "rollback",
+                "configure",
+                "enable",
+                "disable",
+                "search",
+                "build",
+                "develop",
+                "shell",
+                "collect-garbage",
+                "optimize-store",
+                "channel",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            custom,
+            ..Default::default()
+        };
+
+        // NixOS-specific question intents (extend defaults)
+        prototypes.question.extend(vec![
+            "what package".to_string(),
+            "how to configure".to_string(),
+            "which option".to_string(),
+            "where is the config".to_string(),
+            "nix expression".to_string(),
+        ]);
+
+        // NixOS-specific complaint intents (extend defaults)
+        prototypes.complaint.extend(vec![
+            "build failed".to_string(),
+            "hash mismatch".to_string(),
+            "undefined variable".to_string(),
+            "infinite recursion".to_string(),
+            "collision".to_string(),
+            "syntax error".to_string(),
+        ]);
 
         prototypes
     }

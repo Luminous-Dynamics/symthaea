@@ -858,6 +858,7 @@ pub struct CognitiveLoopService {
 
     /// Pain channel sender for distributing to subsystems.
     /// Subsystems clone this to report infrastructure errors.
+    #[allow(dead_code)]
     pub(crate) pain_tx: Option<crate::infrastructure::somatic_error_bridge::PainSender>,
 }
 

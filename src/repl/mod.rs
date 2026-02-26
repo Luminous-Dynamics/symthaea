@@ -553,8 +553,7 @@ impl ReplSession {
 
         // Initialize voice (optional)
         let voice = if config.voice_enabled {
-            let mut voice_config = VoiceOutputConfig::default();
-            voice_config.enable_tts = true;
+            let voice_config = VoiceOutputConfig { enable_tts: true, ..Default::default() };
             let mut v = VoiceOutput::new(voice_config);
             let _ = v.initialize();
             Some(v)

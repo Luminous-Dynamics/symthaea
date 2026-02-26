@@ -128,11 +128,11 @@ impl WidgetValue {
                     let inner = &trimmed[1..trimmed.len() - 1];
                     let items: Vec<String> = inner
                         .split_whitespace()
-                        .filter_map(|s| {
+                        .map(|s| {
                             if s.starts_with('"') && s.ends_with('"') {
-                                Some(s[1..s.len() - 1].to_string())
+                                s[1..s.len() - 1].to_string()
                             } else {
-                                Some(s.to_string())
+                                s.to_string()
                             }
                         })
                         .collect();
@@ -490,11 +490,7 @@ impl WidgetMapper {
                 let value_part = trimmed[eq_pos + 1..].trim();
 
                 // Remove trailing semicolon
-                let value = if value_part.ends_with(';') {
-                    &value_part[..value_part.len() - 1]
-                } else {
-                    value_part
-                };
+                let value = value_part.strip_suffix(';').unwrap_or(value_part);
 
                 if !path.is_empty() && !value.is_empty() {
                     results.push((NixPath::new(path), value.trim().to_string()));

@@ -536,6 +536,7 @@ impl MoralAlgebra {
     /// - Keep promises
     /// - Respect autonomy
     /// - Help those in need (imperfect duty)
+    #[allow(clippy::vec_init_then_push)]
     pub fn standard_obligations(&self) -> ObligationRuleSet {
         let mut rules = Vec::new();
 

@@ -671,9 +671,7 @@ impl SdeSystem for StochasticCfC {
     }
 
     fn diffusion(&self, _t: f64, _state: &[f64], out: &mut [f64]) {
-        for i in 0..self.hidden_dim {
-            out[i] = self.noise_sigma[i];
-        }
+        out[..self.hidden_dim].copy_from_slice(&self.noise_sigma[..self.hidden_dim]);
     }
 }
 

@@ -468,11 +468,11 @@ impl StabilityRegimeProcessor {
                     && cycle.saturating_sub(cfc.last_activated_cycle) >= 5;
 
                 if !dormant {
-                    cfc.evolve(dt, &continuous_input, &params);
+                    cfc.evolve(dt, &continuous_input, params);
                 }
 
                 let was_active = cfc.is_active;
-                cfc.update_active_status(&params);
+                cfc.update_active_status(params);
 
                 // Track per-primitive activation counts
                 if cfc.is_active && !was_active {

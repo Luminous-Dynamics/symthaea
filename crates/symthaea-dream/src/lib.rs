@@ -80,8 +80,7 @@ impl DreamableAction for Vec<f32> {
         let action_influence = self.magnitude();
         state
             .iter()
-            .enumerate()
-            .map(|(_i, &s)| {
+            .map(|&s| {
                 (s * 0.7 + action_influence * 0.1).clamp(-1.0, 1.0)
             })
             .collect()

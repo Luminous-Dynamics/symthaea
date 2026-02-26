@@ -436,76 +436,6 @@ impl DomainPlugin for ProgrammingPlugin {
     }
 
     fn intent_prototypes(&self) -> IntentPrototypes {
-        let mut prototypes = IntentPrototypes::default();
-
-        // Programming-specific command intents
-        prototypes.command = vec![
-            "write",
-            "create",
-            "implement",
-            "build",
-            "compile",
-            "run",
-            "execute",
-            "test",
-            "debug",
-            "deploy",
-            "install",
-            "update",
-            "refactor",
-            "optimize",
-            "fix",
-            "format",
-            "lint",
-            "review",
-            "merge",
-            "rebase",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-
-        // Programming-specific question intents
-        prototypes.question = vec![
-            "how to",
-            "what does",
-            "why does",
-            "when should",
-            "what is the best way",
-            "how do I",
-            "can I",
-            "what is the difference",
-            "which is better",
-            "how to fix",
-            "what causes",
-            "how to debug",
-            "what library",
-            "what framework",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-
-        // Programming-specific complaint intents
-        prototypes.complaint = vec![
-            "not compiling",
-            "crashes",
-            "segfault",
-            "memory leak",
-            "slow",
-            "doesn't work",
-            "returns wrong",
-            "type error",
-            "null pointer",
-            "stack overflow",
-            "infinite loop",
-            "race condition",
-            "deadlock",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-
         // Custom intents for programming
         let mut custom = HashMap::new();
         custom.insert(
@@ -552,9 +482,76 @@ impl DomainPlugin for ProgrammingPlugin {
                 "rename".to_string(),
             ],
         );
-        prototypes.custom = custom;
 
-        prototypes
+        IntentPrototypes {
+            // Programming-specific command intents
+            command: vec![
+                "write",
+                "create",
+                "implement",
+                "build",
+                "compile",
+                "run",
+                "execute",
+                "test",
+                "debug",
+                "deploy",
+                "install",
+                "update",
+                "refactor",
+                "optimize",
+                "fix",
+                "format",
+                "lint",
+                "review",
+                "merge",
+                "rebase",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            // Programming-specific question intents
+            question: vec![
+                "how to",
+                "what does",
+                "why does",
+                "when should",
+                "what is the best way",
+                "how do I",
+                "can I",
+                "what is the difference",
+                "which is better",
+                "how to fix",
+                "what causes",
+                "how to debug",
+                "what library",
+                "what framework",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            // Programming-specific complaint intents
+            complaint: vec![
+                "not compiling",
+                "crashes",
+                "segfault",
+                "memory leak",
+                "slow",
+                "doesn't work",
+                "returns wrong",
+                "type error",
+                "null pointer",
+                "stack overflow",
+                "infinite loop",
+                "race condition",
+                "deadlock",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            custom,
+            ..Default::default()
+        }
     }
 
     fn prompts(&self) -> DomainPrompts {

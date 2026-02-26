@@ -85,9 +85,10 @@ pub struct GraduationEvent {
 }
 
 /// Source of a memory item
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MemorySource {
     /// Internal cognitive process
+    #[default]
     Internal,
     /// Autonomous web research
     WebResearch,
@@ -95,12 +96,6 @@ pub enum MemorySource {
     UserInteraction,
     /// Action outcome (verification signal)
     ActionFeedback,
-}
-
-impl Default for MemorySource {
-    fn default() -> Self {
-        Self::Internal
-    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
