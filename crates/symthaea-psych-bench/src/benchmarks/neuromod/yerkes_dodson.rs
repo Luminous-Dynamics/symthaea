@@ -166,7 +166,7 @@ fn compute_quadratic_r2(data: &[(f64, f64)]) -> f64 {
         + sx[2] * (sx[1] * sxy[2] - sxy[1] * sx[2]))
         / det;
     let a = (sx[0] * (sx[2] * sxy[2] - sx[3] * sxy[1])
-        - sx[1] * (sx[1] * sxy[2] - sx[3] * sxy[0])
+        - sx[1] * (sx[1] * sxy[2] - sxy[1] * sx[2])
         + sxy[0] * (sx[1] * sx[3] - sx[2] * sx[2]))
         / det;
 
