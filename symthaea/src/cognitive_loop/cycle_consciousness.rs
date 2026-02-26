@@ -350,8 +350,13 @@ impl CognitiveLoopService {
         // Science: Sutton & Barto (2018) — reinforcement learning + HDC.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
+        let epistemic_override = self.carryover.quality.epistemic_reasoning_override;
         let adaptive_reasoning_phi = if let Some(ref mut reasoner) = self.adaptive_reasoner {
-            if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
+            if (self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0) || epistemic_override {
+                if epistemic_override {
+                    self.carryover.quality.epistemic_reasoning_override = false;
+                    self.stats.epistemic_reasoning_accelerations += 1;
+                }
                 match reasoner.reason_adaptive(hv16_cached, 5) {
                     Ok(chain) => chain.total_phi,
                     Err(_) => 0.0,
@@ -468,6 +473,11 @@ impl CognitiveLoopService {
                     let matrix: ConflictMatrix = detector.detect(&metrics);
                     let phi_eff_result = compute_phi_eff(&metrics, calibrator);
                     self.carryover.quality.last_phi_eff = phi_eff_result.phi_eff;
+                    // Phase 21: Cache epistemic conflict count for reasoning override
+                    self.carryover.quality.last_epistemic_conflict_count = matrix.conflicts.len();
+                    if matrix.conflicts.len() > 5 {
+                        self.carryover.quality.epistemic_reasoning_override = true;
+                    }
                     (phi_eff_result.phi_eff, matrix.conflicts.len())
                 } else {
                     (self.carryover.quality.last_phi_eff, 0)

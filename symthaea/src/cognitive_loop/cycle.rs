@@ -209,7 +209,7 @@ impl CognitiveLoopService {
             .last_result
             .as_ref()
             .map(|r| r.reward);
-        let selected_strategy = if moral_concern_detected {
+        let mut selected_strategy = if moral_concern_detected {
             // Bias toward supportive strategy when moral concerns detected
             ResponseStrategy::Supportive
         } else {
@@ -253,6 +253,22 @@ impl CognitiveLoopService {
 
         // Strategy influences adaptive behavior
         self.apply_strategy_modulation(selected_strategy);
+
+        // ── Phase 21: Embodied agency → strategy modulation ──────────────
+        // Science: Varela (1991) — low agency = reactive mode → prefer conservative strategy
+        let agency_strategy_override = {
+            let cached_agency = self.carryover.consciousness.last_embodied_agency;
+            if cached_agency < 0.3 && cached_agency > 0.0
+                && selected_strategy == ResponseStrategy::Exploratory
+            {
+                selected_strategy = ResponseStrategy::Supportive;
+                self.apply_strategy_modulation(selected_strategy); // re-apply with new strategy
+                self.stats.agency_strategy_override_count += 1;
+                true
+            } else {
+                false
+            }
+        };
 
         // 1. HDC encode with attention from previous prediction
         let _t_core = Instant::now();
@@ -333,14 +349,30 @@ impl CognitiveLoopService {
 
         module_timings.surprise_exploration = _t.elapsed().as_micros() as u64;
 
+        // ── Phase 21: Codebook diversity → memoization threshold adaptation ─
+        // Science: Low codebook diversity needs more novel inputs; high diversity can consolidate
+        let base_memo_threshold = 0.95_f32;
+        let diversity = self.stats.codebook_diversity;
+        let memo_threshold = if diversity < 0.4 && diversity > 0.0 {
+            let t = (base_memo_threshold - (0.4 - diversity) * 0.1).max(0.88);
+            self.stats.memo_threshold_adaptations += 1;
+            t
+        } else if diversity > 0.8 {
+            let t = (base_memo_threshold + (diversity - 0.8) * 0.05).min(0.98);
+            self.stats.memo_threshold_adaptations += 1;
+            t
+        } else {
+            base_memo_threshold
+        };
+
         // ── Phase 15: Input similarity memoization ───────────────────────────
         // Science: Priming (Tulving & Schacter 1990) — repeated stimuli can reuse
-        // prior processing results. If input cosine similarity > 0.95, flag for
+        // prior processing results. If input cosine similarity > threshold, flag for
         // downstream subsystem skipping (amortize expensive modules).
         let (input_similarity, input_memoized) =
             if let Some(ref prev) = self.carryover.history.last_compressed_state {
                 let sim = helpers::cosine_f32(&compressed_state, prev).max(0.0);
-                let memoized = sim > 0.95;
+                let memoized = sim > memo_threshold;
                 if memoized {
                     self.stats.input_memoization_hits += 1;
                 }
@@ -693,6 +725,22 @@ impl CognitiveLoopService {
                 .clamp(0.5, 2.0);
             self.stats.binding_threshold_mod_count += 1;
             caution
+        } else {
+            0.0
+        };
+
+        // ── Phase 21: Phenomenal binding → prediction confidence ─────────
+        // Science: Tononi (2004) — strong binding = coherent integration = reliable predictions
+        let binding_confidence_mod = if cached_binding > 0.7 {
+            let conf_boost = (cached_binding - 0.7) * 0.1; // up to +0.03
+            self.prediction_confidence = (self.prediction_confidence + conf_boost).clamp(0.0, 1.0);
+            self.stats.binding_confidence_mod_count += 1;
+            conf_boost
+        } else if cached_binding < 0.3 && cached_binding > 0.0 {
+            let conf_dampen = (0.3 - cached_binding) * 0.15; // up to -0.045
+            self.prediction_confidence = (self.prediction_confidence - conf_dampen).clamp(0.0, 1.0);
+            self.stats.binding_confidence_mod_count += 1;
+            -conf_dampen
         } else {
             0.0
         };
@@ -1446,6 +1494,26 @@ impl CognitiveLoopService {
             // Decay boost back toward 1.0 when not surprised
             self.fep_lr_boost = (self.fep_lr_boost * FEP_LR_DECAY).max(1.0);
         }
+
+        // ── Phase 21: Predictive free energy → surprise amplitude scaling ─
+        // Science: Friston (2010) — precision-weighted prediction errors
+        let cached_pfe = self.carryover.consciousness.last_predictive_free_energy;
+        let pfe_surprise_mod = if is_surprised && cached_pfe > 0.5 {
+            // High FE amplifies surprise response (uncertain model → trust the error)
+            let amplification = ((cached_pfe - 0.5) * 0.2).min(0.1) as f32;
+            self.curiosity_drive.exploration_urge =
+                (self.curiosity_drive.exploration_urge + amplification).clamp(0.0, 1.0);
+            self.stats.pfe_surprise_mod_count += 1;
+            amplification
+        } else if is_surprised && cached_pfe < 0.2 && cached_pfe > 0.0 {
+            // Low FE dampens surprise (confident model → spurious surprise)
+            let dampening = ((0.2 - cached_pfe) * 0.15).min(0.05) as f32;
+            self.curiosity_drive.exploration_urge *= 1.0 - dampening;
+            self.stats.pfe_surprise_mod_count += 1;
+            -dampening
+        } else {
+            0.0
+        };
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.6b Enhanced FEP Bridge: Motor commands and learning signals
@@ -2727,6 +2795,8 @@ impl CognitiveLoopService {
         let affective_arousal = late_result.affective_arousal;
         let narrative_self_psi = late_result.narrative_self_psi;
         let predictive_free_energy = late_result.predictive_free_energy;
+        // Phase 21: Cache predictive free energy for next cycle's surprise scaling
+        self.carryover.consciousness.last_predictive_free_energy = predictive_free_energy;
         let predictive_psi_modulation = late_result.predictive_psi_modulation;
         let hierarchical_total_free_energy = late_result.hierarchical_total_free_energy;
         let predictive_self_safety = late_result.predictive_self_safety;
@@ -2747,6 +2817,8 @@ impl CognitiveLoopService {
         let thermodynamic_free_energy = integration_result.thermodynamic_free_energy;
         let embodied_psi_modulation = integration_result.embodied_psi_modulation;
         let embodied_agency = integration_result.embodied_agency;
+        // Phase 21: Cache embodied agency for next cycle's strategy modulation
+        self.carryover.consciousness.last_embodied_agency = embodied_agency;
         let narrative_gwt_veto = integration_result.narrative_gwt_veto;
         let narrative_gwt_self_psi = integration_result.narrative_gwt_self_psi;
         let living_mind_vitality = integration_result.living_mind_vitality;
@@ -3307,6 +3379,13 @@ impl CognitiveLoopService {
             causal_urgency_gated,
             epistemic_semantic_lr_mod,
             predictive_budget_gated,
+            // Phase 21: Consciousness-Grounded Control
+            binding_confidence_mod,
+            discontinuity_streak: self.carryover.urgency.discontinuity_streak,
+            epistemic_reasoning_accelerated: self.carryover.quality.last_epistemic_conflict_count > 5,
+            agency_strategy_override,
+            pfe_surprise_mod,
+            adaptive_memo_threshold: memo_threshold,
             // Thermodynamic / affective (populated by consciousness pipeline + somatic bridge)
             thermodynamic_load: 0.0,
             somatic_stress: 0.0,

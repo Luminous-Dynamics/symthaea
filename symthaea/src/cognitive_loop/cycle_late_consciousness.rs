@@ -470,12 +470,11 @@ impl CognitiveLoopService {
         };
 
         // FEEDBACK: Predictive phi modulation gates plasticity (Friston 2010)
-        if predictive_psi_modulation > 1.0 {
-            let boost = ((predictive_psi_modulation - 1.0) * 0.1) as f32; // up to +10%
-            self.carryover.learning.subsystem_lr_factor *= 1.0 + boost;
-        } else if predictive_psi_modulation < 0.8 {
-            self.carryover.learning.subsystem_lr_factor *= 0.9; // reduce LR when free energy is low
-        }
+        // Clamp and scale to avoid destabilizing the base learner in single-module ablations.
+        let modulation = (predictive_psi_modulation - 1.0).clamp(-0.15, 0.15) as f32;
+        let coherence_scale = (0.5 + 0.5 * ctx.coherence.clamp(0.0, 1.0)) as f32;
+        let delta = modulation * 0.10 * coherence_scale; // ±1.5% max, coherence-weighted
+        self.carryover.learning.subsystem_lr_factor *= 1.0 + delta;
         module_timings.predictive_processing = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -516,12 +515,12 @@ impl CognitiveLoopService {
         // FEEDBACK: High hierarchical free energy suppresses exploration AND boosts learning
         // Science: Friston (2008) — poor model → focus on learning, not exploring
         if hierarchical_total_free_energy > 1.0 {
-            let fe_factor = (1.0 / (1.0 + hierarchical_total_free_energy * 0.1)) as f32;
-            self.curiosity_drive.boredom *= fe_factor; // suppress exploration urge
+            let fe_factor = (1.0 / (1.0 + hierarchical_total_free_energy * 0.05)) as f32;
+            self.curiosity_drive.boredom *= fe_factor; // suppress exploration urge (gentler)
                                                        // Boost LR proportional to free energy (poor model → learn harder)
-                                                       // Capped at +30% to prevent instability
-            let hfe_lr_boost = (1.0 + (hierarchical_total_free_energy * 0.05).min(0.3)) as f32;
-            self.fep_lr_boost = (self.fep_lr_boost * hfe_lr_boost).clamp(1.0, 2.0);
+                                                       // Capped at +10% to avoid overshooting in short ablation windows
+            let hfe_lr_boost = (1.0 + (hierarchical_total_free_energy * 0.02).min(0.1)) as f32;
+            self.fep_lr_boost = (self.fep_lr_boost * hfe_lr_boost).clamp(1.0, 1.3);
         }
 
         module_timings.hierarchical_free_energy = _t.elapsed().as_micros() as u64;
@@ -868,6 +867,23 @@ impl CognitiveLoopService {
             // Slowly return toward baseline
             self.carryover.learning.adaptive_threshold_scale +=
                 (1.0 - self.carryover.learning.adaptive_threshold_scale) * 0.02;
+        }
+
+        // ── Phase 21: Temporal discontinuity recovery cascade ────────────
+        // Science: Context shift detection requires graduated recovery, not just instant reset
+        if temporal_discontinuity {
+            self.carryover.urgency.discontinuity_streak += 1;
+        } else {
+            self.carryover.urgency.discontinuity_streak =
+                self.carryover.urgency.discontinuity_streak.saturating_sub(1);
+        }
+        let streak = self.carryover.urgency.discontinuity_streak;
+        if streak >= 3 {
+            // Persistent discontinuity: aggressive recovery
+            self.last_prediction = None; // invalidate stale predictions
+            self.fep_lr_boost = (self.fep_lr_boost * 1.5).min(3.0);
+            self.curiosity_drive.exploration_urge *= 0.7;
+            self.stats.discontinuity_cascade_count += 1;
         }
 
         // FEEDBACK: High temporal coherence strengthens narrative self engagement
