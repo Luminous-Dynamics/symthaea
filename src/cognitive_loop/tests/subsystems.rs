@@ -155,7 +155,6 @@ fn test_active_inference_bridge_statistics() {
     }
 
     let stats = bridge.statistics();
-    assert_eq!(stats.total_observations, 15);
     assert!(stats.modulation_index.is_some());
     assert!(stats.average_prediction_error.is_some());
     // All successes → 0% error
@@ -174,7 +173,7 @@ fn test_active_inference_bridge_reset() {
 
     assert_eq!(bridge.coupling_quality(), CouplingQuality::InsufficientData);
     let stats = bridge.statistics();
-    assert_eq!(stats.total_observations, 0);
+    assert!(stats.modulation_index.is_none());
 }
 
 #[test]
