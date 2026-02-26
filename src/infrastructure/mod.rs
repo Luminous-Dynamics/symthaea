@@ -22,6 +22,8 @@ pub mod lock_guard;
 pub mod metrics;
 pub mod pagination;
 pub mod sandbox;
+pub mod somatic_error_bridge;
+pub mod task_supervisor;
 
 pub use auth::{AuthError, AuthProvider, AuthToken};
 pub use cache::{CacheStats, HdcCache, LruCache};
@@ -29,7 +31,11 @@ pub use file_watcher::{ConfigWatcher, WatchEvent, WatchEventKind};
 pub use flake_updater::{FlakeInput, FlakeUpdater, UpdatePreview, UpdateResult};
 pub use git_tracking::{CommitInfo, GitTracker};
 pub use home_manager::{HomeConfig, HomeGeneration, HomeManagerBridge, HomeResult};
-pub use lock_guard::{ResilientMutex, ResilientRwLock};
+pub use lock_guard::{ResilientMutex, ResilientMutexWithPain, ResilientRwLock};
 pub use metrics::{MetricValue, MetricsCollector};
 pub use pagination::{Page, PageRequest, Paginator};
 pub use sandbox::{Sandbox, SandboxResult};
+pub use somatic_error_bridge::{
+    InfrastructureError, PainSender, SomaticErrorBridge, SomaticSignals,
+};
+pub use task_supervisor::TaskSupervisor;

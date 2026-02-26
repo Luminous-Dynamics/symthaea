@@ -311,7 +311,7 @@ impl CycleUrgency {
     /// - `> 0.7` → Critical (high arousal, blast wisdom immediately)
     /// - `> 0.3` → Normal  (standard processing)
     /// - `≤ 0.3` → Cruise  (low arousal, conserve bandwidth)
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Called from mind/tick.rs — unused in default feature set
     pub(crate) fn from_arousal(arousal: f32) -> Self {
         if arousal > 0.7 {
             Self::Critical
@@ -490,6 +490,10 @@ pub struct CycleMetadata {
 
     /// Thermodynamic load (0.0 to 1.0, where 1.0 = 6W limit reached).
     pub thermodynamic_load: f32,
+
+    /// Somatic stress from infrastructure errors (0.0 = healthy, 1.0 = critical).
+    /// Fed by the SomaticErrorBridge: lock poisoning, task panics, DB failures.
+    pub somatic_stress: f64,
 
     /// Affective bias: cognitive temperature (0.0 to 2.0).
     pub mood_temperature: f32,
@@ -939,6 +943,12 @@ pub struct CycleMetadata {
     /// Whether predictive budget gating was active (>80% budget at midpoint).
     pub predictive_budget_gated: bool,
 
+    // ── Liquid-Mamba Fusion Telemetry ────────────────────────────────
+    /// Semantic prediction error from Liquid-Mamba round-trip (0.0–1.0, 0.0 when off).
+    /// Measures `1 - cosine(thought_hv, bundled_output_hvs)`.
+    #[cfg(feature = "liquid-mamba")]
+    pub liquid_mamba_semantic_pe: f32,
+
     // ── Mesh Network Telemetry ────────────────────────────────────────
     /// Mesh network composite health score (0.0–1.0, 0.0 when mesh disabled).
     pub mesh_health_score: f32,
@@ -948,58 +958,6 @@ pub struct CycleMetadata {
     pub mesh_bytes_sent: u64,
     /// Total bytes received from mesh since startup.
     pub mesh_bytes_received: u64,
-}
-
-/// Compact subset of CycleMetadata with the most essential telemetry fields.
-///
-/// Use `CycleMetadata::compact()` to extract this from a full metadata struct.
-/// Useful for lightweight logging, streaming telemetry, or consumers that only
-/// need high-level consciousness state rather than per-subsystem detail.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub(crate) struct CycleMetadataCompact {
-    pub(crate) surprise_triggered: bool,
-    pub(crate) prefrontal_veto: bool,
-    pub(crate) reasoning_confidence: f32,
-    pub(crate) consciousness_level: f64,
-    pub(crate) gwt_broadcast: bool,
-    pub(crate) urgency: CycleUrgency,
-    pub(crate) body_phi_modulation: f64,
-    pub(crate) meta_cognitive_accuracy: f32,
-    pub(crate) narrative_self_psi: f64,
-    pub(crate) affective_valence: f32,
-    pub(crate) affective_arousal: f32,
-    pub(crate) prediction_error_trend: f32,
-    /// FEP TD error magnitude (0.0 when not computed).
-    pub(crate) fep_td_error: f64,
-    /// FEP pragmatic value for selected action (0.0 when not computed).
-    pub(crate) fep_pragmatic_value: f64,
-    /// Codebook diversity: average pairwise cosine distance (0.0–1.0).
-    pub(crate) codebook_diversity: f32,
-}
-
-impl CycleMetadata {
-    /// Extract a compact subset of the most essential telemetry fields.
-    #[allow(dead_code)]
-    pub(crate) fn compact(&self) -> CycleMetadataCompact {
-        CycleMetadataCompact {
-            surprise_triggered: self.surprise_triggered,
-            prefrontal_veto: self.prefrontal_veto,
-            reasoning_confidence: self.reasoning_confidence,
-            consciousness_level: self.consciousness_level,
-            gwt_broadcast: self.gwt_broadcast,
-            urgency: self.urgency,
-            body_phi_modulation: self.body_phi_modulation,
-            meta_cognitive_accuracy: self.meta_cognitive_accuracy,
-            narrative_self_psi: self.narrative_self_psi,
-            affective_valence: self.affective_valence,
-            affective_arousal: self.affective_arousal,
-            prediction_error_trend: 0.0, // caller fills from CycleResult
-            fep_td_error: self.fep_td_error,
-            fep_pragmatic_value: self.fep_pragmatic_value,
-            codebook_diversity: self.codebook_diversity,
-        }
-    }
 }
 
 /// Per-module execution timings in microseconds for overhead profiling.
@@ -1135,23 +1093,6 @@ pub struct PsiAttestationRecord {
     pub urgency: CycleUrgency,
 }
 
-impl PsiAttestationRecord {
-    /// Canonical message for signing: deterministic byte representation.
-    /// The bridge crate signs this with the agent's Ed25519 key.
-    ///
-    /// Phi is formatted to 6 decimal places (`{:.6}`), matching the governance
-    /// bridge's reconstruction format in `record_psi_attestation`. This precision
-    /// (~0.000001) is sufficient for IIT Phi and ensures signature verification
-    /// succeeds across Symthaea → bridge → governance without floating-point drift.
-    #[allow(dead_code)]
-    pub(crate) fn sign_message(&self, agent_did: &str) -> Vec<u8> {
-        format!(
-            "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
-            agent_did, self.psi, self.cycle_id, self.captured_at_us,
-        )
-        .into_bytes()
-    }
-}
 
 /// Result of a single cognitive cycle
 #[derive(Debug, Clone)]

@@ -147,6 +147,19 @@ impl CognitiveLoopService {
         self.stats.adaptive_learning_rate = circadian_lr.clamp(0.0001, 0.1);
 
         // ═══════════════════════════════════════════════════════════════════════
+        // NOCICEPTION: Drain infrastructure errors and convert to felt signals
+        // ═══════════════════════════════════════════════════════════════════════
+        self.somatic_bridge.update();
+        let somatic_signals = self.somatic_bridge.to_interoceptive_signals();
+        // Apply somatic stress to thermodynamic load (additive)
+        self.thermodynamic_load = (self.thermodynamic_load + somatic_signals.thermodynamic_load_delta).min(1.0);
+        // Apply arousal spike from severe infrastructure damage
+        if somatic_signals.arousal_spike > 0.0 {
+            self.emotion_contagion.arousal =
+                (self.emotion_contagion.arousal + somatic_signals.arousal_spike).min(1.0);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // PHASE -1: Ingest background-trained weights (non-blocking)
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(ref mut trainer) = self.async_trainer {
@@ -1009,7 +1022,8 @@ impl CognitiveLoopService {
             * resonance_tau_factor
             * arousal_tau_factor
             * codebook_tau_factor
-            * arousal_recovery_tau_factor;
+            * arousal_recovery_tau_factor
+            * somatic_signals.tau_slowdown_factor as f32; // Nociception: infrastructure stress → slower integration
         let _t_core = Instant::now();
         if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
             tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
@@ -2312,7 +2326,8 @@ impl CognitiveLoopService {
         let adaptive_reasoning_phi = consciousness_metrics.adaptive_reasoning_phi;
         let epistemic_quality = consciousness_metrics.epistemic_quality;
         let phi_validation_correlation = consciousness_metrics.phi_validation_correlation;
-        let dissipative_health = consciousness_metrics.dissipative_health;
+        let dissipative_health = consciousness_metrics.dissipative_health
+            * (1.0 - somatic_signals.dissipative_health_penalty); // Nociception: infrastructure stress penalty
         let dissipative_regime = consciousness_metrics.dissipative_regime;
         let dissipative_entropy_rate = consciousness_metrics.dissipative_entropy_rate;
         let epistemic_phi_eff = consciousness_metrics.epistemic_phi_eff;
@@ -2967,7 +2982,7 @@ impl CognitiveLoopService {
                 .map(|j| j.moral_score)
                 .unwrap_or(0.0);
             let experience = crate::soul::Experience {
-                embedding: encoding_hdv,
+                embedding: encoding_hdv.clone(),
                 value_alignment: moral_score,
                 emotional_valence: self.emotion_contagion.valence,
                 lessons: Vec::new(),
@@ -3067,7 +3082,7 @@ impl CognitiveLoopService {
 
         // Build cycle metadata for observability
         let _t = Instant::now();
-        let metadata = super::CycleMetadata {
+        let mut metadata = super::CycleMetadata {
             surprise_triggered,
             prefrontal_veto,
             reasoning_confidence,
@@ -3292,6 +3307,13 @@ impl CognitiveLoopService {
             causal_urgency_gated,
             epistemic_semantic_lr_mod,
             predictive_budget_gated,
+            // Thermodynamic / affective (populated by consciousness pipeline + somatic bridge)
+            thermodynamic_load: 0.0,
+            somatic_stress: 0.0,
+            mood_temperature: 1.0,
+            // Liquid-Mamba fusion telemetry
+            #[cfg(feature = "liquid-mamba")]
+            liquid_mamba_semantic_pe: 0.0,
             // Mesh network telemetry (populated by Mind module post-cycle)
             mesh_health_score: 0.0,
             mesh_peer_count: 0,
@@ -3314,12 +3336,13 @@ impl CognitiveLoopService {
 
         // Populate v0.8.0 Resonance Metadata
         metadata.thermodynamic_load = self.thermodynamic_load;
+        metadata.somatic_stress = self.somatic_bridge.systemic_stress();
         metadata.mood_temperature = self.mood_temperature;
 
         // Project 16,384D HDC to 32D for visualization (mean-pooling)
         let thought_vector = {
-            let chunk_size = encoding_result.hdv.values.len() / 32;
-            encoding_result.hdv.values
+            let chunk_size = encoding_hdv.values.len() / 32;
+            encoding_hdv.values
                 .chunks(chunk_size)
                 .take(32)
                 .map(|chunk| chunk.iter().sum::<f32>() / chunk.len() as f32)

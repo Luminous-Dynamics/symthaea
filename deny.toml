@@ -2,8 +2,10 @@
 # https://embarkstudios.github.io/cargo-deny/
 
 [advisories]
-unmaintained = "none"
-yanked = "allow"
+vulnerability = "deny"
+unmaintained = "warn"
+yanked = "warn"
+notice = "warn"
 ignore = [
     # Marvin Attack timing sidechannel in rsa crate (indirect dep, no direct exposure)
     "RUSTSEC-2023-0071",
@@ -45,6 +47,6 @@ highlight = "all"
 
 [sources]
 unknown-registry = "warn"
-unknown-git = "allow"
+unknown-git = "warn"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = []

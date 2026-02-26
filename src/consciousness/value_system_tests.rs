@@ -15,9 +15,6 @@
 #[cfg(test)]
 mod calibration_tests {
     use crate::consciousness::affective_consciousness::CoreAffect;
-    use crate::consciousness::mycelix_bridge::{
-        BridgeError, ConsciousnessSnapshot, MycelixBridge, Proposal, ProposalType,
-    };
     use crate::consciousness::seven_harmonies::{Harmony, SevenHarmonies};
     use crate::consciousness::unified_value_evaluator::{
         ActionType, AffectiveSystemsState, Decision, EvaluationContext, UnifiedValueEvaluator,
@@ -229,128 +226,136 @@ mod calibration_tests {
     }
 
     // ========================================================================
-    // MYCELIX BRIDGE CALIBRATION
+    // MYCELIX BRIDGE CALIBRATION (requires `mycelix` feature)
     // ========================================================================
 
-    #[test]
-    fn test_bridge_creation() {
-        let bridge = MycelixBridge::new("test-agent");
-        let stats = bridge.stats();
-        assert_eq!(stats.pending_updates, 0);
-        assert_eq!(stats.cached_proposals, 0);
-    }
-
-    #[test]
-    fn test_consciousness_snapshot_adequacy() {
-        // Test consciousness thresholds
-        let snapshot = ConsciousnessSnapshot::new(0.5, 0.6, 0.7, 0.8, 0.5, 0.6);
-
-        assert!(
-            snapshot.is_adequate_for(ActionType::Basic),
-            "0.5 should be adequate for Basic"
-        );
-        assert!(
-            snapshot.is_adequate_for(ActionType::Governance),
-            "0.5 should be adequate for Governance"
-        );
-        assert!(
-            snapshot.is_adequate_for(ActionType::Voting),
-            "0.5 should be adequate for Voting"
-        );
-        assert!(
-            !snapshot.is_adequate_for(ActionType::Constitutional),
-            "0.5 should NOT be adequate for Constitutional"
-        );
-
-        let high_snapshot = ConsciousnessSnapshot::new(0.8, 0.7, 0.8, 0.9, 0.6, 0.7);
-        assert!(
-            high_snapshot.is_adequate_for(ActionType::Constitutional),
-            "0.8 should be adequate for Constitutional"
-        );
-    }
-
-    #[test]
-    fn test_proposal_evaluation() {
-        let mut bridge = MycelixBridge::new("test-agent");
-
-        let proposal = Proposal {
-            id: "prop-1".to_string(),
-            title: "Community Support".to_string(),
-            description: "Create a mutual aid fund to help community members in need with compassion and care".to_string(),
-            proposer: "proposer-1".to_string(),
-            created_at: 0,
-            proposal_type: ProposalType::Standard,
-            required_phi: 0.3,
+    #[cfg(feature = "mycelix")]
+    mod mycelix_bridge_tests {
+        use super::*;
+        use crate::consciousness::mycelix_bridge::{
+            BridgeError, ConsciousnessSnapshot, MycelixBridge, Proposal, ProposalType,
         };
 
-        let consciousness = ConsciousnessSnapshot::new(0.5, 0.6, 0.7, 0.8, 0.5, 0.6);
-        let affective = AffectiveSystemsState {
-            care: 0.7,
-            play: 0.3,
-            seeking: 0.5,
-            fear: 0.1,
-            rage: 0.0,
-            lust: 0.0,
-            panic: 0.1,
-        };
+        #[test]
+        fn test_bridge_creation() {
+            let bridge = MycelixBridge::new("test-agent");
+            let stats = bridge.stats();
+            assert_eq!(stats.pending_updates, 0);
+            assert_eq!(stats.cached_proposals, 0);
+        }
 
-        let result = bridge.evaluate_proposal(&proposal, consciousness, affective);
-        assert!(
-            result.is_ok(),
-            "Positive proposal should evaluate successfully"
-        );
-    }
+        #[test]
+        fn test_consciousness_snapshot_adequacy() {
+            // Test consciousness thresholds
+            let snapshot = ConsciousnessSnapshot::new(0.5, 0.6, 0.7, 0.8, 0.5, 0.6);
 
-    #[test]
-    fn test_insufficient_consciousness_rejection() {
-        let mut bridge = MycelixBridge::new("test-agent");
+            assert!(
+                snapshot.is_adequate_for(ActionType::Basic),
+                "0.5 should be adequate for Basic"
+            );
+            assert!(
+                snapshot.is_adequate_for(ActionType::Governance),
+                "0.5 should be adequate for Governance"
+            );
+            assert!(
+                snapshot.is_adequate_for(ActionType::Voting),
+                "0.5 should be adequate for Voting"
+            );
+            assert!(
+                !snapshot.is_adequate_for(ActionType::Constitutional),
+                "0.5 should NOT be adequate for Constitutional"
+            );
 
-        let proposal = Proposal {
-            id: "prop-1".to_string(),
-            title: "Constitutional Change".to_string(),
-            description: "Major governance change".to_string(),
-            proposer: "proposer-1".to_string(),
-            created_at: 0,
-            proposal_type: ProposalType::Constitutional,
-            required_phi: 0.6,
-        };
+            let high_snapshot = ConsciousnessSnapshot::new(0.8, 0.7, 0.8, 0.9, 0.6, 0.7);
+            assert!(
+                high_snapshot.is_adequate_for(ActionType::Constitutional),
+                "0.8 should be adequate for Constitutional"
+            );
+        }
 
-        // Low consciousness for constitutional change
-        let consciousness = ConsciousnessSnapshot::new(0.3, 0.4, 0.5, 0.6, 0.5, 0.6);
-        let affective = AffectiveSystemsState::default();
+        #[test]
+        fn test_proposal_evaluation() {
+            let mut bridge = MycelixBridge::new("test-agent");
 
-        let result = bridge.submit_proposal(&proposal, consciousness, affective);
-        assert!(
-            matches!(result, Err(BridgeError::InsufficientConsciousness { .. })),
-            "Constitutional proposal with low consciousness should be rejected"
-        );
-    }
+            let proposal = Proposal {
+                id: "prop-1".to_string(),
+                title: "Community Support".to_string(),
+                description: "Create a mutual aid fund to help community members in need with compassion and care".to_string(),
+                proposer: "proposer-1".to_string(),
+                created_at: 0,
+                proposal_type: ProposalType::Standard,
+                required_phi: 0.3,
+            };
 
-    #[test]
-    fn test_value_learning_recording() {
-        let mut bridge = MycelixBridge::new("test-agent");
+            let consciousness = ConsciousnessSnapshot::new(0.5, 0.6, 0.7, 0.8, 0.5, 0.6);
+            let affective = AffectiveSystemsState {
+                care: 0.7,
+                play: 0.3,
+                seeking: 0.5,
+                fear: 0.1,
+                rage: 0.0,
+                lust: 0.0,
+                panic: 0.1,
+            };
 
-        bridge.record_value_learning(
-            Harmony::PanSentientFlourishing,
-            0.01,
-            true,
-            "Helped user with compassion",
-            0.6,
-        );
+            let result = bridge.evaluate_proposal(&proposal, consciousness, affective);
+            assert!(
+                result.is_ok(),
+                "Positive proposal should evaluate successfully"
+            );
+        }
 
-        assert_eq!(
-            bridge.stats().pending_updates,
-            1,
-            "Should have 1 pending update"
-        );
+        #[test]
+        fn test_insufficient_consciousness_rejection() {
+            let mut bridge = MycelixBridge::new("test-agent");
 
-        let updates = bridge.flush_learning_updates();
-        assert_eq!(updates.len(), 1, "Should flush 1 update");
-        assert_eq!(
-            bridge.stats().pending_updates,
-            0,
-            "Should have 0 pending after flush"
-        );
+            let proposal = Proposal {
+                id: "prop-1".to_string(),
+                title: "Constitutional Change".to_string(),
+                description: "Major governance change".to_string(),
+                proposer: "proposer-1".to_string(),
+                created_at: 0,
+                proposal_type: ProposalType::Constitutional,
+                required_phi: 0.6,
+            };
+
+            // Low consciousness for constitutional change
+            let consciousness = ConsciousnessSnapshot::new(0.3, 0.4, 0.5, 0.6, 0.5, 0.6);
+            let affective = AffectiveSystemsState::default();
+
+            let result = bridge.submit_proposal(&proposal, consciousness, affective);
+            assert!(
+                matches!(result, Err(BridgeError::InsufficientConsciousness { .. })),
+                "Constitutional proposal with low consciousness should be rejected"
+            );
+        }
+
+        #[test]
+        fn test_value_learning_recording() {
+            let mut bridge = MycelixBridge::new("test-agent");
+
+            bridge.record_value_learning(
+                Harmony::PanSentientFlourishing,
+                0.01,
+                true,
+                "Helped user with compassion",
+                0.6,
+            );
+
+            assert_eq!(
+                bridge.stats().pending_updates,
+                1,
+                "Should have 1 pending update"
+            );
+
+            let updates = bridge.flush_learning_updates();
+            assert_eq!(updates.len(), 1, "Should flush 1 update");
+            assert_eq!(
+                bridge.stats().pending_updates,
+                0,
+                "Should have 0 pending after flush"
+            );
+        }
     }
 
     // ========================================================================

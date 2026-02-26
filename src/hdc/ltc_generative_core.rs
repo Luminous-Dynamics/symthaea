@@ -124,6 +124,7 @@ pub struct GeneratedThought {
 
 impl GeneratedThought {
     /// Convert to string representation
+    #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         self.primitives.join(" → ")
     }

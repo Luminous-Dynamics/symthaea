@@ -131,7 +131,10 @@ impl OllamaBackend {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(180)) // 3 minutes for longer prompts
             .build()
-            .unwrap_or_default();
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "Failed to build HTTP client with custom config, falling back to default");
+                reqwest::Client::default()
+            });
 
         Self {
             base_url: base_url.to_string(),
@@ -154,7 +157,10 @@ impl OllamaBackend {
             .connect_timeout(connect_timeout)
             .timeout(response_timeout)
             .build()
-            .unwrap_or_default();
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "Failed to build HTTP client with timeouts, falling back to default");
+                reqwest::Client::default()
+            });
 
         Self {
             base_url: base_url.to_string(),
@@ -190,7 +196,7 @@ impl LLMBackend for OllamaBackend {
 
         if !response.status().is_success() {
             let status = response.status();
-            let body = response.text().await.unwrap_or_default();
+            let body = response.text().await.unwrap_or_else(|_| "<body unreadable>".to_string());
             anyhow::bail!("Ollama returned {status}: {body}");
         }
 
@@ -231,7 +237,7 @@ impl LLMBackend for OllamaBackend {
 
         if !response.status().is_success() {
             let status = response.status();
-            let body = response.text().await.unwrap_or_default();
+            let body = response.text().await.unwrap_or_else(|_| "<body unreadable>".to_string());
             anyhow::bail!("Ollama returned {status}: {body}");
         }
 
