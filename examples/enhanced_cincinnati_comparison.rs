@@ -11,7 +11,6 @@ use symthaea::hdc::cincinnati_enhanced::{
 };
 use symthaea::hdc::cincinnati_ltc::CincinnatiLtcEngine;
 use symthaea::hdc::unified_hv::ContinuousHV;
-use symthaea::hdc::HDC_DIMENSION;
 
 // =============================================================================
 // SIGNAL GENERATORS
@@ -134,7 +133,7 @@ fn generate_logistic(r: f64, length: usize) -> Vec<f64> {
 // BASELINE TEST (Original Cincinnati-LTC)
 // =============================================================================
 
-fn test_baseline(signal: &[f64], name: &str) -> (f64, usize) {
+fn test_baseline(signal: &[f64], _name: &str) -> (f64, usize) {
     let threshold = 0.0;
     let mut engine = CincinnatiLtcEngine::new(5);
     engine.set_budding_threshold(0.5);
@@ -193,10 +192,10 @@ fn test_baseline(signal: &[f64], name: &str) -> (f64, usize) {
 // ENHANCED TEST (New Implementation)
 // =============================================================================
 
-fn test_enhanced(signal: &[f64], sample_rate: f32, name: &str) -> (f64, f32, f32) {
+fn test_enhanced(signal: &[f64], sample_rate: f32, _name: &str) -> (f64, f32, f32) {
     let mut engine = EnhancedCincinnatiEngine::new(sample_rate);
 
-    for (i, &sample) in signal.iter().enumerate() {
+    for &sample in signal.iter() {
         engine.process_signal(sample);
     }
 
@@ -243,7 +242,7 @@ fn test_multi_scale_only(signal: &[f64]) -> f64 {
 // CYCLE DETECTOR TEST
 // =============================================================================
 
-fn test_enhanced_cycle_detector(signal: &[f64], expected_period: usize) -> (usize, f32) {
+fn test_enhanced_cycle_detector(signal: &[f64]) -> (usize, f32) {
     let mut detector = EnhancedCycleDetector::new(64);
 
     for &sample in signal.iter() {
@@ -386,7 +385,7 @@ fn main() {
     println!("{:─<20}─┼─{:─^15}─┼─{:─^12}─┼─{:─^10}", "", "", "", "");
 
     for (name, signal, expected) in square_waves {
-        let (detected, confidence) = test_enhanced_cycle_detector(&signal, expected);
+        let (detected, confidence) = test_enhanced_cycle_detector(&signal);
         let status = if detected == expected {
             "✅"
         } else if detected == expected / 2 {
@@ -429,8 +428,6 @@ fn main() {
             ms.step(sample > 0.0);
         }
         let weights = ms.weights();
-        let accs = ms.branch_accuracies();
-
         let best = if weights[0] >= weights[1] && weights[0] >= weights[2] {
             "Fast"
         } else if weights[1] >= weights[2] {

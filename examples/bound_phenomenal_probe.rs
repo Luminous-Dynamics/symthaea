@@ -14,7 +14,9 @@
 //! cargo run --example bound_phenomenal_probe --features neural-bridge --release
 //! ```
 
+#[cfg(feature = "neural-bridge")]
 use anyhow::Result;
+#[cfg(feature = "neural-bridge")]
 use std::collections::HashMap;
 
 #[cfg(feature = "neural-bridge")]
@@ -24,6 +26,7 @@ use symthaea::perception::{Concept, ConsciousnessProbeV2};
 use symthaea_core::hdc::BinaryHV;
 
 /// Phenomenal concept pairs that humans report as unified experiences
+#[cfg(feature = "neural-bridge")]
 const UNIFIED_PHENOMENAL_PAIRS: &[(&str, &str)] = &[
     (
         "The vivid experience of seeing red",
@@ -42,6 +45,7 @@ const UNIFIED_PHENOMENAL_PAIRS: &[(&str, &str)] = &[
 ];
 
 /// Functional concept pairs (control)
+#[cfg(feature = "neural-bridge")]
 const FUNCTIONAL_PAIRS: &[(&str, &str)] = &[
     (
         "The recursive algorithm terminates",
@@ -66,6 +70,7 @@ const FUNCTIONAL_PAIRS: &[(&str, &str)] = &[
 ];
 
 /// Single phenomenal concepts for comparison
+#[cfg(feature = "neural-bridge")]
 const SINGLE_PHENOMENAL: &[&str] = &[
     "The vivid experience of seeing red",
     "What it is like to taste chocolate",
@@ -75,6 +80,7 @@ const SINGLE_PHENOMENAL: &[&str] = &[
 ];
 
 /// Single functional concepts for comparison
+#[cfg(feature = "neural-bridge")]
 const SINGLE_FUNCTIONAL: &[&str] = &[
     "The recursive algorithm terminates",
     "Hash tables provide O(1) lookup",

@@ -6,7 +6,9 @@
 //!
 //! This removes philosophical/abstract concepts that may muddy the signal.
 
+#[cfg(feature = "neural-bridge")]
 use std::path::Path;
+#[cfg(feature = "neural-bridge")]
 use std::time::Instant;
 
 use anyhow::Result;

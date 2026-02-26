@@ -6,8 +6,9 @@
 //! - Effect estimation methods
 //! - IV and mediation analysis
 //!
-//! Run with: cargo run --example benchmark_causal_reasoning --features counterfactual
+//! Run with: cargo run --example benchmark_causal_reasoning --features reasoning_engine
 
+#[cfg(feature = "reasoning_engine")]
 use std::time::Instant;
 
 #[cfg(feature = "reasoning_engine")]
@@ -34,10 +35,10 @@ fn main() {
     println!("═══════════════════════════════════════════════════════════════════");
 }
 
-#[cfg(not(feature = "counterfactual"))]
+#[cfg(not(feature = "reasoning_engine"))]
 fn main() {
-    println!("This benchmark requires the 'counterfactual' feature.");
-    println!("Run with: cargo run --example benchmark_causal_reasoning --features counterfactual");
+    println!("This benchmark requires the 'reasoning_engine' feature.");
+    println!("Run with: cargo run --example benchmark_causal_reasoning --features reasoning_engine");
 }
 
 #[cfg(feature = "reasoning_engine")]

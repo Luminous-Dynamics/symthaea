@@ -15,7 +15,9 @@
 //! - 2x2 ANOVA: Operation (Bind/Bundle) x Pair Type (Unified/Separate)
 //! - Key test: Interaction effect (binding specifically helps unified pairs)
 
+#[cfg(feature = "neural-bridge")]
 use std::path::Path;
+#[cfg(feature = "neural-bridge")]
 use std::time::Instant;
 
 use anyhow::Result;

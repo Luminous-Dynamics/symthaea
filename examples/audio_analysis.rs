@@ -33,7 +33,7 @@ fn main() {
     );
     println!("{:-<87}", "");
 
-    for (filename, description) in &files {
+    for (filename, _description) in &files {
         let path = audio_dir.join(filename);
         if path.exists() {
             match analyze_wav(&path) {

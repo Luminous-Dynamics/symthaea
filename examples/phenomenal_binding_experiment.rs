@@ -49,6 +49,7 @@ struct ConceptPairsFile {
 
 /// JSON structure for a single concept pair
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ConceptPairJson {
     id: String,
     concept_a: String,

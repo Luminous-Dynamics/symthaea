@@ -30,6 +30,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Consciousness state snapshot for governance
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct ConsciousnessSnapshot {
     /// Integrated information (Φ) - mapped from sleep state
@@ -52,6 +53,7 @@ struct ConsciousnessSnapshot {
 }
 
 impl ConsciousnessSnapshot {
+    #[allow(dead_code)]
     fn quality_score(&self) -> f64 {
         (self.phi * 0.4 + self.coherence * 0.3 + (1.0 - self.emg_tone) * 0.3).clamp(0.0, 1.0)
     }
@@ -99,6 +101,7 @@ impl FieldElement {
 }
 
 /// Pedersen Commitment for hiding sleep data
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct PedersenCommitment {
     commitment: FieldElement,
@@ -125,6 +128,7 @@ impl PedersenCommitment {
         }
     }
 
+    #[allow(dead_code)]
     fn verify_opening(&self, value: u64, blinding: u64) -> bool {
         let recomputed = Self::commit(value, blinding);
         recomputed.commitment == self.commitment
@@ -253,6 +257,7 @@ enum ProofVerificationResult {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Rest Reward Token (simulated)
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct RestReward {
     /// Token amount
@@ -268,6 +273,7 @@ struct RestReward {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 enum RewardType {
     /// Deep sleep is most valuable
     DeepSleepBonus,

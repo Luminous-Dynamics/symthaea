@@ -31,17 +31,6 @@ const WINDOW_SIZE: usize = 1024; // Samples per FFT window
 const SAMPLE_RATE: usize = 44100;
 const LEVELS: usize = 8; // 0 to 7
 
-/// Helper trait for norm calculation on ContinuousHV
-trait Norm {
-    fn norm(&self) -> f32;
-}
-
-impl Norm for ContinuousHV {
-    fn norm(&self) -> f32 {
-        self.values.iter().map(|x| x * x).sum::<f32>().sqrt()
-    }
-}
-
 fn main() {
     println!("👂 Initializing The Ear of Dionysus...");
 
@@ -180,6 +169,7 @@ fn main() {
 #[derive(Debug)]
 enum AudioSource {
     Synthetic,
+    #[cfg(feature = "hound")]
     File(String),
 }
 
@@ -195,41 +185,37 @@ struct AudioStream {
 
 impl AudioStream {
     fn new(source: AudioSource) -> Self {
+        #[cfg(feature = "hound")]
         let mut stream = Self {
             source,
             t: 0,
-            #[cfg(feature = "hound")]
             reader: None,
-            #[cfg(feature = "hound")]
             samples: None,
         };
 
+        #[cfg(not(feature = "hound"))]
+        let stream = Self { source, t: 0 };
+
+        #[cfg(feature = "hound")]
         if let AudioSource::File(ref _path) = stream.source {
-            #[cfg(feature = "hound")]
-            {
-                match hound::WavReader::open(_path) {
-                    Ok(reader) => {
-                        let spec = reader.spec();
-                        println!(
-                            "Opened WAV: {} channels, {} Hz, {} bits",
-                            spec.channels, spec.sample_rate, spec.bits_per_sample
-                        );
-                        // We need to move the reader into the struct, but WavReader isn't easily movable
-                        // into an iterator without ownership issues in this simple struct.
-                        // For this demo, we'll re-open or just read all.
-                        // To keep it simple and streaming:
-                        let samples = reader.into_samples::<f32>().map(|s| s.unwrap_or(0.0));
-                        stream.samples = Some(Box::new(samples));
-                    }
-                    Err(e) => {
-                        println!("Failed to open WAV: {}. Falling back to synthetic.", e);
-                        stream.source = AudioSource::Synthetic;
-                    }
+            match hound::WavReader::open(_path) {
+                Ok(reader) => {
+                    let spec = reader.spec();
+                    println!(
+                        "Opened WAV: {} channels, {} Hz, {} bits",
+                        spec.channels, spec.sample_rate, spec.bits_per_sample
+                    );
+                    // We need to move the reader into the struct, but WavReader isn't easily movable
+                    // into an iterator without ownership issues in this simple struct.
+                    // For this demo, we'll re-open or just read all.
+                    // To keep it simple and streaming:
+                    let samples = reader.into_samples::<f32>().map(|s| s.unwrap_or(0.0));
+                    stream.samples = Some(Box::new(samples));
                 }
-            }
-            #[cfg(not(feature = "hound"))]
-            {
-                // Should not happen due to main check, but good for safety
+                Err(e) => {
+                    println!("Failed to open WAV: {}. Falling back to synthetic.", e);
+                    stream.source = AudioSource::Synthetic;
+                }
             }
         }
 
@@ -283,6 +269,7 @@ impl AudioStream {
                 self.t += size;
                 Some(window)
             }
+            #[cfg(feature = "hound")]
             AudioSource::File(_) => {
                 #[cfg(feature = "hound")]
                 {

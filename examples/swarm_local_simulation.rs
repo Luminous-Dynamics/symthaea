@@ -17,8 +17,6 @@
 //!  └─────────────────┘         └─────────────────┘
 //! ```
 
-use std::time::{Duration, Instant};
-
 #[cfg(feature = "swarm")]
 use symthaea::swarm::{ConsciousnessVector, IrohNode, SwarmConfig};
 

@@ -41,9 +41,7 @@ use std::time::Instant;
 
 use anyhow::Result;
 
-use symthaea::hdc::binding_reversibility_study::{
-    PairCategory, ReversibilityConfig, ReversibilityStudy,
-};
+use symthaea::hdc::binding_reversibility_study::{ReversibilityConfig, ReversibilityStudy};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 
 fn main() -> Result<()> {

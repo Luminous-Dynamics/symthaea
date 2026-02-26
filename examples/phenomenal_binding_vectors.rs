@@ -14,7 +14,9 @@
 //! H2 Revised: Binding creates vectors equidistant from inputs (true integration),
 //! while bundling creates vectors closer to one input (superposition).
 
+#[cfg(feature = "neural-bridge")]
 use std::path::Path;
+#[cfg(feature = "neural-bridge")]
 use std::time::Instant;
 
 use anyhow::Result;

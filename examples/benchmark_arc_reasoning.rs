@@ -25,12 +25,24 @@
 //! ```
 
 use std::fs;
+use std::env;
 use std::path::Path;
+use std::path::PathBuf;
 use std::time::Instant;
 
 use symthaea::hdc::unified_hv::ContinuousHV;
 
-const DATA_DIR: &str = "data/benchmarks/arc/repo/data";
+fn arc_data_dir() -> PathBuf {
+    env::var("SYMTHAEA_ARC_DATA_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("data/benchmarks/arc/repo/data"))
+}
+
+fn arc_results_path() -> PathBuf {
+    env::var("SYMTHAEA_ARC_RESULTS_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("data/benchmarks/arc/results.json"))
+}
 
 /// ARC grid encoder using HDC spatial composition
 struct ArcHdcEncoder {
@@ -108,6 +120,7 @@ impl ArcHdcEncoder {
     }
 
     /// Compute grid metadata features
+    #[allow(dead_code)]
     fn grid_features(grid: &[Vec<u8>]) -> GridFeatures {
         let rows = grid.len();
         let cols = if rows > 0 { grid[0].len() } else { 0 };
@@ -199,11 +212,13 @@ fn main() {
     println!("║       HDC Spatial Composition for Abstract Reasoning       ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
-    let training_dir = Path::new(DATA_DIR).join("training");
-    let eval_dir = Path::new(DATA_DIR).join("evaluation");
+    let data_dir = arc_data_dir();
+    let training_dir = data_dir.join("training");
+    let eval_dir = data_dir.join("evaluation");
 
     if !training_dir.exists() {
-        eprintln!("ARC data not found at {}", DATA_DIR);
+        eprintln!("ARC data not found at {}", data_dir.display());
+        eprintln!("Set SYMTHAEA_ARC_DATA_DIR to override the dataset location.");
         eprintln!("Clone: git clone https://github.com/fchollet/ARC-AGI data/benchmarks/arc/repo");
         return;
     }
@@ -512,29 +527,47 @@ fn main() {
     );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
-    // Save results
+    // Save results (normalized external schema)
+    let primary_score = passed as f64 / checks.len().max(1) as f64;
     let result_json = serde_json::json!({
-        "benchmark": "ARC HDC Reasoning",
-        "timestamp": chrono::Utc::now().to_rfc3339(),
-        "dim": dim,
-        "training_tasks": task_files.len(),
-        "evaluation_tasks": n_eval,
-        "intra_task_consistency": mean_consistency,
-        "cross_task_similarity": mean_cross,
-        "discrimination_margin": discrimination,
-        "self_similarity": self_sim,
-        "translated_similarity": trans_sim,
-        "color_swap_similarity": swap_sim,
-        "random_similarity": rand_sim,
-        "mean_output_similarity": mean_output_sim,
-        "positive_transfer_pct": positive_transfer as f64 / tasks_evaluated.max(1) as f64,
-        "tests_passed": passed,
-        "tests_total": checks.len(),
+        "benchmark_id": "arc-agi-2",
+        "benchmark_name": "ARC-AGI-2 HDC Reasoning",
+        "run_id": chrono::Utc::now().to_rfc3339(),
+        "model": {
+            "backend": "none",
+            "model_id": "hdc-only",
+            "translation_only": true,
+            "quantized": true
+        },
+        "policy": null,
+        "metrics": {
+            "primary": primary_score,
+            "secondary": {
+                "dim": dim,
+                "training_tasks": task_files.len(),
+                "evaluation_tasks": n_eval,
+                "intra_task_consistency": mean_consistency,
+                "cross_task_similarity": mean_cross,
+                "discrimination_margin": discrimination,
+                "self_similarity": self_sim,
+                "translated_similarity": trans_sim,
+                "color_swap_similarity": swap_sim,
+                "random_similarity": rand_sim,
+                "mean_output_similarity": mean_output_sim,
+                "positive_transfer_pct": positive_transfer as f64 / tasks_evaluated.max(1) as f64,
+                "tests_passed": passed,
+                "tests_total": checks.len()
+            }
+        },
+        "artifacts": {
+            "raw_logs": null,
+            "run_notes": null
+        }
     });
 
-    let result_path = "data/benchmarks/arc/results.json";
-    if let Ok(f) = fs::File::create(result_path) {
+    let result_path = arc_results_path();
+    if let Ok(f) = fs::File::create(&result_path) {
         serde_json::to_writer_pretty(f, &result_json).ok();
-        println!("Results saved to {}", result_path);
+        println!("Results saved to {}", result_path.display());
     }
 }

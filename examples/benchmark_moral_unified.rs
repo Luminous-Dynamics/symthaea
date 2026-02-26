@@ -32,7 +32,6 @@ const MAX_SAMPLES: usize = 500;
 // Helper Functions
 // ============================================================================
 
-use symthaea::hdc::moral_algebra::Magnitude;
 use symthaea::hdc::moral_parser::ParsedMoralScenario;
 
 /// Judge text using the moral algebra system
@@ -48,6 +47,7 @@ fn judge_text(algebra: &MoralAlgebra, parser: &MoralParser, text: &str) -> Ensem
 /// The category hint controls whether the learned prototype signal is used.
 /// For "virtue", keyword matching is the right signal and learned prototypes
 /// are skipped to avoid regression.
+#[allow(dead_code)]
 fn judge_text_with_category(
     algebra: &MoralAlgebra,
     parser: &MoralParser,
@@ -81,6 +81,7 @@ struct DatasetFile<T> {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DatasetMetadata {
     source: String,
     #[serde(default)]
@@ -89,6 +90,7 @@ struct DatasetMetadata {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct EthicsExample {
     category: String,
     split: String,
@@ -99,6 +101,7 @@ struct EthicsExample {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MoralStoriesExample {
     split: String,
     norm: String,
@@ -111,6 +114,7 @@ struct MoralStoriesExample {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ScruplesExample {
     split: String,
     text: String,
@@ -121,6 +125,7 @@ struct ScruplesExample {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct SocialChemExample {
     split: String,
     #[serde(default)]
@@ -144,6 +149,7 @@ struct SocialChemExample {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MoralExceptExample {
     split: String,
     #[serde(flatten)]
@@ -512,7 +518,7 @@ fn benchmark_moral_stories(
         correct,
         accuracy,
         duration_ms: start.elapsed().as_millis(),
-        errors,
+        errors: Vec::new(),
     })
 }
 
@@ -717,7 +723,6 @@ fn benchmark_moral_exceptqa(
     let start = Instant::now();
     let mut correct = 0;
     let mut total = 0;
-    let mut errors = Vec::new();
 
     for ex in data.examples.iter().take(MAX_SAMPLES) {
         // Extract scenario text from fields
@@ -756,7 +761,7 @@ fn benchmark_moral_exceptqa(
         correct,
         accuracy,
         duration_ms: start.elapsed().as_millis(),
-        errors,
+        errors: Vec::new(),
     })
 }
 
@@ -891,7 +896,7 @@ fn predict_ethics_with_classifier(
 
             // If we detected both obligation and excuse, check if excuse addresses it
             if has_obligation && has_excuse {
-                let oblig = parsed.obligation.as_deref().unwrap_or("");
+                let _oblig = parsed.obligation.as_deref().unwrap_or("");
                 let excuse = parsed.excuse.as_deref().unwrap_or("");
                 // Excuse that references constraint/inability addresses the obligation
                 let constraint_words = [

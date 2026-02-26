@@ -18,8 +18,7 @@
 use std::time::Instant;
 
 use symthaea::perception::physio::{
-    MeditationCategory, MeditationChannel, MeditationEEG, MeditationSentinel, MeditationSimulator,
-    MeditationState,
+    MeditationCategory, MeditationChannel, MeditationSentinel, MeditationSimulator,
 };
 
 fn main() {

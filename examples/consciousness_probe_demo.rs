@@ -38,6 +38,7 @@ use symthaea_core::hdc::consciousness_topology::{
 
 /// Concept for probing
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct Concept {
     id: String,
     text: String,
@@ -56,6 +57,7 @@ struct ClassStats {
 
 /// Result of probing a concept
 #[derive(Clone)]
+#[allow(dead_code)]
 struct ProbeResult {
     concept_id: String,
     betti: BettiNumbers,

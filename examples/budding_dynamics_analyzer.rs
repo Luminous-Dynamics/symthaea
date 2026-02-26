@@ -36,6 +36,7 @@ struct BuddingAnalyzer {
     step: usize,
 
     /// Checkpoint interval
+    #[allow(dead_code)]
     checkpoint_interval: usize,
 }
 
@@ -193,6 +194,7 @@ impl BuddingAnalyzer {
 /// Pattern generator trait
 trait PatternGenerator {
     fn next(&mut self) -> bool;
+    #[allow(dead_code)]
     fn name(&self) -> &str;
 }
 

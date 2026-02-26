@@ -11,7 +11,6 @@
 use std::f64::consts::PI;
 use symthaea::hdc::cincinnati_ltc::CincinnatiLtcEngine;
 use symthaea::hdc::unified_hv::ContinuousHV;
-use symthaea::hdc::HDC_DIMENSION;
 
 // Use smaller dimension for faster execution
 const SIGNAL_DIM: usize = 1024;
@@ -19,7 +18,9 @@ const SIGNAL_DIM: usize = 1024;
 /// Biosignal generator trait
 trait BiosignalGenerator {
     fn sample(&mut self) -> f64;
+    #[allow(dead_code)]
     fn name(&self) -> &str;
+    #[allow(dead_code)]
     fn description(&self) -> &str;
     fn expected_frequency(&self) -> f64;
 }

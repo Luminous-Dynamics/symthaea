@@ -13,6 +13,7 @@ use std::path::Path;
 
 /// EGI 128-channel to 10-20 channel mapping
 /// Based on HydroCel Geodesic Sensor Net layout
+#[allow(dead_code)]
 struct EgiMapping {
     f3: usize,  // E24 -> F3 (left frontal)
     f4: usize,  // E124 -> F4 (right frontal)
@@ -104,6 +105,7 @@ impl DensEegData {
     }
 
     /// Get a sample from a specific channel
+    #[allow(dead_code)]
     fn sample(&self, channel: usize, sample: usize) -> f32 {
         self.data[channel * self.n_samples + sample]
     }
@@ -159,6 +161,7 @@ impl DensEegData {
 
 /// Ground truth emotional ratings from behavioral file
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct EmotionRating {
     stimulus: String,
     valence: f64,   // 1-9 scale (unpleasant-pleasant)
@@ -166,6 +169,7 @@ struct EmotionRating {
     dominance: f64, // 1-9 scale
 }
 
+#[allow(dead_code)]
 impl EmotionRating {
     /// Convert 1-9 scale to -1 to +1 scale
     fn normalized_valence(&self) -> f64 {
@@ -198,6 +202,7 @@ fn compute_arousal_ratio(beta: f64, alpha: f64) -> f64 {
 
 /// Predicted emotional state from EEG
 #[derive(Debug)]
+#[allow(dead_code)]
 struct PredictedEmotion {
     valence: f64,    // -1 to +1
     arousal: f64,    // -1 to +1

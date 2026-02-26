@@ -24,6 +24,7 @@ use symthaea::hierarchical_cantor_ltc::{CantorLtcConfig, HierarchicalCantorLtcNe
 /// Helper trait for linear interpolation on ContinuousHV
 trait Lerp {
     fn lerp(&self, other: &Self, t: f32) -> Self;
+    #[allow(dead_code)]
     fn norm(&self) -> f32;
 }
 

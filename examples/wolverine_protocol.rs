@@ -24,8 +24,8 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::physics::{
-    FusionReaction, HEADesigner, HEASearchResult, HEATarget, Hadrons, PeriodicTable,
-    PhononDynamics, RadiationDamageSystem, StandardModel,
+    FusionReaction, HEADesigner, HEATarget, Hadrons, PeriodicTable, PhononDynamics,
+    RadiationDamageSystem, StandardModel,
 };
 
 fn main() {

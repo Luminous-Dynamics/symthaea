@@ -9,9 +9,6 @@
 //! - Bound qualia pairs should show more integration than bound computation pairs
 //! - The binding operation should amplify phenomenal differences
 
-use std::path::Path;
-use std::time::Instant;
-
 use anyhow::Result;
 
 #[cfg(feature = "neural-bridge")]

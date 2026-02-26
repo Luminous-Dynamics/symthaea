@@ -50,7 +50,7 @@ fn main() {
     println!("============================================================\n");
 }
 
-fn analyze_matrix(similarity_matrix: &[Vec<f64>], name: &str) {
+fn analyze_matrix(similarity_matrix: &[Vec<f64>], _name: &str) {
     let n = similarity_matrix.len();
 
     // Print similarity matrix stats
