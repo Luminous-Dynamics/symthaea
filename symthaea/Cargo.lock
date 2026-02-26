@@ -13387,6 +13387,7 @@ dependencies = [
  "symthaea-core",
  "tokenizers",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
