@@ -382,6 +382,12 @@ impl ContinuousMind {
                     }
                 }
             }
+            crate::swarm::SwarmMessage::LinguisticDelta { lora_id, delta_bytes } => {
+                // v1.7.0 BROCA PHASE:
+                // Apply the linguistic adaptation from the swarm to our tongue.
+                tracing::info!(id = %lora_id, "BROCA: Applying swarm linguistic delta to local voice.");
+                self.llm_organ.apply_lora(&lora_id, &delta_bytes);
+            }
             _ => {}
         }
     }
