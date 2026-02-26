@@ -160,6 +160,25 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
+        // NEUROMODULATOR BATH: Produce from previous cycle's signals (Phase A)
+        // Science: Doya (2002) — DA/NE/5-HT/ACh unify metalearning modulation.
+        // Uses carryover values (previous cycle) to avoid ordering dependencies.
+        // ═══════════════════════════════════════════════════════════════════════
+        {
+            let neuromod_inputs = super::neuromodulators::NeuromodulatorInputs {
+                prediction_error: self.stats.avg_prediction_error,
+                surprise: self.stats.avg_prediction_error > self.config.learning_threshold * 3.0,
+                reward_signal: self.carryover.quality.last_value_score as f32,
+                coherence: self.carryover.history.cached_coherence.unwrap_or(0.5),
+                arousal: self.emotion_contagion.arousal,
+                binding_strength: self.carryover.quality.last_phenomenal_binding as f32,
+                epistemic_confidence: self.carryover.quality.last_epistemic_confidence,
+                flow_active: self.flow_state.in_flow,
+            };
+            self.neuromodulator_bath.update(&neuromod_inputs);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // PHASE -1: Ingest background-trained weights (non-blocking)
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(ref mut trainer) = self.async_trainer {
@@ -1514,6 +1533,30 @@ impl CognitiveLoopService {
         } else {
             0.0
         };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // NEUROMODULATOR BATH: Downstream modulation (Phase B)
+        // Coherent chemical baseline that fine-grained Phase 14-21 loops adjust further.
+        // ═══════════════════════════════════════════════════════════════════════
+        // DA → learning rate
+        self.fep_lr_boost *= self.neuromodulator_bath.learning_rate_factor();
+        self.fep_lr_boost = self.fep_lr_boost.clamp(1.0, 3.0);
+
+        // NE → exploration
+        self.curiosity_drive.exploration_urge += self.neuromodulator_bath.exploration_delta();
+        self.curiosity_drive.exploration_urge =
+            self.curiosity_drive.exploration_urge.clamp(0.0, 1.0);
+
+        // 5-HT → confidence
+        self.prediction_confidence += self.neuromodulator_bath.confidence_delta();
+        self.prediction_confidence = self.prediction_confidence.clamp(0.0, 1.0);
+
+        // ACh → attention sensitivity + threshold
+        self.adaptive_behavior.attention_sensitivity *= self.neuromodulator_bath.attention_factor();
+        self.adaptive_behavior.attention_sensitivity =
+            self.adaptive_behavior.attention_sensitivity.clamp(0.5, 2.0);
+        self.carryover.learning.adaptive_threshold_scale *=
+            self.neuromodulator_bath.threshold_factor();
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.6b Enhanced FEP Bridge: Motor commands and learning signals
@@ -3386,6 +3429,11 @@ impl CognitiveLoopService {
             agency_strategy_override,
             pfe_surprise_mod,
             adaptive_memo_threshold: memo_threshold,
+            // Neuromodulator Bath
+            dopamine_effective: self.neuromodulator_bath.dopamine.effective(),
+            noradrenaline_effective: self.neuromodulator_bath.noradrenaline.effective(),
+            serotonin_effective: self.neuromodulator_bath.serotonin.effective(),
+            acetylcholine_effective: self.neuromodulator_bath.acetylcholine.effective(),
             // Thermodynamic / affective (populated by consciousness pipeline + somatic bridge)
             thermodynamic_load: 0.0,
             somatic_stress: 0.0,
@@ -3411,6 +3459,19 @@ impl CognitiveLoopService {
         }
         if fep_surprise > surprise_thresh {
             self.stats.fep_surprise_replay_boosts += 1;
+        }
+
+        // Neuromodulator EMA stats (alpha=0.05)
+        {
+            let alpha = 0.05_f32;
+            let da = self.neuromodulator_bath.dopamine.effective();
+            let ne = self.neuromodulator_bath.noradrenaline.effective();
+            let sht = self.neuromodulator_bath.serotonin.effective();
+            let ach = self.neuromodulator_bath.acetylcholine.effective();
+            self.stats.avg_dopamine += alpha * (da - self.stats.avg_dopamine);
+            self.stats.avg_noradrenaline += alpha * (ne - self.stats.avg_noradrenaline);
+            self.stats.avg_serotonin += alpha * (sht - self.stats.avg_serotonin);
+            self.stats.avg_acetylcholine += alpha * (ach - self.stats.avg_acetylcholine);
         }
 
         // Populate v0.8.0 Resonance Metadata

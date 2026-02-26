@@ -468,6 +468,18 @@ pub struct LoopStats {
     pub memo_threshold_adaptations: u64,
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // NEUROMODULATOR BATH STATS
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Running average dopamine effective level (EMA, alpha=0.05).
+    pub avg_dopamine: f32,
+    /// Running average noradrenaline effective level (EMA, alpha=0.05).
+    pub avg_noradrenaline: f32,
+    /// Running average serotonin effective level (EMA, alpha=0.05).
+    pub avg_serotonin: f32,
+    /// Running average acetylcholine effective level (EMA, alpha=0.05).
+    pub avg_acetylcholine: f32,
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)
     // ═══════════════════════════════════════════════════════════════════════════
     /// Cached lattice height (0 = not yet computed)
