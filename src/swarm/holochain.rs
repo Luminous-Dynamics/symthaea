@@ -310,6 +310,8 @@ impl Default for HolochainConfig {
     }
 }
 
+use symthaea_core::hdc::hebbian::HebbianAssociativeMemory;
+
 /// The Holochain Cortex client
 ///
 /// Provides trust verification and identity services via Holochain DHT.
@@ -324,11 +326,13 @@ pub struct HolochainCortex {
     /// Cached agent info (mock mode) - LRU cache with bounded capacity
     agent_cache: LruCache<AgentPubKey, AgentInfo>,
 
+    /// The Holographic Thymus: Semantic immune memory
+    pub thymus: HebbianAssociativeMemory,
+
     /// Mock DHT ledger for Epigenetic Insights
     insight_ledger: Vec<EpigeneticInsight>,
 
-    /// Connection state
-    connected: bool,
+    /// Connection state    connected: bool,
 
     /// Statistics
     stats: CortexStats,
@@ -395,10 +399,43 @@ impl HolochainCortex {
             config,
             local_agent: None,
             agent_cache: LruCache::new(capacity),
+            thymus: HebbianAssociativeMemory::new(symthaea_core::hdc::hebbian::HebbianConfig {
+                dimension: 16384, // Standard baseline
+                ..Default::default()
+            }),
             insight_ledger: Vec::new(),
             connected: false,
             stats: CortexStats::default(),
         }
+    }
+
+    /// Check the Thymus (System 1 Fast Path) for known semantic health.
+    /// Returns Some(true) if proven healthy, Some(false) if proven toxic, None if unknown.
+    pub fn check_thymus(&self, state: &symthaea_core::hdc::ContinuousHV) -> Option<bool> {
+        let (id, similarity) = self.thymus.recall(state)?;
+        
+        if similarity > 0.95 {
+            if id.starts_with("toxic") {
+                tracing::warn!(%id, similarity, "THYMUS: Fast-path VETO. Known toxic pattern detected!");
+                return Some(false);
+            } else if id.starts_with("healthy") {
+                tracing::info!(%id, similarity, "THYMUS: Fast-path ALLOW. Known healthy pattern recognized.");
+                return Some(true);
+            }
+        }
+        None
+    }
+
+    /// Imprint a state into the Thymus after a System 2 (zkVM) check.
+    pub fn imprint_thymus(&mut self, state: &symthaea_core::hdc::ContinuousHV, is_healthy: bool) {
+        let id = if is_healthy {
+            format!("healthy_{}", self.stats.verifications_succeeded)
+        } else {
+            format!("toxic_{}", self.stats.verifications_failed)
+        };
+        
+        tracing::info!(%id, "THYMUS: Imprinting semantic shape for future recognition.");
+        self.thymus.store(&id, state.clone());
     }
 
     /// Record a new epigenetic insight in the DHT.
