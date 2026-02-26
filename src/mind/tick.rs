@@ -298,6 +298,28 @@ impl ContinuousMind {
             return None;
         }
 
+        // v1.2.0 EPIGENETIC INSIGHT RECORDING:
+        // If we are in high-resolution (Ultra) and achieve high Phi, record to DHT.
+        if self.state.holocell.dimensionality == symthaea_core::hdc::HdcDimensionality::Ultra
+            && self.state.consciousness_level > 0.8
+            && self.state.tick % 50 == 0 // Don't spam the ledger
+        {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+
+            let insight = crate::swarm::holochain::EpigeneticInsight {
+                agent_key: crate::swarm::AgentPubKey::new("self"),
+                mutation_id: format!("insight_cycle_{}", self.state.tick),
+                tau_scale: self.state.holocell.tau,
+                phi_achieved: self.state.consciousness_level,
+                dimensionality: "2^16".to_string(),
+                timestamp: now,
+            };
+            self.cortex.record_epigenetic_insight(insight);
+        }
+
         if self.state.tick.is_multiple_of(10) && !self.working_memory.is_empty() {
             self.stats.outputs_generated += 1;
 

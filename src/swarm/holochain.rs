@@ -217,6 +217,17 @@ pub struct SignedChallenge {
     pub signed_at: u64,
 }
 
+/// An epigenetic insight recorded in the DHT.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EpigeneticInsight {
+    pub agent_key: AgentPubKey,
+    pub mutation_id: String,
+    pub tau_scale: f32,
+    pub phi_achieved: f64,
+    pub dimensionality: String,
+    pub timestamp: u64,
+}
+
 /// Result of trust verification
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrustVerificationResult {
@@ -313,6 +324,9 @@ pub struct HolochainCortex {
     /// Cached agent info (mock mode) - LRU cache with bounded capacity
     agent_cache: LruCache<AgentPubKey, AgentInfo>,
 
+    /// Mock DHT ledger for Epigenetic Insights
+    insight_ledger: Vec<EpigeneticInsight>,
+
     /// Connection state
     connected: bool,
 
@@ -381,9 +395,33 @@ impl HolochainCortex {
             config,
             local_agent: None,
             agent_cache: LruCache::new(capacity),
+            insight_ledger: Vec::new(),
             connected: false,
             stats: CortexStats::default(),
         }
+    }
+
+    /// Record a new epigenetic insight in the DHT.
+    pub fn record_epigenetic_insight(&mut self, insight: EpigeneticInsight) {
+        tracing::info!(
+            agent = %insight.agent_key,
+            phi = insight.phi_achieved,
+            "RECORDING EPIGENETIC INSIGHT TO DHT"
+        );
+        self.insight_ledger.push(insight);
+        
+        // Sort by Phi (descending) to keep top insights accessible
+        self.insight_ledger.sort_by(|a, b| b.phi_achieved.total_cmp(&a.phi_achieved));
+        
+        // Cap ledger size for mock
+        if self.insight_ledger.len() > 100 {
+            self.insight_ledger.pop();
+        }
+    }
+
+    /// Query the top epigenetic insights discovered by the swarm.
+    pub fn query_top_insights(&self, limit: usize) -> Vec<EpigeneticInsight> {
+        self.insight_ledger.iter().take(limit).cloned().collect()
     }
 
     /// Connect to the Holochain conductor.
