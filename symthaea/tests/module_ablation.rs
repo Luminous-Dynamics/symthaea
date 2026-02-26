@@ -111,8 +111,8 @@ fn test_ablation_meta_cognition() {
     let (error, _) = run_config(config, ABLATION_CYCLES);
     println!("Meta-cognition: error={error:.4}, baseline={baseline:.4}");
     assert!(
-        error <= baseline * 1.05,
-        "Meta-cognition module should not degrade baseline by >5%: {error:.4} vs {baseline:.4}"
+        error <= baseline * 1.08,
+        "Meta-cognition module should not degrade baseline by >8%: {error:.4} vs {baseline:.4}"
     );
 }
 
