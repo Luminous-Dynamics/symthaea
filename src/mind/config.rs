@@ -60,6 +60,8 @@ pub struct MindState {
     pub mood_temperature: f32,
     /// Current arousal level (0 to 1)
     pub arousal: f32,
+    /// Last brain mutation suggested by swarm (tau scale)
+    pub last_mutation_suggestion: Option<f32>,
     /// Current focus/attention target
     pub attention_focus: Option<String>,
     /// Active goals
@@ -100,6 +102,7 @@ impl Default for MindState {
             thermodynamic_load: 0.0,
             mood_temperature: 1.0,
             arousal: 0.5,
+            last_mutation_suggestion: None,
             attention_focus: None,
             active_goals: Vec::new(),
             current_thought: ContinuousHV::zero(512),

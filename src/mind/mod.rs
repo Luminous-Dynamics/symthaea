@@ -65,6 +65,16 @@ const MESH_BANDWIDTH_DECREASE_FACTOR: f64 = 0.5;
 #[cfg(feature = "mesh")]
 const MESH_REPLAY_BUFFER_CAPACITY: usize = 16;
 
+/// Working memory eviction with metadata for persistence tagging.
+#[derive(Debug, Clone)]
+pub struct EvictedMemory {
+    pub content: ContinuousHV,
+    pub steps_survived: u64,
+    pub source: MemorySource,
+    pub is_verified: bool,
+    pub metadata: std::collections::HashMap<String, String>,
+}
+
 /// The continuous mind system
 pub struct ContinuousMind {
     /// Configuration
@@ -80,6 +90,8 @@ pub struct ContinuousMind {
     pub(crate) working_memory_sources: Vec<MemorySource>,
     /// Verification status of each working memory item.
     pub(crate) working_memory_verified: Vec<bool>,
+    /// Metadata for each working memory item.
+    pub(crate) working_memory_metadata: Vec<std::collections::HashMap<String, String>>,
     /// Goal stack
     pub(crate) goals: Vec<Goal>,
     /// Input queue
@@ -104,8 +116,7 @@ pub struct ContinuousMind {
     /// Outgoing gradient messages to broadcast to peers.
     pub(crate) federated_outbox: Vec<crate::swarm::GradientMessage>,
     /// Buffer of items evicted from working memory when capacity is exceeded.
-    /// Each entry is `(hypervector, steps_survived, source, is_verified)`
-    evicted_items: Vec<(ContinuousHV, u64, MemorySource, bool)>,
+    evicted_items: Vec<EvictedMemory>,
     /// Relational Ψ from the partnership module's Φ_dyad computation.
     /// Fed back each cycle to modulate consciousness: higher relational Ψ
     /// boosts integration when the partnership is healthy.
@@ -214,6 +225,7 @@ impl ContinuousMind {
             working_memory_ticks: Vec::new(),
             working_memory_sources: Vec::new(),
             working_memory_verified: Vec::new(),
+            working_memory_metadata: Vec::new(),
             goals: Vec::new(),
             input_queue: Vec::new(),
             stats: MindStats::default(),
@@ -291,6 +303,32 @@ impl ContinuousMind {
     /// Add input to the mind
     pub fn input(&mut self, input: MindInput) {
         self.input_queue.push(input);
+    }
+
+    /// Process a swarm message (e.g. BrainMutation).
+    pub fn receive_swarm_message(&mut self, msg: crate::swarm::SwarmMessage) {
+        match msg {
+            crate::swarm::SwarmMessage::BrainMutation { tau_scale, predicted_phi_gain, .. } => {
+                tracing::info!(
+                    target: "symthaea::swarm",
+                    tau_scale,
+                    phi_gain = predicted_phi_gain,
+                    "Received Brain Mutation via Swarm"
+                );
+                // Enqueue as a perception input so the mind can 'think' about the change
+                // We'll use a zero vector since Mind doesn't have text_to_hv
+                let hv = ContinuousHV::zero(self.config.dimension);
+                self.input(MindInput::new(crate::mind::InputType::Perception, hv));
+                
+                // Store in state for the motor system to potentially execute
+                self.state.last_mutation_suggestion = Some(tau_scale);
+            }
+            crate::swarm::SwarmMessage::ZkProof { mutation_id, .. } => {
+                tracing::info!(target: "symthaea::swarm", id = %mutation_id, "Received ZK-Proof for mutation");
+                // TODO: Verify proof
+            }
+            _ => {}
+        }
     }
 
     /// Add a perception input
@@ -382,6 +420,14 @@ impl ContinuousMind {
     ///
     /// Returns `(hypervector, steps_survived, source, is_verified)` tuples.
     pub fn take_evicted(&mut self) -> Vec<(ContinuousHV, u64, MemorySource, bool)> {
+        self.evicted_items
+            .drain(..)
+            .map(|item| (item.content, item.steps_survived, item.source, item.is_verified))
+            .collect()
+    }
+
+    /// Drain evicted items with metadata for tagged persistence.
+    pub fn take_evicted_tagged(&mut self) -> Vec<EvictedMemory> {
         std::mem::take(&mut self.evicted_items)
     }
 
@@ -860,6 +906,8 @@ impl ContinuousMind {
             self.working_memory_ticks.push(0);
             self.working_memory_sources.push(MemorySource::Internal);
             self.working_memory_verified.push(true);
+            self.working_memory_metadata
+                .push(std::collections::HashMap::new());
 
             tracing::debug!(
                 target: "symthaea::mind::seeding",

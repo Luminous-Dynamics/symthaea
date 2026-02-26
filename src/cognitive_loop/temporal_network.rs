@@ -117,6 +117,23 @@ impl TemporalNetwork {
         }
     }
 
+    /// Scale tau values for all layers uniformly
+    pub fn scale_tau_all(&mut self, scale: f32) {
+        match self {
+            Self::CfC(cfc) => cfc.scale_tau_all(scale),
+            _ => {}
+        }
+    }
+
+    /// Set tau values for all layers
+    pub fn set_tau_all(&mut self, taus: Vec<Array1<f32>>) {
+        if let Self::CfC(cfc) = self {
+            for (cell, tau) in cfc.cells.iter_mut().zip(taus.into_iter()) {
+                cell.tau.copy_from(&tau);
+            }
+        }
+    }
+
     /// Adaptively resize HDC dimension based on prediction error (HdcLtc only)
     pub fn maybe_resize(&mut self, current_error: f32) {
         if let Self::HdcLtc(bridge) = self {

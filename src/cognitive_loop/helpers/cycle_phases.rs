@@ -33,7 +33,70 @@ pub(in crate::cognitive_loop) struct EpisodicReplayResult {
     pub surprise_replay_batch_size: usize,
 }
 
+/// Result from the hyper-parameter optimization phase.
+pub(in crate::cognitive_loop) struct ParameterOptimizationResult {
+    pub best_tau_scale: f32,
+    pub phi_gain: f64,
+    pub swap_occurred: bool,
+}
+
 impl CognitiveLoopService {
+    /// Autonomous Hyper-Parameter Optimization (The Meta-Forge).
+    ///
+    /// Periodically explores variations of the brain's internal dynamics
+    /// (e.g. time constants) using historical high-Phi episodes.
+    pub(in crate::cognitive_loop) fn run_parameter_optimization_phase(
+        &mut self,
+    ) -> ParameterOptimizationResult {
+        let mut result = ParameterOptimizationResult {
+            best_tau_scale: 1.0,
+            phi_gain: 0.0,
+            swap_occurred: false,
+        };
+
+        // Only run every 500 cycles to amortize cost
+        if self.stats.total_cycles % 500 != 0 {
+            return result;
+        }
+
+        if let Some(ref replay) = self.phi_episodic_replay {
+            let episodes = replay.get_top_episodes(16);
+            if episodes.is_empty() {
+                return result;
+            }
+
+            let baseline_phi = self.simulate_episodes(&episodes, 1.0);
+            let mut best_phi = baseline_phi;
+            let mut best_scale = 1.0;
+
+            // Simple swarm of candidate tau scales [0.8, 0.9, 1.1, 1.2]
+            for scale in [0.8, 0.9, 1.1, 1.2] {
+                let candidate_phi = self.simulate_episodes(&episodes, scale);
+                if candidate_phi > best_phi {
+                    best_phi = candidate_phi;
+                    best_scale = scale;
+                }
+            }
+
+            result.best_tau_scale = best_scale;
+            result.phi_gain = best_phi - baseline_phi;
+
+            // If we found an improvement > 5%, hot-swap the live network
+            if result.phi_gain > 0.05 {
+                self.temporal_network.scale_tau_all(best_scale);
+                result.swap_occurred = true;
+                tracing::info!(
+                    target: "symthaea::forge::optimization",
+                    gain = result.phi_gain,
+                    new_scale = best_scale,
+                    "Brain hot-swapped: Hyper-parameter optimization successful!"
+                );
+            }
+        }
+
+        result
+    }
+
     /// Resonator codebook growth, high-Phi episode promotion, diversity computation,
     /// utilization tracking, and diversity-driven exploration governor.
     ///
@@ -533,7 +596,7 @@ impl CognitiveLoopService {
                 prediction_error * (1.0 + unified_psi as f32).clamp(1.0, 2.0) * narrative_salience;
             dream.record(
                 &dream_state,
-                &dream_action,
+                dream_action,
                 &dream_outcome,
                 phi_weighted_surprise,
             );

@@ -156,6 +156,20 @@ pub enum SwarmMessage {
     /// Iroh connection ticket
     TicketResponse { ticket: String },
 
+    /// Brain evolution mutation (e.g. tau scale breakthrough)
+    BrainMutation {
+        mutation_id: String,
+        tau_scale: f32,
+        predicted_phi_gain: f64,
+    },
+
+    /// Zero-knowledge proof of evolutionary validity
+    ZkProof {
+        mutation_id: String,
+        proof_bytes: Vec<u8>,
+        public_inputs: Vec<u8>,
+    },
+
     /// Graceful disconnect
     Goodbye { reason: String },
 }
@@ -174,6 +188,8 @@ impl SwarmMessage {
             Self::TrustResponse { .. } => "TrustResponse",
             Self::TicketRequest => "TicketRequest",
             Self::TicketResponse { .. } => "TicketResponse",
+            Self::BrainMutation { .. } => "BrainMutation",
+            Self::ZkProof { .. } => "ZkProof",
             Self::Goodbye { .. } => "Goodbye",
         }
     }
