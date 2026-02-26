@@ -458,4 +458,7 @@ pub struct LoopStats {
     pub lattice_height_cached: usize,
     /// Cached lattice width (0 = not yet computed)
     pub lattice_width_cached: usize,
+
+    /// Number of successful brain hot-swaps (hyper-parameter optimization)
+    pub brain_swaps_count: u64,
 }

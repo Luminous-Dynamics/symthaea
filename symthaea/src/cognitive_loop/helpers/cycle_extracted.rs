@@ -639,4 +639,40 @@ impl CognitiveLoopService {
 
         (cross_modal_binding_strength, cross_modal_psi)
     }
+
+    /// Meta-Forge: Simulate historical episodes with candidate parameters.
+    ///
+    /// Replays a batch of episodes using the current network state but with
+    /// candidate hyper-parameters (e.g. tau scaling). Returns the average Phi
+    /// achieved during the simulation.
+    pub fn simulate_episodes(
+        &mut self,
+        episodes: &[crate::memory::episodic_replay::Episode],
+        tau_scale: f32,
+    ) -> f64 {
+        // 1. Snapshot current tau
+        let original_tau = self.temporal_network.all_tau_owned();
+        
+        // 2. Apply candidate scaling
+        self.temporal_network.scale_tau_all(tau_scale);
+        
+        // 3. Replay and measure
+        let mut total_phi = 0.0;
+        for ep in episodes {
+            let input_array = ndarray::Array1::from_vec(ep.input.values.clone());
+            let _ = self.temporal_network.step(&input_array, 0.02); // Standard dt
+            
+            // Measure integration (Layer 1 proxy)
+            let phi = match &self.temporal_network {
+                super::super::temporal_network::TemporalNetwork::CfC(cfc) => cfc.consciousness_level() as f64,
+                _ => 0.5,
+            };
+            total_phi += phi;
+        }
+        
+        // 4. Restore original tau
+        self.temporal_network.set_tau_all(original_tau);
+        
+        total_phi / episodes.len().max(1) as f64
+    }
 }

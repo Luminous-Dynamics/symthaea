@@ -1098,6 +1098,10 @@ pub struct ModuleTimings {
     pub demand_consolidation: u64,
     /// Episodic replay CfC retraining + memory coordinator graduations
     pub episodic_replay: u64,
+    /// Hyper-parameter optimization (Meta-Forge)
+    pub parameter_optimization: u64,
+    /// Counterfactual dream cycle
+    pub dream_cycle: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

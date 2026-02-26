@@ -368,6 +368,19 @@ pub fn create_backend_from_env() -> Arc<dyn LLMBackend> {
                 tracing::warn!("SYMTHAEA_LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY not set, falling back to Ollama");
             }
             "ollama" => {
+                let model = std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "llama3".to_string());
+                return Arc::new(OllamaBackend::with_model(&model));
+            }
+            "candle" => {
+                #[cfg(feature = "full_language")]
+                {
+                    let model_id = std::env::var("SYMTHAEA_CANDLE_MODEL").unwrap_or_else(|_| "bartowski/Llama-3.2-1B-Instruct-GGUF".to_string());
+                    let file_name = std::env::var("SYMTHAEA_CANDLE_FILE").unwrap_or_else(|_| "Llama-3.2-1B-Instruct-Q4_K_M.gguf".to_string());
+                    if let Ok(backend) = super::candle_backend::CandleBackend::new(&model_id, "main", &file_name) {
+                        return Arc::new(backend);
+                    }
+                }
+                tracing::warn!("SYMTHAEA_LLM_PROVIDER=candle but feature full_language not enabled or load failed, falling back to Ollama");
                 return Arc::new(OllamaBackend::new());
             }
             "simulated" => {
@@ -386,7 +399,9 @@ pub fn create_backend_from_env() -> Arc<dyn LLMBackend> {
     if let Some(backend) = super::anthropic_backend::AnthropicBackend::from_env() {
         return Arc::new(backend);
     }
-    Arc::new(OllamaBackend::new())
+    
+    let model = std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "llama3".to_string());
+    Arc::new(OllamaBackend::with_model(&model))
 }
 
 /// Summarize a prompt to ~20 words for simulated responses.

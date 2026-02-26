@@ -2648,7 +2648,19 @@ impl CognitiveLoopService {
         module_timings.support_intelligence = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
-        // DREAM ENGINE (extracted): Record surprise events + dream during Cruise
+        // PHASE 10.5: Hyper-Parameter Optimization (The Meta-Forge)
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let opt_result = self.run_parameter_optimization_phase();
+        module_timings.parameter_optimization = _t.elapsed().as_micros() as u64;
+
+        if opt_result.swap_occurred {
+            // Hot-swap occurred: update metrics or log if needed
+            self.stats.brain_swaps_count = self.stats.brain_swaps_count.saturating_add(1);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // Phase 11: DREAM ENGINE (Recording & Wisdom Application)
         // ═══════════════════════════════════════════════════════════════════════
         let DreamPhaseResult {
             dream_insights,

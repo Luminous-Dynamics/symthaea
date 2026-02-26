@@ -43,6 +43,8 @@ enum MindCommand {
     Stats(oneshot::Sender<MindStats>),
     /// Receive a social message from a peer.
     ReceiveSocial(SocialMessage),
+    /// Receive a swarm gossip message (e.g. BrainMutation).
+    SwarmGossip(crate::swarm::SwarmMessage),
     /// Update thermodynamic load (power/heat).
     UpdateThermodynamics(f32),
     /// Drain outgoing social messages.
@@ -149,10 +151,10 @@ impl AsyncMindHandle {
         }
     }
 
-    /// Update thermodynamic load (power/heat).
-    pub async fn update_thermodynamics(&self, load: f32) {
-        if self.tx.send(MindCommand::UpdateThermodynamics(load)).await.is_err() {
-            tracing::warn!("AsyncMind actor has stopped — update_thermodynamics command dropped");
+    /// Receive a swarm gossip message (from a peer).
+    pub async fn receive_swarm_gossip(&self, msg: crate::swarm::SwarmMessage) {
+        if self.tx.send(MindCommand::SwarmGossip(msg)).await.is_err() {
+            tracing::warn!("AsyncMind actor has stopped — receive_swarm_gossip command dropped");
         }
     }
 
@@ -285,6 +287,12 @@ impl AsyncMind {
                             mind.receive_social(msg);
                             // Only trigger a full tick if a certain surprise/phi threshold is reached
                             // in a future implementation. For now, we process immediately.
+                            mind.tick();
+                        }
+                        MindCommand::SwarmGossip(msg) => {
+                            // Forward to top-level message handler (to be implemented in Symthaea or Mind)
+                            // For now, we'll assume ContinuousMind can handle it
+                            mind.receive_swarm_message(msg);
                             mind.tick();
                         }
                         MindCommand::UpdateThermodynamics(load) => {

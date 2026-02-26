@@ -31,6 +31,8 @@ pub mod narrative_compiler;
 // LLM provider backends
 pub mod anthropic_backend;
 pub mod openai_backend;
+#[cfg(feature = "full_language")]
+pub mod candle_backend;
 
 // Code understanding & generation (Phase: Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]

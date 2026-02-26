@@ -381,7 +381,7 @@ lancedb-backend = ["dep:lancedb", "dep:arrow-array", "dep:arrow-schema", "dep:fu
 # ── Consciousness & Reasoning (code-level cfg gates) ────────────────
 full_consciousness = []                     # Extended consciousness submodules
 full_perception = []                        # Extended perception submodules
-full_language = []                          # Advanced language features (grammar, parsers)
+full_language = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub"]                          # Advanced language features (grammar, parsers)
 magi_loop = []                              # MAGI Loop world-grounded prediction
 # Unified reasoning engine: epistemic conflict, tool gating, temporal planning, counterfactual.
 # Subsumes former epistemic_conflict, conscious_tool_gate, temporal_planning, counterfactual features.
