@@ -35,6 +35,8 @@ pub mod openai_backend;
 pub mod candle_backend;
 #[cfg(feature = "ssm_language")]
 pub mod ssm_backend;
+#[cfg(feature = "ssm_language")]
+pub mod distillation;
 
 // Code understanding & generation (Phase: Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]

@@ -281,6 +281,22 @@ pub struct WebResearchConfig {
     pub meta_learning_enabled: bool,
     /// Source credibility scores (domain -> score)
     pub source_credibility: HashMap<String, f32>,
+    /// Optional external search provider (serper|brave|searxng)
+    pub search_provider: Option<String>,
+    /// API key for the search provider (if required)
+    pub search_api_key: Option<String>,
+    /// Override endpoint for the search provider
+    pub search_endpoint: Option<String>,
+    /// Enable arXiv API search
+    pub enable_arxiv_api: bool,
+    /// arXiv API endpoint
+    pub arxiv_endpoint: String,
+    /// Enable OpenReview API search
+    pub enable_openreview_api: bool,
+    /// OpenReview API endpoint
+    pub openreview_endpoint: String,
+    /// OpenReview access token (optional)
+    pub openreview_token: Option<String>,
 }
 
 impl Default for WebResearchConfig {
@@ -294,6 +310,16 @@ impl Default for WebResearchConfig {
             confidence_threshold: 0.3,
             meta_learning_enabled: false,
             source_credibility: HashMap::new(),
+            search_provider: std::env::var("SYMTHAEA_SEARCH_PROVIDER").ok(),
+            search_api_key: std::env::var("SYMTHAEA_SEARCH_API_KEY").ok(),
+            search_endpoint: std::env::var("SYMTHAEA_SEARCH_ENDPOINT").ok(),
+            enable_arxiv_api: env_flag("SYMTHAEA_ARXIV_API_ENABLED", true),
+            arxiv_endpoint: std::env::var("SYMTHAEA_ARXIV_API_ENDPOINT")
+                .unwrap_or_else(|_| "https://export.arxiv.org/api/query".to_string()),
+            enable_openreview_api: env_flag("SYMTHAEA_OPENREVIEW_API_ENABLED", true),
+            openreview_endpoint: std::env::var("SYMTHAEA_OPENREVIEW_API_ENDPOINT")
+                .unwrap_or_else(|_| "https://api2.openreview.net/notes/search".to_string()),
+            openreview_token: std::env::var("SYMTHAEA_OPENREVIEW_TOKEN").ok(),
         }
     }
 }
@@ -320,6 +346,28 @@ impl WebResearchConfig {
     pub fn with_confidence_threshold(mut self, threshold: f32) -> Self {
         self.confidence_threshold = threshold.clamp(0.0, 1.0);
         self
+    }
+
+    /// Configure an external search provider
+    pub fn with_search_provider(
+        mut self,
+        provider: impl Into<String>,
+        api_key: Option<String>,
+        endpoint: Option<String>,
+    ) -> Self {
+        self.search_provider = Some(provider.into());
+        self.search_api_key = api_key;
+        self.search_endpoint = endpoint;
+        self
+    }
+}
+
+fn env_flag(name: &str, default: bool) -> bool {
+    match std::env::var(name).ok().map(|v| v.to_lowercase()) {
+        Some(v) if matches!(v.as_str(), "1" | "true" | "yes" | "on") => true,
+        Some(v) if matches!(v.as_str(), "0" | "false" | "no" | "off") => false,
+        Some(_) => default,
+        None => default,
     }
 }
 

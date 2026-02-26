@@ -5,6 +5,7 @@
 //! captures its semantic meaning.
 
 use ndarray::Array1;
+use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
@@ -13,7 +14,7 @@ use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Difficulty level of a learning objective
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub enum Difficulty {
     /// Very easy, foundational concepts (0.0 - 0.2)
     Beginner,
@@ -61,7 +62,7 @@ impl Difficulty {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Knowledge domain for categorizing objectives
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum Domain {
     /// NixOS system administration
     #[default]
@@ -172,7 +173,7 @@ impl From<&str> for Domain {
 /// - Semantic similarity comparisons
 /// - Efficient CfC-based lookahead predictions
 /// - Integration with the consciousness graph
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LearningObjective {
     /// Unique identifier
     pub id: String,
@@ -283,6 +284,7 @@ pub struct ObjectiveBuilder {
     description: String,
     domain: Domain,
     difficulty: Difficulty,
+    dimension: usize,
     seed: Option<u64>,
     prerequisites: Vec<String>,
     tags: Vec<String>,
@@ -298,11 +300,18 @@ impl ObjectiveBuilder {
             description: String::new(),
             domain: Domain::default(),
             difficulty: Difficulty::default(),
+            dimension: HDC_DIMENSION,
             seed: None,
             prerequisites: Vec::new(),
             tags: Vec::new(),
             estimated_minutes: 15,
         }
+    }
+
+    /// Set dimension
+    pub fn with_dimension(mut self, dimension: usize) -> Self {
+        self.dimension = dimension;
+        self
     }
 
     /// Set description
@@ -370,8 +379,8 @@ impl ObjectiveBuilder {
         });
 
         // Generate HDC encoding
-        let base = ContinuousHV::random(HDC_DIMENSION, seed);
-        let domain_hv = ContinuousHV::random(HDC_DIMENSION, self.domain.seed());
+        let base = ContinuousHV::random(self.dimension, seed);
+        let domain_hv = ContinuousHV::random(self.dimension, self.domain.seed());
 
         // Bind base with domain, scale by inverse difficulty
         // (easier concepts have stronger/cleaner encodings)

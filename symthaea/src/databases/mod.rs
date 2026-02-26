@@ -362,6 +362,7 @@ pub struct DatabaseStats {
 // Database Trait
 // ============================================================================
 
+#[cfg(feature = "school_learning")]
 use crate::school::curriculum::Curriculum;
 use symthaea_dream::CausalLink;
 
@@ -440,11 +441,13 @@ pub trait ConsciousnessDatabase: Send + Sync {
     }
 
     /// Store a curriculum into the database.
+    #[cfg(feature = "school_learning")]
     async fn store_curriculum(&self, _curriculum: &Curriculum) -> DbResult<()> {
         Ok(())
     }
 
     /// Retrieve all curricula from the database.
+    #[cfg(feature = "school_learning")]
     async fn get_curricula(&self) -> DbResult<Vec<Curriculum>> {
         Ok(Vec::new())
     }

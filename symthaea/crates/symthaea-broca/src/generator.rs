@@ -6,6 +6,8 @@
 //! 3. Semantic veto: mid-sentence self-correction when coherence drops
 //! 4. Thermodynamic subjective time: dt varies with system load
 
+use serde::{Serialize, Deserialize};
+
 use crate::controller::{LanguageController, LanguageControllerConfig};
 use crate::encoder::{ThoughtChannels, ThoughtLanguageEncoder};
 use crate::gating::{CoherenceFeedback, EmotionalModulator, EpistemicGate, GatingConfig, consciousness_gated_max_tokens};
@@ -14,7 +16,7 @@ use crate::tokenizer::BpeTokenizer;
 use symthaea_core::genesis::GenesisSeed;
 
 /// Sampling strategy for token selection.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SamplingStrategy {
     /// Always pick the highest-logit token.
     Greedy,
@@ -31,7 +33,7 @@ impl Default for SamplingStrategy {
 }
 
 /// Configuration for the Broca generator.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrocaConfig {
     /// Controller configuration.
     pub controller: LanguageControllerConfig,
@@ -259,6 +261,16 @@ impl BrocaGenerator {
     /// Get reference to the encoder.
     pub fn encoder(&self) -> &ThoughtLanguageEncoder {
         &self.encoder
+    }
+
+    /// Get reference to the controller.
+    pub fn controller(&self) -> &LanguageController {
+        &self.controller
+    }
+
+    /// Get reference to the config.
+    pub fn config(&self) -> &BrocaConfig {
+        &self.config
     }
 }
 

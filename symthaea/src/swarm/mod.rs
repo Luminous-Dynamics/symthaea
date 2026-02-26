@@ -98,8 +98,8 @@ pub use hyperfeel::{
 
 // Holochain Cortex - trust and identity
 pub use holochain::{
-    AgentInfo, AgentPubKey, CortexError, CortexStats, HolochainConfig, HolochainCortex,
-    SignedChallenge, TrustVerificationResult,
+    AgentInfo, AgentPubKey, CortexError, CortexStats, EpigeneticInsight, HolochainConfig,
+    HolochainCortex, SignedChallenge, TrustVerificationResult,
 };
 
 // Iroh types (stub when feature disabled, real when enabled)

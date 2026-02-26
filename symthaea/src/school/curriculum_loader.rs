@@ -39,6 +39,7 @@ use super::objective::{Difficulty, Domain, LearningObjective};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use symthaea_core::hdc::HDC_DIMENSION;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SERIALIZABLE TYPES
@@ -117,6 +118,65 @@ pub struct CurriculumSpec {
     /// Tags for categorization
     #[serde(default)]
     pub tags: Vec<String>,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PERSISTENCE METADATA
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Metadata for persisted curricula
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurriculumMeta {
+    /// Schema version for the stored payload
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
+    /// Last research topic applied to the curriculum
+    #[serde(default)]
+    pub last_research_topic: Option<String>,
+    /// Timestamp of last research ingestion (RFC3339)
+    #[serde(default)]
+    pub last_research_at: Option<String>,
+    /// Timestamp of last save (RFC3339)
+    #[serde(default)]
+    pub last_saved_at: Option<String>,
+    /// Count of objectives added in the last research
+    #[serde(default)]
+    pub last_objectives_added: Option<usize>,
+    /// Dimension used to encode objectives
+    #[serde(default = "default_dimension")]
+    pub dimension: usize,
+    /// Total objectives stored at last save
+    #[serde(default)]
+    pub total_objectives: usize,
+}
+
+impl CurriculumMeta {
+    pub fn new(dimension: usize) -> Self {
+        Self {
+            schema_version: default_schema_version(),
+            last_research_topic: None,
+            last_research_at: None,
+            last_saved_at: None,
+            last_objectives_added: None,
+            dimension,
+            total_objectives: 0,
+        }
+    }
+}
+
+fn default_schema_version() -> u32 {
+    1
+}
+
+fn default_dimension() -> usize {
+    HDC_DIMENSION
+}
+
+/// Combined store for curriculum + metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurriculumStore {
+    pub meta: CurriculumMeta,
+    pub curriculum: CurriculumSpec,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -200,6 +260,14 @@ impl CurriculumLoader {
     /// - `.json` → JSON format
     /// - `.yaml` or `.yml` → YAML format
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Curriculum, LoadError> {
+        Self::load_from_file_with_dimension(path, HDC_DIMENSION)
+    }
+
+    /// Load a curriculum from a file path with a target HDC dimension.
+    pub fn load_from_file_with_dimension<P: AsRef<Path>>(
+        path: P,
+        dimension: usize,
+    ) -> Result<Curriculum, LoadError> {
         let path = path.as_ref();
 
         if !path.exists() {
@@ -211,16 +279,15 @@ impl CurriculumLoader {
         let content = fs::read_to_string(path)?;
 
         match extension.to_lowercase().as_str() {
-            "json" => Self::load_from_json(&content),
-            "yaml" | "yml" => Self::load_from_yaml(&content),
+            "json" => Self::load_from_json_with_dimension(&content, dimension),
+            "yaml" | "yml" => Self::load_from_yaml_with_dimension(&content, dimension),
             other => Err(LoadError::UnsupportedFormat(other.to_string())),
         }
     }
 
     /// Load a curriculum from a JSON string
     pub fn load_from_json(json: &str) -> Result<Curriculum, LoadError> {
-        let spec: CurriculumSpec = serde_json::from_str(json)?;
-        Self::build_curriculum(spec)
+        Self::load_from_json_with_dimension(json, HDC_DIMENSION)
     }
 
     /// Load a curriculum from a YAML string
@@ -228,18 +295,81 @@ impl CurriculumLoader {
     /// This uses a simple YAML parser that handles common cases.
     /// For complex YAML, consider using the serde_yaml crate.
     pub fn load_from_yaml(yaml: &str) -> Result<Curriculum, LoadError> {
+        Self::load_from_yaml_with_dimension(yaml, HDC_DIMENSION)
+    }
+
+    /// Load a curriculum from a JSON string with a target HDC dimension
+    pub fn load_from_json_with_dimension(
+        json: &str,
+        dimension: usize,
+    ) -> Result<Curriculum, LoadError> {
+        let spec: CurriculumSpec = serde_json::from_str(json)?;
+        Self::build_curriculum_with_dimension(spec, dimension)
+    }
+
+    /// Load a curriculum from a YAML string with a target HDC dimension
+    ///
+    /// This uses a simple YAML parser that handles common cases.
+    /// For complex YAML, consider using the serde_yaml crate.
+    pub fn load_from_yaml_with_dimension(
+        yaml: &str,
+        dimension: usize,
+    ) -> Result<Curriculum, LoadError> {
         // Simple YAML to JSON conversion for basic cases
         // This handles the subset of YAML we need for curricula
         let json = yaml_to_json(yaml).map_err(LoadError::YamlError)?;
-        Self::load_from_json(&json)
+        Self::load_from_json_with_dimension(&json, dimension)
     }
 
-    /// Build a Curriculum from a CurriculumSpec
-    fn build_curriculum(spec: CurriculumSpec) -> Result<Curriculum, LoadError> {
+    /// Load a persisted curriculum store from a file path with a target dimension.
+    pub fn load_store_from_file_with_dimension<P: AsRef<Path>>(
+        path: P,
+        dimension: usize,
+    ) -> Result<(Curriculum, CurriculumMeta), LoadError> {
+        let path = path.as_ref();
+
+        if !path.exists() {
+            return Err(LoadError::FileNotFound(path.display().to_string()));
+        }
+
+        let content = fs::read_to_string(path)?;
+        Self::load_store_from_json_with_dimension(&content, dimension)
+    }
+
+    /// Load a persisted curriculum store from a JSON string with a target dimension.
+    ///
+    /// Falls back to legacy CurriculumSpec format when metadata is absent.
+    pub fn load_store_from_json_with_dimension(
+        json: &str,
+        dimension: usize,
+    ) -> Result<(Curriculum, CurriculumMeta), LoadError> {
+        if let Ok(store) = serde_json::from_str::<CurriculumStore>(json) {
+            let curriculum =
+                Self::build_curriculum_with_dimension(store.curriculum, dimension)?;
+            let mut meta = store.meta;
+            if meta.dimension != dimension {
+                meta.dimension = dimension;
+            }
+            meta.total_objectives = curriculum.objectives.len();
+            return Ok((curriculum, meta));
+        }
+
+        let spec: CurriculumSpec = serde_json::from_str(json)?;
+        let curriculum = Self::build_curriculum_with_dimension(spec, dimension)?;
+        let mut meta = CurriculumMeta::new(dimension);
+        meta.total_objectives = curriculum.objectives.len();
+        Ok((curriculum, meta))
+    }
+
+    /// Build a Curriculum from a CurriculumSpec with a target HDC dimension
+    fn build_curriculum_with_dimension(
+        spec: CurriculumSpec,
+        dimension: usize,
+    ) -> Result<Curriculum, LoadError> {
         let mut objectives = Vec::new();
 
         for obj_spec in spec.objectives {
-            let objective = Self::build_objective(obj_spec)?;
+            let objective = Self::build_objective_with_dimension(obj_spec, dimension)?;
             objectives.push(objective);
         }
 
@@ -258,8 +388,11 @@ impl CurriculumLoader {
         Ok(curriculum)
     }
 
-    /// Build a LearningObjective from an ObjectiveSpec
-    fn build_objective(spec: ObjectiveSpec) -> Result<LearningObjective, LoadError> {
+    /// Build a LearningObjective from an ObjectiveSpec with a target HDC dimension
+    fn build_objective_with_dimension(
+        spec: ObjectiveSpec,
+        dimension: usize,
+    ) -> Result<LearningObjective, LoadError> {
         let difficulty = parse_difficulty(&spec.difficulty)
             .ok_or_else(|| LoadError::InvalidDifficulty(spec.difficulty.clone()))?;
 
@@ -269,6 +402,7 @@ impl CurriculumLoader {
             .with_description(&spec.description)
             .with_domain(domain)
             .with_difficulty(difficulty)
+            .with_dimension(dimension)
             .with_estimated_minutes(spec.estimated_minutes);
 
         for prereq in &spec.prerequisites {
@@ -290,6 +424,21 @@ impl CurriculumLoader {
     pub fn save_to_json<P: AsRef<Path>>(curriculum: &Curriculum, path: P) -> Result<(), LoadError> {
         let spec = Self::curriculum_to_spec(curriculum);
         let json = serde_json::to_string_pretty(&spec)?;
+        fs::write(path, json)?;
+        Ok(())
+    }
+
+    /// Save a curriculum store (metadata + curriculum) to a JSON file
+    pub fn save_store_to_json<P: AsRef<Path>>(
+        curriculum: &Curriculum,
+        meta: &CurriculumMeta,
+        path: P,
+    ) -> Result<(), LoadError> {
+        let store = CurriculumStore {
+            meta: meta.clone(),
+            curriculum: Self::curriculum_to_spec(curriculum),
+        };
+        let json = serde_json::to_string_pretty(&store)?;
         fs::write(path, json)?;
         Ok(())
     }
@@ -610,6 +759,42 @@ mod tests {
 
         assert_eq!(loaded.id, original.id);
         assert_eq!(loaded.objectives.len(), original.objectives.len());
+    }
+
+    #[test]
+    fn test_load_store_with_dimension() {
+        let json = r#"
+        {
+            "meta": {
+                "schema_version": 1,
+                "dimension": 2048,
+                "last_research_topic": "test"
+            },
+            "curriculum": {
+                "id": "store-test",
+                "name": "Store Test",
+                "description": "Store test curriculum",
+                "objectives": [
+                    {
+                        "id": "step1",
+                        "name": "Step 1",
+                        "domain": "NixOS",
+                        "difficulty": "Beginner",
+                        "description": "Learn the basics",
+                        "estimated_minutes": 30
+                    }
+                ]
+            }
+        }
+        "#;
+
+        let (curriculum, meta) =
+            CurriculumLoader::load_store_from_json_with_dimension(json, 1024).unwrap();
+
+        assert_eq!(curriculum.id, "store-test");
+        assert_eq!(curriculum.objectives.len(), 1);
+        assert_eq!(meta.dimension, 1024);
+        assert_eq!(meta.last_research_topic.as_deref(), Some("test"));
     }
 
     #[test]

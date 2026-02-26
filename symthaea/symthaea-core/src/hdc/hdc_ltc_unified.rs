@@ -191,7 +191,7 @@ impl UnifiedActivation {
 /// ```text
 /// x(t+Δt) = x_∞ + (x(t) - x_∞) * exp(-Δt/τ)
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HdcLtcUnifiedNeuron {
     /// Current state (hypervector)
     state: ContinuousHV,
@@ -1420,7 +1420,7 @@ impl Default for UnifiedNetworkConfig {
 }
 
 /// Network of unified HDC-LTC neurons
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HdcLtcUnifiedNetwork {
     /// Layers of neurons
     layers: Vec<Vec<HdcLtcUnifiedNeuron>>,

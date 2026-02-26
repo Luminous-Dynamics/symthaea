@@ -607,6 +607,9 @@ fn summarize_action(action: &ActionIR, outcome: &ActionOutcome) -> ActionLog {
         }
         ActionIR::Sequence(_) => "Sequence".to_string(),
         ActionIR::NoOp => "NoOp".to_string(),
+        ActionIR::WasmSandbox { module_path, function_name, .. } => {
+            format!("WasmSandbox({}::{})", module_path.display(), function_name)
+        }
     };
 
     match outcome {
@@ -644,6 +647,11 @@ fn summarize_action(action: &ActionIR, outcome: &ActionOutcome) -> ActionLog {
             action: action_label,
             status: format!("exit_{exit_code}"),
             detail: Some(format!("stdout={} bytes stderr={} bytes", stdout.len(), stderr.len())),
+        },
+        ActionOutcome::WasmResult { output, logs } => ActionLog {
+            action: action_label,
+            status: "wasm_result".to_string(),
+            detail: Some(format!("{} bytes, {} logs", output.len(), logs.len())),
         },
     }
 }

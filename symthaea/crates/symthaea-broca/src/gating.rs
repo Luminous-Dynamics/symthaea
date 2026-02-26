@@ -14,7 +14,7 @@ use crate::encoder::ThoughtChannels;
 use crate::tokenizer::BpeTokenizer;
 
 /// Configuration for the gating system.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GatingConfig {
     /// Logit penalty for factual tokens when epistemic status is Unknown.
     pub unknown_factual_penalty: f32,

@@ -84,7 +84,7 @@ const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
 ///
 /// Conversion from `StructuredThought -> ThoughtChannels` happens at the
 /// integration layer (Phase 3), avoiding circular dependency.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct ThoughtChannels {
     pub channels: [f32; NUM_CHANNELS],
 }

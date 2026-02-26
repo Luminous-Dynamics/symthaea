@@ -750,6 +750,15 @@ impl Curriculum {
                     .with_tags(&["autopoiesis", "self-organization", "emergence"])
                     .with_estimated_minutes(45),
             )
+            .with_objective(
+                LearningObjective::new("power-telemetry", "Power Telemetry and INA219 Monitoring")
+                    .with_domain(Domain::Consciousness)
+                    .with_difficulty(Difficulty::Beginner)
+                    .with_description("Track interoceptive power draw using INA219 readings and SSM smoothing")
+                    .with_prerequisite("consciousness-intro")
+                    .with_tags(&["ina219", "power", "telemetry", "interoception", "ssm"])
+                    .with_estimated_minutes(20),
+            )
             .build()
     }
 
