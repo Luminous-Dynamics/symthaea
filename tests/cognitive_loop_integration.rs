@@ -5075,3 +5075,451 @@ fn test_200_cycle_phase19_stress() {
         stats.reasoning_chain_boost_count,
     );
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Phase 20: Signal-to-Control Synthesis
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_harmonic_interference_lr_modulation() {
+    // Verify harmonic interference count modulates LR without panic
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("test harmonic interference lr feedback");
+        assert!(
+            result.metadata.harmonic_interference_lr_mod.is_finite(),
+            "harmonic_interference_lr_mod not finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.harmonic_interference_lr_mod >= -0.15
+                && result.metadata.harmonic_interference_lr_mod <= 0.05,
+            "harmonic_interference_lr_mod out of bounds at cycle {i}: {}",
+            result.metadata.harmonic_interference_lr_mod
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "harmonic_interference: mod_count={}, total_cycles={}",
+        stats.harmonic_interference_mod_count, stats.total_cycles
+    );
+}
+
+#[test]
+fn test_resonator_prediction_error_exploration() {
+    // Verify resonator prediction error modulates exploration without panic
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("resonator prediction error test");
+        assert!(
+            result.metadata.resonator_error_exploration_mod.is_finite(),
+            "resonator_error_exploration_mod not finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.resonator_prediction_error.is_finite(),
+            "resonator_prediction_error not finite at cycle {i}"
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "resonator_error: exploration_count={}, total_cycles={}",
+        stats.resonator_error_exploration_count, stats.total_cycles
+    );
+}
+
+#[test]
+fn test_phenomenal_binding_threshold_gating() {
+    // Verify phenomenal binding modulates adaptive threshold within bounds
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..40 {
+        let result = service.cycle("binding threshold gate test");
+        assert!(
+            result.metadata.binding_threshold_mod.is_finite(),
+            "binding_threshold_mod not finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.binding_threshold_mod >= -0.15
+                && result.metadata.binding_threshold_mod <= 0.10,
+            "binding_threshold_mod out of bounds at cycle {i}: {}",
+            result.metadata.binding_threshold_mod
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "binding_threshold: mod_count={}, total_cycles={}",
+        stats.binding_threshold_mod_count, stats.total_cycles
+    );
+}
+
+#[test]
+fn test_causal_density_urgency_gating() {
+    // Verify causal density gating doesn't panic and is a valid bool
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("causal graph density test");
+        // causal_urgency_gated is bool — always valid
+        assert!(
+            result.metadata.causal_avg_confidence.is_finite(),
+            "causal_avg_confidence not finite at cycle {i}"
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "causal_urgency: gated_count={}, total_cycles={}",
+        stats.causal_urgency_gated_count, stats.total_cycles
+    );
+}
+
+#[test]
+fn test_epistemic_semantic_lr_bidirectional() {
+    // Verify epistemic gate modulates semantic LR via cached confidence
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("epistemic semantic coupling test");
+        assert!(
+            result.metadata.epistemic_semantic_lr_mod.is_finite(),
+            "epistemic_semantic_lr_mod not finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.epistemic_semantic_lr_mod >= -0.25
+                && result.metadata.epistemic_semantic_lr_mod <= 0.25,
+            "epistemic_semantic_lr_mod out of bounds at cycle {i}: {}",
+            result.metadata.epistemic_semantic_lr_mod
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "epistemic_semantic: mod_count={}, total_cycles={}",
+        stats.epistemic_semantic_mod_count, stats.total_cycles
+    );
+}
+
+#[test]
+fn test_predictive_budget_gating() {
+    // Verify predictive budget gating flag and stats tracking
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("predictive budget gating test");
+        // predictive_budget_gated is bool — always valid
+        assert!(
+            result.cycle_time_us < 10_000_000,
+            "cycle time > 10s at cycle {i}"
+        );
+    }
+
+    let stats = service.stats();
+    eprintln!(
+        "predictive_budget: gated_count={}, exceeded_count={}",
+        stats.predictive_budget_gated_count, stats.attention_budget_exceeded_count
+    );
+}
+
+#[test]
+#[ignore] // stress test — run manually
+fn test_200_cycle_phase20_stress() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "analyze with harmony",
+        "predict next state",
+        "bind consciousness",
+        "map causal space",
+        "epistemic uncertainty",
+        "budget pressure test",
+    ];
+
+    for i in 0..200 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        let m = &result.metadata;
+
+        // All Phase 20 fields must be finite/valid
+        assert!(m.harmonic_interference_lr_mod.is_finite(), "harmonic at {i}");
+        assert!(m.resonator_error_exploration_mod.is_finite(), "resonator at {i}");
+        assert!(m.binding_threshold_mod.is_finite(), "binding at {i}");
+        assert!(m.epistemic_semantic_lr_mod.is_finite(), "epistemic at {i}");
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 200);
+    eprintln!(
+        "200-cycle Phase 20 stress: harmonic={}, resonator={}, binding={}, \
+         causal={}, epistemic={}, predictive_budget={}",
+        stats.harmonic_interference_mod_count,
+        stats.resonator_error_exploration_count,
+        stats.binding_threshold_mod_count,
+        stats.causal_urgency_gated_count,
+        stats.epistemic_semantic_mod_count,
+        stats.predictive_budget_gated_count,
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Phase 21: Consciousness-Grounded Control
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_binding_confidence_modulation() {
+    // Verify phenomenal binding → prediction confidence feedback is finite and bounded
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..40 {
+        let result = service.cycle("binding confidence integration test");
+        let m = &result.metadata;
+        assert!(
+            m.binding_confidence_mod.is_finite(),
+            "binding_confidence_mod not finite at cycle {i}"
+        );
+        // Confidence must remain in [0, 1]
+        assert!(
+            service.stats().prediction_confidence >= 0.0
+                && service.stats().prediction_confidence <= 1.0,
+            "prediction_confidence out of bounds at cycle {i}"
+        );
+    }
+    assert_eq!(service.stats().total_cycles, 40);
+}
+
+#[test]
+fn test_discontinuity_recovery_cascade() {
+    // Verify discontinuity streak tracking doesn't panic with varied inputs
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "stable context A",
+        "completely different topic B",
+        "yet another unrelated C",
+        "random shift D",
+        "back to normal",
+    ];
+    for i in 0..50 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        let m = &result.metadata;
+        assert!(
+            m.discontinuity_streak <= 50,
+            "discontinuity_streak unbounded at cycle {i}: {}",
+            m.discontinuity_streak
+        );
+    }
+    assert_eq!(service.stats().total_cycles, 50);
+}
+
+#[test]
+fn test_epistemic_conflict_reasoning_acceleration() {
+    // Verify epistemic conflict override triggers reasoning without panic
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 100 cycles (2× the 47-cycle adaptive reasoning interval)
+    for i in 0..100 {
+        let result = service.cycle("epistemic conflict acceleration test");
+        // epistemic_reasoning_accelerated is a bool — just verify no panic
+        let _accelerated = result.metadata.epistemic_reasoning_accelerated;
+        assert!(
+            result.metadata.adaptive_reasoning_phi.is_finite(),
+            "adaptive_reasoning_phi not finite at cycle {i}"
+        );
+    }
+    assert_eq!(service.stats().total_cycles, 100);
+    // Stats counter should be non-negative (may or may not have fired)
+    eprintln!(
+        "epistemic accelerations: {}",
+        service.stats().epistemic_reasoning_accelerations
+    );
+}
+
+#[test]
+fn test_agency_strategy_modulation() {
+    // Verify low agency → strategy override doesn't panic
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("agency strategy override test");
+        // agency_strategy_override is a bool — verify no panic
+        let _override = result.metadata.agency_strategy_override;
+        assert!(
+            !result.metadata.selected_strategy.is_empty(),
+            "selected_strategy empty at cycle {i}"
+        );
+    }
+    assert_eq!(service.stats().total_cycles, 30);
+    eprintln!(
+        "agency overrides: {}",
+        service.stats().agency_strategy_override_count
+    );
+}
+
+#[test]
+fn test_pfe_surprise_scaling() {
+    // Verify predictive free energy → surprise amplitude scaling is finite
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..40 {
+        let result = service.cycle("pfe surprise amplitude test");
+        assert!(
+            result.metadata.pfe_surprise_mod.is_finite(),
+            "pfe_surprise_mod not finite at cycle {i}"
+        );
+    }
+    assert_eq!(service.stats().total_cycles, 40);
+    eprintln!(
+        "pfe surprise mods: {}",
+        service.stats().pfe_surprise_mod_count
+    );
+}
+
+#[test]
+fn test_codebook_diversity_memo_threshold() {
+    // Verify adaptive memoization threshold is in valid range
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 60 cycles (past the 50-cycle diversity computation interval)
+    for i in 0..60 {
+        let result = service.cycle("codebook diversity memo threshold test");
+        let threshold = result.metadata.adaptive_memo_threshold;
+        assert!(
+            threshold >= 0.88 && threshold <= 0.98,
+            "adaptive_memo_threshold out of range at cycle {i}: {threshold}"
+        );
+    }
+    assert_eq!(service.stats().total_cycles, 60);
+    eprintln!(
+        "memo threshold adaptations: {}",
+        service.stats().memo_threshold_adaptations
+    );
+}
+
+#[test]
+#[ignore] // stress test — run manually
+fn test_200_cycle_phase21_stress() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "binding coherence test",
+        "discontinuity shift now",
+        "epistemic conflict probe",
+        "low agency reactive mode",
+        "surprise amplitude check",
+        "codebook diversity scan",
+    ];
+
+    for i in 0..200 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        let m = &result.metadata;
+
+        // All Phase 21 fields must be finite/valid
+        assert!(m.binding_confidence_mod.is_finite(), "binding_conf at {i}");
+        assert!(m.pfe_surprise_mod.is_finite(), "pfe_surprise at {i}");
+        assert!(
+            m.adaptive_memo_threshold >= 0.88 && m.adaptive_memo_threshold <= 0.98,
+            "memo_threshold at {i}: {}",
+            m.adaptive_memo_threshold
+        );
+        assert!(m.discontinuity_streak <= 200, "streak at {i}");
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 200);
+    eprintln!(
+        "200-cycle Phase 21 stress: binding_conf={}, discontinuity={}, \
+         epistemic_accel={}, agency_override={}, pfe_surprise={}, memo_adapt={}",
+        stats.binding_confidence_mod_count,
+        stats.discontinuity_cascade_count,
+        stats.epistemic_reasoning_accelerations,
+        stats.agency_strategy_override_count,
+        stats.pfe_surprise_mod_count,
+        stats.memo_threshold_adaptations,
+    );
+}

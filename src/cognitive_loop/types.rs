@@ -35,6 +35,11 @@ pub(crate) struct ConsciousnessCache {
     pub(crate) last_equation_v2_consciousness: f64,
     /// Last hierarchical spectral MIP Phi (cached, updated every 100 cycles).
     pub(crate) last_hierarchical_mip_phi: Option<f64>,
+    // ── Phase 21: Consciousness-Grounded Control ─────────────────────
+    /// Last embodied agency score (cached for strategy modulation).
+    pub(crate) last_embodied_agency: f64,
+    /// Last predictive free energy (cached for surprise amplitude scaling).
+    pub(crate) last_predictive_free_energy: f64,
 }
 
 impl Default for ConsciousnessCache {
@@ -52,6 +57,8 @@ impl Default for ConsciousnessCache {
             last_multimodal_phi: 0.0,
             last_equation_v2_consciousness: 0.0,
             last_hierarchical_mip_phi: None,
+            last_embodied_agency: 0.5,
+            last_predictive_free_energy: 0.0,
         }
     }
 }
@@ -76,6 +83,8 @@ pub(crate) struct UrgencyState {
     pub(crate) prev_urgency: super::CycleUrgency,
     /// Cycles since last urgency mode change
     pub(crate) mode_stability_counter: u32,
+    /// Consecutive temporal discontinuity cycles (Phase 21 recovery cascade).
+    pub(crate) discontinuity_streak: u32,
 }
 
 impl Default for UrgencyState {
@@ -89,6 +98,7 @@ impl Default for UrgencyState {
             mode_confidence: 1.0,
             prev_urgency: CycleUrgency::Normal,
             mode_stability_counter: 0,
+            discontinuity_streak: 0,
         }
     }
 }
@@ -160,6 +170,10 @@ pub(crate) struct QualityMetrics {
     pub(crate) phi_spectral_weight: f32,
     /// Cached phenomenal binding strength (from late consciousness)
     pub(crate) last_phenomenal_binding: f64,
+    /// Last epistemic conflict count (cached for reasoning override).
+    pub(crate) last_epistemic_conflict_count: usize,
+    /// Whether epistemic conflicts should force adaptive reasoning on next cycle.
+    pub(crate) epistemic_reasoning_override: bool,
 }
 
 impl Default for QualityMetrics {
@@ -183,6 +197,8 @@ impl Default for QualityMetrics {
             phi_validation_correlation: 0.0,
             phi_spectral_weight: 0.6,
             last_phenomenal_binding: 0.5,
+            last_epistemic_conflict_count: 0,
+            epistemic_reasoning_override: false,
         }
     }
 }
@@ -942,6 +958,20 @@ pub struct CycleMetadata {
     pub epistemic_semantic_lr_mod: f32,
     /// Whether predictive budget gating was active (>80% budget at midpoint).
     pub predictive_budget_gated: bool,
+
+    // ── Phase 21: Consciousness-Grounded Control ────────────────────
+    /// Prediction confidence modulation from phenomenal binding strength.
+    pub binding_confidence_mod: f32,
+    /// Consecutive temporal discontinuity cycles (recovery cascade tracker).
+    pub discontinuity_streak: u32,
+    /// Whether epistemic conflicts accelerated adaptive reasoning this cycle.
+    pub epistemic_reasoning_accelerated: bool,
+    /// Whether low agency overrode exploratory strategy to supportive.
+    pub agency_strategy_override: bool,
+    /// Surprise amplitude modulation from predictive free energy.
+    pub pfe_surprise_mod: f32,
+    /// Adaptive memoization threshold from codebook diversity.
+    pub adaptive_memo_threshold: f32,
 
     // ── Liquid-Mamba Fusion Telemetry ────────────────────────────────
     /// Semantic prediction error from Liquid-Mamba round-trip (0.0–1.0, 0.0 when off).

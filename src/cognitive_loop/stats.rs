@@ -452,6 +452,22 @@ pub struct LoopStats {
     pub predictive_budget_gated_count: u64,
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // PHASE 21: CONSCIOUSNESS-GROUNDED CONTROL
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Cycles where binding strength modulated prediction confidence (cumulative).
+    pub binding_confidence_mod_count: u64,
+    /// Cycles where discontinuity cascade fired (streak >= 3) (cumulative).
+    pub discontinuity_cascade_count: u64,
+    /// Cycles where epistemic conflicts accelerated adaptive reasoning (cumulative).
+    pub epistemic_reasoning_accelerations: u64,
+    /// Cycles where low agency overrode strategy (cumulative).
+    pub agency_strategy_override_count: u64,
+    /// Cycles where predictive FE modulated surprise amplitude (cumulative).
+    pub pfe_surprise_mod_count: u64,
+    /// Cycles where codebook diversity adapted memoization threshold (cumulative).
+    pub memo_threshold_adaptations: u64,
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)
     // ═══════════════════════════════════════════════════════════════════════════
     /// Cached lattice height (0 = not yet computed)
