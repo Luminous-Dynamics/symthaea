@@ -185,6 +185,26 @@ pub enum SwarmMessage {
         delta_bytes: Vec<u8>,
     },
 
+    /// Request for distributed reasoning task (v1.8.0)
+    TaskRequest {
+        task_id: String,
+        sub_thought: Vec<f32>, // HDC sub-segment
+        required_resolution: String, // e.g. "2^16"
+    },
+
+    /// Bid for a reasoning task based on metabolic availability
+    TaskBid {
+        task_id: String,
+        node_phi: f64,
+        load: f32,
+    },
+
+    /// Result of a completed reasoning sub-task
+    TaskResult {
+        task_id: String,
+        result_thought: Vec<f32>,
+    },
+
     /// Graceful disconnect
     Goodbye { reason: String },
 }
@@ -207,6 +227,9 @@ impl SwarmMessage {
             Self::ZkProof { .. } => "ZkProof",
             Self::ResuscitationPacket { .. } => "ResuscitationPacket",
             Self::LinguisticDelta { .. } => "LinguisticDelta",
+            Self::TaskRequest { .. } => "TaskRequest",
+            Self::TaskBid { .. } => "TaskBid",
+            Self::TaskResult { .. } => "TaskResult",
             Self::Goodbye { .. } => "Goodbye",
         }
     }
