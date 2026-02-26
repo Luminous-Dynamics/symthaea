@@ -1,4 +1,4 @@
-#![cfg(feature = "school_learning")]
+#![cfg(all(feature = "school_learning", feature = "integration-tests"))]
 //! Integration tests for the school learning module.
 //!
 //! Tests the full learning lifecycle: curriculum management, recommendation,

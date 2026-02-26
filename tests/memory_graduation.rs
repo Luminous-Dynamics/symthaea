@@ -21,6 +21,7 @@ use symthaea::memory::{
     CoordinatorConfig, Episode, EpisodicMemory, EpisodicReplayConfig, GraduationEvent,
     MemoryCoordinator, SemanticMemory,
 };
+use symthaea::memory::memory_coordinator::MemorySource;
 use symthaea::mind::{ContinuousMind, MindConfig};
 use symthaea_core::hdc::ContinuousHV;
 
@@ -125,7 +126,7 @@ fn test_evicted_items_are_tracked_with_steps_survived() {
     );
 
     // All evicted items should have valid steps_survived (> 0 for items that lived at least 1 tick)
-    for (_hv, steps_survived) in &evicted {
+    for (_hv, steps_survived, _source, _is_verified) in &evicted {
         assert!(
             *steps_survived > 0,
             "Evicted items should have survived at least 1 tick, got {}",
@@ -173,7 +174,7 @@ fn test_graduation_pipeline_under_sustained_load() {
             let snapshot = mind.snapshot();
             coordinator.update_signals(snapshot.consciousness_level, snapshot.meta_awareness);
 
-            for (hv, steps_survived) in evicted {
+            for (hv, steps_survived, source, is_verified) in evicted {
                 coordinator.queue_graduation(GraduationEvent {
                     content: hv,
                     label: format!("wm_eviction_cycle_{cycle}"),
@@ -181,6 +182,8 @@ fn test_graduation_pipeline_under_sustained_load() {
                     final_activation: 0.5,
                     psi_at_graduation: snapshot.consciousness_level,
                     coherence_at_graduation: snapshot.meta_awareness,
+                    source,
+                    is_verified,
                 });
             }
 
@@ -378,6 +381,8 @@ fn test_coordinator_stats_accumulate_correctly() {
                 final_activation: 0.6,
                 psi_at_graduation: 0.9,
                 coherence_at_graduation: 0.95,
+                source: MemorySource::Internal,
+                is_verified: false,
             });
             total_queued += 1;
         }
@@ -508,7 +513,7 @@ fn test_extended_graduation_500_cycles() {
             let snapshot = mind.snapshot();
             coordinator.update_signals(snapshot.consciousness_level, snapshot.meta_awareness);
 
-            for (hv, steps_survived) in evicted {
+            for (hv, steps_survived, source, is_verified) in evicted {
                 coordinator.queue_graduation(GraduationEvent {
                     content: hv,
                     label: format!("extended_cycle_{cycle}"),
@@ -516,6 +521,8 @@ fn test_extended_graduation_500_cycles() {
                     final_activation: 0.5,
                     psi_at_graduation: snapshot.consciousness_level,
                     coherence_at_graduation: snapshot.meta_awareness,
+                    source,
+                    is_verified,
                 });
             }
             total_graduated += coordinator.process_graduations(&mut episodic);

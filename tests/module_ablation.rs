@@ -10,10 +10,12 @@
 // ==================================================================================
 
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+use std::sync::OnceLock;
 
 const GENESIS_SEED: &str = "ablation_test_deterministic_seed_v061";
 const PATTERN: &[&str] = &["alpha beta", "gamma delta", "epsilon zeta", "eta theta"];
 const ABLATION_CYCLES: usize = 100;
+static BASELINE_CACHE: OnceLock<(f32, f32)> = OnceLock::new();
 
 /// Run N cycles of the repeating pattern and return (final_10_avg_error, coherence).
 fn run_config(config: CognitiveLoopConfig, num_cycles: usize) -> (f32, f32) {
@@ -61,11 +63,15 @@ fn baseline_config() -> CognitiveLoopConfig {
     }
 }
 
+fn baseline_metrics() -> (f32, f32) {
+    *BASELINE_CACHE.get_or_init(|| run_config(baseline_config(), ABLATION_CYCLES))
+}
+
 // ── Single-Module Ablation Tests ─────────────────────────────────
 
 #[test]
 fn test_ablation_baseline() {
-    let (error, coherence) = run_config(baseline_config(), ABLATION_CYCLES);
+    let (error, coherence) = baseline_metrics();
     println!("Baseline: error={error:.4}, coherence={coherence:.4}");
     assert!(error.is_finite());
     assert!(coherence.is_finite());
@@ -73,7 +79,7 @@ fn test_ablation_baseline() {
 
 #[test]
 fn test_ablation_surprise_exploration() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_surprise_exploration = true;
     let (error, _) = run_config(config, ABLATION_CYCLES);
@@ -86,7 +92,7 @@ fn test_ablation_surprise_exploration() {
 
 #[test]
 fn test_ablation_prefrontal() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_prefrontal = true;
     let (error, _) = run_config(config, ABLATION_CYCLES);
@@ -99,7 +105,7 @@ fn test_ablation_prefrontal() {
 
 #[test]
 fn test_ablation_meta_cognition() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_meta_cognition = true;
     let (error, _) = run_config(config, ABLATION_CYCLES);
@@ -112,7 +118,7 @@ fn test_ablation_meta_cognition() {
 
 #[test]
 fn test_ablation_virtual_body() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_virtual_body = true;
     let (error, _) = run_config(config, ABLATION_CYCLES);
@@ -125,7 +131,7 @@ fn test_ablation_virtual_body() {
 
 #[test]
 fn test_ablation_predictive_self() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_predictive_self = true;
     config.enable_narrative_self = true; // Dependency
@@ -139,7 +145,7 @@ fn test_ablation_predictive_self() {
 
 #[test]
 fn test_ablation_attention_schema() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_attention_schema = true;
     let (error, _) = run_config(config, ABLATION_CYCLES);
@@ -152,7 +158,7 @@ fn test_ablation_attention_schema() {
 
 #[test]
 fn test_ablation_gwt() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_gwt = true;
     let (error, _) = run_config(config, ABLATION_CYCLES);
@@ -165,7 +171,7 @@ fn test_ablation_gwt() {
 
 #[test]
 fn test_ablation_temporal_consciousness() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_temporal_consciousness = true;
     config.enable_narrative_self = true; // Dependency
@@ -180,7 +186,7 @@ fn test_ablation_temporal_consciousness() {
 
 #[test]
 fn test_ablation_embodied_cognition() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_embodied_cognition = true;
     config.enable_virtual_body = true; // Dependency
@@ -194,7 +200,7 @@ fn test_ablation_embodied_cognition() {
 
 #[test]
 fn test_ablation_narrative_gwt() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_narrative_gwt = true;
     let (error, _) = run_config(config, ABLATION_CYCLES);
@@ -207,7 +213,7 @@ fn test_ablation_narrative_gwt() {
 
 #[test]
 fn test_ablation_predictive_processing() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_predictive_processing = true;
     let (error, _) = run_config(config, ABLATION_CYCLES);
@@ -220,7 +226,7 @@ fn test_ablation_predictive_processing() {
 
 #[test]
 fn test_ablation_cross_modal_binding() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_cross_modal_binding = true;
     let (error, _) = run_config(config, ABLATION_CYCLES);
@@ -233,7 +239,7 @@ fn test_ablation_cross_modal_binding() {
 
 #[test]
 fn test_ablation_affective_bridge() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_affective_bridge = true;
     let (error, _) = run_config(config, ABLATION_CYCLES);
@@ -246,7 +252,7 @@ fn test_ablation_affective_bridge() {
 
 #[test]
 fn test_ablation_consciousness_thermodynamics() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_consciousness_thermodynamics = true;
     let (error, _) = run_config(config, ABLATION_CYCLES);
@@ -259,7 +265,7 @@ fn test_ablation_consciousness_thermodynamics() {
 
 #[test]
 fn test_ablation_phenomenal_binding() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_phenomenal_binding = true;
     let (error, _) = run_config(config, ABLATION_CYCLES);
@@ -272,7 +278,7 @@ fn test_ablation_phenomenal_binding() {
 
 #[test]
 fn test_ablation_hierarchical_free_energy() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let baseline = baseline_metrics().0;
     let mut config = baseline_config();
     config.enable_hierarchical_free_energy = true;
     let (error, _) = run_config(config, ABLATION_CYCLES);
@@ -349,7 +355,7 @@ fn test_feedback_loops_improve_convergence() {
 
 #[test]
 fn test_all_modules_synergy() {
-    let baseline = run_config(baseline_config(), ABLATION_CYCLES);
+    let baseline = baseline_metrics();
 
     let all_config = CognitiveLoopConfig {
         genesis_phrase: Some(GENESIS_SEED.to_string()),

@@ -367,6 +367,7 @@ mod router_unit_tests {
         let config = ApiConfig {
             allowed_origins: vec!["http://localhost:3000".to_string()],
             bearer_token: Some("test-token".to_string()),
+            ..ApiConfig::default()
         };
 
         let _router = create_router_with_config(config);
@@ -398,6 +399,7 @@ mod router_unit_tests {
         let config = ApiConfig {
             allowed_origins: vec!["https://example.com".to_string()],
             bearer_token: Some("secret-token".to_string()),
+            ..ApiConfig::default()
         };
 
         assert_eq!(config.allowed_origins.len(), 1);

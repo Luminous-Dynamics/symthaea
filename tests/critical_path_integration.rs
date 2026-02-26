@@ -16,6 +16,7 @@ use symthaea::memory::{
     CoordinatorConfig, Episode, EpisodicMemory, EpisodicReplayConfig, GraduationEvent,
     MemoryCoordinator,
 };
+use symthaea::memory::memory_coordinator::MemorySource;
 use symthaea::mind::{ContinuousMind, MindConfig};
 use symthaea_core::hdc::ContinuousHV;
 
@@ -552,7 +553,7 @@ fn test_wm_eviction_multi_batch_graduation() {
     );
 
     coordinator.update_signals(0.8, 0.85);
-    for (i, (hv, steps)) in batch1.into_iter().enumerate() {
+    for (i, (hv, steps, source, is_verified)) in batch1.into_iter().enumerate() {
         coordinator.queue_graduation(GraduationEvent {
             content: hv,
             label: format!("batch1_item_{i}"),
@@ -560,6 +561,8 @@ fn test_wm_eviction_multi_batch_graduation() {
             final_activation: 0.5,
             psi_at_graduation: 0.8,
             coherence_at_graduation: 0.85,
+            source,
+            is_verified,
         });
     }
     let graduated_b1 = coordinator.process_graduations(&mut episodic);
@@ -579,7 +582,7 @@ fn test_wm_eviction_multi_batch_graduation() {
     );
 
     coordinator.update_signals(0.9, 0.95);
-    for (i, (hv, steps)) in batch2.into_iter().enumerate() {
+    for (i, (hv, steps, source, is_verified)) in batch2.into_iter().enumerate() {
         coordinator.queue_graduation(GraduationEvent {
             content: hv,
             label: format!("batch2_item_{i}"),
@@ -587,6 +590,8 @@ fn test_wm_eviction_multi_batch_graduation() {
             final_activation: 0.6,
             psi_at_graduation: 0.9,
             coherence_at_graduation: 0.95,
+            source,
+            is_verified,
         });
     }
     let graduated_b2 = coordinator.process_graduations(&mut episodic);
@@ -633,7 +638,7 @@ fn test_eviction_steps_survived_accuracy() {
     let evicted = mind.take_evicted();
     assert_eq!(evicted.len(), 1, "Should evict exactly 1 item");
 
-    let (_hv, steps) = &evicted[0];
+    let (_hv, steps, _source, _is_verified) = &evicted[0];
     // Item A was pushed at tick 1, evicted at tick 3, so steps_survived should be 2
     assert!(
         *steps >= 1,
@@ -663,6 +668,8 @@ fn test_graduation_mixed_acceptance_rejection() {
             final_activation: 0.5,
             psi_at_graduation: 0.85,
             coherence_at_graduation: 0.9,
+            source: MemorySource::Internal,
+            is_verified: false,
         });
     }
 
@@ -773,6 +780,8 @@ fn test_cognitive_loop_to_memory_pipeline() {
             final_activation: 0.5,
             psi_at_graduation: latest_sigma,
             coherence_at_graduation: avg_error as f64,
+            source: MemorySource::Internal,
+            is_verified: false,
         });
     }
 

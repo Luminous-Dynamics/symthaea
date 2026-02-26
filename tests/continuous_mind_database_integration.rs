@@ -100,8 +100,8 @@ fn test_continuous_mind_eviction() {
         "Should have evicted items when exceeding capacity"
     );
 
-    // Each evicted item should have (hv, steps_survived)
-    for (hv, steps) in &evicted {
+    // Each evicted item should have (hv, steps_survived, source, is_verified)
+    for (hv, steps, _source, _is_verified) in &evicted {
         assert!(!hv.values.is_empty(), "Evicted HV should have values");
         // steps_survived can be 0 if evicted immediately
         let _ = steps;

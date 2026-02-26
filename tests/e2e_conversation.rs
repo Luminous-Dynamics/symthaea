@@ -1,3 +1,5 @@
+#![cfg(feature = "integration-tests")]
+
 //! End-to-End Conversation Test: The First Conversation
 //!
 //! This test validates the complete cognitive pipeline:

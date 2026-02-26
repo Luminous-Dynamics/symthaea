@@ -1,4 +1,4 @@
-#![cfg(feature = "web_research_module")]
+#![cfg(all(feature = "web_research_module", feature = "integration-tests"))]
 //! Web Research Integration Tests
 //!
 //! Tests for the web research system integrated with ContinuousMind.

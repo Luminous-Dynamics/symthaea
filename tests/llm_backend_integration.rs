@@ -13,6 +13,12 @@ use symthaea::language::{
     create_backend_from_env, AnthropicBackend, GenerationParams, LLMBackend, OpenAiBackend,
     SimulatedBackend,
 };
+use std::sync::{Mutex, OnceLock};
+
+fn env_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
 
 // ============================================================================
 // Backend Factory Tests
@@ -20,6 +26,7 @@ use symthaea::language::{
 
 #[test]
 fn test_create_backend_from_env_defaults_to_ollama() {
+    let _guard = env_lock().lock().unwrap();
     // Clear all provider env vars
     let prev_provider = std::env::var("SYMTHAEA_LLM_PROVIDER").ok();
     let prev_openai = std::env::var("OPENAI_API_KEY").ok();
@@ -46,6 +53,7 @@ fn test_create_backend_from_env_defaults_to_ollama() {
 
 #[test]
 fn test_create_backend_explicit_provider_simulated() {
+    let _guard = env_lock().lock().unwrap();
     let prev = std::env::var("SYMTHAEA_LLM_PROVIDER").ok();
     std::env::set_var("SYMTHAEA_LLM_PROVIDER", "simulated");
 
@@ -60,6 +68,7 @@ fn test_create_backend_explicit_provider_simulated() {
 
 #[test]
 fn test_create_backend_auto_detects_openai_key() {
+    let _guard = env_lock().lock().unwrap();
     let prev_provider = std::env::var("SYMTHAEA_LLM_PROVIDER").ok();
     let prev_openai = std::env::var("OPENAI_API_KEY").ok();
     let prev_anthropic = std::env::var("ANTHROPIC_API_KEY").ok();
@@ -87,6 +96,7 @@ fn test_create_backend_auto_detects_openai_key() {
 
 #[test]
 fn test_create_backend_auto_detects_anthropic_key() {
+    let _guard = env_lock().lock().unwrap();
     let prev_provider = std::env::var("SYMTHAEA_LLM_PROVIDER").ok();
     let prev_openai = std::env::var("OPENAI_API_KEY").ok();
     let prev_anthropic = std::env::var("ANTHROPIC_API_KEY").ok();
