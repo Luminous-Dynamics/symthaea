@@ -645,10 +645,92 @@ impl LLMOrgan {
     /// The mind has already computed what to say; this method uses the LLM
     /// purely for fluent translation, NOT for reasoning.
     ///
+    /// ## Direct Neural Path (SSM/L-SSM backends)
+    ///
+    /// When the backend implements `DirectThoughtBackend` (native CfC-HDC or
+    /// Liquid-Mamba), the thought flows directly into ThoughtChannels without
+    /// text-prompt serialization. The 20-channel HDC encoding preserves the full
+    /// cognitive state: intent, epistemic status, emotion, consciousness metrics,
+    /// and relational context.
+    ///
+    /// ## Text Prompt Path (Ollama/OpenAI/Anthropic)
+    ///
     /// Dynamic parameterization based on mood_temperature:
     /// - High Mood Temp (Exhausted/Hot) -> Higher LLM temperature, shorter max_length.
     /// - Low Mood Temp (Rested/Cool) -> Lower LLM temperature, longer max_length.
     pub async fn translate_thought(&mut self, thought: &StructuredThought, mood_temperature: f32) -> LLMGenerationResult {
+        // ── Direct Neural Path ───────────────────────────────────────────────
+        // Try the direct path first: StructuredThought → ThoughtChannels → HDC → text
+        // No text-prompt serialization. No prompt engineering. Pure signal.
+        #[cfg(feature = "ssm_language")]
+        {
+            // Clone the Arc to avoid holding a borrow on self.backend across await + mut self
+            let direct_result = if let Some(backend) = self.backend.clone() {
+                use super::ssm_backend::thought_to_channels;
+                use super::llm_backend::GenerationParams;
+
+                let backend_name = backend.name().to_string();
+                if backend_name == "symthaea-ssm-broca" || backend_name == "liquid-mamba-l-ssm" {
+                    let _channels = thought_to_channels(thought, mood_temperature);
+                    let params = GenerationParams::default();
+                    let start = std::time::Instant::now();
+
+                    // Build a structured prompt with markers that channels_from_prompt()
+                    // can extract directly. This gives the SSM backend the exact same
+                    // channel information that thought_to_channels computes.
+                    let direct_prompt = format!(
+                        "SEMANTIC_INTENT: {:?}\nEPISTEMIC_STATUS: {:?}\nMOOD_TEMPERATURE: {:.2}\n",
+                        thought.semantic_intent, thought.epistemic_status, mood_temperature
+                    );
+
+                    match backend.generate(&direct_prompt, &params).await {
+                        Ok(text) => Some((text, start, backend_name)),
+                        Err(e) => {
+                            tracing::warn!(
+                                target: "symthaea::broca::direct_path",
+                                error = %e,
+                                "Direct Neural Path failed, falling back to text prompt"
+                            );
+                            None
+                        }
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            if let Some((text, start, backend_name)) = direct_result {
+                let generation_time_ms = start.elapsed().as_secs_f64() * 1000.0;
+                self.stats.queries_processed += 1;
+                let tokens_generated = text.split_whitespace().count();
+                self.stats.tokens_generated += tokens_generated as u64;
+                let n = self.stats.queries_processed as f64;
+                self.stats.avg_generation_time_ms =
+                    (self.stats.avg_generation_time_ms * (n - 1.0) + generation_time_ms) / n;
+                let embedding = self.text_to_embedding(&text);
+
+                tracing::debug!(
+                    target: "symthaea::broca::direct_path",
+                    backend = %backend_name,
+                    generation_time_ms = generation_time_ms,
+                    tokens = tokens_generated,
+                    "Direct Neural Path: thought → channels → text"
+                );
+
+                return LLMGenerationResult {
+                    text,
+                    confidence: 0.9,
+                    tokens_generated,
+                    generation_time_ms,
+                    embedding,
+                    finish_reason: FinishReason::EndOfSequence,
+                };
+            }
+        }
+
+        // ── Text Prompt Path (standard LLMs) ────────────────────────────────
         let prompt = self.build_translation_prompt(thought, mood_temperature);
 
         // Affective mapping
@@ -1307,6 +1389,9 @@ pub enum LlmProvider {
     /// Native CfC-HDC SSM language center (Broca's area)
     #[cfg(feature = "ssm_language")]
     Ssm,
+    /// Liquid-Mamba: pre-trained SSM fused with HDC consciousness gating
+    #[cfg(feature = "liquid-mamba")]
+    LiquidMamba,
 }
 
 /// Consciousness-aware LLM wrapper
