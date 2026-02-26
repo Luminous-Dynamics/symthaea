@@ -618,7 +618,17 @@ impl LLMOrgan {
     // Translation Mode (Broca's Area Interface)
     // ========================================================================
 
-    /// Translate a structured thought into natural language.
+    /// Get the current LLM backend.
+    pub fn get_backend(&self) -> Option<Arc<dyn super::llm_backend::LLMBackend>> {
+        Some(self.backend.clone())
+    }
+
+    /// Update the affective state (physics-to-language) of the backend.
+    pub fn update_affective_state(&self, load: f32, mood_temp: f32) {
+        self.backend.update_affect(load, mood_temp);
+    }
+
+    /// Translates a StructuredThought into a natural language response.
     ///
     /// This is the key method for the "Reason-then-Generate" pipeline.
     /// The mind has already computed what to say; this method uses the LLM

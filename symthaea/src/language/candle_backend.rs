@@ -132,4 +132,8 @@ impl LLMBackend for CandleBackend {
     fn name(&self) -> &str {
         "Candle (In-Process)"
     }
+
+    fn update_affect(&self, load: f32, temp: f32) {
+        self.set_affect(load, temp);
+    }
 }
