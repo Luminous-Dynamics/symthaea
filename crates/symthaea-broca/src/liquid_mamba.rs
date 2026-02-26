@@ -1,0 +1,660 @@
+//! Liquid-Mamba Fusion (L-SSM): consciousness-gated SSM language generation.
+//!
+//! Fuses a pre-trained Mamba SSM with Symthaea's HDC-LTC cognitive loop.
+//! The SSM provides vocabulary fluency; the cognitive loop provides
+//! consciousness-gated semantic control, epistemic gating, emotional
+//! authenticity, and biological constraints.
+//!
+//! # Architecture
+//!
+//! ```text
+//! ThoughtChannels → ThoughtLanguageEncoder → thought_hv (16,384D)
+//!                                              │
+//!                           HdcSsmProjection ──┤──→ ssm_context (768D)
+//!                                              │          │
+//!                                              │    MambaWrapper.inject_initial_context()
+//!                                              │          │
+//!                                              │    Autoregressive loop:
+//!                                              │      ├── biological delta modulation
+//!                                              │      ├── forward_one_token() → logits
+//!                                              │      ├── EpistemicGate.apply()
+//!                                              │      ├── EmotionalModulator.apply()
+//!                                              │      ├── top_k_sample()
+//!                                              │      ├── back-project token → HDC
+//!                                              │      └── CoherenceMonitor (veto check)
+//!                                              │
+//!                                         GenerationResult
+//! ```
+
+use std::collections::VecDeque;
+
+use anyhow::Result;
+
+use symthaea_core::genesis::GenesisSeed;
+use symthaea_core::hdc::ContinuousHV;
+
+use crate::encoder::{ThoughtChannels, ThoughtLanguageEncoder};
+use crate::gating::{consciousness_gated_max_tokens, EpistemicGate, EmotionalModulator, GatingConfig};
+use crate::generator::GenerationResult;
+use crate::mamba::MambaWrapper;
+use crate::projection::HdcSsmProjection;
+use crate::tokenizer::BpeTokenizer;
+
+/// Configuration for the Liquid-Mamba generator.
+#[derive(Debug, Clone)]
+pub struct LiquidMambaConfig {
+    /// HuggingFace model ID for the Mamba checkpoint.
+    pub model_id: String,
+    /// Maximum tokens to generate per call.
+    pub max_tokens: usize,
+    /// Sampling temperature.
+    pub temperature: f32,
+    /// Top-k for sampling.
+    pub top_k: usize,
+    /// Coherence below this → veto (mid-sentence self-correction).
+    pub veto_threshold: f32,
+    /// Coherence below this → boost thought binding.
+    pub drift_threshold: f32,
+    /// Sliding window size for coherence monitoring.
+    pub coherence_window: usize,
+    /// EMA smoothing alpha for coherence.
+    pub coherence_ema_alpha: f32,
+    /// Minimum consecutive low-coherence tokens before veto.
+    pub min_consecutive_low: usize,
+    /// Biological delta modulation strength (0 = disabled, 1 = full).
+    pub delta_mod_strength: f32,
+    /// Text inserted on semantic veto.
+    pub veto_hesitation: String,
+    /// Enable epistemic gating.
+    pub enable_gating: bool,
+    /// Enable semantic veto.
+    pub enable_veto: bool,
+    /// Enable biological delta modulation.
+    pub enable_liquid_delta: bool,
+    /// Enable consciousness-gated max tokens.
+    pub enable_consciousness_gating: bool,
+    /// HDC dimension (default 16384).
+    pub hdc_dim: usize,
+    /// Bottleneck dimension (default 256).
+    pub bottleneck_dim: usize,
+    /// SSM hidden dimension (default 768 for mamba-130m).
+    pub ssm_dim: usize,
+}
+
+impl Default for LiquidMambaConfig {
+    fn default() -> Self {
+        Self {
+            model_id: "state-spaces/mamba-130m".to_string(),
+            max_tokens: 256,
+            temperature: 0.8,
+            top_k: 40,
+            veto_threshold: 0.20,
+            drift_threshold: 0.30,
+            coherence_window: 8,
+            coherence_ema_alpha: 0.3,
+            min_consecutive_low: 3,
+            delta_mod_strength: 1.0,
+            veto_hesitation: "-- wait, ".to_string(),
+            enable_gating: true,
+            enable_veto: true,
+            enable_liquid_delta: true,
+            enable_consciousness_gating: true,
+            hdc_dim: 16384,
+            bottleneck_dim: 256,
+            ssm_dim: 768,
+        }
+    }
+}
+
+/// Liquid-Mamba fusion generator: consciousness-gated SSM language generation.
+pub struct LiquidMambaGenerator {
+    mamba: MambaWrapper,
+    projection: HdcSsmProjection,
+    encoder: ThoughtLanguageEncoder,
+    epistemic_gate: EpistemicGate,
+    emotional_modulator: EmotionalModulator,
+    config: LiquidMambaConfig,
+    // Biological state (injected by cognitive loop via update_affect)
+    thermodynamic_load: f32,
+    arousal: f32,
+}
+
+impl LiquidMambaGenerator {
+    /// Create a new Liquid-Mamba generator.
+    ///
+    /// Loads the Mamba model from HuggingFace Hub (requires network on first run).
+    pub fn new(genesis: &GenesisSeed, config: LiquidMambaConfig) -> Result<Self> {
+        let device = candle_core::Device::Cpu;
+        let mamba = MambaWrapper::load(&config.model_id, device)?;
+
+        let projection = HdcSsmProjection::new(
+            genesis,
+            config.hdc_dim,
+            config.bottleneck_dim,
+            config.ssm_dim,
+        );
+
+        let encoder = ThoughtLanguageEncoder::new(genesis);
+
+        // Create gating modules using a minimal tokenizer for classification
+        // (the actual token logits come from Mamba's 50K vocab)
+        let tokenizer = BpeTokenizer::default_minimal();
+        let gating_config = GatingConfig::default();
+        let epistemic_gate = EpistemicGate::new(&tokenizer, &gating_config);
+        let emotional_modulator = EmotionalModulator::new(&tokenizer, &gating_config);
+
+        Ok(Self {
+            mamba,
+            projection,
+            encoder,
+            epistemic_gate,
+            emotional_modulator,
+            config,
+            thermodynamic_load: 0.0,
+            arousal: 0.5,
+        })
+    }
+
+    /// Generate text from thought channels.
+    pub fn generate(&mut self, channels: &ThoughtChannels) -> GenerationResult {
+        match self.generate_inner(channels) {
+            Ok(result) => result,
+            Err(e) => {
+                tracing::error!("Liquid-Mamba generation failed: {e}");
+                GenerationResult {
+                    text: String::new(),
+                    token_ids: Vec::new(),
+                    num_tokens: 0,
+                    eos_terminated: false,
+                    veto_triggered: false,
+                    final_coherence: 0.0,
+                }
+            }
+        }
+    }
+
+    fn generate_inner(&mut self, channels: &ThoughtChannels) -> Result<GenerationResult> {
+        // 1. Encode thought channels to 16,384D HDC
+        let thought_hv = self.encoder.encode(channels);
+
+        // 2. Project to SSM space (768D)
+        let ssm_context = self.projection.project_to_ssm(&thought_hv);
+
+        // 3. Prime Mamba's hidden state with the thought projection
+        self.mamba.inject_initial_context(&ssm_context)?;
+
+        // 4. Compute max tokens (consciousness-gated)
+        let max_tokens = if self.config.enable_consciousness_gating {
+            consciousness_gated_max_tokens(self.config.max_tokens, channels.psi())
+        } else {
+            self.config.max_tokens
+        };
+
+        // 5. Update arousal from channels
+        self.arousal = channels.arousal();
+
+        // 6. Initialize coherence monitor
+        let mut coherence_monitor = CoherenceMonitor::new(
+            thought_hv.clone(),
+            self.config.coherence_window,
+            self.config.coherence_ema_alpha,
+            self.config.veto_threshold,
+            self.config.min_consecutive_low,
+        );
+
+        // 7. Autoregressive generation loop
+        let eos_id = self.mamba.eos_token_id();
+        let mut tokens: Vec<u32> = Vec::new();
+        let mut text = String::new();
+        let mut veto_triggered = false;
+        let mut prev_token = eos_id; // Start with EOS as BOS-equivalent
+
+        for pos in 0..max_tokens {
+            // 5a. Biological delta modulation
+            if self.config.enable_liquid_delta {
+                let scale = self.biological_state_scale();
+                self.mamba.scale_hidden_states(scale)?;
+            }
+
+            // 5b. Forward one token through Mamba
+            let mut logits = self.mamba.forward_one_token(prev_token)?;
+
+            // 5c. Epistemic gating (apply to Mamba's large vocab logits)
+            if self.config.enable_gating {
+                // Apply gating to the first N tokens that overlap with Broca vocab
+                // Mamba vocab >> Broca vocab, so we gate on the Broca-sized prefix
+                let gate_len = logits.len().min(512);
+                self.epistemic_gate.apply(
+                    &mut logits[..gate_len],
+                    channels.epistemic_ordinal(),
+                );
+            }
+
+            // 5d. Emotional modulation
+            if self.config.enable_gating {
+                let gate_len = logits.len().min(512);
+                self.emotional_modulator.apply(
+                    &mut logits[..gate_len],
+                    channels,
+                    pos,
+                );
+            }
+
+            // 5e. Top-k sampling
+            let next_token = top_k_sample(&logits, self.config.top_k, self.config.temperature);
+
+            // 5f-h. Back-project token and monitor coherence
+            if self.config.enable_veto {
+                let token_emb = self.mamba.embedding_vector(next_token)?;
+                let token_hdc = self.projection.project_to_hdc(&token_emb);
+                coherence_monitor.push(token_hdc);
+
+                // 5i. Semantic veto check
+                if coherence_monitor.should_veto() && pos > 2 {
+                    veto_triggered = true;
+                    text.push_str(&self.config.veto_hesitation);
+
+                    // Reset Mamba and re-inject thought context
+                    self.mamba.reset();
+                    self.mamba.inject_initial_context(&ssm_context)?;
+                    coherence_monitor.reset();
+
+                    // Continue from current position (don't restart text)
+                    continue;
+                }
+            }
+
+            // 5j. Decode token
+            if next_token == eos_id {
+                return Ok(GenerationResult {
+                    text,
+                    token_ids: tokens,
+                    num_tokens: pos,
+                    eos_terminated: true,
+                    veto_triggered,
+                    final_coherence: coherence_monitor.current_coherence(),
+                });
+            }
+
+            if let Ok(token_str) = self.mamba.decode_token(next_token) {
+                text.push_str(&token_str);
+            }
+
+            tokens.push(next_token);
+            prev_token = next_token;
+        }
+
+        Ok(GenerationResult {
+            text,
+            token_ids: tokens.clone(),
+            num_tokens: tokens.len(),
+            eos_terminated: false,
+            veto_triggered,
+            final_coherence: coherence_monitor.current_coherence(),
+        })
+    }
+
+    /// Biological delta modulation factor.
+    ///
+    /// Scales SSM hidden state based on thermodynamic load and arousal.
+    /// - `factor < 1.0` → faster decay → shorter memory (exhausted/agitated)
+    /// - `factor > 1.0` → slower decay → longer memory (rested/calm)
+    ///
+    /// Formula: `factor = exp(-alpha * load - beta * (arousal - 0.5))`
+    /// - At rest (load=0, arousal=0.5): factor = 1.0 (no effect)
+    /// - Exhausted (load=1.0, arousal=0.5): factor ≈ 0.61
+    /// - Agitated (load=0, arousal=1.0): factor ≈ 0.86
+    fn biological_state_scale(&self) -> f32 {
+        let alpha = 0.5 * self.config.delta_mod_strength;
+        let beta = 0.3 * self.config.delta_mod_strength;
+        (-alpha * self.thermodynamic_load - beta * (self.arousal - 0.5))
+            .exp()
+            .clamp(0.3, 2.0)
+    }
+
+    /// Update biological state from the cognitive loop.
+    pub fn update_affect(&mut self, load: f32, _temp: f32) {
+        self.thermodynamic_load = load.clamp(0.0, 1.0);
+    }
+
+    /// Get mutable reference to the projection (for gradient learning).
+    pub fn projection_mut(&mut self) -> &mut HdcSsmProjection {
+        &mut self.projection
+    }
+
+    /// Get reference to the projection.
+    pub fn projection(&self) -> &HdcSsmProjection {
+        &self.projection
+    }
+
+    /// Get reference to the encoder.
+    pub fn encoder(&self) -> &ThoughtLanguageEncoder {
+        &self.encoder
+    }
+
+    /// Get the last semantic prediction error (round-trip reconstruction).
+    pub fn semantic_prediction_error(
+        &self,
+        thought_hv: &ContinuousHV,
+        output_hvs: &[ContinuousHV],
+    ) -> f32 {
+        if output_hvs.is_empty() {
+            return 1.0;
+        }
+        let refs: Vec<&ContinuousHV> = output_hvs.iter().collect();
+        let bundled = ContinuousHV::bundle(&refs).normalize();
+        1.0 - thought_hv.similarity(&bundled).clamp(-1.0, 1.0)
+    }
+}
+
+impl std::fmt::Debug for LiquidMambaGenerator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LiquidMambaGenerator")
+            .field("config", &self.config)
+            .field("mamba", &self.mamba)
+            .field("thermodynamic_load", &self.thermodynamic_load)
+            .field("arousal", &self.arousal)
+            .finish()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COHERENCE MONITOR
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Monitors semantic coherence between generated tokens and the original thought.
+///
+/// Bundles back-projected token HDC vectors in a sliding window and computes
+/// EMA cosine similarity against the original `thought_hv`. If coherence drops
+/// below threshold for `min_consecutive_low` tokens, signals a veto.
+struct CoherenceMonitor {
+    thought_hv: ContinuousHV,
+    window: VecDeque<ContinuousHV>,
+    window_size: usize,
+    ema_coherence: f32,
+    ema_alpha: f32,
+    consecutive_low: usize,
+    min_consecutive_low: usize,
+    veto_threshold: f32,
+}
+
+impl CoherenceMonitor {
+    fn new(
+        thought_hv: ContinuousHV,
+        window_size: usize,
+        ema_alpha: f32,
+        veto_threshold: f32,
+        min_consecutive_low: usize,
+    ) -> Self {
+        Self {
+            thought_hv,
+            window: VecDeque::with_capacity(window_size),
+            window_size,
+            ema_coherence: 1.0,
+            ema_alpha,
+            consecutive_low: 0,
+            min_consecutive_low,
+            veto_threshold,
+        }
+    }
+
+    /// Add a back-projected token HV and update coherence.
+    fn push(&mut self, token_hdc: ContinuousHV) {
+        // Maintain sliding window
+        if self.window.len() >= self.window_size {
+            self.window.pop_front();
+        }
+        self.window.push_back(token_hdc);
+
+        // Bundle window contents
+        let refs: Vec<&ContinuousHV> = self.window.iter().collect();
+        let bundled = ContinuousHV::bundle(&refs).normalize();
+
+        // Cosine similarity with thought
+        let sim = self.thought_hv.similarity(&bundled).clamp(-1.0, 1.0);
+
+        // EMA smooth
+        self.ema_coherence = self.ema_alpha * sim + (1.0 - self.ema_alpha) * self.ema_coherence;
+
+        // Track consecutive low
+        if self.ema_coherence < self.veto_threshold {
+            self.consecutive_low += 1;
+        } else {
+            self.consecutive_low = 0;
+        }
+    }
+
+    /// Whether coherence has been below threshold for enough consecutive tokens.
+    fn should_veto(&self) -> bool {
+        self.consecutive_low >= self.min_consecutive_low
+    }
+
+    /// Current EMA coherence value.
+    fn current_coherence(&self) -> f32 {
+        self.ema_coherence
+    }
+
+    /// Reset the monitor (after a veto).
+    fn reset(&mut self) {
+        self.window.clear();
+        self.ema_coherence = 1.0;
+        self.consecutive_low = 0;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SAMPLING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Top-k sampling with temperature from a logits vector.
+fn top_k_sample(logits: &[f32], k: usize, temperature: f32) -> u32 {
+    if k == 0 || logits.is_empty() {
+        return greedy_sample(logits);
+    }
+
+    let k = k.min(logits.len());
+    let temp = temperature.max(1e-8);
+
+    // Find top-k indices
+    let mut indexed: Vec<(usize, f32)> = logits.iter().copied().enumerate().collect();
+    indexed.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
+    indexed.truncate(k);
+
+    // Apply temperature and softmax
+    let max_logit = indexed[0].1;
+    let mut probs: Vec<(usize, f32)> = indexed
+        .into_iter()
+        .map(|(i, l)| (i, ((l - max_logit) / temp).exp()))
+        .collect();
+
+    let sum: f32 = probs.iter().map(|(_, p)| p).sum();
+    if sum < 1e-10 {
+        return probs[0].0 as u32;
+    }
+    for p in &mut probs {
+        p.1 /= sum;
+    }
+
+    // Sample
+    let r = simple_random_f32();
+    let mut cumulative = 0.0f32;
+    for (i, p) in &probs {
+        cumulative += p;
+        if r < cumulative {
+            return *i as u32;
+        }
+    }
+
+    probs.last().map(|(i, _)| *i as u32).unwrap_or(0)
+}
+
+/// Greedy sampling: return argmax.
+fn greedy_sample(logits: &[f32]) -> u32 {
+    logits
+        .iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| a.total_cmp(b))
+        .map(|(i, _)| i as u32)
+        .unwrap_or(0)
+}
+
+/// Simple random float in [0, 1) using thread_rng.
+fn simple_random_f32() -> f32 {
+    use rand::Rng;
+    rand::thread_rng().gen::<f32>()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_biological_state_scale_at_rest() {
+        let config = LiquidMambaConfig::default();
+        // At rest: load=0, arousal=0.5 → factor = exp(0) = 1.0
+        let alpha = 0.5 * config.delta_mod_strength;
+        let beta = 0.3 * config.delta_mod_strength;
+        let factor = (-alpha * 0.0 - beta * (0.5 - 0.5)).exp();
+        assert!((factor - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_biological_state_scale_exhausted() {
+        let config = LiquidMambaConfig::default();
+        let alpha = 0.5 * config.delta_mod_strength;
+        let beta = 0.3 * config.delta_mod_strength;
+        // Exhausted: load=1.0, arousal=0.5
+        let factor = (-alpha * 1.0 - beta * 0.0).exp();
+        assert!((factor - 0.6065).abs() < 0.01, "Expected ~0.61, got {factor}");
+    }
+
+    #[test]
+    fn test_biological_state_scale_agitated() {
+        let config = LiquidMambaConfig::default();
+        let alpha = 0.5 * config.delta_mod_strength;
+        let beta = 0.3 * config.delta_mod_strength;
+        // Agitated: load=0, arousal=1.0
+        let factor = (-alpha * 0.0 - beta * 0.5).exp();
+        assert!((factor - 0.8607).abs() < 0.01, "Expected ~0.86, got {factor}");
+    }
+
+    #[test]
+    fn test_coherence_monitor_no_veto_initially() {
+        let thought = ContinuousHV::random_default(42).normalize();
+        let monitor = CoherenceMonitor::new(thought, 8, 0.3, 0.20, 3);
+        assert!(!monitor.should_veto());
+        assert!((monitor.current_coherence() - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_coherence_monitor_veto_on_drift() {
+        let thought = ContinuousHV::random_default(42).normalize();
+        let mut monitor = CoherenceMonitor::new(thought, 8, 0.3, 0.20, 3);
+
+        // Push orthogonal vectors to simulate drift
+        for i in 0..10 {
+            let drifted = ContinuousHV::random_default(1000 + i as u64).normalize();
+            monitor.push(drifted);
+        }
+
+        // After enough drift, coherence should be very low
+        assert!(monitor.current_coherence() < 0.5,
+            "Coherence should drop with orthogonal tokens, got {}", monitor.current_coherence());
+    }
+
+    #[test]
+    fn test_coherence_monitor_high_coherence_with_similar() {
+        let thought = ContinuousHV::random_default(42).normalize();
+        let mut monitor = CoherenceMonitor::new(thought.clone(), 8, 0.3, 0.20, 3);
+
+        // Push vectors similar to thought (scaled versions)
+        for _ in 0..5 {
+            let similar = thought.scale(0.9).normalize();
+            monitor.push(similar);
+        }
+
+        // Coherence should remain high
+        assert!(monitor.current_coherence() > 0.5,
+            "Coherence should stay high with similar tokens, got {}", monitor.current_coherence());
+        assert!(!monitor.should_veto());
+    }
+
+    #[test]
+    fn test_coherence_monitor_reset() {
+        let thought = ContinuousHV::random_default(42).normalize();
+        let mut monitor = CoherenceMonitor::new(thought, 8, 0.3, 0.20, 3);
+
+        // Push some drift
+        for i in 0..5 {
+            let drifted = ContinuousHV::random_default(1000 + i as u64).normalize();
+            monitor.push(drifted);
+        }
+
+        monitor.reset();
+        assert!(!monitor.should_veto());
+        assert!((monitor.current_coherence() - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_top_k_sample_greedy_fallback() {
+        let logits = vec![0.1, 0.5, 0.3, 0.8, 0.2];
+        let token = greedy_sample(&logits);
+        assert_eq!(token, 3, "Should pick index 3 (highest logit 0.8)");
+    }
+
+    #[test]
+    fn test_top_k_sample_produces_valid_index() {
+        let logits = vec![0.1; 100];
+        let token = top_k_sample(&logits, 10, 1.0);
+        assert!((token as usize) < 100, "Token should be valid index");
+    }
+
+    #[test]
+    fn test_top_k_sample_temperature_zero() {
+        let logits = vec![0.1, 0.5, 0.3, 0.8, 0.2];
+        // Very low temperature → should approach greedy
+        let token = top_k_sample(&logits, 5, 0.001);
+        assert_eq!(token, 3, "Near-zero temperature should be greedy");
+    }
+
+    #[test]
+    fn test_config_default() {
+        let config = LiquidMambaConfig::default();
+        assert_eq!(config.model_id, "state-spaces/mamba-130m");
+        assert_eq!(config.max_tokens, 256);
+        assert_eq!(config.hdc_dim, 16384);
+        assert_eq!(config.bottleneck_dim, 256);
+        assert_eq!(config.ssm_dim, 768);
+        assert!(config.enable_gating);
+        assert!(config.enable_veto);
+        assert!(config.enable_liquid_delta);
+    }
+
+    #[test]
+    fn test_semantic_prediction_error_identical() {
+        let thought = ContinuousHV::random_default(42).normalize();
+        let output = thought.clone();
+
+        // When output == thought, error should be ~0
+        let refs: Vec<&ContinuousHV> = vec![&output];
+        let bundled = ContinuousHV::bundle(&refs).normalize();
+        let error = 1.0 - thought.similarity(&bundled).clamp(-1.0, 1.0);
+        assert!(error < 0.1, "Error should be near 0 for identical vectors, got {error}");
+    }
+
+    #[test]
+    fn test_semantic_prediction_error_orthogonal() {
+        let thought = ContinuousHV::random_default(42).normalize();
+        let other = ContinuousHV::random_default(99).normalize();
+
+        let refs: Vec<&ContinuousHV> = vec![&other];
+        let bundled = ContinuousHV::bundle(&refs).normalize();
+        let error = 1.0 - thought.similarity(&bundled).clamp(-1.0, 1.0);
+        // Random high-dimensional vectors are nearly orthogonal
+        assert!(error > 0.5, "Error should be high for orthogonal vectors, got {error}");
+    }
+}

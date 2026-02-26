@@ -33,6 +33,8 @@ pub mod anthropic_backend;
 pub mod openai_backend;
 #[cfg(feature = "full_language")]
 pub mod candle_backend;
+#[cfg(feature = "ssm_language")]
+pub mod ssm_backend;
 
 // Code understanding & generation (Phase: Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]

@@ -391,6 +391,34 @@ pub fn create_backend_from_env() -> Arc<dyn LLMBackend> {
                 tracing::warn!("SYMTHAEA_LLM_PROVIDER=candle but feature full_language not enabled or load failed, falling back to Ollama");
                 return Arc::new(OllamaBackend::new());
             }
+            "ssm" | "broca" => {
+                #[cfg(feature = "ssm_language")]
+                {
+                    let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-broca-default");
+                    return Arc::new(super::ssm_backend::SsmBackend::new(&genesis));
+                }
+                #[cfg(not(feature = "ssm_language"))]
+                {
+                    tracing::warn!("SYMTHAEA_LLM_PROVIDER=ssm but feature ssm_language not enabled, falling back to Ollama");
+                }
+            }
+            "liquid-mamba" | "l-ssm" => {
+                #[cfg(feature = "liquid-mamba")]
+                {
+                    let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-broca-liquid-mamba");
+                    let config = symthaea_broca::LiquidMambaConfig::default();
+                    match super::ssm_backend::LiquidMambaBackend::new(&genesis, config) {
+                        Ok(backend) => return Arc::new(backend),
+                        Err(e) => {
+                            tracing::error!("Failed to load Liquid-Mamba backend: {e}");
+                        }
+                    }
+                }
+                #[cfg(not(feature = "liquid-mamba"))]
+                {
+                    tracing::warn!("SYMTHAEA_LLM_PROVIDER=liquid-mamba but feature liquid-mamba not enabled, falling back to Ollama");
+                }
+            }
             "simulated" => {
                 return Arc::new(SimulatedBackend);
             }

@@ -620,18 +620,22 @@ impl LLMOrgan {
 
     /// Get the current LLM backend.
     pub fn get_backend(&self) -> Option<Arc<dyn super::llm_backend::LLMBackend>> {
-        Some(self.backend.clone())
+        self.backend.clone()
     }
 
     /// Update the affective state (physics-to-language) of the backend.
     pub fn update_affective_state(&self, load: f32, mood_temp: f32) {
-        self.backend.update_affect(load, mood_temp);
+        if let Some(ref backend) = self.backend {
+            backend.update_affect(load, mood_temp);
+        }
     }
 
     /// Apply a linguistic LoRA adapter to the voice.
     pub fn apply_lora(&self, lora_id: &str, delta: &[u8]) {
-        if let Err(e) = self.backend.apply_lora(lora_id, delta) {
-            tracing::error!(id = %lora_id, "Failed to apply LoRA: {}", e);
+        if let Some(ref backend) = self.backend {
+            if let Err(e) = backend.apply_lora(lora_id, delta) {
+                tracing::error!(id = %lora_id, "Failed to apply LoRA: {}", e);
+            }
         }
     }
 
@@ -1300,6 +1304,9 @@ pub enum LlmProvider {
     /// Custom/local model
     #[default]
     Local,
+    /// Native CfC-HDC SSM language center (Broca's area)
+    #[cfg(feature = "ssm_language")]
+    Ssm,
 }
 
 /// Consciousness-aware LLM wrapper

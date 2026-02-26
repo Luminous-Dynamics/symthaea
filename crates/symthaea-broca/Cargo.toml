@@ -1,0 +1,26 @@
+[package]
+name = "symthaea-broca"
+version = "0.1.0"
+edition = "2021"
+description = "SSM Language Center: CfC-HDC autoregressive thought-to-text generation"
+license = "MIT"
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+rand = { workspace = true }
+rayon = { workspace = true }
+
+# Mamba SSM integration (optional)
+candle-core = { version = "0.8", optional = true }
+candle-nn = { version = "0.8", optional = true }
+candle-transformers = { version = "0.8", optional = true }
+hf-hub = { version = "0.4", optional = true }
+tokenizers = { version = "0.21", optional = true }
+
+[features]
+default = []
+mamba = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:hf-hub", "dep:tokenizers"]
