@@ -4,6 +4,13 @@ use crate::harness::report::{BenchmarkReport, MetricValue};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+/// Current schema version for snapshot files.
+pub const SNAPSHOT_SCHEMA_VERSION: &str = "1.1";
+
+fn default_schema_version() -> String {
+    "1.0".to_string()
+}
+
 /// A snapshot of benchmark results for regression comparison.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegressionSnapshot {
@@ -15,6 +22,9 @@ pub struct RegressionSnapshot {
     pub git_hash: Option<String>,
     /// Free-form configuration summary.
     pub config_summary: String,
+    /// Schema version for forward/backward compatibility.
+    #[serde(default = "default_schema_version")]
+    pub schema_version: String,
     /// benchmark_name -> metric_name -> MetricValue
     pub metrics: BTreeMap<String, BTreeMap<String, MetricValue>>,
 }
@@ -90,6 +100,7 @@ impl RegressionSnapshot {
             timestamp: report.timestamp.clone(),
             git_hash: None,
             config_summary: String::new(),
+            schema_version: SNAPSHOT_SCHEMA_VERSION.to_string(),
             metrics,
         }
     }
@@ -144,6 +155,51 @@ impl RegressionSnapshot {
         } else {
             None
         }
+    }
+
+    /// Validate the snapshot for structural integrity.
+    ///
+    /// Returns `Ok(())` if valid, or a list of validation errors.
+    pub fn validate(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        if self.name.is_empty() {
+            errors.push("Snapshot name is empty".to_string());
+        }
+
+        if self.metrics.is_empty() {
+            errors.push("Snapshot contains no benchmark metrics".to_string());
+        }
+
+        for (bench, bench_metrics) in &self.metrics {
+            for (metric_name, val) in bench_metrics {
+                if !val.mean.is_finite() {
+                    errors.push(format!("{}/{}: mean is not finite ({:?})", bench, metric_name, val.mean));
+                }
+                if !val.std_dev.is_finite() {
+                    errors.push(format!("{}/{}: std_dev is not finite ({:?})", bench, metric_name, val.std_dev));
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// Migrate a JSON string to the current schema version.
+    ///
+    /// Handles version-aware deserialization: v1.0 snapshots (no `schema_version`
+    /// field) are upgraded to v1.1 with the field set.
+    pub fn migrate(json: &str) -> Result<Self, serde_json::Error> {
+        let mut snapshot: Self = serde_json::from_str(json)?;
+        // v1.0 files lack schema_version; serde default fills "1.0"
+        if snapshot.schema_version == "1.0" {
+            snapshot.schema_version = SNAPSHOT_SCHEMA_VERSION.to_string();
+        }
+        Ok(snapshot)
     }
 }
 
@@ -311,6 +367,7 @@ mod tests {
             timestamp: "2026-02-21".to_string(),
             git_hash: None,
             config_summary: String::new(),
+            schema_version: SNAPSHOT_SCHEMA_VERSION.to_string(),
             metrics,
         }
     }
@@ -481,5 +538,107 @@ mod tests {
         let warning = s.staleness_warning(30);
         assert!(warning.is_some(), "Stale snapshot should warn");
         assert!(warning.unwrap().contains("45 days old"));
+    }
+
+    // --- Schema versioning tests ---
+
+    #[test]
+    fn test_schema_version_default() {
+        // Deserializing a v1.0 JSON (no schema_version field) should default to "1.0"
+        let json = r#"{
+            "name": "old-baseline",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "git_hash": null,
+            "config_summary": "",
+            "metrics": {}
+        }"#;
+        let snapshot: RegressionSnapshot = serde_json::from_str(json).unwrap();
+        assert_eq!(snapshot.schema_version, "1.0");
+    }
+
+    #[test]
+    fn test_schema_version_set_on_create() {
+        use crate::harness::report::{BenchmarkReport, BenchmarkResult};
+        let mut report = BenchmarkReport::new();
+        let mut result = BenchmarkResult::new("Bench", None);
+        result.insert("acc", MetricValue::from_samples(&[0.8, 0.9]));
+        report.add(result);
+        let snapshot = RegressionSnapshot::from_report(&report, "new");
+        assert_eq!(snapshot.schema_version, SNAPSHOT_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn test_validate_valid() {
+        let s = make_test_snapshot("valid", 0.85);
+        assert!(s.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_empty_name() {
+        let mut s = make_test_snapshot("", 0.85);
+        s.name = String::new();
+        let errs = s.validate().unwrap_err();
+        assert!(errs.iter().any(|e| e.contains("name is empty")));
+    }
+
+    #[test]
+    fn test_validate_empty_metrics() {
+        let s = RegressionSnapshot {
+            name: "empty".to_string(),
+            timestamp: "2026-02-26".to_string(),
+            git_hash: None,
+            config_summary: String::new(),
+            schema_version: SNAPSHOT_SCHEMA_VERSION.to_string(),
+            metrics: BTreeMap::new(),
+        };
+        let errs = s.validate().unwrap_err();
+        assert!(errs.iter().any(|e| e.contains("no benchmark metrics")));
+    }
+
+    #[test]
+    fn test_validate_nan_metric() {
+        let mut s = make_test_snapshot("nan-test", 0.85);
+        s.metrics.get_mut("TestBench").unwrap().insert(
+            "bad".to_string(),
+            MetricValue {
+                mean: f64::NAN,
+                std_dev: 0.1,
+                n: 10,
+                ci_lower: 0.0,
+                ci_upper: 1.0,
+            },
+        );
+        let errs = s.validate().unwrap_err();
+        assert!(errs.iter().any(|e| e.contains("mean is not finite")));
+    }
+
+    #[test]
+    fn test_migrate_v1_0_to_v1_1() {
+        let json = r#"{
+            "name": "legacy",
+            "timestamp": "2026-01-15T00:00:00Z",
+            "git_hash": "abc123",
+            "config_summary": "dim=512",
+            "metrics": {
+                "Stroop": {
+                    "interference": {"mean": 0.10, "std_dev": 0.02, "n": 50, "ci_lower": 0.09, "ci_upper": 0.11}
+                }
+            }
+        }"#;
+        let migrated = RegressionSnapshot::migrate(json).unwrap();
+        assert_eq!(migrated.schema_version, SNAPSHOT_SCHEMA_VERSION);
+        assert_eq!(migrated.name, "legacy");
+        assert!(migrated.metrics.contains_key("Stroop"));
+    }
+
+    #[test]
+    fn test_backward_compat_roundtrip() {
+        // Create v1.1 snapshot, serialize, deserialize — schema_version preserved
+        let s = make_test_snapshot("roundtrip", 0.90);
+        assert_eq!(s.schema_version, SNAPSHOT_SCHEMA_VERSION);
+        let json = s.to_json().unwrap();
+        let loaded = RegressionSnapshot::from_json(&json).unwrap();
+        assert_eq!(loaded.schema_version, SNAPSHOT_SCHEMA_VERSION);
+        assert_eq!(loaded.name, "roundtrip");
     }
 }

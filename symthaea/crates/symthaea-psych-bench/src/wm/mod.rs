@@ -23,3 +23,5 @@ pub use full::{WmConfig, WorkingMemory};
 pub use lightweight::WmConfig as LightweightWmConfig;
 /// Re-export the lightweight WM under a distinct name for ablation comparisons.
 pub use lightweight::WorkingMemory as LightweightWm;
+
+pub mod ssm_temporal;

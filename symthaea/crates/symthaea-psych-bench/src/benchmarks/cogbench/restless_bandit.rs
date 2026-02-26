@@ -5,7 +5,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
 
@@ -186,6 +186,15 @@ impl PsychBenchmark for RestlessBanditBenchmark {
         "CogBench::RestlessBandit"
     }
 
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Restless Bandit",
+            citation: "Daw et al. (2006)",
+            year: 2006,
+            doi: Some("10.1038/nature04766"),
+        })
+    }
+
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
@@ -334,6 +343,15 @@ impl RestlessBanditMindBenchmark {
 impl PsychBenchmark for RestlessBanditMindBenchmark {
     fn name(&self) -> &str {
         "CogBench::RestlessBandit[Mind]"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Restless Bandit",
+            citation: "Daw et al. (2006)",
+            year: 2006,
+            doi: Some("10.1038/nature04766"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

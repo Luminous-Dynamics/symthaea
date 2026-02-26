@@ -7,7 +7,7 @@ use crate::adapter::spatial::{GridPosition, SpatialAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
 
 /// Spatial updating benchmark.
@@ -93,6 +93,15 @@ impl SpatialUpdatingBenchmark {
 impl PsychBenchmark for SpatialUpdatingBenchmark {
     fn name(&self) -> &str {
         "WorM::SpatialUpdating"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Spatial Updating",
+            citation: "Oberauer (2003)",
+            year: 2003,
+            doi: Some("10.1016/S0022-5371(03)00063-0"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

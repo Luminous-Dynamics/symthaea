@@ -6,7 +6,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
 use symthaea_core::hdc::ContinuousHV;
 
@@ -129,6 +129,15 @@ impl MoodCongruentRecallBenchmark {
 impl PsychBenchmark for MoodCongruentRecallBenchmark {
     fn name(&self) -> &str {
         "Affect::MoodCongruentRecall"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Mood-Congruent Memory",
+            citation: "Bower (1981)",
+            year: 1981,
+            doi: Some("10.1037/0003-066X.36.2.129"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

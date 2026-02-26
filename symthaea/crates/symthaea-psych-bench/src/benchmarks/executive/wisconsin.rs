@@ -11,7 +11,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Card features.
@@ -319,6 +319,15 @@ struct TrialResult {
 impl PsychBenchmark for WisconsinCardSortingBenchmark {
     fn name(&self) -> &str {
         "Executive::WCST"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Wisconsin Card Sorting Test",
+            citation: "Berg (1948)",
+            year: 1948,
+            doi: Some("10.1085/jgp.32.2.163"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

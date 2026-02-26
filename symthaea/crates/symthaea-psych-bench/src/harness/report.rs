@@ -506,6 +506,18 @@ impl BenchmarkReport {
                 "emotional_interference",
                 &bl.affect,
             ),
+            // Reasoning (ARC Fluid)
+            ("rule_consistency", "arc_rule_consistency", &bl.reasoning),
+            (
+                "transfer_accuracy",
+                "arc_transfer_accuracy",
+                &bl.reasoning,
+            ),
+            (
+                "transfer_similarity",
+                "arc_transfer_similarity",
+                &bl.reasoning,
+            ),
         ];
 
         for (metric_key, baseline_key, baselines) in &mappings {
@@ -813,6 +825,40 @@ impl BenchmarkReport {
             );
             push_specific("fok_resolution", "fok_resolution", &bl.metacognition);
         }
+        // ARC Fluid Reasoning
+        if benchmark.contains("ArcFluid") {
+            push_specific("rt_ticks", "arc_rt_ticks", &bl.reasoning);
+        }
+        // SART (Sustained Attention)
+        if benchmark.contains("SART") {
+            push_specific("commission_errors", "commission_errors", &bl.sustained_attention);
+            push_specific("omission_errors", "omission_errors", &bl.sustained_attention);
+            push_specific("d_prime", "sart_d_prime", &bl.sustained_attention);
+            push_specific("rt_ticks", "sart_rt_ticks", &bl.sustained_attention);
+        }
+        // SRTT (Motor)
+        if benchmark.contains("SRTT") {
+            push_specific("learning_effect", "learning_effect", &bl.motor);
+            push_specific("sequence_accuracy", "sequence_accuracy", &bl.motor);
+            push_specific("random_accuracy", "random_accuracy", &bl.motor);
+            push_specific("sequence::rt_ticks", "srtt_sequence_rt_ticks", &bl.motor);
+            push_specific("random::rt_ticks", "srtt_random_rt_ticks", &bl.motor);
+        }
+        // Garden-Path (Language)
+        if benchmark.contains("GardenPath") {
+            push_specific("disambiguation_cost", "disambiguation_cost", &bl.language);
+            push_specific("overall_accuracy", "gp_overall_accuracy", &bl.language);
+            push_specific("garden_path_accuracy", "garden_path_accuracy", &bl.language);
+            push_specific("control_accuracy", "gp_control_accuracy", &bl.language);
+            push_specific("rt_ticks", "gp_rt_ticks", &bl.language);
+        }
+        // RME (Social)
+        if benchmark.contains("Social") && benchmark.contains("RME") {
+            push_specific("rme_accuracy", "rme_accuracy", &bl.social);
+            push_specific("easy_accuracy", "rme_easy_accuracy", &bl.social);
+            push_specific("hard_accuracy", "rme_hard_accuracy", &bl.social);
+            push_specific("rt_ticks", "rme_rt_ticks", &bl.social);
+        }
 
         // Only return comparisons relevant to this benchmark
         if benchmark.contains("WorM")
@@ -826,6 +872,11 @@ impl BenchmarkReport {
             || benchmark.contains("Butlin")
             || benchmark.contains("Inhibition")
             || benchmark.contains("Attention")
+            || benchmark.contains("Reasoning")
+            || benchmark.contains("SustainedAttention")
+            || benchmark.contains("Motor")
+            || benchmark.contains("Language")
+            || benchmark.contains("Social")
         {
             comps
         } else {
@@ -1165,6 +1216,10 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("VisualSearch") => "search_asymmetry",
         b if b.contains("FeelingOfKnowing") => "fok_gamma",
         b if b.contains("DualTask") => "dual_task_cost",
+        b if b.contains("SART") => "commission_errors",
+        b if b.contains("SRTT") => "learning_effect",
+        b if b.contains("GardenPath") => "disambiguation_cost",
+        b if b.contains("RME") && b.contains("Social") => "rme_accuracy",
         _ => "overall_accuracy",
     }
 }
@@ -1563,6 +1618,26 @@ impl Default for BenchmarkReport {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Format a Markdown provenance/citations table from a list of benchmarks.
+pub fn provenance_table(benchmarks: &[&dyn crate::harness::PsychBenchmark]) -> String {
+    let mut out = String::new();
+    out.push_str("| Benchmark | Paradigm | Citation | Year | DOI |\n");
+    out.push_str("|-----------|----------|----------|------|-----|\n");
+    for b in benchmarks {
+        if let Some(p) = b.provenance() {
+            out.push_str(&format!(
+                "| {} | {} | {} | {} | {} |\n",
+                b.name(),
+                p.paradigm,
+                p.citation,
+                p.year,
+                p.doi.unwrap_or("—"),
+            ));
+        }
+    }
+    out
 }
 
 #[cfg(test)]

@@ -6,7 +6,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
 
@@ -85,6 +85,15 @@ impl ProbabilisticReasoningBenchmark {
 impl PsychBenchmark for ProbabilisticReasoningBenchmark {
     fn name(&self) -> &str {
         "CogBench::ProbabilisticReasoning"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Probabilistic Reasoning (Beads Task)",
+            citation: "Phillips & Edwards (1966)",
+            year: 1966,
+            doi: Some("10.1037/h0023653"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

@@ -29,7 +29,33 @@ pub struct BenchmarkConfig {
     /// deliberation ticks, noisier encoding, and faster response thresholds,
     /// trading accuracy for speed (a speed-accuracy tradeoff curve).
     pub time_pressure: f64,
+    /// Enable adaptive trial counts (default: false).
+    ///
+    /// When enabled, benchmarks increase trial counts until the key metric's
+    /// CI half-width is within `precision_target × |mean|`, up to `max_trials`.
+    #[serde(default)]
+    pub adaptive_trials: bool,
+    /// Minimum trials for adaptive mode (default: 10).
+    #[serde(default = "default_min_trials")]
+    pub min_trials: usize,
+    /// Maximum trials for adaptive mode (default: 200).
+    #[serde(default = "default_max_trials")]
+    pub max_trials: usize,
+    /// Precision target: CI half-width as fraction of |mean| (default: 0.05).
+    #[serde(default = "default_precision_target")]
+    pub precision_target: f64,
+    /// Use SSM temporal backend for benchmarks that support it (default: false).
+    ///
+    /// When enabled, replaces ad-hoc decay models with principled state-space
+    /// recurrence from `symthaea-ssm`. Affects: ProspectiveMemory, AttentionalBlink,
+    /// SerialRecall, DigitSpan.
+    #[serde(default)]
+    pub ssm_backend: bool,
 }
+
+fn default_min_trials() -> usize { 10 }
+fn default_max_trials() -> usize { 200 }
+fn default_precision_target() -> f64 { 0.05 }
 
 impl Default for BenchmarkConfig {
     fn default() -> Self {
@@ -44,6 +70,11 @@ impl Default for BenchmarkConfig {
             action_temperature: 1.0,
             label: None,
             time_pressure: 0.0,
+            adaptive_trials: false,
+            min_trials: default_min_trials(),
+            max_trials: default_max_trials(),
+            precision_target: default_precision_target(),
+            ssm_backend: false,
         }
     }
 }

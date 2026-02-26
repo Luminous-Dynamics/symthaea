@@ -11,7 +11,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Iowa Gambling Task benchmark.
@@ -220,6 +220,15 @@ struct IgtResult {
 impl PsychBenchmark for IowaGamblingBenchmark {
     fn name(&self) -> &str {
         "Executive::IGT"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Iowa Gambling Task",
+            citation: "Bechara et al. (1994)",
+            year: 1994,
+            doi: Some("10.1016/0010-0277(94)90018-3"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

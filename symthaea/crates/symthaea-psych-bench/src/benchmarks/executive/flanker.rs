@@ -21,7 +21,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Eriksen Flanker Task benchmark.
@@ -174,6 +174,15 @@ struct TrialResult {
 impl PsychBenchmark for FlankerBenchmark {
     fn name(&self) -> &str {
         "Executive::Flanker"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Eriksen Flanker Task",
+            citation: "Eriksen & Eriksen (1974)",
+            year: 1974,
+            doi: Some("10.3758/BF03203267"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

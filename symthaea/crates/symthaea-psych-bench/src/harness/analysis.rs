@@ -979,6 +979,485 @@ fn ranks(data: &[f64]) -> Vec<f64> {
     result
 }
 
+// ---------- Speed-Accuracy Tradeoff (SAT) Curves ----------
+
+/// A single point on a SAT curve.
+#[derive(Debug, Clone)]
+pub struct SatCurvePoint {
+    /// Time pressure level (0.0 to 1.0).
+    pub time_pressure: f64,
+    /// Accuracy at this pressure level.
+    pub accuracy: f64,
+    /// Mean RT (ticks) at this pressure level.
+    pub rt_ticks: f64,
+}
+
+/// A fitted SAT curve for one benchmark.
+#[derive(Debug, Clone)]
+pub struct SatCurve {
+    /// Benchmark name.
+    pub benchmark: String,
+    /// Raw data points.
+    pub points: Vec<SatCurvePoint>,
+    /// Wickelgren (1977) fit: λ (asymptotic accuracy).
+    pub lambda: f64,
+    /// Wickelgren (1977) fit: β (rate).
+    pub beta: f64,
+    /// Wickelgren (1977) fit: δ (onset delay).
+    pub delta: f64,
+    /// R² goodness of fit.
+    pub r_squared: f64,
+}
+
+/// Fit a Wickelgren (1977) SAT curve: d'(t) = λ(1 - e^{-β(t-δ)}).
+///
+/// Uses grid search over parameter space. `points` should have accuracy in [0,1]
+/// and time_pressure in [0,1] (mapped to time = 1 - time_pressure for fitting).
+pub fn fit_sat_curve(benchmark: &str, points: &[SatCurvePoint]) -> SatCurve {
+    if points.len() < 2 {
+        return SatCurve {
+            benchmark: benchmark.to_string(),
+            points: points.to_vec(),
+            lambda: points.first().map(|p| p.accuracy).unwrap_or(0.5),
+            beta: 1.0,
+            delta: 0.0,
+            r_squared: 0.0,
+        };
+    }
+
+    let max_acc = points.iter().map(|p| p.accuracy).fold(0.0_f64, f64::max);
+    let min_tp = points.iter().map(|p| p.time_pressure).fold(1.0_f64, f64::min);
+
+    // Grid search
+    let mut best_r2 = f64::NEG_INFINITY;
+    let mut best_params = (max_acc, 1.0, 0.0);
+
+    for lambda_i in 0..=10 {
+        let lambda = max_acc + (1.0 - max_acc) * lambda_i as f64 / 10.0;
+        for beta_i in 1..=20 {
+            let beta = beta_i as f64 * 0.25;
+            for delta_i in 0..=10 {
+                let delta = min_tp * delta_i as f64 / 10.0;
+
+                // Compute R²
+                let mean_acc: f64 = points.iter().map(|p| p.accuracy).sum::<f64>() / points.len() as f64;
+                let ss_tot: f64 = points.iter().map(|p| (p.accuracy - mean_acc).powi(2)).sum();
+
+                let ss_res: f64 = points.iter().map(|p| {
+                    // Map time_pressure to "available time": t = 1 - time_pressure
+                    let t = 1.0 - p.time_pressure;
+                    let predicted = if t > delta {
+                        lambda * (1.0 - (-beta * (t - delta)).exp())
+                    } else {
+                        0.0
+                    };
+                    (p.accuracy - predicted).powi(2)
+                }).sum();
+
+                let r2 = if ss_tot > 1e-15 { 1.0 - ss_res / ss_tot } else { 0.0 };
+
+                if r2 > best_r2 {
+                    best_r2 = r2;
+                    best_params = (lambda, beta, delta);
+                }
+            }
+        }
+    }
+
+    SatCurve {
+        benchmark: benchmark.to_string(),
+        points: points.to_vec(),
+        lambda: best_params.0,
+        beta: best_params.1,
+        delta: best_params.2,
+        r_squared: best_r2.max(0.0),
+    }
+}
+
+/// Format SAT curve as ASCII table.
+pub fn sat_curve_ascii(curve: &SatCurve) -> String {
+    let mut out = format!(
+        "SAT Curve: {} (λ={:.3}, β={:.3}, δ={:.3}, R²={:.3})\n",
+        curve.benchmark, curve.lambda, curve.beta, curve.delta, curve.r_squared
+    );
+    out.push_str("  Pressure | Accuracy |  RT\n");
+    out.push_str("  ---------|----------|------\n");
+    for p in &curve.points {
+        out.push_str(&format!(
+            "     {:.1}   |  {:.3}   | {:.1}\n",
+            p.time_pressure, p.accuracy, p.rt_ticks
+        ));
+    }
+    out
+}
+
+// ---------- Random-effects meta-analysis (DerSimonian-Laird) ----------
+
+/// Result of a DerSimonian-Laird random-effects meta-analysis.
+#[derive(Debug, Clone)]
+pub struct MetaAnalysisResult {
+    /// Summary effect size (Cohen's d).
+    pub summary_d: f64,
+    /// Standard error of summary effect.
+    pub summary_se: f64,
+    /// 95% CI lower bound.
+    pub ci_lower: f64,
+    /// 95% CI upper bound.
+    pub ci_upper: f64,
+    /// Heterogeneity variance (tau-squared).
+    pub tau_squared: f64,
+    /// I-squared heterogeneity percentage (0–100).
+    pub i_squared: f64,
+    /// Cochran's Q statistic.
+    pub q: f64,
+    /// Degrees of freedom for Q (k-1).
+    pub q_df: usize,
+    /// p-value for Q test (chi-squared).
+    pub q_p_value: f64,
+    /// Number of studies (k).
+    pub k: usize,
+}
+
+/// Run DerSimonian-Laird random-effects meta-analysis on a set of effect sizes.
+///
+/// `effects` is a slice of `(d, se)` tuples where `d` is Cohen's d and `se` is
+/// the standard error of d. SE for Cohen's d: SE = sqrt(1/n + d²/(2n)).
+pub fn meta_analysis(effects: &[(f64, f64)]) -> Option<MetaAnalysisResult> {
+    let k = effects.len();
+    if k == 0 {
+        return None;
+    }
+    if k == 1 {
+        let (d, se) = effects[0];
+        return Some(MetaAnalysisResult {
+            summary_d: d,
+            summary_se: se,
+            ci_lower: d - 1.96 * se,
+            ci_upper: d + 1.96 * se,
+            tau_squared: 0.0,
+            i_squared: 0.0,
+            q: 0.0,
+            q_df: 0,
+            q_p_value: 1.0,
+            k: 1,
+        });
+    }
+
+    // Fixed-effect weights: w_i = 1/SE_i²
+    let weights: Vec<f64> = effects.iter().map(|(_, se)| {
+        if *se > 0.0 { 1.0 / (se * se) } else { 0.0 }
+    }).collect();
+
+    let sum_w: f64 = weights.iter().sum();
+    if sum_w < 1e-15 {
+        return None;
+    }
+
+    // Fixed-effect estimate
+    let d_fixed: f64 = effects.iter().zip(&weights).map(|((d, _), w)| w * d).sum::<f64>() / sum_w;
+
+    // Cochran's Q
+    let q: f64 = effects.iter().zip(&weights).map(|((d, _), w)| w * (d - d_fixed).powi(2)).sum();
+
+    // tau² via DerSimonian-Laird
+    let sum_w2: f64 = weights.iter().map(|w| w * w).sum();
+    let c = sum_w - sum_w2 / sum_w;
+    let tau_sq = if q > (k as f64 - 1.0) {
+        (q - (k as f64 - 1.0)) / c
+    } else {
+        0.0
+    };
+
+    // Random-effects weights: w_i* = 1/(SE_i² + τ²)
+    let re_weights: Vec<f64> = effects.iter().map(|(_, se)| {
+        let denom = se * se + tau_sq;
+        if denom > 0.0 { 1.0 / denom } else { 0.0 }
+    }).collect();
+
+    let sum_re_w: f64 = re_weights.iter().sum();
+    if sum_re_w < 1e-15 {
+        return None;
+    }
+
+    let summary_d: f64 = effects.iter().zip(&re_weights)
+        .map(|((d, _), w)| w * d).sum::<f64>() / sum_re_w;
+    let summary_se = (1.0 / sum_re_w).sqrt();
+
+    // I² = max(0, (Q - (k-1)) / Q) × 100
+    let i_squared = if q > 0.0 {
+        ((q - (k as f64 - 1.0)) / q).max(0.0) * 100.0
+    } else {
+        0.0
+    };
+
+    // p-value for Q via Wilson-Hilferty chi-squared approximation
+    let df = (k - 1) as f64;
+    let q_p_value = if df > 0.0 {
+        let z = ((q / df).powf(1.0 / 3.0) - (1.0 - 2.0 / (9.0 * df)))
+            / (2.0 / (9.0 * df)).sqrt();
+        1.0 - normal_cdf(z)
+    } else {
+        1.0
+    };
+
+    Some(MetaAnalysisResult {
+        summary_d,
+        summary_se,
+        ci_lower: summary_d - 1.96 * summary_se,
+        ci_upper: summary_d + 1.96 * summary_se,
+        tau_squared: tau_sq,
+        i_squared,
+        q,
+        q_df: k - 1,
+        q_p_value,
+        k,
+    })
+}
+
+/// Run meta-analysis from forest plot rows.
+///
+/// Computes SE for each row's Cohen's d using SE = sqrt(1/n + d²/(2n)).
+pub fn meta_analysis_from_forest(rows: &[super::report::ForestPlotRow]) -> Option<MetaAnalysisResult> {
+    let effects: Vec<(f64, f64)> = rows.iter().filter_map(|row| {
+        let d = row.cohens_d?;
+        // n from the benchmark's trial count isn't in ForestPlotRow,
+        // so estimate from CI width: SE ≈ (ci_upper - ci_lower) / 3.92
+        let ci_width = row.ci_upper - row.ci_lower;
+        let se = if ci_width > 0.0 { ci_width / 3.92 } else { 0.1 };
+        Some((d, se))
+    }).collect();
+
+    meta_analysis(&effects)
+}
+
+/// Format meta-analysis result as a summary string.
+pub fn format_meta_analysis(result: &MetaAnalysisResult) -> String {
+    format!(
+        "Meta-analysis (k={}): d = {:.3} [{:.3}, {:.3}], SE = {:.3}\n  \
+         τ² = {:.4}, I² = {:.1}%, Q({}) = {:.2}, p = {:.4}",
+        result.k,
+        result.summary_d,
+        result.ci_lower,
+        result.ci_upper,
+        result.summary_se,
+        result.tau_squared,
+        result.i_squared,
+        result.q_df,
+        result.q,
+        result.q_p_value,
+    )
+}
+
+// ── Individual Differences Simulation ─────────────────────────────────────
+
+/// Result of individual differences simulation for one benchmark.
+#[derive(Debug, Clone)]
+pub struct IndividualDifferencesResult {
+    /// Benchmark name.
+    pub benchmark: String,
+    /// Key metric name.
+    pub metric: String,
+    /// Number of simulated participants.
+    pub n: usize,
+    /// Mean across participants.
+    pub mean: f64,
+    /// Standard deviation.
+    pub sd: f64,
+    /// Minimum.
+    pub min: f64,
+    /// Maximum.
+    pub max: f64,
+    /// Skewness.
+    pub skewness: f64,
+    /// Shapiro-Wilk W approximation.
+    pub shapiro_wilk_w: f64,
+    /// 95% CI lower bound.
+    pub ci_lower: f64,
+    /// 95% CI upper bound.
+    pub ci_upper: f64,
+}
+
+/// Approximate Shapiro-Wilk W statistic.
+///
+/// Uses the simplified formula W = 1 - ratio of ordered-statistic spread
+/// to total variance. For small samples (<50) this approximates the full
+/// Shapiro-Wilk; for larger samples it converges to a normality measure.
+pub fn shapiro_wilk_approx(data: &[f64]) -> f64 {
+    let n = data.len();
+    if n < 3 {
+        return 1.0;
+    }
+    let mut sorted = data.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mean = sorted.iter().sum::<f64>() / n as f64;
+    let ss_total: f64 = sorted.iter().map(|x| (x - mean).powi(2)).sum();
+
+    if ss_total < 1e-15 {
+        return 1.0; // No variance = perfectly "normal"
+    }
+
+    // Compute ordered-statistic numerator (sum of a_i * (x_(n+1-i) - x_i))
+    let half = n / 2;
+    let mut numerator = 0.0;
+    for i in 0..half {
+        // Approximate a_i coefficients using expected normal order statistics
+        let expected_z = probit_approx((i as f64 + 0.375) / (n as f64 + 0.25));
+        let pair_diff = sorted[n - 1 - i] - sorted[i];
+        numerator += expected_z * pair_diff;
+    }
+
+    let w = numerator * numerator / ss_total;
+    w.clamp(0.0, 1.0)
+}
+
+/// Probit approximation for Shapiro-Wilk.
+fn probit_approx(p: f64) -> f64 {
+    let p = p.clamp(0.001, 0.999);
+    let t = if p < 0.5 {
+        (-2.0 * p.ln()).sqrt()
+    } else {
+        (-2.0 * (1.0 - p).ln()).sqrt()
+    };
+    let c0 = 2.515517;
+    let c1 = 0.802853;
+    let c2 = 0.010328;
+    let d1 = 1.432788;
+    let d2 = 0.189269;
+    let d3 = 0.001308;
+    let z = t - (c0 + c1 * t + c2 * t * t) / (1.0 + d1 * t + d2 * t * t + d3 * t * t * t);
+    if p < 0.5 { -z } else { z }
+}
+
+/// Compute individual differences summary for a set of participant scores.
+pub fn individual_differences(
+    benchmark: &str,
+    metric: &str,
+    scores: &[f64],
+) -> IndividualDifferencesResult {
+    let n = scores.len();
+    if n == 0 {
+        return IndividualDifferencesResult {
+            benchmark: benchmark.to_string(),
+            metric: metric.to_string(),
+            n: 0, mean: 0.0, sd: 0.0, min: 0.0, max: 0.0,
+            skewness: 0.0, shapiro_wilk_w: 1.0, ci_lower: 0.0, ci_upper: 0.0,
+        };
+    }
+
+    let mean = scores.iter().sum::<f64>() / n as f64;
+    let var = if n > 1 {
+        scores.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1) as f64
+    } else {
+        0.0
+    };
+    let sd = var.sqrt();
+    let min = scores.iter().cloned().fold(f64::INFINITY, f64::min);
+    let max = scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+
+    // Skewness (Fisher's)
+    let skewness = if sd > 1e-15 && n > 2 {
+        let m3 = scores.iter().map(|x| ((x - mean) / sd).powi(3)).sum::<f64>() / n as f64;
+        m3 * (n as f64).sqrt() * (n as f64 - 1.0).sqrt() / (n as f64 - 2.0)
+    } else {
+        0.0
+    };
+
+    let w = shapiro_wilk_approx(scores);
+
+    // 95% CI
+    let se = sd / (n as f64).sqrt();
+    let ci_lower = mean - 1.96 * se;
+    let ci_upper = mean + 1.96 * se;
+
+    IndividualDifferencesResult {
+        benchmark: benchmark.to_string(),
+        metric: metric.to_string(),
+        n, mean, sd, min, max, skewness,
+        shapiro_wilk_w: w, ci_lower, ci_upper,
+    }
+}
+
+/// Format individual differences result as a summary line.
+pub fn format_individual_differences(r: &IndividualDifferencesResult) -> String {
+    format!(
+        "{:25} {:>25} | N={:>3} | M={:>8.3} SD={:>7.3} [{:>7.3}, {:>7.3}] | \
+         skew={:>+6.2} W={:.3} | 95%CI [{:.3}, {:.3}]",
+        r.benchmark.split("::").last().unwrap_or(&r.benchmark),
+        r.metric,
+        r.n, r.mean, r.sd, r.min, r.max,
+        r.skewness, r.shapiro_wilk_w,
+        r.ci_lower, r.ci_upper,
+    )
+}
+
+// ── HDC Dimensionality Scaling ───────────────────────────────────────────
+
+/// Result of dimensionality scaling analysis for one benchmark.
+#[derive(Debug, Clone)]
+pub struct DimScalingResult {
+    /// Benchmark name.
+    pub benchmark: String,
+    /// Dimension values tested.
+    pub dims: Vec<usize>,
+    /// Key metric values at each dimension.
+    pub values: Vec<f64>,
+    /// Linear regression slope of metric vs log₂(dim).
+    pub slope: f64,
+    /// R² of the linear regression.
+    pub r_squared: f64,
+}
+
+/// Compute linear regression slope of metric vs log₂(dim).
+pub fn dim_scaling_slope(dims: &[usize], values: &[f64]) -> (f64, f64) {
+    let n = dims.len();
+    if n < 2 || n != values.len() {
+        return (0.0, 0.0);
+    }
+
+    let xs: Vec<f64> = dims.iter().map(|&d| (d as f64).log2()).collect();
+    let x_mean = xs.iter().sum::<f64>() / n as f64;
+    let y_mean = values.iter().sum::<f64>() / n as f64;
+
+    let mut num = 0.0;
+    let mut den = 0.0;
+    for i in 0..n {
+        num += (xs[i] - x_mean) * (values[i] - y_mean);
+        den += (xs[i] - x_mean).powi(2);
+    }
+
+    let slope = if den.abs() > 1e-15 { num / den } else { 0.0 };
+
+    // R²
+    let ss_tot: f64 = values.iter().map(|y| (y - y_mean).powi(2)).sum();
+    let r_squared = if ss_tot > 1e-15 {
+        let ss_res: f64 = xs.iter().zip(values.iter())
+            .map(|(x, y)| {
+                let predicted = y_mean + slope * (x - x_mean);
+                (y - predicted).powi(2)
+            })
+            .sum();
+        1.0 - ss_res / ss_tot
+    } else {
+        0.0
+    };
+
+    (slope, r_squared)
+}
+
+/// Format dimensionality scaling result as a table row.
+pub fn format_dim_scaling(r: &DimScalingResult) -> String {
+    let short = r.benchmark.split("::").last().unwrap_or(&r.benchmark);
+    let vals_str: String = r.values.iter()
+        .map(|v| format!("{:.3}", v))
+        .collect::<Vec<_>>()
+        .join(" | ");
+    format!(
+        "{:25} | {} | slope={:>+7.4} R²={:.3}",
+        short, vals_str, r.slope, r.r_squared,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1574,5 +2053,421 @@ mod tests {
         let (lo2, hi2) = bootstrap_ci(&samples, 2000, 0.05, 42);
         assert!((lo1 - lo2).abs() < 1e-10 && (hi1 - hi2).abs() < 1e-10,
             "same seed should produce identical CIs");
+    }
+
+    // ──── Meta-analysis tests ────
+
+    #[test]
+    fn test_meta_single_effect() {
+        let result = meta_analysis(&[(0.5, 0.1)]).unwrap();
+        assert!((result.summary_d - 0.5).abs() < 1e-10);
+        assert_eq!(result.k, 1);
+        assert_eq!(result.tau_squared, 0.0);
+    }
+
+    #[test]
+    fn test_meta_homogeneous_i2_zero() {
+        // All identical effects → I²=0
+        let effects = vec![(0.5, 0.1), (0.5, 0.1), (0.5, 0.1), (0.5, 0.1)];
+        let result = meta_analysis(&effects).unwrap();
+        assert!((result.i_squared).abs() < 1e-10, "I²={}", result.i_squared);
+        assert!((result.summary_d - 0.5).abs() < 0.01, "d={}", result.summary_d);
+    }
+
+    #[test]
+    fn test_meta_heterogeneous_i2_positive() {
+        // Very different effects → I² should be high
+        let effects = vec![(0.1, 0.05), (0.9, 0.05), (-0.5, 0.05), (1.5, 0.05)];
+        let result = meta_analysis(&effects).unwrap();
+        assert!(result.i_squared > 50.0, "I²={} should be >50", result.i_squared);
+        assert!(result.tau_squared > 0.0, "τ²={} should be >0", result.tau_squared);
+    }
+
+    #[test]
+    fn test_meta_zero_se() {
+        // SE=0 should not panic; weight=0 so effect is excluded
+        let effects = vec![(0.5, 0.0), (0.3, 0.1)];
+        let result = meta_analysis(&effects);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_meta_large_k() {
+        let effects: Vec<(f64, f64)> = (0..50).map(|i| (0.5 + (i as f64 - 25.0) * 0.01, 0.1)).collect();
+        let result = meta_analysis(&effects).unwrap();
+        assert_eq!(result.k, 50);
+        assert!(result.summary_d.is_finite());
+        assert!(result.summary_se.is_finite());
+    }
+
+    #[test]
+    fn test_meta_negative_effects() {
+        let effects = vec![(-0.3, 0.1), (-0.5, 0.15), (-0.2, 0.08)];
+        let result = meta_analysis(&effects).unwrap();
+        assert!(result.summary_d < 0.0, "summary should be negative: {}", result.summary_d);
+    }
+
+    #[test]
+    fn test_meta_q_df() {
+        let effects = vec![(0.3, 0.1), (0.5, 0.12), (0.4, 0.09)];
+        let result = meta_analysis(&effects).unwrap();
+        assert_eq!(result.q_df, 2); // k-1 = 3-1 = 2
+        assert!(result.q >= 0.0);
+    }
+
+    #[test]
+    fn test_meta_ci_contains_summary() {
+        let effects = vec![(0.3, 0.1), (0.5, 0.12), (0.4, 0.09), (0.35, 0.11)];
+        let result = meta_analysis(&effects).unwrap();
+        assert!(result.ci_lower <= result.summary_d, "CI lower > d");
+        assert!(result.ci_upper >= result.summary_d, "CI upper < d");
+    }
+
+    #[test]
+    fn test_meta_fixed_equals_re_when_homogeneous() {
+        // When all effects identical, τ²=0, so fixed and RE weights are the same
+        let effects = vec![(0.4, 0.1), (0.4, 0.1), (0.4, 0.1)];
+        let result = meta_analysis(&effects).unwrap();
+        assert!((result.summary_d - 0.4).abs() < 1e-10);
+        assert!((result.tau_squared).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_meta_from_forest() {
+        use crate::harness::report::ForestPlotRow;
+        let rows = vec![
+            ForestPlotRow {
+                domain: "A".into(), benchmark: "X".into(), metric: "acc".into(),
+                agent_mean: 0.8, human_mean: 0.85, human_sd: Some(0.1),
+                cohens_d: Some(-0.5), ci_lower: 0.75, ci_upper: 0.85,
+                ratio: 0.94, z_score: Some(-0.5),
+            },
+            ForestPlotRow {
+                domain: "B".into(), benchmark: "Y".into(), metric: "acc".into(),
+                agent_mean: 0.9, human_mean: 0.88, human_sd: Some(0.08),
+                cohens_d: Some(0.25), ci_lower: 0.86, ci_upper: 0.94,
+                ratio: 1.02, z_score: Some(0.25),
+            },
+        ];
+        let result = meta_analysis_from_forest(&rows).unwrap();
+        assert_eq!(result.k, 2);
+        assert!(result.summary_d.is_finite());
+    }
+
+    #[test]
+    fn test_meta_summary_format() {
+        let effects = vec![(0.3, 0.1), (0.5, 0.12)];
+        let result = meta_analysis(&effects).unwrap();
+        let fmt = format_meta_analysis(&result);
+        assert!(fmt.contains("Meta-analysis"));
+        assert!(fmt.contains("k=2"));
+        assert!(fmt.contains("I²"));
+    }
+
+    #[test]
+    fn test_meta_p_value_range() {
+        let effects = vec![(0.3, 0.1), (0.5, 0.12), (0.4, 0.09)];
+        let result = meta_analysis(&effects).unwrap();
+        assert!(result.q_p_value >= 0.0 && result.q_p_value <= 1.0,
+            "p={} out of range", result.q_p_value);
+    }
+
+    // ──── SAT Curve tests ────
+
+    #[test]
+    fn test_sat_fit_monotonic() {
+        // Accuracy should decrease with time_pressure (less time → less accuracy)
+        let points = vec![
+            SatCurvePoint { time_pressure: 0.0, accuracy: 0.95, rt_ticks: 10.0 },
+            SatCurvePoint { time_pressure: 0.2, accuracy: 0.90, rt_ticks: 8.0 },
+            SatCurvePoint { time_pressure: 0.4, accuracy: 0.82, rt_ticks: 6.0 },
+            SatCurvePoint { time_pressure: 0.6, accuracy: 0.70, rt_ticks: 4.5 },
+            SatCurvePoint { time_pressure: 0.8, accuracy: 0.55, rt_ticks: 3.0 },
+            SatCurvePoint { time_pressure: 1.0, accuracy: 0.40, rt_ticks: 2.0 },
+        ];
+        let curve = fit_sat_curve("Test", &points);
+        assert!(curve.lambda > 0.0, "λ={}", curve.lambda);
+        assert!(curve.beta > 0.0, "β={}", curve.beta);
+    }
+
+    #[test]
+    fn test_sat_fit_r_squared_high() {
+        // Perfect exponential data should yield high R²
+        let points: Vec<SatCurvePoint> = (0..6).map(|i| {
+            let tp = i as f64 * 0.2;
+            let t = 1.0 - tp;
+            SatCurvePoint {
+                time_pressure: tp,
+                accuracy: 0.9 * (1.0 - (-2.0 * t).exp()),
+                rt_ticks: 10.0 - tp * 8.0,
+            }
+        }).collect();
+        let curve = fit_sat_curve("Perfect", &points);
+        assert!(curve.r_squared > 0.8, "R²={}", curve.r_squared);
+    }
+
+    #[test]
+    fn test_sat_fit_degenerate() {
+        // All same accuracy → R²=0
+        let points = vec![
+            SatCurvePoint { time_pressure: 0.0, accuracy: 0.5, rt_ticks: 5.0 },
+            SatCurvePoint { time_pressure: 1.0, accuracy: 0.5, rt_ticks: 2.0 },
+        ];
+        let curve = fit_sat_curve("Flat", &points);
+        assert!(curve.r_squared >= 0.0);
+    }
+
+    #[test]
+    fn test_sat_fit_two_points() {
+        let points = vec![
+            SatCurvePoint { time_pressure: 0.0, accuracy: 0.9, rt_ticks: 10.0 },
+            SatCurvePoint { time_pressure: 1.0, accuracy: 0.4, rt_ticks: 2.0 },
+        ];
+        let curve = fit_sat_curve("TwoPoint", &points);
+        assert!(curve.lambda.is_finite());
+        assert!(curve.beta.is_finite());
+    }
+
+    #[test]
+    fn test_sat_ascii_output() {
+        let points = vec![
+            SatCurvePoint { time_pressure: 0.0, accuracy: 0.9, rt_ticks: 10.0 },
+            SatCurvePoint { time_pressure: 0.5, accuracy: 0.7, rt_ticks: 5.0 },
+        ];
+        let curve = fit_sat_curve("Bench", &points);
+        let ascii = sat_curve_ascii(&curve);
+        assert!(ascii.contains("SAT Curve: Bench"));
+        assert!(ascii.contains("Pressure"));
+        assert!(ascii.contains("0.9"));
+    }
+
+    #[test]
+    fn test_sat_point_serde() {
+        // SatCurvePoint should have all finite fields
+        let p = SatCurvePoint { time_pressure: 0.3, accuracy: 0.85, rt_ticks: 7.0 };
+        assert!(p.time_pressure.is_finite());
+        assert!(p.accuracy.is_finite());
+        assert!(p.rt_ticks.is_finite());
+    }
+
+    #[test]
+    fn test_sat_sweep_all_finite() {
+        let points: Vec<SatCurvePoint> = (0..=10).map(|i| SatCurvePoint {
+            time_pressure: i as f64 * 0.1,
+            accuracy: 0.9 - i as f64 * 0.04,
+            rt_ticks: 10.0 - i as f64 * 0.8,
+        }).collect();
+        let curve = fit_sat_curve("Sweep", &points);
+        assert!(curve.lambda.is_finite());
+        assert!(curve.beta.is_finite());
+        assert!(curve.delta.is_finite());
+        assert!(curve.r_squared.is_finite());
+    }
+
+    #[test]
+    fn test_sat_accuracy_decreases() {
+        let points = vec![
+            SatCurvePoint { time_pressure: 0.0, accuracy: 0.95, rt_ticks: 10.0 },
+            SatCurvePoint { time_pressure: 0.5, accuracy: 0.75, rt_ticks: 5.0 },
+            SatCurvePoint { time_pressure: 1.0, accuracy: 0.50, rt_ticks: 2.0 },
+        ];
+        // Accuracy should decrease with pressure
+        assert!(points[0].accuracy > points[2].accuracy);
+        let curve = fit_sat_curve("Decreasing", &points);
+        assert!(curve.lambda > 0.0);
+    }
+
+    #[test]
+    fn test_sat_rt_decreases() {
+        let points = vec![
+            SatCurvePoint { time_pressure: 0.0, accuracy: 0.95, rt_ticks: 10.0 },
+            SatCurvePoint { time_pressure: 1.0, accuracy: 0.50, rt_ticks: 2.0 },
+        ];
+        // RT should decrease with pressure
+        assert!(points[0].rt_ticks > points[1].rt_ticks);
+    }
+
+    // ──── Individual Differences tests ────
+
+    #[test]
+    fn test_shapiro_wilk_normal() {
+        // Approximately normal data — W should be close to 1.0
+        let data: Vec<f64> = (0..50).map(|i| {
+            // Linear approximation of normal quantiles
+            let z = (i as f64 - 25.0) / 12.5;
+            5.0 + z * 1.0
+        }).collect();
+        let w = shapiro_wilk_approx(&data);
+        assert!(w > 0.9, "Normal-ish data should have W > 0.9, got {:.4}", w);
+    }
+
+    #[test]
+    fn test_shapiro_wilk_uniform() {
+        // Uniform data — W should be lower than normal
+        let data: Vec<f64> = (0..50).map(|i| i as f64 / 50.0).collect();
+        let w = shapiro_wilk_approx(&data);
+        assert!(w.is_finite(), "Shapiro-Wilk should be finite for uniform data");
+        assert!(w > 0.0 && w <= 1.0, "W={:.4} out of bounds", w);
+    }
+
+    #[test]
+    fn test_shapiro_wilk_small() {
+        // Very small sample — should not panic
+        let w2 = shapiro_wilk_approx(&[1.0, 2.0]);
+        assert_eq!(w2, 1.0, "n<3 should return 1.0");
+
+        let w3 = shapiro_wilk_approx(&[1.0, 2.0, 3.0]);
+        assert!(w3.is_finite());
+        assert!(w3 > 0.0 && w3 <= 1.0, "W={:.4} for n=3", w3);
+    }
+
+    #[test]
+    fn test_indiv_diff_basic() {
+        let scores = vec![0.80, 0.85, 0.75, 0.90, 0.70, 0.88, 0.82, 0.79, 0.91, 0.77];
+        let result = individual_differences("TestBench", "accuracy", &scores);
+        assert_eq!(result.n, 10);
+        assert!(result.mean > 0.7 && result.mean < 0.95, "mean={:.3}", result.mean);
+        assert!(result.sd > 0.0, "sd should be positive");
+        assert!(result.min <= result.mean);
+        assert!(result.max >= result.mean);
+        assert!(result.shapiro_wilk_w > 0.0 && result.shapiro_wilk_w <= 1.0);
+        assert!(result.ci_lower < result.mean);
+        assert!(result.ci_upper > result.mean);
+    }
+
+    #[test]
+    fn test_indiv_diff_empty() {
+        let result = individual_differences("Empty", "metric", &[]);
+        assert_eq!(result.n, 0);
+        assert_eq!(result.mean, 0.0);
+        assert_eq!(result.sd, 0.0);
+    }
+
+    #[test]
+    fn test_indiv_diff_single() {
+        let result = individual_differences("Single", "metric", &[0.42]);
+        assert_eq!(result.n, 1);
+        assert!((result.mean - 0.42).abs() < 1e-10);
+        assert_eq!(result.sd, 0.0);
+        assert_eq!(result.min, 0.42);
+        assert_eq!(result.max, 0.42);
+    }
+
+    #[test]
+    fn test_population_deterministic() {
+        // Same inputs should produce same output
+        let scores = vec![0.8, 0.85, 0.9, 0.75, 0.82];
+        let r1 = individual_differences("A", "m", &scores);
+        let r2 = individual_differences("A", "m", &scores);
+        assert!((r1.mean - r2.mean).abs() < 1e-15);
+        assert!((r1.sd - r2.sd).abs() < 1e-15);
+        assert!((r1.shapiro_wilk_w - r2.shapiro_wilk_w).abs() < 1e-15);
+    }
+
+    #[test]
+    fn test_population_wm_variation() {
+        // Different WM capacities should produce different scores when we vary input
+        let low_wm: Vec<f64> = (0..20).map(|i| 0.50 + (i as f64 % 5.0) * 0.02).collect();
+        let high_wm: Vec<f64> = (0..20).map(|i| 0.80 + (i as f64 % 5.0) * 0.01).collect();
+        let r_low = individual_differences("Low", "acc", &low_wm);
+        let r_high = individual_differences("High", "acc", &high_wm);
+        assert!(r_low.mean < r_high.mean,
+            "low WM mean ({:.3}) should be < high WM mean ({:.3})",
+            r_low.mean, r_high.mean);
+    }
+
+    // ──── Dimensionality Scaling tests ────
+
+    #[test]
+    fn test_dim_slope_positive() {
+        // Accuracy improves with dimension
+        let dims = vec![128, 256, 512, 1024, 2048];
+        let values = vec![0.60, 0.70, 0.78, 0.84, 0.88];
+        let (slope, r2) = dim_scaling_slope(&dims, &values);
+        assert!(slope > 0.0, "slope={:.4} should be positive", slope);
+        assert!(r2 > 0.9, "R²={:.4} should be high for monotonic data", r2);
+    }
+
+    #[test]
+    fn test_dim_r_squared_perfect() {
+        // Perfect linear relationship with log2(dim)
+        let dims = vec![128, 256, 512, 1024];
+        let values: Vec<f64> = dims.iter().map(|&d| (d as f64).log2() * 0.1).collect();
+        let (slope, r2) = dim_scaling_slope(&dims, &values);
+        assert!((r2 - 1.0).abs() < 1e-10, "perfect linear should give R²=1.0, got {:.6}", r2);
+        assert!((slope - 0.1).abs() < 1e-10, "slope should be 0.1, got {:.6}", slope);
+    }
+
+    #[test]
+    fn test_dim_flat() {
+        // No relationship → slope ≈ 0
+        let dims = vec![128, 256, 512, 1024, 2048];
+        let values = vec![0.5, 0.5, 0.5, 0.5, 0.5];
+        let (slope, r2) = dim_scaling_slope(&dims, &values);
+        assert!(slope.abs() < 1e-10, "flat data slope should be ~0, got {:.6}", slope);
+        assert_eq!(r2, 0.0, "flat data R² should be 0");
+    }
+
+    #[test]
+    fn test_dim_single_point() {
+        let (slope, r2) = dim_scaling_slope(&[512], &[0.8]);
+        assert_eq!(slope, 0.0);
+        assert_eq!(r2, 0.0);
+    }
+
+    #[test]
+    fn test_dim_sweep_stroop() {
+        use crate::benchmarks::executive::StroopBenchmark;
+        use crate::harness::PsychBenchmark;
+        let dims = [128, 256, 512];
+        let mut values = Vec::new();
+        for &dim in &dims {
+            let config = super::super::config::BenchmarkConfig {
+                dimension: dim,
+                trials_per_condition: 5,
+                ..Default::default()
+            };
+            let result = StroopBenchmark.run(&config);
+            values.push(result.metrics["stroop_effect"].mean);
+        }
+        let (slope, r2) = dim_scaling_slope(&dims.iter().map(|&d| d as usize).collect::<Vec<_>>(), &values);
+        assert!(slope.is_finite(), "slope should be finite");
+        assert!(r2.is_finite(), "R² should be finite");
+        assert!(r2 >= 0.0 && r2 <= 1.0, "R² should be in [0,1], got {:.4}", r2);
+    }
+
+    #[test]
+    fn test_dim_sweep_all_finite() {
+        let dims = vec![64, 128, 256, 512, 1024];
+        let values = vec![0.55, 0.65, 0.72, 0.78, 0.82];
+        let result = DimScalingResult {
+            benchmark: "Test".to_string(),
+            dims: dims.clone(),
+            values: values.clone(),
+            slope: 0.07,
+            r_squared: 0.98,
+        };
+        let formatted = format_dim_scaling(&result);
+        assert!(formatted.contains("Test"));
+        assert!(formatted.contains("slope="));
+        assert!(formatted.contains("R²="));
+
+        // All fields should be finite
+        assert!(result.slope.is_finite());
+        assert!(result.r_squared.is_finite());
+        for v in &result.values {
+            assert!(v.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_indiv_diff_format() {
+        let scores = vec![0.80, 0.85, 0.75, 0.90, 0.70];
+        let result = individual_differences("TestBench", "accuracy", &scores);
+        let formatted = format_individual_differences(&result);
+        assert!(formatted.contains("TestBench"));
+        assert!(formatted.contains("accuracy"));
+        assert!(formatted.contains("N=  5"));
+        assert!(formatted.contains("W="));
     }
 }

@@ -16,7 +16,7 @@ use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 #[cfg(not(feature = "symthaea-backend"))]
 use symthaea_core::hdc::ContinuousHV;
 
@@ -287,6 +287,15 @@ impl FalseBeliefBenchmark {
 impl PsychBenchmark for FalseBeliefBenchmark {
     fn name(&self) -> &str {
         "ToMBench::FalseBelief"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "False Belief Task",
+            citation: "Wimmer & Perner (1983)",
+            year: 1983,
+            doi: Some("10.1016/0010-0277(83)90004-5"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

@@ -19,7 +19,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Reversal learning benchmark measuring cognitive flexibility.
@@ -248,6 +248,15 @@ struct TrialResult {
 impl PsychBenchmark for ReversalLearningBenchmark {
     fn name(&self) -> &str {
         "CogBench::ReversalLearning"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Reversal Learning",
+            citation: "Cools et al. (2002)",
+            year: 2002,
+            doi: Some("10.1523/JNEUROSCI.22-11-04563.2002"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

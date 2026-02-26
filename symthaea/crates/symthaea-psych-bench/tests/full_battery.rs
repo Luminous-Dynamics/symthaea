@@ -21,11 +21,16 @@ use symthaea_psych_bench::benchmarks::{
         WisconsinCardSortingBenchmark,
     },
     inhibition::{GoNoGoBenchmark, StopSignalBenchmark},
+    language::GardenPathBenchmark,
     memory_agent::{
         AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
         ProspectiveMemoryBenchmark, TestTimeLearningBenchmark,
     },
     metacognition::{FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark},
+    motor::SrttBenchmark,
+    reasoning::ArcFluidBenchmark,
+    social::RmeBenchmark,
+    sustained_attention::SartBenchmark,
     tombench::{
         FalseBeliefBenchmark, FauxPasBenchmark, HintingBenchmark, PersuasionBenchmark,
         StrangeStoryBenchmark,
@@ -52,6 +57,7 @@ fn battery_config() -> BenchmarkConfig {
         action_temperature: 1.0,
         label: None,
         time_pressure: 0.0,
+        ..Default::default()
     }
 }
 
@@ -124,17 +130,32 @@ fn full_battery_report() {
     report.add(AttentionalBlinkBenchmark.run(&config));
     report.add(VisualSearchBenchmark.run(&config));
 
+    // ── Reasoning ──
+    report.add(ArcFluidBenchmark.run(&config));
+
     // ── Additional MemoryAgent ──
     report.add(ProspectiveMemoryBenchmark.run(&config));
 
     // ── Additional Metacognition ──
     report.add(FeelingOfKnowingBenchmark.run(&config));
 
-    // Verify all 43 benchmarks produced results
+    // ── Sustained Attention ──
+    report.add(SartBenchmark.run(&config));
+
+    // ── Motor ──
+    report.add(SrttBenchmark.run(&config));
+
+    // ── Language ──
+    report.add(GardenPathBenchmark.run(&config));
+
+    // ── Social ──
+    report.add(RmeBenchmark.run(&config));
+
+    // Verify all 48 benchmarks produced results
     assert_eq!(
         report.results.len(),
-        43,
-        "Expected 43 benchmark results, got {}",
+        48,
+        "Expected 48 benchmark results, got {}",
         report.results.len()
     );
 
@@ -236,8 +257,13 @@ fn regression_against_baseline() {
     report.add(StopSignalBenchmark.run(&config));
     report.add(AttentionalBlinkBenchmark.run(&config));
     report.add(VisualSearchBenchmark.run(&config));
+    report.add(ArcFluidBenchmark.run(&config));
     report.add(ProspectiveMemoryBenchmark.run(&config));
     report.add(FeelingOfKnowingBenchmark.run(&config));
+    report.add(SartBenchmark.run(&config));
+    report.add(SrttBenchmark.run(&config));
+    report.add(GardenPathBenchmark.run(&config));
+    report.add(RmeBenchmark.run(&config));
 
     let current = RegressionSnapshot::from_report(&report, "current");
     let regression = RegressionReport::compare(&baseline, &current, 0.05, 0.10);

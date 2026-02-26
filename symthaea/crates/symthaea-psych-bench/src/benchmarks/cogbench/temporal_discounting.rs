@@ -5,7 +5,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 
 use super::sample_action;
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
@@ -138,6 +138,15 @@ impl TemporalDiscountingBenchmark {
 impl PsychBenchmark for TemporalDiscountingBenchmark {
     fn name(&self) -> &str {
         "CogBench::TemporalDiscounting"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Temporal Discounting",
+            citation: "Green & Myerson (2004)",
+            year: 2004,
+            doi: Some("10.1037/0033-2909.130.5.769"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

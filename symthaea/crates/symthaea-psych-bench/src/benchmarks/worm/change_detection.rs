@@ -7,7 +7,7 @@ use crate::adapter::spatial::{VisualObject, VisualObjectAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
 
 use symthaea_core::hdc::ContinuousHV;
@@ -152,6 +152,15 @@ impl ChangeDetectionBenchmark {
 impl PsychBenchmark for ChangeDetectionBenchmark {
     fn name(&self) -> &str {
         "WorM::ChangeDetection"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Visual Change Detection",
+            citation: "Luck & Vogel (1997)",
+            year: 1997,
+            doi: Some("10.1038/36846"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

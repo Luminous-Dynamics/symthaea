@@ -21,7 +21,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Stroop Color-Word Interference benchmark.
@@ -193,6 +193,15 @@ struct TrialResult {
 impl PsychBenchmark for StroopBenchmark {
     fn name(&self) -> &str {
         "Executive::Stroop"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Stroop Color-Word",
+            citation: "Stroop (1935)",
+            year: 1935,
+            doi: Some("10.1037/h0054651"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

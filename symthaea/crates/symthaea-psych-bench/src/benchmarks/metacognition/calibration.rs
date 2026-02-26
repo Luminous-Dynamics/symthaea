@@ -15,7 +15,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
 use symthaea_core::hdc::ContinuousHV;
 
@@ -380,6 +380,15 @@ struct CalibrationResult {
 impl PsychBenchmark for MetacognitiveCalibrationBenchmark {
     fn name(&self) -> &str {
         "Metacognition::Calibration"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Confidence Calibration",
+            citation: "Lichtenstein et al. (1982)",
+            year: 1982,
+            doi: None,
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

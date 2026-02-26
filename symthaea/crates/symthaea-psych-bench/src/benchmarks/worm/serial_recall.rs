@@ -7,7 +7,8 @@ use crate::adapter::sequence::{SequenceAdapter, SequenceItem};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::wm::ssm_temporal::SsmTemporalBackend;
 use crate::wm::{WmConfig, WorkingMemory};
 use symthaea_core::hdc::ContinuousHV;
 
@@ -33,6 +34,9 @@ impl SerialRecallBenchmark {
             ..Default::default()
         });
 
+        // SSM temporal backend for PI accumulation (A=-0.42 matches ad-hoc decay constant)
+        let mut ssm = SsmTemporalBackend::new(-0.42, 4);
+
         // Generate unique items
         let items: Vec<SequenceItem> = (0..list_len)
             .map(|i| {
@@ -51,7 +55,13 @@ impl SerialRecallBenchmark {
             // Time pressure: base 0.80 PI produces U-shaped serial curve (Keppel & Underwood, 1962);
             // +0.10/unit amplifies interference, modeling reduced rehearsal under deadline (Wickelgren, 1977).
             let pi_base = 0.80 + config.time_pressure as f32 * 0.10;
-            let pi_strength = pi_base * (1.0 - (-0.42 * pos as f32).exp());
+            let pi_strength = if config.ssm_backend {
+                // SSM accumulates PI via recurrent state; each item drives interference higher
+                ssm.step(1.0);
+                pi_base * ssm.memory_strength()
+            } else {
+                pi_base * (1.0 - (-0.42 * pos as f32).exp())
+            };
             let noisy_hv = if pi_strength > 0.01 {
                 let noise = ContinuousHV::random(dim, seed.wrapping_add(500 + pos as u64));
                 ContinuousHV::weighted_bundle(&[&hv, &noise], &[1.0 - pi_strength, pi_strength])
@@ -99,6 +109,15 @@ impl SerialRecallBenchmark {
 impl PsychBenchmark for SerialRecallBenchmark {
     fn name(&self) -> &str {
         "WorM::SerialRecall"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Serial Recall with Proactive Interference",
+            citation: "Keppel & Underwood (1962)",
+            year: 1962,
+            doi: Some("10.1037/h0084156"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
@@ -188,5 +207,28 @@ mod tests {
         assert_eq!(result.conditions, 3);
         assert!(result.metrics.contains_key("list_5::pos_0"));
         assert!(result.metrics.contains_key("list_7::primacy_index"));
+    }
+
+    #[test]
+    fn test_serial_recall_ssm_matches_baseline() {
+        let base_config = BenchmarkConfig {
+            dimension: 512,
+            trials_per_condition: 20,
+            ..Default::default()
+        };
+        let ssm_config = BenchmarkConfig {
+            ssm_backend: true,
+            ..base_config.clone()
+        };
+        let base_result = SerialRecallBenchmark.run(&base_config);
+        let ssm_result = SerialRecallBenchmark.run(&ssm_config);
+        let base_pi = base_result.metrics["list_7::primacy_index"].mean;
+        let ssm_pi = ssm_result.metrics["list_7::primacy_index"].mean;
+        let diff = (base_pi - ssm_pi).abs();
+        assert!(
+            diff < 0.20,
+            "SSM primacy_index ({:.3}) too far from baseline ({:.3}), diff={:.3}",
+            ssm_pi, base_pi, diff
+        );
     }
 }

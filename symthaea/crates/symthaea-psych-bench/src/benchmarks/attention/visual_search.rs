@@ -15,7 +15,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Visual Search benchmark testing parallel vs serial attentional processing.
@@ -195,6 +195,15 @@ impl VisualSearchBenchmark {
 impl PsychBenchmark for VisualSearchBenchmark {
     fn name(&self) -> &str {
         "Attention::VisualSearch"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Visual Search",
+            citation: "Treisman & Gelade (1980)",
+            year: 1980,
+            doi: Some("10.1016/0010-0285(80)90005-5"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

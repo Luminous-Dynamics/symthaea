@@ -15,7 +15,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Go/No-Go response inhibition benchmark.
@@ -164,6 +164,15 @@ impl GoNoGoBenchmark {
 impl PsychBenchmark for GoNoGoBenchmark {
     fn name(&self) -> &str {
         "Inhibition::GoNoGo"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Go/No-Go Task",
+            citation: "Donders (1969)",
+            year: 1969,
+            doi: Some("10.1016/0001-6918(69)90065-1"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

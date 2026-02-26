@@ -7,7 +7,7 @@ use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
 
 /// Long-range understanding benchmark.
@@ -88,6 +88,15 @@ impl LongRangeBenchmark {
 impl PsychBenchmark for LongRangeBenchmark {
     fn name(&self) -> &str {
         "MemoryAgent::LongRange"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Long-Range Memory Dependency",
+            citation: "Ebbinghaus (1885)",
+            year: 1885,
+            doi: None,
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

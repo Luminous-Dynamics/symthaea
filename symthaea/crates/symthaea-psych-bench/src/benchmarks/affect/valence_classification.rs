@@ -7,7 +7,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Valence classification benchmark.
@@ -94,6 +94,15 @@ impl ValenceClassificationBenchmark {
 impl PsychBenchmark for ValenceClassificationBenchmark {
     fn name(&self) -> &str {
         "Affect::ValenceClassification"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Affective Valence Classification",
+            citation: "Russell (1980)",
+            year: 1980,
+            doi: Some("10.1037/h0077714"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

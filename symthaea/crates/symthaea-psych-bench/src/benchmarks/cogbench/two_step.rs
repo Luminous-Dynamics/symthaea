@@ -6,7 +6,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 
 use super::sample_action;
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
@@ -200,6 +200,15 @@ fn safe_rate(num: u64, denom: u64) -> f64 {
 impl PsychBenchmark for TwoStepBenchmark {
     fn name(&self) -> &str {
         "CogBench::TwoStep"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Two-Step Decision Task",
+            citation: "Daw et al. (2011)",
+            year: 2011,
+            doi: Some("10.1016/j.neuron.2011.02.027"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

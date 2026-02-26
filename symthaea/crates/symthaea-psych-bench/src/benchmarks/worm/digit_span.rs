@@ -13,7 +13,8 @@ use crate::adapter::sequence::{SequenceAdapter, SequenceItem};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::wm::ssm_temporal::SsmTemporalBackend;
 use crate::wm::{WmConfig, WorkingMemory};
 
 /// Digit Span benchmark testing WM capacity via serial recall.
@@ -62,6 +63,7 @@ impl DigitSpanBenchmark {
                 &adapter,
                 false, // not backward
                 config.time_pressure,
+                config.ssm_backend,
             );
             fwd_rt_sum += fwd_rt;
             fwd_rt_count += 1;
@@ -86,6 +88,7 @@ impl DigitSpanBenchmark {
                 &adapter,
                 true, // backward: adds output interference
                 config.time_pressure,
+                config.ssm_backend,
             );
             bwd_rt_sum += bwd_rt;
             bwd_rt_count += 1;
@@ -121,6 +124,12 @@ impl DigitSpanBenchmark {
     /// For backward recall, each retrieval incurs a tick (output interference)
     /// and requires higher similarity, modeling the cognitive cost of
     /// maintaining reversed order (Gathercole et al., 2004).
+    ///
+    /// When `ssm_backend` is true, per-item memory strength is modeled by an
+    /// `SsmTemporalBackend` (A=-0.50, d_state=4) instead of the WM's built-in
+    /// `0.95^age` activation decay. Each digit encoding steps the SSM with
+    /// the item's activation (1.0), and during recall the SSM's decayed output
+    /// modulates the raw similarity score.
     #[allow(clippy::too_many_arguments)]
     fn test_recall(
         &self,
@@ -131,6 +140,7 @@ impl DigitSpanBenchmark {
         adapter: &SequenceAdapter,
         is_backward: bool,
         time_pressure: f64,
+        ssm_backend: bool,
     ) -> (u32, f64) {
         let mut wm = WorkingMemory::new(WmConfig {
             dimension: dim,
@@ -138,11 +148,22 @@ impl DigitSpanBenchmark {
             ..Default::default()
         });
 
+        // SSM temporal backend: A=-0.50 for per-item decay. With 7+ items encoded
+        // (each pumping activation), decay must be fast enough that by recall time
+        // the last items have significantly weaker traces, producing the expected
+        // backward < forward span difference.
+        let mut ssm = SsmTemporalBackend::new(-0.50, 4);
+
         // Encode and present each digit to WM
         for item in presentation {
             let hv = adapter.encode(item, dim);
             wm.perceive(hv);
             wm.tick();
+            // Step SSM with full activation for each encoded digit.
+            // The SSM accumulates per-item trace that decays across ticks.
+            if ssm_backend {
+                ssm.step(1.0);
+            }
         }
 
         // Recall phase: forward uses raw similarity (items are fresh);
@@ -155,11 +176,25 @@ impl DigitSpanBenchmark {
         for expected in expected_recall {
             let target_hv = adapter.encode(expected, dim);
 
-            let recall_score = if is_backward {
-                // Activation-weighted: early items have lower activation
+            let recall_score = if ssm_backend {
+                // SSM-driven recall: raw cosine similarity modulated by the
+                // SSM's current memory strength. Step with 0.0 (no new input)
+                // to advance decay, then read the decayed activation.
+                let ssm_activation = ssm.step(0.0);
+                let raw_sim = wm
+                    .contents()
+                    .iter()
+                    .map(|item| target_hv.similarity(item))
+                    .fold(f32::NEG_INFINITY, f32::max);
+                // Blend raw similarity with SSM decay; backward recall gets
+                // stronger SSM modulation (items decay more by retrieval time).
+                let ssm_weight = if is_backward { 0.5 } else { 0.3 };
+                raw_sim * (1.0 - ssm_weight + ssm_weight * ssm_activation)
+            } else if is_backward {
+                // Legacy: activation-weighted — early items have lower activation
                 wm.activation_weighted_similarity(&target_hv)
             } else {
-                // Raw similarity: all items in capacity are fresh
+                // Legacy: raw similarity — all items in capacity are fresh
                 wm.contents()
                     .iter()
                     .map(|item| target_hv.similarity(item))
@@ -211,6 +246,15 @@ struct TrialResult {
 impl PsychBenchmark for DigitSpanBenchmark {
     fn name(&self) -> &str {
         "WorM::DigitSpan"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Digit Span (Forward/Backward)",
+            citation: "Wechsler (1997)",
+            year: 1997,
+            doi: None,
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
@@ -295,6 +339,30 @@ mod tests {
             "forward span ({}) should be >= backward span ({}) - 1",
             fwd,
             bwd
+        );
+    }
+
+    #[test]
+    fn test_digit_span_ssm_matches_baseline() {
+        let base_config = BenchmarkConfig {
+            dimension: 512,
+            trials_per_condition: 20,
+            ..Default::default()
+        };
+        let ssm_config = BenchmarkConfig {
+            ssm_backend: true,
+            ..base_config.clone()
+        };
+        let base_result = DigitSpanBenchmark.run(&base_config);
+        let ssm_result = DigitSpanBenchmark.run(&ssm_config);
+        let base_bwd = base_result.metrics["backward_span"].mean;
+        let ssm_bwd = ssm_result.metrics["backward_span"].mean;
+        let diff = (base_bwd - ssm_bwd).abs();
+        // backward_span is integer-valued (span lengths), so allow up to 1.5 tolerance
+        assert!(
+            diff < 1.5,
+            "SSM backward_span ({:.3}) too far from baseline ({:.3}), diff={:.3}",
+            ssm_bwd, base_bwd, diff
         );
     }
 }

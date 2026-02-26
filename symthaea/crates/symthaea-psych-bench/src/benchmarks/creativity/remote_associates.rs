@@ -9,7 +9,7 @@ use crate::adapter::semantic::{RatTriadData, SemanticScenarioAdapter, Word};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Remote Associates Test benchmark.
@@ -228,6 +228,15 @@ impl RemoteAssociatesBenchmark {
 impl PsychBenchmark for RemoteAssociatesBenchmark {
     fn name(&self) -> &str {
         "Creativity::RemoteAssociates"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Remote Associates Test",
+            citation: "Mednick (1962)",
+            year: 1962,
+            doi: Some("10.1037/h0048850"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
