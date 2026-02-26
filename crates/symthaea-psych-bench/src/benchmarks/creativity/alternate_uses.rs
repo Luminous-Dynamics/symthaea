@@ -8,7 +8,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Alternate Uses Task benchmark.
@@ -168,6 +168,15 @@ impl AlternateUsesBenchmark {
 impl PsychBenchmark for AlternateUsesBenchmark {
     fn name(&self) -> &str {
         "Creativity::AlternateUses"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Alternate Uses Task",
+            citation: "Guilford (1967)",
+            year: 1967,
+            doi: None,
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

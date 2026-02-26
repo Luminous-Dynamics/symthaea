@@ -8,7 +8,7 @@ use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
 
 /// Conflict resolution benchmark.
@@ -112,6 +112,15 @@ impl ConflictResolutionBenchmark {
 impl PsychBenchmark for ConflictResolutionBenchmark {
     fn name(&self) -> &str {
         "MemoryAgent::ConflictResolution"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Memory Conflict Resolution",
+            citation: "Anderson & Neely (1996)",
+            year: 1996,
+            doi: None,
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

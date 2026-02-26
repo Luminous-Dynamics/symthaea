@@ -15,7 +15,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 
 /// Horizon task benchmark.
 pub struct HorizonBenchmark;
@@ -136,6 +136,15 @@ impl HorizonBenchmark {
 impl PsychBenchmark for HorizonBenchmark {
     fn name(&self) -> &str {
         "CogBench::HorizonTask"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Horizon Task (Explore-Exploit)",
+            citation: "Wilson et al. (2014)",
+            year: 2014,
+            doi: Some("10.1037/a0038199"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

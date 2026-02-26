@@ -14,7 +14,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Emotional Stroop benchmark.
@@ -151,6 +151,15 @@ impl EmotionalStroopBenchmark {
 impl PsychBenchmark for EmotionalStroopBenchmark {
     fn name(&self) -> &str {
         "Affect::EmotionalStroop"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Emotional Stroop",
+            citation: "Williams et al. (1996)",
+            year: 1996,
+            doi: Some("10.1037/0033-2909.120.1.3"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

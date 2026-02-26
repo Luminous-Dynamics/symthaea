@@ -7,7 +7,7 @@ use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
 
 /// Accurate retrieval benchmark.
@@ -100,6 +100,15 @@ impl AccurateRetrievalBenchmark {
 impl PsychBenchmark for AccurateRetrievalBenchmark {
     fn name(&self) -> &str {
         "MemoryAgent::AccurateRetrieval"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Memory Retrieval Accuracy",
+            citation: "Anderson (1983)",
+            year: 1983,
+            doi: None,
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

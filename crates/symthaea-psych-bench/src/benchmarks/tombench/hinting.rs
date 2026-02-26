@@ -12,7 +12,7 @@ use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 #[cfg(not(feature = "symthaea-backend"))]
 use symthaea_core::hdc::ContinuousHV;
 
@@ -365,6 +365,15 @@ impl HintingBenchmark {
 impl PsychBenchmark for HintingBenchmark {
     fn name(&self) -> &str {
         "ToMBench::Hinting"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Hinting Task",
+            citation: "Corcoran et al. (1995)",
+            year: 1995,
+            doi: Some("10.1017/S0033291700035681"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

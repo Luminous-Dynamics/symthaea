@@ -8,7 +8,7 @@
 use super::report::{ButlinIndicatorReport, IndicatorEvidence, IndicatorStatus};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 
 /// Suite that evaluates all 14 Butlin consciousness indicators
 /// via static architectural analysis.
@@ -227,6 +227,15 @@ impl ButlinIndicatorSuite {
 impl PsychBenchmark for ButlinIndicatorSuite {
     fn name(&self) -> &str {
         "Butlin::ConsciousnessIndicators"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Consciousness Indicator Battery",
+            citation: "Butlin et al. (2023)",
+            year: 2023,
+            doi: Some("10.48550/arXiv.2308.08708"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

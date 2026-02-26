@@ -7,7 +7,7 @@ use crate::adapter::sequence::{SequenceAdapter, SequenceItem};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
 use symthaea_core::hdc::ContinuousHV;
 
@@ -145,6 +145,15 @@ impl NBackBenchmark {
 impl PsychBenchmark for NBackBenchmark {
     fn name(&self) -> &str {
         "WorM::N-back"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "N-back Working Memory",
+            citation: "Kirchner (1958)",
+            year: 1958,
+            doi: Some("10.1037/h0043688"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

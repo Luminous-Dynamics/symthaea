@@ -11,7 +11,7 @@ use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 #[cfg(not(feature = "symthaea-backend"))]
 use symthaea_core::hdc::ContinuousHV;
 
@@ -308,6 +308,15 @@ impl StrangeStoryBenchmark {
 impl PsychBenchmark for StrangeStoryBenchmark {
     fn name(&self) -> &str {
         "ToMBench::StrangeStory"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Strange Stories Task",
+            citation: "Happé (1994)",
+            year: 1994,
+            doi: Some("10.1111/j.2044-8295.1994.tb02529.x"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

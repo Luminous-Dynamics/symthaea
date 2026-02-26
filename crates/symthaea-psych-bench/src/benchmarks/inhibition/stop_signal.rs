@@ -13,7 +13,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Stop Signal Task benchmark.
@@ -207,6 +207,15 @@ impl StopSignalBenchmark {
 impl PsychBenchmark for StopSignalBenchmark {
     fn name(&self) -> &str {
         "Inhibition::StopSignal"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Stop-Signal Task",
+            citation: "Logan & Cowan (1984)",
+            year: 1984,
+            doi: Some("10.1037/0096-3445.113.1.1"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

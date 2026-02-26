@@ -12,7 +12,7 @@ use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 
 /// Faux-pas recognition benchmark.
 pub struct FauxPasBenchmark;
@@ -286,6 +286,15 @@ impl FauxPasBenchmark {
 impl PsychBenchmark for FauxPasBenchmark {
     fn name(&self) -> &str {
         "ToMBench::FauxPas"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Faux Pas Recognition",
+            citation: "Baron-Cohen et al. (1999)",
+            year: 1999,
+            doi: Some("10.1023/A:1022155018436"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

@@ -15,7 +15,8 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::wm::ssm_temporal::SsmTemporalBackend;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Prospective Memory benchmark.
@@ -107,13 +108,21 @@ impl ProspectiveMemoryBenchmark {
 
         // Main task with PM monitoring
         let mut pm_activation: f64 = 1.0;
+        // SSM temporal backend (A=-0.03 for slow PM decay)
+        let mut ssm = SsmTemporalBackend::new(-0.03, 4);
+        // Initialize SSM with full activation
+        ssm.step(1.0);
 
         for _trial in 0..total_trials {
             xor_shift(&mut rng);
             let is_pm_cue = (rng % 100) as f64 / 100.0 < pm_cue_rate;
 
             // PM intention decays over time
-            pm_activation = (pm_activation - pm_decay_rate).max(0.0);
+            if config.ssm_backend {
+                pm_activation = ssm.step(0.0) as f64;
+            } else {
+                pm_activation = (pm_activation - pm_decay_rate).max(0.0);
+            }
 
             if is_pm_cue {
                 pm_total += 1;
@@ -134,6 +143,10 @@ impl ProspectiveMemoryBenchmark {
 
                 if pm_sim > cue_threshold {
                     pm_hits += 1;
+                    // Refresh PM intention on successful detection
+                    if config.ssm_backend {
+                        ssm.step(1.0);
+                    }
                 }
             } else {
                 ongoing_total += 1;
@@ -202,6 +215,15 @@ impl ProspectiveMemoryBenchmark {
 impl PsychBenchmark for ProspectiveMemoryBenchmark {
     fn name(&self) -> &str {
         "MemoryAgent::ProspectiveMemory"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Prospective Memory",
+            citation: "Einstein & McDaniel (1990)",
+            year: 1990,
+            doi: Some("10.1037/0278-7393.16.4.717"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
@@ -276,5 +298,35 @@ mod tests {
         let result = ProspectiveMemoryBenchmark.run(&config);
         let cost = result.metrics["pm_cost"].mean;
         assert!(cost >= 0.0, "PM cost ({:.3}) should be >= 0", cost);
+    }
+
+    #[test]
+    fn test_prospective_ssm_matches_baseline() {
+        let base_config = BenchmarkConfig {
+            dimension: 512,
+            trials_per_condition: 20,
+            ..Default::default()
+        };
+        let ssm_config = BenchmarkConfig {
+            ssm_backend: true,
+            ..base_config.clone()
+        };
+        let base_result = ProspectiveMemoryBenchmark.run(&base_config);
+        let ssm_result = ProspectiveMemoryBenchmark.run(&ssm_config);
+        let base_hr = base_result.metrics["pm_hit_rate"].mean;
+        let ssm_hr = ssm_result.metrics["pm_hit_rate"].mean;
+        let diff = (base_hr - ssm_hr).abs();
+        // SSM should produce similar results (within 0.20 absolute)
+        assert!(
+            diff < 0.20,
+            "SSM pm_hit_rate ({:.3}) too far from baseline ({:.3}), diff={:.3}",
+            ssm_hr, base_hr, diff
+        );
+    }
+
+    #[test]
+    fn test_ssm_backend_flag_default_off() {
+        let config = BenchmarkConfig::default();
+        assert!(!config.ssm_backend, "ssm_backend should default to false");
     }
 }

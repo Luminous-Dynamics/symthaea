@@ -39,6 +39,11 @@ pub struct BaselineCollection {
     pub inhibition: BaselineMap,
     pub attention: BaselineMap,
     pub embodied: BaselineMap,
+    pub reasoning: BaselineMap,
+    pub sustained_attention: BaselineMap,
+    pub motor: BaselineMap,
+    pub language: BaselineMap,
+    pub social: BaselineMap,
     /// GPT-4 baselines from CogBench (Coda et al., 2023).
     pub llm_cogbench: BaselineMap,
     /// GPT-4 baselines from ToMBench (Kosinski, 2023).
@@ -61,6 +66,11 @@ impl BaselineCollection {
             inhibition: inhibition_baselines(),
             attention: attention_baselines(),
             embodied: embodied_baselines(),
+            reasoning: reasoning_baselines(),
+            sustained_attention: sustained_attention_baselines(),
+            motor: motor_baselines(),
+            language: language_baselines(),
+            social: social_baselines(),
             llm_cogbench: llm_cogbench_baselines(),
             llm_tombench: llm_tombench_baselines(),
         }
@@ -1450,6 +1460,39 @@ pub fn embodied_baselines() -> BTreeMap<&'static str, Baseline> {
 }
 
 /// GPT-4 baselines from CogBench (Coda et al., 2023).
+/// Get reasoning baselines.
+///
+/// Source: Chollet (2019), "On the Measure of Intelligence", arXiv:1911.01547
+/// Johnson et al. (2021), "Fast and slow learning from ARC"
+pub fn reasoning_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+    m.insert("arc_rule_consistency", Baseline {
+        value: 0.85,
+        sd: Some(0.10),
+        source: "Johnson et al. (2021), estimated from ARC task analysis",
+        population: "human adults",
+    });
+    m.insert("arc_transfer_accuracy", Baseline {
+        value: 0.80,
+        sd: Some(0.12),
+        source: "Chollet (2019), human performance on ARC evaluation set",
+        population: "human adults",
+    });
+    m.insert("arc_transfer_similarity", Baseline {
+        value: 0.70,
+        sd: Some(0.15),
+        source: "Johnson et al. (2021), HDC proxy for structural match",
+        population: "human adults",
+    });
+    m.insert("arc_rt_ticks", Baseline {
+        value: 6.0,
+        sd: Some(2.0),
+        source: "Johnson et al. (2021), deliberation time estimate (1 tick ≈ 50ms)",
+        population: "human adults",
+    });
+    m
+}
+
 ///
 /// Source: "Cogbench: A large language model walks into a psychology lab"
 /// Values represent GPT-4 performance on cognitive psychology tasks.
@@ -1588,6 +1631,192 @@ pub fn llm_tombench_baselines() -> BTreeMap<&'static str, Baseline> {
     m
 }
 
+/// Sustained attention baselines (SART).
+pub fn sustained_attention_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+    m.insert(
+        "commission_errors",
+        Baseline {
+            value: 0.30,
+            sd: Some(0.12),
+            source: "Robertson et al. (1997), Table 1; Manly et al. (1999)",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "omission_errors",
+        Baseline {
+            value: 0.04,
+            sd: Some(0.03),
+            source: "Robertson et al. (1997), healthy controls",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "sart_d_prime",
+        Baseline {
+            value: 2.50,
+            sd: Some(0.60),
+            source: "Robertson et al. (1997), signal detection analysis",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "sart_rt_ticks",
+        Baseline {
+            value: 6.0,
+            sd: Some(1.5),
+            source: "Robertson et al. (1997), ~300ms mean RT → 6 ticks",
+            population: "human adults",
+        },
+    );
+    m
+}
+
+/// Motor learning baselines (SRTT).
+pub fn motor_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+    m.insert(
+        "learning_effect",
+        Baseline {
+            value: 0.15,
+            sd: Some(0.08),
+            source: "Nissen & Bullemer (1987), RT difference normalized",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "sequence_accuracy",
+        Baseline {
+            value: 0.95,
+            sd: Some(0.04),
+            source: "Nissen & Bullemer (1987), sequence block accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "random_accuracy",
+        Baseline {
+            value: 0.92,
+            sd: Some(0.05),
+            source: "Nissen & Bullemer (1987), random block accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "srtt_sequence_rt_ticks",
+        Baseline {
+            value: 5.0,
+            sd: Some(1.0),
+            source: "Nissen & Bullemer (1987), ~250ms sequence RT → 5 ticks",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "srtt_random_rt_ticks",
+        Baseline {
+            value: 6.0,
+            sd: Some(1.2),
+            source: "Nissen & Bullemer (1987), ~300ms random RT → 6 ticks",
+            population: "human adults",
+        },
+    );
+    m
+}
+
+/// Language processing baselines (Garden-Path).
+pub fn language_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+    m.insert(
+        "disambiguation_cost",
+        Baseline {
+            value: 0.12,
+            sd: Some(0.06),
+            source: "Frazier & Rayner (1982), reanalysis time increase",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "gp_overall_accuracy",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.08),
+            source: "Ferreira & Clifton (1986), comprehension accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "garden_path_accuracy",
+        Baseline {
+            value: 0.75,
+            sd: Some(0.10),
+            source: "Frazier & Rayner (1982), GP sentence accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "gp_control_accuracy",
+        Baseline {
+            value: 0.92,
+            sd: Some(0.05),
+            source: "Ferreira & Clifton (1986), unambiguous sentence accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "gp_rt_ticks",
+        Baseline {
+            value: 5.0,
+            sd: Some(1.5),
+            source: "Frazier & Rayner (1982), ~250ms mean reading time → 5 ticks",
+            population: "human adults",
+        },
+    );
+    m
+}
+
+/// Social cognition baselines (RME).
+pub fn social_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+    m.insert(
+        "rme_accuracy",
+        Baseline {
+            value: 0.72,
+            sd: Some(0.09),
+            source: "Baron-Cohen et al. (2001), Table 2; Vellante et al. (2013)",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "rme_easy_accuracy",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.08),
+            source: "Baron-Cohen et al. (2001), easy items",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "rme_hard_accuracy",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.12),
+            source: "Baron-Cohen et al. (2001), hard items",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "rme_rt_ticks",
+        Baseline {
+            value: 5.0,
+            sd: Some(1.5),
+            source: "Baron-Cohen et al. (2001), ~250ms per item → 5 ticks",
+            population: "human adults",
+        },
+    );
+    m
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1606,6 +1835,10 @@ mod tests {
         assert!(!inhibition_baselines().is_empty());
         assert!(!attention_baselines().is_empty());
         assert!(!embodied_baselines().is_empty());
+        assert!(!sustained_attention_baselines().is_empty());
+        assert!(!motor_baselines().is_empty());
+        assert!(!language_baselines().is_empty());
+        assert!(!social_baselines().is_empty());
     }
 
     #[test]

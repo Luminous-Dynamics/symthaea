@@ -5,7 +5,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 
 use super::sample_action;
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
@@ -193,6 +193,15 @@ impl PsychBenchmark for InstrumentalLearningBenchmark {
         "CogBench::InstrumentalLearning"
     }
 
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Instrumental Learning",
+            citation: "Daw et al. (2011)",
+            year: 2011,
+            doi: Some("10.1016/j.neuron.2011.02.027"),
+        })
+    }
+
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
@@ -351,6 +360,15 @@ impl InstrumentalLearningMindBenchmark {
 impl PsychBenchmark for InstrumentalLearningMindBenchmark {
     fn name(&self) -> &str {
         "CogBench::InstrumentalLearning[Mind]"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Instrumental Learning",
+            citation: "Daw et al. (2011)",
+            year: 2011,
+            doi: Some("10.1016/j.neuron.2011.02.027"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

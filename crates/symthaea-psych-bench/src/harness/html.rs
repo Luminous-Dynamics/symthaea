@@ -384,6 +384,207 @@ fn write_composite_scores(html: &mut String, report: &BenchmarkReport) {
     let _ = write!(html, "</table>\n");
 }
 
+/// Write a citations/provenance table section into the HTML report.
+///
+/// Takes a slice of `(name, provenance)` tuples. Call this before `write_footer`.
+pub fn write_provenance_section(
+    html: &mut String,
+    entries: &[(&str, crate::harness::BenchmarkProvenance)],
+) {
+    if entries.is_empty() {
+        return;
+    }
+    let _ = write!(
+        html,
+        r#"<h2>Citations &amp; Provenance</h2>
+<table>
+<tr><th>Benchmark</th><th>Paradigm</th><th>Citation</th><th>Year</th><th>DOI</th></tr>
+"#
+    );
+    for (name, p) in entries {
+        let doi_cell = match p.doi {
+            Some(d) => format!(
+                "<a href=\"https://doi.org/{}\" target=\"_blank\">{}</a>",
+                escape_html(d),
+                escape_html(d)
+            ),
+            None => "\u{2014}".to_string(),
+        };
+        let _ = write!(
+            html,
+            "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>\n",
+            escape_html(name),
+            escape_html(p.paradigm),
+            escape_html(p.citation),
+            p.year,
+            doi_cell,
+        );
+    }
+    html.push_str("</table>\n");
+}
+
+/// Write SAT curve SVG charts into the HTML report.
+///
+/// Each benchmark gets a line chart: X = time_pressure, Y = accuracy.
+/// Dashed fitted curve overlay. Color by domain.
+pub fn write_sat_curves(html: &mut String, curves: &[crate::harness::analysis::SatCurve]) {
+    if curves.is_empty() {
+        return;
+    }
+
+    let _ = write!(
+        html,
+        "<h2>Speed-Accuracy Tradeoff Curves</h2>\n<div class=\"chart-container\">\n"
+    );
+
+    let chart_w = 600;
+    let chart_h = 350;
+    let margin_l = 60;
+    let margin_r = 20;
+    let margin_t = 30;
+    let margin_b = 50;
+    let plot_w = chart_w - margin_l - margin_r;
+    let plot_h = chart_h - margin_t - margin_b;
+
+    let _ = write!(
+        html,
+        "<svg width=\"{}\" height=\"{}\" viewBox=\"0 0 {} {}\">\n",
+        chart_w, chart_h, chart_w, chart_h,
+    );
+
+    // Background
+    let _ = write!(
+        html,
+        "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"#fafafa\" stroke=\"#ccc\" stroke-width=\"1\"/>\n",
+        margin_l, margin_t, plot_w, plot_h,
+    );
+
+    // X axis labels (time pressure 0.0 to 1.0)
+    for i in 0..=5 {
+        let tp = i as f64 / 5.0;
+        let x = margin_l as f64 + tp * plot_w as f64;
+        let y_base = (margin_t + plot_h) as f64;
+        let _ = write!(
+            html,
+            "<line x1=\"{:.0}\" y1=\"{:.0}\" x2=\"{:.0}\" y2=\"{:.0}\" stroke=\"#ddd\" stroke-width=\"1\"/>\n",
+            x, margin_t as f64, x, y_base,
+        );
+        let _ = write!(
+            html,
+            "<text x=\"{:.0}\" y=\"{:.0}\" text-anchor=\"middle\" font-size=\"10\" fill=\"#666\">{:.1}</text>\n",
+            x, y_base + 15.0, tp,
+        );
+    }
+    // X axis title
+    let _ = write!(
+        html,
+        "<text x=\"{:.0}\" y=\"{:.0}\" text-anchor=\"middle\" font-size=\"12\" fill=\"#333\">Time Pressure</text>\n",
+        margin_l as f64 + plot_w as f64 / 2.0,
+        (chart_h - 5) as f64,
+    );
+
+    // Y axis labels (accuracy 0.0 to 1.0)
+    for i in 0..=5 {
+        let acc = i as f64 / 5.0;
+        let y = margin_t as f64 + (1.0 - acc) * plot_h as f64;
+        let _ = write!(
+            html,
+            "<line x1=\"{}\" y1=\"{:.0}\" x2=\"{}\" y2=\"{:.0}\" stroke=\"#ddd\" stroke-width=\"1\"/>\n",
+            margin_l, y, margin_l + plot_w, y,
+        );
+        let _ = write!(
+            html,
+            "<text x=\"{:.0}\" y=\"{:.0}\" text-anchor=\"end\" font-size=\"10\" fill=\"#666\">{:.1}</text>\n",
+            margin_l as f64 - 5.0, y + 3.0, acc,
+        );
+    }
+    // Y axis title
+    let _ = write!(
+        html,
+        "<text x=\"15\" y=\"{:.0}\" text-anchor=\"middle\" font-size=\"12\" fill=\"#333\" transform=\"rotate(-90, 15, {:.0})\">Accuracy</text>\n",
+        margin_t as f64 + plot_h as f64 / 2.0,
+        margin_t as f64 + plot_h as f64 / 2.0,
+    );
+
+    let domain_colors = [
+        "#3498db", "#e74c3c", "#2ecc71", "#f39c12", "#9b59b6",
+        "#1abc9c", "#e67e22", "#34495e", "#16a085", "#c0392b",
+        "#2980b9", "#8e44ad", "#27ae60", "#d35400", "#7f8c8d",
+    ];
+
+    // Plot each curve
+    for (ci, curve) in curves.iter().enumerate() {
+        let color = domain_colors[ci % domain_colors.len()];
+        let short_name = curve.benchmark.split("::").last().unwrap_or(&curve.benchmark);
+
+        // Data points + line
+        let mut path_d = String::new();
+        let mut sorted_points = curve.points.clone();
+        sorted_points.sort_by(|a, b| a.time_pressure.partial_cmp(&b.time_pressure).unwrap_or(std::cmp::Ordering::Equal));
+
+        for (pi, p) in sorted_points.iter().enumerate() {
+            let x = margin_l as f64 + p.time_pressure * plot_w as f64;
+            let y = margin_t as f64 + (1.0 - p.accuracy.clamp(0.0, 1.0)) * plot_h as f64;
+            let cmd = if pi == 0 { "M" } else { "L" };
+            let _ = write!(path_d, "{}{:.1},{:.1} ", cmd, x, y);
+
+            // Data point circle
+            let _ = write!(
+                html,
+                "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"3\" fill=\"{}\" stroke=\"white\" stroke-width=\"1\"/>\n",
+                x, y, color,
+            );
+        }
+        // Solid line for data
+        let _ = write!(
+            html,
+            "<path d=\"{}\" fill=\"none\" stroke=\"{}\" stroke-width=\"2\" opacity=\"0.8\"/>\n",
+            path_d.trim(), color,
+        );
+
+        // Dashed fitted curve (20 segments)
+        let mut fit_d = String::new();
+        for si in 0..=20 {
+            let tp = si as f64 / 20.0;
+            let t = 1.0 - tp;
+            let predicted = if t > curve.delta {
+                curve.lambda * (1.0 - (-curve.beta * (t - curve.delta)).exp())
+            } else {
+                0.0
+            };
+            let x = margin_l as f64 + tp * plot_w as f64;
+            let y = margin_t as f64 + (1.0 - predicted.clamp(0.0, 1.0)) * plot_h as f64;
+            let cmd = if si == 0 { "M" } else { "L" };
+            let _ = write!(fit_d, "{}{:.1},{:.1} ", cmd, x, y);
+        }
+        let _ = write!(
+            html,
+            "<path d=\"{}\" fill=\"none\" stroke=\"{}\" stroke-width=\"1.5\" stroke-dasharray=\"4,3\" opacity=\"0.6\"/>\n",
+            fit_d.trim(), color,
+        );
+
+        // Legend entry
+        let legend_y = margin_t as f64 + 12.0 + ci as f64 * 14.0;
+        if legend_y < (margin_t + plot_h - 10) as f64 {
+            let legend_x = margin_l as f64 + 10.0;
+            let _ = write!(
+                html,
+                "<line x1=\"{:.0}\" y1=\"{:.0}\" x2=\"{:.0}\" y2=\"{:.0}\" stroke=\"{}\" stroke-width=\"2\"/>\n",
+                legend_x, legend_y, legend_x + 15.0, legend_y, color,
+            );
+            let _ = write!(
+                html,
+                "<text x=\"{:.0}\" y=\"{:.0}\" font-size=\"9\" fill=\"#333\">{} (R\u{00b2}={:.2})</text>\n",
+                legend_x + 18.0, legend_y + 3.0,
+                escape_html(&short_name[..short_name.len().min(20)]),
+                curve.r_squared,
+            );
+        }
+    }
+
+    let _ = write!(html, "</svg>\n</div>\n");
+}
+
 fn write_footer(html: &mut String) {
     let _ = write!(
         html,
@@ -479,5 +680,35 @@ mod tests {
         assert_eq!(escape_html("<script>"), "&lt;script&gt;");
         assert_eq!(escape_html("a & b"), "a &amp; b");
         assert_eq!(escape_html("\"hello\""), "&quot;hello&quot;");
+    }
+
+    #[test]
+    fn test_html_sat_curves_svg() {
+        use crate::harness::analysis::{SatCurve, SatCurvePoint};
+        let curve = SatCurve {
+            benchmark: "Test::Benchmark".to_string(),
+            points: vec![
+                SatCurvePoint { time_pressure: 0.0, accuracy: 0.95, rt_ticks: 10.0 },
+                SatCurvePoint { time_pressure: 0.5, accuracy: 0.75, rt_ticks: 5.0 },
+                SatCurvePoint { time_pressure: 1.0, accuracy: 0.50, rt_ticks: 2.0 },
+            ],
+            lambda: 0.95,
+            beta: 1.5,
+            delta: 0.0,
+            r_squared: 0.92,
+        };
+        let mut html = String::new();
+        write_sat_curves(&mut html, &[curve]);
+        assert!(html.contains("<svg"), "SAT SVG should contain svg element");
+        assert!(html.contains("Speed-Accuracy"), "should have SAT heading");
+        assert!(html.contains("circle"), "should have data point circles");
+        assert!(html.contains("stroke-dasharray"), "should have dashed fitted curve");
+    }
+
+    #[test]
+    fn test_html_sat_curves_empty() {
+        let mut html = String::new();
+        write_sat_curves(&mut html, &[]);
+        assert!(html.is_empty(), "empty curves should produce no output");
     }
 }

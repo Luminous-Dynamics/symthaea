@@ -21,6 +21,12 @@
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --llm-baselines
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --html-output /tmp/report.html
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --sequential
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --citations
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --meta-analysis
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --adaptive-trials
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --ssm-backend
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --participants 50
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --dim-sweep
 
 use rayon::prelude::*;
 use std::path::PathBuf;
@@ -43,6 +49,10 @@ use symthaea_psych_bench::benchmarks::executive::{
     WisconsinCardSortingBenchmark,
 };
 use symthaea_psych_bench::benchmarks::inhibition::{GoNoGoBenchmark, StopSignalBenchmark};
+use symthaea_psych_bench::benchmarks::language::GardenPathBenchmark;
+use symthaea_psych_bench::benchmarks::motor::SrttBenchmark;
+use symthaea_psych_bench::benchmarks::social::RmeBenchmark;
+use symthaea_psych_bench::benchmarks::sustained_attention::SartBenchmark;
 use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
     ProspectiveMemoryBenchmark, TestTimeLearningBenchmark,
@@ -101,6 +111,15 @@ fn main() {
     let bootstrap_mode = args.iter().any(|a| a == "--bootstrap");
     let llm_baselines = args.iter().any(|a| a == "--llm-baselines");
     let sequential_mode = args.iter().any(|a| a == "--sequential");
+    let citations_mode = args.iter().any(|a| a == "--citations");
+    let meta_analysis_mode = args.iter().any(|a| a == "--meta-analysis");
+    let adaptive_trials_mode = args.iter().any(|a| a == "--adaptive-trials");
+    let ssm_backend_mode = args.iter().any(|a| a == "--ssm-backend");
+    let participants_count: Option<usize> = args
+        .windows(2)
+        .find(|w| w[0] == "--participants")
+        .and_then(|w| w[1].parse().ok());
+    let dim_sweep_mode = args.iter().any(|a| a == "--dim-sweep");
     let html_output_path: Option<PathBuf> = args
         .windows(2)
         .find(|w| w[0] == "--html-output")
@@ -109,6 +128,8 @@ fn main() {
     let config = BenchmarkConfig {
         dimension: 512,
         trials_per_condition: 10,
+        adaptive_trials: adaptive_trials_mode,
+        ssm_backend: ssm_backend_mode,
         ..Default::default()
     };
 
@@ -171,6 +192,14 @@ fn main() {
         Box::new(ProspectiveMemoryBenchmark),
         // Additional Metacognition
         Box::new(FeelingOfKnowingBenchmark),
+        // Sustained Attention
+        Box::new(SartBenchmark),
+        // Motor
+        Box::new(SrttBenchmark),
+        // Language
+        Box::new(GardenPathBenchmark),
+        // Social
+        Box::new(RmeBenchmark),
     ];
 
     // Filter benchmarks by name if --filter was specified
@@ -455,20 +484,23 @@ fn main() {
         return;
     }
 
-    // Speed-accuracy tradeoff: run at 3 pressure levels
+    // Speed-accuracy tradeoff: 6-level sweep with Wickelgren curve fitting
     if sat_mode {
-        println!("\n--- Speed-Accuracy Tradeoff ---");
-        let pressures = [0.0, 0.5, 1.0];
-        let labels = ["None", "Medium", "High"];
+        use symthaea_psych_bench::harness::analysis::{SatCurvePoint, fit_sat_curve, sat_curve_ascii};
+
+        println!("\n--- Speed-Accuracy Tradeoff (6-level sweep) ---");
+        let pressures = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0];
 
         println!(
-            "| {:25} | {:>12} | {:>12} | {:>12} |",
-            "Benchmark", "P=0.0 (None)", "P=0.5 (Med)", "P=1.0 (High)"
+            "| {:25} | {:>7} | {:>7} | {:>7} | {:>7} | {:>7} | {:>7} | {:>6} |",
+            "Benchmark", "P=0.0", "P=0.2", "P=0.4", "P=0.6", "P=0.8", "P=1.0", "R²"
         );
         println!(
-            "| {:25} | {:>12} | {:>12} | {:>12} |",
-            "-------------------------", "------------", "------------", "------------"
+            "| {:25} | {:>7} | {:>7} | {:>7} | {:>7} | {:>7} | {:>7} | {:>6} |",
+            "-------------------------", "-------", "-------", "-------", "-------", "-------", "-------", "------"
         );
+
+        let mut all_curves = Vec::new();
 
         for bench in &benchmarks {
             if let Some(ref f) = filter {
@@ -478,7 +510,7 @@ fn main() {
             }
 
             let key = symthaea_psych_bench::harness::report::key_metric_for_benchmark(bench.name());
-            let mut level_means = Vec::new();
+            let mut sat_points = Vec::new();
 
             for &pressure in &pressures {
                 let sat_config = BenchmarkConfig {
@@ -486,22 +518,33 @@ fn main() {
                     ..config.clone()
                 };
                 let result = bench.run(&sat_config);
-                let mean = result.metrics.get(key).map(|m| m.mean).unwrap_or(0.0);
-                level_means.push(mean);
+                let acc = result.metrics.get(key).map(|m| m.mean).unwrap_or(0.0);
+                let rt = result.metrics.get("rt_ticks").map(|m| m.mean).unwrap_or(0.0);
+                sat_points.push(SatCurvePoint { time_pressure: pressure, accuracy: acc, rt_ticks: rt });
             }
 
+            let curve = fit_sat_curve(bench.name(), &sat_points);
             let short = bench.name().split("::").last().unwrap_or(bench.name());
             println!(
-                "| {:25} | {:>12.3} | {:>12.3} | {:>12.3} |",
+                "| {:25} | {:>7.3} | {:>7.3} | {:>7.3} | {:>7.3} | {:>7.3} | {:>7.3} | {:>6.3} |",
                 &short[..short.len().min(25)],
-                level_means[0],
-                level_means[1],
-                level_means[2],
+                sat_points[0].accuracy,
+                sat_points[1].accuracy,
+                sat_points[2].accuracy,
+                sat_points[3].accuracy,
+                sat_points[4].accuracy,
+                sat_points[5].accuracy,
+                curve.r_squared,
             );
+            all_curves.push(curve);
         }
 
-        // Overall SAT summary
-        println!("\nPressure labels: {:?}", labels);
+        // Print fitted curve details
+        println!("\n--- Fitted Wickelgren (1977) Curves ---");
+        for curve in &all_curves {
+            println!("{}", sat_curve_ascii(curve));
+        }
+
         return;
     }
 
@@ -596,6 +639,125 @@ fn main() {
                 max,
                 human_str,
             );
+        }
+        return;
+    }
+
+    // Individual differences simulation: per-participant WM + time_pressure variation
+    if let Some(n_participants) = participants_count {
+        use symthaea_psych_bench::harness::analysis::{
+            individual_differences, format_individual_differences,
+        };
+
+        println!("\n--- Individual Differences Simulation (N={}) ---\n", n_participants);
+
+        for bench in &benchmarks {
+            if let Some(ref f) = filter {
+                if !bench.name().to_lowercase().contains(f) {
+                    continue;
+                }
+            }
+
+            let key = symthaea_psych_bench::harness::report::key_metric_for_benchmark(bench.name());
+            let mut participant_scores = Vec::new();
+
+            for p in 0..n_participants {
+                // Derive per-participant parameters deterministically
+                let mut rng = config.seed.wrapping_add(p as u64 * 7919) ^ 0x9E3779B97F4A7C15;
+                let xor_shift = |s: &mut u64| { *s ^= *s << 13; *s ^= *s >> 7; *s ^= *s << 17; };
+
+                // WM capacity: normal(7, 1), clamped [3, 11]
+                xor_shift(&mut rng);
+                let u1 = (rng % 10000) as f64 / 10000.0;
+                xor_shift(&mut rng);
+                let u2 = (rng % 10000) as f64 / 10000.0;
+                let z_wm = (-2.0 * u1.max(1e-10).ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
+                let wm_cap = (7.0 + z_wm).round().clamp(3.0, 11.0) as usize;
+
+                // Time pressure: normal(0.3, 0.15), clamped [0.0, 1.0]
+                xor_shift(&mut rng);
+                let u3 = (rng % 10000) as f64 / 10000.0;
+                xor_shift(&mut rng);
+                let u4 = (rng % 10000) as f64 / 10000.0;
+                let z_tp = (-2.0 * u3.max(1e-10).ln()).sqrt() * (2.0 * std::f64::consts::PI * u4).cos();
+                let tp = (0.3 + 0.15 * z_tp).clamp(0.0, 1.0);
+
+                let p_config = BenchmarkConfig {
+                    seed: config.seed.wrapping_add(p as u64 * 7919),
+                    working_memory_capacity: wm_cap,
+                    time_pressure: tp,
+                    trials_per_condition: 5,
+                    ..config.clone()
+                };
+                let result = bench.run(&p_config);
+                if let Some(metric) = result.metrics.get(key) {
+                    participant_scores.push(metric.mean);
+                }
+            }
+
+            if !participant_scores.is_empty() {
+                let id_result = individual_differences(bench.name(), key, &participant_scores);
+                println!("{}", format_individual_differences(&id_result));
+            }
+        }
+        return;
+    }
+
+    // HDC dimensionality scaling sweep
+    if dim_sweep_mode {
+        use symthaea_psych_bench::harness::analysis::{
+            dim_scaling_slope, DimScalingResult, format_dim_scaling,
+        };
+
+        let sweep_dims = [128, 256, 512, 1024, 2048];
+        println!("\n--- HDC Dimensionality Scaling (dims: {:?}) ---\n", sweep_dims);
+        println!(
+            "| {:25} | {:>7} | {:>7} | {:>7} | {:>7} | {:>7} | {:>+8} | {:>6} |",
+            "Benchmark", "d=128", "d=256", "d=512", "d=1024", "d=2048", "Slope", "R²"
+        );
+        println!(
+            "| {:25} | {:>7} | {:>7} | {:>7} | {:>7} | {:>7} | {:>8} | {:>6} |",
+            "-------------------------", "-------", "-------", "-------", "-------", "-------", "--------", "------"
+        );
+
+        for bench in &benchmarks {
+            if let Some(ref f) = filter {
+                if !bench.name().to_lowercase().contains(f) {
+                    continue;
+                }
+            }
+
+            let key = symthaea_psych_bench::harness::report::key_metric_for_benchmark(bench.name());
+            let mut values = Vec::new();
+
+            for &dim in &sweep_dims {
+                let dim_config = BenchmarkConfig {
+                    dimension: dim,
+                    trials_per_condition: 5,
+                    ..config.clone()
+                };
+                let result = bench.run(&dim_config);
+                let val = result.metrics.get(key).map(|m| m.mean).unwrap_or(0.0);
+                values.push(val);
+            }
+
+            let dims_usize: Vec<usize> = sweep_dims.iter().map(|&d| d as usize).collect();
+            let (slope, r2) = dim_scaling_slope(&dims_usize, &values);
+            let short = bench.name().split("::").last().unwrap_or(bench.name());
+            println!(
+                "| {:25} | {:>7.3} | {:>7.3} | {:>7.3} | {:>7.3} | {:>7.3} | {:>+8.4} | {:>6.3} |",
+                &short[..short.len().min(25)],
+                values[0], values[1], values[2], values[3], values[4],
+                slope, r2,
+            );
+
+            let _result = DimScalingResult {
+                benchmark: bench.name().to_string(),
+                dims: dims_usize,
+                values,
+                slope,
+                r_squared: r2,
+            };
         }
         return;
     }
@@ -863,10 +1025,68 @@ fn main() {
         }
     }
 
+    // Meta-analysis (random-effects, DerSimonian-Laird)
+    if meta_analysis_mode {
+        use symthaea_psych_bench::harness::analysis::{format_meta_analysis, meta_analysis_from_forest};
+        let rows = report.forest_plot_data();
+        if let Some(result) = meta_analysis_from_forest(&rows) {
+            println!("\n{}", format_meta_analysis(&result));
+        } else {
+            eprintln!("No effect sizes available for meta-analysis.");
+        }
+    }
+
+    // Citations / provenance table
+    if citations_mode {
+        let refs: Vec<&dyn PsychBenchmark> = active_indices.iter().map(|&i| &*benchmarks[i] as &dyn PsychBenchmark).collect();
+        let table = symthaea_psych_bench::harness::provenance_table(&refs);
+        println!("\n{}", table);
+    }
+
     // HTML report output
     if let Some(ref path) = html_output_path {
         use symthaea_psych_bench::harness::html;
-        let html_content = html::generate_report(&report, llm_baselines);
+        // Collect provenance entries for the HTML report
+        let prov_entries: Vec<(&str, symthaea_psych_bench::harness::BenchmarkProvenance)> =
+            active_indices.iter().filter_map(|&i| {
+                let b = &*benchmarks[i];
+                b.provenance().map(|p| (b.name(), p))
+            }).collect();
+        let mut html_content = html::generate_report(&report, llm_baselines);
+        // Insert provenance section before closing footer if entries exist
+        if !prov_entries.is_empty() {
+            let mut prov_html = String::new();
+            html::write_provenance_section(&mut prov_html, &prov_entries);
+            // Insert before </body>
+            if let Some(pos) = html_content.rfind("</body>") {
+                html_content.insert_str(pos, &prov_html);
+            }
+        }
+        // Insert SAT curves SVG if we have benchmarks to sweep
+        {
+            use symthaea_psych_bench::harness::analysis::{SatCurvePoint, fit_sat_curve};
+            let pressures = [0.0, 0.5, 1.0];
+            let mut sat_curves = Vec::new();
+            for &i in &active_indices {
+                let bench = &benchmarks[i];
+                let key = symthaea_psych_bench::harness::report::key_metric_for_benchmark(bench.name());
+                let points: Vec<SatCurvePoint> = pressures.iter().map(|&p| {
+                    let c = BenchmarkConfig { time_pressure: p, ..config.clone() };
+                    let r = bench.run(&c);
+                    let acc = r.metrics.get(key).map(|m| m.mean).unwrap_or(0.0);
+                    let rt = r.metrics.get("rt_ticks").map(|m| m.mean).unwrap_or(0.0);
+                    SatCurvePoint { time_pressure: p, accuracy: acc, rt_ticks: rt }
+                }).collect();
+                sat_curves.push(fit_sat_curve(bench.name(), &points));
+            }
+            if !sat_curves.is_empty() {
+                let mut sat_html = String::new();
+                html::write_sat_curves(&mut sat_html, &sat_curves);
+                if let Some(pos) = html_content.rfind("</body>") {
+                    html_content.insert_str(pos, &sat_html);
+                }
+            }
+        }
         std::fs::write(path, html_content).expect("failed to write HTML report");
         eprintln!("HTML report written to {}", path.display());
     }

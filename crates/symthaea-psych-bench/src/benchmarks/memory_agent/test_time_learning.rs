@@ -7,7 +7,7 @@ use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
 
 /// Test-time learning benchmark.
@@ -117,6 +117,15 @@ impl TestTimeLearningBenchmark {
 impl PsychBenchmark for TestTimeLearningBenchmark {
     fn name(&self) -> &str {
         "MemoryAgent::TestTimeLearning"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Test-Enhanced Learning",
+            citation: "Roediger & Karpicke (2006)",
+            year: 2006,
+            doi: Some("10.1111/j.1467-9280.2006.01693.x"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

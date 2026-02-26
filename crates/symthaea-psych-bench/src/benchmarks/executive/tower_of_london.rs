@@ -21,7 +21,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Tower of London planning benchmark.
@@ -475,6 +475,15 @@ struct TrialResult {
 impl PsychBenchmark for TowerOfLondonBenchmark {
     fn name(&self) -> &str {
         "Executive::TowerOfLondon"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Tower of London",
+            citation: "Shallice (1982)",
+            year: 1982,
+            doi: Some("10.1098/rstb.1982.0082"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

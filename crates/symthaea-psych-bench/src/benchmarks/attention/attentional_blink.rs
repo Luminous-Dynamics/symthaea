@@ -15,7 +15,8 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::wm::ssm_temporal::SsmTemporalBackend;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Attentional Blink benchmark.
@@ -41,6 +42,9 @@ impl AttentionalBlinkBenchmark {
             *s ^= *s >> 7;
             *s ^= *s << 17;
         };
+
+        // SSM temporal backend for attention recovery (A=-0.15 for moderate recovery rate)
+        let mut ssm = SsmTemporalBackend::new(-0.15, 4);
 
         // Create target and distractor category prototypes with shared features
         // (visual similarity makes depleted-attention detection harder)
@@ -118,9 +122,24 @@ impl AttentionalBlinkBenchmark {
 
                 // T2 detection — attention depleted by T1 processing
                 let attention_available = if t1_detected {
-                    let depleted = attention_capacity - t1_cost;
-                    let recovered = recovery_rate * (lag as f64 - 1.0);
-                    (depleted + recovered).clamp(0.0, attention_capacity)
+                    if config.ssm_backend {
+                        // SSM path: T1 depletes attention (negative pulse),
+                        // then recovery emerges from state-space dynamics over lags
+                        ssm.reset();
+                        ssm.step(-1.0); // T1 depletion
+                        // Step through intervening lags (lag-1 steps of 0-input recovery)
+                        let mut ssm_out = 0.0_f32;
+                        for _ in 0..(lag - 1) {
+                            ssm_out = ssm.step(0.0);
+                        }
+                        // SSM output is negative (decaying from -1 input); map to [0, 1]
+                        // attention = 1.0 + ssm_out  (ssm_out in ~[-1, 0] range)
+                        (1.0 + ssm_out as f64).clamp(0.0, attention_capacity)
+                    } else {
+                        let depleted = attention_capacity - t1_cost;
+                        let recovered = recovery_rate * (lag as f64 - 1.0);
+                        (depleted + recovered).clamp(0.0, attention_capacity)
+                    }
                 } else {
                     attention_capacity // No T1 cost if T1 missed
                 };
@@ -189,6 +208,15 @@ impl AttentionalBlinkBenchmark {
 impl PsychBenchmark for AttentionalBlinkBenchmark {
     fn name(&self) -> &str {
         "Attention::AttentionalBlink"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Attentional Blink (RSVP)",
+            citation: "Raymond et al. (1992)",
+            year: 1992,
+            doi: Some("10.1037/0096-1523.18.3.849"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
@@ -276,6 +304,30 @@ mod tests {
             "lag8 ({:.3}) should be >= lag3 ({:.3}) - 0.10",
             lag8,
             lag3
+        );
+    }
+
+    #[test]
+    fn test_attblink_ssm_matches_baseline() {
+        let base_config = BenchmarkConfig {
+            dimension: 512,
+            trials_per_condition: 20,
+            ..Default::default()
+        };
+        let ssm_config = BenchmarkConfig {
+            ssm_backend: true,
+            ..base_config.clone()
+        };
+        let base_result = AttentionalBlinkBenchmark.run(&base_config);
+        let ssm_result = AttentionalBlinkBenchmark.run(&ssm_config);
+        // Compare lag-3 accuracy (blink window)
+        let base_lag3 = base_result.metrics["lag3_t2_accuracy"].mean;
+        let ssm_lag3 = ssm_result.metrics["lag3_t2_accuracy"].mean;
+        let diff = (base_lag3 - ssm_lag3).abs();
+        assert!(
+            diff < 0.20,
+            "SSM lag3 ({:.3}) too far from baseline ({:.3}), diff={:.3}",
+            ssm_lag3, base_lag3, diff
         );
     }
 }

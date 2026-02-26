@@ -10,7 +10,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
 
@@ -212,6 +212,15 @@ impl BartBenchmark {
 impl PsychBenchmark for BartBenchmark {
     fn name(&self) -> &str {
         "CogBench::BART"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Balloon Analogue Risk Task",
+            citation: "Lejuez et al. (2002)",
+            year: 2002,
+            doi: Some("10.1037/1076-898X.8.2.75"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

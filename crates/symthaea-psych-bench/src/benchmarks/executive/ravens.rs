@@ -17,7 +17,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Raven's Progressive Matrices benchmark.
@@ -481,6 +481,15 @@ struct RpmResult {
 impl PsychBenchmark for RavensProgressiveMatricesBenchmark {
     fn name(&self) -> &str {
         "Executive::Ravens"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Raven's Progressive Matrices",
+            citation: "Raven (1938)",
+            year: 1938,
+            doi: None,
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
