@@ -3,6 +3,13 @@
 //! Implements `LLMBackend` trait using the local BrocaGenerator instead of
 //! external LLM APIs. Also provides `DirectThoughtBackend` for bypassing
 //! text prompt serialization when the SSM backend is active.
+//!
+//! ## Direct Neural Path
+//!
+//! When an SSM or Liquid-Mamba backend is active, `StructuredThought` is
+//! converted directly to `ThoughtChannels` via [`thought_to_channels`],
+//! completely bypassing text-prompt serialization. The thought flows
+//! continuously from the cognitive loop into the motor cortex.
 
 use anyhow::Result;
 use std::sync::Mutex;
@@ -13,6 +20,7 @@ use symthaea_broca::{
 use symthaea_core::genesis::GenesisSeed;
 
 use super::llm_backend::{GenerationParams, LLMBackend};
+use crate::mind::structured_thought::{EpistemicStatus, SemanticIntent, StructuredThought};
 
 /// Trait for direct thought-to-text generation (bypasses text prompt serialization).
 pub trait DirectThoughtBackend: LLMBackend {
@@ -136,19 +144,26 @@ fn channels_from_prompt(prompt: &str) -> ThoughtChannels {
         channels.set_epistemic(4.0);
     }
 
-    // Parse SEMANTIC_INTENT
-    if prompt.contains("SEMANTIC_INTENT: Answer") {
-        channels = ThoughtChannels::with_intent(1);
+    // Parse SEMANTIC_INTENT — set one-hot on existing channels (don't overwrite epistemic)
+    let intent_idx = if prompt.contains("SEMANTIC_INTENT: Answer") {
+        Some(1)
     } else if prompt.contains("SEMANTIC_INTENT: Acknowledge") {
-        channels = ThoughtChannels::with_intent(0);
+        Some(0)
     } else if prompt.contains("SEMANTIC_INTENT: Clarify") {
-        channels = ThoughtChannels::with_intent(2);
+        Some(2)
     } else if prompt.contains("SEMANTIC_INTENT: ProposeAction") {
-        channels = ThoughtChannels::with_intent(3);
+        Some(3)
     } else if prompt.contains("SEMANTIC_INTENT: ExpressUncertainty") {
-        channels = ThoughtChannels::with_intent(4);
+        Some(4)
     } else if prompt.contains("SEMANTIC_INTENT: Reflect") {
-        channels = ThoughtChannels::with_intent(5);
+        Some(5)
+    } else {
+        None
+    };
+    if let Some(idx) = intent_idx {
+        for i in 0..8 {
+            channels.channels[i] = if i == idx { 1.0 } else { 0.0 };
+        }
     }
 
     // Parse MOOD_TEMPERATURE
@@ -162,6 +177,78 @@ fn channels_from_prompt(prompt: &str) -> ThoughtChannels {
     }
 
     channels
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DIRECT NEURAL PATH: StructuredThought → ThoughtChannels
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Convert a `StructuredThought` directly to `ThoughtChannels`.
+///
+/// This is the **Direct Neural Path** — it bypasses text-prompt serialization
+/// entirely, mapping the cognitive loop's output directly into the 20-channel
+/// representation that the HDC encoder consumes.
+///
+/// Channel layout (matches `crates/symthaea-broca/src/encoder.rs`):
+/// - 0-7:  SemanticIntent one-hot (8 variants)
+/// - 8:    EpistemicStatus ordinal (0=Certain..4=OutOfDomain)
+/// - 9-11: valence, arousal, warmth
+/// - 12-14: psi, meta_awareness, coherence
+/// - 15-16: relationship_stage, trust
+/// - 17:   mood_temperature
+/// - 18:   has_computed_answer
+/// - 19:   concept_count
+pub fn thought_to_channels(thought: &StructuredThought, mood_temperature: f32) -> ThoughtChannels {
+    let mut ch = ThoughtChannels::default();
+
+    // Channels 0-7: semantic intent one-hot
+    let intent_idx = match thought.semantic_intent {
+        SemanticIntent::Acknowledge => 0,
+        SemanticIntent::Answer => 1,
+        SemanticIntent::Clarify => 2,
+        SemanticIntent::ProposeAction => 3,
+        SemanticIntent::ExpressUncertainty => 4,
+        SemanticIntent::Reflect => 5,
+        SemanticIntent::Continue => 6,
+        SemanticIntent::Unknown => 7,
+    };
+    for i in 0..8 {
+        ch.channels[i] = if i == intent_idx { 1.0 } else { 0.0 };
+    }
+
+    // Channel 8: epistemic status ordinal
+    ch.channels[8] = match thought.epistemic_status {
+        EpistemicStatus::Certain => 0.0,
+        EpistemicStatus::Probable => 1.0,
+        EpistemicStatus::Uncertain => 2.0,
+        EpistemicStatus::Unknown => 3.0,
+        EpistemicStatus::OutOfDomain => 4.0,
+    };
+
+    // Channels 9-11: emotional tone
+    ch.channels[9] = (thought.emotional_tone.valence as f32).clamp(-1.0, 1.0);
+    ch.channels[10] = (thought.emotional_tone.arousal as f32).clamp(0.0, 1.0);
+    ch.channels[11] = (thought.emotional_tone.warmth as f32).clamp(0.0, 1.0);
+
+    // Channels 12-14: consciousness metrics
+    ch.channels[12] = (thought.psi as f32).clamp(0.0, 1.0);
+    ch.channels[13] = (thought.meta_awareness as f32).clamp(0.0, 1.0);
+    ch.channels[14] = (thought.coherence as f32).clamp(0.0, 1.0);
+
+    // Channels 15-16: relational context
+    ch.channels[15] = thought.relationship_stage as u32 as f32;
+    ch.channels[16] = thought.trust.clamp(0.0, 1.0);
+
+    // Channel 17: mood temperature
+    ch.channels[17] = mood_temperature.clamp(0.5, 2.0);
+
+    // Channel 18: has computed answer
+    ch.channels[18] = if thought.structured_data.is_some() { 1.0 } else { 0.0 };
+
+    // Channel 19: concept count (capped at 10)
+    ch.channels[19] = (thought.activated_concepts.len() as f32).min(10.0);
+
+    ch
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -292,5 +379,136 @@ mod tests {
 
         let channels = channels_from_prompt("EPISTEMIC_STATUS: Certain\nSEMANTIC_INTENT: Clarify");
         assert!((channels.epistemic_ordinal() - 0.0).abs() < 0.1);
+    }
+
+    // =========================================================================
+    // Direct Neural Path: thought_to_channels tests
+    // =========================================================================
+
+    fn make_test_thought() -> StructuredThought {
+        use crate::mind::structured_thought::{ActivatedConcept, EmotionalTone};
+        use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipStage};
+
+        let mut thought = StructuredThought::default();
+        thought.semantic_intent = SemanticIntent::Answer;
+        thought.activated_concepts = vec![
+            ActivatedConcept {
+                name: "quantum".to_string(),
+                activation: 0.8,
+                relevance: 0.9,
+            },
+            ActivatedConcept {
+                name: "physics".to_string(),
+                activation: 0.6,
+                relevance: 0.7,
+            },
+        ];
+        thought.emotional_tone = EmotionalTone {
+            valence: 0.3,
+            arousal: 0.5,
+            warmth: 0.7,
+        };
+        thought.psi = 0.65;
+        thought.meta_awareness = 0.7;
+        thought.coherence = 0.8;
+        thought.epistemic_status = EpistemicStatus::Probable;
+        thought.relationship_stage = RelationshipStage::Contact;
+        thought.relation_mode = RelationMode::IThou;
+        thought.trust = 0.6;
+        thought
+    }
+
+    #[test]
+    fn test_thought_to_channels_intent() {
+        let thought = make_test_thought();
+        let ch = thought_to_channels(&thought, 1.0);
+        // Answer → index 1
+        assert_eq!(ch.channels[1], 1.0);
+        assert_eq!(ch.channels[0], 0.0); // Acknowledge off
+        assert_eq!(ch.channels[2], 0.0); // Clarify off
+    }
+
+    #[test]
+    fn test_thought_to_channels_epistemic() {
+        let thought = make_test_thought();
+        let ch = thought_to_channels(&thought, 1.0);
+        // Probable → ordinal 1.0
+        assert!((ch.channels[8] - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_thought_to_channels_emotion() {
+        let thought = make_test_thought();
+        let ch = thought_to_channels(&thought, 1.0);
+        assert!((ch.channels[9] - 0.3).abs() < 0.01);  // valence
+        assert!((ch.channels[10] - 0.5).abs() < 0.01); // arousal
+        assert!((ch.channels[11] - 0.7).abs() < 0.01); // warmth
+    }
+
+    #[test]
+    fn test_thought_to_channels_consciousness() {
+        let thought = make_test_thought();
+        let ch = thought_to_channels(&thought, 1.0);
+        assert!((ch.channels[12] - 0.65).abs() < 0.01); // psi
+        assert!((ch.channels[13] - 0.7).abs() < 0.01);  // meta_awareness
+        assert!((ch.channels[14] - 0.8).abs() < 0.01);  // coherence
+    }
+
+    #[test]
+    fn test_thought_to_channels_mood_temperature() {
+        let thought = make_test_thought();
+        let ch = thought_to_channels(&thought, 1.5);
+        assert!((ch.channels[17] - 1.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_thought_to_channels_concept_count() {
+        let thought = make_test_thought();
+        let ch = thought_to_channels(&thought, 1.0);
+        assert!((ch.channels[19] - 2.0).abs() < 0.01); // 2 concepts
+    }
+
+    #[test]
+    fn test_thought_to_channels_all_intents() {
+        let intents = [
+            (SemanticIntent::Acknowledge, 0),
+            (SemanticIntent::Answer, 1),
+            (SemanticIntent::Clarify, 2),
+            (SemanticIntent::ProposeAction, 3),
+            (SemanticIntent::ExpressUncertainty, 4),
+            (SemanticIntent::Reflect, 5),
+            (SemanticIntent::Continue, 6),
+            (SemanticIntent::Unknown, 7),
+        ];
+        for (intent, expected_idx) in intents {
+            let mut thought = make_test_thought();
+            thought.semantic_intent = intent;
+            let ch = thought_to_channels(&thought, 1.0);
+            assert_eq!(ch.channels[expected_idx], 1.0, "Intent {:?} should set channel {}", intent, expected_idx);
+            // All other intent channels should be 0
+            for i in 0..8 {
+                if i != expected_idx {
+                    assert_eq!(ch.channels[i], 0.0, "Channel {} should be 0 for intent {:?}", i, intent);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_thought_to_channels_all_epistemic_statuses() {
+        let statuses = [
+            (EpistemicStatus::Certain, 0.0),
+            (EpistemicStatus::Probable, 1.0),
+            (EpistemicStatus::Uncertain, 2.0),
+            (EpistemicStatus::Unknown, 3.0),
+            (EpistemicStatus::OutOfDomain, 4.0),
+        ];
+        for (status, expected_val) in statuses {
+            let mut thought = make_test_thought();
+            thought.epistemic_status = status;
+            let ch = thought_to_channels(&thought, 1.0);
+            assert!((ch.channels[8] - expected_val).abs() < 0.01,
+                "Status {:?} should map to {}, got {}", status, expected_val, ch.channels[8]);
+        }
     }
 }
