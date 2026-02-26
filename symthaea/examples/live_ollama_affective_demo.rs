@@ -1,6 +1,6 @@
-use symthaea::language::llm_organ::{LLMOrgan, StructuredThought};
+use symthaea::language::llm_organ::LLMOrgan;
+use symthaea::mind::structured_thought::StructuredThought;
 use symthaea::language::llm_backend::create_backend_from_env;
-use std::time::Duration;
 
 #[tokio::main]
 async fn main() {
@@ -27,6 +27,8 @@ async fn main() {
         domain: "consciousness".to_string(),
         entities: vec![("IIT".to_string(), "Integrated Information Theory".to_string(), 0.9)],
         computed_answer: Some("Consciousness is the irreducible unity of a system's causal power over itself.".to_string()),
+        cube: None,
+        psi: None,
     });
 
     // 2. PHASE 1: Rested State (Low Load)

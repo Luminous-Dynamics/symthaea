@@ -51,6 +51,7 @@ use crate::partnership::{
 pub use crate::action::bindings::ActionRegistry;
 use crate::action::SimpleExecutor;
 use crate::consciousness::interoception::InteroceptionTag;
+use crate::infrastructure::{PainSender, SomaticErrorBridge, TaskSupervisor};
 
 #[cfg(feature = "school_learning")]
 use crate::school::curriculum::Curriculum;
@@ -247,6 +248,15 @@ pub struct Symthaea {
     /// Last autonomous research topic to reduce repetition.
     #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
     last_autoresearch_topic: Option<String>,
+
+    // ── Nociception: Pain Channel Infrastructure ──
+    /// Somatic error bridge: drains infrastructure errors and converts to felt stress.
+    /// Updated each process() cycle; signals applied to mind state before tick().
+    somatic_bridge: SomaticErrorBridge,
+    /// Pain channel sender: cloned into TaskSupervisor and database operations.
+    pain_tx: PainSender,
+    /// Task supervisor: wraps all tokio::spawn calls for panic detection + pain reporting.
+    task_supervisor: TaskSupervisor,
 }
 
 #[cfg(feature = "school_learning")]
@@ -510,6 +520,10 @@ impl Symthaea {
         #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
         let autoresearch_config = AutonomousResearchConfig::from_env();
 
+        // Initialize the pain channel: bridge receives, sender distributes
+        let (somatic_bridge, pain_tx) = SomaticErrorBridge::new();
+        let task_supervisor = TaskSupervisor::new(pain_tx.clone());
+
         let mut instance = Self {
             mind,
             language,
@@ -558,6 +572,9 @@ impl Symthaea {
             last_autoresearch_at: None,
             #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
             last_autoresearch_topic: None,
+            somatic_bridge,
+            pain_tx,
+            task_supervisor,
         };
 
         #[cfg(feature = "ssm-power")]
@@ -740,6 +757,9 @@ impl Symthaea {
         #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
         let autoresearch_config = AutonomousResearchConfig::from_env();
 
+        let (somatic_bridge, pain_tx) = SomaticErrorBridge::new();
+        let task_supervisor = TaskSupervisor::new(pain_tx.clone());
+
         Ok(Self {
             mind,
             language,
@@ -795,6 +815,9 @@ impl Symthaea {
             last_autoresearch_at: None,
             #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
             last_autoresearch_topic: None,
+            somatic_bridge,
+            pain_tx,
+            task_supervisor,
         })
     }
 
@@ -991,6 +1014,31 @@ impl Symthaea {
         // ====================================================================
         let phase2_start = Instant::now();
 
+        // ── NOCICEPTION: Drain pain channel and apply somatic signals ──
+        // Infrastructure errors (task panics, DB failures, lock poisons) accumulate
+        // in the pain channel between cycles. Drain them now and convert to felt
+        // signals that modulate cognition: high stress → increased thermodynamic load,
+        // arousal spikes, and tau slowdown for more cautious processing.
+        self.somatic_bridge.update();
+        let somatic_signals = self.somatic_bridge.to_interoceptive_signals();
+        if somatic_signals.thermodynamic_load_delta > 0.0 || somatic_signals.arousal_spike > 0.0 {
+            self.mind.state.thermodynamic_load =
+                (self.mind.state.thermodynamic_load + somatic_signals.thermodynamic_load_delta)
+                    .min(1.0);
+            self.mind.state.arousal =
+                (self.mind.state.arousal + somatic_signals.arousal_spike).min(1.0);
+            tracing::debug!(
+                target: "symthaea::nociception",
+                stress = self.somatic_bridge.systemic_stress(),
+                thermo_delta = somatic_signals.thermodynamic_load_delta,
+                arousal_spike = somatic_signals.arousal_spike,
+                "Somatic pain applied to mind state"
+            );
+        }
+
+        // Prune completed tasks from the supervisor
+        self.task_supervisor.prune_completed();
+
         // Feed relational Ψ from previous cycle's Φ_dyad into the mind.
         // This closes the feedback loop: partnership quality → consciousness boost.
         self.mind.set_relational_psi(self.last_phi_dyad);
@@ -1044,12 +1092,13 @@ impl Symthaea {
             // Persist evicted items to database asynchronously
             if let Some(ref db) = self.database {
                 let db = Arc::clone(db);
+                let pain = self.pain_tx.clone();
                 let timestamp_ms = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_millis() as u64;
 
-                tokio::spawn(async move {
+                self.task_supervisor.spawn("eviction-persist", async move {
                     for (i, item) in evicted.iter().enumerate() {
                         let hv = &item.content;
                         let mut topics = item
@@ -1113,10 +1162,11 @@ impl Symthaea {
                             consolidation_strength: 0.0,
                             retrieval_count: 0,
                         };
-                        // Fire-and-forget: DB writes are async to avoid blocking the
-                        // cognitive loop. Failures are logged but don't halt processing.
                         if let Err(e) = db.store(record).await {
                             tracing::error!(target: "symthaea::database", error = %e, "Failed to persist evicted item");
+                            let _ = pain.send(crate::infrastructure::InfrastructureError::DatabaseFailure {
+                                operation: format!("store evicted item {i}"),
+                            });
                         }
                     }
                 });
@@ -1162,6 +1212,7 @@ impl Symthaea {
             let top_episodes = self.episodic_memory.get_top_episodes(3);
             if !top_episodes.is_empty() {
                 let db = Arc::clone(db);
+                let pain = self.pain_tx.clone();
                 let timestamp_ms = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
@@ -1198,12 +1249,13 @@ impl Symthaea {
                     })
                     .collect();
 
-                tokio::spawn(async move {
-                    // Fire-and-forget: episode persistence is async to avoid
-                    // blocking the cognitive loop. Failures are logged at error level.
+                self.task_supervisor.spawn("episode-persist", async move {
                     for record in episode_records {
                         if let Err(e) = db.store(record).await {
                             tracing::error!(target: "symthaea::database", error = %e, "Failed to persist episode");
+                            let _ = pain.send(crate::infrastructure::InfrastructureError::DatabaseFailure {
+                                operation: "store episode".to_string(),
+                            });
                         }
                     }
                 });
@@ -1608,7 +1660,7 @@ impl Symthaea {
                     let db = self.database.clone();
                     let tx = self.research_update_tx.clone();
 
-                    tokio::spawn(async move {
+                    self.task_supervisor.spawn("curriculum-research", async move {
                         let mut extender = extender;
                         let result = extender
                             .research_and_extend(&topic, &mut curriculum_clone, dimension, db)
@@ -1955,15 +2007,19 @@ impl Symthaea {
         // --- DATABASE PERSISTENCE: Save Curriculum and Causal Links ---
         if let Some(ref db) = self.database {
             let db_clone = Arc::clone(db);
-            
+
             // 1. Save Curriculum
             #[cfg(feature = "school_learning")]
             {
                 let curriculum = self.curriculum.clone();
                 let db_inner = Arc::clone(&db_clone);
-                tokio::spawn(async move {
+                let pain = self.pain_tx.clone();
+                self.task_supervisor.spawn("curriculum-persist", async move {
                     if let Err(e) = db_inner.store_curriculum(&curriculum).await {
                         tracing::error!(target: "symthaea::database", error = %e, "Failed to persist curriculum");
+                        let _ = pain.send(crate::infrastructure::InfrastructureError::DatabaseFailure {
+                            operation: "store curriculum".to_string(),
+                        });
                     }
                 });
             }
@@ -1971,9 +2027,13 @@ impl Symthaea {
             // 2. Save Causal Links from Dream Engine
             let links = self.executor.dream_engine.world_model.observations.clone();
             let db_inner = Arc::clone(&db_clone);
-            tokio::spawn(async move {
+            let pain = self.pain_tx.clone();
+            self.task_supervisor.spawn("causal-links-persist", async move {
                 if let Err(e) = db_inner.store_causal_links(&links).await {
                     tracing::error!(target: "symthaea::database", error = %e, "Failed to persist causal links");
+                    let _ = pain.send(crate::infrastructure::InfrastructureError::DatabaseFailure {
+                        operation: "store causal links".to_string(),
+                    });
                 }
             });
         }
