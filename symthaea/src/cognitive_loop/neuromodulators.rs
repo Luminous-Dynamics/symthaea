@@ -522,7 +522,7 @@ mod tests {
         let avg_factor: f32 = lr_factors.iter().sum::<f32>() / lr_factors.len() as f32;
         // Bath LR factor should be in valid range (0.7–1.5)
         assert!(
-            avg_factor >= 0.7 && avg_factor <= 1.5,
+            (0.7..=1.5).contains(&avg_factor),
             "bath LR factor out of range: {avg_factor}"
         );
         // The bath should produce meaningful LR factor (not stuck near minimum)

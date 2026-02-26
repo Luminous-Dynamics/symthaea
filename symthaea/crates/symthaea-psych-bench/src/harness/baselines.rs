@@ -1518,6 +1518,31 @@ pub fn reasoning_baselines() -> BaselineMap {
         source: "Johnson et al. (2021), harder tasks deliberation estimate",
         population: "human adults",
     });
+    // ARC Analogy baselines (Lovett & Forbus 2017; Chollet 2019)
+    m.insert("arc_analogy_accuracy", Baseline {
+        value: 0.75,
+        sd: Some(0.12),
+        source: "Lovett & Forbus (2017), visual analogy accuracy",
+        population: "human adults",
+    });
+    m.insert("arc_cross_domain_accuracy", Baseline {
+        value: 0.60,
+        sd: Some(0.15),
+        source: "Lovett & Forbus (2017), cross-domain transfer estimate",
+        population: "human adults",
+    });
+    m.insert("arc_multi_example_accuracy", Baseline {
+        value: 0.70,
+        sd: Some(0.13),
+        source: "Chollet (2019), multi-pair analogy estimate",
+        population: "human adults",
+    });
+    m.insert("arc_analogy_rt_ticks", Baseline {
+        value: 5.0,
+        sd: Some(2.0),
+        source: "Lovett & Forbus (2017), analogy deliberation estimate (1 tick ≈ 50ms)",
+        population: "human adults",
+    });
     m
 }
 
