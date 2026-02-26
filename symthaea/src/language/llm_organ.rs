@@ -55,7 +55,9 @@ Never claim certainty when the structured thought indicates uncertainty.
    - E-Axis: How verifiable (E0=opinion, E4=reproducible proof)
    - N-Axis: How binding (N0=personal, N3=axiomatic truth like math)
    - M-Axis: How permanent (M0=ephemeral, M3=foundational)
-   Claims at (E4, N3, M3) are mathematical certainties — present them as fact.
+   9. AFFECTIVE BIAS (Mood):
+   - When MOOD_TEMPERATURE is HIGH (>1.2): Be extremely CONCISE and DIRECT. Speak with an edge of impatience or urgency. Use fewer tokens.
+   - When MOOD_TEMPERATURE is LOW (<0.8): Be more EXPANSIVE and REFLECTIVE. Use richer, more philosophical vocabulary.
 "#;
 
 /// Configuration for LLM organ
@@ -622,9 +624,19 @@ impl LLMOrgan {
     /// The mind has already computed what to say; this method uses the LLM
     /// purely for fluent translation, NOT for reasoning.
     ///
-    /// Uses low temperature (0.3) to ensure faithful translation.
-    pub async fn translate_thought(&mut self, thought: &StructuredThought) -> LLMGenerationResult {
-        let prompt = self.build_translation_prompt(thought);
+    /// Dynamic parameterization based on mood_temperature:
+    /// - High Mood Temp (Exhausted/Hot) -> Higher LLM temperature, shorter max_length.
+    /// - Low Mood Temp (Rested/Cool) -> Lower LLM temperature, longer max_length.
+    pub async fn translate_thought(&mut self, thought: &StructuredThought, mood_temperature: f32) -> LLMGenerationResult {
+        let prompt = self.build_translation_prompt(thought, mood_temperature);
+
+        // Affective mapping
+        let gen_temp = (mood_temperature * 0.5).clamp(0.1, 1.2);
+        let max_len = if mood_temperature > 1.3 {
+            128 // Sharp/Concise when exhausted
+        } else {
+            512 // Expansive when rested
+        };
 
         let query = LLMQuery {
             query_type: QueryType::Translation,
@@ -632,8 +644,8 @@ impl LLMOrgan {
             context: Vec::new(),
             system_prompt: Some(TRANSLATION_SYSTEM_PROMPT.to_string()),
             params: Some(LLMQueryParams {
-                temperature: Some(0.3), // Low temp for faithful translation
-                max_length: Some(512),
+                temperature: Some(gen_temp),
+                max_length: Some(max_len),
                 stop_sequences: vec![],
             }),
         };
@@ -645,10 +657,11 @@ impl LLMOrgan {
     ///
     /// Creates a structured representation that the translation system prompt
     /// can parse and faithfully render into natural language.
-    fn build_translation_prompt(&self, thought: &StructuredThought) -> String {
+    fn build_translation_prompt(&self, thought: &StructuredThought, mood_temperature: f32) -> String {
         let mut prompt = String::new();
 
         prompt.push_str("=== STRUCTURED THOUGHT TO TRANSLATE ===\n\n");
+        prompt.push_str(&format!("MOOD_TEMPERATURE: {:.2}\n", mood_temperature));
 
         // Use the thought's built-in serialization
         prompt.push_str(&thought.to_translation_prompt());

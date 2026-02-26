@@ -847,6 +847,12 @@ pub struct CognitiveLoopService {
     /// Provides causal-strength attention maps for encoding interpretation.
     /// Richer than CausalLoopEnhancer — uses HSIC independence testing.
     causal_consciousness: Option<crate::intelligence::CausalConsciousness>,
+
+    /// Thermodynamic load (0.0 to 1.0, where 1.0 = 6W limit reached).
+    pub(crate) thermodynamic_load: f32,
+
+    /// Affective bias: cognitive temperature (0.0 to 2.0).
+    pub(crate) mood_temperature: f32,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

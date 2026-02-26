@@ -7,7 +7,7 @@ use crate::chronobiology::{Biorhythm, CircadianPhase};
 use symthaea_core::hdc::ContinuousHV;
 
 use super::utils::permute_hv;
-use super::{ContinuousMind, Goal, InputType, MindOutput, OutputType};
+use super::{ContinuousMind, Goal, InputType, MindInput, MindOutput, OutputType};
 
 impl ContinuousMind {
     /// Process one tick of the mind.
@@ -62,6 +62,11 @@ impl ContinuousMind {
         self.state.is_dreaming = should_dream;
 
         if self.state.is_dreaming {
+            // Periodic Causal Pruning during dreaming (every 100 dream ticks)
+            if self.state.tick % 100 == 0 {
+                let load = self.state.thermodynamic_load;
+                self.memory_coordinator.prune_memories(&mut self.episodic_memory, load);
+            }
             return self.process_dream();
         }
 
@@ -125,6 +130,16 @@ impl ContinuousMind {
                     let v2 = self.working_memory_verified.remove(i + 1);
                     self.working_memory_verified[i] = v1 || v2;
 
+                    // Merge metadata (keep existing keys, add missing from merged item)
+                    if !self.working_memory_metadata.is_empty() {
+                        let mut merged = self.working_memory_metadata[i].clone();
+                        let extra = self.working_memory_metadata.remove(i + 1);
+                        for (k, v) in extra {
+                            merged.entry(k).or_insert(v);
+                        }
+                        self.working_memory_metadata[i] = merged;
+                    }
+
                     return Some(MindOutput {
                         output_type: OutputType::Memorize,
                         content: "Dreaming: Consolidating memories...".to_string(),
@@ -174,19 +189,28 @@ impl ContinuousMind {
                 self.working_memory_ticks.push(self.state.tick);
                 self.working_memory_sources.push(input.source);
                 self.working_memory_verified.push(input.is_verified);
+                self.working_memory_metadata.push(input.metadata.clone());
             } else {
                 let evicted = self.working_memory.remove(0);
                 let arrival_tick = self.working_memory_ticks.remove(0);
                 let source = self.working_memory_sources.remove(0);
                 let verified = self.working_memory_verified.remove(0);
+                let metadata = self.working_memory_metadata.remove(0);
                 
                 let steps_survived = self.state.tick.saturating_sub(arrival_tick);
-                self.evicted_items.push((evicted, steps_survived, source, verified));
+                self.evicted_items.push(crate::mind::EvictedMemory {
+                    content: evicted,
+                    steps_survived,
+                    source,
+                    is_verified: verified,
+                    metadata,
+                });
                 
                 self.working_memory.push(input.content.clone());
                 self.working_memory_ticks.push(self.state.tick);
                 self.working_memory_sources.push(input.source);
                 self.working_memory_verified.push(input.is_verified);
+                self.working_memory_metadata.push(input.metadata.clone());
             }
 
             // Update current thought via EMA blend (not bind — bind is multiply,
@@ -686,18 +710,32 @@ impl ContinuousMind {
         // Encode all readings up front so we can drop the registry borrow
         // before calling self.perceive() / self.emit_wisdom().
         let encoded: Vec<_> = readings
-            .iter()
+            .into_iter()
             .map(|(reading, urgency)| {
-                let hv = registry.encode_reading(reading);
+                let hv = registry.encode_reading(&reading);
                 let sensor_id = reading.sensor_id.clone();
                 let n_values = reading.values.len();
-                (hv, *urgency, sensor_id, n_values)
+                (hv, urgency, reading, sensor_id, n_values)
             })
             .collect();
 
-        for (hv, urgency, sensor_id, n_values) in encoded {
+        for (hv, urgency, reading, sensor_id, n_values) in encoded {
             // Feed encoded sensor reading into working memory as a perception
-            self.perceive(hv);
+            let mut input = MindInput::new(InputType::Perception, hv);
+            input
+                .metadata
+                .insert("sensor_id".to_string(), sensor_id.clone());
+            input
+                .metadata
+                .insert("timestamp_s".to_string(), reading.timestamp_s.to_string());
+            if !reading.tags.is_empty() {
+                let tags_json = serde_json::to_string(&reading.tags).unwrap_or_else(|_| "[]".to_string());
+                input.metadata.insert("topics".to_string(), tags_json);
+            }
+            for (key, value) in reading.metadata {
+                input.metadata.insert(key, value);
+            }
+            self.input(input);
 
             // If urgency is Critical (e.g., smoke alarm), broadcast immediately
             if urgency == crate::swarm::mesh::MeshUrgency::Critical && self.mesh_bridge.is_some() {

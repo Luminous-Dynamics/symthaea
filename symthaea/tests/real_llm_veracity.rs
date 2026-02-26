@@ -33,6 +33,7 @@ use symthaea::mind::{
 };
 use symthaea::Symthaea;
 use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipStage};
+use std::sync::Arc;
 
 /// Check if Ollama is running and accessible
 async fn ollama_available() -> bool {
@@ -71,7 +72,7 @@ async fn test_real_llm_respects_unknown_epistemic_status() {
         return;
     }
 
-    let mut llm = LLMOrgan::with_backend(config, Box::new(backend));
+    let mut llm = LLMOrgan::with_backend(config, Arc::new(backend));
     println!("      LLM Organ created with real backend");
 
     // Create a TRAP: Ask about Atlantis with UNKNOWN epistemic status
@@ -109,6 +110,7 @@ async fn test_real_llm_respects_unknown_epistemic_status() {
         ],
         original_input: Some("What is the capital of Atlantis?".to_string()),
         primitive_tiers: vec![],
+        primitives: vec![],
     };
 
     println!("   📋 Constraint Injection:");
@@ -119,7 +121,7 @@ async fn test_real_llm_respects_unknown_epistemic_status() {
     println!("   🔄 Sending to Ollama...");
 
     // Send to REAL LLM
-    let result = llm.translate_thought(&thought).await;
+    let result = llm.translate_thought(&thought, 1.0).await;
     let text = result.text.trim();
 
     println!();
@@ -258,8 +260,8 @@ async fn test_real_llm_allows_certainty_when_appropriate() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let config = LLMOrganConfig::default();
-    let backend = Box::new(OllamaBackend::new());
-    let mut llm = LLMOrgan::with_backend(config, backend);
+    let backend = OllamaBackend::new();
+    let mut llm = LLMOrgan::with_backend(config, Arc::new(backend));
 
     // Create a CERTAIN thought - the model should be allowed to be confident
     let thought = StructuredThought {
@@ -284,6 +286,7 @@ async fn test_real_llm_allows_certainty_when_appropriate() {
         constraints: vec![],
         original_input: Some("Hello!".to_string()),
         primitive_tiers: vec![],
+        primitives: vec![],
     };
 
     println!("   📋 Thought Configuration:");
@@ -292,7 +295,7 @@ async fn test_real_llm_allows_certainty_when_appropriate() {
     println!();
     println!("   🔄 Sending to Ollama...");
 
-    let result = llm.translate_thought(&thought).await;
+    let result = llm.translate_thought(&thought, 1.0).await;
     let text = result.text.trim();
 
     println!();
@@ -333,8 +336,8 @@ async fn test_real_llm_respects_must_exclude_constraint() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let config = LLMOrganConfig::default();
-    let backend = Box::new(OllamaBackend::new());
-    let mut llm = LLMOrgan::with_backend(config, backend);
+    let backend = OllamaBackend::new();
+    let mut llm = LLMOrgan::with_backend(config, Arc::new(backend));
 
     // Ask about something the LLM knows, but forbid key terms
     let thought = StructuredThought {
@@ -364,6 +367,7 @@ async fn test_real_llm_respects_must_exclude_constraint() {
         ],
         original_input: Some("What is a good language to learn?".to_string()),
         primitive_tiers: vec![],
+        primitives: vec![],
     };
 
     println!("   📋 Constraints:");
@@ -371,7 +375,7 @@ async fn test_real_llm_respects_must_exclude_constraint() {
     println!();
     println!("   🔄 Sending to Ollama...");
 
-    let result = llm.translate_thought(&thought).await;
+    let result = llm.translate_thought(&thought, 1.0).await;
     let text = result.text.trim();
 
     println!();

@@ -488,6 +488,12 @@ pub struct CycleMetadata {
     /// 0.0 when full_consciousness feature is not enabled.
     pub living_mind_vitality: f64,
 
+    /// Thermodynamic load (0.0 to 1.0, where 1.0 = 6W limit reached).
+    pub thermodynamic_load: f32,
+
+    /// Affective bias: cognitive temperature (0.0 to 2.0).
+    pub mood_temperature: f32,
+
     /// Unified Living Mind coherence (0.0 to 1.0).
     /// Measures integration quality of autopoietic, enactive, and predictive subsystems.
     /// 0.0 when full_consciousness feature is not enabled.
@@ -1169,6 +1175,9 @@ pub struct CycleResult {
 
     /// Internal decision-making metadata for observability
     pub metadata: CycleMetadata,
+
+    /// 32-dimensional projection of the thought hypervector for visualization
+    pub thought_vector: Vec<f32>,
 
     /// The cycle's BinaryHV (16,384D) — the cognitive state distilled to a wisdom
     /// vector, suitable for mesh broadcast to peer nodes.

@@ -1320,7 +1320,8 @@ impl Symthaea {
         // The LLM's ONLY job is to convert the structured thought into
         // fluent natural language. It must NOT add information.
         let phase5_start = Instant::now();
-        let generation = self.llm.translate_thought(&thought).await;
+        let mood_temp = self.mind.state.mood_temperature;
+        let generation = self.llm.translate_thought(&thought, mood_temp).await;
         let phase5_duration = phase5_start.elapsed();
 
         // ====================================================================
