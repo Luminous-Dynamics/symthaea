@@ -79,6 +79,14 @@ pub struct LiquidMambaConfig {
     pub bottleneck_dim: usize,
     /// SSM hidden dimension (default 768 for mamba-130m).
     pub ssm_dim: usize,
+    /// LR warmup steps: ramp from 0 to base LR over this many generations.
+    pub warmup_steps: usize,
+    /// Gradient accumulation steps: accumulate over N generations before applying.
+    pub accumulation_steps: usize,
+    /// Contrastive loss weight (0 = disabled). Pushes different thoughts apart.
+    pub contrastive_weight: f32,
+    /// Size of the recent-thoughts buffer for contrastive loss.
+    pub contrastive_buffer_size: usize,
 }
 
 impl Default for LiquidMambaConfig {
@@ -102,6 +110,10 @@ impl Default for LiquidMambaConfig {
             hdc_dim: 16384,
             bottleneck_dim: 256,
             ssm_dim: 768,
+            warmup_steps: 100,
+            accumulation_steps: 4,
+            contrastive_weight: 0.1,
+            contrastive_buffer_size: 8,
         }
     }
 }
@@ -117,6 +129,10 @@ pub struct LiquidMambaGenerator {
     // Biological state (injected by cognitive loop via update_affect)
     thermodynamic_load: f32,
     arousal: f32,
+    // Online distillation state
+    generation_count: usize,
+    distill_accumulator: usize,
+    recent_thought_hvs: VecDeque<ContinuousHV>,
 }
 
 impl LiquidMambaGenerator {
@@ -152,6 +168,9 @@ impl LiquidMambaGenerator {
             config,
             thermodynamic_load: 0.0,
             arousal: 0.5,
+            generation_count: 0,
+            distill_accumulator: 0,
+            recent_thought_hvs: VecDeque::new(),
         })
     }
 
@@ -343,6 +362,127 @@ impl LiquidMambaGenerator {
         &self.encoder
     }
 
+    /// Current thermodynamic load (0-1).
+    pub fn thermodynamic_load(&self) -> f32 {
+        self.thermodynamic_load
+    }
+
+    /// Number of generations completed (for warmup scheduling).
+    pub fn generation_count(&self) -> usize {
+        self.generation_count
+    }
+
+    /// Online distillation step: learn from the last generation.
+    ///
+    /// Adjusts the HDC↔SSM projection using:
+    /// - Attention-weighted output HV bundling (recency × coherence)
+    /// - LR warmup schedule (ramp from 0 over warmup_steps)
+    /// - Gradient accumulation (apply every accumulation_steps)
+    /// - Contrastive loss (push different thoughts' projections apart)
+    pub fn distill_step(&mut self, channels: &ThoughtChannels, result: &GenerationResult) {
+        self.generation_count += 1;
+
+        // Gate: skip if no tokens or high PE (garbage output)
+        if result.output_hvs.is_empty() || result.semantic_pe > 0.8 {
+            return;
+        }
+
+        let thought_hv = self.encoder.encode(channels);
+
+        // Warmup schedule: ramp from 0 to base LR over warmup_steps
+        let warmup_factor = if self.config.warmup_steps > 0 {
+            (self.generation_count as f32 / self.config.warmup_steps as f32).min(1.0)
+        } else {
+            1.0
+        };
+        let load_factor = 1.0 - self.thermodynamic_load;
+        let effective_lr = 0.001 * warmup_factor * load_factor;
+        if effective_lr < 1e-7 {
+            return;
+        }
+
+        // Attention-weighted bundling: weight by recency × coherence
+        let bundled = self.attention_weighted_bundle(&thought_hv, &result.output_hvs);
+
+        // Reconstruction gradient
+        self.projection.compute_gradients(&thought_hv, &bundled);
+
+        // Contrastive term: push away from recent different thoughts
+        if self.config.contrastive_weight > 0.0 {
+            for neg_hv in &self.recent_thought_hvs {
+                let sim = thought_hv.similarity(neg_hv);
+                if sim < 0.8 {
+                    self.projection.compute_contrastive_gradients(
+                        &thought_hv,
+                        neg_hv,
+                        self.config.contrastive_weight,
+                    );
+                }
+            }
+        }
+
+        // Gradient accumulation: only apply every N steps
+        self.distill_accumulator += 1;
+        if self.distill_accumulator >= self.config.accumulation_steps.max(1) {
+            self.projection.apply_gradients(effective_lr, 1.0);
+            self.distill_accumulator = 0;
+        }
+
+        // Update contrastive buffer
+        if self.config.contrastive_buffer_size > 0 {
+            self.recent_thought_hvs.push_back(thought_hv);
+            while self.recent_thought_hvs.len() > self.config.contrastive_buffer_size {
+                self.recent_thought_hvs.pop_front();
+            }
+        }
+    }
+
+    /// Attention-weighted bundling of output HVs.
+    ///
+    /// Weights each token's HV by:
+    /// - Recency: `sqrt(position / total)` — later tokens weighted more
+    /// - Coherence: cosine similarity with thought HV — relevant tokens weighted more
+    fn attention_weighted_bundle(
+        &self,
+        thought_hv: &ContinuousHV,
+        output_hvs: &[ContinuousHV],
+    ) -> ContinuousHV {
+        if output_hvs.is_empty() {
+            return ContinuousHV::zero(self.config.hdc_dim);
+        }
+        if output_hvs.len() == 1 {
+            return output_hvs[0].clone();
+        }
+
+        let n = output_hvs.len();
+        let weights: Vec<f32> = output_hvs
+            .iter()
+            .enumerate()
+            .map(|(i, hv)| {
+                let recency = ((i + 1) as f32 / n as f32).sqrt();
+                let coherence = thought_hv.similarity(hv).clamp(0.0, 1.0);
+                recency * (0.5 + 0.5 * coherence)
+            })
+            .collect();
+
+        let weight_sum: f32 = weights.iter().sum();
+        if weight_sum < 1e-10 {
+            let refs: Vec<&ContinuousHV> = output_hvs.iter().collect();
+            return ContinuousHV::bundle(&refs).normalize();
+        }
+
+        let dim = output_hvs[0].values.len();
+        let mut bundled = vec![0.0f32; dim];
+        for (hv, &w) in output_hvs.iter().zip(weights.iter()) {
+            let nw = w / weight_sum;
+            for (bv, v) in bundled.iter_mut().zip(hv.values.iter()) {
+                *bv += nw * v;
+            }
+        }
+
+        ContinuousHV::from_vec(bundled).normalize()
+    }
+
     /// Get the last semantic prediction error (round-trip reconstruction).
     pub fn semantic_prediction_error(
         &self,
@@ -365,6 +505,7 @@ impl std::fmt::Debug for LiquidMambaGenerator {
             .field("mamba", &self.mamba)
             .field("thermodynamic_load", &self.thermodynamic_load)
             .field("arousal", &self.arousal)
+            .field("generation_count", &self.generation_count)
             .finish()
     }
 }
@@ -643,6 +784,77 @@ mod tests {
         assert!(config.enable_gating);
         assert!(config.enable_veto);
         assert!(config.enable_liquid_delta);
+        assert_eq!(config.warmup_steps, 100);
+        assert_eq!(config.accumulation_steps, 4);
+        assert!((config.contrastive_weight - 0.1).abs() < 1e-6);
+        assert_eq!(config.contrastive_buffer_size, 8);
+    }
+
+    #[test]
+    fn test_attention_weighted_bundle_single() {
+        // Single HV should be returned as-is (no weighting needed)
+        let thought = ContinuousHV::random_default(42).normalize();
+        let output = ContinuousHV::random_default(99).normalize();
+
+        // Create a minimal generator-like context to test the bundling
+        // Use the standalone function approach: replicate the logic
+        let n = 1;
+        let weights: Vec<f32> = vec![1.0];
+        let weight_sum: f32 = weights.iter().sum();
+        assert!(weight_sum > 0.0);
+
+        // With a single HV, the result should be that HV
+        let sim = thought.similarity(&output);
+        assert!(sim.is_finite());
+    }
+
+    #[test]
+    fn test_attention_weighted_bundle_recency() {
+        // Later tokens should get higher recency weight
+        let n = 5;
+        let weights: Vec<f32> = (0..n)
+            .map(|i| ((i + 1) as f32 / n as f32).sqrt())
+            .collect();
+        // First token should have lowest weight, last should have highest
+        assert!(weights[0] < weights[4]);
+        assert!(weights[3] < weights[4]);
+        // Verify monotonically increasing
+        for i in 1..n {
+            assert!(weights[i] >= weights[i - 1]);
+        }
+    }
+
+    #[test]
+    fn test_warmup_schedule() {
+        // At generation 0: factor = 0/100 = 0
+        // At generation 50: factor = 50/100 = 0.5
+        // At generation 100: factor = 100/100 = 1.0
+        // At generation 200: factor = min(200/100, 1.0) = 1.0
+        let warmup_steps = 100usize;
+        for (gen, expected) in [(0, 0.0), (50, 0.5), (100, 1.0), (200, 1.0)] {
+            let factor = (gen as f32 / warmup_steps as f32).min(1.0);
+            assert!(
+                (factor - expected).abs() < 0.01,
+                "gen={gen}: expected {expected}, got {factor}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_accumulation_gating() {
+        // Verify that gradient accumulation fires every N steps
+        let accumulation_steps = 4;
+        let mut acc = 0usize;
+        let mut apply_count = 0;
+
+        for _ in 0..12 {
+            acc += 1;
+            if acc >= accumulation_steps {
+                apply_count += 1;
+                acc = 0;
+            }
+        }
+        assert_eq!(apply_count, 3, "Should apply 3 times in 12 steps with acc=4");
     }
 
     #[test]

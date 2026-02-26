@@ -140,10 +140,13 @@ impl CognitiveLoopService {
         self.biorhythm_refresh_counter += 1;
         if self.biorhythm_refresh_counter >= 97 {
             self.biorhythm = crate::chronobiology::Biorhythm::current();
+            self.neuromodulator_bath.modulate_circadian(self.biorhythm.phase);
             self.biorhythm_refresh_counter = 0;
         }
         // Apply circadian plasticity to learning rate (Night=high plasticity, Day=low)
-        let circadian_lr = self.stats.adaptive_learning_rate * self.biorhythm.plasticity_mod as f32;
+        // Halved: bath circadian baselines (Phase 2) provide the other 50%
+        let plasticity_half = 1.0 + (self.biorhythm.plasticity_mod as f32 - 1.0) * 0.5;
+        let circadian_lr = self.stats.adaptive_learning_rate * plasticity_half;
         self.stats.adaptive_learning_rate = circadian_lr.clamp(0.0001, 0.1);
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -3435,6 +3438,8 @@ impl CognitiveLoopService {
             grid_encoding_norm,
             grid_spatial_complexity,
             // Neuromodulator Bath
+            exocortex_query_suggested: self.neuromodulator_bath.should_query_exocortex(),
+            neuromod_personality: self.neuromodulator_bath.personality_description(),
             dopamine_effective: self.neuromodulator_bath.dopamine.effective(),
             noradrenaline_effective: self.neuromodulator_bath.noradrenaline.effective(),
             serotonin_effective: self.neuromodulator_bath.serotonin.effective(),

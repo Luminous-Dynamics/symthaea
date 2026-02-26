@@ -51,6 +51,19 @@ impl Transmitter {
         self.level = (self.level + amount).clamp(0.0, 1.0);
     }
 
+    /// Set the tonic baseline level (clamped to [0.2, 0.8]).
+    /// Used by circadian modulation to shift the resting point.
+    #[inline]
+    pub fn set_baseline(&mut self, baseline: f32) {
+        self.baseline = baseline.clamp(0.2, 0.8);
+    }
+
+    /// Read-only access to baseline for testing.
+    #[cfg(test)]
+    pub fn baseline_for_test(&self) -> f32 {
+        self.baseline
+    }
+
     /// Reuptake: exponential decay toward baseline + receptor sensitivity adaptation.
     pub fn reuptake(&mut self) {
         // Exponential return to baseline
@@ -91,7 +104,7 @@ pub(crate) struct NeuromodulatorInputs {
 /// Science: Doya (2002) — "Metalearning and neuromodulation"
 /// DA = reward prediction error, NE = unexpected uncertainty,
 /// 5-HT = punishment/aversion, ACh = expected uncertainty.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(crate) struct NeuromodulatorBath {
     /// Dopamine: reward prediction error → learning rate & motivation
     pub dopamine: Transmitter,
@@ -101,17 +114,6 @@ pub(crate) struct NeuromodulatorBath {
     pub serotonin: Transmitter,
     /// Acetylcholine: attention & precision → focus & signal filtering
     pub acetylcholine: Transmitter,
-}
-
-impl Default for NeuromodulatorBath {
-    fn default() -> Self {
-        Self {
-            dopamine: Transmitter::default(),
-            noradrenaline: Transmitter::default(),
-            serotonin: Transmitter::default(),
-            acetylcholine: Transmitter::default(),
-        }
-    }
 }
 
 impl NeuromodulatorBath {
@@ -223,6 +225,98 @@ impl NeuromodulatorBath {
         let ach = self.acetylcholine.effective();
         (1.1 - ach * 0.2).clamp(0.8, 1.2)
     }
+
+    /// Shift transmitter baselines based on circadian phase.
+    ///
+    /// Science:
+    /// - Aston-Jones (2001) — LC-NE has strong circadian modulation
+    /// - Nishino (2000) — DA consolidation peaks during sleep
+    /// - 5-HT follows roughly opposite NE pattern
+    /// - ACh peaks during waking attention, troughs in slow-wave sleep
+    pub fn modulate_circadian(&mut self, phase: crate::chronobiology::CircadianPhase) {
+        use crate::chronobiology::CircadianPhase;
+        let (da_base, ne_base, sht_base, ach_base) = match phase {
+            CircadianPhase::Dawn  => (0.55, 0.60, 0.45, 0.50),
+            CircadianPhase::Day   => (0.50, 0.50, 0.50, 0.60),
+            CircadianPhase::Dusk  => (0.45, 0.40, 0.60, 0.50),
+            CircadianPhase::Night => (0.55, 0.30, 0.65, 0.40),
+        };
+        self.dopamine.set_baseline(da_base);
+        self.noradrenaline.set_baseline(ne_base);
+        self.serotonin.set_baseline(sht_base);
+        self.acetylcholine.set_baseline(ach_base);
+    }
+
+    /// Whether the system should query the exocortex (swarm network).
+    ///
+    /// Trigger: high NE (uncertainty) + low DA (no reward prediction) + low 5-HT (low confidence).
+    /// Science: Exploration under uncertainty with no reward expectation → seek external knowledge.
+    pub fn should_query_exocortex(&self) -> bool {
+        let ne = self.noradrenaline.effective();
+        let da = self.dopamine.effective();
+        let sht = self.serotonin.effective();
+        ne > 0.7 && da < 0.4 && sht < 0.5
+    }
+
+    /// Derive a neurochemical personality profile from receptor sensitivities.
+    ///
+    /// Science: Cloninger (1987) — psychobiological model of temperament.
+    pub fn personality_profile(&self) -> NeuromodulatorProfile {
+        NeuromodulatorProfile {
+            novelty_seeking: self.dopamine.receptor_sensitivity,
+            harm_avoidance: 2.0 - self.noradrenaline.receptor_sensitivity,
+            reward_dependence: self.serotonin.receptor_sensitivity,
+            persistence: self.acetylcholine.receptor_sensitivity,
+        }
+    }
+
+    /// Human-readable personality description from receptor sensitivities.
+    pub fn personality_description(&self) -> String {
+        let p = self.personality_profile();
+        let mut traits = Vec::new();
+        if p.novelty_seeking > 1.3 {
+            traits.push("novelty-seeking");
+        } else if p.novelty_seeking < 0.7 {
+            traits.push("risk-averse");
+        }
+        if p.harm_avoidance > 1.3 {
+            traits.push("cautious");
+        } else if p.harm_avoidance < 0.7 {
+            traits.push("bold");
+        }
+        if p.reward_dependence > 1.3 {
+            traits.push("socially-sensitive");
+        }
+        if p.persistence > 1.3 {
+            traits.push("persistent");
+        } else if p.persistence < 0.7 {
+            traits.push("flexible");
+        }
+        if traits.is_empty() {
+            "balanced".into()
+        } else {
+            traits.join(", ")
+        }
+    }
+}
+
+/// Neurochemical personality derived from receptor sensitivities.
+///
+/// Science: Cloninger (1987) — psychobiological model of temperament.
+///   DA receptor → Novelty Seeking
+///   NE receptor → Harm Avoidance (inverse)
+///   5-HT receptor → Reward Dependence
+///   ACh receptor → Persistence
+#[derive(Debug, Clone)]
+pub(crate) struct NeuromodulatorProfile {
+    /// DA sensitivity → novelty seeking
+    pub novelty_seeking: f32,
+    /// Inverse NE sensitivity → harm avoidance (high NE sens = low harm avoidance)
+    pub harm_avoidance: f32,
+    /// 5-HT sensitivity → reward dependence
+    pub reward_dependence: f32,
+    /// ACh sensitivity → persistence
+    pub persistence: f32,
 }
 
 #[cfg(test)]
@@ -373,6 +467,78 @@ mod tests {
     }
 
     #[test]
+    fn test_downstream_range_finite() {
+        // All 5 downstream methods return finite values for edge-case inputs
+        let mut bath = NeuromodulatorBath::default();
+
+        // Edge case: depleted transmitters
+        bath.dopamine.level = 0.0;
+        bath.noradrenaline.level = 0.0;
+        bath.serotonin.level = 0.0;
+        bath.acetylcholine.level = 0.0;
+        assert!(bath.learning_rate_factor().is_finite());
+        assert!(bath.exploration_delta().is_finite());
+        assert!(bath.confidence_delta().is_finite());
+        assert!(bath.attention_factor().is_finite());
+        assert!(bath.threshold_factor().is_finite());
+
+        // Edge case: saturated transmitters with max sensitivity
+        bath.dopamine.level = 1.0;
+        bath.dopamine.receptor_sensitivity = 2.0;
+        bath.noradrenaline.level = 1.0;
+        bath.noradrenaline.receptor_sensitivity = 2.0;
+        bath.serotonin.level = 1.0;
+        bath.serotonin.receptor_sensitivity = 2.0;
+        bath.acetylcholine.level = 1.0;
+        bath.acetylcholine.receptor_sensitivity = 2.0;
+        assert!(bath.learning_rate_factor().is_finite());
+        assert!(bath.exploration_delta().is_finite());
+        assert!(bath.confidence_delta().is_finite());
+        assert!(bath.attention_factor().is_finite());
+        assert!(bath.threshold_factor().is_finite());
+    }
+
+    #[test]
+    fn test_bath_dominance_coefficient() {
+        // Verify bath contributes meaningful LR modulation over 100 cycles
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.3,
+            surprise: false,
+            reward_signal: 0.3,
+            coherence: 0.6,
+            arousal: 0.5,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+        };
+
+        let mut bath = NeuromodulatorBath::default();
+        let mut lr_factors = Vec::new();
+        for _ in 0..100 {
+            bath.update(&inputs);
+            lr_factors.push(bath.learning_rate_factor());
+        }
+
+        let avg_factor: f32 = lr_factors.iter().sum::<f32>() / lr_factors.len() as f32;
+        // Bath LR factor should be in valid range (0.7–1.5)
+        assert!(
+            avg_factor >= 0.7 && avg_factor <= 1.5,
+            "bath LR factor out of range: {avg_factor}"
+        );
+        // The bath should produce meaningful LR factor (not stuck near minimum)
+        assert!(
+            avg_factor > 0.8,
+            "bath should produce meaningful LR factor: {avg_factor}"
+        );
+        let variance: f32 = lr_factors
+            .iter()
+            .map(|f| (f - avg_factor).powi(2))
+            .sum::<f32>()
+            / lr_factors.len() as f32;
+        assert!(variance.is_finite());
+    }
+
+    #[test]
     fn test_cross_modulation_da_suppresses_ne() {
         let mut bath = NeuromodulatorBath::default();
         // Push DA high
@@ -398,5 +564,176 @@ mod tests {
         assert!(bath.noradrenaline.effective().is_finite());
         assert!(bath.noradrenaline.level <= 1.0);
         assert!(bath.noradrenaline.level >= 0.0);
+    }
+
+    // ── Phase 2: Circadian Holon ──────────────────────────────────────
+
+    #[test]
+    fn test_circadian_night_high_serotonin() {
+        use crate::chronobiology::CircadianPhase;
+        let mut bath = NeuromodulatorBath::default();
+        bath.modulate_circadian(CircadianPhase::Night);
+        // Night: 5-HT baseline rises to 0.65
+        assert!(
+            bath.serotonin.baseline_for_test() > 0.6,
+            "Night 5-HT baseline should be >0.6, got {}",
+            bath.serotonin.baseline_for_test()
+        );
+        // Run 50 cycles to let levels converge toward baseline
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.2,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.5,
+            arousal: 0.3,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+        };
+        for _ in 0..50 {
+            bath.update(&inputs);
+        }
+        assert!(
+            bath.serotonin.effective() > 0.45,
+            "Night 5-HT effective should rise: {}",
+            bath.serotonin.effective()
+        );
+    }
+
+    #[test]
+    fn test_circadian_dawn_high_noradrenaline() {
+        use crate::chronobiology::CircadianPhase;
+        let mut bath = NeuromodulatorBath::default();
+        bath.modulate_circadian(CircadianPhase::Dawn);
+        assert!(
+            bath.noradrenaline.baseline_for_test() > 0.55,
+            "Dawn NE baseline should be >0.55, got {}",
+            bath.noradrenaline.baseline_for_test()
+        );
+    }
+
+    #[test]
+    fn test_circadian_day_high_acetylcholine() {
+        use crate::chronobiology::CircadianPhase;
+        let mut bath = NeuromodulatorBath::default();
+        bath.modulate_circadian(CircadianPhase::Day);
+        assert!(
+            bath.acetylcholine.baseline_for_test() > 0.55,
+            "Day ACh baseline should be >0.55, got {}",
+            bath.acetylcholine.baseline_for_test()
+        );
+    }
+
+    #[test]
+    fn test_circadian_phase_transition() {
+        use crate::chronobiology::CircadianPhase;
+        let mut bath = NeuromodulatorBath::default();
+
+        // Start at Dawn: NE baseline high
+        bath.modulate_circadian(CircadianPhase::Dawn);
+        let dawn_ne_baseline = bath.noradrenaline.baseline_for_test();
+        assert!(dawn_ne_baseline > 0.55);
+
+        // Transition to Night: NE baseline drops
+        bath.modulate_circadian(CircadianPhase::Night);
+        let night_ne_baseline = bath.noradrenaline.baseline_for_test();
+        assert!(
+            night_ne_baseline < dawn_ne_baseline,
+            "Night NE baseline ({night_ne_baseline}) should be < Dawn ({dawn_ne_baseline})"
+        );
+        // 5-HT rises when switching to Night
+        let night_sht_baseline = bath.serotonin.baseline_for_test();
+        assert!(
+            night_sht_baseline > 0.6,
+            "Night 5-HT baseline should be > 0.6: {night_sht_baseline}"
+        );
+    }
+
+    // ── Phase 4: Exocortex Query Trigger ────────────────────────────
+
+    #[test]
+    fn test_exocortex_query_triggers() {
+        let mut bath = NeuromodulatorBath::default();
+        // High NE (uncertainty), low DA (no reward), low 5-HT (low confidence)
+        bath.noradrenaline.level = 0.9;
+        bath.noradrenaline.receptor_sensitivity = 1.0;
+        bath.dopamine.level = 0.2;
+        bath.dopamine.receptor_sensitivity = 1.0;
+        bath.serotonin.level = 0.3;
+        bath.serotonin.receptor_sensitivity = 1.0;
+        assert!(
+            bath.should_query_exocortex(),
+            "Should trigger exocortex query: NE={}, DA={}, 5-HT={}",
+            bath.noradrenaline.effective(),
+            bath.dopamine.effective(),
+            bath.serotonin.effective()
+        );
+    }
+
+    #[test]
+    fn test_exocortex_query_suppressed() {
+        let mut bath = NeuromodulatorBath::default();
+        // High DA (reward) → should NOT trigger even with high NE
+        bath.noradrenaline.level = 0.9;
+        bath.dopamine.level = 0.8; // high reward prediction
+        bath.serotonin.level = 0.3;
+        assert!(
+            !bath.should_query_exocortex(),
+            "Should NOT trigger exocortex query when DA is high"
+        );
+    }
+
+    // ── Phase 5: Receptor Personality ────────────────────────────────
+
+    #[test]
+    fn test_personality_profile_from_defaults() {
+        let bath = NeuromodulatorBath::default();
+        let profile = bath.personality_profile();
+        // Default sensitivity = 1.0 → balanced profile
+        assert!((profile.novelty_seeking - 1.0).abs() < f32::EPSILON);
+        assert!((profile.harm_avoidance - 1.0).abs() < f32::EPSILON);
+        assert!((profile.reward_dependence - 1.0).abs() < f32::EPSILON);
+        assert!((profile.persistence - 1.0).abs() < f32::EPSILON);
+        assert_eq!(bath.personality_description(), "balanced");
+    }
+
+    #[test]
+    fn test_personality_description_novelty_seeking() {
+        let mut bath = NeuromodulatorBath::default();
+        // High DA sensitivity → novelty-seeking
+        bath.dopamine.receptor_sensitivity = 1.5;
+        let desc = bath.personality_description();
+        assert!(
+            desc.contains("novelty-seeking"),
+            "Expected 'novelty-seeking' in: {desc}"
+        );
+    }
+
+    #[test]
+    fn test_personality_adapts_over_time() {
+        let mut bath = NeuromodulatorBath::default();
+        let initial = bath.personality_profile().novelty_seeking;
+
+        // 500 cycles of high reward → DA stays high → tolerance → sensitivity drops
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.05,
+            surprise: false,
+            reward_signal: 0.9, // sustained high reward
+            coherence: 0.8,
+            arousal: 0.3,
+            binding_strength: 0.7,
+            epistemic_confidence: 0.8,
+            flow_active: true,
+        };
+        for _ in 0..500 {
+            bath.update(&inputs);
+        }
+
+        let after = bath.personality_profile().novelty_seeking;
+        // DA tolerance should have reduced receptor sensitivity (novelty seeking)
+        assert!(
+            after < initial,
+            "Novelty seeking should decrease after sustained reward: {after} vs initial {initial}"
+        );
     }
 }

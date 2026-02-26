@@ -95,6 +95,9 @@ pub struct BrocaCheckpoint {
     pub training_loss: f32,
     /// Optional Adam optimizer state for training resume.
     pub adam_state: Option<AdamState>,
+    /// Optional HDC↔SSM projection weights for Liquid-Mamba fusion.
+    /// Stored as a flat Vec from `HdcSsmProjection::flatten_weights()`.
+    pub projection_weights: Option<Vec<f32>>,
     /// Blake3 integrity checksum (set to zeros before hashing).
     pub checksum: [u8; 32],
 }
@@ -112,6 +115,7 @@ impl BrocaCheckpoint {
             training_epoch: self.training_epoch,
             training_loss: self.training_loss,
             adam_state: self.adam_state.clone(),
+            projection_weights: self.projection_weights.clone(),
             checksum: [0u8; 32],
         };
         copy.checksum = [0u8; 32];
@@ -186,6 +190,7 @@ impl BrocaGenerator {
         training_epoch: usize,
         training_loss: f32,
         adam_state: Option<AdamState>,
+        projection_weights: Option<Vec<f32>>,
     ) -> Result<()> {
         let vocab = VocabFile {
             tokens: (0..self.tokenizer().vocab_size())
@@ -203,6 +208,7 @@ impl BrocaGenerator {
             training_epoch,
             training_loss,
             adam_state,
+            projection_weights,
             checksum: [0u8; 32],
         };
 
@@ -216,7 +222,7 @@ impl BrocaGenerator {
     pub fn from_checkpoint<P: AsRef<Path>>(
         path: P,
         genesis: &symthaea_core::genesis::GenesisSeed,
-    ) -> Result<(Self, Option<AdamState>)> {
+    ) -> Result<(Self, Option<AdamState>, Option<Vec<f32>>)> {
         let checkpoint = BrocaCheckpoint::load_from_file(path)?;
 
         let tokenizer = crate::tokenizer::BpeTokenizer::from_vocab_file(&checkpoint.vocab);
@@ -227,7 +233,7 @@ impl BrocaGenerator {
         // Restore network state (weights, momentums, etc.)
         *gen.controller_mut().network_mut() = checkpoint.network_state;
 
-        Ok((gen, checkpoint.adam_state))
+        Ok((gen, checkpoint.adam_state, checkpoint.projection_weights))
     }
 }
 
@@ -250,11 +256,12 @@ mod tests {
         let path = dir.join("broca_test_checkpoint.bin");
 
         // Save
-        gen.save_checkpoint(&path, 5, 2.5, None).unwrap();
+        gen.save_checkpoint(&path, 5, 2.5, None, None).unwrap();
 
         // Load
-        let (loaded_gen, adam) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
+        let (loaded_gen, adam, proj) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
         assert!(adam.is_none());
+        assert!(proj.is_none());
         assert_eq!(loaded_gen.tokenizer().vocab_size(), gen.tokenizer().vocab_size());
 
         let _ = std::fs::remove_file(&path);
@@ -271,13 +278,37 @@ mod tests {
         let dir = std::env::temp_dir();
         let path = dir.join("broca_test_checkpoint_adam.bin");
 
-        gen.save_checkpoint(&path, 10, 1.5, Some(adam)).unwrap();
+        gen.save_checkpoint(&path, 10, 1.5, Some(adam), None).unwrap();
 
-        let (_, loaded_adam) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
+        let (_, loaded_adam, _) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
         assert!(loaded_adam.is_some());
         let loaded_adam = loaded_adam.unwrap();
         assert_eq!(loaded_adam.t, 0);
         assert_eq!(loaded_adam.beta1, 0.9);
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_checkpoint_with_projection_weights() {
+        let genesis = test_genesis();
+        let config = BrocaConfig::default();
+        let gen = BrocaGenerator::new(&genesis, config);
+
+        let proj_weights = vec![0.1, 0.2, 0.3, -0.4, 0.5];
+
+        let dir = std::env::temp_dir();
+        let path = dir.join("broca_test_checkpoint_proj.bin");
+
+        gen.save_checkpoint(&path, 3, 2.0, None, Some(proj_weights.clone()))
+            .unwrap();
+
+        let (_, _, loaded_proj) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
+        assert!(loaded_proj.is_some());
+        let loaded_proj = loaded_proj.unwrap();
+        assert_eq!(loaded_proj.len(), 5);
+        assert!((loaded_proj[0] - 0.1).abs() < 1e-6);
+        assert!((loaded_proj[3] - (-0.4)).abs() < 1e-6);
 
         let _ = std::fs::remove_file(&path);
     }
@@ -291,7 +322,7 @@ mod tests {
         let dir = std::env::temp_dir();
         let path = dir.join("broca_test_corrupt.bin");
 
-        gen.save_checkpoint(&path, 1, 3.0, None).unwrap();
+        gen.save_checkpoint(&path, 1, 3.0, None, None).unwrap();
 
         // Corrupt the file
         let mut data = std::fs::read(&path).unwrap();
@@ -333,6 +364,7 @@ mod tests {
             training_epoch: 0,
             training_loss: 0.0,
             adam_state: None,
+            projection_weights: None,
             checksum: [0u8; 32],
         };
         checkpoint.checksum = checkpoint.compute_checksum();
