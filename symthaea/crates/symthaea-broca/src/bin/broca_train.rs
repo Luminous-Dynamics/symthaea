@@ -9,7 +9,6 @@
 
 use std::process;
 
-use symthaea_broca::checkpoint::AdamState;
 use symthaea_broca::generator::{BrocaConfig, BrocaGenerator};
 use symthaea_broca::training::{TrainingConfig, TrainingDataset, train_with_adam};
 
