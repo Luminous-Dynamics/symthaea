@@ -38,10 +38,13 @@ impl Default for GenerationParams {
 /// (Ollama), a remote API, or simulation.
 #[async_trait::async_trait]
 pub trait LLMBackend: Send + Sync {
-    /// Generate a response for the given prompt with parameters.
+    /// Generate a response from a prompt.
     async fn generate(&self, prompt: &str, params: &GenerationParams) -> Result<String>;
 
-    /// Check if the backend is available/healthy.
+    /// Update the affective state (thermodynamics -> language warping).
+    fn update_affect(&self, _load: f32, _temp: f32) {}
+
+    /// Check if the backend is currently available.
     async fn is_available(&self) -> bool;
 
     /// Generate a streaming response, calling `on_token` for each token as it arrives.

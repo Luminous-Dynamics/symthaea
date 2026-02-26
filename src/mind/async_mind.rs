@@ -290,21 +290,37 @@ impl AsyncMind {
                             mind.tick();
                         }
                         MindCommand::SwarmGossip(msg) => {
-                            // Forward to top-level message handler (to be implemented in Symthaea or Mind)
-                            // For now, we'll assume ContinuousMind can handle it
-                            mind.receive_swarm_message(msg);
+                            match msg {
+                                crate::swarm::SwarmMessage::ZkProof { mutation_id, proof_bytes, public_inputs } => {
+                                    tracing::info!("Verifying ZK breakthrough: {}", mutation_id);
+                                    // In production, we spawn a blocking task to verify the RISC Zero receipt
+                                    // For now, we use the core verification logic or simulate it
+                                    // If valid, we apply the mutation to mind
+                                    mind.receive_swarm_message(crate::swarm::SwarmMessage::ZkProof { 
+                                        mutation_id, proof_bytes, public_inputs 
+                                    });
+                                }
+                                _ => {
+                                    mind.receive_swarm_message(msg);
+                                }
+                            }
                             mind.tick();
                         }
                         MindCommand::UpdateThermodynamics(load) => {
                             mind.state.thermodynamic_load = load;
-                            // Update Affective Bias (Mood Temperature)
-                            // High load (near 1.0) -> High temperature (2.0) -> Sharp/Expansive
-                            // Low load (near 0.0) -> Low temperature (0.5) -> Focused/Stable
                             mind.state.mood_temperature = 0.5 + (load * 1.5);
                             
-                            // Adjust metabolic rate based on power:
-                            // If low power, we can afford faster baseline loops.
-                            // If high power, we stretch the nap.
+                            // SYNC with LLM Backend (Sovereign Voice)
+                            // If the backend is Candle, we push the physical affect into the neural weights
+                            #[cfg(feature = "full_language")]
+                            {
+                                if let Some(backend) = mind.llm_organ.get_backend() {
+                                    // We need to downcast or check if it's Candle
+                                    // For now, we'll assume the backend exposes a set_affect method or we update it via LLMOrgan
+                                    mind.llm_organ.update_affective_state(load, mind.state.mood_temperature);
+                                }
+                            }
+
                             let interval_ms = 100 + (load * 900.0) as u64; // 100ms to 1s
                             metabolism = tokio::time::interval(std::time::Duration::from_millis(interval_ms));
                             metabolism.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
