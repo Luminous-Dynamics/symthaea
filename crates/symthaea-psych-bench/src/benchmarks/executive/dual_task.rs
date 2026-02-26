@@ -11,6 +11,10 @@
 //! - Low-load: choice RT while holding 3 digits
 //! - High-load: choice RT while holding 6 digits
 //!
+//! Model: Digit load occupies WM slots, raising the decision temperature
+//! for the choice task. Temperature scales as base * (1 + 0.5 * load_fraction),
+//! yielding ~95% single → ~90% low → ~85% high (Baddeley & Hitch 1974).
+//!
 //! Key metrics:
 //! - dual_task_cost: accuracy drop from single to high-load
 //! - digit_recall_accuracy: maintenance of digit load
@@ -69,17 +73,17 @@ impl DualTaskBenchmark {
         let wm_capacity = config.working_memory_capacity;
         let digit_count = condition.digit_count();
 
-        // Choice stimuli: 4 possible targets
+        // Choice stimuli: 4 possible targets.
         let target_hvs: Vec<ContinuousHV> = (0..4)
             .map(|i| ContinuousHV::random(dim, config.seed.wrapping_add(200 + i)))
             .collect();
 
-        // Response templates
+        // Response templates.
         let response_hvs: Vec<ContinuousHV> = (0..4)
             .map(|i| ContinuousHV::random(dim, config.seed.wrapping_add(300 + i)))
             .collect();
 
-        // Digit representations (0-9)
+        // Digit representations (0-9).
         let digit_hvs: Vec<ContinuousHV> = (0..10)
             .map(|i| ContinuousHV::random(dim, config.seed.wrapping_add(400 + i as u64)))
             .collect();
@@ -88,11 +92,19 @@ impl DualTaskBenchmark {
         // Remaining WM slots determine processing efficiency.
         // Wickelgren (1977): SAT functions show asymptotic accuracy drops with concurrent load.
         let effective_capacity = wm_capacity.saturating_sub(digit_count);
-        let capacity_ratio = effective_capacity as f64 / wm_capacity as f64;
-        // Base temperature yields ~5% error for single task; scales inversely with capacity.
+        let load_fraction = 1.0 - (effective_capacity as f64 / wm_capacity as f64);
+        // Base temperature calibrated for 4-AFC: association/temp ≈ 4.0 → ~95% single.
+        // Linear load scaling: high-load temp ≈ 1.43× base → ~85% (Baddeley & Hitch 1974).
         // Heitz (2014): time pressure compounds with load.
         let base_temp = 0.20 + config.time_pressure * 0.12;
-        let temperature = base_temp / capacity_ratio.max(0.15);
+        let temperature = base_temp * (1.0 + 0.5 * load_fraction);
+
+        // Association strength: learned S-R mapping adds this to the correct
+        // response's activation. At base_temp=0.20, this yields softmax logit
+        // of 4.0 → P(correct) = exp(4)/(exp(4)+3) = 0.948 for single task.
+        // Under high load (temp=0.286), logit drops to 2.80 → P = 0.846.
+        // Must NOT be raised above 0.80 or the load gradient vanishes.
+        let association: f64 = 0.80;
 
         let mut accuracies = Vec::with_capacity(trials);
         let mut rt_ticks = Vec::with_capacity(trials);
@@ -108,7 +120,7 @@ impl DualTaskBenchmark {
         };
 
         for _trial in 0..trials {
-            // Generate digit load
+            // Generate digit load.
             let load_digits: Vec<usize> = (0..digit_count)
                 .map(|_d| {
                     xor_shift(&mut rng);
@@ -116,7 +128,7 @@ impl DualTaskBenchmark {
                 })
                 .collect();
 
-            // Encode digit load into WM (occupies slots, reducing capacity)
+            // Encode digit load into WM (occupies slots, reducing capacity).
             let load_hv: Option<ContinuousHV> = if !load_digits.is_empty() {
                 let sum: ContinuousHV = load_digits.iter().fold(
                     ContinuousHV::zero(dim),
@@ -133,40 +145,41 @@ impl DualTaskBenchmark {
                 None
             };
 
-            // Choice RT task: identify which of 4 targets was presented
+            // Choice RT task: identify which of 4 targets was presented.
             xor_shift(&mut rng);
             let target_idx = (rng as usize) % 4;
             let stimulus = &target_hvs[target_idx];
 
-            // Compute similarity to each response option
+            // Compute similarity to each response option.
             let mut activations: Vec<f64> = response_hvs
                 .iter()
                 .enumerate()
                 .map(|(i, resp)| {
-                    let sim = cosine_similarity(stimulus, resp);
-                    // Correct target gets a boost from learned association
-                    let association = if i == target_idx { 0.6 } else { 0.0 };
-                    (sim as f64 + association) / temperature
+                    let sim = stimulus.similarity(resp) as f64;
+                    // Correct target gets association boost from learned mapping.
+                    let assoc = if i == target_idx { association } else { 0.0 };
+                    (sim + assoc) / temperature
                 })
                 .collect();
 
-            // WM load adds noise to decision process (Baddeley & Hitch, 1974)
-            if let Some(ref load) = load_hv {
-                let load_noise = cosine_similarity(stimulus, load) as f64 * 0.15;
-                for (i, act) in activations.iter_mut().enumerate() {
-                    if i != target_idx {
-                        *act += load_noise;
-                    }
+            // WM load adds stochastic noise to decision process.
+            // Baddeley & Hitch (1974): concurrent maintenance disrupts choice processing.
+            if load_hv.is_some() {
+                let noise_scale = load_fraction * 0.25;
+                for act in activations.iter_mut() {
+                    xor_shift(&mut rng);
+                    let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * noise_scale;
+                    *act += noise;
                 }
             }
 
-            // Softmax response selection
+            // Softmax response selection.
             let max_act = activations.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
             let exp_acts: Vec<f64> = activations.iter().map(|a| (a - max_act).exp()).collect();
             let sum_exp: f64 = exp_acts.iter().sum();
             let probs: Vec<f64> = exp_acts.iter().map(|e| e / sum_exp).collect();
 
-            // Select response (argmax with stochastic tie-breaking)
+            // Select response via cumulative probability.
             xor_shift(&mut rng);
             let u = (rng as f64) / u64::MAX as f64;
             let mut cumulative = 0.0;
@@ -182,25 +195,27 @@ impl DualTaskBenchmark {
             let correct = selected == target_idx;
             accuracies.push(if correct { 1.0 } else { 0.0 });
 
-            // RT: base processing time + WM load overhead
-            // Pashler (1994): dual-task RT increases with concurrent load
+            // RT: base processing time + WM load overhead.
+            // Pashler (1994): dual-task RT increases with concurrent load.
+            xor_shift(&mut rng);
             let base_rt = 3.0 + (rng as f64 / u64::MAX as f64) * 2.0;
             let load_overhead = digit_count as f64 * 0.5;
             rt_ticks.push(base_rt + load_overhead);
 
-            // Digit recall: probe accuracy of maintained digits
+            // Digit recall: probe accuracy of maintained digits.
+            // Digits are the PRIMARY memory task — they fill WM directly.
+            // Recall degrades only when digit count approaches WM capacity.
+            // Cowan (2001): K ≈ 4 items for most adults; well within capacity = near-perfect.
             if !load_digits.is_empty() {
                 xor_shift(&mut rng);
-                let probe_idx = (rng as usize) % digit_count;
-                let _probe_digit = load_digits[probe_idx];
+                let _probe_idx = (rng as usize) % digit_count;
 
-                // Recall accuracy depends on load relative to capacity
-                // Cowan (2001): K ≈ 4 items for most adults
-                let recall_prob = if digit_count <= effective_capacity {
-                    0.95 // well within capacity
+                let recall_prob = if digit_count <= wm_capacity {
+                    // Digits fit within capacity: high recall with slight serial position cost.
+                    0.95 - 0.05 * (digit_count as f64 / wm_capacity as f64)
                 } else {
-                    // Exceeds capacity: probability decays
-                    0.95 * (effective_capacity as f64 / digit_count as f64)
+                    // Exceeds capacity: probability decays proportionally.
+                    0.95 * (wm_capacity as f64 / digit_count as f64)
                 };
                 xor_shift(&mut rng);
                 let recall_u = (rng as f64) / u64::MAX as f64;
@@ -209,17 +224,6 @@ impl DualTaskBenchmark {
         }
 
         (accuracies, rt_ticks, recall_scores)
-    }
-}
-
-fn cosine_similarity(a: &ContinuousHV, b: &ContinuousHV) -> f32 {
-    let dot: f32 = a.values.iter().zip(b.values.iter()).map(|(x, y)| x * y).sum();
-    let mag_a: f32 = a.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let mag_b: f32 = b.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if mag_a < 1e-10 || mag_b < 1e-10 {
-        0.0
-    } else {
-        dot / (mag_a * mag_b)
     }
 }
 
@@ -254,7 +258,7 @@ impl PsychBenchmark for DualTaskBenchmark {
             }
         }
 
-        // Compute dual-task cost: single - high-load accuracy
+        // Compute dual-task cost: single - high-load accuracy.
         let single_acc = result.metrics.get("single_accuracy")
             .map(|m| m.mean)
             .unwrap_or(0.95);
@@ -266,7 +270,7 @@ impl PsychBenchmark for DualTaskBenchmark {
             MetricValue::from_samples(&[single_acc - high_acc]),
         );
 
-        // Overall digit recall accuracy
+        // Overall digit recall accuracy.
         let low_recall = result.metrics.get("dual_low_recall")
             .map(|m| m.mean)
             .unwrap_or(0.9);
@@ -328,7 +332,7 @@ mod tests {
         };
         let result = DualTaskBenchmark.run(&config);
         let single = result.metrics.get("single_accuracy").unwrap().mean;
-        let low = result.metrics.get("dual_low_accuracy").unwrap().mean;
+        let _low = result.metrics.get("dual_low_accuracy").unwrap().mean;
         let high = result.metrics.get("dual_high_accuracy").unwrap().mean;
         // Expected gradient: single >= low >= high
         assert!(single >= high - 0.05,
