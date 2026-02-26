@@ -35,10 +35,13 @@ members = [
     "crates/symthaea-hal",
     "crates/symthaea-ssm",
     "crates/symthaea-zkproof",
+    "crates/symthaea-broca",
 ]
 
 
 [workspace.dependencies]
+arrow-array = "56"
+arrow-schema = "56"
 ndarray = { version = "0.16", features = ["rayon", "serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -150,6 +153,9 @@ symthaea-vocal-tract = { path = "crates/symthaea-vocal-tract", default-features 
 # Symthaea Physics - Tokamak plasma HDC encoding, C-Mod adapter, Phi-based control
 symthaea-physics = { path = "crates/symthaea-physics", optional = true }
 
+# Symthaea Broca - SSM Language Center: CfC-HDC autoregressive thought-to-text generation
+symthaea-broca = { path = "crates/symthaea-broca", optional = true }
+
 # Symthaea Nix - Conscious NixOS mind (HDC + active inference)
 symthaea-nix = { path = "crates/symthaea-nix", optional = true }
 
@@ -190,8 +196,8 @@ iroh = { version = "0.96", optional = true }
 # LanceDB: Columnar vector storage backend (optional)
 # Implementation: src/databases/lance_client.rs
 lancedb = { version = "0.23", optional = true }
-arrow-array = { version = "56", optional = true }
-arrow-schema = { version = "56", optional = true }
+arrow-array = { workspace = true, optional = true }
+arrow-schema = { workspace = true, optional = true }
 futures = { version = "0.3", optional = true }
 
 # Phase 11+: Mycelix Protocol Integration (Deferred to Week 9+)
@@ -367,6 +373,8 @@ humanoid = ["dep:symthaea-humanoid"]       # HDC-LTC bipedal humanoid control vi
 hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 servos, I2C sensors, safety interlocks)
 ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sensor integration (power stream)
 ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-hal"]
+ssm_language = ["dep:symthaea-broca"]          # Native CfC-HDC language center (SSM Broca's area)
+liquid-mamba = ["ssm_language", "symthaea-broca/mamba"]  # Liquid-Mamba fusion: pre-trained Mamba SSM + HDC consciousness gating
 humanoid-mujoco = ["humanoid", "symthaea-humanoid/mujoco"]  # Humanoid with MuJoCo physics
 humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid with MuJoCo viewer
 
@@ -376,6 +384,7 @@ humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid wi
 lancedb-backend = ["dep:lancedb", "dep:arrow-array", "dep:arrow-schema", "dep:futures"]
 
 # ── Consciousness & Reasoning (code-level cfg gates) ────────────────
+multi_agent = ["full_consciousness"]        # Multi-agent trust scoring (byzantine, causal consensus)
 full_consciousness = []                     # Extended consciousness submodules
 full_perception = []                        # Extended perception submodules
 full_language = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub"]                          # Advanced language features (grammar, parsers)
@@ -1031,7 +1040,7 @@ opt-level = 1  # HV16 array ops are 10-100x slower at opt-level=0
 
 [profile.release]
 opt-level = 3
-lto = "fat"
+lto = "thin"         # 5x faster release builds vs "fat", <5% perf difference
 codegen-units = 1
 strip = true
 
