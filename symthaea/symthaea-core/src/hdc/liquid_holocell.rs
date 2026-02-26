@@ -120,6 +120,30 @@ impl LiquidHolocell {
             *h = (*h * decay) + (i * integration);
         }
     }
+
+    /// Fork the holocell into a temporary 'Dream Sandbox' for consequence simulation.
+    pub fn fork(&self) -> Self {
+        self.clone()
+    }
+
+    /// Simulate the thermodynamic impact of an action.
+    /// 
+    /// Returns the predicted thermodynamic load [0, 1].
+    pub fn simulate(&self, input: &ContinuousHV, iterations: usize) -> f32 {
+        let mut sandbox = self.fork();
+        let dt = 0.1;
+        
+        for _ in 0..iterations {
+            sandbox.step(input, dt);
+        }
+
+        // Predicted Load = Energy of the delta (surprise)
+        let surprise = 1.0 - self.state.similarity(&sandbox.state);
+        
+        // Map surprise to thermodynamic load prediction
+        // High surprise = high power draw
+        surprise.clamp(0.0, 1.0)
+    }
 }
 
 #[cfg(test)]

@@ -334,6 +334,15 @@ impl ContinuousMind {
         }
 
         if self.state.tick.is_multiple_of(10) && !self.working_memory.is_empty() {
+            // v1.9.0 CAUSAL VETO:
+            // Simulate the thermodynamic cost of speaking this thought.
+            let predicted_load = self.state.holocell.simulate(&self.state.current_thought, 5);
+            
+            if predicted_load > 0.9 && self.state.thermodynamic_load > 0.7 {
+                tracing::warn!(load = predicted_load, "PREFRONTAL VETO: Thought predicted to cause thermodynamic red-line. Inhibiting output.");
+                return None;
+            }
+
             self.stats.outputs_generated += 1;
 
             return Some(MindOutput {
