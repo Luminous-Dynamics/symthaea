@@ -69,7 +69,7 @@ rayon = "1.10"
 
 [package]
 name = "symthaea"
-version = "0.6.0"
+version = "1.0.0"
 edition = "2021"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Symthaea: Holographic Liquid Brain lineage - Consciousness-first AI in Rust"
@@ -196,9 +196,7 @@ futures = { version = "0.3", optional = true }
 
 # Phase 11+: Mycelix Protocol Integration (Deferred to Week 9+)
 uuid = { workspace = true }  # Week 3: Enabled for Goal IDs
-# mycelix-sdk: Path dependency removed for Nix sandbox compatibility
-# Re-enable when mycelix-workspace/sdk is available as a crates.io package or git dependency
-# mycelix-sdk = { path = "../../../mycelix-workspace/sdk", optional = true, default-features = false, features = ["standalone"] }
+mycelix-sdk = { path = "../mycelix-workspace/sdk-ts/../sdk", optional = true, default-features = false, features = ["standalone"] }
 sha3 = { version = "0.10", optional = true }  # For gradient hashing
 
 # Web Research & Epistemic Verification (Track 6)
@@ -352,9 +350,7 @@ mesh = []                                   # Physical mesh radio (LoRa + B.A.T.
 lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh radio
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
 mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
-# mycelix_sdk: Add mycelix-sdk dep when it's published to crates.io, then enable:
-# mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]
-mycelix_sdk = ["mycelix"]                  # Placeholder until mycelix-sdk is published (SDK code is cfg-gated)
+mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration
 
 # ── Desktop & System Integration ────────────────────────────────────
 notifications = ["zbus"]                    # D-Bus desktop notifications
