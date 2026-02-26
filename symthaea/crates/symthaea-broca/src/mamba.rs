@@ -53,17 +53,15 @@ impl MambaWrapper {
         // Load model weights from safetensors
         let weights_path = repo.get("model.safetensors")
             .context("Failed to download model.safetensors")?;
-        let weights = unsafe {
-            candle_core::safetensors::MmapedSafetensors::new(weights_path)
-                .context("Failed to mmap safetensors")?
+        let vb = unsafe {
+            VarBuilder::from_mmaped_safetensors(
+                &[&weights_path],
+                DType::F32,
+                &device,
+            ).context("Failed to load safetensors")?
         };
-        let vb = VarBuilder::from_mmaped_safetensors(
-            vec![weights],
-            DType::F32,
-            &device,
-        );
 
-        let model = Model::new(&config, vb.clone())
+        let model = Model::new(&config, vb.pp("backbone"))
             .context("Failed to build Mamba model")?;
 
         let state = State::new(1, &config, DType::F32, &device)

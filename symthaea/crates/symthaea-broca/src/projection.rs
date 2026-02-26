@@ -395,17 +395,19 @@ mod tests {
     #[test]
     fn test_gradient_accumulation_and_application() {
         let genesis = test_genesis();
-        let mut proj = HdcSsmProjection::new(&genesis, 256, 32, 64); // Small dims for speed
+        let dim = 256;
+        let mut proj = HdcSsmProjection::new(&genesis, dim, 32, 64); // Small dims for speed
 
-        let thought = ContinuousHV::from_vec(vec![0.1; 256]).normalize();
-        let output = ContinuousHV::from_vec(vec![0.2; 256]).normalize();
+        // Use non-uniform, differently-seeded vectors to ensure non-zero error
+        let thought = ContinuousHV::random(dim, 42);
+        let output = ContinuousHV::random(dim, 99);
 
         // Capture weights before
         let weights_before = proj.flatten_weights();
 
-        // Accumulate and apply gradients
+        // Accumulate and apply gradients with a generous LR and clip
         proj.compute_gradients(&thought, &output);
-        proj.apply_gradients(0.01, 1.0);
+        proj.apply_gradients(0.1, 1000.0);
 
         let weights_after = proj.flatten_weights();
 
@@ -419,11 +421,12 @@ mod tests {
     #[test]
     fn test_gradient_clipping() {
         let genesis = test_genesis();
-        let mut proj = HdcSsmProjection::new(&genesis, 256, 32, 64);
+        let dim = 256;
+        let mut proj = HdcSsmProjection::new(&genesis, dim, 32, 64);
 
-        // Create a large error signal
-        let thought = ContinuousHV::from_vec(vec![10.0; 256]);
-        let output = ContinuousHV::from_vec(vec![-10.0; 256]);
+        // Create a large error signal using differently-scaled random vectors
+        let thought = ContinuousHV::random(dim, 42).scale(10.0);
+        let output = ContinuousHV::random(dim, 99).scale(10.0);
 
         let weights_before = proj.flatten_weights();
 
