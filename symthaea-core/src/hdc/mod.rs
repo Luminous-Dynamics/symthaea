@@ -101,7 +101,7 @@ pub const HDC_DIMENSION_64K: usize = 65_536;
 /// let ultra_custom = HdcDimensionality::Custom(131_072);
 /// assert_eq!(ultra_custom.dimension(), 131_072);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize)]
 pub enum HdcDimensionality {
     /// Rest 8,192 dimensions (2^13) - ultra-low power recovery mode
     Rest,
@@ -290,6 +290,9 @@ pub mod unified_network_phi; // Phi measurement and validation for HdcLtcUnified
 pub mod config; // Centralized HDC configuration (runtime dimension management)
 pub mod projection;
 pub mod unified_hv; // Unified hypervector types (ContinuousHV) // Learned projection layers for dimension conversion
+
+// Grid encoding for 2D spatial reasoning (ARC-style puzzles)
+pub mod grid_encoder;
 
 // Global Workspace Theory (conscious access, competition, broadcasting)
 pub mod global_workspace; // GWT implementation with competitive dynamics
@@ -519,6 +522,9 @@ pub use unified_consciousness_engine::{
 
 // Re-export consciousness visualization
 pub use consciousness_visualizer::ConsciousnessVisualizer;
+
+// Re-export grid encoder
+pub use grid_encoder::GridEncoder;
 
 // Re-export deep integration bridge
 pub use deep_integration::DeepIntegrationBridge;
