@@ -459,6 +459,13 @@ pub struct StructuredThought {
     /// active (e.g. "Mathematical", "Strategic", "MetaCognitive").
     #[serde(default)]
     pub primitive_tiers: Vec<String>,
+
+    /// Concrete executable primitives (the "Hands").
+    ///
+    /// These are resolved from tiers and intent, and can be directly
+    /// executed by the ActionRegistry (e.g. "WRITE", "NIX_BUILD").
+    #[serde(default)]
+    pub primitives: Vec<String>,
 }
 
 /// Context for code understanding and generation within StructuredThought.
@@ -673,6 +680,7 @@ impl Default for StructuredThought {
             constraints: Vec::new(),
             original_input: None,
             primitive_tiers: Vec::new(),
+            primitives: Vec::new(),
         }
     }
 }

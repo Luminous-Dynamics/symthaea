@@ -18,7 +18,7 @@ use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig, HDC_DIMENSION};
 
 /// Configuration for the language controller.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LanguageControllerConfig {
     /// Number of layers in the HdcLtcUnifiedNetwork.
     pub network_layers: usize,

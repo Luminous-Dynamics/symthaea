@@ -491,6 +491,29 @@ impl CurriculumExtender {
                     );
                     match global_hdc_sweep(&mut schema, dimension, db, threshold).await {
                         Ok(report) => {
+                            if report.suppressed > 0 && schema.objectives.is_empty() {
+                                warn!(
+                                    "   🧠 Global HDC sweep suppressed all objectives; skipping ingestion."
+                                );
+                                if !report.causal_links.is_empty() {
+                                    if let Err(e) = db.store_causal_links(&report.causal_links).await {
+                                        warn!("   ⚠️ Failed to persist causal links: {}", e);
+                                    } else {
+                                        info!(
+                                            "   🔗 Stored {} causal links from global sweep",
+                                            report.causal_links.len()
+                                        );
+                                    }
+                                }
+                                return Ok(ResearchSummary {
+                                    objectives_added: 0,
+                                    total_objectives: target_curriculum.objectives.len(),
+                                    confidence: 0.8,
+                                    warnings: vec![
+                                        "All objectives suppressed by global HDC sweep".to_string()
+                                    ],
+                                });
+                            }
                             if report.suppressed > 0 {
                                 warn!(
                                     "   🧠 Global HDC sweep suppressed {} objectives (threshold {:.2})",

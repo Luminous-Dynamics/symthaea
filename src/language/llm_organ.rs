@@ -244,6 +244,9 @@ pub struct LLMOrgan {
     stats: LLMOrganStats,
     /// Optional LLM backend for real generation
     backend: Option<Arc<dyn super::llm_backend::LLMBackend>>,
+    /// Distillation data collector (active when SYMTHAEA_DISTILL_PATH is set)
+    #[cfg(feature = "ssm_language")]
+    distillation_collector: Option<super::distillation::DistillationCollector>,
 }
 
 impl std::fmt::Debug for LLMOrgan {
@@ -280,6 +283,8 @@ impl LLMOrgan {
             embedding_cache: HashMap::new(),
             stats: LLMOrganStats::default(),
             backend: None,
+            #[cfg(feature = "ssm_language")]
+            distillation_collector: super::distillation::DistillationCollector::from_env(),
         }
     }
 
@@ -299,6 +304,8 @@ impl LLMOrgan {
             embedding_cache: HashMap::new(),
             stats: LLMOrganStats::default(),
             backend: Some(backend),
+            #[cfg(feature = "ssm_language")]
+            distillation_collector: super::distillation::DistillationCollector::from_env(),
         }
     }
 
@@ -753,7 +760,16 @@ impl LLMOrgan {
             }),
         };
 
-        self.query_async(query).await
+        let result = self.query_async(query).await;
+
+        // Record (channels, text) pair for Broca distillation training
+        #[cfg(feature = "ssm_language")]
+        if let Some(ref collector) = self.distillation_collector {
+            let channels = super::ssm_backend::thought_to_channels(thought, mood_temperature);
+            collector.record(&channels, &result.text);
+        }
+
+        result
     }
 
     /// Build the translation prompt from a structured thought.

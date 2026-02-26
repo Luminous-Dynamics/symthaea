@@ -9,6 +9,8 @@ license = "MIT"
 symthaea-core = { path = "../../symthaea-core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+bincode = { workspace = true }
+blake3 = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 rand = { workspace = true }
@@ -24,3 +26,4 @@ tokenizers = { version = "0.21", optional = true }
 [features]
 default = []
 mamba = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:hf-hub", "dep:tokenizers"]
+hf-tokenizer = ["dep:tokenizers"]

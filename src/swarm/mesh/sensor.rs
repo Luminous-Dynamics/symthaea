@@ -20,7 +20,7 @@
 //! and encodes readings into HDC space for the cognitive loop.
 
 use super::MeshUrgency;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use symthaea_core::hdc::ContinuousHV;
 
 // ============================================================================
@@ -59,6 +59,10 @@ pub struct SensorReading {
     pub sensor_id: String,
     /// Raw measurement as f32 values (protocol-specific interpretation).
     pub values: Vec<f32>,
+    /// Topic tags for memory routing (e.g., interoception, power).
+    pub tags: Vec<String>,
+    /// Additional metadata for persistence (stringified values).
+    pub metadata: HashMap<String, String>,
     /// Urgency override (`Some` = sensor demands specific urgency,
     /// `None` = use the sensor's default class).
     pub urgency_override: Option<MeshUrgency>,
@@ -203,6 +207,8 @@ impl SensorInput for MockSensor {
         Some(SensorReading {
             sensor_id: self.name.clone(),
             values,
+            tags: Vec::new(),
+            metadata: HashMap::new(),
             urgency_override: None,
             timestamp_s: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -253,6 +259,8 @@ impl<T: symthaea_hal::HalSensorAdapter + Sync> SensorInput for HalSensorBridge<T
         Some(SensorReading {
             sensor_id: self.adapter.name().to_string(),
             values,
+            tags: Vec::new(),
+            metadata: HashMap::new(),
             urgency_override: None,
             timestamp_s: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -337,12 +345,16 @@ mod tests {
         let reading_a = SensorReading {
             sensor_id: "sensor_a".to_string(),
             values: vec![1.0],
+            tags: Vec::new(),
+            metadata: HashMap::new(),
             urgency_override: None,
             timestamp_s: 0,
         };
         let reading_b = SensorReading {
             sensor_id: "sensor_b".to_string(),
             values: vec![1.0],
+            tags: Vec::new(),
+            metadata: HashMap::new(),
             urgency_override: None,
             timestamp_s: 0,
         };

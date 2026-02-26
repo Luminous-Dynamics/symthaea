@@ -691,7 +691,6 @@ impl VocalTractController {
             .map(|d| if *d > median_dist { 20 } else { 10 })
             .collect();
 
-        let mut last_epoch_loss = 0.0;
 
         // Convergence-critical parameters:
         // - 20 warmup steps for LTC neurons to reach differentiated steady states
@@ -730,7 +729,7 @@ impl VocalTractController {
                 }
             }
 
-            last_epoch_loss = epoch_loss / phoneme_hvs.len() as f32;
+            let _epoch_loss = epoch_loss / phoneme_hvs.len() as f32;
         }
 
         // === Phase 2: Vowel fine-tuning tail ===

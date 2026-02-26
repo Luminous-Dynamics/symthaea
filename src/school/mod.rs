@@ -106,6 +106,7 @@ pub mod curriculum_extender;
 pub mod curriculum_loader;
 pub mod objective;
 pub mod reality_check;
+pub mod polymath_drive;
 
 pub mod coherence_bridge;
 pub mod lookahead;

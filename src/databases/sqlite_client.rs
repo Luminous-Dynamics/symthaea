@@ -73,6 +73,7 @@ use super::{
     SearchResult,
 };
 use crate::infrastructure::lock_guard::ResilientMutex;
+#[cfg(feature = "school_learning")]
 use crate::school::Curriculum;
 use async_trait::async_trait;
 use rusqlite::{params, Connection};
@@ -984,32 +985,34 @@ impl ConsciousnessDatabase for SqliteMemory {
         .await
     }
 
+    #[cfg(feature = "school_learning")]
     async fn store_curriculum(&self, curriculum: &Curriculum) -> DbResult<()> {
         let curriculum = curriculum.clone();
         self.with_connection(move |conn| {
             let data = serde_json::to_string(&curriculum)
                 .map_err(|e| DatabaseError::Other(format!("Serialization failed: {e}")))?;
-            
+
             conn.execute(
                 "INSERT OR REPLACE INTO curricula (id, name, description, data) VALUES (?1, ?2, ?3, ?4)",
                 params![curriculum.id, curriculum.name, curriculum.description, data],
             ).map_err(|e| DatabaseError::InsertFailed(format!("Curriculum store failed: {e}")))?;
-            
+
             Ok(())
         }).await
     }
 
+    #[cfg(feature = "school_learning")]
     async fn get_curricula(&self) -> DbResult<Vec<Curriculum>> {
         self.with_connection(|conn| {
             let mut stmt = conn.prepare("SELECT data FROM curricula")
                 .map_err(|e| DatabaseError::QueryFailed(format!("Curricula query failed: {e}")))?;
-            
+
             let rows = stmt.query_map([], |row| {
                 let data: String = row.get(0)?;
                 serde_json::from_str::<Curriculum>(&data)
                     .map_err(|e| rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e)))
             }).map_err(|e| DatabaseError::QueryFailed(format!("Curricula map failed: {e}")))?;
-            
+
             let mut curricula = Vec::new();
             for row in rows {
                 curricula.push(row.map_err(|e| DatabaseError::QueryFailed(format!("Curriculum decode failed: {e}")))?);
