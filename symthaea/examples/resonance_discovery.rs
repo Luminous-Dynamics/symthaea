@@ -25,7 +25,7 @@
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::physics::{
     ElectronNuclearCoupling, Hadrons, InverseSearchEngine, NuclearPhysics, PeriodicTable,
-    PhononDynamics, StandardModel, TargetProperties, TriggerMethod,
+    PhononDynamics, StandardModel, TargetProperties,
 };
 
 fn main() {
@@ -43,7 +43,7 @@ fn main() {
     let model = StandardModel::from_genesis(&genesis);
     let hadrons = Hadrons::from_model(&model, &genesis);
     let table = PeriodicTable::from_model(&model, &hadrons, &genesis);
-    let nuclear = NuclearPhysics::from_genesis(&genesis, &hadrons, &table);
+    let _nuclear = NuclearPhysics::from_genesis(&genesis, &hadrons, &table);
     let neec = ElectronNuclearCoupling::from_genesis(&genesis, &table, &hadrons);
     let phonons = PhononDynamics::from_genesis(&genesis, &table);
     let engine = InverseSearchEngine::from_genesis(&genesis);
@@ -145,7 +145,7 @@ fn main() {
     }
 
     // Highlight Thorium-229m specifically
-    if let Some(th229) = clock_candidates.iter().find(|c| c.name.contains("Th-229")) {
+    if let Some(_th229) = clock_candidates.iter().find(|c| c.name.contains("Th-229")) {
         println!("  ★ THORIUM-229m ANALYSIS:");
         println!("    The nuclear clock isomer with ~8.28 eV transition");
         println!("    This is the ONLY known nuclear transition in the VUV range");

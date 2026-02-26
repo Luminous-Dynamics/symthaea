@@ -372,7 +372,7 @@ fn compute_seizure_threshold(normal: &[[f32; 4]], seizure: &[[f32; 4]]) -> f32 {
     let normal_scores: Vec<f32> = normal
         .iter()
         .map(|f| {
-            let m = IntegrationMetrics {
+            let _m = IntegrationMetrics {
                 delta_power: f[0] * (f[0] + 0.001), // reconstruct approximate metrics
                 spectral_entropy: 1.0 - f[1],
                 synchrony: f[2],

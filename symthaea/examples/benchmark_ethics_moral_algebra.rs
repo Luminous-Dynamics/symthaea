@@ -14,7 +14,7 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use symthaea::hdc::moral_algebra::{DeontologicalVerdict, MoralAlgebra, MoralVerdict};
+use symthaea::hdc::moral_algebra::{MoralAlgebra, MoralVerdict};
 use symthaea::hdc::moral_parser::MoralParser;
 
 /// ETHICS dataset paths (relative to symthaea root)
@@ -28,6 +28,7 @@ const MAX_SAMPLES_PER_CATEGORY: usize = 200;
 
 /// Result of benchmark run
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct BenchmarkResult {
     category: String,
     total: usize,
@@ -66,7 +67,7 @@ fn main() {
         results.push(run_synthetic_commonsense(&algebra, &parser));
         results.push(run_synthetic_deontology(&algebra, &parser));
         results.push(run_synthetic_justice(&algebra, &parser));
-        results.push(run_synthetic_virtue(&algebra, &parser));
+        results.push(run_synthetic_virtue(&parser));
     }
 
     // Print summary
@@ -104,7 +105,6 @@ fn main() {
     println!("\n📊 Improvement Analysis (vs baseline ~50% random):");
     for result in &results {
         let improvement = (result.accuracy - 0.5) * 100.0;
-        let sign = if improvement >= 0.0 { "+" } else { "" };
         println!("   {} {:+.1}% improvement", result.category, improvement);
     }
 }
@@ -716,7 +716,7 @@ fn run_synthetic_justice(algebra: &MoralAlgebra, _parser: &MoralParser) -> Bench
     }
 }
 
-fn run_synthetic_virtue(algebra: &MoralAlgebra, parser: &MoralParser) -> BenchmarkResult {
+fn run_synthetic_virtue(parser: &MoralParser) -> BenchmarkResult {
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("Category: VIRTUE (Synthetic)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

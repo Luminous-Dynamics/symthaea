@@ -14,7 +14,6 @@
 //! ```
 
 use anyhow::Result;
-use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
 use symthaea::perception::{

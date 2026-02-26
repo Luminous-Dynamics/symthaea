@@ -3,8 +3,9 @@
 //! Analyzes which phenomenal/computational categories show the strongest
 //! topological differences to understand what drives the H1 effect.
 
-use std::collections::HashMap;
+#[cfg(feature = "neural-bridge")]
 use std::path::Path;
+#[cfg(feature = "neural-bridge")]
 use std::time::Instant;
 
 use anyhow::Result;

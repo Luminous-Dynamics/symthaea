@@ -6,12 +6,17 @@
 //!
 //! This provides maximum statistical power and subcategory analysis.
 
+#[cfg(feature = "neural-bridge")]
 use std::fs::File;
-use std::io::{BufReader, Write};
+#[cfg(feature = "neural-bridge")]
+use std::io::BufReader;
+#[cfg(feature = "neural-bridge")]
 use std::path::Path;
+#[cfg(feature = "neural-bridge")]
 use std::time::Instant;
 
 use anyhow::Result;
+#[cfg(feature = "neural-bridge")]
 use serde::Deserialize;
 
 #[cfg(feature = "neural-bridge")]
@@ -20,18 +25,21 @@ use symthaea::perception::ConsciousnessProbeV2;
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
 
+#[cfg(feature = "neural-bridge")]
 #[derive(Deserialize)]
 struct ConceptCorpus {
     metadata: Metadata,
     concepts: Vec<Concept>,
 }
 
+#[cfg(feature = "neural-bridge")]
 #[derive(Deserialize)]
 struct Metadata {
     description: String,
     count: usize,
 }
 
+#[cfg(feature = "neural-bridge")]
 #[derive(Deserialize, Clone)]
 struct Concept {
     id: String,

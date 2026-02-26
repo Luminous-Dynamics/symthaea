@@ -8,12 +8,17 @@
 //! - consciousness_unity (phenomenal but low unity - abstract)
 //! - machine_learning (functional but high unity - bridges both domains)
 
+#[cfg(feature = "neural-bridge")]
 use std::fs::File;
+#[cfg(feature = "neural-bridge")]
 use std::io::BufReader;
+#[cfg(feature = "neural-bridge")]
 use std::path::Path;
+#[cfg(feature = "neural-bridge")]
 use std::time::Instant;
 
 use anyhow::Result;
+#[cfg(feature = "neural-bridge")]
 use serde::Deserialize;
 
 #[cfg(feature = "neural-bridge")]
@@ -22,11 +27,13 @@ use symthaea::perception::ConsciousnessProbeV2;
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
 
+#[cfg(feature = "neural-bridge")]
 #[derive(Deserialize)]
 struct ConceptCorpus {
     concepts: Vec<Concept>,
 }
 
+#[cfg(feature = "neural-bridge")]
 #[derive(Deserialize, Clone)]
 struct Concept {
     id: String,

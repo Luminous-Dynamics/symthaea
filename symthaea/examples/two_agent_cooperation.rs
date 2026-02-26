@@ -61,12 +61,16 @@ fn main() {
         content: explorer_knowledge,
         priority: 1.0,
         metadata: std::collections::HashMap::new(),
+        source: symthaea::memory::memory_coordinator::MemorySource::Internal,
+        is_verified: false,
     });
     mind_b.input(MindInput {
         input_type: InputType::Perception,
         content: homesteader_knowledge,
         priority: 1.0,
         metadata: std::collections::HashMap::new(),
+        source: symthaea::memory::memory_coordinator::MemorySource::Internal,
+        is_verified: false,
     });
 
     // Warm up: 5 ticks to establish initial consciousness state

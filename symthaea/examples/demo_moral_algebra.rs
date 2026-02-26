@@ -8,9 +8,7 @@
 //!
 //! Run with: cargo run --example demo_moral_algebra
 
-use symthaea::hdc::moral_algebra::{
-    ConsentState, Magnitude, MoralAlgebra, MoralIntent, MoralVerdict,
-};
+use symthaea::hdc::moral_algebra::{ConsentState, Magnitude, MoralAlgebra, MoralIntent};
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");

@@ -8,9 +8,7 @@
 //! cargo run --example cross_architecture_status --features neural-bridge --release
 //! ```
 
-use symthaea::perception::multi_model_extractor::{
-    all_validation_status, print_support_summary, ModelPreset,
-};
+use symthaea::perception::multi_model_extractor::{print_support_summary, ModelPreset};
 
 fn main() {
     print_support_summary();

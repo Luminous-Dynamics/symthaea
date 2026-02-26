@@ -37,6 +37,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Emotional state in the Valence-Arousal circumplex
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 struct EmotionalState {
     /// Valence: -1.0 (unpleasant) to +1.0 (pleasant)
     valence: f64,
@@ -99,6 +100,7 @@ impl EmotionCategory {
 
 /// Consciousness snapshot for emotion
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct EmotionSnapshot {
     /// Frontal Asymmetry Index
     fai: f64,
@@ -184,6 +186,7 @@ impl PedersenCommitment {
 
 /// Zero-knowledge proof of emotional state
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct EmotionProof {
     /// Commitment to valence
     valence_commitment: PedersenCommitment,
@@ -306,6 +309,7 @@ enum ProofVerificationResult {
 
 /// JOY token reward for positive emotional states
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct JoyReward {
     amount: f64,
     reward_type: RewardType,
@@ -316,6 +320,7 @@ struct JoyReward {
 
 /// Types of JOY rewards
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 enum RewardType {
     /// High valence + high arousal (excitement, joy)
     ExcitementBonus,
@@ -404,6 +409,7 @@ impl JoyValidator {
 // ============================================================================
 
 /// Simulated emotion session based on DENS dataset patterns
+#[allow(dead_code)]
 struct EmotionSession {
     /// Session ID
     id: String,
@@ -441,7 +447,7 @@ impl EmotionSession {
         for (name, valence, arousal, duration) in blocks {
             let n_snapshots = (duration / 5.0) as usize; // One snapshot per 5 seconds
 
-            for i in 0..n_snapshots {
+            for _i in 0..n_snapshots {
                 // Add some noise to simulate natural variation
                 rng_seed = rng_seed.wrapping_mul(6364136223846793005).wrapping_add(1);
                 let noise_v = (rng_seed as f64 / u64::MAX as f64 - 0.5) * 0.2;

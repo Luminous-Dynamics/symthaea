@@ -447,7 +447,7 @@ fn main() {
 
     // Binary classification (Wake vs Sleep)
     let wake_correct = confusion[0][0];
-    let wake_total: usize = confusion[0].iter().sum();
+    let _wake_total: usize = confusion[0].iter().sum();
     let sleep_as_wake: usize = (1..5).map(|i| confusion[i][0]).sum();
     let sleep_total: usize = (1..5).flat_map(|i| confusion[i].iter()).sum();
 

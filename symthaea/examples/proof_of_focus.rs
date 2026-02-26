@@ -38,6 +38,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Meditation state measurement
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 struct MeditationState {
     /// Focus depth (0-1)
     focus: f64,
@@ -51,6 +52,7 @@ struct MeditationState {
     confidence: f64,
 }
 
+#[allow(dead_code)]
 impl MeditationState {
     fn quality(&self) -> f64 {
         0.3 * self.focus + 0.2 * self.calm + 0.3 * self.flow + 0.2 * self.presence
@@ -130,6 +132,7 @@ impl MeditationCategory {
 
 /// Consciousness snapshot for meditation
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct MeditationSnapshot {
     /// Frontal Midline Theta power
     fmt_power: f64,
@@ -214,6 +217,7 @@ impl PedersenCommitment {
 
 /// ZK proof of meditation/focus state
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct FocusProof {
     /// Commitment to focus level
     focus_commitment: PedersenCommitment,
@@ -325,6 +329,7 @@ enum ProofVerificationResult {
 
 /// FOCUS token reward
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct FocusReward {
     amount: f64,
     reward_type: RewardType,

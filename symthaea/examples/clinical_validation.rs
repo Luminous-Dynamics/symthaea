@@ -142,7 +142,7 @@ struct ThetaAlphaRatio {
 }
 
 impl ThetaAlphaRatio {
-    fn new(sample_rate: f64) -> Self {
+    fn new(_sample_rate: f64) -> Self {
         // Time constants tuned for EEG frequency bands
         // τ = 1 / (2π × f_center)
         // Alpha center ~10Hz → τ ≈ 16ms, but we use 40ms for robustness
@@ -235,7 +235,7 @@ struct EyeMovementDetector {
 }
 
 impl EyeMovementDetector {
-    fn new(sample_rate: f64) -> Self {
+    fn new(_sample_rate: f64) -> Self {
         Self {
             buffer: VecDeque::with_capacity(600), // 6 seconds at 100Hz
             window_size: 600,
@@ -404,6 +404,7 @@ impl MuscleToneTracker {
     }
 
     /// Get raw tone value for statistics
+    #[allow(dead_code)]
     fn raw_tone(&self) -> f64 {
         self.tone
     }
@@ -489,11 +490,13 @@ struct EdfSignal {
 }
 
 impl EdfSignal {
+    #[allow(dead_code)]
     fn is_frontal_eeg(&self) -> bool {
         let label = self.label.to_uppercase();
         label.contains("FPZ") || label.contains("EEG FPZ")
     }
 
+    #[allow(dead_code)]
     fn is_occipital_eeg(&self) -> bool {
         let label = self.label.to_uppercase();
         label.contains("PZ-OZ") || label.contains("EOG") // Fallback to EOG if no Pz-Oz
@@ -519,7 +522,7 @@ impl EdfLoader {
             .map_err(|e| format!("Header read: {}", e))?;
 
         // Parse header
-        let header_bytes: usize = parse_field(&header[184..192]).unwrap_or(256);
+        let _header_bytes: usize = parse_field(&header[184..192]).unwrap_or(256);
         let num_records: i64 = parse_field(&header[236..244]).unwrap_or(-1);
         let record_duration: f64 = parse_field(&header[244..252]).unwrap_or(1.0);
         let num_signals: usize = parse_field(&header[252..256]).unwrap_or(0);
@@ -746,7 +749,7 @@ fn load_hypnogram_epochs(path: &Path) -> Result<Vec<SleepStage>, String> {
     annotations.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
     // Convert annotations to 30-second epochs
-    for (onset, duration, annotation) in &annotations {
+    for (_onset, duration, annotation) in &annotations {
         let stage = SleepStage::from_annotation(annotation);
         if stage == SleepStage::Unknown {
             continue;
@@ -857,8 +860,11 @@ struct SleepSentinel {
     emg_tracker: MuscleToneTracker,
 
     // Classification thresholds (tunable)
+    #[allow(dead_code)]
     delta_power_threshold: f64, // For deep sleep detection
+    #[allow(dead_code)]
     sync_threshold: f64,        // For integration detection
+    #[allow(dead_code)]
     complexity_threshold: f64,  // For wake detection
 
     // Temporal hysteresis: rolling vote buffer

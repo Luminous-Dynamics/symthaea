@@ -20,7 +20,9 @@
 //! **Hypothesis (H1)**: LLM internal representations for phenomenal concepts
 //! exhibit different topological properties than functional concepts.
 
+#[cfg(feature = "neural-bridge")]
 use std::path::Path;
+#[cfg(feature = "neural-bridge")]
 use std::time::Instant;
 
 use anyhow::Result;

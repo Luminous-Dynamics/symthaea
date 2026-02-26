@@ -14,9 +14,8 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::physics::{
-    multi_seed_hea_search, AdvancedMaterials, FusionReaction, HEADesigner, HEATarget, Hadrons,
-    PeriodicTable, PhononDynamics, RadiationDamageSystem, SparkEngineSpec, SparkTarget,
-    StandardModel,
+    multi_seed_hea_search, AdvancedMaterials, FusionReaction, HEATarget, RadiationDamageSystem,
+    SparkEngineSpec, SparkTarget,
 };
 
 fn main() {

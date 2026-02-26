@@ -29,13 +29,13 @@
 //! cargo run --example phi_crossvalidation --release
 //! ```
 
-use std::collections::HashMap;
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology, phi_resonant::ResonantPhiCalculator,
     spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
 };
 
 /// Topology specification for testing
+#[allow(dead_code)]
 struct TopologySpec {
     name: &'static str,
     category: &'static str,

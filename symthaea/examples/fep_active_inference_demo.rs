@@ -19,8 +19,7 @@
 
 use symthaea::consciousness::fep_active_inference::{
     ActiveInferenceAgent, ActiveInferenceAgentConfig, CognitiveLoopFEPBridge,
-    ExpectedFreeEnergyComputer, FreeEnergyCalculator, GenerativeModel, HiddenState, Observation,
-    PrecisionEstimator,
+    FreeEnergyCalculator, GenerativeModel, HiddenState, Observation, PrecisionEstimator,
 };
 
 fn main() {

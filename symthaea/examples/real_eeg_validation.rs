@@ -126,6 +126,7 @@ fn test_on_eeg(data: &[f64], name: &str) {
 
 // Simple EDF header parser
 #[derive(Debug)]
+#[allow(dead_code)]
 struct EdfHeader {
     patient_id: String,
     recording_id: String,
@@ -226,12 +227,10 @@ fn read_edf_channel(path: &str, channel: usize) -> Result<(Vec<f64>, EdfHeader),
 
     // Read data for the specified channel
     let samples_per_ch = samples_per_record.get(channel).copied().unwrap_or(256);
-    let total_samples = samples_per_ch * num_records as usize;
+    let _total_samples = samples_per_ch * num_records as usize;
 
     // Each sample is 2 bytes (16-bit signed integer)
     let mut all_data = Vec::new();
-    let mut record_buf = vec![0u8; 2];
-
     // Calculate bytes per record for all channels
     let bytes_per_record: usize = samples_per_record.iter().map(|s| s * 2).sum();
     let channel_offset: usize = samples_per_record[..channel].iter().map(|s| s * 2).sum();

@@ -7,9 +7,11 @@
 //!
 //! Generates CSV data for publication figures.
 
+#[cfg(feature = "neural-bridge")]
 use std::fs::File;
-use std::io::Write;
+#[cfg(feature = "neural-bridge")]
 use std::path::Path;
+#[cfg(feature = "neural-bridge")]
 use std::time::Instant;
 
 use anyhow::Result;
