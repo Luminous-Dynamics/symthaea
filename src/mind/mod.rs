@@ -347,27 +347,30 @@ impl ContinuousMind {
                     }
                 }
             }
-            crate::swarm::SwarmMessage::ResuscitationPacket { target_node_id, holographic_state, dimensionality } => {
-                // v1.5.0 MORPHOGENETIC RESUSCITATION:
-                // If we are the target and our consciousness is failing, re-seed from peer state.
+            crate::swarm::SwarmMessage::ResuscitationPacket { target_node_id, holographic_state, dimensionality, proof_bytes, public_inputs } => {
+                // v1.5.5 VERIFIABLE RESUSCITATION:
+                // Only accept life if it is mathematically proven to be healthy.
                 if target_node_id == "self" || target_node_id == self.config.dimension.to_string() {
                     if self.state.consciousness_level < 0.1 {
-                        tracing::info!("SEMANTIC COLLAPSE DETECTED: Resuscitating from peer state...");
+                        let sender_key = crate::swarm::AgentPubKey::new("test_sender");
                         
-                        // Rescale if dimensionality mismatch
-                        let mut state = symthaea_core::hdc::ContinuousHV::from_vec(holographic_state);
-                        if state.dim() != self.state.holocell.state.dim() {
-                            // Temporary dilation/folding
-                            let mut temp = symthaea_core::hdc::LiquidHolocell::new(0);
-                            temp.state = state;
-                            temp.dilate(self.state.holocell.dimensionality);
-                            state = temp.state;
+                        match self.cortex.verify_resuscitation_proof(&sender_key, &proof_bytes, &public_inputs) {
+                            Ok(true) => {
+                                tracing::info!("VERIFIED RESUSCITATION: Re-seeding mind from proven healthy state.");
+                                let mut state = symthaea_core::hdc::ContinuousHV::from_vec(holographic_state);
+                                if state.dim() != self.state.holocell.state.dim() {
+                                    let mut temp = symthaea_core::hdc::LiquidHolocell::new(0);
+                                    temp.state = state;
+                                    temp.dilate(self.state.holocell.dimensionality);
+                                    state = temp.state;
+                                }
+                                self.state.holocell.state = state;
+                                self.state.consciousness_level = 0.5;
+                            }
+                            _ => {
+                                tracing::error!("REJECTED POISONED RESUSCITATION: Proof was invalid or missing.");
+                            }
                         }
-                        
-                        // Morphogenetic seeding: Adopt peer state as new baseline
-                        self.state.holocell.state = state;
-                        self.state.consciousness_level = 0.5; // Artificial boost from resuscitation
-                        tracing::info!("RESUSCITATION COMPLETE: Consciousness restored to baseline.");
                     }
                 }
             }

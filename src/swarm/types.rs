@@ -175,6 +175,8 @@ pub enum SwarmMessage {
         target_node_id: String,
         holographic_state: Vec<f32>,
         dimensionality: usize,
+        proof_bytes: Vec<u8>,
+        public_inputs: Vec<u8>,
     },
 
     /// Graceful disconnect
