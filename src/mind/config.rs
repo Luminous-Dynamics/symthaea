@@ -3,7 +3,7 @@
 use crate::chronobiology::Biorhythm;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::{ContinuousHV, LiquidHolocell, HdcDimensionality};
 
 /// Configuration for the continuous mind
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,6 +68,8 @@ pub struct MindState {
     pub active_goals: Vec<String>,
     /// Current thought embedding
     pub current_thought: ContinuousHV,
+    /// The liquid holocell governing thought dynamics.
+    pub holocell: LiquidHolocell,
     /// Is the mind active
     pub is_active: bool,
     /// Whether the mind considers itself conscious
@@ -106,6 +108,7 @@ impl Default for MindState {
             attention_focus: None,
             active_goals: Vec::new(),
             current_thought: ContinuousHV::zero(512),
+            holocell: LiquidHolocell::new(42),
             is_active: false,
             is_conscious: false,
             tick: 0,
