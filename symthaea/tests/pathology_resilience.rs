@@ -422,7 +422,7 @@ async fn test_symthaea_feels_database_failure_pain() {
     let mut sym = symthaea::Symthaea::new(256, 16).await.unwrap();
 
     // Process a query to establish baseline
-    let baseline = sym.process("Hello world").await.unwrap();
+    let _baseline = sym.process("Hello world").await.unwrap();
 
     // Inject pain directly through the facade's pain_tx
     // (The pain_tx is private, so we test via the public API: trigger a condition
