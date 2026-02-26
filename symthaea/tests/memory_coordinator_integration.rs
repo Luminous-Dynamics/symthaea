@@ -13,6 +13,7 @@ use symthaea::memory::{
     CoordinatorConfig, Episode, EpisodicMemory, EpisodicReplayConfig, GraduationEvent,
     MemoryCoordinator, SemanticMemory,
 };
+use symthaea::memory::memory_coordinator::MemorySource;
 use symthaea_core::hdc::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -51,6 +52,8 @@ fn test_graduation_pipeline_end_to_end() {
         final_activation: 0.6,
         psi_at_graduation: 0.85,
         coherence_at_graduation: 0.9,
+        source: MemorySource::Internal,
+        is_verified: false,
     });
 
     // Process graduations
@@ -84,6 +87,8 @@ fn test_graduation_rejected_when_too_few_steps() {
         final_activation: 0.3,
         psi_at_graduation: 0.8,
         coherence_at_graduation: 0.8,
+        source: MemorySource::Internal,
+        is_verified: false,
     });
 
     let graduated = coordinator.process_graduations(&mut episodic);
@@ -114,6 +119,8 @@ fn test_multiple_graduations_in_one_cycle() {
             final_activation: 0.5 + i as f64 * 0.05,
             psi_at_graduation: 0.9,
             coherence_at_graduation: 0.95,
+            source: MemorySource::Internal,
+            is_verified: false,
         });
     }
 
@@ -266,7 +273,7 @@ fn test_working_memory_eviction_tracking() {
         "Should evict exactly one item when capacity exceeded"
     );
     // Verify steps_survived is tracked
-    let (_hv, steps_survived) = &evicted[0];
+    let (_hv, steps_survived, _source, _is_verified) = &evicted[0];
     assert!(
         *steps_survived > 0,
         "Evicted item should have survived at least 1 tick"
@@ -313,7 +320,7 @@ fn test_full_eviction_to_graduation_pipeline() {
 
     coordinator.update_signals(0.85, 0.9);
 
-    for (i, (hv, steps_survived)) in evicted.into_iter().enumerate() {
+    for (i, (hv, steps_survived, source, is_verified)) in evicted.into_iter().enumerate() {
         coordinator.queue_graduation(GraduationEvent {
             content: hv,
             label: format!("evicted_wm_{}", i),
@@ -321,6 +328,8 @@ fn test_full_eviction_to_graduation_pipeline() {
             final_activation: 0.5,
             psi_at_graduation: 0.85,
             coherence_at_graduation: 0.9,
+            source,
+            is_verified,
         });
     }
 

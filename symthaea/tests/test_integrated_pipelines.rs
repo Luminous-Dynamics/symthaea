@@ -265,6 +265,7 @@ mod repl_cognitive_fep_motor_integration {
                 working_dir: None,
             },
         ];
+        let current_phi = 0.9;
 
         for action in &actions {
             // Check destructiveness classification
@@ -278,7 +279,7 @@ mod repl_cognitive_fep_motor_integration {
             );
 
             // Validate against policy
-            let validation = action.validate(&policy, &sandbox);
+            let validation = action.validate(&policy, &sandbox, current_phi);
             assert!(
                 validation.is_ok(),
                 "Valid actions should pass policy: {:?}",
@@ -286,7 +287,7 @@ mod repl_cognitive_fep_motor_integration {
             );
 
             // In simulated mode, execution returns simulated outcome
-            let result = executor.execute(action, &policy, &sandbox);
+            let result = executor.execute(action, &policy, &sandbox, current_phi);
             assert!(result.is_ok(), "Simulated execution should succeed");
         }
 

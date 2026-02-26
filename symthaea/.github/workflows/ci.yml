@@ -127,10 +127,20 @@ jobs:
       - name: Run tests with all features
         run: cargo test --all-features
 
-  test-integration-features:
-    name: Test (integration-tests feature)
+  test-feature-matrix-critical:
+    name: Test Feature Matrix (core/web_research/integration)
     runs-on: ubuntu-latest
     needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: core
+            cmd: cargo test -p symthaea
+          - name: web_research
+            cmd: cargo test -p symthaea --features "web_research_module school_learning"
+          - name: integration_tests
+            cmd: cargo test -p symthaea --features integration-tests
     steps:
       - uses: actions/checkout@v4
 
@@ -144,9 +154,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-test-integration-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-test-matrix-${{ matrix.name }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-test-integration-
+            ${{ runner.os }}-cargo-test-matrix-
 
       - name: Install system dependencies
         run: |
@@ -157,8 +167,8 @@ jobs:
             libasound2-dev \
             libdbus-1-dev
 
-      - name: Run integration-tests feature suite
-        run: cargo test -p symthaea --features integration-tests
+      - name: Run ${{ matrix.name }} tests
+        run: ${{ matrix.cmd }}
 
   test-feature-matrix:
     name: Test Feature Combinations
@@ -180,6 +190,7 @@ jobs:
           - "flight"
           - "mesh"
           - "swarm"
+          - "ssm_language"
     steps:
       - uses: actions/checkout@v4
 
@@ -255,6 +266,7 @@ jobs:
           - "flight,humanoid"
           - "mesh,full_consciousness"
           - "swarm,full_consciousness"
+          - "ssm_language,reasoning_engine"
     steps:
       - uses: actions/checkout@v4
 
