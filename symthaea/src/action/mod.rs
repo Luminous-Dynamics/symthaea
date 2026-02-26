@@ -995,7 +995,7 @@ impl SimpleExecutor {
                     ActionOutcome::Success
                 }
             },
-            ActionIR::WasmSandbox { module_path, function_name, input_data } => match self.mode {
+            ActionIR::WasmSandbox { module_path, function_name, input_data: _ } => match self.mode {
                 ExecutionMode::Simulated => {
                     println!("🧪 WASM Sandbox: Simulating verification of module {:?}::{}()", module_path, function_name);
                     ActionOutcome::WasmResult {

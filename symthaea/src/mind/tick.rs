@@ -7,7 +7,9 @@ use crate::chronobiology::{Biorhythm, CircadianPhase};
 use symthaea_core::hdc::ContinuousHV;
 
 use super::utils::permute_hv;
-use super::{ContinuousMind, Goal, InputType, MindInput, MindOutput, OutputType};
+use super::{ContinuousMind, Goal, InputType, MindOutput, OutputType};
+#[cfg(feature = "mesh")]
+use super::MindInput;
 
 impl ContinuousMind {
     /// Process one tick of the mind.

@@ -119,9 +119,8 @@ impl TemporalNetwork {
 
     /// Scale tau values for all layers uniformly
     pub fn scale_tau_all(&mut self, scale: f32) {
-        match self {
-            Self::CfC(cfc) => cfc.scale_tau_all(scale),
-            _ => {}
+        if let Self::CfC(cfc) = self {
+            cfc.scale_tau_all(scale);
         }
     }
 

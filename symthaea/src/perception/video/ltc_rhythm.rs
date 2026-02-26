@@ -41,15 +41,15 @@ pub struct LtcRhythmConfig {
 
 impl Default for LtcRhythmConfig {
     fn default() -> Self {
-        // Configure for rhythm detection (60-120 BPM range)
-        let mut ltc_config = CantorLtcConfig::default();
-        // Use smaller network for speed (4 levels instead of 7)
-        ltc_config.max_depth = 4;
-        // Adjust base τ for rhythm range (500ms = sensitive to 2Hz = 120 BPM)
-        ltc_config.base_tau = 500.0;
-
         Self {
-            ltc_config,
+            // Configure for rhythm detection (60-120 BPM range)
+            ltc_config: CantorLtcConfig {
+                // Use smaller network for speed (4 levels instead of 7)
+                max_depth: 4,
+                // Adjust base τ for rhythm range (500ms = sensitive to 2Hz = 120 BPM)
+                base_tau: 500.0,
+                ..Default::default()
+            },
             dt_ms: 33.3,               // ~30 fps
             trajectory_length: 90,     // 3 seconds at 30fps
             min_trajectory_length: 30, // 1 second minimum

@@ -242,67 +242,6 @@ impl DomainPlugin for MathPlugin {
     }
 
     fn intent_prototypes(&self) -> IntentPrototypes {
-        let mut prototypes = IntentPrototypes::default();
-
-        // Math-specific command intents
-        prototypes.command = vec![
-            "calculate",
-            "compute",
-            "solve",
-            "evaluate",
-            "simplify",
-            "factor",
-            "expand",
-            "derive",
-            "integrate",
-            "plot",
-            "prove",
-            "verify",
-            "check",
-            "convert",
-            "approximate",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-
-        // Math-specific question intents
-        prototypes.question = vec![
-            "what is",
-            "how to solve",
-            "what does",
-            "why does",
-            "is it true",
-            "can you prove",
-            "what are the roots",
-            "what is the derivative",
-            "what is the integral",
-            "how many",
-            "what is the value",
-            "is this correct",
-            "what formula",
-            "which theorem",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-
-        // Math-specific complaint intents
-        prototypes.complaint = vec![
-            "wrong answer",
-            "incorrect",
-            "does not equal",
-            "undefined",
-            "division by zero",
-            "overflow",
-            "does not converge",
-            "no solution",
-            "complex number",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-
         // Custom intents for mathematics
         let mut custom = HashMap::new();
         custom.insert(
@@ -336,9 +275,67 @@ impl DomainPlugin for MathPlugin {
                 "explain".to_string(),
             ],
         );
-        prototypes.custom = custom;
 
-        prototypes
+        IntentPrototypes {
+            // Math-specific command intents
+            command: vec![
+                "calculate",
+                "compute",
+                "solve",
+                "evaluate",
+                "simplify",
+                "factor",
+                "expand",
+                "derive",
+                "integrate",
+                "plot",
+                "prove",
+                "verify",
+                "check",
+                "convert",
+                "approximate",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            // Math-specific question intents
+            question: vec![
+                "what is",
+                "how to solve",
+                "what does",
+                "why does",
+                "is it true",
+                "can you prove",
+                "what are the roots",
+                "what is the derivative",
+                "what is the integral",
+                "how many",
+                "what is the value",
+                "is this correct",
+                "what formula",
+                "which theorem",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            // Math-specific complaint intents
+            complaint: vec![
+                "wrong answer",
+                "incorrect",
+                "does not equal",
+                "undefined",
+                "division by zero",
+                "overflow",
+                "does not converge",
+                "no solution",
+                "complex number",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            custom,
+            ..Default::default()
+        }
     }
 
     fn prompts(&self) -> DomainPrompts {

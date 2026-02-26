@@ -524,6 +524,7 @@ impl Symthaea {
         let (somatic_bridge, pain_tx) = SomaticErrorBridge::new();
         let task_supervisor = TaskSupervisor::new(pain_tx.clone());
 
+        #[allow(unused_mut)] // mutated conditionally under cfg(feature = "ssm-power")
         let mut instance = Self {
             mind,
             language,
@@ -1401,27 +1402,24 @@ impl Symthaea {
         // meta-awareness, trust, and epistemic status for richer adaptation.
         let response_text = {
             let load = crate::resonant_speech::CognitiveLoad::from_level(thought.psi);
-            let mut user_state = crate::resonant_speech::UserState::default();
-            user_state.cognitive_load = load;
-
-            // Emotional tone → frustration (negative valence signals frustration)
-            user_state.frustration = ((-thought.emotional_tone.valence).max(0.0)).min(1.0);
-
-            // Meta-awareness → confidence (higher awareness = higher confidence)
-            user_state.confidence = thought.meta_awareness.clamp(0.0, 1.0);
-
-            // Trust from relationship context
-            user_state.trust_in_sophia = thought.trust as f64;
-
-            // High arousal + low coherence → user appears rushed
-            user_state.is_rushed = thought.emotional_tone.arousal > 0.7 && thought.coherence < 0.4;
-
-            // Epistemic status → learning mode (uncertain/unknown = still learning)
-            user_state.is_learning = matches!(
-                thought.epistemic_status,
-                crate::mind::structured_thought::EpistemicStatus::Uncertain
-                    | crate::mind::structured_thought::EpistemicStatus::Unknown
-            );
+            let user_state = crate::resonant_speech::UserState {
+                cognitive_load: load,
+                // Emotional tone → frustration (negative valence signals frustration)
+                frustration: ((-thought.emotional_tone.valence).max(0.0)).min(1.0),
+                // Meta-awareness → confidence (higher awareness = higher confidence)
+                confidence: thought.meta_awareness.clamp(0.0, 1.0),
+                // Trust from relationship context
+                trust_in_sophia: thought.trust as f64,
+                // High arousal + low coherence → user appears rushed
+                is_rushed: thought.emotional_tone.arousal > 0.7 && thought.coherence < 0.4,
+                // Epistemic status → learning mode (uncertain/unknown = still learning)
+                is_learning: matches!(
+                    thought.epistemic_status,
+                    crate::mind::structured_thought::EpistemicStatus::Uncertain
+                        | crate::mind::structured_thought::EpistemicStatus::Unknown
+                ),
+                ..Default::default()
+            };
 
             self.resonant_speech.update_state(user_state);
             self.resonant_speech.generate(&generation.text, content)
@@ -1435,11 +1433,9 @@ impl Symthaea {
             use crate::action::bindings::{ActionContext, PrimitiveExecutor};
             
             // ACTIVE INFERENCE DRIVE: If she's very awake, embolden her.
-            if thought.psi > 0.7 && !thought.primitives.is_empty() {
-                if thought.epistemic_status == crate::mind::structured_thought::EpistemicStatus::Uncertain {
-                    tracing::info!(target: "symthaea::action", "High Phi detected: Emboldening 'Uncertain' thought to 'Probable' via Active Inference Drive.");
-                    thought.epistemic_status = crate::mind::structured_thought::EpistemicStatus::Probable;
-                }
+            if thought.psi > 0.7 && !thought.primitives.is_empty() && thought.epistemic_status == crate::mind::structured_thought::EpistemicStatus::Uncertain {
+                tracing::info!(target: "symthaea::action", "High Phi detected: Emboldening 'Uncertain' thought to 'Probable' via Active Inference Drive.");
+                thought.epistemic_status = crate::mind::structured_thought::EpistemicStatus::Probable;
             }
 
             // Extract primitive names from the structured thought
@@ -1553,7 +1549,7 @@ impl Symthaea {
                         }
 
                         tracing::info!(target: "symthaea::action", ?action, "Executing autonomous action");
-                        match self.executor.execute(&action, &policy, &sandbox, thought.psi as f64) {
+                        match self.executor.execute(&action, &policy, &sandbox, thought.psi) {
                             Ok(execution_outcome) => {
                                 // Feed outcome back into the mind as a perception signal
                                 let outcome_text = match &execution_outcome.outcome {
@@ -2657,7 +2653,7 @@ impl Symthaea {
                         .as_millis() as u64,
                     valence: 0.1,
                     arousal: 0.4,
-                    psi: self.mind.snapshot().consciousness_level as f64,
+                    psi: self.mind.snapshot().consciousness_level,
                     topics: vec!["swarm".to_string(), "optimization".to_string()],
                     metadata: format!("{{\"topic\":\"{}\"}}", topic),
                     consolidation_strength: 0.0,

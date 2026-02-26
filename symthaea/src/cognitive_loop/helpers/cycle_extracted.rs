@@ -71,10 +71,12 @@ impl CognitiveLoopService {
         if decision.allowed {
             return None;
         }
-        let mut metadata = super::super::CycleMetadata::default();
-        metadata.safety_blocked = true;
-        metadata.safety_category = decision.category.map(|c| format!("{c:?}"));
-        metadata.urgency = self.carryover.urgency.urgency;
+        let metadata = super::super::CycleMetadata {
+            safety_blocked: true,
+            safety_category: decision.category.map(|c| format!("{c:?}")),
+            urgency: self.carryover.urgency.urgency,
+            ..Default::default()
+        };
         tracing::warn!(
             target: "cognitive_loop::safety",
             category = ?decision.category,

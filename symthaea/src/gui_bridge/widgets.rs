@@ -460,10 +460,10 @@ impl GenerationTimeline {
                     let new_ver = parts[1].trim().to_string();
                     changes.upgraded.push((name, old_ver, new_ver));
                 }
-            } else if line.starts_with('+') {
-                changes.added.push(line[1..].trim().to_string());
-            } else if line.starts_with('-') {
-                changes.removed.push(line[1..].trim().to_string());
+            } else if let Some(stripped) = line.strip_prefix('+') {
+                changes.added.push(stripped.trim().to_string());
+            } else if let Some(stripped) = line.strip_prefix('-') {
+                changes.removed.push(stripped.trim().to_string());
             }
         }
 

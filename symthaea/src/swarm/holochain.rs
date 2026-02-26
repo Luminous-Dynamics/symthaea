@@ -332,7 +332,8 @@ pub struct HolochainCortex {
     /// Mock DHT ledger for Epigenetic Insights
     insight_ledger: Vec<EpigeneticInsight>,
 
-    /// Connection state    connected: bool,
+    /// Connection state
+    connected: bool,
 
     /// Statistics
     stats: CortexStats,
@@ -399,10 +400,7 @@ impl HolochainCortex {
             config,
             local_agent: None,
             agent_cache: LruCache::new(capacity),
-            thymus: HebbianAssociativeMemory::new(symthaea_core::hdc::hebbian::HebbianConfig {
-                dimension: 16384, // Standard baseline
-                ..Default::default()
-            }),
+            thymus: HebbianAssociativeMemory::new(),
             insight_ledger: Vec::new(),
             connected: false,
             stats: CortexStats::default(),
@@ -411,9 +409,12 @@ impl HolochainCortex {
 
     /// Check the Thymus (System 1 Fast Path) for known semantic health.
     /// Returns Some(true) if proven healthy, Some(false) if proven toxic, None if unknown.
-    pub fn check_thymus(&self, state: &symthaea_core::hdc::ContinuousHV) -> Option<bool> {
-        let (id, similarity) = self.thymus.recall(state)?;
-        
+    pub fn check_thymus(&self, _state: &symthaea_core::hdc::ContinuousHV) -> Option<bool> {
+        // recall() now takes (query_id, limit) and returns Vec<(String, f32)>
+        // We search by a generic key and check top results
+        let results = self.thymus.recall("thymus_query", 1);
+        let (id, similarity) = results.into_iter().next()?;
+
         if similarity > 0.95 {
             if id.starts_with("toxic") {
                 tracing::warn!(%id, similarity, "THYMUS: Fast-path VETO. Known toxic pattern detected!");
@@ -435,7 +436,7 @@ impl HolochainCortex {
         };
         
         tracing::info!(%id, "THYMUS: Imprinting semantic shape for future recognition.");
-        self.thymus.store(&id, state.clone());
+        self.thymus.store(&id, state.values.clone());
     }
 
     /// Record a new epigenetic insight in the DHT.

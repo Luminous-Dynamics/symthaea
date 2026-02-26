@@ -472,7 +472,7 @@ impl CognitiveLoopService {
         // FEEDBACK: Predictive phi modulation gates plasticity (Friston 2010)
         // Clamp and scale to avoid destabilizing the base learner in single-module ablations.
         let modulation = (predictive_psi_modulation - 1.0).clamp(-0.15, 0.15) as f32;
-        let coherence_scale = (0.5 + 0.5 * ctx.coherence.clamp(0.0, 1.0)) as f32;
+        let coherence_scale = 0.5 + 0.5 * ctx.coherence.clamp(0.0, 1.0);
         let delta = modulation * 0.10 * coherence_scale; // ±1.5% max, coherence-weighted
         self.carryover.learning.subsystem_lr_factor *= 1.0 + delta;
         module_timings.predictive_processing = _t.elapsed().as_micros() as u64;

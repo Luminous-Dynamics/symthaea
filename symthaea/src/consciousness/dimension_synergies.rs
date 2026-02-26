@@ -128,16 +128,14 @@ impl SynergyProfile {
 
     /// Discover synergies between dimensions
     fn discover_synergies(profile: &ConsciousnessProfile) -> Vec<DimensionSynergy> {
-        let mut synergies = Vec::new();
-
         // 1. Φ × Entropy: Rich Integration
         // High integration with high diversity = rich conscious experience
-        synergies.push(DimensionSynergy {
+        let mut synergies = vec![DimensionSynergy {
             dimension1: DimensionType::Phi,
             dimension2: DimensionType::Entropy,
             synergy_strength: profile.phi * profile.entropy,
             synergy_type: SynergyType::Multiplicative,
-        });
+        }];
 
         // 2. Complexity × Coherence: Stable Sophistication
         // Complex structure maintained with stability

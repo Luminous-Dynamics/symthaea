@@ -488,12 +488,11 @@ impl CognitiveLoopService {
 
         // 1. Consciousness state level modulates urgency: low consciousness → Critical
         //    (run all subsystems to diagnose), high consciousness → can tolerate Cruise
-        if consciousness_state_level_val > 0.0 {
-            if consciousness_state_level_val < 0.3
-                && self.carryover.urgency.urgency != super::types::CycleUrgency::Critical
-            {
-                self.carryover.urgency.urgency = super::types::CycleUrgency::Normal;
-            }
+        if consciousness_state_level_val > 0.0
+            && consciousness_state_level_val < 0.3
+            && self.carryover.urgency.urgency != super::types::CycleUrgency::Critical
+        {
+            self.carryover.urgency.urgency = super::types::CycleUrgency::Normal;
         }
 
         // 2. Gradient analysis → adaptive exploration: large gradients mean the system

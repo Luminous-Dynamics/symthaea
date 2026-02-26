@@ -3,7 +3,7 @@
 use crate::chronobiology::Biorhythm;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use symthaea_core::hdc::{ContinuousHV, LiquidHolocell, HdcDimensionality};
+use symthaea_core::hdc::{ContinuousHV, LiquidHolocell};
 
 /// Configuration for the continuous mind
 #[derive(Debug, Clone, Serialize, Deserialize)]

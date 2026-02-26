@@ -471,8 +471,8 @@ impl EdfFile {
             }
 
             // Check for time offset (+seconds)
-            if line.starts_with('+') {
-                if let Ok(time) = line[1..].parse::<f64>() {
+            if let Some(stripped) = line.strip_prefix('+') {
+                if let Ok(time) = stripped.parse::<f64>() {
                     current_time = time;
                 }
                 continue;

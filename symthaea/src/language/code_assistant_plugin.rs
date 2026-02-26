@@ -7,6 +7,7 @@ use super::domain_plugin::{
     DomainPlugin, DomainPrompts, Entity, ErrorDiagnosis, IntentPrototypes, RiskLevel,
     ValidationResult,
 };
+use std::collections::HashMap;
 
 /// Code assistant plugin for multi-language code analysis and generation.
 pub struct CodeAssistantPlugin;
@@ -110,26 +111,8 @@ impl DomainPlugin for CodeAssistantPlugin {
     }
 
     fn intent_prototypes(&self) -> IntentPrototypes {
-        let mut protos = IntentPrototypes::default();
-        protos.command = vec![
-            "fix",
-            "debug",
-            "refactor",
-            "optimize",
-            "write",
-            "generate",
-            "implement",
-            "add",
-            "remove",
-            "rename",
-            "extract",
-            "inline",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-
-        protos.custom.insert(
+        let mut custom = HashMap::new();
+        custom.insert(
             "debug".to_string(),
             vec![
                 "debug".to_string(),
@@ -142,7 +125,7 @@ impl DomainPlugin for CodeAssistantPlugin {
                 "fails".to_string(),
             ],
         );
-        protos.custom.insert(
+        custom.insert(
             "refactor".to_string(),
             vec![
                 "refactor".to_string(),
@@ -153,7 +136,7 @@ impl DomainPlugin for CodeAssistantPlugin {
                 "extract".to_string(),
             ],
         );
-        protos.custom.insert(
+        custom.insert(
             "explain_code".to_string(),
             vec![
                 "explain".to_string(),
@@ -164,7 +147,7 @@ impl DomainPlugin for CodeAssistantPlugin {
                 "trace".to_string(),
             ],
         );
-        protos.custom.insert(
+        custom.insert(
             "generate".to_string(),
             vec![
                 "generate".to_string(),
@@ -175,7 +158,27 @@ impl DomainPlugin for CodeAssistantPlugin {
                 "code".to_string(),
             ],
         );
-        protos
+        IntentPrototypes {
+            command: vec![
+                "fix",
+                "debug",
+                "refactor",
+                "optimize",
+                "write",
+                "generate",
+                "implement",
+                "add",
+                "remove",
+                "rename",
+                "extract",
+                "inline",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            custom,
+            ..Default::default()
+        }
     }
 
     fn prompts(&self) -> DomainPrompts {

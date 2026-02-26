@@ -79,14 +79,14 @@ pub struct TrainedPrototypes {
 impl TrainedPrototypes {
     /// Save prototypes to a JSON file.
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
-        let json = serde_json::to_string(self).map_err(|e| std::io::Error::other(e))?;
+        let json = serde_json::to_string(self).map_err(std::io::Error::other)?;
         std::fs::write(path, json)
     }
 
     /// Load prototypes from a JSON file.
     pub fn load(path: &Path) -> std::io::Result<Self> {
         let json = std::fs::read_to_string(path)?;
-        serde_json::from_str(&json).map_err(|e| std::io::Error::other(e))
+        serde_json::from_str(&json).map_err(std::io::Error::other)
     }
 }
 
@@ -363,14 +363,14 @@ pub struct TrainedVirtuePrototypes {
 impl TrainedVirtuePrototypes {
     /// Save to a JSON file.
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
-        let json = serde_json::to_string(self).map_err(|e| std::io::Error::other(e))?;
+        let json = serde_json::to_string(self).map_err(std::io::Error::other)?;
         std::fs::write(path, json)
     }
 
     /// Load from a JSON file.
     pub fn load(path: &Path) -> std::io::Result<Self> {
         let json = std::fs::read_to_string(path)?;
-        serde_json::from_str(&json).map_err(|e| std::io::Error::other(e))
+        serde_json::from_str(&json).map_err(std::io::Error::other)
     }
 }
 

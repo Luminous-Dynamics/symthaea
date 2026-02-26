@@ -591,9 +591,7 @@ impl AttentionFlowGraph {
 
     /// Export to DOT format for Graphviz
     pub fn to_dot(&self) -> String {
-        let mut lines = Vec::new();
-
-        lines.push("digraph AttentionFlow {".to_string());
+        let mut lines = vec!["digraph AttentionFlow {".to_string()];
         lines.push("  rankdir=LR;".to_string());
         lines.push("  node [shape=box];".to_string());
         lines.push("".to_string());
