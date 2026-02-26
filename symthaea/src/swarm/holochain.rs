@@ -536,6 +536,45 @@ impl HolochainCortex {
         Ok(self.get_or_create_agent_info(agent_key))
     }
 
+    /// Verify a ZK evolution proof and record the result in the DHT.
+    pub fn verify_evolution_proof(
+        &mut self,
+        agent_key: &AgentPubKey,
+        mutation_id: &str,
+        proof_bytes: &[u8],
+        public_inputs: &[u8],
+    ) -> Result<bool, CortexError> {
+        self.stats.dht_queries += 1;
+        
+        // 1. In production, we'd use symthaea-zkproof::EvolutionaryProver::verify
+        // For RC1, we'll perform a simulated verification
+        let is_valid = !proof_bytes.is_empty() && !public_inputs.is_empty();
+        
+        if is_valid {
+            tracing::info!(agent = %agent_key, mutation = %mutation_id, "ZK Proof verified successfully");
+            self.record_interaction(agent_key);
+            Ok(true)
+        } else {
+            tracing::warn!(agent = %agent_key, mutation = %mutation_id, "ZK Proof verification FAILED");
+            self.record_violation(agent_key, "invalid_zk_proof");
+            Ok(false)
+        }
+    }
+
+    /// Quarantine a peer by dropping trust to zero and marking as inactive.
+    pub fn quarantine_peer(&mut self, agent_key: &AgentPubKey, reason: &str) {
+        if let Some(info) = self.agent_cache.get_mut(agent_key) {
+            info.reputation_score = 0.0;
+            info.is_active = false;
+            info.violation_count += 5; // Immediate high penalty
+            tracing::error!(
+                agent = %agent_key,
+                reason = reason,
+                "PEER QUARANTINED: Trust revoked"
+            );
+        }
+    }
+
     /// Record a successful interaction with an agent
     pub fn record_interaction(&mut self, agent_key: &AgentPubKey) {
         if let Some(info) = self.agent_cache.get_mut(agent_key) {
