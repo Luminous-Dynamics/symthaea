@@ -44,6 +44,8 @@ pub struct BaselineCollection {
     pub motor: BaselineMap,
     pub language: BaselineMap,
     pub social: BaselineMap,
+    /// Neuromodulator domain baselines (DA/NE/5-HT/ACh psychopharmacology).
+    pub neuromod: BaselineMap,
     /// GPT-4 baselines from CogBench (Coda et al., 2023).
     pub llm_cogbench: BaselineMap,
     /// GPT-4 baselines from ToMBench (Kosinski, 2023).
@@ -71,6 +73,7 @@ impl BaselineCollection {
             motor: motor_baselines(),
             language: language_baselines(),
             social: social_baselines(),
+            neuromod: neuromod_baselines(),
             llm_cogbench: llm_cogbench_baselines(),
             llm_tombench: llm_tombench_baselines(),
         }
@@ -1842,6 +1845,129 @@ pub fn social_baselines() -> BaselineMap {
     m
 }
 
+/// Neuromodulator domain baselines (DA/NE/5-HT/ACh psychopharmacology).
+pub fn neuromod_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+
+    // ── Reward Learning (Schultz 1997) ──
+    m.insert(
+        "trials_to_criterion",
+        Baseline {
+            value: 15.0,
+            sd: Some(6.0),
+            source: "Schultz (1997); Cools et al. (2009), reversal learning in healthy adults",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "lose_shift_ratio",
+        Baseline {
+            value: 0.70,
+            sd: Some(0.15),
+            source: "Cools et al. (2009), lose-shift propensity",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "da_reward_correlation",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.20),
+            source: "Schultz (1997), DA-reward contingency correlation",
+            population: "human adults",
+        },
+    );
+
+    // ── Yerkes-Dodson (1908) ──
+    m.insert(
+        "peak_ne_level",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "Yerkes & Dodson (1908); Aston-Jones & Cohen (2005), optimal arousal",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "inverted_u_fit_r2",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.20),
+            source: "Diamond et al. (2007), quadratic fit to arousal-performance data",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "simple_peak_shift",
+        Baseline {
+            value: 0.10,
+            sd: Some(0.10),
+            source: "Yerkes & Dodson (1908), simple > complex peak arousal",
+            population: "human adults",
+        },
+    );
+
+    // ── Attention Network Test (Posner & Petersen 1990) ──
+    m.insert(
+        "alerting_effect",
+        Baseline {
+            value: 0.94, // ~47ms / 50ms-per-tick
+            sd: Some(0.40),
+            source: "Fan et al. (2002), ANT alerting effect 47±20ms → 0.94 ticks",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "orienting_effect",
+        Baseline {
+            value: 0.84, // ~42ms
+            sd: Some(0.40),
+            source: "Fan et al. (2002), ANT orienting effect 42±19ms → 0.84 ticks",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "conflict_effect",
+        Baseline {
+            value: 1.32, // ~66ms
+            sd: Some(0.50),
+            source: "Fan et al. (2002), ANT conflict effect 66±23ms → 1.32 ticks",
+            population: "human adults",
+        },
+    );
+
+    // ── Mood Induction (Dayan & Huys 2009) ──
+    m.insert(
+        "risk_aversion_high_5ht",
+        Baseline {
+            value: 0.65,
+            sd: Some(0.15),
+            source: "Dayan & Huys (2009); Crockett et al. (2008), tryptophan loading",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "risk_seeking_low_5ht",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.15),
+            source: "Dayan & Huys (2009); Crockett et al. (2008), tryptophan depletion",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "mood_congruent_bias",
+        Baseline {
+            value: 0.15,
+            sd: Some(0.10),
+            source: "Dayan & Huys (2009), mood-congruent decision bias",
+            population: "human adults",
+        },
+    );
+
+    m
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1864,6 +1990,7 @@ mod tests {
         assert!(!motor_baselines().is_empty());
         assert!(!language_baselines().is_empty());
         assert!(!social_baselines().is_empty());
+        assert!(!neuromod_baselines().is_empty());
     }
 
     #[test]

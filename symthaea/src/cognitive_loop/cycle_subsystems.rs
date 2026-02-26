@@ -113,7 +113,8 @@ impl CognitiveLoopService {
                     (self.prediction_confidence + convergence_boost).clamp(0.0, 1.0);
             } else if phi_divergence > 0.4 {
                 // Significant divergence → epistemic uncertainty about integration
-                let divergence_penalty = (phi_divergence - 0.4).min(0.3) * 0.03;
+                // Attenuated 50%: NE exploration_delta covers surprise-driven exploration
+                let divergence_penalty = (phi_divergence - 0.4).min(0.3) * 0.015;
                 self.prediction_confidence =
                     (self.prediction_confidence - divergence_penalty).max(0.0);
                 self.curiosity_drive.exploration_urge =
@@ -262,7 +263,8 @@ impl CognitiveLoopService {
         // FEEDBACK: Large consciousness gradients drive exploration
         // Science: Bengio (2017) — gradient information guides search
         if consciousness_gradient_magnitude > 0.5 {
-            let gradient_explore = (consciousness_gradient_magnitude - 0.5).clamp(0.0, 0.5) * 0.1;
+            // Attenuated 50%: NE exploration_delta handles consciousness gradient exploration
+            let gradient_explore = (consciousness_gradient_magnitude - 0.5).clamp(0.0, 0.5) * 0.05;
             self.curiosity_drive.exploration_urge =
                 (self.curiosity_drive.exploration_urge + gradient_explore as f32).clamp(0.0, 1.0);
         }

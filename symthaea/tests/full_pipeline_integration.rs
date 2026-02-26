@@ -1,4 +1,4 @@
-#![cfg(feature = "integration-tests")]
+// Full pipeline integration tests — no feature gate required
 
 // ==================================================================================
 // Full Pipeline Integration Test: 15 Improvements Wired End-to-End

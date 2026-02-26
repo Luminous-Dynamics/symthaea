@@ -329,7 +329,8 @@ impl CognitiveLoopService {
         // Science: Steriade (1996) — high arousal (fight-or-flight) suppresses consolidation;
         // low arousal (rest) enhances memory consolidation (REM/slow-wave effect)
         if affective_arousal > 0.7 {
-            let arousal_suppress = ((affective_arousal - 0.7) * 0.5).min(0.15);
+            // Attenuated 50%: DA learning_rate_factor() already scales LR via the bath
+            let arousal_suppress = ((affective_arousal - 0.7) * 0.25).min(0.08);
             self.fep_lr_boost = (self.fep_lr_boost * (1.0 - arousal_suppress)).max(1.0);
 
             // Arousal trap detection (Yerkes-Dodson 1908 — inverted-U performance curve)
@@ -352,11 +353,11 @@ impl CognitiveLoopService {
             {
                 let recovery_intensity =
                     (self.carryover.urgency.arousal_trap_counter - 5) as f32 / 5.0;
-                // Gradual LR dampening: up to 20% reduced learning during recovery
-                self.fep_lr_boost = (self.fep_lr_boost * (1.0 - recovery_intensity * 0.2)).max(1.0);
-                // Slight exploration boost to help escape
+                // Gradual LR dampening: attenuated 50% (NE exploration_delta handles arousal)
+                self.fep_lr_boost = (self.fep_lr_boost * (1.0 - recovery_intensity * 0.1)).max(1.0);
+                // Slight exploration boost: attenuated 50% (NE exploration_delta covers this)
                 self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
-                    + recovery_intensity * 0.05)
+                    + recovery_intensity * 0.025)
                     .clamp(0.0, 1.0);
                 self.stats.arousal_recovery_cycles += 1;
                 tracing::debug!(
@@ -380,7 +381,8 @@ impl CognitiveLoopService {
             self.carryover.urgency.arousal_trap_counter = 0;
 
             if affective_arousal < 0.3 {
-                let consolidation_boost = ((0.3 - affective_arousal) * 0.3).min(0.1);
+                // Attenuated 50%: DA handles low-error consolidation boost via the bath
+                let consolidation_boost = ((0.3 - affective_arousal) * 0.3).min(0.05);
                 self.fep_lr_boost =
                     (self.fep_lr_boost * (1.0 + consolidation_boost)).clamp(1.0, 2.0);
             }
@@ -582,7 +584,8 @@ impl CognitiveLoopService {
         // high focus → deep attention, suppress context-switching to maintain flow
         if attention_schema_focus > 0.0 {
             if attention_schema_focus < 0.3 {
-                let novelty_push = (0.3 - attention_schema_focus) * 0.12;
+                // Attenuated 50%: ACh attention_factor already scales attention via the bath
+                let novelty_push = (0.3 - attention_schema_focus) * 0.06;
                 self.curiosity_drive.exploration_urge =
                     (self.curiosity_drive.exploration_urge + novelty_push).clamp(0.0, 1.0);
             } else if attention_schema_focus > 0.8 {
@@ -603,8 +606,8 @@ impl CognitiveLoopService {
                 crate::consciousness::phi_attention::ActionType::StateModifying,
                 ctx.unified_psi as f32,
             ) {
-                // Low consciousness → reduce exploration (don't take risky actions unconsciously)
-                self.curiosity_drive.exploration_urge *= 0.7;
+                // Attenuated 50%: 5-HT confidence_delta implicitly reduces exploration
+                self.curiosity_drive.exploration_urge *= 0.85;
             }
             phi_attn.phi_average().unwrap_or(0.0)
         } else {

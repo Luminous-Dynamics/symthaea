@@ -310,6 +310,7 @@ impl LLMBackend for LiquidMambaBackend {
         let mut gen = self.generator.lock()
             .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
         let result = gen.generate(&channels);
+        gen.distill_step(&channels, &result);
         Ok(result.text)
     }
 
@@ -338,6 +339,7 @@ impl DirectThoughtBackend for LiquidMambaBackend {
         let mut gen = self.generator.lock()
             .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
         let result = gen.generate(channels);
+        gen.distill_step(channels, &result);
         Ok(result.text)
     }
 }

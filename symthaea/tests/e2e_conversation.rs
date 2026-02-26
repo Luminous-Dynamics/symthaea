@@ -1,4 +1,4 @@
-#![cfg(feature = "integration-tests")]
+// E2E conversation tests — no feature gate required (uses SimulatedBackend by default)
 
 //! End-to-End Conversation Test: The First Conversation
 //!

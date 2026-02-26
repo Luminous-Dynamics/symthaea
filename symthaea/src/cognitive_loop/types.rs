@@ -986,6 +986,12 @@ pub struct CycleMetadata {
     pub grid_spatial_complexity: f32,
 
     // ── Neuromodulator Bath ────────────────────────────────────────────
+    /// Whether the neuromodulator bath suggests querying the exocortex (swarm).
+    /// Triggered by: high NE (uncertainty) + low DA (no reward) + low 5-HT.
+    pub exocortex_query_suggested: bool,
+    /// Neurochemical personality description (e.g., "novelty-seeking, cautious").
+    /// Updated every 97 cycles alongside circadian refresh.
+    pub neuromod_personality: String,
     /// Effective dopamine signal (reward/learning drive, 0.0–2.0).
     pub dopamine_effective: f32,
     /// Effective noradrenaline signal (arousal/exploration, 0.0–2.0).
