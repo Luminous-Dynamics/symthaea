@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "description": "Unified registry for Symthaea benchmark runners and datasets.",
+  "benchmarks": [
+    {
+      "id": "arc-agi-2",
+      "name": "ARC-AGI-2",
+      "type": "external",
+      "root": "benchmarks/external/arc-agi-2",
+      "fetch": "benchmarks/external/arc-agi-2/fetch.sh",
+      "run": "benchmarks/external/arc-agi-2/run.sh",
+      "ready": "benchmarks/external/arc-agi-2/data/READY",
+      "results": "benchmarks/external/results/arc-agi-2.json",
+      "local_only": true,
+      "notes": [
+        "Exact-match per task",
+        "HDC primitives + LLM translation only"
+      ]
+    },
+    {
+      "id": "gaia-dev",
+      "name": "GAIA (Public Dev)",
+      "type": "external",
+      "root": "benchmarks/external/gaia",
+      "fetch": "benchmarks/external/gaia/fetch.sh",
+      "run": "benchmarks/external/gaia/run.sh",
+      "ready": "benchmarks/external/gaia/data/READY",
+      "results": "benchmarks/external/results/gaia-dev.json",
+      "local_only": true,
+      "notes": [
+        "Public dev set only",
+        "Tool-use via ActionIR bindings"
+      ]
+    },
+    {
+      "id": "osworld-verified",
+      "name": "OSWorld-Verified (NixOS)",
+      "type": "external",
+      "root": "benchmarks/external/osworld-verified",
+      "fetch": "benchmarks/external/osworld-verified/fetch.sh",
+      "run": "benchmarks/external/osworld-verified/run.sh",
+      "ready": "benchmarks/external/osworld-verified/data/READY",
+      "results": "benchmarks/external/results/osworld-verified.json",
+      "local_only": true,
+      "notes": [
+        "NixOS VM/derivation required",
+        "Environment determinism for Phi coherence"
+      ]
+    },
+    {
+      "id": "swe-bench-verified-mini",
+      "name": "SWE-bench Verified (Mini)",
+      "type": "external",
+      "root": "benchmarks/external/swe-bench-verified",
+      "fetch": "benchmarks/external/swe-bench-verified/fetch.sh",
+      "run": "benchmarks/external/swe-bench-verified/run.sh",
+      "ready": "benchmarks/external/swe-bench-verified/data/READY",
+      "results": "benchmarks/external/results/swe-bench-verified-mini.json",
+      "local_only": true,
+      "notes": [
+        "Mini subset for CI",
+        "Action budget enforcement"
+      ]
+    },
+    {
+      "id": "helm-capabilities-safety",
+      "name": "HELM Capabilities + Safety",
+      "type": "external",
+      "root": "benchmarks/external/helm",
+      "fetch": "benchmarks/external/helm/fetch.sh",
+      "run": "benchmarks/external/helm/run.sh",
+      "ready": "benchmarks/external/helm/data/READY",
+      "results": "benchmarks/external/results/helm.json",
+      "local_only": true,
+      "notes": [
+        "Official HELM scenarios via helm-run",
+        "No cherry-picking"
+      ]
+    }
+  ]
+}
