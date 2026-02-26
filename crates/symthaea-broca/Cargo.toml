@@ -13,6 +13,7 @@ bincode = { workspace = true }
 blake3 = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = { workspace = true }
 rayon = { workspace = true }
 
@@ -22,6 +23,10 @@ candle-nn = { version = "0.8", optional = true }
 candle-transformers = { version = "0.8", optional = true }
 hf-hub = { version = "0.4", optional = true }
 tokenizers = { version = "0.21", optional = true }
+
+[[bin]]
+name = "broca-train"
+path = "src/bin/broca_train.rs"
 
 [features]
 default = []

@@ -17,6 +17,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
+use crate::checkpoint::AdamState;
 use crate::encoder::ThoughtChannels;
 use crate::generator::BrocaGenerator;
 use crate::tokenizer::BpeTokenizer;
@@ -118,6 +119,12 @@ pub struct TrainingConfig {
     pub grad_clip: f32,
     /// Report loss every N steps.
     pub report_interval: usize,
+    /// Use Adam optimizer (if false, uses SGD).
+    pub use_adam: bool,
+    /// Warmup fraction (0.0 to 1.0). First N% of steps use linear LR ramp.
+    pub warmup_fraction: f32,
+    /// Early stopping patience (0 = disabled). Stop if no improvement for N epochs.
+    pub patience: usize,
 }
 
 impl Default for TrainingConfig {
@@ -128,6 +135,9 @@ impl Default for TrainingConfig {
             bptt_window: 16,
             grad_clip: 1.0,
             report_interval: 100,
+            use_adam: true,
+            warmup_fraction: 0.1,
+            patience: 0,
         }
     }
 }
@@ -139,6 +149,20 @@ pub struct EpochMetrics {
     pub avg_loss: f32,
     pub num_tokens: usize,
     pub num_pairs: usize,
+}
+
+/// Compute the effective learning rate with warmup.
+///
+/// During the warmup phase (first `warmup_fraction` of total steps),
+/// LR ramps linearly from 0.1x to 1.0x base LR.
+fn warmup_lr(base_lr: f32, step: usize, total_steps: usize, warmup_fraction: f32) -> f32 {
+    let warmup_steps = (total_steps as f32 * warmup_fraction) as usize;
+    if warmup_steps == 0 || step >= warmup_steps {
+        base_lr
+    } else {
+        let progress = step as f32 / warmup_steps as f32;
+        base_lr * (0.1 + 0.9 * progress)
+    }
 }
 
 /// Train the BrocaGenerator on a dataset using teacher forcing.
@@ -155,7 +179,38 @@ pub fn train(
     dataset: &TrainingDataset,
     config: &TrainingConfig,
 ) -> Vec<EpochMetrics> {
+    train_with_adam(generator, dataset, config, None).0
+}
+
+/// Train with optional Adam optimizer state.
+///
+/// Returns (metrics, final AdamState if Adam was used).
+pub fn train_with_adam(
+    generator: &mut BrocaGenerator,
+    dataset: &TrainingDataset,
+    config: &TrainingConfig,
+    mut adam_state: Option<AdamState>,
+) -> (Vec<EpochMetrics>, Option<AdamState>) {
     let mut metrics = Vec::with_capacity(config.epochs);
+
+    // Initialize Adam state if requested and not provided
+    if config.use_adam && adam_state.is_none() {
+        let vocab_size = generator.tokenizer().vocab_size();
+        let dim = generator.controller().token_embeddings().first()
+            .map(|e| e.dim())
+            .unwrap_or(16384);
+        adam_state = Some(AdamState::new(vocab_size, dim));
+    }
+
+    // Calculate total steps for warmup
+    let tokens_per_epoch: usize = dataset.pairs.iter()
+        .map(|p| p.target_ids.len().min(config.bptt_window))
+        .sum();
+    let total_steps = tokens_per_epoch * config.epochs;
+
+    let mut global_step = 0usize;
+    let mut best_loss = f32::INFINITY;
+    let mut patience_counter = 0usize;
 
     for epoch in 0..config.epochs {
         let mut total_loss = 0.0f32;
@@ -171,7 +226,6 @@ pub fn train(
 
             // Reset controller for this sequence
             generator.controller_mut().reset();
-            generator.controller_mut().set_learning_rate(config.learning_rate);
 
             // Teacher-forced forward pass
             let mut prev_token = generator.tokenizer().thought_id;
@@ -179,6 +233,9 @@ pub fn train(
             let window_end = pair.target_ids.len().min(config.bptt_window);
 
             for (pos, &target_id) in pair.target_ids[..window_end].iter().enumerate() {
+                let lr = warmup_lr(config.learning_rate, global_step, total_steps, config.warmup_fraction);
+                generator.controller_mut().set_learning_rate(lr);
+
                 let logits = generator.controller_mut().forward_step(&thought_hv, prev_token, pos);
 
                 // Cross-entropy loss: -log(softmax[target])
@@ -186,17 +243,28 @@ pub fn train(
                 total_loss += loss;
                 total_tokens += 1;
 
-                // Compute gradient through weight-tied output and apply
-                // This is a simplified single-step update (not full BPTT through time)
-                apply_weight_tied_gradient(
-                    generator.controller_mut(),
-                    &logits,
-                    target_id as usize,
-                    config.learning_rate,
-                    config.grad_clip,
-                );
+                // Apply gradient update
+                if config.use_adam {
+                    apply_weight_tied_gradient_adam(
+                        generator.controller_mut(),
+                        &logits,
+                        target_id as usize,
+                        lr,
+                        config.grad_clip,
+                        adam_state.as_mut().unwrap(),
+                    );
+                } else {
+                    apply_weight_tied_gradient(
+                        generator.controller_mut(),
+                        &logits,
+                        target_id as usize,
+                        lr,
+                        config.grad_clip,
+                    );
+                }
 
                 prev_token = target_id;
+                global_step += 1;
             }
         }
 
@@ -221,9 +289,28 @@ pub fn train(
                 "Broca training epoch"
             );
         }
+
+        // Early stopping check
+        if config.patience > 0 {
+            if avg_loss < best_loss - 1e-6 {
+                best_loss = avg_loss;
+                patience_counter = 0;
+            } else {
+                patience_counter += 1;
+                if patience_counter >= config.patience {
+                    tracing::info!(
+                        epoch = epoch,
+                        patience = config.patience,
+                        best_loss = best_loss,
+                        "Early stopping triggered"
+                    );
+                    break;
+                }
+            }
+        }
     }
 
-    metrics
+    (metrics, adam_state)
 }
 
 /// Cross-entropy loss for a single position.
@@ -240,7 +327,7 @@ fn cross_entropy_loss(logits: &[f32], target: usize) -> f32 {
     -log_softmax_target
 }
 
-/// Apply gradient through weight-tied output.
+/// Apply gradient through weight-tied output (SGD).
 ///
 /// For weight-tied output: logits[i] = similarity(output_hv, emb[i])
 /// Gradient of CE loss w.r.t. output_hv is: sum_i (softmax[i] - one_hot[target]) * emb[i]
@@ -291,6 +378,124 @@ fn apply_weight_tied_gradient(
             }
         }
     }
+}
+
+/// Apply gradient through weight-tied output with Adam optimizer.
+fn apply_weight_tied_gradient_adam(
+    controller: &mut crate::controller::LanguageController,
+    logits: &[f32],
+    target: usize,
+    lr: f32,
+    grad_clip: f32,
+    adam: &mut AdamState,
+) {
+    if target >= logits.len() {
+        return;
+    }
+
+    // Compute softmax
+    let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let exps: Vec<f32> = logits.iter().map(|&l| (l - max_logit).exp()).collect();
+    let sum_exp: f32 = exps.iter().sum();
+
+    if sum_exp < 1e-10 {
+        return;
+    }
+
+    let output_hv = controller.output_hv();
+    let output_slice = output_hv.as_slice();
+
+    let embeddings = controller.token_embeddings_mut();
+    let n = embeddings.len().min(logits.len());
+
+    for i in 0..n {
+        let prob = exps[i] / sum_exp;
+        let error = if i == target { prob - 1.0 } else { prob };
+
+        if error.abs() < 1e-6 {
+            continue;
+        }
+
+        // Compute per-dimension gradient: error * output_hv
+        let dim = embeddings[i].values.len().min(output_slice.len());
+        let grad: Vec<f32> = (0..dim)
+            .map(|j| (error * output_slice[j]).clamp(-grad_clip, grad_clip))
+            .collect();
+
+        // Apply Adam step if state exists for this embedding
+        if i < adam.m.len() {
+            let update = adam.step(i, &grad, lr);
+            let emb_values = &mut embeddings[i].values;
+            for (j, delta) in update.iter().enumerate() {
+                if j < emb_values.len() {
+                    emb_values[j] -= delta;
+                }
+            }
+        }
+    }
+}
+
+/// Generate a diverse set of ThoughtChannels for training data collection.
+///
+/// 8 intents x 5 epistemic x 3 emotional clusters x 3 relationship stages = 360 configs.
+/// Each has distinct channel encodings covering the full combinatorial space.
+pub fn generate_diverse_thoughts() -> Vec<ThoughtChannels> {
+    let mut thoughts = Vec::with_capacity(360);
+
+    // Emotional clusters: (valence, arousal, warmth)
+    let emotions = [
+        (0.7, 0.3, 0.8),   // Calm-warm
+        (-0.3, 0.7, 0.4),  // Tense-cool
+        (0.5, 0.5, 0.6),   // Neutral-balanced
+    ];
+
+    // Relationship stages
+    let stages = [0.0, 3.0, 6.0]; // New, Established, Deep
+
+    for intent in 0..8 {
+        for epistemic in 0..5 {
+            for &(valence, arousal, warmth) in &emotions {
+                for &stage in &stages {
+                    let mut channels = ThoughtChannels::with_intent(intent);
+                    channels.set_epistemic(epistemic as f32);
+                    channels.set_emotion(valence, arousal, warmth);
+                    channels.channels[15] = stage; // relationship_stage
+                    channels.channels[16] = 0.5;   // trust: mid
+                    channels.channels[17] = 1.0;   // mood_temperature: neutral
+                    channels.channels[12] = 0.5;   // psi: mid
+                    channels.channels[13] = 0.5;   // meta_awareness: mid
+                    channels.channels[14] = 0.5;   // coherence: mid
+                    thoughts.push(channels);
+                }
+            }
+        }
+    }
+
+    thoughts
+}
+
+/// Reconstruct a text prompt from ThoughtChannels for LLM distillation.
+///
+/// Produces markers in the format that `channels_from_prompt()` in ssm_backend.rs can parse.
+pub fn thought_to_prompt(channels: &ThoughtChannels) -> String {
+    // Find the active intent
+    let intent_names = [
+        "Acknowledge", "Answer", "Clarify", "Propose",
+        "Uncertainty", "Reflect", "Continue", "Unknown",
+    ];
+    let active_intent = (0..8)
+        .max_by(|&a, &b| channels.channels[a].total_cmp(&channels.channels[b]))
+        .unwrap_or(7);
+
+    let epistemic_names = ["Certain", "Probable", "Uncertain", "Unknown", "OutOfDomain"];
+    let epistemic_idx = (channels.epistemic_ordinal() as usize).min(4);
+
+    format!(
+        "SEMANTIC_INTENT: {}\nEPISTEMIC_STATUS: {}\nMOOD_TEMPERATURE: {:.2}\n",
+        intent_names[active_intent],
+        epistemic_names[epistemic_idx],
+        channels.channels[17],
+    )
 }
 
 #[cfg(test)]
@@ -366,28 +571,116 @@ mod tests {
         let config = test_config();
         let mut gen = BrocaGenerator::new(&genesis, config);
 
-        // Create a simple dataset
+        // Create a simple dataset with repeated examples for stronger signal
         let tok = gen.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
-        dataset.push(TrainingPair::new(channels, "hello".to_string(), &tok));
-        dataset.push(TrainingPair::new(channels, "world".to_string(), &tok));
+        for _ in 0..5 {
+            dataset.push(TrainingPair::new(channels, "hello".to_string(), &tok));
+            dataset.push(TrainingPair::new(channels, "world".to_string(), &tok));
+        }
 
         let train_config = TrainingConfig {
-            epochs: 5,
-            learning_rate: 0.01,
+            epochs: 20,
+            learning_rate: 0.05,
             bptt_window: 8,
             grad_clip: 1.0,
-            report_interval: 1,
+            report_interval: 100,
+            use_adam: false, // SGD for simplicity in test
+            warmup_fraction: 0.0,
+            patience: 0,
         };
 
         let metrics = train(&mut gen, &dataset, &train_config);
-        assert_eq!(metrics.len(), 5);
+        assert_eq!(metrics.len(), 20);
 
         // Loss should be finite
         for m in &metrics {
             assert!(m.avg_loss.is_finite(), "Loss should be finite: {}", m.avg_loss);
         }
+
+        // Loss should decrease: first epoch > last epoch
+        let first_loss = metrics[0].avg_loss;
+        let last_loss = metrics.last().unwrap().avg_loss;
+        assert!(
+            last_loss < first_loss,
+            "Training should reduce loss: first={first_loss} last={last_loss}"
+        );
+    }
+
+    #[test]
+    fn test_training_with_adam() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for _ in 0..3 {
+            dataset.push(TrainingPair::new(channels, "hello".to_string(), &tok));
+        }
+
+        let train_config = TrainingConfig {
+            epochs: 10,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            grad_clip: 1.0,
+            report_interval: 100,
+            use_adam: true,
+            warmup_fraction: 0.1,
+            patience: 0,
+        };
+
+        let (metrics, adam) = train_with_adam(&mut gen, &dataset, &train_config, None);
+        assert_eq!(metrics.len(), 10);
+        assert!(adam.is_some());
+
+        let adam = adam.unwrap();
+        assert!(adam.t > 0, "Adam should have stepped");
+    }
+
+    #[test]
+    fn test_early_stopping() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        dataset.push(TrainingPair::new(channels, "a".to_string(), &tok));
+
+        let train_config = TrainingConfig {
+            epochs: 100,
+            learning_rate: 0.001,
+            bptt_window: 8,
+            grad_clip: 1.0,
+            report_interval: 200,
+            use_adam: false,
+            warmup_fraction: 0.0,
+            patience: 5,
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+        // Should stop before 100 epochs due to patience
+        assert!(metrics.len() < 100, "Early stopping should trigger: got {} epochs", metrics.len());
+    }
+
+    #[test]
+    fn test_warmup_lr() {
+        let base_lr = 0.01;
+        // At step 0, should be 10% of base
+        let lr0 = warmup_lr(base_lr, 0, 100, 0.1);
+        assert!((lr0 - 0.001).abs() < 1e-5, "Step 0 should be 10% of base: {lr0}");
+
+        // At step 10 (end of warmup), should be full base
+        let lr10 = warmup_lr(base_lr, 10, 100, 0.1);
+        assert!((lr10 - base_lr).abs() < 1e-5, "After warmup should be full base: {lr10}");
+
+        // At step 50, should be full base
+        let lr50 = warmup_lr(base_lr, 50, 100, 0.1);
+        assert!((lr50 - base_lr).abs() < 1e-5);
     }
 
     #[test]
@@ -416,5 +709,32 @@ mod tests {
         assert_eq!(parsed.len(), 2);
         assert_eq!(parsed[0].target_text, "hello");
         assert_eq!(parsed[1].target_text, "world");
+    }
+
+    #[test]
+    fn test_generate_diverse_thoughts() {
+        let thoughts = generate_diverse_thoughts();
+        assert_eq!(thoughts.len(), 360, "8 intents x 5 epistemic x 3 emotions x 3 stages = 360");
+
+        // Verify all are distinct
+        for (i, a) in thoughts.iter().enumerate() {
+            for (j, b) in thoughts.iter().enumerate() {
+                if i != j {
+                    assert_ne!(a.channels, b.channels, "Thoughts {i} and {j} should differ");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_thought_to_prompt() {
+        let mut channels = ThoughtChannels::with_intent(1); // Answer
+        channels.set_epistemic(0.0); // Certain
+        channels.channels[17] = 1.0; // mood_temperature
+
+        let prompt = thought_to_prompt(&channels);
+        assert!(prompt.contains("Answer"), "Should contain intent name");
+        assert!(prompt.contains("Certain"), "Should contain epistemic status");
+        assert!(prompt.contains("MOOD_TEMPERATURE"), "Should contain mood temp marker");
     }
 }

@@ -30,6 +30,14 @@ impl CognitiveLoopService {
         &self.stats
     }
 
+    /// Get a clone of the pain sender channel, if active.
+    ///
+    /// Used by integration tests to inject `InfrastructureError`s and verify
+    /// that the somatic bridge converts them into interoceptive signals.
+    pub fn pain_sender(&self) -> Option<crate::infrastructure::PainSender> {
+        self.pain_tx.clone()
+    }
+
     /// Get the configuration used to create this service.
     pub fn config(&self) -> &CognitiveLoopConfig {
         &self.config

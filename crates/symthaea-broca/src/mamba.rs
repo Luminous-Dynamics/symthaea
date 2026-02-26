@@ -394,4 +394,88 @@ mod tests {
         // Should be non-zero for a real token
         assert!(emb.iter().any(|x| x.abs() > 1e-10));
     }
+
+    #[test]
+    #[ignore = "Requires network access to download mamba-130m (~260MB)"]
+    fn test_mamba_generate_10_tokens() {
+        let device = Device::Cpu;
+        let mut wrapper = MambaWrapper::load("state-spaces/mamba-130m", device)
+            .expect("Failed to load mamba-130m");
+
+        // Encode a prompt
+        let prompt_ids = wrapper.encode("The meaning of life is").expect("Encode failed");
+
+        // Feed prompt tokens
+        let mut last_logits = vec![];
+        for &token_id in &prompt_ids {
+            last_logits = wrapper.forward_one_token(token_id).expect("Forward failed");
+        }
+
+        // Generate 10 tokens greedily
+        let mut generated_ids = Vec::new();
+        for _ in 0..10 {
+            let next_id = last_logits.iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.total_cmp(b))
+                .map(|(i, _)| i as u32)
+                .unwrap();
+            generated_ids.push(next_id);
+            last_logits = wrapper.forward_one_token(next_id).expect("Forward failed");
+        }
+
+        assert_eq!(generated_ids.len(), 10);
+        let decoded = wrapper.decode(&generated_ids).expect("Decode failed");
+        // Should be printable ASCII (no random binary)
+        assert!(
+            decoded.chars().all(|c| c.is_ascii() || c.is_alphanumeric()),
+            "Generated text should be readable: {decoded:?}"
+        );
+    }
+
+    #[test]
+    #[ignore = "Requires network access to download mamba-130m (~260MB)"]
+    fn test_mamba_e2e_thought_to_text() {
+        use crate::encoder::ThoughtChannels;
+        use crate::projection::HdcSsmProjection;
+        use symthaea_core::genesis::GenesisSeed;
+
+        let genesis = GenesisSeed::from_phrase("test-mamba-e2e");
+        let device = Device::Cpu;
+
+        let mut wrapper = MambaWrapper::load("state-spaces/mamba-130m", device)
+            .expect("Failed to load mamba-130m");
+
+        // Create thought channels and encode to HDC
+        let mut channels = ThoughtChannels::with_intent(1); // Answer
+        channels.set_epistemic(0.0); // Certain
+        channels.set_emotion(0.5, 0.5, 0.5);
+
+        let encoder = crate::encoder::ThoughtLanguageEncoder::new(&genesis);
+        let thought_hv = encoder.encode(&channels);
+
+        // Project HDC → SSM space
+        let mut projection = HdcSsmProjection::new(&genesis);
+        let ssm_context = projection.hdc_to_ssm(&thought_hv);
+
+        // Inject context into Mamba
+        wrapper.inject_initial_context(&ssm_context)
+            .expect("Context injection failed");
+
+        // Generate a few tokens
+        let mut token_ids = Vec::new();
+        let mut logits = wrapper.forward_one_token(0).expect("Forward failed");
+        for _ in 0..5 {
+            let next_id = logits.iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.total_cmp(b))
+                .map(|(i, _)| i as u32)
+                .unwrap();
+            token_ids.push(next_id);
+            logits = wrapper.forward_one_token(next_id).expect("Forward failed");
+        }
+
+        let text = wrapper.decode(&token_ids).expect("Decode failed");
+        assert!(!text.is_empty(), "E2E should produce text");
+        assert!(text.len() > 0, "E2E text: {text:?}");
+    }
 }
