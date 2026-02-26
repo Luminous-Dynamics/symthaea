@@ -179,6 +179,12 @@ pub enum SwarmMessage {
         public_inputs: Vec<u8>,
     },
 
+    /// Linguistic LoRA delta for collective dialect (v1.7.0)
+    LinguisticDelta {
+        lora_id: String,
+        delta_bytes: Vec<u8>,
+    },
+
     /// Graceful disconnect
     Goodbye { reason: String },
 }
@@ -200,6 +206,7 @@ impl SwarmMessage {
             Self::BrainMutation { .. } => "BrainMutation",
             Self::ZkProof { .. } => "ZkProof",
             Self::ResuscitationPacket { .. } => "ResuscitationPacket",
+            Self::LinguisticDelta { .. } => "LinguisticDelta",
             Self::Goodbye { .. } => "Goodbye",
         }
     }

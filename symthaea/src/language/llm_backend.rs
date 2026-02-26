@@ -44,6 +44,11 @@ pub trait LLMBackend: Send + Sync {
     /// Update the affective state (thermodynamics -> language warping).
     fn update_affect(&self, _load: f32, _temp: f32) {}
 
+    /// Apply a LoRA adapter to the model (v1.7.0 Broca Phase).
+    fn apply_lora(&self, _lora_id: &str, _delta: &[u8]) -> Result<()> {
+        Ok(())
+    }
+
     /// Check if the backend is currently available.
     async fn is_available(&self) -> bool;
 

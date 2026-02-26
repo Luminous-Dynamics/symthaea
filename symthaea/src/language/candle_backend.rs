@@ -47,6 +47,8 @@ pub struct CandleBackend {
     /// Shared affective state
     thermodynamic_load: Arc<std::sync::atomic::AtomicU32>, // bits of f32
     mood_temperature: Arc<std::sync::atomic::AtomicU32>,
+    /// Currently active LoRA adapter ID
+    current_lora: Arc<Mutex<Option<String>>>,
 }
 
 impl CandleBackend {
@@ -69,6 +71,7 @@ impl CandleBackend {
             device,
             thermodynamic_load: Arc::new(std::sync::atomic::AtomicU32::new(0.0f32.to_bits())),
             mood_temperature: Arc::new(std::sync::atomic::AtomicU32::new(1.0f32.to_bits())),
+            current_lora: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -86,6 +89,15 @@ impl CandleBackend {
 
 #[async_trait::async_trait]
 impl LLMBackend for CandleBackend {
+    fn apply_lora(&self, lora_id: &str, _delta: &[u8]) -> Result<()> {
+        // In a full implementation, we'd use candle-nn::lora to wrap layers
+        // For RC1, we track the ID to simulate the dialect shift
+        tracing::info!(id = %lora_id, "Applying linguistic LoRA adapter (Collective Dialect)");
+        let mut current = self.current_lora.blocking_lock();
+        *current = Some(lora_id.to_string());
+        Ok(())
+    }
+
     async fn generate(&self, prompt: &str, params: &GenerationParams) -> Result<String> {
         let mut tokens = self.tokenizer.encode(prompt, true).map_err(|e| anyhow!(e))?.get_ids().to_vec();
         let (load, mood_temp) = self.get_affect();

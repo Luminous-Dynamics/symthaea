@@ -628,6 +628,13 @@ impl LLMOrgan {
         self.backend.update_affect(load, mood_temp);
     }
 
+    /// Apply a linguistic LoRA adapter to the voice.
+    pub fn apply_lora(&self, lora_id: &str, delta: &[u8]) {
+        if let Err(e) = self.backend.apply_lora(lora_id, delta) {
+            tracing::error!(id = %lora_id, "Failed to apply LoRA: {}", e);
+        }
+    }
+
     /// Translates a StructuredThought into a natural language response.
     ///
     /// This is the key method for the "Reason-then-Generate" pipeline.
