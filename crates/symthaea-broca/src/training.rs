@@ -651,19 +651,20 @@ mod tests {
         let channels = ThoughtChannels::default();
         dataset.push(TrainingPair::new(channels, "a".to_string(), &tok));
 
+        // Use a very tiny LR so loss barely changes, triggering early stopping
         let train_config = TrainingConfig {
             epochs: 100,
-            learning_rate: 0.001,
+            learning_rate: 1e-8,
             bptt_window: 8,
             grad_clip: 1.0,
             report_interval: 200,
             use_adam: false,
             warmup_fraction: 0.0,
-            patience: 5,
+            patience: 3,
         };
 
         let metrics = train(&mut gen, &dataset, &train_config);
-        // Should stop before 100 epochs due to patience
+        // With near-zero LR, loss changes are < 1e-6, so patience triggers
         assert!(metrics.len() < 100, "Early stopping should trigger: got {} epochs", metrics.len());
     }
 
