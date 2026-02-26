@@ -489,4 +489,8 @@ pub struct LoopStats {
 
     /// Number of successful brain hot-swaps (hyper-parameter optimization)
     pub brain_swaps_count: u64,
+
+    /// Last Liquid-Mamba semantic prediction error for CycleMetadata.
+    #[cfg(feature = "liquid-mamba")]
+    pub last_liquid_mamba_pe: f32,
 }

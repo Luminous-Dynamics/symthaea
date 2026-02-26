@@ -245,6 +245,7 @@ pub use symthaea_core::hdc::real_arithmetic;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 pub use symthaea_core::hdc::dynamical_system;
+pub use symthaea_core::hdc::grid_encoder;
 pub use symthaea_core::hdc::incremental_hv;
 pub use symthaea_core::hdc::lsh_index;
 pub use symthaea_core::hdc::lsh_simhash;

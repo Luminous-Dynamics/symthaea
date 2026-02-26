@@ -117,6 +117,11 @@ impl GridEncoder {
         self.dim
     }
 
+    /// The number of colors this encoder supports.
+    pub fn num_colors(&self) -> usize {
+        self.color_hvs.len()
+    }
+
     /// Access a color basis HV by index.
     pub fn color_hv(&self, idx: usize) -> &ContinuousHV {
         &self.color_hvs[idx]

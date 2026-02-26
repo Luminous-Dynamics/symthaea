@@ -695,6 +695,11 @@ pub struct CognitiveLoopService {
     multi_objective_evolution:
         Option<crate::consciousness::multi_objective_evolution::MultiObjectiveEvolution>,
 
+    /// Grid encoder for spatial reasoning: binds 2D position + color into HDC hypervectors.
+    /// Used to encode structured grid inputs for ARC-style spatial reasoning tasks.
+    /// Co-gated with `enable_primitive_consciousness`.
+    grid_encoder: Option<symthaea_core::hdc::grid_encoder::GridEncoder>,
+
     /// Cached primitive validation results (one-shot at cycle 500).
     /// Validates whether mathematical primitives actually improve Φ.
     primitive_validation_result: Option<(f64, f64)>, // (mean_phi_gain, p_value)

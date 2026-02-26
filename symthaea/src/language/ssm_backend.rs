@@ -277,6 +277,23 @@ impl LiquidMambaBackend {
 }
 
 #[cfg(feature = "liquid-mamba")]
+impl LiquidMambaBackend {
+    /// Generate with full result (including output HVs and semantic PE).
+    ///
+    /// Unlike `DirectThoughtBackend::generate_from_channels` which returns only
+    /// text, this returns the complete `GenerationResult` for downstream
+    /// distillation and swarm exchange.
+    pub fn generate_full(
+        &self,
+        channels: &ThoughtChannels,
+    ) -> anyhow::Result<symthaea_broca::GenerationResult> {
+        let mut gen = self.generator.lock()
+            .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
+        Ok(gen.generate(channels))
+    }
+}
+
+#[cfg(feature = "liquid-mamba")]
 impl std::fmt::Debug for LiquidMambaBackend {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LiquidMambaBackend")

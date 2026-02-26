@@ -174,6 +174,10 @@ pub(crate) struct QualityMetrics {
     pub(crate) last_epistemic_conflict_count: usize,
     /// Whether epistemic conflicts should force adaptive reasoning on next cycle.
     pub(crate) epistemic_reasoning_override: bool,
+    /// Last grid encoding norm (cached between amortization cycles).
+    pub(crate) last_grid_norm: f32,
+    /// Last grid spatial complexity (cached between amortization cycles).
+    pub(crate) last_grid_complexity: f32,
 }
 
 impl Default for QualityMetrics {
@@ -199,6 +203,8 @@ impl Default for QualityMetrics {
             last_phenomenal_binding: 0.5,
             last_epistemic_conflict_count: 0,
             epistemic_reasoning_override: false,
+            last_grid_norm: 0.0,
+            last_grid_complexity: 0.0,
         }
     }
 }
@@ -973,6 +979,12 @@ pub struct CycleMetadata {
     /// Adaptive memoization threshold from codebook diversity.
     pub adaptive_memo_threshold: f32,
 
+    // ── Spatial Reasoning (GridEncoder) ─────────────────────────────────
+    /// L2 norm of the grid-encoded current input (0.0 when encoder disabled).
+    pub grid_encoding_norm: f32,
+    /// Spatial complexity estimate from grid encoding (0.0–1.0, 0.0 when disabled).
+    pub grid_spatial_complexity: f32,
+
     // ── Neuromodulator Bath ────────────────────────────────────────────
     /// Effective dopamine signal (reward/learning drive, 0.0–2.0).
     pub dopamine_effective: f32,
@@ -1054,6 +1066,8 @@ pub struct ModuleTimings {
     pub code_primitive_routing: u64,
     pub empathic_unification: u64,
     pub multi_objective_evolution: u64,
+    /// Grid encoder: spatial reasoning via HDC grid encoding
+    pub grid_encoder: u64,
     /// Stability regime: BinaryHV-based regime detection + crystallization
     pub stability_regime: u64,
     // ── Core Pipeline Phases (previously un-instrumented) ──

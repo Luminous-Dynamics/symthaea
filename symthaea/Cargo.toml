@@ -323,9 +323,6 @@ wait-timeout = "0.2"
 [features]
 default = []
 
-# ── Test Scopes ────────────────────────────────────────────────────
-integration-tests = []                      # Enable heavier integration/e2e test suites
-
 # ── Binary build gates ──────────────────────────────────────────────
 # These enable optional dependencies for specific binaries.
 service = ["clap"]                          # symthaea-service binary

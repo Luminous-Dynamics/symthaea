@@ -228,6 +228,7 @@ mod tests {
             Box::new(VisualSearchBenchmark),
             // Reasoning
             Box::new(ArcFluidBenchmark),
+            Box::new(ArcCompositionalBenchmark),
             // Sustained Attention
             Box::new(SartBenchmark),
             // Motor

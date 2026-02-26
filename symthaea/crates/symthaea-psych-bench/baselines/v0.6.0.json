@@ -1,7 +1,7 @@
 {
   "name": "baseline",
-  "timestamp": "2026-02-26T15:56:27.017878106+00:00",
-  "git_hash": "db39d55a",
+  "timestamp": "2026-02-26T19:33:14.575531084+00:00",
+  "git_hash": "f7f0554d",
   "config_summary": "dim=512, trials=10, seed=42",
   "schema_version": "1.1",
   "metrics": {
@@ -1098,6 +1098,43 @@
         "ci_upper": 0.48927695025442125
       }
     },
+    "Language::GardenPath": {
+      "control_accuracy": {
+        "mean": 0.3261799847326163,
+        "std_dev": 0.09288799554295353,
+        "n": 10,
+        "ci_lower": 0.2597365321020294,
+        "ci_upper": 0.39262343736320315
+      },
+      "disambiguation_cost": {
+        "mean": 0.9526213327387983,
+        "std_dev": 0.03891657039174065,
+        "n": 10,
+        "ci_lower": 0.9247840294763675,
+        "ci_upper": 0.9804586360012292
+      },
+      "garden_path_accuracy": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "overall_accuracy": {
+        "mean": 0.155,
+        "std_dev": 0.03872983346207417,
+        "n": 10,
+        "ci_lower": 0.12729627100912225,
+        "ci_upper": 0.18270372899087775
+      },
+      "rt_ticks": {
+        "mean": 6.95487280354574,
+        "std_dev": 0.6212014203829782,
+        "n": 10,
+        "ci_lower": 6.5105229507148294,
+        "ci_upper": 7.399222656376651
+      }
+    },
     "MemoryAgent::AccurateRetrieval": {
       "facts_3_delay_2::accuracy": {
         "mean": 1.0,
@@ -1355,6 +1392,170 @@
         "n": 10,
         "ci_lower": 7.204034630301619,
         "ci_upper": 7.295008840915534
+      }
+    },
+    "Motor::SRTT": {
+      "learning_effect": {
+        "mean": 0.018614892240697768,
+        "std_dev": 0.011855221844876746,
+        "n": 10,
+        "ci_lower": 0.01013476661767347,
+        "ci_upper": 0.027095017863722065
+      },
+      "random::rt_ticks": {
+        "mean": 6.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 6.0,
+        "ci_upper": 6.0
+      },
+      "random_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "sequence::rt_ticks": {
+        "mean": 5.888310646555813,
+        "std_dev": 0.07113133106926046,
+        "n": 10,
+        "ci_lower": 5.837429892817667,
+        "ci_upper": 5.939191400293959
+      },
+      "sequence_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "Reasoning::ArcCompositional": {
+      "compositional_accuracy": {
+        "mean": 0.7166666666666667,
+        "std_dev": 0.10540925533894599,
+        "n": 10,
+        "ci_lower": 0.6412666666666667,
+        "ci_upper": 0.7920666666666667
+      },
+      "compositional_rt_ticks": {
+        "mean": 12.747222222222224,
+        "std_dev": 0.2914681864349928,
+        "n": 10,
+        "ci_lower": 12.538732927932724,
+        "ci_upper": 12.955711516511723
+      },
+      "size_generalization": {
+        "mean": 0.7083333333333334,
+        "std_dev": 0.18941919023591466,
+        "n": 10,
+        "ci_lower": 0.5728404214646062,
+        "ci_upper": 0.8438262452020605
+      },
+      "symmetry_detection": {
+        "mean": 0.24166666666666664,
+        "std_dev": 0.09170874455121766,
+        "n": 10,
+        "ci_lower": 0.17606674076901202,
+        "ci_upper": 0.30726659256432126
+      }
+    },
+    "Reasoning::ArcFluid": {
+      "cross_task_discrimination": {
+        "mean": 0.07262085278521893,
+        "std_dev": 0.04859767874828975,
+        "n": 10,
+        "ci_lower": 0.037858582946213665,
+        "ci_upper": 0.1073831226242242
+      },
+      "rt_ticks": {
+        "mean": 6.006666666666668,
+        "std_dev": 0.1262468677034732,
+        "n": 10,
+        "ci_lower": 5.916361372371274,
+        "ci_upper": 6.096971960962062
+      },
+      "rule_consistency": {
+        "mean": 0.028330608114483763,
+        "std_dev": 0.021793813203573972,
+        "n": 10,
+        "ci_lower": 0.012741336467837967,
+        "ci_upper": 0.04391987976112956
+      },
+      "transfer_accuracy": {
+        "mean": 0.6699999999999998,
+        "std_dev": 0.10327955589886445,
+        "n": 10,
+        "ci_lower": 0.5961233893576592,
+        "ci_upper": 0.7438766106423405
+      },
+      "transfer_similarity": {
+        "mean": 0.4601219157874585,
+        "std_dev": 0.06298461606050629,
+        "n": 10,
+        "ci_lower": 0.41506856600625075,
+        "ci_upper": 0.5051752655686662
+      }
+    },
+    "Social::RME": {
+      "easy_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "hard_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "rme_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "rt_ticks": {
+        "mean": 4.905555555555555,
+        "std_dev": 0.13366727727865624,
+        "n": 10,
+        "ci_lower": 4.809942388814143,
+        "ci_upper": 5.001168722296967
+      }
+    },
+    "SustainedAttention::SART": {
+      "commission_errors": {
+        "mean": 0.640678892710377,
+        "std_dev": 0.10837793303426152,
+        "n": 10,
+        "ci_lower": 0.563155376160459,
+        "ci_upper": 0.7182024092602951
+      },
+      "d_prime": {
+        "mean": 1.95415351252444,
+        "std_dev": 0.29332637732807143,
+        "n": 10,
+        "ci_lower": 1.7443350408976417,
+        "ci_upper": 2.1639719841512384
+      },
+      "omission_errors": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "rt_ticks": {
+        "mean": 3.4084378725736193,
+        "std_dev": 0.004215184647011284,
+        "n": 10,
+        "ci_lower": 3.405422720617914,
+        "ci_upper": 3.4114530245293246
       }
     },
     "ToMBench::FalseBelief": {

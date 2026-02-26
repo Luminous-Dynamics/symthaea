@@ -2492,6 +2492,8 @@ impl CognitiveLoopService {
         let empathic_compassion = subsystem_metrics.empathic_compassion;
         let empathic_tone_adj = subsystem_metrics.empathic_tone_adj;
         let multi_obj_frontier_size = subsystem_metrics.multi_obj_frontier_size;
+        let grid_encoding_norm = subsystem_metrics.grid_encoding_norm;
+        let grid_spatial_complexity = subsystem_metrics.grid_spatial_complexity;
 
         // ── Phase 18: Empathic tone → speech rate modulation ─────────────────
         // Science: Decety & Jackson (2004) — empathic resonance should modulate output.
@@ -3429,6 +3431,9 @@ impl CognitiveLoopService {
             agency_strategy_override,
             pfe_surprise_mod,
             adaptive_memo_threshold: memo_threshold,
+            // Spatial Reasoning (GridEncoder)
+            grid_encoding_norm,
+            grid_spatial_complexity,
             // Neuromodulator Bath
             dopamine_effective: self.neuromodulator_bath.dopamine.effective(),
             noradrenaline_effective: self.neuromodulator_bath.noradrenaline.effective(),
@@ -3440,7 +3445,7 @@ impl CognitiveLoopService {
             mood_temperature: 1.0,
             // Liquid-Mamba fusion telemetry
             #[cfg(feature = "liquid-mamba")]
-            liquid_mamba_semantic_pe: 0.0,
+            liquid_mamba_semantic_pe: self.stats.last_liquid_mamba_pe,
             // Mesh network telemetry (populated by Mind module post-cycle)
             mesh_health_score: 0.0,
             mesh_peer_count: 0,
@@ -3542,6 +3547,40 @@ impl CognitiveLoopService {
     /// Use this in production code paths where a panic must not propagate (e.g., actor loops,
     /// async bridges). Returns `Err` with the panic message if any subsystem panics during
     /// the cycle.
+    /// Online distillation step for the Liquid-Mamba HDC↔SSM projection.
+    ///
+    /// Called after generation with the original thought HV, back-projected
+    /// output HVs, and semantic prediction error. Adjusts projection weights
+    /// using FEP-modulated learning rate, gated by the cognitive loop's
+    /// learning state and thermodynamic load.
+    #[cfg(feature = "liquid-mamba")]
+    pub fn liquid_mamba_distillation_step(
+        &mut self,
+        thought_hv: &symthaea_core::hdc::ContinuousHV,
+        output_hvs: &[symthaea_core::hdc::ContinuousHV],
+        semantic_pe: f32,
+        projection: &mut symthaea_broca::HdcSsmProjection,
+    ) {
+        self.stats.last_liquid_mamba_pe = semantic_pe;
+
+        // Gate on FEP precision confidence (mirrors enhanced_fep_bridge threshold)
+        if self.carryover.learning.prediction_confidence < 0.4 { return; }
+        if output_hvs.is_empty() || semantic_pe > 0.8 { return; }
+
+        // FEP-modulated learning rate: precision × load × boost
+        let fep_precision = self.fep_learning_signal.clamp(0.0, 1.0);
+        let effective_lr = 0.001
+            * fep_precision
+            * (1.0 - self.thermodynamic_load)
+            * self.fep_lr_boost;
+        if effective_lr < 1e-6 { return; }
+
+        let refs: Vec<&symthaea_core::hdc::ContinuousHV> = output_hvs.iter().collect();
+        let bundled = symthaea_core::hdc::ContinuousHV::bundle(&refs).normalize();
+        projection.compute_gradients(thought_hv, &bundled);
+        projection.apply_gradients(effective_lr, 1.0);
+    }
+
     pub fn try_cycle(&mut self, input: &str) -> Result<CycleResult, crate::errors::SymthaeaError> {
         // SAFETY: CognitiveLoopService is not UnwindSafe by default because it contains
         // mutable state. We use AssertUnwindSafe because a panic mid-cycle leaves the

@@ -51,6 +51,7 @@ use symthaea_psych_bench::benchmarks::executive::{
 use symthaea_psych_bench::benchmarks::inhibition::{GoNoGoBenchmark, StopSignalBenchmark};
 use symthaea_psych_bench::benchmarks::language::GardenPathBenchmark;
 use symthaea_psych_bench::benchmarks::motor::SrttBenchmark;
+use symthaea_psych_bench::benchmarks::reasoning::{ArcCompositionalBenchmark, ArcFluidBenchmark};
 use symthaea_psych_bench::benchmarks::social::RmeBenchmark;
 use symthaea_psych_bench::benchmarks::sustained_attention::SartBenchmark;
 use symthaea_psych_bench::benchmarks::memory_agent::{
@@ -188,6 +189,9 @@ fn main() {
         // Attention
         Box::new(AttentionalBlinkBenchmark),
         Box::new(VisualSearchBenchmark),
+        // Reasoning
+        Box::new(ArcFluidBenchmark),
+        Box::new(ArcCompositionalBenchmark),
         // Additional MemoryAgent
         Box::new(ProspectiveMemoryBenchmark),
         // Additional Metacognition

@@ -56,7 +56,7 @@ pub use tokenizer::BpeTokenizer;
 pub use encoder::{ThoughtChannels, ThoughtLanguageEncoder};
 pub use controller::{LanguageController, LanguageControllerConfig};
 pub use gating::{EpistemicGate, EmotionalModulator, CoherenceFeedback, GatingConfig};
-pub use generator::{BrocaGenerator, BrocaConfig, SamplingStrategy};
+pub use generator::{BrocaGenerator, BrocaConfig, GenerationResult, SamplingStrategy};
 pub use training::{TrainingPair, TrainingDataset};
 pub use checkpoint::{BrocaCheckpoint, AdamState};
 
