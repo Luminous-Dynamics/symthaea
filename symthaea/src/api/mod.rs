@@ -30,6 +30,7 @@ pub mod ws;
 
 use crate::api::state::AppState;
 use axum::{
+    extract::DefaultBodyLimit,
     extract::{ws::WebSocketUpgrade, Request},
     http::{HeaderMap, Method, StatusCode},
     middleware,
@@ -49,6 +50,10 @@ pub struct ApiConfig {
     /// Optional Bearer token for authenticated endpoints.
     /// If None, all endpoints are public (development mode).
     pub bearer_token: Option<String>,
+    /// Max request body size in bytes.
+    pub max_body_bytes: usize,
+    /// Max number of in-flight requests before backpressure.
+    pub max_in_flight_requests: usize,
 }
 
 impl Default for ApiConfig {
@@ -59,6 +64,8 @@ impl Default for ApiConfig {
                 "http://127.0.0.1:3000".to_string(),
             ],
             bearer_token: None,
+            max_body_bytes: 16 * 1024 * 1024,
+            max_in_flight_requests: 32,
         }
     }
 }
@@ -174,6 +181,7 @@ pub fn create_router_with_config(config: ApiConfig) -> Router {
         // Security layers
         .layer(middleware::from_fn(auth_middleware))
         .layer(cors)
+        .layer(DefaultBodyLimit::max(config.max_body_bytes))
         // Add shared state
         .with_state(state)
 }
@@ -208,8 +216,9 @@ pub fn create_demo_router() -> Result<Router, Box<dyn std::error::Error>> {
     let runner = demo_runner::DemoRunner::new()?;
     let runner = Arc::new(Mutex::new(runner));
 
-    let state = Arc::new(AppState::new_with_config(&ApiConfig::default()));
-    let cors = build_cors_layer(&ApiConfig::default());
+    let config = ApiConfig::default();
+    let state = Arc::new(AppState::new_with_config(&config));
+    let cors = build_cors_layer(&config);
 
     // Determine static dir relative to the manifest
     let static_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("static");
@@ -254,6 +263,7 @@ pub fn create_demo_router() -> Result<Router, Box<dyn std::error::Error>> {
     let app = app
         .layer(middleware::from_fn(auth_middleware))
         .layer(cors)
+        .layer(DefaultBodyLimit::max(config.max_body_bytes))
         .with_state(state);
 
     Ok(app)
