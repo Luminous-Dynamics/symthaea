@@ -14,8 +14,6 @@ operations hold across randomly generated inputs.
 6. **Binding preserves structure**: sim(bind(a,c), bind(b,c)) ≈ sim(a, b)
 */
 
-#![cfg(test)]
-
 use super::native_similarity::PackedBipolar;
 use super::HdcContext;
 use proptest::prelude::*;

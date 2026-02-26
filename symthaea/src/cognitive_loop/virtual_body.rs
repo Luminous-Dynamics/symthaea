@@ -208,12 +208,6 @@ impl VirtualBody {
         }
     }
 
-    /// Get the current phi modulation factor.
-    #[allow(dead_code)]
-    pub fn phi_modulation(&self) -> f64 {
-        self.phi_modulation
-    }
-
     /// Get the current interoceptive state.
     pub fn interoceptive_state(&self) -> &InteroceptiveState {
         &self.state
@@ -243,7 +237,7 @@ mod tests {
     #[test]
     fn test_virtual_body_initial_state() {
         let body = VirtualBody::new();
-        assert!((body.phi_modulation() - 1.0).abs() < f64::EPSILON);
+        assert!((body.phi_modulation - 1.0).abs() < f64::EPSILON);
     }
 
     #[test]
