@@ -388,6 +388,18 @@ impl ContinuousMind {
                 tracing::info!(id = %lora_id, "BROCA: Applying swarm linguistic delta to local voice.");
                 self.llm_organ.apply_lora(&lora_id, &delta_bytes);
             }
+            crate::swarm::SwarmMessage::TaskRequest { task_id, required_resolution, .. } => {
+                // v1.8.0 RESOURCE-AWARE BIDDING:
+                // Check if we have the resources to help with this task.
+                let my_res = format!("2^{}", (self.state.holocell.dimensionality.dimension() as f32).log2() as u32);
+                
+                if my_res == required_resolution && self.state.thermodynamic_load < 0.6 {
+                    tracing::info!(id = %task_id, "NEOCORTEX: Bidding on task. We have resolution {} and low load.", my_res);
+                    // In a real loop, we'd emit a TaskBid to the swarm_outbox
+                } else {
+                    tracing::debug!(id = %task_id, "NEOCORTEX: Ignoring task. Insufficient resources or too busy.");
+                }
+            }
             _ => {}
         }
     }
