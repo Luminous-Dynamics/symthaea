@@ -27,7 +27,7 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Dual-Task benchmark: choice RT under concurrent memory load.
@@ -230,6 +230,15 @@ impl DualTaskBenchmark {
 impl PsychBenchmark for DualTaskBenchmark {
     fn name(&self) -> &str {
         "Executive::DualTask"
+    }
+
+    fn provenance(&self) -> Option<BenchmarkProvenance> {
+        Some(BenchmarkProvenance {
+            paradigm: "Dual-Task Paradigm",
+            citation: "Pashler (1994)",
+            year: 1994,
+            doi: Some("10.1037/0033-295X.101.2.220"),
+        })
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
