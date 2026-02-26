@@ -213,17 +213,10 @@ impl ContinuousMind {
                 self.working_memory_metadata.push(input.metadata.clone());
             }
 
-            // Update current thought via EMA blend (not bind — bind is multiply,
-            // which is permanently zero when starting from zero vector).
-            if self.state.current_thought.norm() < f32::EPSILON {
-                // First perception: adopt input directly
-                self.state.current_thought = input.content.clone();
-            } else {
-                // Exponential moving average: 70% retain, 30% new input
-                self.state
-                    .current_thought
-                    .lerp_in_place(&input.content, 0.7, 0.3);
-            }
+            // Update current thought via Liquid Holocell dynamics
+            // dt = 0.1s (10Hz baseline), maps to continuous-time integration
+            self.state.holocell.step(&input.content, 0.1);
+            self.state.current_thought = self.state.holocell.state.clone();
 
             match input.input_type {
                 InputType::Goal => {

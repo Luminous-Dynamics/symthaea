@@ -334,6 +334,7 @@ pub mod foundations;
 pub mod hv_pool;
 pub mod incremental_hv; // O(k) incremental bundling (10-100x faster for updates)
 pub mod integer; // Integer arithmetic (ℤ) - extends natural numbers with sign
+pub mod liquid_holocell; // Atomic primitive unit: Liquid Holocell with dilation
 pub mod lsh_index; // LSH index for fast approximate similarity search (heap-optimized)
 pub mod lsh_simhash; // SimHash for binary vectors (Hamming distance)
 pub mod lsh_similarity; // Adaptive LSH-backed similarity search (Session 7C)
@@ -537,6 +538,8 @@ pub use hdc_ltc_unified::{
     HdcLtcUnifiedNetwork, HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig,
     UnifiedNetworkConfig, UnifiedNetworkStats, UnifiedNeuronStats,
 };
+
+pub use liquid_holocell::LiquidHolocell;
 
 // Re-export unified network Phi measurement types
 pub use unified_network_phi::{

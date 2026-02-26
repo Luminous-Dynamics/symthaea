@@ -158,6 +158,13 @@ impl AsyncMindHandle {
         }
     }
 
+    /// Update thermodynamic load (power/heat).
+    pub async fn update_thermodynamics(&self, load: f32) {
+        if self.tx.send(MindCommand::UpdateThermodynamics(load)).await.is_err() {
+            tracing::warn!("AsyncMind actor has stopped — update_thermodynamics command dropped");
+        }
+    }
+
     /// Drain outgoing social messages (for broadcasting to peers).
     pub async fn drain_social_outbox(&self) -> Vec<SocialMessage> {
         let (resp_tx, resp_rx) = oneshot::channel();
@@ -310,13 +317,22 @@ impl AsyncMind {
                             mind.state.thermodynamic_load = load;
                             mind.state.mood_temperature = 0.5 + (load * 1.5);
                             
+                            // HOLOGRAPHIC DILATION
+                            // Trigger dilation to 2^16 when load > 0.75 (Entering 20W regime)
+                            // Retract to 2^14 when load < 0.4 (Returning to 6W baseline)
+                            if load > 0.75 && mind.state.holocell.dimensionality != symthaea_core::hdc::HdcDimensionality::Ultra {
+                                tracing::info!("THERMODYNAMIC SPIKE: Dilating Liquid Holocell to 2^16 (Ultra)");
+                                mind.state.holocell.dilate(symthaea_core::hdc::HdcDimensionality::Ultra);
+                            } else if load < 0.4 && mind.state.holocell.dimensionality != symthaea_core::hdc::HdcDimensionality::Standard {
+                                tracing::info!("HOMEOTASIS REACHED: Constricting Liquid Holocell to 2^14 (Standard)");
+                                mind.state.holocell.dilate(symthaea_core::hdc::HdcDimensionality::Standard);
+                            }
+
                             // SYNC with LLM Backend (Sovereign Voice)
                             // If the backend is Candle, we push the physical affect into the neural weights
                             #[cfg(feature = "full_language")]
                             {
                                 if let Some(backend) = mind.llm_organ.get_backend() {
-                                    // We need to downcast or check if it's Candle
-                                    // For now, we'll assume the backend exposes a set_affect method or we update it via LLMOrgan
                                     mind.llm_organ.update_affective_state(load, mind.state.mood_temperature);
                                 }
                             }
