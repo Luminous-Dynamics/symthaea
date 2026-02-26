@@ -315,6 +315,7 @@ impl CognitiveLoopService {
                 },
                 ..super::CycleMetadata::default()
             },
+            thought_vector: vec![0.0; 32],
             wisdom_hv: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(hdv),
             #[cfg(feature = "identity")]
             signed_output: None,

@@ -90,6 +90,7 @@ impl CognitiveLoopService {
             training_loss: None,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             metadata,
+            thought_vector: vec![0.0; 32],
             wisdom_hv: symthaea_core::hdc::BinaryHV([0u8; 2048]),
             #[cfg(feature = "identity")]
             signed_output: None,

@@ -129,7 +129,7 @@ impl TemporalNetwork {
     pub fn set_tau_all(&mut self, taus: Vec<Array1<f32>>) {
         if let Self::CfC(cfc) = self {
             for (cell, tau) in cfc.cells.iter_mut().zip(taus.into_iter()) {
-                cell.tau.copy_from(&tau);
+                cell.tau.assign(&tau);
             }
         }
     }
