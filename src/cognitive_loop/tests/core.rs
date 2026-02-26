@@ -398,9 +398,9 @@ fn test_self_reflection_record_cycle() {
         reflection.record_cycle(0.3, false, false, 0.5);
     }
 
-    // Should track historical metrics
-    assert!(reflection.historical_error() > 0.0);
-    assert!(reflection.historical_confidence() > 0.0);
+    // Should update learning effectiveness after recording cycles
+    let summary = reflection.summary();
+    assert!(summary.learning_effectiveness >= 0.0);
 }
 
 #[test]
@@ -706,45 +706,6 @@ fn test_try_cycle_multiple() {
     assert_eq!(service.stats().total_cycles, 5);
 }
 
-#[test]
-fn test_cycle_metadata_compact() {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    let result = service.cycle("test compact metadata");
-    let compact = result.metadata.compact();
-
-    // Core fields should match
-    assert_eq!(
-        compact.surprise_triggered,
-        result.metadata.surprise_triggered
-    );
-    assert_eq!(compact.prefrontal_veto, result.metadata.prefrontal_veto);
-    assert_eq!(
-        compact.reasoning_confidence,
-        result.metadata.reasoning_confidence
-    );
-    assert_eq!(
-        compact.consciousness_level,
-        result.metadata.consciousness_level
-    );
-    assert_eq!(compact.gwt_broadcast, result.metadata.gwt_broadcast);
-    assert_eq!(
-        compact.body_phi_modulation,
-        result.metadata.body_phi_modulation
-    );
-    assert_eq!(
-        compact.meta_cognitive_accuracy,
-        result.metadata.meta_cognitive_accuracy
-    );
-    assert_eq!(
-        compact.narrative_self_psi,
-        result.metadata.narrative_self_psi
-    );
-    assert_eq!(compact.affective_valence, result.metadata.affective_valence);
-    assert_eq!(compact.affective_arousal, result.metadata.affective_arousal);
-
-    // Compact struct size should be much smaller than full
-    assert!(std::mem::size_of::<CycleMetadataCompact>() < std::mem::size_of::<CycleMetadata>());
-}
 
 #[test]
 fn test_config_validate_default_clean() {

@@ -5,7 +5,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::ActionHint;
 use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 
 /// Emotion contagion - emotional content influences consciousness state
@@ -343,18 +342,6 @@ impl CuriosityDrive {
         self.exploration_urge > 0.4 || (self.boredom > 0.7 && self.curiosity > 0.6)
     }
 
-    /// Get action hint based on curiosity state
-    #[allow(dead_code)]
-    pub fn action_hint(&self) -> Option<ActionHint> {
-        if self.should_explore() {
-            Some(ActionHint::Explore)
-        } else if self.boredom > 0.5 {
-            Some(ActionHint::SeekInput) // Need new stimuli
-        } else {
-            None
-        }
-    }
-
     /// Get effective learning rate with novelty bonus
     pub fn effective_learning_rate(&self, base_rate: f32) -> f32 {
         base_rate * self.novelty_bonus
@@ -363,12 +350,6 @@ impl CuriosityDrive {
     /// Reset curiosity drive
     pub fn reset(&mut self) {
         *self = Self::default();
-    }
-
-    /// Get exploration probability (for stochastic exploration)
-    #[allow(dead_code)]
-    pub fn exploration_probability(&self) -> f32 {
-        (self.exploration_urge * 0.5 + self.boredom * 0.3).min(0.8)
     }
 
     /// Set boredom threshold from self-reflection
@@ -855,14 +836,9 @@ impl SelfReflection {
     /// Get a human-readable summary of current state
     pub fn summary(&self) -> ReflectionSummary {
         ReflectionSummary {
-            assessment: self.self_assessment,
             reflection_count: self.reflection_count,
             adjustments_made: self.adjustments_made,
-            flow_entry_rate: self.flow_entry_rate,
-            exploration_rate: self.exploration_rate,
             learning_effectiveness: self.learning_effectiveness,
-            historical_error: self.historical_error,
-            historical_confidence: self.historical_confidence,
             next_reflection_in: self
                 .reflection_interval
                 .saturating_sub(self.cycles_since_reflection),
@@ -872,18 +848,6 @@ impl SelfReflection {
     /// Get learning effectiveness score
     pub fn learning_effectiveness(&self) -> f32 {
         self.learning_effectiveness
-    }
-
-    /// Get historical average error (EMA)
-    #[allow(dead_code)]
-    pub fn historical_error(&self) -> f32 {
-        self.historical_error
-    }
-
-    /// Get historical average confidence (EMA)
-    #[allow(dead_code)]
-    pub fn historical_confidence(&self) -> f32 {
-        self.historical_confidence
     }
 
     /// Reset self-reflection state
@@ -900,12 +864,6 @@ impl SelfReflection {
         self.flow_coherence_threshold = thresholds.1;
         self.boredom_threshold = thresholds.2;
         self.trust_threshold = thresholds.3;
-    }
-
-    /// Full reset including learned thresholds
-    #[allow(dead_code)]
-    pub fn full_reset(&mut self) {
-        *self = Self::default();
     }
 
     /// Force an immediate reflection (triggered by motor commands)
@@ -932,15 +890,9 @@ pub struct ReflectionThresholds {
 
 /// Summary of self-reflection state
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ReflectionSummary {
-    pub assessment: SelfAssessment,
     pub reflection_count: u64,
     pub adjustments_made: u32,
-    pub flow_entry_rate: f32,
-    pub exploration_rate: f32,
     pub learning_effectiveness: f32,
-    pub historical_error: f32,
-    pub historical_confidence: f32,
     pub next_reflection_in: u32,
 }

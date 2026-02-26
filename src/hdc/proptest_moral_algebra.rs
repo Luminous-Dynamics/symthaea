@@ -15,8 +15,6 @@ Uses dim=512 for test speed (not full 4096) and 32 cases per property since
 moral algebra construction is more expensive than raw HDC operations.
 */
 
-#![cfg(test)]
-
 use super::moral_algebra::{ConsentState, Magnitude, MoralAlgebra, MoralIntent};
 use proptest::prelude::*;
 
