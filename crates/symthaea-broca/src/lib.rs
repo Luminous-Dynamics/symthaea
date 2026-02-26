@@ -42,6 +42,7 @@ pub mod controller;
 pub mod gating;
 pub mod generator;
 pub mod training;
+pub mod checkpoint;
 
 // Liquid-Mamba fusion: pre-trained Mamba SSM + HDC projection + consciousness gating
 #[cfg(feature = "mamba")]
@@ -57,6 +58,7 @@ pub use controller::{LanguageController, LanguageControllerConfig};
 pub use gating::{EpistemicGate, EmotionalModulator, CoherenceFeedback, GatingConfig};
 pub use generator::{BrocaGenerator, BrocaConfig, SamplingStrategy};
 pub use training::{TrainingPair, TrainingDataset};
+pub use checkpoint::{BrocaCheckpoint, AdamState};
 
 #[cfg(feature = "mamba")]
 pub use liquid_mamba::{LiquidMambaGenerator, LiquidMambaConfig};
