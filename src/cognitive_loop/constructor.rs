@@ -911,6 +911,8 @@ impl CognitiveLoopService {
             #[cfg(feature = "school_learning")]
             school_bridge: None,
             causal_consciousness,
+            thermodynamic_load: 0.0,
+            mood_temperature: 1.0,
         })
     }
 

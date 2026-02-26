@@ -3300,6 +3300,20 @@ impl CognitiveLoopService {
             self.stats.fep_surprise_replay_boosts += 1;
         }
 
+        // Populate v0.8.0 Resonance Metadata
+        metadata.thermodynamic_load = self.thermodynamic_load;
+        metadata.mood_temperature = self.mood_temperature;
+
+        // Project 16,384D HDC to 32D for visualization (mean-pooling)
+        let thought_vector = {
+            let chunk_size = encoding_result.hdv.values.len() / 32;
+            encoding_result.hdv.values
+                .chunks(chunk_size)
+                .take(32)
+                .map(|chunk| chunk.iter().sum::<f32>() / chunk.len() as f32)
+                .collect()
+        };
+
         tracing::debug!(
             surprise = metadata.surprise_triggered,
             prefrontal_veto = metadata.prefrontal_veto,
@@ -3334,6 +3348,7 @@ impl CognitiveLoopService {
             training_loss,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             metadata,
+            thought_vector,
             wisdom_hv: hv16_cached,
             #[cfg(feature = "identity")]
             signed_output,

@@ -78,6 +78,29 @@ pub struct GraduationEvent {
     pub psi_at_graduation: f64,
     /// Coherence at the time of graduation
     pub coherence_at_graduation: f64,
+    /// Source of the memory
+    pub source: MemorySource,
+    /// Whether the information has been verified (e.g., via NIX_BUILD or EpistemicVerifier)
+    pub is_verified: bool,
+}
+
+/// Source of a memory item
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MemorySource {
+    /// Internal cognitive process
+    Internal,
+    /// Autonomous web research
+    WebResearch,
+    /// Direct user interaction
+    UserInteraction,
+    /// Action outcome (verification signal)
+    ActionFeedback,
+}
+
+impl Default for MemorySource {
+    fn default() -> Self {
+        Self::Internal
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -206,12 +229,22 @@ impl MemoryCoordinator {
                 continue;
             }
 
-            // Compute adjusted phi: persistence in WM boosts the effective phi.
-            // When Σ (Layer 2) is available, boost graduation quality — high synergistic
-            // integration indicates the system was deeply consolidated at encoding time.
+            // Persistence in WM boosts effective phi.
+            // Verified information gets a significant boost to its consolidation strength.
             let persistence_bonus = (event.steps_survived as f64 / 10.0).min(0.2);
             let sigma_bonus = self.signals.sigma.map_or(0.0, |s| (s * 0.15).min(0.1));
-            let adjusted_phi = event.psi_at_graduation + persistence_bonus + sigma_bonus;
+            
+            let verification_bonus = if event.is_verified {
+                match event.source {
+                    MemorySource::ActionFeedback => 0.3, // "Proven" by reality
+                    MemorySource::WebResearch => 0.2,    // "Verified" by multiple sources
+                    _ => 0.1,
+                }
+            } else {
+                0.0
+            };
+
+            let adjusted_phi = (event.psi_at_graduation + persistence_bonus + sigma_bonus + verification_bonus).min(1.0);
 
             // Create episode from graduation event
             let episode = Episode::with_metadata(
@@ -220,7 +253,7 @@ impl MemoryCoordinator {
                 adjusted_phi,
                 self.signals.step,
                 1.0 - event.final_activation as f32, // Low activation → high surprise
-                0.0,                                 // Neutral valence
+                if event.is_verified { 0.5 } else { 0.0 }, // Verified = positive valence
                 event.coherence_at_graduation as f32,
             );
 
@@ -231,6 +264,17 @@ impl MemoryCoordinator {
         }
 
         stored
+    }
+
+    /// The Art of Forgetting: Causal Pruning.
+    ///
+    /// Periodically cleanses the episodic memory of low-value noise.
+    /// Threshold is modulated by current coherence and metabolic load.
+    pub fn prune_memories(&mut self, episodic: &mut EpisodicMemory, metabolic_load: f32) -> usize {
+        // Higher metabolic load (stress) increases the pruning threshold (survival of the fittest)
+        // Base threshold (0.2) + stress adjustment
+        let threshold = 0.2 + (metabolic_load as f64 * 0.2);
+        episodic.prune(threshold)
     }
 
     /// Record a retrieval event for consolidation tracking.
@@ -400,6 +444,8 @@ mod tests {
             final_activation: 0.3,
             psi_at_graduation: 0.5,
             coherence_at_graduation: 0.6,
+            source: MemorySource::Internal,
+            is_verified: false,
         });
 
         // Enough steps - should be processed
@@ -410,6 +456,8 @@ mod tests {
             final_activation: 0.4,
             psi_at_graduation: 0.6,
             coherence_at_graduation: 0.7,
+            source: MemorySource::WebResearch,
+            is_verified: true,
         });
 
         let config = crate::memory::episodic_replay::EpisodicReplayConfig {

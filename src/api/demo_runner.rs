@@ -30,6 +30,12 @@ impl DemoRunner {
         self.current_input = text.to_string();
     }
 
+    /// Update thermodynamics state.
+    pub fn update_thermodynamics(&mut self, load: f32) {
+        self.service.thermodynamic_load = load;
+        self.service.mood_temperature = 0.5 + (load * 1.5);
+    }
+
     /// Run one cognitive cycle and return compact telemetry.
     pub fn run_cycle(&mut self) -> DemoCycleData {
         self.cycle_count += 1;
@@ -44,6 +50,8 @@ impl DemoRunner {
             narrative_self_psi: m.narrative_self_psi,
             valence: m.affective_valence,
             arousal: m.affective_arousal,
+            mood_temperature: m.mood_temperature,
+            thermodynamic_load: m.thermodynamic_load,
             moral_score: m.value_evaluator_score,
             coherence: m.harmonic_field_coherence,
             flow_state: m.gwt_broadcast,
@@ -54,6 +62,7 @@ impl DemoRunner {
             reasoning_confidence: m.reasoning_confidence,
             resonance_frequency: m.resonance_frequency,
             input_text: self.current_input.clone(),
+            thought_vector: result.thought_vector,
         }
     }
 

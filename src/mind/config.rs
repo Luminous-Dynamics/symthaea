@@ -54,6 +54,10 @@ pub struct MindState {
     pub cognitive_load: f64,
     /// Current emotional valence (-1 to 1)
     pub emotional_valence: f32,
+    /// Thermodynamic load (0.0 to 1.0, where 1.0 = 6W limit reached)
+    pub thermodynamic_load: f32,
+    /// Affective bias: cognitive temperature (0.0 to 2.0)
+    pub mood_temperature: f32,
     /// Current arousal level (0 to 1)
     pub arousal: f32,
     /// Current focus/attention target
@@ -93,6 +97,8 @@ impl Default for MindState {
             meta_awareness: 0.0,
             cognitive_load: 0.0,
             emotional_valence: 0.0,
+            thermodynamic_load: 0.0,
+            mood_temperature: 1.0,
             arousal: 0.5,
             attention_focus: None,
             active_goals: Vec::new(),

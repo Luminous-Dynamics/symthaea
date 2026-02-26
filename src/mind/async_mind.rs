@@ -43,6 +43,8 @@ enum MindCommand {
     Stats(oneshot::Sender<MindStats>),
     /// Receive a social message from a peer.
     ReceiveSocial(SocialMessage),
+    /// Update thermodynamic load (power/heat).
+    UpdateThermodynamics(f32),
     /// Drain outgoing social messages.
     DrainSocialOutbox(oneshot::Sender<Vec<SocialMessage>>),
     /// Seed working memory with domain knowledge.
@@ -147,6 +149,13 @@ impl AsyncMindHandle {
         }
     }
 
+    /// Update thermodynamic load (power/heat).
+    pub async fn update_thermodynamics(&self, load: f32) {
+        if self.tx.send(MindCommand::UpdateThermodynamics(load)).await.is_err() {
+            tracing::warn!("AsyncMind actor has stopped — update_thermodynamics command dropped");
+        }
+    }
+
     /// Drain outgoing social messages (for broadcasting to peers).
     pub async fn drain_social_outbox(&self) -> Vec<SocialMessage> {
         let (resp_tx, resp_rx) = oneshot::channel();
@@ -226,45 +235,83 @@ impl AsyncMind {
         let mut mind = ContinuousMind::new(config);
         mind.activate();
 
-        while let Some(cmd) = rx.recv().await {
-            match cmd {
-                MindCommand::Tick(resp) => {
-                    let output = mind.tick();
-                    let _ = resp.send(output);
+        // Metabolic interval: baseline background processing (e.g. chronobiology)
+        // Adjusts based on arousal and thermodynamic load in the future.
+        let mut metabolism = tokio::time::interval(std::time::Duration::from_millis(100));
+        metabolism.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+
+        loop {
+            tokio::select! {
+                // metabolic baseline
+                _ = metabolism.tick() => {
+                    // Only tick if mind is active
+                    if mind.state.is_active {
+                        mind.tick();
+                    }
                 }
-                MindCommand::Perceive(content) => {
-                    mind.perceive(content);
-                }
-                MindCommand::PerceiveText(text, embedding) => {
-                    mind.perceive_text(&text, embedding);
-                }
-                MindCommand::Input(input) => {
-                    mind.input(input);
-                }
-                MindCommand::SetGoal(desc, embedding, priority) => {
-                    mind.set_goal(desc, embedding, priority);
-                }
-                MindCommand::Activate => {
-                    mind.activate();
-                }
-                MindCommand::Snapshot(resp) => {
-                    let _ = resp.send(mind.snapshot());
-                }
-                MindCommand::Stats(resp) => {
-                    let _ = resp.send(mind.stats().clone());
-                }
-                MindCommand::ReceiveSocial(msg) => {
-                    mind.receive_social(msg);
-                }
-                MindCommand::DrainSocialOutbox(resp) => {
-                    let _ = resp.send(mind.drain_social_outbox());
-                }
-                MindCommand::SeedMemory(resp) => {
-                    let _ = resp.send(mind.seed_memory());
-                }
-                MindCommand::Shutdown => {
-                    mind.request_shutdown();
-                    break;
+                
+                // Command processing (Wake-up events)
+                Some(cmd) = rx.recv() => {
+                    match cmd {
+                        MindCommand::Tick(resp) => {
+                            let output = mind.tick();
+                            let _ = resp.send(output);
+                        }
+                        MindCommand::Perceive(content) => {
+                            mind.perceive(content);
+                            mind.tick(); // Immediate wake-up on perception
+                        }
+                        MindCommand::PerceiveText(text, embedding) => {
+                            mind.perceive_text(&text, embedding);
+                            mind.tick();
+                        }
+                        MindCommand::Input(input) => {
+                            mind.input(input);
+                            mind.tick();
+                        }
+                        MindCommand::SetGoal(desc, embedding, priority) => {
+                            mind.set_goal(desc, embedding, priority);
+                        }
+                        MindCommand::Activate => {
+                            mind.activate();
+                        }
+                        MindCommand::Snapshot(resp) => {
+                            let _ = resp.send(mind.snapshot());
+                        }
+                        MindCommand::Stats(resp) => {
+                            let _ = resp.send(mind.stats().clone());
+                        }
+                        MindCommand::ReceiveSocial(msg) => {
+                            mind.receive_social(msg);
+                            // Only trigger a full tick if a certain surprise/phi threshold is reached
+                            // in a future implementation. For now, we process immediately.
+                            mind.tick();
+                        }
+                        MindCommand::UpdateThermodynamics(load) => {
+                            mind.state.thermodynamic_load = load;
+                            // Update Affective Bias (Mood Temperature)
+                            // High load (near 1.0) -> High temperature (2.0) -> Sharp/Expansive
+                            // Low load (near 0.0) -> Low temperature (0.5) -> Focused/Stable
+                            mind.state.mood_temperature = 0.5 + (load * 1.5);
+                            
+                            // Adjust metabolic rate based on power:
+                            // If low power, we can afford faster baseline loops.
+                            // If high power, we stretch the nap.
+                            let interval_ms = 100 + (load * 900.0) as u64; // 100ms to 1s
+                            metabolism = tokio::time::interval(std::time::Duration::from_millis(interval_ms));
+                            metabolism.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                        }
+                        MindCommand::DrainSocialOutbox(resp) => {
+                            let _ = resp.send(mind.drain_social_outbox());
+                        }
+                        MindCommand::SeedMemory(resp) => {
+                            let _ = resp.send(mind.seed_memory());
+                        }
+                        MindCommand::Shutdown => {
+                            mind.request_shutdown();
+                            return; // Exit loop
+                        }
+                    }
                 }
             }
         }

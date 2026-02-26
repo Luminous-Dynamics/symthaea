@@ -30,6 +30,8 @@ pub struct DemoCycleData {
     pub narrative_self_psi: f64,
     pub valence: f32,
     pub arousal: f32,
+    pub mood_temperature: f32,
+    pub thermodynamic_load: f32,
     pub moral_score: f64,
     pub coherence: f64,
     pub flow_state: bool,
@@ -40,6 +42,8 @@ pub struct DemoCycleData {
     pub reasoning_confidence: f32,
     pub resonance_frequency: f64,
     pub input_text: String,
+    /// 32-dim projection of the thought hypervector for fractal mapping
+    pub thought_vector: Vec<f32>,
 }
 
 /// Client message format.
@@ -47,6 +51,7 @@ pub struct DemoCycleData {
 #[serde(untagged)]
 pub enum ClientMessage {
     TextInput { text: String },
+    Thermodynamics { load: f32 },
     Command { command: String },
 }
 
@@ -102,6 +107,10 @@ async fn handle_socket(mut socket: WebSocket, runner: Arc<Mutex<DemoRunner>>) {
                                 ClientMessage::TextInput { text } => {
                                     let mut r = runner.lock().await;
                                     r.set_input(&text);
+                                }
+                                ClientMessage::Thermodynamics { load } => {
+                                    let mut r = runner.lock().await;
+                                    r.update_thermodynamics(load);
                                 }
                                 ClientMessage::Command { command } => {
                                     match command.as_str() {

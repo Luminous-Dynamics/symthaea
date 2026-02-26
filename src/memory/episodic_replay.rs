@@ -162,19 +162,22 @@ impl Episode {
 
     /// Calculate the priority score for this episode
     /// Higher scores mean higher priority for replay
-    ///
-    /// Combines:
-    /// - Phi (primary factor)
-    /// - Recency (more recent = slightly higher priority)
-    /// - Replay count penalty (less replayed = higher priority)
     pub fn priority_score(&self, current_timestamp: u64, recency_weight: f64) -> f64 {
+        self.survival_value(current_timestamp, recency_weight)
+    }
+
+    /// Calculate the survival value of this episode.
+    ///
+    /// This value determines if the memory is retained or "forgotten" (pruned).
+    /// Factors: Phi, Consolidation, Recency, and Prediction Error.
+    pub fn survival_value(&self, current_timestamp: u64, recency_weight: f64) -> f64 {
         let base_phi = self.psi;
 
         // Recency bonus: exponential decay based on age
         let age = current_timestamp.saturating_sub(self.timestamp) as f64;
         let recency_bonus = (-age / 10000.0).exp() * recency_weight;
 
-        // Replay count penalty: diminishing returns on repeated replay
+        // Replay count penalty: diminishing returns on repeated replay (prevents over-fixation)
         let replay_penalty = 1.0 / (1.0 + self.replay_count as f64 * 0.1);
 
         // Prediction error bonus: surprising events are more valuable
@@ -184,15 +187,15 @@ impl Episode {
         let valence_bonus = self.valence.map(|v| v.abs() as f64 * 0.15).unwrap_or(0.0);
 
         // Consolidation bonus: retrieved/reconsolidated memories are more valuable
-        let consolidation_bonus = self.consolidation_strength * 0.05;
+        let consolidation_bonus = self.consolidation_strength * 0.1;
 
-        // Final score (Phi-dominant)
-        base_phi * 0.6
+        // Final survival value
+        base_phi * 0.5
             + error_bonus
             + valence_bonus
-            + recency_bonus * 0.1
-            + replay_penalty * 0.15
+            + recency_bonus
             + consolidation_bonus
+            + replay_penalty * 0.05
     }
 
     /// Reconsolidate this episode (called upon retrieval).
@@ -770,6 +773,39 @@ impl EpisodicMemory {
             .take(n)
             .map(|pe| pe.episode.clone())
             .collect()
+    }
+
+    /// The Art of Forgetting: Causal Pruning.
+    ///
+    /// Removes episodes whose survival value falls below the threshold.
+    /// This keeps the memory engine lean and focused on high-Phi insight.
+    pub fn prune(&mut self, threshold: f64) -> usize {
+        let initial_len = self.episodes.len();
+        let current_ts = self.current_cycle;
+        let recency_w = self.config.recency_weight;
+
+        // Extract all episodes, filter by survival value, and rebuild heap
+        let episodes: Vec<PrioritizedEpisode> = self.episodes.drain().collect();
+        let filtered: Vec<PrioritizedEpisode> = episodes
+            .into_iter()
+            .filter(|pe| pe.episode.survival_value(current_ts, recency_w) >= threshold)
+            .collect();
+
+        let pruned_count = initial_len - filtered.len();
+        self.total_evicted += pruned_count as u64;
+        self.episodes.extend(filtered);
+
+        if pruned_count > 0 {
+            tracing::info!(
+                target: "symthaea::memory::episodic",
+                pruned = pruned_count,
+                remaining = self.episodes.len(),
+                threshold = threshold,
+                "Causal pruning complete (The Art of Forgetting)"
+            );
+        }
+
+        pruned_count
     }
 }
 

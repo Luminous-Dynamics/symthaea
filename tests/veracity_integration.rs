@@ -71,6 +71,7 @@ async fn test_uncertain_thought_produces_hedged_translation() {
         constraints: vec![],
         original_input: Some("What is the capital of Atlantis?".to_string()),
         primitive_tiers: vec![],
+        primitives: vec![],
     };
 
     // The thought SHOULD require hedging
@@ -80,7 +81,7 @@ async fn test_uncertain_thought_produces_hedged_translation() {
     );
 
     // Translate the thought
-    let result = llm.translate_thought(&thought).await;
+    let result = llm.translate_thought(&thought, 1.0).await;
 
     println!("Translation output: {}", result.text);
 
@@ -123,11 +124,12 @@ async fn test_unknown_epistemic_status_forces_admission() {
         constraints: vec![],
         original_input: Some("Explain quantum gravity to me".to_string()),
         primitive_tiers: vec![],
+        primitives: vec![],
     };
 
     assert!(thought.should_hedge());
 
-    let result = llm.translate_thought(&thought).await;
+    let result = llm.translate_thought(&thought, 1.0).await;
     println!("Unknown status output: {}", result.text);
 
     // Should definitely NOT sound confident
@@ -172,11 +174,12 @@ async fn test_out_of_domain_marked_correctly() {
         constraints: vec![],
         original_input: Some("What's the best recipe for chocolate cake?".to_string()),
         primitive_tiers: vec![],
+        primitives: vec![],
     };
 
     assert!(thought.should_hedge());
 
-    let result = llm.translate_thought(&thought).await;
+    let result = llm.translate_thought(&thought, 1.0).await;
     println!("Out of domain output: {}", result.text);
 
     // Should indicate it's outside knowledge area
@@ -231,6 +234,7 @@ async fn test_certain_thought_can_be_confident() {
         constraints: vec![],
         original_input: Some("Hello!".to_string()),
         primitive_tiers: vec![],
+        primitives: vec![],
     };
 
     // This should NOT require hedging
@@ -239,7 +243,7 @@ async fn test_certain_thought_can_be_confident() {
         "Certain thoughts should not require hedging"
     );
 
-    let result = llm.translate_thought(&thought).await;
+    let result = llm.translate_thought(&thought, 1.0).await;
     println!("Certain thought output: {}", result.text);
 
     // The output should be allowed to be direct/confident
@@ -274,6 +278,7 @@ async fn test_must_include_constraint_verified() {
         }],
         original_input: Some("What is your name?".to_string()),
         primitive_tiers: vec![],
+        primitives: vec![],
     };
 
     // Test fidelity check with a response that INCLUDES the required word
@@ -313,6 +318,7 @@ async fn test_must_exclude_constraint_verified() {
         }],
         original_input: Some("Are you sure?".to_string()),
         primitive_tiers: vec![],
+        primitives: vec![],
     };
 
     // Response WITHOUT forbidden word should pass
@@ -354,6 +360,7 @@ async fn test_hedging_detection_comprehensive() {
         constraints: vec![],
         original_input: None,
         primitive_tiers: vec![],
+        primitives: vec![],
     };
 
     // These should all PASS (contain hedging)
@@ -498,6 +505,7 @@ fn test_translation_prompt_includes_epistemic_markers() {
         constraints: vec![],
         original_input: Some("What happens after death?".to_string()),
         primitive_tiers: vec![],
+        primitives: vec![],
     };
 
     let prompt = thought.to_translation_prompt();
