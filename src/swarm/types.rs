@@ -170,6 +170,13 @@ pub enum SwarmMessage {
         public_inputs: Vec<u8>,
     },
 
+    /// Holographic state for peer resuscitation (v1.5.0)
+    ResuscitationPacket {
+        target_node_id: String,
+        holographic_state: Vec<f32>,
+        dimensionality: usize,
+    },
+
     /// Graceful disconnect
     Goodbye { reason: String },
 }
@@ -190,6 +197,7 @@ impl SwarmMessage {
             Self::TicketResponse { .. } => "TicketResponse",
             Self::BrainMutation { .. } => "BrainMutation",
             Self::ZkProof { .. } => "ZkProof",
+            Self::ResuscitationPacket { .. } => "ResuscitationPacket",
             Self::Goodbye { .. } => "Goodbye",
         }
     }
