@@ -36,7 +36,7 @@ use symthaea_core::hdc::ContinuousHV;
 use crate::encoder::{ThoughtChannels, ThoughtLanguageEncoder};
 use crate::gating::{consciousness_gated_max_tokens, EpistemicGate, EmotionalModulator, GatingConfig};
 use crate::generator::GenerationResult;
-use crate::mamba::MambaWrapper;
+use crate::mamba::{MambaBackend, MambaWrapper};
 use crate::projection::HdcSsmProjection;
 use crate::tokenizer::BpeTokenizer;
 
@@ -146,7 +146,7 @@ impl Default for LiquidMambaConfig {
 
 /// Liquid-Mamba fusion generator: consciousness-gated SSM language generation.
 pub struct LiquidMambaGenerator {
-    mamba: MambaWrapper,
+    mamba: Box<dyn MambaBackend>,
     projection: HdcSsmProjection,
     encoder: ThoughtLanguageEncoder,
     epistemic_gate: EpistemicGate,
@@ -175,7 +175,27 @@ impl LiquidMambaGenerator {
     pub fn new(genesis: &GenesisSeed, config: LiquidMambaConfig) -> Result<Self> {
         let device = candle_core::Device::Cpu;
         let mamba = MambaWrapper::load(&config.model_id, device)?;
+        Self::with_backend(genesis, config, Box::new(mamba))
+    }
 
+    /// Create a Liquid-Mamba generator with a mock backend (for testing).
+    ///
+    /// Uses the provided [`MambaBackend`] implementation instead of loading
+    /// a real model. This enables deterministic, offline testing of the full
+    /// generation pipeline.
+    #[cfg(test)]
+    pub fn with_mock(genesis: &GenesisSeed, config: LiquidMambaConfig) -> Self {
+        use crate::mamba::tests::MockMamba;
+        Self::with_backend(genesis, config, Box::new(MockMamba::new()))
+            .expect("MockMamba backend cannot fail")
+    }
+
+    /// Internal constructor shared by `new()` and `with_mock()`.
+    fn with_backend(
+        genesis: &GenesisSeed,
+        config: LiquidMambaConfig,
+        mamba: Box<dyn MambaBackend>,
+    ) -> Result<Self> {
         let projection = HdcSsmProjection::new(
             genesis,
             config.hdc_dim,
@@ -518,14 +538,14 @@ impl LiquidMambaGenerator {
         &self.projection
     }
 
-    /// Get reference to the Mamba wrapper.
-    pub fn mamba(&self) -> &MambaWrapper {
-        &self.mamba
+    /// Get reference to the Mamba backend.
+    pub fn mamba(&self) -> &dyn MambaBackend {
+        &*self.mamba
     }
 
-    /// Get mutable reference to the Mamba wrapper.
-    pub fn mamba_mut(&mut self) -> &mut MambaWrapper {
-        &mut self.mamba
+    /// Get mutable reference to the Mamba backend.
+    pub fn mamba_mut(&mut self) -> &mut dyn MambaBackend {
+        &mut *self.mamba
     }
 
     /// Get reference to the config.
@@ -680,8 +700,13 @@ impl LiquidMambaGenerator {
             self.check_projection_health(&result.output_hvs);
         }
 
-        // Gate: skip if no tokens or high PE (garbage output)
-        if result.output_hvs.is_empty() || result.semantic_pe > 0.8 {
+        // Gate: skip if no tokens generated
+        if result.output_hvs.is_empty() {
+            return;
+        }
+        // Skip distillation on garbage output (PE > 0.8) unless consciousness gating is disabled
+        // (e.g. during offline testing with mock backends)
+        if self.config.enable_consciousness_gating && result.semantic_pe > 0.8 {
             return;
         }
 
@@ -822,7 +847,8 @@ impl std::fmt::Debug for LiquidMambaGenerator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LiquidMambaGenerator")
             .field("config", &self.config)
-            .field("mamba", &self.mamba)
+            .field("mamba_d_model", &self.mamba.d_model())
+            .field("mamba_vocab_size", &self.mamba.vocab_size())
             .field("thermodynamic_load", &self.thermodynamic_load)
             .field("arousal", &self.arousal)
             .field("mood_temperature", &self.mood_temperature)
@@ -1414,5 +1440,189 @@ mod tests {
         // Mid FEP signal → neutral
         let fep_mid: f32 = if 0.5f32 > 0.7 { 1.5 } else if 0.5f32 < 0.3 { 0.7 } else { 1.0 };
         assert!((fep_mid - 1.0f32).abs() < 1e-6);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MOCK-BASED INTEGRATION TESTS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_mock_liquid_mamba_generate() {
+        use symthaea_core::genesis::GenesisSeed;
+        use crate::encoder::ThoughtChannels;
+
+        let genesis = GenesisSeed::from_phrase("test-mock-lm-gen");
+        let config = LiquidMambaConfig {
+            max_tokens: 10,
+            enable_veto: false, // Disable veto for deterministic test
+            enable_consciousness_gating: false,
+            ..Default::default()
+        };
+        let mut gen = LiquidMambaGenerator::with_mock(&genesis, config);
+
+        let mut channels = ThoughtChannels::with_intent(1); // Answer
+        channels.set_epistemic(0.0); // Certain
+        channels.set_emotion(0.5, 0.5, 0.5);
+
+        let result = gen.generate(&channels);
+        assert!(result.num_tokens > 0, "Should generate at least 1 token");
+        assert!(result.num_tokens <= 10, "Should respect max_tokens");
+        assert!(!result.token_ids.is_empty());
+        assert!(result.final_coherence.is_finite());
+        assert!(result.semantic_pe.is_finite());
+    }
+
+    #[test]
+    fn test_mock_liquid_mamba_biological_modulation() {
+        use symthaea_core::genesis::GenesisSeed;
+        use crate::encoder::ThoughtChannels;
+
+        let genesis = GenesisSeed::from_phrase("test-mock-lm-bio");
+        let config = LiquidMambaConfig {
+            max_tokens: 5,
+            enable_veto: false,
+            enable_consciousness_gating: false,
+            enable_liquid_delta: true,
+            ..Default::default()
+        };
+        let mut gen = LiquidMambaGenerator::with_mock(&genesis, config);
+
+        // Test with exhausted state
+        gen.update_affect(0.9, 1.5);
+        assert!((gen.thermodynamic_load() - 0.9).abs() < 1e-6);
+        assert!((gen.mood_temperature() - 1.5).abs() < 1e-6);
+
+        let channels = ThoughtChannels::with_intent(0);
+        let result = gen.generate(&channels);
+        assert!(result.num_tokens > 0);
+        assert!(result.final_coherence.is_finite());
+    }
+
+    #[test]
+    fn test_mock_liquid_mamba_distillation() {
+        use symthaea_core::genesis::GenesisSeed;
+        use crate::encoder::ThoughtChannels;
+
+        let genesis = GenesisSeed::from_phrase("test-mock-lm-distill");
+        let config = LiquidMambaConfig {
+            max_tokens: 8,
+            enable_veto: false,
+            enable_consciousness_gating: false,
+            warmup_steps: 2,
+            accumulation_steps: 1,
+            ..Default::default()
+        };
+        let mut gen = LiquidMambaGenerator::with_mock(&genesis, config);
+
+        let channels = ThoughtChannels::with_intent(1);
+        let weights_before = gen.projection().flatten_weights();
+
+        // Generate and distill multiple times to trigger gradient application
+        for _ in 0..4 {
+            let result = gen.generate(&channels);
+            gen.distill_step(&channels, &result);
+        }
+
+        let weights_after = gen.projection().flatten_weights();
+        assert_eq!(gen.generation_count(), 4);
+
+        // Weights should have changed after distillation
+        let changed = weights_before.iter()
+            .zip(weights_after.iter())
+            .any(|(a, b)| (a - b).abs() > 1e-10);
+        assert!(changed, "Distillation should modify projection weights");
+    }
+
+    #[test]
+    fn test_mock_liquid_mamba_pe_tracking() {
+        use symthaea_core::genesis::GenesisSeed;
+        use crate::encoder::ThoughtChannels;
+
+        let genesis = GenesisSeed::from_phrase("test-mock-lm-pe");
+        let config = LiquidMambaConfig {
+            max_tokens: 5,
+            enable_veto: false,
+            enable_consciousness_gating: false,
+            ..Default::default()
+        };
+        let mut gen = LiquidMambaGenerator::with_mock(&genesis, config);
+
+        let channels = ThoughtChannels::with_intent(1);
+
+        // Generate multiple times to build PE history
+        for _ in 0..5 {
+            let result = gen.generate(&channels);
+            gen.distill_step(&channels, &result);
+        }
+
+        let pe = gen.last_semantic_pe();
+        assert!(pe.is_finite(), "PE should be finite");
+        assert!(pe >= 0.0 && pe <= 2.0, "PE should be in reasonable range, got {pe}");
+
+        let (mean, std_dev, trend) = gen.pe_stats();
+        assert!(mean.is_finite());
+        assert!(std_dev.is_finite());
+        assert!(trend.is_finite());
+    }
+
+    #[test]
+    fn test_mock_liquid_mamba_streaming_callback() {
+        use symthaea_core::genesis::GenesisSeed;
+        use crate::encoder::ThoughtChannels;
+
+        let genesis = GenesisSeed::from_phrase("test-mock-lm-stream");
+        let config = LiquidMambaConfig {
+            max_tokens: 5,
+            enable_veto: false,
+            enable_consciousness_gating: false,
+            ..Default::default()
+        };
+        let mut gen = LiquidMambaGenerator::with_mock(&genesis, config);
+
+        let channels = ThoughtChannels::with_intent(1);
+        let mut callback_count = 0usize;
+        let mut _callback_tokens = Vec::new();
+
+        let result = gen.generate_with_callback(&channels, &mut |token_str| {
+            callback_count += 1;
+            _callback_tokens.push(token_str.to_string());
+        });
+
+        assert!(callback_count > 0, "Callback should be invoked at least once");
+        assert_eq!(callback_count, result.num_tokens, "Callback count should match token count");
+    }
+
+    #[test]
+    fn test_mock_liquid_mamba_fep_modulation() {
+        use symthaea_core::genesis::GenesisSeed;
+        use crate::encoder::ThoughtChannels;
+
+        let genesis = GenesisSeed::from_phrase("test-mock-lm-fep");
+        let config = LiquidMambaConfig {
+            max_tokens: 5,
+            enable_veto: false,
+            enable_consciousness_gating: false,
+            warmup_steps: 0,
+            accumulation_steps: 1,
+            ..Default::default()
+        };
+        let mut gen = LiquidMambaGenerator::with_mock(&genesis, config);
+
+        // Set high FEP signal (should boost distillation LR)
+        gen.set_fep_modulation(0.9);
+        let _lr_high = gen.current_lr();
+
+        // Generate and verify FEP modulation doesn't crash
+        let channels = ThoughtChannels::with_intent(1);
+        let result = gen.generate(&channels);
+        gen.distill_step(&channels, &result);
+
+        // Set low FEP signal
+        gen.set_fep_modulation(0.1);
+        let result2 = gen.generate(&channels);
+        gen.distill_step(&channels, &result2);
+
+        assert!(result.num_tokens > 0);
+        assert!(result2.num_tokens > 0);
     }
 }

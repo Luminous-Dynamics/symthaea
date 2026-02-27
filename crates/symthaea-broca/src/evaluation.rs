@@ -373,7 +373,7 @@ fn hedging_ratio(text: &str) -> f32 {
 /// A token counts as "English" if it decodes to a multi-character alphabetic string
 /// (not a single byte, not a byte-escape).
 #[cfg(feature = "mamba")]
-pub fn english_word_ratio_mamba(token_ids: &[u32], wrapper: &crate::mamba::MambaWrapper) -> f32 {
+pub fn english_word_ratio_mamba(token_ids: &[u32], wrapper: &dyn crate::mamba::MambaBackend) -> f32 {
     if token_ids.is_empty() {
         return 0.0;
     }

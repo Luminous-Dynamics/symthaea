@@ -13,8 +13,18 @@ use symthaea_core::hdc::{ContinuousHV, HdcLtcUnifiedNetwork};
 use crate::generator::{BrocaConfig, BrocaGenerator};
 use crate::tokenizer::VocabFile;
 
-/// Current checkpoint schema version.
+/// Current BrocaCheckpoint schema version.
 const CHECKPOINT_VERSION: u32 = 1;
+
+/// Current ProjectionCheckpoint schema version.
+/// v1: 4 weight matrices (w_down, w_up, w_back_down, w_back_up).
+/// v2: v1 + 4 LayerNorm vectors (ln_fwd_gamma, ln_fwd_beta, ln_bwd_gamma, ln_bwd_beta).
+#[cfg(feature = "mamba")]
+const PROJECTION_CHECKPOINT_VERSION: u32 = 2;
+
+/// Minimum supported ProjectionCheckpoint version.
+#[cfg(feature = "mamba")]
+const PROJECTION_MIN_VERSION: u32 = 1;
 
 /// Serializable optimizer state for training resume.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -168,6 +178,14 @@ impl BrocaCheckpoint {
             anyhow::bail!("Checkpoint integrity check failed: checksum mismatch");
         }
 
+        if checkpoint.version > CHECKPOINT_VERSION {
+            anyhow::bail!(
+                "Broca checkpoint version {} is newer than supported (max: {})",
+                checkpoint.version,
+                CHECKPOINT_VERSION
+            );
+        }
+
         tracing::info!(
             path = %path.as_ref().display(),
             epoch = checkpoint.training_epoch,
@@ -305,7 +323,26 @@ impl ProjectionCheckpoint {
         Ok(())
     }
 
-    /// Load from a file with integrity verification.
+    /// Create a new ProjectionCheckpoint with the current version.
+    pub fn new(
+        weights: Vec<f32>,
+        hdc_dim: usize,
+        bottleneck_dim: usize,
+        ssm_dim: usize,
+        training_epoch: usize,
+    ) -> Self {
+        Self {
+            version: PROJECTION_CHECKPOINT_VERSION,
+            projection_weights: weights,
+            hdc_dim,
+            bottleneck_dim,
+            ssm_dim,
+            training_epoch,
+            checksum: [0u8; 32],
+        }
+    }
+
+    /// Load from a file with integrity and version compatibility checks.
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut file = std::fs::File::open(path.as_ref())
             .with_context(|| format!("opening projection checkpoint: {}", path.as_ref().display()))?;
@@ -316,12 +353,40 @@ impl ProjectionCheckpoint {
         if !checkpoint.verify() {
             anyhow::bail!("Projection checkpoint integrity check failed: checksum mismatch");
         }
+
+        // Version compatibility check
+        if checkpoint.version < PROJECTION_MIN_VERSION {
+            anyhow::bail!(
+                "Projection checkpoint version {} is too old (minimum: {})",
+                checkpoint.version,
+                PROJECTION_MIN_VERSION
+            );
+        }
+        if checkpoint.version > PROJECTION_CHECKPOINT_VERSION {
+            anyhow::bail!(
+                "Projection checkpoint version {} is newer than supported (max: {})",
+                checkpoint.version,
+                PROJECTION_CHECKPOINT_VERSION
+            );
+        }
+        if checkpoint.version < PROJECTION_CHECKPOINT_VERSION {
+            tracing::warn!(
+                saved_version = checkpoint.version,
+                current_version = PROJECTION_CHECKPOINT_VERSION,
+                "Loading legacy projection checkpoint (v{} → v{}). LayerNorm params will use defaults.",
+                checkpoint.version,
+                PROJECTION_CHECKPOINT_VERSION
+            );
+        }
+
         tracing::info!(
             path = %path.as_ref().display(),
+            version = checkpoint.version,
             epoch = checkpoint.training_epoch,
             hdc_dim = checkpoint.hdc_dim,
             bottleneck = checkpoint.bottleneck_dim,
             ssm_dim = checkpoint.ssm_dim,
+            params = checkpoint.projection_weights.len(),
             "Projection checkpoint loaded"
         );
         Ok(checkpoint)

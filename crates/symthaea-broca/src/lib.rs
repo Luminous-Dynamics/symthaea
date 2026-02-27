@@ -63,6 +63,8 @@ pub use checkpoint::{BrocaCheckpoint, AdamState};
 pub use evaluation::{EvalConfig, EvalResult, IntentScore};
 
 #[cfg(feature = "mamba")]
+pub use mamba::MambaBackend;
+#[cfg(feature = "mamba")]
 pub use liquid_mamba::{LiquidMambaGenerator, LiquidMambaConfig};
 #[cfg(feature = "mamba")]
 pub use projection::HdcSsmProjection;
