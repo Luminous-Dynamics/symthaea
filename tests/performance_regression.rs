@@ -314,14 +314,20 @@ fn regression_simd_hv16_size() {
 // ============================================================================
 
 /// Maximum acceptable cycle time (microseconds).
-/// Target is 20ms (50Hz), guard allows up to 50ms before failing.
-const MAX_CYCLE_US: u64 = 50_000;
+/// Release baseline (2026-02-27): ~32ms warm steady-state.
+/// Debug builds are ~10x slower (~300-400ms), so we use a generous threshold
+/// that catches catastrophic regressions while passing in both modes.
+/// For accurate perf measurement, use `cargo bench`.
+const MAX_CYCLE_US: u64 = if cfg!(debug_assertions) {
+    2_000_000 // 2s debug mode — catastrophic regression guard only
+} else {
+    50_000 // 50ms release mode — meaningful regression guard
+};
 
-/// Cognitive cycle steady-state should stay below 50ms.
+/// Cognitive cycle steady-state: release ~32ms, debug ~300-400ms.
 ///
 /// Baseline (2026-02-27): ~32ms warm steady-state (measured via criterion).
-/// Guard set at 50ms to catch catastrophic regressions while allowing
-/// normal variance from subsystem amortization spikes.
+/// Debug builds are ~10x slower. Thresholds are mode-adaptive.
 #[test]
 fn regression_cognitive_cycle_steady_state() {
     use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
@@ -345,8 +351,8 @@ fn regression_cognitive_cycle_steady_state() {
         "temporal prediction drives learning",
     ];
 
+    let measure_cycles: usize = if cfg!(debug_assertions) { 20 } else { 100 };
     let start = Instant::now();
-    let measure_cycles = 100usize;
     for i in 0..measure_cycles {
         let _ = service.cycle(inputs[i % inputs.len()]);
     }
@@ -371,7 +377,7 @@ fn regression_cognitive_cycle_steady_state() {
     );
 }
 
-/// Cold start should complete within 100ms (2x budget).
+/// Cold start should complete within 2x budget (release: 100ms, debug: 4s).
 #[test]
 fn regression_cognitive_cycle_cold_start() {
     use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
@@ -401,7 +407,7 @@ fn regression_cognitive_cycle_cold_start() {
     );
 }
 
-/// Sustained 500-cycle p95 should stay below 75ms (1.5x budget).
+/// Sustained 500-cycle p95 should stay below 1.5x budget (release: 75ms, debug: 3s).
 #[test]
 fn regression_cognitive_cycle_sustained_p95() {
     use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
@@ -424,8 +430,9 @@ fn regression_cognitive_cycle_sustained_p95() {
         "epsilon exploration",
     ];
 
-    let mut times_us = Vec::with_capacity(500);
-    for i in 0..500 {
+    let n_cycles: usize = if cfg!(debug_assertions) { 50 } else { 500 };
+    let mut times_us = Vec::with_capacity(n_cycles);
+    for i in 0..n_cycles {
         let start = Instant::now();
         let _ = service.cycle(inputs[i % inputs.len()]);
         times_us.push(start.elapsed().as_micros() as u64);

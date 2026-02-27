@@ -139,3 +139,151 @@ pub struct PhaseTransition {
     #[serde(skip, default = "default_instant")]
     pub timestamp: Instant,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_state() {
+        let state = ThermodynamicState::default();
+        assert!((state.entropy - 0.5).abs() < f64::EPSILON);
+        assert!((state.temperature - 1.0).abs() < f64::EPSILON);
+        assert_eq!(state.phase, ConsciousnessPhase::Normal);
+    }
+
+    #[test]
+    fn test_consciousness_phase_temperature_ranges() {
+        // Each phase should return a valid (low, high) range where low < high
+        let phases = [
+            ConsciousnessPhase::Frozen,
+            ConsciousnessPhase::Normal,
+            ConsciousnessPhase::Critical,
+            ConsciousnessPhase::Chaotic,
+            ConsciousnessPhase::Flow,
+            ConsciousnessPhase::Unified,
+        ];
+        for phase in &phases {
+            let (low, high) = phase.temperature_range();
+            assert!(
+                low < high,
+                "{:?} temperature range invalid: ({}, {})",
+                phase,
+                low,
+                high,
+            );
+            assert!(low >= 0.0, "{:?} lower bound negative: {}", phase, low);
+            assert!(high <= 1.0, "{:?} upper bound exceeds 1.0: {}", phase, high);
+        }
+
+        // Frozen should be the coldest range
+        let (_, frozen_hi) = ConsciousnessPhase::Frozen.temperature_range();
+        let (chaotic_lo, _) = ConsciousnessPhase::Chaotic.temperature_range();
+        assert!(
+            frozen_hi < chaotic_lo,
+            "Frozen range should be entirely below Chaotic range",
+        );
+    }
+
+    #[test]
+    fn test_consciousness_phase_typical_entropy() {
+        // Frozen < Normal < Critical < Chaotic entropy ordering
+        let frozen = ConsciousnessPhase::Frozen.typical_entropy();
+        let normal = ConsciousnessPhase::Normal.typical_entropy();
+        let critical = ConsciousnessPhase::Critical.typical_entropy();
+        let chaotic = ConsciousnessPhase::Chaotic.typical_entropy();
+
+        assert!(
+            frozen < normal,
+            "Frozen ({}) should < Normal ({})",
+            frozen,
+            normal
+        );
+        assert!(
+            normal < critical,
+            "Normal ({}) should < Critical ({})",
+            normal,
+            critical
+        );
+        assert!(
+            critical < chaotic,
+            "Critical ({}) should < Chaotic ({})",
+            critical,
+            chaotic
+        );
+    }
+
+    #[test]
+    fn test_phase_transition_creation() {
+        let transition = PhaseTransition {
+            from_phase: ConsciousnessPhase::Normal,
+            to_phase: ConsciousnessPhase::Critical,
+            transition_temperature: 0.45,
+            latent_heat: 0.1,
+            order_parameter_change: 0.3,
+            transition_order: TransitionOrder::SecondOrder,
+            critical_exponents: Some(CriticalExponents::default()),
+            timestamp: Instant::now(),
+        };
+
+        assert_eq!(transition.from_phase, ConsciousnessPhase::Normal);
+        assert_eq!(transition.to_phase, ConsciousnessPhase::Critical);
+        assert!((transition.transition_temperature - 0.45).abs() < f64::EPSILON);
+        assert!((transition.latent_heat - 0.1).abs() < f64::EPSILON);
+        assert!((transition.order_parameter_change - 0.3).abs() < f64::EPSILON);
+        assert_eq!(transition.transition_order, TransitionOrder::SecondOrder);
+        assert!(transition.critical_exponents.is_some());
+    }
+
+    #[test]
+    fn test_flow_phase_low_entropy() {
+        // Flow state = frictionless consciousness, should have lower entropy than Normal
+        let flow_entropy = ConsciousnessPhase::Flow.typical_entropy();
+        let normal_entropy = ConsciousnessPhase::Normal.typical_entropy();
+        assert!(
+            flow_entropy < normal_entropy,
+            "Flow ({}) should have lower entropy than Normal ({})",
+            flow_entropy,
+            normal_entropy,
+        );
+    }
+
+    #[test]
+    fn test_unified_phase_low_entropy() {
+        // Unified = meditative condensate, should have lower entropy than Normal
+        let unified_entropy = ConsciousnessPhase::Unified.typical_entropy();
+        let normal_entropy = ConsciousnessPhase::Normal.typical_entropy();
+        assert!(
+            unified_entropy < normal_entropy,
+            "Unified ({}) should have lower entropy than Normal ({})",
+            unified_entropy,
+            normal_entropy,
+        );
+    }
+
+    #[test]
+    fn test_thermodynamic_state_defaults_valid() {
+        // Free energy F = U - TS
+        let state = ThermodynamicState::default();
+        let expected_free_energy = state.internal_energy - state.temperature * state.entropy;
+        assert!(
+            (state.free_energy - expected_free_energy).abs() < f64::EPSILON,
+            "F ({}) should equal U - TS ({})",
+            state.free_energy,
+            expected_free_energy,
+        );
+    }
+
+    #[test]
+    fn test_enthalpy_default() {
+        // Enthalpy H = U + PV
+        let state = ThermodynamicState::default();
+        let expected_enthalpy = state.internal_energy + state.pressure * state.volume;
+        assert!(
+            (state.enthalpy - expected_enthalpy).abs() < f64::EPSILON,
+            "H ({}) should equal U + PV ({})",
+            state.enthalpy,
+            expected_enthalpy,
+        );
+    }
+}

@@ -568,26 +568,31 @@ impl QuantumCoherenceAnalyzer {
     }
 
     /// Current coherence length (timesteps)
+    #[allow(dead_code)]
     pub(crate) fn coherence_length(&self) -> usize {
         self.coherence_length
     }
 
     /// Current superposition richness
+    #[allow(dead_code)]
     pub(crate) fn superposition_richness(&self) -> f64 {
         self.richness_history.back().copied().unwrap_or(0.5)
     }
 
     /// Get decoherence events
+    #[allow(dead_code)]
     pub(crate) fn decoherence_events(&self) -> &[DecoherenceEvent] {
         &self.decoherence_events
     }
 
     /// Get recent interference patterns
+    #[allow(dead_code)]
     pub(crate) fn interference_patterns(&self) -> &VecDeque<InterferencePattern> {
         &self.interference_patterns
     }
 
     /// Compute decoherence rate (events per observation)
+    #[allow(dead_code)]
     pub(crate) fn decoherence_rate(&self) -> f64 {
         if self.stats.observations == 0 {
             0.0
@@ -597,6 +602,7 @@ impl QuantumCoherenceAnalyzer {
     }
 
     /// Generate comprehensive coherence report
+    #[allow(dead_code)]
     pub(crate) fn coherence_report(&self) -> QuantumCoherenceReport {
         let last_entanglement = if self.config.estimate_entanglement {
             self.history.back().and_then(|obs| {
@@ -629,6 +635,7 @@ impl QuantumCoherenceAnalyzer {
     }
 
     /// Check if system is currently in a "quantum coherent" state
+    #[allow(dead_code)]
     pub(crate) fn is_quantum_coherent(&self) -> bool {
         // Criteria for quantum coherence:
         // 1. High coherence (> threshold)
@@ -643,6 +650,7 @@ impl QuantumCoherenceAnalyzer {
     }
 
     /// Generate recommendations for maintaining/improving coherence
+    #[allow(dead_code)]
     fn generate_recommendations(&self) -> Vec<CoherenceRecommendation> {
         let mut recommendations = Vec::new();
 

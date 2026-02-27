@@ -404,6 +404,7 @@ impl DissipativeConsciousness {
     }
 
     /// Check if system is "alive" (sufficient entropy production)
+    #[allow(dead_code)]
     pub(crate) fn is_alive(&self) -> bool {
         self.entropy_production_rate > self.config.min_entropy_production
     }
@@ -503,6 +504,7 @@ impl DissipativeConsciousness {
     }
 
     /// Get current state summary
+    #[allow(dead_code)]
     pub(crate) fn summary(&self) -> DissipativeSummary {
         DissipativeSummary {
             regime: self.current_regime(),

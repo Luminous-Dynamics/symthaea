@@ -75,6 +75,7 @@ use std::collections::HashMap;
 /// - NOT: Negation (gaps, exclusion)
 /// - FOR_SOME_TIME: Duration
 /// - MOMENT: Instantaneous transition
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct AllenRelationPrimitiveGrounding {
     /// The Allen relation being grounded
@@ -96,6 +97,7 @@ pub(crate) struct AllenRelationPrimitiveGrounding {
     pub is_causal_candidate: bool,
 }
 
+#[allow(dead_code)]
 impl AllenRelationPrimitiveGrounding {
     /// Get the NSM primitive grounding for a specific Allen relation
     pub(crate) fn for_relation(relation: AllenRelation, primitive_system: &PrimitiveSystem) -> Self {
@@ -473,6 +475,7 @@ impl AllenRelation {
     }
 
     /// Get the NSM primitive grounding for this relation
+    #[allow(dead_code)]
     pub(crate) fn primitive_grounding(
         &self,
         primitive_system: &PrimitiveSystem,
@@ -907,6 +910,7 @@ impl TemporalReasoner {
     }
 
     /// Find causal candidate relations (those that can represent cause-effect)
+    #[allow(dead_code)]
     pub(crate) fn causal_relations(
         &self,
         primitive_system: &PrimitiveSystem,
@@ -1515,6 +1519,7 @@ impl TemporalPrimitiveSystem {
     }
 
     /// Get the NSM grounding for a specific Allen relation
+    #[allow(dead_code)]
     pub(crate) fn get_nsm_grounding(
         &self,
         relation: AllenRelation,

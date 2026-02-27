@@ -250,6 +250,9 @@ pub struct BenchmarkResult {
     pub conditions: usize,
     /// Number of trials per condition.
     pub trials_per_condition: usize,
+    /// Per-trial trace data (populated when `config.trial_trace` is true).
+    #[serde(default)]
+    pub trial_trace: Vec<super::trial_analysis::TrialOutcome>,
 }
 
 impl BenchmarkResult {
@@ -262,6 +265,7 @@ impl BenchmarkResult {
             elapsed_ms: 0,
             conditions: 0,
             trials_per_condition: 0,
+            trial_trace: Vec::new(),
         }
     }
 

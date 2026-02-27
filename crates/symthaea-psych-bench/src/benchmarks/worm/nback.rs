@@ -6,23 +6,28 @@
 use crate::adapter::sequence::{SequenceAdapter, SequenceItem};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// N-back benchmark testing the updating function of working memory.
 pub struct NBackBenchmark;
 
 impl NBackBenchmark {
-    /// Run a single N-back trial and return (hit_rate, false_alarm_rate, rt_ticks).
-    fn run_trial(
+    /// Run a single N-back trial with difficulty scaling and optional trace collection.
+    fn run_trial_traced(
         &self,
         n: usize,
         sequence_len: usize,
         config: &BenchmarkConfig,
         trial_idx: usize,
-    ) -> (f64, f64, Vec<f64>) {
+        temp_mult: f64,
+        global_trial_idx: &mut usize,
+    ) -> (f64, f64, Vec<f64>, Vec<TrialOutcome>) {
         let dim = config.dimension;
         let seed = config.trial_seed("worm", &format!("nback_{}", n), trial_idx);
         let adapter = SequenceAdapter;
@@ -33,11 +38,7 @@ impl NBackBenchmark {
             ..Default::default()
         });
 
-        // Generate sequence with ~30% match targets
         let mut rng_state = seed;
-        // Small vocab creates realistic proactive interference: with frequent
-        // item repetitions, non-target items may match the n-back item by
-        // coincidence, causing false alarms (Jonides & Nee, 2006).
         let vocab_size = 8u64;
         let mut sequence = Vec::with_capacity(sequence_len);
         for i in 0..sequence_len {
@@ -62,11 +63,14 @@ impl NBackBenchmark {
         let mut false_alarms = 0u64;
         let mut correct_rejections = 0u64;
         let mut rt_ticks = Vec::new();
+        let mut outcomes = Vec::new();
 
-        // Keep history of perceived HVs for position-aware n-back retrieval
         let mut perceived_history: Vec<ContinuousHV> = Vec::with_capacity(sequence_len);
 
-        // Present sequence to working memory
+        // Difficulty: scale match threshold via temperature multiplier
+        let base_threshold = 0.5 - config.time_pressure * 0.15;
+        let match_threshold = (base_threshold / temp_mult) as f32;
+
         for (i, &item) in sequence.iter().enumerate() {
             let hv = adapter.encode(&item, dim);
             wm.perceive(hv.clone());
@@ -75,26 +79,10 @@ impl NBackBenchmark {
 
             if i >= n {
                 let is_target = sequence[i] == sequence[i - n];
-
-                // N-back detection: WM-capacity-gated match
-                //
-                // With FIFO eviction and capacity K, an item perceived N steps ago
-                // is retained iff N < K (the current item occupies one slot).
-                // For N >= K, the n-back item has been evicted and the system
-                // cannot identify targets — modelling WM capacity limits.
                 let nback_retained = n < config.working_memory_capacity;
-
-                // Compare current item to n-back item (identity test via HDC similarity)
                 let nback_hv = &perceived_history[i - n];
                 let match_sim = hv.similarity(nback_hv);
-                // Time pressure: base 0.5 produces ~80% hit rate matching Kane et al. (2007) 2-back norms;
-                // -0.15/unit lowers criterion, modeling liberal bias under speed emphasis (Luce, 1986).
-                let match_threshold = (0.5 - config.time_pressure * 0.15) as f32;
 
-                // Proactive interference: check for "lure" items at nearby positions
-                // (n±1 back). Lures cause false alarms in human n-back (Jonides & Nee,
-                // 2006; Kane et al., 2007). If a lure exceeds threshold, the system
-                // may respond "match" even when it shouldn't.
                 let mut lure_match = false;
                 if !is_target && nback_retained {
                     for offset in [1i32, -1] {
@@ -109,20 +97,30 @@ impl NBackBenchmark {
                     }
                 }
 
-                // Respond "match" only if we remember the n-back item AND it
-                // matches the current item. Lure matches cause false alarms.
                 let responded_match = nback_retained && (match_sim > match_threshold || lure_match);
-
-                // RT proxy: deliberation ticks based on decision margin
                 let margin = (match_sim - match_threshold).abs() as f64;
                 let ticks = 3.0 + (1.0 - margin.min(1.0)) * 5.0;
                 rt_ticks.push(ticks);
 
-                match (is_target, responded_match) {
-                    (true, true) => hits += 1,
-                    (true, false) => misses += 1,
-                    (false, true) => false_alarms += 1,
-                    (false, false) => correct_rejections += 1,
+                let correct = match (is_target, responded_match) {
+                    (true, true) => { hits += 1; true }
+                    (true, false) => { misses += 1; false }
+                    (false, true) => { false_alarms += 1; false }
+                    (false, false) => { correct_rejections += 1; true }
+                };
+
+                if config.trial_trace {
+                    outcomes.push(TrialOutcome {
+                        trial_idx: *global_trial_idx,
+                        condition: format!("nback_{}", n),
+                        correct,
+                        rt_ticks: ticks,
+                        similarity: match_sim as f64,
+                        confidence: margin.min(1.0),
+                        response_idx: if responded_match { 1 } else { 0 },
+                        extra: BTreeMap::new(),
+                    });
+                    *global_trial_idx += 1;
                 }
             }
         }
@@ -138,7 +136,7 @@ impl NBackBenchmark {
             0.0
         };
 
-        (hit_rate, fa_rate, rt_ticks)
+        (hit_rate, fa_rate, rt_ticks, outcomes)
     }
 }
 
@@ -160,6 +158,10 @@ impl PsychBenchmark for NBackBenchmark {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
         let sequence_len = 30;
+        let diff_model = difficulty_model_for(self.name());
+        let temp_mult = diff_model.temperature_multiplier(config.difficulty);
+        let mut trace = Vec::new();
+        let mut global_trial_idx = 0usize;
 
         for n in [1, 2, 3] {
             let mut hit_rates = Vec::new();
@@ -168,12 +170,15 @@ impl PsychBenchmark for NBackBenchmark {
             let mut all_rts = Vec::new();
 
             for trial in 0..config.trials_per_condition {
-                let (hr, fa, rts) = self.run_trial(n, sequence_len, config, trial);
+                let (hr, fa, rts, trial_outcomes) =
+                    self.run_trial_traced(n, sequence_len, config, trial, temp_mult, &mut global_trial_idx);
                 hit_rates.push(hr);
                 fa_rates.push(fa);
-                // d'-like accuracy: hit_rate - false_alarm_rate
                 accuracies.push(hr - fa);
                 all_rts.extend_from_slice(&rts);
+                if config.trial_trace {
+                    trace.extend(trial_outcomes);
+                }
             }
 
             result.insert(
@@ -192,6 +197,10 @@ impl PsychBenchmark for NBackBenchmark {
                 format!("nback_{}::rt_ticks", n),
                 MetricValue::from_samples(&all_rts),
             );
+        }
+
+        if config.trial_trace {
+            result.trial_trace = trace;
         }
 
         result.conditions = 3;

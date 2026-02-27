@@ -12,8 +12,11 @@
 //! - rt_ticks: ~6.0 (SD~2.0) — deliberation proxy
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
 
 /// ARC-style fluid reasoning benchmark.
@@ -332,6 +335,7 @@ impl PsychBenchmark for ArcFluidBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let _diff_model = difficulty_model_for(self.name());
 
         let mut consistencies = Vec::new();
         let mut discriminations = Vec::new();
@@ -341,8 +345,8 @@ impl PsychBenchmark for ArcFluidBenchmark {
         let type_names = ["color_fill", "translation", "color_replace", "reflection"];
         let mut per_type: [Vec<f64>; 4] = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
         let mut single_pair_accs = Vec::new();
-        // Aggregate confusion matrix across trials
         let mut confusion_sum = [[0.0f64; 4]; 4];
+        let mut trace = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -357,6 +361,24 @@ impl PsychBenchmark for ArcFluidBenchmark {
                 for j in 0..4 {
                     confusion_sum[i][j] += r.confusion_matrix[i][j];
                 }
+            }
+
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trial,
+                    condition: "arc_fluid".to_string(),
+                    correct: r.transfer_accuracy > 0.5,
+                    rt_ticks: r.rt_ticks,
+                    similarity: r.transfer_similarity,
+                    confidence: r.rule_consistency,
+                    response_idx: 0,
+                    extra: {
+                        let mut m = BTreeMap::new();
+                        m.insert("rule_consistency".to_string(), r.rule_consistency);
+                        m.insert("transfer_accuracy".to_string(), r.transfer_accuracy);
+                        m
+                    },
+                });
             }
         }
 
@@ -439,6 +461,10 @@ impl PsychBenchmark for ArcFluidBenchmark {
                 "confusion_entropy",
                 MetricValue::from_samples(&[entropy_sum / 4.0]), // mean per-row entropy
             );
+        }
+
+        if config.trial_trace {
+            result.trial_trace = trace;
         }
 
         result.conditions = 4; // 4 task types

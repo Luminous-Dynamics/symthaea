@@ -752,6 +752,7 @@ impl PredictiveSelfModel {
     }
 
     /// Learn from actual outcome
+    #[allow(dead_code)]
     pub(crate) fn learn_from_outcome(&mut self, predicted: &SelfState, actual: &NarrativeSelfModel) {
         let actual_state = SelfState::from_narrative_self(actual);
         self.predictor.update_with_outcome(predicted, &actual_state);
@@ -760,6 +761,7 @@ impl PredictiveSelfModel {
     }
 
     /// Explore counterfactual: "What if I did X?"
+    #[allow(dead_code)]
     pub(crate) fn what_if(&mut self, action: &str) -> CounterfactualResult {
         self.stats.counterfactuals_explored += 1;
         let result = self.counterfactuals.explore(action);
@@ -770,22 +772,26 @@ impl PredictiveSelfModel {
     }
 
     /// Find best action from options
+    #[allow(dead_code)]
     pub(crate) fn best_action(&mut self, options: &[&str]) -> Option<CounterfactualResult> {
         self.counterfactuals.find_best(options)
     }
 
     /// Add an intention for the future
+    #[allow(dead_code)]
     pub(crate) fn intend(&mut self, action: &str, goal: &str, trigger: &str, priority: f64) {
         self.prospective.intend(action, goal, trigger, priority);
         self.stats.intentions_created += 1;
     }
 
     /// Check for triggered intentions
+    #[allow(dead_code)]
     pub(crate) fn check_intentions(&self, context: &str) -> Vec<&ProspectiveIntention> {
         self.prospective.check_triggers(context)
     }
 
     /// Mark intention as completed
+    #[allow(dead_code)]
     pub(crate) fn complete_intention(&mut self, action: &str) {
         self.prospective.complete(action);
         self.stats.intentions_completed += 1;
@@ -797,11 +803,13 @@ impl PredictiveSelfModel {
     }
 
     /// Get regret for unexplored paths
+    #[allow(dead_code)]
     pub(crate) fn regret(&self) -> f64 {
         self.counterfactuals.compute_regret()
     }
 
     /// Get intention completion rate
+    #[allow(dead_code)]
     pub(crate) fn intention_completion_rate(&self) -> f64 {
         self.prospective.completion_rate()
     }

@@ -3,9 +3,14 @@
 pub mod analysis;
 pub mod baselines;
 pub mod config;
+pub mod difficulty;
 pub mod html;
+pub mod live_runner;
+pub mod neuromod_profiles;
 pub mod report;
 pub mod snapshot;
+pub mod transfer;
+pub mod trial_analysis;
 
 pub use config::{AblationConfig, AblationPreset, BenchmarkConfig};
 pub use report::{
@@ -16,6 +21,11 @@ pub use snapshot::{
     RegressionReport, RegressionResult, RegressionSeverity, RegressionSnapshot, RegressionSummary,
     SNAPSHOT_SCHEMA_VERSION,
 };
+pub use trial_analysis::{
+    CalibrationResult, ErrorBurst, SpeedAccuracyResult, StrategyShift,
+    TrialAnalysis, TrialBlockRow, TrialOutcome,
+};
+pub use difficulty::{DifficultyModel, DifficultyModelType, difficulty_model_for};
 
 /// Provenance metadata for a psychological benchmark — citation, paradigm, year.
 #[derive(Debug, Clone)]

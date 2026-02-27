@@ -334,16 +334,8 @@ pub struct Symthaea {
     ltc_neurons: usize,
     /// Total interactions processed.
     interactions: u64,
-    /// Human partner model for relational consciousness.
-    partner: HumanPartnerModel,
-    /// Relationship trajectory tracking.
-    trajectory: RelationshipTrajectory,
-    /// Phi-dyad calculator for relational Phi.
-    dyad_calculator: PhiDyadCalculator,
-    /// Recent AI states for dyad computation (ring buffer).
-    recent_ai_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
-    /// Last computed Φ_dyad — fed back into mind as relational Ψ on next cycle.
-    last_phi_dyad: f64,
+    /// Relational consciousness subsystem (partner, trajectory, dyadic Phi).
+    relational: RelationalCore,
     /// Domain plugin registry for multi-domain awareness.
     plugin_registry: PluginRegistry,
     /// Cross-session learning persistence (thresholds, patterns).
@@ -686,11 +678,7 @@ impl Symthaea {
             hdc_dim,
             ltc_neurons,
             interactions: 0,
-            partner: HumanPartnerModel::new("human"),
-            trajectory: RelationshipTrajectory::default(),
-            dyad_calculator: PhiDyadCalculator::new(),
-            recent_ai_states: Vec::new(),
-            last_phi_dyad: 0.0,
+            relational: RelationalCore::new(),
             plugin_registry,
             #[cfg(feature = "full_language")]
             learning_persistence,
@@ -929,11 +917,11 @@ impl Symthaea {
             hdc_dim,
             ltc_neurons,
             interactions: state.interactions,
-            partner: state.partner,
-            trajectory: state.trajectory,
-            dyad_calculator: PhiDyadCalculator::new(),
-            recent_ai_states: state.recent_ai_states,
-            last_phi_dyad: 0.0,
+            relational: RelationalCore::from_persisted(
+                state.partner,
+                state.trajectory,
+                state.recent_ai_states,
+            ),
             plugin_registry,
             #[cfg(feature = "full_language")]
             learning_persistence,
@@ -1211,7 +1199,7 @@ impl Symthaea {
 
         // Feed relational Ψ from previous cycle's Φ_dyad into the mind.
         // This closes the feedback loop: partnership quality → consciousness boost.
-        self.mind.set_relational_psi(self.last_phi_dyad);
+        self.mind.set_relational_psi(self.relational.last_phi_dyad);
 
         self.mind.tick();
 
@@ -1495,9 +1483,9 @@ impl Symthaea {
         // ====================================================================
         // PHASE 4: RELATIONAL ENRICHMENT (Add partnership context)
         // ====================================================================
-        thought.relationship_stage = self.partner.stage;
-        thought.relation_mode = self.partner.mode;
-        thought.trust = self.partner.trust;
+        thought.relationship_stage = self.relational.partner.stage;
+        thought.relation_mode = self.relational.partner.mode;
+        thought.trust = self.relational.partner.trust;
 
         // ====================================================================
         // PHASE 4.5: CALIBRATION ADJUSTMENT (Brier Score confidence tuning)
@@ -1872,10 +1860,7 @@ impl Symthaea {
         let ai_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_values(
             input_embedding.values.clone(),
         );
-        self.recent_ai_states.push(ai_hv);
-        if self.recent_ai_states.len() > 8 {
-            self.recent_ai_states.remove(0);
-        }
+        self.relational.push_ai_state(ai_hv);
 
         // ====================================================================
         // PHASE 7.25: LEARNING PERSISTENCE AUTO-SAVE
@@ -2221,9 +2206,9 @@ impl Symthaea {
             hdc_dim: self.hdc_dim,
             ltc_neurons: self.ltc_neurons,
             interactions: self.interactions,
-            partner: self.partner.clone(),
-            trajectory: self.trajectory.clone(),
-            recent_ai_states: self.recent_ai_states.clone(),
+            partner: self.relational.partner.clone(),
+            trajectory: self.relational.trajectory.clone(),
+            recent_ai_states: self.relational.recent_ai_states.clone(),
             database_path: None,
         };
 
@@ -2235,16 +2220,7 @@ impl Symthaea {
 
     /// Get the current partnership state.
     pub fn partnership_state(&self) -> PartnershipState {
-        let phi_dyad = self.compute_phi_dyad();
-        PartnershipState {
-            stage: self.partner.stage,
-            trust: self.partner.trust,
-            vulnerability: self.partner.vulnerability,
-            reciprocity: self.partner.reciprocity,
-            phi_dyad,
-            interactions: self.partner.interactions_count,
-            trajectory_points: self.trajectory.points().len(),
-        }
+        self.relational.partnership_state()
     }
 
     /// Get learning persistence statistics, if available.
@@ -2482,49 +2458,7 @@ impl Symthaea {
 
     /// Update partnership model based on interaction.
     fn update_partnership(&mut self, _content: &str, consciousness: f32) {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs_f64();
-
-        // Derive interaction quality from consciousness level
-        let depth = (consciousness * 0.5).clamp(0.0, 1.0);
-        let safety = (consciousness * 0.7 + 0.2).clamp(0.0, 1.0);
-        let mutuality = (consciousness * 0.4 + 0.1).clamp(0.0, 1.0);
-
-        let event = InteractionEvent {
-            timestamp: now,
-            depth,
-            emotional_safety: safety,
-            mutuality,
-        };
-        self.partner.update_on_interaction(&event);
-
-        // Create a relational assessment from current state
-        let assessment = RelationalAssessment {
-            agent_a: "symthaea".to_string(),
-            agent_b: self.partner.partner_id.clone(),
-            phi_relation: self.partner.phi_relational,
-            stage: self.partner.stage,
-            synchrony: consciousness as f64 * 0.8,
-            turn_taking_quality: 0.7,
-            mutual_information: mutuality as f64,
-            mode: if self.partner.trust > 0.3 {
-                RelationMode::IThou
-            } else {
-                RelationMode::IIt
-            },
-            num_interactions: self.partner.interactions_count as usize,
-            relationship_age: now,
-            explanation: String::new(),
-        };
-        self.partner.update_from_assessment(&assessment);
-        self.partner.advance_stage_if_ready();
-
-        // Record trajectory point and store for next-cycle feedback
-        let phi_dyad = self.compute_phi_dyad();
-        self.trajectory.record(now, self.partner.stage, phi_dyad);
-        self.last_phi_dyad = phi_dyad;
+        self.relational.update_partnership(consciousness);
     }
 
     // ========================================================================
@@ -2756,51 +2690,6 @@ impl Symthaea {
     }
 
     /// Compute current Phi-dyad value.
-    fn compute_phi_dyad(&self) -> f64 {
-        if self.recent_ai_states.is_empty() {
-            return 0.0;
-        }
-
-        // Generate human states as reflections of AI states (simulated)
-        let human_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV> = self
-            .recent_ai_states
-            .iter()
-            .map(|s| {
-                let mut vals = s.values.clone();
-                // Simple perturbation to simulate distinct human state
-                for v in vals.iter_mut() {
-                    *v *= 0.9;
-                    *v += 0.1;
-                }
-                symthaea_core::hdc::unified_hv::ContinuousHV::from_values(vals).normalize()
-            })
-            .collect();
-
-        let assessment = RelationalAssessment {
-            agent_a: "symthaea".to_string(),
-            agent_b: self.partner.partner_id.clone(),
-            phi_relation: self.partner.phi_relational,
-            stage: self.partner.stage,
-            synchrony: self.partner.trust as f64,
-            turn_taking_quality: 0.7,
-            mutual_information: self.partner.reciprocity as f64,
-            mode: self.partner.mode,
-            num_interactions: self.partner.interactions_count as usize,
-            relationship_age: 0.0,
-            explanation: String::new(),
-        };
-
-        let input = DyadInput {
-            ai_states: &self.recent_ai_states,
-            human_states: &human_states,
-            relational: &assessment,
-            human_model: &self.partner,
-            weights: DyadWeights::default(),
-        };
-
-        self.dyad_calculator.compute(&input).phi_dyad
-    }
-
     /// RECEIVE SWARM MESSAGE (Immune System Constraint)
     ///
     /// When a node receives a broadcasted optimization, it MUST NOT merge it 

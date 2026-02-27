@@ -1512,6 +1512,7 @@ pub(crate) struct DialogueDepthPrimitiveGrounding {
     pub processing_depth: u8,
 }
 
+#[allow(dead_code)]
 impl DialogueDepthPrimitiveGrounding {
     pub(crate) fn new(depth: DialogueDepth, system: &PrimitiveSystem) -> Self {
         let (primitives, proc_depth) = Self::nsm_mapping(depth);
@@ -1549,6 +1550,7 @@ impl DialogueDepthPrimitiveGrounding {
 }
 
 /// Unified NSM grounding system for consciousness unification
+#[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) struct ConsciousnessUnificationNSMGrounding {
     pub phi_methods: HashMap<PhiMethod, PhiMethodPrimitiveGrounding>,
@@ -1558,6 +1560,7 @@ pub(crate) struct ConsciousnessUnificationNSMGrounding {
     pub dialogue_depths: HashMap<DialogueDepth, DialogueDepthPrimitiveGrounding>,
 }
 
+#[allow(dead_code)]
 impl ConsciousnessUnificationNSMGrounding {
     pub(crate) fn new(system: &PrimitiveSystem) -> Self {
         let mut phi_methods = HashMap::new();
@@ -1682,6 +1685,7 @@ impl ConsciousnessUnificationNSMGrounding {
 }
 
 /// Encode NSM primitives into HDC vector via sequential binding
+#[allow(dead_code)]
 fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryHV {
     let vectors: Vec<BinaryHV> = primitives
         .iter()

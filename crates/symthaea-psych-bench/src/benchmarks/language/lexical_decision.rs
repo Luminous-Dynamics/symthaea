@@ -17,8 +17,11 @@
 //! - rt_ticks: 8 (SD~2) — ~400ms mean RT
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Lexical Decision Task benchmark.
@@ -216,12 +219,14 @@ impl PsychBenchmark for LexicalDecisionBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let _diff_model = difficulty_model_for(self.name());
 
         let mut lex_effects = Vec::new();
         let mut word_accs = Vec::new();
         let mut nonword_accs = Vec::new();
         let mut freq_effects = Vec::new();
         let mut rts = Vec::new();
+        let mut trace = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -230,6 +235,24 @@ impl PsychBenchmark for LexicalDecisionBenchmark {
             nonword_accs.push(r.nonword_accuracy);
             freq_effects.push(r.frequency_effect);
             rts.push(r.rt_ticks);
+
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trial,
+                    condition: "lexical_decision".to_string(),
+                    correct: r.word_accuracy > 0.5,
+                    rt_ticks: r.rt_ticks,
+                    similarity: r.word_accuracy,
+                    confidence: r.word_accuracy,
+                    response_idx: 0,
+                    extra: {
+                        let mut m = BTreeMap::new();
+                        m.insert("lexicality_effect".to_string(), r.lexicality_effect);
+                        m.insert("frequency_effect".to_string(), r.frequency_effect);
+                        m
+                    },
+                });
+            }
         }
 
         result.insert("lexicality_effect", MetricValue::from_samples(&lex_effects));
@@ -238,7 +261,11 @@ impl PsychBenchmark for LexicalDecisionBenchmark {
         result.insert("frequency_effect", MetricValue::from_samples(&freq_effects));
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
 
-        result.conditions = 2; // word vs non-word
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
+
+        result.conditions = 2;
         result.trials_per_condition = config.trials_per_condition;
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result

@@ -365,3 +365,365 @@ impl MasterConsciousnessEquation {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::config::MasterEquationConfig;
+    use super::super::types::ConsciousnessInputs;
+    use super::*;
+
+    fn all_high_inputs() -> ConsciousnessInputs {
+        ConsciousnessInputs {
+            phi: 0.8,
+            broadcast: 0.8,
+            working_memory: 0.8,
+            attention: 0.8,
+            recurrence: 0.8,
+            embodiment: 0.8,
+            knowledge: 0.8,
+            synchrony: 0.8,
+        }
+    }
+
+    #[test]
+    fn test_default_creation() {
+        let eq = MasterConsciousnessEquation::default();
+        // Config should have sensible defaults
+        assert!(eq.config().softmin_tau > 0.0);
+        assert!(eq.config().epsilon > 0.0);
+        assert!(eq.config().history_size > 0);
+        assert!(eq.config().enable_embodiment_factor);
+        assert!(eq.config().enable_narrative_factor);
+        assert!(eq.config().enable_social_factor);
+    }
+
+    #[test]
+    fn test_compute_all_high() {
+        let mut eq = MasterConsciousnessEquation::default();
+        let inputs = all_high_inputs();
+        let result = eq.compute(&inputs);
+        assert!(
+            result.consciousness_level > 0.5,
+            "All-high inputs should produce consciousness > 0.5, got {}",
+            result.consciousness_level
+        );
+    }
+
+    #[test]
+    fn test_compute_all_zero() {
+        let mut eq = MasterConsciousnessEquation::default();
+        let inputs = ConsciousnessInputs {
+            phi: 0.0,
+            broadcast: 0.0,
+            working_memory: 0.0,
+            attention: 0.0,
+            recurrence: 0.0,
+            embodiment: 0.0,
+            knowledge: 0.0,
+            synchrony: 0.0,
+        };
+        let result = eq.compute(&inputs);
+        assert!(
+            result.consciousness_level < 0.01,
+            "All-zero inputs should produce consciousness near 0.0, got {}",
+            result.consciousness_level
+        );
+    }
+
+    #[test]
+    fn test_bottleneck_identification() {
+        let mut eq = MasterConsciousnessEquation::default();
+        let inputs = ConsciousnessInputs {
+            phi: 0.01,
+            broadcast: 0.8,
+            working_memory: 0.8,
+            attention: 0.8,
+            recurrence: 0.8,
+            embodiment: 0.8,
+            knowledge: 0.8,
+            synchrony: 0.8,
+        };
+        let result = eq.compute(&inputs);
+        assert!(
+            result.bottleneck_name.contains("\u{03A6}"),
+            "With phi=0.01 as the lowest factor, bottleneck should contain 'Phi', got '{}'",
+            result.bottleneck_name
+        );
+    }
+
+    #[test]
+    fn test_gating_reduces_component() {
+        let mut eq = MasterConsciousnessEquation::default();
+        let inputs = all_high_inputs();
+
+        // Compute baseline weighted sum with all gating at 1.0
+        let baseline = eq.compute(&inputs);
+        let baseline_ws = baseline.weighted_sum;
+
+        // Set phi gating to 0.0 and recompute
+        let mut eq2 = MasterConsciousnessEquation::default();
+        eq2.set_gating("phi", 0.0);
+        let gated = eq2.compute(&inputs);
+        let gated_ws = gated.weighted_sum;
+
+        assert!(
+            gated_ws < baseline_ws,
+            "Gating phi to 0.0 should reduce weighted_sum: baseline={}, gated={}",
+            baseline_ws,
+            gated_ws
+        );
+    }
+
+    #[test]
+    fn test_temporal_stability_default() {
+        let mut eq = MasterConsciousnessEquation::default();
+        let inputs = all_high_inputs();
+        // With fewer than 5 history entries, temporal_stability should be the default 0.8
+        let result = eq.compute(&inputs);
+        assert!(
+            (result.temporal_stability - 0.8).abs() < 1e-6,
+            "With < 5 history entries temporal_stability should be 0.8, got {}",
+            result.temporal_stability
+        );
+    }
+
+    #[test]
+    fn test_temporal_stability_stable_history() {
+        let mut eq = MasterConsciousnessEquation::default();
+        let inputs = all_high_inputs();
+        // Compute 20 times with the same inputs to build stable history
+        for _ in 0..20 {
+            eq.compute(&inputs);
+        }
+        let result = eq.compute(&inputs);
+        assert!(
+            result.temporal_stability > 0.95,
+            "Stable repeated inputs should yield temporal_stability near 1.0, got {}",
+            result.temporal_stability
+        );
+    }
+
+    #[test]
+    fn test_temporal_stability_variable_history() {
+        let mut eq = MasterConsciousnessEquation::default();
+        let high = all_high_inputs();
+        let low = ConsciousnessInputs {
+            phi: 0.1,
+            broadcast: 0.1,
+            working_memory: 0.1,
+            attention: 0.1,
+            recurrence: 0.1,
+            embodiment: 0.1,
+            knowledge: 0.1,
+            synchrony: 0.1,
+        };
+        // Alternate between high and low inputs to create instability
+        for i in 0..20 {
+            if i % 2 == 0 {
+                eq.compute(&high);
+            } else {
+                eq.compute(&low);
+            }
+        }
+        let result = eq.compute(&high);
+        assert!(
+            result.temporal_stability < 1.0,
+            "Variable inputs should reduce temporal_stability below 1.0, got {}",
+            result.temporal_stability
+        );
+    }
+
+    #[test]
+    fn test_consciousness_trend_positive() {
+        let mut eq = MasterConsciousnessEquation::default();
+        let low = ConsciousnessInputs {
+            phi: 0.1,
+            broadcast: 0.1,
+            working_memory: 0.1,
+            attention: 0.1,
+            recurrence: 0.1,
+            embodiment: 0.1,
+            knowledge: 0.1,
+            synchrony: 0.1,
+        };
+        let high = all_high_inputs();
+
+        // Start with low inputs
+        for _ in 0..7 {
+            eq.compute(&low);
+        }
+        // Switch to high inputs
+        for _ in 0..7 {
+            eq.compute(&high);
+        }
+
+        let trend = eq.consciousness_trend();
+        assert!(
+            trend > 0.0,
+            "Trend should be positive after switching from low to high inputs, got {}",
+            trend
+        );
+    }
+
+    #[test]
+    fn test_consciousness_trend_no_history() {
+        let eq = MasterConsciousnessEquation::default();
+        let trend = eq.consciousness_trend();
+        assert!(
+            (trend - 0.0).abs() < 1e-10,
+            "Trend without enough history should be 0.0, got {}",
+            trend
+        );
+    }
+
+    #[test]
+    fn test_average_consciousness() {
+        let mut eq = MasterConsciousnessEquation::default();
+        let inputs = all_high_inputs();
+        for _ in 0..10 {
+            eq.compute(&inputs);
+        }
+        let avg = eq.average_consciousness();
+        assert!(
+            avg > 0.0 && avg <= 1.0,
+            "Average consciousness should be in (0.0, 1.0], got {}",
+            avg
+        );
+    }
+
+    #[test]
+    fn test_disable_embodiment_factor() {
+        let mut config = MasterEquationConfig::default();
+        config.enable_embodiment_factor = false;
+        let mut eq = MasterConsciousnessEquation::new(config);
+        let inputs = all_high_inputs();
+        let result = eq.compute(&inputs);
+        assert!(
+            (result.embodiment_factor - 1.0).abs() < 1e-10,
+            "Disabled embodiment factor should yield 1.0, got {}",
+            result.embodiment_factor
+        );
+    }
+
+    #[test]
+    fn test_disable_narrative_factor() {
+        let mut config = MasterEquationConfig::default();
+        config.enable_narrative_factor = false;
+        let mut eq = MasterConsciousnessEquation::new(config);
+        let inputs = all_high_inputs();
+        let result = eq.compute(&inputs);
+        assert!(
+            (result.narrative_coherence - 1.0).abs() < 1e-10,
+            "Disabled narrative factor should yield 1.0, got {}",
+            result.narrative_coherence
+        );
+    }
+
+    #[test]
+    fn test_disable_social_factor() {
+        let mut config = MasterEquationConfig::default();
+        config.enable_social_factor = false;
+        let mut eq = MasterConsciousnessEquation::new(config);
+        let inputs = all_high_inputs();
+        let result = eq.compute(&inputs);
+        assert!(
+            (result.social_embedding - 1.0).abs() < 1e-10,
+            "Disabled social factor should yield 1.0, got {}",
+            result.social_embedding
+        );
+    }
+
+    #[test]
+    fn test_describe_state() {
+        let mut eq = MasterConsciousnessEquation::default();
+        let inputs = all_high_inputs();
+        let result = eq.compute(&inputs);
+        let description = eq.describe_state(&result);
+        // Description should contain the consciousness level
+        let level_str = format!("{:.3}", result.consciousness_level);
+        assert!(
+            description.contains(&level_str),
+            "describe_state should contain the consciousness level '{}', got '{}'",
+            level_str,
+            description
+        );
+        assert!(
+            description.contains("Consciousness is"),
+            "describe_state should contain 'Consciousness is', got '{}'",
+            description
+        );
+    }
+
+    #[test]
+    fn test_consciousness_clamped() {
+        let mut eq = MasterConsciousnessEquation::default();
+        // Extreme high inputs
+        let extreme = ConsciousnessInputs {
+            phi: 100.0,
+            broadcast: 100.0,
+            working_memory: 100.0,
+            attention: 100.0,
+            recurrence: 100.0,
+            embodiment: 100.0,
+            knowledge: 100.0,
+            synchrony: 100.0,
+        };
+        let result = eq.compute(&extreme);
+        assert!(
+            result.consciousness_level >= 0.0 && result.consciousness_level <= 1.0,
+            "Consciousness level should be clamped to [0.0, 1.0], got {}",
+            result.consciousness_level
+        );
+
+        // Extreme negative inputs
+        let negative = ConsciousnessInputs {
+            phi: -10.0,
+            broadcast: -10.0,
+            working_memory: -10.0,
+            attention: -10.0,
+            recurrence: -10.0,
+            embodiment: -10.0,
+            knowledge: -10.0,
+            synchrony: -10.0,
+        };
+        let mut eq2 = MasterConsciousnessEquation::default();
+        let result2 = eq2.compute(&negative);
+        assert!(
+            result2.consciousness_level >= 0.0 && result2.consciousness_level <= 1.0,
+            "Consciousness level should be clamped to [0.0, 1.0] with negative inputs, got {}",
+            result2.consciousness_level
+        );
+    }
+
+    #[test]
+    fn test_set_gating_clamps() {
+        let mut eq = MasterConsciousnessEquation::default();
+        eq.set_gating("phi", 5.0);
+        // Verify internally the gating is clamped to 1.0 by computing and checking
+        // that the result matches gating=1.0 behavior
+        let inputs = all_high_inputs();
+        let result_clamped = eq.compute(&inputs);
+
+        let mut eq2 = MasterConsciousnessEquation::default();
+        eq2.set_gating("phi", 1.0);
+        let result_normal = eq2.compute(&inputs);
+
+        assert!(
+            (result_clamped.weighted_sum - result_normal.weighted_sum).abs() < 1e-10,
+            "Gating set to 5.0 should be clamped to 1.0: clamped_ws={}, normal_ws={}",
+            result_clamped.weighted_sum,
+            result_normal.weighted_sum
+        );
+    }
+
+    #[test]
+    fn test_component_weights_total() {
+        let config = MasterEquationConfig::default();
+        let total = config.component_weights.total();
+        assert!(
+            (total - 1.0).abs() < 0.01,
+            "Default component weights should total to ~1.0, got {}",
+            total
+        );
+    }
+}

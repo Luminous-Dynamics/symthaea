@@ -202,12 +202,14 @@ impl ConsciousReasoningEngine {
                 .unwrap_or_else(|| default_simulation_state());
 
             if r >= thresholds::R_PLAN_MIN {
-                // Full MCTS
-                let config = if budget.tier == BudgetTier::Tier1 {
+                // Full MCTS with neuromod-modulated exploration constant
+                // Science: Dayan & Huys (2009) — 5-HT modulates risk sensitivity
+                let mut config = if budget.tier == BudgetTier::Tier1 {
                     MctsConfig::tier1()
                 } else {
                     MctsConfig::tier2()
                 };
+                config.exploration_constant *= ctx.neuromod_exploration_mod;
                 event.did_simulate = true;
                 MctsPlanner::plan(&sim_state, &ctx.available_actions, &config, &budget)
             } else if r >= thresholds::R_EPISTEMIC_MIN {

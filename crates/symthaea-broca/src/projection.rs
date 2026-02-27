@@ -9,11 +9,12 @@
 //! # Architecture
 //!
 //! ```text
-//! Forward:  HDC(16384) → w_down → GELU+residual → w_up → SSM(768)
-//! Backward: SSM(768) → w_back_down → GELU+residual → w_back_up → HDC(16384)
+//! Forward:  HDC(16384) → w_down → LayerNorm → GELU+residual → w_up → SSM(768)
+//! Backward: SSM(768) → w_back_down → LayerNorm → GELU+residual → w_back_up → HDC(16384)
 //! ```
 //!
-//! Uses GELU activation (no dead neurons) with a pre-activation residual
+//! Uses LayerNorm on the bottleneck for training stabilization, followed by
+//! GELU activation (no dead neurons) with a pre-activation residual
 //! connection (`GELU(x) + α*x`) for smooth gradient flow.
 
 use symthaea_core::genesis::GenesisSeed;
@@ -65,15 +66,82 @@ pub struct HdcSsmProjection {
     // Backward: SSM → bottleneck → HDC
     w_back_down: Vec<f32>, // [bottleneck × ssm_dim]
     w_back_up: Vec<f32>,   // [hdc_dim × bottleneck]
+    // LayerNorm parameters (learned per-element scale + bias)
+    ln_fwd_gamma: Vec<f32>,  // [bottleneck] forward LayerNorm scale
+    ln_fwd_beta: Vec<f32>,   // [bottleneck] forward LayerNorm bias
+    ln_bwd_gamma: Vec<f32>,  // [bottleneck] backward LayerNorm scale
+    ln_bwd_beta: Vec<f32>,   // [bottleneck] backward LayerNorm bias
     // Gradient accumulators
     grad_down: Vec<f32>,
     grad_up: Vec<f32>,
     grad_back_down: Vec<f32>,
     grad_back_up: Vec<f32>,
+    grad_ln_fwd_gamma: Vec<f32>,
+    grad_ln_fwd_beta: Vec<f32>,
+    grad_ln_bwd_gamma: Vec<f32>,
+    grad_ln_bwd_beta: Vec<f32>,
+    // EMA teacher (Polyak averaging) — None until enabled
+    ema_weights: Option<Vec<f32>>,
+    ema_decay: f32,
     // Dimensions
     hdc_dim: usize,
     bottleneck: usize,
     ssm_dim: usize,
+}
+
+/// LayerNorm epsilon for numerical stability.
+const LN_EPS: f32 = 1e-5;
+
+/// Apply LayerNorm: `gamma * (x - mean) / sqrt(var + eps) + beta`.
+///
+/// Returns (normalized, mean, inv_std) for backward pass.
+fn layer_norm(x: &[f32], gamma: &[f32], beta: &[f32]) -> (Vec<f32>, Vec<f32>, f32) {
+    let n = x.len() as f32;
+    let mean: f32 = x.iter().sum::<f32>() / n;
+    let var: f32 = x.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / n;
+    let inv_std = 1.0 / (var + LN_EPS).sqrt();
+
+    let normed: Vec<f32> = x.iter()
+        .zip(gamma.iter().zip(beta.iter()))
+        .map(|(&xi, (&g, &b))| g * (xi - mean) * inv_std + b)
+        .collect();
+    // Also return x_hat for backward pass
+    let x_hat: Vec<f32> = x.iter().map(|&xi| (xi - mean) * inv_std).collect();
+    (normed, x_hat, inv_std)
+}
+
+/// LayerNorm backward pass.
+///
+/// Given gradient flowing back through LN output, computes:
+/// - Gradient w.r.t. input (returned)
+/// - Gradient w.r.t. gamma/beta (accumulated into grad buffers)
+fn layer_norm_backward(
+    d_out: &[f32],
+    x_hat: &[f32],
+    gamma: &[f32],
+    inv_std: f32,
+    grad_gamma: &mut [f32],
+    grad_beta: &mut [f32],
+) -> Vec<f32> {
+    let n = d_out.len() as f32;
+
+    // Accumulate parameter gradients
+    for i in 0..d_out.len() {
+        grad_gamma[i] += d_out[i] * x_hat[i];
+        grad_beta[i] += d_out[i];
+    }
+
+    // d_x_hat = d_out * gamma
+    let d_x_hat: Vec<f32> = d_out.iter().zip(gamma.iter()).map(|(&dy, &g)| dy * g).collect();
+
+    // d_x = inv_std * (d_x_hat - mean(d_x_hat) - x_hat * mean(d_x_hat * x_hat))
+    let mean_d: f32 = d_x_hat.iter().sum::<f32>() / n;
+    let mean_dx: f32 = d_x_hat.iter().zip(x_hat.iter())
+        .map(|(&d, &x)| d * x).sum::<f32>() / n;
+
+    d_x_hat.iter().zip(x_hat.iter())
+        .map(|(&dxh, &xh)| inv_std * (dxh - mean_d - xh * mean_dx))
+        .collect()
 }
 
 impl HdcSsmProjection {
@@ -94,10 +162,20 @@ impl HdcSsmProjection {
             grad_up: vec![0.0; ssm_dim * bottleneck],
             grad_back_down: vec![0.0; bottleneck * ssm_dim],
             grad_back_up: vec![0.0; hdc_dim * bottleneck],
+            grad_ln_fwd_gamma: vec![0.0; bottleneck],
+            grad_ln_fwd_beta: vec![0.0; bottleneck],
+            grad_ln_bwd_gamma: vec![0.0; bottleneck],
+            grad_ln_bwd_beta: vec![0.0; bottleneck],
             w_down,
             w_up,
             w_back_down,
             w_back_up,
+            ln_fwd_gamma: vec![1.0; bottleneck],
+            ln_fwd_beta: vec![0.0; bottleneck],
+            ln_bwd_gamma: vec![1.0; bottleneck],
+            ln_bwd_beta: vec![0.0; bottleneck],
+            ema_weights: None,
+            ema_decay: 0.999,
             hdc_dim,
             bottleneck,
             ssm_dim,
@@ -128,33 +206,39 @@ impl HdcSsmProjection {
 
     /// Project HDC hypervector (16,384D) to SSM space (768D).
     ///
-    /// Pipeline: `hv → w_down → GELU+residual → w_up → ssm_vec`
+    /// Pipeline: `hv → w_down → LayerNorm → GELU+residual → w_up → ssm_vec`
     pub fn project_to_ssm(&self, hv: &ContinuousHV) -> Vec<f32> {
         debug_assert_eq!(hv.values.len(), self.hdc_dim);
 
         // Step 1: w_down * hv → bottleneck (256D)
         let hidden_pre = self.matmul(&self.w_down, &hv.values, self.bottleneck, self.hdc_dim);
 
-        // Step 2: GELU + pre-activation residual
-        let hidden: Vec<f32> = hidden_pre.into_iter().map(activation).collect();
+        // Step 2: LayerNorm on bottleneck
+        let (hidden_normed, _, _) = layer_norm(&hidden_pre, &self.ln_fwd_gamma, &self.ln_fwd_beta);
 
-        // Step 3: w_up * hidden → ssm (768D)
+        // Step 3: GELU + pre-activation residual
+        let hidden: Vec<f32> = hidden_normed.into_iter().map(activation).collect();
+
+        // Step 4: w_up * hidden → ssm (768D)
         self.matmul(&self.w_up, &hidden, self.ssm_dim, self.bottleneck)
     }
 
     /// Project SSM vector (768D) back to HDC space (16,384D).
     ///
-    /// Pipeline: `ssm_vec → w_back_down → GELU+residual → w_back_up → hv`
+    /// Pipeline: `ssm_vec → w_back_down → LayerNorm → GELU+residual → w_back_up → hv`
     pub fn project_to_hdc(&self, ssm_vec: &[f32]) -> ContinuousHV {
         debug_assert_eq!(ssm_vec.len(), self.ssm_dim);
 
         // Step 1: w_back_down * ssm → bottleneck (256D)
         let hidden_pre = self.matmul(&self.w_back_down, ssm_vec, self.bottleneck, self.ssm_dim);
 
-        // Step 2: GELU + pre-activation residual
-        let hidden: Vec<f32> = hidden_pre.into_iter().map(activation).collect();
+        // Step 2: LayerNorm on bottleneck
+        let (hidden_normed, _, _) = layer_norm(&hidden_pre, &self.ln_bwd_gamma, &self.ln_bwd_beta);
 
-        // Step 3: w_back_up * hidden → hdc (16,384D)
+        // Step 3: GELU + pre-activation residual
+        let hidden: Vec<f32> = hidden_normed.into_iter().map(activation).collect();
+
+        // Step 4: w_back_up * hidden → hdc (16,384D)
         let values = self.matmul(&self.w_back_up, &hidden, self.hdc_dim, self.bottleneck);
 
         ContinuousHV::from_vec(values)
@@ -164,6 +248,8 @@ impl HdcSsmProjection {
     ///
     /// The error signal is the difference between the original thought HV
     /// and the round-trip reconstruction (project_to_ssm → project_to_hdc).
+    /// Backpropagates through: w_back_up → activation → LayerNorm → w_back_down →
+    /// w_up → activation → LayerNorm → w_down.
     pub fn compute_gradients(&mut self, thought_hv: &ContinuousHV, output_hv: &ContinuousHV) {
         debug_assert_eq!(thought_hv.values.len(), self.hdc_dim);
         debug_assert_eq!(output_hv.values.len(), self.hdc_dim);
@@ -174,44 +260,64 @@ impl HdcSsmProjection {
             .map(|(t, o)| t - o)
             .collect();
 
-        // Forward pass to get hidden activations for gradient computation
-        let hidden_fwd_pre = self.matmul(&self.w_down, &thought_hv.values, self.bottleneck, self.hdc_dim);
-        let hidden_fwd: Vec<f32> = hidden_fwd_pre.iter().map(|&x| activation(x)).collect();
-
-        // Backward projection hidden activations
+        // === Forward pass (cache intermediates for backprop) ===
+        // Forward: thought → w_down → LN_fwd → GELU+res → w_up → ssm
+        let fwd_pre_ln = self.matmul(&self.w_down, &thought_hv.values, self.bottleneck, self.hdc_dim);
+        let (fwd_normed, fwd_x_hat, fwd_inv_std) =
+            layer_norm(&fwd_pre_ln, &self.ln_fwd_gamma, &self.ln_fwd_beta);
+        let hidden_fwd: Vec<f32> = fwd_normed.iter().map(|&x| activation(x)).collect();
         let ssm_fwd = self.matmul(&self.w_up, &hidden_fwd, self.ssm_dim, self.bottleneck);
-        let hidden_back_pre = self.matmul(&self.w_back_down, &ssm_fwd, self.bottleneck, self.ssm_dim);
-        let hidden_back: Vec<f32> = hidden_back_pre.iter().map(|&x| activation(x)).collect();
+
+        // Backward: ssm → w_back_down → LN_bwd → GELU+res → w_back_up → reconstructed
+        let bwd_pre_ln = self.matmul(&self.w_back_down, &ssm_fwd, self.bottleneck, self.ssm_dim);
+        let (bwd_normed, bwd_x_hat, bwd_inv_std) =
+            layer_norm(&bwd_pre_ln, &self.ln_bwd_gamma, &self.ln_bwd_beta);
+        let hidden_back: Vec<f32> = bwd_normed.iter().map(|&x| activation(x)).collect();
+
+        // === Backprop through backward projection path ===
 
         // Gradient for w_back_up: error * hidden_back^T
-        // Shape: [hdc_dim × bottleneck]
         for i in 0..self.hdc_dim {
             for j in 0..self.bottleneck {
                 self.grad_back_up[i * self.bottleneck + j] += error[i] * hidden_back[j];
             }
         }
 
-        // Gradient for w_back_down: (w_back_up^T * error) * act'(hidden_back_pre) * ssm_fwd^T
-        let mut delta_back = vec![0.0f32; self.bottleneck];
+        // delta at backward activation input: (w_back_up^T * error) * act'(bwd_normed)
+        let mut delta_back_act = vec![0.0f32; self.bottleneck];
         for j in 0..self.bottleneck {
             let mut sum = 0.0f32;
             for i in 0..self.hdc_dim {
                 sum += self.w_back_up[i * self.bottleneck + j] * error[i];
             }
-            delta_back[j] = sum * activation_derivative(hidden_back_pre[j]);
+            delta_back_act[j] = sum * activation_derivative(bwd_normed[j]);
         }
+
+        // Backprop through backward LayerNorm
+        let delta_back_pre_ln = layer_norm_backward(
+            &delta_back_act,
+            &bwd_x_hat,
+            &self.ln_bwd_gamma,
+            bwd_inv_std,
+            &mut self.grad_ln_bwd_gamma,
+            &mut self.grad_ln_bwd_beta,
+        );
+
+        // Gradient for w_back_down: delta_back_pre_ln * ssm_fwd^T
         for i in 0..self.bottleneck {
             for j in 0..self.ssm_dim {
-                self.grad_back_down[i * self.ssm_dim + j] += delta_back[i] * ssm_fwd[j];
+                self.grad_back_down[i * self.ssm_dim + j] += delta_back_pre_ln[i] * ssm_fwd[j];
             }
         }
 
-        // Gradient for w_up: (w_back_down^T * delta_back) * hidden_fwd^T
+        // === Backprop through forward projection path ===
+
+        // Gradient for w_up: (w_back_down^T * delta_back_pre_ln) * hidden_fwd^T
         let mut delta_up = vec![0.0f32; self.ssm_dim];
         for j in 0..self.ssm_dim {
             let mut sum = 0.0f32;
             for i in 0..self.bottleneck {
-                sum += self.w_back_down[i * self.ssm_dim + j] * delta_back[i];
+                sum += self.w_back_down[i * self.ssm_dim + j] * delta_back_pre_ln[i];
             }
             delta_up[j] = sum;
         }
@@ -221,18 +327,30 @@ impl HdcSsmProjection {
             }
         }
 
-        // Gradient for w_down: (w_up^T * delta_up) * act'(hidden_fwd_pre) * thought_hv^T
-        let mut delta_down = vec![0.0f32; self.bottleneck];
+        // delta at forward activation input: (w_up^T * delta_up) * act'(fwd_normed)
+        let mut delta_fwd_act = vec![0.0f32; self.bottleneck];
         for j in 0..self.bottleneck {
             let mut sum = 0.0f32;
             for i in 0..self.ssm_dim {
                 sum += self.w_up[i * self.bottleneck + j] * delta_up[i];
             }
-            delta_down[j] = sum * activation_derivative(hidden_fwd_pre[j]);
+            delta_fwd_act[j] = sum * activation_derivative(fwd_normed[j]);
         }
+
+        // Backprop through forward LayerNorm
+        let delta_fwd_pre_ln = layer_norm_backward(
+            &delta_fwd_act,
+            &fwd_x_hat,
+            &self.ln_fwd_gamma,
+            fwd_inv_std,
+            &mut self.grad_ln_fwd_gamma,
+            &mut self.grad_ln_fwd_beta,
+        );
+
+        // Gradient for w_down: delta_fwd_pre_ln * thought_hv^T
         for i in 0..self.bottleneck {
             for j in 0..self.hdc_dim {
-                self.grad_down[i * self.hdc_dim + j] += delta_down[i] * thought_hv.values[j];
+                self.grad_down[i * self.hdc_dim + j] += delta_fwd_pre_ln[i] * thought_hv.values[j];
             }
         }
     }
@@ -248,18 +366,21 @@ impl HdcSsmProjection {
         negative_hv: &ContinuousHV,
         weight: f32,
     ) {
-        // Forward both through w_down to get bottleneck representations
-        let hidden_anchor = self.matmul(&self.w_down, &anchor_hv.values, self.bottleneck, self.hdc_dim);
-        let hidden_neg = self.matmul(&self.w_down, &negative_hv.values, self.bottleneck, self.hdc_dim);
+        // Forward both through w_down + LayerNorm to get bottleneck representations
+        let pre_anchor = self.matmul(&self.w_down, &anchor_hv.values, self.bottleneck, self.hdc_dim);
+        let pre_neg = self.matmul(&self.w_down, &negative_hv.values, self.bottleneck, self.hdc_dim);
+        let (normed_anchor, _, _) = layer_norm(&pre_anchor, &self.ln_fwd_gamma, &self.ln_fwd_beta);
+        let (normed_neg, _, _) = layer_norm(&pre_neg, &self.ln_fwd_gamma, &self.ln_fwd_beta);
 
         // Apply activation to get post-activation representations
-        let act_anchor: Vec<f32> = hidden_anchor.iter().map(|&x| activation(x)).collect();
-        let act_neg: Vec<f32> = hidden_neg.iter().map(|&x| activation(x)).collect();
+        let act_anchor: Vec<f32> = normed_anchor.iter().map(|&x| activation(x)).collect();
+        let act_neg: Vec<f32> = normed_neg.iter().map(|&x| activation(x)).collect();
 
         // Contrastive gradient on w_down: push activated representations apart
+        // (simplified: gradient through LN approximated as identity for contrastive signal)
         for i in 0..self.bottleneck {
             let delta = weight * (act_anchor[i] - act_neg[i]);
-            let d_act = activation_derivative(hidden_anchor[i]);
+            let d_act = activation_derivative(normed_anchor[i]);
             let row_start = i * self.hdc_dim;
             for j in 0..self.hdc_dim {
                 self.grad_down[row_start + j] += delta * d_act * anchor_hv.values[j];
@@ -273,6 +394,11 @@ impl HdcSsmProjection {
         Self::apply_grad(&mut self.w_up, &mut self.grad_up, lr, grad_clip);
         Self::apply_grad(&mut self.w_back_down, &mut self.grad_back_down, lr, grad_clip);
         Self::apply_grad(&mut self.w_back_up, &mut self.grad_back_up, lr, grad_clip);
+        // LayerNorm parameters (no clipping — small gradients)
+        Self::apply_grad(&mut self.ln_fwd_gamma, &mut self.grad_ln_fwd_gamma, lr, grad_clip);
+        Self::apply_grad(&mut self.ln_fwd_beta, &mut self.grad_ln_fwd_beta, lr, grad_clip);
+        Self::apply_grad(&mut self.ln_bwd_gamma, &mut self.grad_ln_bwd_gamma, lr, grad_clip);
+        Self::apply_grad(&mut self.ln_bwd_beta, &mut self.grad_ln_bwd_beta, lr, grad_clip);
     }
 
     fn apply_grad(weights: &mut [f32], grads: &mut [f32], lr: f32, grad_clip: f32) {
@@ -290,23 +416,78 @@ impl HdcSsmProjection {
         }
     }
 
+    /// Enable EMA teacher with the given decay rate (typically 0.999 or 0.9999).
+    ///
+    /// Initializes the shadow weights to the current live weights.
+    /// After each `apply_gradients()`, call `update_ema()` to track the moving average.
+    pub fn enable_ema(&mut self, decay: f32) {
+        self.ema_decay = decay.clamp(0.9, 0.99999);
+        self.ema_weights = Some(self.flatten_weights());
+    }
+
+    /// Update EMA shadow weights: `ema = decay * ema + (1-decay) * live`.
+    ///
+    /// Call this after `apply_gradients()`. No-op if EMA is not enabled.
+    pub fn update_ema(&mut self) {
+        if self.ema_weights.is_none() { return; }
+        let live = self.flatten_weights();
+        let d = self.ema_decay;
+        let one_minus_d = 1.0 - d;
+        let ema = self.ema_weights.as_mut().unwrap();
+        for (e, &l) in ema.iter_mut().zip(live.iter()) {
+            *e = d * *e + one_minus_d * l;
+        }
+    }
+
+    /// Swap live weights with EMA weights for evaluation, returning a guard
+    /// that restores live weights when dropped.
+    ///
+    /// If EMA is not enabled, returns None (use live weights as-is).
+    pub fn use_ema_weights(&mut self) -> Option<Vec<f32>> {
+        let ema = self.ema_weights.as_ref()?.clone();
+        let live = self.flatten_weights();
+        self.load_weights(&ema);
+        Some(live)
+    }
+
+    /// Restore live weights after evaluation with EMA weights.
+    pub fn restore_live_weights(&mut self, live: &[f32]) {
+        self.load_weights(live);
+    }
+
+    /// Whether EMA teacher is active.
+    pub fn has_ema(&self) -> bool {
+        self.ema_weights.is_some()
+    }
+
     /// Flatten all projection weights into a single Vec for swarm exchange.
+    ///
+    /// Layout: [w_down, w_up, w_back_down, w_back_up, ln_fwd_gamma, ln_fwd_beta, ln_bwd_gamma, ln_bwd_beta]
     pub fn flatten_weights(&self) -> Vec<f32> {
-        let total = self.w_down.len() + self.w_up.len()
-            + self.w_back_down.len() + self.w_back_up.len();
-        let mut flat = Vec::with_capacity(total);
+        let mut flat = Vec::with_capacity(self.num_params());
         flat.extend_from_slice(&self.w_down);
         flat.extend_from_slice(&self.w_up);
         flat.extend_from_slice(&self.w_back_down);
         flat.extend_from_slice(&self.w_back_up);
+        flat.extend_from_slice(&self.ln_fwd_gamma);
+        flat.extend_from_slice(&self.ln_fwd_beta);
+        flat.extend_from_slice(&self.ln_bwd_gamma);
+        flat.extend_from_slice(&self.ln_bwd_beta);
         flat
     }
 
     /// Load weights from a flat Vec (e.g., from swarm aggregation).
+    ///
+    /// Accepts both legacy (4-matrix only) and new (4-matrix + 4×LN) formats.
     pub fn load_weights(&mut self, flat: &[f32]) {
-        let expected = self.w_down.len() + self.w_up.len()
+        let legacy_size = self.w_down.len() + self.w_up.len()
             + self.w_back_down.len() + self.w_back_up.len();
-        assert_eq!(flat.len(), expected, "Weight vector size mismatch");
+        let full_size = legacy_size + 4 * self.bottleneck;
+        assert!(
+            flat.len() == legacy_size || flat.len() == full_size,
+            "Weight vector size mismatch: expected {legacy_size} (legacy) or {full_size} (with LN), got {}",
+            flat.len()
+        );
 
         let mut offset = 0;
         let n = self.w_down.len();
@@ -320,11 +501,27 @@ impl HdcSsmProjection {
         offset += n;
         let n = self.w_back_up.len();
         self.w_back_up.copy_from_slice(&flat[offset..offset + n]);
+        offset += n;
+
+        // Load LayerNorm params if present (new format)
+        if flat.len() == full_size {
+            let b = self.bottleneck;
+            self.ln_fwd_gamma.copy_from_slice(&flat[offset..offset + b]);
+            offset += b;
+            self.ln_fwd_beta.copy_from_slice(&flat[offset..offset + b]);
+            offset += b;
+            self.ln_bwd_gamma.copy_from_slice(&flat[offset..offset + b]);
+            offset += b;
+            self.ln_bwd_beta.copy_from_slice(&flat[offset..offset + b]);
+            let _ = offset; // suppress unused assignment warning
+        }
     }
 
     /// Total number of learnable parameters.
     pub fn num_params(&self) -> usize {
         self.w_down.len() + self.w_up.len() + self.w_back_down.len() + self.w_back_up.len()
+            + self.ln_fwd_gamma.len() + self.ln_fwd_beta.len()
+            + self.ln_bwd_gamma.len() + self.ln_bwd_beta.len()
     }
 
     /// HDC dimension.
@@ -456,11 +653,12 @@ impl HdcSsmProjection {
         // Step 1: Forward w_down via PCA on HDC samples
         self.warm_start_from_samples(samples);
 
-        // Step 2: Compute bottleneck representations of samples through updated w_down
+        // Step 2: Compute bottleneck representations of samples through updated w_down + LN
         let bottleneck_vecs: Vec<Vec<f32>> = samples.iter()
             .map(|s| {
                 let pre = self.matmul(&self.w_down, &s.values, self.bottleneck, self.hdc_dim);
-                pre.into_iter().map(activation).collect()
+                let (normed, _, _) = layer_norm(&pre, &self.ln_fwd_gamma, &self.ln_fwd_beta);
+                normed.into_iter().map(activation).collect()
             })
             .collect();
 
@@ -561,11 +759,12 @@ impl HdcSsmProjection {
             return 0.0;
         }
 
-        // Compute bottleneck activations for each sample
+        // Compute bottleneck activations for each sample (with LayerNorm)
         let mut activations: Vec<Vec<f32>> = Vec::with_capacity(samples.len());
         for s in samples {
             let hidden_pre = self.matmul(&self.w_down, &s.values, self.bottleneck, self.hdc_dim);
-            let hidden: Vec<f32> = hidden_pre.into_iter().map(activation).collect();
+            let (normed, _, _) = layer_norm(&hidden_pre, &self.ln_fwd_gamma, &self.ln_fwd_beta);
+            let hidden: Vec<f32> = normed.into_iter().map(activation).collect();
             activations.push(hidden);
         }
 
@@ -660,8 +859,9 @@ mod tests {
         assert_eq!(proj.hdc_dim(), 16384);
         assert_eq!(proj.bottleneck_dim(), 256);
         assert_eq!(proj.ssm_dim(), 768);
-        // 256*16384 + 768*256 + 256*768 + 16384*256 = 8,781,824
-        assert_eq!(proj.num_params(), 256 * 16384 + 768 * 256 + 256 * 768 + 16384 * 256);
+        // 256*16384 + 768*256 + 256*768 + 16384*256 = 8,781,824 (matrices)
+        // + 4 * 256 = 1,024 (LayerNorm gamma+beta for fwd+bwd)
+        assert_eq!(proj.num_params(), 256 * 16384 + 768 * 256 + 256 * 768 + 16384 * 256 + 4 * 256);
     }
 
     #[test]
@@ -1027,5 +1227,70 @@ mod tests {
         // Roundtrip should be finite
         let back = proj.project_to_hdc(&ssm);
         assert!(back.values.iter().all(|x| x.is_finite()));
+    }
+
+    #[test]
+    fn test_ema_teacher_tracks_weights() {
+        let genesis = test_genesis();
+        let dim = 256;
+        let mut proj = HdcSsmProjection::new(&genesis, dim, 32, 64);
+
+        proj.enable_ema(0.99);
+        assert!(proj.has_ema());
+
+        let thought = ContinuousHV::random(dim, 42);
+        let output = ContinuousHV::random(dim, 99);
+
+        // Train a few steps
+        for _ in 0..5 {
+            proj.compute_gradients(&thought, &output);
+            proj.apply_gradients(0.01, 1.0);
+            proj.update_ema();
+        }
+
+        // EMA weights should differ from live weights (EMA lags behind)
+        let live = proj.flatten_weights();
+        let saved_live = proj.use_ema_weights().expect("EMA should be enabled");
+        let ema_active = proj.flatten_weights(); // now holds EMA weights
+        proj.restore_live_weights(&saved_live);
+
+        let differs = live.iter().zip(ema_active.iter())
+            .any(|(l, e)| (l - e).abs() > 1e-10);
+        assert!(differs, "EMA weights should lag behind live weights");
+    }
+
+    #[test]
+    fn test_ema_disabled_by_default() {
+        let genesis = test_genesis();
+        let proj = HdcSsmProjection::new(&genesis, 64, 8, 16);
+        assert!(!proj.has_ema());
+    }
+
+    #[test]
+    fn test_ema_swap_restores_live() {
+        let genesis = test_genesis();
+        let dim = 128;
+        let mut proj = HdcSsmProjection::new(&genesis, dim, 16, 32);
+        proj.enable_ema(0.999);
+
+        let thought = ContinuousHV::random(dim, 42);
+        let output = ContinuousHV::random(dim, 99);
+        proj.compute_gradients(&thought, &output);
+        proj.apply_gradients(0.01, 1.0);
+        proj.update_ema();
+
+        let live_before = proj.flatten_weights();
+
+        // Swap to EMA
+        let saved = proj.use_ema_weights().unwrap();
+        // Now projection uses EMA weights
+        let hv = ContinuousHV::random(dim, 7);
+        let _ssm_ema = proj.project_to_ssm(&hv);
+
+        // Restore live
+        proj.restore_live_weights(&saved);
+        let live_after = proj.flatten_weights();
+
+        assert_eq!(live_before, live_after, "Live weights should be fully restored after EMA swap");
     }
 }

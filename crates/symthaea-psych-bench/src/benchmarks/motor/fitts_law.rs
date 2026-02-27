@@ -14,8 +14,11 @@
 //! - accuracy: 0.92 (SD~0.05) — overall accuracy across difficulties
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Fitts' Law benchmark.
@@ -185,12 +188,14 @@ impl PsychBenchmark for FittsLawBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let _diff_model = difficulty_model_for(self.name());
 
         let mut r_squareds = Vec::new();
         let mut throughputs = Vec::new();
         let mut accuracies = Vec::new();
         let mut slopes = Vec::new();
         let mut rts = Vec::new();
+        let mut trace = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -199,6 +204,24 @@ impl PsychBenchmark for FittsLawBenchmark {
             accuracies.push(r.accuracy);
             slopes.push(r.id_slope);
             rts.push(r.rt_ticks);
+
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trial,
+                    condition: "fitts".to_string(),
+                    correct: r.accuracy > 0.5,
+                    rt_ticks: r.rt_ticks,
+                    similarity: r.fitts_r_squared,
+                    confidence: r.accuracy,
+                    response_idx: 0,
+                    extra: {
+                        let mut m = BTreeMap::new();
+                        m.insert("r_squared".to_string(), r.fitts_r_squared);
+                        m.insert("throughput".to_string(), r.throughput);
+                        m
+                    },
+                });
+            }
         }
 
         result.insert("fitts_r_squared", MetricValue::from_samples(&r_squareds));
@@ -207,7 +230,11 @@ impl PsychBenchmark for FittsLawBenchmark {
         result.insert("id_slope", MetricValue::from_samples(&slopes));
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
 
-        result.conditions = 5; // 5 difficulty levels
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
+
+        result.conditions = 5;
         result.trials_per_condition = config.trials_per_condition;
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result

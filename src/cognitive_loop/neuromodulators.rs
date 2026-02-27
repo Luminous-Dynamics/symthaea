@@ -182,6 +182,29 @@ impl CrossModulationMatrix {
     }
 }
 
+/// Receptor subtypes within a transmitter channel.
+///
+/// DA: D1 (excitatory/Go pathway → learning) vs D2 (inhibitory/NoGo pathway → flexibility)
+/// NE: Alpha (tonic precision/focus) vs Beta (phasic reactivity/startle)
+///
+/// Science: Frank (2005) — D1/D2 basal ganglia; Arnsten (2000) — alpha/beta NE.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct ReceptorSubtypes {
+    /// Excitatory subtype sensitivity: D1 for DA, Alpha for NE [0.5, 2.0]
+    pub excitatory: f32,
+    /// Inhibitory subtype sensitivity: D2 for DA, Beta for NE [0.5, 2.0]
+    pub inhibitory: f32,
+}
+
+impl Default for ReceptorSubtypes {
+    fn default() -> Self {
+        Self {
+            excitatory: 1.0,
+            inhibitory: 1.0,
+        }
+    }
+}
+
 /// Signals from the cognitive cycle that drive transmitter production.
 pub(crate) struct NeuromodulatorInputs {
     /// Prediction error magnitude (0.0–1.0+)
@@ -219,6 +242,10 @@ pub(crate) struct NeuromodulatorBath {
     pub acetylcholine: Transmitter,
     /// Learnable cross-modulation weights (Hebbian-adaptive, replaces hardcoded rules).
     pub cross_mod: CrossModulationMatrix,
+    /// DA receptor subtypes: D1 (excitatory/Go) vs D2 (inhibitory/NoGo).
+    pub da_subtypes: ReceptorSubtypes,
+    /// NE receptor subtypes: Alpha (tonic precision) vs Beta (phasic reactivity).
+    pub ne_subtypes: ReceptorSubtypes,
 }
 
 impl NeuromodulatorBath {
@@ -297,6 +324,25 @@ impl NeuromodulatorBath {
         self.noradrenaline.reuptake();
         self.serotonin.reuptake();
         self.acetylcholine.reuptake();
+
+        // ── RECEPTOR SUBTYPE ADAPTATION ──────────────────────────────
+        // Science: Frank (2005) — D1 sensitizes under low DA (phasic bursts have more impact),
+        //          D2 sensitizes under sustained high DA (tolerance → flexibility).
+        //          Arnsten (2000) — Alpha sensitizes during low tonic NE, Beta during high phasic NE.
+        let da_eff = self.dopamine.effective();
+        if da_eff < 0.3 {
+            self.da_subtypes.excitatory = (self.da_subtypes.excitatory * 1.001).min(2.0); // D1 up
+        } else if da_eff > 0.7 {
+            self.da_subtypes.inhibitory = (self.da_subtypes.inhibitory * 1.001).min(2.0); // D2 up
+            self.da_subtypes.excitatory = (self.da_subtypes.excitatory * 0.999).max(0.5); // D1 tolerance
+        }
+        let ne_tonic = (self.noradrenaline.level - self.noradrenaline.phasic).max(0.0);
+        if ne_tonic < 0.3 {
+            self.ne_subtypes.excitatory = (self.ne_subtypes.excitatory * 1.001).min(2.0); // Alpha up
+        }
+        if self.noradrenaline.phasic > 0.3 {
+            self.ne_subtypes.inhibitory = (self.ne_subtypes.inhibitory * 1.001).min(2.0); // Beta up
+        }
     }
 
     /// DA phasic burst magnitude (fast-decaying RPE signal).
@@ -381,12 +427,25 @@ impl NeuromodulatorBath {
         }
     }
 
-    /// DA → gradient magnitude scaling (0.5–2.0).
+    /// DA D1 → gradient magnitude scaling (0.5–2.0).
+    /// Uses D1 (Go pathway) subtype for learning-specific modulation.
     /// Science: Schultz (1997) — DA scales synaptic plasticity amplitude.
+    /// Frank (2005) — D1 pathway specifically drives learning magnitude.
     #[inline]
     pub fn gradient_scale_factor(&self) -> f32 {
-        let da = self.dopamine.effective();
-        (0.5 + da * 0.75).clamp(0.5, 2.0)
+        let d1 = self.da_d1_effective();
+        (0.5 + d1 * 0.75).clamp(0.5, 2.0)
+    }
+
+    /// ACh → plasticity persistence gate (0.2–1.0).
+    /// High ACh = "learning mode": weight updates fully persist.
+    /// Low ACh = "performance mode": only 20% of updates persist.
+    /// Complements threshold_gate (WHICH to learn) — this controls HOW MUCH persists.
+    /// Science: Hasselmo (1999) — cholinergic gating of cortical plasticity.
+    #[inline]
+    pub fn plasticity_gate(&self) -> f32 {
+        let ach = self.acetylcholine.effective();
+        (0.2 + ach * 0.8).clamp(0.2, 1.0)
     }
 
     /// ACh → learning threshold gate (0.5–1.5).
@@ -397,6 +456,22 @@ impl NeuromodulatorBath {
         let ach = self.acetylcholine.effective();
         // Invert: high ACh → low factor → divides threshold → more learning
         (1.5 - ach * 0.5).clamp(0.5, 1.5)
+    }
+
+    /// 5-HT/NE → MCTS exploration constant modulation (0.6–1.8).
+    /// Low 5-HT → higher exploration (cautious/risk-averse search).
+    /// High 5-HT → lower exploration (confident exploitation).
+    /// NE adds secondary exploration boost (arousal-driven breadth).
+    /// Science: Dayan & Huys (2009) — 5-HT risk sensitivity.
+    #[inline]
+    pub fn mcts_exploration_modulation(&self) -> f64 {
+        let sht = self.serotonin.effective() as f64;
+        let ne = self.noradrenaline.effective() as f64;
+        // 5-HT inverts: high confidence → exploit (lower c), low → explore (higher c)
+        let sht_effect = (0.5 - sht) * 0.8; // [-0.4, +0.4]
+        // NE adds exploration breadth
+        let ne_effect = (ne - 0.5) * 0.4; // [-0.2, +0.2]
+        (1.0 + sht_effect + ne_effect).clamp(0.6, 1.8)
     }
 
     /// Neurochemical consciousness modulation factor (0.6–1.2).
@@ -454,6 +529,80 @@ impl NeuromodulatorBath {
         self.acetylcholine.set_baseline(ach_base);
     }
 
+    /// DA D1 signal (Go pathway) — gates learning magnitude.
+    /// Science: Frank (2005) — D1 excitatory pathway drives Go/learning.
+    #[inline]
+    pub fn da_d1_effective(&self) -> f32 {
+        (self.dopamine.effective() * self.da_subtypes.excitatory).clamp(0.0, 2.0)
+    }
+
+    /// DA D2 signal (NoGo pathway) — gates behavioral flexibility/switching.
+    /// Science: Frank (2005) — D2 inhibitory pathway enables flexible switching.
+    #[inline]
+    pub fn da_d2_effective(&self) -> f32 {
+        (self.dopamine.effective() * self.da_subtypes.inhibitory).clamp(0.0, 2.0)
+    }
+
+    /// NE alpha signal (tonic precision/focus).
+    /// Science: Arnsten (2000) — alpha-2 NE prefrontal sustained attention.
+    #[inline]
+    pub fn ne_alpha_effective(&self) -> f32 {
+        let tonic = (self.noradrenaline.level - self.noradrenaline.phasic).max(0.0);
+        (tonic * self.ne_subtypes.excitatory).clamp(0.0, 2.0)
+    }
+
+    /// NE beta signal (phasic startle/reactivity).
+    /// Science: Arnsten (2000) — beta NE amygdala reactivity.
+    #[inline]
+    pub fn ne_beta_effective(&self) -> f32 {
+        (self.noradrenaline.phasic * self.ne_subtypes.inhibitory).clamp(0.0, 2.0)
+    }
+
+    /// D2-mediated behavioral flexibility factor (0.7–1.5).
+    /// High D2 → easier strategy switching; low D2 → perseveration.
+    /// Science: Frank (2005) — D2 pathway enables NoGo/flexibility.
+    #[inline]
+    pub fn behavioral_flexibility(&self) -> f32 {
+        (0.7 + self.da_d2_effective() * 0.4).clamp(0.7, 1.5)
+    }
+
+    /// NE/ACh → attention budget multiplier (0.8–1.5).
+    /// NE beta (phasic startle) expands budget on surprise; tonic ACh provides steady precision.
+    /// Science: Corbetta & Shulman (2002) — NE reorienting; Yu & Dayan (2005) — ACh precision.
+    #[inline]
+    pub fn attention_budget_allocation(&self) -> f32 {
+        let ne_beta = self.ne_beta_effective();
+        let ach_tonic = (self.acetylcholine.level - self.acetylcholine.phasic).max(0.0);
+        // NE beta burst → expand (up to +30%); ACh tonic → modest steady boost (up to +20%)
+        (1.0 + ne_beta * 0.3 + ach_tonic * 0.2).clamp(0.8, 1.5)
+    }
+
+    /// Continuous circadian waveform modulation (sinusoidal per-transmitter baselines).
+    ///
+    /// Replaces discrete phase-based baselines with smooth per-transmitter curves
+    /// that match real neurochemical circadian profiles.
+    ///
+    /// Science: Czeisler (1999) — circadian pacemaker; Aston-Jones (2001) — LC-NE circadian.
+    pub fn modulate_circadian_continuous(&mut self, hour: f64) {
+        use std::f64::consts::PI;
+        let tau = 2.0 * PI / 24.0;
+
+        // DA: double peak — morning reward anticipation (7am) + night consolidation (23pm)
+        let da_base = 0.50 + 0.08 * (tau * (hour - 7.0)).cos()
+                           + 0.03 * (tau * (hour - 23.0)).cos();
+        // NE: single peak mid-morning alertness (10am), deep trough at night
+        let ne_base = 0.50 + 0.15 * (tau * (hour - 10.0)).cos();
+        // 5-HT: peaks late afternoon mood stability (16pm)
+        let sht_base = 0.50 + 0.10 * (tau * (hour - 16.0)).cos();
+        // ACh: peaks during waking attention (14pm), troughs in slow-wave sleep
+        let ach_base = 0.50 + 0.15 * (tau * (hour - 14.0)).cos();
+
+        self.dopamine.set_baseline(da_base as f32);
+        self.noradrenaline.set_baseline(ne_base as f32);
+        self.serotonin.set_baseline(sht_base as f32);
+        self.acetylcholine.set_baseline(ach_base as f32);
+    }
+
     /// Whether the system should query the exocortex (swarm network).
     ///
     /// Trigger: high NE (uncertainty) + low DA (no reward prediction) + low 5-HT (low confidence).
@@ -507,6 +656,80 @@ impl NeuromodulatorBath {
     }
 }
 
+/// Complete neurochemical state snapshot for telemetry/visualization.
+///
+/// Consolidates all bath state into a single struct, sampled periodically
+/// for dashboard display, logging, and offline analysis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NeuromodSnapshot {
+    // ── Effective levels ──
+    pub da_effective: f32,
+    pub ne_effective: f32,
+    pub sht_effective: f32,
+    pub ach_effective: f32,
+    // ── Phasic bursts ──
+    pub da_phasic: f32,
+    pub ne_phasic: f32,
+    // ── Receptor sensitivities (overall) ──
+    pub da_sensitivity: f32,
+    pub ne_sensitivity: f32,
+    pub sht_sensitivity: f32,
+    pub ach_sensitivity: f32,
+    // ── Receptor subtypes ──
+    pub da_d1: f32,
+    pub da_d2: f32,
+    pub ne_alpha: f32,
+    pub ne_beta: f32,
+    // ── Cross-modulation weights (flattened 4×4) ──
+    pub cross_mod_weights: [f32; 16],
+    // ── Derived control signals ──
+    pub consciousness_mod: f32,
+    pub plasticity_gate: f32,
+    pub attention_allocation: f32,
+    pub mcts_exploration_mod: f32,
+    pub sleep_consolidation_boost: f32,
+    pub behavioral_flexibility: f32,
+    pub gradient_scale: f32,
+    pub threshold_gate: f32,
+}
+
+impl NeuromodulatorBath {
+    /// Capture a complete snapshot of neurochemical state for telemetry.
+    pub fn snapshot(&self) -> NeuromodSnapshot {
+        let mut cross_mod_flat = [0.0_f32; 16];
+        for (i, row) in self.cross_mod.weights.iter().enumerate() {
+            for (j, &w) in row.iter().enumerate() {
+                cross_mod_flat[i * 4 + j] = w;
+            }
+        }
+        NeuromodSnapshot {
+            da_effective: self.dopamine.effective(),
+            ne_effective: self.noradrenaline.effective(),
+            sht_effective: self.serotonin.effective(),
+            ach_effective: self.acetylcholine.effective(),
+            da_phasic: self.dopamine.phasic,
+            ne_phasic: self.noradrenaline.phasic,
+            da_sensitivity: self.dopamine.receptor_sensitivity,
+            ne_sensitivity: self.noradrenaline.receptor_sensitivity,
+            sht_sensitivity: self.serotonin.receptor_sensitivity,
+            ach_sensitivity: self.acetylcholine.receptor_sensitivity,
+            da_d1: self.da_subtypes.excitatory,
+            da_d2: self.da_subtypes.inhibitory,
+            ne_alpha: self.ne_subtypes.excitatory,
+            ne_beta: self.ne_subtypes.inhibitory,
+            cross_mod_weights: cross_mod_flat,
+            consciousness_mod: self.consciousness_modulation(),
+            plasticity_gate: self.plasticity_gate(),
+            attention_allocation: self.attention_budget_allocation(),
+            mcts_exploration_mod: self.mcts_exploration_modulation() as f32,
+            sleep_consolidation_boost: self.sleep_consolidation_boost(),
+            behavioral_flexibility: self.behavioral_flexibility(),
+            gradient_scale: self.gradient_scale_factor(),
+            threshold_gate: self.threshold_gate(),
+        }
+    }
+}
+
 /// Persistent neurochemistry state (receptor sensitivities + cross-modulation weights).
 ///
 /// Checkpointed across sessions so personality adapts over time.
@@ -523,6 +746,22 @@ pub struct NeurochemistryCheckpoint {
     pub ach_sensitivity: f32,
     /// Cross-modulation weights (Hebbian-learned)
     pub cross_mod_weights: [[f32; 4]; 4],
+    /// DA D1 (excitatory/Go) subtype sensitivity
+    #[serde(default = "default_one")]
+    pub da_d1_sensitivity: f32,
+    /// DA D2 (inhibitory/NoGo) subtype sensitivity
+    #[serde(default = "default_one")]
+    pub da_d2_sensitivity: f32,
+    /// NE Alpha (tonic precision) subtype sensitivity
+    #[serde(default = "default_one")]
+    pub ne_alpha_sensitivity: f32,
+    /// NE Beta (phasic reactivity) subtype sensitivity
+    #[serde(default = "default_one")]
+    pub ne_beta_sensitivity: f32,
+}
+
+fn default_one() -> f32 {
+    1.0
 }
 
 impl NeuromodulatorBath {
@@ -534,6 +773,10 @@ impl NeuromodulatorBath {
             sht_sensitivity: self.serotonin.receptor_sensitivity,
             ach_sensitivity: self.acetylcholine.receptor_sensitivity,
             cross_mod_weights: self.cross_mod.weights,
+            da_d1_sensitivity: self.da_subtypes.excitatory,
+            da_d2_sensitivity: self.da_subtypes.inhibitory,
+            ne_alpha_sensitivity: self.ne_subtypes.excitatory,
+            ne_beta_sensitivity: self.ne_subtypes.inhibitory,
         }
     }
 
@@ -550,6 +793,11 @@ impl NeuromodulatorBath {
                 *w = w.clamp(-0.1, 0.1);
             }
         }
+        // Restore receptor subtypes
+        self.da_subtypes.excitatory = ckpt.da_d1_sensitivity.clamp(0.5, 2.0);
+        self.da_subtypes.inhibitory = ckpt.da_d2_sensitivity.clamp(0.5, 2.0);
+        self.ne_subtypes.excitatory = ckpt.ne_alpha_sensitivity.clamp(0.5, 2.0);
+        self.ne_subtypes.inhibitory = ckpt.ne_beta_sensitivity.clamp(0.5, 2.0);
     }
 }
 
@@ -1341,6 +1589,10 @@ mod tests {
             sht_sensitivity: 1.0,
             ach_sensitivity: 1.0,
             cross_mod_weights: [[0.5; 4]; 4], // out of range
+            da_d1_sensitivity: 1.0,
+            da_d2_sensitivity: 1.0,
+            ne_alpha_sensitivity: 1.0,
+            ne_beta_sensitivity: 1.0,
         };
         let mut bath = NeuromodulatorBath::default();
         bath.restore(&ckpt);
@@ -1375,6 +1627,83 @@ mod tests {
             "Cross-mod DA→NE weight should persist: {} vs {}",
             bath2.cross_mod.weights[0][1],
             w_before
+        );
+    }
+
+    // ── Phase 3: MCTS Exploration Modulation ─────────────────────────
+
+    #[test]
+    fn test_mcts_mod_default_near_one() {
+        let bath = NeuromodulatorBath::default();
+        let factor = bath.mcts_exploration_modulation();
+        assert!(
+            (0.9..=1.1).contains(&factor),
+            "Default bath should produce factor near 1.0: {factor}"
+        );
+    }
+
+    #[test]
+    fn test_mcts_mod_high_sht_exploits() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.serotonin.level = 0.9;
+        bath.serotonin.receptor_sensitivity = 1.0;
+        bath.noradrenaline.level = 0.5;
+        let factor = bath.mcts_exploration_modulation();
+        assert!(
+            factor < 0.8,
+            "High 5-HT should produce exploitation (factor < 0.8): {factor}"
+        );
+    }
+
+    #[test]
+    fn test_mcts_mod_low_sht_high_ne_explores() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.serotonin.level = 0.2;
+        bath.serotonin.receptor_sensitivity = 1.0;
+        bath.noradrenaline.level = 0.8;
+        bath.noradrenaline.receptor_sensitivity = 1.0;
+        let factor = bath.mcts_exploration_modulation();
+        // 5-HT effect = (0.5-0.2)*0.8 = +0.24; NE effect = (0.8-0.5)*0.4 = +0.12
+        // Total = 1.0 + 0.24 + 0.12 = 1.36
+        assert!(
+            factor > 1.3,
+            "Low 5-HT + high NE should produce exploration (factor > 1.3): {factor}"
+        );
+    }
+
+    // ── Phase 3: ACh Plasticity Gate ─────────────────────────────────
+
+    #[test]
+    fn test_plasticity_gate_high_ach() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.acetylcholine.level = 0.9;
+        bath.acetylcholine.receptor_sensitivity = 1.0;
+        let gate = bath.plasticity_gate();
+        assert!(
+            gate > 0.85,
+            "High ACh should produce gate ≈ 0.92: got {gate}"
+        );
+    }
+
+    #[test]
+    fn test_plasticity_gate_low_ach() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.acetylcholine.level = 0.1;
+        bath.acetylcholine.receptor_sensitivity = 1.0;
+        let gate = bath.plasticity_gate();
+        assert!(
+            gate < 0.35,
+            "Low ACh should produce gate ≈ 0.28: got {gate}"
+        );
+    }
+
+    #[test]
+    fn test_plasticity_gate_default() {
+        let bath = NeuromodulatorBath::default();
+        let gate = bath.plasticity_gate();
+        assert!(
+            (0.5..=0.8).contains(&gate),
+            "Default bath should produce gate in [0.5, 0.8]: got {gate}"
         );
     }
 
@@ -1522,6 +1851,187 @@ mod tests {
             "effective should increase after produce: {} > {}",
             eff_after,
             eff_before
+        );
+    }
+
+    // ── Phase 3: Dashboard Telemetry (NeuromodSnapshot) ──────────────
+
+    #[test]
+    fn test_snapshot_all_fields_finite() {
+        let bath = NeuromodulatorBath::default();
+        let snap = bath.snapshot();
+        assert!(snap.da_effective.is_finite());
+        assert!(snap.ne_effective.is_finite());
+        assert!(snap.sht_effective.is_finite());
+        assert!(snap.ach_effective.is_finite());
+        assert!(snap.consciousness_mod.is_finite());
+        assert!(snap.plasticity_gate.is_finite());
+        assert!(snap.attention_allocation.is_finite());
+        assert!(snap.mcts_exploration_mod.is_finite());
+        assert!(snap.sleep_consolidation_boost.is_finite());
+        assert!(snap.behavioral_flexibility.is_finite());
+        assert!(snap.gradient_scale.is_finite());
+        assert!(snap.threshold_gate.is_finite());
+        for &w in &snap.cross_mod_weights {
+            assert!(w.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_snapshot_matches_individual_methods() {
+        let bath = NeuromodulatorBath::default();
+        let snap = bath.snapshot();
+        assert!((snap.da_effective - bath.dopamine.effective()).abs() < f32::EPSILON);
+        assert!((snap.ne_effective - bath.noradrenaline.effective()).abs() < f32::EPSILON);
+        assert!((snap.consciousness_mod - bath.consciousness_modulation()).abs() < f32::EPSILON);
+        assert!((snap.gradient_scale - bath.gradient_scale_factor()).abs() < f32::EPSILON);
+        assert!((snap.threshold_gate - bath.threshold_gate()).abs() < f32::EPSILON);
+        assert!((snap.plasticity_gate - bath.plasticity_gate()).abs() < f32::EPSILON);
+        assert!((snap.behavioral_flexibility - bath.behavioral_flexibility()).abs() < f32::EPSILON);
+    }
+
+    // ── Phase 3: Continuous Circadian Waveforms ──────────────────────
+
+    #[test]
+    fn test_continuous_circadian_ne_peaks_morning() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.modulate_circadian_continuous(10.0); // 10am = NE peak
+        let ne_morning = bath.noradrenaline.baseline_for_test();
+        let mut bath2 = NeuromodulatorBath::default();
+        bath2.modulate_circadian_continuous(2.0); // 2am = NE trough
+        let ne_night = bath2.noradrenaline.baseline_for_test();
+        assert!(
+            ne_morning > ne_night,
+            "NE should peak in morning: 10am={ne_morning} > 2am={ne_night}"
+        );
+    }
+
+    #[test]
+    fn test_continuous_circadian_ach_peaks_afternoon() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.modulate_circadian_continuous(14.0); // 2pm = ACh peak
+        let ach_afternoon = bath.acetylcholine.baseline_for_test();
+        let mut bath2 = NeuromodulatorBath::default();
+        bath2.modulate_circadian_continuous(2.0); // 2am = ACh trough
+        let ach_night = bath2.acetylcholine.baseline_for_test();
+        assert!(
+            ach_afternoon > ach_night,
+            "ACh should peak in afternoon: 2pm={ach_afternoon} > 2am={ach_night}"
+        );
+    }
+
+    #[test]
+    fn test_continuous_circadian_smooth_transitions() {
+        // Adjacent hours should differ by < 0.03 per channel
+        for h in 0..24 {
+            let hour = h as f64;
+            let mut b1 = NeuromodulatorBath::default();
+            b1.modulate_circadian_continuous(hour);
+            let mut b2 = NeuromodulatorBath::default();
+            b2.modulate_circadian_continuous(hour + 0.5);
+            let ne_diff = (b1.noradrenaline.baseline_for_test() - b2.noradrenaline.baseline_for_test()).abs();
+            let da_diff = (b1.dopamine.baseline_for_test() - b2.dopamine.baseline_for_test()).abs();
+            let sht_diff = (b1.serotonin.baseline_for_test() - b2.serotonin.baseline_for_test()).abs();
+            let ach_diff = (b1.acetylcholine.baseline_for_test() - b2.acetylcholine.baseline_for_test()).abs();
+            assert!(ne_diff < 0.03, "NE not smooth at h={hour}: diff={ne_diff}");
+            assert!(da_diff < 0.03, "DA not smooth at h={hour}: diff={da_diff}");
+            assert!(sht_diff < 0.03, "5-HT not smooth at h={hour}: diff={sht_diff}");
+            assert!(ach_diff < 0.03, "ACh not smooth at h={hour}: diff={ach_diff}");
+        }
+    }
+
+    // ── Phase 3: Receptor Subtypes (D1/D2, Alpha/Beta) ──────────────
+
+    #[test]
+    fn test_d1_d2_default_unity() {
+        let bath = NeuromodulatorBath::default();
+        assert!((bath.da_subtypes.excitatory - 1.0).abs() < f32::EPSILON, "D1 default should be 1.0");
+        assert!((bath.da_subtypes.inhibitory - 1.0).abs() < f32::EPSILON, "D2 default should be 1.0");
+        assert!((bath.ne_subtypes.excitatory - 1.0).abs() < f32::EPSILON, "Alpha default should be 1.0");
+        assert!((bath.ne_subtypes.inhibitory - 1.0).abs() < f32::EPSILON, "Beta default should be 1.0");
+    }
+
+    #[test]
+    fn test_d1_gates_gradient_scale() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.dopamine.level = 0.6;
+        bath.dopamine.receptor_sensitivity = 1.0;
+        // High D1 → gradient_scale > 1.0
+        bath.da_subtypes.excitatory = 1.5;
+        let high = bath.gradient_scale_factor();
+        // Low D1 → gradient_scale < 1.0
+        bath.da_subtypes.excitatory = 0.5;
+        let low = bath.gradient_scale_factor();
+        assert!(
+            high > low,
+            "High D1 should produce higher gradient scale: {high} vs {low}"
+        );
+        assert!(high > 1.0, "High D1 should produce gradient_scale > 1.0: {high}");
+    }
+
+    #[test]
+    fn test_d2_behavioral_flexibility() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.dopamine.level = 0.6;
+        bath.dopamine.receptor_sensitivity = 1.0;
+        bath.da_subtypes.inhibitory = 1.5;
+        let flex = bath.behavioral_flexibility();
+        assert!(flex > 1.0, "High D2 should produce flexibility > 1.0: {flex}");
+    }
+
+    #[test]
+    fn test_ne_alpha_beta_separation() {
+        let mut bath = NeuromodulatorBath::default();
+        // High tonic, low phasic → alpha should be high, beta low
+        bath.noradrenaline.level = 0.8;
+        bath.noradrenaline.phasic = 0.1;
+        let alpha = bath.ne_alpha_effective();
+        let beta = bath.ne_beta_effective();
+        assert!(alpha > beta, "Tonic NE → alpha > beta: {alpha} vs {beta}");
+
+        // Flip: low tonic, high phasic → beta should dominate
+        bath.noradrenaline.level = 0.3;
+        bath.noradrenaline.phasic = 0.25;
+        let alpha2 = bath.ne_alpha_effective();
+        let beta2 = bath.ne_beta_effective();
+        assert!(beta2 > alpha2, "Phasic NE → beta > alpha: {beta2} vs {alpha2}");
+    }
+
+    // ── Phase 3: Attention Budget Allocation ────────────────────────
+
+    #[test]
+    fn test_attention_allocation_default_near_one() {
+        let bath = NeuromodulatorBath::default();
+        let factor = bath.attention_budget_allocation();
+        assert!(
+            (0.9..=1.2).contains(&factor),
+            "Default bath should produce factor near 1.0: {factor}"
+        );
+    }
+
+    #[test]
+    fn test_attention_allocation_ne_burst_expands() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.noradrenaline.phasic = 0.8; // large NE burst
+        let factor = bath.attention_budget_allocation();
+        assert!(
+            factor > 1.2,
+            "Large NE phasic should expand budget: {factor}"
+        );
+    }
+
+    #[test]
+    fn test_attention_allocation_depleted_no_boost() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.noradrenaline.level = 0.0;
+        bath.noradrenaline.phasic = 0.0;
+        bath.acetylcholine.level = 0.0;
+        bath.acetylcholine.phasic = 0.0;
+        let factor = bath.attention_budget_allocation();
+        // No NE phasic burst, no ACh tonic → no boost, factor stays at base 1.0
+        assert!(
+            (factor - 1.0).abs() < f32::EPSILON,
+            "Depleted NE+ACh should produce neutral factor 1.0: {factor}"
         );
     }
 

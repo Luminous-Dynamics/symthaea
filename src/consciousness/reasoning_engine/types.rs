@@ -33,6 +33,9 @@ pub struct ReasoningContext {
     pub recent_utility: f64,
     /// Cycle identifier.
     pub cycle_id: u64,
+    /// Neuromod modulation of MCTS exploration constant (multiplier, default 1.0).
+    /// 5-HT/NE-driven: low 5-HT → explore more, high 5-HT → exploit more.
+    pub neuromod_exploration_mod: f64,
 }
 
 impl ReasoningContext {
@@ -157,6 +160,7 @@ impl ReasoningContextBuilder {
             tool: self.tool,
             recent_utility: self.recent_utility,
             cycle_id: self.cycle_id,
+            neuromod_exploration_mod: 1.0,
         }
     }
 }
