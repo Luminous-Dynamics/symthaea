@@ -958,12 +958,12 @@ impl CoherenceMonitor {
         }
     }
 
-    /// Whether coherence warrants a veto (standard or predictive).
+    /// Whether coherence warrants a veto (standard only, without predictive component).
     ///
     /// Standard veto: coherence below threshold for `min_consecutive_low` tokens.
-    /// Predictive veto: coherence velocity < -0.15 AND coherence near threshold,
-    /// but only when long-term coherence < 0.7 (prevents spurious veto during
-    /// brief fluctuations in otherwise coherent generation).
+    /// Production code uses `should_veto_predictive` which includes this check plus
+    /// velocity-based anticipation. This simpler variant is retained for unit tests.
+    #[cfg(test)]
     fn should_veto(&self) -> bool {
         self.consecutive_low >= self.min_consecutive_low
     }
@@ -987,6 +987,7 @@ impl CoherenceMonitor {
     }
 
     /// Rate of coherence change (negative = declining).
+    #[cfg(test)]
     fn coherence_velocity(&self) -> f32 {
         self.coherence_velocity
     }
