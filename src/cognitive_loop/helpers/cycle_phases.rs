@@ -674,8 +674,7 @@ impl CognitiveLoopService {
                 // boosting confidence that the system can navigate toward them.
                 if avg_phi_improvement > 0.01 {
                     let dream_confidence_boost = (avg_phi_improvement * 0.1).min(0.05);
-                    self.prediction_confidence =
-                        (self.prediction_confidence + dream_confidence_boost).clamp(0.0, 1.0);
+                    self.adjust_confidence("dream_phi_insight", dream_confidence_boost);
                 }
             }
         }
@@ -698,7 +697,7 @@ impl CognitiveLoopService {
                 .dream_feedback_bridge
                 .adjust_confidence(self.prediction_confidence as f64, context_hash);
             if was_informed {
-                self.prediction_confidence = (adjusted as f32).clamp(0.0, 1.0);
+                self.set_confidence("dream_feedback", (adjusted as f32).clamp(0.0, 1.0));
             }
             // Decay priors every 199 cycles to forget stale wisdom (co-prime)
             if self.stats.total_cycles % 199 == 0 {

@@ -302,8 +302,7 @@ impl CognitiveLoopService {
             }
             // Memory Phi primes consciousness expectation
             if memory_phi_avg > 0.4 {
-                self.prediction_confidence =
-                    (self.prediction_confidence + (memory_phi_avg - 0.4) * 0.05).clamp(0.0, 1.0);
+                self.adjust_confidence("memory_phi_prime", (memory_phi_avg - 0.4) * 0.05);
             }
         }
 
@@ -546,8 +545,7 @@ impl CognitiveLoopService {
                 // Boost learning rate when free energy is high
                 if let Some(ref fe) = self.fep_agent.last_fe_components {
                     let fe_boost = (fe.total.abs() as f32 / 2.0).clamp(0.0, 1.5);
-                    self.fep_lr_boost =
-                        (self.fep_lr_boost * (1.0 + fe_boost * 0.5)).clamp(1.0, 2.0);
+                    self.scale_lr("fep_free_energy", 1.0 + fe_boost * 0.5);
                 }
             }
             1 => {
@@ -623,7 +621,7 @@ impl CognitiveLoopService {
         // Science: Treisman (1996) — coherent binding -> confident perception
         if cross_modal_psi > 0.3 {
             let boost = ((cross_modal_psi - 0.3) * 0.05) as f32;
-            self.prediction_confidence = (self.prediction_confidence + boost).clamp(0.0, 1.0);
+            self.adjust_confidence("cross_modal_psi", boost);
         }
 
         // FEEDBACK: Predictive <-> Cross-Modal bidirectional coupling (Talsma 2015)

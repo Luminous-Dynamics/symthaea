@@ -1136,7 +1136,7 @@ mod tests {
         let mut schema = AttentionSchema::new();
 
         // Try to exceed capacity
-        let targets: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i)).collect();
+        let targets: Vec<BinaryHV> = (0..10).map(BinaryHV::random).collect();
 
         let result = schema.divide_attention(targets);
 
