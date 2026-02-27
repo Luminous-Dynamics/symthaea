@@ -3,12 +3,14 @@
 //! Usage:
 //!   broca-train --data training.jsonl --epochs 100 --lr 0.001 --output broca.bin
 //!   broca-train --data training.jsonl --resume prev.bin --epochs 50
+//!   broca-train --data training.jsonl --epochs 200 --eval eval.jsonl --diagnostics
 //!
 //! The data file should be JSONL with one TrainingPair per line:
 //!   {"channels": [0.0, ...20 floats...], "target_text": "hello world"}
 
 use std::process;
 
+use symthaea_broca::evaluation;
 use symthaea_broca::generator::{BrocaConfig, BrocaGenerator};
 use symthaea_broca::training::{TrainingConfig, TrainingDataset, train_with_adam};
 
@@ -81,6 +83,7 @@ fn main() {
         use_adam: true,
         warmup_fraction: 0.1,
         patience: opts.patience,
+        enable_diagnostics: opts.diagnostics,
     };
 
     tracing::info!(
@@ -89,10 +92,11 @@ fn main() {
         bptt_window = opts.bptt_window,
         patience = opts.patience,
         use_adam = true,
+        diagnostics = opts.diagnostics,
         "Starting training"
     );
 
-    let (metrics, final_adam) = train_with_adam(
+    let (metrics, final_adam, diagnostics) = train_with_adam(
         &mut generator,
         &dataset,
         &train_config,
@@ -116,6 +120,12 @@ fn main() {
         println!("{:>6}  {:>10.6}  {:>8}", m.epoch, m.avg_loss, m.num_tokens);
     }
 
+    // Print gradient diagnostics if enabled
+    if let Some(diag) = diagnostics {
+        println!();
+        println!("{}", diag.format_summary());
+    }
+
     // Save checkpoint
     let final_loss = metrics.last().map(|m| m.avg_loss).unwrap_or(0.0);
     let final_epoch = metrics.last().map(|m| m.epoch).unwrap_or(0);
@@ -133,17 +143,45 @@ fn main() {
     }
 
     println!("\nCheckpoint saved to: {}", opts.output_path);
+
+    // Run evaluation if --eval provided
+    if let Some(ref eval_path) = opts.eval_path {
+        tracing::info!(path = %eval_path, "Loading evaluation data");
+        let mut eval_dataset = match TrainingDataset::from_jsonl(eval_path) {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("Failed to load eval data from '{}': {e}", eval_path);
+                process::exit(1);
+            }
+        };
+        let eval_tokenizer = generator.tokenizer().clone();
+        eval_dataset.tokenize_all(&eval_tokenizer);
+
+        let eval_config = evaluation::EvalConfig {
+            dataset: eval_dataset,
+            compute_perplexity: true,
+            compute_english_ratio: true,
+            per_intent_breakdown: true,
+            max_gen_tokens: 64,
+        };
+
+        let result = evaluation::evaluate(&mut generator, &eval_config);
+        println!();
+        println!("{}", evaluation::format_eval_report(&result));
+    }
 }
 
 struct TrainOpts {
     data_path: String,
     output_path: String,
     resume_path: Option<String>,
+    eval_path: Option<String>,
     epochs: usize,
     learning_rate: f32,
     bptt_window: usize,
     grad_clip: f32,
     patience: usize,
+    diagnostics: bool,
     genesis_phrase: String,
 }
 
@@ -152,11 +190,13 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         data_path: String::new(),
         output_path: "broca.bin".to_string(),
         resume_path: None,
+        eval_path: None,
         epochs: 100,
         learning_rate: 0.001,
         bptt_window: 16,
         grad_clip: 1.0,
         patience: 0,
+        diagnostics: false,
         genesis_phrase: "broca-training-default".to_string(),
     };
 
@@ -174,6 +214,10 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
             "--resume" | "-r" => {
                 i += 1;
                 opts.resume_path = Some(args.get(i).cloned().ok_or("--resume requires a path")?);
+            }
+            "--eval" => {
+                i += 1;
+                opts.eval_path = Some(args.get(i).cloned().ok_or("--eval requires a path")?);
             }
             "--epochs" | "-e" => {
                 i += 1;
@@ -210,6 +254,9 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--patience must be a non-negative integer")?;
             }
+            "--diagnostics" => {
+                opts.diagnostics = true;
+            }
             "--genesis" => {
                 i += 1;
                 opts.genesis_phrase = args.get(i).cloned().ok_or("--genesis requires a phrase")?;
@@ -239,11 +286,13 @@ fn print_usage() {
     eprintln!("Optional:");
     eprintln!("  --output, -o PATH    Output checkpoint file (default: broca.bin)");
     eprintln!("  --resume, -r PATH    Resume from existing checkpoint");
+    eprintln!("  --eval PATH          Held-out JSONL for post-training evaluation");
     eprintln!("  --epochs, -e N       Number of training epochs (default: 100)");
     eprintln!("  --lr RATE            Learning rate (default: 0.001)");
     eprintln!("  --bptt-window N      BPTT truncation window (default: 16)");
     eprintln!("  --grad-clip THRESH   Gradient clipping threshold (default: 1.0)");
     eprintln!("  --patience N         Early stopping patience, 0=disabled (default: 0)");
+    eprintln!("  --diagnostics        Enable gradient flow diagnostics");
     eprintln!("  --genesis PHRASE     Genesis seed phrase (default: broca-training-default)");
     eprintln!("  --help, -h           Show this help message");
 }
