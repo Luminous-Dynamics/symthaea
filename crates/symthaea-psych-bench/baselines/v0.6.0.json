@@ -1,7 +1,7 @@
 {
   "name": "baseline",
-  "timestamp": "2026-02-27T02:31:58.566705854+00:00",
-  "git_hash": "0fde8adc8",
+  "timestamp": "2026-02-27T04:12:22.845036736+00:00",
+  "git_hash": "abbf47934",
   "config_summary": "dim=512, trials=10, seed=42",
   "schema_version": "1.1",
   "metrics": {
@@ -1512,6 +1512,71 @@
         "ci_upper": 0.6863937886423377
       }
     },
+    "Reasoning::ArcChain": {
+      "chain_2_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "chain_2_similarity": {
+        "mean": 0.47699679384628935,
+        "std_dev": 0.04841217695742305,
+        "n": 10,
+        "ci_lower": 0.4423672147751524,
+        "ci_upper": 0.5116263729174263
+      },
+      "chain_3_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "chain_3_similarity": {
+        "mean": 0.43841267634804054,
+        "std_dev": 0.08537952289300371,
+        "n": 10,
+        "ci_lower": 0.37734008831549853,
+        "ci_upper": 0.49948526438058255
+      },
+      "chain_4_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "chain_4_similarity": {
+        "mean": 0.40366027976075813,
+        "std_dev": 0.04557960049882968,
+        "n": 10,
+        "ci_lower": 0.371056863044067,
+        "ci_upper": 0.4362636964774493
+      },
+      "chain_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "chain_degradation": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "rt_ticks": {
+        "mean": 6.566666666666667,
+        "std_dev": 0.2416412407985995,
+        "n": 10,
+        "ci_lower": 6.393818945680229,
+        "ci_upper": 6.739514387653106
+      }
+    },
     "Reasoning::ArcCompositional": {
       "accuracy_color_replace_fill": {
         "mean": 0.6,
@@ -1568,6 +1633,106 @@
         "n": 10,
         "ci_lower": 0.1549716901557341,
         "ci_upper": 0.37836164317759924
+      }
+    },
+    "Reasoning::ArcFewShot": {
+      "accuracy_1shot": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "accuracy_2shot": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "accuracy_3shot": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "accuracy_4shot": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "accuracy_5shot": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "fewshot_gain": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "learning_rate": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "rt_ticks": {
+        "mean": 5.9875,
+        "std_dev": 0.47305889931616574,
+        "n": 10,
+        "ci_lower": 5.6491175601113435,
+        "ci_upper": 6.325882439888656
+      },
+      "saturation_point": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "similarity_1shot": {
+        "mean": 0.3924909995403141,
+        "std_dev": 0.08087546486182265,
+        "n": 10,
+        "ci_lower": 0.3346401966770064,
+        "ci_upper": 0.45034180240362176
+      },
+      "similarity_2shot": {
+        "mean": 0.45365990409627555,
+        "std_dev": 0.06037972472125016,
+        "n": 10,
+        "ci_lower": 0.4104698518627865,
+        "ci_upper": 0.4968499563297646
+      },
+      "similarity_3shot": {
+        "mean": 0.4869928127154708,
+        "std_dev": 0.0458541599170633,
+        "n": 10,
+        "ci_lower": 0.4541930016682415,
+        "ci_upper": 0.5197926237627001
+      },
+      "similarity_4shot": {
+        "mean": 0.5040686680004001,
+        "std_dev": 0.03898970985626073,
+        "n": 10,
+        "ci_lower": 0.47617904755190166,
+        "ci_upper": 0.5319582884488985
+      },
+      "similarity_5shot": {
+        "mean": 0.5175361631438136,
+        "std_dev": 0.03335853562289143,
+        "n": 10,
+        "ci_lower": 0.493674562206797,
+        "ci_upper": 0.5413977640808302
       }
     },
     "Reasoning::ArcFluid": {
@@ -1668,6 +1833,234 @@
         "n": 10,
         "ci_lower": 0.41011399482118877,
         "ci_upper": 0.5030130651153346
+      }
+    },
+    "Reasoning::ArcNoise": {
+      "accuracy_0pct": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "accuracy_10pct": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "accuracy_20pct": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "accuracy_30pct": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "accuracy_50pct": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "accuracy_drop": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "noise_resilience": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "rt_ticks": {
+        "mean": 6.05,
+        "std_dev": 0.1835226295462104,
+        "n": 10,
+        "ci_lower": 5.9187249404875395,
+        "ci_upper": 6.18127505951246
+      },
+      "similarity_0pct": {
+        "mean": 0.49024226125329734,
+        "std_dev": 0.06699678000681321,
+        "n": 10,
+        "ci_lower": 0.44231898168671363,
+        "ci_upper": 0.5381655408198811
+      },
+      "similarity_10pct": {
+        "mean": 0.48950903993099926,
+        "std_dev": 0.0661367443330971,
+        "n": 10,
+        "ci_lower": 0.44220095007986965,
+        "ci_upper": 0.5368171297821289
+      },
+      "similarity_20pct": {
+        "mean": 0.4905869921669364,
+        "std_dev": 0.06624297698206645,
+        "n": 10,
+        "ci_lower": 0.443202913336409,
+        "ci_upper": 0.5379710709974639
+      },
+      "similarity_30pct": {
+        "mean": 0.49027905352413653,
+        "std_dev": 0.06493391732816547,
+        "n": 10,
+        "ci_lower": 0.4438313544980841,
+        "ci_upper": 0.536726752550189
+      },
+      "similarity_50pct": {
+        "mean": 0.4880613159388304,
+        "std_dev": 0.06667214317036393,
+        "n": 10,
+        "ci_lower": 0.4403702514409289,
+        "ci_upper": 0.5357523804367319
+      }
+    },
+    "Reasoning::ArcScaling": {
+      "capacity_ratio": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "dim_1024d_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "dim_1024d_similarity": {
+        "mean": 0.2809801363386214,
+        "std_dev": 0.1182096141170403,
+        "n": 10,
+        "ci_lower": 0.1964239474559198,
+        "ci_upper": 0.365536325221323
+      },
+      "dim_128d_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "dim_128d_similarity": {
+        "mean": 0.6950411964207888,
+        "std_dev": 0.07595064978974472,
+        "n": 10,
+        "ci_lower": 0.6407131492703514,
+        "ci_upper": 0.7493692435712261
+      },
+      "dim_256d_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "dim_256d_similarity": {
+        "mean": 0.5696679407730698,
+        "std_dev": 0.08395505419740275,
+        "n": 10,
+        "ci_lower": 0.5096142854642526,
+        "ci_upper": 0.629721596081887
+      },
+      "dim_512d_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "dim_512d_similarity": {
+        "mean": 0.43909918805584314,
+        "std_dev": 0.12149446304522242,
+        "n": 10,
+        "ci_lower": 0.3521933230617933,
+        "ci_upper": 0.526005053049893
+      },
+      "dimension_efficiency_slope": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "grid_12x12_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "grid_12x12_similarity": {
+        "mean": 0.6526345647871494,
+        "std_dev": 0.06560216661145069,
+        "n": 10,
+        "ci_lower": 0.6057088622328708,
+        "ci_upper": 0.6995602673414281
+      },
+      "grid_3x3_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "grid_3x3_similarity": {
+        "mean": 0.35535978358238934,
+        "std_dev": 0.09239839914442607,
+        "n": 10,
+        "ci_lower": 0.2892665427840582,
+        "ci_upper": 0.42145302438072046
+      },
+      "grid_5x5_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "grid_5x5_similarity": {
+        "mean": 0.4630389461293817,
+        "std_dev": 0.07910890031650064,
+        "n": 10,
+        "ci_lower": 0.4064517796164967,
+        "ci_upper": 0.5196261126422667
+      },
+      "grid_8x8_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "grid_8x8_similarity": {
+        "mean": 0.575501581095159,
+        "std_dev": 0.06843540091846438,
+        "n": 10,
+        "ci_lower": 0.5265492456227187,
+        "ci_upper": 0.6244539165675994
+      },
+      "grid_complexity_slope": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
       }
     },
     "Social::RME": {

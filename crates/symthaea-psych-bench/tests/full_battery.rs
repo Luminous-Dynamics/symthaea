@@ -28,7 +28,11 @@ use symthaea_psych_bench::benchmarks::{
     },
     metacognition::{FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark},
     motor::SrttBenchmark,
-    reasoning::{ArcAbductiveBenchmark, ArcAnalogyBenchmark, ArcCompositionalBenchmark, ArcFluidBenchmark},
+    reasoning::{
+        ArcAbductiveBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
+        ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark,
+        ArcNoiseBenchmark, ArcScalingBenchmark,
+    },
     social::RmeBenchmark,
     sustained_attention::SartBenchmark,
     tombench::{
@@ -135,6 +139,10 @@ fn full_battery_report() {
     report.add(ArcCompositionalBenchmark.run(&config));
     report.add(ArcAnalogyBenchmark.run(&config));
     report.add(ArcAbductiveBenchmark.run(&config));
+    report.add(ArcChainBenchmark.run(&config));
+    report.add(ArcNoiseBenchmark.run(&config));
+    report.add(ArcFewShotBenchmark.run(&config));
+    report.add(ArcScalingBenchmark.run(&config));
 
     // ── Additional MemoryAgent ──
     report.add(ProspectiveMemoryBenchmark.run(&config));
@@ -157,8 +165,8 @@ fn full_battery_report() {
     // Verify all benchmarks produced results
     assert_eq!(
         report.results.len(),
-        51,
-        "Expected 51 benchmark results, got {}",
+        55,
+        "Expected 55 benchmark results, got {}",
         report.results.len()
     );
 
@@ -264,6 +272,10 @@ fn regression_against_baseline() {
     report.add(ArcCompositionalBenchmark.run(&config));
     report.add(ArcAnalogyBenchmark.run(&config));
     report.add(ArcAbductiveBenchmark.run(&config));
+    report.add(ArcChainBenchmark.run(&config));
+    report.add(ArcNoiseBenchmark.run(&config));
+    report.add(ArcFewShotBenchmark.run(&config));
+    report.add(ArcScalingBenchmark.run(&config));
     report.add(ProspectiveMemoryBenchmark.run(&config));
     report.add(FeelingOfKnowingBenchmark.run(&config));
     report.add(SartBenchmark.run(&config));
