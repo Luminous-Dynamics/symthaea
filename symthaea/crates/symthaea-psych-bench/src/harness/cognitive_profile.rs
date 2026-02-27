@@ -112,7 +112,7 @@ fn key_metric(benchmark_name: &str) -> &'static str {
         name if name.contains("Stroop") && name.contains("Emotional") => "emotional_interference",
         name if name.contains("Stroop") => "incongruent_accuracy",
         name if name.contains("WCST") => "accuracy",
-        name if name.contains("Flanker") => "accuracy",
+        name if name.contains("Flanker") => "incongruent_accuracy",
         name if name.contains("TowerOfLondon") => "accuracy",
         name if name.contains("DualTask") => "dual_cost",
         name if name.contains("Ravens") => "accuracy",

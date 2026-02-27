@@ -375,6 +375,12 @@ pub struct CognitiveLoopConfig {
     /// Maximum PsiAttestationRecords to buffer before evicting oldest.
     /// The personal cluster should drain the buffer periodically.
     pub attestation_buffer_capacity: usize,
+
+    /// Enable feedback trace logging in CycleMetadata.
+    /// When true, `dump_proposals()` output is written to
+    /// `feedback_trace_confidence` and `feedback_trace_lr` each cycle.
+    /// Intended for debugging and development, not production.
+    pub trace_feedback: bool,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -435,6 +441,7 @@ impl Default for CognitiveLoopConfig {
             enable_psi_attestation: false,
             agent_did: None,
             attestation_buffer_capacity: 64,
+            trace_feedback: false,
         }
     }
 }

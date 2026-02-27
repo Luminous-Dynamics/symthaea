@@ -220,16 +220,16 @@ impl CognitiveLoopService {
         let moral_score = moral_score * contextual_weight_factor;
 
         // Value feedback: self-correcting moral alignment via TD-learning trend
-        let value_trend = self.value_feedback.recent_trend(50);
+        let value_trend = self.primitive_tier.value_feedback.recent_trend(50);
         let moral_feedback = 1.0 + (value_trend * 0.1).clamp(-0.1, 0.1);
         let moral_score = moral_score * moral_feedback;
         {
-            let signal = self.value_feedback.create_signal(
+            let signal = self.primitive_tier.value_feedback.create_signal(
                 input,
                 crate::consciousness::value_feedback_loop::FeedbackType::SelfAssessment,
                 moral_score,
             );
-            self.value_feedback.process_feedback(signal);
+            self.primitive_tier.value_feedback.process_feedback(signal);
         }
 
         (moral_score, moral_concern_detected, moral_judgment)

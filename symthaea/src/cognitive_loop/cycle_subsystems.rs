@@ -84,7 +84,7 @@ impl CognitiveLoopService {
         // Science: Hasani et al. (2021), Dehaene et al. (2003).
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let hierarchical_ltc_phi = if let Some(ref mut hltc) = self.hierarchical_ltc {
+        let hierarchical_ltc_phi = if let Some(ref mut hltc) = self.primitive_tier.hierarchical_ltc {
             if self.stats.total_cycles % 11 == 0 {
                 let input_vec: Vec<f32> = (0..64)
                     .map(|i| {
@@ -136,7 +136,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (evolution_generation, evolution_phi_delta) =
-            if let Some(ref mut coordinator) = self.evolution_coordinator {
+            if let Some(ref mut coordinator) = self.primitive_tier.evolution_coordinator {
                 if self.stats.total_cycles % 499 == 0 && self.stats.total_cycles > 0 {
                     match coordinator.step() {
                         Ok(result) => (result.generation, result.primitive_psi_delta),
@@ -177,7 +177,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (holographic_unity, holographic_binding) =
-            if let Some(ref mut ha) = self.holographic_analyzer {
+            if let Some(ref mut ha) = self.primitive_tier.holographic_analyzer {
                 if self.stats.total_cycles % (47 * interval_mult) == 0 {
                     let content: Vec<f64> = (0..64)
                         .map(|i| {
@@ -222,7 +222,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (consciousness_gradient_magnitude, consciousness_limiting_component) =
-            if let Some(ref dc) = self.differentiable_consciousness {
+            if let Some(ref dc) = self.primitive_tier.differentiable_consciousness {
                 if self.stats.total_cycles % (47 * interval_mult) == 0
                     && self.stats.total_cycles > 0
                 {
@@ -280,7 +280,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (affect_cons_valence, affect_cons_arousal) =
-            if let Some(ref mut ac) = self.affective_consciousness {
+            if let Some(ref mut ac) = self.primitive_tier.affective_consciousness {
                 ac.decay(0.05);
                 if self.stats.total_cycles % (11 * interval_mult) == 0 {
                     let valence = 1.0 - 2.0 * prediction_error;
@@ -305,7 +305,7 @@ impl CognitiveLoopService {
         module_timings.affective_consciousness = _t.elapsed().as_micros() as u64;
 
         // FEEDBACK: Negative affect strengthens caution (lower confidence)
-        if let Some(ref ac) = self.affective_consciousness {
+        if let Some(ref ac) = self.primitive_tier.affective_consciousness {
             let affect = ac.current_affect();
             if affect.valence < -0.3 {
                 self.adjust_confidence("affective_neg_valence", affect.valence * 0.02);
@@ -319,7 +319,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let pipeline_consciousness = if let Some(ref mut pipeline) =
-            self.unified_consciousness_pipeline
+            self.primitive_tier.unified_consciousness_pipeline
         {
             if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
                 let sensory: Vec<f64> = (0..64)
@@ -358,7 +358,7 @@ impl CognitiveLoopService {
         // Science: Damasio (1994), Mesulam (1998), Ghazanfar & Schroeder (2006).
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let multimodal_integrated_phi = if let Some(ref mut mmi) = self.multi_modal_integrator {
+        let multimodal_integrated_phi = if let Some(ref mut mmi) = self.primitive_tier.multi_modal_integrator {
             if self.stats.total_cycles % 13 == 0 && self.stats.total_cycles > 0 {
                 use crate::consciousness::multi_modal_integration::ModalInput;
                 let visual_input = ModalInput::new(Modality::Visual, hv16_cached, coherence as f64);
@@ -393,7 +393,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (consciousness_state_label, consciousness_state_level_val) =
-            if let Some(ref sg) = self.synthetic_grounding {
+            if let Some(ref sg) = self.primitive_tier.synthetic_grounding {
                 if self.stats.total_cycles % 97 == 0 {
                     let similar = sg.find_similar(&hv16_cached, 0.1);
                     if let Some((state_type, _sim)) = similar.first() {
@@ -419,7 +419,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (epistemic_gate_confidence, epistemic_gate_approved) = if let Some(ref mut gate) =
-            self.epistemic_gate
+            self.primitive_tier.epistemic_gate
         {
             if self.stats.total_cycles % 13 == 0 {
                 let action_risk = (1.0 - self.prediction_confidence).clamp(0.0, 1.0);
@@ -455,7 +455,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (grid_encoding_norm, grid_spatial_complexity) =
-            if let Some(ref encoder) = self.grid_encoder {
+            if let Some(ref encoder) = self.primitive_tier.grid_encoder {
                 if self.stats.total_cycles % 13 == 0 {
                     // Interpret input bytes as a small grid (up to 8x8)
                     let input_bytes = input.as_bytes();
@@ -502,8 +502,8 @@ impl CognitiveLoopService {
         // Science: Popper (1959) — falsifiability, scientific method.
         // ═══════════════════════════════════════════════════════════════════════
         let (primitive_validation_phi_gain, primitive_validation_p_value) =
-            if self.primitive_validation_result.is_none()
-                && self.primitive_processor.is_some()
+            if self.primitive_tier.primitive_validation_result.is_none()
+                && self.primitive_tier.primitive_processor.is_some()
                 && self.stats.total_cycles == 500
             {
                 let mut experiment =
@@ -513,18 +513,18 @@ impl CognitiveLoopService {
                     Ok(results) => {
                         let gain = results.statistics.mean_phi_gain;
                         let p = results.statistics.p_value;
-                        self.primitive_validation_result = Some((gain, p));
+                        self.primitive_tier.primitive_validation_result = Some((gain, p));
                         (gain, p)
                     }
                     Err(_) => (0.0, 1.0),
                 }
             } else {
-                self.primitive_validation_result.unwrap_or((0.0, 1.0))
+                self.primitive_tier.primitive_validation_result.unwrap_or((0.0, 1.0))
             };
 
         // FEEDBACK: Validated primitives boost LR; falsified primitives dampen it
         // Science: Popper (1959) — if primitives don't improve Φ, reduce their influence
-        if let Some((phi_gain, p_value)) = self.primitive_validation_result {
+        if let Some((phi_gain, p_value)) = self.primitive_tier.primitive_validation_result {
             if p_value < 0.05 && phi_gain > 0.0 {
                 // Significant positive effect → boost primitive subsystem LR
                 self.carryover.learning.subsystem_lr_factor *=
@@ -588,7 +588,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (meta_reasoning_confidence, meta_reasoning_insights) = if let Some(ref mut reasoner) =
-            self.meta_cognitive_reasoner
+            self.primitive_tier.meta_cognitive_reasoner
         {
             if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
                 // Build lightweight candidate primitives from active set
@@ -638,7 +638,7 @@ impl CognitiveLoopService {
         // Science: Plate (2003) — VSA for structured representations.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let code_primitives_selected = if let Some(ref router) = self.code_primitive_router {
+        let code_primitives_selected = if let Some(ref router) = self.primitive_tier.code_primitive_router {
             if self.stats.total_cycles % 11 == 0 {
                 // Heuristic: detect code-related input
                 let code_related = input.contains("code")
@@ -677,7 +677,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (empathic_compassion, empathic_tone_adj) =
-            if let Some(ref mut empathy) = self.empathic_unification {
+            if let Some(ref mut empathy) = self.primitive_tier.empathic_unification {
                 if self.stats.total_cycles % 11 == 0 {
                     let context = crate::user_state_inference::ContextKind::Task;
                     let response = empathy.process(input, context);
@@ -708,7 +708,7 @@ impl CognitiveLoopService {
         // Science: Deb et al. (2002) — NSGA-II multi-objective optimization.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let multi_obj_frontier_size = if let Some(ref mut moe) = self.multi_objective_evolution {
+        let multi_obj_frontier_size = if let Some(ref mut moe) = self.primitive_tier.multi_objective_evolution {
             if self.stats.total_cycles % 997 == 0 && self.stats.total_cycles > 0 {
                 match moe.evolve() {
                     Ok(result) => result.frontier_size,
