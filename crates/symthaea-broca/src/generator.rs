@@ -84,8 +84,10 @@ pub struct GenerationResult {
     pub eos_terminated: bool,
     /// Whether a semantic veto was triggered.
     pub veto_triggered: bool,
-    /// Final coherence score.
+    /// Final short-window coherence score.
     pub final_coherence: f32,
+    /// Final long-window coherence score (Liquid-Mamba only, 0.0 for CfC-HDC).
+    pub long_coherence: f32,
     /// Back-projected HDC vectors for each generated token (Liquid-Mamba only).
     #[cfg(feature = "mamba")]
     pub output_hvs: Vec<symthaea_core::hdc::ContinuousHV>,
@@ -242,6 +244,7 @@ impl BrocaGenerator {
             eos_terminated,
             veto_triggered,
             final_coherence,
+            long_coherence: 0.0, // CfC-HDC backend doesn't use long window
             #[cfg(feature = "mamba")]
             output_hvs: Vec::new(),
             #[cfg(feature = "mamba")]

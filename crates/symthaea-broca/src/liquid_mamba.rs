@@ -89,6 +89,13 @@ pub struct LiquidMambaConfig {
     pub contrastive_weight: f32,
     /// Size of the recent-thoughts buffer for contrastive loss.
     pub contrastive_buffer_size: usize,
+    /// Base learning rate for online distillation.
+    pub base_lr: f32,
+    /// Total expected training steps for cosine annealing (0 = no annealing).
+    /// When set, LR follows cosine schedule after warmup: `lr * 0.5*(1 + cos(π * t/T))`.
+    pub cosine_annealing_steps: usize,
+    /// Minimum LR floor as fraction of base_lr (default 0.01 = 1% of base).
+    pub min_lr_fraction: f32,
 }
 
 impl Default for LiquidMambaConfig {
@@ -117,6 +124,9 @@ impl Default for LiquidMambaConfig {
             accumulation_steps: 4,
             contrastive_weight: 0.1,
             contrastive_buffer_size: 8,
+            base_lr: 0.001,
+            cosine_annealing_steps: 0,
+            min_lr_fraction: 0.01,
         }
     }
 }
@@ -355,6 +365,45 @@ impl LiquidMambaGenerator {
         })
     }
 
+    /// Compute effective learning rate with warmup + cosine annealing + biological load.
+    ///
+    /// Schedule:
+    /// 1. Warmup: linear ramp from 0 to `base_lr` over `warmup_steps`
+    /// 2. Cosine annealing: `base_lr * 0.5*(1 + cos(π * t/T))` down to `min_lr_fraction * base_lr`
+    /// 3. Biological load: `(1 - thermodynamic_load)` multiplier
+    fn compute_lr(&self) -> f32 {
+        let step = self.generation_count;
+        let base_lr = self.config.base_lr;
+
+        // Phase 1: Warmup
+        let warmup_factor = if self.config.warmup_steps > 0 && step < self.config.warmup_steps {
+            step as f32 / self.config.warmup_steps as f32
+        } else {
+            1.0
+        };
+
+        // Phase 2: Cosine annealing (after warmup)
+        let cosine_factor = if self.config.cosine_annealing_steps > 0 && step >= self.config.warmup_steps {
+            let t = (step - self.config.warmup_steps) as f32;
+            let t_max = self.config.cosine_annealing_steps as f32;
+            let min_frac = self.config.min_lr_fraction;
+            let cos_decay = 0.5 * (1.0 + (std::f32::consts::PI * t / t_max).cos());
+            min_frac + (1.0 - min_frac) * cos_decay
+        } else {
+            1.0
+        };
+
+        // Phase 3: Biological load dampening
+        let load_factor = 1.0 - self.thermodynamic_load;
+
+        base_lr * warmup_factor * cosine_factor * load_factor
+    }
+
+    /// Current effective learning rate (for diagnostics).
+    pub fn current_lr(&self) -> f32 {
+        self.compute_lr()
+    }
+
     /// Biological delta modulation factor.
     ///
     /// Scales SSM hidden state based on thermodynamic load and arousal.
@@ -487,14 +536,8 @@ impl LiquidMambaGenerator {
 
         let thought_hv = self.encoder.encode(channels);
 
-        // Warmup schedule: ramp from 0 to base LR over warmup_steps
-        let warmup_factor = if self.config.warmup_steps > 0 {
-            (self.generation_count as f32 / self.config.warmup_steps as f32).min(1.0)
-        } else {
-            1.0
-        };
-        let load_factor = 1.0 - self.thermodynamic_load;
-        let effective_lr = 0.001 * warmup_factor * load_factor;
+        // LR schedule: warmup → cosine annealing
+        let effective_lr = self.compute_lr();
         if effective_lr < 1e-7 {
             return;
         }
@@ -888,6 +931,52 @@ mod tests {
         assert_eq!(config.accumulation_steps, 4);
         assert!((config.contrastive_weight - 0.1).abs() < 1e-6);
         assert_eq!(config.contrastive_buffer_size, 8);
+        assert!((config.base_lr - 0.001).abs() < 1e-6);
+        assert_eq!(config.cosine_annealing_steps, 0);
+        assert!((config.min_lr_fraction - 0.01).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_lr_warmup_only() {
+        // With no cosine annealing, LR should ramp linearly then stay flat
+        let config = LiquidMambaConfig {
+            base_lr: 0.01,
+            warmup_steps: 100,
+            cosine_annealing_steps: 0,
+            ..Default::default()
+        };
+
+        // At step 0: 0/100 = 0
+        let factor_0 = 0.0f32 / 100.0;
+        assert!((factor_0 - 0.0).abs() < 1e-6);
+
+        // At step 50: 50/100 = 0.5
+        let factor_50 = 50.0f32 / 100.0;
+        assert!((factor_50 - 0.5).abs() < 1e-6);
+
+        // At step 100: full
+        let factor_100 = (100.0f32 / 100.0).min(1.0);
+        assert!((factor_100 - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_cosine_annealing_schedule() {
+        // After warmup, LR should follow cosine decay
+        let base_lr = 0.01f32;
+        let min_frac = 0.01f32;
+        let t_max = 1000.0f32;
+
+        // At t=0 (start of annealing): cos(0) = 1, factor = 1.0
+        let factor_0 = min_frac + (1.0 - min_frac) * 0.5 * (1.0 + (std::f32::consts::PI * 0.0 / t_max).cos());
+        assert!((factor_0 - 1.0).abs() < 0.01);
+
+        // At t=T/2: cos(π/2) = 0, factor = 0.5*(1+0) = 0.5 → ~0.505
+        let factor_mid = min_frac + (1.0 - min_frac) * 0.5 * (1.0 + (std::f32::consts::PI * 500.0 / t_max).cos());
+        assert!((factor_mid - 0.505).abs() < 0.01, "Mid-point should be ~0.505, got {factor_mid}");
+
+        // At t=T: cos(π) = -1, factor = 0.5*(1-1) = 0 → min_frac
+        let factor_end = min_frac + (1.0 - min_frac) * 0.5 * (1.0 + (std::f32::consts::PI * 1000.0 / t_max).cos());
+        assert!((factor_end - min_frac).abs() < 0.01, "End should be ~min_frac, got {factor_end}");
     }
 
     #[test]
