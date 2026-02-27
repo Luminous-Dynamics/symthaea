@@ -13322,6 +13322,7 @@ dependencies = [
  "strsim",
  "symthaea-broca",
  "symthaea-causal-reasoning",
+ "symthaea-consciousness-equation",
  "symthaea-consciousness-resonance",
  "symthaea-consciousness-topology",
  "symthaea-core",
@@ -13398,6 +13399,13 @@ dependencies = [
  "proptest",
  "serde",
  "symthaea-core",
+]
+
+[[package]]
+name = "symthaea-consciousness-equation"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

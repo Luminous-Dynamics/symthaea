@@ -106,6 +106,10 @@ pub struct LiquidMambaConfig {
     pub enable_ema: bool,
     /// EMA decay rate (default 0.999). Higher = smoother, slower tracking.
     pub ema_decay: f32,
+    /// Use deep double-bottleneck projection (HDC→256→128→256→SSM).
+    /// When true, `new()` creates `HdcSsmProjection::new_deep()` instead of `new()`.
+    /// Default false for backwards compatibility.
+    pub deep_projection: bool,
 }
 
 impl Default for LiquidMambaConfig {
@@ -140,6 +144,7 @@ impl Default for LiquidMambaConfig {
             prefix_loss_weight: 0.3,
             enable_ema: false,
             ema_decay: 0.999,
+            deep_projection: false,
         }
     }
 }
@@ -198,12 +203,21 @@ impl LiquidMambaGenerator {
         config: LiquidMambaConfig,
         mamba: Box<dyn MambaBackend>,
     ) -> Result<Self> {
-        let projection = HdcSsmProjection::new(
-            genesis,
-            config.hdc_dim,
-            config.bottleneck_dim,
-            config.ssm_dim,
-        );
+        let projection = if config.deep_projection {
+            HdcSsmProjection::new_deep(
+                genesis,
+                config.hdc_dim,
+                config.bottleneck_dim,
+                config.ssm_dim,
+            )
+        } else {
+            HdcSsmProjection::new(
+                genesis,
+                config.hdc_dim,
+                config.bottleneck_dim,
+                config.ssm_dim,
+            )
+        };
 
         let encoder = ThoughtLanguageEncoder::new(genesis);
 

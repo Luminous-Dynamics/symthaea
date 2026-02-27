@@ -3635,6 +3635,15 @@ impl CognitiveLoopService {
         // Apply neuromodulator telemetry via helper (replaces 36 inline fields)
         metadata.apply_neuromod(self.collect_neuromod_telemetry(neuromod_attention_alloc));
 
+        // Phase 4: local-variable telemetry fields (not bath-derived)
+        metadata.neuromod_phasic_replay_boost = phasic_da_replay_boost;
+        metadata.neuromod_ne_reorienting_boost = ne_reorienting_boost;
+        metadata.neuromod_drift_recovery_remaining = self.carryover.urgency.anomaly_drift_recovery;
+        metadata.ne_arousal_feedback = ne_arousal_feedback;
+        metadata.confidence_velocity = confidence_velocity;
+        metadata.sht_crash_dip = sht_crash_dip;
+        metadata.exploration_sht_drain = exploration_sht_drain;
+
         // Update cumulative stats for resonator-memory loop diagnostics
         if resonator_wm_primed {
             self.stats.resonator_wm_primed_count += 1;

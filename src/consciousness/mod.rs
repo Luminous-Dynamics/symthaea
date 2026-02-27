@@ -30,6 +30,54 @@
 //! | Measurement | [`measurement`] | Phi metrics, consciousness equations, profiles |
 //!
 //! All submodule contents are re-exported at this level for backward compatibility.
+//!
+//! ## Feature Gating Status
+//!
+//! Every module is either always-on or gated behind a feature flag. No modules
+//! are disconnected or dead code.
+//!
+//! | Module | Gate | Notes |
+//! |--------|------|-------|
+//! | `primitives` (Layer 1) | always | HDC primitives, composition, evolution, lattice |
+//! | `values` (Layer 2) | always | Seven Harmonies, contextual weights, feedback |
+//! | `temporal` (Layer 3) | always | Temporal/phenomenal binding |
+//! | `embodiment` (Layer 4) | always | Body schema, autopoiesis, interoception |
+//! | `integration` (Layer 5) | always | Cross-modal, GWT, hierarchical LTC |
+//! | `meta` (Layer 6) | always | Metacognitive monitoring, attention schema |
+//! | `dynamics` (Layer 7) | always | Holographic, dissipative, predictive, quantum |
+//! | `measurement` (Layer 8) | always | Phi metrics, consciousness equations, profiles |
+//! | `affective_consciousness` | always | Core affect, emotion categories |
+//! | `master_consciousness_equation` | always | C(t) = σ(softmin(…)) unified equation |
+//! | `pac` | always | PAC learning bounds |
+//! | `consciousness_thermodynamics` | always | Thermodynamic analysis |
+//! | `epistemic_tiers` | always | Empirical/materiality/normative tiers |
+//! | `harmonics` | always | Fiduciary harmonics, harmonic fields |
+//! | `adaptive_reasoning` | always | Adaptive reasoning strategies |
+//! | `causal_explanation` | always | Causal explanation generation |
+//! | `negation_detector` | always | Negation detection in language |
+//! | `synthetic_states` | always | Synthetic consciousness states |
+//! | `gis_integration` | always | GIS/spatial consciousness |
+//! | `multi_objective_evolution` | always | Multi-objective evolutionary search |
+//! | `epistemic_conflict` | always | Epistemic conflict resolution |
+//! | `unified_value_evaluator` | always | Consciousness-guided decision making |
+//! | `tool_gate` | `reasoning_engine` | Tool access gating for reasoning |
+//! | `temporal_planning` | `reasoning_engine` | Temporal planning with deadlines |
+//! | `reasoning_engine` | `reasoning_engine` | 7-step reasoning cycle |
+//! | `counterfactual` (re-export) | `reasoning_engine` | Counterfactual reasoning |
+//! | `empathic_unification` | `full_consciousness` | Full impl; stub types when off |
+//! | `unified_living_mind` | `full_consciousness` | Unified living mind orchestrator |
+//! | `recursive_improvement` | `full_consciousness \| magi_loop` | Recursive self-improvement |
+//! | `unified_intelligence` | `multi_agent` | Collective + meta-cognitive intelligence |
+//! | `byzantine_collective` | `multi_agent` | Byzantine fault-tolerant consensus |
+//! | `meta_learning_byzantine` | `multi_agent` | Meta-learning Byzantine protocols |
+//! | `causal_byzantine` | `multi_agent` | Causal Byzantine fault tolerance |
+//! | `mycelix_bridge` | `mycelix` | Holochain bridge integration |
+//!
+//! External crate re-exports (always-on): `dream`, `fep_active_inference`,
+//! `phi_architecture_search`, `narrative_self`, `causal_calculus`, `causal_emergence`,
+//! `factor_graph`, `consciousness_field_dynamics`, `consciousness_resonance`,
+//! `consciousness_topology`, `enactive_cognition`, `hodge_laplacian`,
+//! `sensorimotor_contingencies`.
 
 // ============================================================================
 // Layer 1: Primitives (HDC primitives, composition, evolution)
