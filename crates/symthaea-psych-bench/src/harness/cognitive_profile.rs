@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-use super::report::{BenchmarkReport, BenchmarkResult, MetricValue};
+use super::report::BenchmarkReport;
 
 /// A cognitive domain with its constituent benchmarks.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,7 +21,7 @@ pub struct DomainScore {
     /// Individual benchmark scores within this domain.
     pub benchmark_scores: Vec<(String, f64)>,
     /// Interpretation label.
-    pub interpretation: &'static str,
+    pub interpretation: String,
 }
 
 /// The 8 cognitive domains and their benchmark assignments.
@@ -208,7 +208,7 @@ impl CognitiveProfile {
 
             if !scores.is_empty() {
                 let mean_score = scores.iter().map(|(_, s)| s).sum::<f64>() / scores.len() as f64;
-                let interpretation = interpret_score(mean_score);
+                let interpretation = interpret_score(mean_score).to_string();
 
                 domains.push(DomainScore {
                     domain: domain.to_string(),
@@ -308,6 +308,7 @@ fn interpret_score(score: f64) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::harness::report::{BenchmarkResult, MetricValue};
 
     fn make_report() -> BenchmarkReport {
         let mut report = BenchmarkReport::new();

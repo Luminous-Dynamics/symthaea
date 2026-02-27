@@ -13,7 +13,9 @@ use serde::{Deserialize, Serialize};
 
 use super::config::BenchmarkConfig;
 use super::difficulty::difficulty_model_for;
-use super::report::{BenchmarkResult, MetricValue};
+use super::report::BenchmarkResult;
+#[cfg(test)]
+use super::report::MetricValue;
 use super::PsychBenchmark;
 
 /// Staircase rule determining convergence target.

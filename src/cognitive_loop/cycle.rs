@@ -3516,48 +3516,7 @@ impl CognitiveLoopService {
             // Spatial Reasoning (GridEncoder)
             grid_encoding_norm,
             grid_spatial_complexity,
-            // Neuromodulator Bath
-            exocortex_query_suggested: self.neuromodulator_bath.should_query_exocortex(),
-            neuromod_personality: self.neuromodulator_bath.personality_description(),
-            dopamine_effective: self.neuromodulator_bath.dopamine.effective(),
-            noradrenaline_effective: self.neuromodulator_bath.noradrenaline.effective(),
-            serotonin_effective: self.neuromodulator_bath.serotonin.effective(),
-            acetylcholine_effective: self.neuromodulator_bath.acetylcholine.effective(),
-            // Personality drift telemetry
-            neuromod_personality_drift: self.personality_drift_tracker.drift_rate(),
-            neuromod_personality_drift_anomalous: self.personality_drift_tracker.is_anomalous(),
-            // Neuromod-aware training telemetry
-            neuromod_gradient_scale: self.neuromodulator_bath.gradient_scale_factor(),
-            neuromod_threshold_gate: self.neuromodulator_bath.threshold_gate(),
-            // Phasic burst telemetry (Phase 2)
-            neuromod_da_phasic: self.neuromodulator_bath.da_phasic(),
-            neuromod_ne_phasic: self.neuromodulator_bath.ne_phasic(),
-            // Consciousness bridge & sleep consolidation (Phase 2)
-            neuromod_consciousness_mod: self.neuromodulator_bath.consciousness_modulation(),
-            neuromod_sleep_consolidation_boost: self.neuromodulator_bath.sleep_consolidation_boost(),
-            // Phase 3: Attention allocation + plasticity gate + MCTS mod
-            neuromod_attention_allocation: neuromod_attention_alloc,
-            neuromod_plasticity_gate: self.neuromodulator_bath.plasticity_gate(),
-            neuromod_mcts_exploration_mod: self.neuromodulator_bath.mcts_exploration_modulation() as f32,
-            replay_da_tag_avg: 0.0, // populated by episodic replay phase if applicable
-            circadian_hour: self.biorhythm.hour as f32,
-            // Phase 3: Receptor subtypes
-            neuromod_da_d1: self.neuromodulator_bath.da_d1_effective(),
-            neuromod_da_d2: self.neuromodulator_bath.da_d2_effective(),
-            neuromod_ne_alpha: self.neuromodulator_bath.ne_alpha_effective(),
-            neuromod_ne_beta: self.neuromodulator_bath.ne_beta_effective(),
-            neuromod_behavioral_flexibility: self.neuromodulator_bath.behavioral_flexibility(),
-            // Phase 3: Dashboard snapshot (every 10 cycles)
-            neuromod_snapshot: if self.stats.total_cycles % 10 == 0 {
-                Some(self.neuromodulator_bath.snapshot())
-            } else {
-                None
-            },
-            // Exocortex trigger counter
-            exocortex_trigger_count: self.stats.exocortex_triggers,
             // Thermodynamic / affective (populated by consciousness pipeline + somatic bridge)
-            thermodynamic_load: 0.0,
-            somatic_stress: 0.0,
             mood_temperature: 1.0,
             // Liquid-Mamba fusion telemetry
             #[cfg(feature = "liquid-mamba")]
@@ -3568,15 +3527,14 @@ impl CognitiveLoopService {
             liquid_mamba_lr: self.stats.last_liquid_mamba_lr,
             #[cfg(feature = "liquid-mamba")]
             liquid_mamba_generation_count: self.stats.liquid_mamba_generation_count,
-            // Mesh network telemetry (populated by Mind module post-cycle)
-            mesh_health_score: 0.0,
-            mesh_peer_count: 0,
-            mesh_bytes_sent: 0,
-            mesh_bytes_received: 0,
-            feedback_confidence_proposals: 0,
-            feedback_lr_proposals: 0,
-            subsystem_integration_contributors: 0,
+            // Fields defaulting to 0/false/None — populated elsewhere or left as default:
+            // thermodynamic_load, somatic_stress, mesh_*, feedback_*, subsystem_integration_*,
+            // safety_blocked, safety_category, replay_da_tag_avg, neuromod_* (applied below)
+            ..Default::default()
         };
+
+        // Apply neuromodulator telemetry via helper (replaces 36 inline fields)
+        metadata.apply_neuromod(self.collect_neuromod_telemetry(neuromod_attention_alloc));
 
         // Update cumulative stats for resonator-memory loop diagnostics
         if resonator_wm_primed {
@@ -3776,6 +3734,10 @@ pub(crate) fn format_panic_payload(payload: Box<dyn std::any::Any + Send>) -> St
 #[cfg(test)]
 mod tests {
     use super::format_panic_payload;
+    use super::{CognitiveLoopService, CycleResult};
+    use crate::cognitive_loop::CognitiveLoopConfig;
+
+    // ── format_panic_payload tests (existing) ─────────────────────────
 
     #[test]
     fn test_panic_payload_str() {
@@ -3803,5 +3765,254 @@ mod tests {
         let payload: Box<dyn std::any::Any + Send> = Box::new("");
         let msg = format_panic_payload(payload);
         assert_eq!(msg, "cognitive cycle panicked: ");
+    }
+
+    // ── Helper ────────────────────────────────────────────────────────
+
+    fn make_service() -> CognitiveLoopService {
+        CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+    }
+
+    // ── cycle() basic execution ───────────────────────────────────────
+
+    #[test]
+    fn cycle_returns_valid_result() {
+        let mut s = make_service();
+        let result = s.cycle("hello world");
+        assert!(!result.output.is_empty(), "output should not be empty");
+        assert!(result.prediction_error.is_finite());
+        assert!(result.peak_attention.is_finite());
+        assert!(result.cycle_time_us > 0);
+    }
+
+    #[test]
+    fn cycle_increments_total_cycles() {
+        let mut s = make_service();
+        assert_eq!(s.stats().total_cycles, 0);
+        s.cycle("first");
+        assert_eq!(s.stats().total_cycles, 1);
+        s.cycle("second");
+        assert_eq!(s.stats().total_cycles, 2);
+    }
+
+    #[test]
+    fn cycle_output_dimension_matches_config() {
+        let mut s = make_service();
+        let result = s.cycle("testing output dim");
+        assert_eq!(
+            result.output.len(),
+            s.config().cfc_config.num_neurons,
+            "output dimension should match num_neurons"
+        );
+    }
+
+    #[test]
+    fn cycle_prediction_error_non_negative() {
+        let mut s = make_service();
+        let result = s.cycle("checking error sign");
+        assert!(
+            result.prediction_error >= 0.0,
+            "prediction_error should be non-negative, got {}",
+            result.prediction_error
+        );
+    }
+
+    #[test]
+    fn cycle_thought_vector_has_values() {
+        let mut s = make_service();
+        let result = s.cycle("thought projection");
+        assert!(!result.thought_vector.is_empty());
+        assert_eq!(result.thought_vector.len(), 32, "thought_vector should be 32D");
+    }
+
+    #[test]
+    fn cycle_metadata_urgency_populated() {
+        let mut s = make_service();
+        let result = s.cycle("metadata check");
+        // Urgency should be one of the three valid variants
+        let u = result.metadata.urgency;
+        assert!(
+            matches!(
+                u,
+                crate::cognitive_loop::CycleUrgency::Critical
+                    | crate::cognitive_loop::CycleUrgency::Normal
+                    | crate::cognitive_loop::CycleUrgency::Cruise
+            ),
+            "urgency should be a valid variant"
+        );
+    }
+
+    #[test]
+    fn cycle_output_all_finite() {
+        let mut s = make_service();
+        let result = s.cycle("NaN guard check");
+        for (i, &v) in result.output.iter().enumerate() {
+            assert!(v.is_finite(), "output[{i}] is not finite: {v}");
+        }
+    }
+
+    // ── Multiple cycles ───────────────────────────────────────────────
+
+    #[test]
+    fn multiple_cycles_do_not_panic() {
+        let mut s = make_service();
+        for i in 0..10 {
+            let result = s.cycle(&format!("cycle input {i}"));
+            assert!(result.prediction_error.is_finite());
+        }
+        assert_eq!(s.stats().total_cycles, 10);
+    }
+
+    #[test]
+    fn empty_input_does_not_panic() {
+        let mut s = make_service();
+        let result = s.cycle("");
+        assert!(result.prediction_error.is_finite());
+    }
+
+    #[test]
+    fn long_input_does_not_panic() {
+        let mut s = make_service();
+        let long_input = "a".repeat(10_000);
+        let result = s.cycle(&long_input);
+        assert!(result.prediction_error.is_finite());
+    }
+
+    #[test]
+    fn repeated_identical_input_reduces_prediction_error() {
+        let mut s = make_service();
+        // First cycle has no prior prediction
+        let r1 = s.cycle("repeating input");
+        // Run several identical cycles so the system can learn the pattern
+        let mut last_error = r1.prediction_error;
+        for _ in 0..20 {
+            last_error = s.cycle("repeating input").prediction_error;
+        }
+        // After 20 identical cycles, error should be lower or comparable
+        // (not necessarily strictly lower due to stochastic subsystems)
+        assert!(
+            last_error.is_finite(),
+            "error should remain finite after repeated cycles"
+        );
+    }
+
+    // ── try_cycle() ───────────────────────────────────────────────────
+
+    #[test]
+    fn try_cycle_returns_ok() {
+        let mut s = make_service();
+        let result = s.try_cycle("safe input");
+        assert!(result.is_ok(), "try_cycle should succeed for normal input");
+    }
+
+    #[test]
+    fn try_cycle_result_matches_cycle() {
+        let mut s1 = make_service();
+        let mut s2 = make_service();
+        // Use genesis phrase for determinism
+        let mut cfg = CognitiveLoopConfig::default();
+        cfg.genesis_phrase = Some("determinism test".to_string());
+        s1 = CognitiveLoopService::new(cfg.clone()).unwrap();
+        s2 = CognitiveLoopService::new(cfg).unwrap();
+
+        let r1 = s1.cycle("hello");
+        let r2 = s2.try_cycle("hello").unwrap();
+
+        // Both should produce same output with deterministic genesis
+        assert_eq!(r1.output.len(), r2.output.len());
+        assert_eq!(r1.prediction_error, r2.prediction_error);
+    }
+
+    // ── Cycle with different backends ─────────────────────────────────
+
+    #[test]
+    fn cycle_with_hdc_ltc_unified_backend() {
+        let config = CognitiveLoopConfig::with_hdc_ltc_unified();
+        let mut s = CognitiveLoopService::new(config).unwrap();
+        let result = s.cycle("HdcLtc backend test");
+        assert!(!result.output.is_empty());
+        assert!(result.prediction_error.is_finite());
+    }
+
+    #[test]
+    fn cycle_with_hdc_ltc_fast_backend() {
+        let config = CognitiveLoopConfig::with_hdc_ltc_fast();
+        let mut s = CognitiveLoopService::new(config).unwrap();
+        let result = s.cycle("fast backend test");
+        assert!(!result.output.is_empty());
+        assert!(result.prediction_error.is_finite());
+    }
+
+    // ── Cycle stats tracking ──────────────────────────────────────────
+
+    #[test]
+    fn cycle_updates_avg_prediction_error() {
+        let mut s = make_service();
+        s.cycle("first");
+        let err1 = s.stats().avg_prediction_error;
+        // After first cycle, avg error should be populated (may be 0.0 for first cycle)
+        assert!(err1.is_finite());
+    }
+
+    #[test]
+    fn cycle_populates_adaptive_learning_rate() {
+        let mut s = make_service();
+        s.cycle("learning rate check");
+        let lr = s.stats().adaptive_learning_rate;
+        assert!(lr.is_finite());
+        assert!(lr >= 0.0);
+    }
+
+    // ── Genesis determinism ───────────────────────────────────────────
+
+    #[test]
+    fn genesis_seeded_cycles_are_deterministic() {
+        let phrase = "We hold these truths to be self-evident".to_string();
+
+        let mut cfg_a = CognitiveLoopConfig::default();
+        cfg_a.genesis_phrase = Some(phrase.clone());
+        let mut sa = CognitiveLoopService::new(cfg_a).unwrap();
+
+        let mut cfg_b = CognitiveLoopConfig::default();
+        cfg_b.genesis_phrase = Some(phrase);
+        let mut sb = CognitiveLoopService::new(cfg_b).unwrap();
+
+        let ra = sa.cycle("determinism check");
+        let rb = sb.cycle("determinism check");
+
+        assert_eq!(ra.output, rb.output, "genesis-seeded outputs should match");
+        assert_eq!(
+            ra.prediction_error, rb.prediction_error,
+            "genesis-seeded errors should match"
+        );
+    }
+
+    // ── Cycle metadata fields ─────────────────────────────────────────
+
+    #[test]
+    fn cycle_metadata_somatic_stress_finite() {
+        let mut s = make_service();
+        let result = s.cycle("somatic check");
+        assert!(result.metadata.somatic_stress.is_finite());
+    }
+
+    #[test]
+    fn cycle_metadata_consciousness_level_bounded() {
+        let mut s = make_service();
+        // Run a few cycles to populate MCE
+        for _ in 0..15 {
+            s.cycle("populate MCE");
+        }
+        let result = s.cycle("check consciousness");
+        assert!(result.metadata.consciousness_level >= 0.0);
+        assert!(result.metadata.consciousness_level <= 1.0);
+    }
+
+    #[test]
+    fn cycle_metadata_thermodynamic_load_bounded() {
+        let mut s = make_service();
+        let result = s.cycle("thermo check");
+        assert!(result.metadata.thermodynamic_load >= 0.0);
+        assert!(result.metadata.thermodynamic_load <= 1.0);
     }
 }

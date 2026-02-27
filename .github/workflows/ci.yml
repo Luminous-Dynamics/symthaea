@@ -1,7 +1,7 @@
 # Symthaea HLB CI Workflow
 #
-# Runs on push to main and pull requests
-# Jobs: format check, clippy, tests (default and all-features), security audit
+# Runs on push to main, pull requests, and weekly schedule (psych-bench regression)
+# Jobs: format check, clippy, tests (default and all-features), psych-bench regression, security audit
 
 name: CI
 
@@ -9,6 +9,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # Weekly psych-bench regression run: Sundays at 04:00 UTC
+    - cron: '0 4 * * 0'
 
 env:
   CARGO_TERM_COLOR: always
@@ -226,14 +229,49 @@ jobs:
   psych-bench:
     name: Psych-Bench Regression
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: test
+    # Run on: weekly schedule, OR pushes to main touching cognitive_loop/psych-bench, OR manual
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main'
+      ) ||
+      github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check if psych-bench relevant files changed
+        id: changes
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            psych_relevant:
+              - 'src/cognitive_loop/**'
+              - 'crates/symthaea-psych-bench/**'
+              - 'symthaea-core/src/hdc/**'
+
+      - name: Decide whether to run
+        id: should_run
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.changes.outputs.psych_relevant }}" = "true" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping psych-bench: no relevant files changed"
+          fi
+
       - name: Install Rust toolchain
+        if: steps.should_run.outputs.run == 'true'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo registry and target
+        if: steps.should_run.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -245,12 +283,23 @@ jobs:
             ${{ runner.os }}-cargo-psych-
 
       - name: Install system dependencies
+        if: steps.should_run.outputs.run == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
 
-      - name: Run psych-bench regression tests
-        run: cargo test -p symthaea-psych-bench --test full_battery regression_against_baseline -- --nocapture
+      - name: Run psych-bench full battery (release)
+        if: steps.should_run.outputs.run == 'true'
+        run: |
+          cargo test --test full_battery --release -p symthaea-psych-bench -- --nocapture 2>&1 | tee psych-bench-output.txt
+
+      - name: Upload psych-bench results
+        if: steps.should_run.outputs.run == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: psych-bench-results-${{ github.sha }}
+          path: psych-bench-output.txt
+          retention-days: 90
 
   feature-interactions:
     name: Feature Interactions

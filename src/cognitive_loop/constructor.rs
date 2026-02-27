@@ -1014,3 +1014,303 @@ impl CognitiveLoopService {
         self.temporal_network.backend_type()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Default construction ──────────────────────────────────────────
+
+    #[test]
+    fn default_construction_succeeds() {
+        let service = CognitiveLoopService::new(CognitiveLoopConfig::default());
+        assert!(service.is_ok(), "default config should construct successfully");
+    }
+
+    #[test]
+    fn default_prediction_confidence_is_neutral() {
+        let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+        assert!(
+            (service.prediction_confidence() - 0.5).abs() < f32::EPSILON,
+            "initial prediction_confidence should be 0.5, got {}",
+            service.prediction_confidence()
+        );
+    }
+
+    #[test]
+    fn default_stats_are_zeroed() {
+        let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+        let stats = service.stats();
+        assert_eq!(stats.total_cycles, 0);
+        assert_eq!(stats.avg_prediction_error, 0.0);
+    }
+
+    #[test]
+    fn default_cycle_count_is_zero() {
+        let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+        assert_eq!(service.stats().total_cycles, 0);
+    }
+
+    #[test]
+    fn default_social_signals_are_defaults() {
+        let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+        // social_trust defaults to 0.5, cooperation_rate defaults to 0.0
+        assert!((service.social_trust - 0.5).abs() < f32::EPSILON);
+        assert!((service.social_cooperation_rate - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn default_external_reward_is_zero() {
+        let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+        assert!((service.external_reward - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn default_fep_learning_signal_is_zero() {
+        let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+        assert!((service.fep_learning_signal() - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn default_relational_psi_is_zero() {
+        let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+        assert!((service.relational_psi - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ── Backend selection ─────────────────────────────────────────────
+
+    #[test]
+    fn cfc_backend_selection() {
+        let config = CognitiveLoopConfig::with_cfc();
+        let service = CognitiveLoopService::new(config).unwrap();
+        assert_eq!(service.temporal_backend(), TemporalBackend::CfC);
+    }
+
+    #[test]
+    fn hdc_ltc_unified_backend_selection() {
+        let config = CognitiveLoopConfig::with_hdc_ltc_unified();
+        let service = CognitiveLoopService::new(config).unwrap();
+        assert_eq!(service.temporal_backend(), TemporalBackend::HdcLtcUnified);
+    }
+
+    #[test]
+    fn hdc_ltc_fast_backend_selection() {
+        let config = CognitiveLoopConfig::with_hdc_ltc_fast();
+        let service = CognitiveLoopService::new(config).unwrap();
+        assert_eq!(service.temporal_backend(), TemporalBackend::HdcLtcUnified);
+    }
+
+    #[test]
+    fn hdc_ltc_accurate_backend_selection() {
+        let config = CognitiveLoopConfig::with_hdc_ltc_accurate();
+        let service = CognitiveLoopService::new(config).unwrap();
+        assert_eq!(service.temporal_backend(), TemporalBackend::HdcLtcUnified);
+    }
+
+    // ── Config validation passthrough ─────────────────────────────────
+
+    #[test]
+    fn invalid_config_rejected_zero_neurons() {
+        let mut config = CognitiveLoopConfig::default();
+        config.cfc_config.num_neurons = 0;
+        let result = CognitiveLoopService::new(config);
+        assert!(result.is_err(), "zero neurons should be rejected");
+    }
+
+    #[test]
+    fn invalid_config_rejected_zero_buffer() {
+        let mut config = CognitiveLoopConfig::default();
+        config.buffer_size = 0;
+        let result = CognitiveLoopService::new(config);
+        assert!(result.is_err(), "zero buffer should be rejected");
+    }
+
+    #[test]
+    fn invalid_config_rejected_negative_lr() {
+        let mut config = CognitiveLoopConfig::default();
+        config.cfc_config.learning_rate = -0.5;
+        let result = CognitiveLoopService::new(config);
+        assert!(result.is_err(), "negative learning rate should be rejected");
+    }
+
+    #[test]
+    fn invalid_config_rejected_nan_threshold() {
+        let mut config = CognitiveLoopConfig::default();
+        config.learning_threshold = f32::NAN;
+        let result = CognitiveLoopService::new(config);
+        assert!(result.is_err(), "NaN learning threshold should be rejected");
+    }
+
+    // ── Genesis phrase ────────────────────────────────────────────────
+
+    #[test]
+    fn genesis_phrase_construction_succeeds() {
+        let mut config = CognitiveLoopConfig::default();
+        config.genesis_phrase = Some("We hold these truths".to_string());
+        let service = CognitiveLoopService::new(config);
+        assert!(service.is_ok(), "genesis phrase config should construct");
+    }
+
+    #[test]
+    fn genesis_phrase_with_hdc_ltc_backend() {
+        let mut config = CognitiveLoopConfig::with_hdc_ltc_unified();
+        config.genesis_phrase = Some("deterministic seed phrase".to_string());
+        let service = CognitiveLoopService::new(config);
+        assert!(service.is_ok(), "genesis phrase + HdcLtc should construct");
+    }
+
+    // ── Optional subsystem gating ─────────────────────────────────────
+
+    #[test]
+    fn causal_enhancement_disabled_by_default() {
+        let config = CognitiveLoopConfig::default();
+        let service = CognitiveLoopService::new(config).unwrap();
+        assert!(!service.has_causal_structure());
+        assert!(service.causal_graph().is_none());
+    }
+
+    #[test]
+    fn causal_enhancement_enabled_creates_enhancer() {
+        let mut config = CognitiveLoopConfig::default();
+        config.causal_enhancement = true;
+        let service = CognitiveLoopService::new(config).unwrap();
+        // Causal enhancer exists but no structure discovered yet
+        assert!(service.causal_stats().is_some());
+        assert!(!service.has_causal_structure());
+    }
+
+    #[test]
+    fn episodic_replay_disabled_by_default() {
+        let config = CognitiveLoopConfig::default();
+        let service = CognitiveLoopService::new(config).unwrap();
+        assert_eq!(service.episodic_replay_count(), 0);
+        assert!(service.episodic_replay_stats().is_none());
+    }
+
+    #[test]
+    fn episodic_replay_enabled_creates_memory() {
+        let mut config = CognitiveLoopConfig::default();
+        config.episodic_replay = true;
+        let service = CognitiveLoopService::new(config).unwrap();
+        assert!(service.episodic_replay_stats().is_some());
+        assert_eq!(service.episodic_replay_count(), 0);
+    }
+
+    #[test]
+    fn primitive_consciousness_disabled_means_no_subsystems() {
+        let config = CognitiveLoopConfig::default();
+        assert!(!config.enable_primitive_consciousness);
+        let service = CognitiveLoopService::new(config).unwrap();
+        assert!(service.temporal_analyzer().is_none());
+        assert!(service.primitive_lattice().is_none());
+        assert!(service.compositionality_engine().is_none());
+        assert!(service.value_evaluator().is_none());
+        assert!(service.harmonic_field().is_none());
+        assert!(service.primitive_reasoner().is_none());
+        assert!(service.adaptive_reasoner().is_none());
+        assert!(service.causal_explainer().is_none());
+        assert!(service.epistemic_gate().is_none());
+        assert!(service.meta_cognitive_reasoner().is_none());
+        assert!(service.code_primitive_router().is_none());
+    }
+
+    #[test]
+    fn primitive_consciousness_enabled_creates_subsystems() {
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_primitive_consciousness = true;
+        let service = CognitiveLoopService::new(config).unwrap();
+        assert!(service.temporal_analyzer().is_some());
+        assert!(service.primitive_lattice().is_some());
+        assert!(service.compositionality_engine().is_some());
+        assert!(service.value_evaluator().is_some());
+        assert!(service.harmonic_field().is_some());
+        assert!(service.primitive_reasoner().is_some());
+        assert!(service.epistemic_gate().is_some());
+    }
+
+    // ── Attestation buffer capacity ───────────────────────────────────
+
+    #[test]
+    fn attestation_buffer_clamped_to_256() {
+        let mut config = CognitiveLoopConfig::default();
+        config.attestation_buffer_capacity = 1000;
+        let service = CognitiveLoopService::new(config).unwrap();
+        // Constructor clamps to min(1000, 256) = 256
+        assert!(service.config().attestation_buffer_capacity <= 256);
+    }
+
+    #[test]
+    fn attestation_buffer_preserves_small_value() {
+        let mut config = CognitiveLoopConfig::default();
+        config.attestation_buffer_capacity = 32;
+        let service = CognitiveLoopService::new(config).unwrap();
+        assert_eq!(service.config().attestation_buffer_capacity, 32);
+    }
+
+    // ── Psi attestation ───────────────────────────────────────────────
+
+    #[test]
+    fn psi_attestation_initially_empty() {
+        let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+        assert_eq!(service.psi_attestation_count(), 0);
+        assert!(service.latest_psi_attestation().is_none());
+    }
+
+    // ── Config preserved ──────────────────────────────────────────────
+
+    #[test]
+    fn config_accessor_returns_same_config() {
+        let config = CognitiveLoopConfig::default();
+        let service = CognitiveLoopService::new(config.clone()).unwrap();
+        assert_eq!(
+            service.config().learning_threshold,
+            config.learning_threshold
+        );
+        assert_eq!(
+            service.config().target_frequency,
+            config.target_frequency
+        );
+        assert_eq!(
+            service.config().temporal_backend,
+            config.temporal_backend
+        );
+    }
+
+    // ── ConsciousnessProfile-based construction ───────────────────────
+
+    #[test]
+    fn minimal_profile_construction() {
+        let config = CognitiveLoopConfig::from_profile(
+            super::super::config::ConsciousnessProfile::Minimal,
+        );
+        let service = CognitiveLoopService::new(config);
+        assert!(service.is_ok(), "Minimal profile should construct");
+    }
+
+    #[test]
+    fn standard_profile_construction() {
+        let config = CognitiveLoopConfig::from_profile(
+            super::super::config::ConsciousnessProfile::Standard,
+        );
+        let service = CognitiveLoopService::new(config);
+        assert!(service.is_ok(), "Standard profile should construct");
+    }
+
+    #[test]
+    fn full_profile_construction() {
+        let config = CognitiveLoopConfig::from_profile(
+            super::super::config::ConsciousnessProfile::Full,
+        );
+        let service = CognitiveLoopService::new(config);
+        assert!(service.is_ok(), "Full profile should construct");
+    }
+
+    #[test]
+    fn research_profile_construction() {
+        let config = CognitiveLoopConfig::from_profile(
+            super::super::config::ConsciousnessProfile::Research,
+        );
+        let service = CognitiveLoopService::new(config);
+        assert!(service.is_ok(), "Research profile should construct");
+    }
+}
