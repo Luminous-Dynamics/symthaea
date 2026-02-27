@@ -3562,6 +3562,12 @@ impl CognitiveLoopService {
             // Liquid-Mamba fusion telemetry
             #[cfg(feature = "liquid-mamba")]
             liquid_mamba_semantic_pe: self.stats.last_liquid_mamba_pe,
+            #[cfg(feature = "liquid-mamba")]
+            liquid_mamba_effective_rank: self.stats.last_liquid_mamba_rank,
+            #[cfg(feature = "liquid-mamba")]
+            liquid_mamba_lr: self.stats.last_liquid_mamba_lr,
+            #[cfg(feature = "liquid-mamba")]
+            liquid_mamba_generation_count: self.stats.liquid_mamba_generation_count,
             // Mesh network telemetry (populated by Mind module post-cycle)
             mesh_health_score: 0.0,
             mesh_peer_count: 0,
@@ -3699,6 +3705,20 @@ impl CognitiveLoopService {
     /// output HVs, and semantic prediction error. Adjusts projection weights
     /// using FEP-modulated learning rate, gated by the cognitive loop's
     /// learning state and thermodynamic load.
+    #[cfg(feature = "liquid-mamba")]
+    pub fn update_liquid_mamba_telemetry(
+        &mut self,
+        semantic_pe: f32,
+        effective_rank: f32,
+        current_lr: f32,
+        generation_count: u32,
+    ) {
+        self.stats.last_liquid_mamba_pe = semantic_pe;
+        self.stats.last_liquid_mamba_rank = effective_rank;
+        self.stats.last_liquid_mamba_lr = current_lr;
+        self.stats.liquid_mamba_generation_count = generation_count;
+    }
+
     #[cfg(feature = "liquid-mamba")]
     pub fn liquid_mamba_distillation_step(
         &mut self,
