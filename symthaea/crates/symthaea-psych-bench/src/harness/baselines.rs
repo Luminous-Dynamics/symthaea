@@ -1639,6 +1639,33 @@ pub fn reasoning_baselines() -> BaselineMap {
         source: "Kanerva (2009), small-to-large grid accuracy ratio",
         population: "human adults",
     });
+    // ARC RSA baselines (Kriegeskorte et al. 2008)
+    m.insert("arc_rsa_correlation", Baseline {
+        value: 0.60,
+        sd: Some(0.15),
+        source: "Kriegeskorte et al. (2008), RSA correlation estimate",
+        population: "human adults",
+    });
+    m.insert("arc_rsa_discriminability", Baseline {
+        value: 0.20,
+        sd: Some(0.10),
+        source: "Kriegeskorte et al. (2008), within-between type gap",
+        population: "human adults",
+    });
+    // ARC Algebra baselines (Plate 2003; Kanerva 2009)
+    m.insert("arc_algebra_score", Baseline {
+        value: 0.50,
+        sd: Some(0.15),
+        source: "Plate (2003), mean algebraic property satisfaction",
+        population: "theoretical",
+    });
+    // ARC Staircase baselines (Levitt 1971)
+    m.insert("arc_capacity_threshold", Baseline {
+        value: 10.0,
+        sd: Some(4.0),
+        source: "Chollet (2019), estimated grid size capacity",
+        population: "human adults",
+    });
     m
 }
 

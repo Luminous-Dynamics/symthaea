@@ -876,6 +876,19 @@ impl BenchmarkReport {
             push_specific("grid_3x3_accuracy", "arc_grid_3x3_accuracy", &bl.reasoning);
             push_specific("capacity_ratio", "arc_capacity_ratio", &bl.reasoning);
         }
+        // ARC RSA (representational similarity)
+        if benchmark.contains("ArcRSA") {
+            push_specific("rsa_correlation", "arc_rsa_correlation", &bl.reasoning);
+            push_specific("discriminability", "arc_rsa_discriminability", &bl.reasoning);
+        }
+        // ARC Algebra (rule algebra probes)
+        if benchmark.contains("ArcAlgebra") {
+            push_specific("algebra_score", "arc_algebra_score", &bl.reasoning);
+        }
+        // ARC Staircase (adaptive threshold)
+        if benchmark.contains("ArcStaircase") {
+            push_specific("capacity_threshold", "arc_capacity_threshold", &bl.reasoning);
+        }
         // SART (Sustained Attention)
         if benchmark.contains("SART") {
             push_specific("commission_errors", "commission_errors", &bl.sustained_attention);
@@ -1284,6 +1297,9 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("ArcNoise") => "noise_resilience",
         b if b.contains("ArcFewShot") => "accuracy_5shot",
         b if b.contains("ArcScaling") => "capacity_ratio",
+        b if b.contains("ArcRSA") => "rsa_correlation",
+        b if b.contains("ArcAlgebra") => "algebra_score",
+        b if b.contains("ArcStaircase") => "capacity_threshold",
         _ => "overall_accuracy",
     }
 }

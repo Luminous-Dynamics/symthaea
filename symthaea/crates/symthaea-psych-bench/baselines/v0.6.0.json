@@ -1,7 +1,7 @@
 {
   "name": "baseline",
-  "timestamp": "2026-02-27T04:12:22.845036736+00:00",
-  "git_hash": "abbf47934",
+  "timestamp": "2026-02-27T04:55:01.896075165+00:00",
+  "git_hash": "a31d805c5",
   "config_summary": "dim=512, trials=10, seed=42",
   "schema_version": "1.1",
   "metrics": {
@@ -1482,6 +1482,57 @@
         "ci_upper": 0.5481399399196883
       }
     },
+    "Reasoning::ArcAlgebra": {
+      "algebra_score": {
+        "mean": 0.822231009155512,
+        "std_dev": 0.016823709070701316,
+        "n": 10,
+        "ci_lower": 0.810196888813309,
+        "ci_upper": 0.8342651294977149
+      },
+      "associativity": {
+        "mean": 0.9503511600196362,
+        "std_dev": 0.029850922799487156,
+        "n": 10,
+        "ci_lower": 0.9289985798136196,
+        "ci_upper": 0.9717037402256528
+      },
+      "distributivity": {
+        "mean": 0.9992706388235092,
+        "std_dev": 0.0007469865276478512,
+        "n": 10,
+        "ci_lower": 0.9987363139769524,
+        "ci_upper": 0.999804963670066
+      },
+      "identity_preservation": {
+        "mean": 0.6230537243187427,
+        "std_dev": 0.06164030976155722,
+        "n": 10,
+        "ci_lower": 0.5789619665212259,
+        "ci_upper": 0.6671454821162596
+      },
+      "inverse_similarity": {
+        "mean": 0.5990607865154743,
+        "std_dev": 0.054477761430712125,
+        "n": 10,
+        "ci_lower": 0.5600924511575636,
+        "ci_upper": 0.6380291218733851
+      },
+      "rt_ticks": {
+        "mean": 6.9,
+        "std_dev": 1.3703203194062978,
+        "n": 10,
+        "ci_lower": 5.9198,
+        "ci_upper": 7.8802
+      },
+      "rule_consistency": {
+        "mean": 0.9394187361001969,
+        "std_dev": 0.03148235128632142,
+        "n": 10,
+        "ci_lower": 0.916899183340283,
+        "ci_upper": 0.9619382888601108
+      }
+    },
     "Reasoning::ArcAnalogy": {
       "analogy_accuracy": {
         "mean": 0.5611111111111112,
@@ -1928,6 +1979,43 @@
         "ci_upper": 0.5357523804367319
       }
     },
+    "Reasoning::ArcRSA": {
+      "between_type_similarity": {
+        "mean": 0.6875489142723381,
+        "std_dev": 0.1023842321825377,
+        "n": 10,
+        "ci_lower": 0.6143127351366423,
+        "ci_upper": 0.7607850934080339
+      },
+      "discriminability": {
+        "mean": 0.027531095625211784,
+        "std_dev": 0.014983640409447893,
+        "n": 10,
+        "ci_lower": 0.016813189657281548,
+        "ci_upper": 0.03824900159314202
+      },
+      "rsa_correlation": {
+        "mean": 0.42446675126910005,
+        "std_dev": 0.0559524251997781,
+        "n": 10,
+        "ci_lower": 0.3844435782896726,
+        "ci_upper": 0.4644899242485275
+      },
+      "rt_ticks": {
+        "mean": 7.5,
+        "std_dev": 0.8498365855987975,
+        "n": 10,
+        "ci_lower": 6.89210576577829,
+        "ci_upper": 8.10789423422171
+      },
+      "within_type_similarity": {
+        "mean": 0.7150800098975498,
+        "std_dev": 0.09217473188474092,
+        "n": 10,
+        "ci_lower": 0.6491467599019811,
+        "ci_upper": 0.7810132598931185
+      }
+    },
     "Reasoning::ArcScaling": {
       "capacity_ratio": {
         "mean": 1.0,
@@ -2061,6 +2149,50 @@
         "n": 10,
         "ci_lower": 0.0,
         "ci_upper": 0.0
+      }
+    },
+    "Reasoning::ArcStaircase": {
+      "accuracy_easy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "accuracy_hard": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "capacity_threshold": {
+        "mean": 20.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 20.0,
+        "ci_upper": 20.0
+      },
+      "psychometric_slope": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "rt_ticks": {
+        "mean": 9.1,
+        "std_dev": 1.5238839267549946,
+        "n": 10,
+        "ci_lower": 8.009954844972007,
+        "ci_upper": 10.190045155027992
+      },
+      "steps_taken": {
+        "mean": 12.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 12.0,
+        "ci_upper": 12.0
       }
     },
     "Social::RME": {

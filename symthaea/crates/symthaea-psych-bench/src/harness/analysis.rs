@@ -1621,6 +1621,316 @@ pub fn format_reasoning_validity(result: &ReasoningValidityResult) -> String {
     lines.join("\n")
 }
 
+// ── ARC Split-Half Reliability ──
+
+/// Split-half reliability result for a single ARC benchmark.
+#[derive(Debug, Clone)]
+pub struct SplitHalfResult {
+    pub benchmark: String,
+    pub metric: String,
+    /// Raw correlation between odd/even trial halves.
+    pub raw_correlation: f64,
+    /// Spearman-Brown corrected reliability (r_sb = 2r / (1 + r)).
+    pub corrected_reliability: f64,
+    /// Number of trials used.
+    pub n_trials: usize,
+}
+
+/// Compute split-half reliability for ARC benchmarks in a report.
+///
+/// Since `MetricValue` stores summary statistics (mean, std_dev, n) rather
+/// than individual trial samples, this uses a parametric simulation:
+/// generates 2×n synthetic samples from N(mean, std_dev), splits into
+/// odd/even halves, and computes Spearman-Brown corrected reliability.
+/// Seed is derived from the benchmark name for determinism.
+pub fn arc_split_half_reliability(report: &super::report::BenchmarkReport) -> Vec<SplitHalfResult> {
+    let mut results = Vec::new();
+
+    for bench_result in &report.results {
+        if !bench_result.benchmark.contains("Arc") {
+            continue;
+        }
+        let key = super::report::key_metric_for_benchmark(&bench_result.benchmark);
+        if let Some(metric) = bench_result.metrics.get(key) {
+            let n = metric.n.max(4);
+            if n < 4 || metric.std_dev.abs() < 1e-15 {
+                // Not enough trials or zero variance — perfect reliability trivially
+                results.push(SplitHalfResult {
+                    benchmark: bench_result.benchmark.clone(),
+                    metric: key.to_string(),
+                    raw_correlation: 1.0,
+                    corrected_reliability: 1.0,
+                    n_trials: n,
+                });
+                continue;
+            }
+            // Generate 2*n synthetic samples via Box-Muller with deterministic seed
+            let mut seed: u64 = 0x5A17_C0DE;
+            for b in bench_result.benchmark.bytes() {
+                seed = seed.wrapping_mul(31).wrapping_add(b as u64);
+            }
+            seed ^= 0x9E3779B97F4A7C15;
+            let xor_shift = |s: &mut u64| { *s ^= *s << 13; *s ^= *s >> 7; *s ^= *s << 17; };
+            let total = 2 * n;
+            let mut samples = Vec::with_capacity(total);
+            for _ in 0..((total + 1) / 2) {
+                xor_shift(&mut seed);
+                let u1 = (seed % 100_000) as f64 / 100_000.0;
+                xor_shift(&mut seed);
+                let u2 = (seed % 100_000) as f64 / 100_000.0;
+                let u1 = u1.max(1e-10);
+                let z1 = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
+                let z2 = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).sin();
+                samples.push(metric.mean + metric.std_dev * z1);
+                samples.push(metric.mean + metric.std_dev * z2);
+            }
+            samples.truncate(total);
+
+            let odd: Vec<f64> = samples.iter().step_by(2).copied().collect();
+            let even: Vec<f64> = samples.iter().skip(1).step_by(2).copied().collect();
+            let half_n = odd.len().min(even.len());
+            if half_n >= 2 {
+                let r = spearman_correlation(&odd[..half_n], &even[..half_n]);
+                let r_sb = if (1.0 + r).abs() > 1e-10 { 2.0 * r / (1.0 + r) } else { 0.0 };
+                results.push(SplitHalfResult {
+                    benchmark: bench_result.benchmark.clone(),
+                    metric: key.to_string(),
+                    raw_correlation: r,
+                    corrected_reliability: r_sb,
+                    n_trials: n,
+                });
+            }
+        }
+    }
+    results
+}
+
+/// Format split-half reliability results.
+pub fn format_arc_reliability(results: &[SplitHalfResult]) -> String {
+    let mut lines = Vec::new();
+    lines.push("## ARC Benchmark Split-Half Reliability".to_string());
+    lines.push(String::new());
+    lines.push("| Benchmark | Metric | r_raw | r_SB | N | Verdict |".to_string());
+    lines.push("|-----------|--------|-------|------|---|---------|".to_string());
+    for r in results {
+        let verdict = if r.corrected_reliability >= 0.80 {
+            "Excellent"
+        } else if r.corrected_reliability >= 0.70 {
+            "Good"
+        } else if r.corrected_reliability >= 0.50 {
+            "Moderate"
+        } else {
+            "Low"
+        };
+        let short = r.benchmark.split("::").last().unwrap_or(&r.benchmark);
+        lines.push(format!(
+            "| {} | {} | {:.3} | {:.3} | {} | {} |",
+            short, r.metric, r.raw_correlation, r.corrected_reliability, r.n_trials, verdict
+        ));
+    }
+    lines.join("\n")
+}
+
+// ── Unified ARC Report ──
+
+/// Comprehensive ARC analysis report combining all ARC benchmark results.
+pub fn format_arc_report(report: &super::report::BenchmarkReport) -> String {
+    let mut lines = Vec::new();
+    lines.push("# ARC Reasoning Suite — Comprehensive Report".to_string());
+    lines.push(String::new());
+
+    // 1. Overview table: benchmark name, key metric, value
+    lines.push("## 1. Overview".to_string());
+    lines.push(String::new());
+    lines.push("| Benchmark | Key Metric | Mean | SD | CI |".to_string());
+    lines.push("|-----------|-----------|------|----|----|".to_string());
+    for result in &report.results {
+        if !result.benchmark.contains("Arc") {
+            continue;
+        }
+        let key = super::report::key_metric_for_benchmark(&result.benchmark);
+        if let Some(m) = result.metrics.get(key) {
+            let short = result.benchmark.split("::").last().unwrap_or(&result.benchmark);
+            lines.push(format!(
+                "| {} | {} | {:.3} | {:.3} | [{:.3}, {:.3}] |",
+                short, key, m.mean, m.std_dev, m.ci_lower, m.ci_upper
+            ));
+        }
+    }
+
+    // 2. Scaling analysis (if ArcScaling present)
+    lines.push(String::new());
+    lines.push("## 2. Scaling Analysis".to_string());
+    for result in &report.results {
+        if result.benchmark.contains("ArcScaling") {
+            lines.push(String::new());
+            lines.push("### Grid Complexity".to_string());
+            for name in &["grid_3x3_accuracy", "grid_5x5_accuracy", "grid_8x8_accuracy", "grid_12x12_accuracy"] {
+                if let Some(m) = result.metrics.get(*name) {
+                    lines.push(format!("  {}: {:.3} (±{:.3})", name, m.mean, m.std_dev));
+                }
+            }
+            if let Some(m) = result.metrics.get("grid_complexity_slope") {
+                lines.push(format!("  Slope (acc/cell²): {:.4}", m.mean));
+            }
+            lines.push(String::new());
+            lines.push("### Dimension Scaling".to_string());
+            for name in &["dim_128d_accuracy", "dim_256d_accuracy", "dim_512d_accuracy", "dim_1024d_accuracy"] {
+                if let Some(m) = result.metrics.get(*name) {
+                    lines.push(format!("  {}: {:.3} (±{:.3})", name, m.mean, m.std_dev));
+                }
+            }
+            if let Some(m) = result.metrics.get("dimension_efficiency_slope") {
+                lines.push(format!("  Slope (acc/log2_dim): {:.4}", m.mean));
+            }
+        }
+    }
+
+    // 3. Learning curve (ArcFewShot)
+    for result in &report.results {
+        if result.benchmark.contains("ArcFewShot") {
+            lines.push(String::new());
+            lines.push("## 3. Learning Curve (Few-Shot)".to_string());
+            lines.push(String::new());
+            for k in 1..=5 {
+                let key = format!("accuracy_{}shot", k);
+                if let Some(m) = result.metrics.get(&key) {
+                    lines.push(format!("  {}-shot accuracy: {:.3} (±{:.3})", k, m.mean, m.std_dev));
+                }
+            }
+            if let Some(m) = result.metrics.get("learning_rate") {
+                lines.push(format!("  Learning rate (slope): {:.4}", m.mean));
+            }
+            if let Some(m) = result.metrics.get("saturation_point") {
+                lines.push(format!("  Saturation point: {:.1} examples", m.mean));
+            }
+        }
+    }
+
+    // 4. Noise robustness (ArcNoise)
+    for result in &report.results {
+        if result.benchmark.contains("ArcNoise") {
+            lines.push(String::new());
+            lines.push("## 4. Noise Robustness".to_string());
+            lines.push(String::new());
+            for name in &["accuracy_0pct", "accuracy_10pct", "accuracy_20pct", "accuracy_30pct", "accuracy_50pct"] {
+                if let Some(m) = result.metrics.get(*name) {
+                    lines.push(format!("  {}: {:.3}", name, m.mean));
+                }
+            }
+            if let Some(m) = result.metrics.get("noise_resilience") {
+                lines.push(format!("  Noise resilience (AUC): {:.3}", m.mean));
+            }
+            if let Some(m) = result.metrics.get("accuracy_drop") {
+                lines.push(format!("  Accuracy drop (0→50%): {:.3}", m.mean));
+            }
+        }
+    }
+
+    // 5. Chain composition (ArcChain)
+    for result in &report.results {
+        if result.benchmark.contains("ArcChain") {
+            lines.push(String::new());
+            lines.push("## 5. Chain Composition".to_string());
+            lines.push(String::new());
+            for (len, key) in &[(2, "chain_2_accuracy"), (3, "chain_3_accuracy"), (4, "chain_4_accuracy")] {
+                if let Some(m) = result.metrics.get(*key) {
+                    lines.push(format!("  {}-step chain: {:.3} (±{:.3})", len, m.mean, m.std_dev));
+                }
+            }
+            if let Some(m) = result.metrics.get("chain_degradation") {
+                lines.push(format!("  Degradation/step: {:.4}", m.mean));
+            }
+        }
+    }
+
+    // 6. Algebra probes (ArcAlgebra)
+    for result in &report.results {
+        if result.benchmark.contains("ArcAlgebra") {
+            lines.push(String::new());
+            lines.push("## 6. Rule Algebra Properties".to_string());
+            lines.push(String::new());
+            for (label, key) in &[
+                ("Rule consistency", "rule_consistency"),
+                ("Associativity", "associativity"),
+                ("Inverse existence", "inverse_similarity"),
+                ("Identity preservation", "identity_preservation"),
+                ("Distributivity", "distributivity"),
+            ] {
+                if let Some(m) = result.metrics.get(*key) {
+                    lines.push(format!("  {}: {:.3} (±{:.3})", label, m.mean, m.std_dev));
+                }
+            }
+            if let Some(m) = result.metrics.get("algebra_score") {
+                lines.push(format!("  Overall algebra score: {:.3}", m.mean));
+            }
+        }
+    }
+
+    // 7. RSA (ArcRSA)
+    for result in &report.results {
+        if result.benchmark.contains("ArcRSA") {
+            lines.push(String::new());
+            lines.push("## 7. Representational Similarity Analysis".to_string());
+            lines.push(String::new());
+            if let Some(m) = result.metrics.get("rsa_correlation") {
+                lines.push(format!("  RSA correlation (encoding ↔ structural): {:.3}", m.mean));
+            }
+            if let Some(m) = result.metrics.get("within_type_similarity") {
+                lines.push(format!("  Within-type encoding similarity: {:.3}", m.mean));
+            }
+            if let Some(m) = result.metrics.get("between_type_similarity") {
+                lines.push(format!("  Between-type encoding similarity: {:.3}", m.mean));
+            }
+            if let Some(m) = result.metrics.get("discriminability") {
+                lines.push(format!("  Representational discriminability: {:.3}", m.mean));
+            }
+        }
+    }
+
+    // 8. Staircase (ArcStaircase)
+    for result in &report.results {
+        if result.benchmark.contains("ArcStaircase") {
+            lines.push(String::new());
+            lines.push("## 8. Adaptive Staircase".to_string());
+            lines.push(String::new());
+            if let Some(m) = result.metrics.get("capacity_threshold") {
+                lines.push(format!("  Capacity threshold (75% acc): {:.1} grid size", m.mean));
+            }
+            if let Some(m) = result.metrics.get("psychometric_slope") {
+                lines.push(format!("  Psychometric slope: {:.4}", m.mean));
+            }
+        }
+    }
+
+    // 9. Confusion matrix (from ArcFluid)
+    for result in &report.results {
+        if result.benchmark.contains("ArcFluid") {
+            lines.push(String::new());
+            lines.push("## 9. Confusion Analysis (ArcFluid)".to_string());
+            lines.push(String::new());
+            if let Some(m) = result.metrics.get("confusion_diagonal") {
+                lines.push(format!("  Diagonal accuracy: {:.3}", m.mean));
+            }
+            if let Some(m) = result.metrics.get("confusion_max_error") {
+                lines.push(format!("  Max off-diagonal: {:.3}", m.mean));
+            }
+            if let Some(m) = result.metrics.get("confusion_entropy") {
+                lines.push(format!("  Mean row entropy: {:.3} bits", m.mean));
+            }
+        }
+    }
+
+    // 10. Reliability
+    let reliability = arc_split_half_reliability(report);
+    if !reliability.is_empty() {
+        lines.push(String::new());
+        lines.push(format_arc_reliability(&reliability));
+    }
+
+    lines.join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

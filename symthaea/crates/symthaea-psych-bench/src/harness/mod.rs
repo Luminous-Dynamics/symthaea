@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn test_all_benchmarks_have_provenance() {
-        // Instantiate all 56 benchmarks and verify each has provenance
+        // Instantiate all 59 benchmarks and verify each has provenance
         use crate::benchmarks::affect::*;
         use crate::benchmarks::attention::*;
         use crate::benchmarks::butlin::*;
@@ -235,6 +235,9 @@ mod tests {
             Box::new(ArcNoiseBenchmark),
             Box::new(ArcFewShotBenchmark),
             Box::new(ArcScalingBenchmark),
+            Box::new(ArcRsaBenchmark),
+            Box::new(ArcAlgebraBenchmark),
+            Box::new(ArcStaircaseBenchmark),
             // Sustained Attention
             Box::new(SartBenchmark),
             // Motor
