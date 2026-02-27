@@ -17,6 +17,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = { workspace = true }
 rayon = { workspace = true }
 
+# Distillation collection (optional)
+ureq = { version = "2.9", optional = true }
+
 # Mamba SSM integration (optional)
 candle-core = { version = "0.8", optional = true }
 candle-nn = { version = "0.8", optional = true }
@@ -28,7 +31,18 @@ tokenizers = { version = "0.21", optional = true }
 name = "broca-train"
 path = "src/bin/broca_train.rs"
 
+[[bin]]
+name = "broca-collect"
+path = "src/bin/broca_collect.rs"
+required-features = ["collect"]
+
+[[bin]]
+name = "broca-mamba-verify"
+path = "src/bin/broca_mamba_verify.rs"
+required-features = ["mamba"]
+
 [features]
 default = []
 mamba = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:hf-hub", "dep:tokenizers"]
 hf-tokenizer = ["dep:tokenizers"]
+collect = ["dep:ureq"]
