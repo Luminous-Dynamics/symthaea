@@ -54,8 +54,10 @@ Cargo.lock.bak
 .archive/
 archive/
 
-# Large data directories
-data/
+# Large data directories (use ** so negation patterns work for tracked assets)
+**/data/**
+!**/data/
+!crates/symthaea-broca/data/broca-vocab-*.json
 models/
 results/
 zenodo-dataset/

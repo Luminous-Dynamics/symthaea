@@ -175,6 +175,7 @@ sacred.txt
 !.env.sample
 *credentials*
 *token*
+!symthaea/crates/symthaea-broca/src/tokenizer.rs
 !mycelix-health/services/ehr-gateway/**
 !mycelix-health/zomes/verifiable_credentials/**
 !mycelix-care/zomes/credentials/
