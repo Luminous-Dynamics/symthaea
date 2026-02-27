@@ -690,6 +690,7 @@ impl Default for CrossModalBinder {
 // ==============================================================================
 
 /// NSM grounding for sensory modalities
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct ModalityPrimitiveGrounding {
     /// The modality being grounded
@@ -704,6 +705,7 @@ pub(crate) struct ModalityPrimitiveGrounding {
     pub is_embodied: bool,
 }
 
+#[allow(dead_code)]
 impl ModalityPrimitiveGrounding {
     pub(crate) fn new(modality: Modality, system: &PrimitiveSystem) -> Self {
         let (primitives, sensory, embodied) = Self::nsm_mapping(modality);
@@ -811,6 +813,7 @@ impl ModalityPrimitiveGrounding {
 }
 
 /// NSM grounding for convergence levels (integration hierarchy)
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct ConvergenceLevelPrimitiveGrounding {
     /// The convergence level being grounded
@@ -823,6 +826,7 @@ pub(crate) struct ConvergenceLevelPrimitiveGrounding {
     pub integration_breadth: u8,
 }
 
+#[allow(dead_code)]
 impl ConvergenceLevelPrimitiveGrounding {
     pub(crate) fn new(level: ConvergenceLevel, system: &PrimitiveSystem) -> Self {
         let (primitives, breadth) = Self::nsm_mapping(level);
@@ -864,6 +868,7 @@ impl ConvergenceLevelPrimitiveGrounding {
 }
 
 /// Unified NSM grounding system for cross-modal binding
+#[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) struct CrossModalNSMGrounding {
     /// Modality groundings
@@ -872,6 +877,7 @@ pub(crate) struct CrossModalNSMGrounding {
     pub convergence_levels: HashMap<ConvergenceLevel, ConvergenceLevelPrimitiveGrounding>,
 }
 
+#[allow(dead_code)]
 impl CrossModalNSMGrounding {
     /// Create complete grounding system from primitive system
     pub(crate) fn new(system: &PrimitiveSystem) -> Self {
@@ -963,6 +969,7 @@ impl CrossModalNSMGrounding {
 }
 
 /// Encode NSM primitives into HDC vector via sequential binding
+#[allow(dead_code)]
 fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryHV {
     let vectors: Vec<BinaryHV> = primitives
         .iter()

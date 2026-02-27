@@ -1041,6 +1041,7 @@ pub struct EmbodimentSummary {
 // ============================================================================
 
 /// NSM grounding for body parts - spatial/functional semantic primitives
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct BodyPartPrimitiveGrounding {
     /// The body part being grounded
@@ -1055,6 +1056,7 @@ pub(crate) struct BodyPartPrimitiveGrounding {
     pub sensory_organ: bool,
 }
 
+#[allow(dead_code)]
 impl BodyPartPrimitiveGrounding {
     pub(crate) fn new(body_part: BodyPart, system: &PrimitiveSystem) -> Self {
         let (primitives, agency, sensory) = Self::nsm_mapping(body_part);
@@ -1174,6 +1176,7 @@ impl BodyPartPrimitiveGrounding {
 }
 
 /// NSM grounding for movement types - action semantic primitives
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct MovementTypePrimitiveGrounding {
     /// The movement type being grounded
@@ -1188,6 +1191,7 @@ pub(crate) struct MovementTypePrimitiveGrounding {
     pub self_directed: bool,
 }
 
+#[allow(dead_code)]
 impl MovementTypePrimitiveGrounding {
     pub(crate) fn new(movement_type: MovementType, system: &PrimitiveSystem) -> Self {
         let (primitives, requires_obj, self_dir) = Self::nsm_mapping(movement_type);
@@ -1280,6 +1284,7 @@ impl MovementTypePrimitiveGrounding {
 }
 
 /// Unified NSM grounding system for embodied cognition
+#[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) struct EmbodiedNSMGrounding {
     /// Body part groundings indexed by part
@@ -1288,6 +1293,7 @@ pub(crate) struct EmbodiedNSMGrounding {
     pub movements: HashMap<MovementType, MovementTypePrimitiveGrounding>,
 }
 
+#[allow(dead_code)]
 impl EmbodiedNSMGrounding {
     /// Create complete grounding system from primitive system
     pub(crate) fn new(system: &PrimitiveSystem) -> Self {
@@ -1386,6 +1392,7 @@ impl EmbodiedNSMGrounding {
 }
 
 /// Encode NSM primitives into HDC vector via sequential binding
+#[allow(dead_code)]
 fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryHV {
     let vectors: Vec<BinaryHV> = primitives
         .iter()

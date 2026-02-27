@@ -119,7 +119,7 @@ impl CognitiveLoopService {
         self.biorhythm_refresh_counter += 1;
         if self.biorhythm_refresh_counter >= super::thresholds::BIORHYTHM_INTERVAL {
             self.biorhythm = crate::chronobiology::Biorhythm::current();
-            self.neuromodulator_bath.modulate_circadian(self.biorhythm.phase);
+            self.neuromodulator_bath.modulate_circadian_continuous(self.biorhythm.hour);
             // Record personality profile for drift detection
             let profile = self.neuromodulator_bath.personality_profile();
             self.personality_drift_tracker.record(&profile);
@@ -1848,7 +1848,8 @@ impl CognitiveLoopService {
         // Science: Kahneman (1973) — attention is a limited-capacity resource.
         // Track cumulative cycle time; if we've exceeded budget, flag for
         // downstream subsystems to respect (skip expensive optional modules).
-        let attention_budget_us = ATTENTION_BUDGET_US;
+        let neuromod_attention_alloc = self.neuromodulator_bath.attention_budget_allocation();
+        let attention_budget_us = (ATTENTION_BUDGET_US as f32 * neuromod_attention_alloc) as u64;
         let attention_budget_elapsed_us = cycle_start.elapsed().as_micros() as u64;
         let attention_budget_exceeded = attention_budget_elapsed_us > attention_budget_us;
         if attention_budget_exceeded {
@@ -1945,6 +1946,7 @@ impl CognitiveLoopService {
                 tool: None,                    // populated by shell integration
                 recent_utility: 0.5,
                 cycle_id: self.stats.total_cycles as u64,
+                neuromod_exploration_mod: self.neuromodulator_bath.mcts_exploration_modulation(),
             };
 
             let reasoning_result = reasoning_engine.reason(&reasoning_ctx);
@@ -2096,9 +2098,13 @@ impl CognitiveLoopService {
 
         // Compose effective LR from all modulation sources (flow, curiosity, FEP, MCE, subsystem)
         let effective_lr = self.compose_effective_lr(semantic_lr_factor, reasoning_lr_factor);
-        // DA-modulated gradient magnitude (neuromod-aware training)
+        // DA D1-modulated gradient magnitude (neuromod-aware training)
         // Science: Schultz (1997) — DA scales synaptic plasticity amplitude
+        // Frank (2005) — D1 pathway specifically drives learning magnitude
         let effective_lr = effective_lr * self.neuromodulator_bath.gradient_scale_factor();
+        // ACh-gated plasticity persistence: high ACh = learning mode, low = performance mode
+        // Science: Hasselmo (1999) — cholinergic gating of cortical plasticity
+        let effective_lr = effective_lr * self.neuromodulator_bath.plasticity_gate();
 
         // ACh-gated threshold: high ACh → learn from smaller errors
         // Science: Yu & Dayan (2005) — ACh sharpens expected-uncertainty gating
@@ -3529,6 +3535,24 @@ impl CognitiveLoopService {
             // Consciousness bridge & sleep consolidation (Phase 2)
             neuromod_consciousness_mod: self.neuromodulator_bath.consciousness_modulation(),
             neuromod_sleep_consolidation_boost: self.neuromodulator_bath.sleep_consolidation_boost(),
+            // Phase 3: Attention allocation + plasticity gate + MCTS mod
+            neuromod_attention_allocation: neuromod_attention_alloc,
+            neuromod_plasticity_gate: self.neuromodulator_bath.plasticity_gate(),
+            neuromod_mcts_exploration_mod: self.neuromodulator_bath.mcts_exploration_modulation() as f32,
+            replay_da_tag_avg: 0.0, // populated by episodic replay phase if applicable
+            circadian_hour: self.biorhythm.hour as f32,
+            // Phase 3: Receptor subtypes
+            neuromod_da_d1: self.neuromodulator_bath.da_d1_effective(),
+            neuromod_da_d2: self.neuromodulator_bath.da_d2_effective(),
+            neuromod_ne_alpha: self.neuromodulator_bath.ne_alpha_effective(),
+            neuromod_ne_beta: self.neuromodulator_bath.ne_beta_effective(),
+            neuromod_behavioral_flexibility: self.neuromodulator_bath.behavioral_flexibility(),
+            // Phase 3: Dashboard snapshot (every 10 cycles)
+            neuromod_snapshot: if self.stats.total_cycles % 10 == 0 {
+                Some(self.neuromodulator_bath.snapshot())
+            } else {
+                None
+            },
             // Exocortex trigger counter
             exocortex_trigger_count: self.stats.exocortex_triggers,
             // Thermodynamic / affective (populated by consciousness pipeline + somatic bridge)

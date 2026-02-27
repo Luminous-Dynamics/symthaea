@@ -338,6 +338,7 @@ impl MaterialityTier {
 // ==============================================================================
 
 /// NSM grounding for empirical verification tiers
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct EmpiricalTierPrimitiveGrounding {
     /// The tier being grounded
@@ -350,6 +351,7 @@ pub(crate) struct EmpiricalTierPrimitiveGrounding {
     pub verification_strength: f64,
 }
 
+#[allow(dead_code)]
 impl EmpiricalTierPrimitiveGrounding {
     pub(crate) fn new(tier: EmpiricalTier, system: &PrimitiveSystem) -> Self {
         let (primitives, strength) = Self::nsm_mapping(tier);
@@ -407,6 +409,7 @@ impl EmpiricalTierPrimitiveGrounding {
 }
 
 /// NSM grounding for normative authority tiers
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct NormativeTierPrimitiveGrounding {
     /// The tier being grounded
@@ -419,6 +422,7 @@ pub(crate) struct NormativeTierPrimitiveGrounding {
     pub consensus_breadth: f64,
 }
 
+#[allow(dead_code)]
 impl NormativeTierPrimitiveGrounding {
     pub(crate) fn new(tier: NormativeTier, system: &PrimitiveSystem) -> Self {
         let (primitives, breadth) = Self::nsm_mapping(tier);
@@ -471,6 +475,7 @@ impl NormativeTierPrimitiveGrounding {
 }
 
 /// NSM grounding for materiality/permanence tiers
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct MaterialityTierPrimitiveGrounding {
     /// The tier being grounded
@@ -483,6 +488,7 @@ pub(crate) struct MaterialityTierPrimitiveGrounding {
     pub temporal_persistence: f64,
 }
 
+#[allow(dead_code)]
 impl MaterialityTierPrimitiveGrounding {
     pub(crate) fn new(tier: MaterialityTier, system: &PrimitiveSystem) -> Self {
         let (primitives, persistence) = Self::nsm_mapping(tier);
@@ -531,6 +537,7 @@ impl MaterialityTierPrimitiveGrounding {
 }
 
 /// Unified NSM grounding system for epistemic tiers
+#[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) struct EpistemicNSMGrounding {
     /// Empirical tier groundings
@@ -541,6 +548,7 @@ pub(crate) struct EpistemicNSMGrounding {
     pub materiality_tiers: HashMap<MaterialityTier, MaterialityTierPrimitiveGrounding>,
 }
 
+#[allow(dead_code)]
 impl EpistemicNSMGrounding {
     /// Create complete grounding system from primitive system
     pub(crate) fn new(system: &PrimitiveSystem) -> Self {
@@ -677,6 +685,7 @@ impl EpistemicNSMGrounding {
 }
 
 /// Encode NSM primitives into HDC vector via sequential binding
+#[allow(dead_code)]
 fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryHV {
     let vectors: Vec<BinaryHV> = primitives
         .iter()

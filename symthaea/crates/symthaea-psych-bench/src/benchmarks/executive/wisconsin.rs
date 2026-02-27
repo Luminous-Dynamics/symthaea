@@ -10,8 +10,11 @@
 //! - trials_to_first_category: 12.17
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Card features.
@@ -333,6 +336,7 @@ impl PsychBenchmark for WisconsinCardSortingBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let _diff_model = difficulty_model_for(self.name());
 
         let mut categories = Vec::new();
         let mut perseverative = Vec::new();
@@ -340,15 +344,38 @@ impl PsychBenchmark for WisconsinCardSortingBenchmark {
         let mut total_errs = Vec::new();
         let mut trials_first = Vec::new();
         let mut all_rts = Vec::new();
+        let mut trace = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
+            let acc = r.categories_completed as f64 / 6.0; // normalize
             categories.push(r.categories_completed as f64);
             perseverative.push(r.perseverative_errors as f64);
             non_perseverative.push(r.non_perseverative_errors as f64);
             total_errs.push(r.total_errors as f64);
             trials_first.push(r.trials_to_first as f64);
+            let mean_rt = if r.rt_ticks.is_empty() { 0.0 } else {
+                r.rt_ticks.iter().sum::<f64>() / r.rt_ticks.len() as f64
+            };
             all_rts.extend_from_slice(&r.rt_ticks);
+
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trial,
+                    condition: "wcst".to_string(),
+                    correct: acc > 0.5,
+                    rt_ticks: mean_rt,
+                    similarity: acc,
+                    confidence: acc,
+                    response_idx: 0,
+                    extra: {
+                        let mut m = BTreeMap::new();
+                        m.insert("perseverative_errors".to_string(), r.perseverative_errors as f64);
+                        m.insert("categories_completed".to_string(), r.categories_completed as f64);
+                        m
+                    },
+                });
+            }
         }
 
         result.insert(
@@ -369,6 +396,10 @@ impl PsychBenchmark for WisconsinCardSortingBenchmark {
             MetricValue::from_samples(&trials_first),
         );
         result.insert("rt_ticks", MetricValue::from_samples(&all_rts));
+
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

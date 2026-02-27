@@ -55,6 +55,11 @@ impl CognitiveLoopService {
         self.neuromodulator_bath.clamp_levels(da, ne, sht, ach);
     }
 
+    /// Get a complete neurochemical state snapshot for telemetry/visualization.
+    pub fn neuromod_snapshot(&self) -> super::neuromodulators::NeuromodSnapshot {
+        self.neuromodulator_bath.snapshot()
+    }
+
     /// Get a clone of the pain sender channel, if active.
     ///
     /// Used by integration tests to inject `InfrastructureError`s and verify

@@ -51,6 +51,18 @@ pub struct BenchmarkConfig {
     /// SerialRecall, DigitSpan.
     #[serde(default)]
     pub ssm_backend: bool,
+    /// Difficulty level (0.0 = current/easy, 1.0 = hard).
+    ///
+    /// Modulates benchmark parameters (temperature, SNR, interference) to push
+    /// accuracy into human-like ranges (70-95%). Default 0.0 = unchanged behavior.
+    #[serde(default)]
+    pub difficulty: f64,
+    /// Enable per-trial trace collection (default: false).
+    ///
+    /// When enabled, benchmarks that support it will populate `BenchmarkResult.trial_trace`
+    /// with per-trial outcomes for fine-grained analysis.
+    #[serde(default)]
+    pub trial_trace: bool,
 }
 
 fn default_min_trials() -> usize { 10 }
@@ -75,6 +87,8 @@ impl Default for BenchmarkConfig {
             max_trials: default_max_trials(),
             precision_target: default_precision_target(),
             ssm_backend: false,
+            difficulty: 0.0,
+            trial_trace: false,
         }
     }
 }

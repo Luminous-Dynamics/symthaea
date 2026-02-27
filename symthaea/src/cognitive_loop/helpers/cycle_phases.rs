@@ -430,7 +430,8 @@ impl CognitiveLoopService {
                 prediction_error,
                 self.emotion_contagion.smoothed_valence(),
                 coherence_summary.coherence,
-            );
+            )
+            .with_dopamine(self.neuromodulator_bath.dopamine.effective());
 
             let stored = replay.store_if_significant(episode);
             if stored {

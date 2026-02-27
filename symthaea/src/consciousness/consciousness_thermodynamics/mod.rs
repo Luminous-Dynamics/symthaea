@@ -43,5 +43,7 @@ pub use analyzer::*;
 pub use config::*;
 pub use critical::*;
 pub use free_energy::*;
+// grounding module items re-exported via direct use where needed
+#[allow(unused_imports)]
 pub(crate) use grounding::*;
 pub use state::*;

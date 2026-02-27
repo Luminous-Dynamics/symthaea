@@ -22,6 +22,8 @@ pub struct Biorhythm {
     pub arousal_mod: f64,    // Multiplier for attention
     pub plasticity_mod: f64, // Multiplier for learning rate
     pub creativity_mod: f64, // Multiplier for randomness (temperature)
+    /// Fractional hour (0.0–24.0) for continuous waveform computation.
+    pub hour: f64,
 }
 
 impl CircadianPhase {
@@ -80,6 +82,7 @@ impl Biorhythm {
             arousal_mod: arousal,
             plasticity_mod: plasticity,
             creativity_mod: creativity,
+            hour,
         }
     }
 }

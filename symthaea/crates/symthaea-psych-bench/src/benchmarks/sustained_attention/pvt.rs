@@ -14,8 +14,11 @@
 //! - fastest_10pct: 3.0 (SD~0.5) — fastest 10% RT (ticks)
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// PVT benchmark.
@@ -30,7 +33,13 @@ struct TrialResult {
 }
 
 impl PvtBenchmark {
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
+    fn run_trial_traced(
+        &self,
+        config: &BenchmarkConfig,
+        trial_idx: usize,
+        temp_mult: f64,
+        global_trial_idx: &mut usize,
+    ) -> (TrialResult, Vec<TrialOutcome>) {
         let dim = config.dimension;
         let seed = config.trial_seed("sustained", "pvt", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -41,39 +50,35 @@ impl PvtBenchmark {
             *s ^= *s << 17;
         };
 
-        // Stimulus and response prototypes
         let stimulus_proto = ContinuousHV::random(dim, seed.wrapping_add(1));
 
         let n_blocks = 10;
         let trials_per_block = 20;
         let total_trials = n_blocks * trials_per_block;
 
-        // Fatigue parameters
         let base_rt = 4.0f64;
-        let fatigue_increment = 0.15; // RT increase per block
-        let noise_base: f64 = 0.8 + config.time_pressure * 0.5;
-
-        // Lapse threshold: 2x base RT
+        // Difficulty increases fatigue increment
+        let fatigue_increment = 0.15 * temp_mult;
+        let noise_base: f64 = (0.8 + config.time_pressure * 0.5) * temp_mult;
         let lapse_threshold = base_rt * 2.0;
 
         let mut all_rts = Vec::with_capacity(total_trials);
         let mut block_mean_rts = Vec::with_capacity(n_blocks);
         let mut lapses = 0u32;
+        let mut outcomes = Vec::new();
 
         for block in 0..n_blocks {
             let mut block_rt_sum = 0.0f64;
 
             for _ in 0..trials_per_block {
-                // Stimulus detection: similarity check
                 xor_shift(&mut rng);
                 let noise_hv = ContinuousHV::random(dim, rng);
                 let stimulus = ContinuousHV::weighted_bundle(
                     &[&stimulus_proto, &noise_hv],
                     &[0.80, 0.20],
                 );
-                let _detection = stimulus.similarity(&stimulus_proto);
+                let detection = stimulus.similarity(&stimulus_proto) as f64;
 
-                // RT: base + fatigue + random noise
                 xor_shift(&mut rng);
                 let rt_noise = ((rng % 10000) as f64 / 10000.0 - 0.3) * noise_base;
                 let fatigue = fatigue_increment * block as f64;
@@ -83,15 +88,29 @@ impl PvtBenchmark {
                 all_rts.push(rt);
                 block_rt_sum += rt;
 
-                if rt > lapse_threshold {
+                let is_lapse = rt > lapse_threshold;
+                if is_lapse {
                     lapses += 1;
+                }
+
+                if config.trial_trace {
+                    outcomes.push(TrialOutcome {
+                        trial_idx: *global_trial_idx,
+                        condition: format!("block_{}", block),
+                        correct: !is_lapse,
+                        rt_ticks: rt,
+                        similarity: detection,
+                        confidence: (1.0 - rt / (lapse_threshold * 2.0)).max(0.0),
+                        response_idx: 0,
+                        extra: BTreeMap::new(),
+                    });
+                    *global_trial_idx += 1;
                 }
             }
 
             block_mean_rts.push(block_rt_sum / trials_per_block as f64);
         }
 
-        // Vigilance decrement: slope of block mean RTs via linear regression
         let n = n_blocks as f64;
         let mut sum_x = 0.0f64;
         let mut sum_y = 0.0f64;
@@ -116,20 +135,19 @@ impl PvtBenchmark {
         let mean_rt = all_rts.iter().sum::<f64>() / all_rts.len() as f64;
         let lapse_rate = lapses as f64 / total_trials as f64;
 
-        // Fastest 10%
         let mut sorted_rts = all_rts.clone();
         sorted_rts.sort_by(|a, b| a.total_cmp(b));
         let top_10_count = (total_trials as f64 * 0.10).max(1.0) as usize;
         let fastest_10pct =
             sorted_rts[..top_10_count].iter().sum::<f64>() / top_10_count as f64;
 
-        TrialResult {
+        (TrialResult {
             vigilance_decrement,
             mean_rt,
             lapse_rate,
             fastest_10pct,
             rt_ticks: mean_rt,
-        }
+        }, outcomes)
     }
 }
 
@@ -150,20 +168,27 @@ impl PsychBenchmark for PvtBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let diff_model = difficulty_model_for(self.name());
+        let temp_mult = diff_model.temperature_multiplier(config.difficulty);
 
         let mut decrements = Vec::new();
         let mut mean_rts = Vec::new();
         let mut lapse_rates = Vec::new();
         let mut fastest_10s = Vec::new();
         let mut rts = Vec::new();
+        let mut trace = Vec::new();
+        let mut global_trial_idx = 0usize;
 
         for trial in 0..config.trials_per_condition {
-            let r = self.run_trial(config, trial);
+            let (r, outcomes) = self.run_trial_traced(config, trial, temp_mult, &mut global_trial_idx);
             decrements.push(r.vigilance_decrement);
             mean_rts.push(r.mean_rt);
             lapse_rates.push(r.lapse_rate);
             fastest_10s.push(r.fastest_10pct);
             rts.push(r.rt_ticks);
+            if config.trial_trace {
+                trace.extend(outcomes);
+            }
         }
 
         result.insert(
@@ -175,7 +200,11 @@ impl PsychBenchmark for PvtBenchmark {
         result.insert("fastest_10pct", MetricValue::from_samples(&fastest_10s));
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
 
-        result.conditions = 10; // 10 blocks
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
+
+        result.conditions = 10;
         result.trials_per_condition = config.trials_per_condition;
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result

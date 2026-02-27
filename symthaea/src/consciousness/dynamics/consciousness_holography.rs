@@ -598,6 +598,7 @@ pub(crate) struct HolographicConsciousnessAnalyzer {
     memory: HolographicMemory,
 
     /// Binder for feature integration
+    #[allow(dead_code)]
     binder: HolographicBinder,
 
     /// Configuration
@@ -674,11 +675,13 @@ impl HolographicConsciousnessAnalyzer {
     }
 
     /// Recall experience from holographic memory
+    #[allow(dead_code)]
     pub(crate) fn recall_experience(&mut self, cue: &[f64]) -> HolographicRecall {
         self.memory.recall(cue)
     }
 
     /// Bind features into unified percept
+    #[allow(dead_code)]
     pub(crate) fn bind_features(&mut self, features: &[(&str, &[f64])]) -> f64 {
         self.binder.bind(features)
     }

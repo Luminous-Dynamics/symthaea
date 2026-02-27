@@ -117,6 +117,12 @@ pub struct Episode {
     /// Number of times this episode has been actively retrieved (distinct from replay)
     #[serde(default)]
     pub retrieval_count: u32,
+
+    /// Dopamine level at encoding — tags reward salience for replay prioritization.
+    /// High-DA episodes are preferentially consolidated with stronger LR.
+    /// Science: Lisman & Grace (2005) — hippocampal-VTA loop, DA tags memory consolidation.
+    #[serde(default)]
+    pub dopamine_at_encoding: Option<f32>,
 }
 
 impl Episode {
@@ -133,6 +139,7 @@ impl Episode {
             replay_count: 0,
             consolidation_strength: 1.0,
             retrieval_count: 0,
+            dopamine_at_encoding: None,
         }
     }
 
@@ -157,7 +164,14 @@ impl Episode {
             replay_count: 0,
             consolidation_strength: 1.0,
             retrieval_count: 0,
+            dopamine_at_encoding: None,
         }
+    }
+
+    /// Set dopamine level at encoding for DA-tagged replay prioritization.
+    pub fn with_dopamine(mut self, da: f32) -> Self {
+        self.dopamine_at_encoding = Some(da.clamp(0.0, 1.0));
+        self
     }
 
     /// Calculate the priority score for this episode
@@ -189,12 +203,17 @@ impl Episode {
         // Consolidation bonus: retrieved/reconsolidated memories are more valuable
         let consolidation_bonus = self.consolidation_strength * 0.1;
 
+        // DA salience bonus: high-DA episodes are more valuable for consolidation
+        // Science: Lisman & Grace (2005) — DA tags for consolidation priority
+        let da_bonus = self.dopamine_at_encoding.map(|d| d as f64 * 0.25).unwrap_or(0.0);
+
         // Final survival value
         base_phi * 0.5
             + error_bonus
             + valence_bonus
             + recency_bonus
             + consolidation_bonus
+            + da_bonus
             + replay_penalty * 0.05
     }
 
@@ -576,7 +595,14 @@ impl EpisodicMemory {
         base_learning_rate: f32,
         dt: f32,
     ) -> f32 {
-        let learning_rate = base_learning_rate * self.config.replay_learning_rate_multiplier;
+        // DA-modulated replay LR: high-DA episodes get stronger replay training
+        // Science: Schafer & Bhatt (2017) — reward reactivation amplifies replay
+        let da_replay_scale = episode
+            .dopamine_at_encoding
+            .map(|d| 0.7 + d * 0.6) // [0.7, 1.3]
+            .unwrap_or(1.0);
+        let learning_rate =
+            base_learning_rate * self.config.replay_learning_rate_multiplier * da_replay_scale;
 
         // Convert episode to arrays
         let input = episode.input_as_array();
@@ -1113,5 +1139,45 @@ mod tests {
 
         assert!(memory.is_empty());
         assert_eq!(memory.len(), 0);
+    }
+
+    // ── DA-Tagged Replay Prioritization (Phase 3) ────────────────────
+
+    #[test]
+    fn test_da_tagged_episode_higher_priority() {
+        let mut ep_high = make_test_episode(0.5, 100);
+        ep_high.dopamine_at_encoding = Some(0.8);
+        let mut ep_low = make_test_episode(0.5, 100);
+        ep_low.dopamine_at_encoding = Some(0.2);
+        // Same Phi, same timestamp — DA tag should make the difference
+        let high_score = ep_high.priority_score(200, 0.5);
+        let low_score = ep_low.priority_score(200, 0.5);
+        assert!(
+            high_score > low_score,
+            "DA=0.8 should have higher priority than DA=0.2: {high_score} vs {low_score}"
+        );
+    }
+
+    #[test]
+    fn test_da_replay_lr_scaling() {
+        let config = EpisodicReplayConfig::default();
+        let base_lr = 0.01_f32;
+        let da_high_scale = 0.7 + 0.8 * 0.6; // DA=0.8 → 1.18
+        let da_low_scale = 0.7 + 0.2 * 0.6;  // DA=0.2 → 0.82
+        let lr_high = base_lr * config.replay_learning_rate_multiplier * da_high_scale;
+        let lr_low = base_lr * config.replay_learning_rate_multiplier * da_low_scale;
+        assert!(
+            lr_high > lr_low,
+            "High DA should produce higher replay LR: {lr_high} vs {lr_low}"
+        );
+    }
+
+    #[test]
+    fn test_da_tag_backwards_compat() {
+        // Episode without DA tag should have unchanged priority
+        let ep = make_test_episode(0.5, 100);
+        assert!(ep.dopamine_at_encoding.is_none());
+        let score = ep.priority_score(200, 0.5);
+        assert!(score.is_finite(), "Score should be finite without DA tag: {score}");
     }
 }

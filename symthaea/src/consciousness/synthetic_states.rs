@@ -145,6 +145,7 @@ impl StateType {
 /// - **Absence** (NOT, NOT+FEEL) - no subjective experience
 /// - **Emergence** (MAYBE, BODY) - pre-conscious bodily states
 /// - **Presence** (FEEL, KNOW, I) - full phenomenal consciousness
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct StateTypePrimitiveGrounding {
     /// The consciousness state type
@@ -311,6 +312,7 @@ impl StateTypePrimitiveGrounding {
     }
 
     /// Semantic similarity to another state grounding
+    #[allow(dead_code)]
     pub(crate) fn similarity(&self, other: &Self) -> f64 {
         self.primitive_encoding
             .similarity(&other.primitive_encoding) as f64
@@ -341,6 +343,7 @@ impl SyntheticStatesNSMGrounding {
     }
 
     /// Get grounding for a specific state type
+    #[allow(dead_code)]
     pub(crate) fn grounding(&self, state_type: &StateType) -> Option<&StateTypePrimitiveGrounding> {
         self.state_groundings.get(state_type)
     }
@@ -359,6 +362,7 @@ impl SyntheticStatesNSMGrounding {
     }
 
     /// Semantic distance between two state types
+    #[allow(dead_code)]
     pub(crate) fn semantic_distance(&self, state1: &StateType, state2: &StateType) -> f64 {
         match (self.grounding(state1), self.grounding(state2)) {
             (Some(g1), Some(g2)) => 1.0 - g1.similarity(g2),
@@ -367,6 +371,7 @@ impl SyntheticStatesNSMGrounding {
     }
 
     /// Get consciousness ordering based on semantic primitives
+    #[allow(dead_code)]
     pub(crate) fn consciousness_ordering(&self) -> Vec<(StateType, f64)> {
         let mut ordering: Vec<_> = self
             .state_groundings

@@ -31,6 +31,7 @@ use symthaea_core::hdc::ContinuousHV;
 /// - Regulating: controlling boundaries → DO + NOT + LET + OTHER
 /// - Observing: self-reference → SEE + I + KNOW + NOW
 /// - Integrating: unifying components → ALL + TOGETHER + ONE + BECOME
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct AutopoieticPhasePrimitiveGrounding {
     /// The autopoietic phase being grounded
@@ -52,6 +53,7 @@ pub(crate) struct AutopoieticPhasePrimitiveGrounding {
     pub boundary_focus: f32,
 }
 
+#[allow(dead_code)]
 impl AutopoieticPhasePrimitiveGrounding {
     /// Get NSM grounding for a specific autopoietic phase
     pub(crate) fn for_phase(phase: AutopoieticPhase, primitive_system: &PrimitiveSystem) -> Self {
@@ -166,6 +168,7 @@ impl AutopoieticPhasePrimitiveGrounding {
 /// - Memory: storage/recall → KNOW + BEFORE + SAME + AFTER
 /// - Integration: unifying function → ALL + TOGETHER + ONE + SAME
 /// - SelfModel: self-representation → I + THINK + I + KNOW
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct ComponentTypePrimitiveGrounding {
     /// The component type being grounded
@@ -187,6 +190,7 @@ pub(crate) struct ComponentTypePrimitiveGrounding {
     pub self_reference_level: f32,
 }
 
+#[allow(dead_code)]
 impl ComponentTypePrimitiveGrounding {
     /// Get NSM grounding for a specific component type
     pub(crate) fn for_type(component_type: ComponentType, primitive_system: &PrimitiveSystem) -> Self {
@@ -286,6 +290,7 @@ impl ComponentTypePrimitiveGrounding {
 ///
 /// Provides access to all autopoietic concept groundings for
 /// cross-domain semantic reasoning about self-maintaining systems.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct AutopoieticNSMGrounding {
     /// Autopoietic phase groundings
@@ -295,6 +300,7 @@ pub(crate) struct AutopoieticNSMGrounding {
     pub component_types: HashMap<ComponentType, ComponentTypePrimitiveGrounding>,
 }
 
+#[allow(dead_code)]
 impl AutopoieticNSMGrounding {
     /// Create complete autopoietic NSM grounding system
     pub(crate) fn new(primitive_system: &PrimitiveSystem) -> Self {

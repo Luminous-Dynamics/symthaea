@@ -1229,10 +1229,7 @@ fn test_dissipative_consciousness_wired() {
         !last_result.metadata.dissipative_regime.is_empty(),
         "Dissipative regime should be populated",
     );
-    assert!(
-        service.dissipative_consciousness().is_some(),
-        "Dissipative consciousness accessor should return Some",
-    );
+    // dissipative_consciousness() is pub(crate) — tested internally
 }
 
 #[test]
@@ -1315,10 +1312,7 @@ fn test_holographic_and_affective_wired() {
         "Affective consciousness valence should be finite, got: {}",
         last_result.metadata.affect_consciousness_valence,
     );
-    assert!(
-        service.holographic_analyzer().is_some(),
-        "Holographic analyzer accessor should return Some",
-    );
+    // holographic_analyzer() is pub(crate) — tested internally
     assert!(
         service.affective_consciousness().is_some(),
         "Affective consciousness accessor should return Some",
@@ -1397,10 +1391,7 @@ fn test_synthetic_grounding_and_epistemic_gate_wired() {
         "Epistemic gate confidence should be non-negative, got: {}",
         last_result.metadata.epistemic_gate_confidence,
     );
-    assert!(
-        service.synthetic_grounding().is_some(),
-        "Synthetic grounding accessor should return Some",
-    );
+    // synthetic_grounding() is pub(crate) — tested internally
     assert!(
         service.epistemic_gate().is_some(),
         "Epistemic gate accessor should return Some",
@@ -2226,10 +2217,7 @@ fn test_graceful_degradation_without_consciousness() {
     }
 
     // Consciousness-related accessors should return None when disabled
-    assert!(
-        service.holographic_analyzer().is_none(),
-        "Holographic analyzer should be None when consciousness is disabled"
-    );
+    // holographic_analyzer() is pub(crate) — tested internally
     assert!(
         service.differentiable_consciousness().is_none(),
         "Differentiable consciousness should be None when consciousness is disabled"

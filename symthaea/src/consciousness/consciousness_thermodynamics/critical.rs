@@ -73,3 +73,65 @@ impl Default for FluctuationStats {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_transition_order_variants() {
+        let first = TransitionOrder::FirstOrder;
+        let second = TransitionOrder::SecondOrder;
+        let crossover = TransitionOrder::Crossover;
+
+        // All three are distinct
+        assert_ne!(first, second);
+        assert_ne!(first, crossover);
+        assert_ne!(second, crossover);
+    }
+
+    #[test]
+    fn test_critical_exponents_default() {
+        // Mean-field (Landau) values
+        let exp = CriticalExponents::default();
+        assert!((exp.alpha - 0.0).abs() < f64::EPSILON);
+        assert!((exp.beta - 0.5).abs() < f64::EPSILON);
+        assert!((exp.gamma - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_critical_exponents_hyperscaling() {
+        // Hyperscaling relation: 2 - alpha = d * nu
+        // At the mean-field upper critical dimension d=4:
+        // 2 - 0.0 = 4 * 0.5 = 2.0
+        let exp = CriticalExponents::default();
+        let d = 4.0_f64; // upper critical dimension for mean-field
+        let lhs = 2.0 - exp.alpha;
+        let rhs = d * exp.nu;
+        assert!(
+            (lhs - rhs).abs() < f64::EPSILON,
+            "Hyperscaling 2-alpha ({}) should equal d*nu ({})",
+            lhs,
+            rhs,
+        );
+    }
+
+    #[test]
+    fn test_fluctuation_stats_default() {
+        let stats = FluctuationStats::default();
+        assert!((stats.mean_amplitude - 0.1).abs() < f64::EPSILON);
+        assert!((stats.variance - 0.01).abs() < f64::EPSILON);
+        assert!((stats.fdr - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_fluctuation_stats_fdr_equilibrium() {
+        // In thermal equilibrium, the fluctuation-dissipation ratio = 1.0
+        let stats = FluctuationStats::default();
+        assert!(
+            (stats.fdr - 1.0).abs() < f64::EPSILON,
+            "FDR should be 1.0 at equilibrium, got {}",
+            stats.fdr,
+        );
+    }
+}

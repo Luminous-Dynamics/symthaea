@@ -896,3 +896,380 @@ pub struct ReflectionSummary {
     pub learning_effectiveness: f32,
     pub next_reflection_in: u32,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // EmotionContagion tests
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn emotion_default_neutral() {
+        let ec = EmotionContagion::default();
+        assert_eq!(ec.valence, 0.0);
+        assert_eq!(ec.arousal, 0.5);
+        assert_eq!(ec.smoothed_valence, 0.0);
+        assert_eq!(ec.smoothed_arousal, 0.5);
+    }
+
+    #[test]
+    fn emotion_positive_text_increases_valence() {
+        let mut ec = EmotionContagion::default();
+        ec.analyze("I am so happy and excited, this is wonderful!");
+        assert!(ec.valence > 0.0, "valence should be positive: {}", ec.valence);
+        assert!(ec.smoothed_valence > 0.0);
+    }
+
+    #[test]
+    fn emotion_negative_text_decreases_valence() {
+        let mut ec = EmotionContagion::default();
+        ec.analyze("I am sad and angry, everything is terrible and awful");
+        assert!(ec.valence < 0.0, "valence should be negative: {}", ec.valence);
+        assert!(ec.smoothed_valence < 0.0);
+    }
+
+    #[test]
+    fn emotion_neutral_text_near_zero() {
+        let mut ec = EmotionContagion::default();
+        ec.analyze("The cat sat on the mat next to the window");
+        assert!(ec.valence.abs() < 0.01, "neutral text valence: {}", ec.valence);
+    }
+
+    #[test]
+    fn emotion_exclamation_boosts_arousal() {
+        let mut ec = EmotionContagion::default();
+        ec.analyze("Now!!! Immediately!!!");
+        assert!(ec.arousal > 0.5, "arousal should be elevated: {}", ec.arousal);
+    }
+
+    #[test]
+    fn emotion_valence_bounded() {
+        let mut ec = EmotionContagion::default();
+        // Extreme positive
+        ec.analyze("happy joy love great wonderful excellent amazing beautiful fantastic good perfect brilliant awesome");
+        assert!(ec.valence >= -1.0 && ec.valence <= 1.0, "valence out of bounds: {}", ec.valence);
+        // Extreme negative
+        ec.analyze("sad angry fear hate terrible awful horrible bad wrong fail");
+        assert!(ec.valence >= -1.0 && ec.valence <= 1.0);
+    }
+
+    #[test]
+    fn emotion_smoothing_lags() {
+        let mut ec = EmotionContagion::default();
+        ec.analyze("I am incredibly happy and excited!");
+        let raw = ec.valence;
+        let smoothed = ec.smoothed_valence;
+        // First analysis: smoothed should lag behind raw (EMA from 0)
+        assert!(smoothed.abs() < raw.abs(), "smoothed {} should lag raw {}", smoothed, raw);
+    }
+
+    #[test]
+    fn emotion_pattern_nudge_significant_positive() {
+        let mut ec = EmotionContagion::default();
+        // Build up enough smoothed valence
+        for _ in 0..5 {
+            ec.analyze("I am so happy and excited, wonderful amazing day!");
+        }
+        let (pattern, strength) = ec.pattern_nudge();
+        assert!(pattern.is_some(), "should suggest a pattern");
+        assert!(strength > 0.0, "strength should be positive");
+    }
+
+    #[test]
+    fn emotion_pattern_nudge_weak_returns_none() {
+        let ec = EmotionContagion::default();
+        let (pattern, strength) = ec.pattern_nudge();
+        assert!(pattern.is_none(), "neutral state should not suggest a pattern");
+        assert_eq!(strength, 0.0);
+    }
+
+    #[test]
+    fn emotion_reset_restores_default() {
+        let mut ec = EmotionContagion::default();
+        ec.analyze("I am very happy!");
+        ec.reset();
+        assert_eq!(ec.valence, 0.0);
+        assert_eq!(ec.smoothed_valence, 0.0);
+    }
+
+    #[test]
+    fn emotion_prosody_accessors() {
+        let mut ec = EmotionContagion::default();
+        ec.analyze("happy wonderful great");
+        assert_eq!(ec.prosody_valence(), ec.smoothed_valence);
+        assert_eq!(ec.prosody_arousal(), ec.smoothed_arousal);
+    }
+
+    #[test]
+    fn emotion_empty_input() {
+        let mut ec = EmotionContagion::default();
+        ec.analyze("");
+        // Should not panic, valence stays near zero
+        assert!(ec.valence.abs() < 0.01);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CuriosityDrive tests
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn curiosity_default_state() {
+        let cd = CuriosityDrive::default();
+        assert_eq!(cd.boredom, 0.0);
+        assert!((cd.curiosity - 0.3).abs() < f32::EPSILON);
+        assert_eq!(cd.exploration_urge, 0.0);
+        assert_eq!(cd.novelty_bonus, 1.0);
+    }
+
+    #[test]
+    fn curiosity_low_error_builds_boredom() {
+        let mut cd = CuriosityDrive::default();
+        // Feed many low-error updates
+        for _ in 0..30 {
+            cd.update(0.01);
+        }
+        assert!(cd.boredom > 0.3, "boredom should build: {}", cd.boredom);
+    }
+
+    #[test]
+    fn curiosity_high_error_resets_streak() {
+        let mut cd = CuriosityDrive::default();
+        for _ in 0..20 {
+            cd.update(0.01);
+        }
+        let boredom_before = cd.boredom;
+        // High error should reduce low_error_streak
+        for _ in 0..10 {
+            cd.update(0.5);
+        }
+        assert!(cd.boredom < boredom_before + 0.1, "boredom should not keep growing after high error");
+    }
+
+    #[test]
+    fn curiosity_should_explore_after_boredom() {
+        let mut cd = CuriosityDrive::default();
+        // Build up enough boredom + curiosity
+        for _ in 0..100 {
+            cd.update(0.01); // Very low error → boredom + high curiosity
+        }
+        assert!(cd.should_explore(), "should want to explore after prolonged low error");
+    }
+
+    #[test]
+    fn curiosity_effective_lr_baseline() {
+        let cd = CuriosityDrive::default();
+        let lr = cd.effective_learning_rate(0.01);
+        assert!((lr - 0.01).abs() < 1e-6, "baseline novelty_bonus should be 1.0");
+    }
+
+    #[test]
+    fn curiosity_effective_lr_bounded() {
+        let mut cd = CuriosityDrive::default();
+        // Drive exploration to max
+        for _ in 0..200 {
+            cd.update(0.01);
+        }
+        let lr = cd.effective_learning_rate(1.0);
+        assert!(lr <= CuriosityDrive::MAX_NOVELTY_BONUS, "LR bonus {} exceeds max {}", lr, CuriosityDrive::MAX_NOVELTY_BONUS);
+        assert!(lr >= 1.0, "LR bonus should be >= 1.0");
+    }
+
+    #[test]
+    fn curiosity_high_error_gives_novelty_bonus() {
+        let mut cd = CuriosityDrive::default();
+        cd.update(0.8); // High error = novel situation
+        assert!(cd.novelty_bonus > 1.0, "high error should boost novelty: {}", cd.novelty_bonus);
+    }
+
+    #[test]
+    fn curiosity_history_bounded() {
+        let mut cd = CuriosityDrive::default();
+        for i in 0..200 {
+            cd.update(i as f32 * 0.005);
+        }
+        assert!(cd.error_history.len() <= CuriosityDrive::HISTORY_SIZE);
+    }
+
+    #[test]
+    fn curiosity_set_boredom_threshold_clamped() {
+        let mut cd = CuriosityDrive::default();
+        cd.set_boredom_threshold(0.0);
+        assert!((cd.get_boredom_threshold() - 0.05).abs() < f32::EPSILON);
+        cd.set_boredom_threshold(1.0);
+        assert!((cd.get_boredom_threshold() - 0.3).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn curiosity_reset_restores_default() {
+        let mut cd = CuriosityDrive::default();
+        for _ in 0..50 {
+            cd.update(0.01);
+        }
+        cd.reset();
+        assert_eq!(cd.boredom, 0.0);
+        assert_eq!(cd.exploration_urge, 0.0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // SelfReflection tests
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn reflection_default_state() {
+        let sr = SelfReflection::default();
+        assert_eq!(sr.self_assessment, SelfAssessment::Learning);
+        assert_eq!(sr.reflection_count, 0);
+        assert_eq!(sr.adjustments_made, 0);
+    }
+
+    #[test]
+    fn reflection_should_reflect_at_interval() {
+        let mut sr = SelfReflection::default();
+        assert!(!sr.should_reflect());
+        // Record enough cycles to reach interval
+        for _ in 0..50 {
+            sr.record_cycle(0.3, false, false, 0.5);
+        }
+        assert!(sr.should_reflect());
+    }
+
+    #[test]
+    fn reflection_resets_counter_after_reflect() {
+        let mut sr = SelfReflection::default();
+        for _ in 0..50 {
+            sr.record_cycle(0.3, false, false, 0.5);
+        }
+        sr.reflect();
+        assert!(!sr.should_reflect());
+        assert_eq!(sr.reflection_count, 1);
+    }
+
+    #[test]
+    fn reflection_struggling_state() {
+        let mut sr = SelfReflection::default();
+        // High error + low confidence → Struggling
+        for _ in 0..50 {
+            sr.record_cycle(0.7, false, false, 0.2);
+        }
+        let recs = sr.reflect();
+        assert_eq!(sr.self_assessment, SelfAssessment::Struggling);
+        assert!(!recs.is_empty(), "should produce recommendations when struggling");
+    }
+
+    #[test]
+    fn reflection_optimal_state() {
+        let mut sr = SelfReflection::default();
+        // Low error + high flow → Optimal
+        for _ in 0..50 {
+            sr.record_cycle(0.1, true, false, 0.8);
+        }
+        sr.reflect();
+        assert_eq!(sr.self_assessment, SelfAssessment::Optimal);
+    }
+
+    #[test]
+    fn reflection_stagnating_state() {
+        let mut sr = SelfReflection::default();
+        // Low error + no flow + no exploration → Stagnating
+        for _ in 0..50 {
+            sr.record_cycle(0.1, false, false, 0.8);
+        }
+        sr.reflect();
+        assert_eq!(sr.self_assessment, SelfAssessment::Stagnating);
+    }
+
+    #[test]
+    fn reflection_threshold_adjustments_bounded() {
+        let mut sr = SelfReflection::default();
+        // Run many reflection cycles to stress-test bounds
+        for round in 0..20 {
+            for _ in 0..50 {
+                sr.record_cycle(if round % 2 == 0 { 0.1 } else { 0.7 }, false, false, 0.3);
+            }
+            sr.reflect();
+        }
+        assert!(sr.flow_error_threshold >= 0.1 && sr.flow_error_threshold <= 0.4,
+                "flow threshold out of bounds: {}", sr.flow_error_threshold);
+        assert!(sr.boredom_threshold >= 0.05 && sr.boredom_threshold <= 0.3,
+                "boredom threshold out of bounds: {}", sr.boredom_threshold);
+        assert!(sr.trust_threshold >= 0.2 && sr.trust_threshold <= 0.7,
+                "trust threshold out of bounds: {}", sr.trust_threshold);
+        assert!(sr.coherence_gate_threshold >= 0.1 && sr.coherence_gate_threshold <= 0.6,
+                "coherence gate out of bounds: {}", sr.coherence_gate_threshold);
+        assert!(sr.surprise_threshold >= 0.5 && sr.surprise_threshold <= 0.95,
+                "surprise threshold out of bounds: {}", sr.surprise_threshold);
+    }
+
+    #[test]
+    fn reflection_interval_adapts() {
+        let mut sr = SelfReflection::default();
+        let initial_interval = sr.reflection_interval;
+        // Optimal state with few adjustments → interval should grow
+        for _ in 0..3 {
+            for _ in 0..sr.reflection_interval {
+                sr.record_cycle(0.1, true, false, 0.8);
+            }
+            sr.reflect();
+        }
+        assert!(sr.reflection_interval >= initial_interval,
+                "interval should not shrink when optimal");
+    }
+
+    #[test]
+    fn reflection_force_triggers_immediate() {
+        let mut sr = SelfReflection::default();
+        sr.record_cycle(0.3, false, false, 0.5);
+        assert!(!sr.should_reflect());
+        sr.force_reflection();
+        assert!(sr.should_reflect());
+    }
+
+    #[test]
+    fn reflection_reset_preserves_thresholds() {
+        let mut sr = SelfReflection::default();
+        sr.flow_error_threshold = 0.35;
+        sr.boredom_threshold = 0.15;
+        sr.trust_threshold = 0.6;
+        sr.reflection_count = 100;
+        sr.reset();
+        assert_eq!(sr.flow_error_threshold, 0.35);
+        assert_eq!(sr.boredom_threshold, 0.15);
+        assert_eq!(sr.trust_threshold, 0.6);
+        assert_eq!(sr.reflection_count, 0);
+    }
+
+    #[test]
+    fn reflection_get_thresholds() {
+        let sr = SelfReflection::default();
+        let t = sr.get_thresholds();
+        assert_eq!(t.flow_error, sr.flow_error_threshold);
+        assert_eq!(t.boredom, sr.boredom_threshold);
+        assert_eq!(t.trust, sr.trust_threshold);
+        assert_eq!(t.coherence_gate, sr.coherence_gate_threshold);
+    }
+
+    #[test]
+    fn reflection_summary() {
+        let sr = SelfReflection::default();
+        let s = sr.summary();
+        assert_eq!(s.reflection_count, 0);
+        assert_eq!(s.adjustments_made, 0);
+        assert_eq!(s.next_reflection_in, 50);
+    }
+
+    #[test]
+    fn reflection_learning_effectiveness_bounded() {
+        let mut sr = SelfReflection::default();
+        // Various error levels
+        for error in [0.0_f32, 0.25, 0.5, 0.75, 1.0] {
+            for _ in 0..50 {
+                sr.record_cycle(error, false, false, 0.5);
+            }
+            sr.reflect();
+            assert!(sr.learning_effectiveness >= 0.0 && sr.learning_effectiveness <= 1.0,
+                    "effectiveness out of bounds for error {}: {}", error, sr.learning_effectiveness);
+        }
+    }
+}

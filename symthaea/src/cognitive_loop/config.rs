@@ -590,6 +590,43 @@ impl CognitiveLoopConfig {
         config
     }
 
+    /// Count the number of enabled consciousness modules.
+    #[cfg(test)]
+    fn count_enabled(&self) -> usize {
+        let bools = [
+            self.enable_virtual_body,
+            self.enable_surprise_exploration,
+            self.enable_prefrontal,
+            self.enable_meta_cognition,
+            self.enable_narrative_self,
+            self.enable_predictive_self,
+            self.enable_attention_schema,
+            self.enable_gwt,
+            self.enable_resonance,
+            self.enable_quantum_coherence,
+            self.enable_temporal_consciousness,
+            self.enable_embodied_cognition,
+            self.enable_narrative_gwt,
+            self.enable_dream_replay,
+            self.enable_predictive_processing,
+            self.enable_cross_modal_binding,
+            self.enable_affective_bridge,
+            self.enable_user_state_inference,
+            self.enable_consciousness_thermodynamics,
+            self.enable_phenomenal_binding,
+            self.enable_hierarchical_free_energy,
+            self.enable_contextual_weights,
+            self.enable_phi_attention,
+            self.enable_negation_detection,
+            self.enable_primitive_consciousness,
+            self.enable_resonator_recall,
+            self.enable_psi_attestation,
+            self.causal_enhancement,
+            self.episodic_replay,
+        ];
+        bools.iter().filter(|&&b| b).count()
+    }
+
     /// Validate configuration for dependency issues.
     ///
     /// Returns a list of warnings for soft dependency violations — cases where
@@ -756,5 +793,337 @@ impl CognitiveLoopConfig {
             return Err("CognitiveLoopConfig: attestation_buffer_capacity must be > 0".into());
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CfCConfig validation
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn cfc_default_validates() {
+        assert!(CfCConfig::default().validate().is_ok());
+    }
+
+    #[test]
+    fn cfc_zero_neurons_rejected() {
+        let mut c = CfCConfig::default();
+        c.num_neurons = 0;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn cfc_zero_input_dim_rejected() {
+        let mut c = CfCConfig::default();
+        c.input_dim = 0;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn cfc_negative_lr_rejected() {
+        let mut c = CfCConfig::default();
+        c.learning_rate = -0.1;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn cfc_zero_lr_rejected() {
+        let mut c = CfCConfig::default();
+        c.learning_rate = 0.0;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn cfc_nan_lr_rejected() {
+        let mut c = CfCConfig::default();
+        c.learning_rate = f32::NAN;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn cfc_inf_lr_rejected() {
+        let mut c = CfCConfig::default();
+        c.learning_rate = f32::INFINITY;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn cfc_negative_delta_t_rejected() {
+        let mut c = CfCConfig::default();
+        c.delta_t = -1.0;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn cfc_empty_horizons_rejected() {
+        let mut c = CfCConfig::default();
+        c.prediction_horizons = vec![];
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn cfc_negative_horizon_rejected() {
+        let mut c = CfCConfig::default();
+        c.prediction_horizons = vec![0.02, -0.1];
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn cfc_lr_at_max_valid() {
+        let mut c = CfCConfig::default();
+        c.learning_rate = 1.0;
+        assert!(c.validate().is_ok());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CognitiveLoopConfig validation
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn config_default_validates() {
+        assert!(CognitiveLoopConfig::default().validate().is_ok());
+    }
+
+    #[test]
+    fn config_negative_learning_threshold_rejected() {
+        let mut c = CognitiveLoopConfig::default();
+        c.learning_threshold = -0.1;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn config_learning_threshold_above_one_rejected() {
+        let mut c = CognitiveLoopConfig::default();
+        c.learning_threshold = 1.1;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn config_zero_buffer_rejected() {
+        let mut c = CognitiveLoopConfig::default();
+        c.buffer_size = 0;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn config_zero_frequency_rejected() {
+        let mut c = CognitiveLoopConfig::default();
+        c.target_frequency = 0.0;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn config_negative_frequency_rejected() {
+        let mut c = CognitiveLoopConfig::default();
+        c.target_frequency = -50.0;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn config_zero_causal_interval_rejected() {
+        let mut c = CognitiveLoopConfig::default();
+        c.causal_discovery_interval = 0;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn config_zero_novelty_threshold_rejected() {
+        let mut c = CognitiveLoopConfig::default();
+        c.resonator_novelty_threshold = 0.0;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn config_zero_max_symbols_rejected() {
+        let mut c = CognitiveLoopConfig::default();
+        c.resonator_max_symbols = 0;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn config_zero_attestation_cap_rejected() {
+        let mut c = CognitiveLoopConfig::default();
+        c.attestation_buffer_capacity = 0;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn config_propagates_cfc_error() {
+        let mut c = CognitiveLoopConfig::default();
+        c.cfc_config.num_neurons = 0;
+        let err = c.validate().unwrap_err();
+        assert!(err.contains("num_neurons"), "error should mention CfC field: {}", err);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Factory methods
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn factory_with_cfc() {
+        let c = CognitiveLoopConfig::with_cfc();
+        assert_eq!(c.temporal_backend, TemporalBackend::CfC);
+        assert!(c.validate().is_ok());
+    }
+
+    #[test]
+    fn factory_with_hdc_ltc_unified() {
+        let c = CognitiveLoopConfig::with_hdc_ltc_unified();
+        assert_eq!(c.temporal_backend, TemporalBackend::HdcLtcUnified);
+        assert!(c.validate().is_ok());
+    }
+
+    #[test]
+    fn factory_with_hdc_ltc_fast() {
+        let c = CognitiveLoopConfig::with_hdc_ltc_fast();
+        assert_eq!(c.temporal_backend, TemporalBackend::HdcLtcUnified);
+        assert!(c.validate().is_ok());
+    }
+
+    #[test]
+    fn factory_with_hdc_ltc_accurate() {
+        let c = CognitiveLoopConfig::with_hdc_ltc_accurate();
+        assert_eq!(c.temporal_backend, TemporalBackend::HdcLtcUnified);
+        assert!(c.validate().is_ok());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ConsciousnessProfile
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn profile_minimal_enables_only_virtual_body() {
+        let c = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Minimal);
+        assert!(c.enable_virtual_body);
+        assert_eq!(c.count_enabled(), 1);
+    }
+
+    #[test]
+    fn profile_standard_subset_of_full() {
+        let std = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Standard);
+        let full = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Full);
+        assert!(std.count_enabled() < full.count_enabled(),
+                "Standard {} should have fewer modules than Full {}",
+                std.count_enabled(), full.count_enabled());
+    }
+
+    #[test]
+    fn profile_full_subset_of_research() {
+        let full = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Full);
+        let research = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Research);
+        assert!(full.count_enabled() < research.count_enabled(),
+                "Full {} should have fewer modules than Research {}",
+                full.count_enabled(), research.count_enabled());
+    }
+
+    #[test]
+    fn profile_research_enables_causal_and_episodic() {
+        let c = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Research);
+        assert!(c.causal_enhancement);
+        assert!(c.episodic_replay);
+        assert!(c.enable_psi_attestation);
+        assert!(c.enable_user_state_inference);
+    }
+
+    #[test]
+    fn profile_all_configs_validate() {
+        for profile in [
+            ConsciousnessProfile::Minimal,
+            ConsciousnessProfile::Standard,
+            ConsciousnessProfile::Full,
+            ConsciousnessProfile::Research,
+        ] {
+            let c = CognitiveLoopConfig::from_profile(profile);
+            assert!(c.validate().is_ok(), "{:?} profile should validate", profile);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Dependency validation
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn dependency_temporal_without_narrative() {
+        let mut c = CognitiveLoopConfig::default();
+        c.enable_temporal_consciousness = true;
+        let warnings = c.validate_dependencies();
+        assert!(warnings.iter().any(|w| w.contains("narrative_self")),
+                "should warn about missing narrative_self: {:?}", warnings);
+    }
+
+    #[test]
+    fn dependency_temporal_without_predictive() {
+        let mut c = CognitiveLoopConfig::default();
+        c.enable_temporal_consciousness = true;
+        let warnings = c.validate_dependencies();
+        assert!(warnings.iter().any(|w| w.contains("predictive_self")));
+    }
+
+    #[test]
+    fn dependency_embodied_without_body() {
+        let mut c = CognitiveLoopConfig::default();
+        c.enable_virtual_body = false;
+        c.enable_embodied_cognition = true;
+        let warnings = c.validate_dependencies();
+        assert!(warnings.iter().any(|w| w.contains("virtual_body")));
+    }
+
+    #[test]
+    fn dependency_psi_without_did() {
+        let mut c = CognitiveLoopConfig::default();
+        c.enable_psi_attestation = true;
+        c.agent_did = None;
+        let warnings = c.validate_dependencies();
+        assert!(warnings.iter().any(|w| w.contains("agent_did")));
+    }
+
+    #[test]
+    fn dependency_default_no_warnings() {
+        let c = CognitiveLoopConfig::default();
+        let warnings = c.validate_dependencies();
+        assert!(warnings.is_empty(), "default config should have no dependency warnings: {:?}", warnings);
+    }
+
+    #[test]
+    fn dependency_full_profile_no_warnings() {
+        let c = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Full);
+        let warnings = c.validate_dependencies();
+        assert!(warnings.is_empty(), "Full profile should have no warnings: {:?}", warnings);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Serde round-trip
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn config_serde_roundtrip() {
+        let original = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Standard);
+        let json = serde_json::to_string(&original).expect("serialize");
+        let restored: CognitiveLoopConfig = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(restored.temporal_backend, original.temporal_backend);
+        assert_eq!(restored.enable_gwt, original.enable_gwt);
+        assert_eq!(restored.enable_prefrontal, original.enable_prefrontal);
+    }
+
+    #[test]
+    fn temporal_backend_serde_roundtrip() {
+        for backend in [TemporalBackend::CfC, TemporalBackend::HdcLtcUnified] {
+            let json = serde_json::to_string(&backend).unwrap();
+            let restored: TemporalBackend = serde_json::from_str(&json).unwrap();
+            assert_eq!(restored, backend);
+        }
+    }
+
+    #[test]
+    fn training_method_serde_roundtrip() {
+        for method in [TrainingMethod::Bptt, TrainingMethod::Spsa, TrainingMethod::BpttWithSpsaFallback] {
+            let json = serde_json::to_string(&method).unwrap();
+            let restored: TrainingMethod = serde_json::from_str(&json).unwrap();
+            assert_eq!(restored, method);
+        }
     }
 }

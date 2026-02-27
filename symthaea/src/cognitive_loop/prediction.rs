@@ -225,3 +225,167 @@ impl CognitiveLoopService {
         Ok(total_loss / replay_count as f32)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ndarray::Array1;
+    use symthaea_core::hdc::primitive_system::PrimitiveTier;
+
+    // ---- compute_prediction_coherence_from_cache ----
+
+    #[test]
+    fn test_coherence_empty_predictions() {
+        let predictions: &[Array1<f32>] = &[];
+        let coherence = CognitiveLoopService::compute_prediction_coherence_from_cache(predictions);
+        assert!(
+            (coherence - 1.0).abs() < f32::EPSILON,
+            "empty predictions should return 1.0, got {coherence}"
+        );
+    }
+
+    #[test]
+    fn test_coherence_single_prediction() {
+        let predictions = [Array1::from_vec(vec![1.0, 2.0, 3.0])];
+        let coherence = CognitiveLoopService::compute_prediction_coherence_from_cache(&predictions);
+        assert!(
+            (coherence - 1.0).abs() < f32::EPSILON,
+            "single prediction should return 1.0, got {coherence}"
+        );
+    }
+
+    #[test]
+    fn test_coherence_identical_predictions() {
+        let v = Array1::from_vec(vec![1.0, 2.0, 3.0]);
+        let predictions = [v.clone(), v];
+        let coherence = CognitiveLoopService::compute_prediction_coherence_from_cache(&predictions);
+        assert!(
+            (coherence - 1.0).abs() < 1e-5,
+            "identical predictions should yield coherence ~1.0, got {coherence}"
+        );
+    }
+
+    #[test]
+    fn test_coherence_orthogonal_predictions() {
+        // [1, 0, 0] and [0, 1, 0] are orthogonal => cosine = 0
+        let a = Array1::from_vec(vec![1.0, 0.0, 0.0]);
+        let b = Array1::from_vec(vec![0.0, 1.0, 0.0]);
+        let predictions = [a, b];
+        let coherence = CognitiveLoopService::compute_prediction_coherence_from_cache(&predictions);
+        assert!(
+            coherence < 0.01,
+            "orthogonal predictions should yield coherence ~0.0, got {coherence}"
+        );
+    }
+
+    #[test]
+    fn test_coherence_opposite_predictions() {
+        // [1, 2, 3] and [-1, -2, -3] => cosine = -1, clamped to 0
+        let a = Array1::from_vec(vec![1.0, 2.0, 3.0]);
+        let b = Array1::from_vec(vec![-1.0, -2.0, -3.0]);
+        let predictions = [a, b];
+        let coherence = CognitiveLoopService::compute_prediction_coherence_from_cache(&predictions);
+        assert!(
+            coherence.abs() < 1e-5,
+            "opposite predictions should yield coherence ~0.0 (clamped), got {coherence}"
+        );
+    }
+
+    // ---- classify_primitive_tier ----
+
+    #[test]
+    fn test_classify_nsm_primitives() {
+        for name in &["identity", "bind", "unbind"] {
+            let tier = CognitiveLoopService::classify_primitive_tier(name);
+            assert_eq!(tier, PrimitiveTier::NSM, "{name} should be NSM");
+        }
+    }
+
+    #[test]
+    fn test_classify_mathematical_primitives() {
+        for name in &["addition", "multiplication"] {
+            let tier = CognitiveLoopService::classify_primitive_tier(name);
+            assert_eq!(
+                tier,
+                PrimitiveTier::Mathematical,
+                "{name} should be Mathematical"
+            );
+        }
+    }
+
+    #[test]
+    fn test_classify_physical_primitives() {
+        for name in &["cause", "effect"] {
+            let tier = CognitiveLoopService::classify_primitive_tier(name);
+            assert_eq!(tier, PrimitiveTier::Physical, "{name} should be Physical");
+        }
+    }
+
+    #[test]
+    fn test_classify_temporal_primitives() {
+        for name in &["before", "after", "during"] {
+            let tier = CognitiveLoopService::classify_primitive_tier(name);
+            assert_eq!(tier, PrimitiveTier::Temporal, "{name} should be Temporal");
+        }
+    }
+
+    #[test]
+    fn test_classify_unknown_defaults_to_nsm() {
+        let tier = CognitiveLoopService::classify_primitive_tier("foobar");
+        assert_eq!(tier, PrimitiveTier::NSM, "unknown should default to NSM");
+    }
+
+    #[test]
+    fn test_classify_prefix_metacognitive() {
+        let tier = CognitiveLoopService::classify_primitive_tier("metacognition_xyz");
+        assert_eq!(
+            tier,
+            PrimitiveTier::MetaCognitive,
+            "meta-prefixed should be MetaCognitive"
+        );
+    }
+
+    // ---- build_primitive_state ----
+
+    #[test]
+    fn test_build_primitive_state_empty() {
+        let state = CognitiveLoopService::build_primitive_state(&[], 0.5, 100.0);
+        assert!(
+            state.active_by_tier.is_empty(),
+            "empty detected list should produce no active primitives"
+        );
+        assert!((state.phi - 0.5).abs() < f64::EPSILON, "phi should be set");
+        assert!(
+            (state.timestamp - 100.0).abs() < f64::EPSILON,
+            "timestamp should be set"
+        );
+    }
+
+    #[test]
+    fn test_build_primitive_state_populated() {
+        let detected = vec!["cause".to_string(), "bind".to_string()];
+        let state = CognitiveLoopService::build_primitive_state(&detected, 0.8, 42.0);
+
+        // Should have entries in Physical (cause) and NSM (bind)
+        assert!(
+            state.active_by_tier.contains_key(&PrimitiveTier::Physical),
+            "should contain Physical tier for 'cause'"
+        );
+        assert!(
+            state.active_by_tier.contains_key(&PrimitiveTier::NSM),
+            "should contain NSM tier for 'bind'"
+        );
+
+        let physical = &state.active_by_tier[&PrimitiveTier::Physical];
+        assert_eq!(physical.len(), 1, "one Physical primitive expected");
+        assert_eq!(physical[0].primitive.name, "cause");
+        assert!((physical[0].activation - 1.0).abs() < f64::EPSILON);
+
+        let nsm = &state.active_by_tier[&PrimitiveTier::NSM];
+        assert_eq!(nsm.len(), 1, "one NSM primitive expected");
+        assert_eq!(nsm[0].primitive.name, "bind");
+
+        assert!((state.phi - 0.8).abs() < f64::EPSILON);
+        assert!((state.timestamp - 42.0).abs() < f64::EPSILON);
+    }
+}

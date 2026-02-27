@@ -256,3 +256,276 @@ impl ClosedLearningLoop {
         *self = Self::default();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use symthaea_core::genesis::{GenesisSeed, ShakeRng};
+
+    /// Helper: build a seeded ShakeRng from a u64 seed.
+    fn rng_from_seed(seed: u64) -> ShakeRng {
+        let phrase = format!("test-seed-{seed}");
+        GenesisSeed::from_phrase(&phrase).domain("learning-tests")
+    }
+
+    /// Helper: build a CycleLearningResult with the given strategy and reward.
+    fn make_result(strategy: ResponseStrategy, reward: f32) -> CycleLearningResult {
+        CycleLearningResult {
+            reward,
+            strategy_used: strategy,
+            successful: reward > 0.0,
+            prediction_error: (1.0 - reward).abs(),
+            coherence: 0.5,
+        }
+    }
+
+    #[test]
+    fn test_default_values() {
+        let cll = ClosedLearningLoop::default();
+        assert_eq!(cll.q_values, [0.5; 5], "default Q-values should be 0.5");
+        assert!(
+            (cll.exploration_rate() - 0.2).abs() < f32::EPSILON,
+            "default exploration_rate should be 0.2"
+        );
+        assert_eq!(cll.total_interactions(), 0);
+    }
+
+    #[test]
+    fn test_q_value_update() {
+        let mut cll = ClosedLearningLoop::default();
+        let old_q = cll.q_values()[0]; // Detailed index 0
+        assert!((old_q - 0.5).abs() < f32::EPSILON);
+
+        // Give a strong positive reward for Detailed
+        cll.update(make_result(ResponseStrategy::Detailed, 0.9));
+
+        let new_q = cll.q_values()[0];
+        assert!(
+            new_q > old_q,
+            "Q-value for Detailed should increase after positive reward: {new_q} > {old_q}"
+        );
+        // Q = 0.5 + 0.1 * (0.9 - 0.5) = 0.54
+        assert!(
+            (new_q - 0.54).abs() < 1e-5,
+            "Q-update should follow Q(s,a) <- Q(s,a) + α*(r - Q(s,a)): got {new_q}"
+        );
+    }
+
+    #[test]
+    fn test_exploration_rate_decay() {
+        let mut cll = ClosedLearningLoop::default();
+        let initial_rate = cll.exploration_rate();
+        assert!((initial_rate - 0.2).abs() < f32::EPSILON);
+
+        for _ in 0..100 {
+            cll.update(make_result(ResponseStrategy::Supportive, 0.5));
+        }
+
+        let decayed = cll.exploration_rate();
+        assert!(
+            decayed < initial_rate,
+            "exploration_rate should decay: {decayed} < {initial_rate}"
+        );
+        assert!(
+            decayed >= 0.05,
+            "exploration_rate should not drop below 0.05: {decayed}"
+        );
+    }
+
+    #[test]
+    fn test_average_reward() {
+        let mut cll = ClosedLearningLoop::default();
+        assert!(
+            cll.average_reward().abs() < f32::EPSILON,
+            "average_reward should be 0.0 with no interactions"
+        );
+
+        cll.update(make_result(ResponseStrategy::Concise, 0.6));
+        cll.update(make_result(ResponseStrategy::Concise, 0.4));
+        cll.update(make_result(ResponseStrategy::Concise, 0.8));
+
+        let avg = cll.average_reward();
+        let expected = (0.6 + 0.4 + 0.8) / 3.0;
+        assert!(
+            (avg - expected).abs() < 1e-5,
+            "average_reward should be {expected}, got {avg}"
+        );
+    }
+
+    #[test]
+    fn test_best_strategy() {
+        let mut cll = ClosedLearningLoop::with_rng(rng_from_seed(42));
+
+        // Repeatedly reward Exploratory (index 4) to make its Q-value dominant.
+        for _ in 0..50 {
+            cll.update(make_result(ResponseStrategy::Exploratory, 1.0));
+        }
+
+        assert_eq!(
+            cll.best_strategy(),
+            ResponseStrategy::Exploratory,
+            "best_strategy should be Exploratory after many positive updates"
+        );
+    }
+
+    #[test]
+    fn test_phi_gating_high_phi() {
+        // High phi (>=0.6): Supportive→Exploratory, Concise→Detailed
+        let mut cll = ClosedLearningLoop::with_rng(rng_from_seed(100));
+
+        // Seed a strong positive result for Supportive so step 2 sticks with it
+        cll.update(make_result(ResponseStrategy::Supportive, 0.8));
+        let strategy = cll.select_strategy(0.8, None);
+        // Step 2 sticks with Supportive (reward > 0.5), then phi-gate upgrades
+        assert_eq!(
+            strategy,
+            ResponseStrategy::Exploratory,
+            "high phi should upgrade Supportive→Exploratory"
+        );
+
+        // Now test Concise→Detailed
+        let mut cll2 = ClosedLearningLoop::with_rng(rng_from_seed(200));
+        cll2.update(make_result(ResponseStrategy::Concise, 0.8));
+        let strategy2 = cll2.select_strategy(0.8, None);
+        assert_eq!(
+            strategy2,
+            ResponseStrategy::Detailed,
+            "high phi should upgrade Concise→Detailed"
+        );
+    }
+
+    #[test]
+    fn test_phi_gating_low_phi() {
+        // Low phi (<0.3): Exploratory→Supportive, Detailed→Concise
+        let mut cll = ClosedLearningLoop::with_rng(rng_from_seed(300));
+
+        // Seed a strong positive result for Exploratory so step 2 sticks with it
+        cll.update(make_result(ResponseStrategy::Exploratory, 0.8));
+        let strategy = cll.select_strategy(0.2, None);
+        assert_eq!(
+            strategy,
+            ResponseStrategy::Supportive,
+            "low phi should downgrade Exploratory→Supportive"
+        );
+
+        // Now test Detailed→Concise
+        let mut cll2 = ClosedLearningLoop::with_rng(rng_from_seed(400));
+        cll2.update(make_result(ResponseStrategy::Detailed, 0.8));
+        let strategy2 = cll2.select_strategy(0.2, None);
+        assert_eq!(
+            strategy2,
+            ResponseStrategy::Concise,
+            "low phi should downgrade Detailed→Concise"
+        );
+    }
+
+    #[test]
+    fn test_positive_reward_repeats_strategy() {
+        let mut cll = ClosedLearningLoop::with_rng(rng_from_seed(500));
+
+        // Give a strong positive reward for Clarifying
+        cll.update(make_result(ResponseStrategy::Clarifying, 0.8));
+
+        // Select with neutral phi so phi-gating is a no-op
+        let strategy = cll.select_strategy(0.5, None);
+        assert_eq!(
+            strategy,
+            ResponseStrategy::Clarifying,
+            "after reward > 0.5, select_strategy should repeat the last successful strategy"
+        );
+    }
+
+    #[test]
+    fn test_negative_reward_switches_strategy() {
+        let mut cll = ClosedLearningLoop::with_rng(rng_from_seed(600));
+
+        // Give a negative reward for Clarifying
+        cll.update(make_result(ResponseStrategy::Clarifying, -0.5));
+
+        // Select with neutral phi
+        let strategy = cll.select_strategy(0.5, None);
+        let expected = ResponseStrategy::Clarifying.opposite();
+        assert_eq!(
+            strategy, expected,
+            "after reward < -0.2, select_strategy should use opposite(): expected {expected:?}, got {strategy:?}"
+        );
+    }
+
+    #[test]
+    fn test_reset() {
+        let mut cll = ClosedLearningLoop::default();
+
+        // Modify state
+        for _ in 0..20 {
+            cll.update(make_result(ResponseStrategy::Exploratory, 0.9));
+        }
+        assert!(cll.total_interactions() > 0);
+        assert!(cll.q_values()[4] > 0.5);
+
+        // Reset
+        cll.reset();
+
+        assert_eq!(cll.q_values, [0.5; 5], "q_values should reset to 0.5");
+        assert!(
+            (cll.exploration_rate() - 0.2).abs() < f32::EPSILON,
+            "exploration_rate should reset to 0.2"
+        );
+        assert_eq!(cll.total_interactions(), 0, "total_interactions should reset to 0");
+        assert!(
+            cll.average_reward().abs() < f32::EPSILON,
+            "average_reward should reset to 0.0"
+        );
+        assert_eq!(
+            cll.strategy_counts(),
+            &[0; 5],
+            "strategy_counts should reset to zeros"
+        );
+        assert!(cll.last_result.is_none(), "last_result should reset to None");
+    }
+
+    #[test]
+    fn test_strategy_counts_tracked() {
+        let mut cll = ClosedLearningLoop::default();
+
+        cll.update(make_result(ResponseStrategy::Detailed, 0.5));
+        cll.update(make_result(ResponseStrategy::Detailed, 0.5));
+        cll.update(make_result(ResponseStrategy::Concise, 0.5));
+        cll.update(make_result(ResponseStrategy::Exploratory, 0.5));
+        cll.update(make_result(ResponseStrategy::Exploratory, 0.5));
+        cll.update(make_result(ResponseStrategy::Exploratory, 0.5));
+
+        let counts = cll.strategy_counts();
+        assert_eq!(counts[0], 2, "Detailed count should be 2");
+        assert_eq!(counts[1], 1, "Concise count should be 1");
+        assert_eq!(counts[2], 0, "Clarifying count should be 0");
+        assert_eq!(counts[3], 0, "Supportive count should be 0");
+        assert_eq!(counts[4], 3, "Exploratory count should be 3");
+    }
+
+    #[test]
+    fn test_with_rng_deterministic() {
+        let mut cll_a = ClosedLearningLoop::with_rng(rng_from_seed(42));
+        let mut cll_b = ClosedLearningLoop::with_rng(rng_from_seed(42));
+
+        let mut strategies_a = Vec::new();
+        let mut strategies_b = Vec::new();
+
+        for i in 0..20 {
+            let phi = 0.5; // neutral phi to avoid gating interference
+            let sa = cll_a.select_strategy(phi, None);
+            let sb = cll_b.select_strategy(phi, None);
+            strategies_a.push(sa);
+            strategies_b.push(sb);
+
+            // Feed identical results so state stays in sync
+            let reward = (i as f32 % 5.0) * 0.2 - 0.4; // varying rewards
+            cll_a.update(make_result(sa, reward));
+            cll_b.update(make_result(sb, reward));
+        }
+
+        assert_eq!(
+            strategies_a, strategies_b,
+            "two loops with identical ShakeRng seeds should produce identical strategy sequences"
+        );
+    }
+}
