@@ -55,8 +55,10 @@ pub struct LiquidMambaConfig {
     pub veto_threshold: f32,
     /// Coherence below this → boost thought binding.
     pub drift_threshold: f32,
-    /// Sliding window size for coherence monitoring.
+    /// Sliding window size for short-term coherence monitoring.
     pub coherence_window: usize,
+    /// Sliding window size for long-term coherence trend (default 32).
+    pub long_coherence_window: usize,
     /// EMA smoothing alpha for coherence.
     pub coherence_ema_alpha: f32,
     /// Minimum consecutive low-coherence tokens before veto.
@@ -99,6 +101,7 @@ impl Default for LiquidMambaConfig {
             veto_threshold: 0.20,
             drift_threshold: 0.30,
             coherence_window: 8,
+            long_coherence_window: 32,
             coherence_ema_alpha: 0.3,
             min_consecutive_low: 3,
             delta_mod_strength: 1.0,
@@ -187,6 +190,7 @@ impl LiquidMambaGenerator {
                     eos_terminated: false,
                     veto_triggered: false,
                     final_coherence: 0.0,
+                    long_coherence: 0.0,
                     output_hvs: Vec::new(),
                     semantic_pe: 0.0,
                 }
@@ -214,13 +218,20 @@ impl LiquidMambaGenerator {
         // 5. Update arousal from channels
         self.arousal = channels.arousal();
 
-        // 6. Initialize coherence monitor
+        // 6. Initialize coherence monitors (short + long window)
         let mut coherence_monitor = CoherenceMonitor::new(
             thought_hv.clone(),
             self.config.coherence_window,
             self.config.coherence_ema_alpha,
             self.config.veto_threshold,
             self.config.min_consecutive_low,
+        );
+        let mut long_coherence_monitor = CoherenceMonitor::new(
+            thought_hv.clone(),
+            self.config.long_coherence_window,
+            self.config.coherence_ema_alpha * 0.5, // Slower EMA for trend detection
+            self.config.veto_threshold * 0.5,       // Lower threshold (trend signal)
+            self.config.min_consecutive_low * 2,    // More patience for long window
         );
 
         // 7. Autoregressive generation loop
@@ -230,6 +241,8 @@ impl LiquidMambaGenerator {
         let mut veto_triggered = false;
         let mut prev_token = eos_id; // Start with EOS as BOS-equivalent
         let mut output_hvs: Vec<ContinuousHV> = Vec::new();
+        // Per-token PE feedback: boost gating when last token had low thought-coherence
+        let mut token_pe_boost: f32 = 0.0;
 
         for pos in 0..max_tokens {
             // 7a. Biological delta modulation
@@ -242,13 +255,15 @@ impl LiquidMambaGenerator {
             let mut logits = self.mamba.forward_one_token(prev_token)?;
 
             // 7c. Epistemic gating (apply to Mamba's large vocab logits)
+            //     Per-token PE feedback: if last token had low coherence with thought,
+            //     boost epistemic gate by shifting toward higher uncertainty
             if self.config.enable_gating {
-                // Apply gating to the first N tokens that overlap with Broca vocab
-                // Mamba vocab >> Broca vocab, so we gate on the Broca-sized prefix
+                let effective_epistemic = (channels.epistemic_ordinal() + token_pe_boost)
+                    .clamp(0.0, 4.0);
                 let gate_len = logits.len().min(512);
                 self.epistemic_gate.apply(
                     &mut logits[..gate_len],
-                    channels.epistemic_ordinal(),
+                    effective_epistemic,
                 );
             }
 
@@ -270,7 +285,21 @@ impl LiquidMambaGenerator {
             let token_hdc = self.projection.project_to_hdc(&token_emb);
             output_hvs.push(token_hdc.clone());
 
+            // 7f2. Per-token PE feedback: compute token-level coherence with thought
+            //      Low similarity → boost epistemic gating for next token
+            let token_sim = thought_hv.similarity(&token_hdc).clamp(-1.0, 1.0);
+            token_pe_boost = if token_sim < 0.3 {
+                // Low coherence: boost gating by up to +1.5 (shift toward Uncertain)
+                1.5 * (1.0 - token_sim / 0.3)
+            } else {
+                // Adequate coherence: decay boost
+                (token_pe_boost * 0.5).max(0.0)
+            };
+
             // 7g. Coherence monitoring + semantic veto
+            // Always feed long monitor for trend tracking
+            long_coherence_monitor.push(token_hdc.clone());
+
             if self.config.enable_veto {
                 coherence_monitor.push(token_hdc);
 
@@ -298,6 +327,7 @@ impl LiquidMambaGenerator {
                     eos_terminated: true,
                     veto_triggered,
                     final_coherence: coherence_monitor.current_coherence(),
+                    long_coherence: long_coherence_monitor.current_coherence(),
                     output_hvs,
                     semantic_pe,
                 });
@@ -319,6 +349,7 @@ impl LiquidMambaGenerator {
             eos_terminated: false,
             veto_triggered,
             final_coherence: coherence_monitor.current_coherence(),
+            long_coherence: long_coherence_monitor.current_coherence(),
             output_hvs,
             semantic_pe,
         })
@@ -357,6 +388,21 @@ impl LiquidMambaGenerator {
         &self.projection
     }
 
+    /// Get reference to the Mamba wrapper.
+    pub fn mamba(&self) -> &MambaWrapper {
+        &self.mamba
+    }
+
+    /// Get mutable reference to the Mamba wrapper.
+    pub fn mamba_mut(&mut self) -> &mut MambaWrapper {
+        &mut self.mamba
+    }
+
+    /// Get reference to the config.
+    pub fn config(&self) -> &LiquidMambaConfig {
+        &self.config
+    }
+
     /// Get reference to the encoder.
     pub fn encoder(&self) -> &ThoughtLanguageEncoder {
         &self.encoder
@@ -372,6 +418,53 @@ impl LiquidMambaGenerator {
         self.generation_count
     }
 
+    /// Check for projection collapse and auto-recover if detected.
+    ///
+    /// Monitors the effective rank of bottleneck activations. If rank drops
+    /// below `bottleneck_dim / 4`, adds noise to the collapsed dimensions
+    /// to restore representational capacity.
+    ///
+    /// Should be called periodically (e.g., every 50 generations).
+    pub fn check_projection_health(&mut self, recent_hvs: &[ContinuousHV]) {
+        if recent_hvs.len() < 4 {
+            return;
+        }
+
+        let rank = self.projection.effective_rank(recent_hvs);
+        let threshold = (self.config.bottleneck_dim as f32) / 4.0;
+
+        if rank < threshold {
+            tracing::warn!(
+                effective_rank = rank,
+                threshold = threshold,
+                bottleneck = self.config.bottleneck_dim,
+                "Projection collapse detected, adding recovery noise"
+            );
+
+            // Get current weights, add scaled noise to restore rank
+            let mut weights = self.projection.flatten_weights();
+            let noise_scale = 0.01 / (self.config.bottleneck_dim as f32).sqrt();
+            let mut rng_state = self.generation_count as u64 ^ 0x9E3779B97F4A7C15;
+            for w in &mut weights {
+                // xorshift64
+                rng_state ^= rng_state << 13;
+                rng_state ^= rng_state >> 7;
+                rng_state ^= rng_state << 17;
+                let noise = ((rng_state as f32) / (u64::MAX as f32) - 0.5) * 2.0 * noise_scale;
+                *w += noise;
+            }
+            self.projection.load_weights(&weights);
+
+            // Verify recovery
+            let new_rank = self.projection.effective_rank(recent_hvs);
+            tracing::info!(
+                old_rank = rank,
+                new_rank = new_rank,
+                "Projection recovery applied"
+            );
+        }
+    }
+
     /// Online distillation step: learn from the last generation.
     ///
     /// Adjusts the HDC↔SSM projection using:
@@ -381,6 +474,11 @@ impl LiquidMambaGenerator {
     /// - Contrastive loss (push different thoughts' projections apart)
     pub fn distill_step(&mut self, channels: &ThoughtChannels, result: &GenerationResult) {
         self.generation_count += 1;
+
+        // Periodic projection health check (every 50 generations)
+        if self.generation_count % 50 == 0 && !result.output_hvs.is_empty() {
+            self.check_projection_health(&result.output_hvs);
+        }
 
         // Gate: skip if no tokens or high PE (garbage output)
         if result.output_hvs.is_empty() || result.semantic_pe > 0.8 {
@@ -784,6 +882,8 @@ mod tests {
         assert!(config.enable_gating);
         assert!(config.enable_veto);
         assert!(config.enable_liquid_delta);
+        assert_eq!(config.coherence_window, 8);
+        assert_eq!(config.long_coherence_window, 32);
         assert_eq!(config.warmup_steps, 100);
         assert_eq!(config.accumulation_steps, 4);
         assert!((config.contrastive_weight - 0.1).abs() < 1e-6);

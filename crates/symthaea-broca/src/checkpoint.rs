@@ -237,6 +237,97 @@ impl BrocaGenerator {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROJECTION CHECKPOINT (standalone, for Liquid-Mamba fusion)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Standalone checkpoint for the HDC↔SSM projection weights.
+///
+/// Smaller and faster than a full BrocaCheckpoint — only stores the projection
+/// matrix weights (8.8M parameters at default dimensions).
+#[cfg(feature = "mamba")]
+#[derive(Serialize, Deserialize)]
+pub struct ProjectionCheckpoint {
+    /// Schema version.
+    pub version: u32,
+    /// Flat projection weights from `HdcSsmProjection::flatten_weights()`.
+    pub projection_weights: Vec<f32>,
+    /// HDC dimension the projection was built for.
+    pub hdc_dim: usize,
+    /// Bottleneck dimension.
+    pub bottleneck_dim: usize,
+    /// SSM dimension.
+    pub ssm_dim: usize,
+    /// Training epoch at time of save.
+    pub training_epoch: usize,
+    /// Blake3 integrity checksum (zeroed before hashing).
+    pub checksum: [u8; 32],
+}
+
+#[cfg(feature = "mamba")]
+impl ProjectionCheckpoint {
+    /// Compute the blake3 checksum (with checksum field zeroed).
+    fn compute_checksum(&self) -> [u8; 32] {
+        let copy = ProjectionCheckpoint {
+            version: self.version,
+            projection_weights: self.projection_weights.clone(),
+            hdc_dim: self.hdc_dim,
+            bottleneck_dim: self.bottleneck_dim,
+            ssm_dim: self.ssm_dim,
+            training_epoch: self.training_epoch,
+            checksum: [0u8; 32],
+        };
+        let bytes = bincode::serialize(&copy).unwrap_or_default();
+        *blake3::hash(&bytes).as_bytes()
+    }
+
+    /// Verify the checkpoint integrity.
+    pub fn verify(&self) -> bool {
+        let expected = self.compute_checksum();
+        self.checksum == expected
+    }
+
+    /// Save to a file.
+    pub fn save_to_file<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        self.checksum = self.compute_checksum();
+        let serialized = bincode::serialize(self)
+            .context("Failed to serialize ProjectionCheckpoint")?;
+        let mut file = std::fs::File::create(path.as_ref())
+            .with_context(|| format!("creating projection checkpoint: {}", path.as_ref().display()))?;
+        file.write_all(&serialized)?;
+        file.sync_all()?;
+        tracing::info!(
+            path = %path.as_ref().display(),
+            epoch = self.training_epoch,
+            params = self.projection_weights.len(),
+            "Projection checkpoint saved"
+        );
+        Ok(())
+    }
+
+    /// Load from a file with integrity verification.
+    pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let mut file = std::fs::File::open(path.as_ref())
+            .with_context(|| format!("opening projection checkpoint: {}", path.as_ref().display()))?;
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer)?;
+        let checkpoint: Self = bincode::deserialize(&buffer)
+            .context("Failed to deserialize ProjectionCheckpoint")?;
+        if !checkpoint.verify() {
+            anyhow::bail!("Projection checkpoint integrity check failed: checksum mismatch");
+        }
+        tracing::info!(
+            path = %path.as_ref().display(),
+            epoch = checkpoint.training_epoch,
+            hdc_dim = checkpoint.hdc_dim,
+            bottleneck = checkpoint.bottleneck_dim,
+            ssm_dim = checkpoint.ssm_dim,
+            "Projection checkpoint loaded"
+        );
+        Ok(checkpoint)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

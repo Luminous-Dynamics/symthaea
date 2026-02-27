@@ -41,6 +41,11 @@ name = "broca-mamba-verify"
 path = "src/bin/broca_mamba_verify.rs"
 required-features = ["mamba"]
 
+[[bin]]
+name = "broca-projection-train"
+path = "src/bin/broca_projection_train.rs"
+required-features = ["mamba"]
+
 [features]
 default = []
 mamba = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:hf-hub", "dep:tokenizers"]
