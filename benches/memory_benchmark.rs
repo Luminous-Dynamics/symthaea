@@ -85,8 +85,8 @@ fn bench_hippocampus_recall_topk(c: &mut Criterion) {
             for i in 0..n_memories {
                 // Create diverse embeddings
                 let mut emb = vec![0.0f32; 128];
-                for j in 0..128 {
-                    emb[j] = ((i * 17 + j * 31) % 100) as f32 / 100.0;
+                for (j, emb_val) in emb.iter_mut().enumerate().take(128) {
+                    *emb_val = ((i * 17 + j * 31) % 100) as f32 / 100.0;
                 }
                 hippo
                     .encode(format!("Memory {}", i), emb, EmotionalValence::Neutral)
@@ -104,7 +104,7 @@ fn bench_hippocampus_recall_topk(c: &mut Criterion) {
             group.bench_with_input(
                 BenchmarkId::new(format!("n={}_k={}", n_memories, k), n_memories),
                 &(&mut hippo, &query_emb, k),
-                |b, (hippo, query_emb, k)| {
+                |b, (_hippo, query_emb, k)| {
                     // Need to clone hippo for each iteration since recall is &mut self
                     b.iter(|| {
                         let query =

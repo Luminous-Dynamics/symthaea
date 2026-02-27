@@ -193,7 +193,7 @@ fn generate_mock_embedding(text: &str, category: SemanticCategory) -> Vec<f32> {
     let text_hash = text_hasher.finish();
 
     // Generate embedding: category provides base direction, text adds variation
-    for i in 0..1024 {
+    for (i, emb_val) in embedding.iter_mut().enumerate().take(1024) {
         // Category component (same for all in category)
         let cat_idx = ((category_hash as usize) + i * 7) % 1024;
         let cat_component = ((cat_idx as f32 / 512.0) - 1.0) * 0.7;
@@ -202,7 +202,7 @@ fn generate_mock_embedding(text: &str, category: SemanticCategory) -> Vec<f32> {
         let text_idx = ((text_hash as usize) + i * 13) % 1024;
         let text_component = ((text_idx as f32 / 512.0) - 1.0) * 0.3;
 
-        embedding[i] = cat_component + text_component;
+        *emb_val = cat_component + text_component;
     }
 
     // Normalize to unit length

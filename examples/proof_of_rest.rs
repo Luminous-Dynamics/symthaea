@@ -85,7 +85,7 @@ impl FieldElement {
         Self::new(hash)
     }
 
-    fn to_bytes(&self) -> [u8; 16] {
+    fn as_bytes(&self) -> [u8; 16] {
         self.0.to_le_bytes()
     }
 
@@ -95,7 +95,7 @@ impl FieldElement {
 
     fn mul(&self, other: &Self) -> Self {
         // Simplified multiplication for demo
-        let result = ((self.0 as u128) * (other.0 as u128)) % FIELD_MODULUS;
+        let result = (self.0 * other.0) % FIELD_MODULUS;
         Self::new(result)
     }
 }
@@ -180,9 +180,9 @@ impl SleepStateProof {
 
         // Fiat-Shamir challenge (hash of commitments)
         let mut challenge_input = Vec::new();
-        challenge_input.extend_from_slice(&eeg_commitment.commitment.to_bytes());
-        challenge_input.extend_from_slice(&eog_commitment.commitment.to_bytes());
-        challenge_input.extend_from_slice(&emg_commitment.commitment.to_bytes());
+        challenge_input.extend_from_slice(&eeg_commitment.commitment.as_bytes());
+        challenge_input.extend_from_slice(&eog_commitment.commitment.as_bytes());
+        challenge_input.extend_from_slice(&emg_commitment.commitment.as_bytes());
         challenge_input.extend_from_slice(&(snapshot.sleep_stage as u8).to_le_bytes());
         let challenge = FieldElement::from_bytes(&challenge_input);
 
@@ -217,9 +217,9 @@ impl SleepStateProof {
 
         // Verify Fiat-Shamir (recompute challenge)
         let mut challenge_input = Vec::new();
-        challenge_input.extend_from_slice(&self.eeg_commitment.commitment.to_bytes());
-        challenge_input.extend_from_slice(&self.eog_commitment.commitment.to_bytes());
-        challenge_input.extend_from_slice(&self.emg_commitment.commitment.to_bytes());
+        challenge_input.extend_from_slice(&self.eeg_commitment.commitment.as_bytes());
+        challenge_input.extend_from_slice(&self.eog_commitment.commitment.as_bytes());
+        challenge_input.extend_from_slice(&self.emg_commitment.commitment.as_bytes());
         challenge_input.extend_from_slice(&(self.claimed_stage as u8).to_le_bytes());
         let expected_challenge = FieldElement::from_bytes(&challenge_input);
 
@@ -236,8 +236,8 @@ impl SleepStateProof {
 
     fn compute_confidence(&self) -> f64 {
         // More epochs = higher confidence
-        let epoch_factor = (self.epoch_count as f64 / 20.0).min(1.0);
-        epoch_factor
+        
+        (self.epoch_count as f64 / 20.0).min(1.0)
     }
 }
 
@@ -301,7 +301,7 @@ impl RestValidator {
         // Deep sleep is most valuable (regenerative)
         reward_rates.insert(SleepStage::N3, 0.10);
         // REM is valuable (memory consolidation)
-        reward_rates.insert(SleepStage::REM, 0.08);
+        reward_rates.insert(SleepStage::Rem, 0.08);
         // Light sleep base rate
         reward_rates.insert(SleepStage::N2, 0.05);
         reward_rates.insert(SleepStage::N1, 0.03);
@@ -330,7 +330,7 @@ impl RestValidator {
 
                 let reward_type = match stage {
                     SleepStage::N3 => RewardType::DeepSleepBonus,
-                    SleepStage::REM => RewardType::RemSleepBonus,
+                    SleepStage::Rem => RewardType::RemSleepBonus,
                     _ => RewardType::LightSleepBase,
                 };
 
@@ -365,7 +365,7 @@ enum SleepStage {
     N1 = 1,
     N2 = 2,
     N3 = 3,
-    REM = 4,
+    Rem = 4,
 }
 
 impl SleepStage {
@@ -375,16 +375,16 @@ impl SleepStage {
             SleepStage::N1 => "N1",
             SleepStage::N2 => "N2",
             SleepStage::N3 => "N3",
-            SleepStage::REM => "REM",
+            SleepStage::Rem => "REM",
         }
     }
 
     /// Map to Φ (consciousness level)
     /// Higher consciousness = higher Φ
-    fn to_phi(&self) -> f64 {
+    fn as_phi(&self) -> f64 {
         match self {
             SleepStage::Wake => 0.8, // Highest - awake
-            SleepStage::REM => 0.6,  // High - dreaming (conscious)
+            SleepStage::Rem => 0.6,  // High - dreaming (conscious)
             SleepStage::N1 => 0.4,   // Transitional
             SleepStage::N2 => 0.3,   // Light sleep
             SleepStage::N3 => 0.1,   // Lowest - deep sleep
@@ -478,7 +478,7 @@ impl SleepSession {
         // REM sleep
         for _ in 0..25 {
             epochs.push(EpochData {
-                stage: SleepStage::REM,
+                stage: SleepStage::Rem,
                 synchrony: 0.272 + rand_noise(0.05),
                 complexity: 0.993 + rand_noise(0.005),
                 eog_activity: 0.258 + rand_noise(0.04),
@@ -528,8 +528,8 @@ impl SleepSession {
             let avg_emg = epochs.iter().map(|e| e.emg_tone).sum::<f64>() / count as f64;
 
             let snapshot = ConsciousnessSnapshot {
-                phi: stage.to_phi(),
-                meta_awareness: if stage == SleepStage::Wake || stage == SleepStage::REM {
+                phi: stage.as_phi(),
+                meta_awareness: if stage == SleepStage::Wake || stage == SleepStage::Rem {
                     0.7
                 } else {
                     0.2
@@ -614,7 +614,7 @@ fn main() {
         SleepStage::N1,
         SleepStage::N2,
         SleepStage::N3,
-        SleepStage::REM,
+        SleepStage::Rem,
     ] {
         if let Some((snapshot, count)) = analysis.get(&stage) {
             println!(

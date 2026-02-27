@@ -479,11 +479,11 @@ mod tests {
         // Pad to align (npy spec: header_len + magic(6) + version(2) + len_field(2) = multiple of 64)
         let preamble_len = 6 + 2 + 2; // magic + version + header_len field
         let total_unpadded = preamble_len + header_content.len() + 1; // +1 for newline
-        let padded_total = ((total_unpadded + 63) / 64) * 64;
+        let padded_total = total_unpadded.div_ceil(64) * 64;
         let pad_len = padded_total - total_unpadded;
 
         let mut header_bytes = header_content.into_bytes();
-        header_bytes.extend(std::iter::repeat(b' ').take(pad_len));
+        header_bytes.extend(std::iter::repeat_n(b' ', pad_len));
         header_bytes.push(b'\n');
 
         let mut buf = Vec::new();
@@ -512,11 +512,11 @@ mod tests {
 
         let preamble_len = 6 + 2 + 2;
         let total_unpadded = preamble_len + header_content.len() + 1;
-        let padded_total = ((total_unpadded + 63) / 64) * 64;
+        let padded_total = total_unpadded.div_ceil(64) * 64;
         let pad_len = padded_total - total_unpadded;
 
         let mut header_bytes = header_content.as_bytes().to_vec();
-        header_bytes.extend(std::iter::repeat(b' ').take(pad_len));
+        header_bytes.extend(std::iter::repeat_n(b' ', pad_len));
         header_bytes.push(b'\n');
 
         let mut buf = Vec::new();

@@ -152,7 +152,7 @@ fn test_prediction_confidence_initial() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let pc = service.prediction_confidence();
     assert!(pc.is_finite(), "prediction_confidence should be finite");
-    assert!(pc >= 0.0 && pc <= 1.0, "prediction_confidence should be in [0,1]");
+    assert!((0.0..=1.0).contains(&pc), "prediction_confidence should be in [0,1]");
 }
 
 #[test]
@@ -193,7 +193,7 @@ fn test_flow_state_initial() {
     assert_eq!(service.flow_streak(), 0);
     let intensity = service.flow_intensity();
     assert!(intensity.is_finite());
-    assert!(intensity >= 0.0 && intensity <= 1.0);
+    assert!((0.0..=1.0).contains(&intensity));
 }
 
 #[test]
@@ -201,7 +201,7 @@ fn test_emotion_initial() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let v = service.emotional_valence();
     assert!(v.is_finite(), "emotional_valence should be finite");
-    assert!(v >= -1.0 && v <= 1.0, "valence in [-1,1]");
+    assert!((-1.0..=1.0).contains(&v), "valence in [-1,1]");
     // No emotional content initially.
     assert!(!service.has_emotional_content());
 }
@@ -211,8 +211,8 @@ fn test_boredom_and_curiosity_initial() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let b = service.boredom();
     let c = service.curiosity();
-    assert!(b.is_finite() && b >= 0.0 && b <= 1.0, "boredom in [0,1]");
-    assert!(c.is_finite() && c >= 0.0 && c <= 1.0, "curiosity in [0,1]");
+    assert!(b.is_finite() && (0.0..=1.0).contains(&b), "boredom in [0,1]");
+    assert!(c.is_finite() && (0.0..=1.0).contains(&c), "curiosity in [0,1]");
 }
 
 #[test]
@@ -232,7 +232,7 @@ fn test_consciousness_snapshot_fields_finite() {
 fn test_consciousness_level_in_range() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let cl = service.consciousness_level();
-    assert!(cl >= 0.0 && cl <= 1.0, "consciousness_level should be in [0.0, 1.0], got {cl}");
+    assert!((0.0..=1.0).contains(&cl), "consciousness_level should be in [0.0, 1.0], got {cl}");
 }
 
 #[test]

@@ -144,12 +144,14 @@ fn test_exploration_exploitation() {
     let explore_preference = high_uncertainty_epistemic > high_uncertainty_pragmatic;
     let exploit_preference = low_uncertainty_pragmatic > low_uncertainty_epistemic;
 
+    // High epistemic uncertainty (0.9) > pragmatic (0.3) → exploration is attractive
     assert!(
-        explore_preference || !explore_preference,
+        explore_preference,
         "High uncertainty should make exploration attractive"
     );
+    // Low epistemic uncertainty (0.1) < pragmatic (0.3) → exploitation is preferred
     assert!(
-        exploit_preference || !exploit_preference,
+        exploit_preference,
         "Low uncertainty should favor exploitation"
     );
 
@@ -235,7 +237,7 @@ fn test_loop_convergence() {
         // Update beliefs
         for i in 0..belief.len() {
             belief[i] += learning_rate * prediction_error[i];
-            belief[i] = belief[i].max(0.0).min(1.0);
+            belief[i] = belief[i].clamp(0.0, 1.0);
         }
     }
 

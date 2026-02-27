@@ -360,10 +360,10 @@ fn main() {
 
         // Convert to normalized scales
         // FAI typically ranges -0.5 to +0.5, scale to -1 to +1
-        let predicted_valence = (fai * 2.0).max(-1.0).min(1.0);
+        let predicted_valence = (fai * 2.0).clamp(-1.0, 1.0);
 
         // Beta/alpha typically 0.5-2.0, map to arousal
-        let predicted_arousal = ((beta_alpha - 1.0) * 1.5).max(-1.0).min(1.0);
+        let predicted_arousal = ((beta_alpha - 1.0) * 1.5).clamp(-1.0, 1.0);
 
         let time_s = start as f64 / eeg.sampling_rate;
 

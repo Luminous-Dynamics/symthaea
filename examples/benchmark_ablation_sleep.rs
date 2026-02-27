@@ -380,11 +380,11 @@ fn run_random_baseline(test_epochs_per_stage: usize) -> AblationResult {
     let mut confusion = vec![vec![0usize; 5]; 5];
     let mut seed: u64 = 42;
 
-    for stage_idx in 0..5 {
+    for row in &mut confusion {
         for _ in 0..test_epochs_per_stage {
             seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
             let pred = (seed >> 33) as usize % 5;
-            confusion[stage_idx][pred] += 1;
+            row[pred] += 1;
         }
     }
 

@@ -708,6 +708,7 @@ impl LtcRhythmDetector {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::super::temporal_features::TemporalFeatures;
     use super::*;

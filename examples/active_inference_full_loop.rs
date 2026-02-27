@@ -48,7 +48,6 @@ fn main() {
         state_dim: 8,
         learning_rate: 0.05,
         precision_decay: 0.8,
-        ..Default::default()
     };
     let mut hfe = HierarchicalFreeEnergy::new(hfe_config);
 
@@ -103,7 +102,7 @@ fn main() {
         let perception = agent.perceive(&observation);
 
         // b) Hierarchical belief update
-        let hfe_obs: Vec<f64> = perception.updated_belief.mean.iter().copied().collect();
+        let hfe_obs: Vec<f64> = perception.updated_belief.mean.to_vec();
         hfe.update_beliefs(&hfe_obs);
         let hfe_decomp = hfe.compute_free_energy();
 
@@ -117,7 +116,6 @@ fn main() {
             embodiment: 0.6,
             knowledge: 0.4,
             synchrony: 0.5,
-            ..Default::default()
         };
         let consciousness_result = mce.compute(&consciousness_inputs);
 

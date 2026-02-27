@@ -75,6 +75,7 @@ impl ProposalCollector {
     }
 
     /// Iterate over proposals for inspection.
+    #[allow(dead_code)]
     pub fn proposals(&self) -> &[AttributedProposal] {
         &self.proposals
     }
@@ -207,6 +208,7 @@ impl FeedbackState {
     }
 
     /// How many total proposals were recorded this cycle.
+    #[allow(dead_code)]
     pub fn total_proposals(&self) -> usize {
         self.confidence.len() + self.learning_rate.len()
     }

@@ -183,8 +183,8 @@ fn main() {
 
     println!("Energy Density Comparison (per kg):\n");
     println!(
-        "{:<16} {:>15} {:>10} {}",
-        "Battery", "Energy (Wh/kg)", "Relative", "Type"
+        "{:<16} {:>15} {:>10} Type",
+        "Battery", "Energy (Wh/kg)", "Relative"
     );
     println!("{}", "-".repeat(70));
 

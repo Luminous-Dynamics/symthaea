@@ -280,6 +280,7 @@ fn test_consciousness_trend() {
 }
 
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_disabled_factors() {
     let mut config = MasterEquationConfig::default();
     config.enable_embodiment_factor = false;

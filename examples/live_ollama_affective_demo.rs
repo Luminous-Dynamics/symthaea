@@ -18,18 +18,19 @@ async fn main() {
     }
 
     // Define a complex thought to translate
-    let mut thought = StructuredThought::default();
-    thought.semantic_intent = symthaea::mind::SemanticIntent::Reflect;
-    thought.epistemic_status = symthaea::mind::EpistemicStatus::Certain;
-    thought.psi = 0.85;
-    // Add some domain context
-    thought.domain_context = Some(symthaea::mind::DomainContext {
-        domain: "consciousness".to_string(),
-        entities: vec![("IIT".to_string(), "Integrated Information Theory".to_string(), 0.9)],
-        computed_answer: Some("Consciousness is the irreducible unity of a system's causal power over itself.".to_string()),
-        cube: None,
-        psi: None,
-    });
+    let thought = StructuredThought {
+        semantic_intent: symthaea::mind::SemanticIntent::Reflect,
+        epistemic_status: symthaea::mind::EpistemicStatus::Certain,
+        psi: 0.85,
+        domain_context: Some(symthaea::mind::DomainContext {
+            domain: "consciousness".to_string(),
+            entities: vec![("IIT".to_string(), "Integrated Information Theory".to_string(), 0.9)],
+            computed_answer: Some("Consciousness is the irreducible unity of a system's causal power over itself.".to_string()),
+            cube: None,
+            psi: None,
+        }),
+        ..Default::default()
+    };
 
     // 2. PHASE 1: Rested State (Low Load)
     println!("\n[PHASE 1] Physics: RESTED (Load: 0.1, Mood Temp: 0.65)");

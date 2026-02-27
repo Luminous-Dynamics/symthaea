@@ -50,6 +50,7 @@ fn empirical_fisher_matrix(samples: &[ContinuousHV], dim: usize) -> Vec<Vec<f64>
     }
 
     // Normalize and symmetrize
+    #[allow(clippy::needless_range_loop)]
     for i in 0..dim {
         for j in i..dim {
             cov[i][j] /= (n - 1) as f64;
@@ -71,11 +72,11 @@ fn identity_likeness(matrix: &[Vec<f64>]) -> (f64, f64, f64) {
     let mut off_diag_sq_sum = 0.0;
     let mut off_diag_count = 0usize;
 
-    for i in 0..dim {
-        diag_sum += matrix[i][i];
-        for j in 0..dim {
+    for (i, row) in matrix.iter().enumerate().take(dim) {
+        diag_sum += row[i];
+        for (j, &val) in row.iter().enumerate().take(dim) {
             if i != j {
-                off_diag_sq_sum += matrix[i][j] * matrix[i][j];
+                off_diag_sq_sum += val * val;
                 off_diag_count += 1;
             }
         }

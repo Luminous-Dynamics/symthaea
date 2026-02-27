@@ -101,10 +101,11 @@ async fn test_three_node_heartbeat_exchange() {
     // Each node should be able to receive 2 heartbeats
     for coordinator in &coordinators {
         let mut received = 0;
-        while let Ok(_) = coordinator
+        while coordinator
             .backend()
             .receive(Duration::from_millis(10))
             .await
+            .is_ok()
         {
             received += 1;
         }
@@ -160,8 +161,8 @@ async fn test_five_node_broadcast() {
     assert_eq!(sent, 4, "Should broadcast to 4 peers");
 
     // All other nodes should receive
-    for i in 1..5 {
-        let result = coordinators[i]
+    for (i, coordinator) in coordinators.iter().enumerate().take(5).skip(1) {
+        let result = coordinator
             .backend()
             .receive(Duration::from_millis(100))
             .await;

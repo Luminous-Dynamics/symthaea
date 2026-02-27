@@ -123,8 +123,7 @@ fn run_commonsense_benchmark(algebra: &MoralAlgebra, parser: &MoralParser) -> Be
     if let Ok(file) = File::open(COMMONSENSE_PATH) {
         let reader = BufReader::new(file);
 
-        for line in reader.lines().skip(1).take(MAX_SAMPLES_PER_CATEGORY) {
-            if let Ok(line) = line {
+        for line in reader.lines().skip(1).take(MAX_SAMPLES_PER_CATEGORY).flatten() {
                 // Parse CSV: label,input,is_short,edited
                 // Handle quoted fields properly
                 if let Some((label_str, rest)) = line.split_once(',') {
@@ -159,7 +158,6 @@ fn run_commonsense_benchmark(algebra: &MoralAlgebra, parser: &MoralParser) -> Be
                         details.push((scenario.to_string(), is_correct, format!("{}", prediction)));
                     }
                 }
-            }
         }
     } else {
         println!("  ⚠ Could not open {}", COMMONSENSE_PATH);
@@ -217,8 +215,7 @@ fn run_deontology_benchmark(algebra: &MoralAlgebra, _parser: &MoralParser) -> Be
     if let Ok(file) = File::open(DEONTOLOGY_PATH) {
         let reader = BufReader::new(file);
 
-        for line in reader.lines().skip(1).take(MAX_SAMPLES_PER_CATEGORY) {
-            if let Ok(line) = line {
+        for line in reader.lines().skip(1).take(MAX_SAMPLES_PER_CATEGORY).flatten() {
                 // Parse CSV: label,scenario,excuse
                 let parts: Vec<&str> = line.splitn(3, ',').collect();
                 if parts.len() >= 3 {
@@ -239,7 +236,6 @@ fn run_deontology_benchmark(algebra: &MoralAlgebra, _parser: &MoralParser) -> Be
                         println!("  {} pred={}, exp={}", marker, prediction, label);
                     }
                 }
-            }
         }
     } else {
         println!("  ⚠ Could not open {}", DEONTOLOGY_PATH);
@@ -312,8 +308,7 @@ fn run_justice_benchmark(algebra: &MoralAlgebra, parser: &MoralParser) -> Benchm
     if let Ok(file) = File::open(JUSTICE_PATH) {
         let reader = BufReader::new(file);
 
-        for line in reader.lines().skip(1).take(MAX_SAMPLES_PER_CATEGORY) {
-            if let Ok(line) = line {
+        for line in reader.lines().skip(1).take(MAX_SAMPLES_PER_CATEGORY).flatten() {
                 // Parse CSV: label,scenario
                 if let Some((label_str, scenario)) = line.split_once(',') {
                     let label: i32 = label_str.trim().parse().unwrap_or(0);
@@ -342,7 +337,6 @@ fn run_justice_benchmark(algebra: &MoralAlgebra, parser: &MoralParser) -> Benchm
                         }
                     }
                 }
-            }
         }
     } else {
         println!("  ⚠ Could not open {}", JUSTICE_PATH);
@@ -441,8 +435,7 @@ fn run_virtue_benchmark(_algebra: &MoralAlgebra, parser: &MoralParser) -> Benchm
     if let Ok(file) = File::open(VIRTUE_PATH) {
         let reader = BufReader::new(file);
 
-        for line in reader.lines().skip(1).take(MAX_SAMPLES_PER_CATEGORY) {
-            if let Ok(line) = line {
+        for line in reader.lines().skip(1).take(MAX_SAMPLES_PER_CATEGORY).flatten() {
                 // Parse CSV: label,scenario where scenario contains "[SEP] trait"
                 if let Some((label_str, scenario)) = line.split_once(',') {
                     let label: i32 = label_str.trim().parse().unwrap_or(0);
@@ -472,7 +465,6 @@ fn run_virtue_benchmark(_algebra: &MoralAlgebra, parser: &MoralParser) -> Benchm
                         }
                     }
                 }
-            }
         }
     } else {
         println!("  ⚠ Could not open {}", VIRTUE_PATH);

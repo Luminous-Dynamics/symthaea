@@ -109,7 +109,7 @@ fn generate_square_wave(sample_rate: f64, duration: f64, half_period: usize) -> 
     let n = (sample_rate * duration) as usize;
     (0..n)
         .map(|i| {
-            if (i / half_period) % 2 == 0 {
+            if (i / half_period).is_multiple_of(2) {
                 1.0
             } else {
                 -1.0
@@ -259,8 +259,7 @@ fn test_enhanced_cycle_detector(signal: &[f64]) -> (usize, f32) {
 
 fn main() {
     println!(
-        "{}",
-        r#"
+        "
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║            ENHANCED CINCINNATI-LTC COMPARISON                                ║
 ║                                                                              ║
@@ -270,7 +269,7 @@ fn main() {
 ║    3. Enhanced cycle detection (fixed harmonic filter)                       ║
 ║    4. Attention-modulated learning                                           ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
-"#
+"
     );
 
     let sample_rate = 250.0;

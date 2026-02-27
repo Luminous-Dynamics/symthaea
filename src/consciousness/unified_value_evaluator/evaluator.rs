@@ -1059,6 +1059,7 @@ impl Default for UnifiedValueEvaluator {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::super::super::affective_consciousness::CoreAffect;
     use super::super::super::contextual_weights::ActionDomain;

@@ -85,12 +85,12 @@ fn main() {
 
     for round in 0..n_rounds {
         // Each client trains locally and submits gradients
-        for client_id in 0..n_clients {
+        for (client_id, client_datum) in client_data.iter().enumerate().take(n_clients) {
             let mut local_model = CfCNetwork::new(config.clone());
             local_model.set_weights(aggregator.local_weights());
 
             // Train locally
-            let (inputs, targets) = &client_data[client_id];
+            let (inputs, targets) = client_datum;
             let dt = 0.1;
             let lr = 0.01;
             for (inp, tgt) in inputs.iter().zip(targets.iter()) {
@@ -125,8 +125,7 @@ fn main() {
 
             let mut total_loss = 0.0f64;
             let mut count = 0;
-            for client_id in 0..n_clients {
-                let (inputs, targets) = &client_data[client_id];
+            for (inputs, targets) in client_data.iter().take(n_clients) {
                 for (inp, tgt) in inputs.iter().zip(targets.iter()) {
                     eval_model.reset();
                     let out = eval_model.forward(inp, 0.1);
@@ -188,11 +187,11 @@ fn main() {
 
         // Run 10 rounds
         for _ in 0..10 {
-            for client_id in 0..n_clients {
+            for (client_id, client_datum) in client_data.iter().enumerate().take(n_clients) {
                 let mut local_model = CfCNetwork::new(config.clone());
                 local_model.set_weights(agg.local_weights());
 
-                let (inputs, targets) = &client_data[client_id];
+                let (inputs, targets) = client_datum;
                 let dt = 0.1;
                 for (inp, tgt) in inputs.iter().zip(targets.iter()) {
                     let _ = local_model.train_step(inp, tgt, dt, 0.01);
@@ -219,8 +218,7 @@ fn main() {
         eval_model.set_weights(agg.local_weights());
         let mut total_loss = 0.0f64;
         let mut count = 0;
-        for client_id in 0..n_clients {
-            let (inputs, targets) = &client_data[client_id];
+        for (inputs, targets) in client_data.iter().take(n_clients) {
             for (inp, tgt) in inputs.iter().zip(targets.iter()) {
                 eval_model.reset();
                 let out = eval_model.forward(inp, 0.1);
@@ -256,7 +254,7 @@ fn main() {
         FederatedAggregator::new(global_weights.clone()).with_byzantine_tolerance(0.2);
 
     for _ in 0..10 {
-        for client_id in 0..n_clients {
+        for (client_id, client_datum) in client_data.iter().enumerate().take(n_clients) {
             let gradient: Vec<f32> = if client_id < n_byzantine {
                 // Byzantine: random large gradients
                 let mut rng_seed = (client_id as u64 + 1) * 999;
@@ -270,7 +268,7 @@ fn main() {
                 // Honest: small realistic gradients
                 let mut local_model = CfCNetwork::new(config.clone());
                 local_model.set_weights(agg_no_bft.local_weights());
-                let (inputs, targets) = &client_data[client_id];
+                let (inputs, targets) = client_datum;
                 for (inp, tgt) in inputs.iter().zip(targets.iter()) {
                     let _ = local_model.train_step(inp, tgt, 0.1, 0.01);
                 }
@@ -325,11 +323,11 @@ fn main() {
     let mut agg_equal = FederatedAggregator::new(global_weights.clone());
 
     for _ in 0..10 {
-        for client_id in 0..n_clients {
+        for (client_id, client_datum) in client_data.iter().enumerate().take(n_clients) {
             let mut local_model = CfCNetwork::new(config.clone());
             local_model.set_weights(agg_trusted.local_weights());
 
-            let (inputs, targets) = &client_data[client_id];
+            let (inputs, targets) = client_datum;
             // Some clients train with more noise
             let lr = if client_id < 3 { 0.001 } else { 0.01 };
             for (inp, tgt) in inputs.iter().zip(targets.iter()) {
@@ -426,6 +424,7 @@ fn main() {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn evaluate_model(
     config: &CfCNetworkConfig,
     weights: &[f32],
@@ -454,6 +453,7 @@ fn evaluate_model(
 }
 
 /// Generate non-IID client data where each client has biased class distributions
+#[allow(clippy::type_complexity)]
 fn generate_non_iid_data(
     n_clients: usize,
     samples_per_client: usize,

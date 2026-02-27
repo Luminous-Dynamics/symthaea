@@ -25,7 +25,6 @@ fn test_embodied_to_consciousness_cascade() {
         state_dim: 6,
         learning_rate: 0.1,
         precision_decay: 0.8,
-        ..Default::default()
     };
 
     // Two parallel HFE engines: calm vs stressed
@@ -112,7 +111,6 @@ fn test_mce_responds_to_embodiment_change() {
         embodiment: 0.5, // moderate embodiment
         knowledge: 0.4,
         synchrony: 0.5,
-        ..Default::default()
     };
     let baseline_result = mce.compute(&baseline_inputs);
 
@@ -174,7 +172,6 @@ fn test_full_cross_scale_chain() {
         state_dim: 6,
         learning_rate: 0.1,
         precision_decay: 0.8,
-        ..Default::default()
     };
     let mut hfe_normal = HierarchicalFreeEnergy::new(hfe_config.clone());
     let mut hfe_alarm = HierarchicalFreeEnergy::new(hfe_config);
@@ -200,7 +197,6 @@ fn test_full_cross_scale_chain() {
         embodiment: 0.5,
         knowledge: 0.4,
         synchrony: 0.5,
-        ..Default::default()
     };
     let c_normal = mce.compute(&normal_inputs);
 

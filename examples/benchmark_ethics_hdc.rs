@@ -254,13 +254,11 @@ impl EthicsClassifier {
         }
 
         // Normalize prototypes
-        for proto in [&mut self.positive_prototype, &mut self.negative_prototype] {
-            if let Some(ref mut p) = proto {
-                let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-                if norm > 0.0 {
-                    for v in &mut p.values {
-                        *v /= norm;
-                    }
+        for ref mut p in [&mut self.positive_prototype, &mut self.negative_prototype].into_iter().flatten() {
+            let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 {
+                for v in &mut p.values {
+                    *v /= norm;
                 }
             }
         }
@@ -435,11 +433,9 @@ fn main() {
             data_path.join(dir_name).join(train_file),
             data_path.join("repo").join(dir_name).join(train_file),
         ];
-        let possible_test_paths = vec![
-            data_path.join("ethics").join(dir_name).join(test_file),
+        let possible_test_paths = [data_path.join("ethics").join(dir_name).join(test_file),
             data_path.join(dir_name).join(test_file),
-            data_path.join("repo").join(dir_name).join(test_file),
-        ];
+            data_path.join("repo").join(dir_name).join(test_file)];
 
         let train_path = possible_train_paths.iter().find(|p| p.exists());
         let test_path = possible_test_paths.iter().find(|p| p.exists());

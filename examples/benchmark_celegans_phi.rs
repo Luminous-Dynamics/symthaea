@@ -57,7 +57,7 @@ struct Connectome {
 
 impl Connectome {
     fn from_edgelist(path: &Path) -> Self {
-        let file = File::open(path).expect(&format!("Cannot open {:?}", path));
+        let file = File::open(path).unwrap_or_else(|_| panic!("Cannot open {:?}", path));
         let reader = BufReader::new(file);
 
         let mut connections = Vec::new();

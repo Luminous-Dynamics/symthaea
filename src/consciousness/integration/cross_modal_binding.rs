@@ -314,7 +314,7 @@ impl EpisodicBuffer {
 
 /// Configuration for cross-modal binding
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BindingConfig {
+pub struct CrossModalBindingConfig {
     /// Hypervector dimension
     pub dimension: usize,
     /// Binding strength threshold
@@ -327,7 +327,7 @@ pub struct BindingConfig {
     pub use_attention: bool,
 }
 
-impl Default for BindingConfig {
+impl Default for CrossModalBindingConfig {
     fn default() -> Self {
         Self {
             dimension: 512,
@@ -403,7 +403,7 @@ pub struct BindingResult {
 #[derive(Debug)]
 pub struct CrossModalBinder {
     /// Configuration
-    config: BindingConfig,
+    config: CrossModalBindingConfig,
     /// Current modal representations per modality
     representations: HashMap<Modality, Vec<ModalRepresentation>>,
     /// Current bound state
@@ -429,7 +429,7 @@ pub struct BinderStats {
 
 impl CrossModalBinder {
     /// Create a new cross-modal binder
-    pub fn new(config: BindingConfig) -> Self {
+    pub fn new(config: CrossModalBindingConfig) -> Self {
         Self {
             config,
             representations: HashMap::new(),
@@ -681,7 +681,7 @@ impl CrossModalBinder {
 
 impl Default for CrossModalBinder {
     fn default() -> Self {
-        Self::new(BindingConfig::default())
+        Self::new(CrossModalBindingConfig::default())
     }
 }
 

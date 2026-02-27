@@ -109,7 +109,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("   💡 Wisdom Consolidated: substitute dangerous action with:");
         println!("      {:?}", wisdom.better_action);
     }
-    println!("");
+    println!();
 
     // ========================================================================
     // 4. THE ADAPTATION (Closing the Loop)

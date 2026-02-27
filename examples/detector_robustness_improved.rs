@@ -24,7 +24,7 @@ fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
     {
         println!("This example requires the 'neural-bridge' feature.");
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(feature = "neural-bridge")]

@@ -159,9 +159,9 @@ fn ascii_chart(
 
         // Mark phase transitions
         if ep.task != prev_task && col > 0 {
-            for r in 0..height {
-                if grid[r][col] == ' ' {
-                    grid[r][col] = '|';
+            for row in grid.iter_mut().take(height) {
+                if row[col] == ' ' {
+                    row[col] = '|';
                 }
             }
         }

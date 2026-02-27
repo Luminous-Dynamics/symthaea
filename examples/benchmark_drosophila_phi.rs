@@ -296,14 +296,14 @@ fn generate_random_network(n: usize, dim: usize, density: f32, seed: u64) -> Vec
 
     let mut result: Vec<Vec<f32>> = vec![vec![0.0; dim]; n];
     for i in 0..n {
-        for d in 0..dim {
+        for (d, result_val) in result[i].iter_mut().enumerate().take(dim) {
             let mut val = base_hvs[i].values[d];
-            for j in 0..n {
+            for (j, base_hv) in base_hvs.iter().enumerate().take(n) {
                 if i != j && rand_f32() < density {
-                    val += base_hvs[j].values[d] * 0.1;
+                    val += base_hv.values[d] * 0.1;
                 }
             }
-            result[i][d] = val;
+            *result_val = val;
         }
     }
 
@@ -337,9 +337,9 @@ fn generate_modular_network_v2(
     let mut result: Vec<Vec<f32>> = vec![vec![0.0; dim]; n];
     for i in 0..n {
         let module_i = i / module_size.max(1);
-        for d in 0..dim {
+        for (d, result_val) in result[i].iter_mut().enumerate().take(dim) {
             let mut val = base_hvs[i].values[d];
-            for j in 0..n {
+            for (j, base_hv) in base_hvs.iter().enumerate().take(n) {
                 if i == j {
                     continue;
                 }
@@ -350,10 +350,10 @@ fn generate_modular_network_v2(
                     inter_density
                 };
                 if rand_f32() < prob.min(1.0) {
-                    val += base_hvs[j].values[d] * 0.15;
+                    val += base_hv.values[d] * 0.15;
                 }
             }
-            result[i][d] = val;
+            *result_val = val;
         }
     }
 
@@ -376,7 +376,7 @@ fn generate_small_world_network(
 
     let mut result: Vec<Vec<f32>> = vec![vec![0.0; dim]; n];
     for i in 0..n {
-        for d in 0..dim {
+        for (d, result_val) in result[i].iter_mut().enumerate().take(dim) {
             let mut val = base_hvs[i].values[d];
 
             // Connect to k/2 neighbors on each side (ring lattice)
@@ -409,7 +409,7 @@ fn generate_small_world_network(
                 };
                 val += base_hvs[j2].values[d] * 0.2;
             }
-            result[i][d] = val;
+            *result_val = val;
         }
     }
 
@@ -475,12 +475,13 @@ fn generate_scale_free_network(
     // Build HDC vectors from connectivity
     let mut result: Vec<Vec<f32>> = vec![vec![0.0; dim]; n];
     for i in 0..n {
-        for d in 0..dim {
-            result[i][d] = base_hvs[i].values[d];
+        for (d, result_val) in result[i].iter_mut().enumerate().take(dim) {
+            *result_val = base_hvs[i].values[d];
         }
     }
     for &(i, j) in &edges {
         let weight = 0.15;
+        #[allow(clippy::needless_range_loop)]
         for d in 0..dim {
             result[i][d] += base_hvs[j].values[d] * weight;
             result[j][d] += base_hvs[i].values[d] * weight;

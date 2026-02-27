@@ -141,7 +141,7 @@ fn bench_similarity_calculation(c: &mut Criterion) {
     group.bench_function("inverse", |b| b.iter(|| black_box(hv1.similarity(&inv))));
 
     // Batch similarity (query against codebook)
-    let codebook: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
+    let codebook: Vec<BinaryHV> = (0..100).map(BinaryHV::random).collect();
     group.bench_function("batch_100", |b| {
         b.iter(|| {
             let sims: Vec<f32> = codebook.iter().map(|v| hv1.similarity(v)).collect();
@@ -194,7 +194,7 @@ fn bench_hamming_distance(c: &mut Criterion) {
     });
 
     // Pairwise distances in small set
-    let vectors: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i)).collect();
+    let vectors: Vec<BinaryHV> = (0..10).map(BinaryHV::random).collect();
     group.bench_function("pairwise_10", |b| {
         b.iter(|| {
             let mut total = 0u32;
@@ -371,7 +371,7 @@ fn bench_memory_operations(c: &mut Criterion) {
 
     // Clone operation
     let hv = BinaryHV::random(42);
-    group.bench_function("clone", |b| b.iter(|| black_box(hv.clone())));
+    group.bench_function("clone", |b| b.iter(|| black_box(hv)));
 
     // Default (zero) creation
     group.bench_function("default", |b| b.iter(|| black_box(BinaryHV::default())));
@@ -448,7 +448,7 @@ fn bench_weighted_bundle(c: &mut Criterion) {
 
     for count in [3, 10, 50, 100] {
         let vectors: Vec<BinaryHV> = (0..count).map(|i| BinaryHV::random(i as u64)).collect();
-        let weights: Vec<f32> = (0..count).map(|i| (i as f32 + 1.0)).collect();
+        let weights: Vec<f32> = (0..count).map(|i| i as f32 + 1.0).collect();
 
         group.throughput(Throughput::Elements(count as u64));
 
@@ -504,7 +504,7 @@ fn bench_new_primitives(c: &mut Criterion) {
     }
 
     // k_winners
-    let codebook: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
+    let codebook: Vec<BinaryHV> = (0..100).map(BinaryHV::random).collect();
     let sims: Vec<(usize, f32)> = codebook
         .iter()
         .enumerate()

@@ -218,9 +218,9 @@ fn perturbation_complexity(hvs: &[ContinuousHV], perturb_idx: usize) -> f64 {
 
     // Normalize to [0, 1] range
     let max_entropy = (n_bins as f64).ln();
-    let pci = entropy / max_entropy;
+    
 
-    pci
+    entropy / max_entropy
 }
 
 fn main() {

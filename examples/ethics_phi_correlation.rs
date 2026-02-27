@@ -340,6 +340,7 @@ fn main() {
     let (ethical_concept, unethical_concept) = create_concept_vectors(seed);
 
     // Define topologies to test (subset of 19 for speed)
+    #[allow(clippy::type_complexity)]
     let topologies: Vec<(&str, Box<dyn Fn() -> ConsciousnessTopology>)> = vec![
         (
             "Hypercube 4D",
@@ -485,7 +486,7 @@ fn main() {
                 "║ {:14} ║ {:.4} ║ {} {} {} {} {} │{:5.1}%║",
                 name,
                 phi,
-                acc_strs.get(0).unwrap_or(&"  N/A  ".to_string()),
+                acc_strs.first().unwrap_or(&"  N/A  ".to_string()),
                 acc_strs.get(1).unwrap_or(&"  N/A  ".to_string()),
                 acc_strs.get(2).unwrap_or(&"  N/A  ".to_string()),
                 acc_strs.get(3).unwrap_or(&"  N/A  ".to_string()),

@@ -112,8 +112,8 @@ fn test_logistic_map() -> (f64, SignalType) {
     let mut ensemble = HybridEnsemblePredictor::new(42);
 
     // Training phase (first 1500 samples)
-    for i in 0..1500 {
-        ensemble.observe(data[i]);
+    for sample in data.iter().take(1500) {
+        ensemble.observe(*sample);
     }
 
     // Force signal type detection
@@ -125,8 +125,8 @@ fn test_logistic_map() -> (f64, SignalType) {
 
     // Reset for clean testing
     let mut ensemble = HybridEnsemblePredictor::new(42);
-    for i in 0..1500 {
-        ensemble.observe(data[i]);
+    for sample in data.iter().take(1500) {
+        ensemble.observe(*sample);
     }
 
     // Test phase
@@ -192,8 +192,8 @@ fn test_henon_map() -> (f64, SignalType) {
     let mut ensemble = HybridEnsemblePredictor::new(123);
 
     // Training phase
-    for i in 0..1500 {
-        ensemble.observe(data[i]);
+    for sample in data.iter().take(1500) {
+        ensemble.observe(*sample);
     }
 
     let signal_type = ensemble.get_signal_type();
@@ -267,8 +267,8 @@ fn test_lorenz() -> (f64, SignalType) {
 
     // Training phase
     let train_size = (data.len() * 3 / 4).min(1500);
-    for i in 0..train_size {
-        ensemble.observe(data[i]);
+    for sample in data.iter().take(train_size) {
+        ensemble.observe(*sample);
     }
 
     let signal_type = ensemble.get_signal_type();

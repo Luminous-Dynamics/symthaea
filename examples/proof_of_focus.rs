@@ -177,9 +177,9 @@ impl FieldElement {
     fn add(&self, other: &FieldElement) -> Self {
         let mut result = [0u8; 32];
         let mut carry: u16 = 0;
-        for i in 0..32 {
+        for (i, res) in result.iter_mut().enumerate() {
             let sum = self.bytes[i] as u16 + other.bytes[i] as u16 + carry;
-            result[i] = sum as u8;
+            *res = sum as u8;
             carry = sum >> 8;
         }
         Self { bytes: result }

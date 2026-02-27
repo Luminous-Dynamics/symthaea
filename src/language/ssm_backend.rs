@@ -268,8 +268,29 @@ pub struct LiquidMambaBackend {
 #[cfg(feature = "liquid-mamba")]
 impl LiquidMambaBackend {
     /// Create a new Liquid-Mamba backend.
+    ///
+    /// If `BROCA_PROJECTION_PATH` is set, loads pre-trained projection weights
+    /// from that file (produced by `broca-projection-train`).
     pub fn new(genesis: &GenesisSeed, config: symthaea_broca::LiquidMambaConfig) -> Result<Self> {
-        let generator = symthaea_broca::LiquidMambaGenerator::new(genesis, config)?;
+        let mut generator = symthaea_broca::LiquidMambaGenerator::new(genesis, config)?;
+
+        // Load pre-trained projection weights if available
+        if let Ok(path) = std::env::var("BROCA_PROJECTION_PATH") {
+            tracing::info!(path = %path, "Loading projection checkpoint");
+            match symthaea_broca::ProjectionCheckpoint::load_from_file(&path) {
+                Ok(ckpt) => {
+                    generator.projection_mut().load_weights(&ckpt.projection_weights);
+                    tracing::info!(
+                        epoch = ckpt.training_epoch,
+                        "Projection weights loaded"
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(path = %path, error = %e, "Failed to load projection checkpoint, using random init");
+                }
+            }
+        }
+
         Ok(Self {
             generator: Mutex::new(generator),
         })

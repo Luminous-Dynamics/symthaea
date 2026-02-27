@@ -25,6 +25,7 @@ fn main() {
     let phi_calc = ConnectivityCalculator::new();
 
     // Test multiple topologies
+    #[allow(clippy::type_complexity)]
     let topologies: Vec<(
         &str,
         Box<dyn Fn(usize, usize, u64) -> ConsciousnessTopology>,
@@ -58,8 +59,8 @@ fn main() {
 
         // Train on first 80%
         let train_size = (signal.len() * 8) / 10;
-        for i in 0..train_size {
-            predictor.observe(signal[i]);
+        for sample in signal.iter().take(train_size) {
+            predictor.observe(*sample);
         }
 
         // Test on remaining 20%
@@ -209,8 +210,8 @@ fn generate_topology_signal(topology: &ConsciousnessTopology, length: usize) -> 
     // Normalize adjacency
     for i in 0..n_nodes {
         if degree[i] > 0.0 {
-            for j in 0..n_nodes {
-                adj[i][j] /= degree[i];
+            for cell in adj[i].iter_mut().take(n_nodes) {
+                *cell /= degree[i];
             }
         }
     }

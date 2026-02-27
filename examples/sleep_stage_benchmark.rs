@@ -40,7 +40,7 @@ enum SleepStage {
     N1,
     N2,
     N3,
-    REM,
+    Rem,
 }
 
 impl SleepStage {
@@ -50,7 +50,7 @@ impl SleepStage {
             SleepStage::N1 => "N1",
             SleepStage::N2 => "N2",
             SleepStage::N3 => "N3",
-            SleepStage::REM => "REM",
+            SleepStage::Rem => "REM",
         }
     }
 
@@ -60,7 +60,7 @@ impl SleepStage {
             SleepStage::N1 => 1,
             SleepStage::N2 => 2,
             SleepStage::N3 => 3,
-            SleepStage::REM => 4,
+            SleepStage::Rem => 4,
         }
     }
 }
@@ -203,7 +203,7 @@ impl SimpleSleepSentinel {
         } else if high_synchrony && low_freq {
             SleepStage::N3
         } else if high_complexity && !high_synchrony {
-            SleepStage::REM
+            SleepStage::Rem
         } else if self.synchrony > 0.5 {
             SleepStage::N2
         } else {
@@ -276,7 +276,7 @@ fn generate_synthetic_eeg(
                 let delta = 75.0 * (2.0 * PI * 2.0 * t).sin();
                 (delta, delta * 0.95 + 3.0 * (t * 11.0).sin())
             }
-            SleepStage::REM => {
+            SleepStage::Rem => {
                 // Mixed, desynchronized
                 let mixed = 25.0 * (2.0 * PI * 8.0 * t).sin() + 20.0 * (2.0 * PI * 15.0 * t).sin();
                 (
@@ -332,7 +332,7 @@ fn main() {
         SleepStage::N1,
         SleepStage::N2,
         SleepStage::N3,
-        SleepStage::REM,
+        SleepStage::Rem,
     ];
     let epochs_per_stage = 20;
     let sample_rate = 100.0;

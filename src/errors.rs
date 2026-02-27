@@ -341,6 +341,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unnecessary_literal_unwrap)]
     fn test_result_alias() {
         let ok: SymthaeaResult<u32> = Ok(42);
         assert_eq!(ok.unwrap(), 42);

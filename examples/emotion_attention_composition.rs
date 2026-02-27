@@ -197,7 +197,7 @@ fn main() {
     let mut composed_states: HashMap<String, BinaryHV> = HashMap::new();
 
     for (emotion, mode, description) in &pairs {
-        let emotion_encoding = emotions.get(*emotion).unwrap().primitive_encoding.clone();
+        let emotion_encoding = emotions.get(*emotion).unwrap().primitive_encoding;
         let attention_encoding = AttentionPrimitiveGrounding::for_mode(*mode).mode_encoding;
 
         // Compose via binding (XOR) - this creates a unique representation
@@ -212,7 +212,7 @@ fn main() {
             attention_grounding.salience * (1.0 + emotion_grounding.arousal_weight) / 2.0;
 
         let state_name = format!("{}_{:?}", emotion, mode);
-        composed_states.insert(state_name.clone(), composed.clone());
+        composed_states.insert(state_name.clone(), composed);
 
         println!("│  {} + {:?}", emotion, mode);
         println!("│    => {}", description);

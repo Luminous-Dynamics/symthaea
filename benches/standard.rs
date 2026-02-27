@@ -48,7 +48,7 @@ fn bench_hdc_comprehensive(c: &mut Criterion) {
 
     // Bundle scaling
     for size in [2, 5, 10, 20] {
-        let hvs: Vec<BinaryHV> = (0..size).map(|i| BinaryHV::random(i)).collect();
+        let hvs: Vec<BinaryHV> = (0..size).map(BinaryHV::random).collect();
         group.bench_with_input(BenchmarkId::new("bundle", size), &hvs, |b, hvs| {
             b.iter(|| black_box(BinaryHV::bundle(hvs)))
         });

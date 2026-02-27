@@ -110,7 +110,7 @@ fn bench_hdc_vector_stress(c: &mut Criterion) {
                 let vectors: Vec<_> = (0..n).map(|i| BinaryHV::random(i as u64)).collect();
 
                 b.iter(|| {
-                    let mut result = vectors[0].clone();
+                    let mut result = vectors[0];
                     for hv in vectors.iter().skip(1) {
                         result = result.bind(hv);
                     }

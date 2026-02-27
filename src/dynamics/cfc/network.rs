@@ -1448,7 +1448,7 @@ mod tests {
             div
         );
         assert!(
-            div >= 0.0 && div <= 1.0,
+            (0.0..=1.0).contains(&div),
             "diversity is sigmoid-scaled [0,1], got {}",
             div
         );

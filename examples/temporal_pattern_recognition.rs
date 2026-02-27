@@ -63,13 +63,13 @@ impl PatternGenerator {
     }
 
     /// Generate the next bit in the sequence
-    pub fn next(&mut self) -> bool {
+    pub fn next_bit(&mut self) -> bool {
         let bit = match self.pattern_type {
             PatternType::Periodic(period) => self.count % period < period / 2,
-            PatternType::SquareWave(half_period) => (self.count / half_period) % 2 == 0,
+            PatternType::SquareWave(half_period) => (self.count / half_period).is_multiple_of(2),
             PatternType::XorPattern => {
                 if self.history.len() < 2 {
-                    self.count % 2 == 0 // Bootstrap
+                    self.count.is_multiple_of(2) // Bootstrap
                 } else {
                     let a = self.history[self.history.len() - 1];
                     let b = self.history[self.history.len() - 2];
@@ -86,7 +86,7 @@ impl PatternGenerator {
                 // Rule 110: current, left, right -> next
                 // Uses last 3 bits of history
                 if self.history.len() < 3 {
-                    self.count % 3 != 0 // Bootstrap
+                    !self.count.is_multiple_of(3) // Bootstrap
                 } else {
                     let l = self.history.len();
                     let left = self.history[l - 3] as u8;
@@ -99,7 +99,7 @@ impl PatternGenerator {
             }
             PatternType::FibonacciMod(n) => {
                 if self.history.len() < 2 {
-                    self.count % 2 == 0 // Bootstrap
+                    self.count.is_multiple_of(2) // Bootstrap
                 } else {
                     let a = self.history[self.history.len() - 1] as usize;
                     let b = self.history[self.history.len() - 2] as usize;
@@ -365,7 +365,7 @@ fn run_experiment(
     let mut total_budding_events = 0;
 
     for step in 0..n_steps {
-        let bit = generator.next();
+        let bit = generator.next_bit();
         let (_pred, _conf) = recognizer.observe_and_predict(bit);
 
         // Process budding every 10 steps

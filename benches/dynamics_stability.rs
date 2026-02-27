@@ -15,6 +15,7 @@ use symthaea::dynamics::{StabilityAnalyzer, StabilityConfig};
 
 /// N-dimensional coupled linear system: dy_i/dt = -alpha_i * y_i + coupling * y_{i-1}
 /// This models a chain of CfC neurons with nearest-neighbor coupling.
+#[allow(clippy::type_complexity)]
 fn coupled_linear_system(dim: usize) -> Box<dyn Fn(&[f64]) -> Vec<f64>> {
     Box::new(move |x: &[f64]| {
         let mut dx = vec![0.0; dim];
@@ -32,6 +33,7 @@ fn coupled_linear_system(dim: usize) -> Box<dyn Fn(&[f64]) -> Vec<f64>> {
 
 /// N-dimensional CfC-like nonlinear system:
 ///   dy_i/dt = -y_i / tau_i + sigmoid(sum_j w_ij * y_j)
+#[allow(clippy::type_complexity)]
 fn cfc_nonlinear_system(dim: usize, seed: u64) -> Box<dyn Fn(&[f64]) -> Vec<f64>> {
     // Pre-compute weights and tau deterministically
     let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
@@ -213,6 +215,7 @@ fn bench_bifurcation_detection(c: &mut Criterion) {
         let analyzer = StabilityAnalyzer::with_defaults(dim);
         let x_fixed = vec![0.0; dim];
 
+        #[allow(clippy::type_complexity)]
         let f_param = move |mu: f64| -> Box<dyn Fn(&[f64]) -> Vec<f64>> {
             let d = dim;
             Box::new(move |x: &[f64]| {

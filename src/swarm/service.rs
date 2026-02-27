@@ -596,6 +596,7 @@ pub struct CollectiveConsciousness {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
 
@@ -641,7 +642,8 @@ mod tests {
     fn test_bootstrap_config() {
         let config = BootstrapConfig::default();
         // Default has empty bootstrap nodes (placeholders commented out)
-        assert!(!config.has_bootstrap_nodes() || true); // May or may not have nodes
+        // Default config may or may not have bootstrap nodes; just verify the call works
+        let _has_nodes = config.has_bootstrap_nodes();
         assert!(config.enable_local_discovery);
     }
 

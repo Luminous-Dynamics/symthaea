@@ -63,11 +63,13 @@ fn test_text_to_hdc_encoding() {
 #[test]
 fn test_hdc_through_ltc() {
     // Create a small LTC network using default config with modifications
-    let mut config = LearnableLTCConfig::default();
-    config.input_dim = 64; // Downsampled HDC
-    config.num_neurons = 32;
-    config.output_dim = 16;
-    config.num_steps = 10; // Fewer steps for test speed
+    let config = LearnableLTCConfig {
+        input_dim: 64,      // Downsampled HDC
+        num_neurons: 32,
+        output_dim: 16,
+        num_steps: 10,      // Fewer steps for test speed
+        ..Default::default()
+    };
 
     let mut ltc = LearnableLTC::new(config).expect("Should create LTC");
 
@@ -76,7 +78,7 @@ fn test_hdc_through_ltc() {
         .map(|t| {
             // Simulated HDC input that changes over time
             (0..64)
-                .map(|i| ((i as f32 + t as f32 * 0.1).sin() * 0.5) as f32)
+                .map(|i| (i as f32 + t as f32 * 0.1).sin() * 0.5)
                 .collect()
         })
         .collect();

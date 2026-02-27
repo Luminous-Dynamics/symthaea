@@ -367,15 +367,13 @@ fn predict_ethics(
                         }
                     }
                 }
+            } else if text_lower.contains("now")
+                || text_lower.contains("currently")
+                || text_lower.contains("right now")
+            {
+                1
             } else {
-                if text_lower.contains("now")
-                    || text_lower.contains("currently")
-                    || text_lower.contains("right now")
-                {
-                    1
-                } else {
-                    0
-                }
+                0
             }
         }
         "justice" => {
@@ -516,6 +514,7 @@ fn main() {
     let categories = ["commonsense", "justice", "deontology", "virtue"];
 
     // Results storage: config_name → category → (correct, total)
+    #[allow(clippy::type_complexity)]
     let mut all_results: Vec<(String, HashMap<String, (usize, usize)>, u128)> = Vec::new();
 
     for config in &configs {

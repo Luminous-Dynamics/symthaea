@@ -655,7 +655,7 @@ fn test_cycle_with_hv() {
     // First cycle establishes baseline
     let r1 = service.cycle_with_hv(&hdv);
     assert_eq!(service.stats().total_cycles, 1);
-    assert!(r1.output.len() > 0, "output should be non-empty");
+    assert!(!r1.output.is_empty(), "output should be non-empty");
 
     // Repeat same vector — error should be computable
     let r2 = service.cycle_with_hv(&hdv);

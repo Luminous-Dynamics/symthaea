@@ -108,7 +108,7 @@ fn generate_square_wave(sample_rate: f64, duration: f64, half_period: usize) -> 
     let n = (sample_rate * duration) as usize;
     (0..n)
         .map(|i| {
-            if (i / half_period) % 2 == 0 {
+            if (i / half_period).is_multiple_of(2) {
                 1.0
             } else {
                 -1.0
@@ -257,8 +257,7 @@ fn test_advanced(signal: &[f64], sample_rate: f32, _name: &str) -> (f64, bool, f
 
 fn main() {
     println!(
-        "{}",
-        r#"
+        "
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║              ADVANCED CINCINNATI-LTC COMPARISON                              ║
 ║                                                                              ║
@@ -267,7 +266,7 @@ fn main() {
 ║    2. Enhanced: + Multi-scale + amplitude + attention                        ║
 ║    3. Advanced: + Chaos detection + adaptive weights + memory horizon        ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
-"#
+"
     );
 
     let sample_rate = 250.0;
