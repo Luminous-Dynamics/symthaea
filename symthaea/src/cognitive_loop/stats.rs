@@ -496,4 +496,13 @@ pub struct LoopStats {
     /// Last Liquid-Mamba semantic prediction error for CycleMetadata.
     #[cfg(feature = "liquid-mamba")]
     pub last_liquid_mamba_pe: f32,
+    /// Last Liquid-Mamba bottleneck effective rank.
+    #[cfg(feature = "liquid-mamba")]
+    pub last_liquid_mamba_rank: f32,
+    /// Current Liquid-Mamba projection learning rate.
+    #[cfg(feature = "liquid-mamba")]
+    pub last_liquid_mamba_lr: f32,
+    /// Total Liquid-Mamba distillation steps.
+    #[cfg(feature = "liquid-mamba")]
+    pub liquid_mamba_generation_count: u32,
 }

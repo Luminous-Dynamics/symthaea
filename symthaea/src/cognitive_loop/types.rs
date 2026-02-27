@@ -1048,6 +1048,15 @@ pub struct CycleMetadata {
     /// Measures `1 - cosine(thought_hv, bundled_output_hvs)`.
     #[cfg(feature = "liquid-mamba")]
     pub liquid_mamba_semantic_pe: f32,
+    /// Bottleneck effective rank (1.0–256.0). Low = projection collapse.
+    #[cfg(feature = "liquid-mamba")]
+    pub liquid_mamba_effective_rank: f32,
+    /// Current projection learning rate (after warmup + cosine annealing + FEP modulation).
+    #[cfg(feature = "liquid-mamba")]
+    pub liquid_mamba_lr: f32,
+    /// Total distillation steps performed since startup.
+    #[cfg(feature = "liquid-mamba")]
+    pub liquid_mamba_generation_count: u32,
 
     // ── Mesh Network Telemetry ────────────────────────────────────────
     /// Mesh network composite health score (0.0–1.0, 0.0 when mesh disabled).
