@@ -407,10 +407,81 @@ pub(crate) struct CycleState<'a> {
     pub predictive_budget_gated: bool,
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEUROMODULATOR TELEMETRY — collected per-cycle from NeuromodulatorBath
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Neuromodulator telemetry snapshot for CycleMetadata construction.
+///
+/// Extracted as a standalone struct so cycle.rs can build neuromod telemetry
+/// in a focused helper rather than inlining 30+ fields in the metadata literal.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NeuromodTelemetry {
+    /// Whether the neuromodulator bath suggests querying the exocortex (swarm).
+    pub exocortex_query_suggested: bool,
+    /// Neurochemical personality description (e.g., "novelty-seeking, cautious").
+    pub neuromod_personality: String,
+    /// Effective dopamine signal (reward/learning drive, 0.0–2.0).
+    pub dopamine_effective: f32,
+    /// Effective noradrenaline signal (arousal/exploration, 0.0–2.0).
+    pub noradrenaline_effective: f32,
+    /// Effective serotonin signal (satisfaction/confidence, 0.0–2.0).
+    pub serotonin_effective: f32,
+    /// Effective acetylcholine signal (attention/precision, 0.0–2.0).
+    pub acetylcholine_effective: f32,
+    /// Personality drift rate (max trait delta per snapshot, 0.0 = stable).
+    pub neuromod_personality_drift: f32,
+    /// Whether personality drift exceeds the anomaly threshold (>0.005/snapshot).
+    pub neuromod_personality_drift_anomalous: bool,
+    /// DA gradient scaling factor applied to training LR (0.5–2.0).
+    pub neuromod_gradient_scale: f32,
+    /// ACh threshold gate factor applied to learning threshold (0.5–1.5).
+    pub neuromod_threshold_gate: f32,
+    /// Cumulative exocortex trigger count since startup.
+    pub exocortex_trigger_count: u64,
+    /// DA phasic burst magnitude (fast-decaying RPE signal, 0.0–1.0).
+    pub neuromod_da_phasic: f32,
+    /// NE phasic burst magnitude (fast-decaying surprise signal, 0.0–1.0).
+    pub neuromod_ne_phasic: f32,
+    /// Neurochemical consciousness modulation factor (0.6–1.2).
+    pub neuromod_consciousness_mod: f32,
+    /// Sleep consolidation boost (1.0–3.0).
+    pub neuromod_sleep_consolidation_boost: f32,
+    /// Neuromod-driven attention budget multiplier (0.8–1.5).
+    pub neuromod_attention_allocation: f32,
+    /// ACh plasticity gate (0.2–1.0).
+    pub neuromod_plasticity_gate: f32,
+    /// 5-HT/NE MCTS exploration modulation (0.6–1.8).
+    pub neuromod_mcts_exploration_mod: f32,
+    /// Average DA tag on replayed episodes this cycle (0.0–1.0).
+    pub replay_da_tag_avg: f32,
+    /// Circadian hour used for continuous waveform modulation (0.0–24.0).
+    pub circadian_hour: f32,
+    /// DA D1 (Go pathway) effective signal (0.0–2.0).
+    pub neuromod_da_d1: f32,
+    /// DA D2 (NoGo pathway) effective signal (0.0–2.0).
+    pub neuromod_da_d2: f32,
+    /// NE alpha (tonic precision) effective signal (0.0–2.0).
+    pub neuromod_ne_alpha: f32,
+    /// NE beta (phasic reactivity) effective signal (0.0–2.0).
+    pub neuromod_ne_beta: f32,
+    /// D2-mediated behavioral flexibility factor (0.7–1.5).
+    pub neuromod_behavioral_flexibility: f32,
+    /// Full neurochemical state snapshot (sampled every 10 cycles, None otherwise).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub neuromod_snapshot: Option<super::neuromodulators::NeuromodSnapshot>,
+}
+
 /// Metadata about internal decision-making during a cycle.
 ///
 /// Provides observability into which subsystems influenced the cycle's output,
 /// enabling debugging of "why did the agent do that?" questions.
+///
+/// # Domain Groups
+///
+/// Fields are organized by domain (see section comments). For construction,
+/// use [`CycleMetadata::apply_neuromod`] to populate neuromod fields from
+/// a [`NeuromodTelemetry`] snapshot instead of inlining 26 fields.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CycleMetadata {
     /// Whether the surprise exploration bridge triggered exploration this cycle
@@ -1078,6 +1149,41 @@ pub struct CycleMetadata {
     /// Number of subsystems that contributed non-neutral SubsystemOutputs.
     /// 0 = no subsystems using the new CognitiveSubsystem trait yet.
     pub subsystem_integration_contributors: u32,
+}
+
+impl CycleMetadata {
+    /// Apply neuromodulator telemetry snapshot to this metadata.
+    ///
+    /// Populates 26 neuromod-related fields from a [`NeuromodTelemetry`] struct,
+    /// avoiding the need to inline them in the cycle.rs struct literal.
+    pub fn apply_neuromod(&mut self, n: NeuromodTelemetry) {
+        self.exocortex_query_suggested = n.exocortex_query_suggested;
+        self.neuromod_personality = n.neuromod_personality;
+        self.dopamine_effective = n.dopamine_effective;
+        self.noradrenaline_effective = n.noradrenaline_effective;
+        self.serotonin_effective = n.serotonin_effective;
+        self.acetylcholine_effective = n.acetylcholine_effective;
+        self.neuromod_personality_drift = n.neuromod_personality_drift;
+        self.neuromod_personality_drift_anomalous = n.neuromod_personality_drift_anomalous;
+        self.neuromod_gradient_scale = n.neuromod_gradient_scale;
+        self.neuromod_threshold_gate = n.neuromod_threshold_gate;
+        self.exocortex_trigger_count = n.exocortex_trigger_count;
+        self.neuromod_da_phasic = n.neuromod_da_phasic;
+        self.neuromod_ne_phasic = n.neuromod_ne_phasic;
+        self.neuromod_consciousness_mod = n.neuromod_consciousness_mod;
+        self.neuromod_sleep_consolidation_boost = n.neuromod_sleep_consolidation_boost;
+        self.neuromod_attention_allocation = n.neuromod_attention_allocation;
+        self.neuromod_plasticity_gate = n.neuromod_plasticity_gate;
+        self.neuromod_mcts_exploration_mod = n.neuromod_mcts_exploration_mod;
+        self.replay_da_tag_avg = n.replay_da_tag_avg;
+        self.circadian_hour = n.circadian_hour;
+        self.neuromod_da_d1 = n.neuromod_da_d1;
+        self.neuromod_da_d2 = n.neuromod_da_d2;
+        self.neuromod_ne_alpha = n.neuromod_ne_alpha;
+        self.neuromod_ne_beta = n.neuromod_ne_beta;
+        self.neuromod_behavioral_flexibility = n.neuromod_behavioral_flexibility;
+        self.neuromod_snapshot = n.neuromod_snapshot;
+    }
 }
 
 /// Per-module execution timings in microseconds for overhead profiling.

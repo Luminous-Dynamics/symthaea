@@ -391,7 +391,7 @@ impl PsychBenchmark for WisconsinCardSortingBenchmark {
             non_perseverative.push(r.non_perseverative_errors as f64);
             total_errs.push(r.total_errors as f64);
             trials_first.push(r.trials_to_first as f64);
-            let mean_rt = if r.rt_ticks.is_empty() { 0.0 } else {
+            let _mean_rt = if r.rt_ticks.is_empty() { 0.0 } else {
                 r.rt_ticks.iter().sum::<f64>() / r.rt_ticks.len() as f64
             };
             all_rts.extend_from_slice(&r.rt_ticks);

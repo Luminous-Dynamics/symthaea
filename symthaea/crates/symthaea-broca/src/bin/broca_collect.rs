@@ -56,20 +56,22 @@ fn main() {
 
     let mut success_count = 0usize;
     let mut error_count = 0usize;
+    let mut intent_counts = [0usize; 8]; // Per-intent success counts
     let total = base_thoughts.len() * opts.repeats;
 
     for (idx, base_channels) in base_thoughts.iter().enumerate() {
         for repeat in 0..opts.repeats {
             let channels = if opts.augment && repeat > 0 {
-                augment_channels(base_channels, repeat)
+                augment_channels(base_channels, repeat, opts.curriculum)
             } else {
                 *base_channels
             };
 
             let prompt = thought_to_prompt(&channels);
             let system_prompt = build_system_prompt(&channels);
+            let max_tokens = intent_max_tokens(&channels);
 
-            match query_ollama(&opts.ollama_url, &opts.model, &system_prompt, &prompt, opts.temperature) {
+            match query_ollama(&opts.ollama_url, &opts.model, &system_prompt, &prompt, opts.temperature, max_tokens) {
                 Ok(response) => {
                     let response = response.trim().to_string();
                     if response.is_empty() {
@@ -85,6 +87,8 @@ fn main() {
                                 error_count += 1;
                             } else {
                                 success_count += 1;
+                                let di = dominant_intent(&channels);
+                                intent_counts[di] += 1;
                             }
                         }
                         Err(e) => {
@@ -122,12 +126,22 @@ fn main() {
         eprintln!("Failed to flush output: {e}");
     }
 
+    let intent_names = [
+        "Acknowledge", "Answer", "Query", "Suggest",
+        "Wonder", "Reflect", "Continue", "General",
+    ];
+
     println!("\n--- Collection Summary ---");
     println!("  Total configs: {}", base_thoughts.len());
     println!("  Repeats:       {}", opts.repeats);
+    println!("  Curriculum:    {}", if opts.curriculum { "yes" } else { "no" });
     println!("  Successful:    {success_count}");
     println!("  Errors:        {error_count}");
     println!("  Output:        {}", opts.output_path);
+    println!("\n  Per-intent breakdown:");
+    for (i, name) in intent_names.iter().enumerate() {
+        println!("    {name:<12} {}", intent_counts[i]);
+    }
 }
 
 /// Build a system prompt appropriate for the thought's epistemic status and intent.
@@ -171,17 +185,52 @@ fn build_system_prompt(channels: &ThoughtChannels) -> String {
     )
 }
 
-/// Add small noise to channels for data augmentation.
-fn augment_channels(base: &ThoughtChannels, repeat: usize) -> ThoughtChannels {
+/// Add noise to channels for data augmentation.
+///
+/// In curriculum mode, noise scales up with repeat index (progressive difficulty):
+/// repeat 0 = no noise, repeat N = N × base_noise.
+fn augment_channels(base: &ThoughtChannels, repeat: usize, curriculum: bool) -> ThoughtChannels {
     let mut channels = *base;
-    // Deterministic noise based on repeat index
-    let seed = repeat as f32 * 0.05;
+    let noise_scale = if curriculum {
+        // Progressive: 0.03 × repeat (e.g., 0.03, 0.06, 0.09, ...)
+        repeat as f32 * 0.03
+    } else {
+        0.05 // Fixed augmentation noise
+    };
+    let seed = repeat as f32;
     for i in 8..20 {
         // Skip intent one-hot (0..8), perturb continuous channels
-        let noise = ((i as f32 * 7.3 + seed * 13.7).sin()) * 0.05;
+        let noise = ((i as f32 * 7.3 + seed * 13.7).sin()) * noise_scale;
         channels.channels[i] = (channels.channels[i] + noise).clamp(-1.0, 10.0);
     }
     channels
+}
+
+/// Per-intent target response length (num_predict tokens).
+///
+/// Short intents (acknowledge, query) get fewer tokens to avoid padding.
+/// Long intents (reflect, continue) get more tokens for complete thoughts.
+fn intent_max_tokens(channels: &ThoughtChannels) -> usize {
+    let intent_idx = (0..8)
+        .max_by(|&a, &b| channels.channels[a].total_cmp(&channels.channels[b]))
+        .unwrap_or(7);
+    match intent_idx {
+        0 => 64,   // Acknowledge — short and warm
+        1 => 96,   // Answer — moderate detail
+        2 => 80,   // Query — concise question
+        3 => 96,   // Suggest — actionable proposal
+        4 => 80,   // Wonder — brief uncertainty
+        5 => 128,  // Reflect — room for depth
+        6 => 128,  // Continue — extended thought
+        _ => 96,   // Fallback
+    }
+}
+
+/// Dominant intent index (0..7) from channels.
+fn dominant_intent(channels: &ThoughtChannels) -> usize {
+    (0..8)
+        .max_by(|&a, &b| channels.channels[a].total_cmp(&channels.channels[b]))
+        .unwrap_or(7)
 }
 
 /// Query Ollama's /api/generate endpoint.
@@ -191,6 +240,7 @@ fn query_ollama(
     system_prompt: &str,
     prompt: &str,
     temperature: f32,
+    max_tokens: usize,
 ) -> Result<String, String> {
     let url = format!("{base_url}/api/generate");
     let body = serde_json::json!({
@@ -200,7 +250,7 @@ fn query_ollama(
         "stream": false,
         "options": {
             "temperature": temperature,
-            "num_predict": 128,
+            "num_predict": max_tokens,
         }
     });
 
@@ -229,6 +279,8 @@ struct CollectOpts {
     augment: bool,
     temperature: f32,
     ollama_url: String,
+    /// Curriculum mode: progressive augmentation + per-intent difficulty scaling.
+    curriculum: bool,
 }
 
 fn parse_args(args: &[String]) -> Result<CollectOpts, String> {
@@ -239,6 +291,7 @@ fn parse_args(args: &[String]) -> Result<CollectOpts, String> {
         augment: false,
         temperature: 0.7,
         ollama_url: "http://localhost:11434".to_string(),
+        curriculum: false,
     };
 
     let mut i = 1;
@@ -261,6 +314,10 @@ fn parse_args(args: &[String]) -> Result<CollectOpts, String> {
             }
             "--augment" => {
                 opts.augment = true;
+            }
+            "--curriculum" => {
+                opts.curriculum = true;
+                opts.augment = true; // curriculum implies augment
             }
             "--temperature" => {
                 i += 1;
@@ -302,6 +359,7 @@ fn print_usage() {
     eprintln!("Optional:");
     eprintln!("  --repeats N          Repeat each config N times (default: 1)");
     eprintln!("  --augment            Add ±0.05 channel noise on repeat > 0");
+    eprintln!("  --curriculum         Progressive augmentation (implies --augment)");
     eprintln!("  --temperature F      Ollama sampling temperature (default: 0.7)");
     eprintln!("  --ollama-url URL     Ollama API URL (default: http://localhost:11434)");
     eprintln!("  --help, -h           Show this help message");
