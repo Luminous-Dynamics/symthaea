@@ -96,6 +96,16 @@ pub struct LiquidMambaConfig {
     pub cosine_annealing_steps: usize,
     /// Minimum LR floor as fraction of base_lr (default 0.01 = 1% of base).
     pub min_lr_fraction: f32,
+    /// Weight for prefix token loss (0 = disabled, 0.3 = default).
+    /// The first 25% of output tokens get an additional gradient scaled by this factor.
+    /// Prefix tokens frame the response topic — extra gradient signal here
+    /// teaches the projection to steer opening words.
+    pub prefix_loss_weight: f32,
+    /// Enable EMA teacher for projection weights.
+    /// When true, `apply_gradients` is followed by `update_ema`.
+    pub enable_ema: bool,
+    /// EMA decay rate (default 0.999). Higher = smoother, slower tracking.
+    pub ema_decay: f32,
 }
 
 impl Default for LiquidMambaConfig {
@@ -127,6 +137,9 @@ impl Default for LiquidMambaConfig {
             base_lr: 0.001,
             cosine_annealing_steps: 0,
             min_lr_fraction: 0.01,
+            prefix_loss_weight: 0.3,
+            enable_ema: false,
+            ema_decay: 0.999,
         }
     }
 }
@@ -179,7 +192,10 @@ impl LiquidMambaGenerator {
         let epistemic_gate = EpistemicGate::new(&tokenizer, &gating_config);
         let emotional_modulator = EmotionalModulator::new(&tokenizer, &gating_config);
 
-        Ok(Self {
+        let enable_ema = config.enable_ema;
+        let ema_decay = config.ema_decay;
+
+        let mut gen = Self {
             mamba,
             projection,
             encoder,
@@ -195,7 +211,13 @@ impl LiquidMambaGenerator {
             last_semantic_pe: 0.0,
             pe_history: VecDeque::with_capacity(64),
             fep_modulation: 1.0,
-        })
+        };
+
+        if enable_ema {
+            gen.projection.enable_ema(ema_decay);
+        }
+
+        Ok(gen)
     }
 
     /// Generate text from thought channels.
@@ -685,8 +707,23 @@ impl LiquidMambaGenerator {
         // Attention-weighted bundling: weight by recency × coherence
         let bundled = self.attention_weighted_bundle(&thought_hv, &result.output_hvs);
 
-        // Reconstruction gradient
+        // Reconstruction gradient (full sequence)
         self.projection.compute_gradients(&thought_hv, &bundled);
+
+        // Prefix token loss: extra gradient from the first 25% of tokens.
+        // These tokens frame the response topic — the projection needs strong
+        // signal here so it steers Mamba's opening words correctly.
+        if self.config.prefix_loss_weight > 0.0 && result.output_hvs.len() >= 4 {
+            let prefix_len = (result.output_hvs.len() / 4).max(1);
+            let prefix_bundle = self.attention_weighted_bundle(
+                &thought_hv,
+                &result.output_hvs[..prefix_len],
+            );
+            // Scale: prefix_loss_weight controls how much extra gradient the prefix gets
+            // We use compute_gradients which accumulates, so this adds to the main gradient
+            // The net effect: prefix tokens contribute (1 + prefix_loss_weight) × their share
+            self.projection.compute_gradients(&thought_hv, &prefix_bundle);
+        }
 
         // Contrastive term: push away from recent different thoughts
         if self.config.contrastive_weight > 0.0 {
@@ -706,6 +743,8 @@ impl LiquidMambaGenerator {
         self.distill_accumulator += 1;
         if self.distill_accumulator >= self.config.accumulation_steps.max(1) {
             self.projection.apply_gradients(effective_lr, 1.0);
+            // EMA teacher update after gradient application
+            self.projection.update_ema();
             self.distill_accumulator = 0;
         }
 

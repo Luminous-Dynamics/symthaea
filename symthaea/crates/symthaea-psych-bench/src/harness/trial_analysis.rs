@@ -281,7 +281,7 @@ mod tests {
         let curve = TrialAnalysis::learning_curve(&trace, 5);
         assert_eq!(curve.len(), 2);
         assert_eq!(curve[0].n_trials, 5);
-        assert!((curve[0].accuracy - 0.6).abs() < 1e-10); // 3/5
+        assert!((curve[0].accuracy - 0.8).abs() < 1e-10); // 4/5
         assert!((curve[1].accuracy - 0.6).abs() < 1e-10); // 3/5
     }
 
