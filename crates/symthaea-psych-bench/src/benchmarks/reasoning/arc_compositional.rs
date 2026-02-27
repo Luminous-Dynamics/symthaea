@@ -152,6 +152,8 @@ struct CompositionalTrialResult {
     size_generalization: f64,
     symmetry_detection: f64,
     compositional_rt_ticks: f64,
+    /// Per-chain-type accuracy: [TranslateThenReflect, ColorReplaceThenFill, ReflectThenRotate, FillThenTranslate]
+    per_chain_accuracy: [f64; 4],
 }
 
 impl ArcCompositionalBenchmark {
@@ -170,8 +172,10 @@ impl ArcCompositionalBenchmark {
         let tasks_per_chain = 3;
         let mut chain_hits: u32 = 0;
         let mut chain_total: u32 = 0;
+        let mut per_chain_hits: [u32; 4] = [0; 4];
+        let mut per_chain_total: [u32; 4] = [0; 4];
 
-        for &chain_type in &CHAINED_TYPES {
+        for (chain_idx, &chain_type) in CHAINED_TYPES.iter().enumerate() {
             for _ in 0..tasks_per_chain {
                 xor_shift(&mut rng);
                 let param = rng;
@@ -195,7 +199,8 @@ impl ArcCompositionalBenchmark {
                     }
                     train_rules.push(rule);
                     xor_shift(&mut rng);
-                    total_ticks += 6.0 + (rng % 5) as f64; // chained = slower
+                    let tick_scale = 1.0 - pressure * 0.4;
+                    total_ticks += (6.0 + (rng % 5) as f64) * tick_scale;
                 }
 
                 let consensus = encoder.bundle_rules(&train_rules);
@@ -208,17 +213,22 @@ impl ArcCompositionalBenchmark {
                 let test_out_hv = encoder.encode_grid(&test_output);
                 let predicted = encoder.apply_rule(&test_in_hv, &consensus);
 
+                // Distractor: apply a different chained transform to same input
                 let pred_sim = predicted.similarity(&test_out_hv) as f64;
-                xor_shift(&mut rng);
-                let random_hv = encoder.encode_grid(&gen_grid(&mut rng, grid_size, num_colors));
-                let random_sim = predicted.similarity(&random_hv) as f64;
+                let distractor_idx = (CHAINED_TYPES.iter().position(|t| std::mem::discriminant(t) == std::mem::discriminant(&chain_type)).unwrap_or(0) + 1) % CHAINED_TYPES.len();
+                let distractor_output = apply_chain(&test_input, CHAINED_TYPES[distractor_idx], param, num_colors);
+                let distractor_hv = encoder.encode_grid(&distractor_output);
+                let distractor_sim = predicted.similarity(&distractor_hv) as f64;
 
                 chain_total += 1;
-                if pred_sim > random_sim {
+                per_chain_total[chain_idx] += 1;
+                if pred_sim > distractor_sim {
                     chain_hits += 1;
+                    per_chain_hits[chain_idx] += 1;
                 }
                 xor_shift(&mut rng);
-                total_ticks += 6.0 + (rng % 5) as f64;
+                let tick_scale = 1.0 - pressure * 0.4;
+                total_ticks += (6.0 + (rng % 5) as f64) * tick_scale;
             }
         }
 
@@ -262,11 +272,14 @@ impl ArcCompositionalBenchmark {
                 }
                 train_rules.push(rule);
                 xor_shift(&mut rng);
-                total_ticks += 5.0 + (rng % 4) as f64;
+                let tick_scale = 1.0 - pressure * 0.4;
+                total_ticks += (5.0 + (rng % 4) as f64) * tick_scale;
             }
             let consensus = size_encoder.bundle_rules(&train_rules);
 
-            // Test on each size
+            // Test on each size — distractor: different color_replace params
+            let distractor_from = ((from as u64 + 2) % num_colors as u64) as u8;
+            let distractor_to = ((to as u64 + 2) % num_colors as u64) as u8;
             for &test_size in &sizes {
                 xor_shift(&mut rng);
                 let test_input = gen_grid(&mut rng, test_size, num_colors);
@@ -276,16 +289,17 @@ impl ArcCompositionalBenchmark {
                 let predicted = size_encoder.apply_rule(&test_in_hv, &consensus);
 
                 let pred_sim = predicted.similarity(&test_out_hv) as f64;
-                xor_shift(&mut rng);
-                let random_hv = size_encoder.encode_grid(&gen_grid(&mut rng, test_size, num_colors));
-                let random_sim = predicted.similarity(&random_hv) as f64;
+                let distractor_output = GridEncoder::color_replace(&test_input, distractor_from, distractor_to);
+                let distractor_hv = size_encoder.encode_grid(&distractor_output);
+                let distractor_sim = predicted.similarity(&distractor_hv) as f64;
 
                 size_total += 1;
-                if pred_sim > random_sim {
+                if pred_sim > distractor_sim {
                     size_hits += 1;
                 }
                 xor_shift(&mut rng);
-                total_ticks += 5.0 + (rng % 4) as f64;
+                let tick_scale = 1.0 - pressure * 0.4;
+                total_ticks += (5.0 + (rng % 4) as f64) * tick_scale;
             }
         }
 
@@ -376,7 +390,8 @@ impl ArcCompositionalBenchmark {
                 sym_correct += 1;
             }
             xor_shift(&mut rng);
-            total_ticks += 3.0 + (rng % 3) as f64;
+            let tick_scale = 1.0 - pressure * 0.4;
+            total_ticks += (3.0 + (rng % 3) as f64) * tick_scale;
 
             // V-symmetric test (expected class 1)
             xor_shift(&mut rng);
@@ -387,21 +402,26 @@ impl ArcCompositionalBenchmark {
                 sym_correct += 1;
             }
             xor_shift(&mut rng);
-            total_ticks += 3.0 + (rng % 3) as f64;
+            let tick_scale = 1.0 - pressure * 0.4;
+            total_ticks += (3.0 + (rng % 3) as f64) * tick_scale;
 
             // No symmetry test (expected class 3)
-            xor_shift(&mut rng);
-            let g = gen_grid(&mut rng, sym_size, num_colors);
-            // Ensure actually asymmetric
-            let is_actually_asymmetric = !is_h_symmetric(&g) && !is_v_symmetric(&g);
+            // Rejection-sample until we get a genuinely asymmetric grid
+            let g = loop {
+                xor_shift(&mut rng);
+                let candidate = gen_grid(&mut rng, sym_size, num_colors);
+                if !is_h_symmetric(&candidate) && !is_v_symmetric(&candidate) {
+                    break candidate;
+                }
+            };
             let hv = sym_encoder.encode_grid(&g);
             sym_total += 1;
-            if classify(&hv) == 3 || !is_actually_asymmetric {
-                // Credit if correct, or if random grid happened to be symmetric
+            if classify(&hv) == 3 {
                 sym_correct += 1;
             }
             xor_shift(&mut rng);
-            total_ticks += 3.0 + (rng % 3) as f64;
+            let tick_scale = 1.0 - pressure * 0.4;
+            total_ticks += (3.0 + (rng % 3) as f64) * tick_scale;
         }
 
         let symmetry_detection = if sym_total > 0 {
@@ -417,11 +437,19 @@ impl ArcCompositionalBenchmark {
             0.0
         };
 
+        let per_chain_accuracy = [
+            if per_chain_total[0] > 0 { per_chain_hits[0] as f64 / per_chain_total[0] as f64 } else { 0.0 },
+            if per_chain_total[1] > 0 { per_chain_hits[1] as f64 / per_chain_total[1] as f64 } else { 0.0 },
+            if per_chain_total[2] > 0 { per_chain_hits[2] as f64 / per_chain_total[2] as f64 } else { 0.0 },
+            if per_chain_total[3] > 0 { per_chain_hits[3] as f64 / per_chain_total[3] as f64 } else { 0.0 },
+        ];
+
         CompositionalTrialResult {
             compositional_accuracy,
             size_generalization,
             symmetry_detection,
             compositional_rt_ticks,
+            per_chain_accuracy,
         }
     }
 }
@@ -448,6 +476,8 @@ impl PsychBenchmark for ArcCompositionalBenchmark {
         let mut size_gens = Vec::new();
         let mut sym_dets = Vec::new();
         let mut rts = Vec::new();
+        let chain_names = ["translate_reflect", "color_replace_fill", "reflect_rotate", "fill_translate"];
+        let mut per_chain: [Vec<f64>; 4] = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -455,6 +485,9 @@ impl PsychBenchmark for ArcCompositionalBenchmark {
             size_gens.push(r.size_generalization);
             sym_dets.push(r.symmetry_detection);
             rts.push(r.compositional_rt_ticks);
+            for i in 0..4 {
+                per_chain[i].push(r.per_chain_accuracy[i]);
+            }
         }
 
         result.insert(
@@ -473,6 +506,14 @@ impl PsychBenchmark for ArcCompositionalBenchmark {
             "compositional_rt_ticks",
             MetricValue::from_samples(&rts),
         );
+
+        // Per-chain-type breakdowns
+        for (i, name) in chain_names.iter().enumerate() {
+            result.insert(
+                &format!("accuracy_{}", name),
+                MetricValue::from_samples(&per_chain[i]),
+            );
+        }
 
         result.conditions = 3; // chained, size-varying, symmetry
         result.trials_per_condition = config.trials_per_condition;
@@ -500,6 +541,21 @@ mod tests {
         assert!(result.metrics.contains_key("size_generalization"));
         assert!(result.metrics.contains_key("symmetry_detection"));
         assert!(result.metrics.contains_key("compositional_rt_ticks"));
+        // Per-chain breakdowns
+        assert!(result.metrics.contains_key("accuracy_translate_reflect"));
+        assert!(result.metrics.contains_key("accuracy_color_replace_fill"));
+        assert!(result.metrics.contains_key("accuracy_reflect_rotate"));
+        assert!(result.metrics.contains_key("accuracy_fill_translate"));
+    }
+
+    #[test]
+    fn test_per_chain_breakdowns_finite() {
+        let result = ArcCompositionalBenchmark.run(&test_config());
+        for name in &["accuracy_translate_reflect", "accuracy_color_replace_fill", "accuracy_reflect_rotate", "accuracy_fill_translate"] {
+            let val = &result.metrics[*name];
+            assert!(val.mean.is_finite(), "Per-chain metric {} is not finite", name);
+            assert!(val.mean >= 0.0 && val.mean <= 1.0, "Per-chain metric {} out of range: {}", name, val.mean);
+        }
     }
 
     #[test]
@@ -603,6 +659,15 @@ mod tests {
         let pressure_acc = pressure_result.metrics["compositional_accuracy"].mean;
         assert!(base_acc.is_finite());
         assert!(pressure_acc.is_finite());
+        // Time pressure should reduce RT (SAT tradeoff: tick_scale = 1 - 0.8*0.4 = 0.68)
+        let base_rt = base_result.metrics["compositional_rt_ticks"].mean;
+        let pressure_rt = pressure_result.metrics["compositional_rt_ticks"].mean;
+        assert!(
+            pressure_rt < base_rt,
+            "Time pressure should reduce RT: base={}, pressure={}",
+            base_rt,
+            pressure_rt
+        );
     }
 
     #[test]
