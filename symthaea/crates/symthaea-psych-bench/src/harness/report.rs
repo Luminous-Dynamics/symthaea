@@ -854,6 +854,28 @@ impl BenchmarkReport {
             push_specific("single_pair_accuracy", "arc_single_pair_accuracy", &bl.reasoning);
             push_specific("learning_efficiency", "arc_learning_efficiency", &bl.reasoning);
         }
+        // ARC Chain (multi-step composition)
+        if benchmark.contains("ArcChain") {
+            push_specific("chain_accuracy", "arc_chain_accuracy", &bl.reasoning);
+            push_specific("chain_2_accuracy", "arc_chain_2_accuracy", &bl.reasoning);
+            push_specific("chain_degradation", "arc_chain_degradation", &bl.reasoning);
+        }
+        // ARC Noise (robustness)
+        if benchmark.contains("ArcNoise") {
+            push_specific("noise_resilience", "arc_noise_resilience", &bl.reasoning);
+            push_specific("accuracy_0pct", "arc_accuracy_0pct", &bl.reasoning);
+        }
+        // ARC FewShot (learning curve)
+        if benchmark.contains("ArcFewShot") {
+            push_specific("accuracy_1shot", "arc_accuracy_1shot", &bl.reasoning);
+            push_specific("accuracy_5shot", "arc_accuracy_5shot", &bl.reasoning);
+            push_specific("learning_rate", "arc_learning_rate", &bl.reasoning);
+        }
+        // ARC Scaling (grid complexity + dimension)
+        if benchmark.contains("ArcScaling") {
+            push_specific("grid_3x3_accuracy", "arc_grid_3x3_accuracy", &bl.reasoning);
+            push_specific("capacity_ratio", "arc_capacity_ratio", &bl.reasoning);
+        }
         // SART (Sustained Attention)
         if benchmark.contains("SART") {
             push_specific("commission_errors", "commission_errors", &bl.sustained_attention);
@@ -1258,6 +1280,10 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("ArcCompositional") => "compositional_accuracy",
         b if b.contains("ArcAnalogy") => "analogy_accuracy",
         b if b.contains("ArcAbductive") => "abduction_accuracy",
+        b if b.contains("ArcChain") => "chain_accuracy",
+        b if b.contains("ArcNoise") => "noise_resilience",
+        b if b.contains("ArcFewShot") => "accuracy_5shot",
+        b if b.contains("ArcScaling") => "capacity_ratio",
         _ => "overall_accuracy",
     }
 }

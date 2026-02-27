@@ -53,7 +53,11 @@ use symthaea_psych_bench::benchmarks::executive::{
 use symthaea_psych_bench::benchmarks::inhibition::{GoNoGoBenchmark, StopSignalBenchmark};
 use symthaea_psych_bench::benchmarks::language::GardenPathBenchmark;
 use symthaea_psych_bench::benchmarks::motor::SrttBenchmark;
-use symthaea_psych_bench::benchmarks::reasoning::{ArcAbductiveBenchmark, ArcAnalogyBenchmark, ArcCompositionalBenchmark, ArcFluidBenchmark};
+use symthaea_psych_bench::benchmarks::reasoning::{
+    ArcAbductiveBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
+    ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark,
+    ArcNoiseBenchmark, ArcScalingBenchmark,
+};
 use symthaea_psych_bench::benchmarks::social::RmeBenchmark;
 use symthaea_psych_bench::benchmarks::sustained_attention::SartBenchmark;
 use symthaea_psych_bench::benchmarks::memory_agent::{
@@ -201,6 +205,10 @@ fn main() {
         Box::new(ArcCompositionalBenchmark),
         Box::new(ArcAnalogyBenchmark),
         Box::new(ArcAbductiveBenchmark),
+        Box::new(ArcChainBenchmark),
+        Box::new(ArcNoiseBenchmark),
+        Box::new(ArcFewShotBenchmark),
+        Box::new(ArcScalingBenchmark),
         // Additional MemoryAgent
         Box::new(ProspectiveMemoryBenchmark),
         // Additional Metacognition
