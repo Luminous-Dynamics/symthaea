@@ -149,7 +149,7 @@ impl CognitiveLoopBenchmarkRunner {
             let mut best_idx = 0;
             let mut best_sim = f64::NEG_INFINITY;
             for (i, alt) in stim.alternatives.iter().enumerate() {
-                let sim = cosine_f32_vec(output, &alt.as_slice());
+                let sim = cosine_f32_vec(output, alt.as_slice());
                 if sim > best_sim {
                     best_sim = sim;
                     best_idx = i;
@@ -169,7 +169,7 @@ impl CognitiveLoopBenchmarkRunner {
                 ne: result.metadata.noradrenaline_effective,
                 sht: result.metadata.serotonin_effective,
                 ach: result.metadata.acetylcholine_effective,
-                psi: result.metadata.psi_unified,
+                psi: result.metadata.unified_psi as f32,
                 cycle_time_us: result.cycle_time_us,
                 learning_occurred: result.learning_occurred,
             });

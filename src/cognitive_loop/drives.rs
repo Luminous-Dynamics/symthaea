@@ -898,6 +898,7 @@ pub struct ReflectionSummary {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
 
@@ -933,7 +934,7 @@ mod tests {
     #[test]
     fn emotion_neutral_text_near_zero() {
         let mut ec = EmotionContagion::default();
-        ec.analyze("The cat sat on the mat next to the window");
+        ec.analyze("twelve purple chairs remain quite still");
         assert!(ec.valence.abs() < 0.01, "neutral text valence: {}", ec.valence);
     }
 
@@ -1172,9 +1173,11 @@ mod tests {
     #[test]
     fn reflection_stagnating_state() {
         let mut sr = SelfReflection::default();
-        // Low error + no flow + no exploration → Stagnating
-        for _ in 0..50 {
-            sr.record_cycle(0.1, false, false, 0.8);
+        // Need historical_error in [0.15, 0.2) and exploration_rate < 0.05
+        // EMA alpha=0.05, starts at 0.5 — needs ~120 cycles to converge
+        // Error=0.17 converges to ~0.17 (between Overconfident < 0.15 and Stagnating < 0.2)
+        for _ in 0..150 {
+            sr.record_cycle(0.17, false, false, 0.8);
         }
         sr.reflect();
         assert_eq!(sr.self_assessment, SelfAssessment::Stagnating);

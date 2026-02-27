@@ -33,6 +33,8 @@
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --arc-reliability
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --cross-domain
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --arc-latex
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --trial-trace
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --difficulty 0.5
 
 use rayon::prelude::*;
 use std::path::PathBuf;
@@ -149,12 +151,20 @@ fn main() {
     let arc_reliability_mode = args.iter().any(|a| a == "--arc-reliability");
     let cross_domain_mode = args.iter().any(|a| a == "--cross-domain");
     let arc_latex_mode = args.iter().any(|a| a == "--arc-latex");
+    let trial_trace = args.iter().any(|a| a == "--trial-trace");
+    let difficulty: f64 = args
+        .windows(2)
+        .find(|w| w[0] == "--difficulty")
+        .and_then(|w| w[1].parse().ok())
+        .unwrap_or(0.0);
 
     let config = BenchmarkConfig {
         dimension: 512,
         trials_per_condition: 10,
         adaptive_trials: adaptive_trials_mode,
         ssm_backend: ssm_backend_mode,
+        trial_trace,
+        difficulty,
         ..Default::default()
     };
 
