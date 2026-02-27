@@ -69,6 +69,13 @@ impl CognitiveLoopService {
         if budget_gated {
             self.stats.attention_budget_gated_count += 1;
         }
+        // Cruise-mode interval doubling: when urgency is Cruise (low error,
+        // stable state), double all consciousness subsystem intervals to save
+        // ~30% cycle time. Science: Botvinick & Braver (2015) — cognitive
+        // control scales with demand.
+        let cruise_mult: usize =
+            if matches!(state.urgency, super::CycleUrgency::Cruise) { 2 } else { 1 };
+        let interval_mult = budget_interval_mult * cruise_mult;
         let input = state.input;
         // ═══════════════════════════════════════════════════════════════════════
         // HIERARCHICAL LTC: Distributed temporal processing with local circuits
@@ -124,13 +131,13 @@ impl CognitiveLoopService {
         // EVOLUTION COORDINATOR: Stateful co-evolution of primitives + architecture
         // Replaces one-shot PrimitiveEvolution with cross-generation Thompson sampling.
         // The coordinator manages its own Interleaved schedule internally.
-        // EXPENSIVE — called every 199 cycles (actual evolution runs every 5th step, co-prime).
+        // EXPENSIVE — called every 499 cycles (actual evolution runs every 5th step, co-prime).
         // Science: Holland (1975), Kauffman (1993), Thompson (1933).
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (evolution_generation, evolution_phi_delta) =
             if let Some(ref mut coordinator) = self.evolution_coordinator {
-                if self.stats.total_cycles % 199 == 0 && self.stats.total_cycles > 0 {
+                if self.stats.total_cycles % 499 == 0 && self.stats.total_cycles > 0 {
                     match coordinator.step() {
                         Ok(result) => (result.generation, result.primitive_psi_delta),
                         Err(_) => (coordinator.generation(), 0.0),
@@ -171,7 +178,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (holographic_unity, holographic_binding) =
             if let Some(ref mut ha) = self.holographic_analyzer {
-                if self.stats.total_cycles % (47 * budget_interval_mult) == 0 {
+                if self.stats.total_cycles % (47 * interval_mult) == 0 {
                     let content: Vec<f64> = (0..64)
                         .map(|i| {
                             if hv16_cached.get_bit(i) != 0 {
@@ -216,7 +223,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (consciousness_gradient_magnitude, consciousness_limiting_component) =
             if let Some(ref dc) = self.differentiable_consciousness {
-                if self.stats.total_cycles % (47 * budget_interval_mult) == 0
+                if self.stats.total_cycles % (47 * interval_mult) == 0
                     && self.stats.total_cycles > 0
                 {
                     use crate::consciousness::consciousness_equation_v2::{
@@ -275,7 +282,7 @@ impl CognitiveLoopService {
         let (affect_cons_valence, affect_cons_arousal) =
             if let Some(ref mut ac) = self.affective_consciousness {
                 ac.decay(0.05);
-                if self.stats.total_cycles % (11 * budget_interval_mult) == 0 {
+                if self.stats.total_cycles % (11 * interval_mult) == 0 {
                     let valence = 1.0 - 2.0 * prediction_error;
                     let base_affect = crate::consciousness::affective_consciousness::CoreAffect {
                         valence,
