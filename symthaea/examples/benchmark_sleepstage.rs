@@ -160,7 +160,7 @@ fn main() {
             let nr = recording_features.len() as f64;
             let mut feat_mean = [0.0f64; N_FEAT];
             let mut feat_sq = [0.0f64; N_FEAT];
-            for &(_, ref feats) in &recording_features {
+            for (_, feats) in &recording_features {
                 for f in 0..N_FEAT {
                     feat_mean[f] += feats[f];
                     feat_sq[f] += feats[f] * feats[f];
@@ -196,10 +196,10 @@ fn main() {
         "  {:>5} {:>4} {:>6} {:>6} {:>6} {:>6} {:>8} {:>7} {:>6}",
         "", "n", "delta", "theta", "alpha", "beta", "logPow", "logRMS", "ZCR"
     );
-    for s in 0..5 {
+    for (s, feat_stage_name) in feat_stage_names.iter().enumerate() {
         println!(
             "  {:>5} {:>4} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>8.2} {:>7.2} {:>6.4}",
-            feat_stage_names[s],
+            feat_stage_name,
             stage_stats.counts[s],
             stage_stats.means[s][0],
             stage_stats.means[s][1],
@@ -473,7 +473,7 @@ fn run_synthetic_benchmark() {
         for epoch_i in 0..train_epochs_per_stage {
             let (frontal, occipital) =
                 generate_synthetic_eeg(stage, epoch_len, sample_rate, epoch_i as u64);
-            sentinel.train_epoch(&frontal, &occipital, stage.clone());
+            sentinel.train_epoch(&frontal, &occipital, *stage);
         }
         println!("  Trained {} x {} epochs", name, train_epochs_per_stage);
     }
@@ -533,8 +533,8 @@ fn run_synthetic_benchmark() {
 
     // Save results (use HMM-smoothed accuracy)
     let mut total_correct = 0;
-    for i in 0..5 {
-        total_correct += confusion_hmm[i][i];
+    for (i, row) in confusion_hmm.iter().enumerate().take(5) {
+        total_correct += row[i];
     }
     let overall = total_correct as f64 / total as f64;
 
@@ -730,18 +730,18 @@ fn extract_spectral_features(signal: &[f64], spectral: &SpectralAnalyzer) -> [f6
     for (i, &p) in spectrum.psd.iter().enumerate() {
         let f = spectrum.frequencies[i];
         let pv = p.max(0.0);
-        if f >= 0.5 && f < 4.0 {
+        if (0.5..4.0).contains(&f) {
             delta += pv;
-        } else if f >= 4.0 && f < 8.0 {
+        } else if (4.0..8.0).contains(&f) {
             theta += pv;
-        } else if f >= 8.0 && f < 12.0 {
+        } else if (8.0..12.0).contains(&f) {
             alpha += pv;
-        } else if f >= 12.0 && f < 30.0 {
+        } else if (12.0..30.0).contains(&f) {
             beta += pv;
         }
 
         // Spectral slope: linear regression of log(PSD) vs log(f) in 1-30 Hz
-        if f >= 1.0 && f <= 30.0 && pv > 1e-20 {
+        if (1.0..=30.0).contains(&f) && pv > 1e-20 {
             let lf = f.ln();
             let lp = pv.ln();
             log_f_sum += lf;
@@ -833,15 +833,15 @@ impl StageFeatureStats {
     /// Compute emission probability vector for all 5 stages given observed features.
     fn emission_probs(&self, features: &[f64; N_FEAT]) -> Vec<f64> {
         let mut log_likes = [0.0f64; 5];
-        for s in 0..5 {
+        for (s, log_like) in log_likes.iter_mut().enumerate() {
             if self.counts[s] == 0 {
-                log_likes[s] = -100.0;
+                *log_like = -100.0;
                 continue;
             }
-            for f in 0..N_FEAT {
-                let diff = features[f] - self.means[s][f];
-                log_likes[s] += -0.5 * diff * diff / self.vars[s][f];
-                log_likes[s] += -0.5 * self.vars[s][f].ln();
+            for (f, feature) in features.iter().enumerate() {
+                let diff = feature - self.means[s][f];
+                *log_like += -0.5 * diff * diff / self.vars[s][f];
+                *log_like += -0.5 * self.vars[s][f].ln();
             }
         }
         // Softmax with numerical stability
@@ -963,13 +963,13 @@ fn compute_emission_probs_enhanced(
                     let f = spectrum.frequencies[i];
                     let pv = p.max(0.0);
                     total += pv;
-                    if f >= 0.5 && f < 4.0 {
+                    if (0.5..4.0).contains(&f) {
                         delta += pv;
-                    } else if f >= 4.0 && f < 8.0 {
+                    } else if (4.0..8.0).contains(&f) {
                         theta += pv;
-                    } else if f >= 8.0 && f < 12.0 {
+                    } else if (8.0..12.0).contains(&f) {
                         alpha += pv;
-                    } else if f >= 12.0 && f < 30.0 {
+                    } else if (12.0..30.0).contains(&f) {
                         beta += pv;
                     }
                 }

@@ -178,7 +178,7 @@ fn main() {
     let hdc_start = Instant::now();
 
     let mut hdc_prototypes: Vec<Vec<f32>> = vec![vec![0.0f32; dim]; 10];
-    let mut class_counts = vec![0usize; 10];
+    let mut class_counts = [0usize; 10];
 
     for (img, &label) in train_images.iter().zip(train_labels.iter()) {
         let encoded = encoder.encode(img);
@@ -310,7 +310,7 @@ fn main() {
     let cfc_train_start = Instant::now();
 
     let mut cfc_prototypes: Vec<Vec<f32>> = Vec::new();
-    let mut cfc_counts = vec![0usize; 10];
+    let mut cfc_counts = [0usize; 10];
     let mut cfc_dim = 0;
 
     for (img, &label) in train_images

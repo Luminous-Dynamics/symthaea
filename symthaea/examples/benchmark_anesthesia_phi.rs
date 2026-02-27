@@ -7,7 +7,7 @@
 //! ## Clinical Context
 //! During anesthesia induction (e.g. propofol), consciousness transitions through:
 //! 1. Alert wakefulness → Sedation → Loss of consciousness → Surgical anesthesia
-//! Φ should monotonically decrease during induction and increase during recovery.
+//!    Φ should monotonically decrease during induction and increase during recovery.
 //!
 //! ## Method
 //! 1. Simulate neural dynamics across anesthesia phases using CfC networks
@@ -455,15 +455,15 @@ fn simulate_neural_state(
     let mut result: Vec<Vec<f32>> = vec![vec![0.0; dim]; n_neurons];
 
     for i in 0..n_neurons {
-        for d in 0..dim {
+        for (d, result_val) in result[i].iter_mut().enumerate().take(dim) {
             // Self component
             let self_val = base_hvs[i].values[d];
 
             // Coupled component (average of neighbors weighted by coupling)
             let mut coupled = 0.0f32;
-            for j in 0..n_neurons {
+            for (j, base_hv) in base_hvs.iter().enumerate().take(n_neurons) {
                 if i != j {
-                    coupled += base_hvs[j].values[d] * state.coupling;
+                    coupled += base_hv.values[d] * state.coupling;
                 }
             }
             coupled /= (n_neurons - 1).max(1) as f32;
@@ -474,7 +474,7 @@ fn simulate_neural_state(
             // Noise
             let noise = state.noise * rand_f32();
 
-            result[i][d] = self_val * (1.0 - state.coupling) + coupled + recurrent + noise;
+            *result_val = self_val * (1.0 - state.coupling) + coupled + recurrent + noise;
         }
     }
 

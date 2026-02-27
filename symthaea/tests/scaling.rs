@@ -208,12 +208,12 @@ fn test_concurrent_streaming_pipelines() {
                 for i in 0..100 {
                     let input = ndarray::Array1::from_shape_fn(32, |j| ((j + i) as f32).cos());
                     streamer.push(input);
-                    while let Some(_) = streamer.poll() {
+                    while streamer.poll().is_some() {
                         output_count += 1;
                     }
                 }
                 // Flush remaining
-                if let Some(_) = streamer.flush() {
+                if streamer.flush().is_some() {
                     output_count += 1;
                 }
 
@@ -257,12 +257,12 @@ fn test_streaming_throughput_under_load() {
     for i in 0..num_samples {
         let input = ndarray::Array1::from_shape_fn(64, |j| ((j + i) as f32).sin());
         streamer.push(input);
-        while let Some(_) = streamer.poll() {
+        while streamer.poll().is_some() {
             output_count += 1;
         }
     }
     // Flush
-    while let Some(_) = streamer.flush() {
+    while streamer.flush().is_some() {
         output_count += 1;
     }
 
@@ -641,17 +641,17 @@ fn test_streaming_pipeline_no_leaks() {
 
         // Drain outputs periodically
         if i % 10 == 0 {
-            while let Some(_) = streamer.poll() {
+            while streamer.poll().is_some() {
                 total_outputs += 1;
             }
         }
     }
 
     // Final drain
-    while let Some(_) = streamer.flush() {
+    while streamer.flush().is_some() {
         total_outputs += 1;
     }
-    while let Some(_) = streamer.poll() {
+    while streamer.poll().is_some() {
         total_outputs += 1;
     }
 

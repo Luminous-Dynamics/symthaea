@@ -163,14 +163,12 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
 
         // --- Generation quality: English ratio + coherence ---
         let mut pair_english_ratio = 0.0f32;
-        let mut pair_coherence = 0.0f32;
 
         if config.compute_english_ratio {
             let result = generator.generate(&channels);
             pair_english_ratio = english_word_ratio(&result.token_ids, generator.tokenizer());
-            pair_coherence = result.final_coherence;
             total_english_ratio += pair_english_ratio;
-            total_coherence += pair_coherence;
+            total_coherence += result.final_coherence;
             gen_count += 1;
         }
 
@@ -312,6 +310,41 @@ pub struct LiquidMambaEvalResult {
     /// Consciousness gating verification: (certain_hedging%, unknown_hedging%).
     /// If `unknown > certain`, the consciousness bridge is steering generation.
     pub gating_verification: Option<(f32, f32)>,
+    /// Distinct-1: fraction of unique unigrams across all generated text.
+    pub distinct_1: f32,
+    /// Distinct-2: fraction of unique bigrams across all generated text.
+    pub distinct_2: f32,
+    /// Mean cosine similarity between input thought HV and output centroid HV.
+    pub avg_thought_output_similarity: f32,
+}
+
+/// Compute distinct-n: fraction of unique n-grams out of total n-grams.
+///
+/// Measures lexical diversity — higher is better (less repetition).
+#[cfg(feature = "mamba")]
+fn distinct_n(words: &[String], n: usize) -> f32 {
+    if words.len() < n || n == 0 {
+        return 0.0;
+    }
+    let mut ngrams = std::collections::HashSet::new();
+    let total = words.len() - n + 1;
+    for window in words.windows(n) {
+        let ngram: String = window.join(" ");
+        ngrams.insert(ngram);
+    }
+    ngrams.len() as f32 / total as f32
+}
+
+/// Cosine similarity between two f32 slices.
+#[cfg(feature = "mamba")]
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm_a < 1e-12 || norm_b < 1e-12 {
+        return 0.0;
+    }
+    (dot / (norm_a * norm_b)).clamp(-1.0, 1.0)
 }
 
 /// Hedging tokens that indicate epistemic uncertainty in generated text.
@@ -384,6 +417,9 @@ pub fn evaluate_liquid_mamba(
     let mut gen_count = 0usize;
     let mut intent_accum: HashMap<String, (f32, f32, f32, usize, usize)> = HashMap::new();
     let mut all_output_hvs: Vec<symthaea_core::hdc::ContinuousHV> = Vec::new();
+    let mut all_generated_words: Vec<String> = Vec::new();
+    let mut total_thought_output_sim = 0.0f32;
+    let mut sim_count = 0usize;
 
     for pair in &config.dataset.pairs {
         if pair.target_ids.is_empty() && pair.target_text.is_empty() {
@@ -429,12 +465,37 @@ pub fn evaluate_liquid_mamba(
         let mut pair_english_ratio = 0.0f32;
 
         if config.compute_english_ratio {
+            let thought_hv = gen.encoder().encode(&channels);
             let result = gen.generate(&channels);
             pair_english_ratio = english_word_ratio_mamba(&result.token_ids, gen.mamba());
             total_english_ratio += pair_english_ratio;
             total_coherence += result.final_coherence;
             total_semantic_pe += result.semantic_pe;
             gen_count += 1;
+
+            // Collect words for distinct-n
+            let words: Vec<String> = result.text.split_whitespace()
+                .map(|w| w.to_lowercase())
+                .collect();
+            all_generated_words.extend(words);
+
+            // Thought-output similarity: centroid of output HVs vs input thought HV
+            if !result.output_hvs.is_empty() {
+                let dim = thought_hv.dim();
+                let mut centroid = vec![0.0f32; dim];
+                for hv in &result.output_hvs {
+                    for (c, v) in centroid.iter_mut().zip(hv.as_slice().iter()) {
+                        *c += v;
+                    }
+                }
+                let n = result.output_hvs.len() as f32;
+                for c in centroid.iter_mut() {
+                    *c /= n;
+                }
+                let sim = cosine_similarity(thought_hv.as_slice(), &centroid);
+                total_thought_output_sim += sim;
+                sim_count += 1;
+            }
 
             // Collect output HVs for effective rank (sample up to 4)
             for hv in result.output_hvs.iter().take(4) {
@@ -517,11 +578,24 @@ pub fn evaluate_liquid_mamba(
         None
     };
 
+    // --- Diversity metrics ---
+    let d1 = distinct_n(&all_generated_words, 1);
+    let d2 = distinct_n(&all_generated_words, 2);
+
+    let avg_thought_output_similarity = if sim_count > 0 {
+        total_thought_output_sim / sim_count as f32
+    } else {
+        0.0
+    };
+
     LiquidMambaEvalResult {
         base,
         avg_semantic_pe,
         avg_effective_rank,
         gating_verification,
+        distinct_1: d1,
+        distinct_2: d2,
+        avg_thought_output_similarity,
     }
 }
 
@@ -573,6 +647,9 @@ pub fn format_liquid_mamba_eval_report(result: &LiquidMambaEvalResult) -> String
     s.push_str(&format!("Avg coherence:     {:.4}\n", result.base.avg_coherence));
     s.push_str(&format!("Avg semantic PE:   {:.4}\n", result.avg_semantic_pe));
     s.push_str(&format!("Effective rank:    {:.2}\n", result.avg_effective_rank));
+    s.push_str(&format!("Distinct-1:        {:.4}\n", result.distinct_1));
+    s.push_str(&format!("Distinct-2:        {:.4}\n", result.distinct_2));
+    s.push_str(&format!("Thought-output sim:{:.4}\n", result.avg_thought_output_similarity));
 
     if let Some((certain, unknown)) = result.gating_verification {
         s.push_str(&format!("\n--- Consciousness Gating Test ---\n"));
@@ -807,6 +884,9 @@ mod tests {
                 avg_semantic_pe: 0.72,
                 avg_effective_rank: 18.5,
                 gating_verification: Some((0.05, 0.15)),
+                distinct_1: 0.85,
+                distinct_2: 0.92,
+                avg_thought_output_similarity: 0.35,
             };
 
             let report = format_liquid_mamba_eval_report(&result);
@@ -815,6 +895,50 @@ mod tests {
             assert!(report.contains("semantic PE"), "Should contain semantic PE");
             assert!(report.contains("Effective rank"), "Should contain rank");
             assert!(report.contains("PASS"), "Should pass gating test (0.15 > 0.05)");
+        }
+
+        #[test]
+        fn test_distinct_n_all_unique() {
+            let words: Vec<String> = vec!["the", "cat", "sat", "on", "mat"]
+                .into_iter().map(String::from).collect();
+            let d1 = distinct_n(&words, 1);
+            assert!((d1 - 1.0).abs() < 1e-6, "All unique unigrams: d1={d1}");
+            let d2 = distinct_n(&words, 2);
+            assert!((d2 - 1.0).abs() < 1e-6, "All unique bigrams: d2={d2}");
+        }
+
+        #[test]
+        fn test_distinct_n_repetitive() {
+            let words: Vec<String> = vec!["the", "the", "the", "the"]
+                .into_iter().map(String::from).collect();
+            let d1 = distinct_n(&words, 1);
+            assert!((d1 - 0.25).abs() < 1e-6, "One unique out of 4: d1={d1}");
+            let d2 = distinct_n(&words, 2);
+            // All bigrams are "the the" — 1 unique out of 3
+            assert!((d2 - 1.0/3.0).abs() < 1e-3, "One unique bigram of 3: d2={d2}");
+        }
+
+        #[test]
+        fn test_distinct_n_empty() {
+            let words: Vec<String> = vec![];
+            assert!((distinct_n(&words, 1) - 0.0).abs() < 1e-6);
+            assert!((distinct_n(&words, 2) - 0.0).abs() < 1e-6);
+        }
+
+        #[test]
+        fn test_cosine_similarity_identical() {
+            let a = vec![1.0, 2.0, 3.0];
+            let b = vec![1.0, 2.0, 3.0];
+            let sim = cosine_similarity(&a, &b);
+            assert!((sim - 1.0).abs() < 1e-5, "Identical vectors: sim={sim}");
+        }
+
+        #[test]
+        fn test_cosine_similarity_orthogonal() {
+            let a = vec![1.0, 0.0, 0.0];
+            let b = vec![0.0, 1.0, 0.0];
+            let sim = cosine_similarity(&a, &b);
+            assert!(sim.abs() < 1e-5, "Orthogonal vectors: sim={sim}");
         }
 
         #[test]
@@ -830,6 +954,9 @@ mod tests {
                 avg_semantic_pe: 0.9,
                 avg_effective_rank: 2.0,
                 gating_verification: Some((0.10, 0.05)),
+                distinct_1: 0.3,
+                distinct_2: 0.4,
+                avg_thought_output_similarity: 0.1,
             };
 
             let report = format_liquid_mamba_eval_report(&result);

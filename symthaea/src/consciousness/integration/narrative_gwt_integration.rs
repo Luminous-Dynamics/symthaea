@@ -71,7 +71,7 @@ Certain properties must *never* be violated:
 - Autobiographical continuity is maintained
 */
 
-use crate::consciousness::cross_modal_binding::{BindingConfig, CrossModalBinder, Modality};
+use crate::consciousness::cross_modal_binding::{CrossModalBindingConfig, CrossModalBinder, Modality};
 use crate::consciousness::gwt_integration::{
     UnifiedGWTConfig, UnifiedGWTResult, UnifiedGlobalWorkspace,
 };
@@ -438,7 +438,7 @@ impl NarrativeGWTIntegration {
         integration_config: NarrativeGWTConfig,
     ) -> Self {
         let cross_modal = if integration_config.enable_cross_modal {
-            Some(CrossModalBinder::new(BindingConfig::default()))
+            Some(CrossModalBinder::new(CrossModalBindingConfig::default()))
         } else {
             None
         };
@@ -1249,6 +1249,7 @@ pub struct NarrativeGWTProcessResult {
 // ============================================================================
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
 

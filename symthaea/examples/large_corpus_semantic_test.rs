@@ -684,6 +684,7 @@ fn get_large_corpus() -> Vec<(&'static str, SemanticCategory)> {
 }
 
 /// Get pairs of sentences that should cluster together (near-synonyms)
+#[allow(clippy::type_complexity)]
 fn get_synonym_pairs() -> Vec<(
     (&'static str, SemanticCategory),
     (&'static str, SemanticCategory),
@@ -714,6 +715,7 @@ fn get_synonym_pairs() -> Vec<(
 }
 
 /// Get pairs of sentences that should NOT cluster together (homonyms)
+#[allow(clippy::type_complexity)]
 fn get_homonym_pairs() -> Vec<(
     (&'static str, SemanticCategory),
     (&'static str, SemanticCategory),
@@ -925,8 +927,8 @@ fn generate_enhanced_mock_embedding(text: &str, category: SemanticCategory) -> V
     for (domain_idx, &score) in domain_scores.iter().enumerate() {
         if score > 0.0 {
             let offset = domain_idx * 256;
-            for i in offset..(offset + 256).min(1024) {
-                embedding[i] += score * 0.3 * ((i - offset) as f32 / 128.0 - 1.0).sin();
+            for (i, emb_val) in embedding.iter_mut().enumerate().take((offset + 256).min(1024)).skip(offset) {
+                *emb_val += score * 0.3 * ((i - offset) as f32 / 128.0 - 1.0).sin();
             }
         }
     }
@@ -1151,8 +1153,7 @@ impl SimpleHdcProjector {
         let mut output = vec![0.0f32; self.hdc_dim];
 
         // Row-accumulation pattern for cache efficiency
-        for i in 0..input_len {
-            let x = input[i];
+        for (i, &x) in input.iter().enumerate().take(input_len) {
             if x.abs() < 1e-10 {
                 continue;
             }
@@ -1193,11 +1194,7 @@ fn print_similarity_matrix(
             if let Some(entry) = stats.get(&(*cat_a, *cat_b)) {
                 let avg = entry.avg();
                 // Color coding: green for diagonal (high), red for off-diagonal (should be low)
-                if cat_a == cat_b {
-                    print!("{:>6.3} ", avg);
-                } else {
-                    print!("{:>6.3} ", avg);
-                }
+                print!("{:>6.3} ", avg);
             } else {
                 print!("   N/A ");
             }

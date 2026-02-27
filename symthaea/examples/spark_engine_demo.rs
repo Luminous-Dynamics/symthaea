@@ -199,11 +199,11 @@ fn main() {
   │   ARCHITECTURE                                                      │
   │   ────────────                                                      │
   │   ╔═══════════════════════════════════════════════════════════╗     │
-  │   ║  SHELL: {} (HEA)                         ║     │
+  │   ║  SHELL: {:<30} (HEA)                         ║     │
   │   ║    • H-storage: {:.0}%                                      ║     │
   │   ║    • Self-healing via sluggish diffusion                  ║     │
   │   ╠═══════════════════════════════════════════════════════════╣     │
-  │   ║  INTERFACE: {} (Nano-laminate)                     ║     │
+  │   ║  INTERFACE: {:<18} (Nano-laminate)                     ║     │
   │   ║    • Defect sink efficiency: {:.0}%                         ║     │
   │   ╠═══════════════════════════════════════════════════════════╣     │
   │   ║  CORE: Galinstan (Liquid Metal)                           ║     │
@@ -230,9 +230,9 @@ fn main() {
 
 "#,
         consumer_spec.energy_density_gj_g,
-        format!("{:<30}", consumer_spec.shell.name),
+        consumer_spec.shell.name,
         consumer_spec.shell.h_solubility * 100.0,
-        format!("{:<18}", consumer_spec.interface.name),
+        consumer_spec.interface.name,
         consumer_spec.interface.sink_efficiency * 100.0,
     );
 

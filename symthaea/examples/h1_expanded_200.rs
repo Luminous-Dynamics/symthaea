@@ -55,7 +55,7 @@ fn main() -> Result<()> {
         println!(
             "Run with: cargo run --example h1_expanded_200 --features neural-bridge --release"
         );
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(feature = "neural-bridge")]

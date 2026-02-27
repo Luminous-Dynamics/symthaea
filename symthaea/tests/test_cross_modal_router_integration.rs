@@ -113,7 +113,7 @@ fn test_dual_modality_routing() {
     let result = router.route(&[visual, auditory], 0.7);
 
     assert!(
-        result.attention_weights.len() >= 1,
+        !result.attention_weights.is_empty(),
         "Should have attention for modalities"
     );
     assert!(result.effective_phi >= 0.0, "Should have valid effective Φ");
@@ -424,7 +424,7 @@ fn test_all_modality_types() {
 
     assert!(result.quality >= 0.0, "All modality types should work");
     assert!(
-        result.bound_modalities.len() >= 1,
+        !result.bound_modalities.is_empty(),
         "Should bind at least one modality"
     );
 }

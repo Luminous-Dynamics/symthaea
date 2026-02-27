@@ -55,6 +55,7 @@ fn main() {
         (16384, 32, 5, "16,384D"),
     ];
 
+    #[allow(clippy::type_complexity)]
     let mut results: Vec<(usize, &str, f64, f64, Vec<f64>, f64)> = Vec::new();
 
     for (dim, levels, retrain_iters, label) in &conditions {
@@ -283,20 +284,20 @@ impl HdcClassifier {
             self.class_counts[class] += 1;
         }
 
-        for class in 0..10 {
+        for (class, accumulator) in accumulators.iter_mut().enumerate().take(10) {
             if self.class_counts[class] > 0 {
-                let norm: f32 = accumulators[class]
+                let norm: f32 = accumulator
                     .iter()
                     .map(|x| x * x)
                     .sum::<f32>()
                     .sqrt();
                 if norm > 0.0 {
-                    for v in &mut accumulators[class] {
+                    for v in accumulator.iter_mut() {
                         *v /= norm;
                     }
                 }
                 self.class_prototypes[class] =
-                    Some(ContinuousHV::from_vec(accumulators[class].clone()));
+                    Some(ContinuousHV::from_vec(accumulator.clone()));
             }
         }
 
@@ -360,13 +361,11 @@ impl HdcClassifier {
         }
 
         // Normalize prototypes
-        for proto in &mut self.class_prototypes {
-            if let Some(ref mut p) = proto {
-                let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-                if norm > 0.0 {
-                    for v in &mut p.values {
-                        *v /= norm;
-                    }
+        for ref mut p in self.class_prototypes.iter_mut().flatten() {
+            let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 {
+                for v in &mut p.values {
+                    *v /= norm;
                 }
             }
         }
@@ -375,8 +374,8 @@ impl HdcClassifier {
     fn test(&self, images: &[Vec<u8>], labels: &[u8]) -> TestResult {
         let t = Instant::now();
         let mut correct = 0;
-        let mut per_class_correct = vec![0usize; 10];
-        let mut per_class_total = vec![0usize; 10];
+        let mut per_class_correct = [0usize; 10];
+        let mut per_class_total = [0usize; 10];
 
         for (img, &label) in images.iter().zip(labels.iter()) {
             let encoded = self.encode(img);

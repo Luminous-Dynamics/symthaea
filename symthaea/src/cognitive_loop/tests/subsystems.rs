@@ -219,18 +219,15 @@ fn test_closed_learning_loop_phi_gating_high() {
 
     // Set Supportive as best strategy with high Q-value
     // Then with high Φ, it should shift toward Exploratory
-    for _ in 0..100 {
-        let strategy = loop_.select_strategy(0.8, None);
-        // High Φ → integrative mode → favors Exploratory/Detailed
-        assert!(
-            !matches!(
-                strategy,
-                ResponseStrategy::Supportive | ResponseStrategy::Concise
-            ) || loop_.last_result.is_some(),
-            "High Φ should shift away from Supportive/Concise"
-        );
-        break; // Just check first selection
-    }
+    let strategy = loop_.select_strategy(0.8, None);
+    // High Φ → integrative mode → favors Exploratory/Detailed
+    assert!(
+        !matches!(
+            strategy,
+            ResponseStrategy::Supportive | ResponseStrategy::Concise
+        ) || loop_.last_result.is_some(),
+        "High Φ should shift away from Supportive/Concise"
+    );
 }
 
 #[test]

@@ -59,10 +59,9 @@ fn analyze_matrix(similarity_matrix: &[Vec<f64>], _name: &str) {
     let mut sum_sim = 0.0;
     let mut off_diag_count = 0;
 
-    for i in 0..n {
-        for j in 0..n {
+    for (i, row) in similarity_matrix.iter().enumerate().take(n) {
+        for (j, &v) in row.iter().enumerate().take(n) {
             if i != j {
-                let v = similarity_matrix[i][j];
                 min_sim = min_sim.min(v);
                 max_sim = max_sim.max(v);
                 sum_sim += v;
@@ -79,10 +78,10 @@ fn analyze_matrix(similarity_matrix: &[Vec<f64>], _name: &str) {
 
     // Compute degrees
     let mut degrees: Vec<f64> = vec![0.0; n];
-    for i in 0..n {
-        for j in 0..n {
+    for (i, degree) in degrees.iter_mut().enumerate().take(n) {
+        for (j, &val) in similarity_matrix[i].iter().enumerate().take(n) {
             if i != j {
-                degrees[i] += similarity_matrix[i][j];
+                *degree += val;
             }
         }
     }

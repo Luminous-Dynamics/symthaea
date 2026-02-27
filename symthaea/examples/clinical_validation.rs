@@ -68,18 +68,16 @@ fn permutation_entropy(signal: &[f64], delay: usize) -> f64 {
             else {
                 2
             } // x3 < x1 <= x2
-        } else {
-            if x1 <= x3 {
-                3
-            }
-            // x2 < x1 <= x3
-            else if x2 <= x3 {
-                4
-            }
-            // x2 <= x3 < x1
-            else {
-                5
-            } // descending
+        } else if x1 <= x3 {
+            3
+        }
+        // x2 < x1 <= x3
+        else if x2 <= x3 {
+            4
+        }
+        // x2 <= x3 < x1
+        else {
+            5
         };
 
         counts[pattern_idx] += 1;
@@ -280,8 +278,8 @@ impl EyeMovementDetector {
     fn movement_energy(&self) -> f64 {
         // Normalize variance to [0, 1] range
         // Typical EOG variance ranges from ~100 (quiet) to ~10000 (active)
-        let normalized = (self.variance.sqrt() / 100.0).min(1.0);
-        normalized
+        
+        (self.variance.sqrt() / 100.0).min(1.0)
     }
 
     /// Get movement frequency (zero-crossing rate normalized)
@@ -424,6 +422,7 @@ impl MuscleToneTracker {
 
 /// Sleep stage from hypnogram
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::upper_case_acronyms)]
 enum SleepStage {
     Wake,
     N1,
@@ -804,6 +803,7 @@ struct IntegrationMetrics {
 
 /// Predicted consciousness state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::upper_case_acronyms)]
 enum ConsciousnessState {
     Awake,
     LightSleep, // N1/N2
@@ -812,7 +812,7 @@ enum ConsciousnessState {
 }
 
 impl ConsciousnessState {
-    fn to_sleep_stage(&self) -> SleepStage {
+    fn to_sleep_stage(self) -> SleepStage {
         match self {
             ConsciousnessState::Awake => SleepStage::Wake,
             ConsciousnessState::LightSleep => SleepStage::N2, // Map to N2 as primary light sleep
@@ -1369,7 +1369,7 @@ fn main() {
 
     let max_epochs = labels.len().min(frontal.data.len() / epoch_samples);
 
-    for epoch_idx in 0..max_epochs {
+    for (epoch_idx, label) in labels.iter().enumerate().take(max_epochs) {
         let start = epoch_idx * epoch_samples;
         let end = start + epoch_samples;
 
@@ -1408,7 +1408,7 @@ fn main() {
         // Classify
         let (predicted_state, metrics) = sentinel.classify();
         let predicted = predicted_state.to_sleep_stage();
-        let actual = labels[epoch_idx];
+        let actual = *label;
 
         // Skip unknown labels
         if actual == SleepStage::Unknown {
@@ -1472,8 +1472,7 @@ fn main() {
     for (i, row_name) in row_names.iter().enumerate() {
         let row_total: usize = confusion[i].iter().sum();
         print!(" {} │", row_name);
-        for j in 0..5 {
-            let count = confusion[i][j];
+        for &count in confusion[i].iter().take(5) {
             let pct = if row_total > 0 {
                 100.0 * count as f64 / row_total as f64
             } else {

@@ -91,8 +91,8 @@ impl OdeSystem for CfCLikeSystem {
 
             // Nonlinear activation: sigmoid(W*y + b)
             let mut pre_activation = self.bias[i];
-            for j in 0..self.dim {
-                pre_activation += self.weights[i * self.dim + j] * state[j];
+            for (j, &s_j) in state.iter().enumerate().take(self.dim) {
+                pre_activation += self.weights[i * self.dim + j] * s_j;
             }
             let activation = 1.0 / (1.0 + (-pre_activation).exp());
 

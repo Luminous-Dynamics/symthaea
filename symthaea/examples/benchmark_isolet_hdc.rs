@@ -44,7 +44,7 @@ const N_CLASSES: usize = 26;
 
 /// Load ISOLET CSV data (features are comma-separated, last value is class label)
 fn load_isolet(path: &Path) -> (Vec<Vec<f32>>, Vec<usize>) {
-    let file = File::open(path).expect(&format!("Cannot open {:?}", path));
+    let file = File::open(path).unwrap_or_else(|_| panic!("Cannot open {:?}", path));
     let reader = BufReader::new(file);
 
     let mut features = Vec::new();
@@ -176,20 +176,20 @@ impl HdcContinuousClassifier {
             self.class_counts[label] += 1;
         }
 
-        for class in 0..self.n_classes {
+        for (class, accumulator) in accumulators.iter_mut().enumerate().take(self.n_classes) {
             if self.class_counts[class] > 0 {
-                let norm: f32 = accumulators[class]
+                let norm: f32 = accumulator
                     .iter()
                     .map(|x| x * x)
                     .sum::<f32>()
                     .sqrt();
                 if norm > 0.0 {
-                    for v in &mut accumulators[class] {
+                    for v in accumulator.iter_mut() {
                         *v /= norm;
                     }
                 }
                 self.class_prototypes[class] =
-                    Some(ContinuousHV::from_vec(accumulators[class].clone()));
+                    Some(ContinuousHV::from_vec(accumulator.clone()));
             }
         }
 
@@ -253,13 +253,11 @@ impl HdcContinuousClassifier {
         }
 
         // Normalize only once at the end of all iterations (preserves relative magnitudes)
-        for proto in &mut self.class_prototypes {
-            if let Some(ref mut p) = proto {
-                let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-                if norm > 0.0 {
-                    for v in &mut p.values {
-                        *v /= norm;
-                    }
+        for ref mut p in self.class_prototypes.iter_mut().flatten() {
+            let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 {
+                for v in &mut p.values {
+                    *v /= norm;
                 }
             }
         }

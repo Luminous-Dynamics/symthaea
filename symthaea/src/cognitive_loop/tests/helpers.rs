@@ -175,6 +175,7 @@ fn test_run_surprise_exploration_no_bridge() {
 }
 
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_run_surprise_exploration_with_bridge() {
     let mut config = CognitiveLoopConfig::default();
     config.enable_surprise_exploration = true;
@@ -246,7 +247,7 @@ fn test_compute_reward_signal_clamped() {
     // Extreme values should still clamp to [-1, 1]
     let reward = service.compute_reward_signal(10.0, 0.3);
     assert!(
-        reward >= -1.0 && reward <= 1.0,
+        (-1.0..=1.0).contains(&reward),
         "Reward not clamped: {reward}"
     );
 }
@@ -461,7 +462,8 @@ fn test_compute_temporal_primitives_no_analyzer() {
     assert!(cycle_nums.is_empty());
     assert!(codebook.is_empty());
     assert!(!replay);
-    assert!(timings.temporal_analyzer > 0 || true); // timing may be 0 on fast machines
+    // timing may be 0 on fast machines, so just verify it's non-negative (u128 is always >= 0)
+    let _ = timings.temporal_analyzer;
 }
 
 #[test]

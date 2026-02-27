@@ -39,7 +39,7 @@ const DATA_DIR: &str = "data/benchmarks/mnist";
 
 /// Parse IDX file format (MNIST binary format)
 fn read_idx_images(path: &Path) -> Vec<Vec<u8>> {
-    let mut file = File::open(path).expect(&format!("Cannot open {:?}", path));
+    let mut file = File::open(path).unwrap_or_else(|_| panic!("Cannot open {:?}", path));
     let mut buf = Vec::new();
     file.read_to_end(&mut buf).unwrap();
 
@@ -63,7 +63,7 @@ fn read_idx_images(path: &Path) -> Vec<Vec<u8>> {
 }
 
 fn read_idx_labels(path: &Path) -> Vec<u8> {
-    let mut file = File::open(path).expect(&format!("Cannot open {:?}", path));
+    let mut file = File::open(path).unwrap_or_else(|_| panic!("Cannot open {:?}", path));
     let mut buf = Vec::new();
     file.read_to_end(&mut buf).unwrap();
 
@@ -195,20 +195,20 @@ impl HdcMnistClassifier {
         }
 
         // Normalize accumulators to create class prototypes
-        for class in 0..10 {
+        for (class, accumulator) in accumulators.iter_mut().enumerate().take(10) {
             if self.class_counts[class] > 0 {
-                let norm: f32 = accumulators[class]
+                let norm: f32 = accumulator
                     .iter()
                     .map(|x| x * x)
                     .sum::<f32>()
                     .sqrt();
                 if norm > 0.0 {
-                    for v in &mut accumulators[class] {
+                    for v in accumulator.iter_mut() {
                         *v /= norm;
                     }
                 }
                 self.class_prototypes[class] =
-                    Some(ContinuousHV::from_vec(accumulators[class].clone()));
+                    Some(ContinuousHV::from_vec(accumulator.clone()));
             }
         }
 
@@ -283,13 +283,11 @@ impl HdcMnistClassifier {
         }
 
         // Normalize prototypes once at end (preserves relative magnitudes during training)
-        for proto in &mut self.class_prototypes {
-            if let Some(ref mut p) = proto {
-                let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-                if norm > 0.0 {
-                    for v in &mut p.values {
-                        *v /= norm;
-                    }
+        for ref mut p in self.class_prototypes.iter_mut().flatten() {
+            let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 {
+                for v in &mut p.values {
+                    *v /= norm;
                 }
             }
         }
@@ -398,8 +396,8 @@ impl HdcMnistClassifier {
         let n = images.len();
 
         let mut correct = 0;
-        let mut per_class_correct = vec![0usize; 10];
-        let mut per_class_total = vec![0usize; 10];
+        let mut per_class_correct = [0usize; 10];
+        let mut per_class_total = [0usize; 10];
         let mut confusion = vec![vec![0usize; 10]; 10];
 
         for (img, &label) in images.iter().zip(labels.iter()) {
@@ -574,20 +572,20 @@ impl EnhancedMnistClassifier {
             }
         }
 
-        for class in 0..10 {
+        for (class, accumulator) in accumulators.iter_mut().enumerate().take(10) {
             if self.class_counts[class] > 0 {
-                let norm: f32 = accumulators[class]
+                let norm: f32 = accumulator
                     .iter()
                     .map(|x| x * x)
                     .sum::<f32>()
                     .sqrt();
                 if norm > 0.0 {
-                    for v in &mut accumulators[class] {
+                    for v in accumulator.iter_mut() {
                         *v /= norm;
                     }
                 }
                 self.class_prototypes[class] =
-                    Some(ContinuousHV::from_vec(accumulators[class].clone()));
+                    Some(ContinuousHV::from_vec(accumulator.clone()));
             }
         }
 
@@ -653,13 +651,11 @@ impl EnhancedMnistClassifier {
         }
 
         // Normalize prototypes
-        for proto in &mut self.class_prototypes {
-            if let Some(ref mut p) = proto {
-                let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-                if norm > 0.0 {
-                    for v in &mut p.values {
-                        *v /= norm;
-                    }
+        for ref mut p in self.class_prototypes.iter_mut().flatten() {
+            let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 {
+                for v in &mut p.values {
+                    *v /= norm;
                 }
             }
         }
@@ -751,8 +747,8 @@ impl EnhancedMnistClassifier {
         let t = Instant::now();
         let n = images.len();
         let mut correct = 0;
-        let mut per_class_correct = vec![0usize; 10];
-        let mut per_class_total = vec![0usize; 10];
+        let mut per_class_correct = [0usize; 10];
+        let mut per_class_total = [0usize; 10];
         let mut confusion = vec![vec![0usize; 10]; 10];
 
         for (img, &label) in images.iter().zip(labels.iter()) {

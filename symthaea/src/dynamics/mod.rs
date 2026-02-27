@@ -430,8 +430,7 @@ mod tests {
             Box::new(DynamicsError::InvalidConfig("bad".into())),
             Box::new(DynamicsError::ComputationError("fail".into())),
             Box::new(DynamicsError::NotInitialized),
-            Box::new(DynamicsError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            Box::new(DynamicsError::Io(std::io::Error::other(
                 "test io error",
             ))),
         ];
@@ -444,6 +443,7 @@ mod tests {
     // ── DynamicsResult alias test ───────────────────────────────────
 
     #[test]
+    #[allow(clippy::unnecessary_literal_unwrap)]
     fn dynamics_result_ok() {
         let res: DynamicsResult<i32> = Ok(42);
         assert_eq!(res.unwrap(), 42);

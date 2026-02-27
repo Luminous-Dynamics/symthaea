@@ -300,7 +300,7 @@ impl CognitiveLoopService {
         let cross_modal_binder = if config.enable_cross_modal_binding {
             Some(
                 crate::consciousness::cross_modal_binding::CrossModalBinder::new(
-                    crate::consciousness::cross_modal_binding::BindingConfig::default(),
+                    crate::consciousness::cross_modal_binding::CrossModalBindingConfig::default(),
                 ),
             )
         } else {
@@ -329,7 +329,7 @@ impl CognitiveLoopService {
         let phenomenal_binding = if config.enable_phenomenal_binding {
             Some(
                 crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer::new(
-                    crate::consciousness::phenomenal_binding::BindingConfig::default(),
+                    crate::consciousness::phenomenal_binding::PhenomenalBindingConfig::default(),
                 ),
             )
         } else {

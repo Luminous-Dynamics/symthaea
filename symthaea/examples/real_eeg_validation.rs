@@ -31,7 +31,7 @@ fn main() {
             println!("  Samples/channel:   {}", data.len());
             println!(
                 "  Sample rate:       ~{:.1} Hz",
-                data.len() as f64 / header.duration_sec as f64
+                data.len() as f64 / header.duration_sec
             );
 
             // Normalize data to [0, 1]
@@ -86,8 +86,8 @@ fn test_on_eeg(data: &[f64], name: &str) {
     let mut ensemble = HybridEnsemblePredictor::new(42);
 
     // Training phase
-    for i in 0..sub_train {
-        ensemble.observe(subsampled[i]);
+    for sample in subsampled.iter().take(sub_train) {
+        ensemble.observe(*sample);
     }
 
     // Test phase

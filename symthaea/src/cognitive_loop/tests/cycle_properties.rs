@@ -99,7 +99,7 @@ fn test_learning_rate_bounded_after_cycles() {
         service.cycle(&format!("lr test {i}"));
         let lr = service.stats().adaptive_learning_rate;
         assert!(
-            lr >= 0.0 && lr <= 1.0,
+            (0.0..=1.0).contains(&lr),
             "Learning rate out of (0.0, 1.0] at cycle {i}: {lr}"
         );
         assert!(
@@ -919,7 +919,7 @@ fn test_attention_sensitivity_bounded_after_cycles() {
         service.cycle(&format!("attn sens {i}"));
         let sens = service.adaptive_behavior().attention_sensitivity;
         assert!(
-            sens >= 0.5 && sens <= 2.0,
+            (0.5..=2.0).contains(&sens),
             "Attention sensitivity out of [0.5, 2.0] at cycle {i}: {sens}"
         );
     }

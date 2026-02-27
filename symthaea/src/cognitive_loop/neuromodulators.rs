@@ -234,6 +234,7 @@ impl NeuromodulatorBath {
 
     /// Override transmitter levels for pharmacological ablation (virtual lesion).
     /// Pass `None` to leave a channel unchanged, `Some(v)` to clamp it.
+    #[allow(dead_code)]
     pub fn clamp_levels(
         &mut self,
         da: Option<f32>,

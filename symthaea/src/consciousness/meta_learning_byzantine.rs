@@ -515,8 +515,8 @@ impl MetaLearningByzantineDefense {
     }
 
     /// Get current adaptive thresholds
-    pub fn get_adaptive_thresholds(&self) -> AdaptiveThresholds {
-        AdaptiveThresholds {
+    pub fn get_adaptive_thresholds(&self) -> ByzantineAdaptiveThresholds {
+        ByzantineAdaptiveThresholds {
             phi_lower: self.phi_lower_threshold,
             phi_upper: self.phi_upper_threshold,
             name_min: self.name_min_length,
@@ -580,7 +580,7 @@ impl MetaLearningByzantineDefense {
 
 /// Current adaptive thresholds
 #[derive(Debug, Clone)]
-pub struct AdaptiveThresholds {
+pub struct ByzantineAdaptiveThresholds {
     pub phi_lower: f64,
     pub phi_upper: f64,
     pub name_min: usize,

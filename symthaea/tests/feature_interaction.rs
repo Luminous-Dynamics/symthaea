@@ -339,10 +339,12 @@ fn test_genesis_seeded_minimal_is_deterministic() {
 #[test]
 fn test_profile_dependency_warnings() {
     // Manually create a config with temporal_consciousness but without its dependencies
-    let mut config = CognitiveLoopConfig::default();
-    config.enable_temporal_consciousness = true;
-    config.enable_narrative_self = false;
-    config.enable_predictive_self = false;
+    let config = CognitiveLoopConfig {
+        enable_temporal_consciousness: true,
+        enable_narrative_self: false,
+        enable_predictive_self: false,
+        ..Default::default()
+    };
 
     let warnings = config.validate_dependencies();
     assert!(

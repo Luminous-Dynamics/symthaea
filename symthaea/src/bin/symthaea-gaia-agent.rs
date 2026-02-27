@@ -275,11 +275,10 @@ fn extract_expression(text: &str) -> Option<String> {
     let mut has_digit = false;
 
     let flush = |current: &mut String, has_op: &mut bool, has_digit: &mut bool, best: &mut Option<String>| {
-        if *has_op && *has_digit {
-            if best.as_ref().map(|s| s.len()).unwrap_or(0) < current.len() {
+        if *has_op && *has_digit
+            && best.as_ref().map(|s| s.len()).unwrap_or(0) < current.len() {
                 *best = Some(current.clone());
             }
-        }
         current.clear();
         *has_op = false;
         *has_digit = false;
@@ -944,13 +943,17 @@ async fn main() {
         tiers.push(format!("{:?}", PrimitiveTier::MetaCognitive));
     }
 
-    let mut thought = StructuredThought::default();
-    thought.semantic_intent = intent;
-    thought.response_type = ResponseType::Statement;
-    thought.epistemic_status = epistemic;
-    thought.relationship_stage = RelationshipStage::Contact;
-    thought.relation_mode = RelationMode::IIt;
-    thought.activated_concepts = cognitive_concepts;
+    let mut thought = {
+        #[allow(clippy::field_reassign_with_default)]
+        let mut t = StructuredThought::default();
+        t.semantic_intent = intent;
+        t.response_type = ResponseType::Statement;
+        t.epistemic_status = epistemic;
+        t.relationship_stage = RelationshipStage::Contact;
+        t.relation_mode = RelationMode::IIt;
+        t.activated_concepts = cognitive_concepts;
+        t
+    };
     if let Some(snapshot) = &cognitive_snapshot {
         let warmth = ((snapshot.unified_valence + 1.0) * 0.5).clamp(0.0, 1.0);
         thought.emotional_tone = EmotionalTone {

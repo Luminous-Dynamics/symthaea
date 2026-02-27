@@ -137,8 +137,8 @@ fn segmented_spearman(scenes: &[BenchScene], signals: &[NarrativeSignal]) -> f32
         }
         let mut cum = Vec::with_capacity(len);
         let mut c = 0.0f32;
-        for i in *start..*end {
-            c += scenes[i].expected_trend as f32;
+        for scene in scenes.iter().take(*end).skip(*start) {
+            c += scene.expected_trend as f32;
             cum.push(c);
         }
         let actual: Vec<f32> = signals[*start..*end].iter().map(|s| s.tension).collect();
@@ -260,9 +260,11 @@ fn compute_metrics(name: &str, scenes: &[BenchScene], signals: &[NarrativeSignal
 
     println!("\n  {} metrics:", name);
     println!(
-        "  {:<30} {}",
+        "  {:<30} {}/{} (scene: {})",
         "Peak tension step:",
-        format!("{}/{} (scene: {})", peak_idx + 1, n, scenes[peak_idx].title)
+        peak_idx + 1,
+        n,
+        scenes[peak_idx].title
     );
     println!("  {:<30} {:.4}", "Peak tension value:", peak_val.tension);
     println!(

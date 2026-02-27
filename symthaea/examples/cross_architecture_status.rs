@@ -36,7 +36,7 @@ fn main() {
             config
                 .model_id
                 .split('/')
-                .last()
+                .next_back()
                 .unwrap_or(&config.model_id),
             config.num_layers,
             corridor,

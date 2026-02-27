@@ -121,7 +121,7 @@ fn benchmark_core_operations() -> Vec<BenchResult> {
     // 5. BUNDLE (Majority Vote) - Multiple vectors
     println!("Benchmarking BUNDLE (3 vectors)...");
     let c = BinaryHV::random(44);
-    let vectors = vec![a.clone(), b.clone(), c.clone()];
+    let vectors = vec![a, b, c];
     let bundle_iterations = iterations / 10; // Fewer iterations for more expensive op
 
     let simd_bundle = benchmark_op(bundle_iterations, || black_box(BinaryHV::bundle(&vectors)));
@@ -250,11 +250,10 @@ fn benchmark_text_encoding() {
         let seed = sample_idx as u64;
         let mut result = BinaryHV::random(seed); // Start with random base
 
-        for pos in 0..chars_per_sample {
+        for (pos, pos_hv) in pos_memory.iter().enumerate().take(chars_per_sample) {
             let char_idx = ((seed + pos as u64) % 256) as usize;
             // Bind character with position (uses SIMD internally)
             let char_hv = &char_memory[char_idx];
-            let pos_hv = &pos_memory[pos];
             let bound = char_hv.bind(pos_hv);
             result = result.bind(&bound);
         }
@@ -314,7 +313,7 @@ fn benchmark_similarity_search() {
         println!("  Database size: {} vectors", n);
 
         // Create database
-        let database: Vec<BinaryHV> = (0..n as u64).map(|i| BinaryHV::random(i)).collect();
+        let database: Vec<BinaryHV> = (0..n as u64).map(BinaryHV::random).collect();
         let query = BinaryHV::random(999_999);
 
         // SIMD search

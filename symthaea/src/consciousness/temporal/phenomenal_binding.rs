@@ -73,7 +73,7 @@ use crate::hdc::binary_hv::BinaryHV;
 
 /// Configuration for phenomenal binding analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BindingConfig {
+pub struct PhenomenalBindingConfig {
     /// Binding window in milliseconds (typically 10-50ms)
     pub binding_window_ms: f64,
 
@@ -96,7 +96,7 @@ pub struct BindingConfig {
     pub detect_flow_states: bool,
 }
 
-impl Default for BindingConfig {
+impl Default for PhenomenalBindingConfig {
     fn default() -> Self {
         Self {
             binding_window_ms: 25.0,
@@ -261,7 +261,7 @@ pub struct FlowStateAnalysis {
 /// Core analyzer for phenomenal binding through temporal synchronization
 pub struct TemporalSynchronizationAnalyzer {
     /// Configuration
-    pub config: BindingConfig,
+    pub config: PhenomenalBindingConfig,
 
     /// Phase history for each dimension
     phase_history: HashMap<ConsciousnessDimension, VecDeque<f64>>,
@@ -299,7 +299,7 @@ pub struct BindingStats {
 
 impl TemporalSynchronizationAnalyzer {
     /// Create new analyzer
-    pub fn new(config: BindingConfig) -> Self {
+    pub fn new(config: PhenomenalBindingConfig) -> Self {
         let mut phase_history = HashMap::new();
         let mut value_history = HashMap::new();
         let mut timestamp_history = HashMap::new();
@@ -889,14 +889,14 @@ mod tests {
 
     #[test]
     fn test_analyzer_creation() {
-        let analyzer = TemporalSynchronizationAnalyzer::new(BindingConfig::default());
+        let analyzer = TemporalSynchronizationAnalyzer::new(PhenomenalBindingConfig::default());
         assert_eq!(analyzer.stats.observations, 0);
         assert!(analyzer.synchronization_index() >= 0.0);
     }
 
     #[test]
     fn test_single_dimension_observation() {
-        let mut analyzer = TemporalSynchronizationAnalyzer::new(BindingConfig::default());
+        let mut analyzer = TemporalSynchronizationAnalyzer::new(PhenomenalBindingConfig::default());
 
         analyzer.observe(ConsciousnessDimension::Integration, 0.8);
         assert_eq!(analyzer.stats.observations, 1);
@@ -904,7 +904,7 @@ mod tests {
 
     #[test]
     fn test_all_dimensions_observation() {
-        let mut analyzer = TemporalSynchronizationAnalyzer::new(BindingConfig::default());
+        let mut analyzer = TemporalSynchronizationAnalyzer::new(PhenomenalBindingConfig::default());
 
         let values = [0.8, 0.7, 0.9, 0.75, 0.6, 0.85, 0.7];
         analyzer.observe_all(&values);
@@ -914,7 +914,7 @@ mod tests {
 
     #[test]
     fn test_synchronization_with_identical_values() {
-        let mut analyzer = TemporalSynchronizationAnalyzer::new(BindingConfig::default());
+        let mut analyzer = TemporalSynchronizationAnalyzer::new(PhenomenalBindingConfig::default());
 
         // Observe same value for all dimensions multiple times
         for _ in 0..10 {
@@ -929,7 +929,7 @@ mod tests {
 
     #[test]
     fn test_binding_hierarchy() {
-        let mut analyzer = TemporalSynchronizationAnalyzer::new(BindingConfig::default());
+        let mut analyzer = TemporalSynchronizationAnalyzer::new(PhenomenalBindingConfig::default());
 
         // Observe multiple times
         for i in 0..15 {
@@ -950,7 +950,7 @@ mod tests {
 
     #[test]
     fn test_fragmentation_detection() {
-        let mut analyzer = TemporalSynchronizationAnalyzer::new(BindingConfig::default());
+        let mut analyzer = TemporalSynchronizationAnalyzer::new(PhenomenalBindingConfig::default());
 
         // Create desynchronized pattern
         for i in 0..10 {
@@ -981,7 +981,7 @@ mod tests {
 
     #[test]
     fn test_flow_state_high_binding() {
-        let mut analyzer = TemporalSynchronizationAnalyzer::new(BindingConfig::default());
+        let mut analyzer = TemporalSynchronizationAnalyzer::new(PhenomenalBindingConfig::default());
 
         // Observe consistently high, synchronized values
         for _ in 0..20 {
@@ -996,7 +996,7 @@ mod tests {
 
     #[test]
     fn test_pairwise_coherence() {
-        let mut analyzer = TemporalSynchronizationAnalyzer::new(BindingConfig::default());
+        let mut analyzer = TemporalSynchronizationAnalyzer::new(PhenomenalBindingConfig::default());
 
         for _ in 0..10 {
             let values = [0.7; 7];
@@ -1013,7 +1013,7 @@ mod tests {
 
     #[test]
     fn test_binding_report() {
-        let mut analyzer = TemporalSynchronizationAnalyzer::new(BindingConfig::default());
+        let mut analyzer = TemporalSynchronizationAnalyzer::new(PhenomenalBindingConfig::default());
 
         for _ in 0..15 {
             let values = [0.75; 7];
@@ -1031,7 +1031,7 @@ mod tests {
 
     #[test]
     fn test_all_coherences() {
-        let mut analyzer = TemporalSynchronizationAnalyzer::new(BindingConfig::default());
+        let mut analyzer = TemporalSynchronizationAnalyzer::new(PhenomenalBindingConfig::default());
 
         for _ in 0..10 {
             let values = [0.8; 7];
@@ -1058,7 +1058,7 @@ mod tests {
 
     #[test]
     fn test_statistics_update() {
-        let mut analyzer = TemporalSynchronizationAnalyzer::new(BindingConfig::default());
+        let mut analyzer = TemporalSynchronizationAnalyzer::new(PhenomenalBindingConfig::default());
 
         for _ in 0..20 {
             let values = [0.8; 7];

@@ -89,6 +89,7 @@ fn parse_grid(value: &serde_json::Value) -> Option<Vec<Vec<u8>>> {
         .collect()
 }
 
+#[allow(clippy::type_complexity)]
 struct ArcTask {
     train: Vec<(Vec<Vec<u8>>, Vec<Vec<u8>>)>,
     test: Vec<(Vec<Vec<u8>>, Vec<Vec<u8>>)>,

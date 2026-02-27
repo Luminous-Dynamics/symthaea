@@ -81,8 +81,7 @@ fn main() {
     }
 
     println!(
-        "\n  {} Palladium/Erbium fail in MINUTES under fusion conditions",
-        "\u{26A0}"
+        "\n  \u{26A0} Palladium/Erbium fail in MINUTES under fusion conditions"
     );
 
     // Search for self-healing alloys
@@ -220,8 +219,7 @@ fn main() {
 
     if let Some(liq) = liquid {
         println!(
-            "\n  {} {} - The Ultimate Self-Healer",
-            "\u{1F4A7}", liq.alloy.name
+            "\n  \u{1F4A7} {} - The Ultimate Self-Healer", liq.alloy.name
         );
         println!();
         println!(
@@ -256,8 +254,8 @@ fn main() {
         println!("  │                                                         │");
         println!("  │   ╔═══════════════════════════════════════════════╗     │");
         println!(
-            "  │   ║  OUTER SHELL: {}                   ║     │",
-            format!("{:<24}", best.alloy.name)
+            "  │   ║  OUTER SHELL: {:<24}                   ║     │",
+            best.alloy.name
         );
         println!("  │   ║  • H-storage + LCF trigger zone              ║     │");
         println!("  │   ║  • Self-healing via sluggish diffusion       ║     │");

@@ -312,7 +312,7 @@ fn test_cycle_output_valid_dimensions() {
     // Output should match CfC num_neurons
     assert_eq!(
         result.output.len(),
-        service.stats().total_cycles * 0 + 256, // Default num_neurons = 256
+        256, // Default num_neurons = 256
         "Output should match CfC num_neurons"
     );
 }
@@ -333,8 +333,8 @@ fn test_cycle_with_prefrontal_enabled() {
     // With default capacity=7 and 10 inputs, some items should have been graduated
     // Verify the service didn't panic and metadata is valid
     let result = service.cycle("one more cycle");
-    // prefrontal_veto is a valid boolean
-    assert!(result.metadata.prefrontal_veto || !result.metadata.prefrontal_veto);
+    // Verify prefrontal_veto is accessible without panicking
+    let _veto = result.metadata.prefrontal_veto;
 }
 
 #[test]
@@ -424,8 +424,8 @@ fn test_cycle_with_gwt() {
     }
 
     let result = service.cycle("gwt check");
-    // GWT broadcast is a valid boolean
-    assert!(result.metadata.gwt_broadcast || !result.metadata.gwt_broadcast);
+    // Verify gwt_broadcast is accessible without panicking
+    let _broadcast = result.metadata.gwt_broadcast;
 }
 
 #[test]
@@ -545,8 +545,8 @@ fn test_cycle_with_temporal_consciousness() {
     assert!(result.metadata.temporal_coherence_score >= 0.0);
     assert!(result.metadata.temporal_coherence_score <= 1.0);
     // After 15 cycles, should have enough data for analysis
-    // (discontinuity is a boolean - just verify it's valid)
-    assert!(result.metadata.temporal_discontinuity || !result.metadata.temporal_discontinuity);
+    // Verify temporal_discontinuity is accessible without panicking
+    let _discontinuity = result.metadata.temporal_discontinuity;
 }
 
 #[test]
@@ -585,8 +585,8 @@ fn test_cycle_with_narrative_gwt() {
     let result = service.cycle("governance check");
     // Self-phi should be finite
     assert!(result.metadata.narrative_gwt_self_psi.is_finite());
-    // Veto is a boolean - just verify valid
-    assert!(result.metadata.narrative_gwt_veto || !result.metadata.narrative_gwt_veto);
+    // Verify veto is accessible without panicking
+    let _veto = result.metadata.narrative_gwt_veto;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -607,6 +607,7 @@ fn test_resonator_memory_disabled_by_default() {
 }
 
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_resonator_memory_initializes_with_codebooks() {
     let mut config = CognitiveLoopConfig::default();
     config.enable_resonator_recall = true;
@@ -619,6 +620,7 @@ fn test_resonator_memory_initializes_with_codebooks() {
 }
 
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_resonator_memory_stores_episodes() {
     let mut config = CognitiveLoopConfig::default();
     config.enable_resonator_recall = true;
@@ -643,6 +645,7 @@ fn test_resonator_memory_stores_episodes() {
 }
 
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_resonator_codebook_grows_on_novel_patterns() {
     let mut config = CognitiveLoopConfig::default();
     config.enable_resonator_recall = true;
@@ -667,6 +670,7 @@ fn test_resonator_codebook_grows_on_novel_patterns() {
 }
 
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_resonator_recall_no_panic_on_cold_start() {
     let mut config = CognitiveLoopConfig::default();
     config.enable_resonator_recall = true;
@@ -681,6 +685,7 @@ fn test_resonator_recall_no_panic_on_cold_start() {
 }
 
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_resonator_metadata_reported_correctly() {
     let mut config = CognitiveLoopConfig::default();
     config.enable_resonator_recall = true;
@@ -697,6 +702,7 @@ fn test_resonator_metadata_reported_correctly() {
 }
 
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_resonator_configurable_parameters() {
     let mut config = CognitiveLoopConfig::default();
     config.enable_resonator_recall = true;

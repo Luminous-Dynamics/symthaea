@@ -1,8 +1,4 @@
 use symthaea::mind::{AsyncMind, MindConfig};
-use symthaea_core::hdc::{ContinuousHV, HdcDimensionality};
-use symthaea::chronobiology::{Biorhythm, CircadianPhase};
-use std::time::Duration;
-use tokio::time::sleep;
 
 #[tokio::main]
 async fn main() {

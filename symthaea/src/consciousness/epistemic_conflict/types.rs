@@ -552,10 +552,7 @@ mod tests {
             }
         }
         // All conflict kinds should produce a valid recommended action
-        assert!(
-            true,
-            "All ConflictKind variants produced valid EpistemicAction"
-        );
+        // (if we reached here without panic, all variants are valid)
     }
 
     #[test]

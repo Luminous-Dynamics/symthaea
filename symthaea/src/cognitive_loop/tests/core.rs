@@ -594,9 +594,8 @@ fn test_consciousness_snapshot_is_optimal() {
 
     // Fresh service with no cycles should not be optimal
     // (it hasn't had any experience yet)
-    let optimal = snapshot.is_optimal();
-    // Just verify the return is a real boolean (not a panic)
-    assert!(optimal || !optimal, "is_optimal should return a valid bool");
+    // Just verify the call completes without panicking
+    let _optimal = snapshot.is_optimal();
 }
 
 #[test]
@@ -605,12 +604,8 @@ fn test_consciousness_snapshot_needs_attention() {
 
     let snapshot = service.consciousness_snapshot();
 
-    // Verify needs_attention returns a valid boolean and phi is finite
-    let needs = snapshot.needs_attention();
-    assert!(
-        needs || !needs,
-        "needs_attention should return a valid bool"
-    );
+    // Verify needs_attention returns without panicking and phi is finite
+    let _needs = snapshot.needs_attention();
     assert!(
         snapshot.unified_psi.is_finite(),
         "Snapshot phi should be finite"
@@ -811,6 +806,7 @@ fn test_cfc_default_config_is_valid() {
 }
 
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_invalid_learning_rate_rejected() {
     // CfC learning_rate = 0.0 (out of range)
     let mut config = CognitiveLoopConfig::default();
@@ -874,6 +870,7 @@ fn test_invalid_dimension_rejected() {
 }
 
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_invalid_buffer_size_rejected() {
     let mut config = CognitiveLoopConfig::default();
     config.buffer_size = 0;
@@ -885,6 +882,7 @@ fn test_invalid_buffer_size_rejected() {
 }
 
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_invalid_target_frequency_rejected() {
     let mut config = CognitiveLoopConfig::default();
     config.target_frequency = 0.0;
@@ -907,6 +905,7 @@ fn test_invalid_target_frequency_rejected() {
 }
 
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_invalid_causal_discovery_interval_rejected() {
     let mut config = CognitiveLoopConfig::default();
     config.causal_discovery_interval = 0;
@@ -918,6 +917,7 @@ fn test_invalid_causal_discovery_interval_rejected() {
 }
 
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_invalid_resonator_params_rejected() {
     let mut config = CognitiveLoopConfig::default();
     config.resonator_novelty_threshold = 0.0;
@@ -941,6 +941,7 @@ fn test_invalid_resonator_params_rejected() {
 }
 
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_invalid_attestation_buffer_capacity_rejected() {
     let mut config = CognitiveLoopConfig::default();
     config.attestation_buffer_capacity = 0;

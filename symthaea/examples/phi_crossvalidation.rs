@@ -244,7 +244,7 @@ fn main() {
             let resonant_result = resonant_calc.compute(&topo.node_representations);
 
             real_phis.push(real_phi);
-            resonant_phis.push(resonant_result.phi as f64);
+            resonant_phis.push(resonant_result.phi);
         }
 
         let real_mean: f64 = real_phis.iter().sum::<f64>() / n_samples as f64;

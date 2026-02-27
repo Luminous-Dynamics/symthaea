@@ -1770,7 +1770,7 @@ mod tests {
         let mut analyzer = ConsciousnessTemporalAnalyzer::new(0.5);
 
         // Continuous consciousness (no gaps)
-        let intervals = vec![
+        let intervals = [
             (0.0, 1.0),
             (1.0, 2.0), // Meets previous
             (2.0, 3.0), // Meets previous
@@ -2193,7 +2193,7 @@ mod tests {
         let mut analyzer = ConsciousnessTemporalAnalyzer::new(0.5);
 
         // Create intervals with gaps
-        let intervals_data = vec![
+        let intervals_data = [
             (0.0, 1.0), // 1s duration
             (2.0, 3.0), // gap of 1s, then 1s duration
             (5.0, 6.0), // gap of 2s, then 1s duration

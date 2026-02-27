@@ -326,20 +326,20 @@ impl LearnedMnistClassifier {
             }
         }
 
-        for class in 0..10 {
+        for (class, accumulator) in accumulators.iter_mut().enumerate().take(10) {
             if self.class_counts[class] > 0 {
-                let norm: f32 = accumulators[class]
+                let norm: f32 = accumulator
                     .iter()
                     .map(|x| x * x)
                     .sum::<f32>()
                     .sqrt();
                 if norm > 0.0 {
-                    for v in &mut accumulators[class] {
+                    for v in accumulator.iter_mut() {
                         *v /= norm;
                     }
                 }
                 self.class_prototypes[class] =
-                    Some(ContinuousHV::from_vec(accumulators[class].clone()));
+                    Some(ContinuousHV::from_vec(accumulator.clone()));
             }
         }
 
@@ -405,13 +405,11 @@ impl LearnedMnistClassifier {
         }
 
         // Normalize prototypes
-        for proto in &mut self.class_prototypes {
-            if let Some(ref mut p) = proto {
-                let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-                if norm > 0.0 {
-                    for v in &mut p.values {
-                        *v /= norm;
-                    }
+        for ref mut p in self.class_prototypes.iter_mut().flatten() {
+            let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 {
+                for v in &mut p.values {
+                    *v /= norm;
                 }
             }
         }
@@ -437,8 +435,8 @@ impl LearnedMnistClassifier {
         let t = Instant::now();
         let n = images.len();
         let mut correct = 0;
-        let mut per_class_correct = vec![0usize; 10];
-        let mut per_class_total = vec![0usize; 10];
+        let mut per_class_correct = [0usize; 10];
+        let mut per_class_total = [0usize; 10];
         let mut confusion = vec![vec![0usize; 10]; 10];
 
         for (img, &label) in images.iter().zip(labels.iter()) {
@@ -637,20 +635,20 @@ impl PatchHdcMnistClassifier {
             }
         }
 
-        for class in 0..10 {
+        for (class, accumulator) in accumulators.iter_mut().enumerate().take(10) {
             if self.class_counts[class] > 0 {
-                let norm: f32 = accumulators[class]
+                let norm: f32 = accumulator
                     .iter()
                     .map(|x| x * x)
                     .sum::<f32>()
                     .sqrt();
                 if norm > 0.0 {
-                    for v in &mut accumulators[class] {
+                    for v in accumulator.iter_mut() {
                         *v /= norm;
                     }
                 }
                 self.class_prototypes[class] =
-                    Some(ContinuousHV::from_vec(accumulators[class].clone()));
+                    Some(ContinuousHV::from_vec(accumulator.clone()));
             }
         }
 
@@ -714,13 +712,11 @@ impl PatchHdcMnistClassifier {
             }
         }
 
-        for proto in &mut self.class_prototypes {
-            if let Some(ref mut p) = proto {
-                let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-                if norm > 0.0 {
-                    for v in &mut p.values {
-                        *v /= norm;
-                    }
+        for ref mut p in self.class_prototypes.iter_mut().flatten() {
+            let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 {
+                for v in &mut p.values {
+                    *v /= norm;
                 }
             }
         }
@@ -746,8 +742,8 @@ impl PatchHdcMnistClassifier {
         let t = Instant::now();
         let n = images.len();
         let mut correct = 0;
-        let mut per_class_correct = vec![0usize; 10];
-        let mut per_class_total = vec![0usize; 10];
+        let mut per_class_correct = [0usize; 10];
+        let mut per_class_total = [0usize; 10];
         let mut confusion = vec![vec![0usize; 10]; 10];
 
         for (img, &label) in images.iter().zip(labels.iter()) {

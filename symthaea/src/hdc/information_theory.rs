@@ -1058,11 +1058,11 @@ mod tests {
         let mut prev_x = 0.5_f64;
         for i in 0..300 {
             // X: pseudo-random walk
-            let seed = ((i as f64 * 2.718281828).sin() * 1000.0).abs();
+            let seed = ((i as f64 * std::f64::consts::E).sin() * 1000.0).abs();
             let x_val = (seed % 1.0).clamp(0.01, 0.99);
 
             // Y is driven by previous X (causal link) + small noise
-            let noise = ((i as f64 * 3.14159).cos() * 0.05).abs();
+            let noise = ((i as f64 * std::f64::consts::PI).cos() * 0.05).abs();
             let y_val = (prev_x * 0.8 + noise).clamp(0.01, 0.99);
 
             est.observe_scalars(x_val, y_val);

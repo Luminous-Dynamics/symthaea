@@ -3350,7 +3350,7 @@ fn test_thalamic_depth_score_populated() {
         let result = service.cycle(&format!("thalamic depth cycle {i}"));
         let score = result.metadata.thalamic_depth_score;
         assert!(
-            score >= 0.0 && score <= 1.0,
+            (0.0..=1.0).contains(&score),
             "thalamic_depth_score out of bounds: {score}"
         );
         // Track which scores we see (0.2, 0.5, or 1.0)
@@ -4403,7 +4403,7 @@ fn test_coherence_memoization_consistency() {
         "cached coherence must be finite"
     );
     assert!(
-        cached_coherence >= 0.0 && cached_coherence <= 1.0,
+        (0.0..=1.0).contains(&cached_coherence),
         "coherence out of bounds: {cached_coherence}"
     );
 
@@ -4653,7 +4653,7 @@ fn test_empathic_speech_rate_modulation() {
     // Speech rate should stay within bounds [0.6, 1.5]
     let speech_rate = service.speech_rate_multiplier();
     assert!(
-        speech_rate >= 0.6 && speech_rate <= 1.5,
+        (0.6..=1.5).contains(&speech_rate),
         "speech rate out of bounds: {speech_rate}"
     );
 }
@@ -4738,7 +4738,7 @@ fn test_urgency_adaptive_homeostasis() {
         let pull = result.metadata.homeostasis_pull_strength;
         assert!(pull.is_finite(), "homeostasis_pull_strength not finite");
         assert!(
-            pull >= 0.5 && pull <= 2.0,
+            (0.5..=2.0).contains(&pull),
             "homeostasis_pull_strength out of bounds: {pull}"
         );
         pull_strengths.push(pull);
@@ -4995,7 +4995,7 @@ fn test_attention_shift_motor_command() {
     // attention_sensitivity should stay within bounds [0.5, 2.0]
     let sensitivity = service.attention_sensitivity();
     assert!(
-        sensitivity >= 0.5 && sensitivity <= 2.0,
+        (0.5..=2.0).contains(&sensitivity),
         "attention sensitivity out of bounds: {sensitivity}"
     );
 }
@@ -5464,7 +5464,7 @@ fn test_codebook_diversity_memo_threshold() {
         let result = service.cycle("codebook diversity memo threshold test");
         let threshold = result.metadata.adaptive_memo_threshold;
         assert!(
-            threshold >= 0.88 && threshold <= 0.98,
+            (0.88..=0.98).contains(&threshold),
             "adaptive_memo_threshold out of range at cycle {i}: {threshold}"
         );
     }
@@ -5623,7 +5623,7 @@ fn test_serotonin_coherence_satisfaction() {
     // All values should be finite and in range
     for (i, &sht) in sht_values.iter().enumerate() {
         assert!(sht.is_finite(), "5-HT not finite at cycle {i}");
-        assert!(sht >= 0.0 && sht <= 2.0, "5-HT out of range at cycle {i}: {sht}");
+        assert!((0.0..=2.0).contains(&sht), "5-HT out of range at cycle {i}: {sht}");
     }
     // Average 5-HT should be positive (system achieves some coherence)
     let avg: f32 = sht_values.iter().sum::<f32>() / sht_values.len() as f32;

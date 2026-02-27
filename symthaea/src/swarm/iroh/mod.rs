@@ -507,8 +507,10 @@ mod tests {
 
     #[test]
     fn test_stub_mode() {
-        // Without the swarm feature, everything should be stubs
-        assert!(!cfg!(feature = "swarm") || true);
+        // Without the swarm feature, everything should be stubs.
+        // With the swarm feature, real implementations are used.
+        // Either way, the module compiles and this test passes.
+        let _is_stub = !cfg!(feature = "swarm");
     }
 
     #[test]

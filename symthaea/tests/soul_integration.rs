@@ -92,7 +92,7 @@ fn test_experience_integration_updates_stats() {
             value_alignment: 0.5,
             emotional_valence: 0.3,
             lessons: vec![format!("lesson_{i}")],
-            timestamp: i as u64,
+            timestamp: i,
         });
     }
     assert_eq!(
@@ -115,7 +115,7 @@ fn test_experience_integration_many() {
             value_alignment: (i as f32) / 50.0,
             emotional_valence: 0.0,
             lessons: vec![],
-            timestamp: i as u64,
+            timestamp: i,
         });
     }
     let stats = soul.stats();

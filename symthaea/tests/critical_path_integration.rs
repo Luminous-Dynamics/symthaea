@@ -325,7 +325,7 @@ fn test_all_primitive_feedback_loops_synergy() {
         // LR must stay in valid range
         let lr = service.stats().effective_learning_rate;
         assert!(
-            lr.is_finite() && lr >= 0.0 && lr <= 0.01,
+            lr.is_finite() && (0.0..=0.01).contains(&lr),
             "effective_learning_rate out of [0, 0.01] at cycle {i}: {lr}"
         );
     }

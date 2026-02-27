@@ -18,7 +18,7 @@ async fn main() {
     mind.update_thermodynamics(0.1).await;
     
     let start = std::time::Instant::now();
-    for i in 1..=5 {
+    for _i in 1..=5 {
         sleep(Duration::from_millis(150)).await;
         let state = mind.snapshot().await;
         println!("   Tick {}: Time elapsed: {:?}, Mood Temp: {:.2}", 
@@ -30,7 +30,7 @@ async fn main() {
     mind.update_thermodynamics(0.9).await;
     
     let start = std::time::Instant::now();
-    for i in 1..=5 {
+    for _i in 1..=5 {
         sleep(Duration::from_millis(500)).await;
         let state = mind.snapshot().await;
         println!("   Tick {}: Time elapsed: {:?}, Mood Temp: {:.2}", 

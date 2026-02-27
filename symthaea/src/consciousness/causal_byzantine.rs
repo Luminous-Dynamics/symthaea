@@ -63,7 +63,7 @@ pub struct CausalByzantineDefense {
     counterfactual_history: Vec<CounterfactualAnalysis>,
 
     /// Generated explanations
-    explanation_history: Vec<CausalExplanation>,
+    explanation_history: Vec<ByzantineCausalExplanation>,
 
     /// Intervention recommendations
     intervention_plans: Vec<InterventionPlan>,
@@ -194,7 +194,7 @@ pub struct ThresholdSnapshot {
 
 /// Human-readable causal explanation
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CausalExplanation {
+pub struct ByzantineCausalExplanation {
     /// What happened (detection, miss, false positive)
     pub event: String,
 
@@ -329,7 +329,7 @@ impl CausalByzantineDefense {
         &mut self,
         instance_id: &str,
         primitive: CandidatePrimitive,
-    ) -> Result<(ContributionOutcome, CausalExplanation)> {
+    ) -> Result<(ContributionOutcome, ByzantineCausalExplanation)> {
         // Extract features for causal analysis
         let features = AttackFeatures::from_primitive(&primitive);
 
@@ -362,7 +362,7 @@ impl CausalByzantineDefense {
         features: &AttackFeatures,
         thresholds: &ThresholdSnapshot,
         outcome: &ContributionOutcome,
-    ) -> Result<CausalExplanation> {
+    ) -> Result<ByzantineCausalExplanation> {
         let event = match outcome {
             ContributionOutcome::Malicious => "Attack detected",
             ContributionOutcome::Rejected => "Contribution rejected (low quality)",
@@ -502,7 +502,7 @@ impl CausalByzantineDefense {
             primary_cause.causal_strength
         };
 
-        let causal_explanation = CausalExplanation {
+        let causal_explanation = ByzantineCausalExplanation {
             event: event.to_string(),
             primary_cause,
             contributing_causes: factors.into_iter().skip(1).collect(),
@@ -828,7 +828,7 @@ impl CausalByzantineDefense {
     }
 
     /// Get all explanations
-    pub fn explanations(&self) -> &[CausalExplanation] {
+    pub fn explanations(&self) -> &[ByzantineCausalExplanation] {
         &self.explanation_history
     }
 

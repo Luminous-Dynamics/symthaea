@@ -310,8 +310,8 @@ fn dominant_frequency(network: &mut CfCNetwork, period: usize) -> f64 {
 
     network.reset();
     let mut signal: Vec<f64> = Vec::with_capacity(eval_steps);
-    for t in 0..eval_steps {
-        let output = network.forward(&eval_inputs[t], DT);
+    for eval_input in eval_inputs.iter().take(eval_steps) {
+        let output = network.forward(eval_input, DT);
         signal.push(output[0] as f64);
     }
 
@@ -347,8 +347,8 @@ fn analyze_stability(network: &mut CfCNetwork, period: usize) -> f64 {
 
     // Collect hidden state trajectory
     let mut states: Vec<Vec<f64>> = Vec::new();
-    for t in 0..eval_steps {
-        let _ = network.forward(&eval_inputs[t], DT);
+    for eval_input in eval_inputs.iter().take(eval_steps) {
+        let _ = network.forward(eval_input, DT);
         if let Ok(state) = network.read_state() {
             states.push(state.iter().map(|&x| x as f64).collect());
         }

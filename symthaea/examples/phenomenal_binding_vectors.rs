@@ -32,7 +32,7 @@ fn main() -> Result<()> {
     {
         println!("This example requires the 'neural-bridge' feature.");
         println!("Run with: cargo run --example phenomenal_binding_vectors --features neural-bridge --release");
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(feature = "neural-bridge")]

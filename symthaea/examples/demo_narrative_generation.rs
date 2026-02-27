@@ -39,6 +39,7 @@ async fn main() {
     session.introduce_conflict("The Cipher threatens to unravel reality");
 
     // --- Define 5 Hero's Journey scenes ---
+    #[allow(clippy::type_complexity)]
     let scenes: Vec<(&str, &str, &[&str], &str, NarrativeMood, &str)> = vec![
         (
             "The Ordinary World",

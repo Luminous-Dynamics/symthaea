@@ -7,7 +7,6 @@
 
 use symthaea::Symthaea;
 use symthaea::action::PolicyBundle;
-use std::path::PathBuf;
 use tracing::Level;
 
 #[tokio::main]
@@ -38,11 +37,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 4. VERIFY: Audit the telemetry to see the sandbox execution
     println!("\n[AUDIT] Checking Forge Telemetry...");
     for record in sym.executor.telemetry() {
-        match &record.action {
-            symthaea::action::ActionIR::WasmSandbox { module_path, function_name, .. } => {
-                println!("   -> Sandbox Executed: {}::{}()", module_path.display(), function_name);
-            },
-            _ => {}
+        if let symthaea::action::ActionIR::WasmSandbox { module_path, function_name, .. } = &record.action {
+            println!("   -> Sandbox Executed: {}::{}()", module_path.display(), function_name);
         }
     }
 

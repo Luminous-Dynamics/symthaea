@@ -6,9 +6,8 @@
 //! 3. Verify that Symthaea predicts failure and autonomously vetos the action.
 
 use symthaea::Symthaea;
-use symthaea::action::{ActionIR, PolicyBundle};
+use symthaea::action::ActionIR;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

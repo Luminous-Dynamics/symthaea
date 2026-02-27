@@ -6,6 +6,7 @@
 //! Sub-modules hold extracted cycle() helpers:
 //! - `cycle_extracted`: Phases 1–4 (methods on `&mut self`)
 //! - `parallel`: Phase 5 free functions for `rayon::join` branches
+#![allow(unexpected_cfgs)]
 
 mod cycle_extracted;
 mod cycle_phases;
@@ -726,7 +727,7 @@ impl CognitiveLoopService {
         if let Some(ref mut binding) = self.phenomenal_binding {
             *binding =
                 crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer::new(
-                    crate::consciousness::phenomenal_binding::BindingConfig::default(),
+                    crate::consciousness::phenomenal_binding::PhenomenalBindingConfig::default(),
                 );
         }
         if let Some(ref mut hfe) = self.hierarchical_free_energy {

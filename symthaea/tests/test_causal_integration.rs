@@ -31,7 +31,7 @@ fn test_causal_discovery_with_hdc_signals() {
     println!("  Confidence: {:.2}%", confidence * 100.0);
 
     // Confidence should be reasonable
-    assert!(confidence >= 0.0 && confidence <= 1.0);
+    assert!((0.0..=1.0).contains(&confidence));
 }
 
 #[test]
@@ -199,8 +199,8 @@ fn test_nixos_encoder_functions() {
     // Different values should encode differently
     assert_ne!(val1, val2);
     // Values should be in [0, 1]
-    assert!(val1 >= 0.0 && val1 <= 1.0);
-    assert!(val2 >= 0.0 && val2 <= 1.0);
+    assert!((0.0..=1.0).contains(&val1));
+    assert!((0.0..=1.0).contains(&val2));
 }
 
 // ============================================================================

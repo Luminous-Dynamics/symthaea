@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Setup Workspace Sandbox
     let workspace = PathBuf::from("/srv/luminous-dynamics");
-    let sandbox = SandboxRoot::at(workspace.clone())?;
+    let _sandbox = SandboxRoot::at(workspace.clone())?;
     
     let mut policy = PolicyBundle::restrictive();
     policy.capabilities.shell.allowed_programs.insert("cargo".into());

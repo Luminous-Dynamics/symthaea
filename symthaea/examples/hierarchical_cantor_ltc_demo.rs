@@ -80,11 +80,11 @@ fn main() {
         "Sensory Input",
     ];
 
-    for level in 0..=config.max_depth {
+    for (level, func) in functions.iter().enumerate().take(config.max_depth + 1) {
         let tau = config.tau_at_level(level);
         println!(
             "  │    {}    │  {:>8.2} │  {:<28} │",
-            level, tau, functions[level]
+            level, tau, func
         );
     }
     println!("  └─────────┴────────────┴──────────────────────────────┘\n");

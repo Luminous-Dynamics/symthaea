@@ -27,7 +27,7 @@ fn main() -> Result<()> {
     {
         println!("This example requires the 'neural-bridge' feature.");
         println!("Run with: cargo run --example h1_robustness --features neural-bridge --release");
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(feature = "neural-bridge")]

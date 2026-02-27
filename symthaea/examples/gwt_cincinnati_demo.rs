@@ -285,15 +285,14 @@ fn budding_attention_analysis() {
 
 fn main() {
     println!(
-        "{}",
-        r#"
+        "
 ╔══════════════════════════════════════════════════════════════════════╗
 ║      GLOBAL WORKSPACE + CINCINNATI-LTC INTEGRATION DEMO              ║
 ║                                                                      ║
 ║  Demonstrating how temporal pattern recognition integrates with      ║
 ║  the Global Workspace consciousness pipeline (Baars, 1988)           ║
 ╚══════════════════════════════════════════════════════════════════════╝
-"#
+"
     );
 
     // 1. Basic sequence analysis

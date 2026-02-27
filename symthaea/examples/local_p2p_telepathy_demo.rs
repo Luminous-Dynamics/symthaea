@@ -1,5 +1,5 @@
 use symthaea::mind::{AsyncMind, MindConfig};
-use symthaea::swarm::{SwarmMessage, SwarmConfig};
+use symthaea::swarm::SwarmMessage;
 use std::time::Duration;
 use tokio::time::sleep;
 

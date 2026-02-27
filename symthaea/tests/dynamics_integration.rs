@@ -469,7 +469,7 @@ fn activation_type_apply_known_values() {
     );
     let sig_neg = ActivationType::Sigmoid.apply(-100.0);
     assert!(
-        sig_neg >= 0.0 && sig_neg < 0.01,
+        (0.0..0.01).contains(&sig_neg),
         "Sigmoid(-100) should be ~0.0"
     );
 

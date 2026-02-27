@@ -120,8 +120,8 @@ fn bench_train_step_bptt(c: &mut Criterion) {
             |b, _| {
                 b.iter(|| {
                     let _ = black_box(net.train_step_bptt(
-                        black_box(&[input.clone()]),
-                        black_box(&[target.clone()]),
+                        black_box(std::slice::from_ref(&input)),
+                        black_box(std::slice::from_ref(&target)),
                         black_box(&[0.02]),
                         0.001,
                     ));
@@ -153,8 +153,8 @@ fn bench_train_step_bptt_optimized(c: &mut Criterion) {
             |b, _| {
                 b.iter(|| {
                     let _ = black_box(net.train_step_bptt_optimized(
-                        black_box(&[input.clone()]),
-                        black_box(&[target.clone()]),
+                        black_box(std::slice::from_ref(&input)),
+                        black_box(std::slice::from_ref(&target)),
                         black_box(&[0.02]),
                         0.001,
                     ));

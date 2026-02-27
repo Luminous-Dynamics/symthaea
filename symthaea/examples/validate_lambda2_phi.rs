@@ -314,6 +314,7 @@ fn make_ring(n: usize) -> Vec<Vec<f64>> {
     adj
 }
 
+#[allow(clippy::needless_range_loop)]
 fn make_star(n: usize) -> Vec<Vec<f64>> {
     let mut adj = vec![vec![0.0; n]; n];
     for i in 0..n {
@@ -326,6 +327,7 @@ fn make_star(n: usize) -> Vec<Vec<f64>> {
     adj
 }
 
+#[allow(clippy::needless_range_loop)]
 fn make_random(n: usize, density: f64, seed: u64) -> Vec<Vec<f64>> {
     let mut adj = vec![vec![0.0; n]; n];
     let mut rng = seed.wrapping_add(5555);
@@ -350,12 +352,12 @@ fn make_random(n: usize, density: f64, seed: u64) -> Vec<Vec<f64>> {
 
 fn make_complete(n: usize) -> Vec<Vec<f64>> {
     let mut adj = vec![vec![0.0; n]; n];
-    for i in 0..n {
-        for j in 0..n {
+    for (i, row) in adj.iter_mut().enumerate() {
+        for (j, cell) in row.iter_mut().enumerate() {
             if i == j {
-                adj[i][j] = 1.0;
+                *cell = 1.0;
             } else {
-                adj[i][j] = 0.5;
+                *cell = 0.5;
             }
         }
     }

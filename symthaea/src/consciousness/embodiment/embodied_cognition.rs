@@ -1423,6 +1423,7 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryH
 // ============================================================================
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
 

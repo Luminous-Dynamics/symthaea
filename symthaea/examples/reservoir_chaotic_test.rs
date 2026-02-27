@@ -61,8 +61,8 @@ fn test_logistic_map() {
 
     // Reset and warm up on training data
     esn.reset_state();
-    for i in 0..1500 {
-        esn.observe(data[i], None);
+    for sample in data.iter().take(1500) {
+        esn.observe(*sample, None);
     }
 
     // Test phase (last 500 samples)
@@ -135,8 +135,8 @@ fn test_henon_map() {
     esn.train(0.001);
 
     esn.reset_state();
-    for i in 0..1500 {
-        esn.observe(data[i], None);
+    for sample in data.iter().take(1500) {
+        esn.observe(*sample, None);
     }
 
     let mut correct = 0;
@@ -214,8 +214,8 @@ fn test_lorenz() {
     esn.train(0.0001);
 
     esn.reset_state();
-    for i in 0..train_size {
-        esn.observe(data[i], None);
+    for sample in data.iter().take(train_size) {
+        esn.observe(*sample, None);
     }
 
     let mut correct = 0;

@@ -143,7 +143,7 @@ fn demo_hdc_foundation() {
     let bin_a = BinaryHV::random(42);
     let bin_b = BinaryHV::random(43);
     let bin_bound = bin_a.bind(&bin_b);
-    let bin_bundle = BinaryHV::bundle(&[bin_a.clone(), bin_b.clone()]);
+    let bin_bundle = BinaryHV::bundle(&[bin_a, bin_b]);
 
     println!("  Binary HV properties (16,384 bits = 2KB per vector):");
     println!(

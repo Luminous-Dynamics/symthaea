@@ -383,10 +383,7 @@ fn train_cfc_supervised(
                 network.reset();
 
                 // BPTT through the sequence
-                match network.train_step_bptt(&rows, &targets, &dts, lr) {
-                    Ok(loss) => total_loss += loss,
-                    Err(_) => {}
-                }
+                if let Ok(loss) = network.train_step_bptt(&rows, &targets, &dts, lr) { total_loss += loss }
 
                 // Check classification on this sample
                 network.reset();
@@ -593,7 +590,7 @@ fn main() {
     let linear_start = Instant::now();
     for epoch in 0..total_epochs {
         // Learning rate schedule: start at 0.01, decay by 0.97 each epoch
-        let lr = 0.01 * 0.97f32.powi(epoch as i32);
+        let lr = 0.01 * 0.97f32.powi(epoch);
         let loss = linear.train_epoch(&train_cfc_features, train_cfc_labels, lr);
         // Print every 5th epoch
         if (epoch + 1) % 5 == 0 || epoch == 0 {
@@ -902,8 +899,8 @@ fn main() {
         .unwrap_or(0);
     if best_idx > 0 {
         println!("\n  Per-class accuracy (best CfC method):");
-        let mut per_class = vec![0usize; 10];
-        let mut per_class_total = vec![0usize; 10];
+        let mut per_class = [0usize; 10];
+        let mut per_class_total = [0usize; 10];
         for (img, &label) in test_images.iter().zip(test_labels.iter()) {
             let c = label as usize;
             per_class_total[c] += 1;

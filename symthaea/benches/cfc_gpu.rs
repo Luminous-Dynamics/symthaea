@@ -158,7 +158,7 @@ fn bench_forward_batch(c: &mut Criterion) {
         for &batch_size in &batch_sizes {
             let cpu_config = to_cpu_config(&gpu_config);
             let inputs: Vec<Vec<f32>> = (0..batch_size)
-                .map(|i| vec![(i as f32 * 0.01); gpu_config.input_dim])
+                .map(|i| vec![i as f32 * 0.01; gpu_config.input_dim])
                 .collect();
             let dts: Vec<f32> = vec![0.1; batch_size];
             let inputs_arr: Vec<Array1<f32>> =
@@ -214,10 +214,10 @@ fn bench_train_step(c: &mut Criterion) {
         // Training data
         let batch_size = 8;
         let inputs: Vec<Vec<f32>> = (0..batch_size)
-            .map(|i| vec![(i as f32 * 0.1); gpu_config.input_dim])
+            .map(|i| vec![i as f32 * 0.1; gpu_config.input_dim])
             .collect();
         let targets: Vec<Vec<f32>> = (0..batch_size)
-            .map(|i| vec![(i as f32 * 0.1); gpu_config.output_dim])
+            .map(|i| vec![i as f32 * 0.1; gpu_config.output_dim])
             .collect();
         let dts: Vec<f32> = vec![0.1; batch_size];
 

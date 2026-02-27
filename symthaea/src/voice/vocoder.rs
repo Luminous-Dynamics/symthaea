@@ -818,7 +818,6 @@ mod tests {
                 voicing: 1.0,
                 time: 0.0,
                 source_type: SourceType::Vowel,
-                ..Default::default()
             },
             FormantFrame {
                 f1: 500.0,
@@ -832,7 +831,6 @@ mod tests {
                 voicing: 1.0,
                 time: 0.1,
                 source_type: SourceType::Vowel,
-                ..Default::default()
             },
         ];
 
@@ -872,7 +870,6 @@ mod tests {
                 voicing: 1.0,
                 time: 0.0,
                 source_type: SourceType::Vowel,
-                ..Default::default()
             },
             FormantFrame {
                 f1: 730.0,
@@ -886,7 +883,6 @@ mod tests {
                 voicing: 1.0,
                 time: 0.1,
                 source_type: SourceType::Vowel,
-                ..Default::default()
             },
         ];
 
@@ -949,7 +945,6 @@ mod tests {
             voicing: 1.0,
             time: 0.0,
             source_type: SourceType::Vowel,
-            ..Default::default()
         };
 
         // Synthesize with aspiration
@@ -995,7 +990,6 @@ mod tests {
             voicing: 1.0,
             time: 0.0,
             source_type: SourceType::Vowel,
-            ..Default::default()
         };
 
         // No tilt
@@ -1043,7 +1037,6 @@ mod tests {
             voicing: 1.0,
             time: 0.0,
             source_type: SourceType::Vowel,
-            ..Default::default()
         };
 
         // No jitter
@@ -1089,7 +1082,6 @@ mod tests {
             voicing: 1.0,
             time: 0.0,
             source_type: SourceType::Vowel,
-            ..Default::default()
         };
 
         // No shimmer

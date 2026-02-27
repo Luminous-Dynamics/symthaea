@@ -64,8 +64,8 @@ fn topology_aware_nodes(arch: &DecodedArchitecture) -> Vec<ContinuousHV> {
         }
 
         // Normalize
-        for d in 0..dim {
-            accum[d] /= total_weight;
+        for val in accum.iter_mut().take(dim) {
+            *val /= total_weight;
         }
 
         blended.push(ContinuousHV::from_vec(accum));
@@ -100,7 +100,6 @@ fn compute_free_energy_reduction(arch: &DecodedArchitecture) -> f64 {
         state_dim: n_nodes,
         learning_rate: 0.1,
         precision_decay: 0.8,
-        ..Default::default()
     };
     let mut hfe = HierarchicalFreeEnergy::new(config);
 

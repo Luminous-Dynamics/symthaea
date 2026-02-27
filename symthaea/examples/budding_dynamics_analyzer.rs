@@ -237,7 +237,7 @@ impl SquareWave {
 
 impl PatternGenerator for SquareWave {
     fn next(&mut self) -> bool {
-        let bit = (self.step / self.half_period) % 2 == 0;
+        let bit = (self.step / self.half_period).is_multiple_of(2);
         self.step += 1;
         bit
     }
