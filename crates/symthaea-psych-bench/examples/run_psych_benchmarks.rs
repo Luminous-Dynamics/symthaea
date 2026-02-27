@@ -31,6 +31,8 @@
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --reasoning-validity
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --arc-report
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --arc-reliability
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --cross-domain
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --arc-latex
 
 use rayon::prelude::*;
 use std::path::PathBuf;
@@ -53,15 +55,20 @@ use symthaea_psych_bench::benchmarks::executive::{
     WisconsinCardSortingBenchmark,
 };
 use symthaea_psych_bench::benchmarks::inhibition::{GoNoGoBenchmark, StopSignalBenchmark};
-use symthaea_psych_bench::benchmarks::language::GardenPathBenchmark;
-use symthaea_psych_bench::benchmarks::motor::SrttBenchmark;
+use symthaea_psych_bench::benchmarks::language::{
+    GardenPathBenchmark, LexicalDecisionBenchmark, SemanticCoherenceBenchmark,
+    SemanticPrimingBenchmark,
+};
+use symthaea_psych_bench::benchmarks::motor::{BimanualBenchmark, FittsLawBenchmark, SrttBenchmark};
 use symthaea_psych_bench::benchmarks::reasoning::{
     ArcAbductiveBenchmark, ArcAlgebraBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
     ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark,
     ArcNoiseBenchmark, ArcRsaBenchmark, ArcScalingBenchmark, ArcStaircaseBenchmark,
 };
-use symthaea_psych_bench::benchmarks::social::RmeBenchmark;
-use symthaea_psych_bench::benchmarks::sustained_attention::SartBenchmark;
+use symthaea_psych_bench::benchmarks::social::{
+    RmeBenchmark, SocialNormBenchmark, UltimatumGameBenchmark,
+};
+use symthaea_psych_bench::benchmarks::sustained_attention::{CptBenchmark, PvtBenchmark, SartBenchmark};
 use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
     ProspectiveMemoryBenchmark, TestTimeLearningBenchmark,
@@ -140,6 +147,8 @@ fn main() {
     let reasoning_validity = args.iter().any(|a| a == "--reasoning-validity");
     let arc_report_mode = args.iter().any(|a| a == "--arc-report");
     let arc_reliability_mode = args.iter().any(|a| a == "--arc-reliability");
+    let cross_domain_mode = args.iter().any(|a| a == "--cross-domain");
+    let arc_latex_mode = args.iter().any(|a| a == "--arc-latex");
 
     let config = BenchmarkConfig {
         dimension: 512,
@@ -222,12 +231,21 @@ fn main() {
         Box::new(FeelingOfKnowingBenchmark),
         // Sustained Attention
         Box::new(SartBenchmark),
+        Box::new(PvtBenchmark),
+        Box::new(CptBenchmark),
         // Motor
         Box::new(SrttBenchmark),
+        Box::new(FittsLawBenchmark),
+        Box::new(BimanualBenchmark),
         // Language
         Box::new(GardenPathBenchmark),
+        Box::new(SemanticCoherenceBenchmark),
+        Box::new(LexicalDecisionBenchmark),
+        Box::new(SemanticPrimingBenchmark),
         // Social
         Box::new(RmeBenchmark),
+        Box::new(UltimatumGameBenchmark),
+        Box::new(SocialNormBenchmark),
     ];
 
     // Filter benchmarks by name if --filter was specified
@@ -1150,6 +1168,36 @@ fn main() {
         use symthaea_psych_bench::harness::analysis::{arc_split_half_reliability, format_arc_reliability};
         let results = arc_split_half_reliability(&report);
         println!("\n{}", format_arc_reliability(&results));
+    }
+
+    // ── Cross-domain prediction analysis ──
+    if cross_domain_mode {
+        use symthaea_psych_bench::harness::analysis::{cross_domain_prediction, format_cross_domain_prediction};
+        // Run 10-seed battery for stable estimates
+        let mut seed_reports = Vec::new();
+        for seed_offset in 0..10u64 {
+            let mut seed_config = config.clone();
+            seed_config.seed = config.seed + seed_offset;
+            let mut seed_report = BenchmarkReport::new();
+            for bench in &benchmarks {
+                seed_report.add(bench.run(&seed_config));
+            }
+            seed_reports.push(seed_report);
+        }
+        let target = "Reasoning::ArcFluid";
+        let predictors = &[
+            "WorM::NBack", "Executive::WCST", "Attention::VisualSearch", "Motor::SRTT",
+        ];
+        match cross_domain_prediction(&seed_reports, target, predictors) {
+            Some(result) => println!("\n{}", format_cross_domain_prediction(&result)),
+            None => eprintln!("Insufficient data for cross-domain prediction"),
+        }
+    }
+
+    // ── ARC publication-ready LaTeX ──
+    if arc_latex_mode {
+        use symthaea_psych_bench::harness::analysis::arc_paper_section_latex;
+        println!("\n{}", arc_paper_section_latex(&report));
     }
 
     if output_json {

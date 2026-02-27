@@ -50,6 +50,8 @@ pub struct BaselineCollection {
     pub llm_cogbench: BaselineMap,
     /// GPT-4 baselines from ToMBench (Kosinski, 2023).
     pub llm_tombench: BaselineMap,
+    /// LLM baselines on ARC-AGI (GPT-4, Claude 3.5, o3-high, human).
+    pub llm_arc: BaselineMap,
 }
 
 impl BaselineCollection {
@@ -76,6 +78,7 @@ impl BaselineCollection {
             neuromod: neuromod_baselines(),
             llm_cogbench: llm_cogbench_baselines(),
             llm_tombench: llm_tombench_baselines(),
+            llm_arc: llm_arc_baselines(),
         }
     }
 }
@@ -1846,6 +1849,80 @@ pub fn sustained_attention_baselines() -> BaselineMap {
             population: "human adults",
         },
     );
+    // PVT baselines (Dinges & Powell, 1985; Basner & Dinges, 2011)
+    m.insert(
+        "vigilance_decrement",
+        Baseline {
+            value: 0.05,
+            sd: Some(0.02),
+            source: "Dinges & Powell (1985), RT slope per block",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "pvt_mean_rt",
+        Baseline {
+            value: 5.0,
+            sd: Some(1.0),
+            source: "Basner & Dinges (2011), ~250ms mean RT → 5 ticks",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "lapse_rate",
+        Baseline {
+            value: 0.05,
+            sd: Some(0.03),
+            source: "Basner & Dinges (2011), fraction RT > 500ms",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "fastest_10pct",
+        Baseline {
+            value: 3.0,
+            sd: Some(0.5),
+            source: "Basner & Dinges (2011), fastest 10% RT → 3 ticks",
+            population: "human adults",
+        },
+    );
+    // CPT baselines (Rosvold et al., 1956; Riccio et al., 2002)
+    m.insert(
+        "cpt_d_prime",
+        Baseline {
+            value: 2.80,
+            sd: Some(0.60),
+            source: "Riccio et al. (2002), CPT signal detection sensitivity",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "cpt_hit_rate",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.08),
+            source: "Riccio et al. (2002), CPT target detection",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "cpt_false_alarm_rate",
+        Baseline {
+            value: 0.08,
+            sd: Some(0.05),
+            source: "Riccio et al. (2002), CPT false alarms",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "cpt_vigilance_decrement",
+        Baseline {
+            value: 0.03,
+            sd: Some(0.02),
+            source: "Riccio et al. (2002), d' decrease per block",
+            population: "human adults",
+        },
+    );
     m
 }
 
@@ -1894,6 +1971,71 @@ pub fn motor_baselines() -> BaselineMap {
             value: 6.0,
             sd: Some(1.2),
             source: "Nissen & Bullemer (1987), ~300ms random RT → 6 ticks",
+            population: "human adults",
+        },
+    );
+    // Fitts' Law baselines (Fitts, 1954; MacKenzie, 1992)
+    m.insert(
+        "fitts_r_squared",
+        Baseline {
+            value: 0.95,
+            sd: Some(0.03),
+            source: "Fitts (1954); MacKenzie (1992), R² of MT vs ID",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "throughput",
+        Baseline {
+            value: 4.0,
+            sd: Some(1.0),
+            source: "MacKenzie (1992), information throughput in bits/tick",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "fitts_accuracy",
+        Baseline {
+            value: 0.92,
+            sd: Some(0.05),
+            source: "Fitts (1954), overall targeting accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "id_slope",
+        Baseline {
+            value: 1.2,
+            sd: Some(0.3),
+            source: "MacKenzie (1992), MT slope per ID unit",
+            population: "human adults",
+        },
+    );
+    // Bimanual Coordination baselines (Kelso, 1984; Swinnen, 2002)
+    m.insert(
+        "coordination_cost",
+        Baseline {
+            value: 0.15,
+            sd: Some(0.06),
+            source: "Kelso (1984), accuracy drop for asymmetric coordination",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "symmetric_accuracy",
+        Baseline {
+            value: 0.92,
+            sd: Some(0.04),
+            source: "Swinnen (2002), symmetric bimanual accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "asymmetric_accuracy",
+        Baseline {
+            value: 0.77,
+            sd: Some(0.08),
+            source: "Swinnen (2002), asymmetric bimanual accuracy",
             population: "human adults",
         },
     );
@@ -1994,6 +2136,80 @@ pub fn language_baselines() -> BaselineMap {
             population: "human adults",
         },
     );
+    // Lexical Decision baselines (Meyer & Schvaneveldt, 1971; Balota & Chumbley, 1984)
+    m.insert(
+        "lexicality_effect",
+        Baseline {
+            value: 0.12,
+            sd: Some(0.05),
+            source: "Meyer & Schvaneveldt (1971), word vs non-word accuracy advantage",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "word_accuracy",
+        Baseline {
+            value: 0.92,
+            sd: Some(0.05),
+            source: "Balota & Chumbley (1984), word recognition accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "nonword_accuracy",
+        Baseline {
+            value: 0.80,
+            sd: Some(0.08),
+            source: "Balota & Chumbley (1984), non-word rejection accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "frequency_effect",
+        Baseline {
+            value: 0.08,
+            sd: Some(0.04),
+            source: "Balota & Chumbley (1984), high vs low frequency accuracy advantage",
+            population: "human adults",
+        },
+    );
+    // Semantic Priming baselines (Neely, 1977; McNamara, 2005)
+    m.insert(
+        "priming_effect",
+        Baseline {
+            value: 0.10,
+            sd: Some(0.04),
+            source: "Neely (1977), related vs unrelated accuracy boost",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "related_accuracy",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.06),
+            source: "McNamara (2005), related word recognition",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "unrelated_accuracy",
+        Baseline {
+            value: 0.80,
+            sd: Some(0.08),
+            source: "McNamara (2005), unrelated word recognition",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "soa_modulation",
+        Baseline {
+            value: 0.05,
+            sd: Some(0.03),
+            source: "Neely (1977), SOA priming difference (long - short)",
+            population: "human adults",
+        },
+    );
     m
 }
 
@@ -2033,6 +2249,71 @@ pub fn social_baselines() -> BaselineMap {
             value: 5.0,
             sd: Some(1.5),
             source: "Baron-Cohen et al. (2001), ~250ms per item → 5 ticks",
+            population: "human adults",
+        },
+    );
+    // Ultimatum Game baselines (Guth et al., 1982; Camerer, 2003)
+    m.insert(
+        "fairness_sensitivity",
+        Baseline {
+            value: 0.70,
+            sd: Some(0.15),
+            source: "Guth et al. (1982); Camerer (2003), rejection slope vs unfairness",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "rejection_rate",
+        Baseline {
+            value: 0.40,
+            sd: Some(0.12),
+            source: "Camerer (2003), overall rejection rate across offers",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "offer_threshold",
+        Baseline {
+            value: 0.30,
+            sd: Some(0.08),
+            source: "Camerer (2003), offer level at 50% acceptance",
+            population: "human adults",
+        },
+    );
+    // Social Norm Violation baselines (Bicchieri, 2006; Krueger et al., 2012)
+    m.insert(
+        "norm_d_prime",
+        Baseline {
+            value: 2.10,
+            sd: Some(0.50),
+            source: "Krueger et al. (2012), norm violation detection d'",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "norm_detection_accuracy",
+        Baseline {
+            value: 0.82,
+            sd: Some(0.08),
+            source: "Bicchieri (2006), norm violation detection accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "norm_false_alarm_rate",
+        Baseline {
+            value: 0.12,
+            sd: Some(0.06),
+            source: "Krueger et al. (2012), false alarm rate for norm-congruent",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "violation_rt_cost",
+        Baseline {
+            value: 0.15,
+            sd: Some(0.05),
+            source: "Krueger et al. (2012), RT increase for norm violations",
             population: "human adults",
         },
     );
@@ -2194,6 +2475,88 @@ pub fn neuromod_baselines() -> BaselineMap {
             sd: Some(5.0),
             source: "Doya (2002); Yu & Dayan (2005), ACh knockout impairs attention",
             population: "computational model",
+        },
+    );
+
+    // ── Live-Loop Pharmacological Ablation (Phase 2) ────────────────
+    m.insert(
+        "live_da_knockout_gradient_drop_pct",
+        Baseline {
+            value: 25.0,
+            sd: Some(12.0),
+            source: "Doya (2002), live-loop DA knockout reduces gradient scaling >25%",
+            population: "computational model (CognitiveLoopService)",
+        },
+    );
+    m.insert(
+        "live_ne_knockout_exploration_drop_pct",
+        Baseline {
+            value: 40.0,
+            sd: Some(15.0),
+            source: "Aston-Jones (2005), live-loop NE knockout suppresses NE effective level",
+            population: "computational model (CognitiveLoopService)",
+        },
+    );
+    m.insert(
+        "live_sht_knockout_confidence_drop_pct",
+        Baseline {
+            value: 40.0,
+            sd: Some(15.0),
+            source: "Dayan & Huys (2009), live-loop 5-HT knockout reduces 5-HT effective level",
+            population: "computational model (CognitiveLoopService)",
+        },
+    );
+    m.insert(
+        "live_ach_knockout_attention_drop_pct",
+        Baseline {
+            value: 35.0,
+            sd: Some(12.0),
+            source: "Yu & Dayan (2005), live-loop ACh knockout impairs ACh effective level",
+            population: "computational model (CognitiveLoopService)",
+        },
+    );
+
+    m
+}
+
+/// LLM baselines on ARC-AGI.
+pub fn llm_arc_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+
+    m.insert(
+        "gpt4_arc_accuracy",
+        Baseline {
+            value: 0.05,
+            sd: Some(0.02),
+            source: "Chollet (2024), ARC-AGI-Pub leaderboard, GPT-4",
+            population: "GPT-4",
+        },
+    );
+    m.insert(
+        "claude35_arc_accuracy",
+        Baseline {
+            value: 0.21,
+            sd: Some(0.04),
+            source: "Chollet (2024), ARC-AGI-Pub leaderboard, Claude 3.5 Sonnet",
+            population: "Claude 3.5",
+        },
+    );
+    m.insert(
+        "o3_high_arc_accuracy",
+        Baseline {
+            value: 0.875,
+            sd: Some(0.03),
+            source: "OpenAI (2024), o3-high ARC-AGI evaluation",
+            population: "o3-high",
+        },
+    );
+    m.insert(
+        "human_arc_accuracy",
+        Baseline {
+            value: 0.84,
+            sd: Some(0.08),
+            source: "Chollet (2019), human performance on ARC tasks",
+            population: "Human",
         },
     );
 
