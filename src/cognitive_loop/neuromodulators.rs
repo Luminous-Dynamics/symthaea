@@ -392,11 +392,67 @@ impl NeuromodulatorBath {
         ];
         self.cross_mod.hebbian_update(&phasics);
 
+        // ── ACh/NE UNCERTAINTY TYPE SEPARATION (Yu & Dayan 2005) ──────
+        // NE phasic burst → suppress ACh (genuine novelty doesn't need precision).
+        // High tonic ACh → suppress NE (expected uncertainty doesn't need startle).
+        if self.noradrenaline.phasic > 0.3 {
+            self.acetylcholine.level -= self.noradrenaline.phasic * 0.15;
+            self.acetylcholine.level = self.acetylcholine.level.max(0.0);
+        }
+        if self.acetylcholine.effective() > 0.6 {
+            self.noradrenaline.level -= (self.acetylcholine.effective() - 0.6) * 0.1;
+            self.noradrenaline.level = self.noradrenaline.level.max(0.0);
+        }
+
         // ── REUPTAKE (all channels) ──────────────────────────────────
         self.dopamine.reuptake();
         self.noradrenaline.reuptake();
         self.serotonin.reuptake();
         self.acetylcholine.reuptake();
+
+        // ── GABA: Tonic inhibition (Olsen & Sieghart 2009) ────────────
+        // Production: 5-HT promotes, low arousal promotes, surprise suppresses
+        let gaba_signal = self.serotonin.effective() * 0.06
+            + (1.0 - inputs.arousal) * 0.05
+            - if inputs.surprise { 0.1 } else { 0.0 };
+        self.gaba.produce(gaba_signal);
+        // GABA opposes glutamate (E/I balance)
+        if self.glutamate.effective() > 0.5 {
+            self.gaba.produce((self.glutamate.effective() - 0.5) * 0.05);
+        }
+        self.gaba.reuptake();
+
+        // ── OXYTOCIN: Social bonding (Kosfeld et al. 2005) ────────────
+        // Production: flow, calm states (high 5-HT + low NE), strong binding
+        let oxy_signal = if inputs.flow_active { 0.06 } else { 0.0 }
+            + if self.serotonin.effective() > 0.5 && self.noradrenaline.effective() < 0.5 {
+                0.03
+            } else {
+                0.0
+            }
+            + if inputs.binding_strength > 0.7 { 0.02 } else { 0.0 };
+        self.oxytocin.produce(oxy_signal);
+        // Oxytocin cross-mod: suppress NE (calming), potentiate 5-HT
+        if self.oxytocin.effective() > 0.5 {
+            let oxy_excess = self.oxytocin.effective() - 0.5;
+            self.noradrenaline.level = (self.noradrenaline.level - oxy_excess * 0.05).max(0.0);
+            self.serotonin.produce(oxy_excess * 0.03);
+        }
+        self.oxytocin.reuptake();
+
+        // ── GLUTAMATE: Learning cost (Olney 1969, Bhatt et al. 2009) ──
+        // Production driven by report_learning() externally; here we do reuptake
+        // and GABA opposition only.
+        if self.gaba.effective() > 0.5 {
+            self.glutamate.level = (self.glutamate.level - (self.gaba.effective() - 0.5) * 0.05).max(0.0);
+        }
+        self.glutamate.reuptake();
+        // Track sustained high glutamate for excitotoxicity
+        if self.glutamate.effective() > 0.6 {
+            self.glutamate_high_cycles = self.glutamate_high_cycles.saturating_add(1);
+        } else {
+            self.glutamate_high_cycles = self.glutamate_high_cycles.saturating_sub(1);
+        }
 
         // ── RECEPTOR SUBTYPE ADAPTATION ──────────────────────────────
         // Science: Frank (2005) — D1 sensitizes under low DA (phasic bursts have more impact),
