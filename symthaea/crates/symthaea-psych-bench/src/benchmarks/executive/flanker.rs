@@ -20,6 +20,7 @@
 //! - flanker_effect: 0.07 (congruent - incongruent accuracy)
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
@@ -36,6 +37,7 @@ enum Condition {
 
 impl FlankerBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
+        let diff_model = difficulty_model_for(self.name());
         let dim = config.dimension;
         let seed = config.trial_seed("executive", "flanker", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -60,7 +62,7 @@ impl FlankerBenchmark {
         // Decision temperature: controls stochasticity of response selection.
         // Time pressure: base 0.25 matches ~10% flanker interference (Eriksen & Eriksen, 1974);
         // +0.15/unit reflects boundary collapse under speed emphasis (Ratcliff & McKoon, 2008 DDM).
-        let temperature: f64 = 0.25 + config.time_pressure * 0.15;
+        let temperature: f64 = (0.25 + config.time_pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
 
         let trials_per_condition = 40;
         let mut congruent_correct = 0u32;

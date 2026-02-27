@@ -15,6 +15,7 @@
 //! - offer_threshold: 0.30 (SD~0.08) — offer level at 50% acceptance
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
@@ -32,6 +33,7 @@ struct TrialResult {
 
 impl UltimatumGameBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
+        let diff_model = difficulty_model_for(self.name());
         let dim = config.dimension;
         let seed = config.trial_seed("social", "ultimatum_game", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -47,7 +49,7 @@ impl UltimatumGameBenchmark {
         let unfair_proto = ContinuousHV::random(dim, seed.wrapping_add(2));
 
         // Time pressure lowers deliberation: more impulsive rejections
-        let noise_level: f32 = 0.15 + config.time_pressure as f32 * 0.20;
+        let noise_level: f32 = (0.15 + config.time_pressure as f32 * 0.20) * diff_model.interference_multiplier(config.difficulty) as f32;
         let threshold_shift: f32 = config.time_pressure as f32 * 0.10; // lower acceptance threshold
 
         // Social cognition: empathy reduces rejection of low offers

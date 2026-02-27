@@ -33,6 +33,8 @@ struct TrialResult {
     nonword_accuracy: f64,
     frequency_effect: f64,
     rt_ticks: f64,
+    /// Per-item trial trace (populated when config.trial_trace is true).
+    item_trace: Vec<TrialOutcome>,
 }
 
 impl LexicalDecisionBenchmark {
@@ -60,6 +62,8 @@ impl LexicalDecisionBenchmark {
         let noise_level: f32 = 0.20 + config.time_pressure as f32 * 0.15;
 
         let n_items = 40; // 20 word trials + 20 non-word trials
+        let mut item_trace = Vec::new();
+        let mut global_item_idx = 0usize;
         let mut word_correct = 0u32;
         let mut word_total = 0u32;
         let mut nonword_correct = 0u32;
@@ -122,7 +126,24 @@ impl LexicalDecisionBenchmark {
                 // RT: faster for high-frequency words
                 let base_rt = if is_high_freq { 7.0 } else { 9.0 };
                 let tp_speedup = config.time_pressure * 1.5;
-                rt_sum += (base_rt - tp_speedup).max(1.0);
+                let item_rt = (base_rt - tp_speedup).max(1.0);
+                rt_sum += item_rt;
+
+                // Per-item trial trace
+                if config.trial_trace {
+                    let cond = if is_high_freq { "word_high_freq" } else { "word_low_freq" };
+                    item_trace.push(TrialOutcome {
+                        trial_idx: global_item_idx,
+                        condition: cond.to_string(),
+                        correct: best_idx == word_idx,
+                        rt_ticks: item_rt,
+                        similarity: best_sim as f64,
+                        confidence: best_sim as f64,
+                        response_idx: best_idx,
+                        extra: BTreeMap::new(),
+                    });
+                    global_item_idx += 1;
+                }
             } else {
                 // Non-word: chimeric blend of two random words
                 xor_shift(&mut rng);
@@ -167,7 +188,24 @@ impl LexicalDecisionBenchmark {
                 // RT: non-words take longer (exhaustive search)
                 let base_rt = 10.0;
                 let tp_speedup = config.time_pressure * 1.5;
-                rt_sum += (base_rt - tp_speedup).max(1.0);
+                let item_rt = (base_rt - tp_speedup).max(1.0);
+                rt_sum += item_rt;
+
+                // Per-item trial trace
+                if config.trial_trace {
+                    let item_correct = best_sim < rejection_threshold;
+                    item_trace.push(TrialOutcome {
+                        trial_idx: global_item_idx,
+                        condition: "nonword".to_string(),
+                        correct: item_correct,
+                        rt_ticks: item_rt,
+                        similarity: best_sim as f64,
+                        confidence: best_sim as f64,
+                        response_idx: 0,
+                        extra: BTreeMap::new(),
+                    });
+                    global_item_idx += 1;
+                }
             }
         }
 
@@ -198,6 +236,7 @@ impl LexicalDecisionBenchmark {
             nonword_accuracy: nonword_acc,
             frequency_effect: (high_freq_acc - low_freq_acc).max(0.0),
             rt_ticks: rt_sum / n_items as f64,
+            item_trace,
         }
     }
 }
@@ -237,21 +276,7 @@ impl PsychBenchmark for LexicalDecisionBenchmark {
             rts.push(r.rt_ticks);
 
             if config.trial_trace {
-                trace.push(TrialOutcome {
-                    trial_idx: trial,
-                    condition: "lexical_decision".to_string(),
-                    correct: r.word_accuracy > 0.5,
-                    rt_ticks: r.rt_ticks,
-                    similarity: r.word_accuracy,
-                    confidence: r.word_accuracy,
-                    response_idx: 0,
-                    extra: {
-                        let mut m = BTreeMap::new();
-                        m.insert("lexicality_effect".to_string(), r.lexicality_effect);
-                        m.insert("frequency_effect".to_string(), r.frequency_effect);
-                        m
-                    },
-                });
+                trace.extend(r.item_trace);
             }
         }
 

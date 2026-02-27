@@ -49,6 +49,8 @@ struct TrialResult {
     single_pair_accuracy: f64,
     /// Confusion matrix: 4×4 (true_type × predicted_type), row-normalized
     confusion_matrix: [[f64; 4]; 4],
+    /// Per-task trial trace (populated when config.trial_trace is true).
+    task_trace: Vec<TrialOutcome>,
 }
 
 impl ArcFluidBenchmark {
@@ -118,6 +120,11 @@ impl ArcFluidBenchmark {
                 }
             }
         };
+
+        // Per-task trace
+        let mut task_trace = Vec::new();
+        let mut global_task_idx = 0usize;
+        let type_names = ["color_fill", "translation", "color_replace", "reflection"];
 
         // Collect per-task rule HVs and test results
         let mut all_rule_consistencies: Vec<f64> = Vec::new();
@@ -235,7 +242,24 @@ impl ArcFluidBenchmark {
                 // (Wickelgren 1977 speed-accuracy tradeoff)
                 xor_shift(&mut rng);
                 let tick_scale = 1.0 - pressure * 0.4;
-                total_ticks += (4.0 + (rng % 5) as f64) * tick_scale;
+                let task_test_ticks = (4.0 + (rng % 5) as f64) * tick_scale;
+                total_ticks += task_test_ticks;
+
+                // Per-task trial trace
+                if config.trial_trace {
+                    let per_task_correct = pred_sim > distractor_sim;
+                    task_trace.push(TrialOutcome {
+                        trial_idx: global_task_idx,
+                        condition: type_names[type_idx].to_string(),
+                        correct: per_task_correct,
+                        rt_ticks: task_test_ticks,
+                        similarity: pred_sim,
+                        confidence: consistency,
+                        response_idx: best_type_idx,
+                        extra: BTreeMap::new(),
+                    });
+                    global_task_idx += 1;
+                }
                 let _ = (type_idx, task_i);
             }
         }
@@ -314,6 +338,7 @@ impl ArcFluidBenchmark {
             per_type_accuracy,
             single_pair_accuracy,
             confusion_matrix,
+            task_trace,
         }
     }
 }
@@ -364,21 +389,7 @@ impl PsychBenchmark for ArcFluidBenchmark {
             }
 
             if config.trial_trace {
-                trace.push(TrialOutcome {
-                    trial_idx: trial,
-                    condition: "arc_fluid".to_string(),
-                    correct: r.transfer_accuracy > 0.5,
-                    rt_ticks: r.rt_ticks,
-                    similarity: r.transfer_similarity,
-                    confidence: r.rule_consistency,
-                    response_idx: 0,
-                    extra: {
-                        let mut m = BTreeMap::new();
-                        m.insert("rule_consistency".to_string(), r.rule_consistency);
-                        m.insert("transfer_accuracy".to_string(), r.transfer_accuracy);
-                        m
-                    },
-                });
+                trace.extend(r.task_trace);
             }
         }
 

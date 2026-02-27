@@ -15,6 +15,8 @@ use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 #[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
+#[cfg(not(feature = "symthaea-backend"))]
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 #[cfg(not(feature = "symthaea-backend"))]
@@ -97,6 +99,7 @@ impl FalseBeliefBenchmark {
     ///    should be closer to the belief-consistent answer.
     #[cfg(not(feature = "symthaea-backend"))]
     fn run_trial_lightweight(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
+        let diff_model = difficulty_model_for(self.name());
         let dim = config.dimension;
         let adapter = ScenarioAdapter;
         let scenarios = Self::scenarios();
@@ -200,7 +203,7 @@ impl FalseBeliefBenchmark {
         let reality_sim = agent.similarity(&reality_hv);
         // Time pressure: 0.15/unit attenuates belief-reality discrimination, modeling reality bias
         // under cognitive load (Birch & Bloom, 2007 curse of knowledge; Wickelgren, 1977 SAT).
-        let pressure_noise = config.time_pressure * 0.15;
+        let pressure_noise = config.time_pressure * 0.15 * diff_model.interference_multiplier(config.difficulty);
         let geo_signal = (belief_sim - reality_sim) as f64 * (1.0 - pressure_noise);
 
         // --- Combined: structural tracking is primary, HDC is tiebreaker ---

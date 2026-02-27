@@ -2,13 +2,16 @@
 
 pub mod analysis;
 pub mod baselines;
+pub mod cognitive_profile;
 pub mod config;
 pub mod difficulty;
 pub mod html;
 pub mod live_runner;
+pub mod neuromod_correlation;
 pub mod neuromod_profiles;
 pub mod report;
 pub mod snapshot;
+pub mod staircase;
 pub mod transfer;
 pub mod trial_analysis;
 
@@ -25,7 +28,10 @@ pub use trial_analysis::{
     CalibrationResult, ErrorBurst, SpeedAccuracyResult, StrategyShift,
     TrialAnalysis, TrialBlockRow, TrialOutcome,
 };
+pub use cognitive_profile::CognitiveProfile;
 pub use difficulty::{DifficultyModel, DifficultyModelType, difficulty_model_for};
+pub use neuromod_correlation::NeuromodCorrelationMatrix;
+pub use staircase::{StaircaseConfig, StaircaseResult, StaircaseRule, run_staircase};
 
 /// Provenance metadata for a psychological benchmark — citation, paradigm, year.
 #[derive(Debug, Clone)]

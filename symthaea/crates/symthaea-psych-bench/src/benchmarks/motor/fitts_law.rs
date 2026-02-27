@@ -30,6 +30,8 @@ struct TrialResult {
     accuracy: f64,
     id_slope: f64,
     rt_ticks: f64,
+    /// Per-movement trial trace (populated when config.trial_trace is true).
+    movement_trace: Vec<TrialOutcome>,
 }
 
 impl FittsLawBenchmark {
@@ -53,6 +55,8 @@ impl FittsLawBenchmark {
         // 5 difficulty levels: ID = 1.0, 2.0, 3.0, 4.0, 5.0
         let ids = [1.0f64, 2.0, 3.0, 4.0, 5.0];
         let trials_per_id = 10;
+        let mut movement_trace = Vec::new();
+        let mut global_movement_idx = 0usize;
 
         let mut mt_means = [0.0f64; 5]; // mean movement time per ID
         let mut id_correct = [0u32; 5];
@@ -97,6 +101,21 @@ impl FittsLawBenchmark {
                 let mt = (base_mt + slope * id + mt_noise - tp_speedup).max(1.0);
                 mt_sum += mt;
                 total_rt += mt;
+
+                // Per-movement trial trace
+                if config.trial_trace {
+                    movement_trace.push(TrialOutcome {
+                        trial_idx: global_movement_idx,
+                        condition: format!("id_{:.1}", id),
+                        correct: hit,
+                        rt_ticks: mt,
+                        similarity: sim as f64,
+                        confidence: if hit { 1.0 } else { 0.0 },
+                        response_idx: 0,
+                        extra: BTreeMap::new(),
+                    });
+                    global_movement_idx += 1;
+                }
             }
 
             mt_means[id_idx] = mt_sum / trials_per_id as f64;
@@ -167,6 +186,7 @@ impl FittsLawBenchmark {
             accuracy,
             id_slope: slope,
             rt_ticks: mean_mt,
+            movement_trace,
         }
     }
 }
@@ -206,21 +226,7 @@ impl PsychBenchmark for FittsLawBenchmark {
             rts.push(r.rt_ticks);
 
             if config.trial_trace {
-                trace.push(TrialOutcome {
-                    trial_idx: trial,
-                    condition: "fitts".to_string(),
-                    correct: r.accuracy > 0.5,
-                    rt_ticks: r.rt_ticks,
-                    similarity: r.fitts_r_squared,
-                    confidence: r.accuracy,
-                    response_idx: 0,
-                    extra: {
-                        let mut m = BTreeMap::new();
-                        m.insert("r_squared".to_string(), r.fitts_r_squared);
-                        m.insert("throughput".to_string(), r.throughput);
-                        m
-                    },
-                });
+                trace.extend(r.movement_trace);
             }
         }
 
