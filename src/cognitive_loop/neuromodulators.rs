@@ -115,6 +115,29 @@ impl Transmitter {
         }
         self.receptor_sensitivity = self.receptor_sensitivity.clamp(0.5, 2.0);
     }
+
+    /// Boost reuptake rate by factor (clamped 0.01–0.5).
+    /// Science: Turrigiano (2008) — homeostatic plasticity adjusts clearance.
+    pub fn boost_reuptake(&mut self, factor: f32) {
+        self.reuptake_rate = (self.reuptake_rate * factor).clamp(0.01, 0.5);
+    }
+
+    /// Reset reuptake rate to default (0.1).
+    pub fn reset_reuptake(&mut self) {
+        self.reuptake_rate = 0.1;
+    }
+
+    /// Adjust tonic baseline by delta within custom bounds.
+    /// Science: Schultz (2016) — sustained prediction errors shift DA tonic level.
+    pub fn adjust_baseline(&mut self, delta: f32, lo: f32, hi: f32) {
+        self.baseline = (self.baseline + delta).clamp(lo, hi);
+    }
+
+    /// Read-only access to reuptake rate for testing.
+    #[cfg(test)]
+    pub fn reuptake_rate_for_test(&self) -> f32 {
+        self.reuptake_rate
+    }
 }
 
 /// Learnable cross-modulation matrix (4×4 Hebbian weights).
@@ -230,7 +253,7 @@ pub(crate) struct NeuromodulatorInputs {
 /// Science: Doya (2002) — "Metalearning and neuromodulation"
 /// DA = reward prediction error, NE = unexpected uncertainty,
 /// 5-HT = punishment/aversion, ACh = expected uncertainty.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NeuromodulatorBath {
     /// Dopamine: reward prediction error → learning rate & motivation
     pub dopamine: Transmitter,
@@ -240,12 +263,62 @@ pub(crate) struct NeuromodulatorBath {
     pub serotonin: Transmitter,
     /// Acetylcholine: attention & precision → focus & signal filtering
     pub acetylcholine: Transmitter,
+    /// GABA: tonic inhibition → global quiescence & braking.
+    /// Science: Olsen & Sieghart (2009) — GABAergic inhibition scales neural gain.
+    pub gaba: Transmitter,
+    /// Oxytocin: social bonding & trust → coherence amplification.
+    /// Science: Kosfeld et al. (2005) — oxytocin increases trust and cooperation.
+    pub oxytocin: Transmitter,
+    /// Glutamate: excitatory learning signal → metabolic cost of plasticity.
+    /// Science: Olney (1969) — excitotoxicity; Bhatt et al. (2009) — E/I balance.
+    pub glutamate: Transmitter,
+    /// Cycles of sustained high glutamate (>0.6) for excitotoxicity tracking.
+    pub glutamate_high_cycles: u32,
     /// Learnable cross-modulation weights (Hebbian-adaptive, replaces hardcoded rules).
     pub cross_mod: CrossModulationMatrix,
     /// DA receptor subtypes: D1 (excitatory/Go) vs D2 (inhibitory/NoGo).
     pub da_subtypes: ReceptorSubtypes,
     /// NE receptor subtypes: Alpha (tonic precision) vs Beta (phasic reactivity).
     pub ne_subtypes: ReceptorSubtypes,
+}
+
+impl Default for NeuromodulatorBath {
+    fn default() -> Self {
+        Self {
+            dopamine: Transmitter::default(),
+            noradrenaline: Transmitter::default(),
+            serotonin: Transmitter::default(),
+            acetylcholine: Transmitter::default(),
+            gaba: Transmitter {
+                level: 0.4,
+                receptor_sensitivity: 1.0,
+                reuptake_rate: 0.08,
+                baseline: 0.4,
+                phasic: 0.0,
+                phasic_decay: 0.2,
+            },
+            oxytocin: Transmitter {
+                level: 0.3,
+                receptor_sensitivity: 1.0,
+                reuptake_rate: 0.06,
+                baseline: 0.3,
+                phasic: 0.0,
+                phasic_decay: 0.15,
+            },
+            glutamate: Transmitter {
+                level: 0.3,
+                receptor_sensitivity: 1.0,
+                reuptake_rate: 0.08,
+                baseline: 0.3,
+                phasic: 0.0,
+                phasic_decay: 0.25,
+            },
+            glutamate_high_cycles: 0,
+            cross_mod: CrossModulationMatrix::default(),
+            da_subtypes: ReceptorSubtypes::default(),
+            ne_subtypes: ReceptorSubtypes::default(),
+        }
+    }
 }
 
 impl NeuromodulatorBath {
