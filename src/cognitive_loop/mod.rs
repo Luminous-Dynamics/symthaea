@@ -133,6 +133,9 @@ mod cycle_subsystems;
 mod helpers;
 mod moral;
 mod prediction;
+pub(crate) mod consciousness_engine;
+pub(crate) mod ethics_engine;
+pub(crate) mod feedback_state;
 pub(crate) mod neuromodulators;
 pub(crate) mod virtual_body;
 
@@ -335,6 +338,10 @@ pub struct CognitiveLoopService {
 
     /// FEP-driven learning rate boost (applied during CfC training step)
     fep_lr_boost: f32,
+
+    /// Decoupled feedback state: attributed proposals for prediction_confidence
+    /// and fep_lr_boost (Phase 2.2 Great Refactor).
+    feedback_state: feedback_state::FeedbackState,
 
     /// Conversation coherence tracker for degradation detection
     coherence_tracker: ConversationCoherenceTracker,
@@ -862,6 +869,9 @@ pub struct CognitiveLoopService {
     /// Unifies 44+ scattered modulation sites under a coherent biological model.
     /// Science: Doya (2002) — "Metalearning and neuromodulation"
     neuromodulator_bath: neuromodulators::NeuromodulatorBath,
+
+    /// Personality drift tracker — monitors receptor sensitivity stability.
+    personality_drift_tracker: neuromodulators::PersonalityDriftTracker,
 
     /// Somatic error bridge: converts infrastructure failures into felt stress.
     /// Lock poisoning, task panics, DB errors → arousal, thermodynamic load, tau slowdown.

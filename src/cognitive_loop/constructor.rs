@@ -693,6 +693,7 @@ impl CognitiveLoopService {
             ),
             fep_learning_signal: 0.0,
             fep_lr_boost: 1.0,
+            feedback_state: super::feedback_state::FeedbackState::new(),
             coherence_tracker: ConversationCoherenceTracker::new(0.3),
             stability_regime: StabilityRegimeProcessor::new(),
             discovery_service: PrimitiveDiscoveryService::new(DiscoveryServiceConfig::default()),
@@ -932,6 +933,7 @@ impl CognitiveLoopService {
             thermodynamic_load: 0.0,
             mood_temperature: 1.0,
             neuromodulator_bath: super::neuromodulators::NeuromodulatorBath::default(),
+            personality_drift_tracker: super::neuromodulators::PersonalityDriftTracker::default(),
             somatic_bridge: somatic_bridge_instance,
             pain_tx: Some(pain_sender),
         })
