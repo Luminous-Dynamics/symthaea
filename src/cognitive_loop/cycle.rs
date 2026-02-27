@@ -409,8 +409,9 @@ impl CognitiveLoopService {
         self.carryover.history.last_compressed_state = Some(compressed_state.clone());
 
         // ═══════════════════════════════════════════════════════════════════════
-        // UNIFIED ETHICS ENGINE — additive telemetry (runs alongside inline moral code)
-        // Pipeline: moral parse → value gate → harmonies → unified verdict
+        // UNIFIED ETHICS ENGINE — authoritative for value evaluator + harmonies
+        // Stage 1 (moral parse) already ran via evaluate_moral_alignment() above.
+        // Stages 2+3 (value eval + harmonies) fire at co-prime intervals here.
         // ═══════════════════════════════════════════════════════════════════════
         let ethics_output = self.ethics_engine.evaluate(
             &super::ethics_engine::EthicsEngineInput {
@@ -421,6 +422,19 @@ impl CognitiveLoopService {
             },
         );
         module_timings.ethics_engine = ethics_output.total_us;
+        // Apply engine feedback deltas
+        if ethics_output.confidence_delta != 0.0 {
+            self.adjust_confidence("ethics_engine", ethics_output.confidence_delta);
+        }
+        if ethics_output.lr_factor != 1.0 {
+            self.scale_lr("ethics_engine", ethics_output.lr_factor);
+        }
+        // Write value score to quality cache (read by compute_value_evaluator_phase)
+        self.carryover.quality.last_value_score = ethics_output.value_score;
+        // Track value gate application
+        if ethics_output.value_gate_factor < 1.0 || ethics_output.value_gate_factor > 1.0 {
+            self.stats.value_gate_applied_count += 1;
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1.2 Adaptive Learning Threshold + Urgency
@@ -3165,94 +3179,15 @@ impl CognitiveLoopService {
         module_timings.homeostasis = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
-        // SPECTRAL MIP — O(n³) Fiedler-ordered MIP search (Layer 2)
-        let _t = Instant::now();
-        // Replaces SynergisticIntegration: 128 dims (vs 64), better MIP via
-        // Fiedler ordering + bordered Cholesky. Computed every 47 cycles (co-prime).
-        // sigma derived from spectral_mip_phi for backward compatibility.
+        // UNIFIED CONSCIOUSNESS ENGINE — authoritative measurement
+        // Wraps SpectralMIP + MultiModal + EqV2 + Pipeline into single measure() call.
+        // All sigma/LR/confidence feedback computed inside the engine.
         // ═══════════════════════════════════════════════════════════════════════
-        self.spectral_mip_finder.push(&encoding_result.hdv);
         // Move hdv out now — only peak_attention (Copy) and detected_primitives are needed later.
         // Avoids a 64KB ContinuousHV clone for soul experience integration below.
         let encoding_hdv = encoding_result.hdv;
-        let spectral_mip_phi = if self.stats.total_cycles % 97 == 0 {
-            let result = self.spectral_mip_finder.compute();
-            let phi = result.as_ref().map(|r| r.phi);
-            if phi.is_some() {
-                self.carryover.consciousness.last_spectral_mip_phi = phi;
-                self.carryover.consciousness.last_sigma = phi; // backward compat for memory coordinator
-            }
-            // Adaptive dimension selection: every 194 cycles (every 2nd compute at 97-cycle cadence),
-            // concentrate tracked dimensions near the MIP boundary for better
-            // partition quality. Fiedler ordering identifies informative dims.
-            if self.stats.total_cycles % 194 == 0 {
-                if let Some(ref r) = result {
-                    self.spectral_mip_finder.adapt(r);
-                }
-                // Hierarchical spectral MIP: multi-scale (32→64→128) Phi.
-                // Coarser scales focus finer scales on MIP boundary region.
-                // Runs every 94 cycles (~1.9s at 50Hz) for deeper integration analysis.
-                if let Some(hier) = self.spectral_mip_finder.compute_hierarchical() {
-                    self.carryover.consciousness.last_hierarchical_mip_phi = Some(hier.phi);
-                }
-            }
-            phi
-        } else {
-            self.carryover.consciousness.last_spectral_mip_phi
-        };
-        let sigma = self.carryover.consciousness.last_sigma;
-        module_timings.spectral_mip = _t.elapsed().as_micros() as u64;
-
-        // ── W1.7: Σ (sigma) → learning rate + confidence modulation ──────
-        // Science: Tononi (2008) — high integration (Φ) indicates coherent processing;
-        // high Σ → stabilize learning (reduce LR boost), increase prediction confidence
-        if let Some(sig) = sigma {
-            if sig > 0.5 {
-                // High integration → consolidate (stabilize LR)
-                let sig_dampen = ((sig - 0.5) * 0.1).min(0.05) as f32;
-                self.scale_lr("sigma_high", 1.0 - sig_dampen);
-                self.adjust_confidence("sigma_high", sig_dampen * 0.5);
-            } else if sig < 0.2 {
-                // Low integration → boost learning (model needs updating)
-                let sig_boost = ((0.2 - sig) * 0.15).min(0.05) as f32;
-                self.scale_lr("sigma_low", 1.0 + sig_boost);
-            }
-        }
-
-        // ── Phase 16: Adaptive Phi weighting from validation ───────────────
-        // Science: Casali et al. (2013) — validated Phi measures are more reliable.
-        // Use cached phi_validation_correlation to scale sigma's influence on learning.
-        // High validation correlation → sigma is trustworthy → amplify its effect.
-        // Low correlation → sigma is noisy → attenuate its effect.
         let phi_spectral_weight = self.carryover.quality.phi_spectral_weight;
-        let phi_validation_cached = self.carryover.quality.phi_validation_correlation;
-        if let Some(sig) = sigma {
-            if phi_validation_cached > 0.7 {
-                // Validated: amplify sigma's confidence contribution
-                let validation_boost = (phi_validation_cached - 0.7) as f32 * 0.1;
-                self.adjust_confidence("phi_validated", sig as f32 * validation_boost);
-            } else if phi_validation_cached > 0.0 && phi_validation_cached < 0.3 {
-                // Poorly validated: reduce sigma's influence (already applied above)
-                let attenuate = (0.3 - phi_validation_cached) as f32 * 0.05;
-                self.scale_confidence("phi_unvalidated", 1.0 - attenuate);
-            }
-        }
-        // Also weight equation_v2 when it deviates from spectral MIP
-        if let (Some(sig), eq_v2) = (sigma, equation_v2_consciousness) {
-            let deviation = (sig - eq_v2).abs();
-            if deviation > 0.2 && phi_spectral_weight < 0.6 {
-                // Spectral weight reduced (validation says eq_v2 is more reliable)
-                // → trust eq_v2 for confidence modulation
-                let eq_v2_boost = (eq_v2 * (1.0 - phi_spectral_weight as f64) * 0.03) as f32;
-                self.adjust_confidence("eq_v2_deviation", eq_v2_boost);
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // UNIFIED CONSCIOUSNESS ENGINE — additive telemetry (runs alongside inline code)
-        // Wraps SpectralMIP + MultiModal + EqV2 + Pipeline into single measure() call
-        // ═══════════════════════════════════════════════════════════════════════
-        let _consciousness_output = self.consciousness_engine.measure(
+        let consciousness_output = self.consciousness_engine.measure(
             &super::consciousness_engine::ConsciousnessEngineInput {
                 hdv: &encoding_hdv,
                 hv16: &hv16_cached,
@@ -3266,10 +3201,40 @@ impl CognitiveLoopService {
                 phi_spectral_weight: phi_spectral_weight as f64,
             },
         );
-        // NOTE: Not calling update_cache() yet — the existing inline code already
-        // writes to carryover.consciousness. The engine output is for telemetry only
-        // during this additive wiring phase.
-        module_timings.consciousness_engine = _consciousness_output.total_us;
+        // Update carryover from engine cache (backward compat for memory coordinator etc.)
+        self.consciousness_engine
+            .update_cache(&mut self.carryover.consciousness);
+        // Apply engine feedback deltas
+        if consciousness_output.confidence_delta != 0.0 {
+            self.adjust_confidence("consciousness_engine", consciousness_output.confidence_delta);
+        }
+        if consciousness_output.lr_factor != 1.0 {
+            self.scale_lr("consciousness_engine", consciousness_output.lr_factor);
+        }
+        if consciousness_output.exploration_delta != 0.0 {
+            self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
+                + consciousness_output.exploration_delta)
+                .clamp(0.0, 1.0);
+        }
+        if consciousness_output.subsystem_lr_factor != 1.0 {
+            self.carryover.learning.subsystem_lr_factor *= consciousness_output.subsystem_lr_factor;
+            self.carryover.learning.subsystem_lr_factor =
+                self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
+        }
+        // Episodic consolidation boost from high consciousness moments
+        // Science: Dehaene (2014) — conscious access correlates with memory formation
+        if let Some(consolidation_boost) = consciousness_output.episodic_consolidation_boost {
+            if let Some(ref mut replay) = self.phi_episodic_replay {
+                replay.boost_recent_consolidation(consolidation_boost);
+            }
+        }
+        let spectral_mip_phi = consciousness_output.spectral_mip_phi;
+        let sigma = consciousness_output.sigma;
+        // Write pipeline consciousness to quality metrics (read by cycle_subsystems.rs)
+        self.carryover.quality.last_pipeline_consciousness =
+            consciousness_output.pipeline_consciousness;
+        module_timings.spectral_mip = consciousness_output.spectral_mip_us;
+        module_timings.consciousness_engine = consciousness_output.total_us;
 
         // Soul experience integration: feed cycle outcome back into value learning.
         let _t = Instant::now();
@@ -3571,7 +3536,7 @@ impl CognitiveLoopService {
             unified_quality_score,
             dissipative_health_gated,
             dissipative_lr_factor,
-            phi_validation_cached,
+            phi_validation_cached: self.carryover.quality.phi_validation_correlation,
             phi_spectral_weight,
             coherence_velocity,
             coherence_velocity_gated,

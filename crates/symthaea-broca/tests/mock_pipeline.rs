@@ -76,7 +76,7 @@ fn test_distillation_modifies_weights() {
     let changed = initial_weights
         .iter()
         .zip(final_weights.iter())
-        .filter(|(a, b)| (a - b).abs() > 1e-10)
+        .filter(|(a, b)| (*a - *b).abs() > 1e-10)
         .count();
 
     assert!(

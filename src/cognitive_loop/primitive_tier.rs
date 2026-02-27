@@ -11,7 +11,6 @@ use crate::consciousness::affective_consciousness::{
 use crate::consciousness::causal_explanation::CausalExplainer;
 use crate::consciousness::code_primitives::CodePrimitiveRouter;
 use crate::consciousness::compositionality::{CompositionalityConfig, CompositionalityEngine};
-use crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2;
 use crate::consciousness::consciousness_holography::{
     HolographicConfig, HolographicConsciousnessAnalyzer,
 };
@@ -23,12 +22,9 @@ use crate::consciousness::epistemic_conflict::{ConflictDetector, TheoryCalibrato
 use crate::consciousness::evolution_bridge::EvolutionCoordinator;
 use crate::consciousness::gis_integration::EpistemicDecisionGate;
 use crate::consciousness::harmonics::{HarmonicField, HarmonicResolver};
-use crate::consciousness::harmonies_integration::{
-    HarmoniesIntegrationConfig, HarmoniesIntegrator,
-};
+// HarmoniesIntegrator removed — now solely owned by EthicsEngine
 use crate::consciousness::hierarchical_ltc::HierarchicalLTC;
 use crate::consciousness::meta_reasoning::MetaCognitiveReasoner;
-use crate::consciousness::multi_modal_integration::{IntegrationConfig, MultiModalIntegrator};
 use crate::consciousness::multi_objective_evolution::MultiObjectiveEvolution;
 use crate::consciousness::phi_validation::PhiValidationFramework;
 use crate::consciousness::primitive_composition_rules::CompositionRuleEngine;
@@ -38,10 +34,7 @@ use crate::consciousness::primitive_reasoning::{PrimitiveReasoner, ReasonerConfi
 use crate::consciousness::semantic_value_embedder::{EmbedderConfig, SemanticValueEmbedder};
 use crate::consciousness::synthetic_states::SyntheticStatesNSMGrounding;
 use crate::consciousness::temporal_primitives::ConsciousnessTemporalAnalyzer;
-use crate::consciousness::unified_consciousness_pipeline::{
-    PipelineConfig, UnifiedConsciousnessPipeline,
-};
-use crate::consciousness::unified_value_evaluator::UnifiedValueEvaluator;
+// UnifiedValueEvaluator removed — now solely owned by EthicsEngine
 use crate::consciousness::value_feedback_loop::ValueFeedbackLoop;
 
 use super::CognitiveLoopConfig;
@@ -63,8 +56,7 @@ pub(crate) struct PrimitiveTierManager {
     /// Compositionality engine: algebraic composition of primitives.
     pub compositionality_engine: Option<CompositionalityEngine>,
 
-    /// Unified value evaluator: Seven Harmonies alignment scoring.
-    pub value_evaluator: Option<UnifiedValueEvaluator>,
+    // NOTE: UnifiedValueEvaluator removed — now solely owned by EthicsEngine.
 
     /// Harmonic field: tracks strength of each of the Seven Fiduciary Harmonics.
     pub harmonic_field: Option<HarmonicField>,
@@ -90,8 +82,7 @@ pub(crate) struct PrimitiveTierManager {
     /// Evolution coordinator: co-evolves primitives and architecture via Thompson sampling.
     pub evolution_coordinator: Option<EvolutionCoordinator>,
 
-    /// Harmonies integrator: per-action ethical alignment gate.
-    pub harmonies_integrator: Option<HarmoniesIntegrator>,
+    // NOTE: HarmoniesIntegrator removed — now solely owned by EthicsEngine.
 
     /// Semantic value embedder: value-aligned embeddings grounded in primitive tiers.
     pub semantic_value_embedder: Option<SemanticValueEmbedder>,
@@ -105,8 +96,7 @@ pub(crate) struct PrimitiveTierManager {
     /// Theory calibrator for reliability weighting.
     pub theory_calibrator: Option<TheoryCalibrator>,
 
-    /// Master Consciousness Equation v2: unified 7-theory formula.
-    pub consciousness_equation_v2: Option<ConsciousnessEquationV2>,
+    // NOTE: ConsciousnessEquationV2 removed — now solely owned by ConsciousnessEngine.
 
     /// Hierarchical LTC: local circuits + global integrator.
     pub hierarchical_ltc: Option<HierarchicalLTC>,
@@ -120,11 +110,8 @@ pub(crate) struct PrimitiveTierManager {
     /// Affective consciousness analyzer: valence-arousal-dominance tracking.
     pub affective_consciousness: Option<AffectiveConsciousnessAnalyzer>,
 
-    /// Unified consciousness pipeline: end-to-end sensory->consciousness.
-    pub unified_consciousness_pipeline: Option<UnifiedConsciousnessPipeline>,
-
-    /// Multi-modal integration: phi-guided cross-modal binding.
-    pub multi_modal_integrator: Option<MultiModalIntegrator>,
+    // NOTE: UnifiedConsciousnessPipeline removed — now solely owned by ConsciousnessEngine.
+    // NOTE: MultiModalIntegrator removed — now solely owned by ConsciousnessEngine.
 
     /// Primitive composition rules: domain-specific HDC binding operators.
     pub composition_rule_engine: Option<CompositionRuleEngine>,
@@ -178,10 +165,10 @@ impl PrimitiveTierManager {
             (None, None)
         };
 
-        // Compositionality + value evaluator + harmonics + reasoning + validation
+        // Compositionality + harmonics + reasoning + validation
+        // NOTE: UnifiedValueEvaluator removed — now solely owned by EthicsEngine
         let (
             compositionality_engine,
-            value_evaluator,
             harmonic_field,
             harmonic_resolver,
             primitive_reasoner,
@@ -194,7 +181,6 @@ impl PrimitiveTierManager {
                 );
                 CompositionalityEngine::new(ps, CompositionalityConfig::default())
             };
-            let val_eval = UnifiedValueEvaluator::new();
             let hf = HarmonicField::new();
             let hr = HarmonicResolver::new();
             let pr = PrimitiveReasoner::new(ReasonerConfig::default());
@@ -202,7 +188,6 @@ impl PrimitiveTierManager {
             let pv = PhiValidationFramework::new();
             (
                 Some(comp_engine),
-                Some(val_eval),
                 Some(hf),
                 Some(hr),
                 Some(pr),
@@ -210,7 +195,7 @@ impl PrimitiveTierManager {
                 Some(pv),
             )
         } else {
-            (None, None, None, None, None, None, None)
+            (None, None, None, None, None, None)
         };
 
         // Causal self-explainer
@@ -227,15 +212,7 @@ impl PrimitiveTierManager {
             None
         };
 
-        // Harmonies integrator
-        let harmonies_integrator = if has_primitive {
-            Some(HarmoniesIntegrator::new(HarmoniesIntegrationConfig {
-                dimension: cfc_input_dim,
-                ..Default::default()
-            }))
-        } else {
-            None
-        };
+        // NOTE: HarmoniesIntegrator removed — now solely owned by EthicsEngine
 
         // Context-aware optimizer
         let context_optimizer = if has_primitive {
@@ -264,41 +241,37 @@ impl PrimitiveTierManager {
             None
         };
 
-        // Dissipative + epistemic conflict + equation v2 + hierarchical LTC
+        // Dissipative + epistemic conflict + hierarchical LTC
+        // NOTE: ConsciousnessEquationV2 removed — now solely owned by ConsciousnessEngine
         let (
             dissipative_consciousness,
             epistemic_conflict_detector,
             theory_calibrator,
-            consciousness_equation_v2,
             hierarchical_ltc,
         ) = if has_primitive {
             let dc = DissipativeConsciousness::new();
             let cd = ConflictDetector::new();
             let tc = TheoryCalibrator::new();
-            let eq = ConsciousnessEquationV2::new();
             let hltc = HierarchicalLTC::minimal_network().ok();
-            (Some(dc), Some(cd), Some(tc), Some(eq), hltc)
+            (Some(dc), Some(cd), Some(tc), hltc)
         } else {
-            (None, None, None, None, None)
+            (None, None, None, None)
         };
 
-        // Holographic + differentiable + affective + pipeline + multi-modal
+        // Holographic + differentiable + affective
+        // NOTE: UnifiedConsciousnessPipeline + MultiModalIntegrator removed —
+        //       now solely owned by ConsciousnessEngine
         let (
             holographic_analyzer,
             differentiable_consciousness,
             affective_consciousness,
-            unified_consciousness_pipeline,
-            multi_modal_integrator,
         ) = if has_primitive {
             let ha = HolographicConsciousnessAnalyzer::new(HolographicConfig::default());
             let dc = DifferentiableConsciousness::new();
             let ac = AffectiveConsciousnessAnalyzer::new(AffectiveConfig::default());
-            let ucp =
-                UnifiedConsciousnessPipeline::new(PipelineConfig::default()).ok();
-            let mmi = MultiModalIntegrator::new(IntegrationConfig::default());
-            (Some(ha), Some(dc), Some(ac), ucp, Some(mmi))
+            (Some(ha), Some(dc), Some(ac))
         } else {
-            (None, None, None, None, None)
+            (None, None, None)
         };
 
         // Synthetic states + epistemic gate
@@ -367,7 +340,6 @@ impl PrimitiveTierManager {
             temporal_analyzer,
             primitive_lattice,
             compositionality_engine,
-            value_evaluator,
             harmonic_field,
             harmonic_resolver,
             primitive_reasoner,
@@ -376,18 +348,14 @@ impl PrimitiveTierManager {
             causal_explainer,
             context_optimizer,
             evolution_coordinator,
-            harmonies_integrator,
             semantic_value_embedder,
             dissipative_consciousness,
             epistemic_conflict_detector,
             theory_calibrator,
-            consciousness_equation_v2,
             hierarchical_ltc,
             holographic_analyzer,
             differentiable_consciousness,
             affective_consciousness,
-            unified_consciousness_pipeline,
-            multi_modal_integrator,
             composition_rule_engine,
             synthetic_grounding,
             epistemic_gate,
@@ -421,7 +389,7 @@ mod tests {
         let tier = PrimitiveTierManager::new(&config, 64);
         assert!(tier.primitive_processor.is_none());
         assert!(tier.temporal_analyzer.is_none());
-        assert!(tier.consciousness_equation_v2.is_none());
+        assert!(tier.compositionality_engine.is_none());
     }
 
     #[test]
@@ -431,8 +399,8 @@ mod tests {
         let tier = PrimitiveTierManager::new(&config, 64);
         assert!(tier.primitive_processor.is_some());
         assert!(tier.temporal_analyzer.is_some());
-        assert!(tier.consciousness_equation_v2.is_some());
-        assert!(tier.value_evaluator.is_some());
+        assert!(tier.compositionality_engine.is_some());
+        assert!(tier.harmonic_field.is_some());
     }
 
     #[test]

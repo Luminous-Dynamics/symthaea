@@ -575,9 +575,7 @@ impl CognitiveLoopService {
             metacognitive_monitor,
             // Safety gateway for pre-cognitive safety veto
             safety_gateway,
-            // Moral Algebra for compositional ethical reasoning
-            moral_algebra: MoralAlgebra::default_dim(),
-            moral_parser: MoralParser::new(),
+            // Moral parser + algebra now owned by EthicsEngine
             last_moral_judgment: None,
 
             // Primitive-Belief Bridge for tier-level prediction error learning
@@ -622,8 +620,6 @@ impl CognitiveLoopService {
             temporal_consciousness,
             embodied_cognition,
             narrative_gwt,
-            spectral_mip_finder:
-                symthaea_core::consciousness_metrics::SpectralMIPFinder::with_defaults(),
             soul: Some(crate::soul::Soul::new(crate::soul::SoulConfig {
                 dimension: symthaea_core::hdc::unified_hv::HDC_DIMENSION,
                 ..Default::default()
@@ -672,7 +668,7 @@ impl CognitiveLoopService {
 
             // ── Unified Engines (additive wiring — old fields remain) ────────
             consciousness_engine: {
-                // Fresh SpectralMIPFinder for the engine (the old `spectral_mip_finder` field stays).
+                // SpectralMIPFinder is now solely owned by the engine (no top-level duplicate).
                 let engine_smf =
                     symthaea_core::consciousness_metrics::SpectralMIPFinder::with_defaults();
                 // Create fresh optional subsystems for the engine.

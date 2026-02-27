@@ -539,8 +539,7 @@ impl CognitiveLoopService {
             fep_precision: self.fep_agent.precision.perceptual_precision(),
             spectral_mip_phi: self.carryover.consciousness.last_spectral_mip_phi,
             harmonies_alignment: self
-                .primitive_tier.harmonies_integrator
-                .as_ref()
+                .ethics_engine.harmonies_integrator()
                 .map(|h| h.stats().avg_alignment)
                 .unwrap_or(0.0),
             empathic_compassion: self
@@ -926,11 +925,11 @@ impl CognitiveLoopService {
         self.primitive_tier.compositionality_engine.as_ref()
     }
 
-    /// Borrow the unified value evaluator (if enabled).
+    /// Borrow the unified value evaluator (owned by EthicsEngine).
     pub fn value_evaluator(
         &self,
     ) -> Option<&crate::consciousness::unified_value_evaluator::UnifiedValueEvaluator> {
-        self.primitive_tier.value_evaluator.as_ref()
+        self.ethics_engine.value_evaluator()
     }
 
     /// Borrow the harmonic field (if enabled).
@@ -973,11 +972,11 @@ impl CognitiveLoopService {
         self.primitive_tier.evolution_coordinator.as_ref()
     }
 
-    /// Borrow the harmonies integrator (if enabled).
+    /// Borrow the harmonies integrator (owned by EthicsEngine).
     pub fn harmonies_integrator(
         &self,
     ) -> Option<&crate::consciousness::harmonies_integration::HarmoniesIntegrator> {
-        self.primitive_tier.harmonies_integrator.as_ref()
+        self.ethics_engine.harmonies_integrator()
     }
 
     /// Borrow the composition rule engine (if enabled).
@@ -1008,11 +1007,11 @@ impl CognitiveLoopService {
         self.primitive_tier.epistemic_conflict_detector.as_ref()
     }
 
-    /// Borrow the consciousness equation v2 (if enabled).
+    /// Borrow the consciousness equation v2 (owned by ConsciousnessEngine).
     pub fn consciousness_equation_v2(
         &self,
     ) -> Option<&crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2> {
-        self.primitive_tier.consciousness_equation_v2.as_ref()
+        self.consciousness_engine.consciousness_equation_v2()
     }
 
     /// Borrow the hierarchical LTC (if enabled).
@@ -1052,19 +1051,19 @@ impl CognitiveLoopService {
         self.primitive_tier.affective_consciousness.as_ref()
     }
 
-    /// Borrow the unified consciousness pipeline (if enabled).
+    /// Borrow the unified consciousness pipeline (owned by ConsciousnessEngine).
     pub fn unified_consciousness_pipeline(
         &self,
     ) -> Option<&crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline>
     {
-        self.primitive_tier.unified_consciousness_pipeline.as_ref()
+        self.consciousness_engine.unified_consciousness_pipeline()
     }
 
-    /// Borrow the multi-modal integrator (if enabled).
+    /// Borrow the multi-modal integrator (owned by ConsciousnessEngine).
     pub fn multi_modal_integrator(
         &self,
     ) -> Option<&crate::consciousness::multi_modal_integration::MultiModalIntegrator> {
-        self.primitive_tier.multi_modal_integrator.as_ref()
+        self.consciousness_engine.multi_modal_integrator()
     }
 
     /// Borrow the synthetic states NSM grounding (if enabled).

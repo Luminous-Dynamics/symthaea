@@ -1,7 +1,3 @@
-// Engine is wired into CognitiveLoopService::cycle(). Output fields are not yet
-// individually consumed (additive wiring phase — telemetry only), so allow dead_code.
-#![allow(dead_code)]
-
 //! # Unified Consciousness Engine
 //!
 //! Wraps the 4 independent consciousness measurement systems into a single
@@ -23,7 +19,6 @@
 //! 3. **Preserves co-prime intervals**: Each subsystem fires at its original rate
 //! 4. **Backward compatible**: All existing carryover fields populated
 //! 5. **WASM-ready**: Output struct uses only Copy/Clone types (no trait objects)
-// Engine is wired into CognitiveLoopService::cycle() — no dead code.
 
 use std::time::Instant;
 
@@ -444,6 +439,53 @@ impl ConsciousnessEngine {
     /// Get mutable access to the spectral MIP finder.
     pub fn spectral_mip_finder_mut(&mut self) -> &mut SpectralMIPFinder {
         &mut self.spectral_mip_finder
+    }
+
+    /// Borrow the multi-modal integrator (if present).
+    pub fn multi_modal_integrator(
+        &self,
+    ) -> Option<&crate::consciousness::multi_modal_integration::MultiModalIntegrator> {
+        self.multi_modal_integrator.as_ref()
+    }
+
+    /// Mutable borrow of multi-modal integrator (if present).
+    pub fn multi_modal_integrator_mut(
+        &mut self,
+    ) -> Option<&mut crate::consciousness::multi_modal_integration::MultiModalIntegrator> {
+        self.multi_modal_integrator.as_mut()
+    }
+
+    /// Borrow the consciousness equation v2 (if present).
+    pub fn consciousness_equation_v2(
+        &self,
+    ) -> Option<&crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2> {
+        self.consciousness_equation_v2.as_ref()
+    }
+
+    /// Mutable borrow of consciousness equation v2 (if present).
+    pub fn consciousness_equation_v2_mut(
+        &mut self,
+    ) -> Option<&mut crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2> {
+        self.consciousness_equation_v2.as_mut()
+    }
+
+    /// Borrow the unified consciousness pipeline (if present).
+    pub fn unified_consciousness_pipeline(
+        &self,
+    ) -> Option<&UnifiedConsciousnessPipeline> {
+        self.unified_consciousness_pipeline.as_ref()
+    }
+
+    /// Mutable borrow of unified consciousness pipeline (if present).
+    pub fn unified_consciousness_pipeline_mut(
+        &mut self,
+    ) -> Option<&mut UnifiedConsciousnessPipeline> {
+        self.unified_consciousness_pipeline.as_mut()
+    }
+
+    /// Access cached sigma value (backward compatibility).
+    pub fn last_sigma(&self) -> Option<f64> {
+        self.cache.last_sigma
     }
 }
 
