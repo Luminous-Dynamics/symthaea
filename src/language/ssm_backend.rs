@@ -431,6 +431,41 @@ impl LLMBackend for LiquidMambaBackend {
         }
     }
 
+    #[cfg(feature = "liquid-mamba")]
+    fn cycle_level_distill(
+        &self,
+        fep_precision: f32,
+        thermodynamic_load: f32,
+        prediction_confidence: f32,
+        fep_lr_boost: f32,
+    ) {
+        // Gate: only modulate when prediction confidence is sufficient
+        if prediction_confidence < 0.4 {
+            return;
+        }
+        // Modulation factor: high precision + low load → boost; high load → suppress
+        let modulation = fep_precision * fep_lr_boost * (1.0 - thermodynamic_load);
+        let scaled = modulation.clamp(0.0, 2.0);
+        if let Ok(mut gen) = self.generator.lock() {
+            gen.set_fep_modulation(scaled);
+        }
+    }
+
+    #[cfg(feature = "liquid-mamba")]
+    fn current_distillation_lr(&self) -> f32 {
+        self.generator.lock().ok().map(|g| g.current_lr()).unwrap_or(0.0)
+    }
+
+    #[cfg(feature = "liquid-mamba")]
+    fn last_effective_rank(&self) -> f32 {
+        self.generator.lock().ok().map(|g| g.last_cached_rank()).unwrap_or(0.0)
+    }
+
+    #[cfg(feature = "liquid-mamba")]
+    fn generation_count(&self) -> u32 {
+        self.generator.lock().ok().map(|g| g.generation_count() as u32).unwrap_or(0)
+    }
+
     fn update_affect(&self, load: f32, temp: f32) {
         if let Ok(mut gen) = self.generator.lock() {
             gen.update_affect(load, temp);

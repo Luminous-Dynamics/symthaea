@@ -383,7 +383,7 @@ impl MambaBackend for MambaWrapper {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-helpers"))]
 pub(crate) mod tests {
     use super::*;
 

@@ -85,6 +85,9 @@ pub(crate) struct UrgencyState {
     pub(crate) mode_stability_counter: u32,
     /// Consecutive temporal discontinuity cycles (Phase 21 recovery cascade).
     pub(crate) discontinuity_streak: u32,
+    /// Remaining cycles of anomaly drift recovery (0 = not active).
+    /// Science: Turrigiano (2008) — homeostatic plasticity engages for fixed duration.
+    pub(crate) anomaly_drift_recovery: u32,
 }
 
 impl Default for UrgencyState {
@@ -99,6 +102,7 @@ impl Default for UrgencyState {
             prev_urgency: CycleUrgency::Normal,
             mode_stability_counter: 0,
             discontinuity_streak: 0,
+            anomaly_drift_recovery: 0,
         }
     }
 }
@@ -178,6 +182,9 @@ pub(crate) struct QualityMetrics {
     pub(crate) last_grid_norm: f32,
     /// Last grid spatial complexity (cached between amortization cycles).
     pub(crate) last_grid_complexity: f32,
+    /// Previous cycle's prediction confidence (for crash detection).
+    /// Science: Cools et al. (2008) — rapid confidence drop triggers serotonergic dip.
+    pub(crate) prev_confidence_for_crash: f32,
 }
 
 impl Default for QualityMetrics {
@@ -205,6 +212,7 @@ impl Default for QualityMetrics {
             epistemic_reasoning_override: false,
             last_grid_norm: 0.0,
             last_grid_complexity: 0.0,
+            prev_confidence_for_crash: 0.5,
         }
     }
 }
@@ -470,6 +478,35 @@ pub struct NeuromodTelemetry {
     /// Full neurochemical state snapshot (sampled every 10 cycles, None otherwise).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub neuromod_snapshot: Option<super::neuromodulators::NeuromodSnapshot>,
+
+    // ── Phase 4: Neuroendocrine control telemetry ──────────────────────────
+
+    /// Derived cortisol level from NE/5-HT balance (0.0–1.0).
+    pub neuromod_derived_cortisol: f32,
+    /// NE phasic burst → ACh suppression magnitude (0.0–0.15).
+    pub ne_ach_suppression: f32,
+    /// High ACh → NE suppression magnitude (0.0–0.04).
+    pub ach_ne_suppression: f32,
+    /// Effective GABA signal (tonic inhibition, 0.0–2.0).
+    pub neuromod_gaba_effective: f32,
+    /// GABA-derived global inhibition factor (0.7–1.0).
+    pub neuromod_global_inhibition: f32,
+    /// Effective oxytocin signal (social bonding, 0.0–2.0).
+    pub neuromod_oxytocin_effective: f32,
+    /// Oxytocin-derived social coherence factor (0.8–1.3).
+    pub neuromod_social_coherence: f32,
+    /// Oxytocin-derived trust factor (0.8–1.2).
+    pub neuromod_trust_factor: f32,
+    /// Effective glutamate signal (excitatory learning, 0.0–2.0).
+    pub neuromod_glutamate_effective: f32,
+    /// Excitotoxicity risk from sustained high glutamate (0.0–1.0).
+    pub neuromod_excitotoxicity_risk: f32,
+    /// Glutamate-derived learning fatigue factor (0.5–1.0).
+    pub neuromod_learning_fatigue: f32,
+    /// Circadian phase offset in hours (-12.0–12.0).
+    pub circadian_phase_offset: f32,
+    /// Effective circadian hour after phase offset (0.0–24.0).
+    pub circadian_effective_hour: f32,
 }
 
 /// Metadata about internal decision-making during a cycle.
@@ -1114,6 +1151,48 @@ pub struct CycleMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub neuromod_snapshot: Option<super::neuromodulators::NeuromodSnapshot>,
 
+    // ── Phase 4: Neuroendocrine Control ───────────────────────────────
+    /// Phasic DA replay amplification boost (extra episodes, 0 when below threshold).
+    pub neuromod_phasic_replay_boost: usize,
+    /// NE phasic reorienting boost applied to attention_sensitivity.
+    pub neuromod_ne_reorienting_boost: f32,
+    /// Remaining cycles of anomaly drift recovery (0 = not active).
+    pub neuromod_drift_recovery_remaining: u32,
+    /// Derived cortisol from NE/5-HT (0.0–1.0).
+    pub neuromod_derived_cortisol: f32,
+    /// NE→arousal EMA feedback applied this cycle.
+    pub ne_arousal_feedback: f32,
+    /// Confidence velocity (rate of change for crash detection).
+    pub confidence_velocity: f32,
+    /// Whether a confidence crash triggered 5-HT emergency dip.
+    pub sht_crash_dip: bool,
+    /// Exploration-driven 5-HT drain this cycle.
+    pub exploration_sht_drain: f32,
+    /// ACh suppression from NE phasic burst.
+    pub ne_ach_suppression: f32,
+    /// NE suppression from high ACh.
+    pub ach_ne_suppression: f32,
+    /// GABA effective level (0.0–2.0).
+    pub neuromod_gaba_effective: f32,
+    /// GABA global inhibition factor (0.7–1.0).
+    pub neuromod_global_inhibition: f32,
+    /// Oxytocin effective level (0.0–2.0).
+    pub neuromod_oxytocin_effective: f32,
+    /// Oxytocin social coherence factor (0.8–1.3).
+    pub neuromod_social_coherence: f32,
+    /// Oxytocin trust factor (0.8–1.2).
+    pub neuromod_trust_factor: f32,
+    /// Glutamate effective level (0.0–2.0).
+    pub neuromod_glutamate_effective: f32,
+    /// Glutamate excitotoxicity risk (0.0–1.0).
+    pub neuromod_excitotoxicity_risk: f32,
+    /// Glutamate learning fatigue factor (0.5–1.0).
+    pub neuromod_learning_fatigue: f32,
+    /// Circadian phase offset in hours (for jet lag modeling).
+    pub circadian_phase_offset: f32,
+    /// Circadian effective hour after phase offset (0.0–24.0).
+    pub circadian_effective_hour: f32,
+
     // ── Liquid-Mamba Fusion Telemetry ────────────────────────────────
     /// Semantic prediction error from Liquid-Mamba round-trip (0.0–1.0, 0.0 when off).
     /// Measures `1 - cosine(thought_hv, bundled_output_hvs)`.
@@ -1183,6 +1262,20 @@ impl CycleMetadata {
         self.neuromod_ne_beta = n.neuromod_ne_beta;
         self.neuromod_behavioral_flexibility = n.neuromod_behavioral_flexibility;
         self.neuromod_snapshot = n.neuromod_snapshot;
+        // Phase 4: neuroendocrine control
+        self.neuromod_derived_cortisol = n.neuromod_derived_cortisol;
+        self.ne_ach_suppression = n.ne_ach_suppression;
+        self.ach_ne_suppression = n.ach_ne_suppression;
+        self.neuromod_gaba_effective = n.neuromod_gaba_effective;
+        self.neuromod_global_inhibition = n.neuromod_global_inhibition;
+        self.neuromod_oxytocin_effective = n.neuromod_oxytocin_effective;
+        self.neuromod_social_coherence = n.neuromod_social_coherence;
+        self.neuromod_trust_factor = n.neuromod_trust_factor;
+        self.neuromod_glutamate_effective = n.neuromod_glutamate_effective;
+        self.neuromod_excitotoxicity_risk = n.neuromod_excitotoxicity_risk;
+        self.neuromod_learning_fatigue = n.neuromod_learning_fatigue;
+        self.circadian_phase_offset = n.circadian_phase_offset;
+        self.circadian_effective_hour = n.circadian_effective_hour;
     }
 }
 

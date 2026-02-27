@@ -321,12 +321,9 @@ impl RelationalCore {
 /// the consciousness language core (NL understanding and generation)
 /// and the partnership module (relational consciousness tracking).
 pub struct Symthaea {
-    /// Core cognitive system.
+    // ── Core Cognitive Pipeline ──────────────────────────────────────────
+    /// Core cognitive system (CfC network, HDC encoder, working memory).
     mind: ContinuousMind,
-    /// Language processing core (used in Phase 3.5 for primitive tier grounding).
-    language: ConsciousnessLanguageCore,
-    /// LLM organ for text generation.
-    llm: LLMOrgan,
     /// HDC dimension used.
     hdc_dim: usize,
     /// Number of LTC neurons (used in Phase 3 for LTC-paced generation).
@@ -334,6 +331,14 @@ pub struct Symthaea {
     ltc_neurons: usize,
     /// Total interactions processed.
     interactions: u64,
+
+    // ── Language Pipeline ────────────────────────────────────────────────
+    /// Language processing core (used in Phase 3.5 for primitive tier grounding).
+    language: ConsciousnessLanguageCore,
+    /// LLM organ for text generation.
+    llm: LLMOrgan,
+
+    // ── Relational & Social ─────────────────────────────────────────────
     /// Relational consciousness subsystem (partner, trajectory, dyadic Phi).
     relational: RelationalCore,
     /// Domain plugin registry for multi-domain awareness.
@@ -348,17 +353,18 @@ pub struct Symthaea {
     /// When available, replaces hash-based encoding with true semantic understanding.
     #[cfg(feature = "neural-bridge")]
     neural_bridge: Option<NeuralBridgeV2>,
+    // ── Memory & Storage ──────────────────────────────────────────────
     /// Optional persistent database for long-term memory storage.
     database: Option<Arc<dyn ConsciousnessDatabase>>,
     /// Memory coordinator: graduation pipeline + cross-tier signals.
     memory_coordinator: MemoryCoordinator,
     /// Episodic memory: Phi-weighted priority queue for significant moments.
     episodic_memory: EpisodicMemory,
+
+    // ── Output & Actions ────────────────────────────────────────────────
     /// Resonant speech: user-adaptive response generation.
-    /// Modulates output based on inferred cognitive load and user state.
     resonant_speech: crate::resonant_speech::ResonantSpeech,
     /// Optional streaming inference engine for real-time sensor-driven CfC processing.
-    /// Independent of the main cognitive loop — for edge/robot deployments.
     streaming_inference: Option<crate::inference::StreamingInference>,
     /// Registry of primitive action bindings.
     pub action_registry: ActionRegistry,
@@ -395,13 +401,12 @@ pub struct Symthaea {
     #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
     last_autoresearch_topic: Option<String>,
 
-    // ── Nociception: Pain Channel Infrastructure ──
-    /// Somatic error bridge: drains infrastructure errors and converts to felt stress.
-    /// Updated each process() cycle; signals applied to mind state before tick().
+    // ── Nociception: Pain & Infrastructure Health ──────────────────────
+    /// Somatic error bridge: drains infrastructure errors → felt stress.
     somatic_bridge: SomaticErrorBridge,
     /// Pain channel sender: cloned into TaskSupervisor and database operations.
     pain_tx: PainSender,
-    /// Task supervisor: wraps all tokio::spawn calls for panic detection + pain reporting.
+    /// Task supervisor: wraps all tokio::spawn calls for panic detection.
     task_supervisor: TaskSupervisor,
 }
 
@@ -731,6 +736,32 @@ impl Symthaea {
             instance.attach_power_ssm_sensor()?;
         }
 
+        Ok(instance)
+    }
+
+    /// Create a Symthaea instance with a custom Liquid-Mamba configuration.
+    ///
+    /// This overrides the default LLM backend with a Liquid-Mamba backend
+    /// configured from the provided `LiquidMambaConfig`. Requires network
+    /// access on first run to download the Mamba model.
+    #[cfg(feature = "liquid-mamba")]
+    pub async fn with_liquid_mamba_config(
+        hdc_dim: usize,
+        ltc_neurons: usize,
+        genesis: &symthaea_core::genesis::GenesisSeed,
+        lm_config: symthaea_broca::LiquidMambaConfig,
+    ) -> Result<Self> {
+        let backend = llm_backend::backend_with_liquid_mamba_config(genesis, lm_config)?;
+        let llm_organ_config = LLMOrganConfig {
+            dimension: hdc_dim,
+            ..LLMOrganConfig::default()
+        };
+        let mut instance = Self::new(hdc_dim, ltc_neurons).await?;
+        instance.llm = LLMOrgan::with_backend(llm_organ_config, backend);
+        // Re-wire the new backend into ContinuousMind for swarm gradient exchange
+        if let Some(backend) = instance.llm.get_backend() {
+            instance.mind.set_llm_backend(backend);
+        }
         Ok(instance)
     }
 
@@ -1543,12 +1574,21 @@ impl Symthaea {
         {
             let pe = self.llm.last_liquid_mamba_pe();
             self.mind.state.liquid_mamba_pe = pe;
+            self.mind.state.liquid_mamba_lr = self.llm.current_distillation_lr();
+            self.mind.state.liquid_mamba_rank = self.llm.last_effective_rank();
+            self.mind.state.liquid_mamba_generation_count = self.llm.generation_count();
             // FEP proxy: high cognitive load → high surprise → boost distillation
             // consciousness_level provides an integration quality signal
             let fep_proxy = (self.mind.state.cognitive_load as f32)
                 .max(1.0 - self.mind.state.consciousness_level as f32)
                 .clamp(0.0, 1.0);
             self.llm.set_fep_modulation(fep_proxy);
+
+            // Cycle-level distillation modulation: adjusts FEP factor based on
+            // thermodynamic load, consciousness confidence, and FEP precision
+            let thermo_load = self.mind.state.thermodynamic_load;
+            let confidence = self.mind.state.consciousness_level as f32;
+            self.llm.cycle_level_distill(fep_proxy, thermo_load, confidence, 1.0);
         }
 
         // ====================================================================

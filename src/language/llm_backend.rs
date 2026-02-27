@@ -103,6 +103,35 @@ pub trait LLMBackend: Send + Sync {
     #[cfg(feature = "liquid-mamba")]
     fn set_fep_modulation(&self, _fep_signal: f32) {}
 
+    /// Cycle-level distillation modulation: adjusts the FEP factor that the
+    /// next per-generation `distill_step()` uses. Gated by prediction confidence
+    /// and thermodynamic load. This is a *modulation* step, not a gradient step.
+    ///
+    /// - `fep_precision`: free-energy proxy (0-1, higher = more surprise)
+    /// - `thermodynamic_load`: current metabolic cost (0-1)
+    /// - `prediction_confidence`: consciousness-level confidence gate
+    /// - `fep_lr_boost`: scaling factor for the modulation (default 1.0)
+    #[cfg(feature = "liquid-mamba")]
+    fn cycle_level_distill(
+        &self,
+        _fep_precision: f32,
+        _thermodynamic_load: f32,
+        _prediction_confidence: f32,
+        _fep_lr_boost: f32,
+    ) {}
+
+    /// Current effective distillation learning rate (0.0 for non-L-SSM backends).
+    #[cfg(feature = "liquid-mamba")]
+    fn current_distillation_lr(&self) -> f32 { 0.0 }
+
+    /// Last cached effective rank of projection bottleneck activations (0.0 for non-L-SSM).
+    #[cfg(feature = "liquid-mamba")]
+    fn last_effective_rank(&self) -> f32 { 0.0 }
+
+    /// Total number of generation/distillation cycles completed (0 for non-L-SSM).
+    #[cfg(feature = "liquid-mamba")]
+    fn generation_count(&self) -> u32 { 0 }
+
     /// Get the backend name for logging.
     fn name(&self) -> &str;
 }
@@ -387,6 +416,19 @@ use std::sync::Arc;
 /// Create the default backend: tries Ollama first, falls back to simulated.
 pub fn default_backend() -> Arc<dyn LLMBackend> {
     Arc::new(OllamaBackend::new())
+}
+
+/// Create a Liquid-Mamba backend with a specific configuration.
+///
+/// Returns an `Arc<dyn LLMBackend>` that can be passed to `LLMOrgan::with_backend`.
+/// Errors if the Mamba model fails to load (network required on first run).
+#[cfg(feature = "liquid-mamba")]
+pub fn backend_with_liquid_mamba_config(
+    genesis: &symthaea_core::genesis::GenesisSeed,
+    config: symthaea_broca::LiquidMambaConfig,
+) -> anyhow::Result<Arc<dyn LLMBackend>> {
+    let backend = super::ssm_backend::LiquidMambaBackend::new(genesis, config)?;
+    Ok(Arc::new(backend))
 }
 
 /// Create a simulated-only backend (for testing or offline use).

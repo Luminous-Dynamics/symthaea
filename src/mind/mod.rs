@@ -205,6 +205,9 @@ pub struct ContinuousMind {
     /// and `process_federated()` applies aggregated peer weights.
     #[cfg(feature = "liquid-mamba")]
     pub(crate) llm_backend: Option<std::sync::Arc<dyn crate::language::llm_backend::LLMBackend>>,
+    /// Genesis-derived identity for swarm gradient source_id (L-SSM).
+    #[cfg(feature = "liquid-mamba")]
+    pub(crate) genesis_identity: [u8; 32],
 }
 
 impl ContinuousMind {
@@ -296,6 +299,8 @@ impl ContinuousMind {
             cortex: crate::swarm::HolochainCortex::default(),
             #[cfg(feature = "liquid-mamba")]
             llm_backend: None,
+            #[cfg(feature = "liquid-mamba")]
+            genesis_identity: [0u8; 32],
         }
     }
 
@@ -307,6 +312,12 @@ impl ContinuousMind {
     ) -> Self {
         let mut mind = Self::new(config);
         mind.seeded_rng = Some(genesis.domain(&format!("{label}::mind")));
+        #[cfg(feature = "liquid-mamba")]
+        {
+            use rand::RngCore;
+            let mut id_rng = genesis.domain("swarm::source_id");
+            id_rng.fill_bytes(&mut mind.genesis_identity);
+        }
         mind
     }
 

@@ -119,11 +119,29 @@ impl CognitiveLoopService {
         self.biorhythm_refresh_counter += 1;
         if self.biorhythm_refresh_counter >= super::thresholds::BIORHYTHM_INTERVAL {
             self.biorhythm = crate::chronobiology::Biorhythm::current();
-            self.neuromodulator_bath.modulate_circadian_continuous(self.biorhythm.hour);
+            // #14: Use effective_hour (with phase offset) for circadian modulation
+            let effective_hour = self.biorhythm.effective_hour();
+            self.neuromodulator_bath.modulate_circadian_continuous(effective_hour);
+            // #14: Entrain phase offset toward zero each refresh
+            self.biorhythm.entrain();
             // Record personality profile for drift detection
             let profile = self.neuromodulator_bath.personality_profile();
             self.personality_drift_tracker.record(&profile);
+            // #4: Personality drift → anomaly recovery (Turrigiano 2008)
+            if self.personality_drift_tracker.is_anomalous()
+                && self.carryover.urgency.anomaly_drift_recovery == 0
+            {
+                self.neuromodulator_bath.engage_anomaly_recovery();
+                self.carryover.urgency.anomaly_drift_recovery = 50;
+            }
             self.biorhythm_refresh_counter = 0;
+        }
+        // #4: Countdown and disengage drift recovery
+        if self.carryover.urgency.anomaly_drift_recovery > 0 {
+            self.carryover.urgency.anomaly_drift_recovery -= 1;
+            if self.carryover.urgency.anomaly_drift_recovery == 0 {
+                self.neuromodulator_bath.disengage_anomaly_recovery();
+            }
         }
         // Apply circadian plasticity to learning rate (Night=high plasticity, Day=low)
         // Halved: bath circadian baselines (Phase 2) provide the other 50%
@@ -143,6 +161,9 @@ impl CognitiveLoopService {
             self.emotion_contagion.arousal =
                 (self.emotion_contagion.arousal + somatic_signals.arousal_spike).min(1.0);
         }
+        // #5: Forward somatic stress to neuromodulator bath (McEwen 2007)
+        let somatic_stress_level = self.somatic_bridge.systemic_stress() as f32;
+        self.neuromodulator_bath.apply_stress(somatic_stress_level);
 
         // ═══════════════════════════════════════════════════════════════════════
         // NEUROMODULATOR BATH: Produce from previous cycle's signals (Phase A)
@@ -433,10 +454,14 @@ impl CognitiveLoopService {
             prediction_error // Use raw error during bootstrap
         };
         // Hysteresis: require stronger signal to LEAVE current urgency level
+        // #1: D2-mediated behavioral flexibility gates mode transitions (Frank 2005).
+        // High D2 → easier transitions (lower hysteresis), low D2 → perseveration.
+        let flexibility = self.neuromodulator_bath.behavioral_flexibility();
+        let flex_mod = 1.0 / flexibility; // 0.67–1.43 (inverted: high flex = lower threshold)
         let base_hysteresis = match self.carryover.urgency.urgency {
-            super::CycleUrgency::Cruise => effective_threshold * 1.2, // harder to leave Cruise
-            super::CycleUrgency::Critical => effective_threshold * 0.8, // harder to leave Critical
-            _ => effective_threshold,
+            super::CycleUrgency::Cruise => effective_threshold * 1.2 * flex_mod,
+            super::CycleUrgency::Critical => effective_threshold * 0.8 * flex_mod,
+            _ => effective_threshold * flex_mod,
         };
         // ── Phase 17: Predictive interval tuning via error pattern ──────
         // Science: Clark (2013) — predictive brain anticipates state changes.
@@ -565,6 +590,9 @@ impl CognitiveLoopService {
         } else {
             ("Warmup", "Normal")
         };
+
+        // #9: Error trend → DA baseline modulation (Schultz 2016)
+        self.neuromodulator_bath.modulate_from_error_trend(error_pattern);
 
         // ── Phase 17: Mode transition smoothing ──────────────────────────
         // Science: Kelso (1995) — metastable coordination dynamics: transitions between
@@ -1596,6 +1624,13 @@ impl CognitiveLoopService {
         self.curiosity_drive.exploration_urge =
             self.curiosity_drive.exploration_urge.clamp(0.0, 1.0);
 
+        // #1: D2 flexibility scales exploration responsiveness (Frank 2005)
+        let flex_scale = self.neuromodulator_bath.behavioral_flexibility();
+        self.curiosity_drive.exploration_urge =
+            0.5 + (self.curiosity_drive.exploration_urge - 0.5) * flex_scale;
+        self.curiosity_drive.exploration_urge =
+            self.curiosity_drive.exploration_urge.clamp(0.0, 1.0);
+
         // 5-HT → confidence
         self.adjust_confidence("neuromod_serotonin", self.neuromodulator_bath.confidence_delta());
 
@@ -1605,6 +1640,59 @@ impl CognitiveLoopService {
             self.adaptive_behavior.attention_sensitivity.clamp(0.5, 2.0);
         self.carryover.learning.adaptive_threshold_scale *=
             self.neuromodulator_bath.threshold_factor();
+
+        // #3: Phasic NE burst → attentional reorienting (Corbetta & Shulman 2002)
+        let ne_ph = self.neuromodulator_bath.ne_phasic();
+        let ne_reorienting_boost = if ne_ph > 0.3 {
+            self.adaptive_behavior.attention_sensitivity *= 1.0 + (ne_ph - 0.3) * 0.5;
+            self.adaptive_behavior.attention_sensitivity =
+                self.adaptive_behavior.attention_sensitivity.clamp(0.5, 2.0);
+            self.curiosity_drive.exploration_urge += (ne_ph - 0.3) * 0.15;
+            self.curiosity_drive.exploration_urge =
+                self.curiosity_drive.exploration_urge.clamp(0.0, 1.0);
+            (ne_ph - 0.3) * 0.5
+        } else {
+            0.0
+        };
+
+        // #6: Arousal ↔ NE bidirectional coupling (Berridge & Waterhouse 2003)
+        // EMA: arousal pulled toward NE effective (10% per cycle)
+        let ne_arousal_before = self.emotion_contagion.arousal;
+        self.emotion_contagion.arousal = self.emotion_contagion.arousal * 0.9
+            + self.neuromodulator_bath.noradrenaline.effective() * 0.1;
+        // Phasic NE burst → transient arousal spike
+        if ne_ph > 0.2 {
+            self.emotion_contagion.arousal += ne_ph * 0.05;
+        }
+        self.emotion_contagion.arousal = self.emotion_contagion.arousal.clamp(0.0, 1.0);
+        let ne_arousal_feedback = self.emotion_contagion.arousal - ne_arousal_before;
+
+        // #7: Confidence crash detection → 5-HT emergency dip (Cools et al. 2008)
+        let confidence_velocity = self.prediction_confidence
+            - self.carryover.quality.prev_confidence_for_crash;
+        let sht_crash_dip = if confidence_velocity < -0.15 {
+            self.neuromodulator_bath.serotonin.produce(-0.1);
+            true
+        } else {
+            false
+        };
+        self.carryover.quality.prev_confidence_for_crash = self.prediction_confidence;
+
+        // #8: Exploration cost → 5-HT depletion (Tops et al. 2009)
+        let exploration_sht_drain = if self.curiosity_drive.exploration_urge > 0.5 {
+            let drain = (self.curiosity_drive.exploration_urge - 0.5) * 0.03;
+            self.neuromodulator_bath.apply_exploration_cost(self.curiosity_drive.exploration_urge);
+            drain
+        } else {
+            0.0
+        };
+
+        // #11: GABA global inhibition (Olsen & Sieghart 2009)
+        let gaba_inhibition = self.neuromodulator_bath.global_inhibition();
+        if gaba_inhibition < 0.95 {
+            self.scale_lr("gaba_inhibition", gaba_inhibition);
+            self.curiosity_drive.exploration_urge *= gaba_inhibition;
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.6b Enhanced FEP Bridge: Motor commands and learning signals
@@ -2214,6 +2302,16 @@ impl CognitiveLoopService {
         };
         module_timings.core_training = _t_core.elapsed().as_micros() as u64;
 
+        // #13: Report learning activity to glutamate channel (Olney 1969)
+        {
+            let is_night = self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
+            self.neuromodulator_bath.report_learning(effective_lr, prediction_error, is_night);
+            let fatigue = self.neuromodulator_bath.learning_fatigue_factor();
+            if fatigue < 1.0 {
+                self.scale_lr("glutamate_fatigue", fatigue);
+            }
+        }
+
         // Goal←Cognition feedback: consistent low error during goal pursuit signals progress.
         // Science: Anderson (1983) — prediction accuracy is evidence of task mastery.
         // Closes the Goal→Cognition loop (goal priority boosts LR) with Cognition→Goal feedback.
@@ -2749,6 +2847,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let EpisodicReplayResult {
             surprise_replay_batch_size,
+            phasic_da_replay_boost,
         } = self.run_episodic_replay_and_memory_phase(
             &cycle_state,
             memory_context_boost,

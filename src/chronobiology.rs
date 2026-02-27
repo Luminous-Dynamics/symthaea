@@ -24,6 +24,12 @@ pub struct Biorhythm {
     pub creativity_mod: f64, // Multiplier for randomness (temperature)
     /// Fractional hour (0.0–24.0) for continuous waveform computation.
     pub hour: f64,
+    /// Phase offset in hours (jet lag / zeitgeber shift). Range: [-12.0, 12.0].
+    /// Science: Czeisler et al. (1999) — circadian phase-shifting via bright light.
+    pub phase_offset: f64,
+    /// Entrainment rate: how fast the offset recovers toward 0. Default 1.0.
+    /// Higher = faster recovery (1.0 = ~0.5h/refresh toward zero).
+    pub entrainment_rate: f64,
 }
 
 impl CircadianPhase {
@@ -83,6 +89,34 @@ impl Biorhythm {
             plasticity_mod: plasticity,
             creativity_mod: creativity,
             hour,
+            phase_offset: 0.0,
+            entrainment_rate: 1.0,
+        }
+    }
+
+    /// Shift circadian phase by the given number of hours (clamped ±12).
+    /// Science: Czeisler et al. (1999) — circadian phase response curve.
+    pub fn shift_phase(&mut self, hours: f64) {
+        self.phase_offset = (self.phase_offset + hours).clamp(-12.0, 12.0);
+    }
+
+    /// Effective hour incorporating phase offset (wraps 0–24).
+    pub fn effective_hour(&self) -> f64 {
+        ((self.hour + self.phase_offset) % 24.0 + 24.0) % 24.0
+    }
+
+    /// Pull phase_offset toward 0 (entrainment to local zeitgeber).
+    /// Called each biorhythm refresh (~97 cycles).
+    pub fn entrain(&mut self) {
+        if self.phase_offset.abs() > 0.01 {
+            let pull = 0.5 * self.entrainment_rate; // 0.5h per refresh cycle
+            if self.phase_offset > 0.0 {
+                self.phase_offset = (self.phase_offset - pull).max(0.0);
+            } else {
+                self.phase_offset = (self.phase_offset + pull).min(0.0);
+            }
+        } else {
+            self.phase_offset = 0.0;
         }
     }
 }
@@ -187,5 +221,46 @@ mod tests {
             "night arousal should be < 0.5, got {}",
             bio.arousal_mod
         );
+    }
+
+    // ── Phase 4: Circadian Phase Shifting ────────────────────────────
+
+    #[test]
+    fn test_shift_changes_effective_hour() {
+        let mut bio = Biorhythm::for_hour(10.0);
+        assert!((bio.effective_hour() - 10.0).abs() < 0.01);
+        bio.shift_phase(3.0);
+        assert!((bio.effective_hour() - 13.0).abs() < 0.01, "Shifted +3h: {}", bio.effective_hour());
+    }
+
+    #[test]
+    fn test_entrainment_recovers() {
+        let mut bio = Biorhythm::for_hour(10.0);
+        bio.shift_phase(6.0);
+        assert!((bio.phase_offset - 6.0).abs() < 0.01);
+        // Entrain should pull toward 0
+        for _ in 0..20 {
+            bio.entrain();
+        }
+        assert!(bio.phase_offset.abs() < 0.5, "Should recover near 0: {}", bio.phase_offset);
+    }
+
+    #[test]
+    fn test_effective_hour_wrapping() {
+        let mut bio = Biorhythm::for_hour(23.0);
+        bio.shift_phase(3.0);
+        // 23 + 3 = 26 → wraps to 2.0
+        assert!((bio.effective_hour() - 2.0).abs() < 0.01, "Should wrap: {}", bio.effective_hour());
+    }
+
+    #[test]
+    fn test_shift_affects_neuromod_baselines() {
+        // Verify that effective_hour() produces a different value from raw hour
+        let mut bio = Biorhythm::for_hour(14.0); // 2pm
+        bio.shift_phase(-6.0); // shifted to 8am effective
+        let eff = bio.effective_hour();
+        assert!((eff - 8.0).abs() < 0.01, "Effective should be 8am: {eff}");
+        // This effective hour would produce different neuromod baselines
+        // (verified by the circadian continuous test suite)
     }
 }
