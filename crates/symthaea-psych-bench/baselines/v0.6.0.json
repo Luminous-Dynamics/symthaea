@@ -1,7 +1,7 @@
 {
   "name": "baseline",
-  "timestamp": "2026-02-27T00:03:22.237973894+00:00",
-  "git_hash": "b591bacb0",
+  "timestamp": "2026-02-27T02:31:58.566705854+00:00",
+  "git_hash": "0fde8adc8",
   "config_summary": "dim=512, trials=10, seed=42",
   "schema_version": "1.1",
   "metrics": {
@@ -1431,6 +1431,57 @@
         "ci_upper": 1.0
       }
     },
+    "Reasoning::ArcAbductive": {
+      "abduction_accuracy": {
+        "mean": 0.2800000000000001,
+        "std_dev": 0.13784048752090222,
+        "n": 10,
+        "ci_lower": 0.18140170589711005,
+        "ci_upper": 0.37859829410289014
+      },
+      "abduction_color_fill": {
+        "mean": 0.30000000000000004,
+        "std_dev": 0.23570226039551584,
+        "n": 10,
+        "ci_lower": 0.13140047449651593,
+        "ci_upper": 0.46859952550348416
+      },
+      "abduction_color_replace": {
+        "mean": 0.38,
+        "std_dev": 0.27406406388125953,
+        "n": 10,
+        "ci_lower": 0.18396000000000004,
+        "ci_upper": 0.57604
+      },
+      "abduction_reflection": {
+        "mean": 0.2,
+        "std_dev": 0.13333333333333336,
+        "n": 10,
+        "ci_lower": 0.10462570576932168,
+        "ci_upper": 0.29537429423067835
+      },
+      "abduction_rt_ticks": {
+        "mean": 6.503333333333335,
+        "std_dev": 0.18270937592083972,
+        "n": 10,
+        "ci_lower": 6.372640000000001,
+        "ci_upper": 6.634026666666668
+      },
+      "abduction_translation": {
+        "mean": 0.24000000000000005,
+        "std_dev": 0.26331223544175336,
+        "n": 10,
+        "ci_lower": 0.051650860368304324,
+        "ci_upper": 0.42834913963169574
+      },
+      "unbinding_similarity": {
+        "mean": 0.4832827524095774,
+        "std_dev": 0.09067039574030743,
+        "n": 10,
+        "ci_lower": 0.4184255648994665,
+        "ci_upper": 0.5481399399196883
+      }
+    },
     "Reasoning::ArcAnalogy": {
       "analogy_accuracy": {
         "mean": 0.5611111111111112,
@@ -1548,12 +1599,40 @@
         "ci_lower": 0.4547361121471953,
         "ci_upper": 0.7052638878528044
       },
+      "confusion_diagonal": {
+        "mean": 0.295,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.295,
+        "ci_upper": 0.295
+      },
+      "confusion_entropy": {
+        "mean": 1.934688204146844,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 1.934688204146844,
+        "ci_upper": 1.934688204146844
+      },
+      "confusion_max_error": {
+        "mean": 0.36,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.36,
+        "ci_upper": 0.36
+      },
       "cross_task_discrimination": {
         "mean": 0.06913841473258799,
         "std_dev": 0.04651467576518007,
         "n": 10,
         "ci_lower": 0.03586613193904134,
         "ci_upper": 0.10241069752613463
+      },
+      "learning_efficiency": {
+        "mean": -0.015000000000000003,
+        "std_dev": 0.08181958472422386,
+        "n": 10,
+        "ci_lower": -0.0735261386049003,
+        "ci_upper": 0.04352613860490029
       },
       "rt_ticks": {
         "mean": 6.023333333333333,
@@ -1568,6 +1647,13 @@
         "n": 10,
         "ci_lower": 0.0163491484683649,
         "ci_upper": 0.04800825219026285
+      },
+      "single_pair_accuracy": {
+        "mean": 0.56,
+        "std_dev": 0.11498792207106895,
+        "n": 10,
+        "ci_lower": 0.47774831065564677,
+        "ci_upper": 0.6422516893443533
       },
       "transfer_accuracy": {
         "mean": 0.545,

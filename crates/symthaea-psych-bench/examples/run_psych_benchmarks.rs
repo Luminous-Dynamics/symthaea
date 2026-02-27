@@ -27,6 +27,8 @@
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --ssm-backend
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --participants 50
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --dim-sweep
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --arc-data-dir /path/to/ARC-AGI/data/training
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --reasoning-validity
 
 use rayon::prelude::*;
 use std::path::PathBuf;
@@ -51,7 +53,7 @@ use symthaea_psych_bench::benchmarks::executive::{
 use symthaea_psych_bench::benchmarks::inhibition::{GoNoGoBenchmark, StopSignalBenchmark};
 use symthaea_psych_bench::benchmarks::language::GardenPathBenchmark;
 use symthaea_psych_bench::benchmarks::motor::SrttBenchmark;
-use symthaea_psych_bench::benchmarks::reasoning::{ArcAnalogyBenchmark, ArcCompositionalBenchmark, ArcFluidBenchmark};
+use symthaea_psych_bench::benchmarks::reasoning::{ArcAbductiveBenchmark, ArcAnalogyBenchmark, ArcCompositionalBenchmark, ArcFluidBenchmark};
 use symthaea_psych_bench::benchmarks::social::RmeBenchmark;
 use symthaea_psych_bench::benchmarks::sustained_attention::SartBenchmark;
 use symthaea_psych_bench::benchmarks::memory_agent::{
@@ -125,6 +127,11 @@ fn main() {
         .windows(2)
         .find(|w| w[0] == "--html-output")
         .map(|w| PathBuf::from(&w[1]));
+    let arc_data_dir: Option<PathBuf> = args
+        .windows(2)
+        .find(|w| w[0] == "--arc-data-dir")
+        .map(|w| PathBuf::from(&w[1]));
+    let reasoning_validity = args.iter().any(|a| a == "--reasoning-validity");
 
     let config = BenchmarkConfig {
         dimension: 512,
@@ -193,6 +200,7 @@ fn main() {
         Box::new(ArcFluidBenchmark),
         Box::new(ArcCompositionalBenchmark),
         Box::new(ArcAnalogyBenchmark),
+        Box::new(ArcAbductiveBenchmark),
         // Additional MemoryAgent
         Box::new(ProspectiveMemoryBenchmark),
         // Additional Metacognition
@@ -1094,6 +1102,26 @@ fn main() {
         }
         std::fs::write(path, html_content).expect("failed to write HTML report");
         eprintln!("HTML report written to {}", path.display());
+    }
+
+    // ── Real ARC-AGI dataset evaluation ──
+    if let Some(ref arc_dir) = arc_data_dir {
+        use symthaea_psych_bench::benchmarks::reasoning::arc_dataset;
+        match arc_dataset::load_arc_tasks(arc_dir) {
+            Ok(tasks) => {
+                eprintln!("Loaded {} ARC tasks from {}", tasks.len(), arc_dir.display());
+                let result = arc_dataset::evaluate_arc_tasks(&tasks, config.dimension, config.seed);
+                println!("\n{}", arc_dataset::format_arc_dataset_result(&result));
+            }
+            Err(e) => eprintln!("Failed to load ARC dataset: {}", e),
+        }
+    }
+
+    // ── Reasoning domain validity analysis ──
+    if reasoning_validity {
+        use symthaea_psych_bench::harness::analysis::{reasoning_validity_single_run, format_reasoning_validity};
+        let validity = reasoning_validity_single_run(&report);
+        println!("\n{}", format_reasoning_validity(&validity));
     }
 
     if output_json {

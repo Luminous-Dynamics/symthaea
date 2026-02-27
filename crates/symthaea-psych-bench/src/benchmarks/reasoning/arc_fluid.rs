@@ -42,6 +42,10 @@ struct TrialResult {
     rt_ticks: f64,
     /// Per-task-type accuracy: [ColorFill, Translation, ColorReplacement, Reflection]
     per_type_accuracy: [f64; 4],
+    /// Learning curve: transfer accuracy using only 1 training pair
+    single_pair_accuracy: f64,
+    /// Confusion matrix: 4×4 (true_type × predicted_type), row-normalized
+    confusion_matrix: [[f64; 4]; 4],
 }
 
 impl ArcFluidBenchmark {
@@ -121,6 +125,11 @@ impl ArcFluidBenchmark {
         let mut total_ticks: f64 = 0.0;
         let mut per_type_hits: [u32; 4] = [0; 4];
         let mut per_type_total: [u32; 4] = [0; 4];
+        // Learning curve: single-pair accuracy
+        let mut single_pair_hits: u32 = 0;
+        let mut single_pair_total: u32 = 0;
+        // Confusion matrix: [true_type][predicted_type] counts
+        let mut confusion_counts: [[u32; 4]; 4] = [[0; 4]; 4];
 
         for (type_idx, &task_type) in TASK_TYPES.iter().enumerate() {
             for task_i in 0..tasks_per_type {
@@ -192,6 +201,33 @@ impl ArcFluidBenchmark {
                     per_type_hits[type_idx] += 1;
                 }
 
+                // ── Learning curve: test with single training pair ──
+                let single_predicted = encoder.apply_rule(&test_in_hv, &train_rules[0]);
+                let single_sim = single_predicted.similarity(&test_out_hv) as f64;
+                let single_dist_sim = single_predicted.similarity(&distractor_hv) as f64;
+                single_pair_total += 1;
+                if single_sim > single_dist_sim {
+                    single_pair_hits += 1;
+                }
+
+                // ── Confusion matrix: which transform type does the model pick? ──
+                // Compare predicted output against all 4 transform types' outputs
+                let mut best_type_idx = type_idx; // default to correct
+                let mut best_sim = pred_sim;
+                for (other_idx, &other_type) in TASK_TYPES.iter().enumerate() {
+                    if other_idx == type_idx {
+                        continue; // already computed
+                    }
+                    let other_output = apply_transform(&test_input, other_type, task_param);
+                    let other_hv = encoder.encode_grid(&other_output);
+                    let other_sim = predicted.similarity(&other_hv) as f64;
+                    if other_sim > best_sim {
+                        best_sim = other_sim;
+                        best_type_idx = other_idx;
+                    }
+                }
+                confusion_counts[type_idx][best_type_idx] += 1;
+
                 // Deliberation for test — time pressure reduces deliberation
                 // (Wickelgren 1977 speed-accuracy tradeoff)
                 xor_shift(&mut rng);
@@ -249,6 +285,23 @@ impl ArcFluidBenchmark {
             if per_type_total[3] > 0 { per_type_hits[3] as f64 / per_type_total[3] as f64 } else { 0.0 },
         ];
 
+        let single_pair_accuracy = if single_pair_total > 0 {
+            single_pair_hits as f64 / single_pair_total as f64
+        } else {
+            0.0
+        };
+
+        // Normalize confusion matrix rows
+        let mut confusion_matrix = [[0.0f64; 4]; 4];
+        for i in 0..4 {
+            let row_sum: u32 = confusion_counts[i].iter().sum();
+            if row_sum > 0 {
+                for j in 0..4 {
+                    confusion_matrix[i][j] = confusion_counts[i][j] as f64 / row_sum as f64;
+                }
+            }
+        }
+
         TrialResult {
             rule_consistency,
             cross_task_discrimination,
@@ -256,6 +309,8 @@ impl ArcFluidBenchmark {
             transfer_similarity,
             rt_ticks,
             per_type_accuracy,
+            single_pair_accuracy,
+            confusion_matrix,
         }
     }
 }
@@ -285,6 +340,9 @@ impl PsychBenchmark for ArcFluidBenchmark {
         let mut rts = Vec::new();
         let type_names = ["color_fill", "translation", "color_replace", "reflection"];
         let mut per_type: [Vec<f64>; 4] = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+        let mut single_pair_accs = Vec::new();
+        // Aggregate confusion matrix across trials
+        let mut confusion_sum = [[0.0f64; 4]; 4];
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -293,8 +351,12 @@ impl PsychBenchmark for ArcFluidBenchmark {
             accuracies.push(r.transfer_accuracy);
             similarities.push(r.transfer_similarity);
             rts.push(r.rt_ticks);
+            single_pair_accs.push(r.single_pair_accuracy);
             for i in 0..4 {
                 per_type[i].push(r.per_type_accuracy[i]);
+                for j in 0..4 {
+                    confusion_sum[i][j] += r.confusion_matrix[i][j];
+                }
             }
         }
 
@@ -315,6 +377,67 @@ impl PsychBenchmark for ArcFluidBenchmark {
             result.insert(
                 &format!("accuracy_{}", name),
                 MetricValue::from_samples(&per_type[i]),
+            );
+        }
+
+        // ── Learning curve metrics ──
+        result.insert(
+            "single_pair_accuracy",
+            MetricValue::from_samples(&single_pair_accs),
+        );
+        let learning_effs: Vec<f64> = accuracies
+            .iter()
+            .zip(single_pair_accs.iter())
+            .map(|(two, one)| two - one)
+            .collect();
+        result.insert(
+            "learning_efficiency",
+            MetricValue::from_samples(&learning_effs),
+        );
+
+        // ── Confusion matrix summary metrics ──
+        let n_trials = config.trials_per_condition as f64;
+        if n_trials > 0.0 {
+            // Normalize by trial count
+            let mut confusion_avg = [[0.0f64; 4]; 4];
+            for i in 0..4 {
+                for j in 0..4 {
+                    confusion_avg[i][j] = confusion_sum[i][j] / n_trials;
+                }
+            }
+            // Confusion diagonal = mean of diagonal (overall correct classification)
+            let diagonal_mean =
+                (confusion_avg[0][0] + confusion_avg[1][1] + confusion_avg[2][2] + confusion_avg[3][3]) / 4.0;
+            result.insert(
+                "confusion_diagonal",
+                MetricValue::from_samples(&[diagonal_mean]),
+            );
+            // Max off-diagonal: the single largest confusion rate
+            let mut max_offdiag = 0.0f64;
+            for i in 0..4 {
+                for j in 0..4 {
+                    if i != j && confusion_avg[i][j] > max_offdiag {
+                        max_offdiag = confusion_avg[i][j];
+                    }
+                }
+            }
+            result.insert(
+                "confusion_max_error",
+                MetricValue::from_samples(&[max_offdiag]),
+            );
+            // Confusion entropy: Shannon entropy of each row, averaged
+            let mut entropy_sum = 0.0f64;
+            for i in 0..4 {
+                for j in 0..4 {
+                    let p = confusion_avg[i][j];
+                    if p > 0.0 {
+                        entropy_sum -= p * p.log2();
+                    }
+                }
+            }
+            result.insert(
+                "confusion_entropy",
+                MetricValue::from_samples(&[entropy_sum / 4.0]), // mean per-row entropy
             );
         }
 
@@ -436,6 +559,41 @@ mod tests {
         // Verify at least 4 conditions (one per task type)
         let result = ArcFluidBenchmark.run(&test_config());
         assert_eq!(result.conditions, 4, "Should have 4 task type conditions");
+    }
+
+    #[test]
+    fn test_learning_curve_metrics() {
+        let result = ArcFluidBenchmark.run(&test_config());
+        assert!(result.metrics.contains_key("single_pair_accuracy"));
+        assert!(result.metrics.contains_key("learning_efficiency"));
+        let single = result.metrics["single_pair_accuracy"].mean;
+        let two_pair = result.metrics["transfer_accuracy"].mean;
+        assert!(single.is_finite(), "single_pair_accuracy not finite");
+        assert!(single >= 0.0 && single <= 1.0);
+        // Learning efficiency = two_pair - single_pair (can be negative)
+        let eff = result.metrics["learning_efficiency"].mean;
+        assert!(eff.is_finite(), "learning_efficiency not finite");
+        // With dim=256, consensus of 2 should generally >= single pair
+        // But due to noise, we just check it's in a reasonable range
+        assert!(eff > -0.5 && eff < 0.5, "learning_efficiency out of range: {}", eff);
+        let _ = (single, two_pair);
+    }
+
+    #[test]
+    fn test_confusion_matrix_metrics() {
+        let result = ArcFluidBenchmark.run(&test_config());
+        assert!(result.metrics.contains_key("confusion_diagonal"));
+        assert!(result.metrics.contains_key("confusion_max_error"));
+        assert!(result.metrics.contains_key("confusion_entropy"));
+        let diag = result.metrics["confusion_diagonal"].mean;
+        assert!(diag.is_finite() && diag >= 0.0 && diag <= 1.0,
+            "confusion_diagonal out of range: {}", diag);
+        let max_err = result.metrics["confusion_max_error"].mean;
+        assert!(max_err.is_finite() && max_err >= 0.0 && max_err <= 1.0,
+            "confusion_max_error out of range: {}", max_err);
+        let entropy = result.metrics["confusion_entropy"].mean;
+        assert!(entropy.is_finite() && entropy >= 0.0,
+            "confusion_entropy should be non-negative: {}", entropy);
     }
 
     #[test]

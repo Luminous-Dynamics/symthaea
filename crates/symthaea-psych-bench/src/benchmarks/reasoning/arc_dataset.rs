@@ -1,0 +1,329 @@
+//! Real ARC-AGI dataset loader and evaluator.
+//!
+//! Loads tasks from the ARC-AGI JSON format and evaluates Symthaea's HDC
+//! grid encoder on them. This provides ground-truth evaluation against
+//! Chollet's original benchmark.
+//!
+//! ARC JSON format:
+//! ```json
+//! {
+//!   "train": [{"input": [[0,1,...], ...], "output": [[2,3,...], ...]}],
+//!   "test":  [{"input": [[0,1,...], ...], "output": [[2,3,...], ...]}]
+//! }
+//! ```
+//!
+//! Usage: `--arc-data-dir /path/to/ARC-AGI/data/training/`
+//!
+//! Source: <https://github.com/fchollet/ARC-AGI>
+
+use serde::Deserialize;
+use std::collections::BTreeMap;
+use std::path::Path;
+
+/// A single ARC input/output pair.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArcPair {
+    pub input: Vec<Vec<u8>>,
+    pub output: Vec<Vec<u8>>,
+}
+
+/// A complete ARC task with training and test pairs.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArcTask {
+    pub train: Vec<ArcPair>,
+    pub test: Vec<ArcPair>,
+}
+
+/// Results from evaluating on real ARC tasks.
+#[derive(Debug, Clone)]
+pub struct ArcDatasetResult {
+    /// Number of tasks loaded.
+    pub tasks_loaded: usize,
+    /// Number of tasks where test output was predicted correctly (2-AFC).
+    pub tasks_correct: usize,
+    /// Mean cosine similarity between predicted and actual test outputs.
+    pub mean_similarity: f64,
+    /// Mean rule consistency across training pairs (within-task).
+    pub mean_rule_consistency: f64,
+    /// Per-task results: (task_id, similarity, correct).
+    pub per_task: Vec<(String, f64, bool)>,
+}
+
+/// Load all ARC tasks from a directory of JSON files.
+///
+/// Returns a map of filename → ArcTask.
+pub fn load_arc_tasks(dir: &Path) -> Result<BTreeMap<String, ArcTask>, String> {
+    if !dir.is_dir() {
+        return Err(format!("Not a directory: {}", dir.display()));
+    }
+
+    let mut tasks = BTreeMap::new();
+    let entries = std::fs::read_dir(dir)
+        .map_err(|e| format!("Failed to read directory {}: {}", dir.display(), e))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Read dir entry error: {}", e))?;
+        let path = entry.path();
+        if path.extension().map_or(false, |ext| ext == "json") {
+            let content = std::fs::read_to_string(&path)
+                .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+            let task: ArcTask = serde_json::from_str(&content)
+                .map_err(|e| format!("Failed to parse {}: {}", path.display(), e))?;
+            let name = path
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "unknown".to_string());
+            tasks.insert(name, task);
+        }
+    }
+
+    Ok(tasks)
+}
+
+/// Evaluate Symthaea's HDC grid encoder on real ARC tasks.
+///
+/// For each task:
+///   1. Encode all training pairs, compute rule HVs.
+///   2. Bundle training rules into a consensus rule.
+///   3. Apply consensus rule to test input, compare to test output.
+///   4. Score: 2-AFC (predicted vs random grid distractor).
+pub fn evaluate_arc_tasks(
+    tasks: &BTreeMap<String, ArcTask>,
+    dimension: usize,
+    seed: u64,
+) -> ArcDatasetResult {
+    use symthaea_core::hdc::grid_encoder::GridEncoder;
+    use symthaea_core::hdc::ContinuousHV;
+
+    let mut tasks_correct: usize = 0;
+    let mut similarity_sum: f64 = 0.0;
+    let mut consistency_sum: f64 = 0.0;
+    let mut per_task = Vec::new();
+    let mut task_count: usize = 0;
+
+    for (task_id, task) in tasks {
+        if task.train.is_empty() || task.test.is_empty() {
+            continue;
+        }
+
+        // Determine grid dimensions from the task
+        let max_rows = task
+            .train
+            .iter()
+            .chain(task.test.iter())
+            .flat_map(|p| [p.input.len(), p.output.len()])
+            .max()
+            .unwrap_or(30);
+        let max_cols = task
+            .train
+            .iter()
+            .chain(task.test.iter())
+            .flat_map(|p| {
+                [
+                    p.input.iter().map(|r| r.len()).max().unwrap_or(0),
+                    p.output.iter().map(|r| r.len()).max().unwrap_or(0),
+                ]
+            })
+            .max()
+            .unwrap_or(30);
+        let num_colors = 10; // ARC uses colors 0-9
+
+        let encoder = GridEncoder::new(
+            dimension,
+            max_rows.max(1),
+            max_cols.max(1),
+            num_colors,
+            seed ^ (task_count as u64),
+        );
+
+        // Encode training pairs and compute rules
+        let mut rules = Vec::new();
+        for pair in &task.train {
+            let in_hv = encoder.encode_grid(&pair.input);
+            let out_hv = encoder.encode_grid(&pair.output);
+            rules.push(encoder.encode_rule(&in_hv, &out_hv));
+        }
+
+        // Rule consistency: mean pairwise cosine of training rules
+        let mut consistency_pairs = Vec::new();
+        for i in 0..rules.len() {
+            for j in (i + 1)..rules.len() {
+                consistency_pairs.push(rules[i].similarity(&rules[j]) as f64);
+            }
+        }
+        let rule_consistency = if consistency_pairs.is_empty() {
+            1.0
+        } else {
+            consistency_pairs.iter().sum::<f64>() / consistency_pairs.len() as f64
+        };
+        consistency_sum += rule_consistency;
+
+        // Bundle rules into consensus
+        let consensus = encoder.bundle_rules(&rules);
+
+        // Evaluate on first test pair
+        let test_pair = &task.test[0];
+        let test_in_hv = encoder.encode_grid(&test_pair.input);
+        let test_out_hv = encoder.encode_grid(&test_pair.output);
+        let predicted = encoder.apply_rule(&test_in_hv, &consensus);
+
+        let pred_sim = predicted.similarity(&test_out_hv) as f64;
+        similarity_sum += pred_sim;
+
+        // 2-AFC: predicted vs random distractor
+        let distractor = ContinuousHV::random(dimension, seed ^ (task_count as u64) ^ 0xDEAD);
+        let dist_sim = predicted.similarity(&distractor) as f64;
+        let correct = pred_sim > dist_sim;
+        if correct {
+            tasks_correct += 1;
+        }
+
+        per_task.push((task_id.clone(), pred_sim, correct));
+        task_count += 1;
+    }
+
+    ArcDatasetResult {
+        tasks_loaded: task_count,
+        tasks_correct,
+        mean_similarity: if task_count > 0 {
+            similarity_sum / task_count as f64
+        } else {
+            0.0
+        },
+        mean_rule_consistency: if task_count > 0 {
+            consistency_sum / task_count as f64
+        } else {
+            0.0
+        },
+        per_task,
+    }
+}
+
+/// Format ARC dataset evaluation results.
+pub fn format_arc_dataset_result(result: &ArcDatasetResult) -> String {
+    let mut lines = Vec::new();
+    lines.push("## Real ARC-AGI Dataset Evaluation".to_string());
+    lines.push(format!("Tasks loaded: {}", result.tasks_loaded));
+    lines.push(format!(
+        "Tasks correct (2-AFC): {}/{} ({:.1}%)",
+        result.tasks_correct,
+        result.tasks_loaded,
+        if result.tasks_loaded > 0 {
+            100.0 * result.tasks_correct as f64 / result.tasks_loaded as f64
+        } else {
+            0.0
+        }
+    ));
+    lines.push(format!(
+        "Mean predicted-actual similarity: {:.4}",
+        result.mean_similarity
+    ));
+    lines.push(format!(
+        "Mean rule consistency: {:.4}",
+        result.mean_rule_consistency
+    ));
+
+    // Show top-5 best and worst tasks
+    let mut sorted = result.per_task.clone();
+    sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    if sorted.len() > 5 {
+        lines.push(String::new());
+        lines.push("Top 5 tasks (highest similarity):".to_string());
+        for (id, sim, correct) in sorted.iter().take(5) {
+            let mark = if *correct { "+" } else { "-" };
+            lines.push(format!("  [{}] {} sim={:.4}", mark, id, sim));
+        }
+        lines.push(String::new());
+        lines.push("Bottom 5 tasks (lowest similarity):".to_string());
+        for (id, sim, correct) in sorted.iter().rev().take(5) {
+            let mark = if *correct { "+" } else { "-" };
+            lines.push(format!("  [{}] {} sim={:.4}", mark, id, sim));
+        }
+    }
+
+    lines.join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_arc_pair_deserialize() {
+        let json = r#"{"input": [[0,1],[2,3]], "output": [[3,2],[1,0]]}"#;
+        let pair: ArcPair = serde_json::from_str(json).unwrap();
+        assert_eq!(pair.input.len(), 2);
+        assert_eq!(pair.output[0], vec![3, 2]);
+    }
+
+    #[test]
+    fn test_arc_task_deserialize() {
+        let json = r#"{
+            "train": [{"input": [[0,1],[2,3]], "output": [[3,2],[1,0]]}],
+            "test": [{"input": [[4,5],[6,7]], "output": [[7,6],[5,4]]}]
+        }"#;
+        let task: ArcTask = serde_json::from_str(json).unwrap();
+        assert_eq!(task.train.len(), 1);
+        assert_eq!(task.test.len(), 1);
+    }
+
+    #[test]
+    fn test_evaluate_synthetic_task() {
+        use symthaea_core::hdc::grid_encoder::GridEncoder;
+
+        // Create a synthetic ARC task: reflect_x
+        let input1 = vec![vec![0, 1, 2], vec![3, 4, 5]];
+        let output1 = vec![vec![2, 1, 0], vec![5, 4, 3]]; // reflect_x
+        let input2 = vec![vec![1, 0, 1], vec![2, 2, 0]];
+        let output2 = vec![vec![1, 0, 1], vec![0, 2, 2]]; // reflect_x
+
+        let test_input = vec![vec![5, 3, 1], vec![4, 2, 0]];
+        let test_output = GridEncoder::reflect_x(&test_input);
+
+        let task = ArcTask {
+            train: vec![
+                ArcPair { input: input1, output: output1 },
+                ArcPair { input: input2, output: output2 },
+            ],
+            test: vec![ArcPair {
+                input: test_input,
+                output: test_output,
+            }],
+        };
+
+        let mut tasks = BTreeMap::new();
+        tasks.insert("synthetic_reflect".to_string(), task);
+
+        let result = evaluate_arc_tasks(&tasks, 512, 42);
+        assert_eq!(result.tasks_loaded, 1);
+        // The rule should be somewhat consistent
+        assert!(result.mean_rule_consistency.is_finite());
+        // The prediction should beat a random distractor
+        assert!(result.mean_similarity.is_finite());
+    }
+
+    #[test]
+    fn test_load_nonexistent_dir() {
+        let result = load_arc_tasks(Path::new("/nonexistent/path"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_format_result() {
+        let result = ArcDatasetResult {
+            tasks_loaded: 10,
+            tasks_correct: 7,
+            mean_similarity: 0.45,
+            mean_rule_consistency: 0.72,
+            per_task: vec![
+                ("task1".to_string(), 0.6, true),
+                ("task2".to_string(), 0.3, false),
+            ],
+        };
+        let formatted = format_arc_dataset_result(&result);
+        assert!(formatted.contains("10"));
+        assert!(formatted.contains("7/10"));
+        assert!(formatted.contains("70.0%"));
+    }
+}

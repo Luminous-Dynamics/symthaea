@@ -8,10 +8,12 @@
 
 pub mod attention_network;
 pub mod mood_induction;
+pub mod pharmacological_ablation;
 pub mod reward_learning;
 pub mod yerkes_dodson;
 
 pub use attention_network::AttentionNetworkBenchmark;
 pub use mood_induction::MoodInductionBenchmark;
+pub use pharmacological_ablation::PharmacologicalAblationBenchmark;
 pub use reward_learning::RewardLearningBenchmark;
 pub use yerkes_dodson::YerkesDodsonBenchmark;

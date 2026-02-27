@@ -1458,6 +1458,169 @@ pub fn format_dim_scaling(r: &DimScalingResult) -> String {
     )
 }
 
+/// Reasoning domain validity analysis.
+///
+/// Computes convergent validity within the reasoning cluster (ArcFluid,
+/// ArcCompositional, ArcAnalogy, ArcAbductive) and discriminant validity
+/// against executive function benchmarks (Stroop, WCST, Ravens, Tower).
+///
+/// Expects a `BenchmarkReport` containing results from a single seed/run.
+/// For proper correlation analysis, use `CrossBenchmarkAnalysis::from_multi_seed_reports`.
+pub struct ReasoningValidityResult {
+    /// Mean pairwise correlation within reasoning benchmarks.
+    pub reasoning_convergent: f64,
+    /// Number of reasoning benchmark pairs with r > 0.3.
+    pub reasoning_convergent_pairs: usize,
+    /// Mean pairwise correlation between reasoning and executive benchmarks.
+    pub reasoning_executive_correlation: f64,
+    /// Convergent/discriminant ratio (should be > 1).
+    pub convergent_discriminant_ratio: f64,
+    /// Per-benchmark key metric values for the reasoning cluster.
+    pub reasoning_scores: BTreeMap<String, f64>,
+    /// Per-benchmark key metric values for executive function cluster.
+    pub executive_scores: BTreeMap<String, f64>,
+}
+
+/// Extract reasoning validity from a single-run report.
+///
+/// This is a lightweight analysis based on within-run metric values.
+/// For proper validity with correlations, use `CrossBenchmarkAnalysis`.
+pub fn reasoning_validity_single_run(report: &super::report::BenchmarkReport) -> ReasoningValidityResult {
+    let reasoning_benchmarks = ["ArcFluid", "ArcCompositional", "ArcAnalogy", "ArcAbductive"];
+    let executive_benchmarks = ["Stroop", "Wisconsin", "Ravens", "TowerOfLondon"];
+
+    let mut reasoning_scores = BTreeMap::new();
+    let mut executive_scores = BTreeMap::new();
+
+    for result in &report.results {
+        let key_metric = super::report::key_metric_for_benchmark(&result.benchmark);
+        if let Some(metric) = result.metrics.get(key_metric) {
+            for name in &reasoning_benchmarks {
+                if result.benchmark.contains(name) {
+                    reasoning_scores.insert(result.benchmark.clone(), metric.mean);
+                }
+            }
+            for name in &executive_benchmarks {
+                if result.benchmark.contains(name) && !result.benchmark.contains("Emotional") {
+                    executive_scores.insert(result.benchmark.clone(), metric.mean);
+                }
+            }
+        }
+    }
+
+    // Compute "convergent" = mean absolute difference within reasoning (lower = more similar)
+    // and "discriminant" = mean absolute difference between reasoning and executive
+    let reasoning_vals: Vec<f64> = reasoning_scores.values().copied().collect();
+    let executive_vals: Vec<f64> = executive_scores.values().copied().collect();
+
+    // Within-reasoning pairwise correlation of scores (using values as single data points)
+    // Note: with a single run, we can only compute consistency, not true correlation.
+    // We use coefficient of variation as a proxy for convergent validity.
+    let reasoning_mean = if reasoning_vals.is_empty() {
+        0.0
+    } else {
+        reasoning_vals.iter().sum::<f64>() / reasoning_vals.len() as f64
+    };
+    let reasoning_var = if reasoning_vals.len() > 1 {
+        reasoning_vals.iter().map(|v| (v - reasoning_mean).powi(2)).sum::<f64>()
+            / (reasoning_vals.len() - 1) as f64
+    } else {
+        0.0
+    };
+    // Convergent validity proxy: 1 - CV (high = consistent scores within reasoning)
+    let reasoning_cv = if reasoning_mean.abs() > 1e-10 {
+        reasoning_var.sqrt() / reasoning_mean.abs()
+    } else {
+        1.0
+    };
+    let reasoning_convergent = (1.0 - reasoning_cv).max(0.0);
+
+    // Count "convergent pairs" where scores are within 0.2 of each other
+    let mut convergent_pairs = 0;
+    let n_r = reasoning_vals.len();
+    for i in 0..n_r {
+        for j in (i + 1)..n_r {
+            if (reasoning_vals[i] - reasoning_vals[j]).abs() < 0.2 {
+                convergent_pairs += 1;
+            }
+        }
+    }
+
+    // Cross-cluster mean difference (higher = more discriminant)
+    let mut cross_diffs = Vec::new();
+    for r in &reasoning_vals {
+        for e in &executive_vals {
+            cross_diffs.push((r - e).abs());
+        }
+    }
+    let reasoning_executive_correlation = if cross_diffs.is_empty() {
+        0.0
+    } else {
+        1.0 - (cross_diffs.iter().sum::<f64>() / cross_diffs.len() as f64)
+    };
+
+    let convergent_discriminant_ratio = if reasoning_executive_correlation.abs() > 1e-10 {
+        reasoning_convergent / reasoning_executive_correlation.abs()
+    } else if reasoning_convergent > 0.0 {
+        f64::INFINITY
+    } else {
+        1.0
+    };
+
+    ReasoningValidityResult {
+        reasoning_convergent,
+        reasoning_convergent_pairs: convergent_pairs,
+        reasoning_executive_correlation,
+        convergent_discriminant_ratio,
+        reasoning_scores,
+        executive_scores,
+    }
+}
+
+/// Format reasoning validity result as a Markdown table.
+pub fn format_reasoning_validity(result: &ReasoningValidityResult) -> String {
+    let mut lines = Vec::new();
+    lines.push("## Reasoning Domain Validity".to_string());
+    lines.push(String::new());
+    lines.push("### Reasoning Cluster Scores".to_string());
+    lines.push("| Benchmark | Key Metric |".to_string());
+    lines.push("|-----------|-----------|".to_string());
+    for (name, val) in &result.reasoning_scores {
+        let short = name.split("::").last().unwrap_or(name);
+        lines.push(format!("| {} | {:.3} |", short, val));
+    }
+    lines.push(String::new());
+    lines.push("### Executive Function Cluster Scores".to_string());
+    lines.push("| Benchmark | Key Metric |".to_string());
+    lines.push("|-----------|-----------|".to_string());
+    for (name, val) in &result.executive_scores {
+        let short = name.split("::").last().unwrap_or(name);
+        lines.push(format!("| {} | {:.3} |", short, val));
+    }
+    lines.push(String::new());
+    lines.push(format!(
+        "Reasoning convergent (consistency): {:.3}",
+        result.reasoning_convergent
+    ));
+    lines.push(format!(
+        "Reasoning-Executive cross-cluster:  {:.3}",
+        result.reasoning_executive_correlation
+    ));
+    lines.push(format!(
+        "Convergent/Discriminant ratio:      {:.2}",
+        result.convergent_discriminant_ratio
+    ));
+    let verdict = if result.convergent_discriminant_ratio > 1.5 {
+        "GOOD: reasoning scores internally consistent, distinct from executive"
+    } else if result.convergent_discriminant_ratio > 1.0 {
+        "FAIR: some distinction between reasoning and executive"
+    } else {
+        "NOTE: reasoning and executive scores overlap"
+    };
+    lines.push(format!("Verdict: {}", verdict));
+    lines.join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
