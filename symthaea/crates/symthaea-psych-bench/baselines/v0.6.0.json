@@ -1,7 +1,7 @@
 {
   "name": "baseline",
-  "timestamp": "2026-02-27T04:55:01.896075165+00:00",
-  "git_hash": "a31d805c5",
+  "timestamp": "2026-02-27T07:26:59.111164467+00:00",
+  "git_hash": "27498e6fa",
   "config_summary": "dim=512, trials=10, seed=42",
   "schema_version": "1.1",
   "metrics": {
@@ -1135,6 +1135,117 @@
         "ci_upper": 7.399222656376651
       }
     },
+    "Language::LexicalDecision": {
+      "frequency_effect": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "lexicality_effect": {
+        "mean": 0.9700000000000001,
+        "std_dev": 0.03496029493900506,
+        "n": 10,
+        "ci_lower": 0.9449926490807203,
+        "ci_upper": 0.9950073509192798
+      },
+      "nonword_accuracy": {
+        "mean": 0.030000000000000006,
+        "std_dev": 0.03496029493900506,
+        "n": 10,
+        "ci_lower": 0.004992649080720286,
+        "ci_upper": 0.055007350919279725
+      },
+      "rt_ticks": {
+        "mean": 8.975,
+        "std_dev": 0.11365151414154885,
+        "n": 10,
+        "ci_lower": 8.893704252878763,
+        "ci_upper": 9.056295747121236
+      },
+      "word_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "Language::SemanticCoherence": {
+      "coherence_decay": {
+        "mean": 0.002208909856368077,
+        "std_dev": 0.001303743429987714,
+        "n": 10,
+        "ci_lower": 0.001276332785170862,
+        "ci_upper": 0.0031414869275652917
+      },
+      "coherence_mean": {
+        "mean": 0.001317418581772075,
+        "std_dev": 0.035244297493883435,
+        "n": 10,
+        "ci_lower": -0.0238930814117419,
+        "ci_upper": 0.026527918575286052
+      },
+      "complexity_penalty": {
+        "mean": 0.007800266998820006,
+        "std_dev": 0.016221055698729385,
+        "n": 10,
+        "ci_lower": -0.0038027710432512758,
+        "ci_upper": 0.019403305040891286
+      },
+      "recovery_speed": {
+        "mean": 0.0005423081918142901,
+        "std_dev": 0.0003558028031422687,
+        "n": 10,
+        "ci_lower": 0.0002877998825518587,
+        "ci_upper": 0.0007968165010767215
+      },
+      "rt_ticks": {
+        "mean": 6.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 6.0,
+        "ci_upper": 6.0
+      }
+    },
+    "Language::SemanticPriming": {
+      "priming_effect": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "related_accuracy": {
+        "mean": 0.97,
+        "std_dev": 0.04830458915396478,
+        "n": 10,
+        "ci_lower": 0.935447379260033,
+        "ci_upper": 1.004552620739967
+      },
+      "rt_ticks": {
+        "mean": 8.485,
+        "std_dev": 0.12258783698955505,
+        "n": 10,
+        "ci_lower": 8.397312036743918,
+        "ci_upper": 8.572687963256081
+      },
+      "soa_modulation": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "unrelated_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
     "MemoryAgent::AccurateRetrieval": {
       "facts_3_delay_2::accuracy": {
         "mean": 1.0,
@@ -1392,6 +1503,87 @@
         "n": 10,
         "ci_lower": 7.204034630301619,
         "ci_upper": 7.295008840915534
+      }
+    },
+    "Motor::Bimanual": {
+      "asymmetric_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "coordination_cost": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "left_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "right_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "rt_ticks": {
+        "mean": 4.75,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 4.75,
+        "ci_upper": 4.75
+      },
+      "symmetric_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "Motor::FittsLaw": {
+      "accuracy": {
+        "mean": 0.7,
+        "std_dev": 0.043204937989385725,
+        "n": 10,
+        "ci_lower": 0.6690951964898658,
+        "ci_upper": 0.7309048035101341
+      },
+      "fitts_r_squared": {
+        "mean": 0.9988843452161824,
+        "std_dev": 0.0008920081401873492,
+        "n": 10,
+        "ci_lower": 0.9982462853650445,
+        "ci_upper": 0.9995224050673204
+      },
+      "id_slope": {
+        "mean": 1.2017182399999995,
+        "std_dev": 0.012507500673258318,
+        "n": 10,
+        "ci_lower": 1.1927715346302363,
+        "ci_upper": 1.2106649453697627
+      },
+      "rt_ticks": {
+        "mean": 5.60601264,
+        "std_dev": 0.021995394588019246,
+        "n": 10,
+        "ci_lower": 5.590279175736319,
+        "ci_upper": 5.621746104263682
+      },
+      "throughput": {
+        "mean": 0.5351471263396265,
+        "std_dev": 0.0020991740652579172,
+        "n": 10,
+        "ci_lower": 0.5336455720025666,
+        "ci_upper": 0.5366486806766864
       }
     },
     "Motor::SRTT": {
@@ -2223,6 +2415,154 @@
         "n": 10,
         "ci_lower": 4.809942388814143,
         "ci_upper": 5.001168722296967
+      }
+    },
+    "Social::SocialNorm": {
+      "d_prime": {
+        "mean": 4.653570665117932,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 4.653570665117932,
+        "ci_upper": 4.653570665117932
+      },
+      "detection_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "false_alarm_rate": {
+        "mean": 0.009999999999999998,
+        "std_dev": 1.828559098217032e-18,
+        "n": 10,
+        "ci_lower": 0.009999999999999997,
+        "ci_upper": 0.01
+      },
+      "rt_ticks": {
+        "mean": 6.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 6.0,
+        "ci_upper": 6.0
+      },
+      "violation_rt_cost": {
+        "mean": 0.39999999999999997,
+        "std_dev": 5.851389114294502e-17,
+        "n": 10,
+        "ci_lower": 0.3999999999999999,
+        "ci_upper": 0.4
+      }
+    },
+    "Social::UltimatumGame": {
+      "fairness_sensitivity": {
+        "mean": 2.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 2.0,
+        "ci_upper": 2.0
+      },
+      "offer_threshold": {
+        "mean": 0.30000001192092896,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.30000001192092896,
+        "ci_upper": 0.30000001192092896
+      },
+      "rejection_rate": {
+        "mean": 0.39499999999999996,
+        "std_dev": 0.030731814857642963,
+        "n": 10,
+        "ci_lower": 0.3730173113564332,
+        "ci_upper": 0.41698268864356675
+      },
+      "rt_ticks": {
+        "mean": 5.799999999999999,
+        "std_dev": 9.362222582871203e-16,
+        "n": 10,
+        "ci_lower": 5.799999999999998,
+        "ci_upper": 5.8
+      },
+      "strategic_ratio": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "SustainedAttention::CPT": {
+      "d_prime": {
+        "mean": 4.653570665117932,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 4.653570665117932,
+        "ci_upper": 4.653570665117932
+      },
+      "false_alarm_rate": {
+        "mean": 0.009999999999999998,
+        "std_dev": 1.828559098217032e-18,
+        "n": 10,
+        "ci_lower": 0.009999999999999997,
+        "ci_upper": 0.01
+      },
+      "hit_rate": {
+        "mean": 0.99,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.99,
+        "ci_upper": 0.99
+      },
+      "rt_ticks": {
+        "mean": 6.520765950826484,
+        "std_dev": 0.0363917081779591,
+        "n": 10,
+        "ci_lower": 6.494734699701572,
+        "ci_upper": 6.546797201951397
+      },
+      "vigilance_decrement": {
+        "mean": 5.413658939124572e-16,
+        "std_dev": 1.0394155073169213e-31,
+        "n": 10,
+        "ci_lower": 5.413658939124571e-16,
+        "ci_upper": 5.413658939124573e-16
+      }
+    },
+    "SustainedAttention::PVT": {
+      "fastest_10pct": {
+        "mean": 4.012544,
+        "std_dev": 0.06260427998148388,
+        "n": 10,
+        "ci_lower": 3.9677627073570965,
+        "ci_upper": 4.057325292642903
+      },
+      "lapse_rate": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "mean_rt": {
+        "mean": 4.8317332,
+        "std_dev": 0.020805344750914893,
+        "n": 10,
+        "ci_lower": 4.816850986961167,
+        "ci_upper": 4.846615413038834
+      },
+      "rt_ticks": {
+        "mean": 4.8317332,
+        "std_dev": 0.020805344750914893,
+        "n": 10,
+        "ci_lower": 4.816850986961167,
+        "ci_upper": 4.846615413038834
+      },
+      "vigilance_decrement": {
+        "mean": 0.15047844848484848,
+        "std_dev": 0.004767346646403497,
+        "n": 10,
+        "ci_lower": 0.14706833107169553,
+        "ci_upper": 0.15388856589800143
       }
     },
     "SustainedAttention::SART": {

@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn test_all_benchmarks_have_provenance() {
-        // Instantiate all 59 benchmarks and verify each has provenance
+        // Instantiate all 67 benchmarks and verify each has provenance
         use crate::benchmarks::affect::*;
         use crate::benchmarks::attention::*;
         use crate::benchmarks::butlin::*;
@@ -240,13 +240,21 @@ mod tests {
             Box::new(ArcStaircaseBenchmark),
             // Sustained Attention
             Box::new(SartBenchmark),
+            Box::new(PvtBenchmark),
+            Box::new(CptBenchmark),
             // Motor
             Box::new(SrttBenchmark),
+            Box::new(FittsLawBenchmark),
+            Box::new(BimanualBenchmark),
             // Language
             Box::new(GardenPathBenchmark),
             Box::new(SemanticCoherenceBenchmark),
+            Box::new(LexicalDecisionBenchmark),
+            Box::new(SemanticPrimingBenchmark),
             // Social
             Box::new(RmeBenchmark),
+            Box::new(UltimatumGameBenchmark),
+            Box::new(SocialNormBenchmark),
         ];
 
         let mut missing = Vec::new();

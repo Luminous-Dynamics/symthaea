@@ -34,6 +34,13 @@ pub struct ArcTask {
     pub test: Vec<ArcPair>,
 }
 
+/// Breakdown of accuracy by a categorical variable.
+#[derive(Debug, Clone, Default)]
+pub struct AccuracyBreakdown {
+    /// Bin label → (count, correct, mean_similarity).
+    pub bins: BTreeMap<String, (usize, usize, f64)>,
+}
+
 /// Results from evaluating on real ARC tasks.
 #[derive(Debug, Clone)]
 pub struct ArcDatasetResult {
@@ -47,6 +54,12 @@ pub struct ArcDatasetResult {
     pub mean_rule_consistency: f64,
     /// Per-task results: (task_id, similarity, correct).
     pub per_task: Vec<(String, f64, bool)>,
+    /// Accuracy breakdown by grid size (max dimension).
+    pub by_grid_size: AccuracyBreakdown,
+    /// Accuracy breakdown by number of training examples.
+    pub by_train_count: AccuracyBreakdown,
+    /// Histogram of similarity scores (10 bins from 0.0 to 1.0).
+    pub similarity_histogram: [usize; 10],
 }
 
 /// Load all ARC tasks from a directory of JSON files.
@@ -182,6 +195,68 @@ pub fn evaluate_arc_tasks(
         task_count += 1;
     }
 
+    // Build breakdowns
+    let mut by_grid_size = AccuracyBreakdown::default();
+    let mut by_train_count = AccuracyBreakdown::default();
+    let mut similarity_histogram = [0usize; 10];
+
+    for (task_id, task) in tasks {
+        if let Some((_id, sim, correct)) = per_task.iter().find(|(id, _, _)| id == task_id) {
+            // Grid size breakdown
+            let max_dim = task
+                .train
+                .iter()
+                .chain(task.test.iter())
+                .flat_map(|p| [p.input.len(), p.output.len()])
+                .max()
+                .unwrap_or(0);
+            let size_label = if max_dim <= 5 {
+                "small (<=5)"
+            } else if max_dim <= 15 {
+                "medium (6-15)"
+            } else {
+                "large (>15)"
+            };
+            let entry = by_grid_size
+                .bins
+                .entry(size_label.to_string())
+                .or_insert((0, 0, 0.0));
+            entry.0 += 1;
+            if *correct {
+                entry.1 += 1;
+            }
+            entry.2 += sim;
+
+            // Train count breakdown
+            let train_label = format!("{} examples", task.train.len());
+            let entry = by_train_count
+                .bins
+                .entry(train_label)
+                .or_insert((0, 0, 0.0));
+            entry.0 += 1;
+            if *correct {
+                entry.1 += 1;
+            }
+            entry.2 += sim;
+
+            // Similarity histogram
+            let bin = (sim * 10.0).floor().min(9.0).max(0.0) as usize;
+            similarity_histogram[bin] += 1;
+        }
+    }
+
+    // Convert similarity sums to means
+    for entry in by_grid_size.bins.values_mut() {
+        if entry.0 > 0 {
+            entry.2 /= entry.0 as f64;
+        }
+    }
+    for entry in by_train_count.bins.values_mut() {
+        if entry.0 > 0 {
+            entry.2 /= entry.0 as f64;
+        }
+    }
+
     ArcDatasetResult {
         tasks_loaded: task_count,
         tasks_correct,
@@ -196,6 +271,9 @@ pub fn evaluate_arc_tasks(
             0.0
         },
         per_task,
+        by_grid_size,
+        by_train_count,
+        similarity_histogram,
     }
 }
 
@@ -222,6 +300,64 @@ pub fn format_arc_dataset_result(result: &ArcDatasetResult) -> String {
         "Mean rule consistency: {:.4}",
         result.mean_rule_consistency
     ));
+
+    // Grid size breakdown
+    if !result.by_grid_size.bins.is_empty() {
+        lines.push(String::new());
+        lines.push("By grid size:".to_string());
+        for (label, (count, correct, mean_sim)) in &result.by_grid_size.bins {
+            let pct = if *count > 0 {
+                100.0 * *correct as f64 / *count as f64
+            } else {
+                0.0
+            };
+            lines.push(format!(
+                "  {}: {}/{} ({:.1}%), mean_sim={:.4}",
+                label, correct, count, pct, mean_sim
+            ));
+        }
+    }
+
+    // Train count breakdown
+    if !result.by_train_count.bins.is_empty() {
+        lines.push(String::new());
+        lines.push("By training examples:".to_string());
+        for (label, (count, correct, mean_sim)) in &result.by_train_count.bins {
+            let pct = if *count > 0 {
+                100.0 * *correct as f64 / *count as f64
+            } else {
+                0.0
+            };
+            lines.push(format!(
+                "  {}: {}/{} ({:.1}%), mean_sim={:.4}",
+                label, correct, count, pct, mean_sim
+            ));
+        }
+    }
+
+    // Similarity histogram
+    lines.push(String::new());
+    lines.push("Similarity distribution:".to_string());
+    for (i, &count) in result.similarity_histogram.iter().enumerate() {
+        let lo = i as f64 * 0.1;
+        let hi = lo + 0.1;
+        let bar = "#".repeat(count.min(60));
+        lines.push(format!("  [{:.1},{:.1}): {:>4} {}", lo, hi, count, bar));
+    }
+
+    // LLM comparison
+    let our_accuracy = if result.tasks_loaded > 0 {
+        result.tasks_correct as f64 / result.tasks_loaded as f64
+    } else {
+        0.0
+    };
+    lines.push(String::new());
+    lines.push("LLM Comparison (ARC-AGI accuracy):".to_string());
+    lines.push(format!("  Symthaea HDC:    {:.1}%", our_accuracy * 100.0));
+    lines.push("  GPT-4:           5.0%".to_string());
+    lines.push("  Claude 3.5:     21.0%".to_string());
+    lines.push("  o3-high:        87.5%".to_string());
+    lines.push("  Human:          84.0%".to_string());
 
     // Show top-5 best and worst tasks
     let mut sorted = result.per_task.clone();
@@ -320,10 +456,14 @@ mod tests {
                 ("task1".to_string(), 0.6, true),
                 ("task2".to_string(), 0.3, false),
             ],
+            by_grid_size: AccuracyBreakdown::default(),
+            by_train_count: AccuracyBreakdown::default(),
+            similarity_histogram: [0; 10],
         };
         let formatted = format_arc_dataset_result(&result);
         assert!(formatted.contains("10"));
         assert!(formatted.contains("7/10"));
         assert!(formatted.contains("70.0%"));
+        assert!(formatted.contains("LLM Comparison"));
     }
 }

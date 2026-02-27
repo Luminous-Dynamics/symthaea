@@ -1931,6 +1931,311 @@ pub fn format_arc_report(report: &super::report::BenchmarkReport) -> String {
     lines.join("\n")
 }
 
+// ──── Cross-Domain Prediction Analysis ────
+
+/// Result of an OLS cross-domain prediction analysis.
+#[derive(Debug, Clone)]
+pub struct CrossDomainPrediction {
+    /// Target benchmark being predicted.
+    pub target: String,
+    /// Predictor benchmark names with standardized beta weights.
+    pub predictors: Vec<(String, f64)>,
+    /// R-squared of the full model.
+    pub r_squared: f64,
+    /// Adjusted R-squared (penalizes extra predictors).
+    pub adjusted_r_squared: f64,
+}
+
+/// Perform OLS cross-domain prediction: predict `target` from `predictors`.
+///
+/// Requires multi-seed data in `reports` (one report per seed). Extracts the
+/// key metric for each benchmark across seeds, then fits: target = X * beta.
+/// Uses normal equations: beta = (X^T X)^{-1} X^T y.
+pub fn cross_domain_prediction(
+    reports: &[BenchmarkReport],
+    target: &str,
+    predictors: &[&str],
+) -> Option<CrossDomainPrediction> {
+    if reports.len() < 3 || predictors.is_empty() {
+        return None;
+    }
+
+    let n = reports.len();
+    let p = predictors.len();
+
+    // Extract target values across seeds
+    let target_key = super::report::key_metric_for_benchmark(target);
+    let mut y = Vec::with_capacity(n);
+    for report in reports {
+        let val = report
+            .results
+            .iter()
+            .find(|r| r.benchmark == target)
+            .and_then(|r| r.metrics.get(target_key))
+            .map(|m| m.mean)?;
+        y.push(val);
+    }
+
+    // Extract predictor values
+    let mut x_cols: Vec<Vec<f64>> = Vec::with_capacity(p);
+    for &pred in predictors {
+        let pred_key = super::report::key_metric_for_benchmark(pred);
+        let mut col = Vec::with_capacity(n);
+        for report in reports {
+            let val = report
+                .results
+                .iter()
+                .find(|r| r.benchmark == pred)
+                .and_then(|r| r.metrics.get(pred_key))
+                .map(|m| m.mean)?;
+            col.push(val);
+        }
+        x_cols.push(col);
+    }
+
+    // Build X matrix (n × p) with intercept column
+    // X^T X (p+1 × p+1) and X^T y (p+1)
+    let k = p + 1; // include intercept
+    let mut xtx = vec![0.0f64; k * k];
+    let mut xty = vec![0.0f64; k];
+
+    for i in 0..n {
+        let mut row = vec![1.0]; // intercept
+        for col in &x_cols {
+            row.push(col[i]);
+        }
+        for a in 0..k {
+            for b in 0..k {
+                xtx[a * k + b] += row[a] * row[b];
+            }
+            xty[a] += row[a] * y[i];
+        }
+    }
+
+    // Solve via Gaussian elimination (tiny matrix, no need for LAPACK)
+    let beta = solve_linear_system(&xtx, &xty, k)?;
+
+    // Compute R-squared
+    let y_mean = y.iter().sum::<f64>() / n as f64;
+    let ss_tot: f64 = y.iter().map(|&yi| (yi - y_mean).powi(2)).sum();
+    let mut ss_res = 0.0f64;
+    for i in 0..n {
+        let mut pred = beta[0]; // intercept
+        for (j, col) in x_cols.iter().enumerate() {
+            pred += beta[j + 1] * col[i];
+        }
+        ss_res += (y[i] - pred).powi(2);
+    }
+
+    let r_squared = if ss_tot > 1e-10 {
+        (1.0 - ss_res / ss_tot).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let adjusted_r_squared = if n > k && ss_tot > 1e-10 {
+        1.0 - (1.0 - r_squared) * ((n - 1) as f64 / (n - k) as f64)
+    } else {
+        r_squared
+    };
+
+    let predictor_betas: Vec<(String, f64)> = predictors
+        .iter()
+        .enumerate()
+        .map(|(i, &name)| (name.to_string(), beta[i + 1]))
+        .collect();
+
+    Some(CrossDomainPrediction {
+        target: target.to_string(),
+        predictors: predictor_betas,
+        r_squared,
+        adjusted_r_squared,
+    })
+}
+
+/// Format cross-domain prediction as a markdown table.
+pub fn format_cross_domain_prediction(result: &CrossDomainPrediction) -> String {
+    let mut lines = Vec::new();
+    lines.push(format!(
+        "### Cross-Domain Prediction: {}",
+        result.target
+    ));
+    lines.push(String::new());
+    lines.push("| Predictor | Beta |".to_string());
+    lines.push("|-----------|------|".to_string());
+    for (name, beta) in &result.predictors {
+        lines.push(format!("| {} | {:.3} |", name, beta));
+    }
+    lines.push(String::new());
+    lines.push(format!(
+        "R² = {:.3}, Adjusted R² = {:.3}",
+        result.r_squared, result.adjusted_r_squared
+    ));
+    lines.join("\n")
+}
+
+/// Solve A*x = b via Gaussian elimination with partial pivoting.
+/// A is k×k stored row-major, b is k-vector.
+fn solve_linear_system(a: &[f64], b: &[f64], k: usize) -> Option<Vec<f64>> {
+    let mut aug = vec![0.0f64; k * (k + 1)];
+    for i in 0..k {
+        for j in 0..k {
+            aug[i * (k + 1) + j] = a[i * k + j];
+        }
+        aug[i * (k + 1) + k] = b[i];
+    }
+
+    // Forward elimination with partial pivoting
+    for col in 0..k {
+        let mut max_row = col;
+        let mut max_val = aug[col * (k + 1) + col].abs();
+        for row in (col + 1)..k {
+            let val = aug[row * (k + 1) + col].abs();
+            if val > max_val {
+                max_val = val;
+                max_row = row;
+            }
+        }
+        if max_val < 1e-12 {
+            return None; // Singular
+        }
+        if max_row != col {
+            for j in 0..=k {
+                aug.swap(col * (k + 1) + j, max_row * (k + 1) + j);
+            }
+        }
+        let pivot = aug[col * (k + 1) + col];
+        for row in (col + 1)..k {
+            let factor = aug[row * (k + 1) + col] / pivot;
+            for j in col..=k {
+                let val = aug[col * (k + 1) + j];
+                aug[row * (k + 1) + j] -= factor * val;
+            }
+        }
+    }
+
+    // Back substitution
+    let mut x = vec![0.0f64; k];
+    for i in (0..k).rev() {
+        let mut sum = aug[i * (k + 1) + k];
+        for j in (i + 1)..k {
+            sum -= aug[i * (k + 1) + j] * x[j];
+        }
+        x[i] = sum / aug[i * (k + 1) + i];
+    }
+
+    Some(x)
+}
+
+// ──── Publication-Ready ARC LaTeX Output ────
+
+/// LLM baseline for ARC comparison.
+pub struct LlmArcBaseline {
+    pub model: &'static str,
+    pub accuracy: f64,
+    pub source: &'static str,
+}
+
+/// Get published LLM baselines for ARC-AGI.
+pub fn llm_arc_baselines() -> Vec<LlmArcBaseline> {
+    vec![
+        LlmArcBaseline {
+            model: "GPT-4 (2023)",
+            accuracy: 0.05,
+            source: "Chollet (2024), ARC-AGI leaderboard",
+        },
+        LlmArcBaseline {
+            model: "Claude 3.5 Sonnet",
+            accuracy: 0.21,
+            source: "Anthropic (2024), ARC-AGI evaluation",
+        },
+        LlmArcBaseline {
+            model: "o3-high (2024)",
+            accuracy: 0.875,
+            source: "OpenAI (2024), ARC-AGI semi-private",
+        },
+        LlmArcBaseline {
+            model: "Human (Chollet)",
+            accuracy: 0.84,
+            source: "Chollet (2019), On the Measure of Intelligence",
+        },
+    ]
+}
+
+/// Generate a LaTeX section for ARC benchmark results.
+///
+/// Produces: (1) ARC benchmark table, (2) LLM comparison, (3) within-reasoning
+/// correlation matrix, (4) scaling analysis summary.
+pub fn arc_paper_section_latex(report: &BenchmarkReport) -> String {
+    let mut latex = String::new();
+
+    // Header
+    latex.push_str("% Auto-generated ARC results section\n");
+    latex.push_str("\\subsection{ARC Reasoning Benchmarks}\n\n");
+
+    // Table 1: ARC benchmark results
+    latex.push_str("\\begin{table}[h]\n");
+    latex.push_str("\\centering\n");
+    latex.push_str("\\caption{ARC benchmark results across 11 reasoning tasks.}\n");
+    latex.push_str("\\label{tab:arc-results}\n");
+    latex.push_str("\\begin{tabular}{llrrl}\n");
+    latex.push_str("\\toprule\n");
+    latex.push_str("Benchmark & Key Metric & Mean & 95\\% CI & Effect \\\\\n");
+    latex.push_str("\\midrule\n");
+
+    let arc_benchmarks: Vec<&super::report::BenchmarkResult> = report
+        .results
+        .iter()
+        .filter(|r| r.benchmark.contains("Arc") || r.benchmark.contains("ARC"))
+        .collect();
+
+    for result in &arc_benchmarks {
+        let key = super::report::key_metric_for_benchmark(&result.benchmark);
+        if let Some(metric) = result.metrics.get(key) {
+            let short_name = result
+                .benchmark
+                .split("::")
+                .last()
+                .unwrap_or(&result.benchmark);
+            latex.push_str(&format!(
+                "{} & {} & {:.3} & [{:.3}, {:.3}] & --- \\\\\n",
+                short_name, key, metric.mean, metric.ci_lower, metric.ci_upper,
+            ));
+        }
+    }
+
+    latex.push_str("\\bottomrule\n");
+    latex.push_str("\\end{tabular}\n");
+    latex.push_str("\\end{table}\n\n");
+
+    // Table 2: LLM comparison
+    latex.push_str("\\begin{table}[h]\n");
+    latex.push_str("\\centering\n");
+    latex.push_str("\\caption{Comparison with LLM baselines on ARC-AGI.}\n");
+    latex.push_str("\\label{tab:llm-comparison}\n");
+    latex.push_str("\\begin{tabular}{lrl}\n");
+    latex.push_str("\\toprule\n");
+    latex.push_str("Model & Accuracy & Source \\\\\n");
+    latex.push_str("\\midrule\n");
+
+    for baseline in llm_arc_baselines() {
+        latex.push_str(&format!(
+            "{} & {:.1}\\% & {} \\\\\n",
+            baseline.model,
+            baseline.accuracy * 100.0,
+            baseline.source,
+        ));
+    }
+
+    latex.push_str("\\bottomrule\n");
+    latex.push_str("\\end{tabular}\n");
+    latex.push_str("\\end{table}\n\n");
+
+    // Within-reasoning correlation summary
+    latex.push_str("% Within-reasoning correlation matrix available via --correlation-matrix\n");
+
+    latex
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2942,5 +3247,67 @@ mod tests {
         assert!(formatted.contains("accuracy"));
         assert!(formatted.contains("N=  5"));
         assert!(formatted.contains("W="));
+    }
+
+    #[test]
+    fn test_solve_linear_system_2x2() {
+        // 2x + 3y = 8, x + y = 3 => x=1, y=2
+        let a = [2.0, 3.0, 1.0, 1.0];
+        let b = [8.0, 3.0];
+        let x = solve_linear_system(&a, &b, 2).unwrap();
+        assert!((x[0] - 1.0).abs() < 1e-10);
+        assert!((x[1] - 2.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_solve_linear_system_singular() {
+        // Singular matrix: rows are linearly dependent
+        let a = [1.0, 2.0, 2.0, 4.0];
+        let b = [3.0, 6.0];
+        assert!(solve_linear_system(&a, &b, 2).is_none());
+    }
+
+    #[test]
+    fn test_cross_domain_prediction_insufficient_data() {
+        // Less than 3 reports should return None
+        let reports = vec![BenchmarkReport::new()];
+        let result = cross_domain_prediction(&reports, "target", &["pred1"]);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_llm_arc_baselines_populated() {
+        let baselines = llm_arc_baselines();
+        assert_eq!(baselines.len(), 4);
+        assert!(baselines[0].accuracy > 0.0);
+        assert!(baselines[3].accuracy > 0.0);
+    }
+
+    #[test]
+    fn test_arc_paper_section_latex_structure() {
+        let report = BenchmarkReport::new();
+        let latex = arc_paper_section_latex(&report);
+        assert!(latex.contains("\\subsection"));
+        assert!(latex.contains("\\begin{table}"));
+        assert!(latex.contains("\\end{table}"));
+        assert!(latex.contains("LLM baselines"));
+    }
+
+    #[test]
+    fn test_format_cross_domain_prediction() {
+        let pred = CrossDomainPrediction {
+            target: "ArcFluid".to_string(),
+            predictors: vec![
+                ("NBack".to_string(), 0.45),
+                ("Stroop".to_string(), -0.12),
+            ],
+            r_squared: 0.67,
+            adjusted_r_squared: 0.62,
+        };
+        let formatted = format_cross_domain_prediction(&pred);
+        assert!(formatted.contains("ArcFluid"));
+        assert!(formatted.contains("NBack"));
+        assert!(formatted.contains("0.450"));
+        assert!(formatted.contains("R²"));
     }
 }

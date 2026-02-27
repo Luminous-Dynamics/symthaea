@@ -21,20 +21,20 @@ use symthaea_psych_bench::benchmarks::{
         WisconsinCardSortingBenchmark,
     },
     inhibition::{GoNoGoBenchmark, StopSignalBenchmark},
-    language::GardenPathBenchmark,
+    language::{GardenPathBenchmark, LexicalDecisionBenchmark, SemanticCoherenceBenchmark, SemanticPrimingBenchmark},
     memory_agent::{
         AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
         ProspectiveMemoryBenchmark, TestTimeLearningBenchmark,
     },
     metacognition::{FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark},
-    motor::SrttBenchmark,
+    motor::{BimanualBenchmark, FittsLawBenchmark, SrttBenchmark},
     reasoning::{
         ArcAbductiveBenchmark, ArcAlgebraBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
         ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark,
         ArcNoiseBenchmark, ArcRsaBenchmark, ArcScalingBenchmark, ArcStaircaseBenchmark,
     },
-    social::RmeBenchmark,
-    sustained_attention::SartBenchmark,
+    social::{RmeBenchmark, SocialNormBenchmark, UltimatumGameBenchmark},
+    sustained_attention::{CptBenchmark, PvtBenchmark, SartBenchmark},
     tombench::{
         FalseBeliefBenchmark, FauxPasBenchmark, HintingBenchmark, PersuasionBenchmark,
         StrangeStoryBenchmark,
@@ -155,21 +155,30 @@ fn full_battery_report() {
 
     // ── Sustained Attention ──
     report.add(SartBenchmark.run(&config));
+    report.add(PvtBenchmark.run(&config));
+    report.add(CptBenchmark.run(&config));
 
     // ── Motor ──
     report.add(SrttBenchmark.run(&config));
+    report.add(FittsLawBenchmark.run(&config));
+    report.add(BimanualBenchmark.run(&config));
 
     // ── Language ──
     report.add(GardenPathBenchmark.run(&config));
+    report.add(SemanticCoherenceBenchmark.run(&config));
+    report.add(LexicalDecisionBenchmark.run(&config));
+    report.add(SemanticPrimingBenchmark.run(&config));
 
     // ── Social ──
     report.add(RmeBenchmark.run(&config));
+    report.add(UltimatumGameBenchmark.run(&config));
+    report.add(SocialNormBenchmark.run(&config));
 
     // Verify all benchmarks produced results
     assert_eq!(
         report.results.len(),
-        58,
-        "Expected 58 benchmark results, got {}",
+        67,
+        "Expected 67 benchmark results, got {}",
         report.results.len()
     );
 
@@ -285,9 +294,18 @@ fn regression_against_baseline() {
     report.add(ProspectiveMemoryBenchmark.run(&config));
     report.add(FeelingOfKnowingBenchmark.run(&config));
     report.add(SartBenchmark.run(&config));
+    report.add(PvtBenchmark.run(&config));
+    report.add(CptBenchmark.run(&config));
     report.add(SrttBenchmark.run(&config));
+    report.add(FittsLawBenchmark.run(&config));
+    report.add(BimanualBenchmark.run(&config));
     report.add(GardenPathBenchmark.run(&config));
+    report.add(SemanticCoherenceBenchmark.run(&config));
+    report.add(LexicalDecisionBenchmark.run(&config));
+    report.add(SemanticPrimingBenchmark.run(&config));
     report.add(RmeBenchmark.run(&config));
+    report.add(UltimatumGameBenchmark.run(&config));
+    report.add(SocialNormBenchmark.run(&config));
 
     let current = RegressionSnapshot::from_report(&report, "current");
     let regression = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
