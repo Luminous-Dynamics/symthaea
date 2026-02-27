@@ -4,12 +4,17 @@ pub mod analysis;
 pub mod baselines;
 pub mod cognitive_profile;
 pub mod config;
+pub mod cross_domain_prediction;
 pub mod difficulty;
 pub mod html;
 pub mod live_runner;
 pub mod neuromod_correlation;
 pub mod neuromod_profiles;
+pub mod normative_comparison;
+pub mod psychometric_report;
+pub mod reliability_analysis;
 pub mod report;
+pub mod sat_curves;
 pub mod snapshot;
 pub mod staircase;
 pub mod transfer;
@@ -30,7 +35,15 @@ pub use trial_analysis::{
 };
 pub use cognitive_profile::CognitiveProfile;
 pub use difficulty::{DifficultyModel, DifficultyModelType, difficulty_model_for};
+pub use normative_comparison::{NormativeReport, NormativeScore};
 pub use neuromod_correlation::NeuromodCorrelationMatrix;
+pub use reliability_analysis::{
+    ReliabilityBattery, ReliabilityClass, TestRetestResult, PracticeEffect, PracticeDirection,
+    compute_icc, compute_sem, pearson_r, key_metric_for,
+};
+pub use cross_domain_prediction::{CrossDomainMatrix, DomainCorrelation, PredictionModel, SharedMechanism};
+pub use psychometric_report::{PsychometricReport, ReportSummary, BenchmarkDetail};
+pub use sat_curves::{SatBattery, SatCurve, SatFit, SatPoint, run_sat_curve};
 pub use staircase::{StaircaseConfig, StaircaseResult, StaircaseRule, run_staircase};
 
 /// Provenance metadata for a psychological benchmark — citation, paradigm, year.

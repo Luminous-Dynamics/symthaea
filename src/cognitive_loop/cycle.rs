@@ -3374,7 +3374,7 @@ impl CognitiveLoopService {
         };
 
         // Pre-compute values and formatted strings to avoid expensive ops inside struct literal
-        let value_trend = self.value_feedback.recent_trend(50);
+        let value_trend = self.primitive_tier.value_feedback.recent_trend(50);
         let circadian_phase_str = self.biorhythm.phase.as_str();
         let selected_strategy_str = selected_strategy.as_str();
 
@@ -3682,6 +3682,22 @@ impl CognitiveLoopService {
         // Phase 2.2: feedback proposal attribution telemetry
         metadata.feedback_confidence_proposals = self.feedback_state.confidence.len() as u32;
         metadata.feedback_lr_proposals = self.feedback_state.learning_rate.len() as u32;
+        if self.config.trace_feedback {
+            metadata.feedback_trace_confidence = self
+                .feedback_state
+                .confidence
+                .dump_proposals()
+                .into_iter()
+                .map(|(s, d)| (s.to_string(), d))
+                .collect();
+            metadata.feedback_trace_lr = self
+                .feedback_state
+                .learning_rate
+                .dump_proposals()
+                .into_iter()
+                .map(|(s, d)| (s.to_string(), d))
+                .collect();
+        }
 
         // Project 16,384D HDC to 32D for visualization (mean-pooling)
         let thought_vector = {

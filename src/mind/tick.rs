@@ -586,7 +586,7 @@ impl ContinuousMind {
                 self.mesh_stats.packets_deduplicated += 1;
                 continue;
             }
-            if self.mesh_seen_packets.len() >= super::MESH_DEDUP_RING_SIZE {
+            if self.mesh_seen_packets.len() >= super::mesh::MESH_DEDUP_RING_SIZE {
                 self.mesh_seen_packets.remove(0);
             }
             self.mesh_seen_packets.push(key);

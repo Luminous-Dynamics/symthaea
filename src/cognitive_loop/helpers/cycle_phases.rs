@@ -140,7 +140,7 @@ impl CognitiveLoopService {
                             );
 
                             // Track B: Lattice meet for semantic grounding of learned symbol
-                            if let Some(ref lattice) = self.primitive_lattice {
+                            if let Some(ref lattice) = self.primitive_tier.primitive_lattice {
                                 if active_primitive_names.len() >= 2 {
                                     if let (Some(a), Some(b)) = (
                                         lattice.element_index_by_name(&active_primitive_names[0]),

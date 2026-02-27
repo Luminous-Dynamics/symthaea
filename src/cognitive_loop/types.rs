@@ -1223,6 +1223,11 @@ pub struct CycleMetadata {
     pub feedback_confidence_proposals: u32,
     /// Number of learning rate proposals collected this cycle.
     pub feedback_lr_proposals: u32,
+    /// Per-proposal trace for confidence (populated when `trace_feedback = true`).
+    /// Each entry: `(source_label, "Add(+0.0300)")`.
+    pub feedback_trace_confidence: Vec<(String, String)>,
+    /// Per-proposal trace for learning rate (populated when `trace_feedback = true`).
+    pub feedback_trace_lr: Vec<(String, String)>,
 
     // ── Staged Computation Model Telemetry (Phase 2.3) ────────────────
     /// Number of subsystems that contributed non-neutral SubsystemOutputs.

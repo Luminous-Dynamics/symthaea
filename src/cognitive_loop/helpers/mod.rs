@@ -743,7 +743,7 @@ impl CognitiveLoopService {
         if let Some(ref mut nd) = self.negation_detector {
             *nd = crate::consciousness::negation_detector::NegationDetector::new();
         }
-        if let Some(ref mut pp) = self.primitive_processor {
+        if let Some(ref mut pp) = self.primitive_tier.primitive_processor {
             *pp =
                 crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor::new(
                 );

@@ -80,6 +80,24 @@ impl ProposalCollector {
         &self.proposals
     }
 
+    /// Dump all proposals as `(source, description)` pairs for trace logging.
+    ///
+    /// Each entry describes the proposal kind and magnitude, e.g.
+    /// `("binding_strong", "Add(+0.0300)")`.
+    pub fn dump_proposals(&self) -> Vec<(&'static str, String)> {
+        self.proposals
+            .iter()
+            .map(|ap| {
+                let desc = match ap.proposal {
+                    FeedbackProposal::Add(d) => format!("Add({d:+.4})"),
+                    FeedbackProposal::Scale(f) => format!("Scale({f:.4})"),
+                    FeedbackProposal::Set(v) => format!("Set({v:.4})"),
+                };
+                (ap.source, desc)
+            })
+            .collect()
+    }
+
     /// Integrate all proposals into a single effective value.
     ///
     /// Integration strategy:
@@ -358,5 +376,29 @@ mod tests {
         collector.clear();
         assert_eq!(collector.len(), 0);
         assert!(collector.proposals().is_empty());
+    }
+
+    #[test]
+    fn test_dump_proposals_formats_correctly() {
+        let mut collector = ProposalCollector::new();
+        collector.propose("binding_strong", FeedbackProposal::Add(0.03));
+        collector.propose("moral_harm", FeedbackProposal::Scale(0.85));
+        collector.propose("init_reset", FeedbackProposal::Set(0.5));
+
+        let dump = collector.dump_proposals();
+        assert_eq!(dump.len(), 3);
+        assert_eq!(dump[0].0, "binding_strong");
+        assert!(dump[0].1.starts_with("Add("));
+        assert_eq!(dump[1].0, "moral_harm");
+        assert!(dump[1].1.starts_with("Scale("));
+        assert_eq!(dump[2].0, "init_reset");
+        assert!(dump[2].1.starts_with("Set("));
+    }
+
+    #[test]
+    fn test_dump_proposals_empty_collector() {
+        let collector = ProposalCollector::new();
+        let dump = collector.dump_proposals();
+        assert!(dump.is_empty());
     }
 }

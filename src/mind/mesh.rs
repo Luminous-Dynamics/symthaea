@@ -4,35 +4,35 @@ use super::ContinuousMind;
 
 /// Size of the packet deduplication ring buffer (source_id + sequence pairs).
 #[cfg(feature = "mesh")]
-const MESH_DEDUP_RING_SIZE: usize = 128;
+pub(super) const MESH_DEDUP_RING_SIZE: usize = 128;
 
 /// Duration of the bandwidth budget window.
 #[cfg(feature = "mesh")]
-const MESH_BANDWIDTH_WINDOW: std::time::Duration = std::time::Duration::from_secs(10);
+pub(super) const MESH_BANDWIDTH_WINDOW: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// Initial (and reset) bandwidth budget: 100 KB per window.
 #[cfg(feature = "mesh")]
-const MESH_BANDWIDTH_INITIAL: u64 = 100 * 1024;
+pub(super) const MESH_BANDWIDTH_INITIAL: u64 = 100 * 1024;
 
 /// Floor for AIMD multiplicative decrease: never below 25 KB.
 #[cfg(feature = "mesh")]
-const MESH_BANDWIDTH_MIN: u64 = 25 * 1024;
+pub(super) const MESH_BANDWIDTH_MIN: u64 = 25 * 1024;
 
 /// Ceiling for AIMD additive increase: never above 200 KB.
 #[cfg(feature = "mesh")]
-const MESH_BANDWIDTH_MAX: u64 = 200 * 1024;
+pub(super) const MESH_BANDWIDTH_MAX: u64 = 200 * 1024;
 
 /// Additive increase per window when mesh is healthy and not throttled.
 #[cfg(feature = "mesh")]
-const MESH_BANDWIDTH_ADDITIVE_INCREASE: u64 = 10 * 1024;
+pub(super) const MESH_BANDWIDTH_ADDITIVE_INCREASE: u64 = 10 * 1024;
 
 /// Multiplicative decrease factor on throttle or low health.
 #[cfg(feature = "mesh")]
-const MESH_BANDWIDTH_DECREASE_FACTOR: f64 = 0.5;
+pub(super) const MESH_BANDWIDTH_DECREASE_FACTOR: f64 = 0.5;
 
 /// Capacity of the replay buffer for partition recovery.
 #[cfg(feature = "mesh")]
-const MESH_REPLAY_BUFFER_CAPACITY: usize = 16;
+pub(super) const MESH_REPLAY_BUFFER_CAPACITY: usize = 16;
 
 #[cfg(feature = "mesh")]
 impl ContinuousMind {

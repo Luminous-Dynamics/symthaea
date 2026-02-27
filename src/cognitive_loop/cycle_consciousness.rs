@@ -83,7 +83,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let (primitive_psi, active_primitive_names) =
             if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-                if let Some(ref mut processor) = self.primitive_processor {
+                if let Some(ref mut processor) = self.primitive_tier.primitive_processor {
                     let timestamp = self.stats.total_cycles as f64 * 0.02; // 50Hz → seconds
                     let state = processor.process_input(&hv16_cached, timestamp);
                     let names: Vec<String> = state
@@ -132,7 +132,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let compositionality_total =
-            if let Some(ref compositionality) = self.compositionality_engine {
+            if let Some(ref compositionality) = self.primitive_tier.compositionality_engine {
                 compositionality.get_stats().total_compositions
             } else {
                 0
@@ -163,7 +163,7 @@ impl CognitiveLoopService {
             consciousness_profile_composite,
             synergy_enhanced_composite,
             emergent_properties_count,
-        ) = if self.stats.total_cycles % 47 == 0 && self.primitive_processor.is_some() {
+        ) = if self.stats.total_cycles % 47 == 0 && self.primitive_tier.primitive_processor.is_some() {
             let profile =
                 crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
                     self.carryover.history.recent_hvs.make_contiguous(),
@@ -197,7 +197,7 @@ impl CognitiveLoopService {
         // Science: Gigerenzer (2007) — ecological rationality, context-adaptive reasoning.
         // ═══════════════════════════════════════════════════════════════════════
         let (reasoning_context, context_phi_weight) =
-            if let Some(ref optimizer) = self.context_optimizer {
+            if let Some(ref optimizer) = self.primitive_tier.context_optimizer {
                 let ctx = optimizer.detect_context(input, None);
                 let weights = optimizer.get_weights_for_context(&ctx);
                 (ctx.description().to_string(), weights.phi_weight)
@@ -213,7 +213,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (value_embeddings_created, value_cache_hit_rate) =
-            if let Some(ref mut embedder) = self.semantic_value_embedder {
+            if let Some(ref mut embedder) = self.primitive_tier.semantic_value_embedder {
                 if self.stats.total_cycles % 11 == 0 {
                     let continuous = symthaea_core::hdc::ContinuousHV::from_slice(compressed_state);
                     let _concept =
@@ -242,7 +242,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (harmonies_alignment, harmonies_approved) =
-            if let Some(ref mut integrator) = self.harmonies_integrator {
+            if let Some(ref mut integrator) = self.primitive_tier.harmonies_integrator {
                 if self.stats.total_cycles % 19 == 0 {
                     let embedding = symthaea_core::hdc::ContinuousHV::from_slice(compressed_state);
                     let action = crate::consciousness::harmonies_integration::ValuedAction::new(
@@ -273,7 +273,7 @@ impl CognitiveLoopService {
         // Science: Plate (2003) — holographic reduced representations.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let composition_rule_applied = if let Some(ref rule_engine) = self.composition_rule_engine {
+        let composition_rule_applied = if let Some(ref rule_engine) = self.primitive_tier.composition_rule_engine {
             if active_primitive_names.len() >= 2 {
                 let system = symthaea_core::hdc::primitive_system::PrimitiveSystem::global();
                 let tier1 = system
@@ -313,7 +313,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (reasoning_chain_confidence, reasoning_chain_depth) =
-            if let Some(ref mut reasoner) = self.primitive_reasoner {
+            if let Some(ref mut reasoner) = self.primitive_tier.primitive_reasoner {
                 if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
                     let result = reasoner.reason("cognitive_state", &[]);
                     (result.confidence, result.reasoning_chain.len())
@@ -351,7 +351,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let epistemic_override = self.carryover.quality.epistemic_reasoning_override;
-        let adaptive_reasoning_phi = if let Some(ref mut reasoner) = self.adaptive_reasoner {
+        let adaptive_reasoning_phi = if let Some(ref mut reasoner) = self.primitive_tier.adaptive_reasoner {
             if (self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0) || epistemic_override {
                 if epistemic_override {
                     self.carryover.quality.epistemic_reasoning_override = false;
@@ -376,7 +376,7 @@ impl CognitiveLoopService {
         // Science: Mycelix Epistemic Charter v2.0.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let epistemic_quality = if self.primitive_processor.is_some() {
+        let epistemic_quality = if self.primitive_tier.primitive_processor.is_some() {
             if self.stats.total_cycles % 97 == 0 {
                 use crate::consciousness::epistemic_tiers::*;
                 // Classify based on cycle count (more cycles = higher empirical tier)
@@ -412,7 +412,7 @@ impl CognitiveLoopService {
         // Science: IIT empirical validation (Casali et al. 2013).
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let phi_validation_correlation = if let Some(ref mut validator) = self.phi_validation {
+        let phi_validation_correlation = if let Some(ref mut validator) = self.primitive_tier.phi_validation {
             if self.stats.total_cycles % 499 == 0 && self.stats.total_cycles >= 499 {
                 // Phase 16: Run every 499 cycles (co-prime, repeating validation)
                 // Science: Casali et al. (2013) — empirical Phi validation should be ongoing.
@@ -454,8 +454,8 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (epistemic_phi_eff, epistemic_conflict_count) =
             if let (Some(ref mut detector), Some(ref calibrator)) = (
-                &mut self.epistemic_conflict_detector,
-                &self.theory_calibrator,
+                &mut self.primitive_tier.epistemic_conflict_detector,
+                &self.primitive_tier.theory_calibrator,
             ) {
                 if self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0 {
                     use crate::consciousness::epistemic_conflict::{
@@ -572,7 +572,7 @@ impl CognitiveLoopService {
             chain_cycle_numbers,
             causal_codebook_entries,
             continuity_replay_needed,
-        ) = if let Some(ref mut analyzer) = self.temporal_analyzer {
+        ) = if let Some(ref mut analyzer) = self.primitive_tier.temporal_analyzer {
             // Record this cycle as a conscious interval
             let timestamp = self.stats.total_cycles as f64 * 0.02; // 50Hz → seconds
             use crate::consciousness::temporal_primitives::{
@@ -735,7 +735,7 @@ impl CognitiveLoopService {
     ) -> (f64, String, f64) {
         let _t = Instant::now();
         let (dissipative_health, dissipative_regime, dissipative_entropy_rate) =
-            if let Some(ref mut dc) = self.dissipative_consciousness {
+            if let Some(ref mut dc) = self.primitive_tier.dissipative_consciousness {
                 let energy = prediction_error as f64;
                 let info = coherence as f64 * unified_psi;
                 dc.update(unified_psi, energy, info, coherence as f64);
@@ -754,7 +754,7 @@ impl CognitiveLoopService {
         // FEEDBACK: Dissipative regime → exploration + learning rate modulation
         // Science: Prigogine (1977) — dissipative structures self-organize at edge of chaos.
         // Use recommend_action() to translate thermodynamic state into cognitive adjustments.
-        if let Some(ref dc) = self.dissipative_consciousness {
+        if let Some(ref dc) = self.primitive_tier.dissipative_consciousness {
             use crate::consciousness::dissipative_consciousness::DissipativeAction;
             match dc.recommend_action() {
                 DissipativeAction::Maintain { .. } => {
@@ -813,7 +813,7 @@ impl CognitiveLoopService {
         module_timings: &mut super::ModuleTimings,
     ) -> f64 {
         let _t = Instant::now();
-        let equation_v2_consciousness = if let Some(ref mut eq) = self.consciousness_equation_v2 {
+        let equation_v2_consciousness = if let Some(ref mut eq) = self.primitive_tier.consciousness_equation_v2 {
             if self.stats.total_cycles % 23 == 0 && self.stats.total_cycles > 0 {
                 use crate::consciousness::consciousness_equation_v2::{
                     ConsciousnessStateV2, CoreComponent,
@@ -885,7 +885,7 @@ impl CognitiveLoopService {
     ) -> (usize, usize, Option<String>) {
         let _t = Instant::now();
         let (lattice_height, lattice_width, lattice_join_concept) =
-            if let Some(ref lattice) = self.primitive_lattice {
+            if let Some(ref lattice) = self.primitive_tier.primitive_lattice {
                 // Properties (height/width/modularity) are O(n²–n³) on the lattice graph.
                 // The lattice is immutable after construction → compute once on first cycle,
                 // cache in stats, and reuse. This eliminates ~31ms/cycle overhead.
@@ -959,7 +959,7 @@ impl CognitiveLoopService {
     ) -> (f64, String, f32) {
         let _t = Instant::now();
         let (value_evaluator_score, value_evaluator_decision) =
-            if let Some(ref mut evaluator) = self.value_evaluator {
+            if let Some(ref mut evaluator) = self.primitive_tier.value_evaluator {
                 if self.stats.total_cycles % 19 == 0 {
                     let ctx = crate::consciousness::unified_value_evaluator::EvaluationContext {
                         consciousness_level: unified_psi,
@@ -1022,7 +1022,7 @@ impl CognitiveLoopService {
     ) -> (f64, f64, usize) {
         let _t = Instant::now();
         let (harmonic_field_coherence, harmonic_love_resonance, harmonic_interferences) =
-            if let Some(ref mut field) = self.harmonic_field {
+            if let Some(ref mut field) = self.primitive_tier.harmonic_field {
                 if self.stats.total_cycles % 11 == 0 {
                     // Drive harmonic levels from consciousness metrics
                     use crate::consciousness::harmonics::FiduciaryHarmonic;
@@ -1042,7 +1042,7 @@ impl CognitiveLoopService {
                     field.detect_interferences();
                     // Resolve interferences if any were detected
                     if !field.interferences.is_empty() {
-                        if let Some(ref resolver) = self.harmonic_resolver {
+                        if let Some(ref resolver) = self.primitive_tier.harmonic_resolver {
                             let _resolution = resolver.resolve(field);
                         }
                     }
@@ -1093,14 +1093,14 @@ impl CognitiveLoopService {
     ) -> (usize, f64) {
         let _t = Instant::now();
         let (causal_relations_count, causal_avg_confidence) = if let Some(ref mut explainer) =
-            self.causal_explainer
+            self.primitive_tier.causal_explainer
         {
             if self.stats.total_cycles % 23 == 0
                 && self.stats.total_cycles > 0
                 && !active_primitive_names.is_empty()
             {
                 // Construct PrimitiveExecution entries from active primitives
-                if let Some(ref mut processor) = self.primitive_processor {
+                if let Some(ref mut processor) = self.primitive_tier.primitive_processor {
                     let timestamp = self.stats.total_cycles as f64 * 0.02;
                     let state = processor.process_input(&hv16_cached, timestamp);
                     let chain = {
