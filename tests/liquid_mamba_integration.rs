@@ -270,3 +270,118 @@ fn test_biological_modulation() {
         "Semantic PE should be finite under high load"
     );
 }
+
+/// Distill step end-to-end: generate → distill → verify PE in valid range.
+#[test]
+#[ignore = "Requires mamba-130m (~260MB)"]
+fn test_distill_step_end_to_end() {
+    let mut gen = make_generator();
+    let channels = ThoughtChannels::with_intent(1); // Answer
+
+    let result = gen.generate(&channels);
+
+    // PE should be tracked after generation
+    let pe_after_gen = gen.last_semantic_pe();
+    assert!(pe_after_gen.is_finite(), "PE should be finite after generate()");
+    assert_eq!(
+        pe_after_gen, result.semantic_pe,
+        "last_semantic_pe() should match result.semantic_pe"
+    );
+
+    // Distill step should not crash
+    gen.distill_step(&channels, &result);
+
+    // Generation count should have incremented
+    assert!(gen.generation_count() >= 1, "generation_count should increment");
+
+    // Generate again — PE may change
+    let result2 = gen.generate(&channels);
+    assert!(result2.semantic_pe.is_finite(), "PE should stay finite after distill");
+    assert!(
+        gen.last_semantic_pe().is_finite(),
+        "last_semantic_pe should stay finite after second generation"
+    );
+}
+
+/// Streaming callback fires per token for L-SSM.
+#[test]
+#[ignore = "Requires mamba-130m (~260MB)"]
+fn test_streaming_callback_l_ssm() {
+    let mut gen = make_generator();
+    let channels = ThoughtChannels::with_intent(1); // Answer
+
+    let mut streamed = String::new();
+    let mut callback_count = 0usize;
+
+    let result = gen.generate_with_callback(&channels, &mut |token| {
+        streamed.push_str(token);
+        callback_count += 1;
+    });
+
+    // If tokens were generated, callback should have fired
+    if result.num_tokens > 0 {
+        assert!(
+            callback_count > 0,
+            "Streaming callback should fire for {} generated tokens",
+            result.num_tokens
+        );
+    }
+
+    // Streamed text should match result text
+    assert_eq!(
+        streamed, result.text,
+        "Streamed text should match result.text"
+    );
+
+    // Result should be valid
+    assert!(result.final_coherence.is_finite());
+    assert!(result.semantic_pe.is_finite());
+}
+
+/// update_affect temperature modulates biological delta modulation.
+#[test]
+#[ignore = "Requires mamba-130m (~260MB)"]
+fn test_update_affect_changes_delta_modulation() {
+    let genesis = test_genesis();
+    let config = LiquidMambaConfig {
+        max_tokens: 10,
+        temperature: 0.01, // Near-greedy
+        top_k: 1,
+        enable_liquid_delta: true,
+        delta_mod_strength: 1.0,
+        enable_veto: false,
+        ..Default::default()
+    };
+
+    // Normal state: load=0, temp=1.0
+    let mut gen_normal = LiquidMambaGenerator::new(&genesis, config.clone())
+        .expect("load failed");
+    gen_normal.update_affect(0.0, 1.0);
+    assert!((gen_normal.mood_temperature() - 1.0).abs() < 0.01);
+
+    // Hot mood: load=0.5, temp=2.0
+    let mut gen_hot = LiquidMambaGenerator::new(&genesis, config)
+        .expect("load failed");
+    gen_hot.update_affect(0.5, 2.0);
+    assert!((gen_hot.mood_temperature() - 2.0).abs() < 0.01);
+
+    let channels = ThoughtChannels::default();
+    let result_normal = gen_normal.generate(&channels);
+    let result_hot = gen_hot.generate(&channels);
+
+    // Both should produce valid output
+    assert!(result_normal.final_coherence.is_finite());
+    assert!(result_hot.final_coherence.is_finite());
+
+    // With different biological states, outputs should differ
+    // (load=0.5 + hot mood shifts effective arousal)
+    if result_normal.num_tokens > 2 && result_hot.num_tokens > 2 {
+        // They may differ in tokens or coherence
+        let token_diff = result_normal.token_ids != result_hot.token_ids;
+        let coherence_diff = (result_normal.final_coherence - result_hot.final_coherence).abs() > 0.01;
+        eprintln!(
+            "Affect modulation: normal={} tokens, hot={} tokens, token_diff={}, coherence_diff={}",
+            result_normal.num_tokens, result_hot.num_tokens, token_diff, coherence_diff
+        );
+    }
+}

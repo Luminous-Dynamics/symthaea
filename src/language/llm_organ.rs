@@ -247,6 +247,9 @@ pub struct LLMOrgan {
     /// Distillation data collector (active when SYMTHAEA_DISTILL_PATH is set)
     #[cfg(feature = "ssm_language")]
     distillation_collector: Option<Arc<super::distillation::DistillationCollector>>,
+    /// Last L-SSM semantic prediction error for cycle telemetry
+    #[cfg(feature = "liquid-mamba")]
+    last_liquid_mamba_pe: f32,
 }
 
 impl std::fmt::Debug for LLMOrgan {
@@ -285,6 +288,8 @@ impl LLMOrgan {
             backend: None,
             #[cfg(feature = "ssm_language")]
             distillation_collector: super::distillation::DistillationCollector::from_env().map(Arc::new),
+            #[cfg(feature = "liquid-mamba")]
+            last_liquid_mamba_pe: 0.0,
         }
     }
 
@@ -306,6 +311,8 @@ impl LLMOrgan {
             backend: Some(backend),
             #[cfg(feature = "ssm_language")]
             distillation_collector: super::distillation::DistillationCollector::from_env().map(Arc::new),
+            #[cfg(feature = "liquid-mamba")]
+            last_liquid_mamba_pe: 0.0,
         }
     }
 
@@ -621,6 +628,12 @@ impl LLMOrgan {
         &self.stats
     }
 
+    /// Last L-SSM semantic prediction error (0.0 when liquid-mamba is off).
+    #[cfg(feature = "liquid-mamba")]
+    pub fn last_liquid_mamba_pe(&self) -> f32 {
+        self.last_liquid_mamba_pe
+    }
+
     // ========================================================================
     // Translation Mode (Broca's Area Interface)
     // ========================================================================
@@ -678,27 +691,42 @@ impl LLMOrgan {
 
                 let backend_name = backend.name().to_string();
                 if backend_name == "symthaea-ssm-broca" || backend_name == "liquid-mamba-l-ssm" {
-                    let _channels = thought_to_channels(thought, mood_temperature);
+                    let channels = thought_to_channels(thought, mood_temperature);
                     let params = GenerationParams::default();
                     let start = std::time::Instant::now();
 
-                    // Build a structured prompt with markers that channels_from_prompt()
-                    // can extract directly. This gives the SSM backend the exact same
-                    // channel information that thought_to_channels computes.
-                    let direct_prompt = format!(
-                        "SEMANTIC_INTENT: {:?}\nEPISTEMIC_STATUS: {:?}\nMOOD_TEMPERATURE: {:.2}\n",
-                        thought.semantic_intent, thought.epistemic_status, mood_temperature
-                    );
-
-                    match backend.generate(&direct_prompt, &params).await {
-                        Ok(text) => Some((text, start, backend_name)),
-                        Err(e) => {
-                            tracing::warn!(
-                                target: "symthaea::broca::direct_path",
-                                error = %e,
-                                "Direct Neural Path failed, falling back to text prompt"
-                            );
-                            None
+                    // Direct Neural Path: bypass text serialization entirely.
+                    // All 20 channels (intent, epistemic, emotion, psi, meta_awareness,
+                    // coherence, trust, relationship_stage, structured_data, concept_count)
+                    // flow directly into the HDC encoder.
+                    if let Some(result) = backend.generate_from_channels_direct(&channels, &params) {
+                        match result {
+                            Ok(text) => Some((text, start, backend_name)),
+                            Err(e) => {
+                                tracing::warn!(
+                                    target: "symthaea::broca::direct_path",
+                                    error = %e,
+                                    "Direct Neural Path failed, falling back to text prompt"
+                                );
+                                None
+                            }
+                        }
+                    } else {
+                        // Backend doesn't support direct channels — fall back to text prompt
+                        let direct_prompt = format!(
+                            "SEMANTIC_INTENT: {:?}\nEPISTEMIC_STATUS: {:?}\nMOOD_TEMPERATURE: {:.2}\n",
+                            thought.semantic_intent, thought.epistemic_status, mood_temperature
+                        );
+                        match backend.generate(&direct_prompt, &params).await {
+                            Ok(text) => Some((text, start, backend_name)),
+                            Err(e) => {
+                                tracing::warn!(
+                                    target: "symthaea::broca::direct_path",
+                                    error = %e,
+                                    "Direct Neural Path failed, falling back to text prompt"
+                                );
+                                None
+                            }
                         }
                     }
                 } else {
@@ -717,6 +745,12 @@ impl LLMOrgan {
                 self.stats.avg_generation_time_ms =
                     (self.stats.avg_generation_time_ms * (n - 1.0) + generation_time_ms) / n;
                 let embedding = self.text_to_embedding(&text);
+
+                // Capture L-SSM semantic prediction error for cycle telemetry
+                #[cfg(feature = "liquid-mamba")]
+                if let Some(ref backend) = self.backend {
+                    self.last_liquid_mamba_pe = backend.last_semantic_pe();
+                }
 
                 tracing::debug!(
                     target: "symthaea::broca::direct_path",

@@ -30,6 +30,31 @@ impl CognitiveLoopService {
         &self.stats
     }
 
+    /// Export neurochemistry checkpoint for persistence across sessions.
+    pub fn neurochemistry_checkpoint(&self) -> super::neuromodulators::NeurochemistryCheckpoint {
+        self.neuromodulator_bath.checkpoint()
+    }
+
+    /// Restore neurochemistry from a saved checkpoint.
+    pub fn restore_neurochemistry(
+        &mut self,
+        ckpt: &super::neuromodulators::NeurochemistryCheckpoint,
+    ) {
+        self.neuromodulator_bath.restore(ckpt);
+    }
+
+    /// Override transmitter levels for pharmacological ablation (virtual lesion).
+    /// Pass `None` to leave a channel unchanged, `Some(v)` to clamp it.
+    pub fn clamp_neuromod_levels(
+        &mut self,
+        da: Option<f32>,
+        ne: Option<f32>,
+        sht: Option<f32>,
+        ach: Option<f32>,
+    ) {
+        self.neuromodulator_bath.clamp_levels(da, ne, sht, ach);
+    }
+
     /// Get a clone of the pain sender channel, if active.
     ///
     /// Used by integration tests to inject `InfrastructureError`s and verify
@@ -198,6 +223,14 @@ impl CognitiveLoopService {
     pub fn set_social_signals(&mut self, trust: f32, cooperation_rate: f32) {
         self.social_trust = trust.clamp(0.0, 1.0);
         self.social_cooperation_rate = cooperation_rate.clamp(0.0, 1.0);
+    }
+
+    /// Inject L-SSM semantic prediction error from LLMOrgan after translation.
+    /// Called by the Symthaea facade after translate_thought() to feed PE into
+    /// CycleMetadata telemetry for the next cycle.
+    #[cfg(feature = "liquid-mamba")]
+    pub fn set_liquid_mamba_pe(&mut self, pe: f32) {
+        self.stats.last_liquid_mamba_pe = pe;
     }
 
     /// Get the current inferred user state (if user state inference is enabled).
