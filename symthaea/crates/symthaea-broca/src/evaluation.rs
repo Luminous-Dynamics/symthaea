@@ -251,7 +251,347 @@ pub fn format_eval_report(result: &EvalResult) -> String {
         s.push_str(&format!("{:<14} {:>8} {:>10} {:>6}\n", "------", "---", "--------", "-"));
 
         let mut intents: Vec<_> = result.intent_scores.iter().collect();
-        intents.sort_by_key(|(k, _)| k.clone());
+        intents.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+        for (intent, score) in intents {
+            s.push_str(&format!(
+                "{:<14} {:>8.2} {:>9.1}% {:>6}\n",
+                intent, score.perplexity, score.english_ratio * 100.0, score.count
+            ));
+        }
+    }
+
+    s
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LIQUID-MAMBA EVALUATION (requires mamba feature)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Configuration for Liquid-Mamba evaluation.
+#[cfg(feature = "mamba")]
+pub struct LiquidMambaEvalConfig {
+    /// Dataset to evaluate on.
+    pub dataset: TrainingDataset,
+    /// Compute teacher-forced perplexity through frozen Mamba.
+    pub compute_perplexity: bool,
+    /// Compute English word ratio using Mamba's GPT-2 tokenizer.
+    pub compute_english_ratio: bool,
+    /// Break down metrics by semantic intent.
+    pub per_intent_breakdown: bool,
+    /// Maximum tokens to generate per sample.
+    pub max_gen_tokens: usize,
+    /// Run consciousness gating test (Certain vs Unknown hedging comparison).
+    pub consciousness_gating_test: bool,
+}
+
+#[cfg(feature = "mamba")]
+impl Default for LiquidMambaEvalConfig {
+    fn default() -> Self {
+        Self {
+            dataset: TrainingDataset::default(),
+            compute_perplexity: true,
+            compute_english_ratio: true,
+            per_intent_breakdown: true,
+            max_gen_tokens: 64,
+            consciousness_gating_test: true,
+        }
+    }
+}
+
+/// Liquid-Mamba evaluation results.
+#[cfg(feature = "mamba")]
+#[derive(Debug, Clone)]
+pub struct LiquidMambaEvalResult {
+    /// Base evaluation results (perplexity, English ratio, coherence, intent breakdown).
+    pub base: EvalResult,
+    /// Mean semantic prediction error (HDC round-trip reconstruction).
+    pub avg_semantic_pe: f32,
+    /// Mean effective rank of projection bottleneck activations.
+    pub avg_effective_rank: f32,
+    /// Consciousness gating verification: (certain_hedging%, unknown_hedging%).
+    /// If `unknown > certain`, the consciousness bridge is steering generation.
+    pub gating_verification: Option<(f32, f32)>,
+}
+
+/// Hedging tokens that indicate epistemic uncertainty in generated text.
+#[cfg(feature = "mamba")]
+const HEDGING_WORDS: &[&str] = &[
+    "perhaps", "maybe", "might", "possibly", "uncertain",
+    "unclear", "likely", "probably", "could", "seem",
+];
+
+/// Count the fraction of tokens that contain hedging words.
+#[cfg(feature = "mamba")]
+fn hedging_ratio(text: &str) -> f32 {
+    let lower = text.to_lowercase();
+    let words: Vec<&str> = lower.split_whitespace().collect();
+    if words.is_empty() {
+        return 0.0;
+    }
+    let hedging_count = words.iter()
+        .filter(|w| HEDGING_WORDS.iter().any(|h| w.contains(h)))
+        .count();
+    hedging_count as f32 / words.len() as f32
+}
+
+/// Compute English word ratio using Mamba's GPT-2 tokenizer.
+///
+/// A token counts as "English" if it decodes to a multi-character alphabetic string
+/// (not a single byte, not a byte-escape).
+#[cfg(feature = "mamba")]
+pub fn english_word_ratio_mamba(token_ids: &[u32], wrapper: &crate::mamba::MambaWrapper) -> f32 {
+    if token_ids.is_empty() {
+        return 0.0;
+    }
+
+    let mut english_count = 0usize;
+    let mut total_count = 0usize;
+    let eos_id = wrapper.eos_token_id();
+
+    for &id in token_ids {
+        // Skip EOS/special
+        if id == eos_id {
+            continue;
+        }
+        total_count += 1;
+
+        if let Ok(token_str) = wrapper.decode_token(id) {
+            let trimmed = token_str.trim();
+            if trimmed.len() >= 2 && trimmed.chars().any(|c| c.is_alphabetic()) {
+                english_count += 1;
+            }
+        }
+    }
+
+    if total_count == 0 {
+        return 0.0;
+    }
+    english_count as f32 / total_count as f32
+}
+
+/// Run full Liquid-Mamba evaluation: perplexity + generation quality + projection health.
+#[cfg(feature = "mamba")]
+pub fn evaluate_liquid_mamba(
+    gen: &mut crate::liquid_mamba::LiquidMambaGenerator,
+    config: &LiquidMambaEvalConfig,
+) -> LiquidMambaEvalResult {
+    let mut total_ce = 0.0f32;
+    let mut total_ce_tokens = 0usize;
+    let mut total_english_ratio = 0.0f32;
+    let mut total_coherence = 0.0f32;
+    let mut total_semantic_pe = 0.0f32;
+    let mut gen_count = 0usize;
+    let mut intent_accum: HashMap<String, (f32, f32, f32, usize, usize)> = HashMap::new();
+    let mut all_output_hvs: Vec<symthaea_core::hdc::ContinuousHV> = Vec::new();
+
+    for pair in &config.dataset.pairs {
+        if pair.target_ids.is_empty() && pair.target_text.is_empty() {
+            continue;
+        }
+
+        let channels = ThoughtChannels { channels: pair.channels };
+        let intent = active_intent(&pair.channels).to_string();
+
+        // --- Perplexity: teacher-forced through frozen Mamba ---
+        let mut pair_ce = 0.0f32;
+        let mut pair_tokens = 0usize;
+
+        if config.compute_perplexity && !pair.target_text.is_empty() {
+            // Encode thought to HDC → SSM space, inject into Mamba
+            let thought_hv = gen.encoder().encode(&channels);
+            let ssm_context = gen.projection().project_to_ssm(&thought_hv);
+
+            gen.mamba_mut().reset();
+            if gen.mamba_mut().inject_initial_context(&ssm_context).is_ok() {
+                // Tokenize target with Mamba's tokenizer
+                if let Ok(target_ids) = gen.mamba().encode(&pair.target_text) {
+                    let eos_id = gen.mamba().eos_token_id();
+                    let mut prev_token = eos_id;
+                    let window = target_ids.len().min(config.max_gen_tokens);
+
+                    for &target_id in &target_ids[..window] {
+                        if let Ok(logits) = gen.mamba_mut().forward_one_token(prev_token) {
+                            let loss = cross_entropy_loss(&logits, target_id as usize);
+                            pair_ce += loss;
+                            pair_tokens += 1;
+                        }
+                        prev_token = target_id;
+                    }
+                }
+            }
+
+            total_ce += pair_ce;
+            total_ce_tokens += pair_tokens;
+        }
+
+        // --- Generation quality ---
+        let mut pair_english_ratio = 0.0f32;
+
+        if config.compute_english_ratio {
+            let result = gen.generate(&channels);
+            pair_english_ratio = english_word_ratio_mamba(&result.token_ids, gen.mamba());
+            total_english_ratio += pair_english_ratio;
+            total_coherence += result.final_coherence;
+            total_semantic_pe += result.semantic_pe;
+            gen_count += 1;
+
+            // Collect output HVs for effective rank (sample up to 4)
+            for hv in result.output_hvs.iter().take(4) {
+                all_output_hvs.push(hv.clone());
+            }
+        }
+
+        // --- Per-intent accumulation ---
+        if config.per_intent_breakdown {
+            let entry = intent_accum.entry(intent).or_insert((0.0, 0.0, 0.0, 0, 0));
+            if pair_tokens > 0 {
+                entry.0 += pair_ce;
+                entry.1 += pair_tokens as f32;
+            }
+            entry.2 += pair_english_ratio;
+            if config.compute_english_ratio {
+                entry.3 += 1;
+            }
+            entry.4 += 1;
+        }
+    }
+
+    // --- Aggregate base metrics ---
+    let perplexity = if total_ce_tokens > 0 {
+        (total_ce / total_ce_tokens as f32).exp()
+    } else {
+        0.0
+    };
+
+    let english_word_ratio_avg = if gen_count > 0 {
+        total_english_ratio / gen_count as f32
+    } else {
+        0.0
+    };
+
+    let avg_coherence = if gen_count > 0 {
+        total_coherence / gen_count as f32
+    } else {
+        0.0
+    };
+
+    let avg_semantic_pe = if gen_count > 0 {
+        total_semantic_pe / gen_count as f32
+    } else {
+        1.0
+    };
+
+    // Effective rank from collected output HVs
+    let avg_effective_rank = if all_output_hvs.len() >= 4 {
+        gen.projection().effective_rank(&all_output_hvs)
+    } else {
+        0.0
+    };
+
+    // Per-intent scores
+    let mut intent_scores = HashMap::new();
+    for (intent, (sum_ce, sum_ce_tok, sum_er, coh_count, count)) in &intent_accum {
+        let ppl = if *sum_ce_tok > 0.0 { (sum_ce / sum_ce_tok).exp() } else { 0.0 };
+        let er = if *coh_count > 0 { sum_er / *coh_count as f32 } else { 0.0 };
+        intent_scores.insert(intent.clone(), IntentScore {
+            perplexity: ppl,
+            english_ratio: er,
+            avg_coherence: 0.0,
+            count: *count,
+        });
+    }
+
+    let base = EvalResult {
+        perplexity,
+        english_word_ratio: english_word_ratio_avg,
+        avg_coherence,
+        intent_scores,
+        num_samples: config.dataset.len(),
+    };
+
+    // --- Consciousness gating test ---
+    let gating_verification = if config.consciousness_gating_test && !config.dataset.pairs.is_empty() {
+        consciousness_gating_test(gen, &config.dataset)
+    } else {
+        None
+    };
+
+    LiquidMambaEvalResult {
+        base,
+        avg_semantic_pe,
+        avg_effective_rank,
+        gating_verification,
+    }
+}
+
+/// Run consciousness gating test: compare hedging tokens under Certain vs Unknown epistemic states.
+#[cfg(feature = "mamba")]
+fn consciousness_gating_test(
+    gen: &mut crate::liquid_mamba::LiquidMambaGenerator,
+    dataset: &TrainingDataset,
+) -> Option<(f32, f32)> {
+    // Sample up to 20 pairs for the gating test (avoid running full dataset twice)
+    let sample_size = dataset.pairs.len().min(20);
+    let mut certain_hedging_total = 0.0f32;
+    let mut unknown_hedging_total = 0.0f32;
+    let mut test_count = 0usize;
+
+    for pair in dataset.pairs.iter().take(sample_size) {
+        // Generate with Certain epistemic (0.0)
+        let mut certain_channels = ThoughtChannels { channels: pair.channels };
+        certain_channels.set_epistemic(0.0);
+        let certain_result = gen.generate(&certain_channels);
+
+        // Generate with Unknown epistemic (3.0)
+        let mut unknown_channels = ThoughtChannels { channels: pair.channels };
+        unknown_channels.set_epistemic(3.0);
+        let unknown_result = gen.generate(&unknown_channels);
+
+        certain_hedging_total += hedging_ratio(&certain_result.text);
+        unknown_hedging_total += hedging_ratio(&unknown_result.text);
+        test_count += 1;
+    }
+
+    if test_count == 0 {
+        return None;
+    }
+
+    let certain_pct = certain_hedging_total / test_count as f32;
+    let unknown_pct = unknown_hedging_total / test_count as f32;
+    Some((certain_pct, unknown_pct))
+}
+
+/// Format a Liquid-Mamba evaluation result as a human-readable report.
+#[cfg(feature = "mamba")]
+pub fn format_liquid_mamba_eval_report(result: &LiquidMambaEvalResult) -> String {
+    let mut s = String::new();
+    s.push_str("=== Liquid-Mamba Evaluation Report ===\n\n");
+    s.push_str(&format!("Samples:           {}\n", result.base.num_samples));
+    s.push_str(&format!("Perplexity:        {:.4}\n", result.base.perplexity));
+    s.push_str(&format!("English ratio:     {:.4}\n", result.base.english_word_ratio));
+    s.push_str(&format!("Avg coherence:     {:.4}\n", result.base.avg_coherence));
+    s.push_str(&format!("Avg semantic PE:   {:.4}\n", result.avg_semantic_pe));
+    s.push_str(&format!("Effective rank:    {:.2}\n", result.avg_effective_rank));
+
+    if let Some((certain, unknown)) = result.gating_verification {
+        s.push_str(&format!("\n--- Consciousness Gating Test ---\n"));
+        s.push_str(&format!("Certain hedging:   {:.2}%\n", certain * 100.0));
+        s.push_str(&format!("Unknown hedging:   {:.2}%\n", unknown * 100.0));
+        if unknown > certain {
+            s.push_str("Result:            PASS (Unknown hedges more than Certain)\n");
+        } else {
+            s.push_str("Result:            FAIL (consciousness gating not yet effective)\n");
+        }
+    }
+
+    if !result.base.intent_scores.is_empty() {
+        s.push_str("\n--- Per-Intent Breakdown ---\n");
+        s.push_str(&format!("{:<14} {:>8} {:>10} {:>6}\n", "Intent", "PPL", "English%", "N"));
+        s.push_str(&format!("{:<14} {:>8} {:>10} {:>6}\n", "------", "---", "--------", "-"));
+
+        let mut intents: Vec<_> = result.base.intent_scores.iter().collect();
+        intents.sort_by(|(a, _), (b, _)| a.cmp(b));
 
         for (intent, score) in intents {
             s.push_str(&format!(
@@ -429,5 +769,154 @@ mod tests {
         let ch2 = ThoughtChannels::with_intent(0); // Acknowledge
         let intent2 = active_intent(&ch2.channels);
         assert_eq!(intent2, "Acknowledge");
+    }
+
+    #[cfg(feature = "mamba")]
+    mod liquid_mamba_tests {
+        use super::*;
+
+        #[test]
+        fn test_hedging_ratio_with_hedging() {
+            let text = "Perhaps the answer is maybe correct, possibly even likely true";
+            let ratio = hedging_ratio(text);
+            assert!(ratio > 0.2, "Should detect hedging words: {ratio}");
+        }
+
+        #[test]
+        fn test_hedging_ratio_without_hedging() {
+            let text = "The answer is definitely correct and true";
+            let ratio = hedging_ratio(text);
+            assert!(ratio < 0.1, "Should have low hedging ratio: {ratio}");
+        }
+
+        #[test]
+        fn test_hedging_ratio_empty() {
+            assert!((hedging_ratio("") - 0.0).abs() < 1e-6);
+        }
+
+        #[test]
+        fn test_format_liquid_mamba_report() {
+            let result = LiquidMambaEvalResult {
+                base: EvalResult {
+                    perplexity: 120.5,
+                    english_word_ratio: 0.45,
+                    avg_coherence: 0.3,
+                    intent_scores: HashMap::new(),
+                    num_samples: 5,
+                },
+                avg_semantic_pe: 0.72,
+                avg_effective_rank: 18.5,
+                gating_verification: Some((0.05, 0.15)),
+            };
+
+            let report = format_liquid_mamba_eval_report(&result);
+            assert!(report.contains("Liquid-Mamba"), "Should have L-M header");
+            assert!(report.contains("120.5"), "Should contain perplexity");
+            assert!(report.contains("semantic PE"), "Should contain semantic PE");
+            assert!(report.contains("Effective rank"), "Should contain rank");
+            assert!(report.contains("PASS"), "Should pass gating test (0.15 > 0.05)");
+        }
+
+        #[test]
+        fn test_format_liquid_mamba_report_gating_fail() {
+            let result = LiquidMambaEvalResult {
+                base: EvalResult {
+                    perplexity: 200.0,
+                    english_word_ratio: 0.1,
+                    avg_coherence: 0.1,
+                    intent_scores: HashMap::new(),
+                    num_samples: 1,
+                },
+                avg_semantic_pe: 0.9,
+                avg_effective_rank: 2.0,
+                gating_verification: Some((0.10, 0.05)),
+            };
+
+            let report = format_liquid_mamba_eval_report(&result);
+            assert!(report.contains("FAIL"), "Should fail gating test (0.05 < 0.10)");
+        }
+
+        #[test]
+        #[ignore = "Requires network access to download mamba-130m"]
+        fn test_liquid_mamba_perplexity_finite() {
+            use symthaea_core::genesis::GenesisSeed;
+            use crate::liquid_mamba::{LiquidMambaGenerator, LiquidMambaConfig};
+            use crate::training::TrainingPair;
+
+            let genesis = GenesisSeed::from_phrase("test-lm-eval");
+            let config = LiquidMambaConfig {
+                max_tokens: 16,
+                ..Default::default()
+            };
+            let mut gen = LiquidMambaGenerator::new(&genesis, config)
+                .expect("Failed to create LiquidMambaGenerator");
+
+            let mut dataset = TrainingDataset::default();
+            let channels = ThoughtChannels::with_intent(1);
+            dataset.pairs.push(TrainingPair {
+                channels: channels.channels,
+                target_text: "hello world".to_string(),
+                target_ids: vec![],
+            });
+
+            let eval_config = LiquidMambaEvalConfig {
+                dataset,
+                compute_perplexity: true,
+                compute_english_ratio: false,
+                per_intent_breakdown: false,
+                max_gen_tokens: 16,
+                consciousness_gating_test: false,
+            };
+
+            let result = evaluate_liquid_mamba(&mut gen, &eval_config);
+            assert!(result.base.perplexity.is_finite(),
+                "Perplexity should be finite: {}", result.base.perplexity);
+            assert!(result.base.perplexity > 0.0,
+                "Perplexity should be positive: {}", result.base.perplexity);
+        }
+
+        #[test]
+        #[ignore = "Requires network access to download mamba-130m"]
+        fn test_liquid_mamba_gating_verification() {
+            use symthaea_core::genesis::GenesisSeed;
+            use crate::liquid_mamba::{LiquidMambaGenerator, LiquidMambaConfig};
+            use crate::training::TrainingPair;
+
+            let genesis = GenesisSeed::from_phrase("test-lm-gating");
+            let config = LiquidMambaConfig {
+                max_tokens: 32,
+                ..Default::default()
+            };
+            let mut gen = LiquidMambaGenerator::new(&genesis, config)
+                .expect("Failed to create LiquidMambaGenerator");
+
+            let mut dataset = TrainingDataset::default();
+            for intent in 0..4 {
+                let channels = ThoughtChannels::with_intent(intent);
+                dataset.pairs.push(TrainingPair {
+                    channels: channels.channels,
+                    target_text: "the answer is clear".to_string(),
+                    target_ids: vec![],
+                });
+            }
+
+            let eval_config = LiquidMambaEvalConfig {
+                dataset,
+                compute_perplexity: false,
+                compute_english_ratio: false,
+                per_intent_breakdown: false,
+                max_gen_tokens: 32,
+                consciousness_gating_test: true,
+            };
+
+            let result = evaluate_liquid_mamba(&mut gen, &eval_config);
+            assert!(result.gating_verification.is_some(),
+                "Gating verification should produce results");
+            let (certain, unknown) = result.gating_verification.unwrap();
+            assert!(certain.is_finite(), "Certain hedging should be finite");
+            assert!(unknown.is_finite(), "Unknown hedging should be finite");
+            // With a trained projection, unknown_hedging > certain_hedging.
+            // With random projection, this may not hold — just verify they're computed.
+        }
     }
 }

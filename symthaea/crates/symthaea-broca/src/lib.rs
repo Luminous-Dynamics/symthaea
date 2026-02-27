@@ -66,3 +66,7 @@ pub use evaluation::{EvalConfig, EvalResult, IntentScore};
 pub use liquid_mamba::{LiquidMambaGenerator, LiquidMambaConfig};
 #[cfg(feature = "mamba")]
 pub use projection::HdcSsmProjection;
+#[cfg(feature = "mamba")]
+pub use evaluation::{LiquidMambaEvalConfig, LiquidMambaEvalResult};
+#[cfg(feature = "mamba")]
+pub use checkpoint::ProjectionCheckpoint;
