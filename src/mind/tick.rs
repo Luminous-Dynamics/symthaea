@@ -1012,5 +1012,42 @@ impl ContinuousMind {
                 self.federated_outbox.drain(..excess);
             }
         }
+
+        // Step 4 (liquid-mamba): Export L-SSM projection weights for swarm exchange
+        // and apply incoming aggregated peer weights. Uses the LLMBackend trait's
+        // export_gradient()/apply_aggregated_gradient() methods (Phase 6 API).
+        #[cfg(feature = "liquid-mamba")]
+        if let Some(ref backend) = self.llm_backend {
+            // Export projection weights every 10 ticks (same cadence as aggregation)
+            if self.state.tick.is_multiple_of(10) {
+                let source_id = [0u8; 32]; // TODO: derive from genesis identity
+                if let Some(weights) = backend.export_gradient(source_id, 1.0, self.state.tick) {
+                    tracing::debug!(
+                        target: "symthaea::mind::federated",
+                        weight_count = weights.len(),
+                        tick = self.state.tick,
+                        "Exported L-SSM projection weights for swarm"
+                    );
+                    let msg = crate::swarm::GradientMessage::new(
+                        source_id,
+                        weights,
+                        1.0,
+                    );
+                    self.federated_outbox.push(msg);
+                }
+            }
+
+            // Apply aggregated weights back (every 20 ticks, slower to avoid oscillation)
+            if self.state.tick.is_multiple_of(20) && federated.pending_contributions() >= 2 {
+                if let Some(aggregated) = federated.aggregate() {
+                    if backend.apply_aggregated_gradient(&aggregated) {
+                        tracing::info!(
+                            target: "symthaea::mind::federated",
+                            "Applied aggregated L-SSM projection weights from peers"
+                        );
+                    }
+                }
+            }
+        }
     }
 }

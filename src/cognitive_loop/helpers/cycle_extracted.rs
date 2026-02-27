@@ -13,44 +13,24 @@ use crate::consciousness::fep_active_inference::Observation;
 use super::super::{CognitiveLoopService, CycleResult, MoralJudgmentSummary, ResponseStrategy};
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Tuning constants for extracted helpers (moved from cycle.rs)
+// Tuning constants — see `thresholds.rs` for the centralized registry.
 // ═══════════════════════════════════════════════════════════════════════════════
-
-// -- Moral evaluation --
-const MORAL_EVAL_INTERVAL: usize = 7;
-const MORAL_CONCERN_THRESHOLD: f32 = -0.3;
-const NEGATION_POLARITY_THRESHOLD: f32 = 0.5;
-const NEGATION_DAMPENING: f32 = 0.3;
-
-// -- Memory recall --
-pub(in crate::cognitive_loop) const MEMORY_RECALL_TOP_K: usize = 3;
-pub(in crate::cognitive_loop) const MEMORY_RECALL_SIM_THRESHOLD: f32 = 0.3;
-const MEMORY_CONTEXT_BOOST_SCALE: f32 = 0.1;
-
-// -- Surprise & exploration --
-const SURPRISE_BOREDOM_DAMPEN: f32 = 0.7;
-
-// -- Psi synthesis --
-const FLOW_PSI_WEIGHT: f32 = 0.2;
-const RELATIONAL_PSI_WEIGHT: f32 = 0.15;
-const BODY_PSI_WEIGHT: f64 = 0.1;
-const EMBODIED_PSI_WEIGHT: f64 = 0.05;
-
-// -- Strategy modulation --
-const STRATEGY_EXPLORATORY_FACTOR: f32 = 0.8;
-const STRATEGY_DETAILED_SENSITIVITY: f32 = 1.2;
-const STRATEGY_CONCISE_SPEECH_RATE: f32 = 1.2;
-const STRATEGY_CLARIFYING_FACTOR: f32 = 0.5;
-const STRATEGY_SUPPORTIVE_PAUSE: f32 = 1.3;
-
-// -- Reward computation (RL) --
-const REWARD_GOOD_BASE: f32 = 0.5;
-const REWARD_GOOD_CONFIDENCE_SCALE: f32 = 0.5;
-const REWARD_BAD_BASE: f32 = -0.3;
-const REWARD_BAD_SCALE: f32 = -0.2;
-const REWARD_MID_BASE: f32 = 0.2;
-const REWARD_MID_SCALE: f32 = -0.5;
-const REWARD_EXTERNAL_BLEND: f32 = 0.5;
+use crate::cognitive_loop::thresholds::{
+    // Moral evaluation
+    MORAL_EVAL_INTERVAL, MORAL_CONCERN_THRESHOLD, NEGATION_POLARITY_THRESHOLD, NEGATION_DAMPENING,
+    // Memory recall
+    MEMORY_RECALL_TOP_K, MEMORY_RECALL_SIM_THRESHOLD, MEMORY_CONTEXT_BOOST_SCALE,
+    // Surprise & exploration
+    SURPRISE_BOREDOM_DAMPEN,
+    // Psi synthesis
+    FLOW_PSI_WEIGHT, RELATIONAL_PSI_WEIGHT, BODY_PSI_WEIGHT, EMBODIED_PSI_WEIGHT,
+    // Strategy modulation
+    STRATEGY_EXPLORATORY_FACTOR, STRATEGY_DETAILED_SENSITIVITY, STRATEGY_CONCISE_SPEECH_RATE,
+    STRATEGY_CLARIFYING_FACTOR, STRATEGY_SUPPORTIVE_PAUSE,
+    // Reward computation
+    REWARD_GOOD_BASE, REWARD_GOOD_CONFIDENCE_SCALE, REWARD_BAD_BASE, REWARD_BAD_SCALE,
+    REWARD_MID_BASE, REWARD_MID_SCALE, REWARD_EXTERNAL_BLEND,
+};
 
 impl CognitiveLoopService {
     // ═══════════════════════════════════════════════════════════════════════

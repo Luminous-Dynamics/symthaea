@@ -1161,16 +1161,18 @@ pub struct UnifiedConsciousnessResult {
 // ============================================================================
 
 /// NSM grounding for Φ computation methods
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct PhiMethodPrimitiveGrounding {
+pub(crate) struct PhiMethodPrimitiveGrounding {
     pub method: PhiMethod,
     pub nsm_primitives: Vec<String>,
     pub primitive_encoding: BinaryHV,
     pub computational_rigor: f64,
 }
 
+#[allow(dead_code)]
 impl PhiMethodPrimitiveGrounding {
-    pub fn new(method: PhiMethod, system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(method: PhiMethod, system: &PrimitiveSystem) -> Self {
         let (primitives, rigor) = Self::nsm_mapping(method);
         let encoding = encode_primitives(&primitives, system);
         Self {
@@ -1219,16 +1221,18 @@ impl PhiMethodPrimitiveGrounding {
 }
 
 /// NSM grounding for unified emotions
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct UnifiedEmotionPrimitiveGrounding {
+pub(crate) struct UnifiedEmotionPrimitiveGrounding {
     pub emotion: UnifiedEmotion,
     pub nsm_primitives: Vec<String>,
     pub primitive_encoding: BinaryHV,
     pub valence_polarity: i8,
 }
 
+#[allow(dead_code)]
 impl UnifiedEmotionPrimitiveGrounding {
-    pub fn new(emotion: UnifiedEmotion, system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(emotion: UnifiedEmotion, system: &PrimitiveSystem) -> Self {
         let (primitives, polarity) = Self::nsm_mapping(emotion);
         let encoding = encode_primitives(&primitives, system);
         Self {
@@ -1422,15 +1426,17 @@ impl UnifiedEmotionPrimitiveGrounding {
 }
 
 /// NSM grounding for emotional patterns
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct EmotionalPatternPrimitiveGrounding {
+pub(crate) struct EmotionalPatternPrimitiveGrounding {
     pub pattern: EmotionalPattern,
     pub nsm_primitives: Vec<String>,
     pub primitive_encoding: BinaryHV,
 }
 
+#[allow(dead_code)]
 impl EmotionalPatternPrimitiveGrounding {
-    pub fn new(pattern: EmotionalPattern, system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(pattern: EmotionalPattern, system: &PrimitiveSystem) -> Self {
         let primitives = Self::nsm_mapping(pattern);
         let encoding = encode_primitives(&primitives, system);
         Self {
@@ -1453,15 +1459,17 @@ impl EmotionalPatternPrimitiveGrounding {
 }
 
 /// NSM grounding for causal relations
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct CausalRelationPrimitiveGrounding {
+pub(crate) struct CausalRelationPrimitiveGrounding {
     pub relation: CausalRelation,
     pub nsm_primitives: Vec<String>,
     pub primitive_encoding: BinaryHV,
 }
 
+#[allow(dead_code)]
 impl CausalRelationPrimitiveGrounding {
-    pub fn new(relation: CausalRelation, system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(relation: CausalRelation, system: &PrimitiveSystem) -> Self {
         let primitives = Self::nsm_mapping(relation);
         let encoding = encode_primitives(&primitives, system);
         Self {
@@ -1495,8 +1503,9 @@ impl CausalRelationPrimitiveGrounding {
 }
 
 /// NSM grounding for dialogue depth
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct DialogueDepthPrimitiveGrounding {
+pub(crate) struct DialogueDepthPrimitiveGrounding {
     pub depth: DialogueDepth,
     pub nsm_primitives: Vec<String>,
     pub primitive_encoding: BinaryHV,
@@ -1504,7 +1513,7 @@ pub struct DialogueDepthPrimitiveGrounding {
 }
 
 impl DialogueDepthPrimitiveGrounding {
-    pub fn new(depth: DialogueDepth, system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(depth: DialogueDepth, system: &PrimitiveSystem) -> Self {
         let (primitives, proc_depth) = Self::nsm_mapping(depth);
         let encoding = encode_primitives(&primitives, system);
         Self {
@@ -1541,7 +1550,7 @@ impl DialogueDepthPrimitiveGrounding {
 
 /// Unified NSM grounding system for consciousness unification
 #[derive(Debug)]
-pub struct ConsciousnessUnificationNSMGrounding {
+pub(crate) struct ConsciousnessUnificationNSMGrounding {
     pub phi_methods: HashMap<PhiMethod, PhiMethodPrimitiveGrounding>,
     pub emotions: HashMap<UnifiedEmotion, UnifiedEmotionPrimitiveGrounding>,
     pub emotional_patterns: HashMap<EmotionalPattern, EmotionalPatternPrimitiveGrounding>,
@@ -1550,7 +1559,7 @@ pub struct ConsciousnessUnificationNSMGrounding {
 }
 
 impl ConsciousnessUnificationNSMGrounding {
-    pub fn new(system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(system: &PrimitiveSystem) -> Self {
         let mut phi_methods = HashMap::new();
         let mut emotions = HashMap::new();
         let mut emotional_patterns = HashMap::new();
@@ -1642,7 +1651,7 @@ impl ConsciousnessUnificationNSMGrounding {
     }
 
     /// Get positive-valence emotions
-    pub fn positive_emotions(&self) -> Vec<&UnifiedEmotion> {
+    pub(crate) fn positive_emotions(&self) -> Vec<&UnifiedEmotion> {
         self.emotions
             .iter()
             .filter(|(_, g)| g.valence_polarity > 0)
@@ -1651,7 +1660,7 @@ impl ConsciousnessUnificationNSMGrounding {
     }
 
     /// Get negative-valence emotions
-    pub fn negative_emotions(&self) -> Vec<&UnifiedEmotion> {
+    pub(crate) fn negative_emotions(&self) -> Vec<&UnifiedEmotion> {
         self.emotions
             .iter()
             .filter(|(_, g)| g.valence_polarity < 0)
@@ -1660,7 +1669,7 @@ impl ConsciousnessUnificationNSMGrounding {
     }
 
     /// Query emotions by semantic similarity
-    pub fn query_emotions(&self, query: &BinaryHV, threshold: f32) -> Vec<(&UnifiedEmotion, f32)> {
+    pub(crate) fn query_emotions(&self, query: &BinaryHV, threshold: f32) -> Vec<(&UnifiedEmotion, f32)> {
         let mut results: Vec<_> = self
             .emotions
             .iter()

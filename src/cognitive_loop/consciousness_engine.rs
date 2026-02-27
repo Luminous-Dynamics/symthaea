@@ -1,3 +1,7 @@
+// Engine is wired into CognitiveLoopService::cycle(). Output fields are not yet
+// individually consumed (additive wiring phase — telemetry only), so allow dead_code.
+#![allow(dead_code)]
+
 //! # Unified Consciousness Engine
 //!
 //! Wraps the 4 independent consciousness measurement systems into a single
@@ -19,7 +23,7 @@
 //! 3. **Preserves co-prime intervals**: Each subsystem fires at its original rate
 //! 4. **Backward compatible**: All existing carryover fields populated
 //! 5. **WASM-ready**: Output struct uses only Copy/Clone types (no trait objects)
-#![allow(dead_code)]
+// Engine is wired into CognitiveLoopService::cycle() — no dead code.
 
 use std::time::Instant;
 

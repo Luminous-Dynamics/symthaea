@@ -66,6 +66,8 @@ impl CognitiveLoopService {
     pub fn new(mut config: CognitiveLoopConfig) -> Result<Self> {
         // Validate hard constraints (range errors)
         config.validate().map_err(|e| anyhow::anyhow!("{e}"))?;
+        // Validate threshold registry ordering invariants
+        super::thresholds::validate();
 
         // Validate soft constraints (dependency warnings)
         let warnings = config.validate_dependencies();
@@ -637,6 +639,7 @@ impl CognitiveLoopService {
         let enable_resonator_recall = config.enable_resonator_recall;
         let resonator_cfc_input_dim = config.cfc_config.input_dim;
         let resonator_genesis_phrase = config.genesis_phrase.clone();
+        let has_primitive_processor = primitive_processor.is_some();
 
         // Somatic error bridge: infrastructure errors → felt interoceptive signals
         let (somatic_bridge_instance, pain_sender) =
@@ -936,6 +939,73 @@ impl CognitiveLoopService {
             personality_drift_tracker: super::neuromodulators::PersonalityDriftTracker::default(),
             somatic_bridge: somatic_bridge_instance,
             pain_tx: Some(pain_sender),
+            subsystem_collector: super::subsystem_trait::OutputCollector::new(),
+            last_snapshot: None,
+
+            // ── Unified Engines (additive wiring — old fields remain) ────────
+            consciousness_engine: {
+                // Fresh SpectralMIPFinder for the engine (the old `spectral_mip_finder` field stays).
+                let engine_smf =
+                    symthaea_core::consciousness_metrics::SpectralMIPFinder::with_defaults();
+                // Create fresh optional subsystems for the engine.
+                let engine_mmi = if has_primitive_processor {
+                    Some(
+                        crate::consciousness::multi_modal_integration::MultiModalIntegrator::new(
+                            crate::consciousness::multi_modal_integration::IntegrationConfig::default(),
+                        ),
+                    )
+                } else {
+                    None
+                };
+                let engine_eq = if has_primitive_processor {
+                    Some(
+                        crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2::new(),
+                    )
+                } else {
+                    None
+                };
+                let engine_ucp = if has_primitive_processor {
+                    crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline::new(
+                        crate::consciousness::unified_consciousness_pipeline::PipelineConfig::default(),
+                    ).ok()
+                } else {
+                    None
+                };
+                super::consciousness_engine::ConsciousnessEngine::new(
+                    engine_smf,
+                    engine_mmi,
+                    engine_eq,
+                    engine_ucp,
+                )
+            },
+            ethics_engine: {
+                let engine_mp = MoralParser::new();
+                let engine_ma = MoralAlgebra::default_dim();
+                let engine_ve = if has_primitive_processor {
+                    Some(
+                        crate::consciousness::unified_value_evaluator::UnifiedValueEvaluator::new(),
+                    )
+                } else {
+                    None
+                };
+                let engine_hi = if has_primitive_processor {
+                    Some(
+                        crate::consciousness::harmonies_integration::HarmoniesIntegrator::new(
+                            crate::consciousness::harmonies_integration::HarmoniesIntegrationConfig {
+                                dimension: resonator_cfc_input_dim,
+                                ..Default::default()
+                            },
+                        ),
+                    )
+                } else {
+                    None
+                };
+                super::ethics_engine::EthicsEngine::new(engine_mp, engine_ma, engine_ve, engine_hi)
+            },
+            drive_manager: super::managers::DriveManager::default(),
+            memory_manager: super::managers::MemoryManager::default(),
+            learning_manager: super::managers::LearningManager::default(),
+            perception_manager: super::managers::PerceptionManager::default(),
         })
     }
 

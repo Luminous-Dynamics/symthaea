@@ -691,7 +691,7 @@ impl Default for CrossModalBinder {
 
 /// NSM grounding for sensory modalities
 #[derive(Debug, Clone)]
-pub struct ModalityPrimitiveGrounding {
+pub(crate) struct ModalityPrimitiveGrounding {
     /// The modality being grounded
     pub modality: Modality,
     /// NSM primitive composition
@@ -705,7 +705,7 @@ pub struct ModalityPrimitiveGrounding {
 }
 
 impl ModalityPrimitiveGrounding {
-    pub fn new(modality: Modality, system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(modality: Modality, system: &PrimitiveSystem) -> Self {
         let (primitives, sensory, embodied) = Self::nsm_mapping(modality);
         let encoding = encode_primitives(&primitives, system);
 
@@ -812,7 +812,7 @@ impl ModalityPrimitiveGrounding {
 
 /// NSM grounding for convergence levels (integration hierarchy)
 #[derive(Debug, Clone)]
-pub struct ConvergenceLevelPrimitiveGrounding {
+pub(crate) struct ConvergenceLevelPrimitiveGrounding {
     /// The convergence level being grounded
     pub level: ConvergenceLevel,
     /// NSM primitive composition
@@ -824,7 +824,7 @@ pub struct ConvergenceLevelPrimitiveGrounding {
 }
 
 impl ConvergenceLevelPrimitiveGrounding {
-    pub fn new(level: ConvergenceLevel, system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(level: ConvergenceLevel, system: &PrimitiveSystem) -> Self {
         let (primitives, breadth) = Self::nsm_mapping(level);
         let encoding = encode_primitives(&primitives, system);
 
@@ -865,7 +865,7 @@ impl ConvergenceLevelPrimitiveGrounding {
 
 /// Unified NSM grounding system for cross-modal binding
 #[derive(Debug)]
-pub struct CrossModalNSMGrounding {
+pub(crate) struct CrossModalNSMGrounding {
     /// Modality groundings
     pub modalities: HashMap<Modality, ModalityPrimitiveGrounding>,
     /// Convergence level groundings
@@ -874,7 +874,7 @@ pub struct CrossModalNSMGrounding {
 
 impl CrossModalNSMGrounding {
     /// Create complete grounding system from primitive system
-    pub fn new(system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(system: &PrimitiveSystem) -> Self {
         let mut modalities = HashMap::new();
         let mut convergence_levels = HashMap::new();
 
@@ -920,7 +920,7 @@ impl CrossModalNSMGrounding {
     }
 
     /// Query modalities by semantic similarity
-    pub fn query_modalities(&self, query: &BinaryHV, threshold: f32) -> Vec<(&Modality, f32)> {
+    pub(crate) fn query_modalities(&self, query: &BinaryHV, threshold: f32) -> Vec<(&Modality, f32)> {
         let mut results: Vec<_> = self
             .modalities
             .iter()
@@ -932,7 +932,7 @@ impl CrossModalNSMGrounding {
     }
 
     /// Query convergence levels by semantic similarity
-    pub fn query_levels(&self, query: &BinaryHV, threshold: f32) -> Vec<(&ConvergenceLevel, f32)> {
+    pub(crate) fn query_levels(&self, query: &BinaryHV, threshold: f32) -> Vec<(&ConvergenceLevel, f32)> {
         let mut results: Vec<_> = self
             .convergence_levels
             .iter()
@@ -944,7 +944,7 @@ impl CrossModalNSMGrounding {
     }
 
     /// Get sensory modalities
-    pub fn sensory_modalities(&self) -> Vec<&Modality> {
+    pub(crate) fn sensory_modalities(&self) -> Vec<&Modality> {
         self.modalities
             .iter()
             .filter(|(_, g)| g.is_sensory)
@@ -953,7 +953,7 @@ impl CrossModalNSMGrounding {
     }
 
     /// Get embodied modalities (involving body awareness)
-    pub fn embodied_modalities(&self) -> Vec<&Modality> {
+    pub(crate) fn embodied_modalities(&self) -> Vec<&Modality> {
         self.modalities
             .iter()
             .filter(|(_, g)| g.is_embodied)

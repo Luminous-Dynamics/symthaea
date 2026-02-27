@@ -52,6 +52,11 @@ pub mod vocoder;
 pub mod cognitive_bridge;
 pub mod voice_feedback;
 
+// Voice pipeline orchestrator: bridges STT, cognitive loop, Broca, and TTS
+pub mod audio_bridge;
+pub mod orchestrator;
+pub mod synthesis_bridge;
+
 // LTC-driven articulatory synthesis (Phase 17)
 pub mod vocal_tract_controller;
 pub mod vocal_tract_encoder;
@@ -100,6 +105,12 @@ pub use cognitive_bridge::{
 pub use voice_feedback::{
     VoiceFeedbackBridge, VoiceFeedbackConfig, VoiceOutputMetrics, VoiceQualitySummary,
 };
+
+// Re-export voice pipeline orchestrator types
+pub use audio_bridge::{aggregate_audio_hvs, binary_to_continuous};
+pub use orchestrator::VoiceOrchestrator;
+#[cfg(feature = "ssm_language")]
+pub use synthesis_bridge::cycle_result_to_thought_channels;
 
 // Re-export vocal tract types (Phase 17)
 pub use vocal_tract_controller::{train_controller_on_phoneme_db, train_controller_transitions};

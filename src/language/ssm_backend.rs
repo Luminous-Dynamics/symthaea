@@ -347,6 +347,17 @@ impl LiquidMambaBackend {
             false
         }
     }
+
+    /// Pass the FEP learning signal from the cognitive loop to modulate distillation LR.
+    ///
+    /// - `fep_signal > 0.7` → high surprise → boost distillation by 1.5×
+    /// - `fep_signal < 0.3` → low surprise → dampen distillation by 0.7×
+    /// - Otherwise → neutral (1.0×)
+    pub fn set_fep_modulation(&self, fep_signal: f32) {
+        if let Ok(mut gen) = self.generator.lock() {
+            gen.set_fep_modulation(fep_signal);
+        }
+    }
 }
 
 #[cfg(feature = "liquid-mamba")]
@@ -410,6 +421,13 @@ impl LLMBackend for LiquidMambaBackend {
             true
         } else {
             false
+        }
+    }
+
+    #[cfg(feature = "liquid-mamba")]
+    fn set_fep_modulation(&self, fep_signal: f32) {
+        if let Ok(mut gen) = self.generator.lock() {
+            gen.set_fep_modulation(fep_signal);
         }
     }
 

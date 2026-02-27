@@ -1010,6 +1010,15 @@ pub struct CycleMetadata {
     pub neuromod_threshold_gate: f32,
     /// Cumulative exocortex trigger count since startup.
     pub exocortex_trigger_count: u64,
+    /// DA phasic burst magnitude (fast-decaying RPE signal, 0.0–1.0).
+    pub neuromod_da_phasic: f32,
+    /// NE phasic burst magnitude (fast-decaying surprise signal, 0.0–1.0).
+    pub neuromod_ne_phasic: f32,
+    /// Neurochemical consciousness modulation factor (0.6–1.2).
+    /// ACh/NE-driven scaling of unified Ψ.
+    pub neuromod_consciousness_mod: f32,
+    /// Sleep consolidation boost (1.0–3.0). DA-tagged replay amplification during Night.
+    pub neuromod_sleep_consolidation_boost: f32,
 
     // ── Liquid-Mamba Fusion Telemetry ────────────────────────────────
     /// Semantic prediction error from Liquid-Mamba round-trip (0.0–1.0, 0.0 when off).
@@ -1032,6 +1041,11 @@ pub struct CycleMetadata {
     pub feedback_confidence_proposals: u32,
     /// Number of learning rate proposals collected this cycle.
     pub feedback_lr_proposals: u32,
+
+    // ── Staged Computation Model Telemetry (Phase 2.3) ────────────────
+    /// Number of subsystems that contributed non-neutral SubsystemOutputs.
+    /// 0 = no subsystems using the new CognitiveSubsystem trait yet.
+    pub subsystem_integration_contributors: u32,
 }
 
 /// Per-module execution timings in microseconds for overhead profiling.
@@ -1121,6 +1135,10 @@ pub struct ModuleTimings {
     pub soul_experience: u64,
     /// CycleMetadata struct construction + format!() serialization
     pub metadata_assembly: u64,
+    /// Unified consciousness engine (SpectralMIP + MultiModal + EqV2 + Pipeline)
+    pub consciousness_engine: u64,
+    /// Unified ethics engine (MoralParser + MoralAlgebra + ValueEvaluator + Harmonies)
+    pub ethics_engine: u64,
     // ── Mid-cycle sections (Session 10 instrumentation) ──
     /// World model: sensory update + stiffness/level-error feedback
     pub world_model: u64,

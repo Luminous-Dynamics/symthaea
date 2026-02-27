@@ -146,7 +146,7 @@ impl StateType {
 /// - **Emergence** (MAYBE, BODY) - pre-conscious bodily states
 /// - **Presence** (FEEL, KNOW, I) - full phenomenal consciousness
 #[derive(Debug, Clone)]
-pub struct StateTypePrimitiveGrounding {
+pub(crate) struct StateTypePrimitiveGrounding {
     /// The consciousness state type
     pub state_type: StateType,
     /// NSM primitives that define this state (Wierzbicka's 65 primes)
@@ -161,7 +161,7 @@ pub struct StateTypePrimitiveGrounding {
 
 impl StateTypePrimitiveGrounding {
     /// Create grounding for a state type with given primitive system
-    pub fn new(state_type: StateType, primitives: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(state_type: StateType, primitives: &PrimitiveSystem) -> Self {
         let nsm_primitives = Self::primitives_for_state(&state_type);
 
         // Compose primitives using HDC binding
@@ -311,7 +311,7 @@ impl StateTypePrimitiveGrounding {
     }
 
     /// Semantic similarity to another state grounding
-    pub fn similarity(&self, other: &Self) -> f64 {
+    pub(crate) fn similarity(&self, other: &Self) -> f64 {
         self.primitive_encoding
             .similarity(&other.primitive_encoding) as f64
     }
@@ -322,14 +322,14 @@ impl StateTypePrimitiveGrounding {
 /// Provides semantic foundation for consciousness state generation
 /// using Wierzbicka's Natural Semantic Metalanguage.
 #[derive(Debug, Clone)]
-pub struct SyntheticStatesNSMGrounding {
+pub(crate) struct SyntheticStatesNSMGrounding {
     /// Grounding for each state type
     pub state_groundings: HashMap<StateType, StateTypePrimitiveGrounding>,
 }
 
 impl SyntheticStatesNSMGrounding {
     /// Create complete NSM grounding for synthetic states
-    pub fn new(primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(primitive_system: &PrimitiveSystem) -> Self {
         let mut state_groundings = HashMap::new();
 
         for state_type in StateType::all_ordered() {
@@ -341,12 +341,12 @@ impl SyntheticStatesNSMGrounding {
     }
 
     /// Get grounding for a specific state type
-    pub fn grounding(&self, state_type: &StateType) -> Option<&StateTypePrimitiveGrounding> {
+    pub(crate) fn grounding(&self, state_type: &StateType) -> Option<&StateTypePrimitiveGrounding> {
         self.state_groundings.get(state_type)
     }
 
     /// Find states semantically similar to a query vector
-    pub fn find_similar(&self, query: &BinaryHV, threshold: f64) -> Vec<(&StateType, f64)> {
+    pub(crate) fn find_similar(&self, query: &BinaryHV, threshold: f64) -> Vec<(&StateType, f64)> {
         let mut similar: Vec<_> = self
             .state_groundings
             .iter()
@@ -359,7 +359,7 @@ impl SyntheticStatesNSMGrounding {
     }
 
     /// Semantic distance between two state types
-    pub fn semantic_distance(&self, state1: &StateType, state2: &StateType) -> f64 {
+    pub(crate) fn semantic_distance(&self, state1: &StateType, state2: &StateType) -> f64 {
         match (self.grounding(state1), self.grounding(state2)) {
             (Some(g1), Some(g2)) => 1.0 - g1.similarity(g2),
             _ => 1.0,
@@ -367,7 +367,7 @@ impl SyntheticStatesNSMGrounding {
     }
 
     /// Get consciousness ordering based on semantic primitives
-    pub fn consciousness_ordering(&self) -> Vec<(StateType, f64)> {
+    pub(crate) fn consciousness_ordering(&self) -> Vec<(StateType, f64)> {
         let mut ordering: Vec<_> = self
             .state_groundings
             .iter()

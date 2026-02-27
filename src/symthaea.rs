@@ -161,6 +161,160 @@ pub struct CurriculumReport {
     pub recent_objectives: Vec<CurriculumObjectiveSummary>,
 }
 
+/// Relational consciousness subsystem — partnership, trajectory, and dyadic Phi.
+///
+/// Groups all relational state into a cohesive unit: partner model tracking,
+/// relationship trajectory, Phi-dyad computation, and recent AI states for
+/// dyadic assessment.
+struct RelationalCore {
+    /// Human partner model for relational consciousness.
+    partner: HumanPartnerModel,
+    /// Relationship trajectory tracking.
+    trajectory: RelationshipTrajectory,
+    /// Phi-dyad calculator for relational Phi.
+    dyad_calculator: PhiDyadCalculator,
+    /// Recent AI states for dyad computation (ring buffer, max 8).
+    recent_ai_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
+    /// Last computed Phi_dyad — fed back into mind as relational Psi on next cycle.
+    last_phi_dyad: f64,
+}
+
+impl RelationalCore {
+    fn new() -> Self {
+        Self {
+            partner: HumanPartnerModel::new("human"),
+            trajectory: RelationshipTrajectory::default(),
+            dyad_calculator: PhiDyadCalculator::new(),
+            recent_ai_states: Vec::new(),
+            last_phi_dyad: 0.0,
+        }
+    }
+
+    fn from_persisted(
+        partner: HumanPartnerModel,
+        trajectory: RelationshipTrajectory,
+        recent_ai_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
+    ) -> Self {
+        Self {
+            partner,
+            trajectory,
+            dyad_calculator: PhiDyadCalculator::new(),
+            recent_ai_states,
+            last_phi_dyad: 0.0,
+        }
+    }
+
+    /// Push an AI state into the ring buffer (max 8).
+    fn push_ai_state(&mut self, hv: symthaea_core::hdc::unified_hv::ContinuousHV) {
+        self.recent_ai_states.push(hv);
+        if self.recent_ai_states.len() > 8 {
+            self.recent_ai_states.remove(0);
+        }
+    }
+
+    /// Compute Phi-dyad from recent AI states and partner model.
+    fn compute_phi_dyad(&self) -> f64 {
+        if self.recent_ai_states.is_empty() {
+            return 0.0;
+        }
+
+        let human_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV> = self
+            .recent_ai_states
+            .iter()
+            .map(|s| {
+                let mut vals = s.values.clone();
+                for v in vals.iter_mut() {
+                    *v *= 0.9;
+                    *v += 0.1;
+                }
+                symthaea_core::hdc::unified_hv::ContinuousHV::from_values(vals).normalize()
+            })
+            .collect();
+
+        let assessment = RelationalAssessment {
+            agent_a: "symthaea".to_string(),
+            agent_b: self.partner.partner_id.clone(),
+            phi_relation: self.partner.phi_relational,
+            stage: self.partner.stage,
+            synchrony: self.partner.trust as f64,
+            turn_taking_quality: 0.7,
+            mutual_information: self.partner.reciprocity as f64,
+            mode: self.partner.mode,
+            num_interactions: self.partner.interactions_count as usize,
+            relationship_age: 0.0,
+            explanation: String::new(),
+        };
+
+        let input = DyadInput {
+            ai_states: &self.recent_ai_states,
+            human_states: &human_states,
+            relational: &assessment,
+            human_model: &self.partner,
+            weights: DyadWeights::default(),
+        };
+
+        self.dyad_calculator.compute(&input).phi_dyad
+    }
+
+    /// Update partnership state from interaction consciousness level.
+    fn update_partnership(&mut self, consciousness: f32) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs_f64();
+
+        let depth = (consciousness * 0.5).clamp(0.0, 1.0);
+        let safety = (consciousness * 0.7 + 0.2).clamp(0.0, 1.0);
+        let mutuality = (consciousness * 0.4 + 0.1).clamp(0.0, 1.0);
+
+        let event = InteractionEvent {
+            timestamp: now,
+            depth,
+            emotional_safety: safety,
+            mutuality,
+        };
+        self.partner.update_on_interaction(&event);
+
+        let assessment = RelationalAssessment {
+            agent_a: "symthaea".to_string(),
+            agent_b: self.partner.partner_id.clone(),
+            phi_relation: self.partner.phi_relational,
+            stage: self.partner.stage,
+            synchrony: consciousness as f64 * 0.8,
+            turn_taking_quality: 0.7,
+            mutual_information: mutuality as f64,
+            mode: if self.partner.trust > 0.3 {
+                RelationMode::IThou
+            } else {
+                RelationMode::IIt
+            },
+            num_interactions: self.partner.interactions_count as usize,
+            relationship_age: now,
+            explanation: String::new(),
+        };
+        self.partner.update_from_assessment(&assessment);
+        self.partner.advance_stage_if_ready();
+
+        let phi_dyad = self.compute_phi_dyad();
+        self.trajectory.record(now, self.partner.stage, phi_dyad);
+        self.last_phi_dyad = phi_dyad;
+    }
+
+    /// Get current partnership state summary.
+    fn partnership_state(&self) -> PartnershipState {
+        let phi_dyad = self.compute_phi_dyad();
+        PartnershipState {
+            stage: self.partner.stage,
+            trust: self.partner.trust,
+            vulnerability: self.partner.vulnerability,
+            reciprocity: self.partner.reciprocity,
+            phi_dyad,
+            interactions: self.partner.interactions_count,
+            trajectory_points: self.trajectory.points().len(),
+        }
+    }
+}
+
 /// The primary Symthaea consciousness facade.
 ///
 /// Integrates the continuous mind (HDC+LTC cognitive processing) with
@@ -578,6 +732,12 @@ impl Symthaea {
             task_supervisor,
         };
 
+        // Wire LLM backend into ContinuousMind for swarm projection gradient exchange
+        #[cfg(feature = "liquid-mamba")]
+        if let Some(backend) = instance.llm.get_backend() {
+            instance.mind.set_llm_backend(backend);
+        }
+
         #[cfg(feature = "ssm-power")]
         if ssm_power_enabled() {
             instance.attach_power_ssm_sensor()?;
@@ -761,7 +921,8 @@ impl Symthaea {
         let (somatic_bridge, pain_tx) = SomaticErrorBridge::new();
         let task_supervisor = TaskSupervisor::new(pain_tx.clone());
 
-        Ok(Self {
+        #[allow(unused_mut)] // mutated conditionally under cfg(feature = "liquid-mamba")
+        let mut instance = Self {
             mind,
             language,
             llm,
@@ -819,7 +980,15 @@ impl Symthaea {
             somatic_bridge,
             pain_tx,
             task_supervisor,
-        })
+        };
+
+        // Wire LLM backend into ContinuousMind for swarm projection gradient exchange
+        #[cfg(feature = "liquid-mamba")]
+        if let Some(backend) = instance.llm.get_backend() {
+            instance.mind.set_llm_backend(backend);
+        }
+
+        Ok(instance)
     }
 
     /// Process a query through the full consciousness pipeline.
@@ -1379,6 +1548,20 @@ impl Symthaea {
         let mood_temp = self.mind.state.mood_temperature;
         let generation = self.llm.translate_thought(&thought, mood_temp).await;
         let phase5_duration = phase5_start.elapsed();
+
+        // Inject L-SSM semantic PE into MindState for downstream telemetry
+        // and pass FEP-proxy signal to modulate distillation LR
+        #[cfg(feature = "liquid-mamba")]
+        {
+            let pe = self.llm.last_liquid_mamba_pe();
+            self.mind.state.liquid_mamba_pe = pe;
+            // FEP proxy: high cognitive load → high surprise → boost distillation
+            // consciousness_level provides an integration quality signal
+            let fep_proxy = (self.mind.state.cognitive_load as f32)
+                .max(1.0 - self.mind.state.consciousness_level as f32)
+                .clamp(0.0, 1.0);
+            self.llm.set_fep_modulation(fep_proxy);
+        }
 
         // ====================================================================
         // PHASE 6: FIDELITY VERIFICATION

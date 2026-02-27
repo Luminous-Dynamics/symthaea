@@ -32,7 +32,7 @@ use symthaea_core::hdc::ContinuousHV;
 /// - Observing: self-reference → SEE + I + KNOW + NOW
 /// - Integrating: unifying components → ALL + TOGETHER + ONE + BECOME
 #[derive(Debug, Clone)]
-pub struct AutopoieticPhasePrimitiveGrounding {
+pub(crate) struct AutopoieticPhasePrimitiveGrounding {
     /// The autopoietic phase being grounded
     pub phase: AutopoieticPhase,
 
@@ -54,7 +54,7 @@ pub struct AutopoieticPhasePrimitiveGrounding {
 
 impl AutopoieticPhasePrimitiveGrounding {
     /// Get NSM grounding for a specific autopoietic phase
-    pub fn for_phase(phase: AutopoieticPhase, primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn for_phase(phase: AutopoieticPhase, primitive_system: &PrimitiveSystem) -> Self {
         let (primitives, self_directedness, generativity, boundary_focus) = match phase {
             // Producing: self-production of components
             AutopoieticPhase::Producing => (
@@ -129,7 +129,7 @@ impl AutopoieticPhasePrimitiveGrounding {
     }
 
     /// Get all autopoietic phase groundings
-    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<AutopoieticPhase, Self> {
+    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<AutopoieticPhase, Self> {
         [
             AutopoieticPhase::Producing,
             AutopoieticPhase::Maintaining,
@@ -144,12 +144,12 @@ impl AutopoieticPhasePrimitiveGrounding {
     }
 
     /// Semantic formula representation
-    pub fn semantic_formula(&self) -> String {
+    pub(crate) fn semantic_formula(&self) -> String {
         self.nsm_primitives.join(" + ")
     }
 
     /// Calculate similarity between two phases
-    pub fn similarity(&self, other: &Self) -> f32 {
+    pub(crate) fn similarity(&self, other: &Self) -> f32 {
         self.primitive_encoding
             .similarity(&other.primitive_encoding)
     }
@@ -167,7 +167,7 @@ impl AutopoieticPhasePrimitiveGrounding {
 /// - Integration: unifying function → ALL + TOGETHER + ONE + SAME
 /// - SelfModel: self-representation → I + THINK + I + KNOW
 #[derive(Debug, Clone)]
-pub struct ComponentTypePrimitiveGrounding {
+pub(crate) struct ComponentTypePrimitiveGrounding {
     /// The component type being grounded
     pub component_type: ComponentType,
 
@@ -189,7 +189,7 @@ pub struct ComponentTypePrimitiveGrounding {
 
 impl ComponentTypePrimitiveGrounding {
     /// Get NSM grounding for a specific component type
-    pub fn for_type(component_type: ComponentType, primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn for_type(component_type: ComponentType, primitive_system: &PrimitiveSystem) -> Self {
         let (primitives, internal_focus, temporal_span, self_reference_level) = match component_type
         {
             // Boundary: interface/membrane
@@ -257,7 +257,7 @@ impl ComponentTypePrimitiveGrounding {
     }
 
     /// Get all component type groundings
-    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<ComponentType, Self> {
+    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<ComponentType, Self> {
         [
             ComponentType::Boundary,
             ComponentType::Processing,
@@ -271,12 +271,12 @@ impl ComponentTypePrimitiveGrounding {
     }
 
     /// Semantic formula representation
-    pub fn semantic_formula(&self) -> String {
+    pub(crate) fn semantic_formula(&self) -> String {
         self.nsm_primitives.join(" + ")
     }
 
     /// Calculate similarity between two component types
-    pub fn similarity(&self, other: &Self) -> f32 {
+    pub(crate) fn similarity(&self, other: &Self) -> f32 {
         self.primitive_encoding
             .similarity(&other.primitive_encoding)
     }
@@ -287,7 +287,7 @@ impl ComponentTypePrimitiveGrounding {
 /// Provides access to all autopoietic concept groundings for
 /// cross-domain semantic reasoning about self-maintaining systems.
 #[derive(Debug, Clone)]
-pub struct AutopoieticNSMGrounding {
+pub(crate) struct AutopoieticNSMGrounding {
     /// Autopoietic phase groundings
     pub phases: HashMap<AutopoieticPhase, AutopoieticPhasePrimitiveGrounding>,
 
@@ -297,7 +297,7 @@ pub struct AutopoieticNSMGrounding {
 
 impl AutopoieticNSMGrounding {
     /// Create complete autopoietic NSM grounding system
-    pub fn new(primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(primitive_system: &PrimitiveSystem) -> Self {
         Self {
             phases: AutopoieticPhasePrimitiveGrounding::all_groundings(primitive_system),
             component_types: ComponentTypePrimitiveGrounding::all_groundings(primitive_system),
@@ -305,12 +305,12 @@ impl AutopoieticNSMGrounding {
     }
 
     /// Get total number of grounded concepts
-    pub fn concept_count(&self) -> usize {
+    pub(crate) fn concept_count(&self) -> usize {
         self.phases.len() + self.component_types.len()
     }
 
     /// Describe current autopoietic state semantically
-    pub fn describe_state(&self, phase: AutopoieticPhase) -> String {
+    pub(crate) fn describe_state(&self, phase: AutopoieticPhase) -> String {
         self.phases
             .get(&phase)
             .map(|g| format!("Autopoiesis[{}]", g.semantic_formula()))
@@ -318,7 +318,7 @@ impl AutopoieticNSMGrounding {
     }
 
     /// Get semantic description of a component
-    pub fn describe_component(&self, component_type: ComponentType) -> String {
+    pub(crate) fn describe_component(&self, component_type: ComponentType) -> String {
         self.component_types
             .get(&component_type)
             .map(|g| format!("Component[{}]", g.semantic_formula()))

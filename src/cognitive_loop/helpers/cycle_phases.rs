@@ -454,7 +454,15 @@ impl CognitiveLoopService {
                 } else {
                     0
                 };
-                let boosted_batch = base_batch + surprise_batch_boost;
+                // DA-tagged sleep consolidation: Night phase → bigger replay batches
+                // Science: Walker & Stickgold (2006) — DA-tagged memories consolidate during sleep
+                let sleep_boost = if self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night {
+                    let factor = self.neuromodulator_bath.sleep_consolidation_boost();
+                    (base_batch as f32 * (factor - 1.0)).round() as usize
+                } else {
+                    0
+                };
+                let boosted_batch = base_batch + surprise_batch_boost + sleep_boost;
                 // Temporarily set boosted batch size for this replay session
                 let original_batch = replay.config.batch_size;
                 replay.config.batch_size = boosted_batch;

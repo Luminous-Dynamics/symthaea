@@ -23,7 +23,7 @@ use super::state::ConsciousnessPhase;
 /// - Renyi: generalized entropy -> KNOW + NOT + MAYBE + MORE
 /// - KolmogorovSinai: dynamical unpredictability -> KNOW + NOT + AFTER + MOVE
 #[derive(Debug, Clone)]
-pub struct EntropyMethodPrimitiveGrounding {
+pub(crate) struct EntropyMethodPrimitiveGrounding {
     /// The entropy method being grounded
     pub method: EntropyMethod,
 
@@ -42,7 +42,7 @@ pub struct EntropyMethodPrimitiveGrounding {
 
 impl EntropyMethodPrimitiveGrounding {
     /// Get NSM grounding for a specific entropy method
-    pub fn for_method(method: EntropyMethod, primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn for_method(method: EntropyMethod, primitive_system: &PrimitiveSystem) -> Self {
         let (primitives, dynamical_emphasis, quantum_emphasis) = match method {
             // Shannon: classical information theory
             EntropyMethod::Shannon => (
@@ -96,7 +96,7 @@ impl EntropyMethodPrimitiveGrounding {
     }
 
     /// Get all entropy method groundings
-    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<EntropyMethod, Self> {
+    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<EntropyMethod, Self> {
         [
             EntropyMethod::Shannon,
             EntropyMethod::VonNeumann,
@@ -109,7 +109,7 @@ impl EntropyMethodPrimitiveGrounding {
     }
 
     /// Semantic formula representation
-    pub fn semantic_formula(&self) -> String {
+    pub(crate) fn semantic_formula(&self) -> String {
         self.nsm_primitives.join(" + ")
     }
 }
@@ -128,7 +128,7 @@ impl EntropyMethodPrimitiveGrounding {
 /// - Flow: effortless action -> DO + GOOD + NOT + FEEL + BAD + MOVE
 /// - Unified: deep integration -> ALL + TOGETHER + SAME + ONE + FEEL
 #[derive(Debug, Clone)]
-pub struct ConsciousnessPhasePrimitiveGrounding {
+pub(crate) struct ConsciousnessPhasePrimitiveGrounding {
     /// The consciousness phase being grounded
     pub phase: ConsciousnessPhase,
 
@@ -150,7 +150,7 @@ pub struct ConsciousnessPhasePrimitiveGrounding {
 
 impl ConsciousnessPhasePrimitiveGrounding {
     /// Get NSM grounding for a specific consciousness phase
-    pub fn for_phase(phase: ConsciousnessPhase, primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn for_phase(phase: ConsciousnessPhase, primitive_system: &PrimitiveSystem) -> Self {
         let (primitives, order, creativity, wellbeing) = match phase {
             // Frozen: rigid, stuck, over-ordered
             ConsciousnessPhase::Frozen => (
@@ -225,7 +225,7 @@ impl ConsciousnessPhasePrimitiveGrounding {
     }
 
     /// Get all consciousness phase groundings
-    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<ConsciousnessPhase, Self> {
+    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<ConsciousnessPhase, Self> {
         [
             ConsciousnessPhase::Frozen,
             ConsciousnessPhase::Normal,
@@ -240,12 +240,12 @@ impl ConsciousnessPhasePrimitiveGrounding {
     }
 
     /// Semantic formula representation
-    pub fn semantic_formula(&self) -> String {
+    pub(crate) fn semantic_formula(&self) -> String {
         self.nsm_primitives.join(" + ")
     }
 
     /// Calculate similarity between two phases
-    pub fn similarity(&self, other: &Self) -> f32 {
+    pub(crate) fn similarity(&self, other: &Self) -> f32 {
         self.primitive_encoding
             .similarity(&other.primitive_encoding)
     }
@@ -259,7 +259,7 @@ impl ConsciousnessPhasePrimitiveGrounding {
 /// - SecondOrder: continuous, critical -> FOR_SOME_TIME + CHANGE + PART + SAME
 /// - Crossover: smooth, gradual -> FOR_SOME_TIME + BECOME + SAME + MORE
 #[derive(Debug, Clone)]
-pub struct TransitionOrderPrimitiveGrounding {
+pub(crate) struct TransitionOrderPrimitiveGrounding {
     /// The transition order being grounded
     pub order: TransitionOrder,
 
@@ -278,7 +278,7 @@ pub struct TransitionOrderPrimitiveGrounding {
 
 impl TransitionOrderPrimitiveGrounding {
     /// Get NSM grounding for a specific transition order
-    pub fn for_order(order: TransitionOrder, primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn for_order(order: TransitionOrder, primitive_system: &PrimitiveSystem) -> Self {
         let (primitives, discontinuity, criticality) = match order {
             // First order: sudden jump
             TransitionOrder::FirstOrder => (
@@ -325,7 +325,7 @@ impl TransitionOrderPrimitiveGrounding {
     }
 
     /// Get all transition order groundings
-    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<TransitionOrder, Self> {
+    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<TransitionOrder, Self> {
         [
             TransitionOrder::FirstOrder,
             TransitionOrder::SecondOrder,
@@ -337,7 +337,7 @@ impl TransitionOrderPrimitiveGrounding {
     }
 
     /// Semantic formula representation
-    pub fn semantic_formula(&self) -> String {
+    pub(crate) fn semantic_formula(&self) -> String {
         self.nsm_primitives.join(" + ")
     }
 }
@@ -352,7 +352,7 @@ impl TransitionOrderPrimitiveGrounding {
 /// - Increasing: losing coherence -> MORE + BAD + CHANGE + NOT + WANT
 /// - Searching: exploring options -> MOVE + MAYBE + SEE + WANT + KNOW
 #[derive(Debug, Clone)]
-pub struct FreeEnergyStatusPrimitiveGrounding {
+pub(crate) struct FreeEnergyStatusPrimitiveGrounding {
     /// The free energy status being grounded
     pub status: FreeEnergyStatus,
 
@@ -374,7 +374,7 @@ pub struct FreeEnergyStatusPrimitiveGrounding {
 
 impl FreeEnergyStatusPrimitiveGrounding {
     /// Get NSM grounding for a specific free energy status
-    pub fn for_status(status: FreeEnergyStatus, primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn for_status(status: FreeEnergyStatus, primitive_system: &PrimitiveSystem) -> Self {
         let (primitives, direction, stability, optimality) = match status {
             // Minimizing: active reduction
             FreeEnergyStatus::Minimizing => (
@@ -441,7 +441,7 @@ impl FreeEnergyStatusPrimitiveGrounding {
     }
 
     /// Get all free energy status groundings
-    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<FreeEnergyStatus, Self> {
+    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<FreeEnergyStatus, Self> {
         [
             FreeEnergyStatus::Minimizing,
             FreeEnergyStatus::LocalMinimum,
@@ -455,7 +455,7 @@ impl FreeEnergyStatusPrimitiveGrounding {
     }
 
     /// Semantic formula representation
-    pub fn semantic_formula(&self) -> String {
+    pub(crate) fn semantic_formula(&self) -> String {
         self.nsm_primitives.join(" + ")
     }
 }
@@ -469,7 +469,7 @@ impl FreeEnergyStatusPrimitiveGrounding {
 /// - FarFromEquilibrium: active, living -> VERY + NOT + SAME + DO + LIVE
 /// - Metastable: temporarily stable -> SAME + NOW + MAYBE + CHANGE + AFTER
 #[derive(Debug, Clone)]
-pub struct EquilibriumStatusPrimitiveGrounding {
+pub(crate) struct EquilibriumStatusPrimitiveGrounding {
     /// The equilibrium status being grounded
     pub status: EquilibriumStatus,
 
@@ -491,7 +491,7 @@ pub struct EquilibriumStatusPrimitiveGrounding {
 
 impl EquilibriumStatusPrimitiveGrounding {
     /// Get NSM grounding for a specific equilibrium status
-    pub fn for_status(status: EquilibriumStatus, primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn for_status(status: EquilibriumStatus, primitive_system: &PrimitiveSystem) -> Self {
         let (primitives, distance, permanence, activity) = match status {
             // Equilibrium: true balance
             EquilibriumStatus::Equilibrium => (
@@ -556,7 +556,7 @@ impl EquilibriumStatusPrimitiveGrounding {
     }
 
     /// Get all equilibrium status groundings
-    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<EquilibriumStatus, Self> {
+    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<EquilibriumStatus, Self> {
         [
             EquilibriumStatus::Equilibrium,
             EquilibriumStatus::Equilibrating,
@@ -569,7 +569,7 @@ impl EquilibriumStatusPrimitiveGrounding {
     }
 
     /// Semantic formula representation
-    pub fn semantic_formula(&self) -> String {
+    pub(crate) fn semantic_formula(&self) -> String {
         self.nsm_primitives.join(" + ")
     }
 }
@@ -579,7 +579,7 @@ impl EquilibriumStatusPrimitiveGrounding {
 /// Provides access to all thermodynamic concept groundings for
 /// cross-domain semantic reasoning about consciousness states.
 #[derive(Debug, Clone)]
-pub struct ThermodynamicsNSMGrounding {
+pub(crate) struct ThermodynamicsNSMGrounding {
     /// Entropy method groundings
     pub entropy_methods: HashMap<EntropyMethod, EntropyMethodPrimitiveGrounding>,
 
@@ -598,7 +598,7 @@ pub struct ThermodynamicsNSMGrounding {
 
 impl ThermodynamicsNSMGrounding {
     /// Create complete thermodynamics NSM grounding system
-    pub fn new(primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(primitive_system: &PrimitiveSystem) -> Self {
         Self {
             entropy_methods: EntropyMethodPrimitiveGrounding::all_groundings(primitive_system),
             phases: ConsciousnessPhasePrimitiveGrounding::all_groundings(primitive_system),
@@ -613,7 +613,7 @@ impl ThermodynamicsNSMGrounding {
     }
 
     /// Get total number of grounded concepts
-    pub fn concept_count(&self) -> usize {
+    pub(crate) fn concept_count(&self) -> usize {
         self.entropy_methods.len()
             + self.phases.len()
             + self.transition_orders.len()
@@ -622,7 +622,7 @@ impl ThermodynamicsNSMGrounding {
     }
 
     /// Get semantic description of the thermodynamic state
-    pub fn describe_state(
+    pub(crate) fn describe_state(
         &self,
         phase: ConsciousnessPhase,
         fe_status: FreeEnergyStatus,

@@ -432,7 +432,7 @@ impl TemporalIdentityCoherence {
     }
 
     /// Update from narrative, present, and predictive selves
-    pub fn update(
+    pub(crate) fn update(
         &mut self,
         narrative: &NarrativeSelfModel,
         present_state: &BinaryHV,
@@ -758,7 +758,7 @@ impl TemporalConsciousnessAnalyzer {
     }
 
     /// Full observation: update all temporal analyses
-    pub fn observe(
+    pub(crate) fn observe(
         &mut self,
         state: &BinaryHV,
         phi: f64,

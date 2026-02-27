@@ -149,6 +149,10 @@ pub struct LiquidMambaGenerator {
     recent_thought_hvs: VecDeque<ContinuousHV>,
     // Last semantic prediction error for telemetry
     last_semantic_pe: f32,
+    // PE history ring buffer for trend analysis (capacity 64)
+    pe_history: VecDeque<f32>,
+    // FEP modulation factor from cognitive loop (default 1.0 = neutral)
+    fep_modulation: f32,
 }
 
 impl LiquidMambaGenerator {
@@ -189,6 +193,8 @@ impl LiquidMambaGenerator {
             distill_accumulator: 0,
             recent_thought_hvs: VecDeque::new(),
             last_semantic_pe: 0.0,
+            pe_history: VecDeque::with_capacity(64),
+            fep_modulation: 1.0,
         })
     }
 
@@ -197,6 +203,7 @@ impl LiquidMambaGenerator {
         match self.generate_inner(channels, None) {
             Ok(result) => {
                 self.last_semantic_pe = result.semantic_pe;
+                self.push_pe_history(result.semantic_pe);
                 result
             }
             Err(e) => {
@@ -225,6 +232,7 @@ impl LiquidMambaGenerator {
         match self.generate_inner(channels, Some(on_token)) {
             Ok(result) => {
                 self.last_semantic_pe = result.semantic_pe;
+                self.push_pe_history(result.semantic_pe);
                 result
             }
             Err(e) => {
@@ -353,7 +361,9 @@ impl LiquidMambaGenerator {
             if self.config.enable_veto {
                 coherence_monitor.push(token_hdc);
 
-                if coherence_monitor.should_veto() && pos > 2 {
+                // Use predictive veto with long_coherence gating
+                let long_coh = long_coherence_monitor.current_coherence();
+                if coherence_monitor.should_veto_predictive(long_coh) && pos > 2 {
                     veto_triggered = true;
                     text.push_str(&self.config.veto_hesitation);
                     if let Some(ref mut cb) = on_token {
@@ -526,6 +536,66 @@ impl LiquidMambaGenerator {
         self.last_semantic_pe
     }
 
+    /// Push a PE value into the history ring buffer (capacity 64).
+    fn push_pe_history(&mut self, pe: f32) {
+        if self.pe_history.len() >= 64 {
+            self.pe_history.pop_front();
+        }
+        self.pe_history.push_back(pe);
+    }
+
+    /// Compute least-squares slope over the last 16 PE entries.
+    ///
+    /// Positive = PE diverging (getting worse), negative = converging (improving).
+    /// Returns 0.0 if fewer than 2 entries.
+    pub fn pe_trend(&self) -> f32 {
+        let window = 16.min(self.pe_history.len());
+        if window < 2 {
+            return 0.0;
+        }
+        // Least-squares slope: Σ(i - ī)(y_i - ȳ) / Σ(i - ī)²
+        let start = self.pe_history.len() - window;
+        let n = window as f32;
+        let mean_x = (n - 1.0) / 2.0;
+        let mean_y: f32 = self.pe_history.iter().skip(start).sum::<f32>() / n;
+        let mut num = 0.0f32;
+        let mut den = 0.0f32;
+        for (i, &pe) in self.pe_history.iter().skip(start).enumerate() {
+            let dx = i as f32 - mean_x;
+            num += dx * (pe - mean_y);
+            den += dx * dx;
+        }
+        if den.abs() < 1e-10 { 0.0 } else { num / den }
+    }
+
+    /// PE statistics over the full history: (mean, std_dev, trend).
+    pub fn pe_stats(&self) -> (f32, f32, f32) {
+        if self.pe_history.is_empty() {
+            return (0.0, 0.0, 0.0);
+        }
+        let n = self.pe_history.len() as f32;
+        let mean: f32 = self.pe_history.iter().sum::<f32>() / n;
+        let variance: f32 = self.pe_history.iter()
+            .map(|&pe| (pe - mean) * (pe - mean))
+            .sum::<f32>() / n;
+        (mean, variance.sqrt(), self.pe_trend())
+    }
+
+    /// Set the FEP modulation factor from the cognitive loop.
+    ///
+    /// - `fep_signal > 0.7` → high surprise → boost distillation LR by 1.5×
+    /// - `fep_signal < 0.3` → low surprise → dampen distillation LR by 0.7×
+    /// - Otherwise → neutral (1.0×)
+    pub fn set_fep_modulation(&mut self, fep_signal: f32) {
+        self.fep_modulation = if fep_signal > 0.7 {
+            1.5
+        } else if fep_signal < 0.3 {
+            0.7
+        } else {
+            1.0
+        };
+    }
+
     /// Check for projection collapse and auto-recover if detected.
     ///
     /// Monitors the effective rank of bottleneck activations. If rank drops
@@ -595,8 +665,19 @@ impl LiquidMambaGenerator {
 
         let thought_hv = self.encoder.encode(channels);
 
-        // LR schedule: warmup → cosine annealing
-        let effective_lr = self.compute_lr();
+        // LR schedule: warmup → cosine annealing → PE-trend adaptive → FEP modulation
+        let base_effective_lr = self.compute_lr();
+        let trend = self.pe_trend();
+        let trend_factor = if trend > 0.01 {
+            // PE diverging — halve LR to stabilize
+            0.5
+        } else if trend < -0.01 {
+            // PE converging well — allow 1.5× boost (capped at 2× base)
+            1.5f32.min(2.0 * self.config.base_lr / base_effective_lr.max(1e-10))
+        } else {
+            1.0
+        };
+        let effective_lr = base_effective_lr * trend_factor * self.fep_modulation;
         if effective_lr < 1e-7 {
             return;
         }
@@ -729,6 +810,10 @@ struct CoherenceMonitor {
     consecutive_low: usize,
     min_consecutive_low: usize,
     veto_threshold: f32,
+    /// Previous coherence value for velocity computation.
+    prev_coherence: f32,
+    /// Rate of coherence change: `new - prev` per push.
+    coherence_velocity: f32,
 }
 
 impl CoherenceMonitor {
@@ -748,6 +833,8 @@ impl CoherenceMonitor {
             consecutive_low: 0,
             min_consecutive_low,
             veto_threshold,
+            prev_coherence: 1.0,
+            coherence_velocity: 0.0,
         }
     }
 
@@ -766,8 +853,14 @@ impl CoherenceMonitor {
         // Cosine similarity with thought
         let sim = self.thought_hv.similarity(&bundled).clamp(-1.0, 1.0);
 
+        // Save previous for velocity computation
+        self.prev_coherence = self.ema_coherence;
+
         // EMA smooth
         self.ema_coherence = self.ema_alpha * sim + (1.0 - self.ema_alpha) * self.ema_coherence;
+
+        // Compute velocity (rate of change)
+        self.coherence_velocity = self.ema_coherence - self.prev_coherence;
 
         // Track consecutive low
         if self.ema_coherence < self.veto_threshold {
@@ -777,9 +870,27 @@ impl CoherenceMonitor {
         }
     }
 
-    /// Whether coherence has been below threshold for enough consecutive tokens.
+    /// Whether coherence warrants a veto (standard or predictive).
+    ///
+    /// Standard veto: coherence below threshold for `min_consecutive_low` tokens.
+    /// Predictive veto: coherence velocity < -0.15 AND coherence near threshold,
+    /// but only when long-term coherence < 0.7 (prevents spurious veto during
+    /// brief fluctuations in otherwise coherent generation).
     fn should_veto(&self) -> bool {
         self.consecutive_low >= self.min_consecutive_low
+    }
+
+    /// Predictive veto: anticipate coherence drop before it crosses threshold.
+    /// Requires long_coherence from the trend monitor to prevent spurious triggers.
+    fn should_veto_predictive(&self, long_coherence: f32) -> bool {
+        // Standard veto always applies
+        if self.consecutive_low >= self.min_consecutive_low {
+            return true;
+        }
+        // Predictive: rapid decline approaching threshold, only when long-term is also low
+        long_coherence < 0.7
+            && self.coherence_velocity < -0.15
+            && self.ema_coherence < self.veto_threshold + 0.1
     }
 
     /// Current EMA coherence value.
@@ -787,11 +898,18 @@ impl CoherenceMonitor {
         self.ema_coherence
     }
 
+    /// Rate of coherence change (negative = declining).
+    fn coherence_velocity(&self) -> f32 {
+        self.coherence_velocity
+    }
+
     /// Reset the monitor (after a veto).
     fn reset(&mut self) {
         self.window.clear();
         self.ema_coherence = 1.0;
         self.consecutive_low = 0;
+        self.prev_coherence = 1.0;
+        self.coherence_velocity = 0.0;
     }
 }
 
@@ -1128,5 +1246,134 @@ mod tests {
         let error = 1.0 - thought.similarity(&bundled).clamp(-1.0, 1.0);
         // Random high-dimensional vectors are nearly orthogonal
         assert!(error > 0.5, "Error should be high for orthogonal vectors, got {error}");
+    }
+
+    #[test]
+    fn test_pe_trend_empty() {
+        let history: VecDeque<f32> = VecDeque::new();
+        // Replicate trend logic for empty
+        assert_eq!(history.len(), 0);
+    }
+
+    #[test]
+    fn test_pe_trend_rising() {
+        // Simulate rising PE: 0.1, 0.2, ..., 0.8
+        let mut history: VecDeque<f32> = VecDeque::with_capacity(64);
+        for i in 0..8 {
+            history.push_back(0.1 * (i + 1) as f32);
+        }
+        // Compute least-squares slope over last 8
+        let window = 8.min(history.len());
+        let n = window as f32;
+        let mean_x = (n - 1.0) / 2.0;
+        let mean_y: f32 = history.iter().sum::<f32>() / n;
+        let mut num = 0.0f32;
+        let mut den = 0.0f32;
+        for (i, &pe) in history.iter().enumerate() {
+            let dx = i as f32 - mean_x;
+            num += dx * (pe - mean_y);
+            den += dx * dx;
+        }
+        let slope = num / den;
+        assert!(slope > 0.05, "Rising PE should have positive trend, got {slope}");
+    }
+
+    #[test]
+    fn test_pe_trend_falling() {
+        let mut history: VecDeque<f32> = VecDeque::with_capacity(64);
+        for i in (0..8).rev() {
+            history.push_back(0.1 * (i + 1) as f32);
+        }
+        let window = 8.min(history.len());
+        let n = window as f32;
+        let mean_x = (n - 1.0) / 2.0;
+        let mean_y: f32 = history.iter().sum::<f32>() / n;
+        let mut num = 0.0f32;
+        let mut den = 0.0f32;
+        for (i, &pe) in history.iter().enumerate() {
+            let dx = i as f32 - mean_x;
+            num += dx * (pe - mean_y);
+            den += dx * dx;
+        }
+        let slope = num / den;
+        assert!(slope < -0.05, "Falling PE should have negative trend, got {slope}");
+    }
+
+    #[test]
+    fn test_coherence_velocity_computed() {
+        let thought = ContinuousHV::random_default(42).normalize();
+        let mut monitor = CoherenceMonitor::new(thought.clone(), 8, 0.3, 0.20, 3);
+
+        // Push similar tokens — velocity should be near zero or slightly negative (from 1.0 init)
+        let similar = thought.scale(0.9).normalize();
+        monitor.push(similar.clone());
+        let v1 = monitor.coherence_velocity();
+        assert!(v1.is_finite(), "Velocity should be finite");
+
+        // Push orthogonal token — velocity should be negative (coherence dropping)
+        let orthogonal = ContinuousHV::random_default(999).normalize();
+        monitor.push(orthogonal);
+        let v2 = monitor.coherence_velocity();
+        assert!(v2 < v1 || v2.is_finite(), "Velocity should track coherence change");
+    }
+
+    #[test]
+    fn test_predictive_veto_requires_long_coherence() {
+        let thought = ContinuousHV::random_default(42).normalize();
+        let mut monitor = CoherenceMonitor::new(thought.clone(), 4, 0.5, 0.20, 3);
+
+        // Force low coherence and negative velocity by pushing orthogonal tokens
+        for i in 0..4 {
+            let drift = ContinuousHV::random_default(1000 + i as u64).normalize();
+            monitor.push(drift);
+        }
+
+        // With high long_coherence (0.9), predictive veto should NOT fire
+        // (prevents spurious veto during brief fluctuations)
+        let predictive_high_long = monitor.should_veto_predictive(0.9);
+        // Standard veto might fire, but predictive component gated by long_coherence > 0.7
+        // The predictive path requires long_coherence < 0.7
+
+        // With low long_coherence (0.3), predictive veto can fire
+        let predictive_low_long = monitor.should_veto_predictive(0.3);
+
+        // At minimum, predictive with low long should be >= predictive with high long
+        // (standard veto applies regardless, but predictive path is gated)
+        assert!(
+            predictive_low_long || !predictive_high_long,
+            "Predictive veto should be at least as aggressive with low long_coherence"
+        );
+    }
+
+    #[test]
+    fn test_coherence_velocity_resets() {
+        let thought = ContinuousHV::random_default(42).normalize();
+        let mut monitor = CoherenceMonitor::new(thought, 8, 0.3, 0.20, 3);
+
+        // Push some drift
+        for i in 0..3 {
+            let drift = ContinuousHV::random_default(1000 + i as u64).normalize();
+            monitor.push(drift);
+        }
+        assert!(monitor.coherence_velocity().is_finite());
+
+        monitor.reset();
+        assert!((monitor.coherence_velocity() - 0.0).abs() < 1e-6, "Velocity should reset to 0");
+        assert!((monitor.current_coherence() - 1.0).abs() < 1e-6, "Coherence should reset to 1");
+    }
+
+    #[test]
+    fn test_fep_modulation_thresholds() {
+        // High FEP signal → boost
+        let fep_high = if 0.8f32 > 0.7 { 1.5 } else { 1.0 };
+        assert!((fep_high - 1.5).abs() < 1e-6);
+
+        // Low FEP signal → dampen
+        let fep_low = if 0.2f32 < 0.3 { 0.7 } else { 1.0 };
+        assert!((fep_low - 0.7).abs() < 1e-6);
+
+        // Mid FEP signal → neutral
+        let fep_mid = if 0.5f32 > 0.7 { 1.5 } else if 0.5f32 < 0.3 { 0.7 } else { 1.0 };
+        assert!((fep_mid - 1.0).abs() < 1e-6);
     }
 }

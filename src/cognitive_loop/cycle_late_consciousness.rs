@@ -695,7 +695,7 @@ impl CognitiveLoopService {
         // FEEDBACK: GWT broadcast boosts confidence (conscious access moment)
         // Science: Baars (1988) — broadcast = conscious access, should amplify integration
         if gwt_broadcast {
-            self.adjust_confidence("gwt_broadcast", super::cycle::GWT_BROADCAST_CONFIDENCE_BOOST);
+            self.adjust_confidence("gwt_broadcast", super::thresholds::GWT_BROADCAST_CONFIDENCE_BOOST);
         }
 
         module_timings.gwt = _t.elapsed().as_micros() as u64;
@@ -1168,9 +1168,9 @@ impl CognitiveLoopService {
             // Science: Dehaene (2014) — conscious access improves encoding
             if level > 0.0 {
                 self.carryover.learning.mce_lr_boost =
-                    (level * super::cycle::MCE_LR_BOOST_SCALE as f64) as f32;
+                    (level * super::thresholds::MCE_LR_BOOST_SCALE as f64) as f32;
             } else {
-                self.carryover.learning.mce_lr_boost *= super::cycle::MCE_BOOST_DECAY;
+                self.carryover.learning.mce_lr_boost *= super::thresholds::MCE_BOOST_DECAY;
             }
 
             // FEEDBACK: Consciousness gates consolidation intensity (Dehaene 2014)
@@ -1188,7 +1188,7 @@ impl CognitiveLoopService {
             level
         } else {
             // Decay MCE LR boost between MCE firings
-            self.carryover.learning.mce_lr_boost *= super::cycle::MCE_BOOST_DECAY;
+            self.carryover.learning.mce_lr_boost *= super::thresholds::MCE_BOOST_DECAY;
             0.0
         };
 

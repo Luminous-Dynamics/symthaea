@@ -76,7 +76,7 @@ use std::collections::HashMap;
 /// - FOR_SOME_TIME: Duration
 /// - MOMENT: Instantaneous transition
 #[derive(Debug, Clone)]
-pub struct AllenRelationPrimitiveGrounding {
+pub(crate) struct AllenRelationPrimitiveGrounding {
     /// The Allen relation being grounded
     pub relation: AllenRelation,
 
@@ -98,7 +98,7 @@ pub struct AllenRelationPrimitiveGrounding {
 
 impl AllenRelationPrimitiveGrounding {
     /// Get the NSM primitive grounding for a specific Allen relation
-    pub fn for_relation(relation: AllenRelation, primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn for_relation(relation: AllenRelation, primitive_system: &PrimitiveSystem) -> Self {
         let (primitives, directionality, overlap_degree, is_causal) = match relation {
             // === 7 Basic Relations ===
 
@@ -240,7 +240,7 @@ impl AllenRelationPrimitiveGrounding {
     }
 
     /// Get all 13 Allen relation groundings
-    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<AllenRelation, Self> {
+    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<AllenRelation, Self> {
         AllenRelation::all()
             .into_iter()
             .map(|r| (r, Self::for_relation(r, primitive_system)))
@@ -248,13 +248,13 @@ impl AllenRelationPrimitiveGrounding {
     }
 
     /// Calculate semantic similarity between two Allen relations via NSM primitives
-    pub fn similarity(&self, other: &Self) -> f32 {
+    pub(crate) fn similarity(&self, other: &Self) -> f32 {
         self.primitive_encoding
             .similarity(&other.primitive_encoding)
     }
 
     /// Get descriptive semantic formula
-    pub fn semantic_formula(&self) -> String {
+    pub(crate) fn semantic_formula(&self) -> String {
         self.nsm_primitives.join(" + ")
     }
 }
@@ -473,7 +473,7 @@ impl AllenRelation {
     }
 
     /// Get the NSM primitive grounding for this relation
-    pub fn primitive_grounding(
+    pub(crate) fn primitive_grounding(
         &self,
         primitive_system: &PrimitiveSystem,
     ) -> AllenRelationPrimitiveGrounding {
@@ -907,7 +907,7 @@ impl TemporalReasoner {
     }
 
     /// Find causal candidate relations (those that can represent cause-effect)
-    pub fn causal_relations(
+    pub(crate) fn causal_relations(
         &self,
         primitive_system: &PrimitiveSystem,
     ) -> Vec<AllenRelationPrimitiveGrounding> {
@@ -1515,7 +1515,7 @@ impl TemporalPrimitiveSystem {
     }
 
     /// Get the NSM grounding for a specific Allen relation
-    pub fn get_nsm_grounding(
+    pub(crate) fn get_nsm_grounding(
         &self,
         relation: AllenRelation,
         primitive_system: &PrimitiveSystem,

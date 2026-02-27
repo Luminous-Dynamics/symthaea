@@ -1,3 +1,7 @@
+// Engine is wired into CognitiveLoopService::cycle(). Output fields are not yet
+// individually consumed (additive wiring phase — telemetry only), so allow dead_code.
+#![allow(dead_code)]
+
 //! # Unified Ethics Engine
 //!
 //! Wraps the 3 independent ethics systems into a single coherent engine
@@ -17,7 +21,7 @@
 //! 2. **No direct field mutation**: Returns `EthicsEngineOutput` with proposed deltas
 //! 3. **Preserves co-prime intervals**: Each subsystem fires at its original rate
 //! 4. **Backward compatible**: All existing carryover fields populated
-#![allow(dead_code)]
+// Engine is wired into CognitiveLoopService::cycle() — no dead code.
 
 use std::time::Instant;
 
