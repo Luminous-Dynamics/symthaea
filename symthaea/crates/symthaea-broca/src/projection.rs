@@ -9,12 +9,50 @@
 //! # Architecture
 //!
 //! ```text
-//! Forward:  HDC(16384) → w_down → ReLU → w_up → SSM(768)
-//! Backward: SSM(768) → w_back_down → ReLU → w_back_up → HDC(16384)
+//! Forward:  HDC(16384) → w_down → GELU+residual → w_up → SSM(768)
+//! Backward: SSM(768) → w_back_down → GELU+residual → w_back_up → HDC(16384)
 //! ```
+//!
+//! Uses GELU activation (no dead neurons) with a pre-activation residual
+//! connection (`GELU(x) + α*x`) for smooth gradient flow.
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
+
+/// Pre-activation residual scale: `hidden = GELU(x) + RESIDUAL_ALPHA * x`.
+/// Ensures gradient flow even through saturated regions.
+const RESIDUAL_ALPHA: f32 = 0.1;
+
+/// GELU activation: `x * Φ(x)` via tanh approximation.
+#[inline]
+fn gelu(x: f32) -> f32 {
+    // 0.5 * x * (1 + tanh(sqrt(2/π) * (x + 0.044715 * x³)))
+    let c = 0.7978845608; // sqrt(2/π)
+    0.5 * x * (1.0 + (c * (x + 0.044715 * x * x * x)).tanh())
+}
+
+/// GELU derivative (for backprop): d/dx [GELU(x)].
+#[inline]
+fn gelu_derivative(x: f32) -> f32 {
+    let c = 0.7978845608; // sqrt(2/π)
+    let inner = c * (x + 0.044715 * x * x * x);
+    let tanh_inner = inner.tanh();
+    let sech2 = 1.0 - tanh_inner * tanh_inner;
+    let d_inner = c * (1.0 + 3.0 * 0.044715 * x * x);
+    0.5 * (1.0 + tanh_inner) + 0.5 * x * sech2 * d_inner
+}
+
+/// Activation + residual: `GELU(x) + α*x`.
+#[inline]
+fn activation(x: f32) -> f32 {
+    gelu(x) + RESIDUAL_ALPHA * x
+}
+
+/// Derivative of activation + residual: `GELU'(x) + α`.
+#[inline]
+fn activation_derivative(x: f32) -> f32 {
+    gelu_derivative(x) + RESIDUAL_ALPHA
+}
 
 /// Bidirectional projection between HDC (16,384D) and SSM (768D) spaces.
 ///
@@ -90,15 +128,15 @@ impl HdcSsmProjection {
 
     /// Project HDC hypervector (16,384D) to SSM space (768D).
     ///
-    /// Pipeline: `hv → w_down → ReLU → w_up → ssm_vec`
+    /// Pipeline: `hv → w_down → GELU+residual → w_up → ssm_vec`
     pub fn project_to_ssm(&self, hv: &ContinuousHV) -> Vec<f32> {
         debug_assert_eq!(hv.values.len(), self.hdc_dim);
 
         // Step 1: w_down * hv → bottleneck (256D)
-        let hidden = self.matmul(&self.w_down, &hv.values, self.bottleneck, self.hdc_dim);
+        let hidden_pre = self.matmul(&self.w_down, &hv.values, self.bottleneck, self.hdc_dim);
 
-        // Step 2: ReLU
-        let hidden: Vec<f32> = hidden.into_iter().map(|x| x.max(0.0)).collect();
+        // Step 2: GELU + pre-activation residual
+        let hidden: Vec<f32> = hidden_pre.into_iter().map(activation).collect();
 
         // Step 3: w_up * hidden → ssm (768D)
         self.matmul(&self.w_up, &hidden, self.ssm_dim, self.bottleneck)
@@ -106,15 +144,15 @@ impl HdcSsmProjection {
 
     /// Project SSM vector (768D) back to HDC space (16,384D).
     ///
-    /// Pipeline: `ssm_vec → w_back_down → ReLU → w_back_up → hv`
+    /// Pipeline: `ssm_vec → w_back_down → GELU+residual → w_back_up → hv`
     pub fn project_to_hdc(&self, ssm_vec: &[f32]) -> ContinuousHV {
         debug_assert_eq!(ssm_vec.len(), self.ssm_dim);
 
         // Step 1: w_back_down * ssm → bottleneck (256D)
-        let hidden = self.matmul(&self.w_back_down, ssm_vec, self.bottleneck, self.ssm_dim);
+        let hidden_pre = self.matmul(&self.w_back_down, ssm_vec, self.bottleneck, self.ssm_dim);
 
-        // Step 2: ReLU
-        let hidden: Vec<f32> = hidden.into_iter().map(|x| x.max(0.0)).collect();
+        // Step 2: GELU + pre-activation residual
+        let hidden: Vec<f32> = hidden_pre.into_iter().map(activation).collect();
 
         // Step 3: w_back_up * hidden → hdc (16,384D)
         let values = self.matmul(&self.w_back_up, &hidden, self.hdc_dim, self.bottleneck);
@@ -137,32 +175,30 @@ impl HdcSsmProjection {
             .collect();
 
         // Forward pass to get hidden activations for gradient computation
-        let hidden_fwd = self.matmul(&self.w_down, &thought_hv.values, self.bottleneck, self.hdc_dim);
-        let hidden_fwd_relu: Vec<f32> = hidden_fwd.iter().map(|x| x.max(0.0)).collect();
+        let hidden_fwd_pre = self.matmul(&self.w_down, &thought_hv.values, self.bottleneck, self.hdc_dim);
+        let hidden_fwd: Vec<f32> = hidden_fwd_pre.iter().map(|&x| activation(x)).collect();
 
         // Backward projection hidden activations
-        let ssm_fwd = self.matmul(&self.w_up, &hidden_fwd_relu, self.ssm_dim, self.bottleneck);
-        let hidden_back = self.matmul(&self.w_back_down, &ssm_fwd, self.bottleneck, self.ssm_dim);
-        let hidden_back_relu: Vec<f32> = hidden_back.iter().map(|x| x.max(0.0)).collect();
+        let ssm_fwd = self.matmul(&self.w_up, &hidden_fwd, self.ssm_dim, self.bottleneck);
+        let hidden_back_pre = self.matmul(&self.w_back_down, &ssm_fwd, self.bottleneck, self.ssm_dim);
+        let hidden_back: Vec<f32> = hidden_back_pre.iter().map(|&x| activation(x)).collect();
 
-        // Gradient for w_back_up: error * hidden_back_relu^T
+        // Gradient for w_back_up: error * hidden_back^T
         // Shape: [hdc_dim × bottleneck]
         for i in 0..self.hdc_dim {
             for j in 0..self.bottleneck {
-                self.grad_back_up[i * self.bottleneck + j] += error[i] * hidden_back_relu[j];
+                self.grad_back_up[i * self.bottleneck + j] += error[i] * hidden_back[j];
             }
         }
 
-        // Gradient for w_back_down: (w_back_up^T * error) * relu'(hidden_back) * ssm_fwd^T
-        // Simplified: accumulate per-element
+        // Gradient for w_back_down: (w_back_up^T * error) * act'(hidden_back_pre) * ssm_fwd^T
         let mut delta_back = vec![0.0f32; self.bottleneck];
         for j in 0..self.bottleneck {
             let mut sum = 0.0f32;
             for i in 0..self.hdc_dim {
                 sum += self.w_back_up[i * self.bottleneck + j] * error[i];
             }
-            // ReLU derivative
-            delta_back[j] = if hidden_back[j] > 0.0 { sum } else { 0.0 };
+            delta_back[j] = sum * activation_derivative(hidden_back_pre[j]);
         }
         for i in 0..self.bottleneck {
             for j in 0..self.ssm_dim {
@@ -170,7 +206,7 @@ impl HdcSsmProjection {
             }
         }
 
-        // Gradient for w_up: (w_back_down^T * delta_back) * hidden_fwd_relu^T
+        // Gradient for w_up: (w_back_down^T * delta_back) * hidden_fwd^T
         let mut delta_up = vec![0.0f32; self.ssm_dim];
         for j in 0..self.ssm_dim {
             let mut sum = 0.0f32;
@@ -181,18 +217,18 @@ impl HdcSsmProjection {
         }
         for i in 0..self.ssm_dim {
             for j in 0..self.bottleneck {
-                self.grad_up[i * self.bottleneck + j] += delta_up[i] * hidden_fwd_relu[j];
+                self.grad_up[i * self.bottleneck + j] += delta_up[i] * hidden_fwd[j];
             }
         }
 
-        // Gradient for w_down: (w_up^T * delta_up) * relu'(hidden_fwd) * thought_hv^T
+        // Gradient for w_down: (w_up^T * delta_up) * act'(hidden_fwd_pre) * thought_hv^T
         let mut delta_down = vec![0.0f32; self.bottleneck];
         for j in 0..self.bottleneck {
             let mut sum = 0.0f32;
             for i in 0..self.ssm_dim {
                 sum += self.w_up[i * self.bottleneck + j] * delta_up[i];
             }
-            delta_down[j] = if hidden_fwd[j] > 0.0 { sum } else { 0.0 };
+            delta_down[j] = sum * activation_derivative(hidden_fwd_pre[j]);
         }
         for i in 0..self.bottleneck {
             for j in 0..self.hdc_dim {
@@ -216,15 +252,17 @@ impl HdcSsmProjection {
         let hidden_anchor = self.matmul(&self.w_down, &anchor_hv.values, self.bottleneck, self.hdc_dim);
         let hidden_neg = self.matmul(&self.w_down, &negative_hv.values, self.bottleneck, self.hdc_dim);
 
-        // Contrastive gradient on w_down: push hidden_anchor away from hidden_neg
-        // Direction: (anchor - neg) pushes anchor's representation away from neg's
+        // Apply activation to get post-activation representations
+        let act_anchor: Vec<f32> = hidden_anchor.iter().map(|&x| activation(x)).collect();
+        let act_neg: Vec<f32> = hidden_neg.iter().map(|&x| activation(x)).collect();
+
+        // Contrastive gradient on w_down: push activated representations apart
         for i in 0..self.bottleneck {
-            if hidden_anchor[i] > 0.0 {
-                let delta = weight * (hidden_anchor[i] - hidden_neg[i]);
-                let row_start = i * self.hdc_dim;
-                for j in 0..self.hdc_dim {
-                    self.grad_down[row_start + j] += delta * anchor_hv.values[j];
-                }
+            let delta = weight * (act_anchor[i] - act_neg[i]);
+            let d_act = activation_derivative(hidden_anchor[i]);
+            let row_start = i * self.hdc_dim;
+            for j in 0..self.hdc_dim {
+                self.grad_down[row_start + j] += delta * d_act * anchor_hv.values[j];
             }
         }
     }
@@ -302,6 +340,162 @@ impl HdcSsmProjection {
     /// SSM dimension.
     pub fn ssm_dim(&self) -> usize {
         self.ssm_dim
+    }
+
+    /// Warm-start the forward projection (w_down) from sample HDC vectors.
+    ///
+    /// Computes the top-k principal directions of the input distribution and
+    /// aligns w_down rows to span that subspace. This accelerates convergence
+    /// by ensuring the bottleneck captures variance in the thought HV space
+    /// rather than random directions.
+    ///
+    /// Uses power iteration (lightweight, no full SVD needed).
+    pub fn warm_start_from_samples(&mut self, samples: &[ContinuousHV]) {
+        if samples.len() < 2 || self.hdc_dim == 0 || self.bottleneck == 0 {
+            return;
+        }
+
+        let n = samples.len();
+        let d = self.hdc_dim;
+        let k = self.bottleneck.min(n).min(d);
+
+        // Compute mean
+        let mut mean = vec![0.0f32; d];
+        for s in samples {
+            for (m, v) in mean.iter_mut().zip(s.values.iter()) {
+                *m += v;
+            }
+        }
+        let inv_n = 1.0 / n as f32;
+        for m in &mut mean {
+            *m *= inv_n;
+        }
+
+        // Power iteration for top-k principal components
+        // Use genesis-seeded random initialization for determinism
+        let scale = 1.0 / (self.bottleneck as f32).sqrt();
+        for comp_idx in 0..k {
+            // Initialize direction from existing w_down row
+            let row_start = comp_idx * d;
+            let mut dir: Vec<f32> = self.w_down[row_start..row_start + d].to_vec();
+            let dir_norm: f32 = dir.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if dir_norm > 1e-10 {
+                for v in &mut dir {
+                    *v /= dir_norm;
+                }
+            }
+
+            // 10 iterations of power method on covariance
+            for _ in 0..10 {
+                // result = C * dir = (1/n) Σ (x_i - mean) * <(x_i - mean), dir>
+                let mut result = vec![0.0f32; d];
+                for s in samples {
+                    let mut dot = 0.0f32;
+                    for j in 0..d {
+                        dot += (s.values[j] - mean[j]) * dir[j];
+                    }
+                    for j in 0..d {
+                        result[j] += (s.values[j] - mean[j]) * dot;
+                    }
+                }
+                // Normalize
+                let norm: f32 = result.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if norm < 1e-10 {
+                    break;
+                }
+                for v in &mut result {
+                    *v /= norm;
+                }
+
+                // Deflation: remove components of previously found directions
+                for prev_idx in 0..comp_idx {
+                    let prev_start = prev_idx * d;
+                    let mut dot = 0.0f32;
+                    for j in 0..d {
+                        dot += result[j] * self.w_down[prev_start + j] / scale;
+                    }
+                    for j in 0..d {
+                        result[j] -= dot * self.w_down[prev_start + j] / scale;
+                    }
+                }
+                let norm2: f32 = result.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if norm2 < 1e-10 {
+                    break;
+                }
+                for v in &mut result {
+                    *v /= norm2;
+                }
+                dir = result;
+            }
+
+            // Write principal direction as w_down row (scaled)
+            for j in 0..d {
+                self.w_down[comp_idx * d + j] = dir[j] * scale;
+            }
+        }
+
+        tracing::info!(
+            samples = n,
+            components = k,
+            "Projection warm-started from sample covariance"
+        );
+    }
+
+    /// Compute the effective rank of the bottleneck activations for a batch of inputs.
+    ///
+    /// Effective rank = exp(entropy of singular value distribution).
+    /// Low effective rank → projection is collapsing to a low-dimensional subspace.
+    /// Returns a value in [1, bottleneck_dim].
+    pub fn effective_rank(&self, samples: &[ContinuousHV]) -> f32 {
+        if samples.is_empty() || self.bottleneck == 0 {
+            return 0.0;
+        }
+
+        // Compute bottleneck activations for each sample
+        let mut activations: Vec<Vec<f32>> = Vec::with_capacity(samples.len());
+        for s in samples {
+            let hidden_pre = self.matmul(&self.w_down, &s.values, self.bottleneck, self.hdc_dim);
+            let hidden: Vec<f32> = hidden_pre.into_iter().map(activation).collect();
+            activations.push(hidden);
+        }
+
+        // Compute variance per bottleneck dimension
+        let n = activations.len() as f32;
+        let mut means = vec![0.0f32; self.bottleneck];
+        for act in &activations {
+            for (m, v) in means.iter_mut().zip(act.iter()) {
+                *m += v;
+            }
+        }
+        for m in &mut means {
+            *m /= n;
+        }
+
+        let mut variances = vec![0.0f32; self.bottleneck];
+        for act in &activations {
+            for (j, v) in act.iter().enumerate() {
+                let diff = v - means[j];
+                variances[j] += diff * diff;
+            }
+        }
+        for v in &mut variances {
+            *v /= n;
+        }
+
+        // Effective rank from variance distribution (proxy for SVD)
+        let total_var: f32 = variances.iter().sum();
+        if total_var < 1e-10 {
+            return 1.0; // Complete collapse
+        }
+
+        let mut entropy = 0.0f32;
+        for &v in &variances {
+            let p = v / total_var;
+            if p > 1e-10 {
+                entropy -= p * p.ln();
+            }
+        }
+        entropy.exp()
     }
 
     /// Matrix-vector multiply: `result[i] = sum_j(mat[i*cols + j] * vec[j])`
@@ -478,7 +672,7 @@ mod tests {
         let proj = HdcSsmProjection::new(&genesis, 16384, 256, 768);
         let hv = ContinuousHV::zero(16384);
         let ssm_vec = proj.project_to_ssm(&hv);
-        // All zeros through matmul + ReLU should produce all zeros
+        // All zeros through matmul + GELU+residual should produce all zeros
         assert!(ssm_vec.iter().all(|&x| x.abs() < 1e-10));
     }
 
@@ -564,5 +758,76 @@ mod tests {
 
         let back = proj.project_to_hdc(&ssm);
         assert_eq!(back.values.len(), 4);
+    }
+
+    #[test]
+    fn test_warm_start_modifies_weights() {
+        let genesis = test_genesis();
+        let dim = 256;
+        let mut proj = HdcSsmProjection::new(&genesis, dim, 16, 64);
+        let weights_before = proj.flatten_weights();
+
+        // Create sample HVs with a clear structure
+        let samples: Vec<ContinuousHV> = (0..20)
+            .map(|i| {
+                let mut hv = ContinuousHV::random(dim, 100 + i as u64);
+                // Add a dominant component to first few dims
+                for j in 0..8 {
+                    hv.values[j] += 5.0;
+                }
+                hv
+            })
+            .collect();
+
+        proj.warm_start_from_samples(&samples);
+        let weights_after = proj.flatten_weights();
+
+        let changed = weights_before
+            .iter()
+            .zip(weights_after.iter())
+            .any(|(a, b)| (a - b).abs() > 1e-6);
+        assert!(changed, "Warm-start should modify projection weights");
+    }
+
+    #[test]
+    fn test_warm_start_empty_samples() {
+        let genesis = test_genesis();
+        let mut proj = HdcSsmProjection::new(&genesis, 256, 16, 64);
+        let before = proj.flatten_weights();
+
+        proj.warm_start_from_samples(&[]);
+        let after = proj.flatten_weights();
+        assert_eq!(before, after, "Empty samples should not modify weights");
+    }
+
+    #[test]
+    fn test_effective_rank_finite() {
+        let genesis = test_genesis();
+        let dim = 256;
+        let proj = HdcSsmProjection::new(&genesis, dim, 16, 64);
+
+        let samples: Vec<ContinuousHV> = (0..10)
+            .map(|i| ContinuousHV::random(dim, 200 + i as u64))
+            .collect();
+
+        let rank = proj.effective_rank(&samples);
+        assert!(rank.is_finite(), "Effective rank should be finite");
+        assert!(rank >= 1.0, "Effective rank should be at least 1, got {rank}");
+        assert!(rank <= 16.0, "Effective rank should be at most bottleneck_dim, got {rank}");
+    }
+
+    #[test]
+    fn test_effective_rank_collapse_detection() {
+        let genesis = test_genesis();
+        let dim = 64;
+        let proj = HdcSsmProjection::new(&genesis, dim, 8, 16);
+
+        // All-identical samples → should have low effective rank
+        let sample = ContinuousHV::random(dim, 42);
+        let identical_samples: Vec<ContinuousHV> = (0..10).map(|_| sample.clone()).collect();
+        let rank = proj.effective_rank(&identical_samples);
+        assert!(rank.is_finite());
+        // With identical inputs, all activations are the same → zero variance → rank = 1
+        assert!(rank <= 2.0, "Identical inputs should give low rank, got {rank}");
     }
 }

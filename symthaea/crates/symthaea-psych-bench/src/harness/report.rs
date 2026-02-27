@@ -843,6 +843,17 @@ impl BenchmarkReport {
             push_specific("multi_example_accuracy", "arc_multi_example_accuracy", &bl.reasoning);
             push_specific("analogy_rt_ticks", "arc_analogy_rt_ticks", &bl.reasoning);
         }
+        // ARC Abductive Reasoning
+        if benchmark.contains("ArcAbductive") {
+            push_specific("abduction_accuracy", "arc_abduction_accuracy", &bl.reasoning);
+            push_specific("unbinding_similarity", "arc_unbinding_similarity", &bl.reasoning);
+            push_specific("abduction_rt_ticks", "arc_abduction_rt_ticks", &bl.reasoning);
+        }
+        // ARC Learning Curve (in ArcFluid)
+        if benchmark.contains("ArcFluid") {
+            push_specific("single_pair_accuracy", "arc_single_pair_accuracy", &bl.reasoning);
+            push_specific("learning_efficiency", "arc_learning_efficiency", &bl.reasoning);
+        }
         // SART (Sustained Attention)
         if benchmark.contains("SART") {
             push_specific("commission_errors", "commission_errors", &bl.sustained_attention);
@@ -865,6 +876,14 @@ impl BenchmarkReport {
             push_specific("garden_path_accuracy", "garden_path_accuracy", &bl.language);
             push_specific("control_accuracy", "gp_control_accuracy", &bl.language);
             push_specific("rt_ticks", "gp_rt_ticks", &bl.language);
+        }
+        // Semantic Coherence (Language)
+        if benchmark.contains("SemanticCoherence") {
+            push_specific("coherence_mean", "coherence_mean", &bl.language);
+            push_specific("coherence_decay", "coherence_decay", &bl.language);
+            push_specific("recovery_speed", "recovery_speed", &bl.language);
+            push_specific("complexity_penalty", "complexity_penalty", &bl.language);
+            push_specific("rt_ticks", "sc_rt_ticks", &bl.language);
         }
         // RME (Social)
         if benchmark.contains("Social") && benchmark.contains("RME") {
@@ -1233,7 +1252,12 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("SART") => "commission_errors",
         b if b.contains("SRTT") => "learning_effect",
         b if b.contains("GardenPath") => "disambiguation_cost",
+        b if b.contains("SemanticCoherence") => "coherence_mean",
         b if b.contains("RME") && b.contains("Social") => "rme_accuracy",
+        b if b.contains("ArcFluid") => "transfer_accuracy",
+        b if b.contains("ArcCompositional") => "compositional_accuracy",
+        b if b.contains("ArcAnalogy") => "analogy_accuracy",
+        b if b.contains("ArcAbductive") => "abduction_accuracy",
         _ => "overall_accuracy",
     }
 }
