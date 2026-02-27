@@ -836,6 +836,13 @@ impl BenchmarkReport {
             push_specific("symmetry_detection", "arc_symmetry_detection", &bl.reasoning);
             push_specific("compositional_rt_ticks", "arc_compositional_rt_ticks", &bl.reasoning);
         }
+        // ARC Analogy Reasoning
+        if benchmark.contains("ArcAnalogy") {
+            push_specific("analogy_accuracy", "arc_analogy_accuracy", &bl.reasoning);
+            push_specific("cross_domain_accuracy", "arc_cross_domain_accuracy", &bl.reasoning);
+            push_specific("multi_example_accuracy", "arc_multi_example_accuracy", &bl.reasoning);
+            push_specific("analogy_rt_ticks", "arc_analogy_rt_ticks", &bl.reasoning);
+        }
         // SART (Sustained Attention)
         if benchmark.contains("SART") {
             push_specific("commission_errors", "commission_errors", &bl.sustained_attention);

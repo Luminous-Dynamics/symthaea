@@ -40,6 +40,8 @@ struct TrialResult {
     transfer_accuracy: f64,
     transfer_similarity: f64,
     rt_ticks: f64,
+    /// Per-task-type accuracy: [ColorFill, Translation, ColorReplacement, Reflection]
+    per_type_accuracy: [f64; 4],
 }
 
 impl ArcFluidBenchmark {
@@ -117,6 +119,8 @@ impl ArcFluidBenchmark {
         let mut transfer_total: u32 = 0;
         let mut transfer_sims: Vec<f64> = Vec::new();
         let mut total_ticks: f64 = 0.0;
+        let mut per_type_hits: [u32; 4] = [0; 4];
+        let mut per_type_total: [u32; 4] = [0; 4];
 
         for (type_idx, &task_type) in TASK_TYPES.iter().enumerate() {
             for task_i in 0..tasks_per_type {
@@ -144,9 +148,10 @@ impl ArcFluidBenchmark {
                     }
 
                     train_rules.push(rule);
-                    // Deliberation ticks: base ~4 + random jitter
+                    // Deliberation ticks — time pressure reduces deliberation
                     xor_shift(&mut rng);
-                    total_ticks += 4.0 + (rng % 5) as f64;
+                    let tick_scale = 1.0 - pressure * 0.4;
+                    total_ticks += (4.0 + (rng % 5) as f64) * tick_scale;
                     let _ = pair_i; // suppress unused warning
                 }
 
@@ -171,20 +176,27 @@ impl ArcFluidBenchmark {
                 let pred_sim = predicted.similarity(&test_out_hv) as f64;
                 transfer_sims.push(pred_sim);
 
-                // Transfer accuracy: predicted beats random baseline
-                xor_shift(&mut rng);
-                let random_grid = gen_grid(&mut rng);
-                let random_hv = encoder.encode_grid(&random_grid);
-                let random_sim = predicted.similarity(&random_hv) as f64;
+                // Transfer accuracy: 2-AFC discrimination — predicted must be
+                // closer to correct output than a distractor (wrong transform
+                // applied to the same test input). This tests whether the system
+                // learned the right rule, not just "above noise floor."
+                let distractor_type = TASK_TYPES[(type_idx + 1) % TASK_TYPES.len()];
+                let distractor_output = apply_transform(&test_input, distractor_type, task_param);
+                let distractor_hv = encoder.encode_grid(&distractor_output);
+                let distractor_sim = predicted.similarity(&distractor_hv) as f64;
 
                 transfer_total += 1;
-                if pred_sim > random_sim {
+                per_type_total[type_idx] += 1;
+                if pred_sim > distractor_sim {
                     transfer_hits += 1;
+                    per_type_hits[type_idx] += 1;
                 }
 
-                // Deliberation for test
+                // Deliberation for test — time pressure reduces deliberation
+                // (Wickelgren 1977 speed-accuracy tradeoff)
                 xor_shift(&mut rng);
-                total_ticks += 4.0 + (rng % 5) as f64;
+                let tick_scale = 1.0 - pressure * 0.4;
+                total_ticks += (4.0 + (rng % 5) as f64) * tick_scale;
                 let _ = (type_idx, task_i);
             }
         }
@@ -230,12 +242,20 @@ impl ArcFluidBenchmark {
             0.0
         };
 
+        let per_type_accuracy = [
+            if per_type_total[0] > 0 { per_type_hits[0] as f64 / per_type_total[0] as f64 } else { 0.0 },
+            if per_type_total[1] > 0 { per_type_hits[1] as f64 / per_type_total[1] as f64 } else { 0.0 },
+            if per_type_total[2] > 0 { per_type_hits[2] as f64 / per_type_total[2] as f64 } else { 0.0 },
+            if per_type_total[3] > 0 { per_type_hits[3] as f64 / per_type_total[3] as f64 } else { 0.0 },
+        ];
+
         TrialResult {
             rule_consistency,
             cross_task_discrimination,
             transfer_accuracy,
             transfer_similarity,
             rt_ticks,
+            per_type_accuracy,
         }
     }
 }
@@ -263,6 +283,8 @@ impl PsychBenchmark for ArcFluidBenchmark {
         let mut accuracies = Vec::new();
         let mut similarities = Vec::new();
         let mut rts = Vec::new();
+        let type_names = ["color_fill", "translation", "color_replace", "reflection"];
+        let mut per_type: [Vec<f64>; 4] = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -271,6 +293,9 @@ impl PsychBenchmark for ArcFluidBenchmark {
             accuracies.push(r.transfer_accuracy);
             similarities.push(r.transfer_similarity);
             rts.push(r.rt_ticks);
+            for i in 0..4 {
+                per_type[i].push(r.per_type_accuracy[i]);
+            }
         }
 
         result.insert("rule_consistency", MetricValue::from_samples(&consistencies));
@@ -284,6 +309,14 @@ impl PsychBenchmark for ArcFluidBenchmark {
             MetricValue::from_samples(&similarities),
         );
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
+
+        // Per-task-type breakdowns
+        for (i, name) in type_names.iter().enumerate() {
+            result.insert(
+                &format!("accuracy_{}", name),
+                MetricValue::from_samples(&per_type[i]),
+            );
+        }
 
         result.conditions = 4; // 4 task types
         result.trials_per_condition = config.trials_per_condition;
@@ -312,6 +345,21 @@ mod tests {
         assert!(result.metrics.contains_key("transfer_accuracy"));
         assert!(result.metrics.contains_key("transfer_similarity"));
         assert!(result.metrics.contains_key("rt_ticks"));
+        // Per-type breakdowns
+        assert!(result.metrics.contains_key("accuracy_color_fill"));
+        assert!(result.metrics.contains_key("accuracy_translation"));
+        assert!(result.metrics.contains_key("accuracy_color_replace"));
+        assert!(result.metrics.contains_key("accuracy_reflection"));
+    }
+
+    #[test]
+    fn test_per_type_breakdowns_finite() {
+        let result = ArcFluidBenchmark.run(&test_config());
+        for name in &["accuracy_color_fill", "accuracy_translation", "accuracy_color_replace", "accuracy_reflection"] {
+            let val = &result.metrics[*name];
+            assert!(val.mean.is_finite(), "Per-type metric {} is not finite", name);
+            assert!(val.mean >= 0.0 && val.mean <= 1.0, "Per-type metric {} out of range: {}", name, val.mean);
+        }
     }
 
     #[test]
@@ -348,10 +396,11 @@ mod tests {
         };
         let result = ArcFluidBenchmark.run(&config);
         let accuracy = result.metrics["transfer_accuracy"].mean;
-        // With HDC rule binding, transfer should beat pure chance (0.5)
+        // With distractor baseline (wrong transform on same input),
+        // HDC rule binding should discriminate the correct transform
         assert!(
             accuracy > 0.4,
-            "Transfer accuracy should be above chance, got {}",
+            "Transfer accuracy should beat distractor baseline, got {}",
             accuracy
         );
     }
@@ -407,16 +456,23 @@ mod tests {
         // Under time pressure, consistency should degrade (more noise in rule encoding)
         let base_consistency = base_result.metrics["rule_consistency"].mean;
         let pressure_consistency = pressure_result.metrics["rule_consistency"].mean;
-        // We just check both are finite and pressure doesn't impossibly improve
+        // Pressure adds noise (reduces consistency) and reduces RT (SAT tradeoff)
         assert!(base_consistency.is_finite());
         assert!(pressure_consistency.is_finite());
-        // With noise_weight = 0.05 + 0.8*0.15 = 0.17 vs 0.05, pressure should reduce consistency
-        // But with stochastic HDC this is a soft assertion
         assert!(
             pressure_consistency <= base_consistency + 0.1,
             "Time pressure should not dramatically improve consistency: base={}, pressure={}",
             base_consistency,
             pressure_consistency
+        );
+        // Time pressure should reduce RT (tick_scale = 1 - 0.8*0.4 = 0.68)
+        let base_rt = base_result.metrics["rt_ticks"].mean;
+        let pressure_rt = pressure_result.metrics["rt_ticks"].mean;
+        assert!(
+            pressure_rt < base_rt,
+            "Time pressure should reduce RT: base={}, pressure={}",
+            base_rt,
+            pressure_rt
         );
     }
 }
