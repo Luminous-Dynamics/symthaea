@@ -197,6 +197,7 @@ jobs:
           - "multi_agent"
           - "full_perception"
           - "identity"
+          - "all_benchmarks"
     steps:
       - uses: actions/checkout@v4
 
@@ -321,6 +322,8 @@ jobs:
           - "ssm_language,reasoning_engine"
           - "multi_agent,reasoning_engine"
           - "full_perception,reasoning_engine"
+          - "consciousness_full,school_learning"
+          - "all_benchmarks,reasoning_engine"
     steps:
       - uses: actions/checkout@v4
 

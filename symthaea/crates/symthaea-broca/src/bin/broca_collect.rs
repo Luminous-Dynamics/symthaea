@@ -4,8 +4,13 @@
 //! combinatorial space, constructs system prompts, queries an Ollama model, and
 //! records (channels, response) pairs as JSONL for Broca training.
 //!
+//! Multi-model mode: --model2 queries a second model for each thought, writing both
+//! responses as separate training pairs. This produces diverse teacher distributions
+//! and doubles the effective dataset size.
+//!
 //! Usage:
 //!   broca-collect --model gemma3:1b --output data/distillation.jsonl
+//!   broca-collect --model gemma3:1b --model2 mistral:7b --output data/distillation.jsonl
 //!   broca-collect --model gemma3:1b --output data/distillation.jsonl --repeats 3 --augment
 //!   broca-collect --model gemma3:1b --output data/distillation.jsonl --temperature 0.7
 
@@ -56,8 +61,25 @@ fn main() {
 
     let mut success_count = 0usize;
     let mut error_count = 0usize;
+    let mut model2_success = 0usize;
+    let mut model2_errors = 0usize;
     let mut intent_counts = [0usize; 8]; // Per-intent success counts
     let total = base_thoughts.len() * opts.repeats;
+    let models: Vec<&str> = {
+        let mut v = vec![opts.model.as_str()];
+        if let Some(ref m2) = opts.model2 {
+            v.push(m2.as_str());
+        }
+        v
+    };
+
+    if models.len() > 1 {
+        tracing::info!(
+            model1 = %models[0],
+            model2 = %models[1],
+            "Multi-model distillation enabled"
+        );
+    }
 
     for (idx, base_channels) in base_thoughts.iter().enumerate() {
         for repeat in 0..opts.repeats {
@@ -71,40 +93,48 @@ fn main() {
             let system_prompt = build_system_prompt(&channels);
             let max_tokens = intent_max_tokens(&channels);
 
-            match query_ollama(&opts.ollama_url, &opts.model, &system_prompt, &prompt, opts.temperature, max_tokens) {
-                Ok(response) => {
-                    let response = response.trim().to_string();
-                    if response.is_empty() {
-                        error_count += 1;
-                        continue;
-                    }
+            // Query each model and write separate training pairs
+            for (model_idx, model_name) in models.iter().enumerate() {
+                match query_ollama(&opts.ollama_url, model_name, &system_prompt, &prompt, opts.temperature, max_tokens) {
+                    Ok(response) => {
+                        let response = response.trim().to_string();
+                        if response.is_empty() {
+                            if model_idx == 0 { error_count += 1; } else { model2_errors += 1; }
+                            continue;
+                        }
 
-                    let pair = TrainingPair::new(channels, response, &tokenizer);
-                    match serde_json::to_string(&pair) {
-                        Ok(line) => {
-                            if let Err(e) = writeln!(file, "{line}") {
-                                eprintln!("Write error: {e}");
-                                error_count += 1;
-                            } else {
-                                success_count += 1;
-                                let di = dominant_intent(&channels);
-                                intent_counts[di] += 1;
+                        let pair = TrainingPair::new(channels, response, &tokenizer);
+                        match serde_json::to_string(&pair) {
+                            Ok(line) => {
+                                if let Err(e) = writeln!(file, "{line}") {
+                                    eprintln!("Write error: {e}");
+                                    if model_idx == 0 { error_count += 1; } else { model2_errors += 1; }
+                                } else {
+                                    if model_idx == 0 {
+                                        success_count += 1;
+                                        let di = dominant_intent(&channels);
+                                        intent_counts[di] += 1;
+                                    } else {
+                                        model2_success += 1;
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!(error = %e, model = %model_name, "Failed to serialize pair");
+                                if model_idx == 0 { error_count += 1; } else { model2_errors += 1; }
                             }
                         }
-                        Err(e) => {
-                            tracing::warn!(error = %e, "Failed to serialize pair");
-                            error_count += 1;
-                        }
                     }
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        idx = idx,
-                        repeat = repeat,
-                        error = %e,
-                        "Ollama query failed"
-                    );
-                    error_count += 1;
+                    Err(e) => {
+                        tracing::warn!(
+                            idx = idx,
+                            repeat = repeat,
+                            model = %model_name,
+                            error = %e,
+                            "Ollama query failed"
+                        );
+                        if model_idx == 0 { error_count += 1; } else { model2_errors += 1; }
+                    }
                 }
             }
 
@@ -113,8 +143,8 @@ fn main() {
                 tracing::info!(
                     progress = progress,
                     total = total,
-                    success = success_count,
-                    errors = error_count,
+                    success = success_count + model2_success,
+                    errors = error_count + model2_errors,
                     "Collection progress"
                 );
             }
@@ -132,13 +162,22 @@ fn main() {
     ];
 
     println!("\n--- Collection Summary ---");
+    println!("  Model 1:       {}", opts.model);
+    if let Some(ref m2) = opts.model2 {
+        println!("  Model 2:       {m2}");
+    }
     println!("  Total configs: {}", base_thoughts.len());
     println!("  Repeats:       {}", opts.repeats);
     println!("  Curriculum:    {}", if opts.curriculum { "yes" } else { "no" });
-    println!("  Successful:    {success_count}");
-    println!("  Errors:        {error_count}");
+    println!("  Model 1 ok:    {success_count}");
+    println!("  Model 1 err:   {error_count}");
+    if opts.model2.is_some() {
+        println!("  Model 2 ok:    {model2_success}");
+        println!("  Model 2 err:   {model2_errors}");
+        println!("  Total pairs:   {}", success_count + model2_success);
+    }
     println!("  Output:        {}", opts.output_path);
-    println!("\n  Per-intent breakdown:");
+    println!("\n  Per-intent breakdown (model 1):");
     for (i, name) in intent_names.iter().enumerate() {
         println!("    {name:<12} {}", intent_counts[i]);
     }
@@ -274,6 +313,8 @@ fn query_ollama(
 
 struct CollectOpts {
     model: String,
+    /// Optional second model for multi-model distillation.
+    model2: Option<String>,
     output_path: String,
     repeats: usize,
     augment: bool,
@@ -286,6 +327,7 @@ struct CollectOpts {
 fn parse_args(args: &[String]) -> Result<CollectOpts, String> {
     let mut opts = CollectOpts {
         model: String::new(),
+        model2: None,
         output_path: String::new(),
         repeats: 1,
         augment: false,
@@ -300,6 +342,10 @@ fn parse_args(args: &[String]) -> Result<CollectOpts, String> {
             "--model" | "-m" => {
                 i += 1;
                 opts.model = args.get(i).cloned().ok_or("--model requires a value")?;
+            }
+            "--model2" => {
+                i += 1;
+                opts.model2 = Some(args.get(i).cloned().ok_or("--model2 requires a value")?);
             }
             "--output" | "-o" => {
                 i += 1;
@@ -357,6 +403,7 @@ fn print_usage() {
     eprintln!("  --output, -o PATH    Output JSONL file path");
     eprintln!();
     eprintln!("Optional:");
+    eprintln!("  --model2 NAME        Second model for multi-model distillation");
     eprintln!("  --repeats N          Repeat each config N times (default: 1)");
     eprintln!("  --augment            Add ±0.05 channel noise on repeat > 0");
     eprintln!("  --curriculum         Progressive augmentation (implies --augment)");
