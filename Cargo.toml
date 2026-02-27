@@ -358,9 +358,7 @@ mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix 
 # ── Desktop & System Integration ────────────────────────────────────
 notifications = ["zbus"]                    # D-Bus desktop notifications
 nix-mind = ["symthaea-nix"]                 # Conscious NixOS mind with HDC world model + active inference
-nix-cli = ["symthaea-nix", "symthaea-nix/cli"]
-nix-tui = ["symthaea-nix", "symthaea-nix/tui"]
-nix-daemon = ["symthaea-nix", "symthaea-nix/daemon"]
+# Note: nix-cli/nix-tui/nix-daemon removed — use `cargo build -p symthaea-nix --features cli/tui/daemon` directly
 identity = ["ed25519-dalek", "sha2"]        # Ed25519 signatures, capability gating
 physics = ["dep:symthaea-physics"]           # Tokamak plasma encoding, C-Mod adapter
 flight = ["dep:symthaea-flight"]            # HDC-LTC quadrotor flight control via FEP Active Inference
@@ -384,7 +382,7 @@ lancedb-backend = ["dep:lancedb", "dep:arrow-array", "dep:arrow-schema", "dep:fu
 multi_agent = ["full_consciousness"]        # Multi-agent trust scoring (byzantine, causal consensus)
 full_consciousness = []                     # Extended consciousness submodules
 full_perception = []                        # Extended perception submodules
-full_language = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub"]                          # Advanced language features (grammar, parsers)
+full_language = ["neural-bridge"]                          # Advanced language features (grammar, parsers) — candle deps via neural-bridge
 magi_loop = []                              # MAGI Loop world-grounded prediction
 # Unified reasoning engine: epistemic conflict, tool gating, temporal planning, counterfactual.
 # Subsumes former epistemic_conflict, conscious_tool_gate, temporal_planning, counterfactual features.
@@ -404,6 +402,13 @@ observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gate
 support = ["dep:symthaea-support"]                     # IT support intelligence (triage, diagnostics, knowledge, privacy, actions, prediction)
 web_research_module = []        # Web research epistemic verification (cfg-gated in lib.rs)
 unstable-examples = []          # Quarantine gate for examples with stale APIs (never enabled by default)
+
+# ── Convenience bundles ───────────────────────────────────────────
+# Group related features that users commonly enable together.
+candle_stack = ["neural-bridge"]                        # Unifies candle dependency chain (candle-core/nn/transformers + tokenizers + hf-hub)
+consciousness_full = ["reasoning_engine", "identity"]   # Full consciousness: reasoning engine + identity signatures
+nix_full = ["nix-mind"]                                 # All NixOS features via the symthaea-nix crate
+all_benchmarks = ["benchmarks", "physics"]              # All benchmarking features (causal validation + tokamak plasma)
 
 
 [dev-dependencies]

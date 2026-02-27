@@ -83,7 +83,7 @@ pub use integration::gwt_integration;
 pub use integration::hierarchical_ltc;
 pub use integration::multi_modal_integration;
 pub use integration::narrative_gwt_integration;
-pub use integration::neuro_bridge;
+// neuro_bridge: disconnected (uses own LTC, not main CfC pipeline). Kept for reference.
 
 // ============================================================================
 // Layer 6: Meta-cognition (monitoring, reasoning, attention schema)
@@ -151,7 +151,6 @@ pub mod causal_explanation;
 pub mod negation_detector;
 pub mod synthetic_states;
 pub mod gis_integration;
-pub mod value_system_tests;
 pub mod multi_objective_evolution;
 
 // ============================================================================
@@ -438,7 +437,7 @@ pub use multi_modal_integration::{
     IntegrationConfig, IntegrationEvent, IntegrationEventType, IntegrationResult, ModalInput,
     MultiModalIntegrator,
 };
-pub use neuro_bridge::{BridgeState, NeuroAutopoieticBridge};
+// neuro_bridge re-exports removed (disconnected)
 pub use phi_architecture_search::{
     ArchitectureGenome, ArchitectureStats, BundlingGene, DecodedArchitecture, Individual,
     PhiArchitectureSearch, PhiGradient, SearchConfig, SearchResult, SearchStats, SearchStrategy,
