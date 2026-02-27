@@ -8,11 +8,64 @@
 //!
 //! Default: `state-spaces/mamba-130m` (~130M params, d_model=768, n_layer=24, vocab=50280)
 //! CPU-first design targeting 6W edge deployment.
+//!
+//! # Trait Abstraction
+//!
+//! The [`MambaBackend`] trait provides a mockable interface for all Mamba
+//! operations used by [`crate::liquid_mamba::LiquidMambaGenerator`]. This
+//! enables deterministic testing without network access or model downloads.
 
 use anyhow::{Context, Result};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::mamba::{Config, Model, State};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAMBA BACKEND TRAIT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Trait abstracting Mamba SSM operations for mockability.
+///
+/// All methods used by [`crate::liquid_mamba::LiquidMambaGenerator`] are
+/// included. Methods that expose candle-specific types (`State`, `Device`,
+/// `Tokenizer`) remain as inherent methods on [`MambaWrapper`] only.
+pub trait MambaBackend: Send {
+    /// Single-token forward pass. Returns logits as `Vec<f32>` (vocab_size elements).
+    fn forward_one_token(&mut self, token_id: u32) -> Result<Vec<f32>>;
+
+    /// Extract the embedding vector for a given token ID (d_model dimensions).
+    fn embedding_vector(&self, token_id: u32) -> Result<Vec<f32>>;
+
+    /// Inject an initial context vector into the SSM hidden state.
+    fn inject_initial_context(&mut self, context: &[f32]) -> Result<()>;
+
+    /// Scale all hidden states by a biological modulation factor.
+    fn scale_hidden_states(&mut self, factor: f32) -> Result<()>;
+
+    /// Reset state to zeros.
+    fn reset(&mut self);
+
+    /// Vocabulary size.
+    fn vocab_size(&self) -> usize;
+
+    /// Model hidden dimension.
+    fn d_model(&self) -> usize;
+
+    /// Number of layers.
+    fn n_layer(&self) -> usize;
+
+    /// Encode text to token IDs.
+    fn encode(&self, text: &str) -> Result<Vec<u32>>;
+
+    /// Decode token IDs to text.
+    fn decode(&self, ids: &[u32]) -> Result<String>;
+
+    /// Decode a single token ID to text.
+    fn decode_token(&self, id: u32) -> Result<String>;
+
+    /// Get the EOS token ID.
+    fn eos_token_id(&self) -> u32;
+}
 
 /// Wrapper around candle-transformers' Mamba model with Symthaea integration.
 pub struct MambaWrapper {
@@ -280,9 +333,220 @@ impl std::fmt::Debug for MambaWrapper {
     }
 }
 
+impl MambaBackend for MambaWrapper {
+    fn forward_one_token(&mut self, token_id: u32) -> Result<Vec<f32>> {
+        MambaWrapper::forward_one_token(self, token_id)
+    }
+
+    fn embedding_vector(&self, token_id: u32) -> Result<Vec<f32>> {
+        MambaWrapper::embedding_vector(self, token_id)
+    }
+
+    fn inject_initial_context(&mut self, context: &[f32]) -> Result<()> {
+        MambaWrapper::inject_initial_context(self, context)
+    }
+
+    fn scale_hidden_states(&mut self, factor: f32) -> Result<()> {
+        MambaWrapper::scale_hidden_states(self, factor)
+    }
+
+    fn reset(&mut self) {
+        MambaWrapper::reset(self)
+    }
+
+    fn vocab_size(&self) -> usize {
+        MambaWrapper::vocab_size(self)
+    }
+
+    fn d_model(&self) -> usize {
+        MambaWrapper::d_model(self)
+    }
+
+    fn n_layer(&self) -> usize {
+        MambaWrapper::n_layer(self)
+    }
+
+    fn encode(&self, text: &str) -> Result<Vec<u32>> {
+        MambaWrapper::encode(self, text)
+    }
+
+    fn decode(&self, ids: &[u32]) -> Result<String> {
+        MambaWrapper::decode(self, ids)
+    }
+
+    fn decode_token(&self, id: u32) -> Result<String> {
+        MambaWrapper::decode_token(self, id)
+    }
+
+    fn eos_token_id(&self) -> u32 {
+        MambaWrapper::eos_token_id(self)
+    }
+}
+
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MOCK MAMBA
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Deterministic mock Mamba backend for testing without network access.
+    ///
+    /// Produces repeatable, seeded outputs using xorshift64 PRNG. All operations
+    /// that would require a real model (forward, embedding, encode/decode) are
+    /// replaced with lightweight deterministic computations.
+    ///
+    /// # Behavior
+    ///
+    /// - `forward_one_token`: xorshift64-seeded logits (50280 vocab), deterministic per token_id
+    /// - `embedding_vector`: deterministic 768D vector seeded by token_id
+    /// - `inject_initial_context`: records context magnitude, increments injection count
+    /// - `scale_hidden_states`: tracks cumulative scale factor
+    /// - `reset`: resets all state counters
+    /// - `encode`: simple byte-to-id mapping (each UTF-8 byte becomes a token)
+    /// - `decode`: reverse byte-to-char mapping (id mod 128 → ASCII char)
+    /// - Config queries: d_model=768, n_layer=24, vocab_size=50280
+    pub struct MockMamba {
+        /// Number of forward passes executed.
+        pub forward_count: usize,
+        /// Cumulative hidden state scale factor (starts at 1.0).
+        pub scale_factor: f32,
+        /// Number of context injections performed.
+        pub injection_count: usize,
+        /// Last injected context magnitude (L2 norm).
+        pub last_context_magnitude: f32,
+        /// Number of resets performed.
+        pub reset_count: usize,
+    }
+
+    impl MockMamba {
+        /// Create a new mock Mamba with default state.
+        pub fn new() -> Self {
+            Self {
+                forward_count: 0,
+                scale_factor: 1.0,
+                injection_count: 0,
+                last_context_magnitude: 0.0,
+                reset_count: 0,
+            }
+        }
+
+        /// xorshift64 PRNG step. Seed 0 is a fixed point, so we XOR with a
+        /// golden-ratio constant before starting.
+        fn xorshift64(state: &mut u64) -> u64 {
+            *state ^= *state << 13;
+            *state ^= *state >> 7;
+            *state ^= *state << 17;
+            *state
+        }
+    }
+
+    impl MambaBackend for MockMamba {
+        fn forward_one_token(&mut self, token_id: u32) -> Result<Vec<f32>> {
+            self.forward_count += 1;
+            let vocab = 50280usize;
+            let mut logits = Vec::with_capacity(vocab);
+
+            // Seed from token_id × golden ratio + forward_count for determinism that varies per call
+            let mut state = (token_id as u64).wrapping_mul(0x9E3779B97F4A7C15)
+                .wrapping_add(self.forward_count as u64).wrapping_mul(0x517CC1B727220A95);
+            if state == 0 {
+                state = 0x9E3779B97F4A7C15;
+            }
+
+            for _ in 0..vocab {
+                let r = Self::xorshift64(&mut state);
+                // Map u64 to [-2.0, 2.0] range for logit-like distribution
+                let val = (r as f64 / u64::MAX as f64) * 4.0 - 2.0;
+                logits.push(val as f32 * self.scale_factor);
+            }
+            Ok(logits)
+        }
+
+        fn embedding_vector(&self, token_id: u32) -> Result<Vec<f32>> {
+            let d = 768;
+            let mut emb = Vec::with_capacity(d);
+            let mut state = (token_id as u64 ^ 0x517CC1B727220A95)
+                .wrapping_add(1);
+            if state == 0 {
+                state = 0x517CC1B727220A95;
+            }
+
+            for _ in 0..d {
+                let r = Self::xorshift64(&mut state);
+                let val = (r as f64 / u64::MAX as f64) * 2.0 - 1.0;
+                emb.push(val as f32);
+            }
+            Ok(emb)
+        }
+
+        fn inject_initial_context(&mut self, context: &[f32]) -> Result<()> {
+            self.injection_count += 1;
+            // Record L2 magnitude
+            let mag: f32 = context.iter().map(|x| x * x).sum::<f32>().sqrt();
+            self.last_context_magnitude = mag;
+            Ok(())
+        }
+
+        fn scale_hidden_states(&mut self, factor: f32) -> Result<()> {
+            self.scale_factor *= factor;
+            Ok(())
+        }
+
+        fn reset(&mut self) {
+            self.reset_count += 1;
+            self.forward_count = 0;
+            self.scale_factor = 1.0;
+            self.last_context_magnitude = 0.0;
+        }
+
+        fn vocab_size(&self) -> usize {
+            50280
+        }
+
+        fn d_model(&self) -> usize {
+            768
+        }
+
+        fn n_layer(&self) -> usize {
+            24
+        }
+
+        fn encode(&self, text: &str) -> Result<Vec<u32>> {
+            // Simple byte-to-id mapping: each UTF-8 byte becomes a token ID
+            Ok(text.as_bytes().iter().map(|&b| b as u32).collect())
+        }
+
+        fn decode(&self, ids: &[u32]) -> Result<String> {
+            // Reverse: id → byte (mod 128 for ASCII safety)
+            let bytes: Vec<u8> = ids.iter().map(|&id| (id % 128) as u8).collect();
+            Ok(String::from_utf8_lossy(&bytes).into_owned())
+        }
+
+        fn decode_token(&self, id: u32) -> Result<String> {
+            self.decode(&[id])
+        }
+
+        fn eos_token_id(&self) -> u32 {
+            0 // Same convention as MambaWrapper (fallback when <|endoftext|> not found)
+        }
+    }
+
+    impl std::fmt::Debug for MockMamba {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("MockMamba")
+                .field("forward_count", &self.forward_count)
+                .field("scale_factor", &self.scale_factor)
+                .field("injection_count", &self.injection_count)
+                .field("reset_count", &self.reset_count)
+                .finish()
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ORIGINAL INTEGRATION TESTS (require network — kept for manual runs)
+    // ═══════════════════════════════════════════════════════════════════════
 
     /// Integration test requiring network access to download mamba-130m.
     /// Ignored in CI — run manually with `cargo test --features mamba -- --ignored`.
@@ -468,5 +732,247 @@ mod tests {
         let text = wrapper.decode(&token_ids).expect("Decode failed");
         assert!(!text.is_empty(), "E2E should produce text");
         assert!(text.len() > 0, "E2E text: {text:?}");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MOCK-BASED TESTS (no network required)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_mock_mamba_load_and_forward() {
+        let mut mock = MockMamba::new();
+
+        assert_eq!(mock.d_model(), 768);
+        assert_eq!(mock.n_layer(), 24);
+        assert_eq!(mock.vocab_size(), 50280);
+
+        // Forward pass with a single token
+        let logits = mock.forward_one_token(0).expect("Forward pass failed");
+        assert_eq!(logits.len(), 50280);
+        assert!(logits.iter().all(|x| x.is_finite()));
+        assert_eq!(mock.forward_count, 1);
+    }
+
+    #[test]
+    fn test_mock_mamba_context_injection() {
+        let mut mock = MockMamba::new();
+
+        let context = vec![0.1f32; 768];
+        mock.inject_initial_context(&context)
+            .expect("Context injection failed");
+
+        assert_eq!(mock.injection_count, 1);
+        // L2 norm of 768 elements of 0.1 = sqrt(768 * 0.01) = sqrt(7.68)
+        let expected_mag = (768.0f32 * 0.01).sqrt();
+        assert!(
+            (mock.last_context_magnitude - expected_mag).abs() < 0.01,
+            "Expected magnitude ~{expected_mag}, got {}",
+            mock.last_context_magnitude
+        );
+
+        let logits = mock.forward_one_token(1).expect("Forward after injection failed");
+        assert_eq!(logits.len(), 50280);
+    }
+
+    #[test]
+    fn test_mock_mamba_state_scaling() {
+        let mut mock = MockMamba::new();
+
+        // Run a token to get non-zero state
+        let _logits = mock.forward_one_token(0).expect("Forward pass failed");
+
+        // Scale states
+        mock.scale_hidden_states(0.5).expect("State scaling failed");
+        assert!((mock.scale_factor - 0.5).abs() < 1e-6);
+
+        mock.scale_hidden_states(2.0).expect("State scaling failed");
+        assert!((mock.scale_factor - 1.0).abs() < 1e-6);
+
+        // Scale factor affects logit magnitude
+        mock.scale_hidden_states(0.1).expect("Scale failed");
+        let logits = mock.forward_one_token(1).expect("Forward after scaling failed");
+        assert!(logits.iter().all(|x| x.is_finite()));
+        // Logits should be scaled down (max magnitude should be < 0.3 since range is [-2,2]*0.1)
+        let max_abs = logits.iter().map(|x| x.abs()).fold(0.0f32, f32::max);
+        assert!(
+            max_abs < 0.3,
+            "Scaled logits should be small, max_abs = {max_abs}"
+        );
+    }
+
+    #[test]
+    fn test_mock_mamba_encode_decode() {
+        let mock = MockMamba::new();
+
+        let text = "Hello, world!";
+        let ids = mock.encode(text).expect("Encoding failed");
+        assert_eq!(ids.len(), text.len()); // byte-per-token
+        assert_eq!(ids[0], b'H' as u32);
+        assert_eq!(ids[1], b'e' as u32);
+
+        let decoded = mock.decode(&ids).expect("Decoding failed");
+        assert_eq!(decoded, text);
+    }
+
+    #[test]
+    fn test_mock_mamba_reset() {
+        let mut mock = MockMamba::new();
+
+        // Run some tokens
+        let _ = mock.forward_one_token(0);
+        let _ = mock.forward_one_token(1);
+        assert_eq!(mock.forward_count, 2);
+
+        mock.scale_hidden_states(0.5).unwrap();
+        assert!((mock.scale_factor - 0.5).abs() < 1e-6);
+
+        // Reset
+        mock.reset();
+
+        assert_eq!(mock.forward_count, 0);
+        assert!((mock.scale_factor - 1.0).abs() < 1e-6);
+        assert_eq!(mock.reset_count, 1);
+
+        // Should work fine after reset
+        let logits = mock.forward_one_token(0).expect("Forward after reset failed");
+        assert_eq!(logits.len(), 50280);
+    }
+
+    #[test]
+    fn test_mock_mamba_embedding_extraction() {
+        let mock = MockMamba::new();
+
+        let emb = mock.embedding_vector(42).expect("Embedding extraction failed");
+        assert_eq!(emb.len(), 768);
+        // Should be non-zero
+        assert!(emb.iter().any(|x| x.abs() > 1e-10));
+        // Should be finite
+        assert!(emb.iter().all(|x| x.is_finite()));
+
+        // Deterministic: same token_id should produce same embedding
+        let emb2 = mock.embedding_vector(42).expect("Embedding failed");
+        assert_eq!(emb, emb2);
+
+        // Different token_id should produce different embedding
+        let emb3 = mock.embedding_vector(43).expect("Embedding failed");
+        assert_ne!(emb, emb3);
+    }
+
+    #[test]
+    fn test_mock_mamba_generate_10_tokens() {
+        let mut mock = MockMamba::new();
+
+        // Encode a prompt
+        let prompt_ids = mock.encode("The meaning of life is").expect("Encode failed");
+        assert!(!prompt_ids.is_empty());
+
+        // Feed prompt tokens
+        let mut last_logits = vec![];
+        for &token_id in &prompt_ids {
+            last_logits = mock.forward_one_token(token_id).expect("Forward failed");
+        }
+
+        // Generate 10 tokens greedily
+        let mut generated_ids = Vec::new();
+        for _ in 0..10 {
+            let next_id = last_logits.iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.total_cmp(b))
+                .map(|(i, _)| i as u32)
+                .unwrap();
+            generated_ids.push(next_id);
+            last_logits = mock.forward_one_token(next_id).expect("Forward failed");
+        }
+
+        assert_eq!(generated_ids.len(), 10);
+        // All IDs should be within vocab range
+        assert!(generated_ids.iter().all(|&id| (id as usize) < 50280));
+
+        let decoded = mock.decode(&generated_ids).expect("Decode failed");
+        assert!(!decoded.is_empty());
+    }
+
+    #[test]
+    fn test_mock_mamba_e2e_thought_to_text() {
+        use crate::encoder::ThoughtChannels;
+        use crate::projection::HdcSsmProjection;
+        use symthaea_core::genesis::GenesisSeed;
+
+        let genesis = GenesisSeed::from_phrase("test-mock-mamba-e2e");
+        let mut mock: Box<dyn MambaBackend> = Box::new(MockMamba::new());
+
+        // Create thought channels and encode to HDC
+        let mut channels = ThoughtChannels::with_intent(1); // Answer
+        channels.set_epistemic(0.0); // Certain
+        channels.set_emotion(0.5, 0.5, 0.5);
+
+        let encoder = crate::encoder::ThoughtLanguageEncoder::new(&genesis);
+        let thought_hv = encoder.encode(&channels);
+
+        // Project HDC → SSM space
+        let projection = HdcSsmProjection::new(&genesis, 16384, 256, 768);
+        let ssm_context = projection.project_to_ssm(&thought_hv);
+
+        // Inject context into Mamba (via trait)
+        mock.inject_initial_context(&ssm_context)
+            .expect("Context injection failed");
+
+        // Generate a few tokens
+        let mut token_ids = Vec::new();
+        let mut logits = mock.forward_one_token(0).expect("Forward failed");
+        for _ in 0..5 {
+            let next_id = logits.iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.total_cmp(b))
+                .map(|(i, _)| i as u32)
+                .unwrap();
+            token_ids.push(next_id);
+            logits = mock.forward_one_token(next_id).expect("Forward failed");
+        }
+
+        assert_eq!(token_ids.len(), 5);
+        assert!(token_ids.iter().all(|&id| (id as usize) < 50280));
+    }
+
+    #[test]
+    fn test_mock_mamba_determinism() {
+        // Verify that MockMamba produces deterministic results across runs
+        let mut mock1 = MockMamba::new();
+        let mut mock2 = MockMamba::new();
+
+        let logits1 = mock1.forward_one_token(42).expect("Forward failed");
+        let logits2 = mock2.forward_one_token(42).expect("Forward failed");
+        assert_eq!(logits1, logits2, "Same token_id should produce same logits");
+
+        // Different token IDs produce different logits
+        let logits3 = mock1.forward_one_token(43).expect("Forward failed");
+        assert_ne!(logits1, logits3, "Different token_ids should produce different logits");
+    }
+
+    #[test]
+    fn test_mock_mamba_trait_object() {
+        // Verify MockMamba works through Box<dyn MambaBackend>
+        let mut backend: Box<dyn MambaBackend> = Box::new(MockMamba::new());
+
+        assert_eq!(backend.d_model(), 768);
+        assert_eq!(backend.n_layer(), 24);
+        assert_eq!(backend.vocab_size(), 50280);
+        assert_eq!(backend.eos_token_id(), 0);
+
+        let logits = backend.forward_one_token(100).expect("Forward failed");
+        assert_eq!(logits.len(), 50280);
+
+        backend.reset();
+
+        let emb = backend.embedding_vector(0).expect("Embedding failed");
+        assert_eq!(emb.len(), 768);
+
+        backend.inject_initial_context(&[1.0; 768]).expect("Inject failed");
+        backend.scale_hidden_states(0.5).expect("Scale failed");
+
+        let ids = backend.encode("test").expect("Encode failed");
+        assert_eq!(ids.len(), 4);
+        let text = backend.decode(&ids).expect("Decode failed");
+        assert_eq!(text, "test");
     }
 }
