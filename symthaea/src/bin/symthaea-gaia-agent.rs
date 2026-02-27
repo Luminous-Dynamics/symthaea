@@ -661,6 +661,7 @@ fn find_keyword(text: &str, keywords: &[&str]) -> bool {
 }
 
 #[tokio::main]
+#[allow(clippy::field_reassign_with_default)]
 async fn main() {
     let mut input = String::new();
     if io::stdin().read_to_string(&mut input).is_err() {
@@ -943,17 +944,13 @@ async fn main() {
         tiers.push(format!("{:?}", PrimitiveTier::MetaCognitive));
     }
 
-    let mut thought = {
-        #[allow(clippy::field_reassign_with_default)]
-        let mut t = StructuredThought::default();
-        t.semantic_intent = intent;
-        t.response_type = ResponseType::Statement;
-        t.epistemic_status = epistemic;
-        t.relationship_stage = RelationshipStage::Contact;
-        t.relation_mode = RelationMode::IIt;
-        t.activated_concepts = cognitive_concepts;
-        t
-    };
+    let mut thought = StructuredThought::default();
+    thought.semantic_intent = intent;
+    thought.response_type = ResponseType::Statement;
+    thought.epistemic_status = epistemic;
+    thought.relationship_stage = RelationshipStage::Contact;
+    thought.relation_mode = RelationMode::IIt;
+    thought.activated_concepts = cognitive_concepts;
     if let Some(snapshot) = &cognitive_snapshot {
         let warmth = ((snapshot.unified_valence + 1.0) * 0.5).clamp(0.0, 1.0);
         thought.emotional_tone = EmotionalTone {

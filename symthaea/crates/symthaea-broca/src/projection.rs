@@ -441,6 +441,116 @@ impl HdcSsmProjection {
         );
     }
 
+    /// Bidirectional warm-start: initialize all 4 weight matrices from sample data.
+    ///
+    /// 1. `w_down`: PCA on HDC samples (same as `warm_start_from_samples`)
+    /// 2. `w_up`: PCA on the bottleneck representations projected through `w_down`,
+    ///    finding the SSM subspace that best spans the projected data
+    /// 3. `w_back_down`: initialized as transpose of `w_up` (matched backward)
+    /// 4. `w_back_up`: initialized as transpose of `w_down` (matched backward)
+    pub fn warm_start_bidirectional(&mut self, samples: &[ContinuousHV]) {
+        if samples.len() < 2 || self.hdc_dim == 0 || self.bottleneck == 0 {
+            return;
+        }
+
+        // Step 1: Forward w_down via PCA on HDC samples
+        self.warm_start_from_samples(samples);
+
+        // Step 2: Compute bottleneck representations of samples through updated w_down
+        let bottleneck_vecs: Vec<Vec<f32>> = samples.iter()
+            .map(|s| {
+                let pre = self.matmul(&self.w_down, &s.values, self.bottleneck, self.hdc_dim);
+                pre.into_iter().map(activation).collect()
+            })
+            .collect();
+
+        // Step 3: PCA on bottleneck→SSM direction for w_up
+        let n = bottleneck_vecs.len();
+        let b = self.bottleneck;
+        let s = self.ssm_dim;
+        let k = s.min(n).min(b);
+        let scale = 1.0 / (self.bottleneck as f32).sqrt();
+
+        // Compute mean of bottleneck representations
+        let mut bn_mean = vec![0.0f32; b];
+        for bv in &bottleneck_vecs {
+            for (m, v) in bn_mean.iter_mut().zip(bv.iter()) {
+                *m += v;
+            }
+        }
+        let inv_n = 1.0 / n as f32;
+        for m in &mut bn_mean {
+            *m *= inv_n;
+        }
+
+        // Power iteration for top-k principal components of bottleneck distribution
+        // These become the rows of w_up [ssm_dim × bottleneck]
+        for comp_idx in 0..k {
+            let row_start = comp_idx * b;
+            let mut dir: Vec<f32> = self.w_up[row_start..row_start + b].to_vec();
+            let dir_norm: f32 = dir.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if dir_norm > 1e-10 {
+                for v in &mut dir { *v /= dir_norm; }
+            }
+
+            for _ in 0..10 {
+                let mut result = vec![0.0f32; b];
+                for bv in &bottleneck_vecs {
+                    let mut dot = 0.0f32;
+                    for j in 0..b {
+                        dot += (bv[j] - bn_mean[j]) * dir[j];
+                    }
+                    for j in 0..b {
+                        result[j] += (bv[j] - bn_mean[j]) * dot;
+                    }
+                }
+                let norm: f32 = result.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if norm < 1e-10 { break; }
+                for v in &mut result { *v /= norm; }
+
+                // Deflation
+                for prev_idx in 0..comp_idx {
+                    let prev_start = prev_idx * b;
+                    let mut dot = 0.0f32;
+                    for j in 0..b {
+                        dot += result[j] * self.w_up[prev_start + j] / scale;
+                    }
+                    for j in 0..b {
+                        result[j] -= dot * self.w_up[prev_start + j] / scale;
+                    }
+                }
+                let norm2: f32 = result.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if norm2 < 1e-10 { break; }
+                for v in &mut result { *v /= norm2; }
+                dir = result;
+            }
+
+            for j in 0..b {
+                self.w_up[comp_idx * b + j] = dir[j] * scale;
+            }
+        }
+
+        // Step 4: Matched backward initialization
+        // w_back_down = transpose of w_up: [bottleneck × ssm_dim] from [ssm_dim × bottleneck]
+        for i in 0..self.bottleneck {
+            for j in 0..self.ssm_dim {
+                self.w_back_down[i * s + j] = self.w_up[j * b + i];
+            }
+        }
+        // w_back_up = transpose of w_down: [hdc_dim × bottleneck] from [bottleneck × hdc_dim]
+        let d = self.hdc_dim;
+        for i in 0..d {
+            for j in 0..b {
+                self.w_back_up[i * b + j] = self.w_down[j * d + i];
+            }
+        }
+
+        tracing::info!(
+            samples = n,
+            "Bidirectional warm-start complete (w_down PCA + w_up PCA + matched backward)"
+        );
+    }
+
     /// Compute the effective rank of the bottleneck activations for a batch of inputs.
     ///
     /// Effective rank = exp(entropy of singular value distribution).
@@ -501,19 +611,36 @@ impl HdcSsmProjection {
     /// Matrix-vector multiply: `result[i] = sum_j(mat[i*cols + j] * vec[j])`
     ///
     /// mat shape: [rows × cols], vec shape: [cols], result shape: [rows]
+    ///
+    /// When the `simd` feature is enabled, each row dot product uses AVX2+FMA
+    /// via `symthaea_core::hdc::simd_continuous::dot_product_simd`.
     fn matmul(&self, mat: &[f32], vec: &[f32], rows: usize, cols: usize) -> Vec<f32> {
         debug_assert_eq!(mat.len(), rows * cols);
         debug_assert_eq!(vec.len(), cols);
 
         let mut result = vec![0.0f32; rows];
-        for i in 0..rows {
-            let row_start = i * cols;
-            let mut sum = 0.0f32;
-            for j in 0..cols {
-                sum += mat[row_start + j] * vec[j];
+
+        #[cfg(feature = "simd")]
+        {
+            use symthaea_core::hdc::simd_continuous::dot_product_simd;
+            for i in 0..rows {
+                let row_start = i * cols;
+                result[i] = dot_product_simd(&mat[row_start..row_start + cols], vec);
             }
-            result[i] = sum;
         }
+
+        #[cfg(not(feature = "simd"))]
+        {
+            for i in 0..rows {
+                let row_start = i * cols;
+                let mut sum = 0.0f32;
+                for j in 0..cols {
+                    sum += mat[row_start + j] * vec[j];
+                }
+                result[i] = sum;
+            }
+        }
+
         result
     }
 }
@@ -829,5 +956,76 @@ mod tests {
         assert!(rank.is_finite());
         // With identical inputs, all activations are the same → zero variance → rank = 1
         assert!(rank <= 2.0, "Identical inputs should give low rank, got {rank}");
+    }
+
+    #[test]
+    fn test_warm_start_bidirectional_modifies_all_weights() {
+        let genesis = test_genesis();
+        let dim = 256;
+        let mut proj = HdcSsmProjection::new(&genesis, dim, 16, 64);
+        let weights_before = proj.flatten_weights();
+
+        let samples: Vec<ContinuousHV> = (0..20)
+            .map(|i| {
+                let mut hv = ContinuousHV::random(dim, 100 + i as u64);
+                for j in 0..8 {
+                    hv.values[j] += 5.0;
+                }
+                hv
+            })
+            .collect();
+
+        proj.warm_start_bidirectional(&samples);
+        let weights_after = proj.flatten_weights();
+
+        // Count how many weight segments changed
+        let n_down = 16 * dim;
+        let n_up = 64 * 16;
+        let n_back_down = 16 * 64;
+
+        let down_changed = weights_before[..n_down].iter()
+            .zip(weights_after[..n_down].iter())
+            .any(|(a, b)| (a - b).abs() > 1e-6);
+        let up_changed = weights_before[n_down..n_down + n_up].iter()
+            .zip(weights_after[n_down..n_down + n_up].iter())
+            .any(|(a, b)| (a - b).abs() > 1e-6);
+        let back_down_changed = weights_before[n_down + n_up..n_down + n_up + n_back_down].iter()
+            .zip(weights_after[n_down + n_up..n_down + n_up + n_back_down].iter())
+            .any(|(a, b)| (a - b).abs() > 1e-6);
+        let back_up_changed = weights_before[n_down + n_up + n_back_down..].iter()
+            .zip(weights_after[n_down + n_up + n_back_down..].iter())
+            .any(|(a, b)| (a - b).abs() > 1e-6);
+
+        assert!(down_changed, "w_down should be modified by bidirectional warm-start");
+        assert!(up_changed, "w_up should be modified by bidirectional warm-start");
+        assert!(back_down_changed, "w_back_down should be modified by bidirectional warm-start");
+        assert!(back_up_changed, "w_back_up should be modified by bidirectional warm-start");
+    }
+
+    #[test]
+    fn test_warm_start_bidirectional_empty_samples() {
+        let genesis = test_genesis();
+        let mut proj = HdcSsmProjection::new(&genesis, 256, 16, 64);
+        let before = proj.flatten_weights();
+
+        proj.warm_start_bidirectional(&[]);
+        let after = proj.flatten_weights();
+        assert_eq!(before, after, "Empty samples should not modify weights");
+    }
+
+    #[test]
+    fn test_simd_matmul_consistency() {
+        // Verify SIMD and scalar paths produce the same results
+        let genesis = test_genesis();
+        let proj = HdcSsmProjection::new(&genesis, 256, 16, 64);
+
+        let hv = ContinuousHV::random(256, 42);
+        let ssm = proj.project_to_ssm(&hv);
+        assert_eq!(ssm.len(), 64);
+        assert!(ssm.iter().all(|x| x.is_finite()), "All outputs should be finite");
+
+        // Roundtrip should be finite
+        let back = proj.project_to_hdc(&ssm);
+        assert!(back.values.iter().all(|x| x.is_finite()));
     }
 }

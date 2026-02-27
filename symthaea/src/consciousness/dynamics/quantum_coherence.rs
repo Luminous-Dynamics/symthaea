@@ -202,7 +202,7 @@ pub struct EntanglementMeasure {
 // ============================================================================
 
 /// Analyzer for quantum coherence properties of consciousness
-pub struct QuantumCoherenceAnalyzer {
+pub(crate) struct QuantumCoherenceAnalyzer {
     /// Configuration
     pub config: CoherenceConfig,
 
@@ -242,7 +242,7 @@ pub struct CoherenceStats {
 
 impl QuantumCoherenceAnalyzer {
     /// Create new analyzer with configuration
-    pub fn new(config: CoherenceConfig) -> Self {
+    pub(crate) fn new(config: CoherenceConfig) -> Self {
         Self {
             config,
             history: VecDeque::new(),
@@ -256,12 +256,12 @@ impl QuantumCoherenceAnalyzer {
     }
 
     /// Observe a new consciousness state
-    pub fn observe(&mut self, state: &BinaryHV, phi: f64) {
+    pub(crate) fn observe(&mut self, state: &BinaryHV, phi: f64) {
         self.observe_with_components(state, phi, None);
     }
 
     /// Observe with optional component states for entanglement tracking
-    pub fn observe_with_components(
+    pub(crate) fn observe_with_components(
         &mut self,
         state: &BinaryHV,
         phi: f64,
@@ -563,32 +563,32 @@ impl QuantumCoherenceAnalyzer {
     }
 
     /// Current coherence estimate
-    pub fn coherence(&self) -> f64 {
+    pub(crate) fn coherence(&self) -> f64 {
         self.current_coherence
     }
 
     /// Current coherence length (timesteps)
-    pub fn coherence_length(&self) -> usize {
+    pub(crate) fn coherence_length(&self) -> usize {
         self.coherence_length
     }
 
     /// Current superposition richness
-    pub fn superposition_richness(&self) -> f64 {
+    pub(crate) fn superposition_richness(&self) -> f64 {
         self.richness_history.back().copied().unwrap_or(0.5)
     }
 
     /// Get decoherence events
-    pub fn decoherence_events(&self) -> &[DecoherenceEvent] {
+    pub(crate) fn decoherence_events(&self) -> &[DecoherenceEvent] {
         &self.decoherence_events
     }
 
     /// Get recent interference patterns
-    pub fn interference_patterns(&self) -> &VecDeque<InterferencePattern> {
+    pub(crate) fn interference_patterns(&self) -> &VecDeque<InterferencePattern> {
         &self.interference_patterns
     }
 
     /// Compute decoherence rate (events per observation)
-    pub fn decoherence_rate(&self) -> f64 {
+    pub(crate) fn decoherence_rate(&self) -> f64 {
         if self.stats.observations == 0 {
             0.0
         } else {
@@ -597,7 +597,7 @@ impl QuantumCoherenceAnalyzer {
     }
 
     /// Generate comprehensive coherence report
-    pub fn coherence_report(&self) -> QuantumCoherenceReport {
+    pub(crate) fn coherence_report(&self) -> QuantumCoherenceReport {
         let last_entanglement = if self.config.estimate_entanglement {
             self.history.back().and_then(|obs| {
                 obs.components
@@ -629,7 +629,7 @@ impl QuantumCoherenceAnalyzer {
     }
 
     /// Check if system is currently in a "quantum coherent" state
-    pub fn is_quantum_coherent(&self) -> bool {
+    pub(crate) fn is_quantum_coherent(&self) -> bool {
         // Criteria for quantum coherence:
         // 1. High coherence (> threshold)
         // 2. Good superposition richness (0.4-0.6 is ideal)

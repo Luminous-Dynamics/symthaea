@@ -395,7 +395,7 @@ pub struct NarrativeGWTIntegration {
 
     // **REVOLUTIONARY IMPROVEMENT #74**: Predictive Self-Model
     /// The Predictive Self model for future-aware consciousness
-    pub predictive_self: Option<PredictiveSelfModel>,
+    pub(crate) predictive_self: Option<PredictiveSelfModel>,
 
     // **REVOLUTIONARY IMPROVEMENT #75**: Temporal Consciousness Analyzer
     /// Temporal consciousness analysis for flow-based consciousness understanding

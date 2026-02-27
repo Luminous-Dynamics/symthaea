@@ -200,6 +200,11 @@ pub struct ContinuousMind {
     mesh_bandwidth_throttled_in_window: bool,
     /// Holochain Cortex for trust and validation.
     pub(crate) cortex: crate::swarm::HolochainCortex,
+    /// Optional LLM backend for swarm projection gradient exchange.
+    /// When set, `emit_gradients()` also exports L-SSM projection weights
+    /// and `process_federated()` applies aggregated peer weights.
+    #[cfg(feature = "liquid-mamba")]
+    pub(crate) llm_backend: Option<std::sync::Arc<dyn crate::language::llm_backend::LLMBackend>>,
 }
 
 impl ContinuousMind {
@@ -289,6 +294,8 @@ impl ContinuousMind {
             #[cfg(feature = "mesh")]
             mesh_bandwidth_throttled_in_window: false,
             cortex: crate::swarm::HolochainCortex::default(),
+            #[cfg(feature = "liquid-mamba")]
+            llm_backend: None,
         }
     }
 
@@ -637,6 +644,16 @@ impl ContinuousMind {
     /// Check if an Iroh P2P bridge is attached and alive.
     pub fn has_iroh_bridge(&self) -> bool {
         self.iroh_bridge.as_ref().is_some_and(|h| h.is_alive())
+    }
+
+    /// Attach an LLM backend for swarm projection gradient exchange.
+    ///
+    /// When set, `emit_gradients()` exports L-SSM projection weights alongside
+    /// HDC world-model gradients, and `process_federated()` applies incoming
+    /// aggregated peer weights to the backend.
+    #[cfg(feature = "liquid-mamba")]
+    pub fn set_llm_backend(&mut self, backend: std::sync::Arc<dyn crate::language::llm_backend::LLMBackend>) {
+        self.llm_backend = Some(backend);
     }
 
     // ========================================================================

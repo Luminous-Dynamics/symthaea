@@ -666,7 +666,7 @@ impl ProspectiveMemory {
 // ============================================================================
 
 /// Complete Predictive Self-Model integrating prediction, counterfactuals, and prospection
-pub struct PredictiveSelfModel {
+pub(crate) struct PredictiveSelfModel {
     /// Self-state predictor
     pub predictor: SelfPredictor,
     /// Counterfactual reasoning engine
@@ -693,7 +693,7 @@ pub struct PredictiveSelfStats {
 
 impl PredictiveSelfModel {
     /// Create a new Predictive Self-Model
-    pub fn new(config: PredictiveSelfConfig) -> Self {
+    pub(crate) fn new(config: PredictiveSelfConfig) -> Self {
         let predictor = SelfPredictor::new(config.clone());
         let counterfactuals =
             CounterfactualEngine::new(SelfPredictor::new(config.clone()), config.clone());
@@ -709,19 +709,19 @@ impl PredictiveSelfModel {
     }
 
     /// Observe current self-state
-    pub fn observe(&mut self, model: &NarrativeSelfModel) {
+    pub(crate) fn observe(&mut self, model: &NarrativeSelfModel) {
         let state = SelfState::from_narrative_self(model);
         self.predictor.observe(state);
     }
 
     /// Predict future self given action
-    pub fn predict(&mut self, action: &str, steps: usize) -> SelfState {
+    pub(crate) fn predict(&mut self, action: &str, steps: usize) -> SelfState {
         self.stats.predictions_made += 1;
         self.predictor.predict_future_state(action, steps)
     }
 
     /// Evaluate action safety: will it harm identity?
-    pub fn evaluate_action_safety(&mut self, action: &str) -> ActionSafetyAssessment {
+    pub(crate) fn evaluate_action_safety(&mut self, action: &str) -> ActionSafetyAssessment {
         let predicted = self.predict(action, 3);
         let current = self.predictor.history.back().cloned();
 
@@ -752,7 +752,7 @@ impl PredictiveSelfModel {
     }
 
     /// Learn from actual outcome
-    pub fn learn_from_outcome(&mut self, predicted: &SelfState, actual: &NarrativeSelfModel) {
+    pub(crate) fn learn_from_outcome(&mut self, predicted: &SelfState, actual: &NarrativeSelfModel) {
         let actual_state = SelfState::from_narrative_self(actual);
         self.predictor.update_with_outcome(predicted, &actual_state);
         self.stats.predictions_verified += 1;
@@ -760,7 +760,7 @@ impl PredictiveSelfModel {
     }
 
     /// Explore counterfactual: "What if I did X?"
-    pub fn what_if(&mut self, action: &str) -> CounterfactualResult {
+    pub(crate) fn what_if(&mut self, action: &str) -> CounterfactualResult {
         self.stats.counterfactuals_explored += 1;
         let result = self.counterfactuals.explore(action);
         if result.is_improvement {
@@ -770,39 +770,39 @@ impl PredictiveSelfModel {
     }
 
     /// Find best action from options
-    pub fn best_action(&mut self, options: &[&str]) -> Option<CounterfactualResult> {
+    pub(crate) fn best_action(&mut self, options: &[&str]) -> Option<CounterfactualResult> {
         self.counterfactuals.find_best(options)
     }
 
     /// Add an intention for the future
-    pub fn intend(&mut self, action: &str, goal: &str, trigger: &str, priority: f64) {
+    pub(crate) fn intend(&mut self, action: &str, goal: &str, trigger: &str, priority: f64) {
         self.prospective.intend(action, goal, trigger, priority);
         self.stats.intentions_created += 1;
     }
 
     /// Check for triggered intentions
-    pub fn check_intentions(&self, context: &str) -> Vec<&ProspectiveIntention> {
+    pub(crate) fn check_intentions(&self, context: &str) -> Vec<&ProspectiveIntention> {
         self.prospective.check_triggers(context)
     }
 
     /// Mark intention as completed
-    pub fn complete_intention(&mut self, action: &str) {
+    pub(crate) fn complete_intention(&mut self, action: &str) {
         self.prospective.complete(action);
         self.stats.intentions_completed += 1;
     }
 
     /// Get prediction confidence
-    pub fn confidence(&self) -> f64 {
+    pub(crate) fn confidence(&self) -> f64 {
         self.predictor.prediction_confidence()
     }
 
     /// Get regret for unexplored paths
-    pub fn regret(&self) -> f64 {
+    pub(crate) fn regret(&self) -> f64 {
         self.counterfactuals.compute_regret()
     }
 
     /// Get intention completion rate
-    pub fn intention_completion_rate(&self) -> f64 {
+    pub(crate) fn intention_completion_rate(&self) -> f64 {
         self.prospective.completion_rate()
     }
 
@@ -811,7 +811,7 @@ impl PredictiveSelfModel {
     // ========================================================================
 
     /// Learn from raw outcome values (for integration without full NarrativeSelfModel)
-    pub fn learn_from_outcome_raw(&mut self, actual_phi: f64, _actual_coherence: f64) {
+    pub(crate) fn learn_from_outcome_raw(&mut self, actual_phi: f64, _actual_coherence: f64) {
         // Get the most recent prediction to compare
         if let Some(last_state) = self.predictor.history.back() {
             let prediction_error = (last_state.self_phi - actual_phi).abs();
@@ -825,17 +825,17 @@ impl PredictiveSelfModel {
     }
 
     /// Get count of explored counterfactual scenarios
-    pub fn counterfactual_count(&self) -> usize {
+    pub(crate) fn counterfactual_count(&self) -> usize {
         self.counterfactuals.explored.len()
     }
 
     /// Get count of pending intentions in prospective memory
-    pub fn intention_count(&self) -> usize {
+    pub(crate) fn intention_count(&self) -> usize {
         self.prospective.intentions.len()
     }
 
     /// Check for triggered intentions and return count
-    pub fn check_triggers(&mut self, context: &str) -> usize {
+    pub(crate) fn check_triggers(&mut self, context: &str) -> usize {
         let triggered = self.prospective.check_triggers(context);
         triggered.len()
     }

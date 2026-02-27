@@ -593,7 +593,7 @@ impl HolographicBinder {
 
 /// Holographic consciousness analyzer
 #[derive(Debug, Clone)]
-pub struct HolographicConsciousnessAnalyzer {
+pub(crate) struct HolographicConsciousnessAnalyzer {
     /// Memory system
     memory: HolographicMemory,
 
@@ -631,7 +631,7 @@ pub struct HolographicAnalysis {
 
 impl HolographicConsciousnessAnalyzer {
     /// Create a new holographic consciousness analyzer
-    pub fn new(config: HolographicConfig) -> Self {
+    pub(crate) fn new(config: HolographicConfig) -> Self {
         Self {
             memory: HolographicMemory::new(config.clone()),
             binder: HolographicBinder::new(config.clone()),
@@ -641,7 +641,7 @@ impl HolographicConsciousnessAnalyzer {
     }
 
     /// Analyze the holographic state of consciousness
-    pub fn analyze(&mut self) -> HolographicAnalysis {
+    pub(crate) fn analyze(&mut self) -> HolographicAnalysis {
         let coherence = self.memory.coherence();
         let superposition_depth = self.memory.stats().superposition_depth;
         let recall_quality = self.memory.stats().avg_reconstruction_quality;
@@ -669,17 +669,17 @@ impl HolographicConsciousnessAnalyzer {
     }
 
     /// Store experience in holographic memory
-    pub fn encode_experience(&mut self, content: &[f64], label: &str) {
+    pub(crate) fn encode_experience(&mut self, content: &[f64], label: &str) {
         self.memory.store(content, label);
     }
 
     /// Recall experience from holographic memory
-    pub fn recall_experience(&mut self, cue: &[f64]) -> HolographicRecall {
+    pub(crate) fn recall_experience(&mut self, cue: &[f64]) -> HolographicRecall {
         self.memory.recall(cue)
     }
 
     /// Bind features into unified percept
-    pub fn bind_features(&mut self, features: &[(&str, &[f64])]) -> f64 {
+    pub(crate) fn bind_features(&mut self, features: &[(&str, &[f64])]) -> f64 {
         self.binder.bind(features)
     }
 

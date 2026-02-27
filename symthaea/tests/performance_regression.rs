@@ -308,3 +308,167 @@ fn regression_simd_hv16_size() {
         size
     );
 }
+
+// ============================================================================
+// COGNITIVE CYCLE TIMING - Regression guards for the main cognitive loop
+// ============================================================================
+
+/// Maximum acceptable cycle time (microseconds).
+/// Target is 20ms (50Hz), guard allows up to 50ms before failing.
+const MAX_CYCLE_US: u64 = 50_000;
+
+/// Cognitive cycle steady-state should stay below 50ms.
+///
+/// Baseline (2026-02-27): ~32ms warm steady-state (measured via criterion).
+/// Guard set at 50ms to catch catastrophic regressions while allowing
+/// normal variance from subsystem amortization spikes.
+#[test]
+fn regression_cognitive_cycle_steady_state() {
+    use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        async_training: false,
+        ..Default::default()
+    })
+    .expect("Failed to create CognitiveLoopService");
+
+    // Warm up to reach steady state
+    for _ in 0..20 {
+        let _ = service.cycle("warm up input for regression guard");
+    }
+
+    let inputs = [
+        "the sun rises in the east",
+        "cause and effect are linked",
+        "patterns emerge from chaos",
+        "consciousness arises from integration",
+        "temporal prediction drives learning",
+    ];
+
+    let start = Instant::now();
+    let measure_cycles = 100usize;
+    for i in 0..measure_cycles {
+        let _ = service.cycle(inputs[i % inputs.len()]);
+    }
+    let total_us = start.elapsed().as_micros() as u64;
+    let avg_us = total_us / measure_cycles as u64;
+
+    println!(
+        "\n=== Cognitive Cycle Regression ===\n  avg cycle = {}us ({:.1}Hz), budget = {}us ({:.1}Hz)\n",
+        avg_us,
+        1_000_000.0 / avg_us as f64,
+        MAX_CYCLE_US,
+        1_000_000.0 / MAX_CYCLE_US as f64,
+    );
+
+    assert!(
+        avg_us < MAX_CYCLE_US,
+        "PERFORMANCE REGRESSION: avg cycle time {}us exceeds budget {}us ({:.1}Hz < {:.1}Hz)",
+        avg_us,
+        MAX_CYCLE_US,
+        1_000_000.0 / avg_us as f64,
+        1_000_000.0 / MAX_CYCLE_US as f64,
+    );
+}
+
+/// Cold start should complete within 100ms (2x budget).
+#[test]
+fn regression_cognitive_cycle_cold_start() {
+    use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        async_training: false,
+        ..Default::default()
+    })
+    .expect("Failed to create CognitiveLoopService");
+
+    let start = Instant::now();
+    let _ = service.cycle("cold start performance check");
+    let cold_us = start.elapsed().as_micros() as u64;
+
+    let cold_budget = MAX_CYCLE_US * 2;
+
+    println!(
+        "\n=== Cold Start Regression ===\n  cold start: {}us (budget: {}us)\n",
+        cold_us, cold_budget,
+    );
+
+    assert!(
+        cold_us < cold_budget,
+        "COLD START REGRESSION: {}us exceeds {}us budget",
+        cold_us,
+        cold_budget,
+    );
+}
+
+/// Sustained 500-cycle p95 should stay below 75ms (1.5x budget).
+#[test]
+fn regression_cognitive_cycle_sustained_p95() {
+    use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        async_training: false,
+        ..Default::default()
+    })
+    .expect("Failed to create CognitiveLoopService");
+
+    for _ in 0..20 {
+        let _ = service.cycle("warmup");
+    }
+
+    let inputs = [
+        "alpha cognition",
+        "beta dynamics",
+        "gamma binding",
+        "delta sleep",
+        "epsilon exploration",
+    ];
+
+    let mut times_us = Vec::with_capacity(500);
+    for i in 0..500 {
+        let start = Instant::now();
+        let _ = service.cycle(inputs[i % inputs.len()]);
+        times_us.push(start.elapsed().as_micros() as u64);
+    }
+
+    times_us.sort();
+    let p50 = times_us[times_us.len() / 2];
+    let p95 = times_us[times_us.len() * 95 / 100];
+    let p99 = times_us[times_us.len() * 99 / 100];
+
+    println!(
+        "\n=== Sustained Throughput Regression ===\n  p50={}us p95={}us p99={}us\n",
+        p50, p95, p99,
+    );
+
+    let p95_budget = MAX_CYCLE_US * 3 / 2;
+    assert!(
+        p95 < p95_budget,
+        "SUSTAINED REGRESSION: p95 {}us exceeds {}us budget",
+        p95,
+        p95_budget,
+    );
+}
+
+/// Module timings should be populated after warm-up.
+#[test]
+fn regression_module_timings_populated() {
+    use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        async_training: false,
+        ..Default::default()
+    })
+    .expect("Failed to create CognitiveLoopService");
+
+    for _ in 0..50 {
+        let _ = service.cycle("timing check");
+    }
+
+    let result = service.cycle("final timing check");
+    let timings = &result.metadata.module_timings_us;
+
+    assert!(timings.core_hdc_encode > 0, "core_hdc_encode should be > 0");
+    assert!(timings.core_cfc_step > 0, "core_cfc_step should be > 0");
+    assert!(timings.core_predict > 0, "core_predict should be > 0");
+}

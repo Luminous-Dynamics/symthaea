@@ -136,7 +136,10 @@ mod prediction;
 pub(crate) mod consciousness_engine;
 pub(crate) mod ethics_engine;
 pub(crate) mod feedback_state;
+pub(crate) mod managers;
 pub(crate) mod neuromodulators;
+pub(crate) mod subsystem_trait;
+pub(crate) mod thresholds;
 pub(crate) mod virtual_body;
 
 #[cfg(feature = "humanoid")]
@@ -881,6 +884,42 @@ pub struct CognitiveLoopService {
     /// Subsystems clone this to report infrastructure errors.
     #[allow(dead_code)]
     pub(crate) pain_tx: Option<crate::infrastructure::somatic_error_bridge::PainSender>,
+
+    /// Subsystem output collector (Phase 2.3 staged computation model).
+    /// Collects SubsystemOutput proposals during Phase B (COMPUTE),
+    /// integrates them in Phase C for consensus-averaged state updates.
+    /// Currently in dual-write bridge mode alongside direct mutations.
+    subsystem_collector: subsystem_trait::OutputCollector,
+
+    /// Last cycle snapshot (Phase 2.3) for telemetry and debugging.
+    /// Built at the start of each cycle (Phase A: OBSERVE).
+    last_snapshot: Option<subsystem_trait::CycleSnapshot>,
+
+    /// Unified Consciousness Engine: wraps SpectralMIP + MultiModal + EquationV2 + Pipeline
+    /// into a single `measure()` call per cycle with co-prime interval scheduling.
+    /// Runs **alongside** existing inline code (additive wiring — old code not removed yet).
+    consciousness_engine: consciousness_engine::ConsciousnessEngine,
+
+    /// Unified Ethics Engine: wraps MoralParser + MoralAlgebra + ValueEvaluator + Harmonies
+    /// into a single `evaluate()` call per cycle with co-prime interval scheduling.
+    /// Runs **alongside** existing inline code (additive wiring — old code not removed yet).
+    ethics_engine: ethics_engine::EthicsEngine,
+
+    /// Drive Manager: consolidates curiosity, boredom, flow, and exploration drives.
+    /// Implements CognitiveSubsystem — proposals fed into OutputCollector.
+    drive_manager: managers::DriveManager,
+
+    /// Memory Manager: consolidation pressure, retrieval quality, episodic gating.
+    /// Implements CognitiveSubsystem — proposals fed into OutputCollector.
+    memory_manager: managers::MemoryManager,
+
+    /// Learning Manager: FEP plasticity, dream consolidation, error trend gating.
+    /// Implements CognitiveSubsystem — proposals fed into OutputCollector.
+    learning_manager: managers::LearningManager,
+
+    /// Perception Manager: attention budget, coherence tracking, Yerkes-Dodson regulation.
+    /// Implements CognitiveSubsystem — proposals fed into OutputCollector.
+    perception_manager: managers::PerceptionManager,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

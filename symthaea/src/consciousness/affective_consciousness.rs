@@ -245,8 +245,9 @@ impl EmotionCategory {
 ///
 /// Emotions are grounded as felt evaluations (FEEL + GOOD/BAD) with
 /// additional modifiers capturing arousal, agency, and social dimensions.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct EmotionPrimitiveGrounding {
+pub(crate) struct EmotionPrimitiveGrounding {
     /// The emotion category
     pub emotion: EmotionCategory,
     /// NSM primitives that define this emotion
@@ -261,9 +262,10 @@ pub struct EmotionPrimitiveGrounding {
     pub arousal: f32,
 }
 
+#[allow(dead_code)]
 impl EmotionPrimitiveGrounding {
     /// Create grounding for an emotion with given primitive system
-    pub fn new(emotion: EmotionCategory, primitives: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(emotion: EmotionCategory, primitives: &PrimitiveSystem) -> Self {
         let nsm_primitives = Self::primitives_for_emotion(&emotion);
         let primitive_encoding = Self::encode_primitives(&nsm_primitives, primitives);
         let core_affect = emotion.typical_affect();
@@ -437,15 +439,16 @@ impl EmotionPrimitiveGrounding {
     }
 
     /// Semantic similarity to another emotion grounding
-    pub fn similarity(&self, other: &Self) -> f64 {
+    pub(crate) fn similarity(&self, other: &Self) -> f64 {
         self.primitive_encoding
             .similarity(&other.primitive_encoding) as f64
     }
 }
 
 /// Unified NSM grounding system for affective consciousness
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct AffectiveNSMGrounding {
+pub(crate) struct AffectiveNSMGrounding {
     /// Grounding for each emotion category
     pub emotion_groundings: HashMap<EmotionCategory, EmotionPrimitiveGrounding>,
     /// Valence axis endpoints (negative to positive)
@@ -454,9 +457,10 @@ pub struct AffectiveNSMGrounding {
     pub arousal_axis: (BinaryHV, BinaryHV),
 }
 
+#[allow(dead_code)]
 impl AffectiveNSMGrounding {
     /// Create complete NSM grounding for affective consciousness
-    pub fn new(primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(primitive_system: &PrimitiveSystem) -> Self {
         let mut emotion_groundings = HashMap::new();
 
         for emotion in EmotionCategory::all() {
@@ -487,12 +491,12 @@ impl AffectiveNSMGrounding {
     }
 
     /// Get grounding for a specific emotion
-    pub fn grounding(&self, emotion: &EmotionCategory) -> Option<&EmotionPrimitiveGrounding> {
+    pub(crate) fn grounding(&self, emotion: &EmotionCategory) -> Option<&EmotionPrimitiveGrounding> {
         self.emotion_groundings.get(emotion)
     }
 
     /// Find emotions semantically similar to a query vector
-    pub fn find_similar(&self, query: &BinaryHV, threshold: f64) -> Vec<(&EmotionCategory, f64)> {
+    pub(crate) fn find_similar(&self, query: &BinaryHV, threshold: f64) -> Vec<(&EmotionCategory, f64)> {
         let mut similar: Vec<_> = self
             .emotion_groundings
             .iter()
@@ -505,7 +509,7 @@ impl AffectiveNSMGrounding {
     }
 
     /// Semantic distance between two emotions
-    pub fn semantic_distance(&self, e1: &EmotionCategory, e2: &EmotionCategory) -> f64 {
+    pub(crate) fn semantic_distance(&self, e1: &EmotionCategory, e2: &EmotionCategory) -> f64 {
         match (self.grounding(e1), self.grounding(e2)) {
             (Some(g1), Some(g2)) => 1.0 - g1.similarity(g2),
             _ => 1.0,
@@ -513,14 +517,14 @@ impl AffectiveNSMGrounding {
     }
 
     /// Project a vector onto the valence dimension
-    pub fn valence_projection(&self, vector: &BinaryHV) -> f64 {
+    pub(crate) fn valence_projection(&self, vector: &BinaryHV) -> f64 {
         let neg_sim = vector.similarity(&self.valence_axis.0) as f64;
         let pos_sim = vector.similarity(&self.valence_axis.1) as f64;
         (pos_sim - neg_sim) / 2.0 // Range: -0.5 to 0.5, normalized
     }
 
     /// Project a vector onto the arousal dimension
-    pub fn arousal_projection(&self, vector: &BinaryHV) -> f64 {
+    pub(crate) fn arousal_projection(&self, vector: &BinaryHV) -> f64 {
         let low_sim = vector.similarity(&self.arousal_axis.0) as f64;
         let high_sim = vector.similarity(&self.arousal_axis.1) as f64;
         (high_sim - low_sim + 1.0) / 2.0 // Range: 0 to 1

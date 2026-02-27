@@ -91,6 +91,9 @@ pub struct MindState {
     /// Mesh network telemetry snapshot (only available with `mesh` feature).
     #[cfg(feature = "mesh")]
     pub mesh_telemetry: Option<crate::swarm::mesh::MeshTelemetry>,
+    /// Liquid-Mamba semantic prediction error (injected by facade after translation).
+    #[cfg(feature = "liquid-mamba")]
+    pub liquid_mamba_pe: f32,
 }
 
 impl Default for MindState {
@@ -120,6 +123,8 @@ impl Default for MindState {
             is_dreaming: false,
             #[cfg(feature = "mesh")]
             mesh_telemetry: None,
+            #[cfg(feature = "liquid-mamba")]
+            liquid_mamba_pe: 0.0,
         }
     }
 }

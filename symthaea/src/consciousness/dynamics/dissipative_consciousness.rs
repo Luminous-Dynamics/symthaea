@@ -48,7 +48,7 @@ fn instant_now() -> Instant {
 /// Models consciousness as a far-from-equilibrium dissipative structure
 /// that maintains itself through continuous information flow and entropy export.
 #[derive(Debug)]
-pub struct DissipativeConsciousness {
+pub(crate) struct DissipativeConsciousness {
     /// Current entropy production rate (bits/second)
     pub entropy_production_rate: f64,
 
@@ -196,12 +196,12 @@ pub enum ThermodynamicRegime {
 
 impl DissipativeConsciousness {
     /// Create a new dissipative consciousness analyzer
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::with_config(DissipativeConfig::default())
     }
 
     /// Create with custom configuration
-    pub fn with_config(config: DissipativeConfig) -> Self {
+    pub(crate) fn with_config(config: DissipativeConfig) -> Self {
         Self {
             entropy_production_rate: 0.0,
             criticality_distance: 1.0, // Start far from criticality
@@ -222,7 +222,7 @@ impl DissipativeConsciousness {
     /// * `energy_consumption` - Current computational energy use
     /// * `information_processed` - Bits processed per time unit
     /// * `coherence` - Current neural coherence measure
-    pub fn update(
+    pub(crate) fn update(
         &mut self,
         phi: f64,
         energy_consumption: f64,
@@ -399,17 +399,17 @@ impl DissipativeConsciousness {
     }
 
     /// Check if system is at/near criticality (edge of chaos)
-    pub fn is_critical(&self) -> bool {
+    pub(crate) fn is_critical(&self) -> bool {
         self.criticality_distance < self.config.criticality_threshold
     }
 
     /// Check if system is "alive" (sufficient entropy production)
-    pub fn is_alive(&self) -> bool {
+    pub(crate) fn is_alive(&self) -> bool {
         self.entropy_production_rate > self.config.min_entropy_production
     }
 
     /// Get current thermodynamic regime
-    pub fn current_regime(&self) -> ThermodynamicRegime {
+    pub(crate) fn current_regime(&self) -> ThermodynamicRegime {
         let lambda = self.lambda_parameter;
         let entropy = self.entropy_production_rate;
 
@@ -433,7 +433,7 @@ impl DissipativeConsciousness {
     /// - Moderate entropy production (not too low, not too high)
     /// - Good dissipation efficiency
     /// - Stable (few bifurcations)
-    pub fn health_score(&self) -> f64 {
+    pub(crate) fn health_score(&self) -> f64 {
         // Distance from optimal λ (penalty)
         let lambda_score = 1.0
             - (self.lambda_parameter - self.config.target_lambda)
@@ -470,7 +470,7 @@ impl DissipativeConsciousness {
     }
 
     /// Get recommended action to improve dissipative health
-    pub fn recommend_action(&self) -> DissipativeAction {
+    pub(crate) fn recommend_action(&self) -> DissipativeAction {
         let regime = self.current_regime();
         let health = self.health_score();
 
@@ -503,7 +503,7 @@ impl DissipativeConsciousness {
     }
 
     /// Get current state summary
-    pub fn summary(&self) -> DissipativeSummary {
+    pub(crate) fn summary(&self) -> DissipativeSummary {
         DissipativeSummary {
             regime: self.current_regime(),
             lambda_parameter: self.lambda_parameter,

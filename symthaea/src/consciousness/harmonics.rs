@@ -49,7 +49,7 @@ use std::fmt;
 /// - SacredReciprocity: generous flow → DO + GIVE + OTHER + GOOD + WANT
 /// - EvolutionaryProgression: wise becoming → BECOME + MORE + GOOD + AFTER + CHANGE
 #[derive(Debug, Clone)]
-pub struct FiduciaryHarmonicPrimitiveGrounding {
+pub(crate) struct FiduciaryHarmonicPrimitiveGrounding {
     /// The harmonic being grounded
     pub harmonic: FiduciaryHarmonic,
 
@@ -71,7 +71,7 @@ pub struct FiduciaryHarmonicPrimitiveGrounding {
 
 impl FiduciaryHarmonicPrimitiveGrounding {
     /// Get NSM grounding for a specific fiduciary harmonic
-    pub fn for_harmonic(harmonic: FiduciaryHarmonic, primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn for_harmonic(harmonic: FiduciaryHarmonic, primitive_system: &PrimitiveSystem) -> Self {
         let (primitives, love, unity, growth) = match harmonic {
             // Resonant Coherence: luminous order, harmonious integration
             FiduciaryHarmonic::ResonantCoherence => (
@@ -160,7 +160,7 @@ impl FiduciaryHarmonicPrimitiveGrounding {
     }
 
     /// Get all fiduciary harmonic groundings
-    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<FiduciaryHarmonic, Self> {
+    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<FiduciaryHarmonic, Self> {
         FiduciaryHarmonic::all()
             .into_iter()
             .map(|h| (h, Self::for_harmonic(h, primitive_system)))
@@ -168,18 +168,18 @@ impl FiduciaryHarmonicPrimitiveGrounding {
     }
 
     /// Semantic formula representation
-    pub fn semantic_formula(&self) -> String {
+    pub(crate) fn semantic_formula(&self) -> String {
         self.nsm_primitives.join(" + ")
     }
 
     /// Calculate similarity between two harmonics
-    pub fn similarity(&self, other: &Self) -> f32 {
+    pub(crate) fn similarity(&self, other: &Self) -> f32 {
         self.primitive_encoding
             .similarity(&other.primitive_encoding)
     }
 
     /// Get the Infinite Love resonance score (meta-principle binding all harmonics)
-    pub fn infinite_love_score(&self) -> f32 {
+    pub(crate) fn infinite_love_score(&self) -> f32 {
         // Infinite Love = Love × Unity × Growth (geometric mean-ish)
         (self.love_dimension * self.unity_dimension * self.growth_dimension).powf(1.0 / 3.0)
     }
@@ -197,7 +197,7 @@ impl FiduciaryHarmonicPrimitiveGrounding {
 /// - RestoreBoundaries: protect self → I + NOT + OTHER + NEAR + DO
 /// - HierarchicalBalance: order by priority → ALL + SAME + PART + BIG + SMALL
 #[derive(Debug, Clone)]
-pub struct ResolutionStrategyPrimitiveGrounding {
+pub(crate) struct ResolutionStrategyPrimitiveGrounding {
     /// The resolution strategy being grounded
     pub strategy: ResolutionStrategyType,
 
@@ -226,7 +226,7 @@ pub enum ResolutionStrategyType {
 
 impl ResolutionStrategyPrimitiveGrounding {
     /// Get NSM grounding for a specific resolution strategy
-    pub fn for_strategy(
+    pub(crate) fn for_strategy(
         strategy: ResolutionStrategyType,
         primitive_system: &PrimitiveSystem,
     ) -> Self {
@@ -288,7 +288,7 @@ impl ResolutionStrategyPrimitiveGrounding {
     }
 
     /// Get all resolution strategy groundings
-    pub fn all_groundings(
+    pub(crate) fn all_groundings(
         primitive_system: &PrimitiveSystem,
     ) -> HashMap<ResolutionStrategyType, Self> {
         [
@@ -304,7 +304,7 @@ impl ResolutionStrategyPrimitiveGrounding {
     }
 
     /// Semantic formula representation
-    pub fn semantic_formula(&self) -> String {
+    pub(crate) fn semantic_formula(&self) -> String {
         self.nsm_primitives.join(" + ")
     }
 }
@@ -314,7 +314,7 @@ impl ResolutionStrategyPrimitiveGrounding {
 /// Provides access to all harmonic concept groundings for
 /// cross-domain semantic reasoning about consciousness values.
 #[derive(Debug, Clone)]
-pub struct HarmonicsNSMGrounding {
+pub(crate) struct HarmonicsNSMGrounding {
     /// Fiduciary harmonic groundings
     pub harmonics: HashMap<FiduciaryHarmonic, FiduciaryHarmonicPrimitiveGrounding>,
 
@@ -324,7 +324,7 @@ pub struct HarmonicsNSMGrounding {
 
 impl HarmonicsNSMGrounding {
     /// Create complete harmonics NSM grounding system
-    pub fn new(primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(primitive_system: &PrimitiveSystem) -> Self {
         Self {
             harmonics: FiduciaryHarmonicPrimitiveGrounding::all_groundings(primitive_system),
             strategies: ResolutionStrategyPrimitiveGrounding::all_groundings(primitive_system),
@@ -332,12 +332,12 @@ impl HarmonicsNSMGrounding {
     }
 
     /// Get total number of grounded concepts
-    pub fn concept_count(&self) -> usize {
+    pub(crate) fn concept_count(&self) -> usize {
         self.harmonics.len() + self.strategies.len()
     }
 
     /// Describe a harmonic semantically
-    pub fn describe_harmonic(&self, harmonic: FiduciaryHarmonic) -> String {
+    pub(crate) fn describe_harmonic(&self, harmonic: FiduciaryHarmonic) -> String {
         self.harmonics
             .get(&harmonic)
             .map(|g| format!("{}[{}]", harmonic.name(), g.semantic_formula()))
@@ -345,7 +345,7 @@ impl HarmonicsNSMGrounding {
     }
 
     /// Calculate Infinite Love resonance across all harmonics
-    pub fn infinite_love_resonance(&self) -> f32 {
+    pub(crate) fn infinite_love_resonance(&self) -> f32 {
         let scores: Vec<f32> = self
             .harmonics
             .values()

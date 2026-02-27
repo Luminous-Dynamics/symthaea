@@ -92,7 +92,7 @@ impl DriveType {
 /// - Relatedness = WANT + WITH + SOMEONE + GOOD (wanting good connection)
 /// - Homeostasis = WANT + STAY + SAME + GOOD (wanting to maintain good state)
 #[derive(Debug, Clone)]
-pub struct DrivePrimitiveGrounding {
+pub(crate) struct DrivePrimitiveGrounding {
     /// NSM primitives that compose this drive
     pub nsm_primitives: Vec<String>,
     /// Binary BinaryHV encoding from primitives
@@ -105,7 +105,7 @@ pub struct DrivePrimitiveGrounding {
 
 impl DrivePrimitiveGrounding {
     /// Create drive grounding from NSM primitive names
-    pub fn from_primitives(primitives: &[&str], base_strength: f32, valence: f32) -> Self {
+    pub(crate) fn from_primitives(primitives: &[&str], base_strength: f32, valence: f32) -> Self {
         let system = PrimitiveSystem::global();
 
         // Compose drive encoding by binding primitives together
@@ -142,7 +142,7 @@ impl DrivePrimitiveGrounding {
     ///
     /// - **Homeostasis**: The drive to maintain optimal states
     ///   = NSM_WANT + NSM_STAY + NSM_SAME + NSM_GOOD (want to stay the same when good)
-    pub fn for_drive(drive_type: DriveType) -> Self {
+    pub(crate) fn for_drive(drive_type: DriveType) -> Self {
         match drive_type {
             DriveType::Curiosity => Self::from_primitives(
                 &["NSM_WANT", "NSM_KNOW", "NSM_NOT", "NSM_MAYBE"],
@@ -173,7 +173,7 @@ impl DrivePrimitiveGrounding {
     }
 
     /// Get all drive groundings
-    pub fn all_drive_groundings() -> HashMap<DriveType, DrivePrimitiveGrounding> {
+    pub(crate) fn all_drive_groundings() -> HashMap<DriveType, DrivePrimitiveGrounding> {
         let mut groundings = HashMap::new();
         for drive in DriveType::all() {
             groundings.insert(drive, Self::for_drive(drive));
@@ -182,7 +182,7 @@ impl DrivePrimitiveGrounding {
     }
 
     /// Calculate similarity between two drives using primitive encodings
-    pub fn drive_similarity(drive1: DriveType, drive2: DriveType) -> f32 {
+    pub(crate) fn drive_similarity(drive1: DriveType, drive2: DriveType) -> f32 {
         let g1 = Self::for_drive(drive1);
         let g2 = Self::for_drive(drive2);
         g1.primitive_encoding.similarity(&g2.primitive_encoding)
@@ -192,7 +192,7 @@ impl DrivePrimitiveGrounding {
     ///
     /// Combines the base strength with the current satisfaction to get
     /// a primitive-weighted tension value.
-    pub fn grounded_tension(&self, satisfaction: f64) -> f64 {
+    pub(crate) fn grounded_tension(&self, satisfaction: f64) -> f64 {
         let tension = 1.0 - satisfaction;
         tension * self.base_strength as f64
     }

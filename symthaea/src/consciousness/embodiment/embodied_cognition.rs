@@ -1042,7 +1042,7 @@ pub struct EmbodimentSummary {
 
 /// NSM grounding for body parts - spatial/functional semantic primitives
 #[derive(Debug, Clone)]
-pub struct BodyPartPrimitiveGrounding {
+pub(crate) struct BodyPartPrimitiveGrounding {
     /// The body part being grounded
     pub body_part: BodyPart,
     /// NSM primitive composition (e.g., ["BODY", "PART", "SEE", "KNOW"])
@@ -1056,7 +1056,7 @@ pub struct BodyPartPrimitiveGrounding {
 }
 
 impl BodyPartPrimitiveGrounding {
-    pub fn new(body_part: BodyPart, system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(body_part: BodyPart, system: &PrimitiveSystem) -> Self {
         let (primitives, agency, sensory) = Self::nsm_mapping(body_part);
         let encoding = encode_primitives(&primitives, system);
 
@@ -1175,7 +1175,7 @@ impl BodyPartPrimitiveGrounding {
 
 /// NSM grounding for movement types - action semantic primitives
 #[derive(Debug, Clone)]
-pub struct MovementTypePrimitiveGrounding {
+pub(crate) struct MovementTypePrimitiveGrounding {
     /// The movement type being grounded
     pub movement_type: MovementType,
     /// NSM primitive composition
@@ -1189,7 +1189,7 @@ pub struct MovementTypePrimitiveGrounding {
 }
 
 impl MovementTypePrimitiveGrounding {
-    pub fn new(movement_type: MovementType, system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(movement_type: MovementType, system: &PrimitiveSystem) -> Self {
         let (primitives, requires_obj, self_dir) = Self::nsm_mapping(movement_type);
         let encoding = encode_primitives(&primitives, system);
 
@@ -1281,7 +1281,7 @@ impl MovementTypePrimitiveGrounding {
 
 /// Unified NSM grounding system for embodied cognition
 #[derive(Debug)]
-pub struct EmbodiedNSMGrounding {
+pub(crate) struct EmbodiedNSMGrounding {
     /// Body part groundings indexed by part
     pub body_parts: HashMap<BodyPart, BodyPartPrimitiveGrounding>,
     /// Movement type groundings indexed by type
@@ -1290,7 +1290,7 @@ pub struct EmbodiedNSMGrounding {
 
 impl EmbodiedNSMGrounding {
     /// Create complete grounding system from primitive system
-    pub fn new(system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(system: &PrimitiveSystem) -> Self {
         let mut body_parts = HashMap::new();
         let mut movements = HashMap::new();
 
@@ -1325,7 +1325,7 @@ impl EmbodiedNSMGrounding {
     }
 
     /// Find body parts by semantic similarity to query vector
-    pub fn query_body_parts(&self, query: &BinaryHV, threshold: f32) -> Vec<(&BodyPart, f32)> {
+    pub(crate) fn query_body_parts(&self, query: &BinaryHV, threshold: f32) -> Vec<(&BodyPart, f32)> {
         let mut results: Vec<_> = self
             .body_parts
             .iter()
@@ -1337,7 +1337,7 @@ impl EmbodiedNSMGrounding {
     }
 
     /// Find movements by semantic similarity to query vector
-    pub fn query_movements(&self, query: &BinaryHV, threshold: f32) -> Vec<(&MovementType, f32)> {
+    pub(crate) fn query_movements(&self, query: &BinaryHV, threshold: f32) -> Vec<(&MovementType, f32)> {
         let mut results: Vec<_> = self
             .movements
             .iter()
@@ -1349,7 +1349,7 @@ impl EmbodiedNSMGrounding {
     }
 
     /// Get agency-related body parts
-    pub fn agency_parts(&self) -> Vec<&BodyPart> {
+    pub(crate) fn agency_parts(&self) -> Vec<&BodyPart> {
         self.body_parts
             .iter()
             .filter(|(_, g)| g.agency_locus)
@@ -1358,7 +1358,7 @@ impl EmbodiedNSMGrounding {
     }
 
     /// Get sensory body parts
-    pub fn sensory_parts(&self) -> Vec<&BodyPart> {
+    pub(crate) fn sensory_parts(&self) -> Vec<&BodyPart> {
         self.body_parts
             .iter()
             .filter(|(_, g)| g.sensory_organ)
@@ -1367,7 +1367,7 @@ impl EmbodiedNSMGrounding {
     }
 
     /// Get object-directed movements
-    pub fn object_movements(&self) -> Vec<&MovementType> {
+    pub(crate) fn object_movements(&self) -> Vec<&MovementType> {
         self.movements
             .iter()
             .filter(|(_, g)| g.requires_object)
@@ -1376,7 +1376,7 @@ impl EmbodiedNSMGrounding {
     }
 
     /// Get self-directed movements
-    pub fn self_movements(&self) -> Vec<&MovementType> {
+    pub(crate) fn self_movements(&self) -> Vec<&MovementType> {
         self.movements
             .iter()
             .filter(|(_, g)| g.self_directed)

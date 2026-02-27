@@ -99,6 +99,10 @@ pub trait LLMBackend: Send + Sync {
         false
     }
 
+    /// Pass FEP learning signal to modulate distillation LR (no-op for non-L-SSM backends).
+    #[cfg(feature = "liquid-mamba")]
+    fn set_fep_modulation(&self, _fep_signal: f32) {}
+
     /// Get the backend name for logging.
     fn name(&self) -> &str;
 }

@@ -621,8 +621,9 @@ pub struct CausalSummary {
 // ==============================================================================
 
 /// NSM grounding for causal mechanisms - how effects occur
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct CausalMechanismPrimitiveGrounding {
+pub(crate) struct CausalMechanismPrimitiveGrounding {
     /// The mechanism being grounded
     pub mechanism_type: String,
     /// NSM primitive composition
@@ -633,8 +634,9 @@ pub struct CausalMechanismPrimitiveGrounding {
     pub polarity: i8,
 }
 
+#[allow(dead_code)]
 impl CausalMechanismPrimitiveGrounding {
-    pub fn for_mechanism(mechanism: &CausalMechanism, system: &PrimitiveSystem) -> Self {
+    pub(crate) fn for_mechanism(mechanism: &CausalMechanism, system: &PrimitiveSystem) -> Self {
         let (name, primitives, polarity) = Self::nsm_mapping(mechanism);
         let encoding = encode_primitives(&primitives, system);
 
@@ -719,8 +721,9 @@ impl CausalMechanismPrimitiveGrounding {
 }
 
 /// NSM grounding for causal interaction types
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct InteractionTypePrimitiveGrounding {
+pub(crate) struct InteractionTypePrimitiveGrounding {
     /// The interaction type being grounded
     pub interaction_type: InteractionType,
     /// NSM primitive composition
@@ -731,8 +734,9 @@ pub struct InteractionTypePrimitiveGrounding {
     pub effect_direction: i8,
 }
 
+#[allow(dead_code)]
 impl InteractionTypePrimitiveGrounding {
-    pub fn new(interaction_type: InteractionType, system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(interaction_type: InteractionType, system: &PrimitiveSystem) -> Self {
         let (primitives, direction) = Self::nsm_mapping(interaction_type);
         let encoding = encode_primitives(&primitives, system);
 
@@ -777,15 +781,17 @@ impl InteractionTypePrimitiveGrounding {
 }
 
 /// Unified NSM grounding system for causal explanations
+#[allow(dead_code)]
 #[derive(Debug)]
-pub struct CausalNSMGrounding {
+pub(crate) struct CausalNSMGrounding {
     /// Interaction type groundings
     pub interactions: HashMap<InteractionType, InteractionTypePrimitiveGrounding>,
 }
 
+#[allow(dead_code)]
 impl CausalNSMGrounding {
     /// Create grounding system from primitive system
-    pub fn new(system: &PrimitiveSystem) -> Self {
+    pub(crate) fn new(system: &PrimitiveSystem) -> Self {
         let mut interactions = HashMap::new();
 
         for interaction in &[
@@ -803,7 +809,7 @@ impl CausalNSMGrounding {
     }
 
     /// Get grounding for a specific causal mechanism
-    pub fn ground_mechanism(
+    pub(crate) fn ground_mechanism(
         &self,
         mechanism: &CausalMechanism,
         system: &PrimitiveSystem,
@@ -812,7 +818,7 @@ impl CausalNSMGrounding {
     }
 
     /// Query interactions by semantic similarity
-    pub fn query_interactions(
+    pub(crate) fn query_interactions(
         &self,
         query: &BinaryHV,
         threshold: f32,
@@ -828,7 +834,7 @@ impl CausalNSMGrounding {
     }
 
     /// Get amplifying interactions (synergistic)
-    pub fn amplifying_interactions(&self) -> Vec<&InteractionType> {
+    pub(crate) fn amplifying_interactions(&self) -> Vec<&InteractionType> {
         self.interactions
             .iter()
             .filter(|(_, g)| g.effect_direction > 0)
@@ -837,7 +843,7 @@ impl CausalNSMGrounding {
     }
 
     /// Get dampening interactions (antagonistic)
-    pub fn dampening_interactions(&self) -> Vec<&InteractionType> {
+    pub(crate) fn dampening_interactions(&self) -> Vec<&InteractionType> {
         self.interactions
             .iter()
             .filter(|(_, g)| g.effect_direction < 0)
@@ -847,6 +853,7 @@ impl CausalNSMGrounding {
 }
 
 /// Encode NSM primitives into HDC vector via sequential binding
+#[allow(dead_code)]
 fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryHV {
     let vectors: Vec<BinaryHV> = primitives
         .iter()

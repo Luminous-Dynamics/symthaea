@@ -43,5 +43,5 @@ pub use analyzer::*;
 pub use config::*;
 pub use critical::*;
 pub use free_energy::*;
-pub use grounding::*;
+pub(crate) use grounding::*;
 pub use state::*;

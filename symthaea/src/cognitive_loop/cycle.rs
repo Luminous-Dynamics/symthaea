@@ -14,26 +14,17 @@ use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
 use super::helpers::{DreamPhaseResult, EpisodicReplayResult, ResonatorCodebookResult};
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Tuning Constants: centralized for sweep-ability and self-documentation
+// Tuning constants: all values live in `thresholds.rs` with scientific citations.
+// See `super::thresholds` for the centralized registry.
 // ═══════════════════════════════════════════════════════════════════════════════
-
-// -- Amortization strategy --
-// Subsystem intervals use co-prime (prime) values to prevent processing pileups.
-// Old round-number intervals (10, 20, 50, 100, …) all aligned at LCM boundaries
-// (e.g., cycle 100 fired ~15 subsystems simultaneously). Prime intervals ensure
-// at most 2 subsystems coincide on any given cycle.
-//   5→7, 10→11, 15→13, 20→19, 25→23, 50→47, 100→97, 200→199, 1000→997
-
-// -- Moral evaluation (constants used only in cycle.rs; others moved to helpers.rs) --
-const MORAL_CONCERN_THRESHOLD: f32 = -0.3; // score below this triggers concern
-const MORAL_BENEFIT_THRESHOLD: f32 = 0.5; // score above this boosts confidence
-const MORAL_CONCERN_EXPLORATION_DAMPEN: f32 = 0.5; // reduce exploration on moral concern
-const MORAL_CONCERN_PAUSE_BOOST: f32 = 1.5; // slow down on moral concern
-const MORAL_BENEFIT_CONFIDENCE_BOOST: f32 = 1.05; // confidence nudge for positive morality
-
-// -- Surprise & exploration --
-const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5; // coherence above this boosts exploration
-const QUANTUM_COHERENCE_BOOST_SCALE: f32 = 0.2; // strength of coherence → exploration
+use super::thresholds::{
+    // Moral evaluation
+    MORAL_CONCERN_THRESHOLD, MORAL_BENEFIT_THRESHOLD,
+    MORAL_CONCERN_EXPLORATION_DAMPEN, MORAL_CONCERN_PAUSE_BOOST,
+    MORAL_BENEFIT_CONFIDENCE_BOOST,
+    // Surprise & exploration
+    QUANTUM_COHERENCE_THRESHOLD, QUANTUM_COHERENCE_BOOST_SCALE,
+};
 
 // ═══════════════════════════════════════════════════════════════════
 // Ψ (PSI) SYNTHESIS — Consciousness Estimate
@@ -51,40 +42,23 @@ const QUANTUM_COHERENCE_BOOST_SCALE: f32 = 0.2; // strength of coherence → exp
 // For actual integrated information, use PhiEngine or true_phi.
 // ═══════════════════════════════════════════════════════════════════
 
-// -- FEP tuning --
-const FEP_SURPRISE_SCALE: f32 = 3.0; // free-energy divisor for surprise boost
-const FEP_LR_DECAY: f32 = 0.95; // boost decay rate when not surprised
-
-// -- Dominance estimation --
-const DOMINANCE_FLOW_BASE: f64 = 0.6;
-const DOMINANCE_FLOW_SCALE: f64 = 0.2;
-const DOMINANCE_CONFIDENT: f64 = 0.4;
-const DOMINANCE_DEFAULT: f64 = 0.2;
-
-// -- Resonance tau modulation --
-const RESONANCE_TAU_CENTER: f64 = 0.5; // neutral frequency
-const RESONANCE_TAU_SCALE: f32 = 0.1; // ±5% CfC time-step modulation
-
-// -- Policy agreement (KL gate) --
-const POLICY_SOFT_THRESHOLD: f64 = 0.2; // FEP prob to accept MCTS choice
-const POLICY_FULL_AGREEMENT_BOOST: f32 = 1.2; // confidence boost on full agreement
-const POLICY_WINDOW_SIZE: usize = 20; // agreement tracking window
-const POLICY_MIN_WINDOW: usize = 5; // minimum samples for temp adaptation
-const POLICY_TEMP_BASE: f64 = 0.5; // min softmax temperature
-const POLICY_TEMP_RANGE: f64 = 1.5; // temperature range [0.5, 2.0]
-
-// -- GWT / broadcast --
-pub(super) const GWT_BROADCAST_CONFIDENCE_BOOST: f32 = 0.03;
-
-// -- Attention budget --
-const ATTENTION_BUDGET_US: u64 = 50_000; // 50ms budget (~20Hz target)
-
-// -- MCE consciousness --
-pub(super) const MCE_LR_BOOST_SCALE: f32 = 0.1; // up to +10% LR from consciousness
-pub(super) const MCE_BOOST_DECAY: f32 = 0.9; // decay when MCE doesn't fire
+use super::thresholds::{
+    // FEP tuning
+    FEP_SURPRISE_SCALE, FEP_LR_DECAY,
+    // Dominance estimation
+    DOMINANCE_FLOW_BASE, DOMINANCE_FLOW_SCALE, DOMINANCE_CONFIDENT, DOMINANCE_DEFAULT,
+    // Resonance tau modulation
+    RESONANCE_TAU_CENTER, RESONANCE_TAU_SCALE,
+    // Policy agreement (KL gate)
+    POLICY_SOFT_THRESHOLD, POLICY_FULL_AGREEMENT_BOOST,
+    POLICY_WINDOW_SIZE, POLICY_MIN_WINDOW, POLICY_TEMP_BASE, POLICY_TEMP_RANGE,
+    // Attention budget
+    ATTENTION_BUDGET_US,
+    // Memory
+    MEMORY_RECALL_TOP_K,
+};
 
 use super::helpers;
-use super::helpers::MEMORY_RECALL_TOP_K;
 use super::temporal_network::TemporalNetwork;
 use super::training::TrainingSample;
 use super::{
@@ -114,7 +88,7 @@ impl CognitiveLoopService {
         // Science: Hopfield (1982) — recurrent networks require settling time before
         // producing reliable dynamics. During warmup (cycles 0–50), suppress learning
         // rate and curiosity to prevent cementing transient noise as learned patterns.
-        let startup_warmup_cycles = 50usize;
+        let startup_warmup_cycles = super::thresholds::STARTUP_WARMUP_CYCLES;
         let startup_suppressed = self.stats.total_cycles <= startup_warmup_cycles;
         let startup_warmup_progress = if startup_suppressed {
             self.stats.total_cycles as f32 / startup_warmup_cycles as f32
@@ -138,10 +112,12 @@ impl CognitiveLoopService {
 
         // ── Phase 2.2: Begin feedback proposal collection for this cycle ────
         self.feedback_state.begin_cycle();
+        // ── Phase 2.3: Clear subsystem output collector ────
+        self.subsystem_collector.clear();
 
         // Chronobiology: refresh biorhythm every 97 cycles (co-prime amortization)
         self.biorhythm_refresh_counter += 1;
-        if self.biorhythm_refresh_counter >= 97 {
+        if self.biorhythm_refresh_counter >= super::thresholds::BIORHYTHM_INTERVAL {
             self.biorhythm = crate::chronobiology::Biorhythm::current();
             self.neuromodulator_bath.modulate_circadian(self.biorhythm.phase);
             // Record personality profile for drift detection
@@ -379,7 +355,7 @@ impl CognitiveLoopService {
 
         // ── Phase 21: Codebook diversity → memoization threshold adaptation ─
         // Science: Low codebook diversity needs more novel inputs; high diversity can consolidate
-        let base_memo_threshold = 0.95_f32;
+        let base_memo_threshold = super::thresholds::INPUT_MEMO_THRESHOLD;
         let diversity = self.stats.codebook_diversity;
         let memo_threshold = if diversity < 0.4 && diversity > 0.0 {
             let t = (base_memo_threshold - (0.4 - diversity) * 0.1).max(0.88);
@@ -410,6 +386,20 @@ impl CognitiveLoopService {
             };
         // Store current compressed_state for next cycle comparison
         self.carryover.history.last_compressed_state = Some(compressed_state.clone());
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // UNIFIED ETHICS ENGINE — additive telemetry (runs alongside inline moral code)
+        // Pipeline: moral parse → value gate → harmonies → unified verdict
+        // ═══════════════════════════════════════════════════════════════════════
+        let ethics_output = self.ethics_engine.evaluate(
+            &super::ethics_engine::EthicsEngineInput {
+                input,
+                cycle: self.stats.total_cycles as u64,
+                unified_psi: self.stats.unified_psi as f64, // use previous cycle's Ψ
+                compressed_state: &compressed_state,
+            },
+        );
+        module_timings.ethics_engine = ethics_output.total_us;
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1.2 Adaptive Learning Threshold + Urgency
@@ -616,6 +606,69 @@ impl CognitiveLoopService {
         }
         self.stats.avg_mode_stability = self.stats.avg_mode_stability * 0.9
             + self.carryover.urgency.mode_stability_counter as f32 * 0.1;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PHASE A: OBSERVE — Build immutable CycleSnapshot (Phase 2.3)
+        // ═══════════════════════════════════════════════════════════════════════
+        // Captures all observable state BEFORE subsystems begin computing.
+        // This snapshot is passed to subsystems implementing CognitiveSubsystem.
+        // Currently used for telemetry; will become the sole input to all
+        // subsystems once the staged computation model is fully adopted.
+        let cycle_snapshot = super::subsystem_trait::CycleSnapshot::build(
+            self.stats.total_cycles as u64,
+            self.prediction_confidence,
+            self.fep_lr_boost,
+            prediction_error,
+            self.coherence_bridge.smoothed_coherence(),
+            self.stats.unified_psi as f64,
+            phi_attention_weight,
+            self.emotion_contagion.arousal,
+            self.emotion_contagion.valence,
+            self.thermodynamic_load,
+            self.carryover.quality.last_dissipative_health,
+            self.somatic_bridge.systemic_stress(),
+            urgency,
+            false, // attention_budget_exceeded not yet known at this point
+            &compressed_state,
+            &hv16_cached,
+            &self.carryover.consciousness,
+            &self.carryover.quality,
+        );
+        self.last_snapshot = Some(cycle_snapshot);
+
+        // ── Phase B: COMPUTE — Run managers via CognitiveSubsystem trait ──
+        // Each manager reads the immutable CycleSnapshot and proposes state changes.
+        {
+            use super::subsystem_trait::CognitiveSubsystem;
+            if let Some(ref snapshot) = self.last_snapshot {
+                let urgency_u8 = snapshot.urgency;
+                let cycle_num = snapshot.cycle_number;
+
+                // DriveManager (interval 7, co-prime)
+                if self.drive_manager.should_run(cycle_num, urgency_u8) {
+                    let drive_output = self.drive_manager.process(snapshot);
+                    self.subsystem_collector.record("drive_manager", drive_output);
+                }
+
+                // MemoryManager (interval 11, co-prime)
+                if self.memory_manager.should_run(cycle_num, urgency_u8) {
+                    let memory_output = self.memory_manager.process(snapshot);
+                    self.subsystem_collector.record("memory_manager", memory_output);
+                }
+
+                // LearningManager (interval 13, co-prime)
+                if self.learning_manager.should_run(cycle_num, urgency_u8) {
+                    let learning_output = self.learning_manager.process(snapshot);
+                    self.subsystem_collector.record("learning_manager", learning_output);
+                }
+
+                // PerceptionManager (interval 19, co-prime)
+                if self.perception_manager.should_run(cycle_num, urgency_u8) {
+                    let perception_output = self.perception_manager.process(snapshot);
+                    self.subsystem_collector.record("perception_manager", perception_output);
+                }
+            }
+        }
 
         // ── Phase 17: Self-model accuracy tracking ───────────────────────
         // Science: Fleming & Dolan (2012) — metacognitive monitoring improves when
@@ -1729,6 +1782,10 @@ impl CognitiveLoopService {
         // This feeds the dialogue pipeline for consciousness-aware responses
 
         let unified_psi = self.compute_unified_psi();
+        // Neuromod → consciousness bridge: ACh/NE sustain conscious integration
+        // Science: Alkire et al. (2008) — consciousness correlates with ACh/NE
+        let neuromod_consciousness_mod = self.neuromodulator_bath.consciousness_modulation();
+        let unified_psi = (unified_psi * neuromod_consciousness_mod as f64).clamp(0.0, 1.0);
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10h.exp EXPERIENCE BUS: Update principled signals from cognitive state
@@ -3086,6 +3143,29 @@ impl CognitiveLoopService {
             }
         }
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // UNIFIED CONSCIOUSNESS ENGINE — additive telemetry (runs alongside inline code)
+        // Wraps SpectralMIP + MultiModal + EqV2 + Pipeline into single measure() call
+        // ═══════════════════════════════════════════════════════════════════════
+        let _consciousness_output = self.consciousness_engine.measure(
+            &super::consciousness_engine::ConsciousnessEngineInput {
+                hdv: &encoding_hdv,
+                hv16: &hv16_cached,
+                cycle: self.stats.total_cycles as u64,
+                unified_psi,
+                coherence,
+                prediction_error,
+                phi_attention_weight,
+                epistemic_quality: self.carryover.quality.last_epistemic_quality,
+                phi_validation_correlation: self.carryover.quality.phi_validation_correlation,
+                phi_spectral_weight: phi_spectral_weight as f64,
+            },
+        );
+        // NOTE: Not calling update_cache() yet — the existing inline code already
+        // writes to carryover.consciousness. The engine output is for telemetry only
+        // during this additive wiring phase.
+        module_timings.consciousness_engine = _consciousness_output.total_us;
+
         // Soul experience integration: feed cycle outcome back into value learning.
         let _t = Instant::now();
         // This closes the loop: Soul evaluates alignment (pre-cycle) → cognitive cycle
@@ -3443,6 +3523,12 @@ impl CognitiveLoopService {
             // Neuromod-aware training telemetry
             neuromod_gradient_scale: self.neuromodulator_bath.gradient_scale_factor(),
             neuromod_threshold_gate: self.neuromodulator_bath.threshold_gate(),
+            // Phasic burst telemetry (Phase 2)
+            neuromod_da_phasic: self.neuromodulator_bath.da_phasic(),
+            neuromod_ne_phasic: self.neuromodulator_bath.ne_phasic(),
+            // Consciousness bridge & sleep consolidation (Phase 2)
+            neuromod_consciousness_mod: self.neuromodulator_bath.consciousness_modulation(),
+            neuromod_sleep_consolidation_boost: self.neuromodulator_bath.sleep_consolidation_boost(),
             // Exocortex trigger counter
             exocortex_trigger_count: self.stats.exocortex_triggers,
             // Thermodynamic / affective (populated by consciousness pipeline + somatic bridge)
@@ -3459,6 +3545,7 @@ impl CognitiveLoopService {
             mesh_bytes_received: 0,
             feedback_confidence_proposals: 0,
             feedback_lr_proposals: 0,
+            subsystem_integration_contributors: 0,
         };
 
         // Update cumulative stats for resonator-memory loop diagnostics
@@ -3540,6 +3627,19 @@ impl CognitiveLoopService {
             self.prediction_confidence as f64,
             self.fep_lr_boost as f64,
         );
+
+        // ── Phase 2.3: Integrate subsystem outputs (Phase C) ─────────────
+        // Consensus-average all SubsystemOutput proposals collected during
+        // Phase B. Currently in dual-write bridge mode: integration result
+        // is logged for comparison but does NOT override direct mutations.
+        let integrated = self.subsystem_collector.integrate();
+        if integrated.n_contributors > 0 {
+            metadata.subsystem_integration_contributors = integrated.n_contributors as u32;
+            tracing::trace!(
+                "Phase C integration: {}",
+                integrated,
+            );
+        }
 
         CycleResult {
             output,

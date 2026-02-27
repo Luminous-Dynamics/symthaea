@@ -22,8 +22,7 @@ pub(super) use parallel::{
 // Re-export Phase 7 result structs so cycle.rs can destructure them
 pub(super) use cycle_phases::{DreamPhaseResult, EpisodicReplayResult, ResonatorCodebookResult};
 
-// Re-export pub(super) constants used by cycle.rs
-pub(super) use cycle_extracted::MEMORY_RECALL_TOP_K;
+// Constants formerly re-exported here now live in `thresholds.rs`.
 
 use super::CycleCarryover;
 use crate::consciousness::fep_active_inference::ActiveInferenceAgent;
@@ -751,5 +750,11 @@ impl CognitiveLoopService {
         }
         // Note: predictive_phi_modulation and cross_modal_psi already reset
         // via self.carryover = CycleCarryover::default() above.
+        self.subsystem_collector.clear();
+        self.last_snapshot = None;
+        self.drive_manager = super::managers::DriveManager::default();
+        self.memory_manager = super::managers::MemoryManager::default();
+        self.learning_manager = super::managers::LearningManager::default();
+        self.perception_manager = super::managers::PerceptionManager::default();
     }
 }

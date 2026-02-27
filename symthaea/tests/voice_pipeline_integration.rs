@@ -942,3 +942,214 @@ fn test_semantic_prosody_affects_effective_pacing() {
     assert!(question_pacing.is_question());
     assert!(!neutral_pacing.is_question());
 }
+
+// ==================================================================================
+// Voice Pipeline Orchestrator Tests
+// ==================================================================================
+
+use symthaea::voice::{
+    aggregate_audio_hvs, binary_to_continuous, VoiceOrchestrator,
+};
+use symthaea_core::hdc::BinaryHV;
+
+// ── Test: aggregate_audio_hvs produces valid ContinuousHV ─────────────────────
+
+#[test]
+fn test_aggregate_audio_hvs_produces_valid_continuous() {
+    // Create several random BinaryHVs (simulating audio frame projections)
+    let frames: Vec<BinaryHV> = (1..=5)
+        .map(BinaryHV::random)
+        .collect();
+
+    let aggregated = aggregate_audio_hvs(&frames);
+
+    // Should have correct dimensionality
+    assert_eq!(
+        aggregated.values.len(),
+        BinaryHV::DIM,
+        "aggregated HV should have {} dimensions",
+        BinaryHV::DIM
+    );
+
+    // All values should be finite and in [-1, 1]
+    for (i, &v) in aggregated.values.iter().enumerate() {
+        assert!(
+            v.is_finite(),
+            "dimension {} should be finite, got {}",
+            i, v
+        );
+        assert!(
+            (-1.0..=1.0).contains(&v),
+            "dimension {} should be in [-1, 1], got {}",
+            i, v
+        );
+    }
+
+    // With 5 random HVs, the average should be close to 0 (high-dim concentration)
+    let mean: f32 = aggregated.values.iter().sum::<f32>() / aggregated.values.len() as f32;
+    assert!(
+        mean.abs() < 0.1,
+        "mean of random HV aggregation should be near 0, got {}",
+        mean
+    );
+
+    // Empty input should return zeros
+    let empty = aggregate_audio_hvs(&[]);
+    assert_eq!(empty.values.len(), BinaryHV::DIM);
+    assert!(empty.values.iter().all(|&v| v == 0.0));
+}
+
+// ── Test: binary_to_continuous maps bits correctly ────────────────────────────
+
+#[test]
+fn test_binary_to_continuous_maps_bits() {
+    // All zeros -> all -1.0
+    let zeros = BinaryHV::zero();
+    let continuous_zeros = binary_to_continuous(&zeros);
+    assert_eq!(continuous_zeros.values.len(), BinaryHV::DIM);
+    assert!(
+        continuous_zeros.values.iter().all(|&v| (v - (-1.0)).abs() < f32::EPSILON),
+        "all-zero BinaryHV should map to all -1.0"
+    );
+
+    // All ones -> all +1.0
+    let ones = BinaryHV::ones();
+    let continuous_ones = binary_to_continuous(&ones);
+    assert_eq!(continuous_ones.values.len(), BinaryHV::DIM);
+    assert!(
+        continuous_ones.values.iter().all(|&v| (v - 1.0).abs() < f32::EPSILON),
+        "all-one BinaryHV should map to all +1.0"
+    );
+
+    // Random HV should have mix of -1 and +1
+    let random = BinaryHV::random(42);
+    let continuous_random = binary_to_continuous(&random);
+    let pos_count = continuous_random.values.iter().filter(|&&v| v > 0.0).count();
+    let neg_count = continuous_random.values.iter().filter(|&&v| v < 0.0).count();
+    assert!(pos_count > 0, "random HV should have some +1.0 values");
+    assert!(neg_count > 0, "random HV should have some -1.0 values");
+
+    // Each value should be exactly -1 or +1 (bipolar encoding)
+    for &v in &continuous_random.values {
+        assert!(
+            (v - 1.0).abs() < f32::EPSILON || (v - (-1.0)).abs() < f32::EPSILON,
+            "each dimension should be exactly -1 or +1, got {}",
+            v
+        );
+    }
+}
+
+// ── Test: Orchestrator synthesize_from_cycle_result produces audio ────────────
+
+#[test]
+fn test_orchestrator_synthesize_produces_audio() {
+    let mut orchestrator = VoiceOrchestrator::new();
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    // Run a cognitive cycle
+    let result = service.cycle("The system is working correctly.");
+
+    // Synthesize from the cycle result
+    let samples = orchestrator.synthesize_from_cycle_result(
+        "The system is working correctly.",
+        &result,
+    );
+
+    // Should produce non-empty audio
+    assert!(
+        !samples.is_empty(),
+        "orchestrator should produce audio samples"
+    );
+
+    // All samples should be finite
+    for (i, &s) in samples.iter().enumerate() {
+        assert!(
+            s.is_finite(),
+            "sample {} should be finite, got {}",
+            i, s
+        );
+    }
+
+    // Samples should be in a reasonable range
+    let max_abs = samples.iter().map(|s| s.abs()).fold(0.0_f32, f32::max);
+    assert!(
+        max_abs <= 2.0,
+        "max sample amplitude should be reasonable: got {}",
+        max_abs
+    );
+
+    // The bridge should have updated pacing
+    let pacing = orchestrator.current_pacing();
+    assert!(pacing.rate > 0.0 && pacing.rate.is_finite());
+    assert!(pacing.tau > 0.0 && pacing.tau.is_finite());
+}
+
+// ── Test: Full pipeline text -> cognitive cycle -> speech ──────────────────────
+
+#[test]
+fn test_full_pipeline_text_to_speech() {
+    let mut orchestrator = VoiceOrchestrator::new();
+
+    // Use the low-level thought_to_speech path
+    let cfc_output = vec![0.4, -0.2, 0.6, -0.1, 0.3, 0.2, -0.4, 0.1];
+    let samples = orchestrator.thought_to_speech(
+        "Hello, consciousness is emerging.",
+        &cfc_output,
+        0.15,
+        vec!["cause".to_string(), "important".to_string()],
+    );
+
+    // Should produce audio
+    assert!(
+        !samples.is_empty(),
+        "thought_to_speech should produce audio"
+    );
+
+    // All samples should be finite
+    assert!(
+        samples.iter().all(|s| s.is_finite()),
+        "all samples should be finite"
+    );
+
+    // The bridge should reflect the semantic content
+    let cognitive_pacing = orchestrator.voice_bridge().get_pacing();
+
+    // Should have detected semantic categories from "cause" and "important"
+    assert!(
+        cognitive_pacing.semantic_prosody.has_semantic_content(),
+        "should detect semantic content from primitives"
+    );
+
+    // Run multiple cycles to verify smoothing works
+    for i in 0..3 {
+        let text = match i {
+            0 => "Maybe we should reconsider.",
+            1 => "However, the results are clear.",
+            2 => "Therefore we must act.",
+            _ => unreachable!(),
+        };
+        let primitives = match i {
+            0 => vec!["uncertain".to_string()],
+            1 => vec!["contrast".to_string()],
+            2 => vec!["effect".to_string()],
+            _ => unreachable!(),
+        };
+        let samples = orchestrator.thought_to_speech(text, &cfc_output, 0.3, primitives);
+        assert!(
+            !samples.is_empty(),
+            "cycle {} should produce audio",
+            i
+        );
+        assert!(
+            samples.iter().all(|s| s.is_finite()),
+            "cycle {} samples should be finite",
+            i
+        );
+    }
+
+    // After multiple updates, the pacing should still be valid
+    let final_pacing = orchestrator.current_pacing();
+    assert!(final_pacing.rate > 0.0 && final_pacing.rate.is_finite());
+    assert!(final_pacing.emphasis > 0.0 && final_pacing.emphasis.is_finite());
+    assert!(final_pacing.phrase_pause >= 0.0 && final_pacing.phrase_pause.is_finite());
+}

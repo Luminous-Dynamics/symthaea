@@ -233,6 +233,12 @@ impl CognitiveLoopService {
         self.stats.last_liquid_mamba_pe = pe;
     }
 
+    /// Current FEP learning signal (0.0-1.0).
+    /// Used by the facade to modulate L-SSM distillation intensity.
+    pub fn fep_learning_signal(&self) -> f32 {
+        self.fep_learning_signal
+    }
+
     /// Get the current inferred user state (if user state inference is enabled).
     pub fn user_state(&self) -> Option<&crate::user_state_inference::UserState> {
         self.user_state.as_ref().map(|usi| usi.state())
@@ -908,7 +914,7 @@ impl CognitiveLoopService {
     }
 
     /// Borrow the dissipative consciousness model (if enabled).
-    pub fn dissipative_consciousness(
+    pub(crate) fn dissipative_consciousness(
         &self,
     ) -> Option<&crate::consciousness::dissipative_consciousness::DissipativeConsciousness> {
         self.dissipative_consciousness.as_ref()
@@ -943,7 +949,7 @@ impl CognitiveLoopService {
     }
 
     /// Borrow the holographic consciousness analyzer (if enabled).
-    pub fn holographic_analyzer(
+    pub(crate) fn holographic_analyzer(
         &self,
     ) -> Option<&crate::consciousness::consciousness_holography::HolographicConsciousnessAnalyzer>
     {
@@ -981,7 +987,7 @@ impl CognitiveLoopService {
     }
 
     /// Borrow the synthetic states NSM grounding (if enabled).
-    pub fn synthetic_grounding(
+    pub(crate) fn synthetic_grounding(
         &self,
     ) -> Option<&crate::consciousness::synthetic_states::SyntheticStatesNSMGrounding> {
         self.synthetic_grounding.as_ref()

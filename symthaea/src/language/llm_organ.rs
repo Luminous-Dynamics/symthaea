@@ -650,6 +650,14 @@ impl LLMOrgan {
         }
     }
 
+    /// Pass FEP learning signal to modulate L-SSM distillation LR.
+    #[cfg(feature = "liquid-mamba")]
+    pub fn set_fep_modulation(&self, fep_signal: f32) {
+        if let Some(ref backend) = self.backend {
+            backend.set_fep_modulation(fep_signal);
+        }
+    }
+
     /// Apply a linguistic LoRA adapter to the voice.
     pub fn apply_lora(&self, lora_id: &str, delta: &[u8]) {
         if let Some(ref backend) = self.backend {
