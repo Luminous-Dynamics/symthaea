@@ -1365,15 +1365,15 @@ mod tests {
     #[test]
     fn test_fep_modulation_thresholds() {
         // High FEP signal → boost
-        let fep_high = if 0.8f32 > 0.7 { 1.5 } else { 1.0 };
-        assert!((fep_high - 1.5).abs() < 1e-6);
+        let fep_high: f32 = if 0.8f32 > 0.7 { 1.5 } else { 1.0 };
+        assert!((fep_high - 1.5f32).abs() < 1e-6);
 
         // Low FEP signal → dampen
-        let fep_low = if 0.2f32 < 0.3 { 0.7 } else { 1.0 };
-        assert!((fep_low - 0.7).abs() < 1e-6);
+        let fep_low: f32 = if 0.2f32 < 0.3 { 0.7 } else { 1.0 };
+        assert!((fep_low - 0.7f32).abs() < 1e-6);
 
         // Mid FEP signal → neutral
-        let fep_mid = if 0.5f32 > 0.7 { 1.5 } else if 0.5f32 < 0.3 { 0.7 } else { 1.0 };
-        assert!((fep_mid - 1.0).abs() < 1e-6);
+        let fep_mid: f32 = if 0.5f32 > 0.7 { 1.5 } else if 0.5f32 < 0.3 { 0.7 } else { 1.0 };
+        assert!((fep_mid - 1.0f32).abs() < 1e-6);
     }
 }
