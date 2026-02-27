@@ -11,10 +11,10 @@
 //!
 //! | Tier | System | Interval | Science |
 //! |------|--------|----------|---------|
-//! | Layer 1 | SpectralMIPFinder | 47 cycles | Tononi (2004) — IIT Phi via Fiedler ordering |
+//! | Layer 1 | SpectralMIPFinder | 97 cycles | Tononi (2004) — IIT Phi via Fiedler ordering |
 //! | Layer 2 | MultiModalIntegrator | 13 cycles | Damasio (1994) — cross-modal binding Phi |
 //! | Layer 3 | ConsciousnessEquationV2 | 23 cycles | 7-theory master equation C(t) |
-//! | Layer 4 | UnifiedConsciousnessPipeline | 47 cycles | Dehaene (2011) — end-to-end pipeline |
+//! | Layer 4 | UnifiedConsciousnessPipeline | 97 cycles | Dehaene (2011) — end-to-end pipeline |
 //!
 //! ## Design Principles
 //!
@@ -183,12 +183,12 @@ impl ConsciousnessEngine {
 
         // ═══════════════════════════════════════════════════════════════════
         // LAYER 1: Spectral MIP — O(n³) Fiedler-ordered Phi
-        // Push every cycle, compute every 47, adapt+hierarchical every 94
+        // Push every cycle, compute every 97, adapt+hierarchical every 194
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
         self.spectral_mip_finder.push(input.hdv); // ContinuousHV
 
-        let spectral_mip_phi = if input.cycle % 47 == 0 {
+        let spectral_mip_phi = if input.cycle % 97 == 0 {
             let result = self.spectral_mip_finder.compute();
             let phi = result.as_ref().map(|r| r.phi);
             if phi.is_some() {
@@ -196,8 +196,8 @@ impl ConsciousnessEngine {
                 self.cache.last_sigma = phi;
             }
 
-            // Adaptive dimension selection + hierarchical every 94 cycles
-            if input.cycle % 94 == 0 {
+            // Adaptive dimension selection + hierarchical every 194 cycles
+            if input.cycle % 194 == 0 {
                 if let Some(ref r) = result {
                     self.spectral_mip_finder.adapt(r);
                 }
@@ -323,12 +323,12 @@ impl ConsciousnessEngine {
 
         // ═══════════════════════════════════════════════════════════════════
         // LAYER 4: Unified Consciousness Pipeline — end-to-end
-        // Every 47 cycles (co-prime with Spectral MIP via offset)
+        // Every 97 cycles (co-prime with Layer 1 SpectralMIP via offset)
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
         let pipeline_consciousness =
             if let Some(ref mut pipeline) = self.unified_consciousness_pipeline {
-                if input.cycle % 47 == 0 && input.cycle > 0 {
+                if input.cycle % 97 == 0 && input.cycle > 0 {
                     let sensory: Vec<f64> = (0..64)
                         .map(|i| {
                             if input.hv16.get_bit(i) != 0 {
