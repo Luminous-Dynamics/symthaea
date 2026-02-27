@@ -29,6 +29,8 @@
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --dim-sweep
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --arc-data-dir /path/to/ARC-AGI/data/training
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --reasoning-validity
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --arc-report
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --arc-reliability
 
 use rayon::prelude::*;
 use std::path::PathBuf;
@@ -54,9 +56,9 @@ use symthaea_psych_bench::benchmarks::inhibition::{GoNoGoBenchmark, StopSignalBe
 use symthaea_psych_bench::benchmarks::language::GardenPathBenchmark;
 use symthaea_psych_bench::benchmarks::motor::SrttBenchmark;
 use symthaea_psych_bench::benchmarks::reasoning::{
-    ArcAbductiveBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
+    ArcAbductiveBenchmark, ArcAlgebraBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
     ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark,
-    ArcNoiseBenchmark, ArcScalingBenchmark,
+    ArcNoiseBenchmark, ArcRsaBenchmark, ArcScalingBenchmark, ArcStaircaseBenchmark,
 };
 use symthaea_psych_bench::benchmarks::social::RmeBenchmark;
 use symthaea_psych_bench::benchmarks::sustained_attention::SartBenchmark;
@@ -136,6 +138,8 @@ fn main() {
         .find(|w| w[0] == "--arc-data-dir")
         .map(|w| PathBuf::from(&w[1]));
     let reasoning_validity = args.iter().any(|a| a == "--reasoning-validity");
+    let arc_report_mode = args.iter().any(|a| a == "--arc-report");
+    let arc_reliability_mode = args.iter().any(|a| a == "--arc-reliability");
 
     let config = BenchmarkConfig {
         dimension: 512,
@@ -209,6 +213,9 @@ fn main() {
         Box::new(ArcNoiseBenchmark),
         Box::new(ArcFewShotBenchmark),
         Box::new(ArcScalingBenchmark),
+        Box::new(ArcRsaBenchmark),
+        Box::new(ArcAlgebraBenchmark),
+        Box::new(ArcStaircaseBenchmark),
         // Additional MemoryAgent
         Box::new(ProspectiveMemoryBenchmark),
         // Additional Metacognition
@@ -1130,6 +1137,19 @@ fn main() {
         use symthaea_psych_bench::harness::analysis::{reasoning_validity_single_run, format_reasoning_validity};
         let validity = reasoning_validity_single_run(&report);
         println!("\n{}", format_reasoning_validity(&validity));
+    }
+
+    // ── Unified ARC report ──
+    if arc_report_mode {
+        use symthaea_psych_bench::harness::analysis::format_arc_report;
+        println!("\n{}", format_arc_report(&report));
+    }
+
+    // ── ARC split-half reliability ──
+    if arc_reliability_mode {
+        use symthaea_psych_bench::harness::analysis::{arc_split_half_reliability, format_arc_reliability};
+        let results = arc_split_half_reliability(&report);
+        println!("\n{}", format_arc_reliability(&results));
     }
 
     if output_json {
