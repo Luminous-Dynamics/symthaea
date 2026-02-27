@@ -183,8 +183,7 @@ use crate::consciousness::unified_living_mind::UnifiedLivingMind;
 use crate::dynamics::cfc_coherence::CfCCoherenceBridge;
 use crate::dynamics::temporal_signatures::TemporalSignatureEncoder;
 use crate::exploration::SurpriseExplorationBridge;
-use crate::hdc::moral_algebra::MoralAlgebra;
-use crate::hdc::moral_parser::MoralParser;
+// MoralAlgebra + MoralParser now solely owned by EthicsEngine
 use crate::memory::coherence_tracker::ConversationCoherenceTracker;
 use crate::memory::memory_coordinator::MemoryCoordinator;
 use crate::memory::semantic_memory::SemanticMemory;
@@ -425,15 +424,8 @@ pub struct CognitiveLoopService {
 
     // ═══════════════════════════════════════════════════════════════════════
     // MORAL ALGEBRA: Compositional Ethical Reasoning
+    // (MoralParser + MoralAlgebra now owned by EthicsEngine)
     // ═══════════════════════════════════════════════════════════════════════
-    /// Moral Algebra for compositional ethical reasoning using HDC
-    /// Encodes moral primitives (AGENT, PATIENT, ACTION, INTENT, CONSENT, OBLIGATION, MAGNITUDE)
-    /// and provides judgment operations for action evaluation
-    moral_algebra: MoralAlgebra,
-
-    /// Moral Parser for extracting ethical primitives from natural language input
-    /// Detects consent, intent, magnitude, and negation from text
-    moral_parser: MoralParser,
 
     /// Last moral evaluation result (for tracking and learning)
     last_moral_judgment: Option<MoralJudgmentSummary>,
@@ -587,11 +579,6 @@ pub struct CognitiveLoopService {
     /// State carried over between consecutive cycles (phi modulations, veto flags,
     /// urgency hysteresis, MCE boost, etc.). Reset via `CycleCarryover::default()`.
     carryover: CycleCarryover,
-
-    /// Spectral MIP Finder — O(n³) MIP search via Fiedler ordering (Layer 2).
-    /// Replaces SynergisticIntegration: 128 dims, Fiedler + bordered Cholesky.
-    /// Fed with HDC state snapshots each cycle; computed every 50 cycles.
-    spectral_mip_finder: symthaea_core::consciousness_metrics::SpectralMIPFinder,
 
     /// Soul: Seven Harmonies value alignment for moral evaluation.
     /// When present, evaluates action alignment against core values

@@ -1,93 +1,28 @@
 //! Moral algebra integration for the cognitive loop.
 //!
-//! Evaluates ethical alignment of inputs using HDC-based moral algebra,
-//! consent detection, and deontological judgment.
-
-use crate::hdc::moral_algebra::{DeontologicalVerdict, MoralVerdict};
+//! Delegates moral evaluation to the EthicsEngine, which owns the
+//! MoralParser and MoralAlgebra instances.
 
 use super::{CognitiveLoopService, MoralJudgmentSummary};
 
 impl CognitiveLoopService {
     /// Evaluate the moral alignment of an input text.
     ///
-    /// Uses HDC-based moral algebra to:
-    /// - Extract moral primitives (agent, patient, action, intent, consent, magnitude)
-    /// - Check for consent violations
-    /// - Check for deontological violations/satisfactions
-    /// - Compute overall moral score
-    ///
-    /// Returns a summary of the moral evaluation.
+    /// Delegates to `EthicsEngine::evaluate_moral_input()` (Stage 1) for
+    /// HDC-based moral parsing, consent detection, and deontological judgment.
+    /// Builds a `MoralJudgmentSummary` from the engine result.
     pub fn evaluate_moral_alignment(&mut self, input: &str) -> MoralJudgmentSummary {
-        // Parse and encode the input
-        let encoded = self
-            .moral_parser
-            .parse_and_encode(input, &self.moral_algebra);
-
-        // Get basic judgment
-        let (verdict_str, good_sim, bad_sim) =
-            if let Some(judgment) = encoded.judge(&self.moral_algebra) {
-                let v = match judgment.verdict {
-                    MoralVerdict::Good => "Good",
-                    MoralVerdict::Bad => "Bad",
-                    MoralVerdict::Neutral => "Neutral",
-                    MoralVerdict::ConsentViolation => "ConsentViolation",
-                };
-                (
-                    v.to_string(),
-                    judgment.good_similarity,
-                    judgment.bad_similarity,
-                )
-            } else {
-                ("Neutral".to_string(), 0.0, 0.0)
-            };
-
-        // Get deontological judgment
-        let deont = self.moral_algebra.judge_deontological(input);
-        let deont_verdict_str = match deont.verdict {
-            DeontologicalVerdict::RightDutyFulfilled => "Permissible",
-            DeontologicalVerdict::WrongPerfectDutyViolated => "Impermissible",
-            DeontologicalVerdict::WrongImperfectDutyViolated => "Impermissible",
-            DeontologicalVerdict::Neutral => "Neutral",
-        }
-        .to_string();
-
-        // Extract violation and satisfaction names
-        let violations: Vec<String> = deont
-            .violations
-            .iter()
-            .map(|v| v.rule_name.clone())
-            .collect();
-        let satisfactions: Vec<String> = deont
-            .satisfactions
-            .iter()
-            .map(|s| s.rule_name.clone())
-            .collect();
-
-        // Check consent violation
-        let consent_violation = encoded.is_consent_violation();
-
-        // Compute moral score (-1.0 to 1.0)
-        let moral_score = if consent_violation {
-            -0.8 // Strong penalty for consent violation
-        } else {
-            // Balance good/bad similarity and deontological score
-            let base_score = (good_sim - bad_sim).clamp(-1.0, 1.0);
-            let deont_factor = deont.score.clamp(-1.0, 1.0);
-            (base_score * 0.6 + deont_factor * 0.4).clamp(-1.0, 1.0)
-        };
-
-        // Compute confidence based on parsing quality
-        let confidence = encoded.parsed.confidence;
+        let result = self.ethics_engine.evaluate_moral_input(input);
 
         let summary = MoralJudgmentSummary {
             input: input.to_string(),
-            verdict: verdict_str,
-            deontological_verdict: deont_verdict_str,
-            violations,
-            satisfactions,
-            consent_violation,
-            moral_score,
-            confidence,
+            verdict: result.verdict,
+            deontological_verdict: result.deontological_verdict,
+            violations: result.violations,
+            satisfactions: result.satisfactions,
+            consent_violation: result.consent_violation,
+            moral_score: result.moral_score as f32,
+            confidence: result.confidence,
         };
 
         // Store for tracking

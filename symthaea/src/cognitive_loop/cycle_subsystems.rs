@@ -9,7 +9,6 @@
 use std::time::Instant;
 
 use super::CognitiveLoopService;
-use crate::consciousness::cross_modal_binding::Modality;
 
 /// Values computed by the advanced subsystems phase.
 pub(crate) struct SubsystemMetrics {
@@ -313,78 +312,13 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
-        // UNIFIED CONSCIOUSNESS PIPELINE: End-to-end sensory→consciousness
-        // EXPENSIVE — runs every 47 cycles (co-prime). Combines HDC, LTC, binding, equation.
-        // Science: Dehaene (2011), Tononi (2004), Hasani et al. (2021).
+        // UNIFIED CONSCIOUSNESS PIPELINE + MULTI-MODAL INTEGRATION
+        // Now handled authoritatively by ConsciousnessEngine (called in cycle.rs).
+        // We read the cached values here for downstream use; feedback already applied.
+        // Science: Dehaene (2011), Tononi (2004), Damasio (1994), Ghazanfar & Schroeder (2006).
         // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let pipeline_consciousness = if let Some(ref mut pipeline) =
-            self.primitive_tier.unified_consciousness_pipeline
-        {
-            if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
-                let sensory: Vec<f64> = (0..64)
-                    .map(|i| {
-                        if hv16_cached.get_bit(i) != 0 {
-                            1.0
-                        } else {
-                            -1.0
-                        }
-                    })
-                    .collect();
-                match pipeline.process(&sensory) {
-                    Ok(moment) => {
-                        self.carryover.quality.last_pipeline_consciousness = moment.consciousness;
-                        moment.consciousness
-                    }
-                    Err(_) => self.carryover.quality.last_pipeline_consciousness,
-                }
-            } else {
-                self.carryover.quality.last_pipeline_consciousness
-            }
-        } else {
-            0.0
-        };
-        module_timings.unified_consciousness_pipeline = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: High pipeline consciousness strengthens learning toward coherence
-        // Science: Dehaene (2011) — global workspace broadcasts learning signals
-        if pipeline_consciousness > 0.6 {
-            let pipeline_lr_scale = 1.0 + (pipeline_consciousness - 0.6) * 0.5;
-            self.scale_lr("pipeline_consciousness", pipeline_lr_scale as f32);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // MULTI-MODAL INTEGRATION: Phi-guided cross-modal binding
-        // Science: Damasio (1994), Mesulam (1998), Ghazanfar & Schroeder (2006).
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let multimodal_integrated_phi = if let Some(ref mut mmi) = self.primitive_tier.multi_modal_integrator {
-            if self.stats.total_cycles % 13 == 0 && self.stats.total_cycles > 0 {
-                use crate::consciousness::multi_modal_integration::ModalInput;
-                let visual_input = ModalInput::new(Modality::Visual, hv16_cached, coherence as f64);
-                let temporal_input =
-                    ModalInput::new(Modality::Temporal, hv16_cached, unified_psi.clamp(0.0, 1.0));
-                let result = mmi.integrate(&[visual_input, temporal_input]);
-                self.carryover.consciousness.last_multimodal_phi = result.integrated_phi;
-                result.integrated_phi
-            } else {
-                self.carryover.consciousness.last_multimodal_phi
-            }
-        } else {
-            0.0
-        };
-        module_timings.multi_modal_integration = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Strong multimodal integration improves learning precision
-        // Science: Ghazanfar & Schroeder (2006) — cross-modal binding enables precise learning
-        if multimodal_integrated_phi > 0.5 {
-            let phi_confidence = (multimodal_integrated_phi - 0.5) * 0.04;
-            self.adjust_confidence("multimodal_phi", phi_confidence as f32);
-            let phi_subsystem_lr = 1.0 + (multimodal_integrated_phi - 0.5) * 0.4;
-            self.carryover.learning.subsystem_lr_factor *= phi_subsystem_lr as f32;
-            self.carryover.learning.subsystem_lr_factor =
-                self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
-        }
+        let pipeline_consciousness = self.carryover.quality.last_pipeline_consciousness;
+        let multimodal_integrated_phi = self.carryover.consciousness.last_multimodal_phi;
 
         // ═══════════════════════════════════════════════════════════════════════
         // SYNTHETIC STATES NSM GROUNDING: Classify current consciousness state

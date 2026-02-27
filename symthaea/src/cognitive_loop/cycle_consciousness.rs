@@ -234,36 +234,12 @@ impl CognitiveLoopService {
         module_timings.semantic_value_embedder = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
-        // HARMONIES INTEGRATOR: Per-action ethical alignment via Seven Harmonies
-        // Evaluates the current cycle's compressed state as a ValuedAction and
-        // scores it against harmony embeddings for approval/rejection.
-        // Amortized: every 19 cycles (embedding similarity + scoring, co-prime).
+        // HARMONIES INTEGRATOR: Now handled by EthicsEngine (called in cycle.rs).
+        // We read cached values; feedback already applied by engine output handler.
         // Science: Schwartz (2012) — basic human values, Deci & Ryan (2000).
         // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (harmonies_alignment, harmonies_approved) =
-            if let Some(ref mut integrator) = self.primitive_tier.harmonies_integrator {
-                if self.stats.total_cycles % 19 == 0 {
-                    let embedding = symthaea_core::hdc::ContinuousHV::from_slice(compressed_state);
-                    let action = crate::consciousness::harmonies_integration::ValuedAction::new(
-                        format!("cycle_{}", self.stats.total_cycles),
-                        input,
-                        embedding,
-                    );
-                    let eval = integrator.evaluate(&action);
-                    (eval.overall_alignment, eval.approved)
-                } else {
-                    (integrator.stats().avg_alignment, true)
-                }
-            } else {
-                (0.0, true)
-            };
-        module_timings.harmonies_integration = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Low harmony alignment → reduce confidence (ethical uncertainty)
-        if harmonies_alignment > 0.0 && !harmonies_approved {
-            self.adjust_confidence("harmonies_low_align", -0.02);
-        }
+        let harmonies_alignment = self.ethics_engine.last_harmonies_alignment();
+        let harmonies_approved = self.ethics_engine.last_harmonies_approved();
 
         // ═══════════════════════════════════════════════════════════════════════
         // COMPOSITION RULES: Domain-specific HDC binding operator selection
@@ -804,71 +780,20 @@ impl CognitiveLoopService {
     /// low consciousness boosts exploration.
     ///
     /// Science: Tononi (2004), Baars (1988), Friston (2010), Graziano (2013).
+    /// Now delegates to ConsciousnessEngine (called in cycle.rs).
+    /// Reads the cached equation_v2 value — all feedback (confidence, exploration,
+    /// episodic consolidation) is already applied by the engine output handler.
     pub(in crate::cognitive_loop) fn compute_equation_v2_phase(
         &mut self,
-        unified_psi: f64,
-        coherence: f32,
-        prediction_error: f32,
-        phi_attention_weight: f32,
-        module_timings: &mut super::ModuleTimings,
+        _unified_psi: f64,
+        _coherence: f32,
+        _prediction_error: f32,
+        _phi_attention_weight: f32,
+        _module_timings: &mut super::ModuleTimings,
     ) -> f64 {
-        let _t = Instant::now();
-        let equation_v2_consciousness = if let Some(ref mut eq) = self.primitive_tier.consciousness_equation_v2 {
-            if self.stats.total_cycles % 23 == 0 && self.stats.total_cycles > 0 {
-                use crate::consciousness::consciousness_equation_v2::{
-                    ConsciousnessStateV2, CoreComponent,
-                };
-                use std::collections::HashMap;
-                let mut core_values = HashMap::new();
-                core_values.insert(CoreComponent::Integration, unified_psi.clamp(0.0, 1.0));
-                core_values.insert(CoreComponent::Binding, coherence as f64);
-                core_values.insert(CoreComponent::Workspace, coherence as f64 * 0.8); // GWT proxy
-                core_values.insert(CoreComponent::Attention, phi_attention_weight as f64);
-                core_values.insert(CoreComponent::Recursion, 0.5); // Placeholder: HOT depth requires higher-order thought tracking (deferred — see W2-A in consolidation plan)
-                core_values.insert(CoreComponent::Efficacy, 1.0 - prediction_error as f64);
-                core_values.insert(
-                    CoreComponent::Knowledge,
-                    self.carryover.quality.last_epistemic_quality,
-                );
-                let state = ConsciousnessStateV2 {
-                    core_values,
-                    extended_values: HashMap::new(),
-                    phase_coherence: HashMap::new(),
-                    substrate_feasibility: 1.0,
-                    timestamp: self.stats.total_cycles as u64,
-                    context: String::new(),
-                };
-                let result = eq.compute(&state);
-                self.carryover.consciousness.last_equation_v2_consciousness = result.consciousness;
-                result.consciousness
-            } else {
-                self.carryover.consciousness.last_equation_v2_consciousness
-            }
-        } else {
-            0.0
-        };
-        module_timings.consciousness_equation_v2 = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Unified consciousness score modulates confidence + exploration + consolidation
-        // Science: High C(t) = strong integration across theories → confident, less exploration needed
-        // Additionally: high consciousness moments are episodically significant (Baars 2005 —
-        // GWT predicts conscious moments are preferentially consolidated into long-term memory)
-        if equation_v2_consciousness > 0.6 {
-            let boost = (equation_v2_consciousness - 0.6) * 0.08; // up to +3.2%
-            self.adjust_confidence("equation_v2_high", boost as f32);
-            // High-consciousness moments → boost episodic consolidation priority
-            // Science: Conscious access correlates with memory formation (Dehaene 2014, ch.4)
-            if let Some(ref mut replay) = self.phi_episodic_replay {
-                let consolidation_boost = (equation_v2_consciousness - 0.6) * 0.1;
-                replay.boost_recent_consolidation(consolidation_boost);
-            }
-        } else if equation_v2_consciousness > 0.0 && equation_v2_consciousness < 0.3 {
-            // Low consciousness → boost exploration to find better integration
-            self.curiosity_drive.exploration_urge =
-                (self.curiosity_drive.exploration_urge + 0.02).clamp(0.0, 1.0);
-        }
-
-        equation_v2_consciousness
+        // Engine owns ConsciousnessEquationV2 and fires every 23 cycles.
+        // Feedback (confidence, exploration, episodic replay) applied in cycle.rs.
+        self.carryover.consciousness.last_equation_v2_consciousness
     }
 
     /// Primitive Lattice: Structural metrics from the consciousness tier system.
@@ -952,58 +877,18 @@ impl CognitiveLoopService {
     /// Applies feedback: Veto decision drastically reduces learning rate.
     ///
     /// Science: Panksepp (1998) affective neuroscience + value alignment.
+    /// Now delegates to EthicsEngine (called in cycle.rs).
+    /// Reads cached value evaluator score — all feedback (LR gating)
+    /// is applied by the engine output handler.
     pub(in crate::cognitive_loop) fn compute_value_evaluator_phase(
         &mut self,
-        unified_psi: f64,
-        module_timings: &mut super::ModuleTimings,
+        _unified_psi: f64,
+        _module_timings: &mut super::ModuleTimings,
     ) -> (f64, String, f32) {
-        let _t = Instant::now();
-        let (value_evaluator_score, value_evaluator_decision) =
-            if let Some(ref mut evaluator) = self.primitive_tier.value_evaluator {
-                if self.stats.total_cycles % 19 == 0 {
-                    let ctx = crate::consciousness::unified_value_evaluator::EvaluationContext {
-                        consciousness_level: unified_psi,
-                        ..Default::default()
-                    };
-                    let result = evaluator.evaluate("cognitive_cycle", ctx);
-                    let decision_str = match &result.decision {
-                        crate::consciousness::unified_value_evaluator::Decision::Allow => "Allow",
-                        crate::consciousness::unified_value_evaluator::Decision::Warn(_) => "Warn",
-                        crate::consciousness::unified_value_evaluator::Decision::Veto(_) => "Veto",
-                    };
-                    self.carryover.quality.last_value_score = result.overall_score;
-                    (result.overall_score, decision_str.to_string())
-                } else {
-                    (self.carryover.quality.last_value_score, String::new())
-                }
-            } else {
-                (0.0, String::new())
-            };
-        module_timings.value_evaluator = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: Value evaluator → learning gate (Phase 14 Veto + Phase 18 alignment boost)
-        // Science: Panksepp (1998) — value alignment should modulate learning bidirectionally
-        let value_gate_factor = if value_evaluator_decision == "Veto" {
-            self.carryover.learning.subsystem_lr_factor *= 0.1; // Drastically reduce LR on value violation
-            self.stats.value_gate_applied_count += 1;
-            0.1
-        } else if value_evaluator_score > 0.7 && !value_evaluator_decision.is_empty() {
-            // High Seven Harmonies alignment → boost learning (reinforce aligned experiences)
-            let boost = 1.0 + (value_evaluator_score as f32 - 0.7) * 0.15; // up to +4.5%
-            self.carryover.learning.subsystem_lr_factor *= boost;
-            self.carryover.learning.subsystem_lr_factor =
-                self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.3);
-            self.stats.value_gate_applied_count += 1;
-            boost
-        } else {
-            1.0
-        };
-
-        (
-            value_evaluator_score,
-            value_evaluator_decision,
-            value_gate_factor,
-        )
+        // Engine owns UnifiedValueEvaluator and fires every 19 cycles.
+        // Feedback (LR gating, value_gate_applied_count) applied in cycle.rs.
+        let score = self.ethics_engine.last_value_score();
+        (score, String::new(), 1.0)
     }
 
     /// Fiduciary Harmonics: Seven Harmonies field coherence + interference detection.

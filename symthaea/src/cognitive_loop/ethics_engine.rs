@@ -1,7 +1,3 @@
-// Engine is wired into CognitiveLoopService::cycle(). Output fields are not yet
-// individually consumed (additive wiring phase — telemetry only), so allow dead_code.
-#![allow(dead_code)]
-
 //! # Unified Ethics Engine
 //!
 //! Wraps the 3 independent ethics systems into a single coherent engine
@@ -21,7 +17,6 @@
 //! 2. **No direct field mutation**: Returns `EthicsEngineOutput` with proposed deltas
 //! 3. **Preserves co-prime intervals**: Each subsystem fires at its original rate
 //! 4. **Backward compatible**: All existing carryover fields populated
-// Engine is wired into CognitiveLoopService::cycle() — no dead code.
 
 use std::time::Instant;
 
@@ -48,6 +43,10 @@ pub(crate) struct EthicsEngineOutput {
     pub consent_violation: bool,
     /// Moral parsing confidence [0, 1]
     pub moral_confidence: f64,
+    /// Deontological violations detected
+    pub violations: Vec<String>,
+    /// Deontological satisfactions detected
+    pub satisfactions: Vec<String>,
 
     // ── Stage 2: Value Evaluator ───────────────────────────────────────
     /// Value alignment score [0, 1]
@@ -103,6 +102,19 @@ pub(crate) struct EthicsEngineInput<'a> {
     pub unified_psi: f64,
     /// Compressed state (256-dim) for harmonies integrator
     pub compressed_state: &'a [f32],
+}
+
+/// Result of Stage 1 moral evaluation only.
+/// Used by `evaluate_moral_alignment()` to build `MoralJudgmentSummary`.
+#[derive(Debug, Clone)]
+pub(crate) struct MoralEvalResult {
+    pub verdict: String,
+    pub deontological_verdict: String,
+    pub violations: Vec<String>,
+    pub satisfactions: Vec<String>,
+    pub consent_violation: bool,
+    pub moral_score: f64,
+    pub confidence: f32,
 }
 
 /// The unified ethics evaluation engine.
@@ -167,7 +179,7 @@ impl EthicsEngine {
         // Every 7 cycles (co-prime)
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
-        let (moral_score, moral_verdict, deontological_verdict, consent_violation, moral_confidence) =
+        let (moral_score, moral_verdict, deontological_verdict, consent_violation, moral_confidence, violations, satisfactions) =
             if input.cycle % 7 == 0 && input.cycle > 0 {
                 let encoded = self
                     .moral_parser
@@ -195,6 +207,9 @@ impl EthicsEngine {
                 }
                 .to_string();
 
+                let viols: Vec<String> = deont.violations.iter().map(|v| v.rule_name.clone()).collect();
+                let sats: Vec<String> = deont.satisfactions.iter().map(|s| s.rule_name.clone()).collect();
+
                 let cv = encoded.is_consent_violation();
                 let score: f64 = if cv {
                     -0.8
@@ -206,7 +221,7 @@ impl EthicsEngine {
                 let confidence: f64 = encoded.parsed.confidence as f64;
 
                 self.cache.last_moral_score = score;
-                (score, verdict_str, deont_verdict_str, cv, confidence)
+                (score, verdict_str, deont_verdict_str, cv, confidence, viols, sats)
             } else {
                 (
                     self.cache.last_moral_score,
@@ -214,6 +229,8 @@ impl EthicsEngine {
                     String::new(),
                     false,
                     0.0,
+                    Vec::new(),
+                    Vec::new(),
                 )
             };
         let moral_us = t.elapsed().as_micros() as u64;
@@ -324,6 +341,8 @@ impl EthicsEngine {
             deontological_verdict,
             consent_violation,
             moral_confidence,
+            violations,
+            satisfactions,
             value_score,
             value_decision,
             value_gate_factor,
@@ -338,6 +357,91 @@ impl EthicsEngine {
             harmonies_us,
             total_us,
         }
+    }
+
+    /// Evaluate moral alignment of input text (Stage 1 only).
+    ///
+    /// Used by `CognitiveLoopService::evaluate_moral_alignment()` to delegate
+    /// moral parsing through the engine's owned parser/algebra without running
+    /// the full pipeline (Stages 2+3 need `compressed_state` not yet available).
+    pub fn evaluate_moral_input(&mut self, input: &str) -> MoralEvalResult {
+        let encoded = self.moral_parser.parse_and_encode(input, &self.moral_algebra);
+
+        let (verdict, good_sim, bad_sim) =
+            if let Some(judgment) = encoded.judge(&self.moral_algebra) {
+                let v = match judgment.verdict {
+                    MoralVerdict::Good => "Good",
+                    MoralVerdict::Bad => "Bad",
+                    MoralVerdict::Neutral => "Neutral",
+                    MoralVerdict::ConsentViolation => "ConsentViolation",
+                };
+                (v.to_string(), judgment.good_similarity, judgment.bad_similarity)
+            } else {
+                ("Neutral".to_string(), 0.0, 0.0)
+            };
+
+        let deont = self.moral_algebra.judge_deontological(input);
+        let deontological_verdict = match deont.verdict {
+            DeontologicalVerdict::RightDutyFulfilled => "Permissible",
+            DeontologicalVerdict::WrongPerfectDutyViolated => "Impermissible",
+            DeontologicalVerdict::WrongImperfectDutyViolated => "Impermissible",
+            DeontologicalVerdict::Neutral => "Neutral",
+        }
+        .to_string();
+
+        let violations: Vec<String> = deont.violations.iter().map(|v| v.rule_name.clone()).collect();
+        let satisfactions: Vec<String> = deont.satisfactions.iter().map(|s| s.rule_name.clone()).collect();
+        let consent_violation = encoded.is_consent_violation();
+        let moral_score = if consent_violation {
+            -0.8
+        } else {
+            let base_score = (good_sim - bad_sim).clamp(-1.0, 1.0) as f64;
+            let deont_factor = deont.score.clamp(-1.0, 1.0) as f64;
+            (base_score * 0.6 + deont_factor * 0.4).clamp(-1.0, 1.0)
+        };
+        let confidence = encoded.parsed.confidence;
+
+        // Update cache for the full pipeline evaluate() call
+        self.cache.last_moral_score = moral_score;
+
+        MoralEvalResult {
+            verdict,
+            deontological_verdict,
+            violations,
+            satisfactions,
+            consent_violation,
+            moral_score,
+            confidence,
+        }
+    }
+
+    /// Borrow the value evaluator (if present).
+    pub fn value_evaluator(
+        &self,
+    ) -> Option<&crate::consciousness::unified_value_evaluator::UnifiedValueEvaluator> {
+        self.value_evaluator.as_ref()
+    }
+
+    /// Borrow the harmonies integrator (if present).
+    pub fn harmonies_integrator(
+        &self,
+    ) -> Option<&crate::consciousness::harmonies_integration::HarmoniesIntegrator> {
+        self.harmonies_integrator.as_ref()
+    }
+
+    /// Access cached value score.
+    pub fn last_value_score(&self) -> f64 {
+        self.cache.last_value_score
+    }
+
+    /// Access cached harmonies alignment.
+    pub fn last_harmonies_alignment(&self) -> f32 {
+        self.cache.last_harmonies_alignment
+    }
+
+    /// Access cached harmonies approved status.
+    pub fn last_harmonies_approved(&self) -> bool {
+        self.cache.last_harmonies_approved
     }
 }
 
