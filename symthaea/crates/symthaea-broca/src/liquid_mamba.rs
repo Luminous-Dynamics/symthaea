@@ -142,10 +142,13 @@ pub struct LiquidMambaGenerator {
     // Biological state (injected by cognitive loop via update_affect)
     thermodynamic_load: f32,
     arousal: f32,
+    mood_temperature: f32,
     // Online distillation state
     generation_count: usize,
     distill_accumulator: usize,
     recent_thought_hvs: VecDeque<ContinuousHV>,
+    // Last semantic prediction error for telemetry
+    last_semantic_pe: f32,
 }
 
 impl LiquidMambaGenerator {
@@ -181,16 +184,21 @@ impl LiquidMambaGenerator {
             config,
             thermodynamic_load: 0.0,
             arousal: 0.5,
+            mood_temperature: 1.0,
             generation_count: 0,
             distill_accumulator: 0,
             recent_thought_hvs: VecDeque::new(),
+            last_semantic_pe: 0.0,
         })
     }
 
     /// Generate text from thought channels.
     pub fn generate(&mut self, channels: &ThoughtChannels) -> GenerationResult {
-        match self.generate_inner(channels) {
-            Ok(result) => result,
+        match self.generate_inner(channels, None) {
+            Ok(result) => {
+                self.last_semantic_pe = result.semantic_pe;
+                result
+            }
             Err(e) => {
                 tracing::error!("Liquid-Mamba generation failed: {e}");
                 GenerationResult {
@@ -208,7 +216,39 @@ impl LiquidMambaGenerator {
         }
     }
 
-    fn generate_inner(&mut self, channels: &ThoughtChannels) -> Result<GenerationResult> {
+    /// Generate text with a per-token streaming callback.
+    pub fn generate_with_callback(
+        &mut self,
+        channels: &ThoughtChannels,
+        on_token: &mut dyn FnMut(&str),
+    ) -> GenerationResult {
+        match self.generate_inner(channels, Some(on_token)) {
+            Ok(result) => {
+                self.last_semantic_pe = result.semantic_pe;
+                result
+            }
+            Err(e) => {
+                tracing::error!("Liquid-Mamba generation failed: {e}");
+                GenerationResult {
+                    text: String::new(),
+                    token_ids: Vec::new(),
+                    num_tokens: 0,
+                    eos_terminated: false,
+                    veto_triggered: false,
+                    final_coherence: 0.0,
+                    long_coherence: 0.0,
+                    output_hvs: Vec::new(),
+                    semantic_pe: 0.0,
+                }
+            }
+        }
+    }
+
+    fn generate_inner(
+        &mut self,
+        channels: &ThoughtChannels,
+        mut on_token: Option<&mut dyn FnMut(&str)>,
+    ) -> Result<GenerationResult> {
         // 1. Encode thought channels to 16,384D HDC
         let thought_hv = self.encoder.encode(channels);
 
@@ -316,6 +356,9 @@ impl LiquidMambaGenerator {
                 if coherence_monitor.should_veto() && pos > 2 {
                     veto_triggered = true;
                     text.push_str(&self.config.veto_hesitation);
+                    if let Some(ref mut cb) = on_token {
+                        cb(&self.config.veto_hesitation);
+                    }
 
                     // Reset Mamba and re-inject thought context
                     self.mamba.reset();
@@ -345,6 +388,9 @@ impl LiquidMambaGenerator {
 
             if let Ok(token_str) = self.mamba.decode_token(next_token) {
                 text.push_str(&token_str);
+                if let Some(ref mut cb) = on_token {
+                    cb(&token_str);
+                }
             }
 
             tokens.push(next_token);
@@ -417,14 +463,17 @@ impl LiquidMambaGenerator {
     fn biological_state_scale(&self) -> f32 {
         let alpha = 0.5 * self.config.delta_mod_strength;
         let beta = 0.3 * self.config.delta_mod_strength;
-        (-alpha * self.thermodynamic_load - beta * (self.arousal - 0.5))
+        // Mood temperature modulates effective arousal: hot mood → higher arousal effect
+        let effective_arousal = (self.arousal + 0.1 * (self.mood_temperature - 1.0)).clamp(0.0, 1.0);
+        (-alpha * self.thermodynamic_load - beta * (effective_arousal - 0.5))
             .exp()
             .clamp(0.3, 2.0)
     }
 
     /// Update biological state from the cognitive loop.
-    pub fn update_affect(&mut self, load: f32, _temp: f32) {
+    pub fn update_affect(&mut self, load: f32, temp: f32) {
         self.thermodynamic_load = load.clamp(0.0, 1.0);
+        self.mood_temperature = temp.clamp(0.5, 2.0);
     }
 
     /// Get mutable reference to the projection (for gradient learning).
@@ -462,9 +511,19 @@ impl LiquidMambaGenerator {
         self.thermodynamic_load
     }
 
+    /// Current mood temperature (0.5-2.0).
+    pub fn mood_temperature(&self) -> f32 {
+        self.mood_temperature
+    }
+
     /// Number of generations completed (for warmup scheduling).
     pub fn generation_count(&self) -> usize {
         self.generation_count
+    }
+
+    /// Last semantic prediction error from generation (0.0-1.0).
+    pub fn last_semantic_pe(&self) -> f32 {
+        self.last_semantic_pe
     }
 
     /// Check for projection collapse and auto-recover if detected.
@@ -646,6 +705,7 @@ impl std::fmt::Debug for LiquidMambaGenerator {
             .field("mamba", &self.mamba)
             .field("thermodynamic_load", &self.thermodynamic_load)
             .field("arousal", &self.arousal)
+            .field("mood_temperature", &self.mood_temperature)
             .field("generation_count", &self.generation_count)
             .finish()
     }

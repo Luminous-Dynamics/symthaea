@@ -103,6 +103,15 @@ impl LLMBackend for SsmBackend {
         Ok(result.text)
     }
 
+    #[cfg(feature = "ssm_language")]
+    fn generate_from_channels_direct(
+        &self,
+        channels: &ThoughtChannels,
+        params: &super::llm_backend::GenerationParams,
+    ) -> Option<anyhow::Result<String>> {
+        Some(self.generate_from_channels(channels, params))
+    }
+
     async fn is_available(&self) -> bool {
         true // Always available — no external dependencies
     }
@@ -312,6 +321,32 @@ impl LiquidMambaBackend {
             .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
         Ok(gen.generate(channels))
     }
+
+    /// Export projection weights for federated swarm exchange.
+    ///
+    /// Returns flattened projection weights tagged with source identity,
+    /// trust level, and version for aggregation by peers.
+    pub fn export_projection_weights(
+        &self,
+        _source_id: [u8; 32],
+        _trust: f32,
+        _version: u64,
+    ) -> Option<Vec<f32>> {
+        self.generator.lock().ok().map(|g| g.projection().flatten_weights())
+    }
+
+    /// Apply aggregated peer projection weights.
+    ///
+    /// Replaces the local projection weights with externally aggregated weights
+    /// (e.g., from a FederatedAggregator). Returns `true` on success.
+    pub fn apply_peer_weights(&self, aggregated: &[f32]) -> bool {
+        if let Ok(mut gen) = self.generator.lock() {
+            gen.projection_mut().load_weights(aggregated);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[cfg(feature = "liquid-mamba")]
@@ -333,6 +368,49 @@ impl LLMBackend for LiquidMambaBackend {
         let result = gen.generate(&channels);
         gen.distill_step(&channels, &result);
         Ok(result.text)
+    }
+
+    async fn generate_streaming(
+        &self,
+        prompt: &str,
+        _params: &GenerationParams,
+        on_token: &mut (dyn for<'a> FnMut(&'a str) + Send),
+    ) -> Result<String> {
+        let channels = channels_from_prompt(prompt);
+        let mut gen = self.generator.lock()
+            .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
+        let result = gen.generate_with_callback(&channels, on_token);
+        gen.distill_step(&channels, &result);
+        Ok(result.text)
+    }
+
+    #[cfg(feature = "ssm_language")]
+    fn generate_from_channels_direct(
+        &self,
+        channels: &ThoughtChannels,
+        params: &super::llm_backend::GenerationParams,
+    ) -> Option<anyhow::Result<String>> {
+        Some(self.generate_from_channels(channels, params))
+    }
+
+    #[cfg(feature = "liquid-mamba")]
+    fn last_semantic_pe(&self) -> f32 {
+        self.generator.lock().ok().map(|g| g.last_semantic_pe()).unwrap_or(0.0)
+    }
+
+    #[cfg(feature = "liquid-mamba")]
+    fn export_gradient(&self, _source_id: [u8; 32], _trust: f32, _version: u64) -> Option<Vec<f32>> {
+        self.generator.lock().ok().map(|g| g.projection().flatten_weights())
+    }
+
+    #[cfg(feature = "liquid-mamba")]
+    fn apply_aggregated_gradient(&self, weights: &[f32]) -> bool {
+        if let Ok(mut gen) = self.generator.lock() {
+            gen.projection_mut().load_weights(weights);
+            true
+        } else {
+            false
+        }
     }
 
     fn update_affect(&self, load: f32, temp: f32) {

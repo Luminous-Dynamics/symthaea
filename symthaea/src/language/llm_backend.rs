@@ -68,6 +68,37 @@ pub trait LLMBackend: Send + Sync {
         Ok(result)
     }
 
+    /// Generate from pre-computed thought channels (Direct Neural Path).
+    /// Returns `None` if this backend doesn't support direct channel input.
+    #[cfg(feature = "ssm_language")]
+    fn generate_from_channels_direct(
+        &self,
+        _channels: &symthaea_broca::ThoughtChannels,
+        _params: &GenerationParams,
+    ) -> Option<Result<String>> {
+        None
+    }
+
+    /// Return the last L-SSM semantic prediction error (0.0 if not applicable).
+    #[cfg(feature = "liquid-mamba")]
+    fn last_semantic_pe(&self) -> f32 {
+        0.0
+    }
+
+    /// Export projection weights for federated swarm exchange.
+    /// Returns `None` if this backend doesn't support swarm gradient exchange.
+    #[cfg(feature = "liquid-mamba")]
+    fn export_gradient(&self, _source_id: [u8; 32], _trust: f32, _version: u64) -> Option<Vec<f32>> {
+        None
+    }
+
+    /// Apply aggregated projection weights from swarm peers.
+    /// Returns `true` if weights were successfully applied.
+    #[cfg(feature = "liquid-mamba")]
+    fn apply_aggregated_gradient(&self, _weights: &[f32]) -> bool {
+        false
+    }
+
     /// Get the backend name for logging.
     fn name(&self) -> &str;
 }
