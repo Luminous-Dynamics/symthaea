@@ -136,11 +136,17 @@ impl CognitiveLoopService {
         // Snapshot confidence for end-of-cycle drift clamping (Task G)
         self.carryover.learning.prediction_confidence = self.prediction_confidence;
 
+        // ── Phase 2.2: Begin feedback proposal collection for this cycle ────
+        self.feedback_state.begin_cycle();
+
         // Chronobiology: refresh biorhythm every 97 cycles (co-prime amortization)
         self.biorhythm_refresh_counter += 1;
         if self.biorhythm_refresh_counter >= 97 {
             self.biorhythm = crate::chronobiology::Biorhythm::current();
             self.neuromodulator_bath.modulate_circadian(self.biorhythm.phase);
+            // Record personality profile for drift detection
+            let profile = self.neuromodulator_bath.personality_profile();
+            self.personality_drift_tracker.record(&profile);
             self.biorhythm_refresh_counter = 0;
         }
         // Apply circadian plasticity to learning rate (Night=high plasticity, Day=low)
@@ -634,12 +640,11 @@ impl CognitiveLoopService {
                 // Feed back: high self-model accuracy → trust confidence more
                 if self.carryover.learning.self_model_accuracy > 0.7 {
                     let trust_boost = (self.carryover.learning.self_model_accuracy - 0.7) * 0.03;
-                    self.prediction_confidence =
-                        (self.prediction_confidence + trust_boost).clamp(0.0, 1.0);
+                    self.adjust_confidence("self_model_trust", trust_boost);
                 }
                 // Low accuracy → dampen confidence (self-model unreliable)
                 if self.carryover.learning.self_model_accuracy < 0.3 {
-                    self.prediction_confidence *= 0.98;
+                    self.scale_confidence("self_model_low_acc", 0.98);
                 }
             } else {
                 // Not yet time to validate — put it back
@@ -703,13 +708,12 @@ impl CognitiveLoopService {
             let boost = (resonator_prediction_error - 0.5) * 0.08;
             self.curiosity_drive.exploration_urge =
                 (self.curiosity_drive.exploration_urge + boost).min(1.0);
-            self.prediction_confidence = (self.prediction_confidence - boost * 0.5).clamp(0.0, 1.0);
+            self.adjust_confidence("resonator_error_high", -boost * 0.5);
             self.stats.resonator_error_exploration_count += 1;
             boost
         } else if resonator_prediction_error < 0.2 && resonator_prediction_error > 0.0 {
             let confidence_boost = (0.2 - resonator_prediction_error) * 0.03;
-            self.prediction_confidence =
-                (self.prediction_confidence + confidence_boost).clamp(0.0, 1.0);
+            self.adjust_confidence("resonator_error_low", confidence_boost);
             self.stats.resonator_error_exploration_count += 1;
             -confidence_boost // negative = confidence gain (no exploration boost)
         } else {
@@ -755,12 +759,12 @@ impl CognitiveLoopService {
         // Science: Tononi (2004) — strong binding = coherent integration = reliable predictions
         let binding_confidence_mod = if cached_binding > 0.7 {
             let conf_boost = (cached_binding - 0.7) * 0.1; // up to +0.03
-            self.prediction_confidence = (self.prediction_confidence + conf_boost).clamp(0.0, 1.0);
+            self.adjust_confidence("binding_strong", conf_boost);
             self.stats.binding_confidence_mod_count += 1;
             conf_boost
         } else if cached_binding < 0.3 && cached_binding > 0.0 {
             let conf_dampen = (0.3 - cached_binding) * 0.15; // up to -0.045
-            self.prediction_confidence = (self.prediction_confidence - conf_dampen).clamp(0.0, 1.0);
+            self.adjust_confidence("binding_weak", -conf_dampen);
             self.stats.binding_confidence_mod_count += 1;
             -conf_dampen
         } else {
@@ -856,8 +860,7 @@ impl CognitiveLoopService {
                                                     .clamp(-1.0, 1.0);
                                         }
                                         "high" => {
-                                            self.prediction_confidence =
-                                                (self.prediction_confidence + 0.03).clamp(0.0, 1.0);
+                                            self.adjust_confidence("resonator_factor_high", 0.03);
                                         }
                                         _ => {} // neutral, medium, proto_N — no bias
                                     }
@@ -868,9 +871,7 @@ impl CognitiveLoopService {
                         // Track 3a: Resonator recall → confidence priming
                         // Science: Tulving (1983) — episodic retrieval primes processing
                         if best_match_sim > 0.3 {
-                            self.prediction_confidence = (self.prediction_confidence
-                                + best_match_sim * 0.02)
-                                .clamp(0.0, 1.0);
+                            self.adjust_confidence("resonator_recall_prime", best_match_sim * 0.02);
                             resonator_wm_primed = true;
                         }
 
@@ -914,7 +915,7 @@ impl CognitiveLoopService {
             // High-priority active goal → boost learning rate (consolidate goal-relevant knowledge)
             if goal_priority > 0.5 {
                 let goal_lr_boost = (goal_priority - 0.5) * 0.1; // up to +5%
-                self.fep_lr_boost = (self.fep_lr_boost * (1.0 + goal_lr_boost)).clamp(1.0, 2.0);
+                self.scale_lr("goal_priority", 1.0 + goal_lr_boost);
             }
             // Successful prediction (low error) during goal pursuit → exploration toward goal
             if prediction_error < self.config.learning_threshold && goal_priority > 0.3 {
@@ -1117,13 +1118,12 @@ impl CognitiveLoopService {
             // Low coherence → dampen confidence (predictions unreliable)
             if coh < 0.5 {
                 let coh_dampen = (0.5 - coh) * 0.04;
-                self.prediction_confidence *= 1.0 - coh_dampen;
+                self.scale_confidence("pred_coherence_low", 1.0 - coh_dampen);
             }
             // High coherence → slight confidence boost (temporal model is consistent)
             if coh > 0.8 {
                 let coh_boost = (coh - 0.8) * 0.02;
-                self.prediction_confidence =
-                    (self.prediction_confidence + coh_boost).clamp(0.0, 1.0);
+                self.adjust_confidence("pred_coherence_high", coh_boost);
             }
             coh
         } else {
@@ -1153,10 +1153,10 @@ impl CognitiveLoopService {
             if wm_stiffness > 0.5 {
                 // Additive (not multiplicative) to prevent compounding
                 let stiffness_nudge = (wm_stiffness - 0.5) * 0.05;
-                self.fep_lr_boost = (self.fep_lr_boost + stiffness_nudge).clamp(1.0, 2.0);
+                self.adjust_lr("wm_stiff", stiffness_nudge);
             } else if wm_stiffness < 0.2 {
                 let spongy_dampen = (0.2 - wm_stiffness) * 0.15;
-                self.fep_lr_boost = (self.fep_lr_boost * (1.0 - spongy_dampen)).max(1.0);
+                self.scale_lr("wm_spongy", 1.0 - spongy_dampen);
             }
         }
 
@@ -1268,8 +1268,7 @@ impl CognitiveLoopService {
                 let effectiveness = (raw_effectiveness * 0.5 + 0.5).clamp(0.0, 1.0); // map [-1,1] → [0,1]
                                                                                      // Feedback: effective plans → boost confidence in deliberative system
                 if effectiveness > 0.6 {
-                    self.prediction_confidence =
-                        (self.prediction_confidence + (effectiveness - 0.6) * 0.03).clamp(0.0, 1.0);
+                    self.adjust_confidence("mcts_effective", (effectiveness - 0.6) * 0.03);
                 } else if effectiveness < 0.3 {
                     // Poor plan → slightly boost exploration to find better strategies
                     self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
@@ -1298,13 +1297,11 @@ impl CognitiveLoopService {
                 match plan_action {
                     0 => {
                         // Plan said "exploit" — nudge LR down (floor at 1.0)
-                        self.fep_lr_boost =
-                            (self.fep_lr_boost * (1.0 - plan_weight * 0.1)).max(1.0);
+                        self.scale_lr("mcts_exploit", 1.0 - plan_weight * 0.1);
                     }
                     1 => {
                         // Plan said "consolidate" — reinforce prediction confidence
-                        self.prediction_confidence =
-                            (self.prediction_confidence + plan_weight * 0.05).clamp(0.0, 1.0);
+                        self.adjust_confidence("mcts_consolidate", plan_weight * 0.05);
                     }
                     2 => {
                         // Plan said "explore" — nudge exploration urge
@@ -1319,27 +1316,27 @@ impl CognitiveLoopService {
 
         // ── FEP Free Energy Decomposition → targeted modulation ──────────
         // Science: Friston (2010) — accuracy, complexity, surprise drive distinct responses
-        let (fep_accuracy, fep_complexity, fep_surprise, fep_td_error) = if let Some(ref fe) =
-            self.fep_agent.last_fe_components
-        {
+        // Extract FEP values first (avoids borrow conflict with self.adjust_confidence/scale_lr)
+        let fep_vals = self.fep_agent.last_fe_components.as_ref().map(|fe| {
+            (fe.accuracy, fe.complexity, fe.surprise, fe.prediction_error)
+        });
+        let (fep_accuracy, fep_complexity, fep_surprise, fep_td_error) = if let Some((acc, comp, surp, pe)) = fep_vals {
             // High accuracy → stabilize (model fits well)
-            if fe.accuracy > 0.5 {
-                self.prediction_confidence = (self.prediction_confidence + 0.01).clamp(0.0, 1.0);
+            if acc > 0.5 {
+                self.adjust_confidence("fep_accuracy_high", 0.01);
             }
             // High complexity → reduce LR (Occam's razor: penalize overfitting)
-            if fe.complexity > 1.0 {
-                self.fep_lr_boost = (self.fep_lr_boost
-                    * (1.0 - ((fe.complexity - 1.0).min(0.5) * 0.1) as f32))
-                    .max(1.0);
+            if comp > 1.0 {
+                self.scale_lr("fep_complexity", 1.0 - ((comp - 1.0).min(0.5) * 0.1) as f32);
             }
             // High surprise → boost exploration (complement existing is_surprised gate)
-            if fe.surprise > reflection_thresholds.surprise as f64 {
+            if surp > reflection_thresholds.surprise as f64 {
                 let s_explore =
-                    ((fe.surprise - reflection_thresholds.surprise as f64) * 0.1).min(0.05) as f32;
+                    ((surp - reflection_thresholds.surprise as f64) * 0.1).min(0.05) as f32;
                 self.curiosity_drive.exploration_urge =
                     (self.curiosity_drive.exploration_urge + s_explore).clamp(0.0, 1.0);
             }
-            (fe.accuracy, fe.complexity, fe.surprise, fe.prediction_error)
+            (acc, comp, surp, pe)
         } else {
             (0.0, 0.0, 0.0, 0.0)
         };
@@ -1384,9 +1381,7 @@ impl CognitiveLoopService {
                 };
                 // Dense, confident graph → stabilize (good causal model)
                 if edge_count > 5 && avg_confidence > 0.5 {
-                    self.prediction_confidence = (self.prediction_confidence
-                        + (avg_confidence as f32 - 0.5) * 0.03)
-                        .clamp(0.0, 1.0);
+                    self.adjust_confidence("causal_graph_dense", (avg_confidence as f32 - 0.5) * 0.03);
                 }
                 // Sparse graph after many cycles → poor understanding → boost exploration
                 if edge_count < 2 && self.stats.total_cycles > 200 {
@@ -1479,13 +1474,13 @@ impl CognitiveLoopService {
             // Science: Greene (2013) — distinct moral processes for different violation types
             if moral_judgment.consent_violation {
                 // Consent is most severe — strongly dampen confidence + pause learning
-                self.prediction_confidence *= 0.7;
+                self.scale_confidence("moral_consent_viol", 0.7);
                 self.carryover.learning.subsystem_lr_factor *= 0.5;
                 moral_steering_category = "consent";
             } else if moral_judgment.violations.iter().any(|v| v.contains("harm")) {
                 // Harm detected — strongly reduce exploration, shift to protective mode
                 self.curiosity_drive.exploration_urge *= 0.4;
-                self.prediction_confidence *= 0.85;
+                self.scale_confidence("moral_harm_detect", 0.85);
                 moral_steering_category = "harm";
             } else if moral_judgment
                 .violations
@@ -1503,18 +1498,17 @@ impl CognitiveLoopService {
             }
         } else if moral_score > MORAL_BENEFIT_THRESHOLD {
             // Positive moral alignment boosts confidence slightly
-            self.prediction_confidence =
-                (self.prediction_confidence * MORAL_BENEFIT_CONFIDENCE_BOOST).clamp(0.0, 1.0);
+            self.scale_confidence("moral_benefit", MORAL_BENEFIT_CONFIDENCE_BOOST);
         }
 
         // Surprise-gated learning rate boost: when FEP detects surprise, accelerate adaptation
         if is_surprised {
             let surprise_boost =
                 (self.fep_agent.current_free_energy() as f32 / FEP_SURPRISE_SCALE).clamp(0.1, 0.5);
-            self.fep_lr_boost = (self.fep_lr_boost + surprise_boost).clamp(1.0, 2.0);
+            self.adjust_lr("fep_surprise", surprise_boost);
         } else {
             // Decay boost back toward 1.0 when not surprised
-            self.fep_lr_boost = (self.fep_lr_boost * FEP_LR_DECAY).max(1.0);
+            self.scale_lr("fep_decay", FEP_LR_DECAY);
         }
 
         // ── Phase 21: Predictive free energy → surprise amplitude scaling ─
@@ -1542,8 +1536,7 @@ impl CognitiveLoopService {
         // Coherent chemical baseline that fine-grained Phase 14-21 loops adjust further.
         // ═══════════════════════════════════════════════════════════════════════
         // DA → learning rate
-        self.fep_lr_boost *= self.neuromodulator_bath.learning_rate_factor();
-        self.fep_lr_boost = self.fep_lr_boost.clamp(1.0, 3.0);
+        self.scale_lr("neuromod_dopamine", self.neuromodulator_bath.learning_rate_factor());
 
         // NE → exploration
         self.curiosity_drive.exploration_urge += self.neuromodulator_bath.exploration_delta();
@@ -1551,8 +1544,7 @@ impl CognitiveLoopService {
             self.curiosity_drive.exploration_urge.clamp(0.0, 1.0);
 
         // 5-HT → confidence
-        self.prediction_confidence += self.neuromodulator_bath.confidence_delta();
-        self.prediction_confidence = self.prediction_confidence.clamp(0.0, 1.0);
+        self.adjust_confidence("neuromod_serotonin", self.neuromodulator_bath.confidence_delta());
 
         // ACh → attention sensitivity + threshold
         self.adaptive_behavior.attention_sensitivity *= self.neuromodulator_bath.attention_factor();
@@ -1635,7 +1627,7 @@ impl CognitiveLoopService {
                     // Clear prediction cache if action-outcome coupling is poor
                     if enhanced_result.action_outcome_coupling < 0.3 {
                         self.last_prediction = None;
-                        self.prediction_confidence = 0.5;
+                        self.set_confidence("inference_mode_init", 0.5);
                     }
                 }
                 MotorCommandType::MotorOutput | MotorCommandType::NoOp => {
@@ -1657,7 +1649,7 @@ impl CognitiveLoopService {
         let degraded = self.coherence_tracker.record_turn(coherence);
         if degraded {
             // Coherence degradation -> boost learning rate to accelerate recovery
-            self.fep_lr_boost = (self.fep_lr_boost * 1.3).clamp(1.0, 2.0);
+            self.scale_lr("coherence_degraded", 1.3);
             let urgency = self.coherence_tracker.correction_urgency();
             // Feed urgency as a high-error observation to drive FEP learning
             let urgent_obs = Observation::from_consciousness_state(
@@ -1708,10 +1700,10 @@ impl CognitiveLoopService {
                 match rec.target {
                     super::RecommendationTarget::LearningRate => match rec.direction {
                         super::AdjustmentDirection::Decrease => {
-                            self.fep_lr_boost = (self.fep_lr_boost * 0.9).max(1.0);
+                            self.scale_lr("reflection_decrease", 0.9);
                         }
                         super::AdjustmentDirection::Increase => {
-                            self.fep_lr_boost = (self.fep_lr_boost * 1.1).clamp(1.0, 2.0);
+                            self.scale_lr("reflection_increase", 1.1);
                         }
                         _ => {}
                     },
@@ -1776,15 +1768,15 @@ impl CognitiveLoopService {
                 "epistemic"
             } else if q.contains("feel") || q.contains("emotion") || q.contains("care") {
                 // Affective question → boost emotional processing sensitivity
-                self.prediction_confidence = (self.prediction_confidence + 0.01).clamp(0.0, 1.0);
+                self.adjust_confidence("guide_affective", 0.01);
                 "affective"
             } else if q.contains("do") || q.contains("act") || q.contains("make") {
                 // Pragmatic question → boost action-oriented processing
-                self.fep_lr_boost = (self.fep_lr_boost * 1.02).clamp(1.0, 2.0);
+                self.scale_lr("guide_pragmatic", 1.02);
                 "pragmatic"
             } else if q.contains("connect") || q.contains("relate") || q.contains("together") {
                 // Social question → boost coherence sensitivity
-                self.prediction_confidence = (self.prediction_confidence + 0.02).clamp(0.0, 1.0);
+                self.adjust_confidence("guide_social", 0.02);
                 "social"
             } else {
                 "general"
@@ -2047,6 +2039,13 @@ impl CognitiveLoopService {
 
         // Compose effective LR from all modulation sources (flow, curiosity, FEP, MCE, subsystem)
         let effective_lr = self.compose_effective_lr(semantic_lr_factor, reasoning_lr_factor);
+        // DA-modulated gradient magnitude (neuromod-aware training)
+        // Science: Schultz (1997) — DA scales synaptic plasticity amplitude
+        let effective_lr = effective_lr * self.neuromodulator_bath.gradient_scale_factor();
+
+        // ACh-gated threshold: high ACh → learn from smaller errors
+        // Science: Yu & Dayan (2005) — ACh sharpens expected-uncertainty gating
+        let neuromod_threshold = effective_threshold * self.neuromodulator_bath.threshold_gate();
 
         // 11. Learn if error is significant AND we have a previous state AND not paused
         // FEEDBACK: Narrative-GWT veto suppresses learning (consciousness governance)
@@ -2056,7 +2055,7 @@ impl CognitiveLoopService {
         let _t_core = Instant::now();
         let consciousness_awake =
             self.carryover.history.consciousness_level > 0.0 || self.stats.total_cycles < 20; // grace period for boot-up
-        let (learning_occurred, training_loss) = if prediction_error > effective_threshold
+        let (learning_occurred, training_loss) = if prediction_error > neuromod_threshold
             && !self.adaptive_behavior.pause_learning
             && !self.carryover.quality.narrative_veto_active
             && consciousness_awake
@@ -2240,8 +2239,7 @@ impl CognitiveLoopService {
         };
         // Modulate confidence from causal attention (subtle: max 5% boost)
         if causal_attention_boost > 0.0 {
-            self.prediction_confidence =
-                (self.prediction_confidence + causal_attention_boost * 0.05).min(1.0);
+            self.adjust_confidence("causal_attention", causal_attention_boost * 0.05);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -2529,13 +2527,12 @@ impl CognitiveLoopService {
                 }
                 "Binding" => {
                     // Boost prediction confidence — binding weakness signals integration gap
-                    self.prediction_confidence =
-                        (self.prediction_confidence + 0.01).clamp(0.0, 1.0);
+                    self.adjust_confidence("limit_binding", 0.01);
                     self.stats.limiting_component_boost_count += 1;
                     "Binding"
                 }
                 "Efficacy" => {
-                    self.fep_lr_boost = (self.fep_lr_boost * 1.05).min(3.0);
+                    self.scale_lr("limit_efficacy", 1.05);
                     self.stats.limiting_component_boost_count += 1;
                     "Efficacy"
                 }
@@ -2550,7 +2547,7 @@ impl CognitiveLoopService {
         // resonate together (love > 0.6), boost confidence and soul learning rate.
         let love_resonance_boost = if harmonic_love_resonance > 0.6 {
             let boost = ((harmonic_love_resonance - 0.6) * 0.04) as f32; // up to +1.6%
-            self.prediction_confidence = (self.prediction_confidence + boost).clamp(0.0, 1.0);
+            self.adjust_confidence("love_resonance", boost);
             self.carryover.learning.subsystem_lr_factor *= 1.0 + boost * 0.5;
             self.carryover.learning.subsystem_lr_factor =
                 self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.3);
@@ -2566,7 +2563,7 @@ impl CognitiveLoopService {
             reasoning_chain_confidence > 0.7 && reasoning_chain_depth >= 3;
         if reasoning_chain_boosted {
             let chain_boost = (reasoning_chain_confidence - 0.7) * 0.05;
-            self.prediction_confidence = (self.prediction_confidence + chain_boost).clamp(0.0, 1.0);
+            self.adjust_confidence("reasoning_chain", chain_boost);
             self.stats.reasoning_chain_boost_count += 1;
         }
 
@@ -2622,7 +2619,7 @@ impl CognitiveLoopService {
             // (high confidence in rejection → strong dampening)
             let rejection_strength = (1.0 - epistemic_gate_confidence).clamp(0.0, 0.5);
             self.carryover.learning.subsystem_lr_factor *= 1.0 - rejection_strength * 0.3;
-            self.prediction_confidence *= 1.0 - rejection_strength * 0.15;
+            self.scale_confidence("epistemic_reject", 1.0 - rejection_strength * 0.15);
         } else if epistemic_gate_confidence > 0.6 {
             // Gate approves with high confidence → modest LR boost
             let approval_boost = (epistemic_gate_confidence - 0.6) * 0.08;
@@ -2933,7 +2930,7 @@ impl CognitiveLoopService {
                     (-coherence_velocity - 0.15).min(0.5)
                 };
                 // Dampen confidence proportional to severity
-                self.prediction_confidence *= 1.0 - severity * 0.1;
+                self.scale_confidence("coherence_vel_drop", 1.0 - severity * 0.1);
                 // Raise learning threshold (require higher error to trigger training)
                 self.carryover.learning.adaptive_threshold_scale *= 1.0 + severity * 0.2;
                 self.carryover.learning.adaptive_threshold_scale = self
@@ -2962,10 +2959,11 @@ impl CognitiveLoopService {
         {
             let confidence_start = self.carryover.learning.prediction_confidence;
             let max_drift = confidence_start * 0.15 + 0.02; // ±15% + 2% floor
-            self.prediction_confidence = self
+            let clamped = self
                 .prediction_confidence
                 .clamp(confidence_start - max_drift, confidence_start + max_drift)
                 .clamp(0.0, 1.0);
+            self.set_confidence("homeostasis_drift_clamp", clamped);
         }
 
         // Clamp attention_sensitivity to [0.5, 2.0] after all modifications.
@@ -2979,7 +2977,7 @@ impl CognitiveLoopService {
         // when stuck in repetitive states). Prevents confidence runaway from accumulated boosts.
         if self.curiosity_drive.boredom > 0.7 {
             let boredom_dampen = (self.curiosity_drive.boredom - 0.7) * 0.15;
-            self.prediction_confidence *= (1.0 - boredom_dampen).max(0.85);
+            self.scale_confidence("boredom_dampen", (1.0 - boredom_dampen).max(0.85));
         }
 
         // Boredom homeostasis: slow drift toward neutral (0.5) prevents monotonic saturation.
@@ -3015,17 +3013,17 @@ impl CognitiveLoopService {
         // Move hdv out now — only peak_attention (Copy) and detected_primitives are needed later.
         // Avoids a 64KB ContinuousHV clone for soul experience integration below.
         let encoding_hdv = encoding_result.hdv;
-        let spectral_mip_phi = if self.stats.total_cycles % 47 == 0 {
+        let spectral_mip_phi = if self.stats.total_cycles % 97 == 0 {
             let result = self.spectral_mip_finder.compute();
             let phi = result.as_ref().map(|r| r.phi);
             if phi.is_some() {
                 self.carryover.consciousness.last_spectral_mip_phi = phi;
                 self.carryover.consciousness.last_sigma = phi; // backward compat for memory coordinator
             }
-            // Adaptive dimension selection: every 94 cycles (every 2nd compute at 47-cycle cadence),
+            // Adaptive dimension selection: every 194 cycles (every 2nd compute at 97-cycle cadence),
             // concentrate tracked dimensions near the MIP boundary for better
             // partition quality. Fiedler ordering identifies informative dims.
-            if self.stats.total_cycles % 94 == 0 {
+            if self.stats.total_cycles % 194 == 0 {
                 if let Some(ref r) = result {
                     self.spectral_mip_finder.adapt(r);
                 }
@@ -3050,13 +3048,12 @@ impl CognitiveLoopService {
             if sig > 0.5 {
                 // High integration → consolidate (stabilize LR)
                 let sig_dampen = ((sig - 0.5) * 0.1).min(0.05) as f32;
-                self.fep_lr_boost = (self.fep_lr_boost * (1.0 - sig_dampen)).max(1.0);
-                self.prediction_confidence =
-                    (self.prediction_confidence + sig_dampen * 0.5).clamp(0.0, 1.0);
+                self.scale_lr("sigma_high", 1.0 - sig_dampen);
+                self.adjust_confidence("sigma_high", sig_dampen * 0.5);
             } else if sig < 0.2 {
                 // Low integration → boost learning (model needs updating)
                 let sig_boost = ((0.2 - sig) * 0.15).min(0.05) as f32;
-                self.fep_lr_boost = (self.fep_lr_boost * (1.0 + sig_boost)).clamp(1.0, 2.0);
+                self.scale_lr("sigma_low", 1.0 + sig_boost);
             }
         }
 
@@ -3071,12 +3068,11 @@ impl CognitiveLoopService {
             if phi_validation_cached > 0.7 {
                 // Validated: amplify sigma's confidence contribution
                 let validation_boost = (phi_validation_cached - 0.7) as f32 * 0.1;
-                self.prediction_confidence =
-                    (self.prediction_confidence + sig as f32 * validation_boost).clamp(0.0, 1.0);
+                self.adjust_confidence("phi_validated", sig as f32 * validation_boost);
             } else if phi_validation_cached > 0.0 && phi_validation_cached < 0.3 {
                 // Poorly validated: reduce sigma's influence (already applied above)
                 let attenuate = (0.3 - phi_validation_cached) as f32 * 0.05;
-                self.prediction_confidence *= 1.0 - attenuate;
+                self.scale_confidence("phi_unvalidated", 1.0 - attenuate);
             }
         }
         // Also weight equation_v2 when it deviates from spectral MIP
@@ -3086,8 +3082,7 @@ impl CognitiveLoopService {
                 // Spectral weight reduced (validation says eq_v2 is more reliable)
                 // → trust eq_v2 for confidence modulation
                 let eq_v2_boost = (eq_v2 * (1.0 - phi_spectral_weight as f64) * 0.03) as f32;
-                self.prediction_confidence =
-                    (self.prediction_confidence + eq_v2_boost).clamp(0.0, 1.0);
+                self.adjust_confidence("eq_v2_deviation", eq_v2_boost);
             }
         }
 
@@ -3148,12 +3143,10 @@ impl CognitiveLoopService {
         // Agreement modulates confidence and exploration
         if cross_module_agreement > 0.8 {
             // High agreement → amplify shared signal
-            self.prediction_confidence = (self.prediction_confidence
-                + (cross_module_agreement - 0.8) * 0.05)
-                .clamp(0.0, 1.0);
+            self.adjust_confidence("cross_mod_agree", (cross_module_agreement - 0.8) * 0.05);
         } else if cross_module_agreement < 0.3 {
             // Low agreement → modules conflict, dampen confidence, boost exploration
-            self.prediction_confidence *= 1.0 - (0.3 - cross_module_agreement) * 0.1;
+            self.scale_confidence("cross_mod_disagree", 1.0 - (0.3 - cross_module_agreement) * 0.1);
             self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
                 + (0.3 - cross_module_agreement) * 0.15)
                 .clamp(0.0, 1.0);
@@ -3444,6 +3437,14 @@ impl CognitiveLoopService {
             noradrenaline_effective: self.neuromodulator_bath.noradrenaline.effective(),
             serotonin_effective: self.neuromodulator_bath.serotonin.effective(),
             acetylcholine_effective: self.neuromodulator_bath.acetylcholine.effective(),
+            // Personality drift telemetry
+            neuromod_personality_drift: self.personality_drift_tracker.drift_rate(),
+            neuromod_personality_drift_anomalous: self.personality_drift_tracker.is_anomalous(),
+            // Neuromod-aware training telemetry
+            neuromod_gradient_scale: self.neuromodulator_bath.gradient_scale_factor(),
+            neuromod_threshold_gate: self.neuromodulator_bath.threshold_gate(),
+            // Exocortex trigger counter
+            exocortex_trigger_count: self.stats.exocortex_triggers,
             // Thermodynamic / affective (populated by consciousness pipeline + somatic bridge)
             thermodynamic_load: 0.0,
             somatic_stress: 0.0,
@@ -3456,6 +3457,8 @@ impl CognitiveLoopService {
             mesh_peer_count: 0,
             mesh_bytes_sent: 0,
             mesh_bytes_received: 0,
+            feedback_confidence_proposals: 0,
+            feedback_lr_proposals: 0,
         };
 
         // Update cumulative stats for resonator-memory loop diagnostics
@@ -3469,6 +3472,11 @@ impl CognitiveLoopService {
         }
         if fep_surprise > surprise_thresh {
             self.stats.fep_surprise_replay_boosts += 1;
+        }
+
+        // Exocortex trigger counter
+        if self.neuromodulator_bath.should_query_exocortex() {
+            self.stats.exocortex_triggers += 1;
         }
 
         // Neuromodulator EMA stats (alpha=0.05)
@@ -3488,6 +3496,9 @@ impl CognitiveLoopService {
         metadata.thermodynamic_load = self.thermodynamic_load;
         metadata.somatic_stress = self.somatic_bridge.systemic_stress();
         metadata.mood_temperature = self.mood_temperature;
+        // Phase 2.2: feedback proposal attribution telemetry
+        metadata.feedback_confidence_proposals = self.feedback_state.confidence.len() as u32;
+        metadata.feedback_lr_proposals = self.feedback_state.learning_rate.len() as u32;
 
         // Project 16,384D HDC to 32D for visualization (mean-pooling)
         let thought_vector = {
@@ -3523,6 +3534,12 @@ impl CognitiveLoopService {
         let signed_output = self.mfdi_bridge.sign_output(&output).ok();
         #[cfg(feature = "identity")]
         let assurance_level = self.mfdi_bridge.assurance_level();
+
+        // ── Phase 2.2: End feedback proposal collection ──────────────────
+        self.feedback_state.end_cycle(
+            self.prediction_confidence as f64,
+            self.fep_lr_boost as f64,
+        );
 
         CycleResult {
             output,

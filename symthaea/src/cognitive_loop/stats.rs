@@ -470,6 +470,9 @@ pub struct LoopStats {
     // ═══════════════════════════════════════════════════════════════════════════
     // NEUROMODULATOR BATH STATS
     // ═══════════════════════════════════════════════════════════════════════════
+    /// Cumulative exocortex query triggers (NE high + DA low + 5-HT low).
+    pub exocortex_triggers: u64,
+
     /// Running average dopamine effective level (EMA, alpha=0.05).
     pub avg_dopamine: f32,
     /// Running average noradrenaline effective level (EMA, alpha=0.05).

@@ -1000,6 +1000,16 @@ pub struct CycleMetadata {
     pub serotonin_effective: f32,
     /// Effective acetylcholine signal (attention/precision, 0.0–2.0).
     pub acetylcholine_effective: f32,
+    /// Personality drift rate (max trait delta per snapshot, 0.0 = stable).
+    pub neuromod_personality_drift: f32,
+    /// Whether personality drift exceeds the anomaly threshold (>0.005/snapshot).
+    pub neuromod_personality_drift_anomalous: bool,
+    /// DA gradient scaling factor applied to training LR (0.5–2.0).
+    pub neuromod_gradient_scale: f32,
+    /// ACh threshold gate factor applied to learning threshold (0.5–1.5).
+    pub neuromod_threshold_gate: f32,
+    /// Cumulative exocortex trigger count since startup.
+    pub exocortex_trigger_count: u64,
 
     // ── Liquid-Mamba Fusion Telemetry ────────────────────────────────
     /// Semantic prediction error from Liquid-Mamba round-trip (0.0–1.0, 0.0 when off).
@@ -1016,6 +1026,12 @@ pub struct CycleMetadata {
     pub mesh_bytes_sent: u64,
     /// Total bytes received from mesh since startup.
     pub mesh_bytes_received: u64,
+
+    // ── Feedback State Telemetry (Phase 2.2) ────────────────────────────
+    /// Number of confidence proposals collected this cycle.
+    pub feedback_confidence_proposals: u32,
+    /// Number of learning rate proposals collected this cycle.
+    pub feedback_lr_proposals: u32,
 }
 
 /// Per-module execution timings in microseconds for overhead profiling.
