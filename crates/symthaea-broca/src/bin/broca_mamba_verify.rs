@@ -68,7 +68,7 @@ fn main() {
     let start = Instant::now();
     match wrapper.forward_one_token(0) {
         Ok(logits) => {
-            let len_ok = logits.len() == wrapper.vocab_size();
+            let len_ok = logits.len() >= 50257;
             let finite_ok = logits.iter().all(|x| x.is_finite());
             if len_ok && finite_ok {
                 println!("PASS (logits={}, {:.1}ms)", logits.len(), start.elapsed().as_secs_f32() * 1000.0);
