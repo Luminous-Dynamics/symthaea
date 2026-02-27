@@ -13,117 +13,168 @@
 //!   - M (Embodiment Factor) = sensorimotor_prediction_accuracy × interoceptive_coherence
 //!   - N (Narrative Coherence) = autobiographical_integration × future_simulation_depth
 //!   - Soc (Social Embedding) = other_modeling_accuracy × self_other_distinction
+//!
+//! ## Module Organization
+//!
+//! Submodules are grouped into logical layers:
+//!
+//! | Layer | Module | Contents |
+//! |-------|--------|----------|
+//! | Primitives | [`primitives`] | HDC primitives, composition, evolution, lattice |
+//! | Values | [`values`] | Seven Harmonies, contextual weights, semantic embedding |
+//! | Temporal | [`temporal`] | Temporal binding, phenomenal binding, temporal primitives |
+//! | Embodiment | [`embodiment`] | Body schema, autopoiesis, interoception |
+//! | Integration | [`integration`] | Cross-modal, multi-modal, GWT, bridges |
+//! | Meta | [`meta`] | Metacognitive monitoring, meta-reasoning, attention schema |
+//! | Dynamics | [`dynamics`] | Dissipative, holographic, predictive, quantum coherence |
+//! | Measurement | [`measurement`] | Phi metrics, consciousness equations, profiles |
+//!
+//! All submodule contents are re-exported at this level for backward compatibility.
 
 // ============================================================================
-// Core consciousness modules (self-contained, verified working)
+// Layer 1: Primitives (HDC primitives, composition, evolution)
+// ============================================================================
+pub mod primitives;
+pub use primitives::code_primitives;
+pub use primitives::compositionality;
+pub use primitives::primitive_belief_bridge;
+pub use primitives::primitive_composition_rules;
+pub use primitives::primitive_consciousness;
+pub use primitives::primitive_discovery;
+pub use primitives::primitive_evolution;
+pub use primitives::primitive_lattice;
+pub use primitives::primitive_reasoning;
+pub use primitives::primitive_validation;
+pub use primitives::stability_regime;
+
+// ============================================================================
+// Layer 2: Values (Seven Harmonies, weights, embeddings, feedback)
+// ============================================================================
+pub mod values;
+pub use values::contextual_weights;
+pub use values::harmonies_integration;
+pub use values::semantic_value_embedder;
+pub use values::seven_harmonies;
+pub use values::value_feedback_loop;
+
+// ============================================================================
+// Layer 3: Temporal (binding, synchronization, temporal primitives)
+// ============================================================================
+pub mod temporal;
+pub use temporal::phenomenal_binding;
+pub use temporal::temporal_consciousness;
+pub use temporal::temporal_primitives;
+
+// ============================================================================
+// Layer 4: Embodiment (body schema, autopoiesis, interoception)
+// ============================================================================
+pub mod embodiment;
+pub use embodiment::autopoietic_consciousness;
+pub use embodiment::embodied_cognition;
+pub use embodiment::interoception;
+
+// ============================================================================
+// Layer 5: Integration (cross-modal, multi-modal, GWT, bridges)
+// ============================================================================
+pub mod integration;
+pub use integration::cross_modal_binding;
+pub use integration::evolution_bridge;
+pub use integration::gwt_integration;
+pub use integration::hierarchical_ltc;
+pub use integration::multi_modal_integration;
+pub use integration::narrative_gwt_integration;
+pub use integration::neuro_bridge;
+
+// ============================================================================
+// Layer 6: Meta-cognition (monitoring, reasoning, attention schema)
+// ============================================================================
+pub mod meta;
+pub use meta::attention_schema;
+pub use meta::metacognitive_monitoring;
+pub use meta::meta_reasoning;
+
+// ============================================================================
+// Layer 7: Dynamics (field, dissipative, holographic, predictive, quantum)
+// ============================================================================
+pub mod dynamics;
+pub use dynamics::consciousness_holography;
+pub use dynamics::consciousness_unification;
+pub use dynamics::context_aware_evolution;
+pub use dynamics::dissipative_consciousness;
+pub use dynamics::hierarchical_free_energy;
+pub use dynamics::predictive_processing;
+pub use dynamics::predictive_self;
+pub use dynamics::quantum_coherence;
+pub use dynamics::unified_consciousness_pipeline;
+
+// ============================================================================
+// Layer 8: Measurement (Phi metrics, consciousness equations, profiles)
+// ============================================================================
+pub mod measurement;
+pub use measurement::consciousness_equation_v2;
+pub use measurement::consciousness_profile;
+pub use measurement::differentiable;
+pub use measurement::dimension_synergies;
+pub use measurement::phi_attention;
+pub use measurement::phi_validation;
+
+// ============================================================================
+// External crate re-exports
+// ============================================================================
+pub use symthaea_dream as dream;
+pub use symthaea_fep as fep_active_inference;
+pub use symthaea_phi_search as phi_architecture_search;
+pub use symthaea_narrative_self as narrative_self;
+pub use symthaea_causal_reasoning::causal_calculus;
+pub use symthaea_causal_reasoning::causal_emergence;
+pub use symthaea_factor_graph as factor_graph;
+pub use symthaea_field_dynamics as consciousness_field_dynamics;
+pub use symthaea_consciousness_resonance as consciousness_resonance;
+pub use symthaea_consciousness_topology as consciousness_topology;
+pub use symthaea_enactive as enactive_cognition;
+/// Hodge Laplacian for simplicial complexes -- rigorous Betti numbers, spectral
+/// analysis, and Hodge decomposition of higher-order neural interaction signals
+pub use symthaea_hodge as hodge_laplacian;
+pub use symthaea_sensorimotor as sensorimotor_contingencies;
+
+// ============================================================================
+// Remaining root modules (not yet grouped into layers)
 // ============================================================================
 pub mod affective_consciousness;
-pub mod autopoietic_consciousness;
-pub mod code_primitives;
-pub mod compositionality;
-pub mod consciousness_unification;
-pub mod cross_modal_binding;
-pub mod interoception;
-pub use symthaea_fep as fep_active_inference;
-pub mod harmonies_integration;
 pub mod master_consciousness_equation;
 pub mod pac;
-pub use symthaea_phi_search as phi_architecture_search;
-pub mod phi_attention;
-pub mod primitive_composition_rules;
-pub mod primitive_discovery;
-pub mod primitive_evolution;
-pub mod primitive_lattice;
-pub mod primitive_reasoning;
-pub mod semantic_value_embedder;
-pub mod seven_harmonies;
-pub mod value_feedback_loop;
-
-// Counterfactual Dream Engine (extracted to symthaea-dream crate)
-pub use symthaea_dream as dream;
-
-// Neuro-Autopoietic Bridge: Connects HDC consciousness with LTC neural dynamics
-// Provides bidirectional causation between body (autopoiesis) and brain (LTC)
-pub mod neuro_bridge;
+pub mod consciousness_thermodynamics;
+pub mod epistemic_tiers;
+pub mod harmonics;
+pub mod adaptive_reasoning;
+pub mod causal_explanation;
+pub mod negation_detector;
+pub mod synthetic_states;
+pub mod gis_integration;
+pub mod value_system_tests;
+pub mod multi_objective_evolution;
 
 // ============================================================================
-// Modules with internal type dependencies (need more work)
+// Reasoning engine subsystems (cfg-gated)
 // ============================================================================
-
-// Contextual weights for harmony evaluation based on action type and domain.
-// Defines canonical ActionType, re-exported by unified_value_evaluator::types.
-pub mod contextual_weights;
-
-// Evolution bridge - connects primitive evolution with recursive self-improvement
-pub mod evolution_bridge;
-
-// Multi-modal integration - now fully wired with cross_modal_binding types
-pub mod multi_modal_integration;
-
-// Primitive-Consciousness Bridge - connects HDC primitives to consciousness processing
-pub mod primitive_consciousness;
-
-// Primitive-Belief Bridge - maps primitives to active inference belief states
-pub mod primitive_belief_bridge;
-
-// Stability Regime - CfC neurons for primitives with Crystallized/Plastic/Fluid dynamics
-pub mod stability_regime;
-
-// ============================================================================
-// Conscious Reasoning Engine subsystems (cfg-gated)
-// ============================================================================
-
-// Epistemic conflict detection: 15 pairwise theory conflicts, typed ConflictKind,
-// reliability R, effective Φ = Φ × R^γ, calibration with bounded updates (INV-9)
 pub mod epistemic_conflict;
 
-// Consciousness-gated tool use: risk lattice, two-signal gating (Φ_eff + confidence),
-// fallback strategies, NixOS backward compatibility
 #[cfg(feature = "reasoning_engine")]
 pub mod tool_gate;
 
-// Temporal planning: ForkedState + micro-MCTS + EVS + dream integration
 #[cfg(feature = "reasoning_engine")]
 pub mod temporal_planning;
 
-// Counterfactual reasoning v0: backdoor/frontdoor identification,
-// HDC graph surgery, semantic role substitution, reference harness
-// (extracted to symthaea-causal-reasoning crate)
 #[cfg(feature = "reasoning_engine")]
 pub use symthaea_causal_reasoning::counterfactual;
 
-// Unified Conscious Reasoning Engine: composes conflict detection, temporal
-// planning, counterfactual reasoning, and tool gating into a 7-step cycle
-// with tiered degradation (Tier 0 ≤2ms, Tier 1 ≤8ms, Tier 2 ≤20ms)
 #[cfg(feature = "reasoning_engine")]
 pub mod reasoning_engine;
 
 // ============================================================================
-// Module Integration Status (as of v0.5.2)
-// ============================================================================
-//
-// | Module                        | Status       | Gate                  | Notes                                            |
-// |-------------------------------|--------------|-----------------------|--------------------------------------------------|
-// | temporal_planning             | Wired        | reasoning_engine      | Used in reasoning engine 7-step cycle            |
-// | tool_gate                     | Wired        | reasoning_engine      | Used in reasoning engine                         |
-// | empathic_unification          | Wired        | full_consciousness    | Stub provided when feature disabled              |
-// | recursive_improvement         | Wired        | full_consciousness    | Dream feedback loop wired into cognitive cycle   |
-// | consciousness_driven_evolution| DELETED      | —                     | Zero callers, removed in Great Refactor          |
-// | unified_intelligence          | Standalone   | multi_agent           | Compiles, tested; meta_reasoning available       |
-// | mycelix_bridge                | Structural   | mycelix               | Compiled but not called from cognitive loop       |
-// | byzantine_collective          | Standalone   | multi_agent           | Compiles, tested; multi-agent trust scoring      |
-// | unified_living_mind           | Standalone   | full_consciousness    | Compiles, tested; depends on LifeState           |
-// | iroh P2P                      | Wired        | swarm                 | sync_iroh_bridge() called every mind tick        |
-// | vocal_tract                   | Wired        | voice-tts             | Controller/encoder/FEP active in voice pipeline  |
-//
+// Feature-gated modules
 // ============================================================================
 
-// ============================================================================
-// Modules with external dependencies (cfg-gated)
-// ============================================================================
-
-// Empathic unification - re-enabled after adding required types to emotional_core
-// and ContextKind variants to user_state_inference
 #[cfg(feature = "full_consciousness")]
 pub mod empathic_unification;
 
@@ -248,11 +299,8 @@ pub mod empathic_unification {
     #[derive(Debug, Default)]
     #[allow(dead_code)] // RESERVED(future): empathic unification processing state
     pub struct EmpathicUnification {
-        /// Current user need
         current_need: UserNeed,
-        /// Current tone
         tone: ToneGuidance,
-        /// Current user emotional state
         user_emotional_state: UserEmotionalState,
     }
 
@@ -315,46 +363,35 @@ pub mod empathic_unification {
     }
 }
 
-pub mod gis_integration;
+#[cfg(feature = "full_consciousness")]
+pub mod unified_living_mind;
 
-// ============================================================================
-// Ported from crates/symthaea-consciousness (2026-02-06) — Tier 1 high-value
-// ============================================================================
-
-/// Hierarchical LTC architecture with 25x speedup (CSR sparse matrix)
-pub mod hierarchical_ltc;
-
-/// Narrative Self-Model (Damasio autobiographical self, Tulving autonoetic consciousness)
-pub use symthaea_narrative_self as narrative_self;
-
-/// Attention Schema Theory (Graziano) — attention as a control mechanism
-pub mod attention_schema;
-
-/// Consciousness Thermodynamics — free energy, entropy, phase transitions
-pub mod consciousness_thermodynamics;
-
-/// Epistemic Causal Reasoning — 3D epistemic cube (Empirical × Normative × Materiality)
-pub mod epistemic_tiers;
-
-/// Metacognitive Monitoring — self-correction via Φ observation
-pub mod metacognitive_monitoring;
-
-/// Operational Fiduciary Harmonics — Seven Harmonics optimization framework
-pub mod harmonics;
-
-/// Unified Emergent Intelligence — collective + context-aware + meta-cognitive
-#[cfg(feature = "multi_agent")]
-pub mod unified_intelligence;
-
-// Recursive improvement (needs internal API alignment - cfg-gated)
-// MAGI Loop can be enabled standalone via the magi_loop feature
 #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
 pub mod recursive_improvement;
 
 /// Unified value evaluator — consciousness-guided decision making with Seven Harmonies
 pub mod unified_value_evaluator;
 
-// Re-export key types
+/// Unified Emergent Intelligence — collective + context-aware + meta-cognitive
+#[cfg(feature = "multi_agent")]
+pub mod unified_intelligence;
+
+#[cfg(feature = "multi_agent")]
+pub mod byzantine_collective;
+
+#[cfg(feature = "multi_agent")]
+pub mod meta_learning_byzantine;
+
+#[cfg(feature = "multi_agent")]
+pub mod causal_byzantine;
+
+#[cfg(feature = "mycelix")]
+pub mod mycelix_bridge;
+
+// ============================================================================
+// Re-exports — backward-compatible type-level imports
+// ============================================================================
+
 pub use affective_consciousness::{AffectiveConsciousnessAnalyzer, CoreAffect, EmotionCategory};
 pub use autopoietic_consciousness::{AutopoieticConsciousness, AutopoieticState};
 pub use compositionality::{
@@ -388,7 +425,6 @@ pub use fep_active_inference::{
     PerceptionResult,
     PrecisionEstimator,
     StateTransition,
-    // Temporal Difference Learning types
     TemporalDifferenceLearner,
     TemporalDifferenceLearningConfig,
     TemporalDifferenceLearningStats,
@@ -424,8 +460,6 @@ pub use stability_regime::{
     CfCPrimitive, RegimeParams, StabilityRegimeConfig, StabilityRegimeProcessor,
     StabilityRegimeType,
 };
-
-// ── Ported Tier 1 re-exports ──────────────────────────────────────────────
 pub use attention_schema::{AttentionSchema, AttentionSchemaConfig, AttentionState};
 pub use consciousness_thermodynamics::{ConsciousnessThermodynamicsAnalyzer, ThermodynamicsConfig};
 pub use epistemic_tiers::{EmpiricalTier, EpistemicCoordinate, MaterialityTier, NormativeTier};
@@ -435,99 +469,10 @@ pub use metacognitive_monitoring::{MetacognitiveMonitor, MonitoringResult};
 pub use narrative_self::{
     AutobiographicalSelf, CoreSelf, NarrativeSelfConfig, NarrativeSelfModel, ProtoSelf,
 };
-
-// ============================================================================
-// Ported from crates/symthaea-consciousness (2026-02-06) — Tiers 2–5
-// ============================================================================
-
-// ── Tier 2: Primitive Reasoning Layer ───────────────────────────────────────
-pub mod adaptive_reasoning;
-pub mod causal_explanation;
-pub mod negation_detector;
-pub mod synthetic_states;
-pub mod temporal_primitives;
-
-pub mod primitive_validation;
-
-// ── Tier 3: Consciousness Integration ──────────────────────────────────────
-// causal_calculus and causal_emergence extracted to symthaea-causal-reasoning crate
-pub use symthaea_causal_reasoning::causal_calculus;
-pub use symthaea_causal_reasoning::causal_emergence;
-pub use symthaea_factor_graph as factor_graph;
-
-pub mod dimension_synergies;
-
-pub mod consciousness_profile;
-pub mod phi_validation;
-
-// ── Tier 4: Dynamics & Field ───────────────────────────────────────────────
-pub use symthaea_field_dynamics as consciousness_field_dynamics;
-pub mod consciousness_holography;
-pub use symthaea_consciousness_resonance as consciousness_resonance;
-pub use symthaea_consciousness_topology as consciousness_topology;
-pub mod dissipative_consciousness;
-pub mod embodied_cognition;
-pub use symthaea_enactive as enactive_cognition;
-pub mod hierarchical_free_energy;
-/// Hodge Laplacian for simplicial complexes -- rigorous Betti numbers, spectral
-/// analysis, and Hodge decomposition of higher-order neural interaction signals
-pub use symthaea_hodge as hodge_laplacian;
-pub mod phenomenal_binding;
-pub mod predictive_processing;
-pub mod predictive_self;
-pub mod quantum_coherence;
-pub use symthaea_sensorimotor as sensorimotor_contingencies;
-
-// ── Tier 4 (NEEDS_CHAIN — dependencies now satisfied) ──────────────────────
-pub mod consciousness_equation_v2;
-pub mod context_aware_evolution;
-pub mod temporal_consciousness;
-pub mod unified_consciousness_pipeline;
-
-// consciousness_driven_evolution — DELETED (Great Refactor Phase 0.1)
-// Was 986 LOC, zero callers. Depended on commented-out recursive_improvement optimizers.
-
-/// Gated: depends on autopoietic_consciousness::LifeState (not in src version)
-#[cfg(feature = "full_consciousness")]
-pub mod unified_living_mind;
-
-// ── Final batch: remaining unique modules from crate ────────────────────────
-pub mod differentiable;
-pub mod meta_reasoning;
-
-/// Gated: multi-agent trust scoring (depends on unified_intelligence)
-#[cfg(feature = "multi_agent")]
-pub mod byzantine_collective;
-
-/// Gated: multi-agent meta-learning (depends on byzantine_collective)
-#[cfg(feature = "multi_agent")]
-pub mod meta_learning_byzantine;
-
-/// Gated: multi-agent causal consensus (depends on meta_learning_byzantine)
-#[cfg(feature = "multi_agent")]
-pub mod causal_byzantine;
-
-/// GWT integration — Global Workspace Theory processor (observability is optional)
-pub mod gwt_integration;
-
-/// Narrative + GWT integration — narrative self as standing coalition
-pub mod narrative_gwt_integration;
-
-/// Mycelix bridge — consciousness-gated governance
-#[cfg(feature = "mycelix")]
-pub mod mycelix_bridge;
-
-/// Value system tests — calibration and validation
-pub mod value_system_tests;
-
-/// Multi-objective evolution — NSGA-II-inspired Pareto frontier optimization
-pub mod multi_objective_evolution;
-
-// Re-exports from consciousness_equation_v2 (needed by differentiable.rs)
 pub use consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent, EquationConfig};
 
 // ============================================================================
-// Convenience constructors for optional engines
+// Convenience constructors
 // ============================================================================
 
 use crate::hdc::primitive_system::PrimitiveSystem;

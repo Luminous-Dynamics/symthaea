@@ -33,7 +33,7 @@
 //! println!("∂C/∂Φ = {:.4}", gradient.integration);
 //! ```
 
-use super::{ConsciousnessStateV2, CoreComponent, EquationConfig};
+use super::consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent, EquationConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

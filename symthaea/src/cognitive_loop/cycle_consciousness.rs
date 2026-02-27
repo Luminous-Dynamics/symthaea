@@ -163,7 +163,7 @@ impl CognitiveLoopService {
             consciousness_profile_composite,
             synergy_enhanced_composite,
             emergent_properties_count,
-        ) = if self.stats.total_cycles % 23 == 0 && self.primitive_processor.is_some() {
+        ) = if self.stats.total_cycles % 47 == 0 && self.primitive_processor.is_some() {
             let profile =
                 crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
                     self.carryover.history.recent_hvs.make_contiguous(),
@@ -262,7 +262,7 @@ impl CognitiveLoopService {
 
         // FEEDBACK: Low harmony alignment → reduce confidence (ethical uncertainty)
         if harmonies_alignment > 0.0 && !harmonies_approved {
-            self.prediction_confidence = (self.prediction_confidence - 0.02).max(0.0);
+            self.adjust_confidence("harmonies_low_align", -0.02);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -314,7 +314,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (reasoning_chain_confidence, reasoning_chain_depth) =
             if let Some(ref mut reasoner) = self.primitive_reasoner {
-                if self.stats.total_cycles % 23 == 0 && self.stats.total_cycles > 0 {
+                if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
                     let result = reasoner.reason("cognitive_state", &[]);
                     (result.confidence, result.reasoning_chain.len())
                 } else {
@@ -328,7 +328,7 @@ impl CognitiveLoopService {
         // FEEDBACK: High reasoning confidence → boost prediction confidence
         if reasoning_chain_confidence > 0.7 {
             let reason_boost = (reasoning_chain_confidence - 0.7) * 0.03; // up to +0.9%
-            self.prediction_confidence = (self.prediction_confidence + reason_boost).min(1.0);
+            self.adjust_confidence("reasoning_chain", reason_boost);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -352,7 +352,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let epistemic_override = self.carryover.quality.epistemic_reasoning_override;
         let adaptive_reasoning_phi = if let Some(ref mut reasoner) = self.adaptive_reasoner {
-            if (self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0) || epistemic_override {
+            if (self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0) || epistemic_override {
                 if epistemic_override {
                     self.carryover.quality.epistemic_reasoning_override = false;
                     self.stats.epistemic_reasoning_accelerations += 1;
@@ -377,7 +377,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let epistemic_quality = if self.primitive_processor.is_some() {
-            if self.stats.total_cycles % 47 == 0 {
+            if self.stats.total_cycles % 97 == 0 {
                 use crate::consciousness::epistemic_tiers::*;
                 // Classify based on cycle count (more cycles = higher empirical tier)
                 let empirical = if self.stats.total_cycles > 1000 {
@@ -457,7 +457,7 @@ impl CognitiveLoopService {
                 &mut self.epistemic_conflict_detector,
                 &self.theory_calibrator,
             ) {
-                if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
+                if self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0 {
                     use crate::consciousness::epistemic_conflict::{
                         compute_phi_eff, ConflictMatrix, MultiTheoryMetrics,
                     };
@@ -686,13 +686,13 @@ impl CognitiveLoopService {
         // FEEDBACK: Temporal continuity → prediction confidence (stable time-axis = reliable predictions)
         if temporal_continuity > 0.7 {
             let boost = ((temporal_continuity - 0.7) * 0.05) as f32; // up to +1.5%
-            self.prediction_confidence = (self.prediction_confidence + boost).min(1.0);
+            self.adjust_confidence("temporal_continuity", boost);
         }
 
         // FEEDBACK: Causal chain detection → confidence boost (the system found real structure)
         if temporal_causal_chains > 2 {
             let chain_boost = (temporal_causal_chains.min(10) as f32 - 2.0) * 0.005; // +0.5% per chain, up to +4%
-            self.prediction_confidence = (self.prediction_confidence + chain_boost).min(1.0);
+            self.adjust_confidence("causal_chain_detect", chain_boost);
         }
 
         // Track A-1: Causal chain → episodic memory consolidation boost
@@ -759,8 +759,7 @@ impl CognitiveLoopService {
             match dc.recommend_action() {
                 DissipativeAction::Maintain { .. } => {
                     // Optimal regime: slight confidence boost (system is well-organized)
-                    self.prediction_confidence =
-                        (self.prediction_confidence + 0.005).clamp(0.0, 1.0);
+                    self.adjust_confidence("dissipative_maintain", 0.005);
                 }
                 DissipativeAction::IncreaseActivity {
                     suggested_increase, ..
@@ -769,23 +768,23 @@ impl CognitiveLoopService {
                     let explore_boost = (suggested_increase * 0.15).min(0.05) as f32;
                     self.curiosity_drive.exploration_urge =
                         (self.curiosity_drive.exploration_urge + explore_boost).clamp(0.0, 1.0);
-                    self.prediction_confidence = (self.prediction_confidence - 0.01).max(0.0);
+                    self.adjust_confidence("dissipative_equilibrium", -0.01);
                 }
                 DissipativeAction::IncreaseCoherence { .. } => {
                     // Chaotic: suppress exploration, boost learning to restore coherence
                     self.curiosity_drive.exploration_urge =
                         (self.curiosity_drive.exploration_urge * 0.9).max(0.0);
-                    self.fep_lr_boost = (self.fep_lr_boost * 1.05).clamp(1.0, 2.0);
+                    self.scale_lr("dissipative_coherence", 1.05);
                 }
                 DissipativeAction::IncreaseDifferentiation { .. } => {
                     // Too ordered: nudge exploration up, learning down slightly
                     self.curiosity_drive.exploration_urge =
                         (self.curiosity_drive.exploration_urge + 0.02).clamp(0.0, 1.0);
-                    self.prediction_confidence = (self.prediction_confidence - 0.005).max(0.0);
+                    self.adjust_confidence("dissipative_ordered", -0.005);
                 }
                 DissipativeAction::IncreaseIntegration { .. } => {
                     // Too differentiated: boost learning rate for better integration
-                    self.fep_lr_boost = (self.fep_lr_boost * 1.03).clamp(1.0, 2.0);
+                    self.scale_lr("dissipative_integration", 1.03);
                 }
             }
         }
@@ -856,8 +855,7 @@ impl CognitiveLoopService {
         // GWT predicts conscious moments are preferentially consolidated into long-term memory)
         if equation_v2_consciousness > 0.6 {
             let boost = (equation_v2_consciousness - 0.6) * 0.08; // up to +3.2%
-            self.prediction_confidence =
-                (self.prediction_confidence + boost as f32).clamp(0.0, 1.0);
+            self.adjust_confidence("equation_v2_high", boost as f32);
             // High-consciousness moments → boost episodic consolidation priority
             // Science: Conscious access correlates with memory formation (Dehaene 2014, ch.4)
             if let Some(ref mut replay) = self.phi_episodic_replay {
@@ -1070,8 +1068,7 @@ impl CognitiveLoopService {
         // FEEDBACK: Harmonic interferences → reduce confidence (value tensions = uncertainty)
         if harmonic_interferences > 0 {
             let interference_penalty = (harmonic_interferences.min(3) as f32) * 0.01; // -1% per interference
-            self.prediction_confidence =
-                (self.prediction_confidence - interference_penalty).max(0.0);
+            self.adjust_confidence("harmonic_interference", -interference_penalty);
         }
 
         (

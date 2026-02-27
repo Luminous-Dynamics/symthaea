@@ -109,14 +109,12 @@ impl CognitiveLoopService {
             if phi_divergence < 0.2 {
                 // Phi estimates converge → strong confidence in integration measure
                 let convergence_boost = (0.2 - phi_divergence) * 0.05;
-                self.prediction_confidence =
-                    (self.prediction_confidence + convergence_boost).clamp(0.0, 1.0);
+                self.adjust_confidence("hier_ltc_phi_converge", convergence_boost);
             } else if phi_divergence > 0.4 {
                 // Significant divergence → epistemic uncertainty about integration
                 // Attenuated 50%: NE exploration_delta covers surprise-driven exploration
                 let divergence_penalty = (phi_divergence - 0.4).min(0.3) * 0.015;
-                self.prediction_confidence =
-                    (self.prediction_confidence - divergence_penalty).max(0.0);
+                self.adjust_confidence("hier_ltc_phi_diverge", -divergence_penalty);
                 self.curiosity_drive.exploration_urge =
                     (self.curiosity_drive.exploration_urge + divergence_penalty).clamp(0.0, 1.0);
             }
@@ -154,7 +152,7 @@ impl CognitiveLoopService {
             self.carryover.learning.subsystem_lr_factor *= evo_boost;
             // Phase 18: Positive delta → boost confidence (evolution is working)
             let conf_boost = (evolution_phi_delta * 0.05).min(0.03) as f32;
-            self.prediction_confidence = (self.prediction_confidence + conf_boost).clamp(0.0, 1.0);
+            self.adjust_confidence("evolution_phi_delta", conf_boost);
             self.stats.evolution_feedback_count += 1;
         } else if evolution_phi_delta < -0.01 {
             // Phase 18: Negative delta → boost exploration urge (need to search harder)
@@ -173,7 +171,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (holographic_unity, holographic_binding) =
             if let Some(ref mut ha) = self.holographic_analyzer {
-                if self.stats.total_cycles % (19 * budget_interval_mult) == 0 {
+                if self.stats.total_cycles % (47 * budget_interval_mult) == 0 {
                     let content: Vec<f64> = (0..64)
                         .map(|i| {
                             if hv16_cached.get_bit(i) != 0 {
@@ -199,8 +197,7 @@ impl CognitiveLoopService {
         // Science: Pribram (1991) — holographic encoding enables stable predictions
         if holographic_unity > 0.7 {
             let unity_boost = (holographic_unity - 0.7) * 0.03;
-            self.prediction_confidence =
-                (self.prediction_confidence + unity_boost as f32).clamp(0.0, 1.0);
+            self.adjust_confidence("holographic_unity", unity_boost as f32);
         }
         // FEEDBACK: Binding strength modulates learning rate
         // Strong binding = coherent representations → safe to learn faster
@@ -219,7 +216,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (consciousness_gradient_magnitude, consciousness_limiting_component) =
             if let Some(ref dc) = self.differentiable_consciousness {
-                if self.stats.total_cycles % (23 * budget_interval_mult) == 0
+                if self.stats.total_cycles % (47 * budget_interval_mult) == 0
                     && self.stats.total_cycles > 0
                 {
                     use crate::consciousness::consciousness_equation_v2::{
@@ -304,8 +301,7 @@ impl CognitiveLoopService {
         if let Some(ref ac) = self.affective_consciousness {
             let affect = ac.current_affect();
             if affect.valence < -0.3 {
-                self.prediction_confidence =
-                    (self.prediction_confidence + affect.valence * 0.02).max(0.0);
+                self.adjust_confidence("affective_neg_valence", affect.valence * 0.02);
             }
         }
 
@@ -347,7 +343,7 @@ impl CognitiveLoopService {
         // Science: Dehaene (2011) — global workspace broadcasts learning signals
         if pipeline_consciousness > 0.6 {
             let pipeline_lr_scale = 1.0 + (pipeline_consciousness - 0.6) * 0.5;
-            self.fep_lr_boost = (self.fep_lr_boost * pipeline_lr_scale as f32).clamp(1.0, 2.0);
+            self.scale_lr("pipeline_consciousness", pipeline_lr_scale as f32);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -376,8 +372,7 @@ impl CognitiveLoopService {
         // Science: Ghazanfar & Schroeder (2006) — cross-modal binding enables precise learning
         if multimodal_integrated_phi > 0.5 {
             let phi_confidence = (multimodal_integrated_phi - 0.5) * 0.04;
-            self.prediction_confidence =
-                (self.prediction_confidence + phi_confidence as f32).clamp(0.0, 1.0);
+            self.adjust_confidence("multimodal_phi", phi_confidence as f32);
             let phi_subsystem_lr = 1.0 + (multimodal_integrated_phi - 0.5) * 0.4;
             self.carryover.learning.subsystem_lr_factor *= phi_subsystem_lr as f32;
             self.carryover.learning.subsystem_lr_factor =
@@ -419,7 +414,7 @@ impl CognitiveLoopService {
         let (epistemic_gate_confidence, epistemic_gate_approved) = if let Some(ref mut gate) =
             self.epistemic_gate
         {
-            if self.stats.total_cycles % 7 == 0 {
+            if self.stats.total_cycles % 13 == 0 {
                 let action_risk = (1.0 - self.prediction_confidence).clamp(0.0, 1.0);
                 let decision = gate.evaluate(input, action_risk);
                 let (confidence, approved) = match &decision {
@@ -441,7 +436,7 @@ impl CognitiveLoopService {
 
         // FEEDBACK: Low epistemic confidence reduces prediction confidence
         if epistemic_gate_confidence < 0.3 && !epistemic_gate_approved {
-            self.prediction_confidence = (self.prediction_confidence - 0.03).max(0.0);
+            self.adjust_confidence("epistemic_gate_low", -0.03);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -626,7 +621,7 @@ impl CognitiveLoopService {
         // Science: Nelson & Narens (1990) — monitoring-control loop
         if meta_reasoning_confidence > 0.7 {
             let meta_boost = (meta_reasoning_confidence - 0.7) * 0.1;
-            self.fep_lr_boost = (self.fep_lr_boost + meta_boost as f32).clamp(1.0, 2.0);
+            self.adjust_lr("meta_reasoning", meta_boost as f32);
         }
 
         // ═══════════════════════════════════════════════════════════════════════

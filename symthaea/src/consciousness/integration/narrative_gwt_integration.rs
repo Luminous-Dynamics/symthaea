@@ -1857,9 +1857,9 @@ mod tests {
         let _veto = integration.check_veto(&action, "action that might have tension");
 
         // Tension check should be accessible
-        let had_tensions = integration.last_value_had_tensions();
         // Tensions are detected based on harmony scores, may or may not have them
-        assert!(had_tensions || !had_tensions);
+        // Just verify the call completes without panicking
+        let _had_tensions = integration.last_value_had_tensions();
 
         // Report should be available for detailed inspection
         if let Some(report) = integration.last_value_report() {

@@ -39,7 +39,7 @@
 //! println!("{}", report);
 //! ```
 
-use super::synthetic_states::{StateType, SyntheticStateGenerator};
+use crate::consciousness::synthetic_states::{StateType, SyntheticStateGenerator};
 use crate::hdc::integrated_information::IntegratedInformation;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

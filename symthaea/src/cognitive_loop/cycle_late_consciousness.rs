@@ -203,7 +203,7 @@ impl CognitiveLoopService {
         // exploration=0, learning=0. Soften both to allow partial recovery.
         if ctx.reasoning_gate_blocked && prefrontal_veto {
             self.curiosity_drive.exploration_urge = 0.3;
-            self.fep_lr_boost = self.fep_lr_boost.max(1.0); // enforce fep_lr_boost >= 1.0 invariant
+            self.set_lr("dual_veto_freeze", self.fep_lr_boost.max(1.0));
             tracing::debug!(
                 cycle = self.stats.total_cycles,
                 "Dual-veto freeze detected: softening both gates for recovery"
@@ -286,11 +286,9 @@ impl CognitiveLoopService {
         // Science: Damasio (1999) — positive somatic state boosts cognitive coherence;
         // negative somatic state signals danger → dampen confidence
         if body_valence > 0.3 {
-            self.prediction_confidence =
-                (self.prediction_confidence + body_valence * 0.02).clamp(0.0, 1.0);
+            self.adjust_confidence("body_valence_pos", body_valence * 0.02);
         } else if body_valence < -0.3 {
-            self.prediction_confidence =
-                (self.prediction_confidence + body_valence * 0.03).clamp(0.0, 1.0);
+            self.adjust_confidence("body_valence_neg", body_valence * 0.03);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -331,7 +329,7 @@ impl CognitiveLoopService {
         if affective_arousal > 0.7 {
             // Attenuated 50%: DA learning_rate_factor() already scales LR via the bath
             let arousal_suppress = ((affective_arousal - 0.7) * 0.25).min(0.08);
-            self.fep_lr_boost = (self.fep_lr_boost * (1.0 - arousal_suppress)).max(1.0);
+            self.scale_lr("affective_arousal_suppress", 1.0 - arousal_suppress);
 
             // Arousal trap detection (Yerkes-Dodson 1908 — inverted-U performance curve)
             // Science: Prolonged high arousal suppresses LR → error stays high → arousal stays
@@ -354,7 +352,7 @@ impl CognitiveLoopService {
                 let recovery_intensity =
                     (self.carryover.urgency.arousal_trap_counter - 5) as f32 / 5.0;
                 // Gradual LR dampening: attenuated 50% (NE exploration_delta handles arousal)
-                self.fep_lr_boost = (self.fep_lr_boost * (1.0 - recovery_intensity * 0.1)).max(1.0);
+                self.scale_lr("arousal_trap_recovery", 1.0 - recovery_intensity * 0.1);
                 // Slight exploration boost: attenuated 50% (NE exploration_delta covers this)
                 self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
                     + recovery_intensity * 0.025)
@@ -369,7 +367,7 @@ impl CognitiveLoopService {
             }
             if self.carryover.urgency.arousal_trap_counter > 10 {
                 self.curiosity_drive.exploration_urge = 1.0; // forced escape attempt
-                self.prediction_confidence *= 0.9; // reset confidence to allow re-learning
+                self.scale_confidence("arousal_trap_escape", 0.9);
                 self.carryover.urgency.arousal_trap_counter = 0;
                 tracing::debug!(
                     cycle = self.stats.total_cycles,
@@ -383,8 +381,7 @@ impl CognitiveLoopService {
             if affective_arousal < 0.3 {
                 // Attenuated 50%: DA handles low-error consolidation boost via the bath
                 let consolidation_boost = ((0.3 - affective_arousal) * 0.3).min(0.05);
-                self.fep_lr_boost =
-                    (self.fep_lr_boost * (1.0 + consolidation_boost)).clamp(1.0, 2.0);
+                self.scale_lr("low_arousal_consolidate", 1.0 + consolidation_boost);
             }
         }
         module_timings.affective_bridge = _t.elapsed().as_micros() as u64;
@@ -432,9 +429,9 @@ impl CognitiveLoopService {
         // FEEDBACK: Narrative self-Phi modulates prediction confidence (identity coherence)
         // Science: Gallagher (2000) — strong narrative identity stabilizes learning
         if narrative_self_psi > 0.5 {
-            self.prediction_confidence = (self.prediction_confidence * 1.02).clamp(0.0, 1.0);
+            self.scale_confidence("narrative_self_strong", 1.02);
         } else if narrative_self_psi > 0.0 && narrative_self_psi < 0.2 {
-            self.prediction_confidence = (self.prediction_confidence * 0.95).clamp(0.0, 1.0);
+            self.scale_confidence("narrative_self_weak", 0.95);
         }
 
         // FEEDBACK: Narrative self-Phi modulates moral sensitivity (Gallagher & Hutto 2007)
@@ -522,7 +519,7 @@ impl CognitiveLoopService {
                                                        // Boost LR proportional to free energy (poor model → learn harder)
                                                        // Capped at +10% to avoid overshooting in short ablation windows
             let hfe_lr_boost = (1.0 + (hierarchical_total_free_energy * 0.02).min(0.1)) as f32;
-            self.fep_lr_boost = (self.fep_lr_boost * hfe_lr_boost).clamp(1.0, 1.3);
+            self.scale_lr("hierarchical_free_energy", hfe_lr_boost);
         }
 
         module_timings.hierarchical_free_energy = _t.elapsed().as_micros() as u64;
@@ -698,9 +695,7 @@ impl CognitiveLoopService {
         // FEEDBACK: GWT broadcast boosts confidence (conscious access moment)
         // Science: Baars (1988) — broadcast = conscious access, should amplify integration
         if gwt_broadcast {
-            self.prediction_confidence = (self.prediction_confidence
-                + super::cycle::GWT_BROADCAST_CONFIDENCE_BOOST)
-                .clamp(0.0, 1.0);
+            self.adjust_confidence("gwt_broadcast", super::cycle::GWT_BROADCAST_CONFIDENCE_BOOST);
         }
 
         module_timings.gwt = _t.elapsed().as_micros() as u64;
@@ -769,9 +764,9 @@ impl CognitiveLoopService {
         // Decoherence → noisy processing → reduce confidence
         if quantum_coherence_level > 0.6 {
             let qc_boost = (quantum_coherence_level - 0.6) as f32 * 0.05; // up to +2%
-            self.prediction_confidence = (self.prediction_confidence + qc_boost).clamp(0.0, 1.0);
+            self.adjust_confidence("quantum_coherence_high", qc_boost);
         } else if quantum_coherence_level > 0.0 && quantum_coherence_level < 0.2 {
-            self.prediction_confidence *= 0.98; // slight reduction during decoherence
+            self.scale_confidence("quantum_decoherence", 0.98);
         }
 
         module_timings.consciousness_resonance = _t.elapsed().as_micros() as u64;
@@ -857,8 +852,8 @@ impl CognitiveLoopService {
         // FEEDBACK: Temporal discontinuity resets adaptation (context shift re-calibration)
         // Science: Varela (1999) — temporal discontinuities require re-orientation
         if temporal_discontinuity {
-            self.fep_lr_boost = 1.0;
-            self.prediction_confidence *= 0.8;
+            self.set_lr("temporal_discontinuity", 1.0);
+            self.scale_confidence("temporal_discontinuity", 0.8);
             // Lower learning threshold to learn more aggressively after discontinuity
             self.carryover.learning.adaptive_threshold_scale =
                 (self.carryover.learning.adaptive_threshold_scale * 0.8).clamp(0.6, 1.5);
@@ -884,7 +879,7 @@ impl CognitiveLoopService {
         if streak >= 3 {
             // Persistent discontinuity: aggressive recovery
             self.last_prediction = None; // invalidate stale predictions
-            self.fep_lr_boost = (self.fep_lr_boost * 1.5).min(3.0);
+            self.scale_lr("persistent_discontinuity", 1.5);
             self.curiosity_drive.exploration_urge *= 0.7;
             self.stats.discontinuity_cascade_count += 1;
         }
@@ -973,8 +968,7 @@ impl CognitiveLoopService {
                     (self.curiosity_drive.exploration_urge + entropy_boost).clamp(0.0, 1.0);
             } else if thermodynamic_entropy < 0.3 {
                 let consolidation_bias = ((0.3 - thermodynamic_entropy) * 0.08).min(0.08) as f32;
-                self.fep_lr_boost =
-                    (self.fep_lr_boost * (1.0 + consolidation_bias)).clamp(1.0, 2.0);
+                self.scale_lr("low_entropy_consolidate", 1.0 + consolidation_bias);
             }
         }
 
@@ -1008,9 +1002,10 @@ impl CognitiveLoopService {
                     // 3. High allostatic load suppresses learning (conserve resources)
                     // Science: McEwen (2004) — allostatic overload impairs plasticity
                     if response.allostatic_load > 0.7 {
-                        self.fep_lr_boost = (self.fep_lr_boost
-                            * (1.0 - (response.allostatic_load - 0.7) as f32 * 0.5))
-                            .max(1.0);
+                        self.scale_lr(
+                            "allostatic_overload",
+                            1.0 - (response.allostatic_load - 0.7) as f32 * 0.5,
+                        );
                     }
 
                     (response.phi_modulation, response.sense_of_agency)
@@ -1123,8 +1118,10 @@ impl CognitiveLoopService {
             // 2. Negative valence strengthens narrative veto tendency (caution)
             // Science: Colombetti (2014) — affect and enaction are inseparable
             if enacted_meaning.meaning.valence < -0.5 {
-                self.prediction_confidence *= (1.0 + enacted_meaning.meaning.valence * 0.1) as f32;
-                self.prediction_confidence = self.prediction_confidence.clamp(0.0, 1.0);
+                self.scale_confidence(
+                    "enacted_meaning_neg",
+                    (1.0 + enacted_meaning.meaning.valence * 0.1) as f32,
+                );
             }
 
             // Integrate all subsystems into unified living state

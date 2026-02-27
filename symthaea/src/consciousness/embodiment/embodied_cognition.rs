@@ -79,7 +79,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
 
-use super::affective_consciousness::{CoreAffect, PhysiologicalState};
+use crate::consciousness::affective_consciousness::{CoreAffect, PhysiologicalState};
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 
