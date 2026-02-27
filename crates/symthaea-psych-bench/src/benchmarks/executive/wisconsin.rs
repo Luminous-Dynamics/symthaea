@@ -68,6 +68,8 @@ impl WisconsinCardSortingBenchmark {
         let dim = config.dimension;
         let seed = config.trial_seed("executive", "wcst", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
+        let mut card_trace = Vec::new();
+        let mut global_card_idx = 0usize;
 
         // Create deterministic atomic HVs for features
         let color_hvs: Vec<ContinuousHV> = (0..4)
@@ -282,6 +284,38 @@ impl WisconsinCardSortingBenchmark {
                 *c = c.clamp(0.0, 2.5);
             }
 
+            // Per-card trial trace
+            if config.trial_trace {
+                let current_rule_name = match current_rule {
+                    Rule::Color => "color",
+                    Rule::Shape => "shape",
+                    Rule::Number => "number",
+                };
+                let is_perseverative = !is_correct && prev_rule.is_some() && {
+                    let old_rule_idx = match prev_rule.unwrap() {
+                        Rule::Color => 0,
+                        Rule::Shape => 1,
+                        Rule::Number => 2,
+                    };
+                    chosen_rule_idx == old_rule_idx
+                };
+                card_trace.push(TrialOutcome {
+                    trial_idx: global_card_idx,
+                    condition: format!("rule_{}", current_rule_name),
+                    correct: is_correct,
+                    rt_ticks: ticks,
+                    similarity: conf_margin,
+                    confidence: rule_confidence[chosen_rule_idx],
+                    response_idx: chosen_target,
+                    extra: {
+                        let mut m = BTreeMap::new();
+                        m.insert("perseverative".to_string(), if is_perseverative { 1.0 } else { 0.0 });
+                        m
+                    },
+                });
+                global_card_idx += 1;
+            }
+
             // Rule switch after 10 consecutive correct
             if consecutive_correct >= 10 {
                 categories_completed += 1;
@@ -306,6 +340,7 @@ impl WisconsinCardSortingBenchmark {
             total_errors,
             trials_to_first: trials_to_first.unwrap_or(max_trials as u32),
             rt_ticks,
+            card_trace,
         }
     }
 }
@@ -317,6 +352,8 @@ struct TrialResult {
     total_errors: u32,
     trials_to_first: u32,
     rt_ticks: Vec<f64>,
+    /// Per-card trial trace (populated when config.trial_trace is true).
+    card_trace: Vec<TrialOutcome>,
 }
 
 impl PsychBenchmark for WisconsinCardSortingBenchmark {
@@ -360,21 +397,7 @@ impl PsychBenchmark for WisconsinCardSortingBenchmark {
             all_rts.extend_from_slice(&r.rt_ticks);
 
             if config.trial_trace {
-                trace.push(TrialOutcome {
-                    trial_idx: trial,
-                    condition: "wcst".to_string(),
-                    correct: acc > 0.5,
-                    rt_ticks: mean_rt,
-                    similarity: acc,
-                    confidence: acc,
-                    response_idx: 0,
-                    extra: {
-                        let mut m = BTreeMap::new();
-                        m.insert("perseverative_errors".to_string(), r.perseverative_errors as f64);
-                        m.insert("categories_completed".to_string(), r.categories_completed as f64);
-                        m
-                    },
-                });
+                trace.extend(r.card_trace);
             }
         }
 

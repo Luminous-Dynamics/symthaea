@@ -19,6 +19,7 @@
 //! - recall_rate: 0.40 (SD≈0.12)
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
@@ -28,6 +29,7 @@ pub struct FeelingOfKnowingBenchmark;
 
 impl FeelingOfKnowingBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> FokResult {
+        let diff_model = difficulty_model_for(self.name());
         let dim = config.dimension;
         let seed = config.trial_seed("metacognition", "fok", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -52,7 +54,7 @@ impl FeelingOfKnowingBenchmark {
         // Tight noise (0.04) preserves encoding gradient in FOK rankings —
         // the encoding range (~0.40-0.85) is the primary discriminative signal.
         // Lichtenstein et al. (1982): calibration degrades under time pressure.
-        let fok_noise_range: f64 = 0.04 + config.time_pressure * 0.08;
+        let fok_noise_range: f64 = (0.04 + config.time_pressure * 0.08) / diff_model.signal_multiplier(config.difficulty);
 
         // ── Study phase ──
         // Encode cue-target pairs into memory traces with varying quality.

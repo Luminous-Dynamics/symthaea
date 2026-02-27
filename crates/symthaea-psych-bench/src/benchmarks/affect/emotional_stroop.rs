@@ -13,6 +13,7 @@
 //! - emotional_interference: 0.07 (SD≈0.04)
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
@@ -30,6 +31,7 @@ struct TrialResult {
 
 impl EmotionalStroopBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
+        let diff_model = difficulty_model_for(self.name());
         let dim = config.dimension;
         let seed = config.trial_seed("affect", "emotional_stroop", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -51,10 +53,10 @@ impl EmotionalStroopBenchmark {
 
         // Emotional interference: negative valence attracts attention,
         // partially activating a competing color response
-        let emotional_weight: f32 = 0.35;
+        let emotional_weight: f32 = 0.35 * diff_model.interference_multiplier(config.difficulty) as f32;
         // Time pressure: base 0.25 yields ~10% emotional interference (Williams et al., 1996);
         // +0.15/unit raises temperature, modeling noisier color selection under SAT (Heitz, 2014).
-        let temperature: f64 = 0.25 + config.time_pressure * 0.15;
+        let temperature: f64 = (0.25 + config.time_pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
         let trials_per_condition = 40;
 
         let mut neutral_correct = 0u32;

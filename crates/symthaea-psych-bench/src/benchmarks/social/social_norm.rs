@@ -16,6 +16,7 @@
 //! - violation_rt_cost: 0.15 (SD~0.05) — RT increase for violations
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
@@ -33,6 +34,7 @@ struct TrialResult {
 
 impl SocialNormBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
+        let diff_model = difficulty_model_for(self.name());
         let dim = config.dimension;
         let seed = config.trial_seed("social", "social_norm", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -64,7 +66,7 @@ impl SocialNormBenchmark {
             .collect();
 
         // Time pressure and social config
-        let noise_level: f32 = 0.20 + config.time_pressure as f32 * 0.15;
+        let noise_level: f32 = (0.20 + config.time_pressure as f32 * 0.15) * diff_model.interference_multiplier(config.difficulty) as f32;
         let social_boost: f32 = if config.enable_social { 0.10 } else { 0.0 };
 
         let n_items = 40; // 20 congruent + 20 violations

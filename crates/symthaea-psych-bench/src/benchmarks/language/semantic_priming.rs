@@ -16,6 +16,7 @@
 //! - soa_modulation: 0.05 (SD~0.03) — priming difference between short and long SOA
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::ssm_temporal::SsmTemporalBackend;
@@ -34,6 +35,7 @@ struct TrialResult {
 
 impl SemanticPrimingBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
+        let diff_model = difficulty_model_for(self.name());
         let dim = config.dimension;
         let seed = config.trial_seed("language", "semantic_priming", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -65,7 +67,7 @@ impl SemanticPrimingBenchmark {
         }
 
         // Time pressure noise
-        let noise_level: f32 = 0.20 + config.time_pressure as f32 * 0.15;
+        let noise_level: f32 = (0.20 + config.time_pressure as f32 * 0.15) * diff_model.interference_multiplier(config.difficulty) as f32;
 
         let n_pairs = 20; // 10 related + 10 unrelated
         let mut related_correct_short = 0u32;

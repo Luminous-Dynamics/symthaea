@@ -16,6 +16,7 @@
 //! - hard_accuracy: 0.60 (SD≈0.12) — hard items
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
@@ -32,6 +33,7 @@ struct TrialResult {
 
 impl RmeBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
+        let diff_model = difficulty_model_for(self.name());
         let dim = config.dimension;
         let seed = config.trial_seed("social", "rme", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -76,7 +78,7 @@ impl RmeBenchmark {
             // Generate stimulus (eye region) — blend of target + noise
             xor_shift(&mut rng);
             let stimulus_noise = ContinuousHV::random(dim, rng);
-            let signal_weight = if is_easy { 0.65 } else { 0.40 };
+            let signal_weight = (if is_easy { 0.65 } else { 0.40 }) * diff_model.signal_multiplier(config.difficulty) as f32;
             let stimulus = ContinuousHV::weighted_bundle(
                 &[target, &stimulus_noise],
                 &[signal_weight, 1.0 - signal_weight],

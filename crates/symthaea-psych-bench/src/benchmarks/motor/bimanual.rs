@@ -15,6 +15,7 @@
 //! - asymmetric_accuracy: 0.77 (SD~0.08)
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::ssm_temporal::SsmTemporalBackend;
@@ -34,6 +35,7 @@ struct TrialResult {
 
 impl BimanualBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
+        let diff_model = difficulty_model_for(self.name());
         let dim = config.dimension;
         let seed = config.trial_seed("motor", "bimanual", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -55,8 +57,8 @@ impl BimanualBenchmark {
         let mut ssm_right = SsmTemporalBackend::new(-0.10, 2);
 
         // Time pressure and noise
-        let noise_level: f32 = 0.20 + config.time_pressure as f32 * 0.15;
-        let crosstalk_noise: f32 = 0.25; // cross-hand interference
+        let noise_level: f32 = (0.20 + config.time_pressure as f32 * 0.15) * diff_model.interference_multiplier(config.difficulty) as f32;
+        let crosstalk_noise: f32 = 0.25 * diff_model.interference_multiplier(config.difficulty) as f32; // cross-hand interference
 
         let movements_per_condition = 20;
         let mut sym_left_correct = 0u32;
