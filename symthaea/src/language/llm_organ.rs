@@ -658,6 +658,38 @@ impl LLMOrgan {
         }
     }
 
+    /// Cycle-level distillation modulation: adjusts FEP factor for next distill_step.
+    #[cfg(feature = "liquid-mamba")]
+    pub fn cycle_level_distill(
+        &self,
+        fep_precision: f32,
+        thermodynamic_load: f32,
+        prediction_confidence: f32,
+        fep_lr_boost: f32,
+    ) {
+        if let Some(ref backend) = self.backend {
+            backend.cycle_level_distill(fep_precision, thermodynamic_load, prediction_confidence, fep_lr_boost);
+        }
+    }
+
+    /// Current effective distillation learning rate (0.0 when liquid-mamba is off).
+    #[cfg(feature = "liquid-mamba")]
+    pub fn current_distillation_lr(&self) -> f32 {
+        self.backend.as_ref().map(|b| b.current_distillation_lr()).unwrap_or(0.0)
+    }
+
+    /// Last cached effective rank of projection bottleneck (0.0 when liquid-mamba is off).
+    #[cfg(feature = "liquid-mamba")]
+    pub fn last_effective_rank(&self) -> f32 {
+        self.backend.as_ref().map(|b| b.last_effective_rank()).unwrap_or(0.0)
+    }
+
+    /// Total generation/distillation cycles completed (0 when liquid-mamba is off).
+    #[cfg(feature = "liquid-mamba")]
+    pub fn generation_count(&self) -> u32 {
+        self.backend.as_ref().map(|b| b.generation_count()).unwrap_or(0)
+    }
+
     /// Apply a linguistic LoRA adapter to the voice.
     pub fn apply_lora(&self, lora_id: &str, delta: &[u8]) {
         if let Some(ref backend) = self.backend {

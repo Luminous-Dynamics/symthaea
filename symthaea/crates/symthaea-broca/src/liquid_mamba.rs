@@ -166,6 +166,8 @@ pub struct LiquidMambaGenerator {
     pe_history: VecDeque<f32>,
     // FEP modulation factor from cognitive loop (default 1.0 = neutral)
     fep_modulation: f32,
+    // Last cached effective rank from check_projection_health()
+    last_cached_rank: f32,
 }
 
 impl LiquidMambaGenerator {
@@ -183,7 +185,7 @@ impl LiquidMambaGenerator {
     /// Uses the provided [`MambaBackend`] implementation instead of loading
     /// a real model. This enables deterministic, offline testing of the full
     /// generation pipeline.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-helpers"))]
     pub fn with_mock(genesis: &GenesisSeed, config: LiquidMambaConfig) -> Self {
         use crate::mamba::tests::MockMamba;
         Self::with_backend(genesis, config, Box::new(MockMamba::new()))
@@ -231,6 +233,7 @@ impl LiquidMambaGenerator {
             last_semantic_pe: 0.0,
             pe_history: VecDeque::with_capacity(64),
             fep_modulation: 1.0,
+            last_cached_rank: 0.0,
         };
 
         if enable_ema {
@@ -578,6 +581,11 @@ impl LiquidMambaGenerator {
         self.last_semantic_pe
     }
 
+    /// Last cached effective rank from check_projection_health().
+    pub fn last_cached_rank(&self) -> f32 {
+        self.last_cached_rank
+    }
+
     /// Push a PE value into the history ring buffer (capacity 64).
     fn push_pe_history(&mut self, pe: f32) {
         if self.pe_history.len() >= 64 {
@@ -651,6 +659,7 @@ impl LiquidMambaGenerator {
         }
 
         let rank = self.projection.effective_rank(recent_hvs);
+        self.last_cached_rank = rank;
         let threshold = (self.config.bottleneck_dim as f32) / 4.0;
 
         if rank < threshold {

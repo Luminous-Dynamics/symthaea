@@ -57,3 +57,4 @@ mamba = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:hf-
 hf-tokenizer = ["dep:tokenizers"]
 collect = ["dep:ureq"]
 simd = ["symthaea-core/simd"]
+test-helpers = ["mamba"]

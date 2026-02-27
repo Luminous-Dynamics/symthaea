@@ -128,8 +128,8 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
     let mut total_english_ratio = 0.0f32;
     let mut total_coherence = 0.0f32;
     let mut gen_count = 0usize;
-    let mut intent_accum: HashMap<String, (f32, f32, f32, usize, usize)> = HashMap::new();
-    // (sum_ce, sum_ce_tokens_f, sum_english_ratio, sum_coherence_count, count)
+    let mut intent_accum: HashMap<String, (f32, f32, f32, f32, usize, usize)> = HashMap::new();
+    // (sum_ce, sum_ce_tokens_f, sum_english_ratio, sum_coherence, gen_count, count)
 
     for pair in &config.dataset.pairs {
         if pair.target_ids.is_empty() {
@@ -163,27 +163,30 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
 
         // --- Generation quality: English ratio + coherence ---
         let mut pair_english_ratio = 0.0f32;
+        let mut pair_coherence = 0.0f32;
 
         if config.compute_english_ratio {
             let result = generator.generate(&channels);
             pair_english_ratio = english_word_ratio(&result.token_ids, generator.tokenizer());
+            pair_coherence = result.final_coherence;
             total_english_ratio += pair_english_ratio;
-            total_coherence += result.final_coherence;
+            total_coherence += pair_coherence;
             gen_count += 1;
         }
 
         // --- Per-intent accumulation ---
         if config.per_intent_breakdown {
-            let entry = intent_accum.entry(intent).or_insert((0.0, 0.0, 0.0, 0, 0));
+            let entry = intent_accum.entry(intent).or_insert((0.0, 0.0, 0.0, 0.0, 0, 0));
             if pair_tokens > 0 {
                 entry.0 += pair_ce;
                 entry.1 += pair_tokens as f32;
             }
             entry.2 += pair_english_ratio;
+            entry.3 += pair_coherence;
             if config.compute_english_ratio {
-                entry.3 += 1; // coherence sample count
+                entry.4 += 1; // generation count for this intent
             }
-            entry.4 += 1;
+            entry.5 += 1;
         }
     }
 
@@ -208,19 +211,18 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
 
     // Per-intent scores
     let mut intent_scores = HashMap::new();
-    for (intent, (sum_ce, sum_ce_tok, sum_er, coh_count, count)) in &intent_accum {
+    for (intent, (sum_ce, sum_ce_tok, sum_er, sum_coh, intent_gen_count, count)) in &intent_accum {
         let ppl = if *sum_ce_tok > 0.0 {
             (sum_ce / sum_ce_tok).exp()
         } else {
             0.0
         };
-        let er = if *coh_count > 0 { sum_er / *coh_count as f32 } else { 0.0 };
-        // coherence was summed into sum_er's count — we need a separate accumulator
-        // For simplicity, reuse the generation path's data
+        let er = if *intent_gen_count > 0 { sum_er / *intent_gen_count as f32 } else { 0.0 };
+        let coh = if *intent_gen_count > 0 { sum_coh / *intent_gen_count as f32 } else { 0.0 };
         intent_scores.insert(intent.clone(), IntentScore {
             perplexity: ppl,
             english_ratio: er,
-            avg_coherence: 0.0, // coherence not tracked per-intent (would need separate accumulator)
+            avg_coherence: coh,
             count: *count,
         });
     }
@@ -316,6 +318,12 @@ pub struct LiquidMambaEvalResult {
     pub distinct_2: f32,
     /// Mean cosine similarity between input thought HV and output centroid HV.
     pub avg_thought_output_similarity: f32,
+    /// PE trend (least-squares slope over last 16 PE entries) after all generations.
+    pub pe_trend: f32,
+    /// Mean PE across all generations in history buffer.
+    pub pe_mean: f32,
+    /// Standard deviation of PE across all generations in history buffer.
+    pub pe_std_dev: f32,
 }
 
 /// Compute distinct-n: fraction of unique n-grams out of total n-grams.
@@ -415,7 +423,7 @@ pub fn evaluate_liquid_mamba(
     let mut total_coherence = 0.0f32;
     let mut total_semantic_pe = 0.0f32;
     let mut gen_count = 0usize;
-    let mut intent_accum: HashMap<String, (f32, f32, f32, usize, usize)> = HashMap::new();
+    let mut intent_accum: HashMap<String, (f32, f32, f32, f32, usize, usize)> = HashMap::new();
     let mut all_output_hvs: Vec<symthaea_core::hdc::ContinuousHV> = Vec::new();
     let mut all_generated_words: Vec<String> = Vec::new();
     let mut total_thought_output_sim = 0.0f32;
@@ -463,13 +471,15 @@ pub fn evaluate_liquid_mamba(
 
         // --- Generation quality ---
         let mut pair_english_ratio = 0.0f32;
+        let mut pair_coherence = 0.0f32;
 
         if config.compute_english_ratio {
             let thought_hv = gen.encoder().encode(&channels);
             let result = gen.generate(&channels);
             pair_english_ratio = english_word_ratio_mamba(&result.token_ids, gen.mamba());
+            pair_coherence = result.final_coherence;
             total_english_ratio += pair_english_ratio;
-            total_coherence += result.final_coherence;
+            total_coherence += pair_coherence;
             total_semantic_pe += result.semantic_pe;
             gen_count += 1;
 
@@ -505,16 +515,17 @@ pub fn evaluate_liquid_mamba(
 
         // --- Per-intent accumulation ---
         if config.per_intent_breakdown {
-            let entry = intent_accum.entry(intent).or_insert((0.0, 0.0, 0.0, 0, 0));
+            let entry = intent_accum.entry(intent).or_insert((0.0, 0.0, 0.0, 0.0, 0, 0));
             if pair_tokens > 0 {
                 entry.0 += pair_ce;
                 entry.1 += pair_tokens as f32;
             }
             entry.2 += pair_english_ratio;
+            entry.3 += pair_coherence;
             if config.compute_english_ratio {
-                entry.3 += 1;
+                entry.4 += 1;
             }
-            entry.4 += 1;
+            entry.5 += 1;
         }
     }
 
@@ -552,13 +563,14 @@ pub fn evaluate_liquid_mamba(
 
     // Per-intent scores
     let mut intent_scores = HashMap::new();
-    for (intent, (sum_ce, sum_ce_tok, sum_er, coh_count, count)) in &intent_accum {
+    for (intent, (sum_ce, sum_ce_tok, sum_er, sum_coh, intent_gen_count, count)) in &intent_accum {
         let ppl = if *sum_ce_tok > 0.0 { (sum_ce / sum_ce_tok).exp() } else { 0.0 };
-        let er = if *coh_count > 0 { sum_er / *coh_count as f32 } else { 0.0 };
+        let er = if *intent_gen_count > 0 { sum_er / *intent_gen_count as f32 } else { 0.0 };
+        let coh = if *intent_gen_count > 0 { sum_coh / *intent_gen_count as f32 } else { 0.0 };
         intent_scores.insert(intent.clone(), IntentScore {
             perplexity: ppl,
             english_ratio: er,
-            avg_coherence: 0.0,
+            avg_coherence: coh,
             count: *count,
         });
     }
@@ -588,6 +600,9 @@ pub fn evaluate_liquid_mamba(
         0.0
     };
 
+    // PE history statistics from the generator's ring buffer
+    let (pe_mean, pe_std_dev, pe_trend) = gen.pe_stats();
+
     LiquidMambaEvalResult {
         base,
         avg_semantic_pe,
@@ -596,6 +611,9 @@ pub fn evaluate_liquid_mamba(
         distinct_1: d1,
         distinct_2: d2,
         avg_thought_output_similarity,
+        pe_trend,
+        pe_mean,
+        pe_std_dev,
     }
 }
 
@@ -650,6 +668,9 @@ pub fn format_liquid_mamba_eval_report(result: &LiquidMambaEvalResult) -> String
     s.push_str(&format!("Distinct-1:        {:.4}\n", result.distinct_1));
     s.push_str(&format!("Distinct-2:        {:.4}\n", result.distinct_2));
     s.push_str(&format!("Thought-output sim:{:.4}\n", result.avg_thought_output_similarity));
+    s.push_str(&format!("PE trend:          {:.6}\n", result.pe_trend));
+    s.push_str(&format!("PE mean:           {:.4}\n", result.pe_mean));
+    s.push_str(&format!("PE std dev:        {:.4}\n", result.pe_std_dev));
 
     if let Some((certain, unknown)) = result.gating_verification {
         s.push_str(&format!("\n--- Consciousness Gating Test ---\n"));
@@ -887,6 +908,9 @@ mod tests {
                 distinct_1: 0.85,
                 distinct_2: 0.92,
                 avg_thought_output_similarity: 0.35,
+                pe_trend: -0.01,
+                pe_mean: 0.65,
+                pe_std_dev: 0.12,
             };
 
             let report = format_liquid_mamba_eval_report(&result);
@@ -957,6 +981,9 @@ mod tests {
                 distinct_1: 0.3,
                 distinct_2: 0.4,
                 avg_thought_output_similarity: 0.1,
+                pe_trend: 0.0,
+                pe_mean: 0.9,
+                pe_std_dev: 0.0,
             };
 
             let report = format_liquid_mamba_eval_report(&result);

@@ -31,6 +31,8 @@ pub(in crate::cognitive_loop) struct DreamPhaseResult {
 /// Result from the episodic replay and memory coordinator phase.
 pub(in crate::cognitive_loop) struct EpisodicReplayResult {
     pub surprise_replay_batch_size: usize,
+    /// Phasic DA burst replay boost (number of extra episodes, 0 if DA < threshold).
+    pub phasic_da_replay_boost: usize,
 }
 
 /// Result from the hyper-parameter optimization phase.
@@ -463,7 +465,16 @@ impl CognitiveLoopService {
                 } else {
                     0
                 };
-                let boosted_batch = base_batch + surprise_batch_boost + sleep_boost;
+                // #2: Phasic DA burst → replay amplification (Lisman & Grace 2005)
+                let phasic_da_boost = {
+                    let da_ph = self.neuromodulator_bath.da_phasic();
+                    if da_ph > 0.3 {
+                        ((da_ph - 0.3) * base_batch as f32 * 1.5).round() as usize
+                    } else {
+                        0
+                    }
+                };
+                let boosted_batch = base_batch + surprise_batch_boost + sleep_boost + phasic_da_boost;
                 // Temporarily set boosted batch size for this replay session
                 let original_batch = replay.config.batch_size;
                 replay.config.batch_size = boosted_batch;
@@ -560,6 +571,7 @@ impl CognitiveLoopService {
 
         EpisodicReplayResult {
             surprise_replay_batch_size,
+            phasic_da_replay_boost,
         }
     }
 

@@ -1020,7 +1020,7 @@ impl ContinuousMind {
         if let Some(ref backend) = self.llm_backend {
             // Export projection weights every 10 ticks (same cadence as aggregation)
             if self.state.tick.is_multiple_of(10) {
-                let source_id = [0u8; 32]; // TODO: derive from genesis identity
+                let source_id = self.genesis_identity;
                 if let Some(weights) = backend.export_gradient(source_id, 1.0, self.state.tick) {
                     tracing::debug!(
                         target: "symthaea::mind::federated",

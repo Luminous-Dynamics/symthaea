@@ -58,8 +58,10 @@ fn main() {
     let lm_config = LiquidMambaConfig {
         model_id: opts.model_id.clone(),
         max_tokens: 64,
+        base_lr: opts.learning_rate,
         warmup_steps: opts.warmup_steps,
         accumulation_steps: opts.accumulation_steps,
+        cosine_annealing_steps: opts.cosine_annealing_steps,
         ..Default::default()
     };
 
@@ -88,8 +90,7 @@ fn main() {
     }
 
     // Warm-start: compute principal directions from training data
-    if opts.warm_start {
-        tracing::info!("Warm-starting projection from training data covariance");
+    if opts.warm_start || opts.warm_start_bidirectional {
         let sample_hvs: Vec<_> = dataset.pairs.iter()
             .take(200) // Use up to 200 samples for covariance
             .map(|pair| {
@@ -97,7 +98,13 @@ fn main() {
                 gen.encoder().encode(&channels)
             })
             .collect();
-        gen.projection_mut().warm_start_from_samples(&sample_hvs);
+        if opts.warm_start_bidirectional {
+            tracing::info!("Bidirectional warm-starting projection from training data");
+            gen.projection_mut().warm_start_bidirectional(&sample_hvs);
+        } else {
+            tracing::info!("Warm-starting projection from training data covariance");
+            gen.projection_mut().warm_start_from_samples(&sample_hvs);
+        }
     }
 
     // Training loop
@@ -253,9 +260,11 @@ struct ProjectionTrainOpts {
     epochs: usize,
     learning_rate: f32,
     warm_start: bool,
+    warm_start_bidirectional: bool,
     diagnostics: bool,
     warmup_steps: usize,
     accumulation_steps: usize,
+    cosine_annealing_steps: usize,
     genesis_phrase: String,
 }
 
@@ -269,9 +278,11 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
         epochs: 5,
         learning_rate: 0.001,
         warm_start: false,
+        warm_start_bidirectional: false,
         diagnostics: false,
         warmup_steps: 100,
         accumulation_steps: 4,
+        cosine_annealing_steps: 0,
         genesis_phrase: "broca-projection-default".to_string(),
     };
 
@@ -314,6 +325,16 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
             }
             "--warm-start" => {
                 opts.warm_start = true;
+            }
+            "--warm-start-bidirectional" => {
+                opts.warm_start_bidirectional = true;
+            }
+            "--cosine-annealing-steps" => {
+                i += 1;
+                opts.cosine_annealing_steps = args.get(i)
+                    .ok_or("--cosine-annealing-steps requires a number")?
+                    .parse()
+                    .map_err(|_| "--cosine-annealing-steps must be a positive integer")?;
             }
             "--diagnostics" => {
                 opts.diagnostics = true;
@@ -365,10 +386,12 @@ fn print_usage() {
     eprintln!("  --model ID             HuggingFace model ID (default: state-spaces/mamba-130m)");
     eprintln!("  --epochs, -e N         Number of training epochs (default: 5)");
     eprintln!("  --lr RATE              Learning rate (default: 0.001)");
-    eprintln!("  --warm-start           PCA warm-start from training data covariance");
-    eprintln!("  --diagnostics          Enable periodic projection health logging");
-    eprintln!("  --warmup-steps N       LR warmup steps (default: 100)");
-    eprintln!("  --accumulation-steps N Gradient accumulation steps (default: 4)");
-    eprintln!("  --genesis PHRASE       Genesis seed phrase (default: broca-projection-default)");
-    eprintln!("  --help, -h             Show this help message");
+    eprintln!("  --warm-start                PCA warm-start from training data covariance");
+    eprintln!("  --warm-start-bidirectional  Bidirectional warm-start (forward + backward projection)");
+    eprintln!("  --diagnostics               Enable periodic projection health logging");
+    eprintln!("  --warmup-steps N            LR warmup steps (default: 100)");
+    eprintln!("  --accumulation-steps N      Gradient accumulation steps (default: 4)");
+    eprintln!("  --cosine-annealing-steps N  Cosine annealing total steps (default: 0 = disabled)");
+    eprintln!("  --genesis PHRASE            Genesis seed phrase (default: broca-projection-default)");
+    eprintln!("  --help, -h                  Show this help message");
 }

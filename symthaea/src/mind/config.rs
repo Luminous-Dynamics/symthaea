@@ -94,6 +94,15 @@ pub struct MindState {
     /// Liquid-Mamba semantic prediction error (injected by facade after translation).
     #[cfg(feature = "liquid-mamba")]
     pub liquid_mamba_pe: f32,
+    /// Liquid-Mamba effective distillation learning rate.
+    #[cfg(feature = "liquid-mamba")]
+    pub liquid_mamba_lr: f32,
+    /// Liquid-Mamba last cached effective rank of projection bottleneck.
+    #[cfg(feature = "liquid-mamba")]
+    pub liquid_mamba_rank: f32,
+    /// Liquid-Mamba total generation/distillation cycles completed.
+    #[cfg(feature = "liquid-mamba")]
+    pub liquid_mamba_generation_count: u32,
 }
 
 impl Default for MindState {
@@ -125,6 +134,12 @@ impl Default for MindState {
             mesh_telemetry: None,
             #[cfg(feature = "liquid-mamba")]
             liquid_mamba_pe: 0.0,
+            #[cfg(feature = "liquid-mamba")]
+            liquid_mamba_lr: 0.0,
+            #[cfg(feature = "liquid-mamba")]
+            liquid_mamba_rank: 0.0,
+            #[cfg(feature = "liquid-mamba")]
+            liquid_mamba_generation_count: 0,
         }
     }
 }
