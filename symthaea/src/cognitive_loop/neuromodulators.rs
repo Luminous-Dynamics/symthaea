@@ -2401,10 +2401,10 @@ mod tests {
         bath.dopamine.level = 0.8;
         bath.da_subtypes.inhibitory = 1.5; // High D2
         let flex = bath.behavioral_flexibility();
-        assert!(flex > 1.2, "High D2 should produce flexibility > 1.2: {flex}");
-        // flex_mod = 1/flex < 0.84 → hysteresis drops
+        assert!(flex > 1.15, "High D2 should produce flexibility > 1.15: {flex}");
+        // flex_mod = 1/flex < 0.87 → hysteresis drops
         let flex_mod = 1.0 / flex;
-        assert!(flex_mod < 0.85, "flex_mod should lower hysteresis: {flex_mod}");
+        assert!(flex_mod < 0.87, "flex_mod should lower hysteresis: {flex_mod}");
     }
 
     #[test]

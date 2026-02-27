@@ -3734,7 +3734,7 @@ pub(crate) fn format_panic_payload(payload: Box<dyn std::any::Any + Send>) -> St
 #[cfg(test)]
 mod tests {
     use super::format_panic_payload;
-    use super::{CognitiveLoopService, CycleResult};
+    use super::CognitiveLoopService;
     use crate::cognitive_loop::CognitiveLoopConfig;
 
     // ── format_panic_payload tests (existing) ─────────────────────────
@@ -3907,13 +3907,11 @@ mod tests {
 
     #[test]
     fn try_cycle_result_matches_cycle() {
-        let mut s1 = make_service();
-        let mut s2 = make_service();
         // Use genesis phrase for determinism
         let mut cfg = CognitiveLoopConfig::default();
         cfg.genesis_phrase = Some("determinism test".to_string());
-        s1 = CognitiveLoopService::new(cfg.clone()).unwrap();
-        s2 = CognitiveLoopService::new(cfg).unwrap();
+        let mut s1 = CognitiveLoopService::new(cfg.clone()).unwrap();
+        let mut s2 = CognitiveLoopService::new(cfg).unwrap();
 
         let r1 = s1.cycle("hello");
         let r2 = s2.try_cycle("hello").unwrap();

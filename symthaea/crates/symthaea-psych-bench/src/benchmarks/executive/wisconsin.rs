@@ -385,7 +385,7 @@ impl PsychBenchmark for WisconsinCardSortingBenchmark {
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
-            let acc = r.categories_completed as f64 / 6.0; // normalize
+            let _acc = r.categories_completed as f64 / 6.0; // normalize
             categories.push(r.categories_completed as f64);
             perseverative.push(r.perseverative_errors as f64);
             non_perseverative.push(r.non_perseverative_errors as f64);
