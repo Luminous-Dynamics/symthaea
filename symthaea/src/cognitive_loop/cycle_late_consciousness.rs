@@ -1183,7 +1183,7 @@ impl CognitiveLoopService {
             }
             // Scale learning signal by consciousness quality (gradual, not on/off)
             // This complements the binary consciousness_awake gate with continuous modulation
-            self.fep_learning_signal *= (0.5 + level as f32 * 0.5).clamp(0.5, 1.0);
+            self.fep_learning_signal *= (0.5_f32 + level as f32 * 0.5_f32).clamp(0.5_f32, 1.0_f32);
 
             level
         } else {

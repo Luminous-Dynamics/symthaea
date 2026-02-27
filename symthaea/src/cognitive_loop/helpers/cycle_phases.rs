@@ -380,6 +380,7 @@ impl CognitiveLoopService {
         let compressed_state = state.compressed_state;
         let output = state.output;
         let mut surprise_replay_batch_size: usize = 0;
+        let mut phasic_da_replay_boost: usize = 0;
 
         // ═══════════════════════════════════════════════════════════════════════
         // DEMAND-DRIVEN CONSOLIDATION TRIGGERS
@@ -474,6 +475,7 @@ impl CognitiveLoopService {
                         0
                     }
                 };
+                phasic_da_replay_boost = phasic_da_boost;
                 let boosted_batch = base_batch + surprise_batch_boost + sleep_boost + phasic_da_boost;
                 // Temporarily set boosted batch size for this replay session
                 let original_batch = replay.config.batch_size;

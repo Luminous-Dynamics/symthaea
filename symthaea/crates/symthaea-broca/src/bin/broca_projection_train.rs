@@ -62,6 +62,7 @@ fn main() {
         warmup_steps: opts.warmup_steps,
         accumulation_steps: opts.accumulation_steps,
         cosine_annealing_steps: opts.cosine_annealing_steps,
+        deep_projection: opts.deep_projection,
         ..Default::default()
     };
 
@@ -105,6 +106,31 @@ fn main() {
             tracing::info!("Warm-starting projection from training data covariance");
             gen.projection_mut().warm_start_from_samples(&sample_hvs);
         }
+    }
+
+    // Contrastive pretraining: learn to separate thoughts before distillation
+    if opts.contrastive_pretrain_epochs > 0 {
+        tracing::info!(
+            epochs = opts.contrastive_pretrain_epochs,
+            "Running contrastive pretraining"
+        );
+        let sample_hvs: Vec<_> = dataset.pairs.iter()
+            .take(50) // Diverse subset — 50 thoughts → 1,225 pairs
+            .map(|pair| {
+                let channels = ThoughtChannels { channels: pair.channels };
+                gen.encoder().encode(&channels)
+            })
+            .collect();
+        let (avg_dist, recon_err) = gen.projection_mut().contrastive_pretrain(
+            &sample_hvs,
+            opts.contrastive_pretrain_epochs,
+            opts.learning_rate * 0.5, // Lower LR for pretraining
+        );
+        tracing::info!(
+            avg_distance = format!("{avg_dist:.4}"),
+            recon_error = format!("{recon_err:.4}"),
+            "Contrastive pretraining complete"
+        );
     }
 
     // Training loop
@@ -265,7 +291,9 @@ struct ProjectionTrainOpts {
     warmup_steps: usize,
     accumulation_steps: usize,
     cosine_annealing_steps: usize,
+    contrastive_pretrain_epochs: usize,
     genesis_phrase: String,
+    deep_projection: bool,
 }
 
 fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
@@ -283,7 +311,9 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
         warmup_steps: 100,
         accumulation_steps: 4,
         cosine_annealing_steps: 0,
+        contrastive_pretrain_epochs: 0,
         genesis_phrase: "broca-projection-default".to_string(),
+        deep_projection: false,
     };
 
     let mut i = 1;
@@ -336,6 +366,13 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
                     .parse()
                     .map_err(|_| "--cosine-annealing-steps must be a positive integer")?;
             }
+            "--contrastive-pretrain" => {
+                i += 1;
+                opts.contrastive_pretrain_epochs = args.get(i)
+                    .ok_or("--contrastive-pretrain requires a number")?
+                    .parse()
+                    .map_err(|_| "--contrastive-pretrain must be a positive integer")?;
+            }
             "--diagnostics" => {
                 opts.diagnostics = true;
             }
@@ -356,6 +393,9 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
             "--genesis" => {
                 i += 1;
                 opts.genesis_phrase = args.get(i).cloned().ok_or("--genesis requires a phrase")?;
+            }
+            "--deep-projection" => {
+                opts.deep_projection = true;
             }
             "--help" | "-h" => {
                 print_usage();
@@ -388,10 +428,12 @@ fn print_usage() {
     eprintln!("  --lr RATE              Learning rate (default: 0.001)");
     eprintln!("  --warm-start                PCA warm-start from training data covariance");
     eprintln!("  --warm-start-bidirectional  Bidirectional warm-start (forward + backward projection)");
+    eprintln!("  --contrastive-pretrain N   Contrastive pretraining epochs before distillation");
     eprintln!("  --diagnostics               Enable periodic projection health logging");
     eprintln!("  --warmup-steps N            LR warmup steps (default: 100)");
     eprintln!("  --accumulation-steps N      Gradient accumulation steps (default: 4)");
     eprintln!("  --cosine-annealing-steps N  Cosine annealing total steps (default: 0 = disabled)");
     eprintln!("  --genesis PHRASE            Genesis seed phrase (default: broca-projection-default)");
+    eprintln!("  --deep-projection           Use deep double-bottleneck projection (256→128→256)");
     eprintln!("  --help, -h                  Show this help message");
 }

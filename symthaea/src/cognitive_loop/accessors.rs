@@ -114,6 +114,26 @@ impl CognitiveLoopService {
             } else {
                 None
             },
+            // Phase 4: neuroendocrine control telemetry
+            neuromod_derived_cortisol: self.neuromodulator_bath.to_hormone_state().cortisol as f32,
+            ne_ach_suppression: {
+                let ne_ph = self.neuromodulator_bath.ne_phasic();
+                if ne_ph > 0.3 { ne_ph * 0.15 } else { 0.0 }
+            },
+            ach_ne_suppression: {
+                let ach_eff = self.neuromodulator_bath.acetylcholine.effective();
+                if ach_eff > 0.6 { (ach_eff - 0.6) * 0.1 } else { 0.0 }
+            },
+            neuromod_gaba_effective: self.neuromodulator_bath.gaba.effective(),
+            neuromod_global_inhibition: self.neuromodulator_bath.global_inhibition(),
+            neuromod_oxytocin_effective: self.neuromodulator_bath.oxytocin.effective(),
+            neuromod_social_coherence: self.neuromodulator_bath.social_coherence_factor(),
+            neuromod_trust_factor: self.neuromodulator_bath.trust_factor(),
+            neuromod_glutamate_effective: self.neuromodulator_bath.glutamate.effective(),
+            neuromod_excitotoxicity_risk: self.neuromodulator_bath.excitotoxicity_risk(),
+            neuromod_learning_fatigue: self.neuromodulator_bath.learning_fatigue_factor(),
+            circadian_phase_offset: self.biorhythm.phase_offset as f32,
+            circadian_effective_hour: self.biorhythm.effective_hour() as f32,
         }
     }
 
@@ -144,6 +164,18 @@ impl CognitiveLoopService {
             .as_ref()
             .map(|e| e.has_causal_structure())
             .unwrap_or(false)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CIRCADIAN ACCESSORS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Shift the circadian phase by the given number of hours (±12 max).
+    ///
+    /// Models jet lag / zeitgeber effects (Czeisler et al. 1999).
+    /// The phase offset gradually returns to 0 via entrainment each cycle.
+    pub fn shift_circadian_phase(&mut self, hours: f64) {
+        self.biorhythm.shift_phase(hours);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
