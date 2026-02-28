@@ -1510,7 +1510,6 @@ impl CognitiveLoopService {
             unified_psi,
             learning_occurred,
             training_loss,
-            is_surprised,
             effective_lr,
             attention_budget_exceeded,
             attention_budget_elapsed_us,
