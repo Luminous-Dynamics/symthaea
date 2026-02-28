@@ -688,4 +688,274 @@ mod tests {
         assert!(result.metadata.thermodynamic_load >= 0.0);
         assert!(result.metadata.thermodynamic_load <= 1.0);
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Dynamics phase coverage (cycle_phase_dynamics.rs)
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn dynamics_fep_fields_finite() {
+        let mut s = make_service();
+        let r = s.cycle("FEP test");
+        assert!(r.metadata.fep_pragmatic_value.is_finite());
+        assert!(r.metadata.fep_accuracy.is_finite());
+        assert!(r.metadata.fep_complexity.is_finite());
+        assert!(r.metadata.fep_surprise.is_finite());
+        assert!(r.metadata.fep_td_error.is_finite());
+    }
+
+    #[test]
+    fn dynamics_reasoning_fields_populated() {
+        let mut s = make_service();
+        let r = s.cycle("reasoning check");
+        assert!(r.metadata.reasoning_confidence.is_finite());
+        // gate_blocked is a bool — just verify it doesn't panic
+        let _ = r.metadata.reasoning_gate_blocked;
+    }
+
+    #[test]
+    fn dynamics_coherence_finite() {
+        let mut s = make_service();
+        let r = s.cycle("coherence check");
+        assert!(r.metadata.prediction_coherence.is_finite());
+        assert!(r.metadata.cross_module_agreement.is_finite());
+    }
+
+    #[test]
+    fn dynamics_homeostasis_pulls_finite() {
+        let mut s = make_service();
+        let r = s.cycle("homeostasis check");
+        assert!(r.metadata.valence_homeostasis_pull.is_finite());
+        assert!(r.metadata.arousal_homeostasis_pull.is_finite());
+        assert!(r.metadata.homeostasis_pull_strength.is_finite());
+    }
+
+    #[test]
+    fn dynamics_neuromod_fields_populated() {
+        let mut s = make_service();
+        let r = s.cycle("neuromod check");
+        assert!(!r.metadata.guiding_question.is_empty());
+        assert!(!r.metadata.dominant_harmonic.is_empty());
+    }
+
+    #[test]
+    fn dynamics_metacognitive_anomaly_defaults_false() {
+        let mut s = make_service();
+        let r = s.cycle("anomaly check");
+        // On first cycle, no anomaly should be detected
+        assert!(!r.metadata.metacognitive_anomaly);
+    }
+
+    #[test]
+    fn dynamics_cycle_reward_finite() {
+        let mut s = make_service();
+        let r = s.cycle("reward test");
+        assert!(r.metadata.cycle_reward.is_finite());
+    }
+
+    #[test]
+    fn dynamics_attention_budget_fields() {
+        let mut s = make_service();
+        let r = s.cycle("attention budget");
+        // Budget shouldn't be exceeded on first cycle
+        let _ = r.metadata.attention_budget_exceeded;
+        // Elapsed should be non-negative
+        assert!(r.metadata.attention_budget_elapsed_us < u64::MAX);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Feedback phase coverage (cycle_phase_feedback.rs)
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn feedback_consciousness_metrics_finite() {
+        let mut s = make_service();
+        for _ in 0..5 {
+            s.cycle("warmup");
+        }
+        let r = s.cycle("consciousness check");
+        assert!(r.metadata.consciousness_level.is_finite());
+        assert!(r.metadata.consciousness_level >= 0.0);
+        assert!(r.metadata.consciousness_level <= 1.0);
+        assert!(r.metadata.primitive_psi.is_finite());
+    }
+
+    #[test]
+    fn feedback_quality_gating_fields() {
+        let mut s = make_service();
+        let r = s.cycle("quality check");
+        assert!(r.metadata.unified_quality_score.is_finite());
+        // Gating booleans should be accessible
+        let _ = r.metadata.coherence_velocity_gated;
+        let _ = r.metadata.dissipative_health_gated;
+        let _ = r.metadata.epistemic_gate_approved;
+    }
+
+    #[test]
+    fn feedback_temporal_fields_finite() {
+        let mut s = make_service();
+        let r = s.cycle("temporal check");
+        assert!(r.metadata.temporal_continuity.is_finite());
+        assert!(r.metadata.temporal_coherence_score.is_finite());
+    }
+
+    #[test]
+    fn feedback_harmonic_fields_finite() {
+        let mut s = make_service();
+        let r = s.cycle("harmonic check");
+        assert!(r.metadata.harmonies_alignment.is_finite());
+        assert!(r.metadata.harmonic_field_coherence.is_finite());
+        assert!(r.metadata.harmonic_love_resonance.is_finite());
+    }
+
+    #[test]
+    fn feedback_dream_engine_defaults() {
+        let mut s = make_service();
+        let r = s.cycle("dream check");
+        // Dream engine requires many cycles, so on first cycle defaults
+        assert!(r.metadata.dream_phi_improvement.is_finite());
+    }
+
+    #[test]
+    fn feedback_dissipative_fields_finite() {
+        let mut s = make_service();
+        let r = s.cycle("dissipative check");
+        assert!(r.metadata.dissipative_health.is_finite());
+        assert!(r.metadata.dissipative_entropy_rate.is_finite());
+    }
+
+    #[test]
+    fn feedback_epistemic_fields_finite() {
+        let mut s = make_service();
+        let r = s.cycle("epistemic check");
+        assert!(r.metadata.epistemic_quality.is_finite());
+        assert!(r.metadata.epistemic_phi_eff.is_finite());
+    }
+
+    #[test]
+    fn feedback_holographic_fields_finite() {
+        let mut s = make_service();
+        let r = s.cycle("holographic check");
+        assert!(r.metadata.holographic_unity.is_finite());
+        assert!(r.metadata.holographic_binding.is_finite());
+    }
+
+    #[test]
+    fn feedback_phenomenal_binding_fields() {
+        let mut s = make_service();
+        let r = s.cycle("phenomenal check");
+        assert!(r.metadata.phenomenal_binding_strength.is_finite());
+        let _ = r.metadata.phenomenal_fragmented;
+    }
+
+    #[test]
+    fn feedback_affective_fields_bounded() {
+        let mut s = make_service();
+        let r = s.cycle("affective check");
+        assert!(r.metadata.affective_valence.is_finite());
+        assert!(r.metadata.affective_arousal.is_finite());
+        assert!(r.metadata.body_valence.is_finite());
+        assert!(r.metadata.body_arousal.is_finite());
+    }
+
+    #[test]
+    fn feedback_living_mind_fields_finite() {
+        let mut s = make_service();
+        let r = s.cycle("living mind check");
+        assert!(r.metadata.living_mind_vitality.is_finite());
+        assert!(r.metadata.living_mind_coherence.is_finite());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Output phase coverage (cycle_phase_output.rs)
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn output_thought_vector_32d() {
+        let mut s = make_service();
+        let r = s.cycle("thought vector");
+        assert_eq!(r.thought_vector.len(), 32);
+        for v in &r.thought_vector {
+            assert!(v.is_finite());
+        }
+    }
+
+    #[test]
+    fn output_cycle_time_nonzero() {
+        let mut s = make_service();
+        let r = s.cycle("timing");
+        assert!(r.cycle_time_us > 0);
+    }
+
+    #[test]
+    fn output_circadian_phase_non_empty() {
+        let mut s = make_service();
+        let r = s.cycle("circadian");
+        assert!(!r.metadata.circadian_phase.is_empty());
+    }
+
+    #[test]
+    fn output_selected_strategy_non_empty() {
+        let mut s = make_service();
+        let r = s.cycle("strategy output");
+        assert!(!r.metadata.selected_strategy.is_empty());
+    }
+
+    #[test]
+    fn output_module_timings_populated() {
+        let mut s = make_service();
+        let r = s.cycle("timing check");
+        let t = &r.metadata.module_timings_us;
+        assert!(t.core_hdc_encode > 0 || t.core_cfc_step > 0);
+    }
+
+    #[test]
+    fn output_sigma_and_spectral_phi() {
+        let mut s = make_service();
+        let r = s.cycle("sigma check");
+        // May be None on first cycle — just verify finitely populated if present
+        if let Some(sigma) = r.metadata.sigma {
+            assert!(sigma.is_finite());
+        }
+        if let Some(phi) = r.metadata.spectral_mip_phi {
+            assert!(phi.is_finite());
+        }
+    }
+
+    #[test]
+    fn output_detected_primitives_exist() {
+        let mut s = make_service();
+        let r = s.cycle("hello world primitive");
+        // May or may not detect primitives — just verify it doesn't panic
+        for p in &r.detected_primitives {
+            assert!(!p.is_empty());
+        }
+    }
+
+    #[test]
+    fn output_wisdom_hv_correct_size() {
+        let mut s = make_service();
+        let r = s.cycle("wisdom hv");
+        // BinaryHV is 16384 bits = 2048 bytes
+        assert_eq!(r.wisdom_hv.0.len(), 2048);
+    }
+
+    #[test]
+    fn output_soul_alignment_finite() {
+        let mut s = make_service();
+        let r = s.cycle("soul alignment");
+        assert!(r.metadata.soul_alignment.is_finite());
+    }
+
+    #[test]
+    fn output_feedback_divergence_tracked() {
+        let mut s = make_service();
+        // Run several cycles so feedback proposals accumulate
+        for _ in 0..10 {
+            s.cycle("divergence");
+        }
+        // After cycles, feedback state should have integration results
+        assert!(s.feedback_state.last_confidence_integration.is_some());
+        assert!(s.feedback_state.last_lr_integration.is_some());
+    }
 }

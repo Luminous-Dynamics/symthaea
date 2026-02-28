@@ -176,6 +176,16 @@ impl CognitiveLoopService {
         self.neuromodulator_bath.clear_injections();
     }
 
+    /// Human-readable phase label for the current bath state.
+    pub fn bath_phase_label(&self) -> &'static str {
+        self.neuromodulator_bath.phase_label()
+    }
+
+    /// Borrow the bath phase tracker for trajectory/centroid/variance queries.
+    pub fn bath_phase_tracker(&self) -> &super::neuromodulators::BathPhaseTracker {
+        &self.bath_phase_tracker
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // CAUSAL ENHANCEMENT ACCESSORS
     // ═══════════════════════════════════════════════════════════════════════
