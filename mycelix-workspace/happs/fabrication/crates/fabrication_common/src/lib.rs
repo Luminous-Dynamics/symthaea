@@ -154,7 +154,7 @@ impl Default for FabricationConfig {
             base_mycelium_reward: 10,
             rate_limit_max_ops: 100,
             rate_limit_window_secs: 60,
-            hdc_dimensions: 4096,
+            hdc_dimensions: 16_384,
             similarity_threshold: 0.7,
         }
     }
@@ -179,14 +179,6 @@ impl FabricationConfig {
 // =============================================================================
 // SIGNAL TYPES
 // =============================================================================
-
-/// Legacy untyped signal — deprecated, use `TypedFabricationSignal` instead.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct FabricationSignal {
-    pub event_type: String,
-    pub source_zome: String,
-    pub payload: String,
-}
 
 // =============================================================================
 // TYPED SIGNAL TYPES
@@ -294,6 +286,21 @@ impl FabricationError {
     pub fn to_wasm_error(&self) -> WasmError {
         wasm_error!(WasmErrorInner::Guest(format!("{:?}", self)))
     }
+
+    /// Convenience: entity not found on DHT
+    pub fn not_found(entity: &str, hash: &impl std::fmt::Display) -> WasmError {
+        Self::NotFound { entity: entity.to_string(), hash: hash.to_string() }.to_wasm_error()
+    }
+
+    /// Convenience: caller is not authorized for this action
+    pub fn unauthorized(action: &str, reason: &str) -> WasmError {
+        Self::Unauthorized { action: action.to_string(), reason: reason.to_string() }.to_wasm_error()
+    }
+
+    /// Convenience: cross-hApp role is unavailable
+    pub fn cross_happ(role: &str) -> WasmError {
+        Self::CrossHappUnavailable { role: role.to_string() }.to_wasm_error()
+    }
 }
 
 // =============================================================================
@@ -317,6 +324,7 @@ pub struct AuditTrailFilter {
     pub after: Option<Timestamp>,
     pub before: Option<Timestamp>,
     pub limit: Option<u32>,
+    pub pagination: Option<PaginationInput>,
 }
 
 // =============================================================================
@@ -436,9 +444,9 @@ pub enum HdcMethod {
 /// Dual-format HDC encoding: legacy bipolar or new continuous
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum HdcEncoding {
-    /// Legacy 10,000D bipolar {-1, +1} vectors
+    /// Legacy bipolar {-1, +1} vectors
     BipolarLegacy { dimensions: u32, vector: Vec<i8> },
-    /// New 4,096D continuous f32 vectors (FabHV)
+    /// Continuous f32 vectors (FabHV, 16,384D standard)
     Continuous { dimensions: u32, vector: Vec<f32> },
     /// Hash-only reference (vector stored externally)
     HashOnly { vector_hash: String },
@@ -451,7 +459,8 @@ pub enum HdcEncoding {
 pub mod hdc {
     use serde::{Deserialize, Serialize};
 
-    pub const FAB_HDC_DIM: usize = 4096;
+    /// Standard HDC dimension (2^14 = 16,384), matching symthaea-core's HDC_DIMENSION.
+    pub const FAB_HDC_DIM: usize = 16_384;
 
     /// Continuous hypervector for WASM-compatible HDC operations
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -2066,21 +2075,6 @@ mod tests {
         assert!(hv.data.iter().all(|&v| v == 0.0));
     }
 
-    // === SIGNAL TESTS ===
-
-    #[test]
-    fn test_fabrication_signal_serde() {
-        let signal = FabricationSignal {
-            event_type: "design_created".to_string(),
-            source_zome: "designs".to_string(),
-            payload: r#"{"hash":"abc123"}"#.to_string(),
-        };
-        let json = serde_json::to_string(&signal).unwrap();
-        let parsed: FabricationSignal = serde_json::from_str(&json).unwrap();
-        assert_eq!(signal.event_type, parsed.event_type);
-        assert_eq!(signal.source_zome, parsed.source_zome);
-    }
-
     // === PAGINATION TESTS ===
 
     #[test]
@@ -2594,7 +2588,7 @@ mod tests {
         assert_eq!(cfg.base_mycelium_reward, 10);
         assert_eq!(cfg.rate_limit_max_ops, 100);
         assert_eq!(cfg.rate_limit_window_secs, 60);
-        assert_eq!(cfg.hdc_dimensions, 4096);
+        assert_eq!(cfg.hdc_dimensions, 16_384);
         assert_eq!(cfg.similarity_threshold, 0.7);
     }
 
@@ -2808,6 +2802,7 @@ mod tests {
             after: None,
             before: None,
             limit: Some(50),
+            pagination: None,
         };
         let json = serde_json::to_string(&filter).unwrap();
         let parsed: AuditTrailFilter = serde_json::from_str(&json).unwrap();

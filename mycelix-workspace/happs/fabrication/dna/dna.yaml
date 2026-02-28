@@ -9,7 +9,7 @@ integrity:
   properties:
     # HDC (Hyperdimensional Computing) Configuration
     hdc:
-      dimensions: 10000
+      dimensions: 16384
       binding_method: "circular"
       similarity_threshold: 0.7
       codebook_size: 1024

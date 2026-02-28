@@ -308,9 +308,9 @@ pub fn update_repair_workflow(input: UpdateWorkflowInput) -> ExternResult<Record
     // Only the original creator can update the workflow
     let caller = agent_info()?.agent_initial_pubkey;
     if *record.action().author() != caller {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Only the workflow creator can update it".to_string()
-        )));
+        return Err(FabricationError::unauthorized(
+            "update_repair_workflow", "Only the workflow creator can update it",
+        ));
     }
 
     let mut workflow: RepairWorkflowEntry = record
@@ -620,7 +620,7 @@ fn log_audit_event(
 
 /// Query audit trail with optional filters
 #[hdk_extern]
-pub fn get_audit_trail(filter: AuditTrailFilter) -> ExternResult<Vec<Record>> {
+pub fn get_audit_trail(filter: AuditTrailFilter) -> ExternResult<PaginatedResponse<Record>> {
     // Determine which anchor to query
     let anchor = if let Some(ref agent) = filter.agent {
         audit_anchor(&format!("agent:{}", agent))?
@@ -639,13 +639,9 @@ pub fn get_audit_trail(filter: AuditTrailFilter) -> ExternResult<Vec<Record>> {
     };
 
     let links = get_links(LinkQuery::try_new(anchor, link_type)?, GetStrategy::default())?;
-    let limit = filter.limit.unwrap_or(100) as usize;
 
     let mut results = Vec::new();
     for link in links {
-        if results.len() >= limit {
-            break;
-        }
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get(hash, GetOptions::default())? {
                 if let Some(audit) = record.entry().to_app_option::<bridge_integrity::AuditEntryRecord>().ok().flatten() {
@@ -666,7 +662,7 @@ pub fn get_audit_trail(filter: AuditTrailFilter) -> ExternResult<Vec<Record>> {
         }
     }
 
-    Ok(results)
+    Ok(paginate(results, filter.pagination.as_ref()))
 }
 
 fn audit_anchor(name: &str) -> ExternResult<EntryHash> {
@@ -835,18 +831,6 @@ mod tests {
     }
 
     #[test]
-    fn test_legacy_signal_still_serdeable() {
-        let signal = FabricationSignal {
-            event_type: "prediction_created".to_string(),
-            source_zome: "bridge".to_string(),
-            payload: "{}".to_string(),
-        };
-        let json = serde_json::to_string(&signal).unwrap();
-        let parsed: FabricationSignal = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.event_type, "prediction_created");
-    }
-
-    #[test]
     fn test_cross_happ_role_names() {
         // Verify the role names used in cross-hApp calls are consistent
         let role = "mycelix-commons";
@@ -887,6 +871,7 @@ mod tests {
             after: Some(Timestamp::from_micros(100)),
             before: None,
             limit: Some(50),
+            pagination: None,
         };
         let json = serde_json::to_string(&filter).unwrap();
         let parsed: AuditTrailFilter = serde_json::from_str(&json).unwrap();

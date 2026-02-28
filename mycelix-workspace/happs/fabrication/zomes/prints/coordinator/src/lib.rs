@@ -147,22 +147,18 @@ pub struct DesignPrintStats {
 fn ensure_caller_is_printer_owner(printer_hash: &ActionHash) -> ExternResult<()> {
     let caller = agent_info()?.agent_initial_pubkey;
     let record = get(printer_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Printer not found".to_string()
-        )))?;
+        .ok_or(FabricationError::not_found("Printer", printer_hash))?;
 
     let printer: Printer = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not parse printer".to_string()
-        )))?;
+        .ok_or(FabricationError::not_found("Printer", printer_hash))?;
 
     if printer.owner != caller {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Only the printer owner can perform this action".to_string()
-        )));
+        return Err(FabricationError::unauthorized(
+            "printer_operation", "Only the printer owner can perform this action",
+        ));
     }
 
     Ok(())
@@ -933,29 +929,50 @@ pub fn update_cincinnati_session(input: UpdateCincinnatiInput) -> ExternResult<R
 // DISCOVERY
 // =============================================================================
 
+/// Input for paginated hash-based list queries
+#[derive(Serialize, Deserialize, Debug)]
+pub struct HashPaginationInput {
+    pub hash: ActionHash,
+    pub pagination: Option<PaginationInput>,
+}
+
+/// Input for paginated agent-scoped list queries
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AgentPaginationInput {
+    pub pagination: Option<PaginationInput>,
+}
+
 /// Get all print jobs for the current agent
 #[hdk_extern]
-pub fn get_my_print_jobs(_: ()) -> ExternResult<Vec<Record>> {
+pub fn get_my_print_jobs(input: AgentPaginationInput) -> ExternResult<PaginatedResponse<Record>> {
     let requester = agent_info()?.agent_initial_pubkey;
-    get_jobs_by_link(requester.into(), LinkTypes::RequesterToJobs)
+    let items = get_jobs_by_link(requester.into(), LinkTypes::RequesterToJobs)?;
+    Ok(paginate(items, input.pagination.as_ref()))
 }
 
 /// Get print jobs for a printer
 #[hdk_extern]
-pub fn get_printer_jobs(printer_hash: ActionHash) -> ExternResult<Vec<Record>> {
-    get_jobs_by_link(printer_hash.into(), LinkTypes::PrinterToPrints)
+pub fn get_printer_jobs(input: HashPaginationInput) -> ExternResult<PaginatedResponse<Record>> {
+    let items = get_jobs_by_link(input.hash.into(), LinkTypes::PrinterToPrints)?;
+    Ok(paginate(items, input.pagination.as_ref()))
+}
+
+/// Get prints for a design (internal: returns all records for statistics)
+fn get_design_prints_all(design_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    get_jobs_by_link(design_hash.into(), LinkTypes::DesignToPrints)
 }
 
 /// Get prints for a design
 #[hdk_extern]
-pub fn get_design_prints(design_hash: ActionHash) -> ExternResult<Vec<Record>> {
-    get_jobs_by_link(design_hash.into(), LinkTypes::DesignToPrints)
+pub fn get_design_prints(input: HashPaginationInput) -> ExternResult<PaginatedResponse<Record>> {
+    let items = get_design_prints_all(input.hash)?;
+    Ok(paginate(items, input.pagination.as_ref()))
 }
 
 /// Get print statistics for a design
 #[hdk_extern]
 pub fn get_print_statistics(design_hash: ActionHash) -> ExternResult<DesignPrintStats> {
-    let jobs = get_design_prints(design_hash.clone())?;
+    let jobs = get_design_prints_all(design_hash.clone())?;
 
     let mut total = 0u32;
     let mut success = 0u32;

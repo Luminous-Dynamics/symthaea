@@ -148,10 +148,13 @@ fn validate_hdc_intent(intent: HdcIntentEntry) -> ExternResult<ValidateCallbackR
     check!(validation::require_non_empty(&intent.description, "description"));
     check!(validation::require_max_len(&intent.description, 4096, "description"));
 
-    // vector_dimensions: must be 4096 or 10000 (dual-format support)
-    if intent.vector_dimensions != 4096 && intent.vector_dimensions != 10000 {
+    // vector_dimensions: must be a power of 2 in [4096, 16384]
+    if !intent.vector_dimensions.is_power_of_two()
+        || intent.vector_dimensions < 4096
+        || intent.vector_dimensions > 16384
+    {
         return Ok(ValidateCallbackResult::Invalid(
-            "vector_dimensions must be 4096 or 10000".to_string(),
+            "vector_dimensions must be a power of 2 between 4096 and 16384".to_string(),
         ));
     }
 
@@ -259,7 +262,7 @@ mod tests {
     fn valid_intent() -> HdcIntentEntry {
         HdcIntentEntry {
             description: "Design a cup holder".to_string(),
-            vector_dimensions: 4096,
+            vector_dimensions: 16384,
             vector_hash: "abc123hash".to_string(),
             semantic_bindings: vec![SerializedBinding {
                 concept: "cup".to_string(),
@@ -342,15 +345,26 @@ mod tests {
     }
 
     #[test]
-    fn vector_dimensions_not_4096_or_10000_rejected() {
+    fn vector_dimensions_invalid_rejected() {
+        // Too small
         let mut intent = valid_intent();
         intent.vector_dimensions = 512;
         assert!(is_invalid(validate_hdc_intent(intent)));
 
-        // 10000 should pass
+        // Not power of 2
         let mut intent2 = valid_intent();
         intent2.vector_dimensions = 10000;
-        assert!(is_valid(validate_hdc_intent(intent2)));
+        assert!(is_invalid(validate_hdc_intent(intent2)));
+
+        // 8192 should pass (power of 2 in range)
+        let mut intent3 = valid_intent();
+        intent3.vector_dimensions = 8192;
+        assert!(is_valid(validate_hdc_intent(intent3)));
+
+        // Too large
+        let mut intent4 = valid_intent();
+        intent4.vector_dimensions = 32768;
+        assert!(is_invalid(validate_hdc_intent(intent4)));
     }
 
     #[test]

@@ -7,7 +7,24 @@
 use hdk::prelude::*;
 use designs_integrity::*;
 use fabrication_common::*;
+use std::cell::RefCell;
 use std::collections::HashMap;
+
+thread_local! {
+    static CONFIG: RefCell<Option<FabricationConfig>> = const { RefCell::new(None) };
+}
+
+fn get_config() -> FabricationConfig {
+    CONFIG.with(|c| {
+        c.borrow_mut()
+            .get_or_insert_with(|| {
+                dna_info()
+                    .map(|info| FabricationConfig::from_properties_or_default(info.modifiers.properties.bytes()))
+                    .unwrap_or_default()
+            })
+            .clone()
+    })
+}
 
 /// Input for creating a new design
 #[derive(Serialize, Deserialize, Debug)]
@@ -91,6 +108,13 @@ pub struct GetFeaturedDesignsInput {
     pub pagination: Option<PaginationInput>,
 }
 
+/// Generic hash + pagination input for list-by-hash queries
+#[derive(Serialize, Deserialize, Debug)]
+pub struct HashListInput {
+    pub hash: ActionHash,
+    pub pagination: Option<PaginationInput>,
+}
+
 // =============================================================================
 // CRUD OPERATIONS
 // =============================================================================
@@ -102,9 +126,10 @@ pub fn create_design(input: CreateDesignInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     // Generate default HDC vector if not provided
+    let dim = get_config().hdc_dimensions as usize;
     let intent_vector = input.intent_vector.unwrap_or_else(|| HdcHypervector {
-        dimensions: 10000,
-        vector: vec![0; 10000],
+        dimensions: dim as u32,
+        vector: vec![0; dim],
         semantic_bindings: vec![],
         generation_method: HdcMethod::ManualEncoding,
     });
@@ -174,9 +199,7 @@ pub fn get_design(hash: ActionHash) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn update_design(input: UpdateDesignInput) -> ExternResult<Record> {
     let original = get(input.original_action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Design not found".to_string()
-        )))?;
+        .ok_or(FabricationError::not_found("Design", &input.original_action_hash))?;
 
     let original_design: Design = original
         .entry()
@@ -189,9 +212,7 @@ pub fn update_design(input: UpdateDesignInput) -> ExternResult<Record> {
     // Verify author
     let author = agent_info()?.agent_initial_pubkey;
     if original_design.author != author {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Only the author can update a design".to_string()
-        )));
+        return Err(FabricationError::unauthorized("update_design", "Only the author can update a design"));
     }
 
     let now = sys_time()?;
@@ -240,9 +261,7 @@ pub fn update_design(input: UpdateDesignInput) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn delete_design(hash: ActionHash) -> ExternResult<ActionHash> {
     let design_record = get(hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Design not found".to_string()
-        )))?;
+        .ok_or(FabricationError::not_found("Design", &hash))?;
 
     let design: Design = design_record
         .entry()
@@ -255,9 +274,7 @@ pub fn delete_design(hash: ActionHash) -> ExternResult<ActionHash> {
     // Verify author
     let author = agent_info()?.agent_initial_pubkey;
     if design.author != author {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Only the author can delete a design".to_string()
-        )));
+        return Err(FabricationError::unauthorized("delete_design", "Only the author can delete a design"));
     }
 
     let delete_hash = delete_entry(hash.clone())?;
@@ -289,9 +306,7 @@ pub fn add_design_file(input: AddFileInput) -> ExternResult<Record> {
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse design".to_string())))?;
     if design.author != uploader {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Only the design author can add files".to_string()
-        )));
+        return Err(FabricationError::unauthorized("add_design_file", "Only the design author can add files"));
     }
 
     let now = sys_time()?;
@@ -326,9 +341,9 @@ pub fn add_design_file(input: AddFileInput) -> ExternResult<Record> {
 
 /// Get all files for a design
 #[hdk_extern]
-pub fn get_design_files(design_hash: ActionHash) -> ExternResult<Vec<Record>> {
+pub fn get_design_files(input: HashListInput) -> ExternResult<PaginatedResponse<Record>> {
     let links = get_links(
-        LinkQuery::try_new(design_hash, LinkTypes::DesignToFiles)?, GetStrategy::default(),
+        LinkQuery::try_new(input.hash, LinkTypes::DesignToFiles)?, GetStrategy::default(),
     )?;
 
     let mut files = Vec::new();
@@ -340,7 +355,7 @@ pub fn get_design_files(design_hash: ActionHash) -> ExternResult<Vec<Record>> {
         }
     }
 
-    Ok(files)
+    Ok(paginate(files, input.pagination.as_ref()))
 }
 
 // =============================================================================
@@ -462,39 +477,35 @@ pub fn fork_design(input: ForkDesignInput) -> ExternResult<Record> {
 
 /// Get the history of a design (all updates)
 #[hdk_extern]
-pub fn get_design_history(hash: ActionHash) -> ExternResult<Vec<Record>> {
-    let details = get_details(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Design not found".to_string()
-        )))?;
+pub fn get_design_history(input: HashListInput) -> ExternResult<PaginatedResponse<Record>> {
+    let details = get_details(input.hash.clone(), GetOptions::default())?
+        .ok_or(FabricationError::not_found("Design", &input.hash))?;
 
     match details {
         Details::Entry(entry_details) => {
             let mut records: Vec<Record> = Vec::new();
             for signed_action in entry_details.actions {
-                // Get the action hash and fetch the full record
                 let action_hash = signed_action.hashed.hash.clone();
                 if let Some(record) = get(action_hash, GetOptions::default())? {
                     records.push(record);
                 }
             }
-            // Sort by timestamp
             records.sort_by(|a, b| {
                 a.action()
                     .timestamp()
                     .cmp(&b.action().timestamp())
             });
-            Ok(records)
+            Ok(paginate(records, input.pagination.as_ref()))
         }
-        _ => Ok(vec![]),
+        _ => Ok(paginate(vec![], input.pagination.as_ref())),
     }
 }
 
 /// Get all forks of a design
 #[hdk_extern]
-pub fn get_design_forks(hash: ActionHash) -> ExternResult<Vec<Record>> {
+pub fn get_design_forks(input: HashListInput) -> ExternResult<PaginatedResponse<Record>> {
     let links = get_links(
-        LinkQuery::try_new(hash, LinkTypes::ParentToForks)?, GetStrategy::default(),
+        LinkQuery::try_new(input.hash, LinkTypes::ParentToForks)?, GetStrategy::default(),
     )?;
 
     let mut forks = Vec::new();
@@ -506,7 +517,7 @@ pub fn get_design_forks(hash: ActionHash) -> ExternResult<Vec<Record>> {
         }
     }
 
-    Ok(forks)
+    Ok(paginate(forks, input.pagination.as_ref()))
 }
 
 // =============================================================================
@@ -638,10 +649,8 @@ pub fn get_featured_designs(input: GetFeaturedDesignsInput) -> ExternResult<Pagi
 /// Get parametric configuration for a design
 #[hdk_extern]
 pub fn get_parameters(hash: ActionHash) -> ExternResult<Option<ParametricSchema>> {
-    let record = get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Design not found".to_string()
-        )))?;
+    let record = get(hash.clone(), GetOptions::default())?
+        .ok_or(FabricationError::not_found("Design", &hash))?;
 
     let design: Design = record
         .entry()
@@ -761,9 +770,7 @@ pub fn generate_variant(input: GenerateVariantInput) -> ExternResult<GeneratedVa
     // 1. Validate: design must exist on DHT and have a parametric schema.
     // -------------------------------------------------------------------------
     let record = get(input.design_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Design not found".to_string()
-        )))?;
+        .ok_or(FabricationError::not_found("Design", &input.design_hash))?;
 
     let design: Design = record
         .entry()
@@ -1095,5 +1102,96 @@ mod tests {
             decoded.parameters.get("material_grade"),
             Some(ParameterValue::String(s)) if s == "PETG-CF"
         ));
+    }
+
+    // =========================================================================
+    // params_to_symthaea_input tests
+    // =========================================================================
+
+    fn make_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    #[test]
+    fn test_params_number_produces_dimension_role() {
+        let mut params = HashMap::new();
+        params.insert("width".to_string(), ParameterValue::Number(50.0));
+        let result = params_to_symthaea_input(make_hash(), &params);
+        assert_eq!(result.intent_modifiers.len(), 1);
+        assert_eq!(result.intent_modifiers[0].role, "dimension");
+        assert_eq!(result.intent_modifiers[0].concept, "width=50");
+        assert_eq!(result.intent_modifiers[0].weight, 1.0);
+    }
+
+    #[test]
+    fn test_params_boolean_produces_feature_role() {
+        let mut params = HashMap::new();
+        params.insert("chamfered".to_string(), ParameterValue::Boolean(true));
+        let result = params_to_symthaea_input(make_hash(), &params);
+        assert_eq!(result.intent_modifiers.len(), 1);
+        assert_eq!(result.intent_modifiers[0].role, "feature");
+        assert!(result.intent_modifiers[0].concept.contains("chamfered=true"));
+    }
+
+    #[test]
+    fn test_params_material_key_collected() {
+        let mut params = HashMap::new();
+        params.insert("material_type".to_string(), ParameterValue::String("PLA".to_string()));
+        let result = params_to_symthaea_input(make_hash(), &params);
+        assert_eq!(result.material_constraints, vec!["PLA"]);
+        assert_eq!(result.intent_modifiers[0].role, "material");
+    }
+
+    #[test]
+    fn test_params_string_non_material_produces_modifier_role() {
+        let mut params = HashMap::new();
+        params.insert("color".to_string(), ParameterValue::String("red".to_string()));
+        let result = params_to_symthaea_input(make_hash(), &params);
+        assert_eq!(result.intent_modifiers[0].role, "modifier");
+        assert!(result.material_constraints.is_empty());
+    }
+
+    #[test]
+    fn test_params_nan_skipped() {
+        let mut params = HashMap::new();
+        params.insert("width".to_string(), ParameterValue::Number(f64::NAN));
+        params.insert("height".to_string(), ParameterValue::Number(25.0));
+        let result = params_to_symthaea_input(make_hash(), &params);
+        assert_eq!(result.intent_modifiers.len(), 1);
+        assert_eq!(result.intent_modifiers[0].concept, "height=25");
+    }
+
+    #[test]
+    fn test_params_infinity_skipped() {
+        let mut params = HashMap::new();
+        params.insert("depth".to_string(), ParameterValue::Number(f64::INFINITY));
+        let result = params_to_symthaea_input(make_hash(), &params);
+        assert!(result.intent_modifiers.is_empty());
+    }
+
+    #[test]
+    fn test_params_integer_produces_dimension_role() {
+        let mut params = HashMap::new();
+        params.insert("count".to_string(), ParameterValue::Integer(4));
+        let result = params_to_symthaea_input(make_hash(), &params);
+        assert_eq!(result.intent_modifiers[0].role, "dimension");
+        assert_eq!(result.intent_modifiers[0].concept, "count=4");
+    }
+
+    #[test]
+    fn test_params_filament_key_is_material() {
+        let mut params = HashMap::new();
+        params.insert("filament_type".to_string(), ParameterValue::String("PETG".to_string()));
+        let result = params_to_symthaea_input(make_hash(), &params);
+        assert_eq!(result.material_constraints, vec!["PETG"]);
+        assert_eq!(result.intent_modifiers[0].role, "material");
+    }
+
+    #[test]
+    fn test_params_empty_map() {
+        let params = HashMap::new();
+        let result = params_to_symthaea_input(make_hash(), &params);
+        assert!(result.intent_modifiers.is_empty());
+        assert!(result.material_constraints.is_empty());
     }
 }

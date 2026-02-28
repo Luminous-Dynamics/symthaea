@@ -96,8 +96,8 @@ pub fn generate_intent_vector(input: CreateIntentInput) -> ExternResult<IntentRe
     let cat_anchor = category_anchor(&category)?;
     create_link(cat_anchor, hash.clone(), LinkTypes::AuthorToIntents, ())?;
 
-    let record = get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))?;
+    let record = get(hash.clone(), GetOptions::default())?
+        .ok_or(FabricationError::not_found("Intent", &hash))?;
 
     Ok(IntentResult {
         record,
@@ -229,7 +229,7 @@ pub struct LateralBindInput {
 pub fn lateral_bind(input: LateralBindInput) -> ExternResult<IntentResult> {
     // Get base intent
     let base_record = get(input.base_intent_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Base intent not found".into())))?;
+        .ok_or(FabricationError::not_found("Intent", &input.base_intent_hash))?;
 
     let base_intent: HdcIntentEntry = base_record
         .entry()
@@ -285,8 +285,8 @@ pub fn lateral_bind(input: LateralBindInput) -> ExternResult<IntentResult> {
     create_link(author, hash.clone(), LinkTypes::AuthorToIntents, ())?;
     create_link(input.base_intent_hash, hash.clone(), LinkTypes::IntentToDesigns, ())?;
 
-    let record = get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))?;
+    let record = get(hash.clone(), GetOptions::default())?
+        .ok_or(FabricationError::not_found("Intent", &hash))?;
 
     Ok(IntentResult {
         record,
@@ -321,7 +321,7 @@ pub fn semantic_search(input: SemanticSearchInput) -> ExternResult<Vec<SearchRes
 
     // Get query intent
     let query_record = get(input.intent_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Intent not found".into())))?;
+        .ok_or(FabricationError::not_found("Intent", &input.intent_hash))?;
 
     let query_intent: HdcIntentEntry = query_record
         .entry()
@@ -393,7 +393,7 @@ pub fn semantic_search_by_category(input: SemanticSearchInput) -> ExternResult<V
     let limit = input.limit.unwrap_or(10) as usize;
 
     let query_record = get(input.intent_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Intent not found".into())))?;
+        .ok_or(FabricationError::not_found("Intent", &input.intent_hash))?;
     let query_intent: HdcIntentEntry = query_record
         .entry().to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
@@ -606,7 +606,7 @@ pub fn generate_parametric_variant(input: GenerateVariantInput) -> ExternResult<
         (),
     )?;
 
-    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get(hash.clone(), GetOptions::default())?.ok_or(FabricationError::not_found("GeneratedDesign", &hash))
 }
 
 // =============================================================================
@@ -661,7 +661,7 @@ pub fn optimize_for_local(input: OptimizeLocalInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get(hash.clone(), GetOptions::default())?.ok_or(FabricationError::not_found("Optimization", &hash))
 }
 
 fn calculate_local_adjustments(
@@ -1163,8 +1163,21 @@ fn zero_crossing_rate(values: &[f32], duration_hours: f32) -> f32 {
 // QUERIES
 // =============================================================================
 
+/// Input for paginated agent-scoped queries
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MyIntentsInput {
+    pub pagination: Option<PaginationInput>,
+}
+
+/// Input for paginated hash-based queries
+#[derive(Serialize, Deserialize, Debug)]
+pub struct HashPaginationInput {
+    pub hash: ActionHash,
+    pub pagination: Option<PaginationInput>,
+}
+
 #[hdk_extern]
-pub fn get_my_intents(_: ()) -> ExternResult<Vec<Record>> {
+pub fn get_my_intents(input: MyIntentsInput) -> ExternResult<PaginatedResponse<Record>> {
     let author = agent_info()?.agent_initial_pubkey;
     let links = get_links(LinkQuery::try_new(author, LinkTypes::AuthorToIntents)?, GetStrategy::default())?;
 
@@ -1176,13 +1189,13 @@ pub fn get_my_intents(_: ()) -> ExternResult<Vec<Record>> {
             }
         }
     }
-    Ok(results)
+    Ok(paginate(results, input.pagination.as_ref()))
 }
 
 #[hdk_extern]
-pub fn get_design_optimizations(design_hash: ActionHash) -> ExternResult<Vec<Record>> {
+pub fn get_design_optimizations(input: HashPaginationInput) -> ExternResult<PaginatedResponse<Record>> {
     let links = get_links(
-        LinkQuery::try_new(design_hash, LinkTypes::DesignToOptimizations)?, GetStrategy::default(),
+        LinkQuery::try_new(input.hash, LinkTypes::DesignToOptimizations)?, GetStrategy::default(),
     )?;
 
     let mut results = Vec::new();
@@ -1193,7 +1206,7 @@ pub fn get_design_optimizations(design_hash: ActionHash) -> ExternResult<Vec<Rec
             }
         }
     }
-    Ok(results)
+    Ok(paginate(results, input.pagination.as_ref()))
 }
 
 // =============================================================================
@@ -1787,5 +1800,68 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&config).unwrap();
         assert_eq!(parsed["csg_tree"]["Boolean"]["op"], "Subtract",
             "Hole feature should create a Boolean Subtract");
+    }
+
+    // =========================================================================
+    // compute_binding_overlap tests
+    // =========================================================================
+
+    #[test]
+    fn test_binding_overlap_exact_match() {
+        let a = vec![
+            SerializedBinding { concept: "cup".to_string(), role: "Base".to_string(), weight: 0.8 },
+        ];
+        let b = vec![
+            SerializedBinding { concept: "cup".to_string(), role: "Base".to_string(), weight: 0.5 },
+        ];
+        let result = compute_binding_overlap(&a, &b);
+        assert_eq!(result, vec!["cup"]);
+    }
+
+    #[test]
+    fn test_binding_overlap_different_roles_no_match() {
+        let a = vec![
+            SerializedBinding { concept: "cup".to_string(), role: "Base".to_string(), weight: 0.8 },
+        ];
+        let b = vec![
+            SerializedBinding { concept: "cup".to_string(), role: "Modifier".to_string(), weight: 0.5 },
+        ];
+        let result = compute_binding_overlap(&a, &b);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_binding_overlap_different_concepts_no_match() {
+        let a = vec![
+            SerializedBinding { concept: "cup".to_string(), role: "Base".to_string(), weight: 0.8 },
+        ];
+        let b = vec![
+            SerializedBinding { concept: "plate".to_string(), role: "Base".to_string(), weight: 0.5 },
+        ];
+        let result = compute_binding_overlap(&a, &b);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_binding_overlap_multiple_matches() {
+        let a = vec![
+            SerializedBinding { concept: "cup".to_string(), role: "Base".to_string(), weight: 0.8 },
+            SerializedBinding { concept: "handle".to_string(), role: "Modifier".to_string(), weight: 0.5 },
+        ];
+        let b = vec![
+            SerializedBinding { concept: "cup".to_string(), role: "Base".to_string(), weight: 0.6 },
+            SerializedBinding { concept: "handle".to_string(), role: "Modifier".to_string(), weight: 0.3 },
+            SerializedBinding { concept: "lid".to_string(), role: "Modifier".to_string(), weight: 0.2 },
+        ];
+        let result = compute_binding_overlap(&a, &b);
+        assert_eq!(result.len(), 2);
+        assert!(result.contains(&"cup".to_string()));
+        assert!(result.contains(&"handle".to_string()));
+    }
+
+    #[test]
+    fn test_binding_overlap_empty_inputs() {
+        let result = compute_binding_overlap(&[], &[]);
+        assert!(result.is_empty());
     }
 }

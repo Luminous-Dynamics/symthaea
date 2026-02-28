@@ -8,6 +8,25 @@ use hdk::prelude::*;
 use printers_integrity::*;
 use fabrication_common::*;
 
+use std::cell::RefCell;
+
+thread_local! {
+    static CONFIG: RefCell<Option<FabricationConfig>> = const { RefCell::new(None) };
+}
+
+#[allow(dead_code)]
+fn get_config() -> FabricationConfig {
+    CONFIG.with(|c| {
+        c.borrow_mut()
+            .get_or_insert_with(|| {
+                dna_info()
+                    .map(|info| FabricationConfig::from_properties_or_default(info.modifiers.properties.bytes()))
+                    .unwrap_or_default()
+            })
+            .clone()
+    })
+}
+
 /// Input for registering a printer
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RegisterPrinterInput {
@@ -165,9 +184,7 @@ pub fn get_printer(hash: ActionHash) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn update_printer(input: UpdatePrinterInput) -> ExternResult<Record> {
     let original = get(input.original_action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Printer not found".to_string()
-        )))?;
+        .ok_or(FabricationError::not_found("Printer", &input.original_action_hash))?;
 
     let original_printer: Printer = original
         .entry()
@@ -180,9 +197,7 @@ pub fn update_printer(input: UpdatePrinterInput) -> ExternResult<Record> {
     // Verify owner
     let owner = agent_info()?.agent_initial_pubkey;
     if original_printer.owner != owner {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Only the owner can update a printer".to_string()
-        )));
+        return Err(FabricationError::unauthorized("update_printer", "Only the owner can update a printer"));
     }
 
     let now = sys_time()?;
@@ -223,9 +238,7 @@ pub fn update_printer(input: UpdatePrinterInput) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn deactivate_printer(hash: ActionHash) -> ExternResult<ActionHash> {
     let printer_record = get(hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Printer not found".to_string()
-        )))?;
+        .ok_or(FabricationError::not_found("Printer", &hash))?;
 
     let printer: Printer = printer_record
         .entry()
@@ -238,9 +251,7 @@ pub fn deactivate_printer(hash: ActionHash) -> ExternResult<ActionHash> {
     // Verify owner
     let owner = agent_info()?.agent_initial_pubkey;
     if printer.owner != owner {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Only the owner can deactivate a printer".to_string()
-        )));
+        return Err(FabricationError::unauthorized("deactivate_printer", "Only the owner can deactivate a printer"));
     }
 
     // Update availability to offline
@@ -266,9 +277,15 @@ pub fn deactivate_printer(hash: ActionHash) -> ExternResult<ActionHash> {
 // DISCOVERY
 // =============================================================================
 
+/// Input for paginated agent-scoped queries
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MyPrintersInput {
+    pub pagination: Option<PaginationInput>,
+}
+
 /// Get all printers owned by the current agent
 #[hdk_extern]
-pub fn get_my_printers(_: ()) -> ExternResult<Vec<Record>> {
+pub fn get_my_printers(input: MyPrintersInput) -> ExternResult<PaginatedResponse<Record>> {
     let owner = agent_info()?.agent_initial_pubkey;
     let links = get_links(
         LinkQuery::try_new(owner, LinkTypes::OwnerToPrinters)?, GetStrategy::default(),
@@ -283,7 +300,7 @@ pub fn get_my_printers(_: ()) -> ExternResult<Vec<Record>> {
         }
     }
 
-    Ok(printers)
+    Ok(paginate(printers, input.pagination.as_ref()))
 }
 
 /// Find printers nearby a location
@@ -600,10 +617,8 @@ pub struct CheckCompatibilityInput {
 
 #[hdk_extern]
 pub fn check_printer_compatibility(input: CheckCompatibilityInput) -> ExternResult<CompatibilityResult> {
-    let printer_record = get(input.printer_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Printer not found".to_string()
-        )))?;
+    let printer_record = get(input.printer_hash.clone(), GetOptions::default())?
+        .ok_or(FabricationError::not_found("Printer", &input.printer_hash))?;
 
     let _printer: Printer = printer_record
         .entry()
@@ -642,24 +657,18 @@ pub struct UpdateAvailabilityInput {
 #[hdk_extern]
 pub fn update_availability(input: UpdateAvailabilityInput) -> ExternResult<Record> {
     let printer_record = get(input.printer_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Printer not found".to_string()
-        )))?;
+        .ok_or(FabricationError::not_found("Printer", &input.printer_hash))?;
 
     let printer: Printer = printer_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not parse printer".to_string()
-        )))?;
+        .ok_or(FabricationError::not_found("Printer", &input.printer_hash))?;
 
     // Verify owner
     let owner = agent_info()?.agent_initial_pubkey;
     if printer.owner != owner {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Only the owner can update availability".to_string()
-        )));
+        return Err(FabricationError::unauthorized("update_availability", "Only the owner can update availability"));
     }
 
     let now = sys_time()?;
@@ -1090,5 +1099,36 @@ mod tests {
         assert!((result.score - 1.0).abs() < f32::EPSILON,
             "No requirements should yield score 1.0, got {}", result.score);
         assert!(result.issues.is_empty(), "No requirements should yield no issues");
+    }
+
+    // =========================================================================
+    // Proximity scoring formula tests
+    // =========================================================================
+
+    #[test]
+    fn test_proximity_score_at_origin() {
+        // At distance 0, score should be 1.0
+        let d: f32 = 0.0;
+        let radius_km: f32 = 10.0;
+        let score = (1.0_f32 - (d / radius_km) * 0.5).max(0.5);
+        assert!((score - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_proximity_score_at_edge() {
+        // At distance = radius, score should be 0.5
+        let d: f32 = 10.0;
+        let radius_km: f32 = 10.0;
+        let score = (1.0_f32 - (d / radius_km) * 0.5).max(0.5);
+        assert!((score - 0.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_proximity_score_midpoint() {
+        // At distance = radius/2, score should be 0.75
+        let d: f32 = 5.0;
+        let radius_km: f32 = 10.0;
+        let score = (1.0_f32 - (d / radius_km) * 0.5).max(0.5);
+        assert!((score - 0.75).abs() < f32::EPSILON);
     }
 }

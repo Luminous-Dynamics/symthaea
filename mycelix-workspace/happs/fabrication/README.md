@@ -1,5 +1,8 @@
 # Mycelix Fabrication hApp
 
+[![CI](https://github.com/luminous-dynamics/luminous-dynamics/actions/workflows/fabrication-ci.yml/badge.svg)](https://github.com/luminous-dynamics/luminous-dynamics/actions/workflows/fabrication-ci.yml)
+**348 unit tests** | **14 WASM zomes** | **Holochain 0.6**
+
 **Distributed Manufacturing Commons for the Civilizational OS**
 
 The Fabrication hApp transforms digital intent into grounded, sustainable, community-owned physical artifacts. It is the **physical hands** of the Mycelix organism.
@@ -7,7 +10,7 @@ The Fabrication hApp transforms digital intent into grounded, sustainable, commu
 ## Key Innovations
 
 ### 1. HDC-Encoded Parametric Designs
-Designs are stored as 10,000-dimensional **Hyperdimensional Computing** vectors, enabling:
+Designs are stored as 16,384-dimensional (2^14) **Hyperdimensional Computing** vectors, enabling:
 - Natural language design search ("bracket for 12mm pipe")
 - Semantic similarity matching across languages
 - AI-assisted parametric variant generation
@@ -71,66 +74,26 @@ fabrication/
 
 ## Quick Start
 
-### Using the TypeScript SDK
-
-```typescript
-import { FabricationClient } from '@mycelix/fabrication-sdk';
-
-const client = new FabricationClient({
-  url: 'ws://localhost:8888',
-  installedAppId: 'fabrication'
-});
-
-await client.connect();
-
-// Search for designs using natural language
-const results = await client.searchDesigns('bracket for 12mm pipe');
-
-// Create a print job
-const job = await client.prints.createJob({
-  designHash: results[0].designHash,
-  printerHash: myPrinterHash,
-  settings: {
-    layerHeight: 0.2,
-    infillPercent: 20,
-    material: 'PETG',
-    supports: false,
-    raft: false,
-    temperatures: { hotend: 240, bed: 70 }
-  }
-});
-
-// Calculate PoGF score
-const pogScore = client.calculatePogScore({
-  energyRenewableFraction: 0.8,  // 80% solar
-  materialCircularity: 0.6,      // 60% recycled
-  qualityVerified: 0.9,          // Cincinnati verified
-  localParticipation: 1.0        // HEARTH funded
-});
-
-console.log(`PoGF Score: ${pogScore}`);  // 0.76
-console.log(`MYCELIUM Reward: ${client.estimateMyceliumReward(pogScore, 0.9)}`);
-
-await client.disconnect();
-```
-
 ### Building from Source
 
 ```bash
 # Enter the workspace
 cd mycelix-workspace/happs/fabrication
 
-# Build all zomes
-cargo build --release
+# Build all WASM zomes (14 zomes)
+cargo build --release --target wasm32-unknown-unknown
+
+# Run unit tests (348 tests)
+cargo test --target x86_64-unknown-linux-gnu
 
 # Package the DNA
-hc dna pack dna/
+hc dna pack dna/ -o workdir/fabrication.dna
 
 # Package the hApp
-hc app pack .
+hc app pack . -o fabrication.happ
 
-# Run tests
-cargo test
+# Clippy (deny warnings)
+cargo clippy --target wasm32-unknown-unknown -- -D warnings
 ```
 
 ## Cross-hApp Integration
@@ -161,9 +124,12 @@ The Fabrication hApp integrates with the entire Mycelix civilizational OS:
 ## Documentation
 
 - [Getting Started](docs/GETTING_STARTED.md)
-- [Core Concepts](docs/CONCEPTS.md) - HDC, PoGF, Cincinnati Algorithm
+- [Core Concepts](docs/CONCEPTS.md) — HDC, PoGF, Cincinnati Algorithm
 - [API Reference](docs/API_REFERENCE.md)
 - [Integration Guide](docs/INTEGRATION_GUIDE.md)
+- [Cincinnati Algorithm](docs/CINCINNATI_ALGORITHM.md) — Teleomorphic quality monitoring
+- [Design Lifecycle](docs/DESIGN_LIFECYCLE.md) — From creation to fabrication
+- [PoGF Specification](docs/POGF_SPECIFICATION.md) — Proof of Grounded Fabrication
 
 ## License
 

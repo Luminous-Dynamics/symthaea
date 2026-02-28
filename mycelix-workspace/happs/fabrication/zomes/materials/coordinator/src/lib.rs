@@ -51,7 +51,7 @@ pub fn create_material(input: CreateMaterialInput) -> ExternResult<Record> {
     let anchor = all_materials_anchor()?;
     create_link(anchor, hash.clone(), LinkTypes::AllMaterials, ())?;
 
-    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get(hash.clone(), GetOptions::default())?.ok_or(FabricationError::not_found("Material", &hash))
 }
 
 #[hdk_extern]

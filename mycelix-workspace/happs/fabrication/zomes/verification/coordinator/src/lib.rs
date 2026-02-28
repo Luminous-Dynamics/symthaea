@@ -112,11 +112,18 @@ pub fn submit_verification(input: SubmitVerificationInput) -> ExternResult<Recor
     create_link(input.design_hash, hash.clone(), LinkTypes::DesignToVerifications, ())?;
     create_link(verifier, hash.clone(), LinkTypes::VerifierToVerifications, ())?;
 
-    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get(hash.clone(), GetOptions::default())?.ok_or(FabricationError::not_found("Verification", &hash))
 }
 
-#[hdk_extern]
-pub fn get_design_verifications(design_hash: ActionHash) -> ExternResult<Vec<Record>> {
+/// Input for paginated hash-based list queries
+#[derive(Serialize, Deserialize, Debug)]
+pub struct HashPaginationInput {
+    pub hash: ActionHash,
+    pub pagination: Option<PaginationInput>,
+}
+
+/// Internal: get all verifications for a design (used by summary/score functions)
+fn get_design_verifications_all(design_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let links = get_links(LinkQuery::try_new(design_hash, LinkTypes::DesignToVerifications)?, GetStrategy::default())?;
     let mut results = Vec::new();
     for link in links {
@@ -130,9 +137,15 @@ pub fn get_design_verifications(design_hash: ActionHash) -> ExternResult<Vec<Rec
 }
 
 #[hdk_extern]
+pub fn get_design_verifications(input: HashPaginationInput) -> ExternResult<PaginatedResponse<Record>> {
+    let items = get_design_verifications_all(input.hash)?;
+    Ok(paginate(items, input.pagination.as_ref()))
+}
+
+#[hdk_extern]
 pub fn get_verification_summary(design_hash: ActionHash) -> ExternResult<VerificationSummary> {
-    let verifications = get_design_verifications(design_hash.clone())?;
-    let claims = get_design_claims(design_hash.clone())?;
+    let verifications = get_design_verifications_all(design_hash.clone())?;
+    let claims = get_design_claims_all(design_hash.clone())?;
 
     let mut passed = 0u32;
     let mut failed = 0u32;
@@ -198,11 +211,11 @@ pub fn submit_safety_claim(input: SubmitClaimInput) -> ExternResult<Record> {
 
     create_link(input.design_hash, hash.clone(), LinkTypes::DesignToClaims, ())?;
 
-    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get(hash.clone(), GetOptions::default())?.ok_or(FabricationError::not_found("SafetyClaim", &hash))
 }
 
-#[hdk_extern]
-pub fn get_design_claims(design_hash: ActionHash) -> ExternResult<Vec<Record>> {
+/// Internal: get all claims for a design (used by summary/score functions)
+fn get_design_claims_all(design_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let links = get_links(LinkQuery::try_new(design_hash, LinkTypes::DesignToClaims)?, GetStrategy::default())?;
     let mut results = Vec::new();
     for link in links {
@@ -216,8 +229,14 @@ pub fn get_design_claims(design_hash: ActionHash) -> ExternResult<Vec<Record>> {
 }
 
 #[hdk_extern]
+pub fn get_design_claims(input: HashPaginationInput) -> ExternResult<PaginatedResponse<Record>> {
+    let items = get_design_claims_all(input.hash)?;
+    Ok(paginate(items, input.pagination.as_ref()))
+}
+
+#[hdk_extern]
 pub fn get_epistemic_score(design_hash: ActionHash) -> ExternResult<EpistemicScore> {
-    let claims = get_design_claims(design_hash)?;
+    let claims = get_design_claims_all(design_hash)?;
 
     let mut e_sum = 0.0f32;
     let mut n_sum = 0.0f32;
