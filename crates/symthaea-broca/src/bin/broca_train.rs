@@ -70,9 +70,11 @@ fn main() {
         (BrocaGenerator::new(&genesis, config), None)
     };
 
-    // Tokenize all pairs with the generator's tokenizer
+    // Re-tokenize all pairs with the generator's BPE tokenizer.
+    // The JSONL may have target_ids from a different tokenizer (e.g., GPT-NeoX
+    // from broca-collect), so we always re-tokenize for CfC-HDC compatibility.
     let tokenizer = generator.tokenizer().clone();
-    dataset.tokenize_all(&tokenizer);
+    dataset.retokenize_all(&tokenizer);
 
     let train_config = TrainingConfig {
         epochs: opts.epochs,

@@ -95,11 +95,21 @@ impl TrainingDataset {
     }
 
     /// Ensure all pairs have target_ids populated from the tokenizer.
+    /// Only tokenizes pairs with empty target_ids.
     pub fn tokenize_all(&mut self, tokenizer: &BpeTokenizer) {
         for pair in &mut self.pairs {
             if pair.target_ids.is_empty() {
                 pair.target_ids = tokenizer.encode(&pair.target_text);
             }
+        }
+    }
+
+    /// Re-tokenize all pairs with the given tokenizer, replacing any existing target_ids.
+    /// Use this when the dataset was tokenized with a different tokenizer (e.g.,
+    /// GPT-NeoX from broca-collect) and needs the BPE tokenizer for CfC-HDC training.
+    pub fn retokenize_all(&mut self, tokenizer: &BpeTokenizer) {
+        for pair in &mut self.pairs {
+            pair.target_ids = tokenizer.encode(&pair.target_text);
         }
     }
 }
