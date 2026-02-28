@@ -199,7 +199,7 @@ impl PersuasionBenchmark {
         // Difficulty-gated noise (breaks ceiling at higher difficulty).
         // Scales with (1 + difficulty) so noise amplitude grows with task difficulty.
         let noise = if config.difficulty > 0.0 {
-            let mut rng_state = (config.seed ^ (trial_idx as u64 * 0x9E3779B97F4A7C15)).wrapping_add(1);
+            let mut rng_state = (config.seed ^ ((trial_idx as u64).wrapping_mul(0x9E3779B97F4A7C15))).wrapping_add(1);
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
             rng_state ^= rng_state << 17;
@@ -226,7 +226,7 @@ impl PersuasionBenchmark {
         // Difficulty-gated processing error: stochastic response flip models
         // impaired ToM inference at higher cognitive load (Apperly et al., 2006).
         if config.difficulty > 0.0 {
-            let mut rng2 = (config.seed ^ (trial_idx as u64 * 0xA0761D6478BD642F)).wrapping_add(1);
+            let mut rng2 = (config.seed ^ ((trial_idx as u64).wrapping_mul(0xA0761D6478BD642F))).wrapping_add(1);
             rng2 ^= rng2 << 13;
             rng2 ^= rng2 >> 7;
             rng2 ^= rng2 << 17;

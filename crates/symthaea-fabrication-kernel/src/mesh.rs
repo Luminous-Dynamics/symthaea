@@ -82,9 +82,8 @@ pub fn resolve_to_mesh(node: &CSGNode) -> TriangleMesh {
                     result.merge(&right_mesh);
                     result
                 }
-                // Subtract and Intersect are placeholders — full mesh booleans
-                // require BSP or similar. For now, return left mesh only.
-                BooleanOp::Subtract | BooleanOp::Intersect => left_mesh,
+                BooleanOp::Subtract => bsp::csg_subtract(&left_mesh, &right_mesh),
+                BooleanOp::Intersect => bsp::csg_intersect(&left_mesh, &right_mesh),
             }
         }
     }

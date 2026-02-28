@@ -318,7 +318,7 @@ impl PsychBenchmark for FalseBeliefBenchmark {
                 // Two mechanisms: (1) belief-reality confusion (difficulty * 0.35 flip rate),
                 // (2) processing noise that scales with difficulty (breaks ceiling at d>=0.3).
                 if config.difficulty > 0.0 {
-                    let mut rng_state = (config.seed ^ (trial as u64 * 0x517CC1B727220A95)).wrapping_add(1);
+                    let mut rng_state = (config.seed ^ (trial as u64).wrapping_mul(0x517CC1B727220A95)).wrapping_add(1);
                     rng_state ^= rng_state << 13;
                     rng_state ^= rng_state >> 7;
                     rng_state ^= rng_state << 17;
