@@ -5,7 +5,6 @@
 //!
 //! Enabled via `CognitiveLoopConfig::enable_nurture_attachment`.
 
-use symthaea_neuromodulators::NeuromodulatorBath;
 use symthaea_nurture::{
     AttachmentNeuromodulation, AttachmentStyle, AttachmentSystem, CaregiverAction,
 };
@@ -145,5 +144,102 @@ mod tests {
         reunion_mod.apply_to_bath(&mut bath);
 
         assert!(bath.oxytocin.level > initial_oxy);
+    }
+
+    /// Simulates a Strange Situation-inspired protocol:
+    /// 100 calm cycles (caregiver present) -> 50 distress cycles -> 50 reunion cycles.
+    /// Verifies that attachment style and security score evolve appropriately.
+    #[test]
+    fn test_strange_situation_100_calm_50_distress_50_reunion() {
+        let mut bridge = NurtureAttachmentBridge::new();
+        let initial_security = bridge.security_score();
+
+        // Phase 1: 100 calm cycles — caregiver present, low arousal, positive valence
+        // Co-regulation only (no process_interaction), so security_score stays at baseline.
+        for _ in 0..100 {
+            let neuromod = bridge.cycle_step(0.3, 0.7);
+            // Every calm cycle should produce positive oxytocin co-regulation
+            assert!(
+                neuromod.oxytocin_burst >= 0.0,
+                "calm cycle should not produce negative oxytocin"
+            );
+        }
+        assert!(
+            bridge.caregiver_present,
+            "caregiver should remain present during calm phase"
+        );
+        assert_eq!(
+            bridge.style(),
+            AttachmentStyle::Forming,
+            "style should still be Forming after calm-only cycles"
+        );
+        let post_calm_security = bridge.security_score();
+        assert!(
+            (post_calm_security - initial_security).abs() < f64::EPSILON,
+            "security score should not change during calm (no interactions processed)"
+        );
+
+        // Phase 2: 50 distress cycles — high arousal, negative valence
+        // First cycle triggers separation onset; subsequent cycles are ongoing separation.
+        for i in 0..50 {
+            let neuromod = bridge.cycle_step(0.8, 0.2);
+            if i == 0 {
+                // First distress cycle triggers separation onset -> NE spike
+                assert!(
+                    neuromod.noradrenaline_separation > 0.0,
+                    "separation onset should produce NE spike"
+                );
+            }
+        }
+        assert!(
+            !bridge.caregiver_present,
+            "caregiver should be absent after distress phase"
+        );
+        assert_eq!(
+            bridge.style(),
+            AttachmentStyle::Forming,
+            "style should remain Forming (no reunion interactions yet)"
+        );
+        // Separation doesn't call process_interaction, so security_score unchanged
+        let post_distress_security = bridge.security_score();
+        assert!(
+            (post_distress_security - initial_security).abs() < f64::EPSILON,
+            "security score should not change during separation (no interactions processed)"
+        );
+
+        // Phase 3: 50 reunion cycles — low arousal, positive valence
+        // First cycle triggers reunion (process_reunion with reliable action);
+        // subsequent cycles are calm co-regulation (caregiver already present).
+        for i in 0..50 {
+            let neuromod = bridge.cycle_step(0.3, 0.7);
+            if i == 0 {
+                // First reunion cycle: oxytocin burst from reliable reunion
+                assert!(
+                    neuromod.oxytocin_burst > 0.0,
+                    "reunion should produce oxytocin burst"
+                );
+            }
+        }
+        assert!(
+            bridge.caregiver_present,
+            "caregiver should be present after reunion phase"
+        );
+
+        // After reunion: security score should have increased from the reliable interaction
+        let post_reunion_security = bridge.security_score();
+        assert!(
+            post_reunion_security > initial_security,
+            "security score should increase after reliable reunion: {} > {}",
+            post_reunion_security,
+            initial_security
+        );
+
+        // Style remains Forming because only 1 interaction was processed
+        // (style requires >= 20 interactions to differentiate)
+        assert_eq!(
+            bridge.style(),
+            AttachmentStyle::Forming,
+            "style should remain Forming after a single reunion interaction"
+        );
     }
 }
