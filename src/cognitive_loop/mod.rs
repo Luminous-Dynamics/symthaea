@@ -694,6 +694,9 @@ pub struct CognitiveLoopService {
     /// Personality drift tracker — monitors receptor sensitivity stability.
     personality_drift_tracker: neuromodulators::PersonalityDriftTracker,
 
+    /// Bath phase space tracker — entropy, centroid, attractor detection.
+    pub(crate) bath_phase_tracker: neuromodulators::BathPhaseTracker,
+
     /// Somatic error bridge: converts infrastructure failures into felt stress.
     /// Lock poisoning, task panics, DB errors → arousal, thermodynamic load, tau slowdown.
     pub(crate) somatic_bridge: crate::infrastructure::somatic_error_bridge::SomaticErrorBridge,
