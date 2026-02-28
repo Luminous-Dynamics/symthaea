@@ -434,7 +434,8 @@ impl CognitiveLoopService {
                 self.emotion_contagion.smoothed_valence(),
                 coherence_summary.coherence,
             )
-            .with_dopamine(self.neuromodulator_bath.dopamine.effective());
+            .with_dopamine(self.neuromodulator_bath.dopamine.effective())
+            .with_bath_state(self.neuromodulator_bath.state_vector());
 
             let stored = replay.store_if_significant(episode);
             if stored {
@@ -460,12 +461,13 @@ impl CognitiveLoopService {
                 };
                 // DA-tagged sleep consolidation: Night phase → bigger replay batches
                 // Science: Walker & Stickgold (2006) — DA-tagged memories consolidate during sleep
-                let sleep_boost = if self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night {
-                    let factor = self.neuromodulator_bath.sleep_consolidation_boost();
-                    (base_batch as f32 * (factor - 1.0)).round() as usize
-                } else {
-                    0
-                };
+                let sleep_boost =
+                    if self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night {
+                        let factor = self.neuromodulator_bath.sleep_consolidation_boost();
+                        (base_batch as f32 * (factor - 1.0)).round() as usize
+                    } else {
+                        0
+                    };
                 // #2: Phasic DA burst → replay amplification (Lisman & Grace 2005)
                 let phasic_da_boost = {
                     let da_ph = self.neuromodulator_bath.da_phasic();
@@ -476,7 +478,8 @@ impl CognitiveLoopService {
                     }
                 };
                 phasic_da_replay_boost = phasic_da_boost;
-                let boosted_batch = base_batch + surprise_batch_boost + sleep_boost + phasic_da_boost;
+                let boosted_batch =
+                    base_batch + surprise_batch_boost + sleep_boost + phasic_da_boost;
                 // Temporarily set boosted batch size for this replay session
                 let original_batch = replay.config.batch_size;
                 replay.config.batch_size = boosted_batch;
@@ -484,7 +487,11 @@ impl CognitiveLoopService {
 
                 if let TemporalNetwork::CfC(ref mut cfc) = self.temporal_network {
                     let learning_rate = self.config.cfc_config.learning_rate;
-                    let result = replay.replay_session(cfc, learning_rate);
+                    // State-dependent replay: prioritize episodes encoded in similar bath state
+                    // Science: Godden & Baddeley (1975) — state-dependent memory
+                    let current_bath = Some(self.neuromodulator_bath.state_vector());
+                    let result =
+                        replay.replay_session_conditioned(cfc, learning_rate, current_bath);
 
                     if !result.skipped {
                         tracing::debug!(
@@ -611,9 +618,10 @@ impl CognitiveLoopService {
             // Science: Tononi (2015) — consciousness = integrated information = memory salience
             // Narrative→Dream coupling (Conway 2005): self-relevant memories encode preferentially.
             let narrative_salience = self
+                .self_model_tier
                 .narrative_self
                 .as_ref()
-                .map(|n| 1.0 + n.self_phi() as f32 * 0.5) // 1.0 to 1.5x boost
+                .map(|n: &crate::consciousness::narrative_self::NarrativeSelfModel| 1.0 + n.self_phi() as f32 * 0.5) // 1.0 to 1.5x boost
                 .unwrap_or(1.0);
             let phi_weighted_surprise =
                 prediction_error * (1.0 + unified_psi as f32).clamp(1.0, 2.0) * narrative_salience;
@@ -644,7 +652,7 @@ impl CognitiveLoopService {
                         // Dream→Narrative coupling: dream insights feed narrative self-model.
                         // Science: Revonsuo (2000) — dreaming enhances threat simulation
                         // and narrative integration of novel experiences.
-                        if let Some(ref mut narrative) = self.narrative_self {
+                        if let Some(ref mut narrative) = self.self_model_tier.narrative_self {
                             narrative.process_experience(
                                 hv16_cached,
                                 &format!("dream_insight_{}", result.insights),

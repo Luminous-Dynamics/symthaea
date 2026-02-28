@@ -3772,12 +3772,36 @@ impl CognitiveLoopService {
 
         // ── Phase 2.3: Integrate subsystem outputs (Phase C) ─────────────
         // Consensus-average all SubsystemOutput proposals collected during
-        // Phase B. Currently in dual-write bridge mode: integration result
-        // is logged for comparison but does NOT override direct mutations.
+        // Phase B. Apply integrated deltas via attributed feedback helpers.
         let integrated = self.subsystem_collector.integrate();
         if integrated.n_contributors > 0 {
             metadata.subsystem_integration_contributors = integrated.n_contributors as u32;
-            tracing::trace!("Phase C integration: {}", integrated,);
+
+            // Apply consensus-averaged feedback from subsystem managers
+            if integrated.confidence_delta != 0.0 {
+                self.adjust_confidence(
+                    "subsystem_managers",
+                    integrated.confidence_delta as f32,
+                );
+            }
+            if integrated.lr_modulation != 1.0 {
+                self.scale_lr("subsystem_managers", integrated.lr_modulation as f32);
+            }
+            if integrated.exploration_delta != 0.0 {
+                self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
+                    + integrated.exploration_delta as f32)
+                    .clamp(0.0, 1.0);
+            }
+            if integrated.arousal_delta != 0.0 {
+                self.emotion_contagion.arousal =
+                    (self.emotion_contagion.arousal + integrated.arousal_delta).clamp(0.0, 1.0);
+            }
+            if integrated.valence_delta != 0.0 {
+                self.emotion_contagion.valence =
+                    (self.emotion_contagion.valence + integrated.valence_delta).clamp(-1.0, 1.0);
+            }
+
+            tracing::trace!("Phase C integration: {}", integrated);
         }
 
         CycleResult {
