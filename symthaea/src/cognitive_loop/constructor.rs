@@ -661,6 +661,7 @@ impl CognitiveLoopService {
             mood_temperature: 1.0,
             neuromodulator_bath: super::neuromodulators::NeuromodulatorBath::default(),
             personality_drift_tracker: super::neuromodulators::PersonalityDriftTracker::default(),
+            bath_phase_tracker: super::neuromodulators::BathPhaseTracker::default(),
             somatic_bridge: somatic_bridge_instance,
             pain_tx: Some(pain_sender),
             subsystem_collector: super::subsystem_trait::OutputCollector::new(),

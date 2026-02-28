@@ -144,7 +144,26 @@ impl CognitiveLoopService {
             neuromod_learning_fatigue: self.neuromodulator_bath.learning_fatigue_factor(),
             circadian_phase_offset: self.biorhythm.phase_offset as f32,
             circadian_effective_hour: self.biorhythm.effective_hour() as f32,
+            // Phase 5: advanced neuroendocrine dynamics
+            neuromod_adenosine_effective: self.neuromodulator_bath.adenosine.effective(),
+            neuromod_sleep_pressure: self.neuromodulator_bath.sleep_pressure(),
+            neuromod_allostatic_load: self.neuromodulator_bath.allostatic_load,
+            neuromod_ei_ratio: self.neuromodulator_bath.ei_ratio(),
+            neuromod_ei_seizure_events: self.neuromodulator_bath.ei_seizure_events,
+            neuromod_bath_entropy: self.bath_phase_tracker.entropy(),
+            neuromod_attractor_detected: self.bath_phase_tracker.detect_attractor().is_some(),
+            active_injection_count: self.neuromodulator_bath.active_injections.len() as u8,
         }
+    }
+
+    /// Inject a pharmacological agent into the neuromodulator bath.
+    pub fn inject_pharmacological(&mut self, target: &str, dose: f32, half_life: u32) {
+        self.neuromodulator_bath.inject(target, dose, half_life);
+    }
+
+    /// Clear all pharmacological injections.
+    pub fn clear_pharmacological(&mut self) {
+        self.neuromodulator_bath.clear_injections();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
