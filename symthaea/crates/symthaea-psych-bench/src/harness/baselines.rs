@@ -2571,6 +2571,84 @@ pub fn neuromod_baselines() -> BaselineMap {
         },
     );
 
+    // ── Pharmacological Challenge (Arnsten 2011) ──
+    m.insert(
+        "da_agonist_gradient_scale",
+        Baseline {
+            value: 1.35,
+            sd: Some(0.25),
+            source: "Arnsten (2011), DA agonist enhances gradient scaling ~35% over baseline",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "da_antagonist_gradient_scale",
+        Baseline {
+            value: 0.65,
+            sd: Some(0.20),
+            source: "Arnsten (2011), DA antagonist suppresses gradient scaling ~35%",
+            population: "computational model",
+        },
+    );
+
+    // ── Injection Challenge (Arnsten 2011; Nehlig 2010; Stahl 2013) ──
+    m.insert(
+        "stimulant_peak_effect",
+        Baseline {
+            value: 0.35,
+            sd: Some(0.12),
+            source: "Arnsten (2011); Stahl (2013), stimulant peak DA elevation ~0.35",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "caffeine_peak_effect",
+        Baseline {
+            value: 0.20,
+            sd: Some(0.08),
+            source: "Nehlig (2010), caffeine peak NE effect ~0.20",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "ssri_peak_effect",
+        Baseline {
+            value: 0.25,
+            sd: Some(0.10),
+            source: "Stahl (2013), SSRI peak 5-HT elevation ~0.25",
+            population: "computational model",
+        },
+    );
+
+    // ── Allostatic Stress (McEwen 1998; McEwen & Stellar 1993) ──
+    m.insert(
+        "chronic_da_baseline_final",
+        Baseline {
+            value: 0.35,
+            sd: Some(0.10),
+            source: "McEwen (1998), chronic stress depletes DA baseline to ~0.35",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "burnout_recovery_cycles_needed",
+        Baseline {
+            value: 30.0,
+            sd: Some(10.0),
+            source: "McEwen & Stellar (1993), allostatic overload recovery ~30 cycles",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "burnout_allostatic_load_peak",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.12),
+            source: "McEwen (1998), burnout allostatic load peaks ~0.85",
+            population: "computational model",
+        },
+    );
+
     // ── Live-Loop Pharmacological Ablation (Phase 2) ────────────────
     m.insert(
         "live_da_knockout_gradient_drop_pct",
