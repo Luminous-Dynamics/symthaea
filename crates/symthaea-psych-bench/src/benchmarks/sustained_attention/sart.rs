@@ -14,6 +14,7 @@
 //! - d_prime: 2.50 (SD≈0.60) — signal detection sensitivity
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
@@ -55,11 +56,12 @@ impl SartBenchmark {
 
         // Time pressure: raises response criterion noise, modeling impulsive responding
         // under deadline (Robertson et al., 1997).
-        let tp_noise: f32 = 0.10 + config.time_pressure as f32 * 0.15;
+        let diff_model = difficulty_model_for(self.name());
+        let tp_noise: f32 = (0.10 + config.time_pressure as f32 * 0.15) / diff_model.signal_multiplier(config.difficulty) as f32;
 
         // Automatic response tendency builds over go trials (monotone increase)
         let mut response_tendency: f32 = 0.5;
-        let tendency_growth: f32 = 0.003;
+        let tendency_growth: f32 = 0.003 * diff_model.temperature_multiplier(config.difficulty) as f32;
 
         let mut commission = 0u32; // false alarm to target
         let mut commission_total = 0u32;

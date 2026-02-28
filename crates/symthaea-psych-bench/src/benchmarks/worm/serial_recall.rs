@@ -6,6 +6,7 @@
 use crate::adapter::sequence::{SequenceAdapter, SequenceItem};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
@@ -56,7 +57,8 @@ impl SerialRecallBenchmark {
             let hv = adapter.encode(item, dim);
             // Time pressure: base 0.80 PI produces U-shaped serial curve (Keppel & Underwood, 1962);
             // +0.10/unit amplifies interference, modeling reduced rehearsal under deadline (Wickelgren, 1977).
-            let pi_base = 0.80 + config.time_pressure as f32 * 0.10;
+            let diff_model = difficulty_model_for("WorM::SerialRecall");
+            let pi_base = (0.80 + config.time_pressure as f32 * 0.10) * diff_model.interference_multiplier(config.difficulty) as f32;
             let pi_strength = if config.ssm_backend {
                 // SSM accumulates PI via recurrent state; each item drives interference higher
                 ssm.step(1.0);

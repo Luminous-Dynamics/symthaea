@@ -6,6 +6,7 @@
 use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
@@ -74,7 +75,8 @@ impl LongRangeBenchmark {
         // in episodic memory; here we test WM persistence directly
         // Time pressure: base 0.2 threshold for long-range retrieval; +0.10/unit raises criterion,
         // modeling truncated memory search under deadline (Ratcliff & McKoon, 2008 DDM).
-        let threshold = 0.2 + config.time_pressure as f32 * 0.10;
+        let diff_model = difficulty_model_for("MemoryAgent::LongRange");
+        let threshold = 0.2 * diff_model.interference_multiplier(config.difficulty) as f32 + config.time_pressure as f32 * 0.10;
         let accuracy = if max_sim > threshold { 1.0 } else { 0.0 };
 
         // RT proxy: delay ticks add retention interval cost, retrieval

@@ -12,6 +12,7 @@
 use crate::adapter::sequence::{SequenceAdapter, SequenceItem};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
@@ -65,6 +66,7 @@ impl DigitSpanBenchmark {
                 &adapter,
                 false, // not backward
                 config.time_pressure,
+                config.difficulty,
                 config.ssm_backend,
             );
             fwd_rt_sum += fwd_rt;
@@ -90,6 +92,7 @@ impl DigitSpanBenchmark {
                 &adapter,
                 true, // backward: adds output interference
                 config.time_pressure,
+                config.difficulty,
                 config.ssm_backend,
             );
             bwd_rt_sum += bwd_rt;
@@ -142,6 +145,7 @@ impl DigitSpanBenchmark {
         adapter: &SequenceAdapter,
         is_backward: bool,
         time_pressure: f64,
+        difficulty: f64,
         ssm_backend: bool,
     ) -> (u32, f64) {
         let mut wm = WorkingMemory::new(WmConfig {
@@ -205,11 +209,13 @@ impl DigitSpanBenchmark {
 
             // Time pressure: +0.10/unit raises recall threshold, modeling reduced retrieval search
             // under deadline (Woods et al., 2011 digit span norms; Wickelgren, 1977 SAT framework).
+            let diff_model = difficulty_model_for("WorM::DigitSpan");
+            let temp_mult = diff_model.temperature_multiplier(difficulty) as f32;
             let tp_penalty = time_pressure as f32 * 0.10;
             let threshold = if is_backward {
-                0.60 + tp_penalty
+                0.60 * temp_mult + tp_penalty
             } else {
-                0.5 + tp_penalty
+                0.5 * temp_mult + tp_penalty
             };
             if recall_score > threshold {
                 correct += 1;

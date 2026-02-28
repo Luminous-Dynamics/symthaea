@@ -16,6 +16,7 @@
 //! - vigilance_decrement: 0.03 (SD~0.02) — d' decrease per block
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
@@ -63,7 +64,8 @@ impl CptBenchmark {
         let trials_per_block = total_trials / n_blocks;
 
         // Time pressure noise
-        let noise_level: f32 = 0.15 + config.time_pressure as f32 * 0.15;
+        let diff_model = difficulty_model_for(self.name());
+        let noise_level: f32 = (0.15 + config.time_pressure as f32 * 0.15) / diff_model.signal_multiplier(config.difficulty) as f32;
 
         // Vigilance decrement: threshold rises per block
         let threshold_increment: f32 = 0.005;
@@ -118,7 +120,7 @@ impl CptBenchmark {
 
                 // Threshold rises with vigilance decrement
                 let base_threshold: f32 = 0.50;
-                let threshold = base_threshold + threshold_increment * block as f32;
+                let threshold = base_threshold + threshold_increment * block as f32 + config.difficulty as f32 * 0.15;
 
                 let responded = (similarity + noise) > threshold;
 

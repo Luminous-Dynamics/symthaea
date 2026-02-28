@@ -6,6 +6,7 @@
 use crate::adapter::spatial::{GridPosition, SpatialAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
@@ -79,15 +80,18 @@ impl SpatialUpdatingBenchmark {
 
         // Time pressure: base 0.3 threshold yields ~75% spatial recall; +0.10/unit raises criterion,
         // modeling reduced search depth under speed emphasis (Luce, 1986 sequential sampling).
-        let threshold = 0.3 + config.time_pressure as f32 * 0.10;
+        let diff_model = difficulty_model_for("WorM::SpatialUpdating");
+        let interference = config.difficulty as f32 * 0.35 * diff_model.interference_multiplier(config.difficulty) as f32;
+        let degraded_sim = (max_sim - interference).max(0.0);
+        let threshold = 0.3 * diff_model.temperature_multiplier(config.difficulty) as f32 + config.time_pressure as f32 * 0.10;
 
         // RT proxy: deliberation ticks based on spatial match confidence.
         // Smaller margin between max_sim and threshold → harder discrimination → longer RT
         // (Luce, 1986; Ratcliff, 1978 diffusion model).
-        let decision_margin = ((max_sim - threshold).abs() as f64).min(1.0);
+        let decision_margin = ((degraded_sim - threshold).abs() as f64).min(1.0);
         let rt_ticks = 4.0 + (1.0 - decision_margin) * 6.0;
 
-        let acc = if max_sim > threshold { 1.0 } else { 0.0 };
+        let acc = if degraded_sim > threshold { 1.0 } else { 0.0 };
         (acc, rt_ticks)
     }
 }

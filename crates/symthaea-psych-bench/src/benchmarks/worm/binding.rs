@@ -7,6 +7,7 @@
 use crate::adapter::spatial::{VisualObject, VisualObjectAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
@@ -54,7 +55,8 @@ impl BindingBenchmark {
 
         // Time pressure: 0.15/unit encoding noise models degraded feature integration under
         // speed emphasis (Treisman, 1996 FIT); rushed binding produces illusory conjunctions.
-        let tp_noise_frac = config.time_pressure as f32 * 0.15;
+        let diff_model = difficulty_model_for("WorM::Binding");
+        let tp_noise_frac = (config.time_pressure as f32 * 0.15 + config.difficulty as f32 * 0.10) * diff_model.interference_multiplier(config.difficulty) as f32;
         for (pos, obj) in objects.iter().enumerate() {
             let hv = adapter.encode(obj, dim);
             let hv = if tp_noise_frac > 0.01 {

@@ -187,8 +187,8 @@ fn test_normative_coverage() {
         "Neuromod::AttentionNetwork",
         "Neuromod::MoodInduction",
         "Neuromod::PharmacologicalAblation",
-        "BehavioralKnockout",
-        "ConsciousnessPharmacology",
+        "Neuromod::BehavioralKnockout",
+        "Neuromod::ConsciousnessPharmacology",
     ];
 
     let covered: Vec<&str> = normative

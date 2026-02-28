@@ -11,6 +11,7 @@ use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 #[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
@@ -191,7 +192,9 @@ impl HintingBenchmark {
             + (correct_desire_sim - wrong_desire_sim) as f64 * 0.3;
 
         // --- Combined: keyword-dominant with HDC as tiebreaker ---
-        let combined = keyword_score * 0.8 + geo_signal * 0.2;
+        let diff_model_kw = difficulty_model_for("ToMBench::Hinting");
+        let kw_attenuation = diff_model_kw.signal_multiplier(config.difficulty);
+        let combined = keyword_score * 0.8 * kw_attenuation + geo_signal * 0.2;
 
         // Softmax decision: convert combined score to P(correct) via sigmoid.
         // Even healthy adults make ~20% errors on hinting tasks (Corcoran
@@ -199,7 +202,8 @@ impl HintingBenchmark {
         // inherent uncertainty in ToM inference.
         // Time pressure: -0.4/unit flattens sigmoid gain, modeling hasty pragmatic inference;
         // at max pressure, ~20% accuracy drop matches ToM under cognitive load (Lin et al., 2010).
-        let sigmoid_gain = 0.25 * (1.0 - config.time_pressure * 0.4);
+        let diff_model = difficulty_model_for("ToMBench::Hinting");
+        let sigmoid_gain = 0.25 * (1.0 - config.time_pressure * 0.4) * diff_model.signal_multiplier(config.difficulty);
         let p_correct = 1.0 / (1.0 + (-combined * sigmoid_gain).exp());
         let seed = config.trial_seed("tombench", "hinting_noise", trial_idx);
         let mut noise_rng = seed ^ 0x9E3779B97F4A7C15;
@@ -350,7 +354,8 @@ impl HintingBenchmark {
             + (correct_desire_sim - wrong_desire_sim) as f64 * 0.3;
         let combined = keyword_score * 0.8 + geo_signal * 0.2;
         // Same SAT sigmoid gain as lightweight path (Lin et al., 2010).
-        let sigmoid_gain = 0.25 * (1.0 - config.time_pressure * 0.4);
+        let diff_model = difficulty_model_for("ToMBench::Hinting");
+        let sigmoid_gain = 0.25 * (1.0 - config.time_pressure * 0.4) * diff_model.signal_multiplier(config.difficulty);
         let p_correct = 1.0 / (1.0 + (-combined * sigmoid_gain).exp());
 
         // RT proxy: decisions near p=0.5 are hardest (most uncertain)
