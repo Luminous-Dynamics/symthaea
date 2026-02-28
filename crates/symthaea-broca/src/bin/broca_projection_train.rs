@@ -241,9 +241,14 @@ fn main() {
                     "Health check"
                 );
                 // Unbuffered progress (tracing stderr is internally buffered)
+                let phase = if result.semantic_pe < 0.5 {
+                    "mamba"
+                } else {
+                    "roundtrip"
+                };
                 let _ = writeln!(
                     std::io::stderr(),
-                    "[progress] epoch={epoch} sample={}/{num_samples} pe={:.4} rank={rank:.1} coh={:.4}",
+                    "[progress] epoch={epoch} sample={}/{num_samples} pe={:.4} rank={rank:.1} coh={:.4} phase={phase}",
                     i + 1, result.semantic_pe, result.final_coherence,
                 );
                 std::io::stderr().flush().ok();

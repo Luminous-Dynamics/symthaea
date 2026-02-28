@@ -877,27 +877,39 @@ impl LiquidMambaGenerator {
             return;
         }
 
-        // Attention-weighted bundling: weight by recency × coherence
-        let bundled = self.attention_weighted_bundle(&thought_hv, &result.output_hvs);
+        // Gradient curriculum: roundtrip autoencoder first, Mamba-output later.
+        //
+        // When PE > 0.5, Mamba generates garbage (projection is untrained), so
+        // the bundled output is noise. Using `thought - noise` as error drives
+        // a random walk in weight space. Instead, use pure roundtrip reconstruction
+        // `thought - backward(forward(thought))` which gives clean gradients
+        // independent of Mamba output quality.
+        //
+        // Once PE drops below 0.5, the projection is good enough that Mamba
+        // output carries meaningful semantic signal — switch to the full
+        // Mamba-output-based loss for fine-tuning.
+        let use_mamba_signal = result.semantic_pe < 0.5;
 
-        // Reconstruction gradient (full sequence)
-        self.projection.compute_gradients(&thought_hv, &bundled);
+        if use_mamba_signal {
+            // Phase 2: Mamba output is meaningful — use it as target
+            let bundled = self.attention_weighted_bundle(&thought_hv, &result.output_hvs);
+            self.projection.compute_gradients(&thought_hv, &bundled);
 
-        // Prefix token loss: extra gradient from the first 25% of tokens.
-        // These tokens frame the response topic — the projection needs strong
-        // signal here so it steers Mamba's opening words correctly.
-        if self.config.prefix_loss_weight > 0.0 && result.output_hvs.len() >= 4 {
-            let prefix_len = (result.output_hvs.len() / 4).max(1);
-            let prefix_bundle =
-                self.attention_weighted_bundle(&thought_hv, &result.output_hvs[..prefix_len]);
-            // Scale: prefix_loss_weight controls how much extra gradient the prefix gets
-            // We use compute_gradients which accumulates, so this adds to the main gradient
-            // The net effect: prefix tokens contribute (1 + prefix_loss_weight) × their share
-            self.projection
-                .compute_gradients(&thought_hv, &prefix_bundle);
+            // Prefix token loss (only useful when Mamba output is meaningful)
+            if self.config.prefix_loss_weight > 0.0 && result.output_hvs.len() >= 4 {
+                let prefix_len = (result.output_hvs.len() / 4).max(1);
+                let prefix_bundle =
+                    self.attention_weighted_bundle(&thought_hv, &result.output_hvs[..prefix_len]);
+                self.projection
+                    .compute_gradients(&thought_hv, &prefix_bundle);
+            }
+        } else {
+            // Phase 1: Pure roundtrip autoencoder (no Mamba dependency)
+            self.projection.compute_roundtrip_gradients(&thought_hv);
         }
 
         // Contrastive term: push away from recent different thoughts
+        // (useful in both phases — prevents bottleneck collapse)
         if self.config.contrastive_weight > 0.0 {
             for neg_hv in &self.recent_thought_hvs {
                 let sim = thought_hv.similarity(neg_hv);
@@ -911,8 +923,8 @@ impl LiquidMambaGenerator {
             }
         }
 
-        // Surprise-weighted gradient: amplify hard (high-PE) examples
-        if self.config.surprise_gradient_alpha > 0.0 {
+        // Surprise-weighted gradient: only in Phase 2 (high PE is expected in Phase 1)
+        if use_mamba_signal && self.config.surprise_gradient_alpha > 0.0 {
             let scale = 1.0 + self.config.surprise_gradient_alpha * result.semantic_pe;
             self.projection.scale_accumulated_gradients(scale);
         }
