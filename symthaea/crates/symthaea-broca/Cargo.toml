@@ -52,7 +52,7 @@ path = "src/bin/broca_compare.rs"
 required-features = ["mamba"]
 
 [features]
-default = []
+default = ["simd"]
 mamba = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:hf-hub", "dep:tokenizers"]
 hf-tokenizer = ["dep:tokenizers"]
 collect = ["dep:ureq"]

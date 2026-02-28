@@ -34,7 +34,9 @@ use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::encoder::{ThoughtChannels, ThoughtLanguageEncoder};
-use crate::gating::{consciousness_gated_max_tokens, EpistemicGate, EmotionalModulator, GatingConfig};
+use crate::gating::{
+    consciousness_gated_max_tokens, EmotionalModulator, EpistemicGate, GatingConfig,
+};
 use crate::generator::GenerationResult;
 use crate::mamba::{MambaBackend, MambaWrapper};
 use crate::projection::HdcSsmProjection;
@@ -319,6 +321,13 @@ impl LiquidMambaGenerator {
         // 1. Encode thought channels to 16,384D HDC
         let thought_hv = self.encoder.encode(channels);
 
+        // 1b. Swap to EMA weights for inference (if enabled)
+        let ema_live_backup = if self.config.enable_ema {
+            self.projection.use_ema_weights()
+        } else {
+            None
+        };
+
         // 2. Project to SSM space (768D)
         let ssm_context = self.projection.project_to_ssm(&thought_hv);
 
@@ -347,8 +356,8 @@ impl LiquidMambaGenerator {
             thought_hv.clone(),
             self.config.long_coherence_window,
             self.config.coherence_ema_alpha * 0.5, // Slower EMA for trend detection
-            self.config.veto_threshold * 0.5,       // Lower threshold (trend signal)
-            self.config.min_consecutive_low * 2,    // More patience for long window
+            self.config.veto_threshold * 0.5,      // Lower threshold (trend signal)
+            self.config.min_consecutive_low * 2,   // More patience for long window
         );
 
         // 7. Autoregressive generation loop
@@ -375,23 +384,18 @@ impl LiquidMambaGenerator {
             //     Per-token PE feedback: if last token had low coherence with thought,
             //     boost epistemic gate by shifting toward higher uncertainty
             if self.config.enable_gating {
-                let effective_epistemic = (channels.epistemic_ordinal() + token_pe_boost)
-                    .clamp(0.0, 4.0);
+                let effective_epistemic =
+                    (channels.epistemic_ordinal() + token_pe_boost).clamp(0.0, 4.0);
                 let gate_len = logits.len().min(512);
-                self.epistemic_gate.apply(
-                    &mut logits[..gate_len],
-                    effective_epistemic,
-                );
+                self.epistemic_gate
+                    .apply(&mut logits[..gate_len], effective_epistemic);
             }
 
             // 7d. Emotional modulation
             if self.config.enable_gating {
                 let gate_len = logits.len().min(512);
-                self.emotional_modulator.apply(
-                    &mut logits[..gate_len],
-                    channels,
-                    pos,
-                );
+                self.emotional_modulator
+                    .apply(&mut logits[..gate_len], channels, pos);
             }
 
             // 7e. Top-k sampling
@@ -442,6 +446,9 @@ impl LiquidMambaGenerator {
             // 7h. Decode token
             if next_token == eos_id {
                 let semantic_pe = self.semantic_prediction_error(&thought_hv, &output_hvs);
+                if let Some(live) = ema_live_backup {
+                    self.projection.restore_live_weights(&live);
+                }
                 return Ok(GenerationResult {
                     text,
                     token_ids: tokens,
@@ -467,6 +474,9 @@ impl LiquidMambaGenerator {
         }
 
         let semantic_pe = self.semantic_prediction_error(&thought_hv, &output_hvs);
+        if let Some(live) = ema_live_backup {
+            self.projection.restore_live_weights(&live);
+        }
         Ok(GenerationResult {
             text,
             token_ids: tokens.clone(),
@@ -498,15 +508,16 @@ impl LiquidMambaGenerator {
         };
 
         // Phase 2: Cosine annealing (after warmup)
-        let cosine_factor = if self.config.cosine_annealing_steps > 0 && step >= self.config.warmup_steps {
-            let t = (step - self.config.warmup_steps) as f32;
-            let t_max = self.config.cosine_annealing_steps as f32;
-            let min_frac = self.config.min_lr_fraction;
-            let cos_decay = 0.5 * (1.0 + (std::f32::consts::PI * t / t_max).cos());
-            min_frac + (1.0 - min_frac) * cos_decay
-        } else {
-            1.0
-        };
+        let cosine_factor =
+            if self.config.cosine_annealing_steps > 0 && step >= self.config.warmup_steps {
+                let t = (step - self.config.warmup_steps) as f32;
+                let t_max = self.config.cosine_annealing_steps as f32;
+                let min_frac = self.config.min_lr_fraction;
+                let cos_decay = 0.5 * (1.0 + (std::f32::consts::PI * t / t_max).cos());
+                min_frac + (1.0 - min_frac) * cos_decay
+            } else {
+                1.0
+            };
 
         // Phase 3: Biological load dampening
         let load_factor = 1.0 - self.thermodynamic_load;
@@ -533,7 +544,8 @@ impl LiquidMambaGenerator {
         let alpha = 0.5 * self.config.delta_mod_strength;
         let beta = 0.3 * self.config.delta_mod_strength;
         // Mood temperature modulates effective arousal: hot mood → higher arousal effect
-        let effective_arousal = (self.arousal + 0.1 * (self.mood_temperature - 1.0)).clamp(0.0, 1.0);
+        let effective_arousal =
+            (self.arousal + 0.1 * (self.mood_temperature - 1.0)).clamp(0.0, 1.0);
         (-alpha * self.thermodynamic_load - beta * (effective_arousal - 0.5))
             .exp()
             .clamp(0.3, 2.0)
@@ -629,7 +641,11 @@ impl LiquidMambaGenerator {
             num += dx * (pe - mean_y);
             den += dx * dx;
         }
-        if den.abs() < 1e-10 { 0.0 } else { num / den }
+        if den.abs() < 1e-10 {
+            0.0
+        } else {
+            num / den
+        }
     }
 
     /// PE statistics over the full history: (mean, std_dev, trend).
@@ -639,9 +655,12 @@ impl LiquidMambaGenerator {
         }
         let n = self.pe_history.len() as f32;
         let mean: f32 = self.pe_history.iter().sum::<f32>() / n;
-        let variance: f32 = self.pe_history.iter()
+        let variance: f32 = self
+            .pe_history
+            .iter()
             .map(|&pe| (pe - mean) * (pe - mean))
-            .sum::<f32>() / n;
+            .sum::<f32>()
+            / n;
         (mean, variance.sqrt(), self.pe_trend())
     }
 
@@ -763,14 +782,13 @@ impl LiquidMambaGenerator {
         // signal here so it steers Mamba's opening words correctly.
         if self.config.prefix_loss_weight > 0.0 && result.output_hvs.len() >= 4 {
             let prefix_len = (result.output_hvs.len() / 4).max(1);
-            let prefix_bundle = self.attention_weighted_bundle(
-                &thought_hv,
-                &result.output_hvs[..prefix_len],
-            );
+            let prefix_bundle =
+                self.attention_weighted_bundle(&thought_hv, &result.output_hvs[..prefix_len]);
             // Scale: prefix_loss_weight controls how much extra gradient the prefix gets
             // We use compute_gradients which accumulates, so this adds to the main gradient
             // The net effect: prefix tokens contribute (1 + prefix_loss_weight) × their share
-            self.projection.compute_gradients(&thought_hv, &prefix_bundle);
+            self.projection
+                .compute_gradients(&thought_hv, &prefix_bundle);
         }
 
         // Contrastive term: push away from recent different thoughts
@@ -1017,11 +1035,14 @@ fn top_k_sample(logits: &[f32], k: usize, temperature: f32) -> u32 {
 
     // Find top-k indices
     let mut indexed: Vec<(usize, f32)> = logits.iter().copied().enumerate().collect();
-    indexed.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
+    indexed.select_nth_unstable_by(k - 1, |a, b| b.1.total_cmp(&a.1));
     indexed.truncate(k);
 
     // Apply temperature and softmax
-    let max_logit = indexed[0].1;
+    let max_logit = indexed
+        .iter()
+        .map(|(_, l)| *l)
+        .fold(f32::NEG_INFINITY, f32::max);
     let mut probs: Vec<(usize, f32)> = indexed
         .into_iter()
         .map(|(i, l)| (i, ((l - max_logit) / temp).exp()))
@@ -1089,7 +1110,10 @@ mod tests {
         let beta = 0.3 * config.delta_mod_strength;
         // Exhausted: load=1.0, arousal=0.5
         let factor = (-alpha * 1.0 - beta * 0.0).exp();
-        assert!((factor - 0.6065).abs() < 0.01, "Expected ~0.61, got {factor}");
+        assert!(
+            (factor - 0.6065).abs() < 0.01,
+            "Expected ~0.61, got {factor}"
+        );
     }
 
     #[test]
@@ -1099,7 +1123,10 @@ mod tests {
         let beta = 0.3 * config.delta_mod_strength;
         // Agitated: load=0, arousal=1.0
         let factor = (-alpha * 0.0 - beta * 0.5).exp();
-        assert!((factor - 0.8607).abs() < 0.01, "Expected ~0.86, got {factor}");
+        assert!(
+            (factor - 0.8607).abs() < 0.01,
+            "Expected ~0.86, got {factor}"
+        );
     }
 
     #[test]
@@ -1122,8 +1149,11 @@ mod tests {
         }
 
         // After enough drift, coherence should be very low
-        assert!(monitor.current_coherence() < 0.5,
-            "Coherence should drop with orthogonal tokens, got {}", monitor.current_coherence());
+        assert!(
+            monitor.current_coherence() < 0.5,
+            "Coherence should drop with orthogonal tokens, got {}",
+            monitor.current_coherence()
+        );
     }
 
     #[test]
@@ -1138,8 +1168,11 @@ mod tests {
         }
 
         // Coherence should remain high
-        assert!(monitor.current_coherence() > 0.5,
-            "Coherence should stay high with similar tokens, got {}", monitor.current_coherence());
+        assert!(
+            monitor.current_coherence() > 0.5,
+            "Coherence should stay high with similar tokens, got {}",
+            monitor.current_coherence()
+        );
         assert!(!monitor.should_veto());
     }
 
@@ -1234,16 +1267,25 @@ mod tests {
         let t_max = 1000.0f32;
 
         // At t=0 (start of annealing): cos(0) = 1, factor = 1.0
-        let factor_0 = min_frac + (1.0 - min_frac) * 0.5 * (1.0 + (std::f32::consts::PI * 0.0 / t_max).cos());
+        let factor_0 =
+            min_frac + (1.0 - min_frac) * 0.5 * (1.0 + (std::f32::consts::PI * 0.0 / t_max).cos());
         assert!((factor_0 - 1.0).abs() < 0.01);
 
         // At t=T/2: cos(π/2) = 0, factor = 0.5*(1+0) = 0.5 → ~0.505
-        let factor_mid = min_frac + (1.0 - min_frac) * 0.5 * (1.0 + (std::f32::consts::PI * 500.0 / t_max).cos());
-        assert!((factor_mid - 0.505).abs() < 0.01, "Mid-point should be ~0.505, got {factor_mid}");
+        let factor_mid = min_frac
+            + (1.0 - min_frac) * 0.5 * (1.0 + (std::f32::consts::PI * 500.0 / t_max).cos());
+        assert!(
+            (factor_mid - 0.505).abs() < 0.01,
+            "Mid-point should be ~0.505, got {factor_mid}"
+        );
 
         // At t=T: cos(π) = -1, factor = 0.5*(1-1) = 0 → min_frac
-        let factor_end = min_frac + (1.0 - min_frac) * 0.5 * (1.0 + (std::f32::consts::PI * 1000.0 / t_max).cos());
-        assert!((factor_end - min_frac).abs() < 0.01, "End should be ~min_frac, got {factor_end}");
+        let factor_end = min_frac
+            + (1.0 - min_frac) * 0.5 * (1.0 + (std::f32::consts::PI * 1000.0 / t_max).cos());
+        assert!(
+            (factor_end - min_frac).abs() < 0.01,
+            "End should be ~min_frac, got {factor_end}"
+        );
     }
 
     #[test]
@@ -1268,9 +1310,7 @@ mod tests {
     fn test_attention_weighted_bundle_recency() {
         // Later tokens should get higher recency weight
         let n = 5;
-        let weights: Vec<f32> = (0..n)
-            .map(|i| ((i + 1) as f32 / n as f32).sqrt())
-            .collect();
+        let weights: Vec<f32> = (0..n).map(|i| ((i + 1) as f32 / n as f32).sqrt()).collect();
         // First token should have lowest weight, last should have highest
         assert!(weights[0] < weights[4]);
         assert!(weights[3] < weights[4]);
@@ -1310,7 +1350,10 @@ mod tests {
                 acc = 0;
             }
         }
-        assert_eq!(apply_count, 3, "Should apply 3 times in 12 steps with acc=4");
+        assert_eq!(
+            apply_count, 3,
+            "Should apply 3 times in 12 steps with acc=4"
+        );
     }
 
     #[test]
@@ -1322,7 +1365,10 @@ mod tests {
         let refs: Vec<&ContinuousHV> = vec![&output];
         let bundled = ContinuousHV::bundle(&refs).normalize();
         let error = 1.0 - thought.similarity(&bundled).clamp(-1.0, 1.0);
-        assert!(error < 0.1, "Error should be near 0 for identical vectors, got {error}");
+        assert!(
+            error < 0.1,
+            "Error should be near 0 for identical vectors, got {error}"
+        );
     }
 
     #[test]
@@ -1334,7 +1380,10 @@ mod tests {
         let bundled = ContinuousHV::bundle(&refs).normalize();
         let error = 1.0 - thought.similarity(&bundled).clamp(-1.0, 1.0);
         // Random high-dimensional vectors are nearly orthogonal
-        assert!(error > 0.5, "Error should be high for orthogonal vectors, got {error}");
+        assert!(
+            error > 0.5,
+            "Error should be high for orthogonal vectors, got {error}"
+        );
     }
 
     #[test]
@@ -1364,7 +1413,10 @@ mod tests {
             den += dx * dx;
         }
         let slope = num / den;
-        assert!(slope > 0.05, "Rising PE should have positive trend, got {slope}");
+        assert!(
+            slope > 0.05,
+            "Rising PE should have positive trend, got {slope}"
+        );
     }
 
     #[test]
@@ -1385,7 +1437,10 @@ mod tests {
             den += dx * dx;
         }
         let slope = num / den;
-        assert!(slope < -0.05, "Falling PE should have negative trend, got {slope}");
+        assert!(
+            slope < -0.05,
+            "Falling PE should have negative trend, got {slope}"
+        );
     }
 
     #[test]
@@ -1403,7 +1458,10 @@ mod tests {
         let orthogonal = ContinuousHV::random_default(999).normalize();
         monitor.push(orthogonal);
         let v2 = monitor.coherence_velocity();
-        assert!(v2 < v1 || v2.is_finite(), "Velocity should track coherence change");
+        assert!(
+            v2 < v1 || v2.is_finite(),
+            "Velocity should track coherence change"
+        );
     }
 
     #[test]
@@ -1447,8 +1505,14 @@ mod tests {
         assert!(monitor.coherence_velocity().is_finite());
 
         monitor.reset();
-        assert!((monitor.coherence_velocity() - 0.0).abs() < 1e-6, "Velocity should reset to 0");
-        assert!((monitor.current_coherence() - 1.0).abs() < 1e-6, "Coherence should reset to 1");
+        assert!(
+            (monitor.coherence_velocity() - 0.0).abs() < 1e-6,
+            "Velocity should reset to 0"
+        );
+        assert!(
+            (monitor.current_coherence() - 1.0).abs() < 1e-6,
+            "Coherence should reset to 1"
+        );
     }
 
     #[test]
@@ -1462,7 +1526,13 @@ mod tests {
         assert!((fep_low - 0.7f32).abs() < 1e-6);
 
         // Mid FEP signal → neutral
-        let fep_mid: f32 = if 0.5f32 > 0.7 { 1.5 } else if 0.5f32 < 0.3 { 0.7 } else { 1.0 };
+        let fep_mid: f32 = if 0.5f32 > 0.7 {
+            1.5
+        } else if 0.5f32 < 0.3 {
+            0.7
+        } else {
+            1.0
+        };
         assert!((fep_mid - 1.0f32).abs() < 1e-6);
     }
 
@@ -1472,8 +1542,8 @@ mod tests {
 
     #[test]
     fn test_mock_liquid_mamba_generate() {
-        use symthaea_core::genesis::GenesisSeed;
         use crate::encoder::ThoughtChannels;
+        use symthaea_core::genesis::GenesisSeed;
 
         let genesis = GenesisSeed::from_phrase("test-mock-lm-gen");
         let config = LiquidMambaConfig {
@@ -1498,8 +1568,8 @@ mod tests {
 
     #[test]
     fn test_mock_liquid_mamba_biological_modulation() {
-        use symthaea_core::genesis::GenesisSeed;
         use crate::encoder::ThoughtChannels;
+        use symthaea_core::genesis::GenesisSeed;
 
         let genesis = GenesisSeed::from_phrase("test-mock-lm-bio");
         let config = LiquidMambaConfig {
@@ -1524,8 +1594,8 @@ mod tests {
 
     #[test]
     fn test_mock_liquid_mamba_distillation() {
-        use symthaea_core::genesis::GenesisSeed;
         use crate::encoder::ThoughtChannels;
+        use symthaea_core::genesis::GenesisSeed;
 
         let genesis = GenesisSeed::from_phrase("test-mock-lm-distill");
         let config = LiquidMambaConfig {
@@ -1551,7 +1621,8 @@ mod tests {
         assert_eq!(gen.generation_count(), 4);
 
         // Weights should have changed after distillation
-        let changed = weights_before.iter()
+        let changed = weights_before
+            .iter()
             .zip(weights_after.iter())
             .any(|(a, b)| (a - b).abs() > 1e-10);
         assert!(changed, "Distillation should modify projection weights");
@@ -1559,8 +1630,8 @@ mod tests {
 
     #[test]
     fn test_mock_liquid_mamba_pe_tracking() {
-        use symthaea_core::genesis::GenesisSeed;
         use crate::encoder::ThoughtChannels;
+        use symthaea_core::genesis::GenesisSeed;
 
         let genesis = GenesisSeed::from_phrase("test-mock-lm-pe");
         let config = LiquidMambaConfig {
@@ -1581,7 +1652,10 @@ mod tests {
 
         let pe = gen.last_semantic_pe();
         assert!(pe.is_finite(), "PE should be finite");
-        assert!(pe >= 0.0 && pe <= 2.0, "PE should be in reasonable range, got {pe}");
+        assert!(
+            pe >= 0.0 && pe <= 2.0,
+            "PE should be in reasonable range, got {pe}"
+        );
 
         let (mean, std_dev, trend) = gen.pe_stats();
         assert!(mean.is_finite());
@@ -1591,8 +1665,8 @@ mod tests {
 
     #[test]
     fn test_mock_liquid_mamba_streaming_callback() {
-        use symthaea_core::genesis::GenesisSeed;
         use crate::encoder::ThoughtChannels;
+        use symthaea_core::genesis::GenesisSeed;
 
         let genesis = GenesisSeed::from_phrase("test-mock-lm-stream");
         let config = LiquidMambaConfig {
@@ -1612,14 +1686,20 @@ mod tests {
             _callback_tokens.push(token_str.to_string());
         });
 
-        assert!(callback_count > 0, "Callback should be invoked at least once");
-        assert_eq!(callback_count, result.num_tokens, "Callback count should match token count");
+        assert!(
+            callback_count > 0,
+            "Callback should be invoked at least once"
+        );
+        assert_eq!(
+            callback_count, result.num_tokens,
+            "Callback count should match token count"
+        );
     }
 
     #[test]
     fn test_mock_liquid_mamba_fep_modulation() {
-        use symthaea_core::genesis::GenesisSeed;
         use crate::encoder::ThoughtChannels;
+        use symthaea_core::genesis::GenesisSeed;
 
         let genesis = GenesisSeed::from_phrase("test-mock-lm-fep");
         let config = LiquidMambaConfig {

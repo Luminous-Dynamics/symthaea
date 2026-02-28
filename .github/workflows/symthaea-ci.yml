@@ -310,6 +310,10 @@ jobs:
         run: |
           cargo clippy -p symthaea-nix --lib -- -D warnings
           cargo test -p symthaea-nix --lib
+      - name: Test symthaea-broca (L-SSM)
+        run: |
+          cargo clippy -p symthaea-broca --features test-helpers --lib -- -D warnings
+          cargo test -p symthaea-broca --features test-helpers
 
   msrv:
     name: MSRV Check (1.75)

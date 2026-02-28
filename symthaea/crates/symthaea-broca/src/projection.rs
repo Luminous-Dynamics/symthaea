@@ -75,20 +75,20 @@ fn activation_derivative(x: f32) -> f32 {
 /// ```
 pub struct HdcSsmProjection {
     // Forward: HDC → bottleneck → SSM
-    w_down: Vec<f32>,     // [bottleneck × hdc_dim]
-    w_up: Vec<f32>,       // [ssm_dim × bottleneck]
+    w_down: Vec<f32>, // [bottleneck × hdc_dim]
+    w_up: Vec<f32>,   // [ssm_dim × bottleneck]
     // Backward: SSM → bottleneck → HDC
     w_back_down: Vec<f32>, // [bottleneck × ssm_dim]
     w_back_up: Vec<f32>,   // [hdc_dim × bottleneck]
     // LayerNorm parameters (learned per-element scale + bias)
-    ln_fwd_gamma: Vec<f32>,  // [bottleneck] forward LayerNorm scale
-    ln_fwd_beta: Vec<f32>,   // [bottleneck] forward LayerNorm bias
-    ln_bwd_gamma: Vec<f32>,  // [bottleneck] backward LayerNorm scale
-    ln_bwd_beta: Vec<f32>,   // [bottleneck] backward LayerNorm bias
+    ln_fwd_gamma: Vec<f32>, // [bottleneck] forward LayerNorm scale
+    ln_fwd_beta: Vec<f32>,  // [bottleneck] forward LayerNorm bias
+    ln_bwd_gamma: Vec<f32>, // [bottleneck] backward LayerNorm scale
+    ln_bwd_beta: Vec<f32>,  // [bottleneck] backward LayerNorm bias
     // Deep inner bottleneck (only used when deep=true)
     // Forward inner: bottleneck → inner_dim → bottleneck
-    w_down2: Vec<f32>,    // [inner_dim × bottleneck]
-    w_up2: Vec<f32>,      // [bottleneck × inner_dim]
+    w_down2: Vec<f32>, // [inner_dim × bottleneck]
+    w_up2: Vec<f32>,   // [bottleneck × inner_dim]
     grad_down2: Vec<f32>,
     grad_up2: Vec<f32>,
     inner_dim: usize,
@@ -123,7 +123,8 @@ fn layer_norm(x: &[f32], gamma: &[f32], beta: &[f32]) -> (Vec<f32>, Vec<f32>, f3
     let var: f32 = x.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / n;
     let inv_std = 1.0 / (var + LN_EPS).sqrt();
 
-    let normed: Vec<f32> = x.iter()
+    let normed: Vec<f32> = x
+        .iter()
         .zip(gamma.iter().zip(beta.iter()))
         .map(|(&xi, (&g, &b))| g * (xi - mean) * inv_std + b)
         .collect();
@@ -154,14 +155,24 @@ fn layer_norm_backward(
     }
 
     // d_x_hat = d_out * gamma
-    let d_x_hat: Vec<f32> = d_out.iter().zip(gamma.iter()).map(|(&dy, &g)| dy * g).collect();
+    let d_x_hat: Vec<f32> = d_out
+        .iter()
+        .zip(gamma.iter())
+        .map(|(&dy, &g)| dy * g)
+        .collect();
 
     // d_x = inv_std * (d_x_hat - mean(d_x_hat) - x_hat * mean(d_x_hat * x_hat))
     let mean_d: f32 = d_x_hat.iter().sum::<f32>() / n;
-    let mean_dx: f32 = d_x_hat.iter().zip(x_hat.iter())
-        .map(|(&d, &x)| d * x).sum::<f32>() / n;
+    let mean_dx: f32 = d_x_hat
+        .iter()
+        .zip(x_hat.iter())
+        .map(|(&d, &x)| d * x)
+        .sum::<f32>()
+        / n;
 
-    d_x_hat.iter().zip(x_hat.iter())
+    d_x_hat
+        .iter()
+        .zip(x_hat.iter())
         .map(|(&dxh, &xh)| inv_std * (dxh - mean_d - xh * mean_dx))
         .collect()
 }
@@ -176,8 +187,18 @@ impl HdcSsmProjection {
 
         let w_down = Self::init_weights(genesis, "projection::w_down", bottleneck * hdc_dim, scale);
         let w_up = Self::init_weights(genesis, "projection::w_up", ssm_dim * bottleneck, scale);
-        let w_back_down = Self::init_weights(genesis, "projection::w_back_down", bottleneck * ssm_dim, scale);
-        let w_back_up = Self::init_weights(genesis, "projection::w_back_up", hdc_dim * bottleneck, scale);
+        let w_back_down = Self::init_weights(
+            genesis,
+            "projection::w_back_down",
+            bottleneck * ssm_dim,
+            scale,
+        );
+        let w_back_up = Self::init_weights(
+            genesis,
+            "projection::w_back_up",
+            hdc_dim * bottleneck,
+            scale,
+        );
 
         Self {
             grad_down: vec![0.0; bottleneck * hdc_dim],
@@ -244,17 +265,42 @@ impl HdcSsmProjection {
     /// The inner dimension is `bottleneck_dim / 2`. This provides a stronger
     /// information bottleneck that forces higher-quality compression while
     /// the skip connections maintain gradient flow.
-    pub fn new_deep(genesis: &GenesisSeed, hdc_dim: usize, bottleneck: usize, ssm_dim: usize) -> Self {
+    pub fn new_deep(
+        genesis: &GenesisSeed,
+        hdc_dim: usize,
+        bottleneck: usize,
+        ssm_dim: usize,
+    ) -> Self {
         let inner_dim = bottleneck / 2;
         let scale = 1.0 / (bottleneck as f32).sqrt();
         let inner_scale = 1.0 / (inner_dim as f32).sqrt();
 
         let w_down = Self::init_weights(genesis, "projection::w_down", bottleneck * hdc_dim, scale);
         let w_up = Self::init_weights(genesis, "projection::w_up", ssm_dim * bottleneck, scale);
-        let w_back_down = Self::init_weights(genesis, "projection::w_back_down", bottleneck * ssm_dim, scale);
-        let w_back_up = Self::init_weights(genesis, "projection::w_back_up", hdc_dim * bottleneck, scale);
-        let w_down2 = Self::init_weights(genesis, "projection::w_down2", inner_dim * bottleneck, inner_scale);
-        let w_up2 = Self::init_weights(genesis, "projection::w_up2", bottleneck * inner_dim, inner_scale);
+        let w_back_down = Self::init_weights(
+            genesis,
+            "projection::w_back_down",
+            bottleneck * ssm_dim,
+            scale,
+        );
+        let w_back_up = Self::init_weights(
+            genesis,
+            "projection::w_back_up",
+            hdc_dim * bottleneck,
+            scale,
+        );
+        let w_down2 = Self::init_weights(
+            genesis,
+            "projection::w_down2",
+            inner_dim * bottleneck,
+            inner_scale,
+        );
+        let w_up2 = Self::init_weights(
+            genesis,
+            "projection::w_up2",
+            bottleneck * inner_dim,
+            inner_scale,
+        );
 
         Self {
             grad_down: vec![0.0; bottleneck * hdc_dim],
@@ -320,7 +366,9 @@ impl HdcSsmProjection {
             let inner_act: Vec<f32> = inner.into_iter().map(gelu).collect();
             // w_up2: inner_dim → bottleneck, then GELU + residual with pre-inner hidden
             let expanded = self.matmul(&self.w_up2, &inner_act, self.bottleneck, self.inner_dim);
-            expanded.into_iter().zip(hidden.iter())
+            expanded
+                .into_iter()
+                .zip(hidden.iter())
                 .map(|(e, &h)| activation(e) + RESIDUAL_ALPHA * h)
                 .collect()
         } else {
@@ -424,14 +472,21 @@ impl HdcSsmProjection {
         debug_assert_eq!(output_hv.values.len(), self.hdc_dim);
 
         // Error = thought - output (MSE gradient direction)
-        let error: Vec<f32> = thought_hv.values.iter()
+        let error: Vec<f32> = thought_hv
+            .values
+            .iter()
             .zip(output_hv.values.iter())
             .map(|(t, o)| t - o)
             .collect();
 
         // === Forward pass (cache intermediates for backprop) ===
         // Forward: thought → w_down → LN_fwd → GELU+res → [deep inner] → w_up → ssm
-        let fwd_pre_ln = self.matmul(&self.w_down, &thought_hv.values, self.bottleneck, self.hdc_dim);
+        let fwd_pre_ln = self.matmul(
+            &self.w_down,
+            &thought_hv.values,
+            self.bottleneck,
+            self.hdc_dim,
+        );
         let (fwd_normed, fwd_x_hat, fwd_inv_std) =
             layer_norm(&fwd_pre_ln, &self.ln_fwd_gamma, &self.ln_fwd_beta);
         let hidden_fwd_pre_deep: Vec<f32> = fwd_normed.iter().map(|&x| activation(x)).collect();
@@ -439,14 +494,26 @@ impl HdcSsmProjection {
         // Deep forward inner bottleneck intermediates (cached for backprop)
         let (inner_fwd_pre_act, inner_fwd_act, expanded_fwd_pre_act, hidden_fwd) = if self.deep {
             // w_down2: bottleneck → inner_dim
-            let inner_pre = self.matmul(&self.w_down2, &hidden_fwd_pre_deep, self.inner_dim, self.bottleneck);
+            let inner_pre = self.matmul(
+                &self.w_down2,
+                &hidden_fwd_pre_deep,
+                self.inner_dim,
+                self.bottleneck,
+            );
             let inner_act: Vec<f32> = inner_pre.iter().map(|&x| gelu(x)).collect();
             // w_up2: inner_dim → bottleneck
             let expanded = self.matmul(&self.w_up2, &inner_act, self.bottleneck, self.inner_dim);
-            let hidden: Vec<f32> = expanded.iter().zip(hidden_fwd_pre_deep.iter())
+            let hidden: Vec<f32> = expanded
+                .iter()
+                .zip(hidden_fwd_pre_deep.iter())
                 .map(|(&e, &h)| activation(e) + RESIDUAL_ALPHA * h)
                 .collect();
-            (Some(inner_pre), Some(inner_act), Some(expanded.clone()), hidden)
+            (
+                Some(inner_pre),
+                Some(inner_act),
+                Some(expanded.clone()),
+                hidden,
+            )
         } else {
             (None, None, None, hidden_fwd_pre_deep.clone())
         };
@@ -566,7 +633,8 @@ impl HdcSsmProjection {
             //   w_down2 is [inner_dim × bottleneck]
             for i in 0..self.inner_dim {
                 for j in 0..self.bottleneck {
-                    self.grad_down2[i * self.bottleneck + j] += delta_inner_pre[i] * hidden_fwd_pre_deep[j];
+                    self.grad_down2[i * self.bottleneck + j] +=
+                        delta_inner_pre[i] * hidden_fwd_pre_deep[j];
                 }
             }
 
@@ -626,8 +694,18 @@ impl HdcSsmProjection {
         weight: f32,
     ) {
         // Forward both through w_down + LayerNorm to get bottleneck representations
-        let pre_anchor = self.matmul(&self.w_down, &anchor_hv.values, self.bottleneck, self.hdc_dim);
-        let pre_neg = self.matmul(&self.w_down, &negative_hv.values, self.bottleneck, self.hdc_dim);
+        let pre_anchor = self.matmul(
+            &self.w_down,
+            &anchor_hv.values,
+            self.bottleneck,
+            self.hdc_dim,
+        );
+        let pre_neg = self.matmul(
+            &self.w_down,
+            &negative_hv.values,
+            self.bottleneck,
+            self.hdc_dim,
+        );
         let (normed_anchor, _, _) = layer_norm(&pre_anchor, &self.ln_fwd_gamma, &self.ln_fwd_beta);
         let (normed_neg, _, _) = layer_norm(&pre_neg, &self.ln_fwd_gamma, &self.ln_fwd_beta);
 
@@ -692,7 +770,9 @@ impl HdcSsmProjection {
                     // Measure bottleneck distance
                     let ssm_i = self.project_to_ssm(&thought_hvs[i]);
                     let ssm_j = self.project_to_ssm(&thought_hvs[j]);
-                    let dist: f32 = ssm_i.iter().zip(ssm_j.iter())
+                    let dist: f32 = ssm_i
+                        .iter()
+                        .zip(ssm_j.iter())
                         .map(|(a, b)| (a - b).powi(2))
                         .sum::<f32>()
                         .sqrt();
@@ -706,9 +786,23 @@ impl HdcSsmProjection {
                 let recon_hv = self.project_to_hdc(&ssm_vec);
                 self.compute_gradients(&thought_hvs[i], &recon_hv);
 
+                // Accumulate reconstruction error (MSE)
+                let recon_error: f32 = thought_hvs[i]
+                    .values
+                    .iter()
+                    .zip(recon_hv.values.iter())
+                    .map(|(a, b)| (a - b).powi(2))
+                    .sum::<f32>()
+                    / thought_hvs[i].values.len() as f32;
+                total_recon += recon_error;
+
                 // Scale reconstruction gradients
-                for g in self.grad_back_down.iter_mut() { *g *= recon_weight; }
-                for g in self.grad_back_up.iter_mut() { *g *= recon_weight; }
+                for g in self.grad_back_down.iter_mut() {
+                    *g *= recon_weight;
+                }
+                for g in self.grad_back_up.iter_mut() {
+                    *g *= recon_weight;
+                }
             }
 
             self.apply_gradients(lr, grad_clip);
@@ -726,13 +820,38 @@ impl HdcSsmProjection {
     pub fn apply_gradients(&mut self, lr: f32, grad_clip: f32) {
         Self::apply_grad(&mut self.w_down, &mut self.grad_down, lr, grad_clip);
         Self::apply_grad(&mut self.w_up, &mut self.grad_up, lr, grad_clip);
-        Self::apply_grad(&mut self.w_back_down, &mut self.grad_back_down, lr, grad_clip);
+        Self::apply_grad(
+            &mut self.w_back_down,
+            &mut self.grad_back_down,
+            lr,
+            grad_clip,
+        );
         Self::apply_grad(&mut self.w_back_up, &mut self.grad_back_up, lr, grad_clip);
         // LayerNorm parameters (no clipping — small gradients)
-        Self::apply_grad(&mut self.ln_fwd_gamma, &mut self.grad_ln_fwd_gamma, lr, grad_clip);
-        Self::apply_grad(&mut self.ln_fwd_beta, &mut self.grad_ln_fwd_beta, lr, grad_clip);
-        Self::apply_grad(&mut self.ln_bwd_gamma, &mut self.grad_ln_bwd_gamma, lr, grad_clip);
-        Self::apply_grad(&mut self.ln_bwd_beta, &mut self.grad_ln_bwd_beta, lr, grad_clip);
+        Self::apply_grad(
+            &mut self.ln_fwd_gamma,
+            &mut self.grad_ln_fwd_gamma,
+            lr,
+            grad_clip,
+        );
+        Self::apply_grad(
+            &mut self.ln_fwd_beta,
+            &mut self.grad_ln_fwd_beta,
+            lr,
+            grad_clip,
+        );
+        Self::apply_grad(
+            &mut self.ln_bwd_gamma,
+            &mut self.grad_ln_bwd_gamma,
+            lr,
+            grad_clip,
+        );
+        Self::apply_grad(
+            &mut self.ln_bwd_beta,
+            &mut self.grad_ln_bwd_beta,
+            lr,
+            grad_clip,
+        );
         // Deep inner bottleneck weights
         if self.deep {
             Self::apply_grad(&mut self.w_down2, &mut self.grad_down2, lr, grad_clip);
@@ -768,7 +887,9 @@ impl HdcSsmProjection {
     ///
     /// Call this after `apply_gradients()`. No-op if EMA is not enabled.
     pub fn update_ema(&mut self) {
-        if self.ema_weights.is_none() { return; }
+        if self.ema_weights.is_none() {
+            return;
+        }
         let live = self.flatten_weights();
         let d = self.ema_decay;
         let one_minus_d = 1.0 - d;
@@ -824,8 +945,8 @@ impl HdcSsmProjection {
     /// Accepts legacy (4-matrix only), standard (4-matrix + 4xLN), and
     /// deep (4-matrix + 4xLN + w_down2 + w_up2) formats.
     pub fn load_weights(&mut self, flat: &[f32]) {
-        let legacy_size = self.w_down.len() + self.w_up.len()
-            + self.w_back_down.len() + self.w_back_up.len();
+        let legacy_size =
+            self.w_down.len() + self.w_up.len() + self.w_back_down.len() + self.w_back_up.len();
         let full_size = legacy_size + 4 * self.bottleneck;
         let deep_size = full_size + self.w_down2.len() + self.w_up2.len();
         assert!(
@@ -874,10 +995,16 @@ impl HdcSsmProjection {
 
     /// Total number of learnable parameters.
     pub fn num_params(&self) -> usize {
-        self.w_down.len() + self.w_up.len() + self.w_back_down.len() + self.w_back_up.len()
-            + self.ln_fwd_gamma.len() + self.ln_fwd_beta.len()
-            + self.ln_bwd_gamma.len() + self.ln_bwd_beta.len()
-            + self.w_down2.len() + self.w_up2.len()
+        self.w_down.len()
+            + self.w_up.len()
+            + self.w_back_down.len()
+            + self.w_back_up.len()
+            + self.ln_fwd_gamma.len()
+            + self.ln_fwd_beta.len()
+            + self.ln_bwd_gamma.len()
+            + self.ln_bwd_beta.len()
+            + self.w_down2.len()
+            + self.w_up2.len()
     }
 
     /// HDC dimension.
@@ -1010,7 +1137,8 @@ impl HdcSsmProjection {
         self.warm_start_from_samples(samples);
 
         // Step 2: Compute bottleneck representations of samples through updated w_down + LN
-        let bottleneck_vecs: Vec<Vec<f32>> = samples.iter()
+        let bottleneck_vecs: Vec<Vec<f32>> = samples
+            .iter()
             .map(|s| {
                 let pre = self.matmul(&self.w_down, &s.values, self.bottleneck, self.hdc_dim);
                 let (normed, _, _) = layer_norm(&pre, &self.ln_fwd_gamma, &self.ln_fwd_beta);
@@ -1044,7 +1172,9 @@ impl HdcSsmProjection {
             let mut dir: Vec<f32> = self.w_up[row_start..row_start + b].to_vec();
             let dir_norm: f32 = dir.iter().map(|x| x * x).sum::<f32>().sqrt();
             if dir_norm > 1e-10 {
-                for v in &mut dir { *v /= dir_norm; }
+                for v in &mut dir {
+                    *v /= dir_norm;
+                }
             }
 
             for _ in 0..10 {
@@ -1059,8 +1189,12 @@ impl HdcSsmProjection {
                     }
                 }
                 let norm: f32 = result.iter().map(|x| x * x).sum::<f32>().sqrt();
-                if norm < 1e-10 { break; }
-                for v in &mut result { *v /= norm; }
+                if norm < 1e-10 {
+                    break;
+                }
+                for v in &mut result {
+                    *v /= norm;
+                }
 
                 // Deflation
                 for prev_idx in 0..comp_idx {
@@ -1074,8 +1208,12 @@ impl HdcSsmProjection {
                     }
                 }
                 let norm2: f32 = result.iter().map(|x| x * x).sum::<f32>().sqrt();
-                if norm2 < 1e-10 { break; }
-                for v in &mut result { *v /= norm2; }
+                if norm2 < 1e-10 {
+                    break;
+                }
+                for v in &mut result {
+                    *v /= norm2;
+                }
                 dir = result;
             }
 
@@ -1217,7 +1355,10 @@ mod tests {
         assert_eq!(proj.ssm_dim(), 768);
         // 256*16384 + 768*256 + 256*768 + 16384*256 = 8,781,824 (matrices)
         // + 4 * 256 = 1,024 (LayerNorm gamma+beta for fwd+bwd)
-        assert_eq!(proj.num_params(), 256 * 16384 + 768 * 256 + 256 * 768 + 16384 * 256 + 4 * 256);
+        assert_eq!(
+            proj.num_params(),
+            256 * 16384 + 768 * 256 + 256 * 768 + 16384 * 256 + 4 * 256
+        );
     }
 
     #[test]
@@ -1265,7 +1406,10 @@ mod tests {
         let hv = ContinuousHV::random_default(42);
         let ssm1 = proj1.project_to_ssm(&hv);
         let ssm2 = proj2.project_to_ssm(&hv);
-        assert_eq!(ssm1, ssm2, "Same genesis should produce identical projections");
+        assert_eq!(
+            ssm1, ssm2,
+            "Same genesis should produce identical projections"
+        );
     }
 
     #[test]
@@ -1278,7 +1422,10 @@ mod tests {
 
         let ssm1 = proj.project_to_ssm(&hv1);
         let ssm2 = proj.project_to_ssm(&hv2);
-        assert_ne!(ssm1, ssm2, "Different inputs should produce different outputs");
+        assert_ne!(
+            ssm1, ssm2,
+            "Different inputs should produce different outputs"
+        );
     }
 
     #[test]
@@ -1294,7 +1441,10 @@ mod tests {
         let hv = ContinuousHV::random_default(42);
         let ssm1 = proj.project_to_ssm(&hv);
         let ssm2 = proj2.project_to_ssm(&hv);
-        assert_eq!(ssm1, ssm2, "Loaded weights should produce identical results");
+        assert_eq!(
+            ssm1, ssm2,
+            "Loaded weights should produce identical results"
+        );
     }
 
     #[test]
@@ -1317,7 +1467,8 @@ mod tests {
         let weights_after = proj.flatten_weights();
 
         // Weights should have changed
-        let changed = weights_before.iter()
+        let changed = weights_before
+            .iter()
             .zip(weights_after.iter())
             .any(|(a, b)| (a - b).abs() > 1e-10);
         assert!(changed, "Gradients should modify weights");
@@ -1342,11 +1493,15 @@ mod tests {
         let weights_after = proj.flatten_weights();
 
         // Weight changes should be bounded by clipping
-        let max_change: f32 = weights_before.iter()
+        let max_change: f32 = weights_before
+            .iter()
             .zip(weights_after.iter())
             .map(|(a, b)| (a - b).abs())
             .fold(0.0f32, f32::max);
-        assert!(max_change < 1.0, "Gradient clipping should bound weight changes, got {max_change}");
+        assert!(
+            max_change < 1.0,
+            "Gradient clipping should bound weight changes, got {max_change}"
+        );
     }
 
     #[test]
@@ -1495,8 +1650,14 @@ mod tests {
 
         let rank = proj.effective_rank(&samples);
         assert!(rank.is_finite(), "Effective rank should be finite");
-        assert!(rank >= 1.0, "Effective rank should be at least 1, got {rank}");
-        assert!(rank <= 16.0, "Effective rank should be at most bottleneck_dim, got {rank}");
+        assert!(
+            rank >= 1.0,
+            "Effective rank should be at least 1, got {rank}"
+        );
+        assert!(
+            rank <= 16.0,
+            "Effective rank should be at most bottleneck_dim, got {rank}"
+        );
     }
 
     #[test]
@@ -1511,7 +1672,10 @@ mod tests {
         let rank = proj.effective_rank(&identical_samples);
         assert!(rank.is_finite());
         // With identical inputs, all activations are the same → zero variance → rank = 1
-        assert!(rank <= 2.0, "Identical inputs should give low rank, got {rank}");
+        assert!(
+            rank <= 2.0,
+            "Identical inputs should give low rank, got {rank}"
+        );
     }
 
     #[test]
@@ -1539,23 +1703,39 @@ mod tests {
         let n_up = 64 * 16;
         let n_back_down = 16 * 64;
 
-        let down_changed = weights_before[..n_down].iter()
+        let down_changed = weights_before[..n_down]
+            .iter()
             .zip(weights_after[..n_down].iter())
             .any(|(a, b)| (a - b).abs() > 1e-6);
-        let up_changed = weights_before[n_down..n_down + n_up].iter()
+        let up_changed = weights_before[n_down..n_down + n_up]
+            .iter()
             .zip(weights_after[n_down..n_down + n_up].iter())
             .any(|(a, b)| (a - b).abs() > 1e-6);
-        let back_down_changed = weights_before[n_down + n_up..n_down + n_up + n_back_down].iter()
+        let back_down_changed = weights_before[n_down + n_up..n_down + n_up + n_back_down]
+            .iter()
             .zip(weights_after[n_down + n_up..n_down + n_up + n_back_down].iter())
             .any(|(a, b)| (a - b).abs() > 1e-6);
-        let back_up_changed = weights_before[n_down + n_up + n_back_down..].iter()
+        let back_up_changed = weights_before[n_down + n_up + n_back_down..]
+            .iter()
             .zip(weights_after[n_down + n_up + n_back_down..].iter())
             .any(|(a, b)| (a - b).abs() > 1e-6);
 
-        assert!(down_changed, "w_down should be modified by bidirectional warm-start");
-        assert!(up_changed, "w_up should be modified by bidirectional warm-start");
-        assert!(back_down_changed, "w_back_down should be modified by bidirectional warm-start");
-        assert!(back_up_changed, "w_back_up should be modified by bidirectional warm-start");
+        assert!(
+            down_changed,
+            "w_down should be modified by bidirectional warm-start"
+        );
+        assert!(
+            up_changed,
+            "w_up should be modified by bidirectional warm-start"
+        );
+        assert!(
+            back_down_changed,
+            "w_back_down should be modified by bidirectional warm-start"
+        );
+        assert!(
+            back_up_changed,
+            "w_back_up should be modified by bidirectional warm-start"
+        );
     }
 
     #[test]
@@ -1578,7 +1758,10 @@ mod tests {
         let hv = ContinuousHV::random(256, 42);
         let ssm = proj.project_to_ssm(&hv);
         assert_eq!(ssm.len(), 64);
-        assert!(ssm.iter().all(|x| x.is_finite()), "All outputs should be finite");
+        assert!(
+            ssm.iter().all(|x| x.is_finite()),
+            "All outputs should be finite"
+        );
 
         // Roundtrip should be finite
         let back = proj.project_to_hdc(&ssm);
@@ -1610,7 +1793,9 @@ mod tests {
         let ema_active = proj.flatten_weights(); // now holds EMA weights
         proj.restore_live_weights(&saved_live);
 
-        let differs = live.iter().zip(ema_active.iter())
+        let differs = live
+            .iter()
+            .zip(ema_active.iter())
             .any(|(l, e)| (l - e).abs() > 1e-10);
         assert!(differs, "EMA weights should lag behind live weights");
     }
@@ -1647,7 +1832,10 @@ mod tests {
         proj.restore_live_weights(&saved);
         let live_after = proj.flatten_weights();
 
-        assert_eq!(live_before, live_after, "Live weights should be fully restored after EMA swap");
+        assert_eq!(
+            live_before, live_after,
+            "Live weights should be fully restored after EMA swap"
+        );
     }
 
     // === Deep projection tests ===
@@ -1696,7 +1884,10 @@ mod tests {
         let ssm = proj.project_to_ssm(&hv);
         let recon = proj.project_to_hdc(&ssm).normalize();
         let sim = hv.similarity(&recon);
-        assert!(sim.is_finite(), "Deep roundtrip similarity should be finite");
+        assert!(
+            sim.is_finite(),
+            "Deep roundtrip similarity should be finite"
+        );
     }
 
     #[test]
@@ -1729,7 +1920,10 @@ mod tests {
         let hv = ContinuousHV::random(256, 42);
         let ssm1 = proj.project_to_ssm(&hv);
         let ssm2 = proj2.project_to_ssm(&hv);
-        assert_eq!(ssm1, ssm2, "Loaded deep weights should produce identical results");
+        assert_eq!(
+            ssm1, ssm2,
+            "Loaded deep weights should produce identical results"
+        );
     }
 
     #[test]
@@ -1746,7 +1940,8 @@ mod tests {
         proj.apply_gradients(0.1, 1000.0);
         let weights_after = proj.flatten_weights();
 
-        let changed = weights_before.iter()
+        let changed = weights_before
+            .iter()
             .zip(weights_after.iter())
             .any(|(a, b)| (a - b).abs() > 1e-10);
         assert!(changed, "Deep gradients should modify weights");
@@ -1776,10 +1971,14 @@ mod tests {
         let flat_after = proj.flatten_weights();
         let deep_after = &flat_after[deep_start..deep_end];
 
-        let changed = deep_before.iter()
+        let changed = deep_before
+            .iter()
             .zip(deep_after.iter())
             .any(|(a, b)| (a - b).abs() > 1e-10);
-        assert!(changed, "Deep inner bottleneck weights should be updated by gradient flow");
+        assert!(
+            changed,
+            "Deep inner bottleneck weights should be updated by gradient flow"
+        );
     }
 
     #[test]
@@ -1808,7 +2007,10 @@ mod tests {
         let hv = ContinuousHV::random(256, 42);
         let ssm1 = proj1.project_to_ssm(&hv);
         let ssm2 = proj2.project_to_ssm(&hv);
-        assert_eq!(ssm1, ssm2, "Same genesis should produce identical deep projections");
+        assert_eq!(
+            ssm1, ssm2,
+            "Same genesis should produce identical deep projections"
+        );
     }
 
     #[test]
@@ -1826,5 +2028,40 @@ mod tests {
         let back = proj.project_to_hdc(&ssm);
         assert_eq!(back.values.len(), 8);
         assert!(back.values.iter().all(|x| x.is_finite()));
+    }
+
+    #[test]
+    fn test_contrastive_pretrain_accumulates_recon() {
+        let genesis = test_genesis();
+        let dim = 256;
+        let mut proj = HdcSsmProjection::new(&genesis, dim, 32, 64);
+
+        let thoughts: Vec<ContinuousHV> = (0..5)
+            .map(|seed| ContinuousHV::random(dim, seed).normalize())
+            .collect();
+
+        let weights_before = proj.flatten_weights();
+        let (avg_dist, avg_recon) = proj.contrastive_pretrain(&thoughts, 3, 0.01);
+        let weights_after = proj.flatten_weights();
+
+        // Weights should have changed
+        let changed = weights_before
+            .iter()
+            .zip(weights_after.iter())
+            .any(|(a, b)| (a - b).abs() > 1e-10);
+        assert!(changed, "Contrastive pretrain should modify weights");
+
+        // Distance should be positive (thoughts pushed apart)
+        assert!(
+            avg_dist > 0.0,
+            "avg_dist should be positive, got: {avg_dist}"
+        );
+
+        // Reconstruction error should be positive (not zero — catches the bug)
+        assert!(
+            avg_recon > 0.0,
+            "avg_recon should be positive, got: {avg_recon}"
+        );
+        assert!(avg_recon.is_finite(), "avg_recon should be finite");
     }
 }

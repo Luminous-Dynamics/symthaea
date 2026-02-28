@@ -84,7 +84,10 @@ fn main() {
                 tracing::info!(epoch = ckpt.training_epoch, "Projection weights loaded");
             }
             Err(e) => {
-                eprintln!("Failed to load projection checkpoint '{}': {e}", resume_path);
+                eprintln!(
+                    "Failed to load projection checkpoint '{}': {e}",
+                    resume_path
+                );
                 process::exit(1);
             }
         }
@@ -92,10 +95,14 @@ fn main() {
 
     // Warm-start: compute principal directions from training data
     if opts.warm_start || opts.warm_start_bidirectional {
-        let sample_hvs: Vec<_> = dataset.pairs.iter()
+        let sample_hvs: Vec<_> = dataset
+            .pairs
+            .iter()
             .take(200) // Use up to 200 samples for covariance
             .map(|pair| {
-                let channels = ThoughtChannels { channels: pair.channels };
+                let channels = ThoughtChannels {
+                    channels: pair.channels,
+                };
                 gen.encoder().encode(&channels)
             })
             .collect();
@@ -114,10 +121,14 @@ fn main() {
             epochs = opts.contrastive_pretrain_epochs,
             "Running contrastive pretraining"
         );
-        let sample_hvs: Vec<_> = dataset.pairs.iter()
+        let sample_hvs: Vec<_> = dataset
+            .pairs
+            .iter()
             .take(50) // Diverse subset — 50 thoughts → 1,225 pairs
             .map(|pair| {
-                let channels = ThoughtChannels { channels: pair.channels };
+                let channels = ThoughtChannels {
+                    channels: pair.channels,
+                };
                 gen.encoder().encode(&channels)
             })
             .collect();
@@ -151,7 +162,9 @@ fn main() {
         let num_samples = dataset.pairs.len();
 
         for (i, pair) in dataset.pairs.iter().enumerate() {
-            let channels = ThoughtChannels { channels: pair.channels };
+            let channels = ThoughtChannels {
+                channels: pair.channels,
+            };
 
             // Generate through full Mamba inference
             let result = gen.generate(&channels);
@@ -180,13 +193,27 @@ fn main() {
             }
         }
 
-        let avg_pe = if num_samples > 0 { epoch_semantic_pe / num_samples as f32 } else { 1.0 };
-        let avg_coh = if num_samples > 0 { epoch_coherence / num_samples as f32 } else { 0.0 };
+        let avg_pe = if num_samples > 0 {
+            epoch_semantic_pe / num_samples as f32
+        } else {
+            1.0
+        };
+        let avg_coh = if num_samples > 0 {
+            epoch_coherence / num_samples as f32
+        } else {
+            0.0
+        };
 
         // Compute effective rank on a few samples
-        let rank_samples: Vec<_> = dataset.pairs.iter()
+        let rank_samples: Vec<_> = dataset
+            .pairs
+            .iter()
             .take(10)
-            .map(|p| gen.encoder().encode(&ThoughtChannels { channels: p.channels }))
+            .map(|p| {
+                gen.encoder().encode(&ThoughtChannels {
+                    channels: p.channels,
+                })
+            })
             .collect();
         let avg_rank = gen.projection().effective_rank(&rank_samples);
 
@@ -212,7 +239,10 @@ fn main() {
 
     // Print training summary
     println!("\n--- Projection Training Summary ---");
-    println!("{:>6}  {:>10}  {:>8}  {:>10}  {:>6}", "Epoch", "Semantic PE", "Rank", "Coherence", "Vetos");
+    println!(
+        "{:>6}  {:>10}  {:>8}  {:>10}  {:>6}",
+        "Epoch", "Semantic PE", "Rank", "Coherence", "Vetos"
+    );
     for m in &all_epoch_metrics {
         println!(
             "{:>6}  {:>10.4}  {:>8.2}  {:>10.4}  {:>6}",
@@ -224,15 +254,13 @@ fn main() {
     let final_epoch = all_epoch_metrics.last().map(|m| m.epoch).unwrap_or(0);
     let weights = gen.projection().flatten_weights();
 
-    let mut checkpoint = ProjectionCheckpoint {
-        version: 1,
-        projection_weights: weights,
-        hdc_dim: gen.config().hdc_dim,
-        bottleneck_dim: gen.config().bottleneck_dim,
-        ssm_dim: gen.config().ssm_dim,
-        training_epoch: final_epoch,
-        checksum: [0u8; 32],
-    };
+    let mut checkpoint = ProjectionCheckpoint::new(
+        weights,
+        gen.config().hdc_dim,
+        gen.config().bottleneck_dim,
+        gen.config().ssm_dim,
+        final_epoch,
+    );
 
     tracing::info!(path = %opts.output_path, "Saving projection checkpoint");
     if let Err(e) = checkpoint.save_to_file(&opts.output_path) {
@@ -264,7 +292,10 @@ fn main() {
         tracing::info!("Running evaluation");
         let result = symthaea_broca::evaluation::evaluate_liquid_mamba(&mut gen, &eval_config);
         println!();
-        println!("{}", symthaea_broca::evaluation::format_liquid_mamba_eval_report(&result));
+        println!(
+            "{}",
+            symthaea_broca::evaluation::format_liquid_mamba_eval_report(&result)
+        );
     }
 }
 
@@ -341,14 +372,16 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
             }
             "--epochs" | "-e" => {
                 i += 1;
-                opts.epochs = args.get(i)
+                opts.epochs = args
+                    .get(i)
                     .ok_or("--epochs requires a number")?
                     .parse()
                     .map_err(|_| "--epochs must be a positive integer")?;
             }
             "--lr" => {
                 i += 1;
-                opts.learning_rate = args.get(i)
+                opts.learning_rate = args
+                    .get(i)
                     .ok_or("--lr requires a number")?
                     .parse()
                     .map_err(|_| "--lr must be a float")?;
@@ -361,14 +394,16 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
             }
             "--cosine-annealing-steps" => {
                 i += 1;
-                opts.cosine_annealing_steps = args.get(i)
+                opts.cosine_annealing_steps = args
+                    .get(i)
                     .ok_or("--cosine-annealing-steps requires a number")?
                     .parse()
                     .map_err(|_| "--cosine-annealing-steps must be a positive integer")?;
             }
             "--contrastive-pretrain" => {
                 i += 1;
-                opts.contrastive_pretrain_epochs = args.get(i)
+                opts.contrastive_pretrain_epochs = args
+                    .get(i)
                     .ok_or("--contrastive-pretrain requires a number")?
                     .parse()
                     .map_err(|_| "--contrastive-pretrain must be a positive integer")?;
@@ -378,14 +413,16 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
             }
             "--warmup-steps" => {
                 i += 1;
-                opts.warmup_steps = args.get(i)
+                opts.warmup_steps = args
+                    .get(i)
                     .ok_or("--warmup-steps requires a number")?
                     .parse()
                     .map_err(|_| "--warmup-steps must be a positive integer")?;
             }
             "--accumulation-steps" => {
                 i += 1;
-                opts.accumulation_steps = args.get(i)
+                opts.accumulation_steps = args
+                    .get(i)
                     .ok_or("--accumulation-steps requires a number")?
                     .parse()
                     .map_err(|_| "--accumulation-steps must be a positive integer")?;
@@ -427,13 +464,17 @@ fn print_usage() {
     eprintln!("  --epochs, -e N         Number of training epochs (default: 5)");
     eprintln!("  --lr RATE              Learning rate (default: 0.001)");
     eprintln!("  --warm-start                PCA warm-start from training data covariance");
-    eprintln!("  --warm-start-bidirectional  Bidirectional warm-start (forward + backward projection)");
+    eprintln!(
+        "  --warm-start-bidirectional  Bidirectional warm-start (forward + backward projection)"
+    );
     eprintln!("  --contrastive-pretrain N   Contrastive pretraining epochs before distillation");
     eprintln!("  --diagnostics               Enable periodic projection health logging");
     eprintln!("  --warmup-steps N            LR warmup steps (default: 100)");
     eprintln!("  --accumulation-steps N      Gradient accumulation steps (default: 4)");
     eprintln!("  --cosine-annealing-steps N  Cosine annealing total steps (default: 0 = disabled)");
-    eprintln!("  --genesis PHRASE            Genesis seed phrase (default: broca-projection-default)");
+    eprintln!(
+        "  --genesis PHRASE            Genesis seed phrase (default: broca-projection-default)"
+    );
     eprintln!("  --deep-projection           Use deep double-bottleneck projection (256→128→256)");
     eprintln!("  --help, -h                  Show this help message");
 }

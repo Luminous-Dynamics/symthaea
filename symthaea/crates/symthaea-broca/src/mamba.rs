@@ -85,26 +85,29 @@ impl MambaWrapper {
         tracing::info!(model_id, "Loading Mamba model");
 
         // Download model files from HuggingFace Hub
-        let api = hf_hub::api::sync::Api::new()
-            .context("Failed to create HuggingFace Hub API")?;
+        let api = hf_hub::api::sync::Api::new().context("Failed to create HuggingFace Hub API")?;
         let repo = api.model(model_id.to_string());
 
         // Load config
-        let config_path = repo.get("config.json")
+        let config_path = repo
+            .get("config.json")
             .context("Failed to download config.json")?;
-        let config_str = std::fs::read_to_string(&config_path)
-            .context("Failed to read config.json")?;
-        let config: Config = serde_json::from_str(&config_str)
-            .context("Failed to parse Mamba config")?;
+        let config_str =
+            std::fs::read_to_string(&config_path).context("Failed to read config.json")?;
+        let config: Config =
+            serde_json::from_str(&config_str).context("Failed to parse Mamba config")?;
 
         // Load tokenizer — Mamba models typically don't ship their own tokenizer.json,
         // they use the GPT-NeoX tokenizer from EleutherAI/gpt-neox-20b.
         let tokenizer_path = match repo.get("tokenizer.json") {
             Ok(path) => path,
             Err(_) => {
-                tracing::info!("No tokenizer.json in model repo, falling back to EleutherAI/gpt-neox-20b");
+                tracing::info!(
+                    "No tokenizer.json in model repo, falling back to EleutherAI/gpt-neox-20b"
+                );
                 let tok_repo = api.model("EleutherAI/gpt-neox-20b".to_string());
-                tok_repo.get("tokenizer.json")
+                tok_repo
+                    .get("tokenizer.json")
                     .context("Failed to download tokenizer.json from EleutherAI/gpt-neox-20b")?
             }
         };
@@ -115,15 +118,13 @@ impl MambaWrapper {
         let vb = if let Ok(weights_path) = repo.get("model.safetensors") {
             tracing::info!("Loading weights from model.safetensors");
             unsafe {
-                VarBuilder::from_mmaped_safetensors(
-                    &[&weights_path],
-                    DType::F32,
-                    &device,
-                ).context("Failed to load safetensors")?
+                VarBuilder::from_mmaped_safetensors(&[&weights_path], DType::F32, &device)
+                    .context("Failed to load safetensors")?
             }
         } else {
             tracing::info!("No model.safetensors, loading from pytorch_model.bin");
-            let pth_path = repo.get("pytorch_model.bin")
+            let pth_path = repo
+                .get("pytorch_model.bin")
                 .context("Failed to download pytorch_model.bin (no safetensors or .bin found)")?;
             let tensors = candle_core::pickle::read_all(&pth_path)
                 .context("Failed to read pytorch_model.bin")?;
@@ -132,8 +133,8 @@ impl MambaWrapper {
             VarBuilder::from_tensors(tensors_map, DType::F32, &device)
         };
 
-        let model = Model::new(&config, vb.pp("backbone"))
-            .context("Failed to build Mamba model")?;
+        let model =
+            Model::new(&config, vb.pp("backbone")).context("Failed to build Mamba model")?;
 
         let state = State::new(1, &config, DType::F32, &device)
             .context("Failed to initialize Mamba state")?;
@@ -161,12 +162,15 @@ impl MambaWrapper {
     pub fn forward_one_token(&mut self, token_id: u32) -> Result<Vec<f32>> {
         let input_ids = Tensor::new(&[token_id], &self.device)?; // [1] — single token
 
-        let logits = self.model.forward(&input_ids, &mut self.state)
+        let logits = self
+            .model
+            .forward(&input_ids, &mut self.state)
             .context("Mamba forward pass failed")?;
 
         // logits shape: [1, vocab_size] — squeeze to [vocab_size]
         let logits = logits.squeeze(0)?;
-        let logits_vec: Vec<f32> = logits.to_vec1()
+        let logits_vec: Vec<f32> = logits
+            .to_vec1()
             .context("Failed to convert logits to Vec<f32>")?;
 
         Ok(logits_vec)
@@ -184,7 +188,9 @@ impl MambaWrapper {
         let input_ids = Tensor::new(&[token_id], &self.device)?; // [1] — single token
         let mut temp_state = State::new(1, &self.config, DType::F32, &self.device)
             .context("Failed to create temp state for embedding extraction")?;
-        let _logits = self.model.forward(&input_ids, &mut temp_state)
+        let _logits = self
+            .model
+            .forward(&input_ids, &mut temp_state)
             .context("Embedding forward pass failed")?;
 
         // Extract the final hidden state by averaging the SSM states
@@ -195,8 +201,7 @@ impl MambaWrapper {
 
         // Use the first layer's hidden state projected to d_model size
         if let Some(hs) = temp_state.hs.first() {
-            let hs_flat: Vec<f32> = hs.flatten_all()?.to_vec1()
-                .unwrap_or_default();
+            let hs_flat: Vec<f32> = hs.flatten_all()?.to_vec1().unwrap_or_default();
             // Take the first d_model elements (or pad with zeros)
             let take = hs_flat.len().min(d_model);
             embedding[..take].copy_from_slice(&hs_flat[..take]);
@@ -245,16 +250,6 @@ impl MambaWrapper {
         Ok(())
     }
 
-    /// Get a reference to the SSM hidden states.
-    pub fn hidden_states(&self) -> &State {
-        &self.state
-    }
-
-    /// Get a mutable reference to the SSM hidden states.
-    pub fn hidden_states_mut(&mut self) -> &mut State {
-        &mut self.state
-    }
-
     /// Scale all hidden states by a biological modulation factor.
     ///
     /// `factor < 1.0` → faster decay → shorter memory (exhausted/agitated)
@@ -291,14 +286,17 @@ impl MambaWrapper {
 
     /// Encode text to token IDs.
     pub fn encode(&self, text: &str) -> Result<Vec<u32>> {
-        let encoding = self.tokenizer.encode(text, false)
+        let encoding = self
+            .tokenizer
+            .encode(text, false)
             .map_err(|e| anyhow::anyhow!("Tokenization failed: {e}"))?;
         Ok(encoding.get_ids().to_vec())
     }
 
     /// Decode token IDs to text.
     pub fn decode(&self, ids: &[u32]) -> Result<String> {
-        self.tokenizer.decode(ids, true)
+        self.tokenizer
+            .decode(ids, true)
             .map_err(|e| anyhow::anyhow!("Detokenization failed: {e}"))
     }
 
@@ -449,8 +447,10 @@ pub(crate) mod tests {
             let mut logits = Vec::with_capacity(vocab);
 
             // Seed from token_id × golden ratio + forward_count for determinism that varies per call
-            let mut state = (token_id as u64).wrapping_mul(0x9E3779B97F4A7C15)
-                .wrapping_add(self.forward_count as u64).wrapping_mul(0x517CC1B727220A95);
+            let mut state = (token_id as u64)
+                .wrapping_mul(0x9E3779B97F4A7C15)
+                .wrapping_add(self.forward_count as u64)
+                .wrapping_mul(0x517CC1B727220A95);
             if state == 0 {
                 state = 0x9E3779B97F4A7C15;
             }
@@ -467,8 +467,7 @@ pub(crate) mod tests {
         fn embedding_vector(&self, token_id: u32) -> Result<Vec<f32>> {
             let d = 768;
             let mut emb = Vec::with_capacity(d);
-            let mut state = (token_id as u64 ^ 0x517CC1B727220A95)
-                .wrapping_add(1);
+            let mut state = (token_id as u64 ^ 0x517CC1B727220A95).wrapping_add(1);
             if state == 0 {
                 state = 0x517CC1B727220A95;
             }
@@ -577,10 +576,13 @@ pub(crate) mod tests {
             .expect("Failed to load mamba-130m");
 
         let context = vec![0.1f32; 768];
-        wrapper.inject_initial_context(&context)
+        wrapper
+            .inject_initial_context(&context)
             .expect("Context injection failed");
 
-        let logits = wrapper.forward_one_token(1).expect("Forward after injection failed");
+        let logits = wrapper
+            .forward_one_token(1)
+            .expect("Forward after injection failed");
         assert!(logits.len() >= 50257, "vocab too small: {}", logits.len());
     }
 
@@ -595,11 +597,17 @@ pub(crate) mod tests {
         let _logits = wrapper.forward_one_token(0).expect("Forward pass failed");
 
         // Scale states
-        wrapper.scale_hidden_states(0.5).expect("State scaling failed");
-        wrapper.scale_hidden_states(2.0).expect("State scaling failed");
+        wrapper
+            .scale_hidden_states(0.5)
+            .expect("State scaling failed");
+        wrapper
+            .scale_hidden_states(2.0)
+            .expect("State scaling failed");
 
         // Should still produce valid logits
-        let logits = wrapper.forward_one_token(1).expect("Forward after scaling failed");
+        let logits = wrapper
+            .forward_one_token(1)
+            .expect("Forward after scaling failed");
         assert!(logits.iter().all(|x| x.is_finite()));
     }
 
@@ -633,7 +641,9 @@ pub(crate) mod tests {
         wrapper.reset();
 
         // Should work fine after reset
-        let logits = wrapper.forward_one_token(0).expect("Forward after reset failed");
+        let logits = wrapper
+            .forward_one_token(0)
+            .expect("Forward after reset failed");
         assert!(logits.len() >= 50257, "vocab too small: {}", logits.len());
     }
 
@@ -644,7 +654,9 @@ pub(crate) mod tests {
         let wrapper = MambaWrapper::load("state-spaces/mamba-130m", device)
             .expect("Failed to load mamba-130m");
 
-        let emb = wrapper.embedding_vector(42).expect("Embedding extraction failed");
+        let emb = wrapper
+            .embedding_vector(42)
+            .expect("Embedding extraction failed");
         assert_eq!(emb.len(), 768);
         // Should be non-zero for a real token
         assert!(emb.iter().any(|x| x.abs() > 1e-10));
@@ -658,7 +670,9 @@ pub(crate) mod tests {
             .expect("Failed to load mamba-130m");
 
         // Encode a prompt
-        let prompt_ids = wrapper.encode("The meaning of life is").expect("Encode failed");
+        let prompt_ids = wrapper
+            .encode("The meaning of life is")
+            .expect("Encode failed");
 
         // Feed prompt tokens
         let mut last_logits = vec![];
@@ -669,7 +683,8 @@ pub(crate) mod tests {
         // Generate 10 tokens greedily
         let mut generated_ids = Vec::new();
         for _ in 0..10 {
-            let next_id = last_logits.iter()
+            let next_id = last_logits
+                .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.total_cmp(b))
                 .map(|(i, _)| i as u32)
@@ -713,14 +728,16 @@ pub(crate) mod tests {
         let ssm_context = projection.project_to_ssm(&thought_hv);
 
         // Inject context into Mamba
-        wrapper.inject_initial_context(&ssm_context)
+        wrapper
+            .inject_initial_context(&ssm_context)
             .expect("Context injection failed");
 
         // Generate a few tokens
         let mut token_ids = Vec::new();
         let mut logits = wrapper.forward_one_token(0).expect("Forward failed");
         for _ in 0..5 {
-            let next_id = logits.iter()
+            let next_id = logits
+                .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.total_cmp(b))
                 .map(|(i, _)| i as u32)
@@ -770,7 +787,9 @@ pub(crate) mod tests {
             mock.last_context_magnitude
         );
 
-        let logits = mock.forward_one_token(1).expect("Forward after injection failed");
+        let logits = mock
+            .forward_one_token(1)
+            .expect("Forward after injection failed");
         assert_eq!(logits.len(), 50280);
     }
 
@@ -790,7 +809,9 @@ pub(crate) mod tests {
 
         // Scale factor affects logit magnitude
         mock.scale_hidden_states(0.1).expect("Scale failed");
-        let logits = mock.forward_one_token(1).expect("Forward after scaling failed");
+        let logits = mock
+            .forward_one_token(1)
+            .expect("Forward after scaling failed");
         assert!(logits.iter().all(|x| x.is_finite()));
         // Logits should be scaled down (max magnitude should be < 0.3 since range is [-2,2]*0.1)
         let max_abs = logits.iter().map(|x| x.abs()).fold(0.0f32, f32::max);
@@ -834,7 +855,9 @@ pub(crate) mod tests {
         assert_eq!(mock.reset_count, 1);
 
         // Should work fine after reset
-        let logits = mock.forward_one_token(0).expect("Forward after reset failed");
+        let logits = mock
+            .forward_one_token(0)
+            .expect("Forward after reset failed");
         assert_eq!(logits.len(), 50280);
     }
 
@@ -842,7 +865,9 @@ pub(crate) mod tests {
     fn test_mock_mamba_embedding_extraction() {
         let mock = MockMamba::new();
 
-        let emb = mock.embedding_vector(42).expect("Embedding extraction failed");
+        let emb = mock
+            .embedding_vector(42)
+            .expect("Embedding extraction failed");
         assert_eq!(emb.len(), 768);
         // Should be non-zero
         assert!(emb.iter().any(|x| x.abs() > 1e-10));
@@ -863,7 +888,9 @@ pub(crate) mod tests {
         let mut mock = MockMamba::new();
 
         // Encode a prompt
-        let prompt_ids = mock.encode("The meaning of life is").expect("Encode failed");
+        let prompt_ids = mock
+            .encode("The meaning of life is")
+            .expect("Encode failed");
         assert!(!prompt_ids.is_empty());
 
         // Feed prompt tokens
@@ -875,7 +902,8 @@ pub(crate) mod tests {
         // Generate 10 tokens greedily
         let mut generated_ids = Vec::new();
         for _ in 0..10 {
-            let next_id = last_logits.iter()
+            let next_id = last_logits
+                .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.total_cmp(b))
                 .map(|(i, _)| i as u32)
@@ -921,7 +949,8 @@ pub(crate) mod tests {
         let mut token_ids = Vec::new();
         let mut logits = mock.forward_one_token(0).expect("Forward failed");
         for _ in 0..5 {
-            let next_id = logits.iter()
+            let next_id = logits
+                .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.total_cmp(b))
                 .map(|(i, _)| i as u32)
@@ -946,7 +975,10 @@ pub(crate) mod tests {
 
         // Different token IDs produce different logits
         let logits3 = mock1.forward_one_token(43).expect("Forward failed");
-        assert_ne!(logits1, logits3, "Different token_ids should produce different logits");
+        assert_ne!(
+            logits1, logits3,
+            "Different token_ids should produce different logits"
+        );
     }
 
     #[test]
@@ -967,7 +999,9 @@ pub(crate) mod tests {
         let emb = backend.embedding_vector(0).expect("Embedding failed");
         assert_eq!(emb.len(), 768);
 
-        backend.inject_initial_context(&[1.0; 768]).expect("Inject failed");
+        backend
+            .inject_initial_context(&[1.0; 768])
+            .expect("Inject failed");
         backend.scale_hidden_states(0.5).expect("Scale failed");
 
         let ids = backend.encode("test").expect("Encode failed");
