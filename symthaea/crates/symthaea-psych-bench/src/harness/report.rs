@@ -1367,6 +1367,16 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("ArcRSA") => "rsa_correlation",
         b if b.contains("ArcAlgebra") => "algebra_score",
         b if b.contains("ArcStaircase") => "capacity_threshold",
+        // Neuromod domain
+        b if b.contains("RewardLearning") => "trials_to_criterion",
+        b if b.contains("YerkesDodson") => "inverted_u_fit_r2",
+        b if b.contains("AttentionNetwork") => "conflict_effect",
+        b if b.contains("MoodInduction") => "mood_congruent_bias",
+        b if b.contains("PharmacologicalAblation") => "da_knockout_lr_drop_pct",
+        b if b.contains("PharmacologicalChallenge") => "da_agonist_gradient_scale",
+        b if b.contains("InjectionChallenge") => "stimulant_peak_effect",
+        b if b.contains("AllostaticStress") => "chronic_da_baseline_final",
+        b if b.contains("LiveLoopAblation") => "live_da_knockout_gradient_drop_pct",
         _ => "overall_accuracy",
     }
 }
@@ -1392,7 +1402,9 @@ fn rt_summary_for_result(result: &BenchmarkResult) -> String {
 }
 
 /// Returns true if a lower metric value is better (inverted scoring).
-fn is_lower_better(metric_key: &str) -> bool {
+///
+/// Canonical list — all callers should use this instead of maintaining copies.
+pub fn is_lower_better(metric_key: &str) -> bool {
     matches!(
         metric_key,
         "stroop_effect"

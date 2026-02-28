@@ -7,8 +7,12 @@
 //! - **MoodInduction** — 5-HT mood-cognition interaction and risk preference (Dayan & Huys 2009)
 //! - **LiveLoopAblation** — Transmitter knockout on real CognitiveLoopService (Doya 2002)
 //! - **PharmacologicalChallenge** — Agonist (0.9) + antagonist (0.1) inverted-U (Arnsten 2011)
+//! - **InjectionChallenge** — PK injection + tolerance dynamics (Arnsten 2011)
+//! - **AllostaticStress** — Chronic stress load accumulation and recovery (McEwen 1998)
 
+pub mod allostatic_stress;
 pub mod attention_network;
+pub mod injection_challenge;
 #[cfg(feature = "symthaea-backend")]
 pub mod live_loop_ablation;
 pub mod mood_induction;
@@ -17,7 +21,9 @@ pub mod pharmacological_challenge;
 pub mod reward_learning;
 pub mod yerkes_dodson;
 
+pub use allostatic_stress::AllostaticStressBenchmark;
 pub use attention_network::AttentionNetworkBenchmark;
+pub use injection_challenge::InjectionChallengeBenchmark;
 #[cfg(feature = "symthaea-backend")]
 pub use live_loop_ablation::LiveLoopAblationBenchmark;
 pub use mood_induction::MoodInductionBenchmark;
