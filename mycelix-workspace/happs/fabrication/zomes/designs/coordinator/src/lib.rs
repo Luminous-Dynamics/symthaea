@@ -275,10 +275,25 @@ pub fn delete_design(hash: ActionHash) -> ExternResult<ActionHash> {
 // FILE MANAGEMENT
 // =============================================================================
 
-/// Add a file to a design
+/// Add a file to a design (only the design author may add files)
 #[hdk_extern]
 pub fn add_design_file(input: AddFileInput) -> ExternResult<Record> {
     let uploader = agent_info()?.agent_initial_pubkey;
+
+    // Verify caller is the design author
+    let design_record = get(input.design_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Design not found".to_string())))?;
+    let design: Design = design_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse design".to_string())))?;
+    if design.author != uploader {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the design author can add files".to_string()
+        )));
+    }
+
     let now = sys_time()?;
 
     let file_entry = DesignFileEntry {
@@ -707,7 +722,12 @@ fn params_to_symthaea_input(
         let is_material_key = key_lower.contains("material") || key_lower.contains("filament");
 
         let (role, concept_value) = match value {
-            ParameterValue::Number(n) => ("dimension".to_string(), format!("{}={}", key, n)),
+            ParameterValue::Number(n) => {
+                if !n.is_finite() {
+                    continue; // Skip non-finite parameter values
+                }
+                ("dimension".to_string(), format!("{}={}", key, n))
+            }
             ParameterValue::Integer(i) => ("dimension".to_string(), format!("{}={}", key, i)),
             ParameterValue::Boolean(b) => ("feature".to_string(), format!("{}={}", key, b)),
             ParameterValue::String(s) => {

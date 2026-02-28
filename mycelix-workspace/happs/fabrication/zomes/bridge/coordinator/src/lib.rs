@@ -305,6 +305,14 @@ pub fn update_repair_workflow(input: UpdateWorkflowInput) -> ExternResult<Record
     let record = get(input.workflow_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Workflow not found".into())))?;
 
+    // Only the original creator can update the workflow
+    let caller = agent_info()?.agent_initial_pubkey;
+    if *record.action().author() != caller {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the workflow creator can update it".to_string()
+        )));
+    }
+
     let mut workflow: RepairWorkflowEntry = record
         .entry()
         .to_app_option()

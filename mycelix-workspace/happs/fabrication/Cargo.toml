@@ -16,6 +16,7 @@ members = [
     "zomes/symthaea/integrity",
     "zomes/symthaea/coordinator",
 ]
+exclude = ["tests/sweettest"]
 resolver = "2"
 
 [workspace.package]

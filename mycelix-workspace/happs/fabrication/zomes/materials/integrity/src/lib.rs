@@ -120,12 +120,27 @@ fn validate_material(m: Material) -> ExternResult<ValidateCallbackResult> {
         ));
     }
 
-    // certifications: max 32 items
+    // certifications: max 32 items, validate nested string fields
     check!(validation::require_max_vec_len(
         &m.certifications,
         32,
         "certifications"
     ));
+    for (i, cert) in m.certifications.iter().enumerate() {
+        check!(validation::require_max_len(
+            &cert.issuer, 256, &format!("certifications[{}].issuer", i)
+        ));
+        if let Some(ref cid) = cert.document_cid {
+            check!(validation::require_max_len(
+                cid, 256, &format!("certifications[{}].document_cid", i)
+            ));
+        }
+    }
+
+    // material_type: Custom variant max 256 chars
+    if let MaterialType::Custom(ref s) = m.material_type {
+        check!(validation::require_max_len(s, 256, "material_type(Custom)"));
+    }
 
     // suppliers: max 64 items
     check!(validation::require_max_vec_len(
@@ -402,6 +417,58 @@ mod tests {
     fn density_at_boundary_passes() {
         let mut m = valid_material();
         m.properties.density_g_cm3 = 0.001; // Exact minimum
+        let result = validate_material(m).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    // =========================================================================
+    // Certification nested field validation tests
+    // =========================================================================
+
+    #[test]
+    fn cert_issuer_over_max_rejected() {
+        let mut m = valid_material();
+        m.certifications = vec![Certification {
+            cert_type: CertificationType::ISO,
+            issuer: "x".repeat(257),
+            valid_until: None,
+            document_cid: None,
+        }];
+        let result = validate_material(m).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("issuer")));
+    }
+
+    #[test]
+    fn cert_document_cid_over_max_rejected() {
+        let mut m = valid_material();
+        m.certifications = vec![Certification {
+            cert_type: CertificationType::ISO,
+            issuer: "ACME".to_string(),
+            valid_until: None,
+            document_cid: Some("x".repeat(257)),
+        }];
+        let result = validate_material(m).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("document_cid")));
+    }
+
+    #[test]
+    fn custom_material_type_over_max_rejected() {
+        let mut m = valid_material();
+        m.material_type = MaterialType::Custom("x".repeat(257));
+        let result = validate_material(m).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("material_type")));
+    }
+
+    #[test]
+    fn valid_cert_fields_pass() {
+        let mut m = valid_material();
+        m.certifications = vec![Certification {
+            cert_type: CertificationType::ISO,
+            issuer: "x".repeat(256),
+            valid_until: None,
+            document_cid: Some("x".repeat(256)),
+        }];
+        m.material_type = MaterialType::Custom("x".repeat(256));
         let result = validate_material(m).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }

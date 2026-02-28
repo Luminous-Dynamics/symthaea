@@ -324,6 +324,9 @@ fn validate_cincinnati_session(session: CincinnatiSessionEntry) -> ExternResult<
 
 /// Validate Cincinnati anomaly
 fn validate_cincinnati_anomaly(anomaly: CincinnatiAnomalyEntry) -> ExternResult<ValidateCallbackResult> {
+    // session_id: max 256 chars
+    check!(validation::require_max_len(&anomaly.session_id, 256, "session_id"));
+
     // Severity: finite, in range 0.0..1.0
     check!(validation::require_in_range(
         anomaly.event.severity, 0.0, 1.0, "severity"
@@ -763,6 +766,25 @@ mod tests {
         let mut a2 = valid_cincinnati_anomaly_entry();
         a2.event.severity = 1.0;
         assert!(is_valid(&validate_cincinnati_anomaly(a2)));
+    }
+
+    // =========================================================================
+    // Session ID validation tests
+    // =========================================================================
+
+    #[test]
+    fn test_anomaly_session_id_over_max_rejected() {
+        let mut a = valid_cincinnati_anomaly_entry();
+        a.session_id = "x".repeat(257);
+        let result = validate_cincinnati_anomaly(a);
+        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(msg) if msg.contains("session_id")));
+    }
+
+    #[test]
+    fn test_anomaly_session_id_at_max_passes() {
+        let mut a = valid_cincinnati_anomaly_entry();
+        a.session_id = "x".repeat(256);
+        assert!(is_valid(&validate_cincinnati_anomaly(a)));
     }
 
     // =========================================================================

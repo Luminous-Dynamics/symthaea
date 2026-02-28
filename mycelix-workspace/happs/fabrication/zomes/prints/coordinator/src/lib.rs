@@ -754,6 +754,10 @@ pub fn add_print_photos(input: AddPhotosInput) -> ExternResult<Record> {
             "Could not parse record".to_string()
         )))?;
 
+    // Only the printer owner can add photos
+    let job = get_print_job_mut(print_record.job_hash.clone())?;
+    ensure_caller_is_printer_owner(&job.printer_hash)?;
+
     print_record.photos.extend(input.photos);
 
     let new_hash = update_entry(input.record_hash, EntryTypes::PrintRecord(print_record))?;
