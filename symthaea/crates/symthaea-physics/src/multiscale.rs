@@ -121,22 +121,8 @@ impl ScaleEncoder {
             self.bases.len()
         );
 
-        let bound: Vec<ContinuousHV> = self
-            .bases
-            .iter()
-            .zip(observables.iter())
-            .map(|(base, &val)| {
-                let mut scaled = base.clone();
-                let data = scaled.values.as_mut_slice();
-                for x in data.iter_mut() {
-                    *x *= val as f32;
-                }
-                scaled
-            })
-            .collect();
-
-        let refs: Vec<&ContinuousHV> = bound.iter().collect();
-        ContinuousHV::bundle(&refs)
+        let weights: Vec<f32> = observables.iter().map(|&v| v as f32).collect();
+        ContinuousHV::encode_weighted(&self.bases[..weights.len()], &weights)
     }
 
     /// Which physical scale this encodes.

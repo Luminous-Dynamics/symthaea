@@ -12,6 +12,15 @@ use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 use crate::plasma_hdc_encoder::{PlasmaReading, PlasmaSensorType};
 
+// ── FEP Action Thresholds (unified) ────────────────────────────────────────
+/// Free energy thresholds for PlasmaFepAction selection AND DisruptionRisk
+/// classification. Single source of truth — never duplicate these values.
+const FE_EMERGENCY: f64 = 0.7;
+const FE_SOFT_LANDING: f64 = 0.5;
+const FE_INJECT_GAS: f64 = 0.3;
+const FE_ADJUST_FIELD: f64 = 0.2;
+const FE_REDUCE_HEATING: f64 = 0.1;
+
 // ── Plasma-Tuned Horizons ──────────────────────────────────────────────────
 
 /// Plasma prediction horizons (seconds): from sub-millisecond MHD events to 10s confinement.
@@ -83,22 +92,8 @@ impl FusionHdcEncoder {
             if counts[3] > 0 { (sums[3] / counts[3] as f64 / 5.0).min(1.0) } else { 0.0 },
         ];
 
-        let bound: Vec<ContinuousHV> = self
-            .bases
-            .iter()
-            .zip(norms.iter())
-            .map(|(base, &val)| {
-                let mut scaled = base.clone();
-                let data = scaled.values.as_mut_slice();
-                for x in data.iter_mut() {
-                    *x *= val as f32;
-                }
-                scaled
-            })
-            .collect();
-
-        let refs: Vec<&ContinuousHV> = bound.iter().collect();
-        ContinuousHV::bundle(&refs)
+        let weights: Vec<f32> = norms.iter().map(|&v| v as f32).collect();
+        ContinuousHV::encode_weighted(&self.bases, &weights)
     }
 }
 
@@ -168,7 +163,7 @@ impl Default for PlasmaMultiScalePredictor {
 // ── Plasma FEP Agent ───────────────────────────────────────────────────────
 
 /// Discrete actions the plasma FEP agent can take to avoid disruptions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum PlasmaFepAction {
     /// Everything within tolerance — no intervention.
     MaintainState,
@@ -270,15 +265,15 @@ impl PlasmaFepAgent {
             r.sensor == PlasmaSensorType::SafetyFactor && r.value < 1.5
         });
 
-        if free_energy > 0.8 || has_low_safety_factor {
+        if free_energy > FE_EMERGENCY || has_low_safety_factor {
             PlasmaFepAction::EmergencyShutdown
-        } else if free_energy > 0.6 || (has_critical_density && has_high_radiation) {
+        } else if free_energy > FE_SOFT_LANDING || (has_critical_density && has_high_radiation) {
             PlasmaFepAction::TriggerSoftLanding
-        } else if free_energy > 0.5 || has_high_radiation {
+        } else if free_energy > FE_INJECT_GAS || has_high_radiation {
             PlasmaFepAction::InjectGas
-        } else if free_energy > 0.3 {
+        } else if free_energy > FE_ADJUST_FIELD {
             PlasmaFepAction::AdjustMagneticField
-        } else if free_energy > 0.15 {
+        } else if free_energy > FE_REDUCE_HEATING {
             PlasmaFepAction::ReduceHeating
         } else {
             PlasmaFepAction::MaintainState
@@ -391,11 +386,11 @@ impl FusionDigitalTwin {
         let recommended_action = self.agent.select_action(readings, &current_hv);
 
         // 6. Map free energy to disruption risk
-        let disruption_risk = if free_energy > 0.7 {
+        let disruption_risk = if free_energy > FE_EMERGENCY {
             DisruptionRisk::Red
-        } else if free_energy > 0.5 {
+        } else if free_energy > FE_SOFT_LANDING {
             DisruptionRisk::Orange
-        } else if free_energy > 0.25 {
+        } else if free_energy > FE_REDUCE_HEATING {
             DisruptionRisk::Yellow
         } else {
             DisruptionRisk::Green
@@ -582,14 +577,19 @@ mod tests {
         let mut twin = FusionDigitalTwin::new();
         twin.set_reference_shot(&scenario[0]);
 
-        // Process disruption onset
         let last_output = twin.step(&scenario[scenario.len() - 1], 0.001);
 
-        // At full disruption, risk should be elevated
+        // Sensor check (safety factor < 1.5) should trigger EmergencyShutdown
+        assert_eq!(
+            last_output.recommended_action,
+            PlasmaFepAction::EmergencyShutdown,
+            "Low safety factor should trigger EmergencyShutdown"
+        );
+        // Risk should be at least Yellow from free energy
         assert!(
             last_output.disruption_risk >= DisruptionRisk::Yellow,
-            "Full disruption should trigger at least Yellow risk, got {:?}",
-            last_output.disruption_risk
+            "Full disruption should trigger at least Yellow risk, got {:?} (fe={:.3})",
+            last_output.disruption_risk, last_output.free_energy
         );
     }
 

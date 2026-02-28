@@ -20,15 +20,8 @@ impl MaterialHdcEncoder {
     }
 
     pub fn encode(&self, material: &MaterialProperty) -> ContinuousHV {
-        let vals = material.normalized_values();
-        let scaled: Vec<ContinuousHV> = self.bases.iter().zip(vals.iter())
-            .map(|(base, &v)| {
-                let mut hv = base.clone();
-                for x in hv.values.as_mut_slice() { *x *= v; }
-                hv
-            })
-            .collect();
-        ContinuousHV::bundle(&scaled.iter().collect::<Vec<_>>())
+        let weights = material.normalized_values();
+        ContinuousHV::encode_weighted(&self.bases, &weights)
     }
 
     pub fn similarity(&self, a: &MaterialProperty, b: &MaterialProperty) -> f32 {

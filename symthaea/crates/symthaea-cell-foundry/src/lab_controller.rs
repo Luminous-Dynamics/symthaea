@@ -319,12 +319,48 @@ impl<I: InstrumentAdapter> LabController<I> {
     }
 
     /// Run a complete protocol.
+    ///
+    /// Enforces protocol-level `safety_viability_floor` and `max_duration_seconds`
+    /// in addition to per-step viability checks.
     pub fn run_protocol(&mut self, protocol: &LabProtocol) -> ProtocolResult {
         let mut step_results = Vec::new();
+        let mut elapsed_seconds = 0.0f64;
 
         for (i, step) in protocol.steps.iter().enumerate() {
+            // Check protocol-level duration limit
+            if protocol.max_duration_seconds > 0.0
+                && elapsed_seconds > protocol.max_duration_seconds
+            {
+                return ProtocolResult {
+                    success: false,
+                    failure_reason: Some(format!(
+                        "Protocol exceeded max duration {:.0}s at step {}",
+                        protocol.max_duration_seconds, i
+                    )),
+                    steps_completed: i,
+                    step_results,
+                };
+            }
+
             let result = self.execute_step(step, i);
             let failed = result.failure_reason.is_some();
+
+            // Check protocol-level viability floor (only if step itself didn't fail)
+            if !failed && result.viability < protocol.safety_viability_floor {
+                let reason = format!(
+                    "Viability {:.3} below protocol safety floor {:.3}",
+                    result.viability, protocol.safety_viability_floor
+                );
+                step_results.push(result);
+                return ProtocolResult {
+                    success: false,
+                    failure_reason: Some(reason),
+                    steps_completed: i,
+                    step_results,
+                };
+            }
+
+            elapsed_seconds += step.duration_seconds;
             step_results.push(result);
 
             if failed {

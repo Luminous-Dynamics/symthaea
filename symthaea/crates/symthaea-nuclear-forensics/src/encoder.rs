@@ -20,15 +20,8 @@ impl IsotopicHdcEncoder {
     }
 
     pub fn encode(&self, sig: &IsotopicSignature) -> ContinuousHV {
-        let vals = sig.normalized_values();
-        let scaled: Vec<ContinuousHV> = self.bases.iter().zip(vals.iter())
-            .map(|(base, &v)| {
-                let mut hv = base.clone();
-                for x in hv.values.as_mut_slice() { *x *= v; }
-                hv
-            })
-            .collect();
-        ContinuousHV::bundle(&scaled.iter().collect::<Vec<_>>())
+        let weights = sig.normalized_values();
+        ContinuousHV::encode_weighted(&self.bases, &weights)
     }
 
     pub fn similarity(&self, a: &IsotopicSignature, b: &IsotopicSignature) -> f32 {

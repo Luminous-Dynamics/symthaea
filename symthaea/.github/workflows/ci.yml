@@ -198,6 +198,7 @@ jobs:
           - "full_perception"
           - "identity"
           - "all_benchmarks"
+          - "genesis-missions"
     steps:
       - uses: actions/checkout@v4
 
@@ -420,6 +421,9 @@ jobs:
           - symthaea-causal-reasoning
           - symthaea-broca
           - symthaea-physics
+          - symthaea-cell-foundry
+          - symthaea-materials
+          - symthaea-nuclear-forensics
     steps:
       - uses: actions/checkout@v4
 

@@ -138,7 +138,7 @@ mod tests {
     fn test_normalized_bounded() {
         for m in MaterialProperty::presets() {
             for v in m.normalized_values() {
-                assert!(v >= 0.0 && v <= 1.5, "Out of range: {} for {}", v, m.name);
+                assert!(v >= 0.0 && v <= 1.0, "Out of range: {} for {}", v, m.name);
             }
         }
     }

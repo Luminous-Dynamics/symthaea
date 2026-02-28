@@ -1,5 +1,7 @@
 //! Nuclear attribution agent: match unknown samples against reference database.
 
+use symthaea_core::hdc::unified_hv::ContinuousHV;
+
 use crate::decay_model::IsotopeDecayModel;
 use crate::encoder::IsotopicHdcEncoder;
 use crate::isotope::{IsotopicSignature, NuclearSource};
@@ -14,23 +16,24 @@ pub struct AttributionResult {
 
 pub struct NuclearAttributionAgent {
     references: Vec<IsotopicSignature>,
+    /// Pre-computed reference HVs — avoids re-encoding on every attribution call.
+    reference_hvs: Vec<ContinuousHV>,
     encoder: IsotopicHdcEncoder,
     decay_model: IsotopeDecayModel,
 }
 
 impl NuclearAttributionAgent {
     pub fn new() -> Self {
-        Self {
-            references: IsotopicSignature::references(),
-            encoder: IsotopicHdcEncoder::new(),
-            decay_model: IsotopeDecayModel::new(),
-        }
+        Self::with_references(IsotopicSignature::references())
     }
 
     pub fn with_references(refs: Vec<IsotopicSignature>) -> Self {
+        let encoder = IsotopicHdcEncoder::new();
+        let reference_hvs = refs.iter().map(|r| encoder.encode(r)).collect();
         Self {
             references: refs,
-            encoder: IsotopicHdcEncoder::new(),
+            reference_hvs,
+            encoder,
             decay_model: IsotopeDecayModel::new(),
         }
     }
@@ -39,9 +42,9 @@ impl NuclearAttributionAgent {
     pub fn attribute(&self, unknown: &IsotopicSignature) -> AttributionResult {
         let unknown_hv = self.encoder.encode(unknown);
         let mut similarities: Vec<(String, NuclearSource, f32)> = self.references.iter()
-            .map(|r| {
-                let ref_hv = self.encoder.encode(r);
-                (r.name.clone(), r.source, unknown_hv.similarity(&ref_hv))
+            .zip(self.reference_hvs.iter())
+            .map(|(r, ref_hv)| {
+                (r.name.clone(), r.source, unknown_hv.similarity(ref_hv))
             })
             .collect();
         similarities.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
@@ -111,5 +114,18 @@ mod tests {
         let (attr, age) = agent.attribute_with_age(&IsotopicSignature::spent_fuel());
         assert_eq!(attr.matched_source, NuclearSource::SpentFuel);
         assert!(age.estimated_age_seconds >= 0.0);
+    }
+
+    #[test]
+    fn test_all_references_self_match() {
+        let agent = NuclearAttributionAgent::new();
+        for sig in &IsotopicSignature::references() {
+            let r = agent.attribute(sig);
+            assert_eq!(
+                r.matched_source, sig.source,
+                "Self-attribution failed for {}",
+                sig.name
+            );
+        }
     }
 }

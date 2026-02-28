@@ -256,7 +256,17 @@ mod tests {
     #[test]
     fn test_top_reasons_sorted() {
         let report = SafetyAuditReport::from_assessments(&make_assessments());
-        // "all metrics within normal range" appears once, consciousness threshold messages appear once each
         assert!(!report.top_reasons.is_empty());
+        // Verify descending sort order by frequency
+        for i in 1..report.top_reasons.len() {
+            assert!(
+                report.top_reasons[i - 1].1 >= report.top_reasons[i].1,
+                "top_reasons not sorted: {} ({}) before {} ({})",
+                report.top_reasons[i - 1].0,
+                report.top_reasons[i - 1].1,
+                report.top_reasons[i].0,
+                report.top_reasons[i].1
+            );
+        }
     }
 }
