@@ -43,7 +43,8 @@ members = [
     "crates/symthaea-genomics",
     "crates/symthaea-nurture",
     "crates/symthaea-population",
-    "crates/symthaea-fabrication-kernel",
+    "crates/symthaea-materials",
+    "crates/symthaea-nuclear-forensics",
 ]
 
 
@@ -179,6 +180,9 @@ symthaea-cell-foundry = { path = "crates/symthaea-cell-foundry", optional = true
 symthaea-ectogenesis = { path = "crates/symthaea-ectogenesis", optional = true }
 symthaea-nurture = { path = "crates/symthaea-nurture", optional = true }
 symthaea-population = { path = "crates/symthaea-population", optional = true }
+symthaea-materials = { path = "crates/symthaea-materials", optional = true }
+symthaea-nuclear-forensics = { path = "crates/symthaea-nuclear-forensics", optional = true }
+
 
 # HDC / Vector Symbolic Architectures
 # hypervector = "0.1"  # Using custom HDC implementation instead
@@ -431,6 +435,17 @@ ectogenesis = ["dep:symthaea-ectogenesis"]              # Artificial womb, conse
 nurture = ["dep:symthaea-nurture"]                      # Bowlby attachment, co-regulation, milestones
 population = ["dep:symthaea-population"]                # Population genetics, breeding strategy, governance
 genesis = ["genomics", "cell-foundry", "ectogenesis", "nurture", "population"]  # Full DNA-to-human pipeline
+
+# ── Genesis Mission Challenges (DOE 2026) ─────────────────────────
+fusion-twin = ["physics"]
+safety-agents = []
+lab-controller = ["cell-foundry"]
+materials = ["dep:symthaea-materials"]
+nuclear-forensics = ["dep:symthaea-nuclear-forensics"]
+water-prediction = ["cell-foundry"]
+physics-unification = ["physics"]
+genesis-missions = ["fusion-twin", "safety-agents", "lab-controller", "materials", "nuclear-forensics", "water-prediction", "physics-unification"]
+
 
 # ── Convenience bundles ───────────────────────────────────────────
 # Group related features that users commonly enable together.
@@ -968,6 +983,34 @@ required-features = ["web_research_module", "school_learning"]
 
 [[example]]
 name = "swarm_immune_system_demo"
+
+[[example]]
+name = "benchmark_genesis_fusion"
+required-features = ["fusion-twin"]
+
+[[example]]
+name = "benchmark_genesis_safety"
+required-features = ["safety-agents"]
+
+[[example]]
+name = "benchmark_genesis_lab"
+required-features = ["lab-controller"]
+
+[[example]]
+name = "benchmark_genesis_materials"
+required-features = ["materials"]
+
+[[example]]
+name = "benchmark_genesis_nuclear"
+required-features = ["nuclear-forensics"]
+
+[[example]]
+name = "benchmark_genesis_water"
+required-features = ["water-prediction"]
+
+[[example]]
+name = "benchmark_genesis_multiscale"
+required-features = ["physics-unification"]
 
 [[example]]
 name = "six_watt_benchmark"

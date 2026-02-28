@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-ectogenesis"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Artificial womb ectogenesis with 40-week developmental gating, consent proxy escalation, and FEP control"
+license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["ectogenesis", "artificial-womb", "hdc", "developmental", "ethics"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+serde = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

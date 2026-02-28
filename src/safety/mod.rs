@@ -7,8 +7,23 @@
 
 pub mod gateway;
 
+// Genesis Mission Challenge 26: Safety Agents
+#[cfg(feature = "safety-agents")]
+pub mod agent;
+#[cfg(feature = "safety-agents")]
+pub mod audit;
+#[cfg(feature = "safety-agents")]
+pub mod gate;
+
 // Re-export key types
 pub use gateway::{SafetyCheck, SafetyDecision, SafetyGateway};
+
+#[cfg(feature = "safety-agents")]
+pub use agent::{SafetyAgent, SafetyAgentConfig, SafetyAssessment, SafetyLevel, SafetyMetrics};
+#[cfg(feature = "safety-agents")]
+pub use audit::SafetyAuditReport;
+#[cfg(feature = "safety-agents")]
+pub use gate::{consciousness_gate, safety_gate, SafetyGateResult};
 
 /// Categories of forbidden content/actions
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

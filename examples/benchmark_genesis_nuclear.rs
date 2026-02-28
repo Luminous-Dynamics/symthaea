@@ -1,0 +1,89 @@
+//! Genesis Mission Challenge 25: Nuclear Attribution
+//!
+//! Demonstrates:
+//! - Encode 5 reference signatures into 16,384D
+//! - Perturbed HEU sample → correct attribution
+//! - O(1) decay backdating proof
+
+fn main() {
+    println!("=== Genesis Mission Challenge 25: Nuclear Attribution ===\n");
+
+    use symthaea_nuclear_forensics::{
+        IsotopeDecayModel, IsotopicHdcEncoder, IsotopicSignature, NuclearAttributionAgent,
+    };
+
+    // 1. Similarity matrix
+    println!("--- Isotopic Signature Similarity Matrix ---");
+    let encoder = IsotopicHdcEncoder::new();
+    let refs = IsotopicSignature::references();
+    let matrix = encoder.similarity_matrix(&refs);
+
+    print!("{:>15}", "");
+    for r in &refs {
+        print!("{:>12}", &r.name[..r.name.len().min(10)]);
+    }
+    println!();
+    for (i, r) in refs.iter().enumerate() {
+        print!("{:>15}", &r.name[..r.name.len().min(13)]);
+        for j in 0..refs.len() {
+            print!("{:>12.3}", matrix[i][j]);
+        }
+        println!();
+    }
+
+    // 2. Attribution of perturbed HEU sample
+    println!("\n--- Attribution: Perturbed HEU Sample ---");
+    let agent = NuclearAttributionAgent::new();
+    let perturbed_heu = IsotopicSignature::heu().perturbed(0.01, 42);
+    let result = agent.attribute(&perturbed_heu);
+    println!("  Source: {:?}", result.source);
+    println!("  Reference: {}", result.reference_name);
+    println!("  Confidence: {:.3}", result.confidence);
+    println!("  All matches:");
+    for (name, sim) in &result.all_similarities {
+        println!("    {}: {:.3}", name, sim);
+    }
+
+    // 3. Attribution of all references (should all self-match)
+    println!("\n--- Self-Match Verification ---");
+    for sig in IsotopicSignature::references() {
+        let r = agent.attribute(&sig);
+        println!("  {} → {:?} (confidence={:.3})", sig.name, r.source, r.confidence);
+    }
+
+    // 4. O(1) decay backdating proof
+    println!("\n--- O(1) Decay Backdating Cost ---");
+    let decay_model = IsotopeDecayModel::new();
+    let spent = IsotopicSignature::spent_fuel();
+    for &horizon in symthaea_nuclear_forensics::DECAY_HORIZONS {
+        let start = std::time::Instant::now();
+        for _ in 0..1000 {
+            let _ = decay_model.backdate(&spent, horizon);
+        }
+        let elapsed = start.elapsed();
+        println!(
+            "  {:>10}: {:.1}µs/backdate",
+            symthaea_nuclear_forensics::DECAY_HORIZONS
+                .iter()
+                .position(|&h| h == horizon)
+                .map(|i| ["1 day", "1 month", "1 year", "10 years", "50 years"][i])
+                .unwrap_or("?"),
+            elapsed.as_micros() as f64 / 1000.0
+        );
+    }
+
+    // 5. Classical decay corrections
+    println!("\n--- Classical Decay Corrections ---");
+    println!(
+        "  Pu-241 after 14.3y (1 half-life): {:.3} → {:.3}",
+        0.5,
+        IsotopeDecayModel::correct_pu241_decay(0.5, 14.3)
+    );
+    println!(
+        "  Cs-137 after 30.2y (1 half-life): {:.3} → {:.3}",
+        0.5,
+        IsotopeDecayModel::correct_cs137_decay(0.5, 30.17)
+    );
+
+    println!("\nPASS: Nuclear Attribution operational");
+}

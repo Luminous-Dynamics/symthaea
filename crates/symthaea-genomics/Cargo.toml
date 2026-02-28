@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-genomics"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "DNA assembly, damage modeling, and repair for degraded/ancient samples — HDC + LTC temporal degradation"
+license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["genomics", "dna", "hdc", "ancient-dna", "assembly"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+symthaea-fep = { path = "../symthaea-fep" }
+serde = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
