@@ -1276,6 +1276,12 @@ pub struct CycleMetadata {
     pub mesh_bytes_sent: u64,
     /// Total bytes received from mesh since startup.
     pub mesh_bytes_received: u64,
+    /// Mesh compression ratio (0.0–1.0, lower is better).
+    pub mesh_compression_ratio: f64,
+    /// Current AIMD bandwidth budget in bytes.
+    pub mesh_bandwidth_budget: u64,
+    /// Cumulative bandwidth throttle events.
+    pub mesh_packets_throttled: u64,
 
     // ── Feedback State Telemetry (Phase 2.2) ────────────────────────────
     /// Number of confidence proposals collected this cycle.
@@ -1306,6 +1312,22 @@ pub struct CycleMetadata {
     pub attachment_style: Option<String>,
     /// Current attachment security score (0.0–1.0). None when nurture disabled.
     pub attachment_security: Option<f64>,
+
+    // ── Moral Topology (Persistent Homology) ────────────────────────────
+    /// β₀: connected components in moral space (1 = unified).
+    pub moral_topo_beta_0: usize,
+    /// β₁: 1-cycles (circular reasoning patterns).
+    pub moral_topo_beta_1: usize,
+    /// β₂: 2-voids in moral space.
+    pub moral_topo_beta_2: usize,
+    /// Unity score (1.0 = fully connected, < 1.0 = fragmented).
+    pub moral_topo_unity: f64,
+    /// Completeness: fraction of harmonies with non-trivial variance.
+    pub moral_topo_completeness: f64,
+    /// Dominant harmony axis index (0–6, maps to Harmony::all()).
+    pub moral_topo_dominant_harmony: u8,
+    /// Number of scenarios in the moral topology sliding window.
+    pub moral_topo_scenario_count: usize,
 }
 
 impl CycleMetadata {
@@ -1461,8 +1483,20 @@ pub struct ModuleTimings {
     pub metadata_assembly: u64,
     /// Unified consciousness engine (SpectralMIP + MultiModal + EqV2 + Pipeline)
     pub consciousness_engine: u64,
+    /// Consciousness engine sub-component: Equation V2 (7-theory C(t))
+    pub consciousness_engine_equation_v2: u64,
+    /// Consciousness engine sub-component: Unified pipeline (end-to-end)
+    pub consciousness_engine_pipeline: u64,
+    /// Consciousness engine sub-component: Multi-modal integration
+    pub consciousness_engine_multimodal: u64,
     /// Unified ethics engine (MoralParser + MoralAlgebra + ValueEvaluator + Harmonies)
     pub ethics_engine: u64,
+    /// Ethics engine sub-component: Moral parser + algebra
+    pub ethics_engine_moral: u64,
+    /// Ethics engine sub-component: Value evaluator
+    pub ethics_engine_value: u64,
+    /// Ethics engine sub-component: Harmonies integrator
+    pub ethics_engine_harmonies: u64,
     // ── Mid-cycle sections (Session 10 instrumentation) ──
     /// World model: sensory update + stiffness/level-error feedback
     pub world_model: u64,
@@ -1478,6 +1512,8 @@ pub struct ModuleTimings {
     pub parameter_optimization: u64,
     /// Counterfactual dream cycle
     pub dream_cycle: u64,
+    /// Moral topology: persistent homology analysis on moral scenarios
+    pub moral_topology: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

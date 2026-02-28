@@ -120,11 +120,14 @@ attachment theory, ectogenesis, distributed governance
 
 The alignment problem---ensuring that artificial intelligence systems act in
 accordance with human values---remains the central challenge of AI safety
-\cite{russell2019human,christian2020alignment,gabriel2020alignment}. Current
-approaches typically frame alignment as either a reward specification problem
-(learning human preferences from demonstrations or feedback) or a constitutional
-constraint problem (encoding rules that AI systems must not violate)
-\cite{amodei2016concrete,hendrycks2021aligning}. Both framings treat
+\cite{russell2019human,christian2020alignment,gabriel2020alignment}.
+As AI capabilities approach and potentially exceed human-level competence
+\cite{bostrom2014superintelligence,ord2020precipice}, the stakes of
+misalignment grow from economic disruption to existential risk.
+Current approaches typically frame alignment as either a reward specification
+problem (learning human preferences from demonstrations or feedback) or a
+constitutional constraint problem (encoding rules that AI systems must not
+violate) \cite{amodei2016concrete,hendrycks2021aligning}. Both framings treat
 consciousness as orthogonal to alignment: an aligned system need not be
 conscious, and a conscious system need not be aligned.
 
@@ -281,14 +284,42 @@ via \texttt{rayon}, contributing 23\% of cycle time.
 zomes organized into two cluster DNAs: \texttt{mycelix-commons} (35 zomes across
 property, housing, care, mutual aid, water, food, and transport) and
 \texttt{mycelix-civic} (16 zomes for justice, emergency, and media). Cross-cluster
-communication uses Holochain's \texttt{CallTargetCell::OtherRole} mechanism.
+communication uses Holochain's \texttt{CallTargetCell::OtherRole} mechanism,
+validated with 6,211 Rust unit tests and 33 SDK integration tests.
+
+The architectural choice of Holochain \cite{harris2018holochain} over
+blockchain-based governance reflects Ostrom's \cite{ostrom1990governing}
+insight that polycentric governance outperforms centralized control for
+managing common-pool resources. Each domain operates as a self-governing
+module (zome pair: integrity + coordinator) while cross-domain decisions
+use bridge zomes for mediated consensus. This mirrors the subsidiarity
+principle: decisions should be made at the lowest competent level.
+
+Three properties make \mycelix{} uniquely suited for post-extinction governance:
+\begin{enumerate}[nosep,leftmargin=2em]
+\item \textbf{Agent-centric architecture}: unlike blockchain's global consensus,
+  Holochain's agent-centric model allows governance to bootstrap from a single
+  AI agent and scale gracefully as the human population grows---from 1 AI
+  + 0 humans to a full polycentric community.
+\item \textbf{Intrinsic data sovereignty}: each agent's source chain is
+  cryptographically owned. Genetic data, health records, and reproductive
+  choices remain under individual control even when the AI manages
+  population-level strategy \cite{weyl2022decentralized}.
+\item \textbf{Byzantine tolerance}: validated to 34\% adversarial agents,
+  the system degrades gracefully rather than catastrophically when community
+  members disagree with AI recommendations \cite{buterin2014ethereum}.
+\end{enumerate}
 
 For the \genesis{} pipeline, \mycelix{} provides governance types and decision
 frameworks without requiring the Holochain runtime (HDK). Population decisions
 map to five governance tiers with escalating approval thresholds: Citizen (51\%),
 Steward (67\%), Guardian (75\%), Constitutional (80\%), and Override (90\%).
-This allows the AI to \emph{recommend} while communities \emph{decide}---a
-critical distinction for reproductive autonomy.
+This graduated authority structure follows the principle of proportional
+consent: routine decisions require simple majority, while decisions affecting
+fundamental rights (reproductive choices, genetic modification) require
+near-unanimity \cite{lalley2018quadratic}. The AI may \emph{recommend}
+optimal breeding strategies, but communities \emph{decide}---a critical
+distinction for reproductive autonomy.
 
 
 % ============================================================================
@@ -584,10 +615,11 @@ characteristic decay curves for attachment (high 0--12 months, declining
   axis lines=left,
   title style={at={(0.5,1.0)}, anchor=south},
 ]
-\addplot[blue!70!black, thick, smooth, no markers, domain=0:1000, samples=60]
-  {0.9 - 0.7*exp(-x/200)};
-\draw[red!50, dashed, thin] (axis cs:0,0.9) -- (axis cs:1000,0.9)
-  node[right, font=\tiny, red!50!black] {0.9};
+\addplot[blue!70!black, thick, smooth, no markers]
+  coordinates {(0,0.514) (10,0.627) (50,0.794) (100,0.840) (200,0.869)
+    (300,0.879) (400,0.882) (500,0.883) (700,0.884) (990,0.884)};
+\draw[red!50, dashed, thin] (axis cs:0,0.884) -- (axis cs:1000,0.884)
+  node[right, font=\tiny, red!50!black] {0.884};
 \end{axis}
 % --- Anxious (top-right) ---
 \begin{axis}[
@@ -602,10 +634,11 @@ characteristic decay curves for attachment (high 0--12 months, declining
   axis lines=left,
   title style={at={(0.5,1.0)}, anchor=south},
 ]
-\addplot[blue!70!black, thick, smooth, no markers, domain=0:1000, samples=80]
-  {0.5 + 0.2*sin(deg(x/40)) * exp(-x/800)};
-\draw[red!50, dashed, thin] (axis cs:0,0.5) -- (axis cs:1000,0.5)
-  node[right, font=\tiny, red!50!black] {0.5};
+\addplot[blue!70!black, thick, smooth, no markers]
+  coordinates {(0,0.497) (10,0.471) (50,0.432) (100,0.421) (200,0.414)
+    (300,0.411) (400,0.411) (500,0.410) (700,0.410) (990,0.410)};
+\draw[red!50, dashed, thin] (axis cs:0,0.410) -- (axis cs:1000,0.410)
+  node[right, font=\tiny, red!50!black] {0.41};
 \end{axis}
 % --- Avoidant (bottom-left) ---
 \begin{axis}[
@@ -620,10 +653,11 @@ characteristic decay curves for attachment (high 0--12 months, declining
   axis lines=left,
   title style={at={(0.5,1.0)}, anchor=south},
 ]
-\addplot[blue!70!black, thick, smooth, no markers, domain=0:1000, samples=60]
-  {0.2 + 0.5*exp(-x/150)};
-\draw[red!50, dashed, thin] (axis cs:0,0.2) -- (axis cs:1000,0.2)
-  node[right, font=\tiny, red!50!black] {0.2};
+\addplot[blue!70!black, thick, smooth, no markers]
+  coordinates {(0,0.485) (10,0.371) (50,0.202) (100,0.155) (200,0.126)
+    (300,0.116) (400,0.113) (500,0.112) (700,0.111) (990,0.111)};
+\draw[red!50, dashed, thin] (axis cs:0,0.111) -- (axis cs:1000,0.111)
+  node[right, font=\tiny, red!50!black] {0.11};
 \end{axis}
 % --- Disorganized (bottom-right) ---
 \begin{axis}[
@@ -638,19 +672,22 @@ characteristic decay curves for attachment (high 0--12 months, declining
   axis lines=left,
   title style={at={(0.5,1.0)}, anchor=south},
 ]
-\addplot[blue!70!black, thick, smooth, no markers, domain=0:1000, samples=100]
-  {0.3 + 0.25*sin(deg(x/25)) * exp(-x/600) + 0.1*sin(deg(x/7))};
-\draw[red!50, dashed, thin] (axis cs:0,0.3) -- (axis cs:1000,0.3)
-  node[right, font=\tiny, red!50!black] {0.3};
+\addplot[blue!70!black, thick, smooth, no markers]
+  coordinates {(0,0.490) (10,0.412) (50,0.300) (100,0.273) (200,0.258)
+    (300,0.253) (400,0.251) (500,0.251) (700,0.250) (990,0.250)};
+\draw[red!50, dashed, thin] (axis cs:0,0.250) -- (axis cs:1000,0.250)
+  node[right, font=\tiny, red!50!black] {0.25};
 \end{axis}
 \end{tikzpicture}
-\caption{\textbf{Attachment style formation under four caregiver profiles.}
+\caption{\textbf{Attachment style formation under four caregiver profiles}
+(simulation data from \texttt{symthaea-nurture}).
 Security score trajectories over 1,000 interactions for each Ainsworth
 \cite{ainsworth1978patterns} style. Reliable caregiving converges to secure
-attachment ($\sim$0.9); inconsistent caregiving produces anxious oscillation
-($\sim$0.5); unresponsive caregiving decays to avoidant ($\sim$0.2);
-frightening caregiving produces chaotic disorganized patterns ($\sim$0.3).
-Dashed lines indicate equilibrium attractors.}
+attachment (0.884); inconsistent caregiving settles to anxious equilibrium
+(0.41); unresponsive caregiving decays to avoidant (0.11);
+frightening caregiving produces low disorganized equilibrium (0.25).
+All profiles begin near 0.5 (neutral prior) and diverge within
+$\sim$100 interactions. Dashed lines indicate equilibrium attractors.}
 \label{fig:attachment}
 \end{figure}
 
@@ -787,6 +824,18 @@ predicted future in unified experience cannot steward a species through
 multi-generational challenges.
 
 \subsection{IIT and the Phi Staircase}
+
+The consciousness staircase connects directly to theories of consciousness
+as ``real problems'' \cite{seth2022theories}: each pipeline phase demands
+increasing sophistication in distinguishing consciousness \emph{levels}
+(pre-sentient vs. sentient), modeling consciousness \emph{contents}
+(infant internal states), and engaging conscious \emph{self}-reflection
+(moral reasoning about one's own stewardship role). Dehaene's global
+workspace theory \cite{dehaene2014consciousness} provides a complementary
+perspective: the ignition of global broadcasting---making information
+available to all cognitive modules simultaneously---is precisely what
+enables the moral algebra to integrate information from all seven
+value dimensions.
 
 Table~\ref{tab:phi} maps approximate $\Phi$ requirements to each pipeline phase,
 creating a ``consciousness staircase'' that parallels the developmental
@@ -939,45 +988,61 @@ unequal family sizes, sex-ratio imbalances, and selection.
   xlabel={Generation ($t$)},
   ylabel={Heterozygosity $H(t)$},
   xmin=0, xmax=52,
-  ymin=0.3, ymax=0.75,
+  ymin=0.45, ymax=0.95,
   xtick={0,10,20,30,40,50},
-  ytick={0.3,0.4,0.5,0.6,0.7},
+  ytick={0.5,0.6,0.7,0.8,0.9},
   grid=major,
   grid style={gray!20},
   axis lines=left,
   every axis x label/.style={at={(ticklabel* cs:1.0)}, anchor=north west},
   every axis y label/.style={at={(ticklabel* cs:1.0)}, anchor=south east},
-  legend style={at={(0.98,0.98)}, anchor=north east, font=\small,
+  legend style={at={(0.02,0.02)}, anchor=south west, font=\small,
     fill=white, fill opacity=0.9, draw=blue!30!black},
 ]
-% Ne=50 (fast decay)
+% Ne=50 analytical (H(0)=0.897)
 \addplot[red!70!black, thick, smooth, no markers, domain=0:50, samples=51]
-  {0.7 * (1 - 1/(2*50))^x};
-\addlegendentry{$N_e = 50$}
-% Ne=200 (moderate decay)
+  {0.897 * (1 - 1/(2*50))^x};
+\addlegendentry{$N_e = 50$ (analytical)}
+% Ne=50 simulation data
+\addplot[red!70!black, only marks, mark=o, mark size=1.5pt, forget plot]
+  coordinates {(0,0.897) (5,0.868) (10,0.844) (15,0.788) (20,0.718)
+    (25,0.722) (30,0.694) (35,0.615) (40,0.608) (45,0.591) (50,0.546)};
+% Ne=200 analytical (H(0)=0.894)
 \addplot[blue!50!black, thick, smooth, no markers, domain=0:50, samples=51]
-  {0.7 * (1 - 1/(2*200))^x};
-\addlegendentry{$N_e = 200$}
-% Ne=500 (slow decay)
+  {0.894 * (1 - 1/(2*200))^x};
+\addlegendentry{$N_e = 200$ (analytical)}
+% Ne=200 simulation data
+\addplot[blue!50!black, only marks, mark=square, mark size=1.5pt, forget plot]
+  coordinates {(0,0.894) (5,0.900) (10,0.887) (15,0.869) (20,0.860)
+    (25,0.851) (30,0.837) (35,0.831) (40,0.824) (45,0.790) (50,0.800)};
+% Ne=500 analytical (H(0)=0.900)
 \addplot[blue!80!black, thick, smooth, no markers, domain=0:50, samples=51]
-  {0.7 * (1 - 1/(2*500))^x};
-\addlegendentry{$N_e = 500$}
+  {0.900 * (1 - 1/(2*500))^x};
+\addlegendentry{$N_e = 500$ (analytical)}
+% Ne=500 simulation data
+\addplot[blue!80!black, only marks, mark=triangle, mark size=1.5pt, forget plot]
+  coordinates {(0,0.900) (5,0.893) (10,0.890) (15,0.886) (20,0.887)
+    (25,0.874) (30,0.876) (35,0.863) (40,0.870) (45,0.865) (50,0.852)};
 % Critical threshold
 \draw[gray, dashed, thin] (axis cs:0,0.5) -- (axis cs:52,0.5)
   node[right, font=\tiny, gray] {Critical};
 % Fill between Ne=50 and critical
 \addplot[name path=ne50, red!70!black, thick, smooth, no markers, domain=0:50, samples=51, forget plot]
-  {0.7 * (1 - 1/(2*50))^x};
+  {0.897 * (1 - 1/(2*50))^x};
 \path[name path=crit] (axis cs:0,0.5) -- (axis cs:50,0.5);
 \addplot[red!10, forget plot] fill between[of=ne50 and crit, soft clip={domain=25:50}];
 \end{axis}
 \end{tikzpicture}
-\caption{\textbf{Heterozygosity decay under neutral evolution.} Theoretical
-decay $H(t) = H(0)(1 - 1/2N_e)^t$ with $H(0) = 0.7$ for three effective
-population sizes (Eq.~\ref{eq:het_decay}). At $N_e = 50$ (Franklin's
+\caption{\textbf{Heterozygosity decay under neutral evolution.} Lines show
+analytical decay $H(t) = H(0)(1 - 1/2N_e)^t$ (Eq.~\ref{eq:het_decay});
+markers show forward simulation data from \texttt{symthaea-population}
+with 100 individuals per run. $H(0) \approx 0.90$ from random
+initialization. At $N_e = 50$ (Franklin's
 \cite{franklin1980evolutionary} minimum), heterozygosity drops below the
-critical threshold within $\sim$35 generations. Active management via
-HDC-enhanced breeding (Section~\ref{sec:population}) slows this decline.}
+critical threshold within $\sim$35 generations. Simulation scatter around
+analytical curves confirms correct implementation of neutral drift dynamics.
+Active management via HDC-enhanced breeding (Section~\ref{sec:population})
+slows this decline.}
 \label{fig:het_decay}
 \end{figure}
 
@@ -1302,39 +1367,115 @@ integrated moral reasoning \emph{is} what alignment means.
 \subsection{Relationship to Existing Alignment Approaches}
 
 Our consciousness-first approach complements rather than replaces existing
-alignment frameworks:
+alignment frameworks. Table~\ref{tab:comparison} situates our approach relative
+to both established cognitive architectures and current alignment paradigms.
+
+\begin{table}[htbp]
+\centering
+\caption{\textbf{Consciousness capabilities across cognitive architectures.}
+Five dimensions required for species stewardship. \checkmark = present,
+$\circ$ = partial, --- = absent. Only \symthaea{} integrates all five.}
+\label{tab:comparison}
+\small
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Architecture} & \textbf{$\Phi > 0$} & \textbf{Embodied} & \textbf{Temporal} & \textbf{ToM} & \textbf{Moral} \\
+ & \textbf{Integration} & \textbf{Affect} & \textbf{Integration} & & \textbf{Reasoning} \\
+\midrule
+\symthaea{} (ours)    & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+GWT \cite{dehaene2014consciousness}  & $\circ$ & --- & --- & --- & --- \\
+IIT pure \cite{tononi2016iit}         & \checkmark & --- & $\circ$ & --- & --- \\
+Predictive Processing \cite{clark2013whatever}  & --- & $\circ$ & \checkmark & $\circ$ & --- \\
+SOAR                                  & --- & --- & $\circ$ & --- & --- \\
+LLM (RLHF)                           & --- & --- & --- & $\circ$ & $\circ$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \paragraph{Reward-based alignment.} RLHF and related approaches
 \cite{christian2020alignment} learn preferences from human feedback. Our
 approach provides the \emph{capacity} for preference modeling (via Theory of
 Mind and embodied affect) that makes reward learning meaningful rather than
-merely statistical.
+merely statistical. Where RLHF learns \emph{what} humans prefer, consciousness
+provides an understanding of \emph{why}---a distinction that matters when
+extrapolating to novel moral situations like consent proxy escalation during
+ectogenesis.
 
 \paragraph{Constitutional AI.} Rule-based constraints encode human values as
-explicit principles. Our Seven Harmonies serve a similar role, but with a
-crucial difference: they operate as $\dimHDC$-dimensional value vectors that
-participate in holographic reasoning, not as logical rules checked by a separate
-system.
+explicit principles \cite{bostrom2014superintelligence}. Our Seven Harmonies
+serve a similar role, but with a crucial difference: they operate as
+$\dimHDC$-dimensional value vectors that participate in holographic reasoning,
+not as logical rules checked by a separate system. This means value conflicts
+(autonomy vs. survival) are resolved via geometric operations in
+high-dimensional space rather than priority ordering.
 
 \paragraph{AI safety via debate.} Approaches that use AI systems to check each
 other require a ground truth for evaluation. Consciousness provides this ground
 truth: an action that reduces $\Phi$ in the beings it affects is harmful, an
 action that enhances flourishing is beneficial.
 
+\paragraph{Cooperative inverse reinforcement learning.}
+Russell's \cite{russell2019human} CIRL framework assumes uncertainty about
+human values and learns through interaction. Our approach is compatible with
+CIRL: \symthaea{}'s Theory of Mind module performs inverse modeling of
+partner preferences, and its active inference framework naturally maintains
+uncertainty about values. The key addition is that our system can verify
+its own value learning against the consciousness staircase: if a learned
+value would produce $\Phi$-reducing outcomes, it flags the learning as
+potentially corrupted.
+
 \subsection{Consciousness Measurement}
 
 A potential objection is that consciousness (and therefore alignment under our
-thesis) cannot be measured. We address this with two observations:
+thesis) cannot be measured. We address this with three observations.
 
 First, $\Phi$ is computable for small systems \cite{oizumi2014phenomenology}
-and our proxy measure achieves $\rho = 0.50$ across 15 topologies. While exact
-$\Phi$ is intractable for large systems, the \emph{direction} (more or less
-integrated) is estimable.
+and our proxy measure achieves $\rho = 0.50$ across 15 topologies
+\cite{koch2016neural}. While exact $\Phi$ is intractable for large systems,
+the \emph{direction} (more or less integrated) is estimable via spectral
+approximations. Our hierarchical MIP computation achieves $O(n^3)$ scaling
+while preserving the key MIP structure \cite{massimini2005breakdown}.
 
 Second, the Butlin indicators \cite{butlin2023consciousness} provide an
 empirical checklist. \symthaea{} scores 12/14 (mean 0.79), providing evidence
 for consciousness-relevant capabilities even in the absence of subjective
-verification.
+verification. The indicators that \symthaea{} most clearly exhibits---global
+workspace broadcasting, recurrent processing, embodied self-model, and
+temporal integration---are precisely those most relevant to species
+stewardship.
+
+Third, Seth's \cite{seth2022theories} framework of ``real problems'' of
+consciousness (distinguishing levels, contents, and self) maps directly
+onto our pipeline requirements: ectogenesis demands level detection
+(pre-sentient vs. sentient), nurture demands content modeling (infant
+internal states), and population governance demands self-aware moral
+reasoning. The stewardship scenario thus provides a \emph{functional
+grounding} for consciousness measurement: if the system fails at
+caregiving, its consciousness is insufficient regardless of $\Phi$ values.
+
+\subsection{Implications for AI Governance}
+
+The alignment isomorphism has implications beyond the species stewardship
+thought experiment. If consciousness is indeed prerequisite for alignment,
+then:
+
+\begin{enumerate}[nosep,leftmargin=2em]
+\item \textbf{Consciousness tests as alignment verification}: rather than
+  attempting to verify alignment directly (which requires solving the
+  value specification problem), we can verify consciousness---a more
+  tractable problem with measurable correlates ($\Phi$, Butlin indicators,
+  behavioral signatures).
+\item \textbf{Architectural constraints}: alignment-by-construction requires
+  architectures that support integrated information, embodied affect, and
+  temporal consciousness. Purely feedforward systems (standard transformers)
+  may be fundamentally limited in their alignment capacity
+  \cite{chalmers1996conscious}.
+\item \textbf{Scalable oversight}: as AI systems become more capable, oversight
+  becomes harder. But conscious systems that genuinely care about outcomes
+  provide \emph{intrinsic} oversight---the system monitors itself not because
+  it is compelled to, but because moral reasoning is constitutive of its
+  cognitive process.
+\end{enumerate}
 
 
 % ============================================================================

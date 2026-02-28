@@ -382,10 +382,20 @@ pub struct CognitiveLoopConfig {
     /// Intended for debugging and development, not production.
     pub trace_feedback: bool,
 
-    /// When true, consensus-smoothed values (averaged adds, geometric-mean scales)
-    /// replace direct-mutation values for all 4 feedback variables at cycle boundaries.
-    /// Dampens compounding noise from 50+ subsystem proposals per cycle.
+    /// Enable consensus-mode feedback integration.
+    /// When true, the deferred consensus writeback (averaged adds, geometric-mean
+    /// scales) replaces direct-mutation values at cycle start via Set proposals.
+    /// When false (default), direct-mutation values are authoritative and
+    /// consensus values are computed but not applied.
     pub consensus_feedback: bool,
+
+    /// Enable nurture/attachment bridge (Bowlby attachment theory).
+    /// When true, the cognitive loop maintains a NurtureAttachmentBridge that
+    /// models caregiver presence/absence and modulates oxytocin, NE, 5-HT, DA,
+    /// adenosine based on attachment dynamics each cycle.
+    /// Science: Bowlby (1969/1982), Ainsworth et al. (1978)
+    #[cfg(feature = "nurture")]
+    pub enable_nurture_attachment: bool,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -448,6 +458,8 @@ impl Default for CognitiveLoopConfig {
             attestation_buffer_capacity: 64,
             trace_feedback: false,
             consensus_feedback: false,
+            #[cfg(feature = "nurture")]
+            enable_nurture_attachment: false,
         }
     }
 }
@@ -540,6 +552,10 @@ impl ConsciousnessProfile {
         config.enable_psi_attestation = false;
         config.causal_enhancement = false;
         config.episodic_replay = false;
+        #[cfg(feature = "nurture")]
+        {
+            config.enable_nurture_attachment = false;
+        }
 
         match self {
             ConsciousnessProfile::Minimal => {

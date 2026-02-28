@@ -373,6 +373,8 @@ impl CognitiveLoopService {
         };
 
         let enable_user_state = config.enable_user_state_inference;
+        #[cfg(feature = "nurture")]
+        let enable_nurture_attachment = config.enable_nurture_attachment;
         let enable_resonator_recall = config.enable_resonator_recall;
         let resonator_cfc_input_dim = config.cfc_config.input_dim;
         let resonator_genesis_phrase = config.genesis_phrase.clone();
@@ -611,7 +613,11 @@ impl CognitiveLoopService {
             },
             virtual_body,
             #[cfg(feature = "nurture")]
-            nurture_attachment: None,
+            nurture_attachment: if enable_nurture_attachment {
+                Some(super::nurture_bridge::NurtureAttachmentBridge::new())
+            } else {
+                None
+            },
             psi_attestation_buffer: std::collections::VecDeque::with_capacity(attestation_buf_cap),
             policy_agreement_window: std::collections::VecDeque::with_capacity(20),
             master_equation: MasterConsciousnessEquation::default(),

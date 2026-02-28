@@ -270,6 +270,14 @@ impl CognitiveLoopService {
             liquid_mamba_lr: self.stats.last_liquid_mamba_lr,
             #[cfg(feature = "liquid-mamba")]
             liquid_mamba_generation_count: self.stats.liquid_mamba_generation_count,
+            // ── Moral topology telemetry ──
+            moral_topo_beta_0: self.ethics_engine.moral_topology().last_summary().beta_0,
+            moral_topo_beta_1: self.ethics_engine.moral_topology().last_summary().beta_1,
+            moral_topo_beta_2: self.ethics_engine.moral_topology().last_summary().beta_2,
+            moral_topo_unity: self.ethics_engine.moral_topology().last_summary().unity,
+            moral_topo_completeness: self.ethics_engine.moral_topology().last_summary().completeness,
+            moral_topo_dominant_harmony: self.ethics_engine.moral_topology().last_summary().dominant_harmony,
+            moral_topo_scenario_count: self.ethics_engine.moral_topology().last_summary().scenario_count,
             ..Default::default()
         };
 
