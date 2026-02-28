@@ -13340,9 +13340,11 @@ dependencies = [
  "symthaea-hal",
  "symthaea-hodge",
  "symthaea-humanoid",
+ "symthaea-materials",
  "symthaea-narrative-self",
  "symthaea-neuromodulators",
  "symthaea-nix",
+ "symthaea-nuclear-forensics",
  "symthaea-nurture",
  "symthaea-observability",
  "symthaea-phi-search",
@@ -13604,6 +13606,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-materials"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "symthaea-core",
+]
+
+[[package]]
 name = "symthaea-narrative-self"
 version = "0.1.0"
 dependencies = [
@@ -13648,6 +13659,15 @@ dependencies = [
  "tree-sitter",
  "tree-sitter-nix",
  "zbus 4.4.0",
+]
+
+[[package]]
+name = "symthaea-nuclear-forensics"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "symthaea-core",
 ]
 
 [[package]]
@@ -13739,6 +13759,7 @@ dependencies = [
  "symthaea",
  "symthaea-core",
  "symthaea-fep",
+ "symthaea-neuromodulators",
  "symthaea-ssm",
 ]
 

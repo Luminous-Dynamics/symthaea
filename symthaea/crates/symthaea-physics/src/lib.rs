@@ -23,6 +23,8 @@
 #![deny(unsafe_code)]
 
 pub mod cmod_adapter;
+pub mod fusion_twin;
+pub mod multiscale;
 pub mod plasma_control;
 pub mod plasma_hdc_encoder;
 
@@ -59,6 +61,15 @@ pub use plasma_control::{
     PlasmaStabilityAssessment,
     StabilityRegime,
     TrendDirection,
+};
+
+pub use multiscale::{
+    CrossScaleCoherence, MultiScaleUnifier, PhysicalScale, ScaleEncoder, ScalePredictor,
+};
+
+pub use fusion_twin::{
+    DisruptionRisk, FusionDigitalTwin, FusionTwinOutput, PlasmaFepAction, PlasmaFepAgent,
+    PlasmaMultiScalePredictor, PLASMA_HORIZONS, PLASMA_HORIZON_LABELS,
 };
 
 pub use cmod_adapter::{

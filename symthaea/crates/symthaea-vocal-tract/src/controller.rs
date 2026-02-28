@@ -186,7 +186,7 @@ impl VocalTractController {
         let weight_hv = genesis.hv("vocal_tract::output_weights", total_weights);
         let mut output_weights = weight_hv.values;
         for w in &mut output_weights {
-            *w *= 0.08; // Larger init → stronger phoneme differentiation from start
+            *w *= 0.15; // Large init → network can deviate far from schwa bias
         }
 
         // Bias initialized to schwa (neutral vowel) defaults
@@ -695,14 +695,14 @@ impl VocalTractController {
         // - 20 warmup steps for LTC neurons to reach differentiated steady states
         // - Distance-weighted LR: extreme vowels get up to 3× the LR
         // - Adaptive gradient steps: outlier phonemes get 20 steps vs 10 for near-schwa
-        // - Cosine LR annealing with high floor (30×→20×) for sustained gradient strength
+        // - Cosine LR annealing (30×→10×) for strong early gradients + late fine-tuning
         // - No weight decay during supervised training (prevents erosion)
         const WARMUP_STEPS: usize = 20;
 
-        // Cosine annealing: 30× → 20× base. High floor keeps gradients strong
-        // throughout (extreme vowels need sustained high LR for convergence).
+        // Cosine annealing: 30× → 10× base. Wide range gives strong early gradients
+        // for extreme vowels then lower LR for fine-tuning in late epochs.
         let lr_peak = self.learning_rate * 30.0;
-        let lr_min = self.learning_rate * 20.0;
+        let lr_min = self.learning_rate * 10.0;
 
         let mut last_epoch_loss = 0.0;
 
@@ -763,7 +763,7 @@ impl VocalTractController {
         const WARMUP_STEPS: usize = 20;
         const TRANSITION_STEPS: usize = 16; // 80ms at 200Hz — matches coarticulation_frames
 
-        let lr = self.learning_rate * 10.0;
+        let lr = self.learning_rate * 5.0;
         let mut last_epoch_loss = 0.0;
 
         // Pre-compute HVs and target frames
