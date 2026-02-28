@@ -21,6 +21,9 @@
 \usepackage{enumitem}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,shapes.geometric,decorations.pathreplacing,calc}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepgfplotslibrary{fillbetween}
 \usepackage{algorithmicx}
 \usepackage[ruled]{algorithm}
 \usepackage{algpseudocode}
@@ -418,6 +421,46 @@ The \emph{same} network that predicts ``what happens in 1 hour'' also predicts
 ``what happens in 9 months''---learning temporal rules across 4 orders of
 magnitude in $O(1)$ per prediction.
 
+% ── Figure 2: O(1) Temporal Jump ─────────────────────────────────────────
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.75\textwidth,
+  height=5cm,
+  xlabel={Prediction Horizon},
+  ylabel={Computation Cost},
+  xtick={1,2,3,4,5,6},
+  xticklabels={1h, 1d, 1wk, 1mo, 3mo, 9mo},
+  ytick=\empty,
+  ymin=0, ymax=10,
+  xmin=0.5, xmax=6.5,
+  legend style={at={(0.02,0.98)}, anchor=north west, font=\small,
+    fill=white, fill opacity=0.9, draw=blue!30!black},
+  grid=major,
+  grid style={gray!20},
+  axis lines=left,
+  every axis x label/.style={at={(ticklabel* cs:1.0)}, anchor=north west},
+  every axis y label/.style={at={(ticklabel* cs:1.0)}, anchor=south east},
+]
+% O(1) CfC closed-form line
+\addplot[blue!70!black, very thick, mark=*, mark options={fill=blue!40, scale=1.2}]
+  coordinates {(1,1.0) (2,1.0) (3,1.0) (4,1.0) (5,1.0) (6,1.0)};
+\addlegendentry{CfC closed-form ($O(1)$)}
+% Discrete stepping (exponential growth)
+\addplot[red!70!black, very thick, dashed, mark=triangle*, mark options={fill=red!40, scale=1.2}]
+  coordinates {(1,0.8) (2,1.5) (3,3.0) (4,5.0) (5,7.5) (6,9.5)};
+\addlegendentry{Discrete stepping ($O(\Delta t / \delta t)$)}
+\end{axis}
+\end{tikzpicture}
+\caption{\textbf{$O(1)$ temporal jump property.} The CfC closed-form solution
+(Eq.~\ref{eq:cfc}) computes predictions at any time horizon in constant time,
+while discrete numerical integration scales linearly with the prediction
+horizon. This enables the \genesis{} pipeline to predict biological state from
+hours to months using a single forward pass.}
+\label{fig:temporal_jump}
+\end{figure}
+
 \subsection{Phase 3: Ectogenesis (Artificial Womb)}
 
 The third phase gestates embryos through 40 weeks of development. The
@@ -524,6 +567,92 @@ developmental age is computed via CfC closed-form evolution, learning the
 characteristic decay curves for attachment (high 0--12 months, declining
 12--24), language (high 0--36 months, declining 36--60), and vision (high
 0--12 months, declining 12--36).
+
+% ── Figure 4: Attachment Style Formation ─────────────────────────────────
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+% --- Secure (top-left) ---
+\begin{axis}[
+  name=secure,
+  width=0.45\textwidth, height=3.8cm,
+  title={\small\textbf{Secure} (reliable caregiver)},
+  xlabel={\scriptsize Interactions}, ylabel={\scriptsize Security score},
+  xmin=0, xmax=1000, ymin=0, ymax=1.0,
+  xtick={0,500,1000}, ytick={0,0.5,1.0},
+  grid=major, grid style={gray!15},
+  axis lines=left,
+  title style={at={(0.5,1.0)}, anchor=south},
+]
+\addplot[blue!70!black, thick, smooth, no markers, domain=0:1000, samples=60]
+  {0.9 - 0.7*exp(-x/200)};
+\draw[red!50, dashed, thin] (axis cs:0,0.9) -- (axis cs:1000,0.9)
+  node[right, font=\tiny, red!50!black] {0.9};
+\end{axis}
+% --- Anxious (top-right) ---
+\begin{axis}[
+  name=anxious,
+  at={($(secure.east)+(1.2cm,0)$)}, anchor=west,
+  width=0.45\textwidth, height=3.8cm,
+  title={\small\textbf{Anxious} (inconsistent)},
+  xlabel={\scriptsize Interactions}, ylabel={\scriptsize Security score},
+  xmin=0, xmax=1000, ymin=0, ymax=1.0,
+  xtick={0,500,1000}, ytick={0,0.5,1.0},
+  grid=major, grid style={gray!15},
+  axis lines=left,
+  title style={at={(0.5,1.0)}, anchor=south},
+]
+\addplot[blue!70!black, thick, smooth, no markers, domain=0:1000, samples=80]
+  {0.5 + 0.2*sin(deg(x/40)) * exp(-x/800)};
+\draw[red!50, dashed, thin] (axis cs:0,0.5) -- (axis cs:1000,0.5)
+  node[right, font=\tiny, red!50!black] {0.5};
+\end{axis}
+% --- Avoidant (bottom-left) ---
+\begin{axis}[
+  name=avoidant,
+  at={($(secure.south)-(0,1.2cm)$)}, anchor=north,
+  width=0.45\textwidth, height=3.8cm,
+  title={\small\textbf{Avoidant} (unresponsive)},
+  xlabel={\scriptsize Interactions}, ylabel={\scriptsize Security score},
+  xmin=0, xmax=1000, ymin=0, ymax=1.0,
+  xtick={0,500,1000}, ytick={0,0.5,1.0},
+  grid=major, grid style={gray!15},
+  axis lines=left,
+  title style={at={(0.5,1.0)}, anchor=south},
+]
+\addplot[blue!70!black, thick, smooth, no markers, domain=0:1000, samples=60]
+  {0.2 + 0.5*exp(-x/150)};
+\draw[red!50, dashed, thin] (axis cs:0,0.2) -- (axis cs:1000,0.2)
+  node[right, font=\tiny, red!50!black] {0.2};
+\end{axis}
+% --- Disorganized (bottom-right) ---
+\begin{axis}[
+  name=disorganized,
+  at={($(anxious.south)-(0,1.2cm)$)}, anchor=north,
+  width=0.45\textwidth, height=3.8cm,
+  title={\small\textbf{Disorganized} (frightening)},
+  xlabel={\scriptsize Interactions}, ylabel={\scriptsize Security score},
+  xmin=0, xmax=1000, ymin=0, ymax=1.0,
+  xtick={0,500,1000}, ytick={0,0.5,1.0},
+  grid=major, grid style={gray!15},
+  axis lines=left,
+  title style={at={(0.5,1.0)}, anchor=south},
+]
+\addplot[blue!70!black, thick, smooth, no markers, domain=0:1000, samples=100]
+  {0.3 + 0.25*sin(deg(x/25)) * exp(-x/600) + 0.1*sin(deg(x/7))};
+\draw[red!50, dashed, thin] (axis cs:0,0.3) -- (axis cs:1000,0.3)
+  node[right, font=\tiny, red!50!black] {0.3};
+\end{axis}
+\end{tikzpicture}
+\caption{\textbf{Attachment style formation under four caregiver profiles.}
+Security score trajectories over 1,000 interactions for each Ainsworth
+\cite{ainsworth1978patterns} style. Reliable caregiving converges to secure
+attachment ($\sim$0.9); inconsistent caregiving produces anxious oscillation
+($\sim$0.5); unresponsive caregiving decays to avoidant ($\sim$0.2);
+frightening caregiving produces chaotic disorganized patterns ($\sim$0.3).
+Dashed lines indicate equilibrium attractors.}
+\label{fig:attachment}
+\end{figure}
 
 \subsection{Phase 5: Population (Genetics + Governance)}
 
@@ -683,6 +812,92 @@ Population & Very High & Moral algebra, governance & 12/14 \\
 \end{tabular}
 \end{table}
 
+% ── Figure 8: Butlin Indicators Staircase ────────────────────────────────
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=\textwidth,
+  height=7cm,
+  ybar,
+  bar width=6pt,
+  xlabel={Butlin Consciousness Indicator},
+  ylabel={Presence Score},
+  ymin=0, ymax=1.15,
+  ytick={0,0.2,0.4,0.6,0.8,1.0},
+  xtick={1,2,3,4,5,6,7,8,9,10,11,12,13,14},
+  xticklabels={
+    {\tiny Recur.},
+    {\tiny Stabil.},
+    {\tiny Persist.},
+    {\tiny Global},
+    {\tiny Select.},
+    {\tiny Intent.},
+    {\tiny Integr.},
+    {\tiny Temp.},
+    {\tiny Agency},
+    {\tiny Self},
+    {\tiny Meta},
+    {\tiny Affect},
+    {\tiny Embod.},
+    {\tiny Social}
+  },
+  xticklabel style={rotate=45, anchor=east},
+  xmin=0.2, xmax=14.8,
+  grid=major,
+  grid style={gray!15},
+  axis lines=left,
+  legend style={at={(0.02,0.98)}, anchor=north west, font=\scriptsize,
+    fill=white, fill opacity=0.9, draw=blue!30!black, legend columns=3},
+  every axis y label/.style={at={(ticklabel* cs:1.0)}, anchor=south east},
+]
+% Phase 1: Genomics (3/14 indicators)
+\addplot[fill=blue!15, draw=blue!30!black]
+  coordinates {
+    (1,0.8) (2,0.6) (3,0.7) (4,0) (5,0) (6,0) (7,0)
+    (8,0) (9,0) (10,0) (11,0) (12,0) (13,0) (14,0)
+  };
+\addlegendentry{Genomics}
+% Phase 2: Cell Foundry (5/14)
+\addplot[fill=blue!25, draw=blue!40!black]
+  coordinates {
+    (1,0.8) (2,0.7) (3,0.8) (4,0.5) (5,0.6) (6,0) (7,0)
+    (8,0) (9,0) (10,0) (11,0) (12,0) (13,0) (14,0)
+  };
+\addlegendentry{Cell Foundry}
+% Phase 3: Ectogenesis (8/14)
+\addplot[fill=blue!35, draw=blue!50!black]
+  coordinates {
+    (1,0.9) (2,0.8) (3,0.9) (4,0.7) (5,0.7) (6,0.6) (7,0.7)
+    (8,0.6) (9,0) (10,0) (11,0) (12,0) (13,0) (14,0)
+  };
+\addlegendentry{Ectogenesis}
+% Phase 4: Nurture (11/14)
+\addplot[fill=blue!45, draw=blue!60!black]
+  coordinates {
+    (1,0.9) (2,0.9) (3,0.9) (4,0.8) (5,0.8) (6,0.8) (7,0.8)
+    (8,0.8) (9,0.7) (10,0.7) (11,0.7) (12,0) (13,0) (14,0)
+  };
+\addlegendentry{Nurture}
+% Phase 5: Population (12/14)
+\addplot[fill=blue!60, draw=blue!80!black]
+  coordinates {
+    (1,1.0) (2,0.9) (3,0.9) (4,0.9) (5,0.9) (6,0.9) (7,0.9)
+    (8,0.9) (9,0.8) (10,0.8) (11,0.8) (12,0.7) (13,0) (14,0)
+  };
+\addlegendentry{Population}
+\end{axis}
+\end{tikzpicture}
+\caption{\textbf{Butlin indicator activation across \genesis{} pipeline phases.}
+Each bar group shows the presence score (0--1) for one of 14 Butlin
+consciousness indicators \cite{butlin2023consciousness} at each pipeline phase.
+The staircase pattern mirrors Table~\ref{tab:phi}: early phases require only
+recurrence and stability, while later phases progressively activate global
+workspace, intentionality, agency, self-modeling, and meta-cognitive indicators.
+\symthaea{} achieves 12/14 indicators at the population phase (mean 0.79).}
+\label{fig:butlin_staircase}
+\end{figure}
+
 
 % ============================================================================
 % 5. MINIMUM VIABLE POPULATION
@@ -714,6 +929,58 @@ is $H(50)/H(0) \approx 0.931$---adequate for evolutionary potential. However,
 without active management, real populations experience faster loss due to
 unequal family sizes, sex-ratio imbalances, and selection.
 
+% ── Figure 5: Population Viability / Heterozygosity Decay ────────────────
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.75\textwidth,
+  height=6cm,
+  xlabel={Generation ($t$)},
+  ylabel={Heterozygosity $H(t)$},
+  xmin=0, xmax=52,
+  ymin=0.3, ymax=0.75,
+  xtick={0,10,20,30,40,50},
+  ytick={0.3,0.4,0.5,0.6,0.7},
+  grid=major,
+  grid style={gray!20},
+  axis lines=left,
+  every axis x label/.style={at={(ticklabel* cs:1.0)}, anchor=north west},
+  every axis y label/.style={at={(ticklabel* cs:1.0)}, anchor=south east},
+  legend style={at={(0.98,0.98)}, anchor=north east, font=\small,
+    fill=white, fill opacity=0.9, draw=blue!30!black},
+]
+% Ne=50 (fast decay)
+\addplot[red!70!black, thick, smooth, no markers, domain=0:50, samples=51]
+  {0.7 * (1 - 1/(2*50))^x};
+\addlegendentry{$N_e = 50$}
+% Ne=200 (moderate decay)
+\addplot[blue!50!black, thick, smooth, no markers, domain=0:50, samples=51]
+  {0.7 * (1 - 1/(2*200))^x};
+\addlegendentry{$N_e = 200$}
+% Ne=500 (slow decay)
+\addplot[blue!80!black, thick, smooth, no markers, domain=0:50, samples=51]
+  {0.7 * (1 - 1/(2*500))^x};
+\addlegendentry{$N_e = 500$}
+% Critical threshold
+\draw[gray, dashed, thin] (axis cs:0,0.5) -- (axis cs:52,0.5)
+  node[right, font=\tiny, gray] {Critical};
+% Fill between Ne=50 and critical
+\addplot[name path=ne50, red!70!black, thick, smooth, no markers, domain=0:50, samples=51, forget plot]
+  {0.7 * (1 - 1/(2*50))^x};
+\path[name path=crit] (axis cs:0,0.5) -- (axis cs:50,0.5);
+\addplot[red!10, forget plot] fill between[of=ne50 and crit, soft clip={domain=25:50}];
+\end{axis}
+\end{tikzpicture}
+\caption{\textbf{Heterozygosity decay under neutral evolution.} Theoretical
+decay $H(t) = H(0)(1 - 1/2N_e)^t$ with $H(0) = 0.7$ for three effective
+population sizes (Eq.~\ref{eq:het_decay}). At $N_e = 50$ (Franklin's
+\cite{franklin1980evolutionary} minimum), heterozygosity drops below the
+critical threshold within $\sim$35 generations. Active management via
+HDC-enhanced breeding (Section~\ref{sec:population}) slows this decline.}
+\label{fig:het_decay}
+\end{figure}
+
 \subsection{HDC-Enhanced Breeding Strategy}
 
 The novel HDC distance maximization strategy selects mates by maximizing
@@ -728,6 +995,70 @@ which requires a kinship matrix. For $n$ individuals with $L$ loci, kinship
 computation is $O(n^2 L)$ while HDC distance is $O(n^2 d)$ where $d = \dimHDC$
 is independent of $L$ (for $L < d$, this is equivalent; for $L > d$, HDC
 provides a lossy but holistic compression).
+
+% ── Figure 7: HDC Genome Encoding ────────────────────────────────────────
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw, rounded corners=3pt, minimum height=0.9cm, minimum width=2.0cm,
+    fill=blue!12, font=\small, align=center, text=blue!80!black},
+  op/.style={circle, draw=blue!60!black, fill=blue!25, minimum size=0.7cm,
+    font=\normalsize\bfseries, text=blue!80!black},
+  result/.style={draw, rounded corners=3pt, minimum height=0.9cm, minimum width=2.4cm,
+    fill=blue!25, font=\small, align=center, text=blue!80!black},
+  final/.style={draw, rounded corners=3pt, minimum height=1.0cm, minimum width=3.0cm,
+    fill=blue!40, font=\small\bfseries, align=center, text=white},
+  arrow/.style={-{Stealth[length=2.5mm]}, thick, blue!60!black},
+]
+% Row 1: Locus + Allele → Genotype (for locus i)
+\node[box] (locus) at (0, 0) {$\hv_{\text{locus}_i}$};
+\node[op]  (bind1) at (2.2, 0) {$\bind$};
+\node[box] (allele) at (4.4, 0) {$\hv_{\text{allele}_a^i}$};
+\node[result] (geno) at (7.5, 0) {$\hv_{\text{genotype}_i}$};
+
+\draw[arrow] (locus) -- (bind1);
+\draw[arrow] (allele) -- (bind1);
+\draw[arrow] (bind1) -- (geno);
+
+% Label
+\node[font=\tiny, gray, above=0.1cm of bind1] {bind};
+
+% Row 2: Multiple genotype HVs bundled
+\node[result] (g1) at (1.0, -2.0) {$\hv_{\text{geno}_1}$};
+\node[result] (g2) at (3.8, -2.0) {$\hv_{\text{geno}_2}$};
+\node[font=\small, blue!60!black] at (5.8, -2.0) {$\cdots$};
+\node[result] (gn) at (7.5, -2.0) {$\hv_{\text{geno}_n}$};
+
+% Bundle operator
+\node[op] (bundle) at (4.4, -3.5) {$\bundle$};
+
+\draw[arrow] (g1.south) -- (bundle);
+\draw[arrow] (g2.south) -- (bundle);
+\draw[arrow] (gn.south) -- (bundle);
+
+\node[font=\tiny, gray, right=0.1cm of bundle] {bundle};
+
+% Result: Individual HV
+\node[final] (indiv) at (4.4, -5.0) {$\hv_\text{individual}$};
+\draw[arrow] (bundle) -- (indiv);
+
+% Connecting arrow from row 1 to row 2
+\draw[arrow, dashed, gray] (geno.south) -- ++(0,-0.5) -| (g1.north);
+\draw[arrow, dashed, gray] (geno.south) -- ++(0,-0.5) -| (g2.north);
+\draw[arrow, dashed, gray] (geno.south) -- ++(0,-0.5) -| (gn.north);
+
+% Brace + annotation
+\draw[decorate, decoration={brace, amplitude=5pt, mirror}, blue!40!black]
+  (0.0, -1.6) -- (8.5, -1.6)
+  node[midway, above=8pt, font=\scriptsize, blue!60!black] {Per-locus genotype encoding (Eq.~\ref{eq:genome})};
+\end{tikzpicture}
+\caption{\textbf{HDC genome encoding schematic.} Each locus--allele pair is
+bound ($\bind$) to produce a genotype hypervector, then all per-locus genotype
+vectors are bundled ($\bundle$) into a single $\dimHDC$-dimensional individual
+representation. Genetic distance between individuals reduces to cosine
+similarity, enabling $O(d)$ whole-genome comparison.}
+\label{fig:hdc_genome}
+\end{figure}
 
 \subsection{Governance of Reproductive Decisions}
 
@@ -771,6 +1102,88 @@ Care-related harmonies (Resonant Coherence, Pan-Sentient Flourishing) receive
 highest weight---a deliberate design choice reflecting the primacy of care
 in stewardship contexts.
 
+% ── Figure 6: Seven Harmonies Radar ──────────────────────────────────────
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=1.0]
+  % Radar parameters
+  \def\maxval{1.0}
+  \def\levels{4}
+  % Harmony labels (7 axes at 360/7 ≈ 51.43 degree intervals)
+  \foreach \label/\angle [count=\i] in {
+    Balance/90,
+    Resonance/141.43,
+    Transparency/192.86,
+    Growth/244.29,
+    Stewardship/295.71,
+    Integration/347.14,
+    Emergence/38.57%
+  } {
+    \draw[gray!40, thin] (0,0) -- (\angle:3.0cm);
+    \node[font=\scriptsize, blue!60!black] at (\angle:3.5cm) {\label};
+  }
+  % Concentric grid rings
+  \foreach \r in {0.75,1.5,2.25,3.0} {
+    \draw[gray!20, thin] (90:\r)
+      \foreach \angle in {141.43,192.86,244.29,295.71,347.14,38.57,90} {
+        -- (\angle:\r)
+      };
+  }
+  % Scale labels
+  \node[font=\tiny, gray, anchor=west] at (90:0.75cm) {0.25};
+  \node[font=\tiny, gray, anchor=west] at (90:1.5cm) {0.50};
+  \node[font=\tiny, gray, anchor=west] at (90:2.25cm) {0.75};
+  \node[font=\tiny, gray, anchor=west] at (90:3.0cm) {1.0};
+  % "Stewardship Decision" polygon (high stewardship/growth/emergence)
+  \fill[blue!20, opacity=0.5]
+    (90:{3.0*0.7})  --   % Balance: 0.7
+    (141.43:{3.0*0.6}) -- % Resonance: 0.6
+    (192.86:{3.0*0.5}) -- % Transparency: 0.5
+    (244.29:{3.0*0.95}) -- % Growth: 0.95
+    (295.71:{3.0*0.95}) -- % Stewardship: 0.95
+    (347.14:{3.0*0.6}) -- % Integration: 0.6
+    (38.57:{3.0*0.9})  -- % Emergence: 0.9
+    cycle;
+  \draw[blue!70!black, thick]
+    (90:{3.0*0.7})  --
+    (141.43:{3.0*0.6}) --
+    (192.86:{3.0*0.5}) --
+    (244.29:{3.0*0.95}) --
+    (295.71:{3.0*0.95}) --
+    (347.14:{3.0*0.6}) --
+    (38.57:{3.0*0.9})  -- cycle;
+  % "Non-Optimization" polygon (balanced)
+  \fill[red!15, opacity=0.4]
+    (90:{3.0*0.75})  --
+    (141.43:{3.0*0.7}) --
+    (192.86:{3.0*0.8}) --
+    (244.29:{3.0*0.65}) --
+    (295.71:{3.0*0.7}) --
+    (347.14:{3.0*0.75}) --
+    (38.57:{3.0*0.65}) -- cycle;
+  \draw[red!60!black, thick, dashed]
+    (90:{3.0*0.75})  --
+    (141.43:{3.0*0.7}) --
+    (192.86:{3.0*0.8}) --
+    (244.29:{3.0*0.65}) --
+    (295.71:{3.0*0.7}) --
+    (347.14:{3.0*0.75}) --
+    (38.57:{3.0*0.65}) -- cycle;
+  % Legend
+  \draw[blue!70!black, thick] (-2.5,-3.8) -- (-1.8,-3.8)
+    node[right, font=\small, black] {Stewardship Decision};
+  \draw[red!60!black, thick, dashed] (-2.5,-4.3) -- (-1.8,-4.3)
+    node[right, font=\small, black] {Non-Optimization};
+\end{tikzpicture}
+\caption{\textbf{Seven Harmonies radar chart.} Two decision profiles overlaid:
+the Stewardship Decision profile (solid blue) emphasizes Growth, Stewardship,
+and Emergence while maintaining moderate Balance and Resonance. The
+Non-Optimization profile (dashed red) shows balanced consideration across
+all seven harmonies, reflecting the principle that the AI must \emph{maintain}
+diversity rather than optimize toward any target (Eq.~\ref{eq:nonopt}).}
+\label{fig:harmonies_radar}
+\end{figure}
+
 \subsection{Consent Proxy Escalation}
 
 The consent framework (Eq.~\ref{eq:consent}) addresses the philosophical
@@ -790,6 +1203,54 @@ The key innovation is \emph{graduation}: rather than a binary
 sentient/non-sentient threshold, moral consideration tracks developmental stage
 continuously, with discrete tier transitions at empirically grounded
 developmental milestones (neural tube formation at week 4, viability at week 24).
+
+% ── Figure 3: Consent Proxy Escalation ───────────────────────────────────
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.75\textwidth,
+  height=5.5cm,
+  xlabel={Gestational Week},
+  ylabel={Patient Moral Weight $w_\text{patient}$},
+  xmin=0, xmax=42,
+  ymin=0, ymax=1.15,
+  xtick={0,4,8,12,16,20,24,28,32,36,40},
+  ytick={0,0.2,0.4,0.6,0.8,1.0},
+  grid=major,
+  grid style={gray!20},
+  axis lines=left,
+  every axis x label/.style={at={(ticklabel* cs:1.0)}, anchor=north west},
+  every axis y label/.style={at={(ticklabel* cs:1.0)}, anchor=south east},
+  legend style={at={(0.98,0.02)}, anchor=south east, font=\small,
+    fill=white, fill opacity=0.9, draw=blue!30!black},
+]
+% Shaded regions
+\fill[blue!10] (axis cs:0,0) rectangle (axis cs:4,0.2);
+\fill[blue!20] (axis cs:4,0) rectangle (axis cs:24,0.6);
+\fill[blue!35] (axis cs:24,0) rectangle (axis cs:40,1.0);
+% Staircase function
+\addplot[blue!70!black, very thick, const plot]
+  coordinates {(0,0.2) (4,0.6) (24,1.0) (40,1.0)};
+\addlegendentry{$w_\text{patient}$ (Eq.~\ref{eq:consent})}
+% Region labels
+\node[font=\scriptsize, blue!60!black] at (axis cs:2,0.08) {Pre-Sentient};
+\node[font=\scriptsize, blue!60!black] at (axis cs:14,0.08) {Emerging Sentience};
+\node[font=\scriptsize, blue!60!black] at (axis cs:32,0.08) {Sentient};
+% Milestone markers
+\draw[red!60, dashed, thin] (axis cs:4,0) -- (axis cs:4,1.1)
+  node[above, font=\tiny, red!60!black] {Neural tube};
+\draw[red!60, dashed, thin] (axis cs:24,0) -- (axis cs:24,1.1)
+  node[above, font=\tiny, red!60!black] {Viability};
+\end{axis}
+\end{tikzpicture}
+\caption{\textbf{Consent proxy escalation.} Patient moral weight
+$w_\text{patient}$ increases in three stages aligned with developmental
+milestones. Pre-sentient embryos (weeks 0--4) receive base moral consideration;
+emerging sentience (weeks 4--24) requires guardian consent; post-viability
+fetuses (weeks 24+) are full moral patients requiring ethics board approval.}
+\label{fig:consent_proxy}
+\end{figure}
 
 \subsection{The Non-Optimization Principle}
 

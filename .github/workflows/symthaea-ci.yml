@@ -230,6 +230,7 @@ jobs:
           - support
           # Database & specialized features
           - lz4_compression
+          - mesh-encryption
           - lancedb-backend
           - school_learning
           - benchmarks
@@ -244,6 +245,8 @@ jobs:
           - lancedb-backend,full_consciousness,reasoning_engine
           - observability_module,reasoning_engine
           - support,observability_module
+          # Genesis DNA-to-Human pipeline (5 bio crates)
+          - genesis
           # Genesis Mission Challenges (DOE S&T)
           - genesis-missions
     defaults:
@@ -299,7 +302,7 @@ jobs:
             ${{ runner.os }}-cargo-subcrates-
       - name: Test sub-crates (fast path)
         run: |
-          for crate in symthaea-dream symthaea-phi-search symthaea-narrative-self symthaea-fep symthaea-causal-reasoning symthaea-field-dynamics symthaea-hodge symthaea-factor-graph symthaea-enactive symthaea-sensorimotor symthaea-consciousness-topology symthaea-exploration symthaea-wisdom symthaea-types symthaea-seven-harmonies symthaea-consciousness-resonance symthaea-embeddings symthaea-observability symthaea-dynamics symthaea-sentinel symthaea-perception symthaea-stt symthaea-physics symthaea-flight symthaea-hal symthaea-humanoid symthaea-vehicle symthaea-vocal-tract symthaea-materials symthaea-nuclear-forensics; do
+          for crate in symthaea-dream symthaea-phi-search symthaea-narrative-self symthaea-fep symthaea-causal-reasoning symthaea-field-dynamics symthaea-hodge symthaea-factor-graph symthaea-enactive symthaea-sensorimotor symthaea-consciousness-topology symthaea-exploration symthaea-wisdom symthaea-types symthaea-seven-harmonies symthaea-consciousness-resonance symthaea-embeddings symthaea-observability symthaea-dynamics symthaea-sentinel symthaea-perception symthaea-stt symthaea-physics symthaea-flight symthaea-hal symthaea-humanoid symthaea-vehicle symthaea-vocal-tract symthaea-materials symthaea-nuclear-forensics symthaea-genomics symthaea-cell-foundry symthaea-ectogenesis symthaea-nurture symthaea-population; do
             echo "::group::$crate"
             cargo clippy -p $crate --lib -- -D warnings
             cargo test -p $crate --lib
