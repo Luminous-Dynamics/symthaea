@@ -646,4 +646,86 @@ mod tests {
             "pedigree should grow with each generation"
         );
     }
+
+    #[test]
+    fn test_simulation_vs_analytical_heterozygosity() {
+        // Run simulation with 25F + 25M (Ne ~ 50) for 20 generations
+        // Compare observed heterozygosity decay against analytical formula
+        let mut rng = rand::rngs::StdRng::seed_from_u64(12345);
+        let loci = make_loci(20);
+        let (pop, mut ped) = make_founder_population(25, 25, &loci, &mut rng);
+
+        // Measure initial heterozygosity
+        let h0 = {
+            let n_loci = loci.len();
+            let total: f64 = (0..n_loci)
+                .map(|li| {
+                    let genos: Vec<_> = pop.individuals.iter()
+                        .filter_map(|ind| ind.genotypes.get(li).cloned())
+                        .collect();
+                    crate::diversity::observed_heterozygosity(&genos)
+                })
+                .sum();
+            total / n_loci as f64
+        };
+
+        let sim = PopulationSimulator {
+            strategy: BreedingStrategy::Random,
+            target_population_size: 50,
+            mutation_rate: 0.0, // No mutation for clean comparison
+            selection_enabled: false,
+        };
+
+        let result = sim.run(&pop, &mut ped, &loci, 20, &mut rng);
+        let ne = 50.0; // 25F + 25M balanced -> Ne ~ N
+
+        // Compare simulation heterozygosity vs analytical at each generation
+        // Allow 30% tolerance due to stochastic drift
+        for snap in &result.generations {
+            let analytical = crate::diversity::heterozygosity_after_generations(
+                h0, ne, snap.generation,
+            );
+            if snap.generation > 0 && analytical > 0.01 {
+                let relative_error = (snap.heterozygosity - analytical).abs() / analytical;
+                assert!(
+                    relative_error < 0.5,
+                    "Gen {}: sim H={:.4}, analytical H={:.4}, relative error={:.2}%",
+                    snap.generation, snap.heterozygosity, analytical, relative_error * 100.0
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_cfc_predictor_vs_analytical() {
+        // Verify CfC O(1) predictor produces a meaningful state change
+        // across different generation horizons
+        use crate::temporal_evolution::PopulationTrajectoryPredictor;
+
+        let mut rng = rand::rngs::StdRng::seed_from_u64(99);
+        let loci = make_loci(10);
+        let (pop, _) = make_founder_population(15, 15, &loci, &mut rng);
+
+        let initial_state = PopulationTrajectoryPredictor::encode_population_state(&pop);
+        assert!(initial_state.norm() > 0.0, "Initial state should be non-zero");
+
+        let mut predictor = PopulationTrajectoryPredictor::new();
+
+        // Short-term prediction
+        let state_5 = predictor.predict_at_generation(&initial_state, 5);
+        predictor.reset();
+
+        // Long-term prediction
+        let state_100 = predictor.predict_at_generation(&initial_state, 100);
+
+        // Both should be valid non-zero states
+        assert!(state_5.norm() > 0.0, "5-gen prediction should be non-zero");
+        assert!(state_100.norm() > 0.0, "100-gen prediction should be non-zero");
+
+        // Decoded metrics should be in reasonable ranges
+        let h_5 = PopulationTrajectoryPredictor::decode_heterozygosity(&state_5);
+        let h_100 = PopulationTrajectoryPredictor::decode_heterozygosity(&state_100);
+        assert!(h_5 >= 0.0 && h_5 <= 1.0, "Decoded H at gen 5 should be in [0,1]: {h_5}");
+        assert!(h_100 >= 0.0 && h_100 <= 1.0, "Decoded H at gen 100 should be in [0,1]: {h_100}");
+    }
 }

@@ -260,6 +260,10 @@ impl AttachmentNeuromodulation {
         if self.noradrenaline_separation > 0.0 {
             bath.noradrenaline.produce(self.noradrenaline_separation);
         }
+        if self.noradrenaline_separation < 0.0 {
+            bath.noradrenaline.level =
+                (bath.noradrenaline.level + self.noradrenaline_separation).max(0.0);
+        }
         if self.serotonin_despair < 0.0 {
             bath.serotonin.level = (bath.serotonin.level + self.serotonin_despair).max(0.0);
         }
@@ -435,5 +439,96 @@ mod tests {
             MilestoneCategory::Cognitive,
         ];
         assert_eq!(cats.len(), 5);
+    }
+
+    #[test]
+    fn test_neuromod_separation_ne_increases_in_bath() {
+        let mut bath = NeuromodulatorBath::default();
+        let initial_ne = bath.noradrenaline.level;
+        let sep = AttachmentNeuromodulation::separation();
+        sep.apply_to_bath(&mut bath);
+        assert!(
+            bath.noradrenaline.level > initial_ne,
+            "NE should increase on separation: before={initial_ne}, after={}",
+            bath.noradrenaline.level
+        );
+    }
+
+    #[test]
+    fn test_neuromod_reunion_ne_decreases_in_bath() {
+        let mut bath = NeuromodulatorBath::default();
+        // First elevate NE via separation
+        AttachmentNeuromodulation::separation().apply_to_bath(&mut bath);
+        let elevated_ne = bath.noradrenaline.level;
+        // Then reunion should bring it down
+        AttachmentNeuromodulation::reunion().apply_to_bath(&mut bath);
+        assert!(
+            bath.noradrenaline.level < elevated_ne,
+            "NE should decrease on reunion: elevated={elevated_ne}, after={}",
+            bath.noradrenaline.level
+        );
+    }
+
+    #[test]
+    fn test_neuromod_despair_serotonin_drops_in_bath() {
+        let mut bath = NeuromodulatorBath::default();
+        let initial_5ht = bath.serotonin.level;
+        let desp = AttachmentNeuromodulation::despair();
+        desp.apply_to_bath(&mut bath);
+        assert!(
+            bath.serotonin.level < initial_5ht,
+            "5-HT should decrease in despair: before={initial_5ht}, after={}",
+            bath.serotonin.level
+        );
+    }
+
+    #[test]
+    fn test_neuromod_separation_reunion_cycle() {
+        let mut bath = NeuromodulatorBath::default();
+        let baseline_oxy = bath.oxytocin.level;
+
+        // Separation: NE up, 5-HT down
+        AttachmentNeuromodulation::separation().apply_to_bath(&mut bath);
+        let post_sep_ne = bath.noradrenaline.level;
+        let post_sep_5ht = bath.serotonin.level;
+
+        // Reunion: oxytocin burst, DA up, NE down
+        AttachmentNeuromodulation::reunion().apply_to_bath(&mut bath);
+        assert!(bath.oxytocin.level > baseline_oxy, "Oxytocin should surge on reunion");
+        assert!(bath.noradrenaline.level < post_sep_ne, "NE should drop on reunion");
+        assert!(bath.dopamine.level > 0.5, "DA reward burst on reunion");
+
+        // Co-regulation: further calming
+        AttachmentNeuromodulation::coregulation(0.9).apply_to_bath(&mut bath);
+        assert!(bath.oxytocin.level > baseline_oxy, "Oxytocin should remain elevated after co-regulation");
+    }
+
+    #[test]
+    fn test_neuromod_adenosine_stress_accumulates() {
+        let mut bath = NeuromodulatorBath::default();
+        let initial_ade = bath.adenosine.level;
+
+        // Separation adds stress
+        AttachmentNeuromodulation::separation().apply_to_bath(&mut bath);
+        let post_sep = bath.adenosine.level;
+        assert!(post_sep > initial_ade, "Adenosine should increase on separation");
+
+        // Despair adds more stress
+        AttachmentNeuromodulation::despair().apply_to_bath(&mut bath);
+        assert!(
+            bath.adenosine.level > post_sep,
+            "Adenosine should accumulate further in despair"
+        );
+    }
+
+    #[test]
+    fn test_neuromod_coregulation_zero_synchrony_no_effect() {
+        let mut bath = NeuromodulatorBath::default();
+        let before = bath.oxytocin.level;
+        AttachmentNeuromodulation::coregulation(0.0).apply_to_bath(&mut bath);
+        assert!(
+            (bath.oxytocin.level - before).abs() < 1e-6,
+            "Zero synchrony should produce no neuromodulatory effect"
+        );
     }
 }
