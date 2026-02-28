@@ -154,8 +154,19 @@ fn validate_member(member: Member) -> ExternResult<ValidateCallbackResult> {
         return Ok(ValidateCallbackResult::Invalid("Member cannot have more than 20 roles".into()));
     }
     if let Some(score) = member.matl_score {
-        if score < 0.0 || score > 1.0 {
-            return Ok(ValidateCallbackResult::Invalid("MATL score must be between 0.0 and 1.0".into()));
+        if !score.is_finite() || score < 0.0 || score > 1.0 {
+            return Ok(ValidateCallbackResult::Invalid("MATL score must be a finite number between 0.0 and 1.0".into()));
+        }
+    }
+    // Validate custom role name lengths
+    for role in &member.roles {
+        if let MemberRole::Custom(name) = role {
+            if name.trim().is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Custom role name cannot be empty".into()));
+            }
+            if name.len() > 128 {
+                return Ok(ValidateCallbackResult::Invalid("Custom role name must be 128 characters or fewer".into()));
+            }
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -1520,12 +1531,8 @@ mod tests {
     fn member_matl_score_nan_rejected() {
         let mut m = make_valid_member();
         m.matl_score = Some(f64::NAN);
-        // NaN comparisons: NaN < 0.0 is false, NaN > 1.0 is false
-        // Current validation passes NaN — documenting this edge case
         let result = validate_member(m);
-        // This currently passes due to NaN comparison semantics.
-        // If this test starts failing, it means NaN handling was added (good!)
-        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 
     #[test]
@@ -1549,6 +1556,37 @@ mod tests {
         let mut m = make_valid_member();
         m.roles = vec![MemberRole::Member];
         assert!(matches!(validate_member(m), Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn member_role_name_too_long_rejected() {
+        let mut m = make_valid_member();
+        m.roles = vec![MemberRole::Custom("x".repeat(129))];
+        let result = validate_member(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn member_role_name_exactly_128_ok() {
+        let mut m = make_valid_member();
+        m.roles = vec![MemberRole::Custom("x".repeat(128))];
+        assert!(matches!(validate_member(m), Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn member_empty_custom_role_rejected() {
+        let mut m = make_valid_member();
+        m.roles = vec![MemberRole::Custom(String::new())];
+        let result = validate_member(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn member_whitespace_custom_role_rejected() {
+        let mut m = make_valid_member();
+        m.roles = vec![MemberRole::Custom("  \t ".to_string())];
+        let result = validate_member(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 
     // ── Vote edge cases ─────────────────────────────────────────────────

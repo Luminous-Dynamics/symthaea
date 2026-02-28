@@ -355,6 +355,15 @@ pub fn contribute(input: ContributeInput) -> ExternResult<ContributionWithHash> 
         )));
     }
 
+    // Validate note length (defense in depth — also checked at integrity layer)
+    if let Some(ref note) = input.note {
+        if note.len() > 4096 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Contribution note must be 4096 characters or fewer".into()
+            )));
+        }
+    }
+
     let now = sys_time()?;
     let id = generate_id("contrib")?;
 
