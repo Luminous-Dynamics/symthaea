@@ -8,6 +8,9 @@
 //!   broca-projection-train --data train.jsonl [--eval eval.jsonl] [--epochs 5]
 //!     [--lr 0.001] [--warm-start] [--diagnostics] [--output broca-projection.bin]
 //!     [--model state-spaces/mamba-130m] [--genesis PHRASE]
+//!
+//! Eval-only mode (skip training):
+//!   broca-projection-train --eval-only --resume checkpoint.bin --eval eval.jsonl
 
 use std::process;
 
@@ -35,21 +38,6 @@ fn main() {
             process::exit(1);
         }
     };
-
-    // Load training dataset
-    tracing::info!(path = %opts.data_path, "Loading training data");
-    let dataset = match TrainingDataset::from_jsonl(&opts.data_path) {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("Failed to load data from '{}': {e}", opts.data_path);
-            process::exit(1);
-        }
-    };
-    if dataset.is_empty() {
-        eprintln!("Dataset is empty");
-        process::exit(1);
-    }
-    tracing::info!(pairs = dataset.len(), "Dataset loaded");
 
     // Genesis seed
     let genesis = GenesisSeed::from_phrase(&opts.genesis_phrase);
@@ -92,6 +80,33 @@ fn main() {
             }
         }
     }
+
+    // Enable gradient diagnostics if requested
+    if opts.diagnostics {
+        gen.enable_diagnostics();
+    }
+
+    // ─── Eval-only mode: skip training, jump straight to evaluation ───
+    if opts.eval_only {
+        let eval_path = opts.eval_path.as_ref().unwrap(); // validated in parse_args
+        run_evaluation(&mut gen, eval_path);
+        return;
+    }
+
+    // Load training dataset
+    tracing::info!(path = %opts.data_path, "Loading training data");
+    let dataset = match TrainingDataset::from_jsonl(&opts.data_path) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("Failed to load data from '{}': {e}", opts.data_path);
+            process::exit(1);
+        }
+    };
+    if dataset.is_empty() {
+        eprintln!("Dataset is empty");
+        process::exit(1);
+    }
+    tracing::info!(pairs = dataset.len(), "Dataset loaded");
 
     // Warm-start: compute principal directions from training data
     if opts.warm_start || opts.warm_start_bidirectional {
@@ -250,6 +265,12 @@ fn main() {
         );
     }
 
+    // Print gradient diagnostics if enabled
+    if let Some(diag) = gen.projection_diagnostics() {
+        println!();
+        println!("{}", diag.format_summary());
+    }
+
     // Save projection checkpoint
     let final_epoch = all_epoch_metrics.last().map(|m| m.epoch).unwrap_or(0);
     let weights = gen.projection().flatten_weights();
@@ -273,32 +294,37 @@ fn main() {
 
     // Run evaluation if --eval provided
     if let Some(ref eval_path) = opts.eval_path {
-        tracing::info!(path = %eval_path, "Loading evaluation data");
-        let eval_dataset = match TrainingDataset::from_jsonl(eval_path) {
-            Ok(d) => d,
-            Err(e) => {
-                eprintln!("Failed to load eval data from '{}': {e}", eval_path);
-                process::exit(1);
-            }
-        };
-
-        let eval_config = symthaea_broca::evaluation::LiquidMambaEvalConfig {
-            dataset: eval_dataset,
-            compute_perplexity: true,
-            compute_english_ratio: true,
-            per_intent_breakdown: true,
-            max_gen_tokens: 64,
-            consciousness_gating_test: true,
-        };
-
-        tracing::info!("Running evaluation");
-        let result = symthaea_broca::evaluation::evaluate_liquid_mamba(&mut gen, &eval_config);
-        println!();
-        println!(
-            "{}",
-            symthaea_broca::evaluation::format_liquid_mamba_eval_report(&result)
-        );
+        run_evaluation(&mut gen, eval_path);
     }
+}
+
+/// Run evaluation and print the formatted report.
+fn run_evaluation(gen: &mut LiquidMambaGenerator, eval_path: &str) {
+    tracing::info!(path = %eval_path, "Loading evaluation data");
+    let eval_dataset = match TrainingDataset::from_jsonl(eval_path) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("Failed to load eval data from '{eval_path}': {e}");
+            process::exit(1);
+        }
+    };
+
+    let eval_config = symthaea_broca::evaluation::LiquidMambaEvalConfig {
+        dataset: eval_dataset,
+        compute_perplexity: true,
+        compute_english_ratio: true,
+        per_intent_breakdown: true,
+        max_gen_tokens: 64,
+        consciousness_gating_test: true,
+    };
+
+    tracing::info!("Running evaluation");
+    let result = symthaea_broca::evaluation::evaluate_liquid_mamba(gen, &eval_config);
+    println!();
+    println!(
+        "{}",
+        symthaea_broca::evaluation::format_liquid_mamba_eval_report(&result)
+    );
 }
 
 /// Per-epoch training metrics for projection training.
@@ -321,6 +347,7 @@ struct ProjectionTrainOpts {
     warm_start: bool,
     warm_start_bidirectional: bool,
     diagnostics: bool,
+    eval_only: bool,
     warmup_steps: usize,
     accumulation_steps: usize,
     cosine_annealing_steps: usize,
@@ -341,6 +368,7 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
         warm_start: false,
         warm_start_bidirectional: false,
         diagnostics: false,
+        eval_only: false,
         warmup_steps: 100,
         accumulation_steps: 4,
         cosine_annealing_steps: 0,
@@ -413,6 +441,9 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
             "--diagnostics" => {
                 opts.diagnostics = true;
             }
+            "--eval-only" => {
+                opts.eval_only = true;
+            }
             "--warmup-steps" => {
                 i += 1;
                 opts.warmup_steps = args
@@ -445,8 +476,17 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
         i += 1;
     }
 
-    if opts.data_path.is_empty() {
-        return Err("--data is required".to_string());
+    if opts.data_path.is_empty() && !opts.eval_only {
+        return Err("--data is required (unless --eval-only)".to_string());
+    }
+
+    if opts.eval_only {
+        if opts.resume_path.is_none() {
+            return Err("--eval-only requires --resume to load projection weights".to_string());
+        }
+        if opts.eval_path.is_none() {
+            return Err("--eval-only requires --eval to specify evaluation data".to_string());
+        }
     }
 
     Ok(opts)
@@ -456,13 +496,11 @@ fn print_usage() {
     eprintln!("Usage: broca-projection-train [OPTIONS]");
     eprintln!();
     eprintln!("Required:");
-    eprintln!("  --data, -d PATH        JSONL training data file");
+    eprintln!("  --data, -d PATH        JSONL training data file (not required with --eval-only)");
     eprintln!();
-    eprintln!("Optional:");
+    eprintln!("Training options:");
     eprintln!("  --output, -o PATH      Output checkpoint file (default: broca-projection.bin)");
     eprintln!("  --resume, -r PATH      Load existing projection weights to continue training");
-    eprintln!("  --eval PATH            Held-out JSONL for post-training evaluation");
-    eprintln!("  --model ID             HuggingFace model ID (default: state-spaces/mamba-130m)");
     eprintln!("  --epochs, -e N         Number of training epochs (default: 5)");
     eprintln!("  --lr RATE              Learning rate (default: 0.001)");
     eprintln!("  --warm-start                PCA warm-start from training data covariance");
@@ -470,13 +508,22 @@ fn print_usage() {
         "  --warm-start-bidirectional  Bidirectional warm-start (forward + backward projection)"
     );
     eprintln!("  --contrastive-pretrain N   Contrastive pretraining epochs before distillation");
-    eprintln!("  --diagnostics               Enable periodic projection health logging");
     eprintln!("  --warmup-steps N            LR warmup steps (default: 100)");
     eprintln!("  --accumulation-steps N      Gradient accumulation steps (default: 4)");
     eprintln!("  --cosine-annealing-steps N  Cosine annealing total steps (default: 0 = disabled)");
     eprintln!(
         "  --genesis PHRASE            Genesis seed phrase (default: broca-projection-default)"
     );
-    eprintln!("  --deep-projection           Use deep double-bottleneck projection (256→128→256)");
-    eprintln!("  --help, -h                  Show this help message");
+    eprintln!("  --deep-projection           Use deep double-bottleneck projection (256->128->256)");
+    eprintln!();
+    eprintln!("Evaluation options:");
+    eprintln!("  --eval PATH            Held-out JSONL for post-training evaluation");
+    eprintln!("  --eval-only            Skip training, run evaluation only (requires --resume + --eval)");
+    eprintln!();
+    eprintln!("Diagnostics:");
+    eprintln!("  --diagnostics          Enable gradient diagnostics and periodic health logging");
+    eprintln!();
+    eprintln!("Other:");
+    eprintln!("  --model ID             HuggingFace model ID (default: state-spaces/mamba-130m)");
+    eprintln!("  --help, -h             Show this help message");
 }

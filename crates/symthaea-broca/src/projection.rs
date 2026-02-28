@@ -111,6 +111,140 @@ pub struct HdcSsmProjection {
     ssm_dim: usize,
 }
 
+/// Metrics from a single gradient application step.
+#[derive(Debug, Clone)]
+pub struct GradientStepMetrics {
+    /// L2 norm of the forward-down gradient accumulator.
+    pub norm_down: f32,
+    /// L2 norm of the forward-up gradient accumulator.
+    pub norm_up: f32,
+    /// Combined L2 norm of backward gradient accumulators.
+    pub norm_backward: f32,
+    /// Whether any gradient group was clipped this step.
+    pub was_clipped: bool,
+}
+
+/// Accumulated diagnostics over multiple gradient steps.
+#[derive(Debug, Clone, Default)]
+pub struct ProjectionGradientDiagnostics {
+    /// Per-step L2 norms of the forward-down gradient.
+    pub grad_norms_down: Vec<f32>,
+    /// Per-step L2 norms of the forward-up gradient.
+    pub grad_norms_up: Vec<f32>,
+    /// Per-step combined L2 norms of backward gradients.
+    pub grad_norms_backward: Vec<f32>,
+    /// Per-step max weight update magnitudes.
+    pub update_magnitudes: Vec<f32>,
+    /// Total gradient steps recorded.
+    pub total_steps: usize,
+    /// Number of steps where clipping was applied.
+    pub clip_count: usize,
+    /// Per-step L2 norms of the bottleneck activation.
+    pub bottleneck_norms: Vec<f32>,
+    /// Per-step variance of the bottleneck activation.
+    pub bottleneck_variances: Vec<f32>,
+}
+
+impl ProjectionGradientDiagnostics {
+    /// Record a gradient step's metrics.
+    pub fn record_step(&mut self, metrics: &GradientStepMetrics, lr: f32) {
+        self.grad_norms_down.push(metrics.norm_down);
+        self.grad_norms_up.push(metrics.norm_up);
+        self.grad_norms_backward.push(metrics.norm_backward);
+        // Approximate max update magnitude: lr * max(norms)
+        let max_norm = metrics
+            .norm_down
+            .max(metrics.norm_up)
+            .max(metrics.norm_backward);
+        self.update_magnitudes.push(lr * max_norm);
+        self.total_steps += 1;
+        if metrics.was_clipped {
+            self.clip_count += 1;
+        }
+    }
+
+    /// Record bottleneck activation statistics from a forward pass.
+    pub fn record_bottleneck(&mut self, bottleneck: &[f32]) {
+        let norm: f32 = bottleneck.iter().map(|v| v * v).sum::<f32>().sqrt();
+        self.bottleneck_norms.push(norm);
+        let n = bottleneck.len() as f32;
+        if n > 0.0 {
+            let mean: f32 = bottleneck.iter().sum::<f32>() / n;
+            let var: f32 = bottleneck.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / n;
+            self.bottleneck_variances.push(var);
+        }
+    }
+
+    /// Detect bottleneck collapse: variance consistently below threshold.
+    ///
+    /// Returns true if the last 5 recorded variances are all below 0.01,
+    /// indicating the bottleneck dimensions have collapsed to near-constant values.
+    pub fn bottleneck_collapse_detected(&self) -> bool {
+        if self.bottleneck_variances.len() < 5 {
+            return false;
+        }
+        self.bottleneck_variances
+            .iter()
+            .rev()
+            .take(5)
+            .all(|&v| v < 0.01)
+    }
+
+    /// Format a human-readable summary of gradient diagnostics.
+    pub fn format_summary(&self) -> String {
+        let mut s = String::new();
+        s.push_str("=== Projection Gradient Diagnostics ===\n\n");
+        s.push_str(&format!("Total steps:       {}\n", self.total_steps));
+        s.push_str(&format!(
+            "Clip count:        {} ({:.1}%)\n",
+            self.clip_count,
+            if self.total_steps > 0 {
+                self.clip_count as f32 / self.total_steps as f32 * 100.0
+            } else {
+                0.0
+            }
+        ));
+
+        if !self.grad_norms_down.is_empty() {
+            let avg_down: f32 =
+                self.grad_norms_down.iter().sum::<f32>() / self.grad_norms_down.len() as f32;
+            let avg_up: f32 =
+                self.grad_norms_up.iter().sum::<f32>() / self.grad_norms_up.len() as f32;
+            let avg_back: f32 = self.grad_norms_backward.iter().sum::<f32>()
+                / self.grad_norms_backward.len() as f32;
+            s.push_str(&format!("Avg grad norm (down):     {:.6}\n", avg_down));
+            s.push_str(&format!("Avg grad norm (up):       {:.6}\n", avg_up));
+            s.push_str(&format!("Avg grad norm (backward): {:.6}\n", avg_back));
+        }
+
+        if !self.update_magnitudes.is_empty() {
+            let avg_mag: f32 =
+                self.update_magnitudes.iter().sum::<f32>() / self.update_magnitudes.len() as f32;
+            let max_mag: f32 = self
+                .update_magnitudes
+                .iter()
+                .copied()
+                .fold(0.0f32, f32::max);
+            s.push_str(&format!("Avg update magnitude:     {:.6}\n", avg_mag));
+            s.push_str(&format!("Max update magnitude:     {:.6}\n", max_mag));
+        }
+
+        if !self.bottleneck_variances.is_empty() {
+            let avg_var: f32 = self.bottleneck_variances.iter().sum::<f32>()
+                / self.bottleneck_variances.len() as f32;
+            let avg_norm: f32 =
+                self.bottleneck_norms.iter().sum::<f32>() / self.bottleneck_norms.len() as f32;
+            s.push_str(&format!("Avg bottleneck norm:      {:.4}\n", avg_norm));
+            s.push_str(&format!("Avg bottleneck variance:  {:.6}\n", avg_var));
+            if self.bottleneck_collapse_detected() {
+                s.push_str("WARNING: Bottleneck collapse detected (variance < 0.01)\n");
+            }
+        }
+
+        s
+    }
+}
+
 /// LayerNorm epsilon for numerical stability.
 const LN_EPS: f32 = 1e-5;
 
@@ -856,17 +990,22 @@ impl HdcSsmProjection {
     }
 
     /// Apply accumulated gradients with SGD + gradient clipping, then zero accumulators.
-    pub fn apply_gradients(&mut self, lr: f32, grad_clip: f32) {
-        Self::apply_grad(&mut self.w_down, &mut self.grad_down, lr, grad_clip);
-        Self::apply_grad(&mut self.w_up, &mut self.grad_up, lr, grad_clip);
-        Self::apply_grad(
+    ///
+    /// Returns [`GradientStepMetrics`] with L2 norms of the main gradient groups
+    /// (computed before zeroing) and whether any group was clipped.
+    pub fn apply_gradients(&mut self, lr: f32, grad_clip: f32) -> GradientStepMetrics {
+        let (n_down, c_down) =
+            Self::apply_grad(&mut self.w_down, &mut self.grad_down, lr, grad_clip);
+        let (n_up, c_up) = Self::apply_grad(&mut self.w_up, &mut self.grad_up, lr, grad_clip);
+        let (n_bdown, c_bdown) = Self::apply_grad(
             &mut self.w_back_down,
             &mut self.grad_back_down,
             lr,
             grad_clip,
         );
-        Self::apply_grad(&mut self.w_back_up, &mut self.grad_back_up, lr, grad_clip);
-        // LayerNorm parameters (no clipping — small gradients)
+        let (n_bup, c_bup) =
+            Self::apply_grad(&mut self.w_back_up, &mut self.grad_back_up, lr, grad_clip);
+        // LayerNorm parameters
         Self::apply_grad(
             &mut self.ln_fwd_gamma,
             &mut self.grad_ln_fwd_gamma,
@@ -896,12 +1035,20 @@ impl HdcSsmProjection {
             Self::apply_grad(&mut self.w_down2, &mut self.grad_down2, lr, grad_clip);
             Self::apply_grad(&mut self.w_up2, &mut self.grad_up2, lr, grad_clip);
         }
+
+        GradientStepMetrics {
+            norm_down: n_down,
+            norm_up: n_up,
+            norm_backward: (n_bdown * n_bdown + n_bup * n_bup).sqrt(),
+            was_clipped: c_down || c_up || c_bdown || c_bup,
+        }
     }
 
-    fn apply_grad(weights: &mut [f32], grads: &mut [f32], lr: f32, grad_clip: f32) {
-        // Compute gradient norm for clipping
+    /// Apply gradient to a single weight group. Returns (grad_norm, was_clipped).
+    fn apply_grad(weights: &mut [f32], grads: &mut [f32], lr: f32, grad_clip: f32) -> (f32, bool) {
         let grad_norm: f32 = grads.iter().map(|g| g * g).sum::<f32>().sqrt();
-        let clip_scale = if grad_norm > grad_clip {
+        let was_clipped = grad_norm > grad_clip;
+        let clip_scale = if was_clipped {
             grad_clip / grad_norm
         } else {
             1.0
@@ -909,8 +1056,9 @@ impl HdcSsmProjection {
 
         for (w, g) in weights.iter_mut().zip(grads.iter_mut()) {
             *w += lr * clip_scale * *g;
-            *g = 0.0; // Zero accumulator
+            *g = 0.0;
         }
+        (grad_norm, was_clipped)
     }
 
     /// Enable EMA teacher with the given decay rate (typically 0.999 or 0.9999).
@@ -1374,6 +1522,15 @@ impl HdcSsmProjection {
         }
 
         result
+    }
+
+    /// Compute the bottleneck activation for a single HDC input (for diagnostics).
+    ///
+    /// Returns the intermediate 256D representation after LayerNorm + GELU + residual.
+    pub fn bottleneck_activation(&self, hv: &ContinuousHV) -> Vec<f32> {
+        let hidden_pre = self.matmul(&self.w_down, &hv.values, self.bottleneck, self.hdc_dim);
+        let (normed, _, _) = layer_norm(&hidden_pre, &self.ln_fwd_gamma, &self.ln_fwd_beta);
+        normed.into_iter().map(activation).collect()
     }
 }
 
@@ -2140,5 +2297,100 @@ mod tests {
             "avg_recon should be positive, got: {avg_recon}"
         );
         assert!(avg_recon.is_finite(), "avg_recon should be finite");
+    }
+
+    #[test]
+    fn test_gradient_step_metrics_returned() {
+        let genesis = GenesisSeed::from_phrase("test-metrics");
+        let hdc_dim = 256;
+        let bottleneck = 32;
+        let ssm_dim = 64;
+        let mut proj = HdcSsmProjection::new(&genesis, hdc_dim, bottleneck, ssm_dim);
+
+        // Accumulate some gradients
+        let thought = ContinuousHV::random(hdc_dim, 42).normalize();
+        let target = ContinuousHV::random(hdc_dim, 99).normalize();
+        proj.compute_gradients(&thought, &target);
+
+        let metrics = proj.apply_gradients(0.01, 1.0);
+        assert!(
+            metrics.norm_down.is_finite() && metrics.norm_down >= 0.0,
+            "norm_down should be non-negative finite: {}",
+            metrics.norm_down
+        );
+        assert!(
+            metrics.norm_up.is_finite() && metrics.norm_up >= 0.0,
+            "norm_up should be non-negative finite: {}",
+            metrics.norm_up
+        );
+        assert!(
+            metrics.norm_backward.is_finite() && metrics.norm_backward >= 0.0,
+            "norm_backward should be non-negative finite: {}",
+            metrics.norm_backward
+        );
+    }
+
+    #[test]
+    fn test_diagnostics_record_and_collapse() {
+        let mut diag = ProjectionGradientDiagnostics::default();
+        assert_eq!(diag.total_steps, 0);
+        assert!(!diag.bottleneck_collapse_detected());
+
+        // Record some steps
+        let metrics = GradientStepMetrics {
+            norm_down: 0.5,
+            norm_up: 0.3,
+            norm_backward: 0.4,
+            was_clipped: false,
+        };
+        diag.record_step(&metrics, 0.001);
+        assert_eq!(diag.total_steps, 1);
+        assert_eq!(diag.clip_count, 0);
+
+        let clipped = GradientStepMetrics {
+            norm_down: 2.0,
+            norm_up: 1.5,
+            norm_backward: 1.8,
+            was_clipped: true,
+        };
+        diag.record_step(&clipped, 0.001);
+        assert_eq!(diag.total_steps, 2);
+        assert_eq!(diag.clip_count, 1);
+
+        // Record bottleneck with normal variance
+        diag.record_bottleneck(&[1.0, 2.0, 3.0, 0.5, -1.0]);
+        assert_eq!(diag.bottleneck_norms.len(), 1);
+        assert!(!diag.bottleneck_collapse_detected());
+
+        // Record 5 collapsed bottlenecks
+        for _ in 0..5 {
+            diag.record_bottleneck(&[0.5, 0.5, 0.5, 0.5, 0.5]);
+        }
+        assert!(
+            diag.bottleneck_collapse_detected(),
+            "Should detect collapse when variance < 0.01 for 5 consecutive entries"
+        );
+
+        let summary = diag.format_summary();
+        assert!(summary.contains("Total steps"));
+        assert!(summary.contains("Clip count"));
+        assert!(summary.contains("collapse"));
+    }
+
+    #[test]
+    fn test_bottleneck_activation_dimensions() {
+        let genesis = GenesisSeed::from_phrase("test-bottleneck");
+        let hdc_dim = 256;
+        let bottleneck = 32;
+        let ssm_dim = 64;
+        let proj = HdcSsmProjection::new(&genesis, hdc_dim, bottleneck, ssm_dim);
+
+        let hv = ContinuousHV::random(hdc_dim, 42).normalize();
+        let act = proj.bottleneck_activation(&hv);
+        assert_eq!(act.len(), bottleneck, "Bottleneck activation should have bottleneck dimensions");
+        assert!(
+            act.iter().all(|v| v.is_finite()),
+            "All bottleneck activations should be finite"
+        );
     }
 }

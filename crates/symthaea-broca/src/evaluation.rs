@@ -344,9 +344,9 @@ pub struct LiquidMambaEvalResult {
     pub avg_semantic_pe: f32,
     /// Mean effective rank of projection bottleneck activations.
     pub avg_effective_rank: f32,
-    /// Consciousness gating verification: (certain_hedging%, unknown_hedging%).
-    /// If `unknown > certain`, the consciousness bridge is steering generation.
-    pub gating_verification: Option<(f32, f32)>,
+    /// Consciousness gating verification with detailed per-condition metrics.
+    /// If `unknown_hedging > certain_hedging`, the consciousness bridge is steering generation.
+    pub gating_verification: Option<GatingTestResult>,
     /// Distinct-1: fraction of unique unigrams across all generated text.
     pub distinct_1: f32,
     /// Distinct-2: fraction of unique bigrams across all generated text.
@@ -359,6 +359,30 @@ pub struct LiquidMambaEvalResult {
     pub pe_mean: f32,
     /// Standard deviation of PE across all generations in history buffer.
     pub pe_std_dev: f32,
+}
+
+/// Detailed results from the consciousness gating test.
+///
+/// Compares generation behavior under Certain (epistemic=0.0) vs Unknown (epistemic=3.0)
+/// conditions. A properly functioning consciousness bridge should produce more hedging,
+/// lower coherence, and higher veto rates under Unknown conditions.
+#[cfg(feature = "mamba")]
+#[derive(Debug, Clone)]
+pub struct GatingTestResult {
+    /// Fraction of hedging tokens under Certain epistemic state.
+    pub certain_hedging: f32,
+    /// Fraction of hedging tokens under Unknown epistemic state.
+    pub unknown_hedging: f32,
+    /// Average final coherence under Certain conditions.
+    pub certain_coherence: f32,
+    /// Average final coherence under Unknown conditions.
+    pub unknown_coherence: f32,
+    /// Fraction of Certain generations that triggered a veto.
+    pub certain_veto_rate: f32,
+    /// Fraction of Unknown generations that triggered a veto.
+    pub unknown_veto_rate: f32,
+    /// Number of test pairs evaluated.
+    pub test_count: usize,
 }
 
 /// Compute distinct-n: fraction of unique n-grams out of total n-grams.
@@ -686,16 +710,21 @@ pub fn evaluate_liquid_mamba(
     }
 }
 
-/// Run consciousness gating test: compare hedging tokens under Certain vs Unknown epistemic states.
+/// Run consciousness gating test: compare hedging, coherence, and veto rates
+/// under Certain vs Unknown epistemic states.
 #[cfg(feature = "mamba")]
 fn consciousness_gating_test(
     gen: &mut crate::liquid_mamba::LiquidMambaGenerator,
     dataset: &TrainingDataset,
-) -> Option<(f32, f32)> {
+) -> Option<GatingTestResult> {
     // Sample up to 20 pairs for the gating test (avoid running full dataset twice)
     let sample_size = dataset.pairs.len().min(20);
     let mut certain_hedging_total = 0.0f32;
     let mut unknown_hedging_total = 0.0f32;
+    let mut certain_coherence_total = 0.0f32;
+    let mut unknown_coherence_total = 0.0f32;
+    let mut certain_veto_count = 0usize;
+    let mut unknown_veto_count = 0usize;
     let mut test_count = 0usize;
 
     for pair in dataset.pairs.iter().take(sample_size) {
@@ -715,6 +744,14 @@ fn consciousness_gating_test(
 
         certain_hedging_total += hedging_ratio(&certain_result.text);
         unknown_hedging_total += hedging_ratio(&unknown_result.text);
+        certain_coherence_total += certain_result.final_coherence;
+        unknown_coherence_total += unknown_result.final_coherence;
+        if certain_result.veto_triggered {
+            certain_veto_count += 1;
+        }
+        if unknown_result.veto_triggered {
+            unknown_veto_count += 1;
+        }
         test_count += 1;
     }
 
@@ -722,55 +759,146 @@ fn consciousness_gating_test(
         return None;
     }
 
-    let certain_pct = certain_hedging_total / test_count as f32;
-    let unknown_pct = unknown_hedging_total / test_count as f32;
-    Some((certain_pct, unknown_pct))
+    let n = test_count as f32;
+    Some(GatingTestResult {
+        certain_hedging: certain_hedging_total / n,
+        unknown_hedging: unknown_hedging_total / n,
+        certain_coherence: certain_coherence_total / n,
+        unknown_coherence: unknown_coherence_total / n,
+        certain_veto_rate: certain_veto_count as f32 / n,
+        unknown_veto_rate: unknown_veto_count as f32 / n,
+        test_count,
+    })
 }
 
-/// Format a Liquid-Mamba evaluation result as a human-readable report.
+/// Classify a metric value against a threshold and return a status string.
+#[cfg(feature = "mamba")]
+fn quality_gate(value: f32, good_threshold: f32, ok_threshold: f32, higher_is_better: bool) -> &'static str {
+    if higher_is_better {
+        if value >= good_threshold {
+            "GOOD"
+        } else if value >= ok_threshold {
+            "OK"
+        } else {
+            ""
+        }
+    } else if value <= good_threshold {
+        "GOOD"
+    } else if value <= ok_threshold {
+        "OK"
+    } else {
+        ""
+    }
+}
+
+/// Format a Liquid-Mamba evaluation result as a human-readable report with quality gates.
 #[cfg(feature = "mamba")]
 pub fn format_liquid_mamba_eval_report(result: &LiquidMambaEvalResult) -> String {
     let mut s = String::new();
     s.push_str("=== Liquid-Mamba Evaluation Report ===\n\n");
-    s.push_str(&format!("Samples:           {}\n", result.base.num_samples));
     s.push_str(&format!(
-        "Perplexity:        {:.4}\n",
-        result.base.perplexity
+        "{:<20} {:>10}  {}\n",
+        "Metric", "Value", "Status"
     ));
     s.push_str(&format!(
-        "English ratio:     {:.4}\n",
-        result.base.english_word_ratio
+        "{:<20} {:>10}  {}\n",
+        "------", "-----", "------"
     ));
     s.push_str(&format!(
-        "Avg coherence:     {:.4}\n",
-        result.base.avg_coherence
+        "{:<20} {:>10.2}  \n",
+        "Samples", result.base.num_samples
     ));
     s.push_str(&format!(
-        "Avg semantic PE:   {:.4}\n",
-        result.avg_semantic_pe
+        "{:<20} {:>10.2}\n",
+        "Perplexity", result.base.perplexity
     ));
     s.push_str(&format!(
-        "Effective rank:    {:.2}\n",
-        result.avg_effective_rank
+        "{:<20} {:>9.1}%\n",
+        "English ratio",
+        result.base.english_word_ratio * 100.0
     ));
-    s.push_str(&format!("Distinct-1:        {:.4}\n", result.distinct_1));
-    s.push_str(&format!("Distinct-2:        {:.4}\n", result.distinct_2));
     s.push_str(&format!(
-        "Thought-output sim:{:.4}\n",
-        result.avg_thought_output_similarity
+        "{:<20} {:>10.4}\n",
+        "Avg coherence", result.base.avg_coherence
     ));
-    s.push_str(&format!("PE trend:          {:.6}\n", result.pe_trend));
-    s.push_str(&format!("PE mean:           {:.4}\n", result.pe_mean));
-    s.push_str(&format!("PE std dev:        {:.4}\n", result.pe_std_dev));
+    s.push_str(&format!(
+        "{:<20} {:>10.4}\n",
+        "Avg semantic PE", result.avg_semantic_pe
+    ));
 
-    if let Some((certain, unknown)) = result.gating_verification {
-        s.push_str(&format!("\n--- Consciousness Gating Test ---\n"));
-        s.push_str(&format!("Certain hedging:   {:.2}%\n", certain * 100.0));
-        s.push_str(&format!("Unknown hedging:   {:.2}%\n", unknown * 100.0));
-        if unknown > certain {
-            s.push_str("Result:            PASS (Unknown hedges more than Certain)\n");
+    let rank_status = quality_gate(result.avg_effective_rank, 20.0, 10.0, true);
+    s.push_str(&format!(
+        "{:<20} {:>10.2}  {}\n",
+        "Effective rank", result.avg_effective_rank, rank_status
+    ));
+
+    let d1_status = quality_gate(result.distinct_1, 0.7, 0.5, true);
+    s.push_str(&format!(
+        "{:<20} {:>10.4}  {}\n",
+        "Distinct-1", result.distinct_1, d1_status
+    ));
+
+    let d2_status = quality_gate(result.distinct_2, 0.8, 0.6, true);
+    s.push_str(&format!(
+        "{:<20} {:>10.4}  {}\n",
+        "Distinct-2", result.distinct_2, d2_status
+    ));
+
+    s.push_str(&format!(
+        "{:<20} {:>10.4}\n",
+        "Thought-output sim", result.avg_thought_output_similarity
+    ));
+
+    let pe_trend_status = if result.pe_trend < 0.0 {
+        "IMPROVING"
+    } else if result.pe_trend > 0.02 {
+        "DIVERGING"
+    } else {
+        ""
+    };
+    s.push_str(&format!(
+        "{:<20} {:>10.6}  {}\n",
+        "PE trend", result.pe_trend, pe_trend_status
+    ));
+    s.push_str(&format!(
+        "{:<20} {:>10.4}\n",
+        "PE mean", result.pe_mean
+    ));
+    s.push_str(&format!(
+        "{:<20} {:>10.4}\n",
+        "PE std dev", result.pe_std_dev
+    ));
+
+    if let Some(ref gating) = result.gating_verification {
+        s.push_str(&format!("\n--- Consciousness Gating Test ({} pairs) ---\n", gating.test_count));
+        s.push_str(&format!(
+            "{:<20} {:>10} {:>10}\n",
+            "", "Certain", "Unknown"
+        ));
+        s.push_str(&format!(
+            "{:<20} {:>10} {:>10}\n",
+            "", "-------", "-------"
+        ));
+        s.push_str(&format!(
+            "{:<20} {:>9.2}% {:>9.2}%\n",
+            "Hedging",
+            gating.certain_hedging * 100.0,
+            gating.unknown_hedging * 100.0
+        ));
+        s.push_str(&format!(
+            "{:<20} {:>10.4} {:>10.4}\n",
+            "Coherence", gating.certain_coherence, gating.unknown_coherence
+        ));
+        s.push_str(&format!(
+            "{:<20} {:>9.1}% {:>9.1}%\n",
+            "Veto rate",
+            gating.certain_veto_rate * 100.0,
+            gating.unknown_veto_rate * 100.0
+        ));
+        if gating.unknown_hedging > gating.certain_hedging {
+            s.push_str("Result:              PASS (Unknown hedges more than Certain)\n");
         } else {
-            s.push_str("Result:            FAIL (consciousness gating not yet effective)\n");
+            s.push_str("Result:              FAIL (consciousness gating not yet effective)\n");
         }
     }
 
@@ -1060,7 +1188,15 @@ mod tests {
                 },
                 avg_semantic_pe: 0.72,
                 avg_effective_rank: 18.5,
-                gating_verification: Some((0.05, 0.15)),
+                gating_verification: Some(GatingTestResult {
+                    certain_hedging: 0.05,
+                    unknown_hedging: 0.15,
+                    certain_coherence: 0.6,
+                    unknown_coherence: 0.3,
+                    certain_veto_rate: 0.0,
+                    unknown_veto_rate: 0.2,
+                    test_count: 5,
+                }),
                 distinct_1: 0.85,
                 distinct_2: 0.92,
                 avg_thought_output_similarity: 0.35,
@@ -1078,6 +1214,10 @@ mod tests {
                 report.contains("PASS"),
                 "Should pass gating test (0.15 > 0.05)"
             );
+            assert!(report.contains("Coherence"), "Should contain coherence column");
+            assert!(report.contains("Veto rate"), "Should contain veto rate");
+            assert!(report.contains("IMPROVING"), "PE trend -0.01 should show IMPROVING");
+            assert!(report.contains("GOOD"), "Distinct-1 0.85 should show GOOD");
         }
 
         #[test]
@@ -1143,7 +1283,15 @@ mod tests {
                 },
                 avg_semantic_pe: 0.9,
                 avg_effective_rank: 2.0,
-                gating_verification: Some((0.10, 0.05)),
+                gating_verification: Some(GatingTestResult {
+                    certain_hedging: 0.10,
+                    unknown_hedging: 0.05,
+                    certain_coherence: 0.3,
+                    unknown_coherence: 0.4,
+                    certain_veto_rate: 0.0,
+                    unknown_veto_rate: 0.0,
+                    test_count: 1,
+                }),
                 distinct_1: 0.3,
                 distinct_2: 0.4,
                 avg_thought_output_similarity: 0.1,
@@ -1243,9 +1391,10 @@ mod tests {
                 result.gating_verification.is_some(),
                 "Gating verification should produce results"
             );
-            let (certain, unknown) = result.gating_verification.unwrap();
-            assert!(certain.is_finite(), "Certain hedging should be finite");
-            assert!(unknown.is_finite(), "Unknown hedging should be finite");
+            let gating = result.gating_verification.unwrap();
+            assert!(gating.certain_hedging.is_finite(), "Certain hedging should be finite");
+            assert!(gating.unknown_hedging.is_finite(), "Unknown hedging should be finite");
+            assert!(gating.test_count > 0, "Should have tested at least one pair");
             // With a trained projection, unknown_hedging > certain_hedging.
             // With random projection, this may not hold — just verify they're computed.
         }
@@ -1289,7 +1438,17 @@ mod tests {
             assert!(result.distinct_1.is_finite());
             assert!(result.distinct_2.is_finite());
             assert!(result.pe_mean.is_finite());
-            assert!(result.gating_verification.is_some());
+            let gating = result
+                .gating_verification
+                .as_ref()
+                .expect("Gating test should produce results");
+            assert!(gating.certain_hedging.is_finite());
+            assert!(gating.unknown_hedging.is_finite());
+            assert!(gating.certain_coherence.is_finite());
+            assert!(gating.unknown_coherence.is_finite());
+            assert!(gating.certain_veto_rate >= 0.0 && gating.certain_veto_rate <= 1.0);
+            assert!(gating.unknown_veto_rate >= 0.0 && gating.unknown_veto_rate <= 1.0);
+            assert!(gating.test_count > 0);
         }
     }
 }

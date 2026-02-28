@@ -20,6 +20,25 @@ use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::mamba::{Config, Model, State};
 
+/// Select the best available compute device.
+///
+/// Returns CUDA GPU 0 if available (requires the `cuda` feature),
+/// otherwise falls back to CPU.
+pub fn best_device() -> Device {
+    #[cfg(feature = "cuda")]
+    {
+        match Device::cuda_if_available(0) {
+            Ok(dev) if dev.is_cuda() => {
+                tracing::info!("Using CUDA device (GPU 0)");
+                return dev;
+            }
+            _ => {}
+        }
+    }
+    tracing::info!("Using CPU device");
+    Device::Cpu
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAMBA BACKEND TRAIT
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -552,7 +571,7 @@ pub(crate) mod tests {
     #[test]
     #[ignore = "Requires network access to download mamba-130m (~260MB)"]
     fn test_mamba_load_and_forward() {
-        let device = Device::Cpu;
+        let device = best_device();
         let mut wrapper = MambaWrapper::load("state-spaces/mamba-130m", device)
             .expect("Failed to load mamba-130m");
 
@@ -571,7 +590,7 @@ pub(crate) mod tests {
     #[test]
     #[ignore = "Requires network access to download mamba-130m (~260MB)"]
     fn test_mamba_context_injection() {
-        let device = Device::Cpu;
+        let device = best_device();
         let mut wrapper = MambaWrapper::load("state-spaces/mamba-130m", device)
             .expect("Failed to load mamba-130m");
 
@@ -589,7 +608,7 @@ pub(crate) mod tests {
     #[test]
     #[ignore = "Requires network access to download mamba-130m (~260MB)"]
     fn test_mamba_state_scaling() {
-        let device = Device::Cpu;
+        let device = best_device();
         let mut wrapper = MambaWrapper::load("state-spaces/mamba-130m", device)
             .expect("Failed to load mamba-130m");
 
@@ -614,7 +633,7 @@ pub(crate) mod tests {
     #[test]
     #[ignore = "Requires network access to download mamba-130m (~260MB)"]
     fn test_mamba_encode_decode() {
-        let device = Device::Cpu;
+        let device = best_device();
         let wrapper = MambaWrapper::load("state-spaces/mamba-130m", device)
             .expect("Failed to load mamba-130m");
 
@@ -629,7 +648,7 @@ pub(crate) mod tests {
     #[test]
     #[ignore = "Requires network access to download mamba-130m (~260MB)"]
     fn test_mamba_reset() {
-        let device = Device::Cpu;
+        let device = best_device();
         let mut wrapper = MambaWrapper::load("state-spaces/mamba-130m", device)
             .expect("Failed to load mamba-130m");
 
@@ -650,7 +669,7 @@ pub(crate) mod tests {
     #[test]
     #[ignore = "Requires network access to download mamba-130m (~260MB)"]
     fn test_mamba_embedding_extraction() {
-        let device = Device::Cpu;
+        let device = best_device();
         let wrapper = MambaWrapper::load("state-spaces/mamba-130m", device)
             .expect("Failed to load mamba-130m");
 
@@ -665,7 +684,7 @@ pub(crate) mod tests {
     #[test]
     #[ignore = "Requires network access to download mamba-130m (~260MB)"]
     fn test_mamba_generate_10_tokens() {
-        let device = Device::Cpu;
+        let device = best_device();
         let mut wrapper = MambaWrapper::load("state-spaces/mamba-130m", device)
             .expect("Failed to load mamba-130m");
 
