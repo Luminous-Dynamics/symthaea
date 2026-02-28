@@ -16,7 +16,7 @@
 //! │       ▼                                                            │
 //! │   ┌──────────────────┐                                             │
 //! │   │  Qwen3Embedder   │ → 1024D dense semantic embedding            │
-//! │   │  (ONNX/simulated)│                                             │
+//! │   │  (Burn/simulated)│                                             │
 //! │   └────────┬─────────┘                                             │
 //! │            │                                                       │
 //! │            ▼                                                       │
@@ -35,7 +35,7 @@
 //!
 //! ## Features
 //!
-//! - **Qwen3 Embeddings**: 1024D semantic embeddings (ONNX or simulated)
+//! - **Qwen3 Embeddings**: 1024D semantic embeddings (Burn or simulated)
 //! - **HdcBridge**: Projects embeddings to HDC space preserving similarity
 //! - **Aligned Encoding**: Same projection for primitives and inputs
 
