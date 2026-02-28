@@ -99,10 +99,16 @@ fn test_pe_trend_after_distillation() {
 
     let (mean, std_dev, trend) = gen.pe_stats();
     assert!(mean.is_finite(), "PE mean should be finite: {mean}");
-    assert!(std_dev.is_finite(), "PE std_dev should be finite: {std_dev}");
+    assert!(
+        std_dev.is_finite(),
+        "PE std_dev should be finite: {std_dev}"
+    );
     assert!(trend.is_finite(), "PE trend should be finite: {trend}");
     assert!(mean >= 0.0, "PE mean should be non-negative: {mean}");
-    assert!(std_dev >= 0.0, "PE std_dev should be non-negative: {std_dev}");
+    assert!(
+        std_dev >= 0.0,
+        "PE std_dev should be non-negative: {std_dev}"
+    );
 }
 
 /// With veto enabled, final_coherence should be finite.
@@ -136,4 +142,91 @@ fn test_fep_modulation_no_panic() {
         let lr = gen.current_lr();
         assert!(lr.is_finite(), "LR should be finite for fep={fep}: {lr}");
     }
+}
+
+/// 55 rounds triggers check_projection_health at gen 50.
+/// last_cached_rank() should be finite and positive afterward.
+#[test]
+fn test_collapse_recovery_health_check() {
+    let config = LiquidMambaConfig {
+        max_tokens: 8,
+        warmup_steps: 0,
+        accumulation_steps: 1,
+        enable_consciousness_gating: false,
+        ..Default::default()
+    };
+    let mut gen = mock_gen(config);
+    let channels = ThoughtChannels::with_intent(1);
+
+    for _ in 0..55 {
+        let result = gen.generate(&channels);
+        gen.distill_step(&channels, &result);
+    }
+
+    let rank = gen.last_cached_rank();
+    assert!(rank.is_finite(), "Cached rank should be finite: {rank}");
+    assert!(rank > 0.0, "Cached rank should be positive: {rank}");
+}
+
+/// Consciousness gating with high and low psi should complete
+/// and produce finite PE.
+#[test]
+fn test_consciousness_gating_high_low_psi() {
+    let config = LiquidMambaConfig {
+        max_tokens: 12,
+        enable_consciousness_gating: true,
+        ..Default::default()
+    };
+
+    // High psi
+    let mut gen = mock_gen(config.clone());
+    let mut channels = ThoughtChannels::with_intent(0);
+    channels.channels[12] = 0.95; // psi = high
+    let result = gen.generate(&channels);
+    assert!(
+        result.semantic_pe.is_finite(),
+        "PE should be finite with high psi: {}",
+        result.semantic_pe
+    );
+
+    // Low psi
+    let mut gen = mock_gen(config);
+    let mut channels = ThoughtChannels::with_intent(0);
+    channels.channels[12] = 0.05; // psi = low
+    let result = gen.generate(&channels);
+    assert!(
+        result.semantic_pe.is_finite(),
+        "PE should be finite with low psi: {}",
+        result.semantic_pe
+    );
+}
+
+/// EMA inference swap: after 10 rounds with enable_ema, EMA should be
+/// active and all weights finite.
+#[test]
+fn test_ema_inference_swap() {
+    let config = LiquidMambaConfig {
+        max_tokens: 8,
+        warmup_steps: 0,
+        accumulation_steps: 1,
+        enable_ema: true,
+        ema_decay: 0.99,
+        enable_consciousness_gating: false,
+        ..Default::default()
+    };
+    let mut gen = mock_gen(config);
+    let channels = ThoughtChannels::with_intent(1);
+
+    for _ in 0..10 {
+        let result = gen.generate(&channels);
+        gen.distill_step(&channels, &result);
+    }
+
+    assert!(gen.projection().has_ema(), "EMA should be active");
+
+    let weights = gen.projection().flatten_weights();
+    assert!(
+        weights.iter().all(|w| w.is_finite()),
+        "All projection weights should be finite after EMA inference cycles"
+    );
 }

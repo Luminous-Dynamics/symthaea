@@ -14,8 +14,7 @@
 use anyhow::Result;
 use std::sync::Mutex;
 use symthaea_broca::{
-    BrocaConfig, BrocaGenerator, LanguageControllerConfig, SamplingStrategy,
-    ThoughtChannels,
+    BrocaConfig, BrocaGenerator, LanguageControllerConfig, SamplingStrategy, ThoughtChannels,
 };
 use symthaea_core::genesis::GenesisSeed;
 
@@ -85,7 +84,10 @@ impl LLMBackend for SsmBackend {
         // otherwise use a default channel set derived from the prompt text.
         let channels = channels_from_prompt(prompt);
 
-        let mut gen = self.generator.lock().map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
+        let mut gen = self
+            .generator
+            .lock()
+            .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
         let result = gen.generate(&channels);
         Ok(result.text)
     }
@@ -98,7 +100,10 @@ impl LLMBackend for SsmBackend {
     ) -> Result<String> {
         let channels = channels_from_prompt(prompt);
 
-        let mut gen = self.generator.lock().map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
+        let mut gen = self
+            .generator
+            .lock()
+            .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
         let result = gen.generate_with_callback(&channels, on_token);
         Ok(result.text)
     }
@@ -127,7 +132,10 @@ impl DirectThoughtBackend for SsmBackend {
         channels: &ThoughtChannels,
         _params: &GenerationParams,
     ) -> Result<String> {
-        let mut gen = self.generator.lock().map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
+        let mut gen = self
+            .generator
+            .lock()
+            .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
         let result = gen.generate(channels);
         Ok(result.text)
     }
@@ -252,7 +260,11 @@ pub fn thought_to_channels(thought: &StructuredThought, mood_temperature: f32) -
     ch.channels[17] = mood_temperature.clamp(0.5, 2.0);
 
     // Channel 18: has computed answer
-    ch.channels[18] = if thought.structured_data.is_some() { 1.0 } else { 0.0 };
+    ch.channels[18] = if thought.structured_data.is_some() {
+        1.0
+    } else {
+        0.0
+    };
 
     // Channel 19: concept count (capped at 10)
     ch.channels[19] = (thought.activated_concepts.len() as f32).min(10.0);
@@ -288,11 +300,10 @@ impl LiquidMambaBackend {
             tracing::info!(path = %path, "Loading projection checkpoint");
             match symthaea_broca::ProjectionCheckpoint::load_from_file(&path) {
                 Ok(ckpt) => {
-                    generator.projection_mut().load_weights(&ckpt.projection_weights);
-                    tracing::info!(
-                        epoch = ckpt.training_epoch,
-                        "Projection weights loaded"
-                    );
+                    generator
+                        .projection_mut()
+                        .load_weights(&ckpt.projection_weights);
+                    tracing::info!(epoch = ckpt.training_epoch, "Projection weights loaded");
                 }
                 Err(e) => {
                     tracing::warn!(path = %path, error = %e, "Failed to load projection checkpoint, using random init");
@@ -317,35 +328,11 @@ impl LiquidMambaBackend {
         &self,
         channels: &ThoughtChannels,
     ) -> anyhow::Result<symthaea_broca::GenerationResult> {
-        let mut gen = self.generator.lock()
+        let mut gen = self
+            .generator
+            .lock()
             .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
         Ok(gen.generate(channels))
-    }
-
-    /// Export projection weights for federated swarm exchange.
-    ///
-    /// Returns flattened projection weights tagged with source identity,
-    /// trust level, and version for aggregation by peers.
-    pub fn export_projection_weights(
-        &self,
-        _source_id: [u8; 32],
-        _trust: f32,
-        _version: u64,
-    ) -> Option<Vec<f32>> {
-        self.generator.lock().ok().map(|g| g.projection().flatten_weights())
-    }
-
-    /// Apply aggregated peer projection weights.
-    ///
-    /// Replaces the local projection weights with externally aggregated weights
-    /// (e.g., from a FederatedAggregator). Returns `true` on success.
-    pub fn apply_peer_weights(&self, aggregated: &[f32]) -> bool {
-        if let Ok(mut gen) = self.generator.lock() {
-            gen.projection_mut().load_weights(aggregated);
-            true
-        } else {
-            false
-        }
     }
 
     /// Pass the FEP learning signal from the cognitive loop to modulate distillation LR.
@@ -374,7 +361,9 @@ impl std::fmt::Debug for LiquidMambaBackend {
 impl LLMBackend for LiquidMambaBackend {
     async fn generate(&self, prompt: &str, _params: &GenerationParams) -> Result<String> {
         let channels = channels_from_prompt(prompt);
-        let mut gen = self.generator.lock()
+        let mut gen = self
+            .generator
+            .lock()
             .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
         let result = gen.generate(&channels);
         gen.distill_step(&channels, &result);
@@ -388,7 +377,9 @@ impl LLMBackend for LiquidMambaBackend {
         on_token: &mut (dyn for<'a> FnMut(&'a str) + Send),
     ) -> Result<String> {
         let channels = channels_from_prompt(prompt);
-        let mut gen = self.generator.lock()
+        let mut gen = self
+            .generator
+            .lock()
             .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
         let result = gen.generate_with_callback(&channels, on_token);
         gen.distill_step(&channels, &result);
@@ -406,12 +397,24 @@ impl LLMBackend for LiquidMambaBackend {
 
     #[cfg(feature = "liquid-mamba")]
     fn last_semantic_pe(&self) -> f32 {
-        self.generator.lock().ok().map(|g| g.last_semantic_pe()).unwrap_or(0.0)
+        self.generator
+            .lock()
+            .ok()
+            .map(|g| g.last_semantic_pe())
+            .unwrap_or(0.0)
     }
 
     #[cfg(feature = "liquid-mamba")]
-    fn export_gradient(&self, _source_id: [u8; 32], _trust: f32, _version: u64) -> Option<Vec<f32>> {
-        self.generator.lock().ok().map(|g| g.projection().flatten_weights())
+    fn export_gradient(
+        &self,
+        _source_id: [u8; 32],
+        _trust: f32,
+        _version: u64,
+    ) -> Option<Vec<f32>> {
+        self.generator
+            .lock()
+            .ok()
+            .map(|g| g.projection().flatten_weights())
     }
 
     #[cfg(feature = "liquid-mamba")]
@@ -453,17 +456,29 @@ impl LLMBackend for LiquidMambaBackend {
 
     #[cfg(feature = "liquid-mamba")]
     fn current_distillation_lr(&self) -> f32 {
-        self.generator.lock().ok().map(|g| g.current_lr()).unwrap_or(0.0)
+        self.generator
+            .lock()
+            .ok()
+            .map(|g| g.current_lr())
+            .unwrap_or(0.0)
     }
 
     #[cfg(feature = "liquid-mamba")]
     fn last_effective_rank(&self) -> f32 {
-        self.generator.lock().ok().map(|g| g.last_cached_rank()).unwrap_or(0.0)
+        self.generator
+            .lock()
+            .ok()
+            .map(|g| g.last_cached_rank())
+            .unwrap_or(0.0)
     }
 
     #[cfg(feature = "liquid-mamba")]
     fn generation_count(&self) -> u32 {
-        self.generator.lock().ok().map(|g| g.generation_count() as u32).unwrap_or(0)
+        self.generator
+            .lock()
+            .ok()
+            .map(|g| g.generation_count() as u32)
+            .unwrap_or(0)
     }
 
     fn update_affect(&self, load: f32, temp: f32) {
@@ -488,7 +503,9 @@ impl DirectThoughtBackend for LiquidMambaBackend {
         channels: &ThoughtChannels,
         _params: &GenerationParams,
     ) -> Result<String> {
-        let mut gen = self.generator.lock()
+        let mut gen = self
+            .generator
+            .lock()
             .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
         let result = gen.generate(channels);
         gen.distill_step(channels, &result);
@@ -524,7 +541,12 @@ mod tests {
         let backend = SsmBackend::new(&genesis);
 
         let params = GenerationParams::default();
-        let result = backend.generate("SEMANTIC_INTENT: Answer\nEPISTEMIC_STATUS: Certain\nTranslate this thought.", &params).await;
+        let result = backend
+            .generate(
+                "SEMANTIC_INTENT: Answer\nEPISTEMIC_STATUS: Certain\nTranslate this thought.",
+                &params,
+            )
+            .await;
         assert!(result.is_ok());
         // Should produce some text (untrained model produces pseudo-random tokens)
         let text = result.unwrap();
@@ -611,7 +633,7 @@ mod tests {
     fn test_thought_to_channels_emotion() {
         let thought = make_test_thought();
         let ch = thought_to_channels(&thought, 1.0);
-        assert!((ch.channels[9] - 0.3).abs() < 0.01);  // valence
+        assert!((ch.channels[9] - 0.3).abs() < 0.01); // valence
         assert!((ch.channels[10] - 0.5).abs() < 0.01); // arousal
         assert!((ch.channels[11] - 0.7).abs() < 0.01); // warmth
     }
@@ -621,8 +643,8 @@ mod tests {
         let thought = make_test_thought();
         let ch = thought_to_channels(&thought, 1.0);
         assert!((ch.channels[12] - 0.65).abs() < 0.01); // psi
-        assert!((ch.channels[13] - 0.7).abs() < 0.01);  // meta_awareness
-        assert!((ch.channels[14] - 0.8).abs() < 0.01);  // coherence
+        assert!((ch.channels[13] - 0.7).abs() < 0.01); // meta_awareness
+        assert!((ch.channels[14] - 0.8).abs() < 0.01); // coherence
     }
 
     #[test]
@@ -655,11 +677,19 @@ mod tests {
             let mut thought = make_test_thought();
             thought.semantic_intent = intent;
             let ch = thought_to_channels(&thought, 1.0);
-            assert_eq!(ch.channels[expected_idx], 1.0, "Intent {:?} should set channel {}", intent, expected_idx);
+            assert_eq!(
+                ch.channels[expected_idx], 1.0,
+                "Intent {:?} should set channel {}",
+                intent, expected_idx
+            );
             // All other intent channels should be 0
             for i in 0..8 {
                 if i != expected_idx {
-                    assert_eq!(ch.channels[i], 0.0, "Channel {} should be 0 for intent {:?}", i, intent);
+                    assert_eq!(
+                        ch.channels[i], 0.0,
+                        "Channel {} should be 0 for intent {:?}",
+                        i, intent
+                    );
                 }
             }
         }
@@ -678,8 +708,13 @@ mod tests {
             let mut thought = make_test_thought();
             thought.epistemic_status = status;
             let ch = thought_to_channels(&thought, 1.0);
-            assert!((ch.channels[8] - expected_val).abs() < 0.01,
-                "Status {:?} should map to {}, got {}", status, expected_val, ch.channels[8]);
+            assert!(
+                (ch.channels[8] - expected_val).abs() < 0.01,
+                "Status {:?} should map to {}, got {}",
+                status,
+                expected_val,
+                ch.channels[8]
+            );
         }
     }
 }
