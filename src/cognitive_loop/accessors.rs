@@ -78,7 +78,7 @@ impl CognitiveLoopService {
     ///
     /// Builds a [`NeuromodTelemetry`] snapshot from the current bath state,
     /// personality drift tracker, and loop stats. Call once per cycle during
-    /// metadata assembly, then apply via [`CycleMetadata::apply_neuromod`].
+    /// metadata assembly, then assign directly to `metadata.neuromod`.
     pub(crate) fn collect_neuromod_telemetry(
         &self,
         neuromod_attention_alloc: f32,
@@ -184,6 +184,27 @@ impl CognitiveLoopService {
     /// Borrow the bath phase tracker for trajectory/centroid/variance queries.
     pub fn bath_phase_tracker(&self) -> &super::neuromodulators::BathPhaseTracker {
         &self.bath_phase_tracker
+    }
+
+    /// 9-dimensional bath state vector [DA, NE, 5-HT, ACh, GABA, Oxy, Glut, Aden, ECB].
+    pub fn bath_state_vector(&self) -> [f32; 9] {
+        self.neuromodulator_bath.state_vector()
+    }
+
+    /// Couple this bath with a peer agent's state vector (oxytocin-mediated).
+    pub fn couple_bath_with_peer(&mut self, peer_state: &[f32]) {
+        self.neuromodulator_bath.couple_with_peer(peer_state);
+    }
+
+    /// Export the bath trajectory as a serializable timeline.
+    pub fn bath_timeline(&self) -> super::neuromodulators::BathTimeline {
+        self.bath_phase_tracker
+            .to_timeline(self.neuromodulator_bath.phase_label())
+    }
+
+    /// Borrow the bath phase transition detector.
+    pub fn bath_phase_detector(&self) -> &super::neuromodulators::PhaseTransitionDetector {
+        &self.bath_phase_detector
     }
 
     // ═══════════════════════════════════════════════════════════════════════
