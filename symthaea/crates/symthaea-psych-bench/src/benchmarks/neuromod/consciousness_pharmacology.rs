@@ -144,7 +144,7 @@ pub struct ConsciousnessPharmacologyBenchmark;
 
 impl PsychBenchmark for ConsciousnessPharmacologyBenchmark {
     fn name(&self) -> &str {
-        "ConsciousnessPharmacology"
+        "Neuromod::ConsciousnessPharmacology"
     }
 
     fn run(&self, _config: &BenchmarkConfig) -> BenchmarkResult {
@@ -218,7 +218,7 @@ mod tests {
     fn test_consciousness_pharmacology_runs() {
         let bench = ConsciousnessPharmacologyBenchmark;
         let result = bench.run(&config());
-        assert_eq!(result.benchmark, "ConsciousnessPharmacology");
+        assert_eq!(result.benchmark, "Neuromod::ConsciousnessPharmacology");
         assert!(result.metrics.len() >= 20);
     }
 

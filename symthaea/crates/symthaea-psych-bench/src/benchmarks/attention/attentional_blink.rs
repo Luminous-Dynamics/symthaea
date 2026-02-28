@@ -14,6 +14,7 @@
 //! - blink_magnitude: 0.30 (SD≈0.12)
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
@@ -70,7 +71,8 @@ impl AttentionalBlinkBenchmark {
 
         // Time pressure: base 0.30 matches ~50% T2|T1 accuracy at lag-2 (Raymond et al., 1992 AB);
         // +0.15/unit degrades target discrimination, modeling attention-gate narrowing under SAT (Heitz, 2014).
-        let temperature: f64 = 0.30 + config.time_pressure * 0.15;
+        let diff_model = difficulty_model_for(self.name());
+        let temperature: f64 = (0.30 + config.time_pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
         let trials_per_lag = 25;
         let lags = [2, 3, 5, 8];
 

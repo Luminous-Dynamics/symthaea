@@ -14,6 +14,7 @@
 //! - search_asymmetry: 2.0 (SD≈0.5)
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
@@ -58,8 +59,10 @@ impl VisualSearchBenchmark {
         // under speed emphasis (Wickelgren, 1977 SAT); temperature increase models
         // noisier evidence accumulation (Heitz, 2014).
         let pressure = config.time_pressure;
-        let threshold: f64 = 0.35 - pressure * 0.10;
-        let temperature: f64 = 0.25 + pressure * 0.15;
+        let diff_model = difficulty_model_for(self.name());
+        let sig_mult = diff_model.signal_multiplier(config.difficulty);
+        let threshold: f64 = (0.35 - pressure * 0.10) * sig_mult;
+        let temperature: f64 = (0.25 + pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
 
         let set_sizes = [4usize, 8, 16, 24];
         let trials_per_size = 20;

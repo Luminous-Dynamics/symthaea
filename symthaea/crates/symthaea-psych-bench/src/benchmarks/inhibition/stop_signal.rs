@@ -12,6 +12,7 @@
 //! - ssrt_ticks: 4 (SD~1.0)
 
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
@@ -52,10 +53,12 @@ impl StopSignalBenchmark {
         // Ratcliff & McKoon (2008) DDM: boundary collapse under speed pressure.
         // Verbruggen & Logan (2008): stop process slows under time pressure.
         let pressure = config.time_pressure;
-        let go_threshold: f64 = 0.15 - pressure * 0.08;
-        let stop_effectiveness: f64 = 0.70 - pressure * 0.20;
+        let diff_model = difficulty_model_for(self.name());
+        let sig_mult = diff_model.signal_multiplier(config.difficulty);
+        let go_threshold: f64 = (0.15 - pressure * 0.08) * sig_mult;
+        let stop_effectiveness: f64 = (0.70 - pressure * 0.20) * sig_mult;
         // Softmax temperature: noisier decisions under pressure
-        let temperature: f64 = 0.30 + pressure * 0.15;
+        let temperature: f64 = (0.30 + pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
 
         let total_trials = 200;
         // 25% stop trials (Logan 1994, standard SST design)

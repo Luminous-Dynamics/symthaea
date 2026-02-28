@@ -165,7 +165,7 @@ pub struct BehavioralKnockoutBenchmark;
 
 impl PsychBenchmark for BehavioralKnockoutBenchmark {
     fn name(&self) -> &str {
-        "BehavioralKnockout"
+        "Neuromod::BehavioralKnockout"
     }
 
     fn run(&self, _config: &BenchmarkConfig) -> BenchmarkResult {
@@ -247,7 +247,7 @@ mod tests {
     fn test_behavioral_knockout_runs() {
         let bench = BehavioralKnockoutBenchmark;
         let result = bench.run(&config());
-        assert_eq!(result.benchmark, "BehavioralKnockout");
+        assert_eq!(result.benchmark, "Neuromod::BehavioralKnockout");
         assert!(result.metrics.len() >= 18);
     }
 

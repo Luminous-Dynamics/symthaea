@@ -11,11 +11,16 @@
 //! - **AllostaticStress** — Chronic stress load accumulation and recovery (McEwen 1998)
 //! - **BehavioralKnockout** — Cohen's d effect sizes for transmitter knockouts (Doya 2002)
 //! - **ConsciousnessPharmacology** — Pharmacological injection → consciousness round-trip
+//! - **DoseResponse** — Graded dose sweeps verify monotonic behavioral output (Clark 1937)
+//! - **ToleranceWithdrawal** — Tolerance/withdrawal curves under sustained injection (Koob 2001)
+//! - **AntagonistProfiles** — Named antagonist methods + behavioral validation (Stahl 2013)
 
 pub mod allostatic_stress;
+pub mod antagonist_profiles;
 pub mod attention_network;
 pub mod behavioral_knockout;
 pub mod consciousness_pharmacology;
+pub mod dose_response;
 pub mod injection_challenge;
 #[cfg(feature = "symthaea-backend")]
 pub mod live_loop_ablation;
@@ -23,12 +28,15 @@ pub mod mood_induction;
 pub mod pharmacological_ablation;
 pub mod pharmacological_challenge;
 pub mod reward_learning;
+pub mod tolerance_withdrawal;
 pub mod yerkes_dodson;
 
 pub use allostatic_stress::AllostaticStressBenchmark;
+pub use antagonist_profiles::AntagonistProfilesBenchmark;
 pub use attention_network::AttentionNetworkBenchmark;
 pub use behavioral_knockout::BehavioralKnockoutBenchmark;
 pub use consciousness_pharmacology::ConsciousnessPharmacologyBenchmark;
+pub use dose_response::DoseResponseBenchmark;
 pub use injection_challenge::InjectionChallengeBenchmark;
 #[cfg(feature = "symthaea-backend")]
 pub use live_loop_ablation::LiveLoopAblationBenchmark;
@@ -36,4 +44,5 @@ pub use mood_induction::MoodInductionBenchmark;
 pub use pharmacological_ablation::PharmacologicalAblationBenchmark;
 pub use pharmacological_challenge::PharmacologicalChallengeBenchmark;
 pub use reward_learning::RewardLearningBenchmark;
+pub use tolerance_withdrawal::ToleranceWithdrawalBenchmark;
 pub use yerkes_dodson::YerkesDodsonBenchmark;

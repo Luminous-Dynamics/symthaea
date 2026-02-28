@@ -129,6 +129,29 @@ fn comprehensive_difficulty_gradient() {
         "vigilance_decrement",
         "disambiguation_cost",
         "blink_magnitude",
+        "list_7::primacy_index",
+    ];
+
+    // Benchmarks exempt from the minimum-effect check. These have difficulty
+    // models wired but their KEY METRIC is insensitive at dim=128 / 15 trials:
+    // - Discrete count metrics (forward_span, categories_completed)
+    // - Ceiling metrics (overall_accuracy = 1.0 even with degradation)
+    // - Metrics dominated by stochastic keyword matching (hinting, priming)
+    // - Metrics whose primary variance comes from stimulus design (bimanual)
+    // The difficulty model DOES modulate internal variables (threshold, noise,
+    // temperature) but the observable key metric doesn't shift enough to detect.
+    let exempt_from_effect_check = [
+        "Executive::WCST",             // categories_completed always 6 at low dim
+        "Language::SemanticPriming",    // priming_effect too small at dim=128
+        "Social::SocialNorm",          // d' at ceiling with 128-dim HVs
+        "Social::UltimatumGame",       // fairness_sensitivity deterministic at low trials
+        "Motor::Bimanual",             // coordination_cost stays 0 at low dim
+        "WorM::ChangeDetection",       // set_size_4::accuracy insensitive to noise_frac delta
+        "WorM::DigitSpan",             // forward_span is discrete integer (7→7)
+        "WorM::N-back",                // nback_2::accuracy ceiling at dim=128
+        "WorM::SpatialUpdating",       // overall_accuracy at ceiling (1.0)
+        "SustainedAttention::CPT",     // d' at ceiling with dim=128 HVs
+        "ToMBench::Hinting",           // keyword-dominant scoring, sigmoid too flat
     ];
 
     let mut failures = Vec::new();
@@ -172,6 +195,23 @@ fn comprehensive_difficulty_gradient() {
                  (d=0.0: {:.3}, d=0.5: {:.3}, d=0.9: {:.3}, lower_better={})",
                 label, metric, first, values[1], last, is_lower_better,
             ));
+        }
+
+        // Stricter check: non-Default models MUST produce a measurable effect.
+        // If d=0.0 and d=0.9 produce identical metrics, the difficulty wiring
+        // is broken (model registered but never read by run_trial).
+        // Some benchmarks are exempt (discrete/ceiling metrics at low dim).
+        if !exempt_from_effect_check.contains(label) {
+            let abs_diff = (last - first).abs();
+            let min_effect = 0.005; // must see at least 0.5% change
+            if abs_diff < min_effect {
+                failures.push(format!(
+                    "{}: metric '{}' shows NO difficulty effect \
+                     (d=0.0: {:.4}, d=0.9: {:.4}, |diff|={:.4} < {:.4}). \
+                     Difficulty model may be registered but unwired in run_trial().",
+                    label, metric, first, last, abs_diff, min_effect,
+                ));
+            }
         }
     }
 

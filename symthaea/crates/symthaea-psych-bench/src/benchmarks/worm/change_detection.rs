@@ -6,6 +6,7 @@
 use crate::adapter::spatial::{VisualObject, VisualObjectAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
@@ -56,7 +57,8 @@ impl ChangeDetectionBenchmark {
             // Encoding noise: 5% per item models variable-precision encoding (Bays & Husain, 2008).
             // Time pressure: +0.10/unit adds encoding degradation, reflecting reduced dwell time
             // in visual WM consolidation under speed emphasis (Vogel et al., 2006).
-            let noise_frac = 0.05 * set_size as f32 + config.time_pressure as f32 * 0.10;
+            let diff_model = difficulty_model_for("WorM::ChangeDetection");
+            let noise_frac = (0.05 * set_size as f32 + config.time_pressure as f32 * 0.10) * diff_model.interference_multiplier(config.difficulty) as f32;
             let encoding_noise_seed = rng_state.wrapping_add(700 + pos as u64);
             let noisy_hv = if noise_frac > 0.01 {
                 let noise = ContinuousHV::random(dim, encoding_noise_seed);
