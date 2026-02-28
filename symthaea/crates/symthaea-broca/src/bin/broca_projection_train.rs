@@ -52,9 +52,11 @@ fn main() {
         accumulation_steps: opts.accumulation_steps,
         cosine_annealing_steps: opts.cosine_annealing_steps,
         deep_projection: opts.deep_projection,
+        grad_clip: opts.grad_clip,
         // Disable runtime safety features during batch training:
         // - consciousness_gating: the PE > 0.8 gate in distill_step() blocks all
-        //   gradient flow when projection is untrained (PE ≈ 1.0 always)
+        //   gradient flow when projection is untrained (PE ≈ 1.0 always).
+        //   Also gates recovery noise injection, which fights gradient updates.
         // - veto: truncates generation to ~3 tokens, starving distillation of signal
         enable_consciousness_gating: false,
         enable_veto: false,
@@ -195,6 +197,7 @@ fn main() {
     tracing::info!(
         epochs = opts.epochs,
         lr = opts.learning_rate,
+        grad_clip = opts.grad_clip,
         max_gen_tokens = opts.max_gen_tokens,
         warm_start = opts.warm_start,
         diagnostics = opts.diagnostics,
@@ -226,9 +229,8 @@ fn main() {
                 epoch_vetos += 1;
             }
 
-            // Periodic projection health check
+            // Periodic progress report (rank computed without injecting noise)
             if opts.diagnostics && (i + 1) % 50 == 0 && !result.output_hvs.is_empty() {
-                gen.check_projection_health(&result.output_hvs);
                 let rank = gen.projection().effective_rank(&result.output_hvs);
                 tracing::info!(
                     epoch = epoch,
@@ -399,6 +401,7 @@ struct ProjectionTrainOpts {
     model_id: String,
     epochs: usize,
     learning_rate: f32,
+    grad_clip: f32,
     warm_start: bool,
     warm_start_bidirectional: bool,
     diagnostics: bool,
@@ -421,6 +424,7 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
         model_id: "state-spaces/mamba-130m".to_string(),
         epochs: 5,
         learning_rate: 0.001,
+        grad_clip: 100.0,
         warm_start: false,
         warm_start_bidirectional: false,
         diagnostics: false,
@@ -472,6 +476,14 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
                     .ok_or("--lr requires a number")?
                     .parse()
                     .map_err(|_| "--lr must be a float")?;
+            }
+            "--grad-clip" => {
+                i += 1;
+                opts.grad_clip = args
+                    .get(i)
+                    .ok_or("--grad-clip requires a number")?
+                    .parse()
+                    .map_err(|_| "--grad-clip must be a float")?;
             }
             "--warm-start" => {
                 opts.warm_start = true;
@@ -568,6 +580,7 @@ fn print_usage() {
     eprintln!("  --resume, -r PATH      Load existing projection weights to continue training");
     eprintln!("  --epochs, -e N         Number of training epochs (default: 5)");
     eprintln!("  --lr RATE              Learning rate (default: 0.001)");
+    eprintln!("  --grad-clip THRESH     Gradient clipping threshold (default: 100.0)");
     eprintln!("  --warm-start                PCA warm-start from training data covariance");
     eprintln!(
         "  --warm-start-bidirectional  Bidirectional warm-start (forward + backward projection)"

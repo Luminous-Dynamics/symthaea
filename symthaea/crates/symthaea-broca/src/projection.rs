@@ -284,6 +284,16 @@ impl ProjectionGradientDiagnostics {
             collapse_detected: self.bottleneck_collapse_detected(),
         }
     }
+
+    /// Restore summary counters from a checkpoint snapshot.
+    ///
+    /// Seeds `total_steps` and `clip_count` so that resumed training
+    /// reports cumulative values. Does NOT restore per-step history
+    /// vectors (those remain empty until new steps are recorded).
+    pub fn restore_from_snapshot(&mut self, snap: &GradientDiagnosticsSnapshot) {
+        self.total_steps = snap.total_steps;
+        self.clip_count = snap.clip_count;
+    }
 }
 
 /// LayerNorm epsilon for numerical stability.

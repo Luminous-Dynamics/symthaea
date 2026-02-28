@@ -269,17 +269,30 @@ impl GradientDiagnostics {
     }
 }
 
-/// Compute the effective learning rate with warmup.
+/// Compute the effective learning rate with warmup + cosine decay.
 ///
-/// During the warmup phase (first `warmup_fraction` of total steps),
-/// LR ramps linearly from 0.1x to 1.0x base LR.
+/// Schedule:
+/// 1. Warmup phase (first `warmup_fraction` of total steps):
+///    LR ramps linearly from 0.1x to 1.0x base LR.
+/// 2. Cosine decay phase (remaining steps):
+///    LR decays from base_lr to min_lr following `0.5 * (1 + cos(π * t))`.
 fn warmup_lr(base_lr: f32, step: usize, total_steps: usize, warmup_fraction: f32) -> f32 {
     let warmup_steps = (total_steps as f32 * warmup_fraction) as usize;
-    if warmup_steps == 0 || step >= warmup_steps {
-        base_lr
-    } else {
+    let min_lr = base_lr * 0.01; // Floor at 1% of base LR
+
+    if warmup_steps > 0 && step < warmup_steps {
+        // Warmup: linear ramp from 0.1x to 1.0x
         let progress = step as f32 / warmup_steps as f32;
         base_lr * (0.1 + 0.9 * progress)
+    } else {
+        // Cosine decay from base_lr to min_lr
+        let decay_steps = total_steps.saturating_sub(warmup_steps);
+        if decay_steps == 0 {
+            return base_lr;
+        }
+        let decay_step = step.saturating_sub(warmup_steps);
+        let t = (decay_step as f32 / decay_steps as f32).min(1.0);
+        min_lr + (base_lr - min_lr) * 0.5 * (1.0 + (std::f32::consts::PI * t).cos())
     }
 }
 

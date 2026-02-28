@@ -702,6 +702,16 @@ impl LiquidMambaGenerator {
         self.diagnostics.as_ref()
     }
 
+    /// Get a mutable reference to the collected gradient diagnostics (if enabled).
+    pub fn projection_diagnostics_mut(&mut self) -> Option<&mut ProjectionGradientDiagnostics> {
+        self.diagnostics.as_mut()
+    }
+
+    /// Generation at which diagnostics-triggered recovery last ran.
+    pub fn last_diag_recovery_gen(&self) -> usize {
+        self.last_diag_recovery_gen
+    }
+
     /// Push a PE value into the history ring buffer (capacity 64).
     fn push_pe_history(&mut self, pe: f32) {
         if self.pe_history.len() >= 64 {
@@ -827,8 +837,14 @@ impl LiquidMambaGenerator {
     pub fn distill_step(&mut self, channels: &ThoughtChannels, result: &GenerationResult) {
         self.generation_count += 1;
 
-        // Periodic projection health check (every 50 generations)
-        if self.generation_count % 50 == 0 && !result.output_hvs.is_empty() {
+        // Periodic projection health check (every 50 generations).
+        // Only inject recovery noise during inference (consciousness_gating enabled).
+        // During batch training (consciousness_gating disabled), recovery noise
+        // fights the gradients and causes rank oscillation.
+        if self.config.enable_consciousness_gating
+            && self.generation_count % 50 == 0
+            && !result.output_hvs.is_empty()
+        {
             self.check_projection_health(&result.output_hvs);
         }
 
@@ -916,25 +932,27 @@ impl LiquidMambaGenerator {
             self.projection.update_ema();
             self.distill_accumulator = 0;
 
-            // Auto-recovery: if diagnostics detect bottleneck collapse and
-            // we haven't recovered recently (>10 generations gap)
-            let collapse_detected = self
-                .diagnostics
-                .as_ref()
-                .map_or(false, |d| d.bottleneck_collapse_detected());
-            let recovery_gap = self
-                .generation_count
-                .saturating_sub(self.last_diag_recovery_gen)
-                > 10;
+            // Auto-recovery: only during inference (consciousness_gating enabled).
+            // During batch training, recovery noise fights gradient updates.
+            if self.config.enable_consciousness_gating {
+                let collapse_detected = self
+                    .diagnostics
+                    .as_ref()
+                    .map_or(false, |d| d.bottleneck_collapse_detected());
+                let recovery_gap = self
+                    .generation_count
+                    .saturating_sub(self.last_diag_recovery_gen)
+                    > 10;
 
-            if collapse_detected && recovery_gap {
-                tracing::warn!(
-                    gen = self.generation_count,
-                    "diagnostics: bottleneck collapse detected, triggering recovery"
-                );
-                let recent: Vec<_> = self.recent_thought_hvs.iter().cloned().collect();
-                self.check_projection_health(&recent);
-                self.last_diag_recovery_gen = self.generation_count;
+                if collapse_detected && recovery_gap {
+                    tracing::warn!(
+                        gen = self.generation_count,
+                        "diagnostics: bottleneck collapse detected, triggering recovery"
+                    );
+                    let recent: Vec<_> = self.recent_thought_hvs.iter().cloned().collect();
+                    self.check_projection_health(&recent);
+                    self.last_diag_recovery_gen = self.generation_count;
+                }
             }
         }
 
