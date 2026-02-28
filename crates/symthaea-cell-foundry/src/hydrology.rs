@@ -137,24 +137,8 @@ impl WaterHdcEncoder {
             reading.potability,
         ];
 
-        // Bind each base with its magnitude (level code)
-        let bound: Vec<ContinuousHV> = self
-            .bases
-            .iter()
-            .zip(values.iter())
-            .map(|(base, &val)| {
-                let mut scaled = base.clone();
-                let data = scaled.values.as_mut_slice();
-                for x in data.iter_mut() {
-                    *x *= val as f32;
-                }
-                scaled
-            })
-            .collect();
-
-        // Bundle all bound vectors
-        let refs: Vec<&ContinuousHV> = bound.iter().collect();
-        ContinuousHV::bundle(&refs)
+        let weights: Vec<f32> = values.iter().map(|&v| v as f32).collect();
+        ContinuousHV::encode_weighted(&self.bases, &weights)
     }
 
     /// Encode a window of readings (temporal bundling).

@@ -531,6 +531,37 @@ impl ContinuousHV {
         }
     }
 
+    /// Encode a set of base vectors weighted by corresponding scalar values.
+    ///
+    /// This is a common HDC encoding pattern: scale each base vector by its
+    /// corresponding weight, then bundle (average) the results.
+    /// Equivalent to `bundle` of individually-scaled vectors but avoids
+    /// intermediate allocations.
+    ///
+    /// # Panics
+    /// - If `bases` and `weights` have different lengths.
+    /// - If `bases` is empty.
+    pub fn encode_weighted(bases: &[ContinuousHV], weights: &[f32]) -> Self {
+        assert_eq!(
+            bases.len(),
+            weights.len(),
+            "bases and weights must have equal length"
+        );
+        assert!(!bases.is_empty(), "cannot encode empty set");
+        let dim = bases[0].dim();
+        let inv_n = 1.0 / bases.len() as f32;
+        let mut values = vec![0.0f32; dim];
+        for (base, &w) in bases.iter().zip(weights.iter()) {
+            for (acc, &v) in values.iter_mut().zip(base.values.iter()) {
+                *acc += v * w;
+            }
+        }
+        for v in values.iter_mut() {
+            *v *= inv_n;
+        }
+        Self { values }
+    }
+
     /// Bundle multiple vectors (owned version)
     ///
     /// Takes owned values instead of references. Useful when you have a `Vec<ContinuousHV>`
@@ -998,5 +1029,55 @@ mod tests {
                 norms[i - 1]
             );
         }
+    }
+
+    #[test]
+    fn test_encode_weighted_matches_manual() {
+        let bases = [
+            ContinuousHV::random(HDC_DIMENSION, 100),
+            ContinuousHV::random(HDC_DIMENSION, 101),
+            ContinuousHV::random(HDC_DIMENSION, 102),
+        ];
+        let weights = [0.5f32, 0.8, 0.3];
+
+        // Manual: scale each base, then bundle
+        let scaled: Vec<ContinuousHV> = bases
+            .iter()
+            .zip(weights.iter())
+            .map(|(b, &w)| {
+                let mut hv = b.clone();
+                for x in hv.values.iter_mut() {
+                    *x *= w;
+                }
+                hv
+            })
+            .collect();
+        let refs: Vec<&ContinuousHV> = scaled.iter().collect();
+        let manual = ContinuousHV::bundle(&refs);
+
+        // encode_weighted
+        let encoded = ContinuousHV::encode_weighted(&bases, &weights);
+
+        let sim = manual.similarity(&encoded);
+        assert!(
+            sim > 0.9999,
+            "encode_weighted should match manual encode, got similarity {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_encode_weighted_deterministic() {
+        let bases = [
+            ContinuousHV::random(HDC_DIMENSION, 200),
+            ContinuousHV::random(HDC_DIMENSION, 201),
+        ];
+        let weights = [0.7f32, 0.3];
+        let a = ContinuousHV::encode_weighted(&bases, &weights);
+        let b = ContinuousHV::encode_weighted(&bases, &weights);
+        assert!(
+            a.similarity(&b) > 0.9999,
+            "encode_weighted should be deterministic"
+        );
     }
 }
