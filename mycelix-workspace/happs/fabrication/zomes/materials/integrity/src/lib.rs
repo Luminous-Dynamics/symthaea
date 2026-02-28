@@ -331,4 +331,72 @@ mod tests {
         let result = validate_material_batch(b).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("batch_id")));
     }
+
+    // =========================================================================
+    // Edge case: infinity, whitespace-only, boundary values
+    // =========================================================================
+
+    #[test]
+    fn infinity_density_rejected() {
+        let mut m = valid_material();
+        m.properties.density_g_cm3 = f32::INFINITY;
+        let result = validate_material(m).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn neg_infinity_density_rejected() {
+        let mut m = valid_material();
+        m.properties.density_g_cm3 = f32::NEG_INFINITY;
+        let result = validate_material(m).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn whitespace_only_name_rejected() {
+        let mut m = valid_material();
+        m.name = "\t\n  ".to_string();
+        let result = validate_material(m).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("name")));
+    }
+
+    #[test]
+    fn name_at_max_length_passes() {
+        let mut m = valid_material();
+        m.name = "x".repeat(256);
+        let result = validate_material(m).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn name_over_max_length_rejected() {
+        let mut m = valid_material();
+        m.name = "x".repeat(257);
+        let result = validate_material(m).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("name")));
+    }
+
+    #[test]
+    fn infinity_quantity_rejected() {
+        let mut b = valid_batch();
+        b.quantity_kg = f32::INFINITY;
+        let result = validate_material_batch(b).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn recycled_content_negative_rejected() {
+        let mut b = valid_batch();
+        b.recycled_content_percent = -0.01;
+        let result = validate_material_batch(b).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("recycled_content_percent")));
+    }
+
+    #[test]
+    fn density_at_boundary_passes() {
+        let mut m = valid_material();
+        m.properties.density_g_cm3 = 0.001; // Exact minimum
+        let result = validate_material(m).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
 }

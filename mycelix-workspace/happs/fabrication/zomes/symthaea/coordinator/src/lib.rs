@@ -708,18 +708,74 @@ fn build_parametric_config(modifiers: &[SerializedBinding]) -> String {
 // REPAIR PREDICTION
 // =============================================================================
 
-/// Default mean time between failures in hours, used when `mtbf_hours` is not
-/// provided by the caller. Callers should supply asset-specific MTBF data when
-/// available; this default is a conservative baseline.
-const DEFAULT_MTBF_HOURS: u32 = 2000;
+/// Per-asset-type MTBF table (hours). Looked up by asset_type field or falls
+/// back to "general" (2000h). Values are industry baselines that callers can
+/// override with measured data.
+fn lookup_mtbf(asset_type: &str) -> u32 {
+    match asset_type.to_lowercase().as_str() {
+        "fdm_printer" | "3d_printer" => 3000,
+        "sla_printer" | "resin_printer" => 2500,
+        "cnc_mill" | "cnc_router" => 5000,
+        "laser_cutter" => 4000,
+        "power_drill" | "drill" => 1500,
+        "impact_driver" => 1200,
+        "circular_saw" | "saw" => 1800,
+        "angle_grinder" | "grinder" => 1000,
+        "compressor" => 6000,
+        "motor" | "electric_motor" => 8000,
+        "pump" => 4500,
+        "hvac" | "heat_pump" => 7000,
+        _ => 2000, // General fallback
+    }
+}
+
+/// Per-component failure mode signatures.  Used to map dominant sensor
+/// channel to the most likely failing component.
+fn component_from_signature(signature: &SensorSignature) -> &'static str {
+    // Prioritise by signal strength (strongest channel wins)
+    let mut scores: Vec<(&str, f32)> = Vec::new();
+
+    if signature.vibration_rms > 0.0 {
+        scores.push(("bearing", signature.vibration_rms));
+    }
+    if signature.vibration_peak_freq > 0.0 {
+        // High-frequency peaks → gear teeth or belt; low → imbalance
+        if signature.vibration_peak_freq > 500.0 {
+            scores.push(("gearbox", signature.vibration_peak_freq / 1000.0));
+        } else {
+            scores.push(("shaft_balance", signature.vibration_peak_freq / 500.0));
+        }
+    }
+    if signature.temp_max > 60.0 {
+        scores.push(("thermal_component", (signature.temp_max - 60.0) / 40.0));
+    }
+    if signature.torque_variance > 0.0 {
+        scores.push(("chuck_mechanism", signature.torque_variance));
+    }
+    if signature.current_draw_delta > 0.0 {
+        scores.push(("motor_winding", signature.current_draw_delta));
+    }
+    if signature.pressure_drop > 0.0 {
+        scores.push(("seal", signature.pressure_drop));
+    }
+    if signature.stress_cycles > 0 {
+        scores.push(("fatigue_joint", (signature.stress_cycles as f32) / 50_000.0));
+    }
+
+    scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    scores.first().map(|(c, _)| *c).unwrap_or("unknown")
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PredictRepairInput {
     pub property_asset_hash: ActionHash,
     pub sensor_history: Vec<SensorReading>,
     pub usage_hours: u32,
-    /// Asset-specific mean time between failures (hours). Falls back to
-    /// [`DEFAULT_MTBF_HOURS`] (2000) when `None`.
+    /// Asset type for MTBF lookup (e.g., "fdm_printer", "drill"). Falls back
+    /// to "general" (2000h) when missing.
+    #[serde(default)]
+    pub asset_type: Option<String>,
+    /// Override MTBF if the caller has measured data.
     #[serde(default)]
     pub mtbf_hours: Option<u32>,
 }
@@ -738,89 +794,283 @@ pub struct RepairPredictionResult {
     pub failure_probability: f32,
     pub estimated_remaining_hours: u32,
     pub recommended_action: String,
+    pub sensor_summary: SensorSummary,
     pub matching_repair_designs: Vec<ActionHash>,
+}
+
+/// Structured summary of the numeric sensor analysis
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SensorSummary {
+    pub vibration_rms: f32,
+    pub vibration_trend_slope: f32,
+    pub vibration_peak_freq: f32,
+    pub temp_mean: f32,
+    pub temp_max: f32,
+    pub temp_trend_slope: f32,
+    pub torque_variance: f32,
+    pub current_draw_delta: f32,
+    pub pressure_drop: f32,
+    pub stress_cycles: u32,
+    pub degradation_score: f32,
 }
 
 /// Predict repair needs from digital twin data
 #[hdk_extern]
 pub fn predict_repair_needs(input: PredictRepairInput) -> ExternResult<RepairPredictionResult> {
-    // Analyze sensor history for degradation patterns
     let analysis = analyze_sensor_degradation(&input.sensor_history);
 
-    // Calculate failure probability based on usage
-    let base_mtbf = input.mtbf_hours.unwrap_or(DEFAULT_MTBF_HOURS);
-    let usage_factor = input.usage_hours as f32 / base_mtbf as f32;
-    let sensor_factor = analysis.degradation_rate;
+    // MTBF: caller override > asset-type lookup > general fallback
+    let base_mtbf = input.mtbf_hours.unwrap_or_else(|| {
+        lookup_mtbf(input.asset_type.as_deref().unwrap_or("general"))
+    });
 
-    let failure_probability = (usage_factor * sensor_factor).min(1.0);
+    // Weibull-inspired failure probability:
+    // P(t) = 1 - exp(-(t/η)^β) where η = MTBF, β = shape (sensor-adjusted)
+    let t = input.usage_hours as f32;
+    let eta = base_mtbf as f32;
+    // β > 1 = wear-out, β < 1 = infant mortality; sensor degradation shifts β up
+    let beta = 1.5 + analysis.degradation_score * 2.0; // Range [1.5, 3.5]
+    let failure_probability = if eta > 0.0 {
+        (1.0 - (-(t / eta).powf(beta)).exp()).clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
 
-    // Estimate remaining useful life
-    let remaining_hours = if failure_probability < 0.9 {
-        ((1.0 - failure_probability) * base_mtbf as f32) as u32
+    // Remaining useful life: solve P(t+Δ)=0.9 for Δ
+    let target_p = 0.9f32;
+    let remaining_hours = if failure_probability < target_p && eta > 0.0 {
+        // t_target = η × (-ln(1 - target_p))^(1/β)
+        let t_target = eta * (-((1.0 - target_p).ln())).powf(1.0 / beta);
+        if t_target > t { (t_target - t) as u32 } else { 0 }
     } else {
         0
     };
 
-    // Determine recommended action
     let recommended_action = if failure_probability > 0.8 {
-        "PrintReplacement".to_string()
+        "PrintReplacement"
     } else if failure_probability > 0.6 {
-        "ScheduleReplacement".to_string()
+        "ScheduleReplacement"
     } else if failure_probability > 0.4 {
-        "OrderMaterials".to_string()
+        "OrderMaterials"
     } else {
-        "Monitor".to_string()
-    };
+        "Monitor"
+    }.to_string();
 
-    // Search for matching repair designs (would query designs zome)
-    let matching_designs = Vec::new(); // Placeholder
+    let matching_designs = Vec::new();
 
     Ok(RepairPredictionResult {
         predicted_component: analysis.likely_component,
         failure_probability,
         estimated_remaining_hours: remaining_hours,
         recommended_action,
+        sensor_summary: analysis.summary,
         matching_repair_designs: matching_designs,
     })
 }
 
-struct DegradationAnalysis {
-    degradation_rate: f32,
-    likely_component: String,
+/// Internal: aggregated sensor signal envelope
+struct SensorSignature {
+    vibration_rms: f32,
+    vibration_trend_slope: f32,
+    vibration_peak_freq: f32,
+    temp_mean: f32,
+    temp_max: f32,
+    temp_trend_slope: f32,
+    torque_variance: f32,
+    current_draw_delta: f32,
+    pressure_drop: f32,
+    stress_cycles: u32,
 }
 
+struct DegradationAnalysis {
+    degradation_score: f32,
+    likely_component: String,
+    summary: SensorSummary,
+}
+
+/// Real numeric sensor analysis: compute RMS, trend slopes (linear regression),
+/// peak frequencies, and per-channel statistics from raw sensor readings.
 fn analyze_sensor_degradation(readings: &[SensorReading]) -> DegradationAnalysis {
     if readings.is_empty() {
         return DegradationAnalysis {
-            degradation_rate: 0.5,
+            degradation_score: 0.5,
             likely_component: "unknown".to_string(),
+            summary: SensorSummary {
+                vibration_rms: 0.0, vibration_trend_slope: 0.0,
+                vibration_peak_freq: 0.0, temp_mean: 0.0, temp_max: 0.0,
+                temp_trend_slope: 0.0, torque_variance: 0.0,
+                current_draw_delta: 0.0, pressure_drop: 0.0,
+                stress_cycles: 0, degradation_score: 0.5,
+            },
         };
     }
 
-    // Simple trend analysis
-    let mut vibration_trend = 0.0;
-    let mut temp_trend = 0.0;
+    // Partition readings by sensor type
+    let mut vibration: Vec<(f32, f32)> = Vec::new(); // (time, value)
+    let mut temperature: Vec<(f32, f32)> = Vec::new();
+    let mut torque: Vec<f32> = Vec::new();
+    let mut current: Vec<f32> = Vec::new();
+    let mut pressure: Vec<f32> = Vec::new();
+    let mut stress_cycles: u32 = 0;
 
-    for reading in readings {
-        match reading.sensor_type.as_str() {
-            "vibration" => vibration_trend += reading.value * 0.1,
-            "temperature" => temp_trend += (reading.value - 25.0).abs() * 0.01,
+    let t0 = readings.iter().map(|r| r.timestamp).min().unwrap_or(0) as f32;
+    for r in readings {
+        let t = (r.timestamp as f32 - t0) / 3600.0; // Relative hours
+        match r.sensor_type.as_str() {
+            "vibration" => vibration.push((t, r.value)),
+            "temperature" => temperature.push((t, r.value)),
+            "torque" => torque.push(r.value),
+            "current" | "current_draw" => current.push(r.value),
+            "pressure" => pressure.push(r.value),
+            "stress_cycle" | "stress_cycles" => stress_cycles += r.value as u32,
             _ => {}
         }
     }
 
-    let degradation_rate = ((vibration_trend + temp_trend) / readings.len() as f32).min(2.0);
+    // Vibration: RMS + trend slope + dominant frequency estimate
+    let vibration_rms = rms(&vibration.iter().map(|(_, v)| *v).collect::<Vec<_>>());
+    let vibration_trend_slope = linear_slope(&vibration);
+    // Peak frequency: use zero-crossing rate as lightweight proxy
+    let vibration_peak_freq = zero_crossing_rate(
+        &vibration.iter().map(|(_, v)| *v).collect::<Vec<_>>(),
+        vibration.last().map(|(t, _)| *t).unwrap_or(1.0).max(0.001),
+    );
 
-    let likely_component = if vibration_trend > temp_trend {
-        "bearing".to_string()
+    // Temperature: mean, max, trend slope
+    let temp_values: Vec<f32> = temperature.iter().map(|(_, v)| *v).collect();
+    let temp_mean = mean(&temp_values);
+    let temp_max = temp_values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let temp_max = if temp_max.is_finite() { temp_max } else { 0.0 };
+    let temp_trend_slope = linear_slope(&temperature);
+
+    // Torque: variance
+    let torque_variance = variance(&torque);
+
+    // Current: delta between first and last quartile means
+    let current_draw_delta = if current.len() >= 4 {
+        let q = current.len() / 4;
+        let first_q: f32 = current[..q].iter().sum::<f32>() / q as f32;
+        let last_q: f32 = current[current.len() - q..].iter().sum::<f32>() / q as f32;
+        (last_q - first_q).max(0.0)
     } else {
-        "thermal_component".to_string()
+        0.0
     };
 
-    DegradationAnalysis {
-        degradation_rate,
-        likely_component,
+    // Pressure: max drop from first reading
+    let pressure_drop = if pressure.len() >= 2 {
+        let first = pressure[0];
+        pressure.iter().copied().map(|p| (first - p).max(0.0)).fold(0.0f32, f32::max)
+    } else {
+        0.0
+    };
+
+    let sig = SensorSignature {
+        vibration_rms, vibration_trend_slope, vibration_peak_freq,
+        temp_mean, temp_max, temp_trend_slope,
+        torque_variance, current_draw_delta, pressure_drop, stress_cycles,
+    };
+
+    // Composite degradation score (0.0 = healthy, 1.0 = critical)
+    // Each channel contributes proportionally to its severity
+    let mut score = 0.0f32;
+    let mut weight_sum = 0.0f32;
+
+    // Vibration RMS > 5 mm/s is generally concerning for rotating machinery
+    if vibration_rms > 0.0 {
+        score += (vibration_rms / 10.0).clamp(0.0, 1.0) * 0.25;
+        weight_sum += 0.25;
     }
+    // Positive vibration trend (getting worse)
+    if vibration_trend_slope > 0.0 {
+        score += (vibration_trend_slope / 5.0).clamp(0.0, 1.0) * 0.15;
+        weight_sum += 0.15;
+    }
+    // Temperature above 60°C is concerning for most components
+    if temp_max > 0.0 {
+        score += ((temp_max - 40.0) / 60.0).clamp(0.0, 1.0) * 0.15;
+        weight_sum += 0.15;
+    }
+    // Rising temperature trend
+    if temp_trend_slope > 0.0 {
+        score += (temp_trend_slope / 10.0).clamp(0.0, 1.0) * 0.1;
+        weight_sum += 0.1;
+    }
+    // Torque variance > 0.1 indicates mechanical looseness
+    if torque_variance > 0.0 {
+        score += (torque_variance / 0.5).clamp(0.0, 1.0) * 0.15;
+        weight_sum += 0.15;
+    }
+    // Current draw increase indicates motor degradation
+    if current_draw_delta > 0.0 {
+        score += (current_draw_delta / 2.0).clamp(0.0, 1.0) * 0.1;
+        weight_sum += 0.1;
+    }
+    // Pressure drop indicates seal failure
+    if pressure_drop > 0.0 {
+        score += (pressure_drop / 5.0).clamp(0.0, 1.0) * 0.1;
+        weight_sum += 0.1;
+    }
+
+    let degradation_score = if weight_sum > 0.0 {
+        (score / weight_sum).clamp(0.0, 1.0)
+    } else {
+        0.5 // No sensor data → uncertain
+    };
+
+    let likely_component = component_from_signature(&sig).to_string();
+
+    let summary = SensorSummary {
+        vibration_rms, vibration_trend_slope, vibration_peak_freq,
+        temp_mean, temp_max, temp_trend_slope, torque_variance,
+        current_draw_delta, pressure_drop, stress_cycles, degradation_score,
+    };
+
+    DegradationAnalysis { degradation_score, likely_component, summary }
+}
+
+// ── Numeric helpers ──────────────────────────────────────────────────────
+
+fn rms(values: &[f32]) -> f32 {
+    if values.is_empty() { return 0.0; }
+    let sum_sq: f32 = values.iter().map(|v| v * v).sum();
+    (sum_sq / values.len() as f32).sqrt()
+}
+
+fn mean(values: &[f32]) -> f32 {
+    if values.is_empty() { return 0.0; }
+    values.iter().sum::<f32>() / values.len() as f32
+}
+
+fn variance(values: &[f32]) -> f32 {
+    if values.len() < 2 { return 0.0; }
+    let m = mean(values);
+    values.iter().map(|v| (v - m) * (v - m)).sum::<f32>() / (values.len() - 1) as f32
+}
+
+/// Simple linear regression slope for (x, y) pairs
+fn linear_slope(pairs: &[(f32, f32)]) -> f32 {
+    if pairs.len() < 2 { return 0.0; }
+    let n = pairs.len() as f32;
+    let sum_x: f32 = pairs.iter().map(|(x, _)| x).sum();
+    let sum_y: f32 = pairs.iter().map(|(_, y)| y).sum();
+    let sum_xy: f32 = pairs.iter().map(|(x, y)| x * y).sum();
+    let sum_xx: f32 = pairs.iter().map(|(x, _)| x * x).sum();
+    let denom = n * sum_xx - sum_x * sum_x;
+    if denom.abs() < 1e-10 { return 0.0; }
+    (n * sum_xy - sum_x * sum_y) / denom
+}
+
+/// Zero-crossing rate as a lightweight dominant frequency proxy.
+/// Returns estimated frequency in Hz.
+fn zero_crossing_rate(values: &[f32], duration_hours: f32) -> f32 {
+    if values.len() < 3 || duration_hours <= 0.0 { return 0.0; }
+    let m = mean(values);
+    let crossings = values.windows(2)
+        .filter(|w| (w[0] - m).signum() != (w[1] - m).signum())
+        .count();
+    // Each zero-crossing pair ≈ half a cycle
+    let cycles = crossings as f32 / 2.0;
+    cycles / (duration_hours * 3600.0) // Convert to Hz
 }
 
 // =============================================================================
@@ -911,6 +1161,178 @@ fn extract_primary_category(bindings: &[SerializedBinding]) -> String {
 }
 
 // =============================================================================
+// CONSCIOUSNESS-GATED FABRICATION
+// =============================================================================
+
+/// Consciousness tiers for fabrication gating. Higher consciousness enables
+/// more creative/exploratory parametric generation; lower consciousness uses
+/// proven templates with tighter constraints.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+pub enum ConsciousnessTier {
+    /// Tier 0: Minimal awareness — strict templates only
+    Reflexive,
+    /// Tier 1: Pattern recognition — template + minor variations
+    Adaptive,
+    /// Tier 2: Goal-directed — parametric exploration within bounds
+    Intentional,
+    /// Tier 3: Self-reflective — creative CSG combinations, novel geometry
+    Creative,
+    /// Tier 4: Meta-cognitive — cross-domain inspiration, surprise-driven design
+    Transcendent,
+}
+
+impl ConsciousnessTier {
+    /// Classify a consciousness score [0.0, 1.0] into a tier
+    pub fn from_score(score: f32) -> Self {
+        match score {
+            s if s < 0.2 => Self::Reflexive,
+            s if s < 0.4 => Self::Adaptive,
+            s if s < 0.6 => Self::Intentional,
+            s if s < 0.8 => Self::Creative,
+            _ => Self::Transcendent,
+        }
+    }
+
+    /// Maximum CSG tree depth allowed at this tier
+    pub fn max_csg_depth(&self) -> usize {
+        match self {
+            Self::Reflexive => 1,    // Single primitive
+            Self::Adaptive => 2,     // One boolean op
+            Self::Intentional => 4,  // Nested operations
+            Self::Creative => 8,     // Complex assemblies
+            Self::Transcendent => 16, // Unrestricted
+        }
+    }
+
+    /// Number of design variants to explore
+    pub fn exploration_width(&self) -> usize {
+        match self {
+            Self::Reflexive => 1,
+            Self::Adaptive => 2,
+            Self::Intentional => 4,
+            Self::Creative => 8,
+            Self::Transcendent => 16,
+        }
+    }
+
+    /// Similarity threshold for search — lower = wider net
+    pub fn search_threshold(&self) -> f32 {
+        match self {
+            Self::Reflexive => 0.9,   // Very strict matching
+            Self::Adaptive => 0.8,
+            Self::Intentional => 0.7,
+            Self::Creative => 0.5,    // Cross-domain inspiration
+            Self::Transcendent => 0.3, // Maximum openness
+        }
+    }
+
+    /// Confidence penalty — lower tiers require higher confidence to proceed
+    pub fn min_confidence(&self) -> f32 {
+        match self {
+            Self::Reflexive => 0.9,
+            Self::Adaptive => 0.7,
+            Self::Intentional => 0.5,
+            Self::Creative => 0.3,
+            Self::Transcendent => 0.1,
+        }
+    }
+}
+
+/// Fabrication parameters adjusted by consciousness level
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConsciousnessGatedParams {
+    pub tier: String,
+    pub consciousness_score: f32,
+    pub max_csg_depth: usize,
+    pub exploration_width: usize,
+    pub search_threshold: f32,
+    pub min_confidence: f32,
+    pub creative_features_enabled: bool,
+}
+
+/// Compute consciousness-gated fabrication parameters from a score.
+/// This is called by the LUCID bridge to adjust fabrication behaviour
+/// based on Symthaea's current consciousness state.
+fn consciousness_gated_params(consciousness_score: f32) -> ConsciousnessGatedParams {
+    let score = consciousness_score.clamp(0.0, 1.0);
+    let tier = ConsciousnessTier::from_score(score);
+    ConsciousnessGatedParams {
+        tier: format!("{:?}", tier),
+        consciousness_score: score,
+        max_csg_depth: tier.max_csg_depth(),
+        exploration_width: tier.exploration_width(),
+        search_threshold: tier.search_threshold(),
+        min_confidence: tier.min_confidence(),
+        creative_features_enabled: matches!(tier, ConsciousnessTier::Creative | ConsciousnessTier::Transcendent),
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ConsciousnessGatedInput {
+    pub base_design_hash: ActionHash,
+    pub intent_modifiers: Vec<SerializedBinding>,
+    pub material_constraints: Vec<String>,
+    pub printer_constraints: Option<String>,
+    /// Consciousness score from Symthaea cognitive loop [0.0, 1.0].
+    /// Higher values enable more creative/exploratory generation.
+    pub consciousness_score: f32,
+}
+
+/// Generate a parametric variant with consciousness-gated exploration depth.
+/// At low consciousness, sticks to proven templates with minimal variation.
+/// At high consciousness, explores novel CSG combinations and wider search.
+#[hdk_extern]
+pub fn generate_consciousness_gated_variant(
+    input: ConsciousnessGatedInput,
+) -> ExternResult<Record> {
+    let params = consciousness_gated_params(input.consciousness_score);
+
+    // Gate: if confidence would be below tier minimum, fall back to template
+    let recognized = input.intent_modifiers.iter()
+        .filter(|b| matches!(b.role.as_str(), "shape" | "dimension" | "material" | "feature" | "transform"))
+        .count();
+    let raw_confidence = if input.intent_modifiers.is_empty() {
+        0.5
+    } else {
+        0.5 + 0.5 * (recognized as f32 / input.intent_modifiers.len() as f32)
+    };
+
+    // At low consciousness, require higher confidence to proceed with parametric
+    let use_parametric = raw_confidence >= params.min_confidence;
+
+    let modifiers = if use_parametric {
+        input.intent_modifiers.clone()
+    } else {
+        // Fall back to just the base shape binding
+        input.intent_modifiers.iter()
+            .filter(|b| b.role == "shape")
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+
+    let result = generate_parametric_variant(GenerateVariantInput {
+        base_design_hash: input.base_design_hash,
+        intent_modifiers: modifiers,
+        material_constraints: input.material_constraints,
+        printer_constraints: input.printer_constraints,
+    })?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "consciousness_gated_variant".to_string(),
+        source_zome: "symthaea".to_string(),
+        payload: serde_json::to_string(&params).unwrap_or_else(|_| "{}".to_string()),
+    });
+
+    Ok(result)
+}
+
+/// Query consciousness-gated parameters (read-only, for UI display)
+#[hdk_extern]
+pub fn get_consciousness_params(consciousness_score: f32) -> ExternResult<ConsciousnessGatedParams> {
+    Ok(consciousness_gated_params(consciousness_score))
+}
+
+// =============================================================================
 // UNIT TESTS (pure functions only -- HDK externs require conductor)
 // =============================================================================
 
@@ -972,39 +1394,133 @@ mod tests {
     }
 
     // =========================================================================
+    // lookup_mtbf
+    // =========================================================================
+
+    #[test]
+    fn test_mtbf_fdm_printer() {
+        assert_eq!(lookup_mtbf("fdm_printer"), 3000);
+        assert_eq!(lookup_mtbf("FDM_PRINTER"), 3000); // Case insensitive
+    }
+
+    #[test]
+    fn test_mtbf_drill() {
+        assert_eq!(lookup_mtbf("power_drill"), 1500);
+        assert_eq!(lookup_mtbf("drill"), 1500);
+    }
+
+    #[test]
+    fn test_mtbf_general_fallback() {
+        assert_eq!(lookup_mtbf("unknown_device"), 2000);
+        assert_eq!(lookup_mtbf("general"), 2000);
+    }
+
+    // =========================================================================
     // analyze_sensor_degradation
     // =========================================================================
 
     #[test]
     fn test_analyze_sensor_degradation_empty() {
         let analysis = analyze_sensor_degradation(&[]);
-        assert!((analysis.degradation_rate - 0.5).abs() < f32::EPSILON,
-            "Empty readings should return default 0.5 degradation rate");
+        assert!((analysis.degradation_score - 0.5).abs() < f32::EPSILON,
+            "Empty readings should return default 0.5 degradation score");
         assert_eq!(analysis.likely_component, "unknown");
     }
 
     #[test]
     fn test_analyze_sensor_degradation_vibration_dominant() {
         let readings = vec![
-            SensorReading { timestamp: 1, sensor_type: "vibration".into(), value: 10.0, unit: "mm/s".into() },
-            SensorReading { timestamp: 2, sensor_type: "vibration".into(), value: 12.0, unit: "mm/s".into() },
-            SensorReading { timestamp: 3, sensor_type: "temperature".into(), value: 26.0, unit: "C".into() },
+            SensorReading { timestamp: 1000, sensor_type: "vibration".into(), value: 10.0, unit: "mm/s".into() },
+            SensorReading { timestamp: 2000, sensor_type: "vibration".into(), value: 12.0, unit: "mm/s".into() },
+            SensorReading { timestamp: 3000, sensor_type: "temperature".into(), value: 26.0, unit: "C".into() },
         ];
         let analysis = analyze_sensor_degradation(&readings);
         assert_eq!(analysis.likely_component, "bearing",
             "Vibration-dominant readings should point to bearing");
+        assert!(analysis.summary.vibration_rms > 0.0);
     }
 
     #[test]
     fn test_analyze_sensor_degradation_temp_dominant() {
         let readings = vec![
-            SensorReading { timestamp: 1, sensor_type: "temperature".into(), value: 80.0, unit: "C".into() },
-            SensorReading { timestamp: 2, sensor_type: "temperature".into(), value: 85.0, unit: "C".into() },
-            SensorReading { timestamp: 3, sensor_type: "vibration".into(), value: 0.5, unit: "mm/s".into() },
+            SensorReading { timestamp: 1000, sensor_type: "temperature".into(), value: 80.0, unit: "C".into() },
+            SensorReading { timestamp: 2000, sensor_type: "temperature".into(), value: 85.0, unit: "C".into() },
+            SensorReading { timestamp: 3000, sensor_type: "vibration".into(), value: 0.5, unit: "mm/s".into() },
         ];
         let analysis = analyze_sensor_degradation(&readings);
         assert_eq!(analysis.likely_component, "thermal_component",
             "Temperature-dominant readings should point to thermal_component");
+        assert!(analysis.summary.temp_max >= 85.0);
+    }
+
+    #[test]
+    fn test_analyze_sensor_torque_variance() {
+        let readings = vec![
+            SensorReading { timestamp: 1000, sensor_type: "torque".into(), value: 5.0, unit: "Nm".into() },
+            SensorReading { timestamp: 2000, sensor_type: "torque".into(), value: 8.0, unit: "Nm".into() },
+            SensorReading { timestamp: 3000, sensor_type: "torque".into(), value: 3.0, unit: "Nm".into() },
+            SensorReading { timestamp: 4000, sensor_type: "torque".into(), value: 9.0, unit: "Nm".into() },
+        ];
+        let analysis = analyze_sensor_degradation(&readings);
+        assert_eq!(analysis.likely_component, "chuck_mechanism");
+        assert!(analysis.summary.torque_variance > 0.0);
+    }
+
+    #[test]
+    fn test_degradation_score_healthy() {
+        // Low-vibration, normal temperature → low score
+        let readings = vec![
+            SensorReading { timestamp: 1000, sensor_type: "vibration".into(), value: 0.5, unit: "mm/s".into() },
+            SensorReading { timestamp: 2000, sensor_type: "temperature".into(), value: 30.0, unit: "C".into() },
+        ];
+        let analysis = analyze_sensor_degradation(&readings);
+        assert!(analysis.degradation_score < 0.5, "Healthy readings should have low score, got {}", analysis.degradation_score);
+    }
+
+    #[test]
+    fn test_degradation_score_critical() {
+        // High vibration + high temperature → high score
+        let readings = vec![
+            SensorReading { timestamp: 1000, sensor_type: "vibration".into(), value: 15.0, unit: "mm/s".into() },
+            SensorReading { timestamp: 2000, sensor_type: "vibration".into(), value: 18.0, unit: "mm/s".into() },
+            SensorReading { timestamp: 3000, sensor_type: "temperature".into(), value: 95.0, unit: "C".into() },
+            SensorReading { timestamp: 4000, sensor_type: "temperature".into(), value: 100.0, unit: "C".into() },
+        ];
+        let analysis = analyze_sensor_degradation(&readings);
+        assert!(analysis.degradation_score > 0.5, "Critical readings should have high score, got {}", analysis.degradation_score);
+    }
+
+    // =========================================================================
+    // numeric helpers
+    // =========================================================================
+
+    #[test]
+    fn test_rms() {
+        assert!((rms(&[3.0, 4.0]) - 3.5355).abs() < 0.01);
+        assert_eq!(rms(&[]), 0.0);
+    }
+
+    #[test]
+    fn test_linear_slope_positive() {
+        // Perfect positive slope: y = 2x
+        let pairs = vec![(0.0, 0.0), (1.0, 2.0), (2.0, 4.0)];
+        assert!((linear_slope(&pairs) - 2.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_linear_slope_flat() {
+        let pairs = vec![(0.0, 5.0), (1.0, 5.0), (2.0, 5.0)];
+        assert!((linear_slope(&pairs)).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_variance_uniform() {
+        assert!((variance(&[5.0, 5.0, 5.0])).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_variance_spread() {
+        assert!(variance(&[0.0, 10.0]) > 0.0);
     }
 
     // =========================================================================
@@ -1108,6 +1624,72 @@ mod tests {
     #[test]
     fn test_extract_category_empty() {
         assert_eq!(extract_primary_category(&[]), "general");
+    }
+
+    // =========================================================================
+    // consciousness gating
+    // =========================================================================
+
+    #[test]
+    fn test_consciousness_tier_reflexive() {
+        let tier = ConsciousnessTier::from_score(0.1);
+        assert_eq!(tier, ConsciousnessTier::Reflexive);
+        assert_eq!(tier.max_csg_depth(), 1);
+        assert_eq!(tier.exploration_width(), 1);
+        assert!(tier.search_threshold() > 0.85);
+    }
+
+    #[test]
+    fn test_consciousness_tier_creative() {
+        let tier = ConsciousnessTier::from_score(0.75);
+        assert_eq!(tier, ConsciousnessTier::Creative);
+        assert_eq!(tier.max_csg_depth(), 8);
+        assert_eq!(tier.exploration_width(), 8);
+        assert!(tier.search_threshold() < 0.6);
+    }
+
+    #[test]
+    fn test_consciousness_tier_transcendent() {
+        let tier = ConsciousnessTier::from_score(0.95);
+        assert_eq!(tier, ConsciousnessTier::Transcendent);
+        assert_eq!(tier.max_csg_depth(), 16);
+        assert!(tier.min_confidence() < 0.2, "Transcendent should accept low confidence");
+    }
+
+    #[test]
+    fn test_consciousness_gated_params_low() {
+        let params = consciousness_gated_params(0.1);
+        assert_eq!(params.tier, "Reflexive");
+        assert!(!params.creative_features_enabled);
+        assert_eq!(params.exploration_width, 1);
+    }
+
+    #[test]
+    fn test_consciousness_gated_params_high() {
+        let params = consciousness_gated_params(0.9);
+        assert_eq!(params.tier, "Transcendent");
+        assert!(params.creative_features_enabled);
+        assert_eq!(params.exploration_width, 16);
+    }
+
+    #[test]
+    fn test_consciousness_gated_params_clamped() {
+        let low = consciousness_gated_params(-1.0);
+        assert_eq!(low.tier, "Reflexive");
+        let high = consciousness_gated_params(2.0);
+        assert_eq!(high.tier, "Transcendent");
+    }
+
+    #[test]
+    fn test_consciousness_tiers_monotonic() {
+        // As consciousness increases, exploration should increase
+        let scores = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0];
+        let widths: Vec<usize> = scores.iter().map(|s| {
+            ConsciousnessTier::from_score(*s).exploration_width()
+        }).collect();
+        for w in widths.windows(2) {
+            assert!(w[1] >= w[0], "exploration_width should be monotonically non-decreasing");
+        }
     }
 
     #[test]

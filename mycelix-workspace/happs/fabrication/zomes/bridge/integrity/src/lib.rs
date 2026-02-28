@@ -414,4 +414,97 @@ mod tests {
         let result = validate_supply_chain_link(&s).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
+
+    // =========================================================================
+    // Edge case: infinity, whitespace-only, boundary precision
+    // =========================================================================
+
+    #[test]
+    fn infinity_failure_probability_rejected() {
+        let mut p = valid_prediction();
+        p.prediction.failure_probability = f32::INFINITY;
+        let result = validate_repair_prediction(&p).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn neg_infinity_failure_probability_rejected() {
+        let mut p = valid_prediction();
+        p.prediction.failure_probability = f32::NEG_INFINITY;
+        let result = validate_repair_prediction(&p).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn failure_probability_at_zero_passes() {
+        let mut p = valid_prediction();
+        p.prediction.failure_probability = 0.0;
+        let result = validate_repair_prediction(&p).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn failure_probability_at_one_passes() {
+        let mut p = valid_prediction();
+        p.prediction.failure_probability = 1.0;
+        let result = validate_repair_prediction(&p).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn whitespace_only_asset_model_rejected() {
+        let mut p = valid_prediction();
+        p.prediction.asset_model = "  \t\n  ".to_string();
+        let result = validate_repair_prediction(&p).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("asset_model")));
+    }
+
+    #[test]
+    fn sensor_summary_at_max_length_passes() {
+        let mut p = valid_prediction();
+        p.prediction.sensor_data_summary = "x".repeat(4096);
+        let result = validate_repair_prediction(&p).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn listing_price_zero_passes() {
+        let ml = MarketplaceListingEntry {
+            design_hash: make_action_hash(),
+            marketplace_listing_hash: None,
+            price: Some(0),
+            listing_type: ListingType::DesignSale,
+            created_at: make_timestamp(),
+        };
+        let result = validate_marketplace_listing(&ml).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn whitespace_only_supplier_did_rejected() {
+        let s = SupplyChainLinkEntry {
+            material_hash: make_action_hash(),
+            supplychain_item_hash: None,
+            supplier_did: "   ".to_string(),
+            created_at: make_timestamp(),
+        };
+        let result = validate_supply_chain_link(&s).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn confidence_interval_at_max_passes() {
+        let mut p = valid_prediction();
+        p.prediction.confidence_interval_days = 3650;
+        let result = validate_repair_prediction(&p).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn confidence_interval_over_max_rejected() {
+        let mut p = valid_prediction();
+        p.prediction.confidence_interval_days = 3651;
+        let result = validate_repair_prediction(&p).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
 }

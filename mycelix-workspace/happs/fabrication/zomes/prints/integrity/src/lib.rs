@@ -672,4 +672,94 @@ mod tests {
         let result = validate_cincinnati_anomaly(anomaly);
         assert!(is_invalid(&result), "Infinite stepper_current should be rejected");
     }
+
+    // =========================================================================
+    // Edge cases: infinity, boundary values, combined failures
+    // =========================================================================
+
+    #[test]
+    fn test_infinity_pog_score_rejected() {
+        let mut r = valid_print_record();
+        r.pog_score = f32::INFINITY;
+        let result = validate_print_record(r);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn test_neg_infinity_energy_rejected() {
+        let mut r = valid_print_record();
+        r.energy_used_kwh = f32::NEG_INFINITY;
+        let result = validate_print_record(r);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn test_pog_score_at_zero_passes() {
+        let mut r = valid_print_record();
+        r.pog_score = 0.0;
+        let result = validate_print_record(r);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_pog_score_at_one_passes() {
+        let mut r = valid_print_record();
+        r.pog_score = 1.0;
+        let result = validate_print_record(r);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_layer_height_at_min_boundary_passes() {
+        let mut j = valid_print_job();
+        j.settings.layer_height = 0.01;
+        let result = validate_print_job(j);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_layer_height_below_min_rejected() {
+        let mut j = valid_print_job();
+        j.settings.layer_height = 0.009;
+        let result = validate_print_job(j);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn test_infill_at_zero_passes() {
+        let mut j = valid_print_job();
+        j.settings.infill_percent = 0;
+        let result = validate_print_job(j);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_infill_at_hundred_passes() {
+        let mut j = valid_print_job();
+        j.settings.infill_percent = 100;
+        let result = validate_print_job(j);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_health_score_at_boundaries_passes() {
+        let mut s = valid_cincinnati_session_entry();
+        s.running_health_score = 0.0;
+        assert!(is_valid(&validate_cincinnati_session(s)));
+
+        let mut s2 = valid_cincinnati_session_entry();
+        s2.running_health_score = 1.0;
+        assert!(is_valid(&validate_cincinnati_session(s2)));
+    }
+
+    #[test]
+    fn test_severity_at_boundaries_passes() {
+        let mut a = valid_cincinnati_anomaly_entry();
+        a.event.severity = 0.0;
+        assert!(is_valid(&validate_cincinnati_anomaly(a)));
+
+        let mut a2 = valid_cincinnati_anomaly_entry();
+        a2.event.severity = 1.0;
+        assert!(is_valid(&validate_cincinnati_anomaly(a2)));
+    }
 }
