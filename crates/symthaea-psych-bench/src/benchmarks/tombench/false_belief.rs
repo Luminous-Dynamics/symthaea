@@ -18,7 +18,9 @@ use crate::harness::config::BenchmarkConfig;
 #[cfg(not(feature = "symthaea-backend"))]
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
 #[cfg(not(feature = "symthaea-backend"))]
 use symthaea_core::hdc::ContinuousHV;
 
@@ -203,7 +205,8 @@ impl FalseBeliefBenchmark {
         let reality_sim = agent.similarity(&reality_hv);
         // Time pressure: 0.15/unit attenuates belief-reality discrimination, modeling reality bias
         // under cognitive load (Birch & Bloom, 2007 curse of knowledge; Wickelgren, 1977 SAT).
-        let pressure_noise = config.time_pressure * 0.15 * diff_model.interference_multiplier(config.difficulty);
+        let pressure_noise =
+            config.time_pressure * 0.15 * diff_model.interference_multiplier(config.difficulty);
         let geo_signal = (belief_sim - reality_sim) as f64 * (1.0 - pressure_noise);
 
         // --- Combined: structural tracking is primary, HDC is tiebreaker ---
@@ -309,6 +312,7 @@ impl PsychBenchmark for FalseBeliefBenchmark {
         let mut rt_ticks = Vec::new();
         #[cfg(feature = "symthaea-backend")]
         let mut confidences = Vec::new();
+        let mut trace = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             #[cfg(feature = "symthaea-backend")]
@@ -319,9 +323,35 @@ impl PsychBenchmark for FalseBeliefBenchmark {
             }
             #[cfg(not(feature = "symthaea-backend"))]
             {
-                let (acc, rt) = self.run_trial(config, trial);
+                let (mut acc, rt) = self.run_trial(config, trial);
+
+                // Curse of knowledge: stochastic response flip at higher difficulty (Birch & Bloom 2007)
+                if config.difficulty > 0.0 {
+                    let mut rng_state = (config.seed ^ (trial as u64 * 0x517CC1B727220A95)).wrapping_add(1);
+                    rng_state ^= rng_state << 13;
+                    rng_state ^= rng_state >> 7;
+                    rng_state ^= rng_state << 17;
+                    let u = (rng_state as f64) / (u64::MAX as f64);
+                    if u < config.difficulty * 0.35 {
+                        acc = 1.0 - acc; // flip response
+                    }
+                }
+
                 accuracies.push(acc);
                 rt_ticks.push(rt);
+
+                if config.trial_trace {
+                    trace.push(TrialOutcome {
+                        trial_idx: trial,
+                        condition: "false_belief".to_string(),
+                        correct: acc > 0.5,
+                        rt_ticks: rt,
+                        similarity: 0.0,
+                        confidence: 0.0,
+                        response_idx: 0,
+                        extra: BTreeMap::new(),
+                    });
+                }
             }
         }
 
@@ -334,6 +364,10 @@ impl PsychBenchmark for FalseBeliefBenchmark {
         }
         #[cfg(feature = "symthaea-backend")]
         result.insert("action_confidence", MetricValue::from_samples(&confidences));
+
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

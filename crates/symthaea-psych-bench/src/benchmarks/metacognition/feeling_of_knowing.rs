@@ -21,7 +21,9 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Feeling of Knowing benchmark testing metamemory accuracy.
@@ -54,7 +56,8 @@ impl FeelingOfKnowingBenchmark {
         // Tight noise (0.04) preserves encoding gradient in FOK rankings —
         // the encoding range (~0.40-0.85) is the primary discriminative signal.
         // Lichtenstein et al. (1982): calibration degrades under time pressure.
-        let fok_noise_range: f64 = (0.04 + config.time_pressure * 0.08) / diff_model.signal_multiplier(config.difficulty);
+        let fok_noise_range: f64 =
+            (0.04 + config.time_pressure * 0.08) / diff_model.signal_multiplier(config.difficulty);
 
         // ── Study phase ──
         // Encode cue-target pairs into memory traces with varying quality.
@@ -87,10 +90,8 @@ impl FeelingOfKnowingBenchmark {
             xor_shift(&mut rng);
             let noise_hv = ContinuousHV::random(dim, rng.wrapping_add(2000 + i as u64));
             let enc_f32 = encoding as f32;
-            let trace = ContinuousHV::weighted_bundle(
-                &[&pair, &noise_hv],
-                &[enc_f32, 1.0 - enc_f32],
-            );
+            let trace =
+                ContinuousHV::weighted_bundle(&[&pair, &noise_hv], &[enc_f32, 1.0 - enc_f32]);
 
             cues.push(cue);
             targets.push(target);
@@ -158,8 +159,8 @@ impl FeelingOfKnowingBenchmark {
             //   encoding=0.48 → P≈0.12, encoding=0.58 → P≈0.50, encoding=0.68 → P≈0.88
             let rec_criterion: f64 = 0.58;
             let rec_sensitivity: f64 = 20.0;
-            let recognition_prob = 1.0
-                / (1.0 + (-(encoding_strengths[i] - rec_criterion) * rec_sensitivity).exp());
+            let recognition_prob =
+                1.0 / (1.0 + (-(encoding_strengths[i] - rec_criterion) * rec_sensitivity).exp());
             xor_shift(&mut rng);
             let rec_u = (rng as f64) / u64::MAX as f64;
             let recognized = rec_u < recognition_prob;
@@ -301,6 +302,7 @@ impl PsychBenchmark for FeelingOfKnowingBenchmark {
         let mut resolutions = Vec::new();
         let mut recall_rates = Vec::new();
         let mut rts = Vec::new();
+        let mut trace = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -309,6 +311,19 @@ impl PsychBenchmark for FeelingOfKnowingBenchmark {
             resolutions.push(r.fok_resolution);
             recall_rates.push(r.recall_rate);
             rts.push(r.rt_ticks);
+
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trial,
+                    condition: "fok".to_string(),
+                    correct: r.fok_gamma > 0.0,
+                    rt_ticks: r.rt_ticks,
+                    similarity: r.fok_gamma,
+                    confidence: r.recognition_hit_rate,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("fok_gamma", MetricValue::from_samples(&gammas));
@@ -319,6 +334,10 @@ impl PsychBenchmark for FeelingOfKnowingBenchmark {
         result.insert("fok_resolution", MetricValue::from_samples(&resolutions));
         result.insert("recall_rate", MetricValue::from_samples(&recall_rates));
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
+
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

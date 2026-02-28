@@ -20,31 +20,33 @@ pub mod staircase;
 pub mod transfer;
 pub mod trial_analysis;
 
+pub use cognitive_profile::CognitiveProfile;
 pub use config::{AblationConfig, AblationPreset, BenchmarkConfig};
-pub use report::{
-    provenance_table, BaselineComparison, BenchmarkReport, BenchmarkResult, CompositeScore,
-    ForestPlotRow, LearningCurveRow, MetricValue, RtSummary,
+pub use cross_domain_prediction::{
+    CrossDomainMatrix, DomainCorrelation, PredictionModel, SharedMechanism,
 };
+pub use difficulty::{difficulty_model_for, DifficultyModel, DifficultyModelType};
+pub use neuromod_correlation::NeuromodCorrelationMatrix;
+pub use normative_comparison::{NormativeReport, NormativeScore};
+pub use psychometric_report::{BenchmarkDetail, PsychometricReport, ReportSummary};
+pub use reliability_analysis::{
+    compute_icc, compute_sem, pearson_r, PracticeDirection, PracticeEffect, ReliabilityBattery,
+    ReliabilityClass, TestRetestResult,
+};
+pub use report::{
+    key_metric_for_benchmark, provenance_table, BaselineComparison, BenchmarkReport,
+    BenchmarkResult, CompositeScore, ForestPlotRow, LearningCurveRow, MetricValue, RtSummary,
+};
+pub use sat_curves::{run_sat_curve, SatBattery, SatCurve, SatFit, SatPoint};
 pub use snapshot::{
     RegressionReport, RegressionResult, RegressionSeverity, RegressionSnapshot, RegressionSummary,
     SNAPSHOT_SCHEMA_VERSION,
 };
+pub use staircase::{run_staircase, StaircaseConfig, StaircaseResult, StaircaseRule};
 pub use trial_analysis::{
-    CalibrationResult, ErrorBurst, SpeedAccuracyResult, StrategyShift,
-    TrialAnalysis, TrialBlockRow, TrialOutcome,
+    CalibrationResult, ErrorBurst, SpeedAccuracyResult, StrategyShift, TrialAnalysis,
+    TrialBlockRow, TrialOutcome,
 };
-pub use cognitive_profile::CognitiveProfile;
-pub use difficulty::{DifficultyModel, DifficultyModelType, difficulty_model_for};
-pub use normative_comparison::{NormativeReport, NormativeScore};
-pub use neuromod_correlation::NeuromodCorrelationMatrix;
-pub use reliability_analysis::{
-    ReliabilityBattery, ReliabilityClass, TestRetestResult, PracticeEffect, PracticeDirection,
-    compute_icc, compute_sem, pearson_r, key_metric_for,
-};
-pub use cross_domain_prediction::{CrossDomainMatrix, DomainCorrelation, PredictionModel, SharedMechanism};
-pub use psychometric_report::{PsychometricReport, ReportSummary, BenchmarkDetail};
-pub use sat_curves::{SatBattery, SatCurve, SatFit, SatPoint, run_sat_curve};
-pub use staircase::{StaircaseConfig, StaircaseResult, StaircaseRule, run_staircase};
 
 /// Provenance metadata for a psychological benchmark — citation, paradigm, year.
 #[derive(Debug, Clone)]
@@ -141,7 +143,9 @@ mod tests {
     /// Minimal benchmark with no provenance (tests default).
     struct NoProv;
     impl PsychBenchmark for NoProv {
-        fn name(&self) -> &str { "NoProv" }
+        fn name(&self) -> &str {
+            "NoProv"
+        }
         fn run(&self, _config: &BenchmarkConfig) -> BenchmarkResult {
             BenchmarkResult::new("NoProv", None)
         }
@@ -150,7 +154,9 @@ mod tests {
     /// Benchmark with provenance populated.
     struct WithProv;
     impl PsychBenchmark for WithProv {
-        fn name(&self) -> &str { "WithProv" }
+        fn name(&self) -> &str {
+            "WithProv"
+        }
         fn run(&self, _config: &BenchmarkConfig) -> BenchmarkResult {
             BenchmarkResult::new("WithProv", None)
         }
@@ -461,7 +467,12 @@ mod tests {
         let r2 = AdaptiveRunner::run_adaptive(&StroopBenchmark, &config, "stroop_effect");
         let m1 = r1.metrics["stroop_effect"].mean;
         let m2 = r2.metrics["stroop_effect"].mean;
-        assert!((m1 - m2).abs() < 1e-10, "same seed should produce same result: {} vs {}", m1, m2);
+        assert!(
+            (m1 - m2).abs() < 1e-10,
+            "same seed should produce same result: {} vs {}",
+            m1,
+            m2
+        );
     }
 
     #[test]

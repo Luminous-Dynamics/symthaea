@@ -11,7 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::report::BenchmarkReport;
+use super::report::{key_metric_for_benchmark, BenchmarkReport};
 use super::trial_analysis::TrialOutcome;
 
 // ────────────────────────────────────────────────────────────────────
@@ -229,65 +229,6 @@ pub fn fit_linear(x: &[f64], y: &[f64]) -> PredictionModel {
 }
 
 // ────────────────────────────────────────────────────────────────────
-// Key metric mapping (mirrors cognitive_profile.rs)
-// ────────────────────────────────────────────────────────────────────
-
-/// Map a benchmark name to its primary metric key.
-///
-/// Reuses the same logic as `cognitive_profile::key_metric` to ensure
-/// consistency across the harness.
-pub fn key_metric_for(benchmark: &str) -> &'static str {
-    match benchmark {
-        name if name.contains("Stroop") && name.contains("Emotional") => "emotional_interference",
-        name if name.contains("Stroop") => "incongruent_accuracy",
-        name if name.contains("WCST") => "accuracy",
-        name if name.contains("Flanker") => "incongruent_accuracy",
-        name if name.contains("TowerOfLondon") => "accuracy",
-        name if name.contains("DualTask") => "dual_cost",
-        name if name.contains("Ravens") => "accuracy",
-        name if name.contains("IowaGambling") => "net_score",
-        name if name.contains("N-back") => "hit_rate",
-        name if name.contains("ChangeDetection") => "accuracy",
-        name if name.contains("SerialRecall") => "accuracy",
-        name if name.contains("SpatialUpdating") => "accuracy",
-        name if name.contains("Binding") => "accuracy",
-        name if name.contains("DigitSpan") => "max_span",
-        name if name.contains("PVT") => "mean_rt_ticks",
-        name if name.contains("CPT") => "hit_rate",
-        name if name.contains("SART") => "accuracy",
-        name if name.contains("FittsLaw") => "fitts_r_squared",
-        name if name.contains("Bimanual") => "accuracy",
-        name if name.contains("SRTT") => "accuracy",
-        name if name.contains("GoNoGo") => "overall_accuracy",
-        name if name.contains("StopSignal") => "accuracy",
-        name if name.contains("VisualSearch") => "accuracy",
-        name if name.contains("AttentionalBlink") => "t1_accuracy",
-        name if name.contains("RME") => "accuracy",
-        name if name.contains("SocialNorm") => "accuracy",
-        name if name.contains("UltimatumGame") => "acceptance_rate",
-        name if name.contains("FalseBelief") => "accuracy",
-        name if name.contains("FauxPas") => "accuracy",
-        name if name.contains("Persuasion") => "accuracy",
-        name if name.contains("StrangeStory") => "accuracy",
-        name if name.contains("Hinting") => "accuracy",
-        name if name.contains("LexicalDecision") => "word_accuracy",
-        name if name.contains("SemanticPriming") => "priming_effect",
-        name if name.contains("SemanticCoherence") => "accuracy",
-        name if name.contains("GardenPath") => "accuracy",
-        name if name.contains("Calibration") => "calibration_ece",
-        name if name.contains("FOK") => "gamma",
-        name if name.contains("ReversalLearning") => "accuracy",
-        name if name.contains("Arc") => "transfer_accuracy",
-        name if name.contains("AccurateRetrieval") => "accuracy",
-        name if name.contains("LongRange") => "accuracy",
-        name if name.contains("ProspectiveMemory") => "pm_accuracy",
-        name if name.contains("ConflictResolution") => "accuracy",
-        name if name.contains("TestTimeLearning") => "accuracy",
-        _ => "accuracy",
-    }
-}
-
-// ────────────────────────────────────────────────────────────────────
 // Theoretically motivated benchmark pairs
 // ────────────────────────────────────────────────────────────────────
 
@@ -300,21 +241,41 @@ const KEY_PAIRS: [(&str, &str, &str); 10] = [
     // 2. Shared working memory capacity
     ("WorM::N-back", "WorM::DigitSpan", "working_memory"),
     // 3. Shared set-shifting / cognitive flexibility
-    ("Executive::WCST", "CogBench::ReversalLearning", "set_shifting"),
+    (
+        "Executive::WCST",
+        "CogBench::ReversalLearning",
+        "set_shifting",
+    ),
     // 4. Shared response inhibition
     ("Inhibition::GoNoGo", "Inhibition::StopSignal", "inhibition"),
     // 5. Shared social cognition / mentalizing
     ("Social::RME", "ToMBench::FalseBelief", "social_cognition"),
     // 6. Shared attentional resources
-    ("Attention::VisualSearch", "SustainedAttention::CPT", "attention"),
+    (
+        "Attention::VisualSearch",
+        "SustainedAttention::CPT",
+        "attention",
+    ),
     // 7. Shared lexical processing
-    ("Language::LexicalDecision", "Language::SemanticPriming", "lexical_processing"),
+    (
+        "Language::LexicalDecision",
+        "Language::SemanticPriming",
+        "lexical_processing",
+    ),
     // 8. Shared motor control
     ("Motor::FittsLaw", "Motor::Bimanual", "motor_control"),
     // 9. Shared metacognitive monitoring
-    ("Metacognition::Calibration", "Metacognition::FOK", "metacognition"),
+    (
+        "Metacognition::Calibration",
+        "Metacognition::FOK",
+        "metacognition",
+    ),
     // 10. Shared fluid intelligence
-    ("Reasoning::ArcFluid", "Executive::Ravens", "fluid_intelligence"),
+    (
+        "Reasoning::ArcFluid",
+        "Executive::Ravens",
+        "fluid_intelligence",
+    ),
 ];
 
 // ────────────────────────────────────────────────────────────────────
@@ -342,8 +303,8 @@ impl CrossDomainMatrix {
         let mut predictions = Vec::new();
 
         for &(bench_a, bench_b, _label) in &KEY_PAIRS {
-            let metric_a_name = key_metric_for(bench_a);
-            let metric_b_name = key_metric_for(bench_b);
+            let metric_a_name = key_metric_for_benchmark(bench_a);
+            let metric_b_name = key_metric_for_benchmark(bench_b);
 
             // Collect paired observations across reports.
             let mut vals_a = Vec::new();
@@ -396,8 +357,8 @@ impl CrossDomainMatrix {
         let mut predictions = Vec::new();
 
         for &(bench_a, bench_b, _label) in &KEY_PAIRS {
-            let metric_a_name = key_metric_for(bench_a);
-            let metric_b_name = key_metric_for(bench_b);
+            let metric_a_name = key_metric_for_benchmark(bench_a);
+            let metric_b_name = key_metric_for_benchmark(bench_b);
 
             let result_a = report.results.iter().find(|r| r.benchmark == bench_a);
             let result_b = report.results.iter().find(|r| r.benchmark == bench_b);
@@ -448,7 +409,12 @@ impl CrossDomainMatrix {
     pub fn shared_mechanisms(&self) -> Vec<&DomainCorrelation> {
         self.correlations
             .iter()
-            .filter(|c| matches!(c.shared_mechanism, SharedMechanism::Strong | SharedMechanism::Moderate))
+            .filter(|c| {
+                matches!(
+                    c.shared_mechanism,
+                    SharedMechanism::Strong | SharedMechanism::Moderate
+                )
+            })
             .collect()
     }
 
@@ -459,7 +425,9 @@ impl CrossDomainMatrix {
         // Correlation matrix table.
         out.push_str("## Cross-Domain Correlation Matrix\n\n");
         out.push_str("| Domain A | Metric A | Domain B | Metric B | r | N | p | Mechanism |\n");
-        out.push_str("|----------|----------|----------|----------|------|------|------|----------|\n");
+        out.push_str(
+            "|----------|----------|----------|----------|------|------|------|----------|\n",
+        );
         for c in &self.correlations {
             let mech_str = match c.shared_mechanism {
                 SharedMechanism::Strong => "Strong",
@@ -687,10 +655,10 @@ mod tests {
             .map(|i| {
                 let base = 0.5 + i as f64 * 0.1; // 0.5, 0.6, 0.7, 0.8, 0.9
                 make_report_with_benchmarks(&[
-                    ("Executive::Stroop", "incongruent_accuracy", base),
-                    ("Executive::WCST", "accuracy", base * 0.9 + 0.05),
-                    ("WorM::N-back", "hit_rate", base * 0.8),
-                    ("WorM::DigitSpan", "max_span", 4.0 + i as f64),
+                    ("Executive::Stroop", "stroop_effect", base),
+                    ("Executive::WCST", "categories_completed", base * 0.9 + 0.05),
+                    ("WorM::N-back", "nback_2::accuracy", base * 0.8),
+                    ("WorM::DigitSpan", "forward_span", 4.0 + i as f64),
                 ])
             })
             .collect();
@@ -843,14 +811,14 @@ mod tests {
 
         report.results.push(make_result_with_trace(
             "Executive::Stroop",
-            "incongruent_accuracy",
+            "stroop_effect",
             0.8,
             50,
             0.8,
         ));
         report.results.push(make_result_with_trace(
             "Executive::WCST",
-            "accuracy",
+            "categories_completed",
             0.75,
             50,
             0.75,
@@ -875,16 +843,43 @@ mod tests {
     // ── test_key_metric_for ──
 
     #[test]
-    fn test_key_metric_for() {
-        assert_eq!(key_metric_for("Executive::Stroop"), "incongruent_accuracy");
-        assert_eq!(key_metric_for("Executive::WCST"), "accuracy");
-        assert_eq!(key_metric_for("WorM::N-back"), "hit_rate");
-        assert_eq!(key_metric_for("WorM::DigitSpan"), "max_span");
-        assert_eq!(key_metric_for("Metacognition::FOK"), "gamma");
-        assert_eq!(key_metric_for("Metacognition::Calibration"), "calibration_ece");
-        assert_eq!(key_metric_for("Motor::FittsLaw"), "fitts_r_squared");
-        assert_eq!(key_metric_for("Reasoning::ArcFluid"), "transfer_accuracy");
-        assert_eq!(key_metric_for("Unknown::Benchmark"), "accuracy");
+    fn test_key_metric_for_benchmark() {
+        assert_eq!(
+            key_metric_for_benchmark("Executive::Stroop"),
+            "stroop_effect"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("Executive::WCST"),
+            "categories_completed"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("WorM::N-back"),
+            "nback_2::accuracy"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("WorM::DigitSpan"),
+            "forward_span"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("Metacognition::FeelingOfKnowing"),
+            "fok_gamma"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("Metacognition::Calibration"),
+            "calibration_error_ece"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("Motor::FittsLaw"),
+            "fitts_r_squared"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("Reasoning::ArcFluid"),
+            "transfer_accuracy"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("Unknown::Benchmark"),
+            "overall_accuracy"
+        );
     }
 
     // ── test_shared_mechanisms_filter ──

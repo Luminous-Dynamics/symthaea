@@ -15,8 +15,10 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Metacognitive Calibration benchmark.
@@ -400,6 +402,7 @@ impl PsychBenchmark for MetacognitiveCalibrationBenchmark {
         let mut overconfs = Vec::new();
         let mut resolutions = Vec::new();
         let mut rts = Vec::new();
+        let mut trace = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -408,6 +411,19 @@ impl PsychBenchmark for MetacognitiveCalibrationBenchmark {
             overconfs.push(r.overconfidence);
             resolutions.push(r.resolution);
             rts.push(r.rt_ticks);
+
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trial,
+                    condition: "calibrated".to_string(),
+                    correct: r.calibration_error < 0.20,
+                    rt_ticks: r.rt_ticks,
+                    similarity: r.discrimination,
+                    confidence: 1.0 - r.calibration_error,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("calibration_error_ece", MetricValue::from_samples(&eces));
@@ -415,6 +431,10 @@ impl PsychBenchmark for MetacognitiveCalibrationBenchmark {
         result.insert("overconfidence", MetricValue::from_samples(&overconfs));
         result.insert("resolution", MetricValue::from_samples(&resolutions));
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
+
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
 
         result.conditions = 5; // easy, medium_low, medium, medium_high, hard
         result.trials_per_condition = config.trials_per_condition;

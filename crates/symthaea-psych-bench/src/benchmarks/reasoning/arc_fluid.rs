@@ -72,7 +72,10 @@ impl ArcFluidBenchmark {
 
         let pressure = config.time_pressure;
         // Time pressure adds noise to rule encoding (Wickelgren 1977)
-        let noise_weight = 0.05 + pressure * 0.15;
+        // Difficulty scales temperature via the difficulty model
+        let diff_model = difficulty_model_for(self.name());
+        let noise_weight = (0.05 + pressure * 0.15)
+            * diff_model.temperature_multiplier(config.difficulty);
 
         // Generate a random grid
         let gen_grid = |rng: &mut u64| -> Vec<Vec<u8>> {
@@ -306,10 +309,26 @@ impl ArcFluidBenchmark {
         };
 
         let per_type_accuracy = [
-            if per_type_total[0] > 0 { per_type_hits[0] as f64 / per_type_total[0] as f64 } else { 0.0 },
-            if per_type_total[1] > 0 { per_type_hits[1] as f64 / per_type_total[1] as f64 } else { 0.0 },
-            if per_type_total[2] > 0 { per_type_hits[2] as f64 / per_type_total[2] as f64 } else { 0.0 },
-            if per_type_total[3] > 0 { per_type_hits[3] as f64 / per_type_total[3] as f64 } else { 0.0 },
+            if per_type_total[0] > 0 {
+                per_type_hits[0] as f64 / per_type_total[0] as f64
+            } else {
+                0.0
+            },
+            if per_type_total[1] > 0 {
+                per_type_hits[1] as f64 / per_type_total[1] as f64
+            } else {
+                0.0
+            },
+            if per_type_total[2] > 0 {
+                per_type_hits[2] as f64 / per_type_total[2] as f64
+            } else {
+                0.0
+            },
+            if per_type_total[3] > 0 {
+                per_type_hits[3] as f64 / per_type_total[3] as f64
+            } else {
+                0.0
+            },
         ];
 
         let single_pair_accuracy = if single_pair_total > 0 {
@@ -360,8 +379,6 @@ impl PsychBenchmark for ArcFluidBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
-        let _diff_model = difficulty_model_for(self.name());
-
         let mut consistencies = Vec::new();
         let mut discriminations = Vec::new();
         let mut accuracies = Vec::new();
@@ -393,7 +410,10 @@ impl PsychBenchmark for ArcFluidBenchmark {
             }
         }
 
-        result.insert("rule_consistency", MetricValue::from_samples(&consistencies));
+        result.insert(
+            "rule_consistency",
+            MetricValue::from_samples(&consistencies),
+        );
         result.insert(
             "cross_task_discrimination",
             MetricValue::from_samples(&discriminations),
@@ -439,8 +459,11 @@ impl PsychBenchmark for ArcFluidBenchmark {
                 }
             }
             // Confusion diagonal = mean of diagonal (overall correct classification)
-            let diagonal_mean =
-                (confusion_avg[0][0] + confusion_avg[1][1] + confusion_avg[2][2] + confusion_avg[3][3]) / 4.0;
+            let diagonal_mean = (confusion_avg[0][0]
+                + confusion_avg[1][1]
+                + confusion_avg[2][2]
+                + confusion_avg[3][3])
+                / 4.0;
             result.insert(
                 "confusion_diagonal",
                 MetricValue::from_samples(&[diagonal_mean]),
@@ -515,10 +538,24 @@ mod tests {
     #[test]
     fn test_per_type_breakdowns_finite() {
         let result = ArcFluidBenchmark.run(&test_config());
-        for name in &["accuracy_color_fill", "accuracy_translation", "accuracy_color_replace", "accuracy_reflection"] {
+        for name in &[
+            "accuracy_color_fill",
+            "accuracy_translation",
+            "accuracy_color_replace",
+            "accuracy_reflection",
+        ] {
             let val = &result.metrics[*name];
-            assert!(val.mean.is_finite(), "Per-type metric {} is not finite", name);
-            assert!(val.mean >= 0.0 && val.mean <= 1.0, "Per-type metric {} out of range: {}", name, val.mean);
+            assert!(
+                val.mean.is_finite(),
+                "Per-type metric {} is not finite",
+                name
+            );
+            assert!(
+                val.mean >= 0.0 && val.mean <= 1.0,
+                "Per-type metric {} out of range: {}",
+                name,
+                val.mean
+            );
         }
     }
 
@@ -585,8 +622,7 @@ mod tests {
         let r1 = ArcFluidBenchmark.run(&config);
         let r2 = ArcFluidBenchmark.run(&config);
         assert_eq!(
-            r1.metrics["rule_consistency"].mean,
-            r2.metrics["rule_consistency"].mean,
+            r1.metrics["rule_consistency"].mean, r2.metrics["rule_consistency"].mean,
             "Same seed should produce identical results"
         );
     }
@@ -612,7 +648,11 @@ mod tests {
         assert!(eff.is_finite(), "learning_efficiency not finite");
         // With dim=256, consensus of 2 should generally >= single pair
         // But due to noise, we just check it's in a reasonable range
-        assert!(eff > -0.5 && eff < 0.5, "learning_efficiency out of range: {}", eff);
+        assert!(
+            eff > -0.5 && eff < 0.5,
+            "learning_efficiency out of range: {}",
+            eff
+        );
         let _ = (single, two_pair);
     }
 
@@ -623,14 +663,23 @@ mod tests {
         assert!(result.metrics.contains_key("confusion_max_error"));
         assert!(result.metrics.contains_key("confusion_entropy"));
         let diag = result.metrics["confusion_diagonal"].mean;
-        assert!(diag.is_finite() && diag >= 0.0 && diag <= 1.0,
-            "confusion_diagonal out of range: {}", diag);
+        assert!(
+            diag.is_finite() && diag >= 0.0 && diag <= 1.0,
+            "confusion_diagonal out of range: {}",
+            diag
+        );
         let max_err = result.metrics["confusion_max_error"].mean;
-        assert!(max_err.is_finite() && max_err >= 0.0 && max_err <= 1.0,
-            "confusion_max_error out of range: {}", max_err);
+        assert!(
+            max_err.is_finite() && max_err >= 0.0 && max_err <= 1.0,
+            "confusion_max_error out of range: {}",
+            max_err
+        );
         let entropy = result.metrics["confusion_entropy"].mean;
-        assert!(entropy.is_finite() && entropy >= 0.0,
-            "confusion_entropy should be non-negative: {}", entropy);
+        assert!(
+            entropy.is_finite() && entropy >= 0.0,
+            "confusion_entropy should be non-negative: {}",
+            entropy
+        );
     }
 
     #[test]

@@ -18,7 +18,9 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// RME benchmark.
@@ -32,7 +34,13 @@ struct TrialResult {
 }
 
 impl RmeBenchmark {
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
+    fn run_trial(
+        &self,
+        config: &BenchmarkConfig,
+        trial_idx: usize,
+        trace: &mut Vec<TrialOutcome>,
+        global_trial_idx: &mut usize,
+    ) -> TrialResult {
         let diff_model = difficulty_model_for(self.name());
         let dim = config.dimension;
         let seed = config.trial_seed("social", "rme", trial_idx);
@@ -78,7 +86,8 @@ impl RmeBenchmark {
             // Generate stimulus (eye region) — blend of target + noise
             xor_shift(&mut rng);
             let stimulus_noise = ContinuousHV::random(dim, rng);
-            let signal_weight = (if is_easy { 0.65 } else { 0.40 }) * diff_model.signal_multiplier(config.difficulty) as f32;
+            let signal_weight = (if is_easy { 0.65 } else { 0.40 })
+                * diff_model.signal_multiplier(config.difficulty) as f32;
             let stimulus = ContinuousHV::weighted_bundle(
                 &[target, &stimulus_noise],
                 &[signal_weight, 1.0 - signal_weight],
@@ -102,10 +111,7 @@ impl RmeBenchmark {
                         states[fi].clone()
                     } else {
                         // Hard foils: blend with target (more confusable)
-                        ContinuousHV::weighted_bundle(
-                            &[&states[fi], target],
-                            &[0.70, 0.30],
-                        )
+                        ContinuousHV::weighted_bundle(&[&states[fi], target], &[0.70, 0.30])
                     }
                 })
                 .collect();
@@ -146,7 +152,26 @@ impl RmeBenchmark {
             // RT: harder items take longer
             let base_rt = if is_easy { 4.0 } else { 6.0 };
             let tp_speedup = config.time_pressure * 1.5;
-            rt_sum += (base_rt - tp_speedup).max(1.0);
+            let item_rt = (base_rt - tp_speedup).max(1.0);
+            rt_sum += item_rt;
+
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: *global_trial_idx,
+                    condition: if is_easy {
+                        "easy".to_string()
+                    } else {
+                        "hard".to_string()
+                    },
+                    correct: chose_target,
+                    rt_ticks: item_rt,
+                    similarity: target_sim as f64,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+                *global_trial_idx += 1;
+            }
 
             let _ = item; // suppress unused warning
         }
@@ -195,9 +220,11 @@ impl PsychBenchmark for RmeBenchmark {
         let mut easy_accs = Vec::new();
         let mut hard_accs = Vec::new();
         let mut rts = Vec::new();
+        let mut trace = Vec::new();
+        let mut global_trial_idx = 0usize;
 
         for trial in 0..config.trials_per_condition {
-            let r = self.run_trial(config, trial);
+            let r = self.run_trial(config, trial, &mut trace, &mut global_trial_idx);
             accs.push(r.rme_accuracy);
             easy_accs.push(r.easy_accuracy);
             hard_accs.push(r.hard_accuracy);
@@ -208,6 +235,10 @@ impl PsychBenchmark for RmeBenchmark {
         result.insert("easy_accuracy", MetricValue::from_samples(&easy_accs));
         result.insert("hard_accuracy", MetricValue::from_samples(&hard_accs));
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
+
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
 
         result.conditions = 2; // easy vs hard
         result.trials_per_condition = config.trials_per_condition;
@@ -256,7 +287,11 @@ mod tests {
         };
         let result = RmeBenchmark.run(&config);
         let acc = result.metrics["rme_accuracy"].mean;
-        assert!(acc >= 0.0 && acc <= 1.0, "accuracy ({:.3}) out of bounds", acc);
+        assert!(
+            acc >= 0.0 && acc <= 1.0,
+            "accuracy ({:.3}) out of bounds",
+            acc
+        );
         // Should be above chance (0.25 for 4-AFC) given non-trivial dim
         assert!(acc > 0.25, "accuracy ({:.3}) should be above chance", acc);
     }
@@ -280,7 +315,8 @@ mod tests {
         assert!(
             rt_press <= rt_base + 0.5,
             "time pressure should reduce RT: base={:.2}, pressed={:.2}",
-            rt_base, rt_press
+            rt_base,
+            rt_press
         );
     }
 }

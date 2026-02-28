@@ -49,8 +49,10 @@ impl FittsLawBenchmark {
         // Target prototype
         let target = ContinuousHV::random(dim, seed.wrapping_add(1));
 
-        // Time pressure noise
-        let base_noise: f32 = 0.15 + config.time_pressure as f32 * 0.20;
+        // Time pressure noise, scaled by difficulty temperature model
+        let diff_model = difficulty_model_for(self.name());
+        let base_noise: f32 = (0.15 + config.time_pressure as f32 * 0.20)
+            * diff_model.temperature_multiplier(config.difficulty) as f32;
 
         // 5 difficulty levels: ID = 1.0, 2.0, 3.0, 4.0, 5.0
         let ids = [1.0f64, 2.0, 3.0, 4.0, 5.0];
@@ -208,8 +210,6 @@ impl PsychBenchmark for FittsLawBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
-        let _diff_model = difficulty_model_for(self.name());
-
         let mut r_squareds = Vec::new();
         let mut throughputs = Vec::new();
         let mut accuracies = Vec::new();
@@ -330,7 +330,8 @@ mod tests {
         assert!(
             rt_press <= rt_base + 0.5,
             "time pressure should reduce RT: base={:.2}, pressed={:.2}",
-            rt_base, rt_press
+            rt_base,
+            rt_press
         );
     }
 }

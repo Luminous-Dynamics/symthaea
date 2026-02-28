@@ -58,8 +58,10 @@ impl LexicalDecisionBenchmark {
         // Frequency split: first 10 = high frequency (stronger signal), rest = low frequency
         let high_freq_count = codebook_size / 2;
 
-        // Time pressure noise
-        let noise_level: f32 = 0.20 + config.time_pressure as f32 * 0.15;
+        // Time pressure noise, scaled by difficulty temperature model
+        let diff_model = difficulty_model_for(self.name());
+        let noise_level: f32 = (0.20 + config.time_pressure as f32 * 0.15)
+            * diff_model.temperature_multiplier(config.difficulty) as f32;
 
         let n_items = 40; // 20 word trials + 20 non-word trials
         let mut item_trace = Vec::new();
@@ -131,7 +133,11 @@ impl LexicalDecisionBenchmark {
 
                 // Per-item trial trace
                 if config.trial_trace {
-                    let cond = if is_high_freq { "word_high_freq" } else { "word_low_freq" };
+                    let cond = if is_high_freq {
+                        "word_high_freq"
+                    } else {
+                        "word_low_freq"
+                    };
                     item_trace.push(TrialOutcome {
                         trial_idx: global_item_idx,
                         condition: cond.to_string(),
@@ -154,16 +160,11 @@ impl LexicalDecisionBenchmark {
                     w2 = (w1 + 1) % codebook_size;
                 }
 
-                let nonword = ContinuousHV::weighted_bundle(
-                    &[&words[w1], &words[w2]],
-                    &[0.50, 0.50],
-                );
+                let nonword =
+                    ContinuousHV::weighted_bundle(&[&words[w1], &words[w2]], &[0.50, 0.50]);
                 xor_shift(&mut rng);
                 let noise_hv = ContinuousHV::random(dim, rng);
-                let stimulus = ContinuousHV::weighted_bundle(
-                    &[&nonword, &noise_hv],
-                    &[0.60, 0.40],
-                );
+                let stimulus = ContinuousHV::weighted_bundle(&[&nonword, &noise_hv], &[0.60, 0.40]);
 
                 // Match against codebook: non-word should NOT strongly match any entry
                 let mut best_sim = f32::NEG_INFINITY;
@@ -258,8 +259,6 @@ impl PsychBenchmark for LexicalDecisionBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
-        let _diff_model = difficulty_model_for(self.name());
-
         let mut lex_effects = Vec::new();
         let mut word_accs = Vec::new();
         let mut nonword_accs = Vec::new();
@@ -338,7 +337,11 @@ mod tests {
         };
         let result = LexicalDecisionBenchmark.run(&config);
         let acc = result.metrics["word_accuracy"].mean;
-        assert!(acc >= 0.0 && acc <= 1.0, "word accuracy ({:.3}) out of bounds", acc);
+        assert!(
+            acc >= 0.0 && acc <= 1.0,
+            "word accuracy ({:.3}) out of bounds",
+            acc
+        );
     }
 
     #[test]
@@ -350,7 +353,11 @@ mod tests {
         };
         let result = LexicalDecisionBenchmark.run(&config);
         let effect = result.metrics["lexicality_effect"].mean;
-        assert!(effect >= 0.0, "lexicality effect ({:.3}) should be >= 0", effect);
+        assert!(
+            effect >= 0.0,
+            "lexicality effect ({:.3}) should be >= 0",
+            effect
+        );
     }
 
     #[test]
@@ -372,7 +379,8 @@ mod tests {
         assert!(
             rt_press <= rt_base + 0.5,
             "time pressure should reduce RT: base={:.2}, pressed={:.2}",
-            rt_base, rt_press
+            rt_base,
+            rt_press
         );
     }
 }

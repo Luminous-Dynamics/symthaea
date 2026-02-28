@@ -8,7 +8,11 @@
 //!
 //! No external dependencies — pure `format!()` / `write!()` HTML generation.
 
+use super::cross_domain_prediction::CrossDomainMatrix;
+use super::normative_comparison::NormativeReport;
+use super::psychometric_report::PsychometricReport;
 use super::report::{domain_of, key_metric_for_benchmark, BenchmarkReport};
+use super::sat_curves::SatCurve;
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
@@ -23,6 +27,9 @@ pub fn generate_report(report: &BenchmarkReport, include_llm: bool) -> String {
     write_domain_tables(&mut html, report, include_llm);
     write_forest_plot_svg(&mut html, report);
     write_composite_scores(&mut html, report);
+    write_psychometric_summary(&mut html, report);
+    write_normative_section(&mut html, report);
+    write_cross_domain_section(&mut html, report);
     write_footer(&mut html);
 
     html
@@ -72,7 +79,11 @@ svg {{ max-width: 100%; }}
 "#,
         escape_html(&report.timestamp),
         report.results.len(),
-        report.results.iter().map(|r| r.metrics.len()).sum::<usize>(),
+        report
+            .results
+            .iter()
+            .map(|r| r.metrics.len())
+            .sum::<usize>(),
     );
 }
 
@@ -82,12 +93,18 @@ fn write_profile_radar(html: &mut String, report: &BenchmarkReport) {
         return;
     }
 
-    let _ = write!(html, "<h2>Cognitive Profile</h2>\n<div class=\"chart-container\">\n");
+    let _ = write!(
+        html,
+        "<h2>Cognitive Profile</h2>\n<div class=\"chart-container\">\n"
+    );
 
     let domains: Vec<(&String, &f64)> = profile.iter().collect();
     let n = domains.len();
     if n < 3 {
-        let _ = write!(html, "<p>Need at least 3 domains for radar chart.</p></div>\n");
+        let _ = write!(
+            html,
+            "<p>Need at least 3 domains for radar chart.</p></div>\n"
+        );
         return;
     }
 
@@ -206,9 +223,18 @@ fn write_domain_tables(html: &mut String, report: &BenchmarkReport, include_llm:
             let comparisons = report.find_comparisons(result, &bl);
             let comp = comparisons.iter().find(|(k, _)| k == key);
 
-            let bench_name = result.benchmark.split("::").last().unwrap_or(&result.benchmark);
+            let bench_name = result
+                .benchmark
+                .split("::")
+                .last()
+                .unwrap_or(&result.benchmark);
             let (human_str, pct_str) = comp
-                .map(|(_, c)| (format!("{:.3}", c.human_value), format!("{:.1}%", c.ratio * 100.0)))
+                .map(|(_, c)| {
+                    (
+                        format!("{:.3}", c.human_value),
+                        format!("{:.1}%", c.ratio * 100.0),
+                    )
+                })
                 .unwrap_or_else(|| ("\u{2014}".to_string(), "\u{2014}".to_string()));
 
             let d_val = comp.and_then(|(_, c)| c.effect_size).unwrap_or(0.0);
@@ -242,7 +268,12 @@ fn write_domain_tables(html: &mut String, report: &BenchmarkReport, include_llm:
                 let llm_comps = report.find_llm_comparisons(result, &bl);
                 let llm_comp = llm_comps.iter().find(|(k, _)| k == key);
                 let (llm_val, llm_pct) = llm_comp
-                    .map(|(_, c)| (format!("{:.3}", c.human_value), format!("{:.1}%", c.ratio * 100.0)))
+                    .map(|(_, c)| {
+                        (
+                            format!("{:.3}", c.human_value),
+                            format!("{:.1}%", c.ratio * 100.0),
+                        )
+                    })
                     .unwrap_or_else(|| ("\u{2014}".to_string(), "\u{2014}".to_string()));
                 let _ = write!(html, "<td>{}</td><td>{}</td>", llm_val, llm_pct);
             }
@@ -259,7 +290,10 @@ fn write_forest_plot_svg(html: &mut String, report: &BenchmarkReport) {
         return;
     }
 
-    let _ = write!(html, "<h2>Effect Size Forest Plot</h2>\n<div class=\"chart-container\">\n");
+    let _ = write!(
+        html,
+        "<h2>Effect Size Forest Plot</h2>\n<div class=\"chart-container\">\n"
+    );
 
     let row_height = 28;
     let left_margin = 200;
@@ -276,9 +310,7 @@ fn write_forest_plot_svg(html: &mut String, report: &BenchmarkReport) {
     );
 
     // Scale: d ∈ [-2, +2] maps to plot_width
-    let d_to_x = |d: f64| -> f64 {
-        left_margin as f64 + ((d + 2.0) / 4.0) * plot_width as f64
-    };
+    let d_to_x = |d: f64| -> f64 { left_margin as f64 + ((d + 2.0) / 4.0) * plot_width as f64 };
 
     // Axis
     let axis_y = top_margin as f64 - 5.0;
@@ -326,8 +358,12 @@ fn write_forest_plot_svg(html: &mut String, report: &BenchmarkReport) {
         );
 
         // CI whisker
-        let ci_lo = ((row.ci_lower / row.human_mean - 1.0) * row.cohens_d.unwrap_or(1.0).abs().max(0.5)).clamp(-2.0, 2.0);
-        let ci_hi = ((row.ci_upper / row.human_mean - 1.0) * row.cohens_d.unwrap_or(1.0).abs().max(0.5)).clamp(-2.0, 2.0);
+        let ci_lo = ((row.ci_lower / row.human_mean - 1.0)
+            * row.cohens_d.unwrap_or(1.0).abs().max(0.5))
+        .clamp(-2.0, 2.0);
+        let ci_hi = ((row.ci_upper / row.human_mean - 1.0)
+            * row.cohens_d.unwrap_or(1.0).abs().max(0.5))
+        .clamp(-2.0, 2.0);
         let _ = write!(
             html,
             "<line x1=\"{:.0}\" y1=\"{:.0}\" x2=\"{:.0}\" y2=\"{:.0}\" stroke=\"#666\" stroke-width=\"1\"/>\n",
@@ -427,7 +463,7 @@ pub fn write_provenance_section(
 ///
 /// Each benchmark gets a line chart: X = time_pressure, Y = accuracy.
 /// Dashed fitted curve overlay. Color by domain.
-pub fn write_sat_curves(html: &mut String, curves: &[crate::harness::analysis::SatCurve]) {
+pub fn write_sat_curves(html: &mut String, curves: &[SatCurve]) {
     if curves.is_empty() {
         return;
     }
@@ -507,20 +543,27 @@ pub fn write_sat_curves(html: &mut String, curves: &[crate::harness::analysis::S
     );
 
     let domain_colors = [
-        "#3498db", "#e74c3c", "#2ecc71", "#f39c12", "#9b59b6",
-        "#1abc9c", "#e67e22", "#34495e", "#16a085", "#c0392b",
-        "#2980b9", "#8e44ad", "#27ae60", "#d35400", "#7f8c8d",
+        "#3498db", "#e74c3c", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c", "#e67e22", "#34495e",
+        "#16a085", "#c0392b", "#2980b9", "#8e44ad", "#27ae60", "#d35400", "#7f8c8d",
     ];
 
     // Plot each curve
     for (ci, curve) in curves.iter().enumerate() {
         let color = domain_colors[ci % domain_colors.len()];
-        let short_name = curve.benchmark.split("::").last().unwrap_or(&curve.benchmark);
+        let short_name = curve
+            .benchmark
+            .split("::")
+            .last()
+            .unwrap_or(&curve.benchmark);
 
         // Data points + line
         let mut path_d = String::new();
         let mut sorted_points = curve.points.clone();
-        sorted_points.sort_by(|a, b| a.time_pressure.partial_cmp(&b.time_pressure).unwrap_or(std::cmp::Ordering::Equal));
+        sorted_points.sort_by(|a, b| {
+            a.time_pressure
+                .partial_cmp(&b.time_pressure)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         for (pi, p) in sorted_points.iter().enumerate() {
             let x = margin_l as f64 + p.time_pressure * plot_w as f64;
@@ -539,7 +582,8 @@ pub fn write_sat_curves(html: &mut String, curves: &[crate::harness::analysis::S
         let _ = write!(
             html,
             "<path d=\"{}\" fill=\"none\" stroke=\"{}\" stroke-width=\"2\" opacity=\"0.8\"/>\n",
-            path_d.trim(), color,
+            path_d.trim(),
+            color,
         );
 
         // Dashed fitted curve (20 segments)
@@ -547,8 +591,9 @@ pub fn write_sat_curves(html: &mut String, curves: &[crate::harness::analysis::S
         for si in 0..=20 {
             let tp = si as f64 / 20.0;
             let t = 1.0 - tp;
-            let predicted = if t > curve.delta {
-                curve.lambda * (1.0 - (-curve.beta * (t - curve.delta)).exp())
+            let predicted = if t > curve.fit.intercept {
+                curve.fit.asymptote
+                    * (1.0 - (-curve.fit.rate * (t - curve.fit.intercept)).exp())
             } else {
                 0.0
             };
@@ -577,12 +622,158 @@ pub fn write_sat_curves(html: &mut String, curves: &[crate::harness::analysis::S
                 "<text x=\"{:.0}\" y=\"{:.0}\" font-size=\"9\" fill=\"#333\">{} (R\u{00b2}={:.2})</text>\n",
                 legend_x + 18.0, legend_y + 3.0,
                 escape_html(&short_name[..short_name.len().min(20)]),
-                curve.r_squared,
+                curve.fit.r_squared,
             );
         }
     }
 
     let _ = write!(html, "</svg>\n</div>\n");
+}
+
+fn write_psychometric_summary(html: &mut String, report: &BenchmarkReport) {
+    if report.results.is_empty() {
+        return;
+    }
+
+    let pr = PsychometricReport::from_report(report);
+
+    let _ = write!(html, "<h2>Psychometric Summary</h2>\n<div class=\"summary\">\n");
+    let _ = write!(
+        html,
+        "<strong>Overall score:</strong> {:.1}% | ",
+        pr.summary.overall_score * 100.0
+    );
+    let _ = write!(
+        html,
+        "<strong>Strongest:</strong> {} | ",
+        escape_html(&pr.summary.strongest_domain)
+    );
+    let _ = write!(
+        html,
+        "<strong>Weakest:</strong> {}",
+        escape_html(&pr.summary.weakest_domain)
+    );
+    let _ = write!(html, "</div>\n");
+
+    // Benchmark details table
+    let _ = write!(
+        html,
+        "<table>\n<tr><th>Benchmark</th><th>Key Metric</th><th>Value</th><th>Trials</th><th>Time (ms)</th></tr>\n"
+    );
+    for d in &pr.benchmark_details {
+        let _ = write!(
+            html,
+            "<tr><td>{}</td><td>{}</td><td>{:.3}</td><td>{}</td><td>{}</td></tr>\n",
+            escape_html(&d.benchmark),
+            escape_html(&d.key_metric),
+            d.key_value,
+            d.n_trials,
+            d.elapsed_ms,
+        );
+    }
+    let _ = write!(html, "</table>\n");
+}
+
+fn write_normative_section(html: &mut String, report: &BenchmarkReport) {
+    if report.results.is_empty() {
+        return;
+    }
+
+    let normative = NormativeReport::from_report(report);
+    if normative.scores.is_empty() {
+        return;
+    }
+
+    let _ = write!(
+        html,
+        "<h2>Normative Comparison</h2>\n<div class=\"summary\">\n"
+    );
+    let _ = write!(
+        html,
+        "<strong>Mean z:</strong> {:+.2} | <strong>Percentile:</strong> {:.1}%",
+        normative.overall_mean_z, normative.overall_percentile,
+    );
+    let _ = write!(html, "</div>\n");
+
+    let _ = write!(
+        html,
+        "<table>\n<tr><th>Benchmark</th><th>Metric</th><th>Agent</th><th>Human</th><th>z</th><th>Percentile</th><th>Interpretation</th></tr>\n"
+    );
+    for s in &normative.scores {
+        let z_class = if s.z_score > 1.0 {
+            "green"
+        } else if s.z_score < -1.0 {
+            "red"
+        } else {
+            ""
+        };
+        let _ = write!(
+            html,
+            "<tr><td>{}</td><td>{}</td><td>{:.3}</td><td>{:.3} &plusmn; {:.3}</td><td class=\"{}\">{:+.2}</td><td>{:.1}%</td><td>{}</td></tr>\n",
+            escape_html(&s.benchmark),
+            escape_html(&s.metric),
+            s.agent_value,
+            s.human_mean,
+            s.human_sd,
+            z_class,
+            s.z_score,
+            s.percentile,
+            escape_html(&s.interpretation),
+        );
+    }
+    let _ = write!(html, "</table>\n");
+}
+
+fn write_cross_domain_section(html: &mut String, report: &BenchmarkReport) {
+    if report.results.is_empty() {
+        return;
+    }
+
+    let matrix = CrossDomainMatrix::from_single_report(report);
+    if matrix.correlations.is_empty() {
+        return;
+    }
+
+    let _ = write!(html, "<h2>Cross-Domain Correlations</h2>\n");
+    let _ = write!(
+        html,
+        "<table>\n<tr><th>Domain A</th><th>Domain B</th><th>r</th><th>N</th><th>p</th><th>Mechanism</th></tr>\n"
+    );
+    for c in &matrix.correlations {
+        let mech_str = match c.shared_mechanism {
+            super::cross_domain_prediction::SharedMechanism::Strong => "Strong",
+            super::cross_domain_prediction::SharedMechanism::Moderate => "Moderate",
+            super::cross_domain_prediction::SharedMechanism::Weak => "Weak",
+            super::cross_domain_prediction::SharedMechanism::Independent => "Independent",
+        };
+        let _ = write!(
+            html,
+            "<tr><td>{}</td><td>{}</td><td>{:.3}</td><td>{}</td><td>{:.3}</td><td>{}</td></tr>\n",
+            escape_html(&c.domain_a),
+            escape_html(&c.domain_b),
+            c.r,
+            c.n,
+            c.p_value,
+            mech_str,
+        );
+    }
+    let _ = write!(html, "</table>\n");
+
+    // Shared mechanisms
+    let shared = matrix.shared_mechanisms();
+    if !shared.is_empty() {
+        let _ = write!(html, "<h3>Shared Mechanisms (Moderate+)</h3>\n<ul>\n");
+        for c in &shared {
+            let _ = write!(
+                html,
+                "<li><strong>{} &times; {}</strong>: r={:.3}</li>\n",
+                escape_html(&c.domain_a),
+                escape_html(&c.domain_b),
+                c.r,
+            );
+        }
+        let _ = write!(html, "</ul>\n");
+    }
 }
 
 fn write_footer(html: &mut String) {
@@ -628,10 +819,16 @@ mod tests {
     fn sample_report() -> BenchmarkReport {
         let mut report = BenchmarkReport::new();
         let mut r1 = BenchmarkResult::new("WorM::N-back", None);
-        r1.insert("nback_2::accuracy", MetricValue::from_samples(&[0.85, 0.90, 0.88]));
+        r1.insert(
+            "nback_2::accuracy",
+            MetricValue::from_samples(&[0.85, 0.90, 0.88]),
+        );
         report.add(r1);
         let mut r2 = BenchmarkResult::new("Executive::Stroop", None);
-        r2.insert("stroop_effect", MetricValue::from_samples(&[0.10, 0.12, 0.11]));
+        r2.insert(
+            "stroop_effect",
+            MetricValue::from_samples(&[0.10, 0.12, 0.11]),
+        );
         report.add(r2);
         let mut r3 = BenchmarkResult::new("CogBench::BART", None);
         r3.insert("average_pumps", MetricValue::from_samples(&[28.0, 32.0]));
@@ -663,7 +860,10 @@ mod tests {
         let report = sample_report();
         let html = generate_report(&report, false);
         // Forest plot should contain circle elements for data points
-        assert!(html.contains("<circle"), "SVG should contain circle elements");
+        assert!(
+            html.contains("<circle"),
+            "SVG should contain circle elements"
+        );
     }
 
     #[test]
@@ -684,25 +884,43 @@ mod tests {
 
     #[test]
     fn test_html_sat_curves_svg() {
-        use crate::harness::analysis::{SatCurve, SatCurvePoint};
+        use crate::harness::sat_curves::{SatCurve, SatFit, SatPoint};
         let curve = SatCurve {
             benchmark: "Test::Benchmark".to_string(),
             points: vec![
-                SatCurvePoint { time_pressure: 0.0, accuracy: 0.95, rt_ticks: 10.0 },
-                SatCurvePoint { time_pressure: 0.5, accuracy: 0.75, rt_ticks: 5.0 },
-                SatCurvePoint { time_pressure: 1.0, accuracy: 0.50, rt_ticks: 2.0 },
+                SatPoint {
+                    time_pressure: 0.0,
+                    accuracy: 0.95,
+                    mean_rt: 10.0,
+                },
+                SatPoint {
+                    time_pressure: 0.5,
+                    accuracy: 0.75,
+                    mean_rt: 5.0,
+                },
+                SatPoint {
+                    time_pressure: 1.0,
+                    accuracy: 0.50,
+                    mean_rt: 2.0,
+                },
             ],
-            lambda: 0.95,
-            beta: 1.5,
-            delta: 0.0,
-            r_squared: 0.92,
+            fit: SatFit {
+                asymptote: 0.95,
+                rate: 1.5,
+                intercept: 0.0,
+                r_squared: 0.92,
+            },
+            human_like: true,
         };
         let mut html = String::new();
         write_sat_curves(&mut html, &[curve]);
         assert!(html.contains("<svg"), "SAT SVG should contain svg element");
         assert!(html.contains("Speed-Accuracy"), "should have SAT heading");
         assert!(html.contains("circle"), "should have data point circles");
-        assert!(html.contains("stroke-dasharray"), "should have dashed fitted curve");
+        assert!(
+            html.contains("stroke-dasharray"),
+            "should have dashed fitted curve"
+        );
     }
 
     #[test]
@@ -710,5 +928,54 @@ mod tests {
         let mut html = String::new();
         write_sat_curves(&mut html, &[]);
         assert!(html.is_empty(), "empty curves should produce no output");
+    }
+
+    #[test]
+    fn test_html_psychometric_summary() {
+        let report = sample_report();
+        let mut html = String::new();
+        write_psychometric_summary(&mut html, &report);
+        assert!(
+            html.contains("Psychometric Summary"),
+            "missing psychometric summary heading"
+        );
+        assert!(
+            html.contains("Overall score"),
+            "missing overall score label"
+        );
+    }
+
+    #[test]
+    fn test_html_normative_section() {
+        let mut report = BenchmarkReport::new();
+        let mut stroop = BenchmarkResult::new("Executive::Stroop", None);
+        stroop.insert(
+            "incongruent_accuracy",
+            MetricValue::from_samples(&[0.85, 0.87, 0.83]),
+        );
+        report.add(stroop);
+        let mut html = String::new();
+        write_normative_section(&mut html, &report);
+        // May or may not produce output depending on baselines having SD
+        // Just verify no panic
+        let _ = html;
+    }
+
+    #[test]
+    fn test_html_cross_domain_section() {
+        let report = BenchmarkReport::new();
+        let mut html = String::new();
+        write_cross_domain_section(&mut html, &report);
+        // Empty report: no output, no panic
+        assert!(html.is_empty());
+    }
+
+    #[test]
+    fn test_html_new_sections_in_full_report() {
+        let report = sample_report();
+        let html = generate_report(&report, false);
+        // Full report should include new sections
+        assert!(html.contains("Psychometric Summary"));
+        assert!(html.contains("</html>"));
     }
 }

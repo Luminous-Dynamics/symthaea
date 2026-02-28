@@ -185,7 +185,9 @@ impl WisconsinCardSortingBenchmark {
             // Softmax over rule confidences for stochastic selection.
             // Time pressure: gain 1.5 produces ~15% perseverative errors (Heaton, 1993 WCST norms);
             // -0.8/unit flattens selection toward chance, modeling impaired set-shifting under SAT (Heitz, 2014).
-            let softmax_gain = 1.5 - config.time_pressure * 0.8;
+            let diff_model = difficulty_model_for("Executive::WCST");
+            let softmax_gain = (1.5 - config.time_pressure * 0.8)
+                * diff_model.temperature_multiplier(config.difficulty);
             let max_conf = rule_confidence
                 .iter()
                 .cloned()
@@ -309,7 +311,10 @@ impl WisconsinCardSortingBenchmark {
                     response_idx: chosen_target,
                     extra: {
                         let mut m = BTreeMap::new();
-                        m.insert("perseverative".to_string(), if is_perseverative { 1.0 } else { 0.0 });
+                        m.insert(
+                            "perseverative".to_string(),
+                            if is_perseverative { 1.0 } else { 0.0 },
+                        );
                         m
                     },
                 });
@@ -373,8 +378,6 @@ impl PsychBenchmark for WisconsinCardSortingBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
-        let _diff_model = difficulty_model_for(self.name());
-
         let mut categories = Vec::new();
         let mut perseverative = Vec::new();
         let mut non_perseverative = Vec::new();
@@ -391,7 +394,9 @@ impl PsychBenchmark for WisconsinCardSortingBenchmark {
             non_perseverative.push(r.non_perseverative_errors as f64);
             total_errs.push(r.total_errors as f64);
             trials_first.push(r.trials_to_first as f64);
-            let _mean_rt = if r.rt_ticks.is_empty() { 0.0 } else {
+            let _mean_rt = if r.rt_ticks.is_empty() {
+                0.0
+            } else {
                 r.rt_ticks.iter().sum::<f64>() / r.rt_ticks.len() as f64
             };
             all_rts.extend_from_slice(&r.rt_ticks);
