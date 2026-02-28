@@ -696,10 +696,7 @@ impl CognitiveLoopService {
                     None
                 };
                 super::consciousness_engine::ConsciousnessEngine::new(
-                    engine_smf,
-                    engine_mmi,
-                    engine_eq,
-                    engine_ucp,
+                    engine_smf, engine_mmi, engine_eq, engine_ucp,
                 )
             },
             ethics_engine: {
@@ -748,7 +745,10 @@ mod tests {
     #[test]
     fn default_construction_succeeds() {
         let service = CognitiveLoopService::new(CognitiveLoopConfig::default());
-        assert!(service.is_ok(), "default config should construct successfully");
+        assert!(
+            service.is_ok(),
+            "default config should construct successfully"
+        );
     }
 
     #[test]
@@ -990,50 +990,40 @@ mod tests {
             service.config().learning_threshold,
             config.learning_threshold
         );
-        assert_eq!(
-            service.config().target_frequency,
-            config.target_frequency
-        );
-        assert_eq!(
-            service.config().temporal_backend,
-            config.temporal_backend
-        );
+        assert_eq!(service.config().target_frequency, config.target_frequency);
+        assert_eq!(service.config().temporal_backend, config.temporal_backend);
     }
 
     // ── ConsciousnessProfile-based construction ───────────────────────
 
     #[test]
     fn minimal_profile_construction() {
-        let config = CognitiveLoopConfig::from_profile(
-            super::super::config::ConsciousnessProfile::Minimal,
-        );
+        let config =
+            CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Minimal);
         let service = CognitiveLoopService::new(config);
         assert!(service.is_ok(), "Minimal profile should construct");
     }
 
     #[test]
     fn standard_profile_construction() {
-        let config = CognitiveLoopConfig::from_profile(
-            super::super::config::ConsciousnessProfile::Standard,
-        );
+        let config =
+            CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Standard);
         let service = CognitiveLoopService::new(config);
         assert!(service.is_ok(), "Standard profile should construct");
     }
 
     #[test]
     fn full_profile_construction() {
-        let config = CognitiveLoopConfig::from_profile(
-            super::super::config::ConsciousnessProfile::Full,
-        );
+        let config =
+            CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Full);
         let service = CognitiveLoopService::new(config);
         assert!(service.is_ok(), "Full profile should construct");
     }
 
     #[test]
     fn research_profile_construction() {
-        let config = CognitiveLoopConfig::from_profile(
-            super::super::config::ConsciousnessProfile::Research,
-        );
+        let config =
+            CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Research);
         let service = CognitiveLoopService::new(config);
         assert!(service.is_ok(), "Research profile should construct");
     }
