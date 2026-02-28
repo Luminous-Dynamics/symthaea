@@ -18,12 +18,15 @@ use super::helpers::{DreamPhaseResult, EpisodicReplayResult, ResonatorCodebookRe
 // See `super::thresholds` for the centralized registry.
 // ═══════════════════════════════════════════════════════════════════════════════
 use super::thresholds::{
-    // Moral evaluation
-    MORAL_CONCERN_THRESHOLD, MORAL_BENEFIT_THRESHOLD,
-    MORAL_CONCERN_EXPLORATION_DAMPEN, MORAL_CONCERN_PAUSE_BOOST,
     MORAL_BENEFIT_CONFIDENCE_BOOST,
+    MORAL_BENEFIT_THRESHOLD,
+    MORAL_CONCERN_EXPLORATION_DAMPEN,
+    MORAL_CONCERN_PAUSE_BOOST,
+    // Moral evaluation
+    MORAL_CONCERN_THRESHOLD,
+    QUANTUM_COHERENCE_BOOST_SCALE,
     // Surprise & exploration
-    QUANTUM_COHERENCE_THRESHOLD, QUANTUM_COHERENCE_BOOST_SCALE,
+    QUANTUM_COHERENCE_THRESHOLD,
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -43,19 +46,28 @@ use super::thresholds::{
 // ═══════════════════════════════════════════════════════════════════
 
 use super::thresholds::{
-    // FEP tuning
-    FEP_SURPRISE_SCALE, FEP_LR_DECAY,
-    // Dominance estimation
-    DOMINANCE_FLOW_BASE, DOMINANCE_FLOW_SCALE, DOMINANCE_CONFIDENT, DOMINANCE_DEFAULT,
-    // Resonance tau modulation
-    RESONANCE_TAU_CENTER, RESONANCE_TAU_SCALE,
-    // Policy agreement (KL gate)
-    POLICY_SOFT_THRESHOLD, POLICY_FULL_AGREEMENT_BOOST,
-    POLICY_WINDOW_SIZE, POLICY_MIN_WINDOW, POLICY_TEMP_BASE, POLICY_TEMP_RANGE,
     // Attention budget
     ATTENTION_BUDGET_US,
+    DOMINANCE_CONFIDENT,
+    DOMINANCE_DEFAULT,
+    // Dominance estimation
+    DOMINANCE_FLOW_BASE,
+    DOMINANCE_FLOW_SCALE,
+    FEP_LR_DECAY,
+    // FEP tuning
+    FEP_SURPRISE_SCALE,
     // Memory
     MEMORY_RECALL_TOP_K,
+    POLICY_FULL_AGREEMENT_BOOST,
+    POLICY_MIN_WINDOW,
+    // Policy agreement (KL gate)
+    POLICY_SOFT_THRESHOLD,
+    POLICY_TEMP_BASE,
+    POLICY_TEMP_RANGE,
+    POLICY_WINDOW_SIZE,
+    // Resonance tau modulation
+    RESONANCE_TAU_CENTER,
+    RESONANCE_TAU_SCALE,
 };
 
 use super::helpers;
@@ -121,7 +133,8 @@ impl CognitiveLoopService {
             self.biorhythm = crate::chronobiology::Biorhythm::current();
             // #14: Use effective_hour (with phase offset) for circadian modulation
             let effective_hour = self.biorhythm.effective_hour();
-            self.neuromodulator_bath.modulate_circadian_continuous(effective_hour);
+            self.neuromodulator_bath
+                .modulate_circadian_continuous(effective_hour);
             // #14: Entrain phase offset toward zero each refresh
             self.biorhythm.entrain();
             // Record personality profile for drift detection
@@ -155,7 +168,8 @@ impl CognitiveLoopService {
         self.somatic_bridge.update();
         let somatic_signals = self.somatic_bridge.to_interoceptive_signals();
         // Apply somatic stress to thermodynamic load (additive)
-        self.thermodynamic_load = (self.thermodynamic_load + somatic_signals.thermodynamic_load_delta).min(1.0);
+        self.thermodynamic_load =
+            (self.thermodynamic_load + somatic_signals.thermodynamic_load_delta).min(1.0);
         // Apply arousal spike from severe infrastructure damage
         if somatic_signals.arousal_spike > 0.0 {
             self.emotion_contagion.arousal =
@@ -182,6 +196,22 @@ impl CognitiveLoopService {
                 flow_active: self.flow_state.in_flow,
             };
             self.neuromodulator_bath.update(&neuromod_inputs);
+        }
+
+        // ── Phase 5: Post-update bath wiring ────────────────────────────────
+        // Record bath state for phase space analysis
+        self.bath_phase_tracker
+            .record(self.neuromodulator_bath.state_vector());
+        // Allostatic load accumulation (McEwen 1998)
+        {
+            let cortisol = self.neuromodulator_bath.to_hormone_state().cortisol as f32;
+            let is_sleep = self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
+            self.neuromodulator_bath
+                .accumulate_allostatic_load(cortisol, is_sleep);
+            // Adenosine clearance during sleep (Xie et al. 2013 — glymphatic)
+            if is_sleep {
+                self.neuromodulator_bath.clear_adenosine_sleep();
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -283,7 +313,8 @@ impl CognitiveLoopService {
         // Science: Varela (1991) — low agency = reactive mode → prefer conservative strategy
         let agency_strategy_override = {
             let cached_agency = self.carryover.consciousness.last_embodied_agency;
-            if cached_agency < 0.3 && cached_agency > 0.0
+            if cached_agency < 0.3
+                && cached_agency > 0.0
                 && selected_strategy == ResponseStrategy::Exploratory
             {
                 selected_strategy = ResponseStrategy::Supportive;
@@ -413,14 +444,14 @@ impl CognitiveLoopService {
         // Stage 1 (moral parse) already ran via evaluate_moral_alignment() above.
         // Stages 2+3 (value eval + harmonies) fire at co-prime intervals here.
         // ═══════════════════════════════════════════════════════════════════════
-        let ethics_output = self.ethics_engine.evaluate(
-            &super::ethics_engine::EthicsEngineInput {
+        let ethics_output = self
+            .ethics_engine
+            .evaluate(&super::ethics_engine::EthicsEngineInput {
                 input,
                 cycle: self.stats.total_cycles as u64,
                 unified_psi: self.stats.unified_psi as f64, // use previous cycle's Ψ
                 compressed_state: &compressed_state,
-            },
-        );
+            });
         module_timings.ethics_engine = ethics_output.total_us;
         // Apply engine feedback deltas
         if ethics_output.confidence_delta != 0.0 {
@@ -606,7 +637,8 @@ impl CognitiveLoopService {
         };
 
         // #9: Error trend → DA baseline modulation (Schultz 2016)
-        self.neuromodulator_bath.modulate_from_error_trend(error_pattern);
+        self.neuromodulator_bath
+            .modulate_from_error_trend(error_pattern);
 
         // ── Phase 17: Mode transition smoothing ──────────────────────────
         // Science: Kelso (1995) — metastable coordination dynamics: transitions between
@@ -689,25 +721,29 @@ impl CognitiveLoopService {
                 // DriveManager (interval 7, co-prime)
                 if self.drive_manager.should_run(cycle_num, urgency_u8) {
                     let drive_output = self.drive_manager.process(snapshot);
-                    self.subsystem_collector.record("drive_manager", drive_output);
+                    self.subsystem_collector
+                        .record("drive_manager", drive_output);
                 }
 
                 // MemoryManager (interval 11, co-prime)
                 if self.memory_manager.should_run(cycle_num, urgency_u8) {
                     let memory_output = self.memory_manager.process(snapshot);
-                    self.subsystem_collector.record("memory_manager", memory_output);
+                    self.subsystem_collector
+                        .record("memory_manager", memory_output);
                 }
 
                 // LearningManager (interval 13, co-prime)
                 if self.learning_manager.should_run(cycle_num, urgency_u8) {
                     let learning_output = self.learning_manager.process(snapshot);
-                    self.subsystem_collector.record("learning_manager", learning_output);
+                    self.subsystem_collector
+                        .record("learning_manager", learning_output);
                 }
 
                 // PerceptionManager (interval 19, co-prime)
                 if self.perception_manager.should_run(cycle_num, urgency_u8) {
                     let perception_output = self.perception_manager.process(snapshot);
-                    self.subsystem_collector.record("perception_manager", perception_output);
+                    self.subsystem_collector
+                        .record("perception_manager", perception_output);
                 }
             }
         }
@@ -797,23 +833,22 @@ impl CognitiveLoopService {
         // Science: Bar (2007) — high analogical mismatch signals novel territory.
         // High prediction error (bad analogy) → boost exploration, dampen confidence.
         // Low error (good analogy) → boost confidence (familiar territory).
-        let resonator_error_exploration_mod = if resonator_prediction_error > 0.5
-            && self.stats.total_cycles > 5
-        {
-            let boost = (resonator_prediction_error - 0.5) * 0.08;
-            self.curiosity_drive.exploration_urge =
-                (self.curiosity_drive.exploration_urge + boost).min(1.0);
-            self.adjust_confidence("resonator_error_high", -boost * 0.5);
-            self.stats.resonator_error_exploration_count += 1;
-            boost
-        } else if resonator_prediction_error < 0.2 && resonator_prediction_error > 0.0 {
-            let confidence_boost = (0.2 - resonator_prediction_error) * 0.03;
-            self.adjust_confidence("resonator_error_low", confidence_boost);
-            self.stats.resonator_error_exploration_count += 1;
-            -confidence_boost // negative = confidence gain (no exploration boost)
-        } else {
-            0.0
-        };
+        let resonator_error_exploration_mod =
+            if resonator_prediction_error > 0.5 && self.stats.total_cycles > 5 {
+                let boost = (resonator_prediction_error - 0.5) * 0.08;
+                self.curiosity_drive.exploration_urge =
+                    (self.curiosity_drive.exploration_urge + boost).min(1.0);
+                self.adjust_confidence("resonator_error_high", -boost * 0.5);
+                self.stats.resonator_error_exploration_count += 1;
+                boost
+            } else if resonator_prediction_error < 0.2 && resonator_prediction_error > 0.0 {
+                let confidence_boost = (0.2 - resonator_prediction_error) * 0.03;
+                self.adjust_confidence("resonator_error_low", confidence_boost);
+                self.stats.resonator_error_exploration_count += 1;
+                -confidence_boost // negative = confidence gain (no exploration boost)
+            } else {
+                0.0
+            };
 
         // ── Phase 17: Coherence memoization — cache pre-update value ─────
         // Science: O(n) history averaging computed once per cycle, not 5×.
@@ -1412,29 +1447,32 @@ impl CognitiveLoopService {
         // ── FEP Free Energy Decomposition → targeted modulation ──────────
         // Science: Friston (2010) — accuracy, complexity, surprise drive distinct responses
         // Extract FEP values first (avoids borrow conflict with self.adjust_confidence/scale_lr)
-        let fep_vals = self.fep_agent.last_fe_components.as_ref().map(|fe| {
-            (fe.accuracy, fe.complexity, fe.surprise, fe.prediction_error)
-        });
-        let (fep_accuracy, fep_complexity, fep_surprise, fep_td_error) = if let Some((acc, comp, surp, pe)) = fep_vals {
-            // High accuracy → stabilize (model fits well)
-            if acc > 0.5 {
-                self.adjust_confidence("fep_accuracy_high", 0.01);
-            }
-            // High complexity → reduce LR (Occam's razor: penalize overfitting)
-            if comp > 1.0 {
-                self.scale_lr("fep_complexity", 1.0 - ((comp - 1.0).min(0.5) * 0.1) as f32);
-            }
-            // High surprise → boost exploration (complement existing is_surprised gate)
-            if surp > reflection_thresholds.surprise as f64 {
-                let s_explore =
-                    ((surp - reflection_thresholds.surprise as f64) * 0.1).min(0.05) as f32;
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + s_explore).clamp(0.0, 1.0);
-            }
-            (acc, comp, surp, pe)
-        } else {
-            (0.0, 0.0, 0.0, 0.0)
-        };
+        let fep_vals = self
+            .fep_agent
+            .last_fe_components
+            .as_ref()
+            .map(|fe| (fe.accuracy, fe.complexity, fe.surprise, fe.prediction_error));
+        let (fep_accuracy, fep_complexity, fep_surprise, fep_td_error) =
+            if let Some((acc, comp, surp, pe)) = fep_vals {
+                // High accuracy → stabilize (model fits well)
+                if acc > 0.5 {
+                    self.adjust_confidence("fep_accuracy_high", 0.01);
+                }
+                // High complexity → reduce LR (Occam's razor: penalize overfitting)
+                if comp > 1.0 {
+                    self.scale_lr("fep_complexity", 1.0 - ((comp - 1.0).min(0.5) * 0.1) as f32);
+                }
+                // High surprise → boost exploration (complement existing is_surprised gate)
+                if surp > reflection_thresholds.surprise as f64 {
+                    let s_explore =
+                        ((surp - reflection_thresholds.surprise as f64) * 0.1).min(0.05) as f32;
+                    self.curiosity_drive.exploration_urge =
+                        (self.curiosity_drive.exploration_urge + s_explore).clamp(0.0, 1.0);
+                }
+                (acc, comp, surp, pe)
+            } else {
+                (0.0, 0.0, 0.0, 0.0)
+            };
 
         // ── FEP Pragmatic value → consolidation vs exploration balance ───
         // Science: Friston (2015) — pragmatic value drives goal-directed behavior
@@ -1476,7 +1514,10 @@ impl CognitiveLoopService {
                 };
                 // Dense, confident graph → stabilize (good causal model)
                 if edge_count > 5 && avg_confidence > 0.5 {
-                    self.adjust_confidence("causal_graph_dense", (avg_confidence as f32 - 0.5) * 0.03);
+                    self.adjust_confidence(
+                        "causal_graph_dense",
+                        (avg_confidence as f32 - 0.5) * 0.03,
+                    );
                 }
                 // Sparse graph after many cycles → poor understanding → boost exploration
                 if edge_count < 2 && self.stats.total_cycles > 200 {
@@ -1631,7 +1672,10 @@ impl CognitiveLoopService {
         // Coherent chemical baseline that fine-grained Phase 14-21 loops adjust further.
         // ═══════════════════════════════════════════════════════════════════════
         // DA → learning rate
-        self.scale_lr("neuromod_dopamine", self.neuromodulator_bath.learning_rate_factor());
+        self.scale_lr(
+            "neuromod_dopamine",
+            self.neuromodulator_bath.learning_rate_factor(),
+        );
 
         // NE → exploration
         self.curiosity_drive.exploration_urge += self.neuromodulator_bath.exploration_delta();
@@ -1646,7 +1690,10 @@ impl CognitiveLoopService {
             self.curiosity_drive.exploration_urge.clamp(0.0, 1.0);
 
         // 5-HT → confidence
-        self.adjust_confidence("neuromod_serotonin", self.neuromodulator_bath.confidence_delta());
+        self.adjust_confidence(
+            "neuromod_serotonin",
+            self.neuromodulator_bath.confidence_delta(),
+        );
 
         // ACh → attention sensitivity + threshold
         self.adaptive_behavior.attention_sensitivity *= self.neuromodulator_bath.attention_factor();
@@ -1682,8 +1729,8 @@ impl CognitiveLoopService {
         let ne_arousal_feedback = self.emotion_contagion.arousal - ne_arousal_before;
 
         // #7: Confidence crash detection → 5-HT emergency dip (Cools et al. 2008)
-        let confidence_velocity = self.prediction_confidence
-            - self.carryover.quality.prev_confidence_for_crash;
+        let confidence_velocity =
+            self.prediction_confidence - self.carryover.quality.prev_confidence_for_crash;
         let sht_crash_dip = if confidence_velocity < -0.15 {
             self.neuromodulator_bath.serotonin.produce(-0.1);
             true
@@ -1695,7 +1742,8 @@ impl CognitiveLoopService {
         // #8: Exploration cost → 5-HT depletion (Tops et al. 2009)
         let exploration_sht_drain = if self.curiosity_drive.exploration_urge > 0.5 {
             let drain = (self.curiosity_drive.exploration_urge - 0.5) * 0.03;
-            self.neuromodulator_bath.apply_exploration_cost(self.curiosity_drive.exploration_urge);
+            self.neuromodulator_bath
+                .apply_exploration_cost(self.curiosity_drive.exploration_urge);
             drain
         } else {
             0.0
@@ -1706,6 +1754,10 @@ impl CognitiveLoopService {
         if gaba_inhibition < 0.95 {
             self.scale_lr("gaba_inhibition", gaba_inhibition);
             self.curiosity_drive.exploration_urge *= gaba_inhibition;
+        }
+        // E/I seizure protection: freeze exploration during recovery (Turrigiano 2012)
+        if self.neuromodulator_bath.exploration_frozen() {
+            self.curiosity_drive.exploration_urge *= 0.1;
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -2207,6 +2259,13 @@ impl CognitiveLoopService {
         // ACh-gated plasticity persistence: high ACh = learning mode, low = performance mode
         // Science: Hasselmo (1999) — cholinergic gating of cortical plasticity
         let effective_lr = effective_lr * self.neuromodulator_bath.plasticity_gate();
+        // Adenosine sleep pressure dampens learning (Porkka-Heiskanen 1997)
+        let effective_lr = if self.neuromodulator_bath.sleep_pressure() > 0.7 {
+            let pressure_factor = 1.0 - (self.neuromodulator_bath.sleep_pressure() - 0.7) * 0.5;
+            effective_lr * pressure_factor.clamp(0.5, 1.0)
+        } else {
+            effective_lr
+        };
 
         // ACh-gated threshold: high ACh → learn from smaller errors
         // Science: Yu & Dayan (2005) — ACh sharpens expected-uncertainty gating
@@ -2319,7 +2378,8 @@ impl CognitiveLoopService {
         // #13: Report learning activity to glutamate channel (Olney 1969)
         {
             let is_night = self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
-            self.neuromodulator_bath.report_learning(effective_lr, prediction_error, is_night);
+            self.neuromodulator_bath
+                .report_learning(effective_lr, prediction_error, is_night);
             let fatigue = self.neuromodulator_bath.learning_fatigue_factor();
             if fatigue < 1.0 {
                 self.scale_lr("glutamate_fatigue", fatigue);
@@ -3198,7 +3258,6 @@ impl CognitiveLoopService {
                 phi_attention_weight,
                 epistemic_quality: self.carryover.quality.last_epistemic_quality,
                 phi_validation_correlation: self.carryover.quality.phi_validation_correlation,
-                phi_spectral_weight: phi_spectral_weight as f64,
             },
         );
         // Update carryover from engine cache (backward compat for memory coordinator etc.)
@@ -3206,7 +3265,10 @@ impl CognitiveLoopService {
             .update_cache(&mut self.carryover.consciousness);
         // Apply engine feedback deltas
         if consciousness_output.confidence_delta != 0.0 {
-            self.adjust_confidence("consciousness_engine", consciousness_output.confidence_delta);
+            self.adjust_confidence(
+                "consciousness_engine",
+                consciousness_output.confidence_delta,
+            );
         }
         if consciousness_output.lr_factor != 1.0 {
             self.scale_lr("consciousness_engine", consciousness_output.lr_factor);
@@ -3296,7 +3358,10 @@ impl CognitiveLoopService {
             self.adjust_confidence("cross_mod_agree", (cross_module_agreement - 0.8) * 0.05);
         } else if cross_module_agreement < 0.3 {
             // Low agreement → modules conflict, dampen confidence, boost exploration
-            self.scale_confidence("cross_mod_disagree", 1.0 - (0.3 - cross_module_agreement) * 0.1);
+            self.scale_confidence(
+                "cross_mod_disagree",
+                1.0 - (0.3 - cross_module_agreement) * 0.1,
+            );
             self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
                 + (0.3 - cross_module_agreement) * 0.15)
                 .clamp(0.0, 1.0);
@@ -3573,7 +3638,8 @@ impl CognitiveLoopService {
             // Phase 21: Consciousness-Grounded Control
             binding_confidence_mod,
             discontinuity_streak: self.carryover.urgency.discontinuity_streak,
-            epistemic_reasoning_accelerated: self.carryover.quality.last_epistemic_conflict_count > 5,
+            epistemic_reasoning_accelerated: self.carryover.quality.last_epistemic_conflict_count
+                > 5,
             agency_strategy_override,
             pfe_surprise_mod,
             adaptive_memo_threshold: memo_threshold,
@@ -3667,7 +3733,8 @@ impl CognitiveLoopService {
         // Project 16,384D HDC to 32D for visualization (mean-pooling)
         let thought_vector = {
             let chunk_size = encoding_hdv.values.len() / 32;
-            encoding_hdv.values
+            encoding_hdv
+                .values
                 .chunks(chunk_size)
                 .take(32)
                 .map(|chunk| chunk.iter().sum::<f32>() / chunk.len() as f32)
@@ -3700,10 +3767,8 @@ impl CognitiveLoopService {
         let assurance_level = self.mfdi_bridge.assurance_level();
 
         // ── Phase 2.2: End feedback proposal collection ──────────────────
-        self.feedback_state.end_cycle(
-            self.prediction_confidence as f64,
-            self.fep_lr_boost as f64,
-        );
+        self.feedback_state
+            .end_cycle(self.prediction_confidence as f64, self.fep_lr_boost as f64);
 
         // ── Phase 2.3: Integrate subsystem outputs (Phase C) ─────────────
         // Consensus-average all SubsystemOutput proposals collected during
@@ -3712,10 +3777,7 @@ impl CognitiveLoopService {
         let integrated = self.subsystem_collector.integrate();
         if integrated.n_contributors > 0 {
             metadata.subsystem_integration_contributors = integrated.n_contributors as u32;
-            tracing::trace!(
-                "Phase C integration: {}",
-                integrated,
-            );
+            tracing::trace!("Phase C integration: {}", integrated,);
         }
 
         CycleResult {
@@ -3777,16 +3839,20 @@ impl CognitiveLoopService {
         self.stats.last_liquid_mamba_pe = semantic_pe;
 
         // Gate on FEP precision confidence (mirrors enhanced_fep_bridge threshold)
-        if self.carryover.learning.prediction_confidence < 0.4 { return; }
-        if output_hvs.is_empty() || semantic_pe > 0.8 { return; }
+        if self.carryover.learning.prediction_confidence < 0.4 {
+            return;
+        }
+        if output_hvs.is_empty() || semantic_pe > 0.8 {
+            return;
+        }
 
         // FEP-modulated learning rate: precision × load × boost
         let fep_precision = self.fep_learning_signal.clamp(0.0, 1.0);
-        let effective_lr = 0.001
-            * fep_precision
-            * (1.0 - self.thermodynamic_load)
-            * self.fep_lr_boost;
-        if effective_lr < 1e-6 { return; }
+        let effective_lr =
+            0.001 * fep_precision * (1.0 - self.thermodynamic_load) * self.fep_lr_boost;
+        if effective_lr < 1e-6 {
+            return;
+        }
 
         let refs: Vec<&symthaea_core::hdc::ContinuousHV> = output_hvs.iter().collect();
         let bundled = symthaea_core::hdc::ContinuousHV::bundle(&refs).normalize();
@@ -3911,7 +3977,11 @@ mod tests {
         let mut s = make_service();
         let result = s.cycle("thought projection");
         assert!(!result.thought_vector.is_empty());
-        assert_eq!(result.thought_vector.len(), 32, "thought_vector should be 32D");
+        assert_eq!(
+            result.thought_vector.len(),
+            32,
+            "thought_vector should be 32D"
+        );
     }
 
     #[test]
