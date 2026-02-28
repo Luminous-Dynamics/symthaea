@@ -1,0 +1,156 @@
+name: Fabrication CI
+
+on:
+  push:
+    branches: [main, 'feature/**', 'bugfix/**']
+    paths:
+      - 'mycelix-workspace/happs/fabrication/**'
+      - 'symthaea/crates/symthaea-fabrication-kernel/**'
+      - '.github/workflows/fabrication-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mycelix-workspace/happs/fabrication/**'
+      - 'symthaea/crates/symthaea-fabrication-kernel/**'
+      - '.github/workflows/fabrication-ci.yml'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: '1.92.0'
+  CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: '--cfg getrandom_backend="custom"'
+
+jobs:
+  # ============================================================================
+  # Format check
+  # ============================================================================
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-workspace/happs/fabrication
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt
+      - name: Check formatting (fabrication zomes)
+        run: cargo fmt --all --check
+
+  # ============================================================================
+  # Clippy lint (native target for full analysis)
+  # ============================================================================
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-workspace/happs/fabrication
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: clippy
+          targets: wasm32-unknown-unknown
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-workspace/happs/fabrication/target
+          key: ${{ runner.os }}-fab-clippy-${{ hashFiles('mycelix-workspace/happs/fabrication/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-fab-clippy-
+      - name: Clippy (all zomes)
+        run: cargo clippy --workspace --no-deps --lib --target wasm32-unknown-unknown -- -D warnings
+
+  # ============================================================================
+  # Unit tests (native target — WASM can't run tests directly)
+  # ============================================================================
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-workspace/happs/fabrication
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-workspace/happs/fabrication/target
+          key: ${{ runner.os }}-fab-test-${{ hashFiles('mycelix-workspace/happs/fabrication/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-fab-test-
+      - name: Run unit tests (all 15 crates)
+        run: cargo test --target x86_64-unknown-linux-gnu
+
+  # ============================================================================
+  # WASM compilation gate (all 14 zomes must compile)
+  # ============================================================================
+  wasm:
+    name: WASM Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-workspace/happs/fabrication
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-workspace/happs/fabrication/target
+          key: ${{ runner.os }}-fab-wasm-${{ hashFiles('mycelix-workspace/happs/fabrication/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-fab-wasm-
+      - name: Build all 14 WASM zomes
+        run: cargo build --target wasm32-unknown-unknown
+      - name: Verify zome count
+        run: |
+          ZOME_COUNT=$(find target/wasm32-unknown-unknown/debug -name '*.wasm' -not -path '*/deps/*' | wc -l)
+          echo "Built $ZOME_COUNT WASM zomes"
+          if [ "$ZOME_COUNT" -lt 14 ]; then
+            echo "Expected at least 14 zomes, got $ZOME_COUNT"
+            exit 1
+          fi
+
+  # ============================================================================
+  # Fabrication Kernel tests (native Rust, in symthaea workspace)
+  # ============================================================================
+  kernel:
+    name: Fabrication Kernel
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-fab-kernel-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-fab-kernel-
+      - name: Test fabrication kernel
+        run: cargo test -p symthaea-fabrication-kernel --lib
+      - name: Clippy fabrication kernel
+        run: cargo clippy -p symthaea-fabrication-kernel --lib -- -D warnings

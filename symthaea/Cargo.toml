@@ -45,6 +45,8 @@ members = [
     "crates/symthaea-population",
     "crates/symthaea-materials",
     "crates/symthaea-nuclear-forensics",
+    "crates/symthaea-memory",
+    "crates/symthaea-fabrication-kernel",
 ]
 
 
@@ -101,6 +103,7 @@ symthaea-consciousness-equation = { path = "crates/symthaea-consciousness-equati
 
 # Symthaea Neuromodulators - DA/NE/5-HT/ACh/GABA/Oxytocin/Glutamate/Adenosine bath
 symthaea-neuromodulators = { path = "crates/symthaea-neuromodulators" }
+symthaea-memory = { path = "crates/symthaea-memory" }
 
 # Symthaea Causal Reasoning - Pearl's do-calculus, counterfactual reasoning, causal emergence
 symthaea-causal-reasoning = { path = "crates/symthaea-causal-reasoning", default-features = false }
@@ -306,6 +309,7 @@ cpal = { version = "0.17", optional = true }      # Low-level audio I/O (live-vo
 ringbuf = { version = "0.4", optional = true }    # Lock-free ring buffer (live-voice)
 hound = { workspace = true, optional = true }
 lz4_flex = { version = "0.11", default-features = false, optional = true }
+chacha20poly1305 = { version = "0.10", optional = true }
 hf-hub = { version = "0.4", optional = true }       # HuggingFace Hub for model download
 espeak-rs = { version = "0.1", optional = true }    # espeak-ng bindings for proper G2P
 
@@ -376,6 +380,7 @@ neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "ca
 # ── Distributed / Network ──────────────────────────────────────────
 mesh = []                                   # Physical mesh radio (LoRa + B.A.T.M.A.N. + Yggdrasil)
 lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh radio
+mesh-encryption = ["mesh", "dep:chacha20poly1305"]  # ChaCha20-Poly1305 AEAD encryption for mesh packets
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
 mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
 mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration

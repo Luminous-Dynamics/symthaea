@@ -337,16 +337,12 @@ pub fn fork_design(input: ForkDesignInput) -> ExternResult<Record> {
                 "Proprietary designs cannot be forked".to_string()
             )));
         }
-        License::CreativeCommons(variant) => {
-            match variant {
-                CCVariant::BYND | CCVariant::BYNCND => {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "This Creative Commons license does not allow derivatives".to_string()
-                    )));
-                }
-                _ => {}
-            }
+        License::CreativeCommons(CCVariant::BYND | CCVariant::BYNCND) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "This Creative Commons license does not allow derivatives".to_string()
+            )));
         }
+        License::CreativeCommons(_) => {}
         _ => {}
     }
 

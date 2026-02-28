@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 // VALIDATION HELPERS
 // =============================================================================
 
+#[allow(clippy::result_unit_err)]
 pub mod validation {
     use hdi::prelude::ValidateCallbackResult;
 
@@ -126,7 +127,7 @@ pub struct PaginationInput {
 
 impl PaginationInput {
     pub fn clamp(&self) -> (u32, u32) {
-        let limit = self.limit.min(100).max(1);
+        let limit = self.limit.clamp(1, 100);
         (self.offset, limit)
     }
 }
@@ -1415,6 +1416,236 @@ impl Default for CincinnatiSession {
     }
 }
 
+// =============================================================================
+// PoGF ATTESTATION TYPES (VERIFIABLE SUSTAINABILITY CLAIMS)
+// =============================================================================
+
+/// Energy attestation for PoGF verification
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct EnergyAttestation {
+    /// Type of energy used
+    pub energy_type: EnergyType,
+    /// Energy consumed in kWh
+    pub kwh_consumed: f32,
+    /// Grid carbon intensity at time of print (gCO2/kWh)
+    pub grid_carbon_intensity: f32,
+    /// Reference to Terra Atlas energy source (external verification)
+    pub terra_atlas_hash: Option<String>,
+    /// Attesting agent
+    pub attester: String,
+    /// When attestation was made
+    pub attested_at_micros: i64,
+}
+
+/// Material attestation for PoGF verification
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct MaterialAttestation {
+    /// Material batch used
+    pub batch_id: String,
+    /// Material origin
+    pub origin: MaterialOrigin,
+    /// Recycled content fraction (0.0-1.0)
+    pub recycled_fraction: f32,
+    /// Reference to Supply Chain hApp entry
+    pub supply_chain_hash: Option<String>,
+    /// Certifications held by the material
+    pub certifications: Vec<String>,
+    /// Attesting agent
+    pub attester: String,
+    /// When attestation was made
+    pub attested_at_micros: i64,
+}
+
+/// Local participation attestation for PoGF verification
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct LocalAttestation {
+    /// HEARTH funding hash (if community-funded)
+    pub hearth_funding_hash: Option<String>,
+    /// Whether the print was done within the community
+    pub local_printer: bool,
+    /// Distance in km from requester to printer (if known)
+    pub distance_km: Option<f32>,
+    /// Attesting agent
+    pub attester: String,
+    /// When attestation was made
+    pub attested_at_micros: i64,
+}
+
+/// Combined PoGF attestation bundle
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct PogfAttestationBundle {
+    pub energy: Option<EnergyAttestation>,
+    pub material: Option<MaterialAttestation>,
+    pub local: Option<LocalAttestation>,
+}
+
+impl PogfAttestationBundle {
+    /// Calculate a penalty multiplier for unattested claims.
+    /// Fully attested = 1.0 (no penalty), fully unattested = 0.25 (75% penalty)
+    pub fn attestation_multiplier(&self) -> f32 {
+        let mut attested = 0u32;
+        let total = 3u32;
+        if self.energy.is_some() { attested += 1; }
+        if self.material.is_some() { attested += 1; }
+        if self.local.is_some() { attested += 1; }
+        // Base 0.25 + 0.75 * (attested/total)
+        0.25 + 0.75 * (attested as f32 / total as f32)
+    }
+}
+
+impl SafetyClass {
+    /// Returns true if this safety class requires verification before printing
+    pub fn requires_verification(&self) -> bool {
+        matches!(
+            self,
+            SafetyClass::Class3BodyContact
+                | SafetyClass::Class4Medical
+                | SafetyClass::Class5Critical
+        )
+    }
+
+    /// Numeric level for ordering
+    pub fn level(&self) -> u8 {
+        match self {
+            SafetyClass::Class0Decorative => 0,
+            SafetyClass::Class1Functional => 1,
+            SafetyClass::Class2LoadBearing => 2,
+            SafetyClass::Class3BodyContact => 3,
+            SafetyClass::Class4Medical => 4,
+            SafetyClass::Class5Critical => 5,
+        }
+    }
+}
+
+// =============================================================================
+// LSH (LOCALITY-SENSITIVE HASHING) FOR HDC SEARCH
+// =============================================================================
+
+pub mod lsh {
+    use super::hdc::FabHV;
+    use serde::{Deserialize, Serialize};
+
+    /// Number of random hyperplanes for LSH hash
+    pub const LSH_NUM_PLANES: usize = 16;
+
+    /// LSH index using random hyperplane method for approximate nearest-neighbor
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    pub struct LshIndex {
+        /// Random hyperplanes for hashing (each is a FAB_HDC_DIM vector)
+        pub planes: Vec<Vec<f32>>,
+        /// Buckets: hash -> list of (id, vector) pairs
+        pub buckets: std::collections::HashMap<u32, Vec<LshEntry>>,
+    }
+
+    /// Entry in an LSH bucket
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    pub struct LshEntry {
+        /// Identifier (e.g., ActionHash string)
+        pub id: String,
+        /// The stored vector
+        pub vector: Vec<f32>,
+    }
+
+    impl LshIndex {
+        /// Create a new LSH index with deterministic random hyperplanes
+        pub fn new(num_planes: usize, dim: usize, seed: u64) -> Self {
+            let mut planes = Vec::with_capacity(num_planes);
+            for i in 0..num_planes {
+                let plane = FabHV::random(dim, seed.wrapping_add(i as u64 * 83492791));
+                planes.push(plane.data);
+            }
+            Self {
+                planes,
+                buckets: std::collections::HashMap::new(),
+            }
+        }
+
+        /// Compute LSH hash for a vector
+        pub fn hash(&self, vector: &[f32]) -> u32 {
+            let mut h: u32 = 0;
+            for (i, plane) in self.planes.iter().enumerate() {
+                let dot: f32 = vector.iter()
+                    .zip(plane.iter())
+                    .map(|(a, b)| a * b)
+                    .sum();
+                if dot >= 0.0 {
+                    h |= 1 << i;
+                }
+            }
+            h
+        }
+
+        /// Insert a vector into the index
+        pub fn insert(&mut self, id: String, vector: Vec<f32>) {
+            let h = self.hash(&vector);
+            self.buckets.entry(h).or_default().push(LshEntry {
+                id,
+                vector,
+            });
+        }
+
+        /// Query: find candidate vectors in the same bucket, then rank by cosine similarity
+        pub fn query(&self, query: &FabHV, max_results: usize) -> Vec<(String, f32)> {
+            let h = self.hash(&query.data);
+            let candidates = match self.buckets.get(&h) {
+                Some(entries) => entries,
+                None => return vec![],
+            };
+
+            let mut scored: Vec<(String, f32)> = candidates.iter()
+                .map(|entry| {
+                    let candidate = FabHV::from_vec(entry.vector.clone());
+                    let sim = query.similarity(&candidate);
+                    (entry.id.clone(), sim)
+                })
+                .collect();
+
+            scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            scored.truncate(max_results);
+            scored
+        }
+
+        /// Multi-probe query: check the primary bucket plus neighbors (1-bit flips)
+        pub fn query_multiprobe(&self, query: &FabHV, max_results: usize) -> Vec<(String, f32)> {
+            let primary_hash = self.hash(&query.data);
+            let mut all_candidates: Vec<(String, f32)> = Vec::new();
+            let mut seen_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+            // Check primary bucket + all 1-bit-flip neighbors
+            let mut hashes_to_check = vec![primary_hash];
+            for bit in 0..self.planes.len().min(16) {
+                hashes_to_check.push(primary_hash ^ (1 << bit));
+            }
+
+            for h in hashes_to_check {
+                if let Some(entries) = self.buckets.get(&h) {
+                    for entry in entries {
+                        if seen_ids.insert(entry.id.clone()) {
+                            let candidate = FabHV::from_vec(entry.vector.clone());
+                            let sim = query.similarity(&candidate);
+                            all_candidates.push((entry.id.clone(), sim));
+                        }
+                    }
+                }
+            }
+
+            all_candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            all_candidates.truncate(max_results);
+            all_candidates
+        }
+
+        /// Number of entries in the index
+        pub fn len(&self) -> usize {
+            self.buckets.values().map(|b| b.len()).sum()
+        }
+
+        /// Whether the index is empty
+        pub fn is_empty(&self) -> bool {
+            self.len() == 0
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1932,5 +2163,177 @@ mod tests {
         };
         assert_eq!(schema.engine, ParametricEngine::OpenSCAD);
         assert!(schema.auto_generate);
+    }
+
+    // === POGF ATTESTATION TESTS ===
+
+    #[test]
+    fn test_attestation_multiplier_fully_attested() {
+        let bundle = PogfAttestationBundle {
+            energy: Some(EnergyAttestation {
+                energy_type: EnergyType::Solar,
+                kwh_consumed: 1.5,
+                grid_carbon_intensity: 25.0,
+                terra_atlas_hash: None,
+                attester: "agent1".to_string(),
+                attested_at_micros: 0,
+            }),
+            material: Some(MaterialAttestation {
+                batch_id: "batch-001".to_string(),
+                origin: MaterialOrigin::PostConsumer,
+                recycled_fraction: 0.8,
+                supply_chain_hash: None,
+                certifications: vec![],
+                attester: "agent2".to_string(),
+                attested_at_micros: 0,
+            }),
+            local: Some(LocalAttestation {
+                hearth_funding_hash: Some("hash123".to_string()),
+                local_printer: true,
+                distance_km: Some(2.5),
+                attester: "agent3".to_string(),
+                attested_at_micros: 0,
+            }),
+        };
+        let m = bundle.attestation_multiplier();
+        assert!((m - 1.0).abs() < 0.001, "Fully attested should be 1.0, got {}", m);
+    }
+
+    #[test]
+    fn test_attestation_multiplier_none_attested() {
+        let bundle = PogfAttestationBundle {
+            energy: None,
+            material: None,
+            local: None,
+        };
+        let m = bundle.attestation_multiplier();
+        assert!((m - 0.25).abs() < 0.001, "Unattested should be 0.25, got {}", m);
+    }
+
+    #[test]
+    fn test_attestation_multiplier_partial() {
+        let bundle = PogfAttestationBundle {
+            energy: Some(EnergyAttestation {
+                energy_type: EnergyType::Wind,
+                kwh_consumed: 0.5,
+                grid_carbon_intensity: 0.0,
+                terra_atlas_hash: None,
+                attester: "a".to_string(),
+                attested_at_micros: 0,
+            }),
+            material: None,
+            local: None,
+        };
+        let m = bundle.attestation_multiplier();
+        // 0.25 + 0.75 * (1/3) = 0.5
+        assert!((m - 0.5).abs() < 0.001, "1/3 attested should be 0.5, got {}", m);
+    }
+
+    #[test]
+    fn test_attestation_bundle_serde() {
+        let bundle = PogfAttestationBundle {
+            energy: None,
+            material: None,
+            local: None,
+        };
+        let json = serde_json::to_string(&bundle).unwrap();
+        let parsed: PogfAttestationBundle = serde_json::from_str(&json).unwrap();
+        assert_eq!(bundle, parsed);
+    }
+
+    // === SAFETY CLASS TESTS ===
+
+    #[test]
+    fn test_safety_class_requires_verification() {
+        assert!(!SafetyClass::Class0Decorative.requires_verification());
+        assert!(!SafetyClass::Class1Functional.requires_verification());
+        assert!(!SafetyClass::Class2LoadBearing.requires_verification());
+        assert!(SafetyClass::Class3BodyContact.requires_verification());
+        assert!(SafetyClass::Class4Medical.requires_verification());
+        assert!(SafetyClass::Class5Critical.requires_verification());
+    }
+
+    #[test]
+    fn test_safety_class_level() {
+        assert_eq!(SafetyClass::Class0Decorative.level(), 0);
+        assert_eq!(SafetyClass::Class3BodyContact.level(), 3);
+        assert_eq!(SafetyClass::Class5Critical.level(), 5);
+    }
+
+    // === LSH INDEX TESTS ===
+
+    #[test]
+    fn test_lsh_index_insert_and_query() {
+        use super::lsh::*;
+        let mut index = LshIndex::new(LSH_NUM_PLANES, FAB_HDC_DIM, 42);
+        let hv = FabHV::random(FAB_HDC_DIM, 100);
+        index.insert("test-1".to_string(), hv.data.clone());
+        assert_eq!(index.len(), 1);
+
+        let results = index.query(&hv, 10);
+        assert!(!results.is_empty());
+        assert_eq!(results[0].0, "test-1");
+        assert!(results[0].1 > 0.99, "Self-query should have similarity ~1.0");
+    }
+
+    #[test]
+    fn test_lsh_index_similar_vectors_same_bucket() {
+        use super::lsh::*;
+        let mut index = LshIndex::new(LSH_NUM_PLANES, FAB_HDC_DIM, 42);
+
+        // Create two similar vectors (bundle of common + unique)
+        let common = FabHV::random(FAB_HDC_DIM, 1);
+        let unique_a = FabHV::random(FAB_HDC_DIM, 2);
+        let unique_b = FabHV::random(FAB_HDC_DIM, 3);
+
+        let a = FabHV::bundle(&[&common, &common, &common, &unique_a]);
+        let b = FabHV::bundle(&[&common, &common, &common, &unique_b]);
+
+        index.insert("a".to_string(), a.data.clone());
+        index.insert("b".to_string(), b.data.clone());
+
+        // They should be similar
+        let sim = a.similarity(&b);
+        assert!(sim > 0.5, "Bundled vectors should be similar, got {}", sim);
+    }
+
+    #[test]
+    fn test_lsh_index_multiprobe_finds_neighbors() {
+        use super::lsh::*;
+        let mut index = LshIndex::new(LSH_NUM_PLANES, FAB_HDC_DIM, 42);
+
+        // Insert 20 random vectors
+        for i in 0..20 {
+            let hv = FabHV::random(FAB_HDC_DIM, i as u64 * 1000 + 500);
+            index.insert(format!("vec-{}", i), hv.data);
+        }
+        assert_eq!(index.len(), 20);
+
+        // Multiprobe should find more candidates than single-probe
+        let query = FabHV::random(FAB_HDC_DIM, 999);
+        let single = index.query(&query, 20);
+        let multi = index.query_multiprobe(&query, 20);
+        assert!(multi.len() >= single.len(),
+            "Multiprobe ({}) should find >= single-probe ({})", multi.len(), single.len());
+    }
+
+    #[test]
+    fn test_lsh_index_empty() {
+        use super::lsh::*;
+        let index = LshIndex::new(LSH_NUM_PLANES, FAB_HDC_DIM, 42);
+        assert!(index.is_empty());
+        let query = FabHV::random(FAB_HDC_DIM, 1);
+        let results = index.query(&query, 10);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_lsh_hash_deterministic() {
+        use super::lsh::*;
+        let index = LshIndex::new(LSH_NUM_PLANES, FAB_HDC_DIM, 42);
+        let hv = FabHV::random(FAB_HDC_DIM, 100);
+        let h1 = index.hash(&hv.data);
+        let h2 = index.hash(&hv.data);
+        assert_eq!(h1, h2);
     }
 }

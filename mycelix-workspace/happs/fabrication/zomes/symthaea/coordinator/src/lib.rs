@@ -431,6 +431,77 @@ pub fn semantic_search_by_category(input: SemanticSearchInput) -> ExternResult<V
     Ok(results)
 }
 
+/// LSH-accelerated semantic search — builds an in-memory LSH index from all
+/// intents, then uses multi-probe approximate nearest neighbor to find candidates.
+/// Falls back to brute-force when the index is small (<50 intents).
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LshSearchInput {
+    pub query_description: String,
+    pub threshold: Option<f32>,
+    pub limit: Option<u32>,
+}
+
+#[hdk_extern]
+pub fn semantic_search_lsh(input: LshSearchInput) -> ExternResult<Vec<SearchResult>> {
+    use fabrication_common::lsh::{LshIndex, LSH_NUM_PLANES};
+
+    let threshold = input.threshold.unwrap_or(SIMILARITY_THRESHOLD);
+    let limit = input.limit.unwrap_or(10) as usize;
+
+    let encoder = FabTextEncoder::new(FAB_HDC_DIM);
+    let query_hv = encoder.encode(&input.query_description);
+
+    // Build LSH index from all intents
+    let anchor = all_intents_anchor()?;
+    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::AuthorToIntents)?, GetStrategy::default())?;
+
+    let mut index = LshIndex::new(LSH_NUM_PLANES, FAB_HDC_DIM, 0xFAB0_0DC0);
+    let mut intent_map: std::collections::HashMap<String, (ActionHash, HdcIntentEntry)> = std::collections::HashMap::new();
+
+    for link in &links {
+        if let Some(hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(hash.clone(), GetOptions::default())? {
+                if let Some(intent) = record.entry().to_app_option::<HdcIntentEntry>().ok().flatten() {
+                    let hv = encoder.encode(&intent.description);
+                    let id = hash.to_string();
+                    index.insert(id.clone(), hv.data);
+                    intent_map.insert(id, (hash, intent));
+                }
+            }
+        }
+    }
+
+    // If small index, fall back to brute-force (LSH overhead not worth it)
+    let candidates = if index.len() < 50 {
+        // Brute-force: score all
+        intent_map.iter().map(|(id, (_hash, intent))| {
+            let hv = encoder.encode(&intent.description);
+            let sim = query_hv.similarity(&hv);
+            (id.clone(), sim)
+        }).collect::<Vec<_>>()
+    } else {
+        // LSH multi-probe
+        index.query_multiprobe(&query_hv, limit * 3) // over-fetch for threshold filtering
+    };
+
+    let mut results = Vec::new();
+    for (id, similarity) in candidates {
+        if similarity >= threshold {
+            if let Some((hash, _intent)) = intent_map.get(&id) {
+                results.push(SearchResult {
+                    design_hash: hash.clone(),
+                    similarity_score: similarity,
+                    matched_bindings: vec![], // LSH search doesn't compute binding overlap
+                });
+            }
+        }
+    }
+
+    results.sort_by(|a, b| b.similarity_score.partial_cmp(&a.similarity_score).unwrap());
+    results.truncate(limit);
+    Ok(results)
+}
+
 /// Compute binding overlap between two sets of semantic bindings.
 /// Returns the list of concepts that appear in both sets with the same role.
 /// This is supplementary metadata for display; the real similarity comes from
@@ -869,6 +940,7 @@ pub fn predict_repair_needs(input: PredictRepairInput) -> ExternResult<RepairPre
 }
 
 /// Internal: aggregated sensor signal envelope
+#[allow(dead_code)]
 struct SensorSignature {
     vibration_rms: f32,
     vibration_trend_slope: f32,

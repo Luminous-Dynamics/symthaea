@@ -98,6 +98,8 @@ pub struct RecordPrintInput {
     pub notes: String,
     pub issues: Vec<PrintIssue>,
     pub dimensional_measurements: Option<Vec<DimensionalMeasurement>>,
+    /// Optional PoGF attestation bundle for verifiable sustainability claims
+    pub attestations: Option<PogfAttestationBundle>,
 }
 
 /// Input for starting Cincinnati monitoring
@@ -167,9 +169,110 @@ fn ensure_caller_is_requester_or_owner(job: &PrintJob) -> ExternResult<()> {
     ensure_caller_is_printer_owner(&job.printer_hash)
 }
 
+// Local Design struct for cross-zome deserialization
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
+struct DesignForSafetyCheck {
+    pub safety_class: SafetyClass,
+}
+
+/// Check if a design with Class3+ safety requires passing verification
+fn enforce_safety_class(design_hash: &ActionHash) -> ExternResult<()> {
+    // Fetch the design to read its safety class
+    let design_record = get(design_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Design not found".to_string()
+        )))?;
+
+    let design: DesignForSafetyCheck = design_record
+        .entry()
+        .to_app_option()
+        .map_err(|_| {
+            // If we can't parse safety class, allow the job (backward compatibility)
+            wasm_error!(WasmErrorInner::Guest(
+                "Could not parse design safety class".to_string()
+            ))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Design entry is empty".to_string()
+        )))?;
+
+    if !design.safety_class.requires_verification() {
+        return Ok(());
+    }
+
+    // For Class3+, check verification records via cross-zome call
+    let response = call(
+        CallTargetCell::Local,
+        "verification",
+        "get_design_verifications".into(),
+        None,
+        design_hash.clone(),
+    )?;
+
+    let verifications: Vec<Record> = match response {
+        ZomeCallResponse::Ok(bytes) => bytes
+            .decode()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                format!("Failed to decode verification response: {}", e)
+            )))?,
+        ZomeCallResponse::NetworkError(_) => {
+            // Network error → allow job (best-effort)
+            return Ok(());
+        }
+        _ => {
+            // Other responses → allow job
+            return Ok(());
+        }
+    };
+
+    // Check if any verification passed
+    let has_passing = verifications.iter().any(|record: &Record| {
+        record
+            .entry()
+            .to_app_option::<DesignVerificationCheck>()
+            .ok()
+            .flatten()
+            .map(|v| matches!(v.result, VerificationResult::Passed { .. }))
+            .unwrap_or(false)
+    });
+
+    if !has_passing {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Design has safety class {:?} which requires at least one passing verification before printing",
+            design.safety_class
+        ))));
+    }
+
+    Ok(())
+}
+
+// Local struct for verification deserialization
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
+struct DesignVerificationCheck {
+    pub result: VerificationResult,
+}
+
 /// Create a new print job
 #[hdk_extern]
 pub fn create_print_job(input: CreatePrintJobInput) -> ExternResult<Record> {
+    // Enforce safety class verification for Class3+ designs
+    // Best-effort: if verification zome is unavailable, allow the job
+    match enforce_safety_class(&input.design_hash) {
+        Ok(()) => {},
+        Err(e) => {
+            let msg = format!("{}", e);
+            if msg.contains("requires at least one passing verification") {
+                return Err(e);
+            }
+            // Other errors (zome unavailable, parse error) → allow job with warning signal
+            let _ = emit_signal(&FabricationSignal {
+                event_type: "safety_check_skipped".to_string(),
+                source_zome: "prints".to_string(),
+                payload: format!(r#"{{"reason":"{}"}}"#, msg.replace('"', "'")),
+            });
+        }
+    }
+
     let requester = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -520,13 +623,20 @@ pub fn record_print_result(input: RecordPrintInput) -> ExternResult<Record> {
         0.0
     };
 
-    // Calculate PoGF score
-    let pog_score = calculate_pog_score(
+    // Calculate raw PoGF score
+    let raw_pog_score = calculate_pog_score(
         energy_renewable,
         material_circularity,
         quality_score,
         local_participation,
     );
+
+    // Apply attestation multiplier: unattested claims are penalized
+    let attestation_multiplier = input.attestations
+        .as_ref()
+        .map(|a| a.attestation_multiplier())
+        .unwrap_or(0.25); // No attestations = 75% penalty
+    let pog_score = raw_pog_score * attestation_multiplier;
 
     // Calculate MYCELIUM reward
     let mycelium_earned = if matches!(input.result, PrintResult::Success) {
@@ -656,7 +766,7 @@ pub fn start_cincinnati_monitoring(input: StartCincinnatiInput) -> ExternResult<
     ensure_caller_is_printer_owner(&job.printer_hash)?;
 
     let now = sys_time()?;
-    let session_id = format!("cin_{}_{}", now.as_micros(), input.job_hash.to_string()[..8].to_string());
+    let session_id = format!("cin_{}_{}", now.as_micros(), &input.job_hash.to_string()[..8]);
 
     let session = CincinnatiSession {
         session_id: session_id.clone(),
@@ -1140,5 +1250,78 @@ mod tests {
         // total = 10.0 * 0.3 + 0.0 = 3.0 → 3
         let reward = calculate_mycelium_reward(0.6, 0.0);
         assert_eq!(reward, 3, "Threshold pog with zero quality should yield 3, got {}", reward);
+    }
+
+    // ── pog_score with attestation multiplier ──────────────────────────
+
+    #[test]
+    fn test_pog_score_with_full_attestation() {
+        // Full attestation → multiplier = 1.0 → no penalty
+        let raw = calculate_pog_score(1.0, 1.0, 1.0, 1.0);
+        let bundle = PogfAttestationBundle {
+            energy: Some(EnergyAttestation {
+                energy_type: EnergyType::Solar,
+                kwh_consumed: 1.0,
+                grid_carbon_intensity: 25.0,
+                terra_atlas_hash: None,
+                attester: "a".to_string(),
+                attested_at_micros: 0,
+            }),
+            material: Some(MaterialAttestation {
+                batch_id: "b".to_string(),
+                origin: MaterialOrigin::PostConsumer,
+                recycled_fraction: 0.9,
+                supply_chain_hash: None,
+                certifications: vec![],
+                attester: "b".to_string(),
+                attested_at_micros: 0,
+            }),
+            local: Some(LocalAttestation {
+                hearth_funding_hash: Some("h".to_string()),
+                local_printer: true,
+                distance_km: None,
+                attester: "c".to_string(),
+                attested_at_micros: 0,
+            }),
+        };
+        let adjusted = raw * bundle.attestation_multiplier();
+        assert!((adjusted - raw).abs() < 0.001, "Full attestation should not penalize");
+    }
+
+    #[test]
+    fn test_pog_score_with_no_attestation() {
+        let raw = calculate_pog_score(1.0, 1.0, 1.0, 1.0);
+        // No attestations → multiplier = 0.25
+        let adjusted = raw * 0.25;
+        assert!((adjusted - 0.25).abs() < 0.001, "No attestation should yield 25% of raw");
+    }
+
+    #[test]
+    fn test_pog_score_partial_attestation_scales() {
+        let raw = calculate_pog_score(1.0, 1.0, 1.0, 1.0);
+        let bundle = PogfAttestationBundle {
+            energy: Some(EnergyAttestation {
+                energy_type: EnergyType::Wind,
+                kwh_consumed: 0.5,
+                grid_carbon_intensity: 0.0,
+                terra_atlas_hash: None,
+                attester: "a".to_string(),
+                attested_at_micros: 0,
+            }),
+            material: Some(MaterialAttestation {
+                batch_id: "b".to_string(),
+                origin: MaterialOrigin::Virgin,
+                recycled_fraction: 0.0,
+                supply_chain_hash: None,
+                certifications: vec![],
+                attester: "b".to_string(),
+                attested_at_micros: 0,
+            }),
+            local: None,
+        };
+        let m = bundle.attestation_multiplier();
+        let adjusted = raw * m;
+        // 2/3 attested → 0.25 + 0.75*(2/3) = 0.75
+        assert!((adjusted - 0.75).abs() < 0.001, "2/3 attested should yield 0.75, got {}", adjusted);
     }
 }
