@@ -221,6 +221,15 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("LiveLoopAblation") => {
             Some(("live_da_knockout_gradient_drop_pct", &bl.neuromod))
         }
+        name if name.contains("PharmacologicalChallenge") => {
+            Some(("da_agonist_gradient_scale", &bl.neuromod))
+        }
+        name if name.contains("InjectionChallenge") => {
+            Some(("stimulant_peak_effect", &bl.neuromod))
+        }
+        name if name.contains("AllostaticStress") => {
+            Some(("chronic_da_baseline_final", &bl.neuromod))
+        }
 
         _ => {
             // Try generic metric name lookup against all baseline maps

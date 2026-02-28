@@ -15,6 +15,7 @@ use symthaea_psych_bench::benchmarks::language::*;
 use symthaea_psych_bench::benchmarks::memory_agent::*;
 use symthaea_psych_bench::benchmarks::metacognition::*;
 use symthaea_psych_bench::benchmarks::motor::*;
+use symthaea_psych_bench::benchmarks::neuromod::*;
 use symthaea_psych_bench::benchmarks::reasoning::*;
 use symthaea_psych_bench::benchmarks::social::*;
 use symthaea_psych_bench::benchmarks::sustained_attention::*;
@@ -107,6 +108,10 @@ fn test_normative_coverage() {
         Box::new(RmeBenchmark),
         Box::new(UltimatumGameBenchmark),
         Box::new(SocialNormBenchmark),
+        // Neuromod
+        Box::new(PharmacologicalChallengeBenchmark),
+        Box::new(InjectionChallengeBenchmark),
+        Box::new(AllostaticStressBenchmark),
     ];
 
     // Build a full report from all benchmarks
@@ -144,6 +149,10 @@ fn test_normative_coverage() {
         // Social (fixed baseline key mappings)
         "Social::UltimatumGame",
         "Social::SocialNorm",
+        // Neuromod
+        "Neuromod::PharmacologicalChallenge",
+        "Neuromod::InjectionChallenge",
+        "Neuromod::AllostaticStress",
     ];
 
     let covered: Vec<&str> = normative

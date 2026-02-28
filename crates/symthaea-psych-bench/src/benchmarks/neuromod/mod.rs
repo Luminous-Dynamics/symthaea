@@ -9,9 +9,13 @@
 //! - **PharmacologicalChallenge** — Agonist (0.9) + antagonist (0.1) inverted-U (Arnsten 2011)
 //! - **InjectionChallenge** — PK injection + tolerance dynamics (Arnsten 2011)
 //! - **AllostaticStress** — Chronic stress load accumulation and recovery (McEwen 1998)
+//! - **BehavioralKnockout** — Cohen's d effect sizes for transmitter knockouts (Doya 2002)
+//! - **ConsciousnessPharmacology** — Pharmacological injection → consciousness round-trip
 
 pub mod allostatic_stress;
 pub mod attention_network;
+pub mod behavioral_knockout;
+pub mod consciousness_pharmacology;
 pub mod injection_challenge;
 #[cfg(feature = "symthaea-backend")]
 pub mod live_loop_ablation;
@@ -23,6 +27,8 @@ pub mod yerkes_dodson;
 
 pub use allostatic_stress::AllostaticStressBenchmark;
 pub use attention_network::AttentionNetworkBenchmark;
+pub use behavioral_knockout::BehavioralKnockoutBenchmark;
+pub use consciousness_pharmacology::ConsciousnessPharmacologyBenchmark;
 pub use injection_challenge::InjectionChallengeBenchmark;
 #[cfg(feature = "symthaea-backend")]
 pub use live_loop_ablation::LiveLoopAblationBenchmark;
