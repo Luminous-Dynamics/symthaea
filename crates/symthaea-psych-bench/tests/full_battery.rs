@@ -31,6 +31,12 @@ use symthaea_psych_bench::benchmarks::{
     },
     metacognition::{FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark},
     motor::{BimanualBenchmark, FittsLawBenchmark, SrttBenchmark},
+    neuromod::{
+        AllostaticStressBenchmark, AttentionNetworkBenchmark, BehavioralKnockoutBenchmark,
+        ConsciousnessPharmacologyBenchmark, InjectionChallengeBenchmark, MoodInductionBenchmark,
+        PharmacologicalAblationBenchmark, PharmacologicalChallengeBenchmark,
+        RewardLearningBenchmark, YerkesDodsonBenchmark,
+    },
     reasoning::{
         ArcAbductiveBenchmark, ArcAlgebraBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
         ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark, ArcNoiseBenchmark,
@@ -177,11 +183,23 @@ fn full_battery_report() {
     report.add(UltimatumGameBenchmark.run(&config));
     report.add(SocialNormBenchmark.run(&config));
 
+    // ── Neuromod ──
+    report.add(PharmacologicalChallengeBenchmark.run(&config));
+    report.add(InjectionChallengeBenchmark.run(&config));
+    report.add(AllostaticStressBenchmark.run(&config));
+    report.add(RewardLearningBenchmark.run(&config));
+    report.add(YerkesDodsonBenchmark.run(&config));
+    report.add(AttentionNetworkBenchmark.run(&config));
+    report.add(MoodInductionBenchmark.run(&config));
+    report.add(PharmacologicalAblationBenchmark.run(&config));
+    report.add(BehavioralKnockoutBenchmark.run(&config));
+    report.add(ConsciousnessPharmacologyBenchmark.run(&config));
+
     // Verify all benchmarks produced results
     assert_eq!(
         report.results.len(),
-        67,
-        "Expected 67 benchmark results, got {}",
+        77,
+        "Expected 77 benchmark results, got {}",
         report.results.len()
     );
 
@@ -309,6 +327,16 @@ fn regression_against_baseline() {
     report.add(RmeBenchmark.run(&config));
     report.add(UltimatumGameBenchmark.run(&config));
     report.add(SocialNormBenchmark.run(&config));
+    report.add(PharmacologicalChallengeBenchmark.run(&config));
+    report.add(InjectionChallengeBenchmark.run(&config));
+    report.add(AllostaticStressBenchmark.run(&config));
+    report.add(RewardLearningBenchmark.run(&config));
+    report.add(YerkesDodsonBenchmark.run(&config));
+    report.add(AttentionNetworkBenchmark.run(&config));
+    report.add(MoodInductionBenchmark.run(&config));
+    report.add(PharmacologicalAblationBenchmark.run(&config));
+    report.add(BehavioralKnockoutBenchmark.run(&config));
+    report.add(ConsciousnessPharmacologyBenchmark.run(&config));
 
     let current = RegressionSnapshot::from_report(&report, "current");
     let regression = RegressionReport::compare(&baseline, &current, 0.05, 0.10);

@@ -599,7 +599,7 @@ mod tests {
         for &(_, to) in &moves {
             if to == 0 {
                 // Only valid if peg 0 is empty after the move (from == 0)
-                panic!("Should not move to full peg 0 unless it's the source");
+                unreachable!("legal_moves() should not produce a move to full peg 0 unless it's the source");
             }
         }
     }

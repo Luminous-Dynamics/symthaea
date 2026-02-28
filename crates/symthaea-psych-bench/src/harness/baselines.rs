@@ -2687,6 +2687,28 @@ pub fn neuromod_baselines() -> BaselineMap {
         },
     );
 
+    // ── Behavioral Knockout (Doya 2002; Cohen 1988) ──
+    m.insert(
+        "da_ko_lr_d",
+        Baseline {
+            value: 2.0,
+            sd: Some(0.8),
+            source: "Doya (2002); Cohen (1988), DA knockout Cohen's d on learning rate ~2.0 (large)",
+            population: "computational model",
+        },
+    );
+
+    // ── Consciousness Pharmacology (Carhart-Harris & Nutt 2017) ──
+    m.insert(
+        "psychedelic_proxy_peak",
+        Baseline {
+            value: 0.52,
+            sd: Some(0.05),
+            source: "Carhart-Harris & Nutt (2017), 5-HT2A agonist peak consciousness proxy",
+            population: "computational model",
+        },
+    );
+
     m
 }
 

@@ -230,6 +230,12 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("AllostaticStress") => {
             Some(("chronic_da_baseline_final", &bl.neuromod))
         }
+        name if name.contains("BehavioralKnockout") => {
+            Some(("da_ko_lr_d", &bl.neuromod))
+        }
+        name if name.contains("ConsciousnessPharmacology") => {
+            Some(("psychedelic_proxy_peak", &bl.neuromod))
+        }
 
         _ => {
             // Try generic metric name lookup against all baseline maps

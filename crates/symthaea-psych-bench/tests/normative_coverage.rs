@@ -91,6 +91,16 @@ fn test_normative_coverage() {
         Box::new(VisualSearchBenchmark),
         // Reasoning
         Box::new(ArcFluidBenchmark),
+        Box::new(ArcAbductiveBenchmark),
+        Box::new(ArcAlgebraBenchmark),
+        Box::new(ArcAnalogyBenchmark),
+        Box::new(ArcChainBenchmark),
+        Box::new(ArcCompositionalBenchmark),
+        Box::new(ArcFewShotBenchmark),
+        Box::new(ArcNoiseBenchmark),
+        Box::new(ArcRsaBenchmark),
+        Box::new(ArcScalingBenchmark),
+        Box::new(ArcStaircaseBenchmark),
         // Sustained Attention
         Box::new(SartBenchmark),
         Box::new(PvtBenchmark),
@@ -112,6 +122,13 @@ fn test_normative_coverage() {
         Box::new(PharmacologicalChallengeBenchmark),
         Box::new(InjectionChallengeBenchmark),
         Box::new(AllostaticStressBenchmark),
+        Box::new(RewardLearningBenchmark),
+        Box::new(YerkesDodsonBenchmark),
+        Box::new(AttentionNetworkBenchmark),
+        Box::new(MoodInductionBenchmark),
+        Box::new(PharmacologicalAblationBenchmark),
+        Box::new(BehavioralKnockoutBenchmark),
+        Box::new(ConsciousnessPharmacologyBenchmark),
     ];
 
     // Build a full report from all benchmarks
@@ -149,10 +166,29 @@ fn test_normative_coverage() {
         // Social (fixed baseline key mappings)
         "Social::UltimatumGame",
         "Social::SocialNorm",
+        // Reasoning (ARC variants)
+        "Reasoning::ArcFluid",
+        "Reasoning::ArcAbductive",
+        "Reasoning::ArcAlgebra",
+        "Reasoning::ArcAnalogy",
+        "Reasoning::ArcChain",
+        "Reasoning::ArcCompositional",
+        "Reasoning::ArcFewShot",
+        "Reasoning::ArcNoise",
+        "Reasoning::ArcRSA",
+        "Reasoning::ArcScaling",
+        "Reasoning::ArcStaircase",
         // Neuromod
         "Neuromod::PharmacologicalChallenge",
         "Neuromod::InjectionChallenge",
         "Neuromod::AllostaticStress",
+        "Neuromod::RewardLearning",
+        "Neuromod::YerkesDodson",
+        "Neuromod::AttentionNetwork",
+        "Neuromod::MoodInduction",
+        "Neuromod::PharmacologicalAblation",
+        "BehavioralKnockout",
+        "ConsciousnessPharmacology",
     ];
 
     let covered: Vec<&str> = normative
