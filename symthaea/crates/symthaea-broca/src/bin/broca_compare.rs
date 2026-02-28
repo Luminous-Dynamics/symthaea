@@ -80,7 +80,7 @@ fn main() {
     if let Some(ref ckpt_path) = opts.cfc_checkpoint {
         tracing::info!(path = %ckpt_path, "Loading CfC-HDC checkpoint");
         match BrocaGenerator::from_checkpoint(ckpt_path, &genesis) {
-            Ok((gen, _adam, _proj)) => {
+            Ok((gen, _adam, _proj, _lm_config)) => {
                 cfc_gen = gen;
                 tracing::info!("CfC-HDC checkpoint loaded");
             }

@@ -11,10 +11,12 @@ use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::{ContinuousHV, HdcLtcUnifiedNetwork};
 
 use crate::generator::{BrocaConfig, BrocaGenerator};
-use crate::tokenizer::VocabFile;
+use crate::tokenizer::{MergePair, VocabFile};
 
 /// Current BrocaCheckpoint schema version.
-const CHECKPOINT_VERSION: u32 = 1;
+/// v1: original schema
+/// v2: added `liquid_mamba_config: Option<LiquidMambaConfig>`
+const CHECKPOINT_VERSION: u32 = 2;
 
 /// Current ProjectionCheckpoint schema version.
 /// v1: 4 weight matrices (w_down, w_up, w_back_down, w_back_up).
@@ -108,6 +110,13 @@ pub struct BrocaCheckpoint {
     /// Optional HDC↔SSM projection weights for Liquid-Mamba fusion.
     /// Stored as a flat Vec from `HdcSsmProjection::flatten_weights()`.
     pub projection_weights: Option<Vec<f32>>,
+    /// Optional Liquid-Mamba configuration for full L-SSM resume (serialized as JSON string).
+    /// Added in v2; v1 checkpoints deserialize with `None` via serde(default).
+    /// Stored as a JSON `String` for feature-flag independence — the `liquid_mamba`
+    /// module is gated behind `cfg(feature = "mamba")`, but checkpoints must (de)serialize
+    /// regardless of enabled features. Bincode can't round-trip `serde_json::Value` (untagged enum).
+    #[serde(default)]
+    pub liquid_mamba_config: Option<String>,
     /// Blake3 integrity checksum (set to zeros before hashing).
     pub checksum: [u8; 32],
 }
@@ -116,7 +125,7 @@ impl BrocaCheckpoint {
     /// Compute the blake3 checksum of the checkpoint (with checksum field zeroed).
     fn compute_checksum(&self) -> [u8; 32] {
         // Serialize with zeroed checksum
-        let mut copy = BrocaCheckpoint {
+        let copy = BrocaCheckpoint {
             version: self.version,
             token_embeddings: self.token_embeddings.clone(),
             network_state: self.network_state.clone(),
@@ -126,9 +135,9 @@ impl BrocaCheckpoint {
             training_loss: self.training_loss,
             adam_state: self.adam_state.clone(),
             projection_weights: self.projection_weights.clone(),
+            liquid_mamba_config: self.liquid_mamba_config.clone(),
             checksum: [0u8; 32],
         };
-        copy.checksum = [0u8; 32];
 
         let bytes = bincode::serialize(&copy).unwrap_or_default();
         *blake3::hash(&bytes).as_bytes()
@@ -184,6 +193,15 @@ impl BrocaCheckpoint {
                 CHECKPOINT_VERSION
             );
         }
+        if checkpoint.version < CHECKPOINT_VERSION {
+            tracing::warn!(
+                saved_version = checkpoint.version,
+                current_version = CHECKPOINT_VERSION,
+                "Loading legacy Broca checkpoint (v{} → v{}). LiquidMambaConfig will use defaults.",
+                checkpoint.version,
+                CHECKPOINT_VERSION
+            );
+        }
 
         tracing::info!(
             path = %path.as_ref().display(),
@@ -201,6 +219,10 @@ impl BrocaCheckpoint {
 /// Extension methods for BrocaGenerator to support checkpointing.
 impl BrocaGenerator {
     /// Save the current generator state to a checkpoint file.
+    ///
+    /// The `liquid_mamba_config` parameter accepts a JSON string — serialize
+    /// your `LiquidMambaConfig` via `serde_json::to_string(&config).ok()` before calling.
+    /// Pass `None` for CfC-HDC-only training.
     pub fn save_checkpoint<P: AsRef<Path>>(
         &self,
         path: P,
@@ -208,12 +230,21 @@ impl BrocaGenerator {
         training_loss: f32,
         adam_state: Option<AdamState>,
         projection_weights: Option<Vec<f32>>,
+        liquid_mamba_config: Option<String>,
     ) -> Result<()> {
         let vocab = VocabFile {
             tokens: (0..self.tokenizer().vocab_size())
                 .map(|i| self.tokenizer().token_str(i as u32).to_string())
                 .collect(),
-            merges: vec![],
+            merges: self
+                .tokenizer()
+                .merges()
+                .iter()
+                .map(|(l, r)| MergePair {
+                    left: l.clone(),
+                    right: r.clone(),
+                })
+                .collect(),
         };
 
         let mut checkpoint = BrocaCheckpoint {
@@ -226,6 +257,7 @@ impl BrocaGenerator {
             training_loss,
             adam_state,
             projection_weights,
+            liquid_mamba_config,
             checksum: [0u8; 32],
         };
 
@@ -236,10 +268,23 @@ impl BrocaGenerator {
     ///
     /// The genesis seed is used to reconstruct the encoder and position base
     /// (which are deterministic and not stored in the checkpoint).
+    ///
+    /// Returns `(generator, adam_state, projection_weights, liquid_mamba_config)`.
+    ///
+    /// The `liquid_mamba_config` is a JSON string that can be deserialized
+    /// into `LiquidMambaConfig` when the mamba feature is enabled:
+    /// ```ignore
+    /// let lm_config: LiquidMambaConfig = serde_json::from_str(&json_str)?;
+    /// ```
     pub fn from_checkpoint<P: AsRef<Path>>(
         path: P,
         genesis: &symthaea_core::genesis::GenesisSeed,
-    ) -> Result<(Self, Option<AdamState>, Option<Vec<f32>>)> {
+    ) -> Result<(
+        Self,
+        Option<AdamState>,
+        Option<Vec<f32>>,
+        Option<String>,
+    )> {
         let checkpoint = BrocaCheckpoint::load_from_file(path)?;
 
         let tokenizer = crate::tokenizer::BpeTokenizer::from_vocab_file(&checkpoint.vocab);
@@ -250,7 +295,12 @@ impl BrocaGenerator {
         // Restore network state (weights, momentums, etc.)
         *gen.controller_mut().network_mut() = checkpoint.network_state;
 
-        Ok((gen, checkpoint.adam_state, checkpoint.projection_weights))
+        Ok((
+            gen,
+            checkpoint.adam_state,
+            checkpoint.projection_weights,
+            checkpoint.liquid_mamba_config,
+        ))
     }
 }
 
@@ -277,6 +327,14 @@ pub struct ProjectionCheckpoint {
     pub ssm_dim: usize,
     /// Training epoch at time of save.
     pub training_epoch: usize,
+    /// Whether this projection uses the deep double-bottleneck architecture.
+    /// Added after v2; backward-compatible via serde(default) = false.
+    #[serde(default)]
+    pub deep: bool,
+    /// Inner bottleneck dimension (0 if shallow).
+    /// Added after v2; backward-compatible via serde(default) = 0.
+    #[serde(default)]
+    pub inner_dim: usize,
     /// Blake3 integrity checksum (zeroed before hashing).
     pub checksum: [u8; 32],
 }
@@ -292,6 +350,8 @@ impl ProjectionCheckpoint {
             bottleneck_dim: self.bottleneck_dim,
             ssm_dim: self.ssm_dim,
             training_epoch: self.training_epoch,
+            deep: self.deep,
+            inner_dim: self.inner_dim,
             checksum: [0u8; 32],
         };
         let bytes = bincode::serialize(&copy).unwrap_or_default();
@@ -333,6 +393,8 @@ impl ProjectionCheckpoint {
         bottleneck_dim: usize,
         ssm_dim: usize,
         training_epoch: usize,
+        deep: bool,
+        inner_dim: usize,
     ) -> Self {
         Self {
             version: PROJECTION_CHECKPOINT_VERSION,
@@ -341,6 +403,8 @@ impl ProjectionCheckpoint {
             bottleneck_dim,
             ssm_dim,
             training_epoch,
+            deep,
+            inner_dim,
             checksum: [0u8; 32],
         }
     }
@@ -416,12 +480,15 @@ mod tests {
         let path = dir.join("broca_test_checkpoint.bin");
 
         // Save
-        gen.save_checkpoint(&path, 5, 2.5, None, None).unwrap();
+        gen.save_checkpoint(&path, 5, 2.5, None, None, None)
+            .unwrap();
 
         // Load
-        let (loaded_gen, adam, proj) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
+        let (loaded_gen, adam, proj, lm_config) =
+            BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
         assert!(adam.is_none());
         assert!(proj.is_none());
+        assert!(lm_config.is_none());
         assert_eq!(
             loaded_gen.tokenizer().vocab_size(),
             gen.tokenizer().vocab_size()
@@ -441,10 +508,10 @@ mod tests {
         let dir = std::env::temp_dir();
         let path = dir.join("broca_test_checkpoint_adam.bin");
 
-        gen.save_checkpoint(&path, 10, 1.5, Some(adam), None)
+        gen.save_checkpoint(&path, 10, 1.5, Some(adam), None, None)
             .unwrap();
 
-        let (_, loaded_adam, _) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
+        let (_, loaded_adam, _, _) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
         assert!(loaded_adam.is_some());
         let loaded_adam = loaded_adam.unwrap();
         assert_eq!(loaded_adam.t, 0);
@@ -464,10 +531,10 @@ mod tests {
         let dir = std::env::temp_dir();
         let path = dir.join("broca_test_checkpoint_proj.bin");
 
-        gen.save_checkpoint(&path, 3, 2.0, None, Some(proj_weights.clone()))
+        gen.save_checkpoint(&path, 3, 2.0, None, Some(proj_weights.clone()), None)
             .unwrap();
 
-        let (_, _, loaded_proj) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
+        let (_, _, loaded_proj, _) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
         assert!(loaded_proj.is_some());
         let loaded_proj = loaded_proj.unwrap();
         assert_eq!(loaded_proj.len(), 5);
@@ -486,7 +553,8 @@ mod tests {
         let dir = std::env::temp_dir();
         let path = dir.join("broca_test_corrupt.bin");
 
-        gen.save_checkpoint(&path, 1, 3.0, None, None).unwrap();
+        gen.save_checkpoint(&path, 1, 3.0, None, None, None)
+            .unwrap();
 
         // Corrupt the file
         let mut data = std::fs::read(&path).unwrap();
@@ -532,9 +600,105 @@ mod tests {
             training_loss: 0.0,
             adam_state: None,
             projection_weights: None,
+            liquid_mamba_config: None,
             checksum: [0u8; 32],
         };
         checkpoint.checksum = checkpoint.compute_checksum();
         assert!(checkpoint.verify());
+    }
+
+    #[cfg(feature = "mamba")]
+    #[test]
+    fn test_checkpoint_roundtrip_liquid_mamba_config() {
+        use crate::liquid_mamba::LiquidMambaConfig;
+
+        let genesis = test_genesis();
+        let config = BrocaConfig::default();
+        let gen = BrocaGenerator::new(&genesis, config);
+
+        let lm_config = LiquidMambaConfig {
+            surprise_gradient_alpha: 0.8,
+            base_lr: 0.005,
+            ..Default::default()
+        };
+
+        let dir = std::env::temp_dir();
+        let path = dir.join("broca_test_lm_config.bin");
+
+        let lm_json = serde_json::to_string(&lm_config).ok();
+        gen.save_checkpoint(&path, 7, 1.0, None, None, lm_json)
+            .unwrap();
+
+        let (_, _, _, loaded_lm_json) =
+            BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
+        assert!(loaded_lm_json.is_some());
+        let loaded: LiquidMambaConfig =
+            serde_json::from_str(&loaded_lm_json.unwrap()).unwrap();
+        assert!((loaded.surprise_gradient_alpha - 0.8).abs() < 1e-6);
+        assert!((loaded.base_lr - 0.005).abs() < 1e-6);
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_checkpoint_roundtrip_merges() {
+        let genesis = test_genesis();
+        let config = BrocaConfig::default();
+
+        // Use 4K tokenizer which has merge rules
+        let tokenizer = crate::tokenizer::BpeTokenizer::default_4k();
+        let gen = BrocaGenerator::with_tokenizer(&genesis, config, tokenizer);
+
+        let original_merges_count = gen.tokenizer().merges().len();
+        assert!(original_merges_count > 0, "4K tokenizer should have merges");
+
+        // Encode some text to compare before/after
+        let test_text = "the world is beautiful";
+        let original_ids = gen.tokenizer().encode(test_text);
+
+        let dir = std::env::temp_dir();
+        let path = dir.join("broca_test_merges.bin");
+
+        gen.save_checkpoint(&path, 1, 1.0, None, None, None)
+            .unwrap();
+
+        let (loaded_gen, _, _, _) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
+        let loaded_merges_count = loaded_gen.tokenizer().merges().len();
+        assert_eq!(
+            loaded_merges_count, original_merges_count,
+            "Merges should survive checkpoint round-trip"
+        );
+
+        let loaded_ids = loaded_gen.tokenizer().encode(test_text);
+        assert_eq!(
+            original_ids, loaded_ids,
+            "Token IDs should be identical after checkpoint round-trip"
+        );
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[cfg(feature = "mamba")]
+    #[test]
+    fn test_projection_checkpoint_deep_flag() {
+        let dir = std::env::temp_dir();
+        let path = dir.join("broca_test_proj_deep.bin");
+
+        let mut ckpt = ProjectionCheckpoint::new(
+            vec![0.1, 0.2, 0.3],
+            16384,
+            256,
+            768,
+            5,
+            true,
+            128,
+        );
+        ckpt.save_to_file(&path).unwrap();
+
+        let loaded = ProjectionCheckpoint::load_from_file(&path).unwrap();
+        assert!(loaded.deep, "deep flag should survive round-trip");
+        assert_eq!(loaded.inner_dim, 128, "inner_dim should survive round-trip");
+
+        let _ = std::fs::remove_file(&path);
     }
 }

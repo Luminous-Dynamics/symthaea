@@ -29,6 +29,7 @@
 use std::collections::VecDeque;
 
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
@@ -43,7 +44,7 @@ use crate::projection::HdcSsmProjection;
 use crate::tokenizer::BpeTokenizer;
 
 /// Configuration for the Liquid-Mamba generator.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LiquidMambaConfig {
     /// HuggingFace model ID for the Mamba checkpoint.
     pub model_id: String,
@@ -116,6 +117,55 @@ pub struct LiquidMambaConfig {
     /// Gradients are scaled by `1 + alpha * semantic_pe` before application,
     /// amplifying gradients for surprising/difficult examples.
     pub surprise_gradient_alpha: f32,
+    /// Gradient clipping threshold for projection updates (default 1.0).
+    #[serde(default = "default_grad_clip")]
+    pub grad_clip: f32,
+    /// Token-PE similarity threshold below which gating boost activates (default 0.3).
+    #[serde(default = "default_token_pe_sim_threshold")]
+    pub token_pe_sim_threshold: f32,
+    /// Maximum per-token epistemic gating boost from PE feedback (default 1.5).
+    #[serde(default = "default_token_pe_max_boost")]
+    pub token_pe_max_boost: f32,
+    /// Decay factor for per-token PE boost when coherence is adequate (default 0.5).
+    #[serde(default = "default_token_pe_decay")]
+    pub token_pe_decay: f32,
+    /// FEP signal threshold above which distillation LR is boosted (default 0.7).
+    #[serde(default = "default_fep_high_threshold")]
+    pub fep_high_threshold: f32,
+    /// FEP signal threshold below which distillation LR is dampened (default 0.3).
+    #[serde(default = "default_fep_low_threshold")]
+    pub fep_low_threshold: f32,
+    /// FEP high-surprise LR multiplier (default 1.5).
+    #[serde(default = "default_fep_high_multiplier")]
+    pub fep_high_multiplier: f32,
+    /// FEP low-surprise LR multiplier (default 0.7).
+    #[serde(default = "default_fep_low_multiplier")]
+    pub fep_low_multiplier: f32,
+}
+
+fn default_grad_clip() -> f32 {
+    1.0
+}
+fn default_token_pe_sim_threshold() -> f32 {
+    0.3
+}
+fn default_token_pe_max_boost() -> f32 {
+    1.5
+}
+fn default_token_pe_decay() -> f32 {
+    0.5
+}
+fn default_fep_high_threshold() -> f32 {
+    0.7
+}
+fn default_fep_low_threshold() -> f32 {
+    0.3
+}
+fn default_fep_high_multiplier() -> f32 {
+    1.5
+}
+fn default_fep_low_multiplier() -> f32 {
+    0.7
 }
 
 impl Default for LiquidMambaConfig {
@@ -152,6 +202,14 @@ impl Default for LiquidMambaConfig {
             ema_decay: 0.999,
             deep_projection: false,
             surprise_gradient_alpha: 0.5,
+            grad_clip: 1.0,
+            token_pe_sim_threshold: 0.3,
+            token_pe_max_boost: 1.5,
+            token_pe_decay: 0.5,
+            fep_high_threshold: 0.7,
+            fep_low_threshold: 0.3,
+            fep_high_multiplier: 1.5,
+            fep_low_multiplier: 0.7,
         }
     }
 }
@@ -418,12 +476,13 @@ impl LiquidMambaGenerator {
                 // 7f2. Per-token PE feedback: compute token-level coherence with thought
                 //      Low similarity → boost epistemic gating for next token
                 let token_sim = thought_hv.similarity(&token_hdc).clamp(-1.0, 1.0);
-                token_pe_boost = if token_sim < 0.3 {
-                    // Low coherence: boost gating by up to +1.5 (shift toward Uncertain)
-                    1.5 * (1.0 - token_sim / 0.3)
+                token_pe_boost = if token_sim < self.config.token_pe_sim_threshold {
+                    // Low coherence: boost gating (shift toward Uncertain)
+                    self.config.token_pe_max_boost
+                        * (1.0 - token_sim / self.config.token_pe_sim_threshold)
                 } else {
                     // Adequate coherence: decay boost
-                    (token_pe_boost * 0.5).max(0.0)
+                    (token_pe_boost * self.config.token_pe_decay).max(0.0)
                 };
 
                 // 7g. Coherence monitoring + semantic veto
@@ -519,11 +578,11 @@ impl LiquidMambaGenerator {
             1.0
         };
 
-        // Phase 2: Cosine annealing (after warmup)
+        // Phase 2: Cosine annealing (after warmup), clamped to avoid wrap-around
         let cosine_factor =
             if self.config.cosine_annealing_steps > 0 && step >= self.config.warmup_steps {
-                let t = (step - self.config.warmup_steps) as f32;
                 let t_max = self.config.cosine_annealing_steps as f32;
+                let t = ((step - self.config.warmup_steps) as f32).min(t_max);
                 let min_frac = self.config.min_lr_fraction;
                 let cos_decay = 0.5 * (1.0 + (std::f32::consts::PI * t / t_max).cos());
                 min_frac + (1.0 - min_frac) * cos_decay
@@ -682,10 +741,10 @@ impl LiquidMambaGenerator {
     /// - `fep_signal < 0.3` → low surprise → dampen distillation LR by 0.7×
     /// - Otherwise → neutral (1.0×)
     pub fn set_fep_modulation(&mut self, fep_signal: f32) {
-        self.fep_modulation = if fep_signal > 0.7 {
-            1.5
-        } else if fep_signal < 0.3 {
-            0.7
+        self.fep_modulation = if fep_signal > self.config.fep_high_threshold {
+            self.config.fep_high_multiplier
+        } else if fep_signal < self.config.fep_low_threshold {
+            self.config.fep_low_multiplier
         } else {
             1.0
         };
@@ -826,7 +885,7 @@ impl LiquidMambaGenerator {
         // Gradient accumulation: only apply every N steps
         self.distill_accumulator += 1;
         if self.distill_accumulator >= self.config.accumulation_steps.max(1) {
-            self.projection.apply_gradients(effective_lr, 1.0);
+            self.projection.apply_gradients(effective_lr, self.config.grad_clip);
             // EMA teacher update after gradient application
             self.projection.update_ema();
             self.distill_accumulator = 0;
@@ -1746,5 +1805,42 @@ mod tests {
 
         assert!(result.num_tokens > 0);
         assert!(result2.num_tokens > 0);
+    }
+
+    #[test]
+    fn test_cosine_annealing_clamps_past_t() {
+        use symthaea_core::genesis::GenesisSeed;
+
+        let genesis = GenesisSeed::from_phrase("test-cosine-clamp");
+        let config = LiquidMambaConfig {
+            max_tokens: 5,
+            enable_veto: false,
+            enable_consciousness_gating: false,
+            base_lr: 0.01,
+            warmup_steps: 10,
+            cosine_annealing_steps: 100,
+            min_lr_fraction: 0.01,
+            ..Default::default()
+        };
+        let mut gen = LiquidMambaGenerator::with_mock(&genesis, config);
+
+        // Advance generation count well past warmup + cosine_annealing_steps
+        // (warmup=10, cosine=100, so t_max at step 110)
+        for _ in 0..300 {
+            gen.generation_count += 1;
+        }
+
+        let lr = gen.current_lr();
+        let min_lr = 0.01 * 0.01; // base_lr * min_lr_fraction
+
+        // After clamping, LR should be at or near min_lr (not oscillating back up)
+        assert!(
+            lr <= min_lr * 1.5,
+            "LR at step 300 should be near min_lr ({min_lr}), got {lr}"
+        );
+        assert!(
+            lr > 0.0,
+            "LR should still be positive"
+        );
     }
 }

@@ -260,6 +260,8 @@ fn main() {
         gen.config().bottleneck_dim,
         gen.config().ssm_dim,
         final_epoch,
+        gen.projection().is_deep(),
+        gen.projection().inner_dim(),
     );
 
     tracing::info!(path = %opts.output_path, "Saving projection checkpoint");
