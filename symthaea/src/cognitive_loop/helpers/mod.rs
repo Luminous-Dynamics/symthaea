@@ -230,6 +230,7 @@ impl CognitiveLoopService {
             training_loss,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             metadata: super::CycleMetadata::default(),
+            thought_vector: vec![0.0; 32],
             wisdom_hv: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(&hdv),
             #[cfg(feature = "identity")]
             signed_output,
