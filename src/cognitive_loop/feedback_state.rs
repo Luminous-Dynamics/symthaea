@@ -249,8 +249,12 @@ pub(crate) struct FeedbackDivergence {
     pub learning_rate: f64,
     pub exploration: f64,
     pub threshold: f64,
+    /// Consensus-integrated prediction_confidence for next cycle
+    pub consensus_confidence: f64,
     /// Consensus-integrated fep_lr_boost value for next cycle
     pub consensus_lr: f64,
+    /// Consensus-integrated exploration_urge for next cycle
+    pub consensus_exploration: f64,
     /// Consensus-integrated adaptive_threshold_scale for next cycle
     pub consensus_threshold: f64,
 }
@@ -291,6 +295,17 @@ pub(crate) struct FeedbackState {
 
     /// Last computed divergence (set by `end_cycle()`, before any consensus writeback).
     pub last_divergence: Option<FeedbackDivergence>,
+
+    // ── Deferred consensus writeback ────────────────────────────────────
+    /// Consensus confidence to apply as a Set proposal at the start of the next cycle.
+    /// Stored by `store_consensus_for_next_cycle()`, consumed by `apply_pending_consensus()`.
+    pending_consensus_confidence: Option<f64>,
+    /// Consensus LR to apply as a Set proposal at the start of the next cycle.
+    pending_consensus_lr: Option<f64>,
+    /// Consensus exploration to apply as a Set proposal at the start of the next cycle.
+    pending_consensus_exploration: Option<f64>,
+    /// Consensus threshold to apply as a Set proposal at the start of the next cycle.
+    pending_consensus_threshold: Option<f64>,
 }
 
 impl FeedbackState {
@@ -309,6 +324,10 @@ impl FeedbackState {
             last_exploration_integration: None,
             last_threshold_integration: None,
             last_divergence: None,
+            pending_consensus_confidence: None,
+            pending_consensus_lr: None,
+            pending_consensus_exploration: None,
+            pending_consensus_threshold: None,
         }
     }
 
@@ -352,12 +371,18 @@ impl FeedbackState {
             .threshold
             .integrate_sequential(base_threshold, 0.5, 2.0);
 
-        // Also compute consensus integration (averaged adds, geometric mean scales)
-        // for the fully-mediated fields (lr and threshold). These dampened values
-        // can optionally replace the direct-mutation values at cycle end.
+        // Compute consensus integration (averaged adds, geometric mean scales)
+        // for all 4 feedback variables. These dampened values can optionally
+        // replace the direct-mutation values at cycle end.
+        let consensus_confidence = self
+            .confidence
+            .integrate(base_confidence, 0.0, 1.0);
         let consensus_lr = self
             .learning_rate
             .integrate(base_lr, 1.0, 3.0);
+        let consensus_exploration = self
+            .exploration
+            .integrate(base_exploration, 0.0, 1.0);
         let consensus_threshold = self
             .threshold
             .integrate(base_threshold, 0.5, 2.0);
@@ -367,7 +392,9 @@ impl FeedbackState {
             learning_rate: (current_lr - lr_result.effective).abs(),
             exploration: (current_exploration - explore_result.effective).abs(),
             threshold: (current_threshold - thresh_result.effective).abs(),
+            consensus_confidence: consensus_confidence.effective,
             consensus_lr: consensus_lr.effective,
+            consensus_exploration: consensus_exploration.effective,
             consensus_threshold: consensus_threshold.effective,
         };
 
@@ -394,6 +421,44 @@ impl FeedbackState {
         self.cycle_start_lr = lr;
         self.cycle_start_exploration = exploration;
         self.cycle_start_threshold = threshold;
+    }
+
+    /// Store consensus-smoothed values for deferred application at the next cycle start.
+    ///
+    /// Called at cycle end instead of directly overwriting the feedback fields.
+    /// The values are applied as `Set` proposals by `apply_pending_consensus()`
+    /// so the divergence tracker sees them.
+    pub fn store_consensus_for_next_cycle(&mut self, divergence: &FeedbackDivergence) {
+        self.pending_consensus_confidence = Some(divergence.consensus_confidence);
+        self.pending_consensus_lr = Some(divergence.consensus_lr);
+        self.pending_consensus_exploration = Some(divergence.consensus_exploration);
+        self.pending_consensus_threshold = Some(divergence.consensus_threshold);
+    }
+
+    /// Apply any pending consensus values as `Set` proposals.
+    ///
+    /// Call at cycle start (after `begin_cycle()` + `snapshot_cycle_start()`).
+    /// Returns `(confidence, lr, exploration, threshold)` — the values applied.
+    pub fn apply_pending_consensus(
+        &mut self,
+    ) -> (Option<f64>, Option<f64>, Option<f64>, Option<f64>) {
+        let confidence = self.pending_consensus_confidence.take();
+        let lr = self.pending_consensus_lr.take();
+        let exploration = self.pending_consensus_exploration.take();
+        let threshold = self.pending_consensus_threshold.take();
+        if let Some(v) = confidence {
+            self.confidence.propose("consensus_writeback", FeedbackProposal::Set(v));
+        }
+        if let Some(v) = lr {
+            self.learning_rate.propose("consensus_writeback", FeedbackProposal::Set(v));
+        }
+        if let Some(v) = exploration {
+            self.exploration.propose("consensus_writeback", FeedbackProposal::Set(v));
+        }
+        if let Some(v) = threshold {
+            self.threshold.propose("consensus_writeback", FeedbackProposal::Set(v));
+        }
+        (confidence, lr, exploration, threshold)
     }
 
     /// How many total proposals were recorded this cycle.
@@ -786,6 +851,55 @@ mod tests {
             cons_var <= seq_var * 1.1, // Allow 10% tolerance for edge cases
             "Consensus variance ({cons_var:.6}) should be <= sequential ({seq_var:.6})"
         );
+    }
+
+    /// Verify that consensus writebacks routed through `store_consensus_for_next_cycle`
+    /// + `apply_pending_consensus` produce Set proposals across two cycles.
+    #[test]
+    fn test_consensus_writeback_routed_through_proposals() {
+        let mut state = FeedbackState::new();
+
+        // Cycle 1: no pending consensus yet
+        state.begin_cycle();
+        let (conf, lr, explore, thresh) = state.apply_pending_consensus();
+        assert!(conf.is_none()); // No pending on first cycle
+        assert!(lr.is_none());
+        assert!(explore.is_none());
+        assert!(thresh.is_none());
+
+        state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
+        state
+            .confidence
+            .propose("test", FeedbackProposal::Add(0.05));
+        state
+            .learning_rate
+            .propose("test", FeedbackProposal::Scale(1.1));
+        state
+            .exploration
+            .propose("test", FeedbackProposal::Add(0.02));
+        state
+            .threshold
+            .propose("test", FeedbackProposal::Scale(0.95));
+
+        let div = state.end_cycle(0.55, 1.1, 0.32, 0.95);
+
+        // Store consensus for next cycle (simulating what cycle_phase_output does)
+        state.store_consensus_for_next_cycle(&div);
+
+        // Cycle 2: consensus should be applied
+        state.begin_cycle();
+        let (conf, lr, explore, thresh) = state.apply_pending_consensus();
+        // Consensus values should be applied as Set proposals
+        assert!(conf.is_some(), "consensus confidence should be pending");
+        assert!(lr.is_some(), "consensus lr should be pending");
+        assert!(explore.is_some(), "consensus exploration should be pending");
+        assert!(thresh.is_some(), "consensus threshold should be pending");
+
+        // Values should be finite and within clamp ranges
+        assert!(conf.unwrap().is_finite());
+        assert!(lr.unwrap().is_finite());
+        assert!(explore.unwrap().is_finite());
+        assert!(thresh.unwrap().is_finite());
     }
 
     /// Multi-cycle divergence diagnostic: runs 50 cognitive cycles and checks that

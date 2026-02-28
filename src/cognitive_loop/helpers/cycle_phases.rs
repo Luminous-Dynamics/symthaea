@@ -1038,6 +1038,25 @@ impl CognitiveLoopService {
 
         // ── Phase 2.2: Begin feedback proposal collection for this cycle ────
         self.feedback_state.begin_cycle();
+
+        // Apply consensus overrides from the previous cycle as Set proposals,
+        // syncing actual fields so both direct-mutation and proposal paths
+        // start from the same base value.
+        let (consensus_conf, consensus_lr, consensus_explore, consensus_threshold) =
+            self.feedback_state.apply_pending_consensus();
+        if let Some(conf) = consensus_conf {
+            self.prediction_confidence = conf as f32;
+        }
+        if let Some(lr) = consensus_lr {
+            self.fep_lr_boost = lr as f32;
+        }
+        if let Some(explore) = consensus_explore {
+            self.curiosity_drive.exploration_urge = explore as f32;
+        }
+        if let Some(thresh) = consensus_threshold {
+            self.carryover.learning.adaptive_threshold_scale = thresh as f32;
+        }
+
         self.feedback_state.snapshot_cycle_start(
             self.prediction_confidence as f64,
             self.fep_lr_boost as f64,
