@@ -4,7 +4,6 @@
 //! HDC-CfC loop with rayon-parallelized subsystem updates.
 
 use crate::consciousness::fep_active_inference::{MotorCommandType, Observation};
-use super::neuromodulators::NeuromodulatorBathExt;
 use ndarray::Array1;
 use rayon::join as rayon_join;
 use std::borrow::Cow;
@@ -72,7 +71,6 @@ use super::thresholds::{
 };
 
 use super::helpers;
-use super::temporal_network::TemporalNetwork;
 use super::training::TrainingSample;
 use super::{
     ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, CycleResult,
@@ -488,8 +486,7 @@ impl CognitiveLoopService {
             let coherence_boost = (self.carryover.consciousness.quantum_coherence
                 - QUANTUM_COHERENCE_THRESHOLD) as f32
                 * QUANTUM_COHERENCE_BOOST_SCALE;
-            self.curiosity_drive.exploration_urge =
-                (self.curiosity_drive.exploration_urge + coherence_boost).clamp(0.0, 1.0);
+            self.adjust_exploration("quantum_coherence", coherence_boost);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -526,8 +523,7 @@ impl CognitiveLoopService {
         let resonator_error_exploration_mod =
             if resonator_prediction_error > 0.5 && self.stats.total_cycles > 5 {
                 let boost = (resonator_prediction_error - 0.5) * 0.08;
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + boost).min(1.0);
+                self.adjust_exploration("resonator_error_high", boost);
                 self.adjust_confidence("resonator_error_high", -boost * 0.5);
                 self.stats.resonator_error_exploration_count += 1;
                 boost
@@ -739,8 +735,7 @@ impl CognitiveLoopService {
             }
             // Successful prediction (low error) during goal pursuit → exploration toward goal
             if prediction_error < self.config.learning_threshold && goal_priority > 0.3 {
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + goal_priority * 0.03).clamp(0.0, 1.0);
+                self.adjust_exploration("goal_pursuit", goal_priority * 0.03);
             }
         }
 
@@ -991,8 +986,7 @@ impl CognitiveLoopService {
             let abstract_error = level_errors[level_errors.len() - 1];
             // Conceptual confusion: abstract failure > 1.5x sensory
             if abstract_error > sensory_error * 1.5 && abstract_error > 0.1 {
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + 0.08).clamp(0.0, 1.0);
+                self.adjust_exploration("conceptual_confusion", 0.08);
             }
             // Perceptual mismatch flag — applied after from_consciousness_state() + strategy reset
             wm_sensory_mismatch = sensory_error > abstract_error * 2.0 && sensory_error > 0.1;
@@ -1091,9 +1085,7 @@ impl CognitiveLoopService {
                     self.adjust_confidence("mcts_effective", (effectiveness - 0.6) * 0.03);
                 } else if effectiveness < 0.3 {
                     // Poor plan → slightly boost exploration to find better strategies
-                    self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
-                        + (0.3 - effectiveness) * 0.02)
-                        .clamp(0.0, 1.0);
+                    self.adjust_exploration("mcts_poor_plan", (0.3 - effectiveness) * 0.02);
                 }
                 // EMA update
                 self.stats.avg_mcts_plan_effectiveness =
@@ -1125,9 +1117,7 @@ impl CognitiveLoopService {
                     }
                     2 => {
                         // Plan said "explore" — nudge exploration urge
-                        self.curiosity_drive.exploration_urge =
-                            (self.curiosity_drive.exploration_urge + plan_weight * 0.08)
-                                .clamp(0.0, 1.0);
+                        self.adjust_exploration("plan_explore_directive", plan_weight * 0.08);
                     }
                     _ => {}
                 }
@@ -1156,8 +1146,7 @@ impl CognitiveLoopService {
                 if surp > reflection_thresholds.surprise as f64 {
                     let s_explore =
                         ((surp - reflection_thresholds.surprise as f64) * 0.1).min(0.05) as f32;
-                    self.curiosity_drive.exploration_urge =
-                        (self.curiosity_drive.exploration_urge + s_explore).clamp(0.0, 1.0);
+                    self.adjust_exploration("reflection_surprise", s_explore);
                 }
                 (acc, comp, surp, pe)
             } else {
@@ -1169,13 +1158,14 @@ impl CognitiveLoopService {
         let fep_pragmatic_value = fep_pragmatic_value_raw;
         if fep_pragmatic_value > 0.7 {
             // High pragmatic: exploit — reduce exploration
-            self.curiosity_drive.exploration_urge *=
-                (1.0 - (fep_pragmatic_value - 0.7) * 0.3) as f32;
+            self.scale_exploration(
+                "fep_pragmatic_exploit",
+                (1.0 - (fep_pragmatic_value - 0.7) * 0.3) as f32,
+            );
         } else if fep_pragmatic_value < 0.3 && fep_pragmatic_value > 0.0 {
             // Low pragmatic: explore — model needs updating
             let p_explore = ((0.3 - fep_pragmatic_value) * 0.15).min(0.05) as f32;
-            self.curiosity_drive.exploration_urge =
-                (self.curiosity_drive.exploration_urge + p_explore).clamp(0.0, 1.0);
+            self.adjust_exploration("fep_pragmatic_low", p_explore);
         }
 
         // ── FEP TD error → causal discovery trigger ──────────────────────
@@ -1211,8 +1201,7 @@ impl CognitiveLoopService {
                 }
                 // Sparse graph after many cycles → poor understanding → boost exploration
                 if edge_count < 2 && self.stats.total_cycles > 200 {
-                    self.curiosity_drive.exploration_urge =
-                        (self.curiosity_drive.exploration_urge + 0.02).clamp(0.0, 1.0);
+                    self.adjust_exploration("sparse_causal_graph", 0.02);
                 }
                 self.stats.causal_attention_uses += 1;
             }
@@ -1277,7 +1266,7 @@ impl CognitiveLoopService {
 
         if moral_concern_detected {
             // Reduce exploration when facing moral concerns
-            self.curiosity_drive.exploration_urge *= MORAL_CONCERN_EXPLORATION_DAMPEN;
+            self.scale_exploration("moral_concern", MORAL_CONCERN_EXPLORATION_DAMPEN);
 
             // Increase trust threshold (be more cautious)
             self.self_reflection.trust_threshold =
@@ -1305,7 +1294,7 @@ impl CognitiveLoopService {
                 moral_steering_category = "consent";
             } else if moral_judgment.violations.iter().any(|v| v.contains("harm")) {
                 // Harm detected — strongly reduce exploration, shift to protective mode
-                self.curiosity_drive.exploration_urge *= 0.4;
+                self.scale_exploration("harm_detected", 0.4);
                 self.scale_confidence("moral_harm_detect", 0.85);
                 moral_steering_category = "harm";
             } else if moral_judgment
@@ -1343,14 +1332,13 @@ impl CognitiveLoopService {
         let pfe_surprise_mod = if is_surprised && cached_pfe > 0.5 {
             // High FE amplifies surprise response (uncertain model → trust the error)
             let amplification = ((cached_pfe - 0.5) * 0.2).min(0.1) as f32;
-            self.curiosity_drive.exploration_urge =
-                (self.curiosity_drive.exploration_urge + amplification).clamp(0.0, 1.0);
+            self.adjust_exploration("pfe_surprise_amplify", amplification);
             self.stats.pfe_surprise_mod_count += 1;
             amplification
         } else if is_surprised && cached_pfe < 0.2 && cached_pfe > 0.0 {
             // Low FE dampens surprise (confident model → spurious surprise)
             let dampening = ((0.2 - cached_pfe) * 0.15).min(0.05) as f32;
-            self.curiosity_drive.exploration_urge *= 1.0 - dampening;
+            self.scale_exploration("pfe_surprise_dampen", 1.0 - dampening);
             self.stats.pfe_surprise_mod_count += 1;
             -dampening
         } else {
@@ -1368,16 +1356,14 @@ impl CognitiveLoopService {
         );
 
         // NE → exploration
-        self.curiosity_drive.exploration_urge += self.neuromodulator_bath.exploration_delta();
-        self.curiosity_drive.exploration_urge =
-            self.curiosity_drive.exploration_urge.clamp(0.0, 1.0);
+        self.adjust_exploration("neuromod_ne_delta", self.neuromodulator_bath.exploration_delta());
 
         // #1: D2 flexibility scales exploration responsiveness (Frank 2005)
         let flex_scale = self.neuromodulator_bath.behavioral_flexibility();
-        self.curiosity_drive.exploration_urge =
-            0.5 + (self.curiosity_drive.exploration_urge - 0.5) * flex_scale;
-        self.curiosity_drive.exploration_urge =
-            self.curiosity_drive.exploration_urge.clamp(0.0, 1.0);
+        self.set_exploration(
+            "d2_flexibility",
+            0.5 + (self.curiosity_drive.exploration_urge - 0.5) * flex_scale,
+        );
 
         // 5-HT → confidence
         self.adjust_confidence(
@@ -1398,9 +1384,7 @@ impl CognitiveLoopService {
             self.adaptive_behavior.attention_sensitivity *= 1.0 + (ne_ph - 0.3) * 0.5;
             self.adaptive_behavior.attention_sensitivity =
                 self.adaptive_behavior.attention_sensitivity.clamp(0.5, 2.0);
-            self.curiosity_drive.exploration_urge += (ne_ph - 0.3) * 0.15;
-            self.curiosity_drive.exploration_urge =
-                self.curiosity_drive.exploration_urge.clamp(0.0, 1.0);
+            self.adjust_exploration("ne_phasic_reorient", (ne_ph - 0.3) * 0.15);
             (ne_ph - 0.3) * 0.5
         } else {
             0.0
@@ -1443,11 +1427,11 @@ impl CognitiveLoopService {
         let gaba_inhibition = self.neuromodulator_bath.global_inhibition();
         if gaba_inhibition < 0.95 {
             self.scale_lr("gaba_inhibition", gaba_inhibition);
-            self.curiosity_drive.exploration_urge *= gaba_inhibition;
+            self.scale_exploration("gaba_inhibition", gaba_inhibition);
         }
         // E/I seizure protection: freeze exploration during recovery (Turrigiano 2012)
         if self.neuromodulator_bath.exploration_frozen() {
-            self.curiosity_drive.exploration_urge *= 0.1;
+            self.scale_exploration("seizure_protection", 0.1);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -1504,8 +1488,7 @@ impl CognitiveLoopService {
                 MotorCommandType::ExplorationTrigger => {
                     // Boost exploration based on epistemic value
                     if enhanced_result.fep_result.epistemic_value > 0.5 {
-                        self.curiosity_drive.exploration_urge =
-                            (self.curiosity_drive.exploration_urge + 0.1).clamp(0.0, 1.0);
+                        self.adjust_exploration("motor_exploration_trigger", 0.1);
                     }
                 }
                 MotorCommandType::ReflectionInitiate => {
@@ -1606,11 +1589,10 @@ impl CognitiveLoopService {
                     },
                     super::RecommendationTarget::ExplorationFactor => match rec.direction {
                         super::AdjustmentDirection::Increase => {
-                            self.curiosity_drive.exploration_urge =
-                                (self.curiosity_drive.exploration_urge + 0.12).clamp(0.0, 1.0);
+                            self.adjust_exploration("metacog_explore_increase", 0.12);
                         }
                         super::AdjustmentDirection::Decrease => {
-                            self.curiosity_drive.exploration_urge *= 0.75;
+                            self.scale_exploration("metacog_explore_decrease", 0.75);
                         }
                         _ => {}
                     },
@@ -1664,8 +1646,7 @@ impl CognitiveLoopService {
             let q = guiding_question.to_lowercase();
             let cat = if q.contains("know") || q.contains("learn") || q.contains("understand") {
                 // Epistemic question → boost prediction confidence sensitivity
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + 0.03).clamp(0.0, 1.0);
+                self.adjust_exploration("guiding_epistemic", 0.03);
                 "epistemic"
             } else if q.contains("feel") || q.contains("emotion") || q.contains("care") {
                 // Affective question → boost emotional processing sensitivity
@@ -2964,9 +2945,10 @@ impl CognitiveLoopService {
             self.scale_lr("consciousness_engine", consciousness_output.lr_factor);
         }
         if consciousness_output.exploration_delta != 0.0 {
-            self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
-                + consciousness_output.exploration_delta)
-                .clamp(0.0, 1.0);
+            self.adjust_exploration(
+                "consciousness_engine",
+                consciousness_output.exploration_delta,
+            );
         }
         if consciousness_output.subsystem_lr_factor != 1.0 {
             self.carryover.learning.subsystem_lr_factor *= consciousness_output.subsystem_lr_factor;
@@ -3052,9 +3034,10 @@ impl CognitiveLoopService {
                 "cross_mod_disagree",
                 1.0 - (0.3 - cross_module_agreement) * 0.1,
             );
-            self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
-                + (0.3 - cross_module_agreement) * 0.15)
-                .clamp(0.0, 1.0);
+            self.adjust_exploration(
+                "cross_module_disagree",
+                (0.3 - cross_module_agreement) * 0.15,
+            );
         }
         // EMA update for stats tracking
         self.stats.avg_cross_module_agreement =
@@ -3081,7 +3064,7 @@ impl CognitiveLoopService {
             }
             // Low quality → dampen exploration (conflicting signals, don't wander)
             if unified_quality_score < 0.3 && self.stats.total_cycles > 30 {
-                self.curiosity_drive.exploration_urge *= 0.9;
+                self.scale_exploration("low_quality_dampen", 0.9);
             }
         }
 
@@ -3433,9 +3416,10 @@ impl CognitiveLoopService {
                 self.scale_lr("subsystem_managers", integrated.lr_modulation as f32);
             }
             if integrated.exploration_delta != 0.0 {
-                self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
-                    + integrated.exploration_delta as f32)
-                    .clamp(0.0, 1.0);
+                self.adjust_exploration(
+                    "subsystem_managers",
+                    integrated.exploration_delta as f32,
+                );
             }
             if integrated.arousal_delta != 0.0 {
                 self.emotion_contagion.arousal =
