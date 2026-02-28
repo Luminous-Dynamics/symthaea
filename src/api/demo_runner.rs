@@ -64,26 +64,39 @@ impl DemoRunner {
             input_text: self.current_input.clone(),
             thought_vector: result.thought_vector,
             // Phase 6: neuromodulator bath telemetry
-            neuromod_state_vector: {
-                let nt = &m.neuromod_telemetry;
-                vec![
-                    nt.dopamine_effective,
-                    nt.noradrenaline_effective,
-                    nt.serotonin_effective,
-                    nt.acetylcholine_effective,
-                    nt.neuromod_gaba_effective,
-                    nt.neuromod_oxytocin_effective,
-                    nt.neuromod_glutamate_effective,
-                    nt.neuromod_adenosine_effective,
-                    nt.neuromod_endocannabinoid_effective,
-                ]
+            neuromod_state_vector: vec![
+                m.dopamine_effective,
+                m.noradrenaline_effective,
+                m.serotonin_effective,
+                m.acetylcholine_effective,
+                m.neuromod_gaba_effective,
+                m.neuromod_oxytocin_effective,
+                m.neuromod_glutamate_effective,
+                m.neuromod_adenosine_effective,
+                m.neuromod_endocannabinoid_effective,
+            ],
+            bath_entropy: m.neuromod_bath_entropy,
+            allostatic_load: m.neuromod_allostatic_load,
+            ei_ratio: m.neuromod_ei_ratio,
+            sleep_pressure: m.neuromod_sleep_pressure,
+            active_injection_count: m.active_injection_count,
+            attractor_detected: m.neuromod_attractor_detected,
+            // Post-Phase 6: phase tracker visualization
+            bath_centroid: self.service.bath_phase_tracker().centroid().to_vec(),
+            bath_variance: self.service.bath_phase_tracker().variance().to_vec(),
+            bath_trajectory: self
+                .service
+                .bath_phase_tracker()
+                .trajectory(20)
+                .into_iter()
+                .map(|s| s.to_vec())
+                .collect(),
+            bath_projection_2d: {
+                let c = self.service.bath_phase_tracker().centroid();
+                // [DA+NE mean, 5-HT+GABA mean]
+                vec![(c[0] + c[1]) / 2.0, (c[2] + c[4]) / 2.0]
             },
-            bath_entropy: m.neuromod_telemetry.neuromod_bath_entropy,
-            allostatic_load: m.neuromod_telemetry.neuromod_allostatic_load,
-            ei_ratio: m.neuromod_telemetry.neuromod_ei_ratio,
-            sleep_pressure: m.neuromod_telemetry.neuromod_sleep_pressure,
-            active_injection_count: m.neuromod_telemetry.active_injection_count,
-            attractor_detected: m.neuromod_telemetry.neuromod_attractor_detected,
+            bath_phase_label: self.service.bath_phase_label().to_string(),
         }
     }
 
