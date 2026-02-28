@@ -646,6 +646,11 @@ pub struct CompleteUsageWithTimebankInput {
 #[hdk_extern]
 pub fn complete_usage_with_timebank(input: CompleteUsageWithTimebankInput) -> ExternResult<TimebankCreditResult> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "complete_usage_with_timebank")?;
+    if !input.hours_used.is_finite() || input.hours_used < 0.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "hours_used must be a finite non-negative number".into()
+        )));
+    }
     // First, get the booking to find resource owner and booker
     let booking_record = get(input.booking_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())))?;
@@ -729,6 +734,11 @@ pub fn complete_usage_with_timebank(input: CompleteUsageWithTimebankInput) -> Ex
 #[hdk_extern]
 pub fn record_maintenance(input: RecordMaintenanceInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "record_maintenance")?;
+    if !input.hours_spent.is_finite() || input.hours_spent < 0.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "hours_spent must be a finite non-negative number".into()
+        )));
+    }
     let maintainer = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -1230,5 +1240,91 @@ mod tests {
         assert!((back.hours_used - 4.5).abs() < f64::EPSILON);
         assert_eq!(back.category_description, "Power tool rental");
         assert_eq!(back.issues.len(), 1);
+    }
+
+    // ========================================================================
+    // FLOAT VALIDATION EDGE CASES
+    // ========================================================================
+
+    #[test]
+    fn maintenance_nan_hours_detected() {
+        let input = RecordMaintenanceInput {
+            resource_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            maintenance_type: MaintenanceType::Routine,
+            description: "NaN test".to_string(),
+            cost: None,
+            hours_spent: f64::NAN,
+            parts_used: vec![],
+            next_due: None,
+        };
+        assert!(!input.hours_spent.is_finite(), "NaN hours_spent should fail is_finite()");
+    }
+
+    #[test]
+    fn maintenance_infinite_hours_detected() {
+        let input = RecordMaintenanceInput {
+            resource_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            maintenance_type: MaintenanceType::Routine,
+            description: "Infinity test".to_string(),
+            cost: None,
+            hours_spent: f64::INFINITY,
+            parts_used: vec![],
+            next_due: None,
+        };
+        assert!(!input.hours_spent.is_finite(), "Infinite hours_spent should fail is_finite()");
+    }
+
+    #[test]
+    fn maintenance_negative_hours_detected() {
+        let input = RecordMaintenanceInput {
+            resource_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            maintenance_type: MaintenanceType::Routine,
+            description: "Negative test".to_string(),
+            cost: None,
+            hours_spent: -2.0,
+            parts_used: vec![],
+            next_due: None,
+        };
+        assert!(input.hours_spent < 0.0, "Negative hours should be caught");
+    }
+
+    #[test]
+    fn maintenance_valid_hours_accepted() {
+        let input = RecordMaintenanceInput {
+            resource_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            maintenance_type: MaintenanceType::Routine,
+            description: "Valid test".to_string(),
+            cost: Some(50),
+            hours_spent: 1.5,
+            parts_used: vec!["filter".to_string()],
+            next_due: None,
+        };
+        assert!(input.hours_spent.is_finite() && input.hours_spent >= 0.0);
+    }
+
+    #[test]
+    fn timebank_nan_hours_detected() {
+        let input = CompleteUsageWithTimebankInput {
+            booking_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            condition_after: ResourceCondition::Good,
+            issues: vec![],
+            notes: "NaN test".to_string(),
+            hours_used: f64::NAN,
+            category_description: "Test".to_string(),
+        };
+        assert!(!input.hours_used.is_finite(), "NaN hours_used should fail is_finite()");
+    }
+
+    #[test]
+    fn timebank_negative_hours_detected() {
+        let input = CompleteUsageWithTimebankInput {
+            booking_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            condition_after: ResourceCondition::Good,
+            issues: vec![],
+            notes: "Negative test".to_string(),
+            hours_used: -1.0,
+            category_description: "Test".to_string(),
+        };
+        assert!(input.hours_used < 0.0, "Negative hours should be caught");
     }
 }

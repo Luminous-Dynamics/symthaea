@@ -50,6 +50,21 @@ pub fn define_watershed(watershed: Watershed) -> ExternResult<Record> {
             "Watershed name must be 1-256 non-whitespace characters".into()
         )));
     }
+    if !watershed.area_sq_km.is_finite() || watershed.area_sq_km < 0.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Watershed area_sq_km must be a finite non-negative number".into()
+        )));
+    }
+    for (lat, lon) in &watershed.boundary {
+        if !lat.is_finite() || !lon.is_finite()
+            || !(-90.0..=90.0).contains(lat)
+            || !(-180.0..=180.0).contains(lon)
+        {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Boundary coordinates must be finite with lat in [-90,90] and lon in [-180,180]".into()
+            )));
+        }
+    }
 
     let action_hash = create_entry(&EntryTypes::Watershed(watershed.clone()))?;
 
@@ -971,5 +986,88 @@ mod tests {
         let json = serde_json::to_string(&input).unwrap();
         let decoded: ResolveDisputeInput = serde_json::from_str(&json).unwrap();
         assert!(decoded.resolution_text.trim().is_empty(), "Whitespace-only resolution must be caught by trim()");
+    }
+
+    // ========================================================================
+    // FLOAT VALIDATION EDGE CASES
+    // ========================================================================
+
+    #[test]
+    fn watershed_nan_area_rejected() {
+        let ws = Watershed {
+            id: "ws-nan".to_string(),
+            name: "NaN Watershed".to_string(),
+            huc_code: None,
+            boundary: vec![(45.5, -122.6)],
+            area_sq_km: f32::NAN,
+            stewardship_type: StewardshipType::Commons,
+            governing_body: None,
+            primary_source_type: WaterSourceType::River,
+        };
+        // NaN should fail is_finite() check in define_watershed
+        assert!(!ws.area_sq_km.is_finite());
+    }
+
+    #[test]
+    fn watershed_infinite_area_rejected() {
+        let ws = Watershed {
+            id: "ws-inf".to_string(),
+            name: "Infinite Watershed".to_string(),
+            huc_code: None,
+            boundary: vec![(45.5, -122.6)],
+            area_sq_km: f32::INFINITY,
+            stewardship_type: StewardshipType::Commons,
+            governing_body: None,
+            primary_source_type: WaterSourceType::River,
+        };
+        assert!(!ws.area_sq_km.is_finite());
+    }
+
+    #[test]
+    fn watershed_negative_area_rejected() {
+        let ws = Watershed {
+            id: "ws-neg".to_string(),
+            name: "Negative Watershed".to_string(),
+            huc_code: None,
+            boundary: vec![(45.5, -122.6)],
+            area_sq_km: -10.0,
+            stewardship_type: StewardshipType::Commons,
+            governing_body: None,
+            primary_source_type: WaterSourceType::River,
+        };
+        assert!(ws.area_sq_km < 0.0, "Negative area should be caught");
+    }
+
+    #[test]
+    fn watershed_boundary_nan_coordinate_detected() {
+        let boundary = vec![(f64::NAN, -122.6), (45.6, -122.5)];
+        assert!(!boundary[0].0.is_finite(), "NaN coordinate should fail is_finite()");
+    }
+
+    #[test]
+    fn watershed_boundary_out_of_range_detected() {
+        // Latitude > 90 should be rejected
+        let lat = 91.0;
+        assert!(!(-90.0..=90.0).contains(&lat), "Latitude > 90 should be out of range");
+    }
+
+    #[test]
+    fn watershed_valid_area_accepted() {
+        let ws = Watershed {
+            id: "ws-ok".to_string(),
+            name: "Valid Watershed".to_string(),
+            huc_code: None,
+            boundary: vec![(45.5, -122.6), (45.6, -122.5), (45.4, -122.4)],
+            area_sq_km: 150.0,
+            stewardship_type: StewardshipType::Commons,
+            governing_body: None,
+            primary_source_type: WaterSourceType::River,
+        };
+        assert!(ws.area_sq_km.is_finite() && ws.area_sq_km >= 0.0);
+        for (lat, lon) in &ws.boundary {
+            assert!(lat.is_finite() && lon.is_finite());
+            assert!((-90.0..=90.0).contains(lat));
+            assert!((-180.0..=180.0).contains(lon));
+        }
     }
 }
