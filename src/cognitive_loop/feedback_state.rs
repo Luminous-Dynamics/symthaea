@@ -288,6 +288,9 @@ pub(crate) struct FeedbackState {
     pub last_exploration_integration: Option<IntegrationResult>,
     /// Last integrated threshold result
     pub last_threshold_integration: Option<IntegrationResult>,
+
+    /// Last computed divergence (set by `end_cycle()`, before any consensus writeback).
+    pub last_divergence: Option<FeedbackDivergence>,
 }
 
 impl FeedbackState {
@@ -305,6 +308,7 @@ impl FeedbackState {
             last_lr_integration: None,
             last_exploration_integration: None,
             last_threshold_integration: None,
+            last_divergence: None,
         }
     }
 
@@ -371,6 +375,7 @@ impl FeedbackState {
         self.last_lr_integration = Some(lr_result);
         self.last_exploration_integration = Some(explore_result);
         self.last_threshold_integration = Some(thresh_result);
+        self.last_divergence = Some(divergence);
 
         divergence
     }
@@ -801,7 +806,7 @@ mod tests {
             let input = format!("divergence diagnostic cycle {i}");
             let _ = service.cycle(&input);
 
-            // Collect divergence from the last integration
+            // Collect proposal counts from the last integration
             if let Some(ref lr_int) = service.feedback_state.last_lr_integration {
                 total_lr_proposals += lr_int.n_adds + lr_int.n_scales + lr_int.n_sets;
             }
@@ -809,22 +814,13 @@ mod tests {
                 total_thresh_proposals += thresh_int.n_adds + thresh_int.n_scales + thresh_int.n_sets;
             }
 
-            // Compute divergence by re-running end_cycle logic
-            let lr_actual = service.fep_lr_boost as f64;
-            let thresh_actual = service.carryover.learning.adaptive_threshold_scale as f64;
-
-            // The last_*_integration holds the sequential integration result.
-            // Compare with actual values.
-            if let Some(ref lr_int) = service.feedback_state.last_lr_integration {
-                let div = (lr_actual - lr_int.effective).abs();
-                if div > max_lr_div {
-                    max_lr_div = div;
+            // Read divergence computed by end_cycle() (before consensus writeback).
+            if let Some(ref div) = service.feedback_state.last_divergence {
+                if div.learning_rate > max_lr_div {
+                    max_lr_div = div.learning_rate;
                 }
-            }
-            if let Some(ref thresh_int) = service.feedback_state.last_threshold_integration {
-                let div = (thresh_actual - thresh_int.effective).abs();
-                if div > max_thresh_div {
-                    max_thresh_div = div;
+                if div.threshold > max_thresh_div {
+                    max_thresh_div = div.threshold;
                 }
             }
         }
