@@ -114,6 +114,12 @@ pub fn create_design(input: CreateDesignInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(EntryTypes::Design(design.clone()))?;
 
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "design_created".to_string(),
+        source_zome: "designs".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, action_hash),
+    });
+
     // Create links for discovery
     create_link(
         author.clone(),
@@ -201,6 +207,12 @@ pub fn update_design(input: UpdateDesignInput) -> ExternResult<Record> {
 
     let new_hash = update_entry(input.original_action_hash, EntryTypes::Design(updated_design))?;
 
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "design_updated".to_string(),
+        source_zome: "designs".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
+    });
+
     get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated design".to_string()
     )))
@@ -230,7 +242,15 @@ pub fn delete_design(hash: ActionHash) -> ExternResult<ActionHash> {
         )));
     }
 
-    delete_entry(hash)
+    let delete_hash = delete_entry(hash.clone())?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "design_deleted".to_string(),
+        source_zome: "designs".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, hash),
+    });
+
+    Ok(delete_hash)
 }
 
 // =============================================================================
@@ -251,6 +271,12 @@ pub fn add_design_file(input: AddFileInput) -> ExternResult<Record> {
     };
 
     let file_hash = create_entry(EntryTypes::DesignFile(file_entry))?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "file_added".to_string(),
+        source_zome: "designs".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, file_hash),
+    });
 
     // Link file to design
     create_link(
@@ -360,6 +386,12 @@ pub fn fork_design(input: ForkDesignInput) -> ExternResult<Record> {
     };
 
     let child_hash = create_entry(EntryTypes::Design(forked_design.clone()))?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "design_forked".to_string(),
+        source_zome: "designs".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, child_hash),
+    });
 
     // Create modification entry
     let modification = DesignModification {

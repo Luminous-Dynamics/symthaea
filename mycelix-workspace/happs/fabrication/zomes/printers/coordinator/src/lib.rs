@@ -87,6 +87,12 @@ pub fn register_printer(input: RegisterPrinterInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(EntryTypes::Printer(printer.clone()))?;
 
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "printer_registered".to_string(),
+        source_zome: "printers".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, action_hash),
+    });
+
     // Link from owner
     create_link(
         owner,
@@ -191,6 +197,12 @@ pub fn update_printer(input: UpdatePrinterInput) -> ExternResult<Record> {
         EntryTypes::Printer(updated_printer),
     )?;
 
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "printer_updated".to_string(),
+        source_zome: "printers".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
+    });
+
     get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated printer".to_string()
     )))
@@ -228,7 +240,15 @@ pub fn deactivate_printer(hash: ActionHash) -> ExternResult<ActionHash> {
         ..printer
     };
 
-    update_entry(hash, EntryTypes::Printer(deactivated))
+    let deactivated_hash = update_entry(hash.clone(), EntryTypes::Printer(deactivated))?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "printer_deactivated".to_string(),
+        source_zome: "printers".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, deactivated_hash),
+    });
+
+    Ok(deactivated_hash)
 }
 
 // =============================================================================
@@ -506,6 +526,12 @@ pub fn update_availability(input: UpdateAvailabilityInput) -> ExternResult<Recor
     };
 
     let status_hash = create_entry(EntryTypes::PrinterStatus(status))?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "availability_changed".to_string(),
+        source_zome: "printers".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, status_hash),
+    });
 
     // Link status to printer
     create_link(

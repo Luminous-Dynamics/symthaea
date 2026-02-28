@@ -12,6 +12,134 @@ use hdi::prelude::*;
 use serde::{Deserialize, Serialize};
 
 // =============================================================================
+// VALIDATION HELPERS
+// =============================================================================
+
+pub mod validation {
+    use hdi::prelude::ValidateCallbackResult;
+
+    pub fn require_finite(val: f32, field: &str) -> Result<ValidateCallbackResult, ()> {
+        if !val.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!("{} must be a finite number", field),
+            ));
+        }
+        Err(())
+    }
+
+    pub fn require_finite_f64(val: f64, field: &str) -> Result<ValidateCallbackResult, ()> {
+        if !val.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!("{} must be a finite number", field),
+            ));
+        }
+        Err(())
+    }
+
+    pub fn require_in_range(val: f32, min: f32, max: f32, field: &str) -> Result<ValidateCallbackResult, ()> {
+        if !val.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!("{} must be a finite number", field),
+            ));
+        }
+        if val < min || val > max {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!("{} must be between {} and {}", field, min, max),
+            ));
+        }
+        Err(())
+    }
+
+    pub fn require_in_range_f64(val: f64, min: f64, max: f64, field: &str) -> Result<ValidateCallbackResult, ()> {
+        if !val.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!("{} must be a finite number", field),
+            ));
+        }
+        if val < min || val > max {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!("{} must be between {} and {}", field, min, max),
+            ));
+        }
+        Err(())
+    }
+
+    pub fn require_non_empty(s: &str, field: &str) -> Result<ValidateCallbackResult, ()> {
+        if s.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!("{} cannot be empty", field),
+            ));
+        }
+        Err(())
+    }
+
+    pub fn require_max_len(s: &str, max: usize, field: &str) -> Result<ValidateCallbackResult, ()> {
+        if s.len() > max {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!("{} cannot exceed {} characters", field, max),
+            ));
+        }
+        Err(())
+    }
+
+    pub fn require_max_vec_len<T>(v: &[T], max: usize, field: &str) -> Result<ValidateCallbackResult, ()> {
+        if v.len() > max {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!("{} cannot exceed {} items", field, max),
+            ));
+        }
+        Err(())
+    }
+}
+
+/// Check a validation result — returns early with Invalid if the check fails.
+/// Usage: `check!(validation::require_finite(val, "field"));`
+#[macro_export]
+macro_rules! check {
+    ($expr:expr) => {
+        if let Ok(result) = $expr {
+            return Ok(result);
+        }
+    };
+}
+
+// =============================================================================
+// SIGNAL TYPES
+// =============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FabricationSignal {
+    pub event_type: String,
+    pub source_zome: String,
+    pub payload: String,
+}
+
+// =============================================================================
+// PAGINATION TYPES
+// =============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PaginationInput {
+    pub offset: u32,
+    pub limit: u32,
+}
+
+impl PaginationInput {
+    pub fn clamp(&self) -> (u32, u32) {
+        let limit = self.limit.min(100).max(1);
+        (self.offset, limit)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PaginatedResponse<T: Serialize> {
+    pub items: Vec<T>,
+    pub offset: u32,
+    pub limit: u32,
+    pub total: u32,
+}
+
+// =============================================================================
 // HDC (HYPERDIMENSIONAL COMPUTING) TYPES
 // =============================================================================
 
@@ -68,6 +196,198 @@ pub enum HdcMethod {
     LateralBinding,
     /// Optimized via genetic algorithm
     EvolutionarySearch,
+}
+
+// =============================================================================
+// HDC ENCODING (DUAL FORMAT SUPPORT)
+// =============================================================================
+
+/// Dual-format HDC encoding: legacy bipolar or new continuous
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum HdcEncoding {
+    /// Legacy 10,000D bipolar {-1, +1} vectors
+    BipolarLegacy { dimensions: u32, vector: Vec<i8> },
+    /// New 4,096D continuous f32 vectors (FabHV)
+    Continuous { dimensions: u32, vector: Vec<f32> },
+    /// Hash-only reference (vector stored externally)
+    HashOnly { vector_hash: String },
+}
+
+// =============================================================================
+// WASM-COMPATIBLE HDC MODULE (FabHV)
+// =============================================================================
+
+pub mod hdc {
+    use serde::{Deserialize, Serialize};
+
+    pub const FAB_HDC_DIM: usize = 4096;
+
+    /// Continuous hypervector for WASM-compatible HDC operations
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    pub struct FabHV {
+        pub data: Vec<f32>,
+    }
+
+    impl FabHV {
+        pub fn zero(dim: usize) -> Self {
+            Self { data: vec![0.0; dim] }
+        }
+
+        pub fn from_vec(data: Vec<f32>) -> Self {
+            Self { data }
+        }
+
+        pub fn dim(&self) -> usize {
+            self.data.len()
+        }
+
+        /// Deterministic pseudo-random HV via xorshift64
+        pub fn random(dim: usize, seed: u64) -> Self {
+            let mut state = seed;
+            if state == 0 { state = 0xDEADBEEF; }
+            let mut data = Vec::with_capacity(dim);
+            for _ in 0..dim {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                // Map to [-1, 1]
+                let val = ((state as f32) / (u64::MAX as f32)) * 2.0 - 1.0;
+                data.push(val);
+            }
+            let mut hv = Self { data };
+            hv.normalize();
+            hv
+        }
+
+        /// Element-wise multiply (binding operation)
+        pub fn bind(&self, other: &Self) -> Self {
+            assert_eq!(self.data.len(), other.data.len(), "FabHV dimension mismatch");
+            let data: Vec<f32> = self.data.iter()
+                .zip(other.data.iter())
+                .map(|(a, b)| a * b)
+                .collect();
+            let mut hv = Self { data };
+            hv.normalize();
+            hv
+        }
+
+        /// Element-wise mean + normalize (bundling operation)
+        pub fn bundle(hvs: &[&Self]) -> Self {
+            if hvs.is_empty() {
+                return Self::zero(FAB_HDC_DIM);
+            }
+            let dim = hvs[0].dim();
+            let n = hvs.len() as f32;
+            let mut data = vec![0.0f32; dim];
+            for hv in hvs {
+                for (i, val) in hv.data.iter().enumerate() {
+                    data[i] += val;
+                }
+            }
+            for val in &mut data {
+                *val /= n;
+            }
+            let mut hv = Self { data };
+            hv.normalize();
+            hv
+        }
+
+        /// Cosine similarity
+        pub fn similarity(&self, other: &Self) -> f32 {
+            assert_eq!(self.data.len(), other.data.len(), "FabHV dimension mismatch");
+            let mut dot = 0.0f32;
+            let mut norm_a = 0.0f32;
+            let mut norm_b = 0.0f32;
+            for (a, b) in self.data.iter().zip(other.data.iter()) {
+                dot += a * b;
+                norm_a += a * a;
+                norm_b += b * b;
+            }
+            let denom = norm_a.sqrt() * norm_b.sqrt();
+            if denom < 1e-10 {
+                return 0.0;
+            }
+            dot / denom
+        }
+
+        /// L2 normalization in-place
+        pub fn normalize(&mut self) {
+            let norm: f32 = self.data.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 1e-10 {
+                for val in &mut self.data {
+                    *val /= norm;
+                }
+            }
+        }
+    }
+
+    /// Character trigram + word position encoder
+    pub struct FabTextEncoder {
+        dim: usize,
+        // We generate char/position vectors on the fly using deterministic seeds
+    }
+
+    impl FabTextEncoder {
+        pub fn new(dim: usize) -> Self {
+            Self { dim }
+        }
+
+        fn char_hv(&self, c: char) -> FabHV {
+            FabHV::random(self.dim, c as u64 * 73856093)
+        }
+
+        fn position_hv(&self, pos: usize) -> FabHV {
+            FabHV::random(self.dim, (pos as u64 + 1) * 19349669)
+        }
+
+        fn trigram_hv(&self, a: char, b: char, c: char) -> FabHV {
+            let ha = self.char_hv(a);
+            let hb = self.char_hv(b);
+            let hc = self.char_hv(c);
+            ha.bind(&hb).bind(&hc)
+        }
+
+        pub fn encode(&self, text: &str) -> FabHV {
+            let lower = text.to_lowercase();
+            let words: Vec<&str> = lower.split_whitespace().collect();
+            if words.is_empty() {
+                return FabHV::zero(self.dim);
+            }
+
+            let mut word_hvs: Vec<FabHV> = Vec::new();
+            for (pos, word) in words.iter().enumerate() {
+                let chars: Vec<char> = word.chars().collect();
+                let mut trigrams: Vec<FabHV> = Vec::new();
+                if chars.len() < 3 {
+                    // For short words, use the chars directly
+                    let padded: Vec<char> = std::iter::once(' ')
+                        .chain(chars.iter().copied())
+                        .chain(std::iter::once(' '))
+                        .collect();
+                    for window in padded.windows(3) {
+                        trigrams.push(self.trigram_hv(window[0], window[1], window[2]));
+                    }
+                } else {
+                    for window in chars.windows(3) {
+                        trigrams.push(self.trigram_hv(window[0], window[1], window[2]));
+                    }
+                }
+                if trigrams.is_empty() {
+                    continue;
+                }
+                let refs: Vec<&FabHV> = trigrams.iter().collect();
+                let word_hv = FabHV::bundle(&refs);
+                let pos_hv = self.position_hv(pos);
+                word_hvs.push(word_hv.bind(&pos_hv));
+            }
+
+            if word_hvs.is_empty() {
+                return FabHV::zero(self.dim);
+            }
+            let refs: Vec<&FabHV> = word_hvs.iter().collect();
+            FabHV::bundle(&refs)
+        }
+    }
 }
 
 // =============================================================================
@@ -504,7 +824,7 @@ pub enum FailureReason {
 }
 
 /// Common print issues
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PrintIssue {
     Warping,
     LayerShift,
@@ -1098,6 +1418,247 @@ impl Default for CincinnatiSession {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::hdc::*;
+    use super::validation;
+
+    // === VALIDATION HELPER TESTS ===
+
+    #[test]
+    fn test_require_finite_valid() {
+        assert!(validation::require_finite(1.0, "test").is_err());
+        assert!(validation::require_finite(0.0, "test").is_err());
+        assert!(validation::require_finite(-1.0, "test").is_err());
+    }
+
+    #[test]
+    fn test_require_finite_nan() {
+        let result = validation::require_finite(f32::NAN, "score");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_require_finite_inf() {
+        let result = validation::require_finite(f32::INFINITY, "score");
+        assert!(result.is_ok());
+        let result = validation::require_finite(f32::NEG_INFINITY, "score");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_require_in_range_valid() {
+        assert!(validation::require_in_range(0.5, 0.0, 1.0, "test").is_err());
+        assert!(validation::require_in_range(0.0, 0.0, 1.0, "test").is_err());
+        assert!(validation::require_in_range(1.0, 0.0, 1.0, "test").is_err());
+    }
+
+    #[test]
+    fn test_require_in_range_out_of_bounds() {
+        let result = validation::require_in_range(-0.1, 0.0, 1.0, "score");
+        assert!(result.is_ok());
+        let result = validation::require_in_range(1.1, 0.0, 1.0, "score");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_require_in_range_nan() {
+        let result = validation::require_in_range(f32::NAN, 0.0, 1.0, "score");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_require_non_empty() {
+        assert!(validation::require_non_empty("hello", "test").is_err());
+        let result = validation::require_non_empty("", "name");
+        assert!(result.is_ok());
+        let result = validation::require_non_empty("   ", "name");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_require_max_len() {
+        assert!(validation::require_max_len("hi", 10, "test").is_err());
+        let result = validation::require_max_len("a".repeat(257).as_str(), 256, "name");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_require_max_vec_len() {
+        let v: Vec<u8> = vec![1, 2, 3];
+        assert!(validation::require_max_vec_len(&v, 10, "test").is_err());
+        let result = validation::require_max_vec_len(&v, 2, "items");
+        assert!(result.is_ok());
+    }
+
+    // === HDC MODULE TESTS ===
+
+    #[test]
+    fn test_fabhv_zero() {
+        let hv = FabHV::zero(FAB_HDC_DIM);
+        assert_eq!(hv.dim(), FAB_HDC_DIM);
+        assert!(hv.data.iter().all(|&v| v == 0.0));
+    }
+
+    #[test]
+    fn test_fabhv_random_deterministic() {
+        let a = FabHV::random(FAB_HDC_DIM, 42);
+        let b = FabHV::random(FAB_HDC_DIM, 42);
+        assert_eq!(a.data, b.data);
+    }
+
+    #[test]
+    fn test_fabhv_random_different_seeds() {
+        let a = FabHV::random(FAB_HDC_DIM, 1);
+        let b = FabHV::random(FAB_HDC_DIM, 2);
+        assert_ne!(a.data, b.data);
+    }
+
+    #[test]
+    fn test_fabhv_orthogonality() {
+        // Random HVs in high dimensions should be approximately orthogonal
+        let a = FabHV::random(FAB_HDC_DIM, 100);
+        let b = FabHV::random(FAB_HDC_DIM, 200);
+        let sim = a.similarity(&b);
+        assert!(sim.abs() < 0.1, "Random HVs should be near-orthogonal, got {}", sim);
+    }
+
+    #[test]
+    fn test_fabhv_self_similarity() {
+        let a = FabHV::random(FAB_HDC_DIM, 42);
+        let sim = a.similarity(&a);
+        assert!((sim - 1.0).abs() < 0.001, "Self-similarity should be ~1.0, got {}", sim);
+    }
+
+    #[test]
+    fn test_fabhv_bind() {
+        let a = FabHV::random(FAB_HDC_DIM, 1);
+        let b = FabHV::random(FAB_HDC_DIM, 2);
+        let bound = a.bind(&b);
+        assert_eq!(bound.dim(), FAB_HDC_DIM);
+        // Bound vector should be dissimilar to both inputs
+        assert!(bound.similarity(&a).abs() < 0.15);
+        assert!(bound.similarity(&b).abs() < 0.15);
+    }
+
+    #[test]
+    fn test_fabhv_bundle_preserves_similarity() {
+        let a = FabHV::random(FAB_HDC_DIM, 1);
+        let b = FabHV::random(FAB_HDC_DIM, 2);
+        let bundled = FabHV::bundle(&[&a, &b]);
+        // Bundled vector should be similar to both components
+        assert!(bundled.similarity(&a) > 0.3);
+        assert!(bundled.similarity(&b) > 0.3);
+    }
+
+    #[test]
+    fn test_fabhv_normalize() {
+        let mut hv = FabHV::from_vec(vec![3.0, 4.0]);
+        hv.normalize();
+        let norm: f32 = hv.data.iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!((norm - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_fab_text_encoder_determinism() {
+        let enc = FabTextEncoder::new(FAB_HDC_DIM);
+        let a = enc.encode("steel bracket");
+        let b = enc.encode("steel bracket");
+        assert_eq!(a.data, b.data);
+    }
+
+    #[test]
+    fn test_fab_text_encoder_similar_texts() {
+        let enc = FabTextEncoder::new(FAB_HDC_DIM);
+        let a = enc.encode("steel bracket");
+        let b = enc.encode("steel mounting bracket");
+        let sim = a.similarity(&b);
+        assert!(sim > 0.2, "Similar texts should have positive similarity, got {}", sim);
+    }
+
+    #[test]
+    fn test_fab_text_encoder_dissimilar_texts() {
+        let enc = FabTextEncoder::new(FAB_HDC_DIM);
+        let a = enc.encode("steel bracket");
+        let b = enc.encode("rubber duck toy");
+        let sim = a.similarity(&b);
+        assert!(sim < 0.5, "Dissimilar texts should have low similarity, got {}", sim);
+    }
+
+    #[test]
+    fn test_fab_text_encoder_empty() {
+        let enc = FabTextEncoder::new(FAB_HDC_DIM);
+        let hv = enc.encode("");
+        assert_eq!(hv.dim(), FAB_HDC_DIM);
+        assert!(hv.data.iter().all(|&v| v == 0.0));
+    }
+
+    // === SIGNAL TESTS ===
+
+    #[test]
+    fn test_fabrication_signal_serde() {
+        let signal = FabricationSignal {
+            event_type: "design_created".to_string(),
+            source_zome: "designs".to_string(),
+            payload: r#"{"hash":"abc123"}"#.to_string(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let parsed: FabricationSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(signal.event_type, parsed.event_type);
+        assert_eq!(signal.source_zome, parsed.source_zome);
+    }
+
+    // === PAGINATION TESTS ===
+
+    #[test]
+    fn test_pagination_clamp() {
+        let p = PaginationInput { offset: 0, limit: 200 };
+        let (offset, limit) = p.clamp();
+        assert_eq!(offset, 0);
+        assert_eq!(limit, 100); // clamped to max
+    }
+
+    #[test]
+    fn test_pagination_clamp_zero_limit() {
+        let p = PaginationInput { offset: 5, limit: 0 };
+        let (offset, limit) = p.clamp();
+        assert_eq!(offset, 5);
+        assert_eq!(limit, 1); // clamped to min
+    }
+
+    // === HDC ENCODING TESTS ===
+
+    #[test]
+    fn test_hdc_encoding_bipolar_serde() {
+        let enc = HdcEncoding::BipolarLegacy {
+            dimensions: 10000,
+            vector: vec![1, -1, 1],
+        };
+        let json = serde_json::to_string(&enc).unwrap();
+        let parsed: HdcEncoding = serde_json::from_str(&json).unwrap();
+        assert_eq!(enc, parsed);
+    }
+
+    #[test]
+    fn test_hdc_encoding_continuous_serde() {
+        let enc = HdcEncoding::Continuous {
+            dimensions: 4096,
+            vector: vec![0.5, -0.3, 0.1],
+        };
+        let json = serde_json::to_string(&enc).unwrap();
+        let parsed: HdcEncoding = serde_json::from_str(&json).unwrap();
+        assert_eq!(enc, parsed);
+    }
+
+    #[test]
+    fn test_print_issue_hash_eq() {
+        use std::collections::HashMap;
+        let mut map = HashMap::new();
+        map.insert(PrintIssue::Warping, 3u32);
+        map.insert(PrintIssue::Stringing, 5u32);
+        assert_eq!(map[&PrintIssue::Warping], 3);
+        assert_eq!(map[&PrintIssue::Stringing], 5);
+    }
+
+    // === ORIGINAL TESTS ===
 
     #[test]
     fn test_hdchypervector_default() {
@@ -1146,7 +1707,6 @@ mod tests {
 
     #[test]
     fn test_safety_class_ordering() {
-        // Safety classes should be distinct
         let classes = [
             SafetyClass::Class0Decorative,
             SafetyClass::Class1Functional,
@@ -1166,7 +1726,6 @@ mod tests {
 
     #[test]
     fn test_material_types_serialization() {
-        // Test all material types serialize correctly
         let materials = vec![
             MaterialType::PLA,
             MaterialType::PETG,
@@ -1231,7 +1790,6 @@ mod tests {
 
     #[test]
     fn test_print_job_status_flow() {
-        // Typical status flow: Pending -> Accepted -> Queued -> Printing -> Completed
         let statuses = vec![
             PrintJobStatus::Pending,
             PrintJobStatus::Accepted,
@@ -1311,7 +1869,7 @@ mod tests {
             issuer_signature: vec![0u8; 64],
         };
         assert_eq!(cert.energy_type, EnergyType::Solar);
-        assert!(cert.grid_carbon_intensity < 100.0); // Low carbon
+        assert!(cert.grid_carbon_intensity < 100.0);
     }
 
     #[test]
@@ -1324,7 +1882,6 @@ mod tests {
             EndOfLifeStrategy::Downcycle,
             EndOfLifeStrategy::Landfill,
         ];
-        // Landfill should be discouraged (last resort)
         assert_eq!(strategies[5], EndOfLifeStrategy::Landfill);
     }
 

@@ -6,6 +6,7 @@
 
 use hdi::prelude::*;
 use fabrication_common::*;
+use fabrication_common::validation;
 
 /// Entry types for the designs zome
 #[hdk_entry_types]
@@ -165,73 +166,51 @@ fn validate_create_entry(entry: EntryTypes) -> ExternResult<ValidateCallbackResu
 
 /// Validate a design entry
 fn validate_design(design: Design) -> ExternResult<ValidateCallbackResult> {
-    // ID must not be empty and should be reasonably short
-    if design.id.is_empty() {
+    // --- String field validation ---
+    check!(validation::require_non_empty(&design.id, "Design ID"));
+    check!(validation::require_max_len(&design.id, 64, "Design ID"));
+
+    check!(validation::require_non_empty(&design.title, "Design title"));
+    check!(validation::require_max_len(&design.title, 256, "Design title"));
+
+    check!(validation::require_max_len(&design.description, 4096, "Design description"));
+
+    // --- HDC hypervector validation ---
+    if design.intent_vector.dimensions != 4096 && design.intent_vector.dimensions != 10000 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Design ID cannot be empty".to_string(),
-        ));
-    }
-    if design.id.len() > 200 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Design ID cannot exceed 200 characters".to_string(),
+            "HDC hypervector must have 4096 or 10000 dimensions".to_string(),
         ));
     }
 
-    // Title must not be empty
-    if design.title.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Design title cannot be empty".to_string(),
-        ));
-    }
-
-    // Title length limit
-    if design.title.len() > 200 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Design title cannot exceed 200 characters".to_string(),
-        ));
-    }
-
-    // Description length limit
-    if design.description.len() > 10000 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Design description cannot exceed 10000 characters".to_string(),
-        ));
-    }
-
-    // Validate HDC hypervector dimensions
-    if design.intent_vector.dimensions != 10000 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "HDC hypervector must have 10000 dimensions".to_string(),
-        ));
-    }
-
-    // Validate vector length matches dimensions
     if design.intent_vector.vector.len() != design.intent_vector.dimensions as usize {
         return Ok(ValidateCallbackResult::Invalid(
             "HDC vector length must match dimensions".to_string(),
         ));
     }
 
-    // Validate circularity score range
-    if design.circularity_score < 0.0 || design.circularity_score > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Circularity score must be between 0.0 and 1.0".to_string(),
-        ));
+    // --- Semantic bindings validation ---
+    check!(validation::require_max_vec_len(
+        &design.intent_vector.semantic_bindings, 128, "semantic_bindings"
+    ));
+    for binding in &design.intent_vector.semantic_bindings {
+        check!(validation::require_max_len(&binding.concept, 256, "binding concept"));
+        check!(validation::require_in_range(binding.weight, 0.0, 1.0, "binding weight"));
     }
 
-    // Validate embodied energy is non-negative
+    // --- Float field validation ---
+    check!(validation::require_in_range(design.circularity_score, 0.0, 1.0, "circularity_score"));
+
+    check!(validation::require_finite(design.embodied_energy_kwh, "embodied_energy_kwh"));
     if design.embodied_energy_kwh < 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Embodied energy cannot be negative".to_string(),
+            "embodied_energy_kwh must be >= 0".to_string(),
         ));
     }
 
-    // Limit number of material compatibility entries to prevent abuse
-    if design.material_compatibility.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Design has too many material compatibility entries (max 64)".to_string(),
-        ));
-    }
+    // --- Collection size limits ---
+    check!(validation::require_max_vec_len(
+        &design.material_compatibility, 64, "material_compatibility"
+    ));
 
     // Sanity check on file_count
     if design.file_count > 10_000 {
@@ -240,16 +219,21 @@ fn validate_design(design: Design) -> ExternResult<ValidateCallbackResult> {
         ));
     }
 
-    // Validate epistemic scores
-    if design.epistemic.manufacturability < 0.0
-        || design.epistemic.manufacturability > 1.0
-        || design.epistemic.safety < 0.0
-        || design.epistemic.safety > 1.0
-        || design.epistemic.usability < 0.0
-        || design.epistemic.usability > 1.0
-    {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Epistemic scores must be between 0.0 and 1.0".to_string(),
+    // --- Epistemic scores ---
+    check!(validation::require_in_range(
+        design.epistemic.manufacturability, 0.0, 1.0, "epistemic.manufacturability"
+    ));
+    check!(validation::require_in_range(
+        design.epistemic.safety, 0.0, 1.0, "epistemic.safety"
+    ));
+    check!(validation::require_in_range(
+        design.epistemic.usability, 0.0, 1.0, "epistemic.usability"
+    ));
+
+    // --- Material compatibility item validation ---
+    for mat in &design.material_compatibility {
+        check!(validation::require_in_range(
+            mat.compatibility, 0.0, 1.0, "material compatibility"
         ));
     }
 
@@ -258,38 +242,26 @@ fn validate_design(design: Design) -> ExternResult<ValidateCallbackResult> {
 
 /// Validate a design file entry
 fn validate_design_file(file: DesignFileEntry) -> ExternResult<ValidateCallbackResult> {
-    // Filename must not be empty
-    if file.file.filename.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Filename cannot be empty".to_string(),
-        ));
-    }
+    // Filename: non-empty, max 256
+    check!(validation::require_non_empty(&file.file.filename, "filename"));
+    check!(validation::require_max_len(&file.file.filename, 256, "filename"));
 
-    // IPFS CID must not be empty
-    if file.file.ipfs_cid.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "IPFS CID cannot be empty".to_string(),
-        ));
-    }
+    // IPFS CID: non-empty, max 256
+    check!(validation::require_non_empty(&file.file.ipfs_cid, "IPFS CID"));
+    check!(validation::require_max_len(&file.file.ipfs_cid, 256, "IPFS CID"));
 
-    // Checksum must not be empty
-    if file.file.checksum_sha256.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Checksum cannot be empty".to_string(),
-        ));
-    }
+    // Checksum: non-empty, max 128
+    check!(validation::require_non_empty(&file.file.checksum_sha256, "checksum"));
+    check!(validation::require_max_len(&file.file.checksum_sha256, 128, "checksum"));
 
     Ok(ValidateCallbackResult::Valid)
 }
 
 /// Validate a design modification
 fn validate_modification(modification: DesignModification) -> ExternResult<ValidateCallbackResult> {
-    // Modification notes should not be empty
-    if modification.modification_notes.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Modification notes cannot be empty".to_string(),
-        ));
-    }
+    // Modification notes: non-empty, max 4096
+    check!(validation::require_non_empty(&modification.modification_notes, "Modification notes"));
+    check!(validation::require_max_len(&modification.modification_notes, 4096, "Modification notes"));
 
     // Parent and child must be different
     if modification.parent_hash == modification.child_hash {
@@ -348,4 +320,191 @@ fn validate_delete_link(
 ) -> ExternResult<ValidateCallbackResult> {
     // Links can be deleted by their creators
     Ok(ValidateCallbackResult::Valid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: build a valid Design with 10000-dim vector for tests.
+    fn valid_design() -> Design {
+        Design {
+            id: "test-design-001".to_string(),
+            title: "Test Bracket".to_string(),
+            description: "A simple test bracket for unit tests".to_string(),
+            category: DesignCategory::Parts,
+            intent_vector: HdcHypervector {
+                dimensions: 10000,
+                vector: vec![1i8; 10000],
+                semantic_bindings: vec![],
+                generation_method: HdcMethod::ManualEncoding,
+            },
+            parametric_schema: None,
+            constraint_graph: None,
+            material_compatibility: vec![],
+            file_count: 1,
+            circularity_score: 0.8,
+            embodied_energy_kwh: 2.5,
+            repair_manifest: None,
+            license: License::PublicDomain,
+            safety_class: SafetyClass::Class0Decorative,
+            epistemic: DesignEpistemic {
+                manufacturability: 0.9,
+                safety: 0.95,
+                usability: 0.85,
+            },
+            author: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            created_at: Timestamp::from_micros(0),
+            updated_at: Timestamp::from_micros(0),
+        }
+    }
+
+    /// Helper: build a valid DesignFileEntry for tests.
+    fn valid_design_file() -> DesignFileEntry {
+        DesignFileEntry {
+            design_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            file: DesignFile {
+                filename: "bracket.stl".to_string(),
+                format: FileFormat::STL,
+                ipfs_cid: "QmTest1234567890".to_string(),
+                size_bytes: 1024,
+                checksum_sha256: "abc123def456".to_string(),
+            },
+            uploader: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            uploaded_at: Timestamp::from_micros(0),
+        }
+    }
+
+    /// Helper: build a valid DesignModification for tests.
+    fn valid_modification() -> DesignModification {
+        DesignModification {
+            parent_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            child_hash: ActionHash::from_raw_36(vec![1u8; 36]),
+            modification_notes: "Increased wall thickness for durability".to_string(),
+            modifier: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            modified_at: Timestamp::from_micros(0),
+        }
+    }
+
+    // ---- Design validation tests ----
+
+    #[test]
+    fn test_valid_design_passes() {
+        let result = validate_design(valid_design()).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_empty_id_rejected() {
+        let mut d = valid_design();
+        d.id = "".to_string();
+        let result = validate_design(d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("Design ID")));
+    }
+
+    #[test]
+    fn test_id_too_long_rejected() {
+        let mut d = valid_design();
+        d.id = "x".repeat(65);
+        let result = validate_design(d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("Design ID")));
+    }
+
+    #[test]
+    fn test_title_too_long_rejected() {
+        let mut d = valid_design();
+        d.title = "x".repeat(257);
+        let result = validate_design(d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("Design title")));
+    }
+
+    #[test]
+    fn test_nan_circularity_rejected() {
+        let mut d = valid_design();
+        d.circularity_score = f32::NAN;
+        let result = validate_design(d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("circularity_score")));
+    }
+
+    #[test]
+    fn test_nan_epistemic_rejected() {
+        let mut d = valid_design();
+        d.epistemic.manufacturability = f32::NAN;
+        let result = validate_design(d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("epistemic.manufacturability")));
+    }
+
+    #[test]
+    fn test_negative_energy_rejected() {
+        let mut d = valid_design();
+        d.embodied_energy_kwh = -1.0;
+        let result = validate_design(d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("embodied_energy_kwh")));
+    }
+
+    #[test]
+    fn test_too_many_materials_rejected() {
+        let mut d = valid_design();
+        d.material_compatibility = (0..65)
+            .map(|_| MaterialBinding {
+                material: MaterialType::PLA,
+                compatibility: 0.9,
+                requirements: vec![],
+            })
+            .collect();
+        let result = validate_design(d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("material_compatibility")));
+    }
+
+    #[test]
+    fn test_vector_dimension_mismatch_rejected() {
+        let mut d = valid_design();
+        // Set dimensions to 10000 but only provide 100 values
+        d.intent_vector.dimensions = 10000;
+        d.intent_vector.vector = vec![1i8; 100];
+        let result = validate_design(d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("vector length must match")));
+    }
+
+    #[test]
+    fn test_binding_weight_nan_rejected() {
+        let mut d = valid_design();
+        d.intent_vector.semantic_bindings = vec![SemanticBinding {
+            concept: "bracket".to_string(),
+            role: BindingRole::Base,
+            weight: f32::NAN,
+        }];
+        let result = validate_design(d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("binding weight")));
+    }
+
+    // ---- DesignFile validation tests ----
+
+    #[test]
+    fn test_empty_filename_rejected() {
+        let mut f = valid_design_file();
+        f.file.filename = "".to_string();
+        let result = validate_design_file(f).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("filename")));
+    }
+
+    // ---- DesignModification validation tests ----
+
+    #[test]
+    fn test_empty_modification_notes_rejected() {
+        let mut m = valid_modification();
+        m.modification_notes = "".to_string();
+        let result = validate_modification(m).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("Modification notes")));
+    }
+
+    #[test]
+    fn test_parent_equals_child_rejected() {
+        let mut m = valid_modification();
+        let same_hash = ActionHash::from_raw_36(vec![42u8; 36]);
+        m.parent_hash = same_hash.clone();
+        m.child_hash = same_hash;
+        let result = validate_modification(m).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("Parent and child")));
+    }
 }

@@ -58,6 +58,13 @@ pub fn submit_verification(input: SubmitVerificationInput) -> ExternResult<Recor
     };
 
     let hash = create_entry(EntryTypes::DesignVerification(verification))?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "verification_submitted".to_string(),
+        source_zome: "verification".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, hash),
+    });
+
     create_link(input.design_hash, hash.clone(), LinkTypes::DesignToVerifications, ())?;
     create_link(verifier, hash.clone(), LinkTypes::VerifierToVerifications, ())?;
 
@@ -141,6 +148,13 @@ pub fn submit_safety_claim(input: SubmitClaimInput) -> ExternResult<Record> {
     };
 
     let hash = create_entry(EntryTypes::SafetyClaim(claim))?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "claim_submitted".to_string(),
+        source_zome: "verification".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, hash),
+    });
+
     create_link(input.design_hash, hash.clone(), LinkTypes::DesignToClaims, ())?;
 
     get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))

@@ -4,6 +4,8 @@
 //! and AI-assisted design generation.
 
 use hdi::prelude::*;
+use fabrication_common::check;
+use fabrication_common::validation;
 
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
@@ -103,36 +105,309 @@ pub fn genesis_self_check(_: GenesisSelfCheckData) -> ExternResult<ValidateCallb
     Ok(ValidateCallbackResult::Valid)
 }
 
+/// Main validation callback
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, .. } => match app_entry {
-                EntryTypes::HdcIntent(intent) => {
-                    if intent.description.is_empty() {
-                        return Ok(ValidateCallbackResult::Invalid("Description required".into()));
-                    }
-                    if intent.vector_dimensions == 0 {
-                        return Ok(ValidateCallbackResult::Invalid("Invalid dimensions".into()));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                EntryTypes::GeneratedDesign(design) => {
-                    if design.confidence_score < 0.0 || design.confidence_score > 1.0 {
-                        return Ok(ValidateCallbackResult::Invalid("Invalid confidence".into()));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                EntryTypes::SemanticMatch(m) => {
-                    if m.similarity_score < 0.0 || m.similarity_score > 1.0 {
-                        return Ok(ValidateCallbackResult::Invalid("Invalid similarity".into()));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                _ => Ok(ValidateCallbackResult::Valid),
-            },
+            OpEntry::CreateEntry { app_entry, .. } => validate_create_entry(app_entry),
+            OpEntry::UpdateEntry { app_entry, .. } => validate_create_entry(app_entry),
             _ => Ok(ValidateCallbackResult::Valid),
         },
         _ => Ok(ValidateCallbackResult::Valid),
+    }
+}
+
+/// Dispatch entry validation to per-type functions
+fn validate_create_entry(entry: EntryTypes) -> ExternResult<ValidateCallbackResult> {
+    match entry {
+        EntryTypes::HdcIntent(intent) => validate_hdc_intent(intent),
+        EntryTypes::GeneratedDesign(design) => validate_generated_design(design),
+        EntryTypes::SemanticMatch(m) => validate_semantic_match(m),
+        EntryTypes::OptimizationResult(o) => validate_optimization_result(o),
+    }
+}
+
+/// Validate an HdcIntentEntry
+fn validate_hdc_intent(intent: HdcIntentEntry) -> ExternResult<ValidateCallbackResult> {
+    // description: non-empty (trim), max 4096 chars
+    check!(validation::require_non_empty(&intent.description, "description"));
+    check!(validation::require_max_len(&intent.description, 4096, "description"));
+
+    // vector_dimensions: must be 4096 or 10000 (dual-format support)
+    if intent.vector_dimensions != 4096 && intent.vector_dimensions != 10000 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "vector_dimensions must be 4096 or 10000".to_string(),
+        ));
+    }
+
+    // vector_hash: non-empty, max 256 chars
+    check!(validation::require_non_empty(&intent.vector_hash, "vector_hash"));
+    check!(validation::require_max_len(&intent.vector_hash, 256, "vector_hash"));
+
+    // generation_method: max 64 chars
+    check!(validation::require_max_len(&intent.generation_method, 64, "generation_method"));
+
+    // language: non-empty, max 32 chars
+    check!(validation::require_non_empty(&intent.language, "language"));
+    check!(validation::require_max_len(&intent.language, 32, "language"));
+
+    // semantic_bindings: max 128 items
+    check!(validation::require_max_vec_len(&intent.semantic_bindings, 128, "semantic_bindings"));
+
+    // Each binding: weight in range, concept max 256, role max 32
+    for binding in &intent.semantic_bindings {
+        check!(validation::require_in_range(binding.weight, 0.0, 1.0, "binding weight"));
+        check!(validation::require_max_len(&binding.concept, 256, "binding concept"));
+        check!(validation::require_max_len(&binding.role, 32, "binding role"));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate a GeneratedDesignEntry
+fn validate_generated_design(design: GeneratedDesignEntry) -> ExternResult<ValidateCallbackResult> {
+    // confidence_score: in range 0.0..1.0 (also catches NaN/Inf)
+    check!(validation::require_in_range(design.confidence_score, 0.0, 1.0, "confidence_score"));
+
+    // parametric_config: max 32768 chars
+    check!(validation::require_max_len(&design.parametric_config, 32768, "parametric_config"));
+
+    // material_constraints: max 64 items, each max 256 chars
+    check!(validation::require_max_vec_len(&design.material_constraints, 64, "material_constraints"));
+    for constraint in &design.material_constraints {
+        check!(validation::require_max_len(constraint, 256, "material constraint"));
+    }
+
+    // printer_constraints: if Some, max 32768 chars
+    if let Some(ref pc) = design.printer_constraints {
+        check!(validation::require_max_len(pc, 32768, "printer_constraints"));
+    }
+
+    // generated_file_cid: if Some, max 256 chars
+    if let Some(ref cid) = design.generated_file_cid {
+        check!(validation::require_max_len(cid, 256, "generated_file_cid"));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate a SemanticMatchEntry
+fn validate_semantic_match(m: SemanticMatchEntry) -> ExternResult<ValidateCallbackResult> {
+    // similarity_score: in range 0.0..1.0 (also catches NaN/Inf)
+    check!(validation::require_in_range(m.similarity_score, 0.0, 1.0, "similarity_score"));
+
+    // matched_bindings: max 128 items, each max 256 chars
+    check!(validation::require_max_vec_len(&m.matched_bindings, 128, "matched_bindings"));
+    for binding in &m.matched_bindings {
+        check!(validation::require_max_len(binding, 256, "matched binding"));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate an OptimizationResultEntry
+fn validate_optimization_result(o: OptimizationResultEntry) -> ExternResult<ValidateCallbackResult> {
+    // energy_preference: max 256 chars
+    check!(validation::require_max_len(&o.energy_preference, 256, "energy_preference"));
+
+    // parameter_adjustments: max 32768 chars
+    check!(validation::require_max_len(&o.parameter_adjustments, 32768, "parameter_adjustments"));
+
+    // improvement_metrics: max 32768 chars
+    check!(validation::require_max_len(&o.improvement_metrics, 32768, "improvement_metrics"));
+
+    // local_materials: max 64 items
+    check!(validation::require_max_vec_len(&o.local_materials, 64, "local_materials"));
+
+    // local_printers: max 64 items
+    check!(validation::require_max_vec_len(&o.local_printers, 64, "local_printers"));
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // =========================================================================
+    // Test helpers
+    // =========================================================================
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn valid_intent() -> HdcIntentEntry {
+        HdcIntentEntry {
+            description: "Design a cup holder".to_string(),
+            vector_dimensions: 4096,
+            vector_hash: "abc123hash".to_string(),
+            semantic_bindings: vec![SerializedBinding {
+                concept: "cup".to_string(),
+                role: "Base".to_string(),
+                weight: 0.8,
+            }],
+            generation_method: "auto".to_string(),
+            language: "en".to_string(),
+            author: fake_agent(),
+            created_at: Timestamp::now(),
+        }
+    }
+
+    fn valid_generated_design() -> GeneratedDesignEntry {
+        GeneratedDesignEntry {
+            intent_hash: fake_action_hash(),
+            base_design_hash: None,
+            parametric_config: r#"{"width": 50}"#.to_string(),
+            material_constraints: vec!["PLA".to_string()],
+            printer_constraints: None,
+            generated_file_cid: None,
+            confidence_score: 0.85,
+            generation_time_ms: 1200,
+            created_at: Timestamp::now(),
+        }
+    }
+
+    fn valid_semantic_match() -> SemanticMatchEntry {
+        SemanticMatchEntry {
+            query_intent_hash: fake_action_hash(),
+            matched_design_hash: fake_action_hash(),
+            similarity_score: 0.92,
+            matched_bindings: vec!["cup".to_string()],
+            searched_at: Timestamp::now(),
+        }
+    }
+
+    fn valid_optimization_result() -> OptimizationResultEntry {
+        OptimizationResultEntry {
+            original_design_hash: fake_action_hash(),
+            optimized_for: OptimizationTarget::CostReduction,
+            local_materials: vec![fake_action_hash()],
+            local_printers: vec![fake_action_hash()],
+            energy_preference: "solar".to_string(),
+            parameter_adjustments: r#"{"infill": 20}"#.to_string(),
+            improvement_metrics: r#"{"cost": -0.15}"#.to_string(),
+            created_at: Timestamp::now(),
+        }
+    }
+
+    fn is_valid(result: ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(result, Ok(ValidateCallbackResult::Valid))
+    }
+
+    fn is_invalid(result: ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(result, Ok(ValidateCallbackResult::Invalid(_)))
+    }
+
+    // =========================================================================
+    // HdcIntentEntry tests
+    // =========================================================================
+
+    #[test]
+    fn valid_intent_passes() {
+        assert!(is_valid(validate_hdc_intent(valid_intent())));
+    }
+
+    #[test]
+    fn empty_description_rejected() {
+        let mut intent = valid_intent();
+        intent.description = "   ".to_string();
+        assert!(is_invalid(validate_hdc_intent(intent)));
+    }
+
+    #[test]
+    fn description_too_long_rejected() {
+        let mut intent = valid_intent();
+        intent.description = "x".repeat(4097);
+        assert!(is_invalid(validate_hdc_intent(intent)));
+    }
+
+    #[test]
+    fn vector_dimensions_not_4096_or_10000_rejected() {
+        let mut intent = valid_intent();
+        intent.vector_dimensions = 512;
+        assert!(is_invalid(validate_hdc_intent(intent)));
+
+        // 10000 should pass
+        let mut intent2 = valid_intent();
+        intent2.vector_dimensions = 10000;
+        assert!(is_valid(validate_hdc_intent(intent2)));
+    }
+
+    #[test]
+    fn too_many_semantic_bindings_rejected() {
+        let mut intent = valid_intent();
+        intent.semantic_bindings = (0..129)
+            .map(|i| SerializedBinding {
+                concept: format!("concept_{}", i),
+                role: "Base".to_string(),
+                weight: 0.5,
+            })
+            .collect();
+        assert!(is_invalid(validate_hdc_intent(intent)));
+    }
+
+    #[test]
+    fn binding_weight_nan_rejected() {
+        let mut intent = valid_intent();
+        intent.semantic_bindings = vec![SerializedBinding {
+            concept: "test".to_string(),
+            role: "Base".to_string(),
+            weight: f32::NAN,
+        }];
+        assert!(is_invalid(validate_hdc_intent(intent)));
+    }
+
+    // =========================================================================
+    // GeneratedDesignEntry tests
+    // =========================================================================
+
+    #[test]
+    fn valid_generated_design_passes() {
+        assert!(is_valid(validate_generated_design(valid_generated_design())));
+    }
+
+    #[test]
+    fn nan_confidence_score_rejected() {
+        let mut design = valid_generated_design();
+        design.confidence_score = f32::NAN;
+        assert!(is_invalid(validate_generated_design(design)));
+    }
+
+    #[test]
+    fn parametric_config_too_long_rejected() {
+        let mut design = valid_generated_design();
+        design.parametric_config = "x".repeat(32769);
+        assert!(is_invalid(validate_generated_design(design)));
+    }
+
+    // =========================================================================
+    // SemanticMatchEntry tests
+    // =========================================================================
+
+    #[test]
+    fn valid_semantic_match_passes() {
+        assert!(is_valid(validate_semantic_match(valid_semantic_match())));
+    }
+
+    #[test]
+    fn nan_similarity_score_rejected() {
+        let mut m = valid_semantic_match();
+        m.similarity_score = f32::NAN;
+        assert!(is_invalid(validate_semantic_match(m)));
+    }
+
+    // =========================================================================
+    // OptimizationResultEntry tests
+    // =========================================================================
+
+    #[test]
+    fn valid_optimization_result_passes() {
+        assert!(is_valid(validate_optimization_result(valid_optimization_result())));
     }
 }

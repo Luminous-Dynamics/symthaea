@@ -2,18 +2,20 @@
 //!
 //! HDC (Hyperdimensional Computing) operations and AI-assisted design generation.
 //! This zome handles:
-//! - Natural language to HDC hypervector encoding
-//! - Lateral binding of semantic concepts
-//! - Semantic similarity search
+//! - Natural language to HDC hypervector encoding (4096D continuous via FabHV)
+//! - Lateral binding of semantic concepts (element-wise multiply in HDC space)
+//! - Semantic similarity search (cosine similarity in HDC space)
 //! - Parametric design generation
 //! - Local condition optimization
 //! - Repair prediction from sensor data
 
 use hdk::prelude::*;
 use symthaea_integrity::*;
+use fabrication_common::hdc::{FabHV, FabTextEncoder, FAB_HDC_DIM};
+use fabrication_common::FabricationSignal;
 
 // HDC Configuration
-const HDC_DIMENSIONS: u32 = 10_000;
+const HDC_DIMENSIONS: u32 = 4_096;
 const SIMILARITY_THRESHOLD: f32 = 0.7;
 
 // =============================================================================
@@ -40,24 +42,35 @@ pub fn generate_intent_vector(input: CreateIntentInput) -> ExternResult<IntentRe
     let author = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
-    // Parse description into semantic bindings
+    // Parse description into semantic bindings (supplementary metadata)
     let bindings = parse_semantic_bindings(&input.description);
 
-    // Generate vector hash (actual vector stored externally due to size)
-    let vector_hash = generate_vector_hash(&input.description, &bindings);
+    // Encode description into a real 4096D hypervector via FabTextEncoder
+    let encoder = FabTextEncoder::new(FAB_HDC_DIM);
+    let hv = encoder.encode(&input.description);
+
+    // Generate deterministic hash from the actual HDC vector
+    let vector_hash = generate_vector_hash(&hv);
 
     let intent = HdcIntentEntry {
         description: input.description,
         vector_dimensions: HDC_DIMENSIONS,
         vector_hash: vector_hash.clone(),
         semantic_bindings: bindings.clone(),
-        generation_method: "symthaea_nlp".to_string(),
+        generation_method: "symthaea_hdc".to_string(),
         language: input.language.unwrap_or_else(|| "en".to_string()),
         author: author.clone(),
         created_at: Timestamp::from_micros(now.as_micros() as i64),
     };
 
     let hash = create_entry(EntryTypes::HdcIntent(intent))?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "intent_generated".to_string(),
+        source_zome: "symthaea".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, hash),
+    });
+
     create_link(author, hash.clone(), LinkTypes::AuthorToIntents, ())?;
 
     let record = get(hash, GetOptions::default())?
@@ -70,7 +83,8 @@ pub fn generate_intent_vector(input: CreateIntentInput) -> ExternResult<IntentRe
     })
 }
 
-/// Parse natural language into semantic bindings
+/// Parse natural language into semantic bindings (supplementary metadata for
+/// filtering and display; the real similarity comes from HDC vectors).
 fn parse_semantic_bindings(description: &str) -> Vec<SerializedBinding> {
     let mut bindings = Vec::new();
     let lower = description.to_lowercase();
@@ -163,18 +177,17 @@ fn parse_semantic_bindings(description: &str) -> Vec<SerializedBinding> {
     bindings
 }
 
-/// Generate a hash representing the HDC vector
-fn generate_vector_hash(description: &str, bindings: &[SerializedBinding]) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-
-    let mut hasher = DefaultHasher::new();
-    description.hash(&mut hasher);
-    for b in bindings {
-        b.concept.hash(&mut hasher);
-        b.role.hash(&mut hasher);
+/// Generate a deterministic hash from the actual HDC hypervector using FNV-1a.
+fn generate_vector_hash(hv: &FabHV) -> String {
+    let mut hash: u64 = 0xcbf29ce484222325; // FNV offset basis
+    for val in &hv.data {
+        let bytes = val.to_le_bytes();
+        for &b in &bytes {
+            hash ^= b as u64;
+            hash = hash.wrapping_mul(0x100000001b3); // FNV prime
+        }
     }
-    format!("hdc_{:016x}", hasher.finish())
+    format!("hdc_{:016x}", hash)
 }
 
 // =============================================================================
@@ -187,8 +200,8 @@ pub struct LateralBindInput {
     pub modifier_descriptions: Vec<String>,
 }
 
-/// Lateral binding: Combine base design with modifiers
-/// bracket_vector ⊛ 12mm_vector ⊛ weatherproof_vector
+/// Lateral binding: Combine base design with modifiers using HDC bind operation.
+/// bracket_vector (x) 12mm_vector (x) weatherproof_vector
 #[hdk_extern]
 pub fn lateral_bind(input: LateralBindInput) -> ExternResult<IntentResult> {
     // Get base intent
@@ -201,22 +214,28 @@ pub fn lateral_bind(input: LateralBindInput) -> ExternResult<IntentResult> {
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Parse error".into())))?;
 
-    // Combine descriptions
+    // Reconstruct the base HDC vector from the description (deterministic)
+    let encoder = FabTextEncoder::new(FAB_HDC_DIM);
+    let mut bound_hv = encoder.encode(&base_intent.description);
+
+    // Combine descriptions (text-level for human readability)
     let combined_description = format!(
         "{} {}",
         base_intent.description,
         input.modifier_descriptions.join(" ")
     );
 
-    // Parse all modifiers
+    // Bind each modifier's HDC vector with the base via element-wise multiply
     let mut all_bindings = base_intent.semantic_bindings.clone();
     for modifier in &input.modifier_descriptions {
+        let modifier_hv = encoder.encode(modifier);
+        bound_hv = bound_hv.bind(&modifier_hv);
         let modifier_bindings = parse_semantic_bindings(modifier);
         all_bindings.extend(modifier_bindings);
     }
 
-    // Generate new combined vector hash
-    let vector_hash = generate_vector_hash(&combined_description, &all_bindings);
+    // Generate hash from the bound vector (not the text)
+    let vector_hash = generate_vector_hash(&bound_hv);
 
     let author = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
@@ -233,6 +252,13 @@ pub fn lateral_bind(input: LateralBindInput) -> ExternResult<IntentResult> {
     };
 
     let hash = create_entry(EntryTypes::HdcIntent(combined_intent))?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "intent_bound".to_string(),
+        source_zome: "symthaea".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, hash),
+    });
+
     create_link(author, hash.clone(), LinkTypes::AuthorToIntents, ())?;
     create_link(input.base_intent_hash, hash.clone(), LinkTypes::IntentToDesigns, ())?;
 
@@ -264,7 +290,7 @@ pub struct SearchResult {
     pub matched_bindings: Vec<String>,
 }
 
-/// Find designs by semantic similarity (cosine distance in HDC space)
+/// Find designs by semantic similarity (cosine similarity in 4096D HDC space)
 #[hdk_extern]
 pub fn semantic_search(input: SemanticSearchInput) -> ExternResult<Vec<SearchResult>> {
     let threshold = input.threshold.unwrap_or(SIMILARITY_THRESHOLD);
@@ -280,8 +306,11 @@ pub fn semantic_search(input: SemanticSearchInput) -> ExternResult<Vec<SearchRes
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Parse error".into())))?;
 
-    // Get all intents and compute similarity
-    // In production, this would use a FAISS index or similar
+    // Reconstruct query HDC vector from description (deterministic encoding)
+    let encoder = FabTextEncoder::new(FAB_HDC_DIM);
+    let query_hv = encoder.encode(&query_intent.description);
+
+    // Get all intents and compute cosine similarity in HDC space
     let anchor = all_intents_anchor()?;
     let links = get_links(LinkQuery::try_new(anchor, LinkTypes::AuthorToIntents)?, GetStrategy::default())?;
 
@@ -295,7 +324,12 @@ pub fn semantic_search(input: SemanticSearchInput) -> ExternResult<Vec<SearchRes
             }
             if let Some(record) = get(hash.clone(), GetOptions::default())? {
                 if let Some(intent) = record.entry().to_app_option::<HdcIntentEntry>().ok().flatten() {
-                    let (similarity, matched) = compute_binding_similarity(
+                    // Reconstruct candidate HDC vector and compute cosine similarity
+                    let candidate_hv = encoder.encode(&intent.description);
+                    let similarity = query_hv.similarity(&candidate_hv);
+
+                    // Also compute binding overlap for metadata display
+                    let matched = compute_binding_overlap(
                         &query_intent.semantic_bindings,
                         &intent.semantic_bindings,
                     );
@@ -329,31 +363,23 @@ pub fn semantic_search(input: SemanticSearchInput) -> ExternResult<Vec<SearchRes
     Ok(results)
 }
 
-/// Compute similarity between two sets of semantic bindings
-fn compute_binding_similarity(
+/// Compute binding overlap between two sets of semantic bindings.
+/// Returns the list of concepts that appear in both sets with the same role.
+/// This is supplementary metadata for display; the real similarity comes from
+/// HDC cosine similarity.
+fn compute_binding_overlap(
     a: &[SerializedBinding],
     b: &[SerializedBinding],
-) -> (f32, Vec<String>) {
+) -> Vec<String> {
     let mut matched = Vec::new();
-    let mut score_sum = 0.0;
-
     for binding_a in a {
         for binding_b in b {
             if binding_a.concept == binding_b.concept && binding_a.role == binding_b.role {
                 matched.push(binding_a.concept.clone());
-                score_sum += (binding_a.weight + binding_b.weight) / 2.0;
             }
         }
     }
-
-    let max_possible = (a.len() + b.len()) as f32 / 2.0;
-    let similarity = if max_possible > 0.0 {
-        (score_sum / max_possible).min(1.0)
-    } else {
-        0.0
-    };
-
-    (similarity, matched)
+    matched
 }
 
 // =============================================================================
@@ -400,6 +426,13 @@ pub fn generate_parametric_variant(input: GenerateVariantInput) -> ExternResult<
     };
 
     let hash = create_entry(EntryTypes::GeneratedDesign(generated))?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "variant_generated".to_string(),
+        source_zome: "symthaea".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, hash),
+    });
+
     create_link(
         input.base_design_hash,
         hash.clone(),
@@ -448,6 +481,13 @@ pub fn optimize_for_local(input: OptimizeLocalInput) -> ExternResult<Record> {
     };
 
     let hash = create_entry(EntryTypes::OptimizationResult(optimization))?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "optimization_completed".to_string(),
+        source_zome: "symthaea".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, hash),
+    });
+
     create_link(
         input.design_hash,
         hash.clone(),
@@ -501,11 +541,20 @@ fn calculate_improvement_metrics(
 // REPAIR PREDICTION
 // =============================================================================
 
+/// Default mean time between failures in hours, used when `mtbf_hours` is not
+/// provided by the caller. Callers should supply asset-specific MTBF data when
+/// available; this default is a conservative baseline.
+const DEFAULT_MTBF_HOURS: u32 = 2000;
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PredictRepairInput {
     pub property_asset_hash: ActionHash,
     pub sensor_history: Vec<SensorReading>,
     pub usage_hours: u32,
+    /// Asset-specific mean time between failures (hours). Falls back to
+    /// [`DEFAULT_MTBF_HOURS`] (2000) when `None`.
+    #[serde(default)]
+    pub mtbf_hours: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -532,7 +581,7 @@ pub fn predict_repair_needs(input: PredictRepairInput) -> ExternResult<RepairPre
     let analysis = analyze_sensor_degradation(&input.sensor_history);
 
     // Calculate failure probability based on usage
-    let base_mtbf = 2000u32; // Mean time between failures in hours
+    let base_mtbf = input.mtbf_hours.unwrap_or(DEFAULT_MTBF_HOURS);
     let usage_factor = input.usage_hours as f32 / base_mtbf as f32;
     let sensor_factor = analysis.degradation_rate;
 
@@ -658,4 +707,140 @@ fn make_anchor(name: &str) -> ExternResult<EntryHash> {
 
 fn all_intents_anchor() -> ExternResult<EntryHash> {
     make_anchor("all_intents")
+}
+
+// =============================================================================
+// UNIT TESTS (pure functions only -- HDK externs require conductor)
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // =========================================================================
+    // generate_vector_hash
+    // =========================================================================
+
+    #[test]
+    fn test_generate_vector_hash_deterministic() {
+        let encoder = FabTextEncoder::new(FAB_HDC_DIM);
+        let hv = encoder.encode("a weatherproof bracket for 12mm pipe");
+        let hash1 = generate_vector_hash(&hv);
+        let hash2 = generate_vector_hash(&hv);
+        assert_eq!(hash1, hash2, "Same vector must produce same hash");
+        assert!(hash1.starts_with("hdc_"), "Hash must start with hdc_ prefix");
+    }
+
+    #[test]
+    fn test_generate_vector_hash_different() {
+        let encoder = FabTextEncoder::new(FAB_HDC_DIM);
+        let hv_a = encoder.encode("bracket for pipe");
+        let hv_b = encoder.encode("gear for motor");
+        let hash_a = generate_vector_hash(&hv_a);
+        let hash_b = generate_vector_hash(&hv_b);
+        assert_ne!(hash_a, hash_b, "Different vectors must produce different hashes");
+    }
+
+    // =========================================================================
+    // parse_semantic_bindings
+    // =========================================================================
+
+    #[test]
+    fn test_parse_semantic_bindings_bracket() {
+        let bindings = parse_semantic_bindings("I need a bracket");
+        assert!(bindings.iter().any(|b| b.concept == "bracket" && b.role == "Base"));
+    }
+
+    #[test]
+    fn test_parse_semantic_bindings_dimensional() {
+        let bindings = parse_semantic_bindings("pipe is 12mm diameter");
+        assert!(bindings.iter().any(|b| b.concept.contains("12mm") && b.role == "Dimensional"));
+    }
+
+    #[test]
+    fn test_parse_semantic_bindings_material() {
+        let bindings = parse_semantic_bindings("print it in pla");
+        assert!(bindings.iter().any(|b| b.concept == "pla" && b.role == "Material"));
+    }
+
+    #[test]
+    fn test_parse_semantic_bindings_empty() {
+        let bindings = parse_semantic_bindings("just a thing");
+        // "just a thing" contains no recognized keywords
+        assert!(bindings.is_empty(), "Unrecognized description should yield no bindings");
+    }
+
+    // =========================================================================
+    // analyze_sensor_degradation
+    // =========================================================================
+
+    #[test]
+    fn test_analyze_sensor_degradation_empty() {
+        let analysis = analyze_sensor_degradation(&[]);
+        assert!((analysis.degradation_rate - 0.5).abs() < f32::EPSILON,
+            "Empty readings should return default 0.5 degradation rate");
+        assert_eq!(analysis.likely_component, "unknown");
+    }
+
+    #[test]
+    fn test_analyze_sensor_degradation_vibration_dominant() {
+        let readings = vec![
+            SensorReading { timestamp: 1, sensor_type: "vibration".into(), value: 10.0, unit: "mm/s".into() },
+            SensorReading { timestamp: 2, sensor_type: "vibration".into(), value: 12.0, unit: "mm/s".into() },
+            SensorReading { timestamp: 3, sensor_type: "temperature".into(), value: 26.0, unit: "C".into() },
+        ];
+        let analysis = analyze_sensor_degradation(&readings);
+        assert_eq!(analysis.likely_component, "bearing",
+            "Vibration-dominant readings should point to bearing");
+    }
+
+    #[test]
+    fn test_analyze_sensor_degradation_temp_dominant() {
+        let readings = vec![
+            SensorReading { timestamp: 1, sensor_type: "temperature".into(), value: 80.0, unit: "C".into() },
+            SensorReading { timestamp: 2, sensor_type: "temperature".into(), value: 85.0, unit: "C".into() },
+            SensorReading { timestamp: 3, sensor_type: "vibration".into(), value: 0.5, unit: "mm/s".into() },
+        ];
+        let analysis = analyze_sensor_degradation(&readings);
+        assert_eq!(analysis.likely_component, "thermal_component",
+            "Temperature-dominant readings should point to thermal_component");
+    }
+
+    // =========================================================================
+    // calculate_local_adjustments
+    // =========================================================================
+
+    #[test]
+    fn test_calculate_local_adjustments_solar() {
+        let adjustments = calculate_local_adjustments(&[], &[], "solar");
+        assert_eq!(adjustments.get("print_speed").map(|s| s.as_str()), Some("reduced_10%"));
+        assert_eq!(adjustments.get("infill_pattern").map(|s| s.as_str()), Some("efficient"));
+        assert_eq!(adjustments.get("local_optimized").map(|s| s.as_str()), Some("true"));
+    }
+
+    #[test]
+    fn test_calculate_local_adjustments_grid() {
+        let adjustments = calculate_local_adjustments(&[], &[], "grid");
+        assert_eq!(adjustments.get("print_time").map(|s| s.as_str()), Some("off_peak"));
+        assert_eq!(adjustments.get("local_optimized").map(|s| s.as_str()), Some("true"));
+        // solar-specific keys should not be present
+        assert!(adjustments.get("print_speed").is_none());
+    }
+
+    // =========================================================================
+    // calculate_improvement_metrics
+    // =========================================================================
+
+    #[test]
+    fn test_calculate_improvement_metrics() {
+        let mut adjustments = std::collections::HashMap::new();
+        adjustments.insert("print_time".to_string(), "off_peak".to_string());
+
+        let metrics = calculate_improvement_metrics(&adjustments);
+        assert!(metrics.contains_key("energy_efficiency"), "Must contain energy_efficiency");
+        assert!(metrics.contains_key("material_utilization"), "Must contain material_utilization");
+        assert!(metrics.contains_key("local_economy_boost"), "Must contain local_economy_boost");
+        assert!(metrics.contains_key("grid_friendliness"),
+            "Must contain grid_friendliness when print_time is present");
+    }
 }

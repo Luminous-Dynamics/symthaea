@@ -31,6 +31,12 @@ pub fn create_material(input: CreateMaterialInput) -> ExternResult<Record> {
 
     let hash = create_entry(EntryTypes::Material(material))?;
 
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "material_created".to_string(),
+        source_zome: "materials".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, hash),
+    });
+
     let anchor = all_materials_anchor()?;
     create_link(anchor, hash.clone(), LinkTypes::AllMaterials, ())?;
 

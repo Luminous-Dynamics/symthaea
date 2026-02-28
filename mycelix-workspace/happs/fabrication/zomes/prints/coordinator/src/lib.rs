@@ -195,6 +195,12 @@ pub fn create_print_job(input: CreatePrintJobInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(EntryTypes::PrintJob(job))?;
 
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "job_created".to_string(),
+        source_zome: "prints".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, action_hash),
+    });
+
     // Create links
     create_link(
         input.design_hash,
@@ -257,6 +263,12 @@ pub fn accept_print_job(hash: ActionHash) -> ExternResult<Record> {
 
     let new_hash = update_entry(hash, EntryTypes::PrintJob(updated))?;
 
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "job_accepted".to_string(),
+        source_zome: "prints".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
+    });
+
     get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated job".to_string()
     )))
@@ -284,6 +296,12 @@ pub fn start_print(hash: ActionHash) -> ExternResult<Record> {
     };
 
     let new_hash = update_entry(hash, EntryTypes::PrintJob(updated))?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "print_started".to_string(),
+        source_zome: "prints".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
+    });
 
     get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated job".to_string()
@@ -326,6 +344,12 @@ pub fn update_print_progress(input: UpdateProgressInput) -> ExternResult<Record>
 
     let new_hash = update_entry(input.job_hash, EntryTypes::PrintJob(updated))?;
 
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "progress_updated".to_string(),
+        source_zome: "prints".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
+    });
+
     get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated job".to_string()
     )))
@@ -367,6 +391,12 @@ pub fn complete_print(input: CompletePrintInput) -> ExternResult<Record> {
 
     let new_hash = update_entry(input.job_hash, EntryTypes::PrintJob(updated))?;
 
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "print_completed".to_string(),
+        source_zome: "prints".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
+    });
+
     get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated job".to_string()
     )))
@@ -406,6 +436,12 @@ pub fn cancel_print(input: CancelPrintInput) -> ExternResult<Record> {
     };
 
     let new_hash = update_entry(input.job_hash, EntryTypes::PrintJob(updated))?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "print_cancelled".to_string(),
+        source_zome: "prints".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
+    });
 
     get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated job".to_string()
@@ -542,6 +578,12 @@ pub fn record_print_result(input: RecordPrintInput) -> ExternResult<Record> {
 
     let record_hash = create_entry(EntryTypes::PrintRecord(record))?;
 
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "result_recorded".to_string(),
+        source_zome: "prints".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, record_hash),
+    });
+
     // Link job to record
     create_link(
         input.job_hash,
@@ -636,6 +678,12 @@ pub fn start_cincinnati_monitoring(input: StartCincinnatiInput) -> ExternResult<
 
     let session_hash = create_entry(EntryTypes::CincinnatiSessionEntry(session_entry))?;
 
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "cincinnati_started".to_string(),
+        source_zome: "prints".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, session_hash),
+    });
+
     // Link job to session
     create_link(
         input.job_hash,
@@ -688,6 +736,12 @@ pub fn report_cincinnati_anomaly(input: ReportAnomalyInput) -> ExternResult<Reco
     };
 
     let anomaly_hash = create_entry(EntryTypes::CincinnatiAnomalyEntry(anomaly_entry))?;
+
+    let _ = emit_signal(&FabricationSignal {
+        event_type: "anomaly_detected".to_string(),
+        source_zome: "prints".to_string(),
+        payload: format!(r#"{{"hash":"{}"}}"#, anomaly_hash),
+    });
 
     // Link to session via anchor
     let session_anchor = cincinnati_session_anchor(&input.session_id)?;
@@ -786,7 +840,7 @@ pub fn get_print_statistics(design_hash: ActionHash) -> ExternResult<DesignPrint
     let mut quality_sum = 0.0f32;
     let mut pog_sum = 0.0f32;
     let mut mycelium_total = 0u64;
-    let mut issue_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    let mut issue_counts: std::collections::HashMap<PrintIssue, u32> = std::collections::HashMap::new();
 
     for job_record in jobs {
         if let Some(job) = job_record.entry().to_app_option::<PrintJob>().ok().flatten() {
@@ -807,8 +861,7 @@ pub fn get_print_statistics(design_hash: ActionHash) -> ExternResult<DesignPrint
                     mycelium_total += print_record.mycelium_earned;
 
                     for issue in &print_record.issues {
-                        let key = format!("{:?}", issue);
-                        *issue_counts.entry(key).or_insert(0) += 1;
+                        *issue_counts.entry(issue.clone()).or_insert(0) += 1;
                     }
                 }
             }
@@ -819,16 +872,7 @@ pub fn get_print_statistics(design_hash: ActionHash) -> ExternResult<DesignPrint
     let avg_pog = if total > 0 { pog_sum / total as f32 } else { 0.0 };
 
     // Convert issues to sorted vec
-    let mut common_issues: Vec<(PrintIssue, u32)> = issue_counts
-        .into_iter()
-        .filter_map(|(key, count)| {
-            // Parse back to PrintIssue (simplified)
-            if key.contains("Warping") { Some((PrintIssue::Warping, count)) }
-            else if key.contains("LayerShift") { Some((PrintIssue::LayerShift, count)) }
-            else if key.contains("Stringing") { Some((PrintIssue::Stringing, count)) }
-            else { Some((PrintIssue::Other(key), count)) }
-        })
-        .collect();
+    let mut common_issues: Vec<(PrintIssue, u32)> = issue_counts.into_iter().collect();
     common_issues.sort_by(|a, b| b.1.cmp(&a.1));
 
     Ok(DesignPrintStats {
@@ -905,4 +949,196 @@ fn all_jobs_anchor() -> ExternResult<EntryHash> {
 
 fn cincinnati_session_anchor(session_id: &str) -> ExternResult<EntryHash> {
     make_anchor(&format!("cincinnati_{}", session_id))
+}
+
+// =============================================================================
+// TESTS
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── calculate_pog_score ─────────────────────────────────────────────
+
+    #[test]
+    fn test_calculate_pog_score_all_zeros() {
+        let score = calculate_pog_score(0.0, 0.0, 0.0, 0.0);
+        assert!((score - 0.0).abs() < f32::EPSILON, "All-zero inputs should yield 0.0, got {}", score);
+    }
+
+    #[test]
+    fn test_calculate_pog_score_all_ones() {
+        let score = calculate_pog_score(1.0, 1.0, 1.0, 1.0);
+        // 1.0*0.3 + 1.0*0.3 + 1.0*0.2 + 1.0*0.2 = 1.0
+        assert!((score - 1.0).abs() < f32::EPSILON, "All-one inputs should yield 1.0, got {}", score);
+    }
+
+    #[test]
+    fn test_calculate_pog_score_typical_values() {
+        // Renewable energy=0.8, circularity=0.5, quality=0.9, local=0.0
+        let score = calculate_pog_score(0.8, 0.5, 0.9, 0.0);
+        // 0.8*0.3 + 0.5*0.3 + 0.9*0.2 + 0.0*0.2 = 0.24 + 0.15 + 0.18 + 0.0 = 0.57
+        let expected = 0.24 + 0.15 + 0.18;
+        assert!(
+            (score - expected).abs() < 1e-6,
+            "Expected ~{}, got {}",
+            expected, score
+        );
+    }
+
+    #[test]
+    fn test_calculate_pog_score_weights_sum_to_one() {
+        // With all inputs at the same value x, the result should be x
+        let x = 0.42;
+        let score = calculate_pog_score(x, x, x, x);
+        // x*(0.3+0.3+0.2+0.2) = x*1.0 = x
+        assert!(
+            (score - x).abs() < 1e-6,
+            "Uniform inputs of {} should yield {}, got {}",
+            x, x, score
+        );
+    }
+
+    #[test]
+    fn test_calculate_pog_score_clamps_above_one() {
+        // Values above 1.0 should be clamped to 1.0
+        let score = calculate_pog_score(2.0, 1.5, 3.0, 10.0);
+        // After clamping: all 1.0 → score = 1.0
+        assert!(
+            (score - 1.0).abs() < f32::EPSILON,
+            "Over-range inputs should clamp to 1.0, got {}",
+            score
+        );
+    }
+
+    #[test]
+    fn test_calculate_pog_score_clamps_below_zero() {
+        // Negative values should be clamped to 0.0
+        let score = calculate_pog_score(-1.0, -0.5, -3.0, -10.0);
+        assert!(
+            (score - 0.0).abs() < f32::EPSILON,
+            "Negative inputs should clamp to 0.0, got {}",
+            score
+        );
+    }
+
+    #[test]
+    fn test_calculate_pog_score_mixed_clamp() {
+        // Mix of in-range, above, and below values
+        let score = calculate_pog_score(-0.5, 0.5, 1.5, 0.8);
+        // After clamping: 0.0, 0.5, 1.0, 0.8
+        // 0.0*0.3 + 0.5*0.3 + 1.0*0.2 + 0.8*0.2 = 0.0 + 0.15 + 0.20 + 0.16 = 0.51
+        let expected = 0.0 + 0.15 + 0.20 + 0.16;
+        assert!(
+            (score - expected).abs() < 1e-6,
+            "Expected ~{}, got {}",
+            expected, score
+        );
+    }
+
+    #[test]
+    fn test_calculate_pog_score_energy_only() {
+        // Only energy component active
+        let score = calculate_pog_score(1.0, 0.0, 0.0, 0.0);
+        assert!(
+            (score - 0.3).abs() < f32::EPSILON,
+            "Energy-only should yield 0.3, got {}",
+            score
+        );
+    }
+
+    #[test]
+    fn test_calculate_pog_score_local_only() {
+        // Only local participation active
+        let score = calculate_pog_score(0.0, 0.0, 0.0, 1.0);
+        assert!(
+            (score - 0.2).abs() < f32::EPSILON,
+            "Local-only should yield 0.2, got {}",
+            score
+        );
+    }
+
+    // ── calculate_mycelium_reward ───────────────────────────────────────
+
+    #[test]
+    fn test_mycelium_reward_below_threshold_returns_zero() {
+        // pog_score < 0.6 → no reward
+        assert_eq!(calculate_mycelium_reward(0.59, 1.0), 0);
+        assert_eq!(calculate_mycelium_reward(0.0, 1.0), 0);
+        assert_eq!(calculate_mycelium_reward(0.3, 0.9), 0);
+    }
+
+    #[test]
+    fn test_mycelium_reward_at_threshold_boundary() {
+        // pog_score exactly at 0.6 should earn a reward (not below threshold)
+        // multiplier = (0.6 + 0.9) / 2.0 = 0.75
+        // bonus = (0.6 - 0.6) * 50.0 = 0.0
+        // total = 10.0 * 0.75 + 0.0 = 7.5 → 7
+        let reward = calculate_mycelium_reward(0.6, 0.9);
+        assert_eq!(reward, 7, "At threshold with quality=0.9, expected 7, got {}", reward);
+    }
+
+    #[test]
+    fn test_mycelium_reward_above_threshold() {
+        // pog=0.8, quality=0.9
+        // multiplier = (0.8 + 0.9) / 2.0 = 0.85
+        // bonus = (0.8 - 0.6) * 50.0 = 10.0
+        // total = 10.0 * 0.85 + 10.0 = 18.5 → 18
+        let reward = calculate_mycelium_reward(0.8, 0.9);
+        assert_eq!(reward, 18, "pog=0.8, quality=0.9 should yield 18, got {}", reward);
+    }
+
+    #[test]
+    fn test_mycelium_reward_perfect_scores() {
+        // pog=1.0, quality=1.0
+        // multiplier = (1.0 + 1.0) / 2.0 = 1.0
+        // bonus = (1.0 - 0.6f32) * 50.0
+        // 0.6f32 is ~0.6000000238, so bonus = 0.3999999762 * 50.0 = ~19.999998
+        // total = 10.0 * 1.0 + ~19.999998 = ~29.999998 → truncated to 29
+        let reward = calculate_mycelium_reward(1.0, 1.0);
+        assert_eq!(reward, 29, "Perfect scores should yield 29 (f32 truncation of ~29.999998), got {}", reward);
+    }
+
+    #[test]
+    fn test_mycelium_reward_high_pog_low_quality() {
+        // pog=1.0, quality=0.0
+        // multiplier = (1.0 + 0.0) / 2.0 = 0.5
+        // bonus = (1.0 - 0.6f32) * 50.0 = ~19.999998 (f32 precision)
+        // total = 10.0 * 0.5 + ~19.999998 = ~24.999998 → truncated to 24
+        let reward = calculate_mycelium_reward(1.0, 0.0);
+        assert_eq!(reward, 24, "High pog, zero quality should yield 24 (f32 truncation), got {}", reward);
+    }
+
+    #[test]
+    fn test_mycelium_reward_just_above_threshold() {
+        // pog=0.61, quality=0.5
+        // multiplier = (0.61 + 0.5) / 2.0 = 0.555
+        // bonus = (0.61 - 0.6) * 50.0 = 0.5
+        // total = 10.0 * 0.555 + 0.5 = 6.05 → 6
+        let reward = calculate_mycelium_reward(0.61, 0.5);
+        assert_eq!(reward, 6, "Just above threshold should yield 6, got {}", reward);
+    }
+
+    #[test]
+    fn test_mycelium_reward_zero_pog_zero_quality() {
+        // Below threshold → 0
+        assert_eq!(calculate_mycelium_reward(0.0, 0.0), 0);
+    }
+
+    #[test]
+    fn test_mycelium_reward_negative_pog() {
+        // Negative pog is below threshold → 0
+        assert_eq!(calculate_mycelium_reward(-1.0, 1.0), 0);
+    }
+
+    #[test]
+    fn test_mycelium_reward_threshold_with_zero_quality() {
+        // pog=0.6, quality=0.0
+        // multiplier = (0.6 + 0.0) / 2.0 = 0.3
+        // bonus = (0.6 - 0.6) * 50.0 = 0.0
+        // total = 10.0 * 0.3 + 0.0 = 3.0 → 3
+        let reward = calculate_mycelium_reward(0.6, 0.0);
+        assert_eq!(reward, 3, "Threshold pog with zero quality should yield 3, got {}", reward);
+    }
 }
