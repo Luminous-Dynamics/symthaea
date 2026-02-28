@@ -58,8 +58,8 @@ impl Default for VocalTractConfig {
     fn default() -> Self {
         Self {
             network_layers: 2,
-            neurons_per_layer: 4,
-            // 8 total neurons — 4 per layer. Proven to differentiate 44 phonemes.
+            neurons_per_layer: 6,
+            // 12 total neurons — 6 per layer. Extra capacity for extreme vowel F2 targets.
             learning_rate: 0.001,
             base_f0: 120.0,
             f0_range: 200.0,
@@ -407,7 +407,7 @@ impl VocalTractController {
         // causing all vowels to converge to schwa.
         const ERROR_SCALE: [f32; OUTPUT_DIM] = [
             400.0,  // F1: range ~200-1000 Hz (reduced from 500 for 25% stronger F1 gradient)
-            600.0,  // F2: range ~600-3000 Hz (reduced from 750 for front vowel IY/EY accuracy)
+            300.0,  // F2: range ~600-3000 Hz (halved for 2× stronger F2 gradient — IY/UW need it)
             1500.0, // F3: range ~1500-5000 Hz
             100.0,  // B1: range ~30-300 Hz
             150.0,  // B2: range ~30-400 Hz
@@ -688,16 +688,16 @@ impl VocalTractController {
         };
         let adaptive_steps: Vec<usize> = distances
             .iter()
-            .map(|d| if *d > median_dist { 20 } else { 10 })
+            .map(|d| if *d > median_dist { 30 } else { 10 })
             .collect();
 
         // Convergence-critical parameters:
-        // - 20 warmup steps for LTC neurons to reach differentiated steady states
+        // - 40 warmup steps for LTC neurons to reach maximally differentiated steady states
         // - Distance-weighted LR: extreme vowels get up to 3× the LR
-        // - Adaptive gradient steps: outlier phonemes get 20 steps vs 10 for near-schwa
+        // - Adaptive gradient steps: outlier phonemes get 30 steps vs 10 for near-schwa
         // - Cosine LR annealing (30×→10×) for strong early gradients + late fine-tuning
         // - No weight decay during supervised training (prevents erosion)
-        const WARMUP_STEPS: usize = 20;
+        const WARMUP_STEPS: usize = 40;
 
         // Cosine annealing: 30× → 10× base. Wide range gives strong early gradients
         // for extreme vowels then lower LR for fine-tuning in late epochs.
