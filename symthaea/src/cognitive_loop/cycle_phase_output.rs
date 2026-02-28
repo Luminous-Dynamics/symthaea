@@ -334,6 +334,15 @@ impl CognitiveLoopService {
             self.curiosity_drive.exploration_urge as f64,
             self.carryover.learning.adaptive_threshold_scale as f64,
         );
+
+        // Apply consensus-smoothed values for fully-mediated fields.
+        // Consensus integration (averaged adds, geometric mean scales) dampens
+        // extreme compounding from 30+ subsystem proposals per cycle while
+        // preserving mid-cycle mutation semantics.
+        self.fep_lr_boost = feedback_divergence.consensus_lr as f32;
+        self.carryover.learning.adaptive_threshold_scale =
+            feedback_divergence.consensus_threshold as f32;
+
         if feedback_divergence.confidence > 0.01
             || feedback_divergence.learning_rate > 0.01
             || feedback_divergence.exploration > 0.01
