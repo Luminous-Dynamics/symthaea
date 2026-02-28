@@ -19,6 +19,7 @@ symthaea-backend = ["dep:symthaea"]
 symthaea-core = { path = "../../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
 symthaea-ssm = { path = "../symthaea-ssm" }
+symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
 symthaea = { path = "../..", optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

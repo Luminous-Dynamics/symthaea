@@ -172,6 +172,11 @@ pub struct ContinuousMind {
     /// Whether any emission was throttled within the current bandwidth window.
     #[cfg(feature = "mesh")]
     mesh_bandwidth_throttled_in_window: bool,
+    /// Dream-level neuromodulator bath for sleep neurochemistry.
+    /// Tracks adenosine clearance, allostatic recovery, and 5-HT1A up-regulation
+    /// independently from the cognitive loop's bath (which doesn't run during dreams).
+    /// Science: Xie et al. (2013), Piomelli (2003), Blier & de Montigny (1994).
+    pub(crate) dream_bath: symthaea_neuromodulators::NeuromodulatorBath,
     /// Holochain Cortex for trust and validation.
     pub(crate) cortex: crate::swarm::HolochainCortex,
     /// Optional LLM backend for swarm projection gradient exchange.
@@ -270,6 +275,7 @@ impl ContinuousMind {
             mesh_bandwidth_budget: mesh::MESH_BANDWIDTH_INITIAL,
             #[cfg(feature = "mesh")]
             mesh_bandwidth_throttled_in_window: false,
+            dream_bath: symthaea_neuromodulators::NeuromodulatorBath::default(),
             cortex: crate::swarm::HolochainCortex::default(),
             #[cfg(feature = "liquid-mamba")]
             llm_backend: None,

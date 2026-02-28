@@ -184,6 +184,10 @@ impl MambaWrapper {
         let logits = self
             .model
             .forward(&input_ids, &mut self.state)
+            .map_err(|e| {
+                tracing::error!("Mamba forward error (device={:?}): {e:#}", self.device);
+                e
+            })
             .context("Mamba forward pass failed")?;
 
         // logits shape: [1, vocab_size] — squeeze to [vocab_size]
@@ -729,7 +733,7 @@ pub(crate) mod tests {
         use symthaea_core::genesis::GenesisSeed;
 
         let genesis = GenesisSeed::from_phrase("test-mamba-e2e");
-        let device = Device::Cpu;
+        let device = best_device();
 
         let mut wrapper = MambaWrapper::load("state-spaces/mamba-130m", device)
             .expect("Failed to load mamba-130m");

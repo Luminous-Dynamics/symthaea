@@ -286,4 +286,8 @@ pub struct MindStats {
     pub avg_consciousness: f64,
     /// Peak consciousness level
     pub peak_consciousness: f64,
+    /// Dream ticks where adenosine was cleared (Xie 2013)
+    pub dream_adenosine_cleared: u64,
+    /// Dream ticks where allostatic recovery occurred (McEwen 1998)
+    pub dream_allostatic_recovery: u64,
 }

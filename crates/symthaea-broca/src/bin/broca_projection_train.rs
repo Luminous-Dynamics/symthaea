@@ -45,7 +45,7 @@ fn main() {
     // Build LiquidMambaGenerator
     let lm_config = LiquidMambaConfig {
         model_id: opts.model_id.clone(),
-        max_tokens: 64,
+        max_tokens: opts.max_gen_tokens,
         base_lr: opts.learning_rate,
         warmup_steps: opts.warmup_steps,
         accumulation_steps: opts.accumulation_steps,
@@ -70,6 +70,17 @@ fn main() {
             Ok(ckpt) => {
                 gen.projection_mut().load_weights(&ckpt.projection_weights);
                 tracing::info!(epoch = ckpt.training_epoch, "Projection weights loaded");
+                // Log diagnostics snapshot if present in the checkpoint
+                if let Some(ref snap) = ckpt.diagnostics_snapshot {
+                    tracing::info!(
+                        total_steps = snap.total_steps,
+                        clip_count = snap.clip_count,
+                        last_norm_down = format!("{:.6}", snap.last_norm_down),
+                        last_norm_up = format!("{:.6}", snap.last_norm_up),
+                        collapse_detected = snap.collapse_detected,
+                        "Restored diagnostics snapshot from checkpoint"
+                    );
+                }
             }
             Err(e) => {
                 eprintln!(
@@ -163,6 +174,7 @@ fn main() {
     tracing::info!(
         epochs = opts.epochs,
         lr = opts.learning_rate,
+        max_gen_tokens = opts.max_gen_tokens,
         warm_start = opts.warm_start,
         diagnostics = opts.diagnostics,
         "Starting projection training"
@@ -285,6 +297,11 @@ fn main() {
         gen.projection().inner_dim(),
     );
 
+    // Persist gradient diagnostics snapshot if enabled
+    if let Some(diag) = gen.projection_diagnostics() {
+        checkpoint.diagnostics_snapshot = Some(diag.snapshot());
+    }
+
     tracing::info!(path = %opts.output_path, "Saving projection checkpoint");
     if let Err(e) = checkpoint.save_to_file(&opts.output_path) {
         eprintln!("Failed to save projection checkpoint: {e}");
@@ -323,7 +340,10 @@ fn run_evaluation(gen: &mut LiquidMambaGenerator, eval_path: &str) {
     println!();
     println!(
         "{}",
-        symthaea_broca::evaluation::format_liquid_mamba_eval_report(&result)
+        symthaea_broca::evaluation::format_liquid_mamba_eval_report(
+            &result,
+            &symthaea_broca::evaluation::QualityGateThresholds::default(),
+        )
     );
 }
 
@@ -354,6 +374,7 @@ struct ProjectionTrainOpts {
     contrastive_pretrain_epochs: usize,
     genesis_phrase: String,
     deep_projection: bool,
+    max_gen_tokens: usize,
 }
 
 fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
@@ -375,6 +396,7 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
         contrastive_pretrain_epochs: 0,
         genesis_phrase: "broca-projection-default".to_string(),
         deep_projection: false,
+        max_gen_tokens: 16,
     };
 
     let mut i = 1;
@@ -467,6 +489,14 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
             "--deep-projection" => {
                 opts.deep_projection = true;
             }
+            "--max-gen-tokens" => {
+                i += 1;
+                opts.max_gen_tokens = args
+                    .get(i)
+                    .ok_or("--max-gen-tokens requires a number")?
+                    .parse()
+                    .map_err(|_| "--max-gen-tokens must be a positive integer")?;
+            }
             "--help" | "-h" => {
                 print_usage();
                 process::exit(0);
@@ -515,6 +545,7 @@ fn print_usage() {
         "  --genesis PHRASE            Genesis seed phrase (default: broca-projection-default)"
     );
     eprintln!("  --deep-projection           Use deep double-bottleneck projection (256->128->256)");
+    eprintln!("  --max-gen-tokens N          Max tokens per generation during training (default: 16)");
     eprintln!();
     eprintln!("Evaluation options:");
     eprintln!("  --eval PATH            Held-out JSONL for post-training evaluation");
