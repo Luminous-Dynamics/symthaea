@@ -65,6 +65,18 @@ pub struct VerificationSummary {
     pub average_confidence: f32,
 }
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct HashPaginationInput {
+    pub hash: ActionHash,
+    pub pagination: Option<PaginationInput>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct PaginationInput {
+    pub offset: u32,
+    pub limit: u32,
+}
+
 // ============================================================================
 // DNA setup helper
 // ============================================================================
@@ -145,16 +157,20 @@ async fn test_verification_submit_and_query() {
         alice.agent_pubkey()
     );
 
-    // Query verifications for this design
-    let verifications: Vec<Record> = conductor
+    // Query verifications for this design (now takes HashPaginationInput)
+    let verifications: serde_json::Value = conductor
         .call(
             &alice.zome("verification_coordinator"),
             "get_design_verifications",
-            design_hash.clone(),
+            HashPaginationInput {
+                hash: design_hash.clone(),
+                pagination: None,
+            },
         )
         .await;
 
-    assert_eq!(verifications.len(), 1);
+    let items = verifications.get("items").and_then(|v| v.as_array()).unwrap();
+    assert_eq!(items.len(), 1);
 
     // Get verification summary
     let summary: VerificationSummary = conductor

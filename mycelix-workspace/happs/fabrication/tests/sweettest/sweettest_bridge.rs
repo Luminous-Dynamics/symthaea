@@ -86,6 +86,7 @@ pub struct AuditTrailFilter {
     pub after: Option<i64>,
     pub before: Option<i64>,
     pub limit: u32,
+    pub pagination: Option<PaginationInput>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -307,7 +308,7 @@ async fn test_event_emission_and_audit_trail() {
         )
         .await;
 
-    let audit_trail: Vec<Record> = conductor
+    let audit_result: serde_json::Value = conductor
         .call(
             &alice.zome("bridge_coordinator"),
             "get_audit_trail",
@@ -317,12 +318,14 @@ async fn test_event_emission_and_audit_trail() {
                 after: None,
                 before: None,
                 limit: 50,
+                pagination: None,
             },
         )
         .await;
 
+    let audit_items = audit_result.get("items").and_then(|v| v.as_array());
     assert!(
-        !audit_trail.is_empty(),
+        audit_items.map(|a| !a.is_empty()).unwrap_or(false),
         "Audit trail should have entries from prediction creation"
     );
 
