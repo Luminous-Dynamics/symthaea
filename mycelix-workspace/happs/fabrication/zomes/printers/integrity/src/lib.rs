@@ -107,12 +107,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             tag,
             ..
         } => validate_create_link(link_type, base_address, target_address, tag),
-        FlatOp::RegisterDeleteLink {
-            link_type,
-            ..
-        } => {
-            // Links can be deleted by their creators
-            let _ = link_type;
+        FlatOp::RegisterDeleteLink { action, .. } => {
+            let original_action = must_get_action(action.link_add_address.clone())?;
+            if action.author != *original_action.action().author() {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original link creator can delete this link".into(),
+                ));
+            }
             Ok(ValidateCallbackResult::Valid)
         }
         _ => Ok(ValidateCallbackResult::Valid),

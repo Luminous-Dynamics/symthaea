@@ -262,6 +262,15 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             check!(validation::require_max_tag_len(&tag, max_len, &format!("{:?}", link_type)));
             Ok(ValidateCallbackResult::Valid)
         }
+        FlatOp::RegisterDeleteLink { action, .. } => {
+            let original_action = must_get_action(action.link_add_address.clone())?;
+            if action.author != *original_action.action().author() {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original link creator can delete this link".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }

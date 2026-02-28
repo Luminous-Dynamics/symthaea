@@ -128,6 +128,44 @@ jobs:
           fi
 
   # ============================================================================
+  # hApp bundle packing (verifies DNA + hApp YAML are valid)
+  # ============================================================================
+  happ-pack:
+    name: hApp Bundle
+    needs: wasm
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-workspace/happs/fabrication
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+      - name: Install Holochain CLI
+        run: cargo install holochain_cli --locked
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-workspace/happs/fabrication/target
+          key: ${{ runner.os }}-fab-happ-${{ hashFiles('mycelix-workspace/happs/fabrication/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-fab-happ-
+      - name: Build WASM zomes
+        run: cargo build --release --target wasm32-unknown-unknown
+      - name: Pack DNA bundle
+        run: |
+          hc dna pack dna/ -o workdir/fabrication.dna
+          echo "Packed DNA: $(du -h workdir/fabrication.dna | cut -f1)"
+      - name: Pack hApp bundle
+        run: |
+          hc app pack . -o fabrication.happ
+          echo "Packed hApp: $(du -h fabrication.happ | cut -f1)"
+
+  # ============================================================================
   # Fabrication Kernel tests (native Rust, in symthaea workspace)
   # ============================================================================
   kernel:
