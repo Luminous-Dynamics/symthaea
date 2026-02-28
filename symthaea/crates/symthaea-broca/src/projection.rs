@@ -867,6 +867,18 @@ impl HdcSsmProjection {
         }
     }
 
+    /// Compute gradients from pure roundtrip reconstruction (autoencoder loss).
+    ///
+    /// Error = `thought - backward(forward(thought))`. This doesn't depend on
+    /// Mamba's output, giving a clean gradient signal even when the projection
+    /// is randomly initialized. Use during early training (high PE) before
+    /// switching to Mamba-output-based gradients.
+    pub fn compute_roundtrip_gradients(&mut self, thought_hv: &ContinuousHV) {
+        let ssm_context = self.project_to_ssm(thought_hv);
+        let reconstructed = self.project_to_hdc(&ssm_context);
+        self.compute_gradients(thought_hv, &reconstructed);
+    }
+
     /// Compute contrastive gradients: push anchor and negative apart in bottleneck space.
     ///
     /// Adds a repulsive gradient so that the projections of `anchor_hv` and
