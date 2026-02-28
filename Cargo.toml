@@ -38,6 +38,12 @@ members = [
     "crates/symthaea-broca",
     "crates/symthaea-consciousness-equation",
     "crates/symthaea-neuromodulators",
+    "crates/symthaea-cell-foundry",
+    "crates/symthaea-ectogenesis",
+    "crates/symthaea-genomics",
+    "crates/symthaea-nurture",
+    "crates/symthaea-population",
+    "crates/symthaea-fabrication-kernel",
 ]
 
 
@@ -166,6 +172,13 @@ symthaea-broca = { path = "crates/symthaea-broca", optional = true }
 
 # Symthaea Nix - Conscious NixOS mind (HDC + active inference)
 symthaea-nix = { path = "crates/symthaea-nix", optional = true }
+
+# Genesis Pipeline - DNA-to-Human species stewardship
+symthaea-genomics = { path = "crates/symthaea-genomics", optional = true }
+symthaea-cell-foundry = { path = "crates/symthaea-cell-foundry", optional = true }
+symthaea-ectogenesis = { path = "crates/symthaea-ectogenesis", optional = true }
+symthaea-nurture = { path = "crates/symthaea-nurture", optional = true }
+symthaea-population = { path = "crates/symthaea-population", optional = true }
 
 # HDC / Vector Symbolic Architectures
 # hypervector = "0.1"  # Using custom HDC implementation instead
@@ -348,7 +361,7 @@ vocal-tract = ["hound", "symthaea-vocal-tract/hound"]  # LTC-driven articulatory
 live-voice = ["cpal", "ringbuf", "vocal-tract"]         # Real-time speaker output (cpal + ringbuf + vocal tract pipeline)
 
 # ── Perception & Embeddings ─────────────────────────────────────────
-embeddings = ["tokenizers", "ort", "hf-hub"]          # Qwen3/BGE text embeddings via ONNX
+embeddings = ["tokenizers", "ort", "hf-hub", "symthaea-embeddings/onnx"]  # Qwen3/BGE text embeddings via ONNX
 vision = ["ort", "hf-hub"]                            # SigLIP image embeddings via ONNX
 perception = ["embeddings", "vision"]                 # Full multimodal perception stack
 webcam = []                                           # Live webcam capture (gates cfg blocks in source)
@@ -410,6 +423,14 @@ observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gate
 support = ["dep:symthaea-support"]                     # IT support intelligence (triage, diagnostics, knowledge, privacy, actions, prediction)
 web_research_module = []        # Web research epistemic verification (cfg-gated in lib.rs)
 unstable-examples = []          # Quarantine gate for examples with stale APIs (never enabled by default)
+
+# ── Genesis Pipeline (DNA-to-Human species stewardship) ───────────
+genomics = ["dep:symthaea-genomics"]                    # DNA assembly, damage modeling, repair
+cell-foundry = ["dep:symthaea-cell-foundry"]            # iPSC, IVG, SCNT, multi-scale prediction
+ectogenesis = ["dep:symthaea-ectogenesis"]              # Artificial womb, consent proxy escalation
+nurture = ["dep:symthaea-nurture"]                      # Bowlby attachment, co-regulation, milestones
+population = ["dep:symthaea-population"]                # Population genetics, breeding strategy, governance
+genesis = ["genomics", "cell-foundry", "ectogenesis", "nurture", "population"]  # Full DNA-to-human pipeline
 
 # ── Convenience bundles ───────────────────────────────────────────
 # Group related features that users commonly enable together.

@@ -13322,11 +13322,13 @@ dependencies = [
  "strsim",
  "symthaea-broca",
  "symthaea-causal-reasoning",
+ "symthaea-cell-foundry",
  "symthaea-consciousness-equation",
  "symthaea-consciousness-resonance",
  "symthaea-consciousness-topology",
  "symthaea-core",
  "symthaea-dream",
+ "symthaea-ectogenesis",
  "symthaea-embeddings",
  "symthaea-enactive",
  "symthaea-exploration",
@@ -13334,15 +13336,18 @@ dependencies = [
  "symthaea-fep",
  "symthaea-field-dynamics",
  "symthaea-flight",
+ "symthaea-genomics",
  "symthaea-hal",
  "symthaea-hodge",
  "symthaea-humanoid",
  "symthaea-narrative-self",
  "symthaea-neuromodulators",
  "symthaea-nix",
+ "symthaea-nurture",
  "symthaea-observability",
  "symthaea-phi-search",
  "symthaea-physics",
+ "symthaea-population",
  "symthaea-sensorimotor",
  "symthaea-sentinel",
  "symthaea-seven-harmonies",
@@ -13400,6 +13405,17 @@ dependencies = [
  "proptest",
  "serde",
  "symthaea-core",
+]
+
+[[package]]
+name = "symthaea-cell-foundry"
+version = "0.1.0"
+dependencies = [
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-fep",
 ]
 
 [[package]]
@@ -13463,14 +13479,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-ectogenesis"
+version = "0.1.0"
+dependencies = [
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+]
+
+[[package]]
 name = "symthaea-embeddings"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ndarray 0.16.1",
+ "ort",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "serde",
  "symthaea-core",
+ "tokenizers",
+ "tracing",
 ]
 
 [[package]]
@@ -13486,6 +13516,17 @@ name = "symthaea-exploration"
 version = "0.1.0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "symthaea-fabrication-kernel"
+version = "0.5.0"
+dependencies = [
+ "anyhow",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "symthaea-core",
 ]
 
 [[package]]
@@ -13520,6 +13561,17 @@ dependencies = [
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "rayon",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-fep",
+]
+
+[[package]]
+name = "symthaea-genomics"
+version = "0.1.0"
+dependencies = [
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "symthaea-core",
@@ -13610,6 +13662,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-nurture"
+version = "0.1.0"
+dependencies = [
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-fep",
+ "symthaea-neuromodulators",
+]
+
+[[package]]
 name = "symthaea-observability"
 version = "0.1.0"
 dependencies = [
@@ -13659,6 +13723,17 @@ dependencies = [
  "serde_json",
  "symthaea-core",
  "symthaea-fep",
+]
+
+[[package]]
+name = "symthaea-population"
+version = "0.1.0"
+dependencies = [
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-types",
 ]
 
 [[package]]
