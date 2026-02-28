@@ -125,8 +125,7 @@ impl CognitiveLoopService {
                 // Attenuated 50%: NE exploration_delta covers surprise-driven exploration
                 let divergence_penalty = (phi_divergence - 0.4).min(0.3) * 0.015;
                 self.adjust_confidence("hier_ltc_phi_diverge", -divergence_penalty);
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + divergence_penalty).clamp(0.0, 1.0);
+                self.adjust_exploration("hierarchical_phi_div", divergence_penalty);
             }
         }
 
@@ -167,8 +166,7 @@ impl CognitiveLoopService {
         } else if evolution_phi_delta < -0.01 {
             // Phase 18: Negative delta → boost exploration urge (need to search harder)
             let explore_boost = ((-evolution_phi_delta) * 0.08).min(0.04) as f32;
-            self.curiosity_drive.exploration_urge =
-                (self.curiosity_drive.exploration_urge + explore_boost).clamp(0.0, 1.0);
+            self.adjust_exploration("evolution_negative", explore_boost);
             self.stats.evolution_feedback_count += 1;
         }
 
@@ -272,8 +270,7 @@ impl CognitiveLoopService {
         if consciousness_gradient_magnitude > 0.5 {
             // Attenuated 50%: NE exploration_delta handles consciousness gradient exploration
             let gradient_explore = (consciousness_gradient_magnitude - 0.5).clamp(0.0, 0.5) * 0.05;
-            self.curiosity_drive.exploration_urge =
-                (self.curiosity_drive.exploration_urge + gradient_explore as f32).clamp(0.0, 1.0);
+            self.adjust_exploration("consciousness_gradient", gradient_explore as f32);
         }
 
         // ═══════════════════════════════════════════════════════════════════════

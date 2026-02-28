@@ -583,8 +583,7 @@ impl CognitiveLoopService {
             if attention_schema_focus < 0.3 {
                 // Attenuated 50%: ACh attention_factor already scales attention via the bath
                 let novelty_push = (0.3 - attention_schema_focus) * 0.06;
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + novelty_push).clamp(0.0, 1.0);
+                self.adjust_exploration("attention_deficit", novelty_push);
             } else if attention_schema_focus > 0.8 {
                 let focus_lock = (attention_schema_focus - 0.8) * 0.15;
                 self.adaptive_behavior.exploration_factor *= (1.0 - focus_lock).max(0.7);
@@ -596,20 +595,20 @@ impl CognitiveLoopService {
         // Observes current Phi and gates expensive actions by consciousness level.
         // Science: Dehaene (2014) — conscious access enables flexible routing
         // ═══════════════════════════════════════════════════════════════════════
-        let psi_attention_avg = if let Some(ref mut phi_attn) = self.phi_attention {
+        let (psi_attention_avg, phi_suppress) = if let Some(ref mut phi_attn) = self.phi_attention {
             phi_attn.observe(ctx.unified_psi as f32);
-            // Gate: only allow state-modifying actions when Phi is sufficient
-            if !phi_attn.allows_action(
+            let suppress = !phi_attn.allows_action(
                 crate::consciousness::phi_attention::ActionType::StateModifying,
                 ctx.unified_psi as f32,
-            ) {
-                // Attenuated 50%: 5-HT confidence_delta implicitly reduces exploration
-                self.curiosity_drive.exploration_urge *= 0.85;
-            }
-            phi_attn.phi_average().unwrap_or(0.0)
+            );
+            (phi_attn.phi_average().unwrap_or(0.0), suppress)
         } else {
-            0.0
+            (0.0, false)
         };
+        if phi_suppress {
+            // Attenuated: 5-HT confidence_delta implicitly reduces exploration
+            self.scale_exploration("phi_gate_suppress", 0.85);
+        }
 
         // Attention visualization: record snapshot for debugging/introspection
         if let Some(ref mut viz) = self.attention_visualizer {
@@ -888,7 +887,7 @@ impl CognitiveLoopService {
             // Persistent discontinuity: aggressive recovery
             self.last_prediction = None; // invalidate stale predictions
             self.scale_lr("persistent_discontinuity", 1.5);
-            self.curiosity_drive.exploration_urge *= 0.7;
+            self.scale_exploration("discontinuity_recovery", 0.7);
             self.stats.discontinuity_cascade_count += 1;
         }
 
@@ -972,8 +971,7 @@ impl CognitiveLoopService {
         if thermodynamic_entropy > 0.0 {
             if thermodynamic_entropy > 0.7 {
                 let entropy_boost = ((thermodynamic_entropy - 0.7) * 0.1).min(0.1) as f32;
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + entropy_boost).clamp(0.0, 1.0);
+                self.adjust_exploration("thermo_entropy", entropy_boost);
             } else if thermodynamic_entropy < 0.3 {
                 let consolidation_bias = ((0.3 - thermodynamic_entropy) * 0.08).min(0.08) as f32;
                 self.scale_lr("low_entropy_consolidate", 1.0 + consolidation_bias);
@@ -1004,8 +1002,7 @@ impl CognitiveLoopService {
                     // Science: Friston (2010) — interoceptive surprise drives active inference
                     if response.sensorimotor_surprise > 0.3 {
                         let body_nudge = (response.sensorimotor_surprise * 0.1).min(0.15) as f32;
-                        self.curiosity_drive.exploration_urge =
-                            (self.curiosity_drive.exploration_urge + body_nudge).clamp(0.0, 1.0);
+                        self.adjust_exploration("sensorimotor_surprise", body_nudge);
                     }
                     // 3. High allostatic load suppresses learning (conserve resources)
                     // Science: McEwen (2004) — allostatic overload impairs plasticity
@@ -1035,7 +1032,7 @@ impl CognitiveLoopService {
             self.adaptive_behavior.exploration_factor *= 1.0 + agency_boost;
         } else if embodied_agency > 0.0 && embodied_agency < 0.3 {
             let caution = ((0.3 - embodied_agency) * 0.1) as f32; // up to -3%
-            self.curiosity_drive.exploration_urge *= (1.0 - caution).max(0.7);
+            self.scale_exploration("embodied_caution", (1.0 - caution).max(0.7));
         }
 
         // ═══════════════════════════════════════════════════════════════════════

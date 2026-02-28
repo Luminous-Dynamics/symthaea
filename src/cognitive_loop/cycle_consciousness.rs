@@ -749,20 +749,17 @@ impl CognitiveLoopService {
                 } => {
                     // Near equilibrium: boost exploration proportional to suggested increase
                     let explore_boost = (suggested_increase * 0.15).min(0.05) as f32;
-                    self.curiosity_drive.exploration_urge =
-                        (self.curiosity_drive.exploration_urge + explore_boost).clamp(0.0, 1.0);
+                    self.adjust_exploration("dissipative_activity", explore_boost);
                     self.adjust_confidence("dissipative_equilibrium", -0.01);
                 }
                 DissipativeAction::IncreaseCoherence { .. } => {
                     // Chaotic: suppress exploration, boost learning to restore coherence
-                    self.curiosity_drive.exploration_urge =
-                        (self.curiosity_drive.exploration_urge * 0.9).max(0.0);
+                    self.scale_exploration("dissipative_coherence", 0.9);
                     self.scale_lr("dissipative_coherence", 1.05);
                 }
                 DissipativeAction::IncreaseDifferentiation { .. } => {
                     // Too ordered: nudge exploration up, learning down slightly
-                    self.curiosity_drive.exploration_urge =
-                        (self.curiosity_drive.exploration_urge + 0.02).clamp(0.0, 1.0);
+                    self.adjust_exploration("dissipative_differentiation", 0.02);
                     self.adjust_confidence("dissipative_ordered", -0.005);
                 }
                 DissipativeAction::IncreaseIntegration { .. } => {
