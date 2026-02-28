@@ -676,4 +676,452 @@ mod tests {
         let result_zero = hippo.recall(query_zero).await.unwrap();
         assert_eq!(result_zero.memories.len(), 0);
     }
+
+    // ====================================================================
+    // Additional tests for memory encoding, retrieval, and edge cases
+    // ====================================================================
+
+    #[test]
+    fn test_emotional_valence_from_f64_boundary_values() {
+        // Test boundary values for from_f64
+        // Boundaries: >0.75 VP, >0.25 P, >-0.25 N, >-0.75 Neg, else VN
+        assert_eq!(
+            EmotionalValence::from_f64(0.76),
+            EmotionalValence::VeryPositive
+        );
+        assert_eq!(EmotionalValence::from_f64(0.75), EmotionalValence::Positive);
+        assert_eq!(EmotionalValence::from_f64(0.26), EmotionalValence::Positive);
+        assert_eq!(EmotionalValence::from_f64(0.25), EmotionalValence::Neutral);
+        assert_eq!(EmotionalValence::from_f64(0.0), EmotionalValence::Neutral);
+        // -0.25 is NOT > -0.25, so it falls into Negative
+        assert_eq!(EmotionalValence::from_f64(-0.25), EmotionalValence::Negative);
+        assert_eq!(
+            EmotionalValence::from_f64(-0.50),
+            EmotionalValence::Negative
+        );
+        assert_eq!(
+            EmotionalValence::from_f64(-0.75),
+            EmotionalValence::VeryNegative
+        );
+        assert_eq!(
+            EmotionalValence::from_f64(-0.76),
+            EmotionalValence::VeryNegative
+        );
+    }
+
+    #[test]
+    fn test_emotional_valence_default_is_neutral() {
+        assert_eq!(EmotionalValence::default(), EmotionalValence::Neutral);
+    }
+
+    #[test]
+    fn test_memory_trace_with_tags_and_phi() {
+        let trace = MemoryTrace::new(1, "tagged memory", vec![1.0; 8], EmotionalValence::Positive)
+            .with_tags(vec!["foo".to_string(), "bar".to_string()])
+            .with_phi(0.85);
+
+        assert_eq!(trace.tags, vec!["foo", "bar"]);
+        assert_eq!(trace.phi_at_encoding, Some(0.85));
+        assert_eq!(trace.strength, 1.0);
+        assert_eq!(trace.access_count, 0);
+    }
+
+    #[test]
+    fn test_memory_trace_similarity_identical() {
+        let emb = vec![1.0, 2.0, 3.0];
+        let t1 = MemoryTrace::new(1, "a", emb.clone(), EmotionalValence::Neutral);
+        let t2 = MemoryTrace::new(2, "b", emb, EmotionalValence::Neutral);
+        let sim = t1.similarity(&t2);
+        assert!(
+            (sim - 1.0).abs() < 0.001,
+            "Identical embeddings should have similarity ~1.0, got {sim}"
+        );
+    }
+
+    #[test]
+    fn test_memory_trace_query_similarity_orthogonal() {
+        let trace = MemoryTrace::new(1, "a", vec![1.0, 0.0, 0.0], EmotionalValence::Neutral);
+        let query = vec![0.0, 1.0, 0.0];
+        let sim = trace.query_similarity(&query);
+        assert!(
+            sim.abs() < 0.001,
+            "Orthogonal vectors should have ~0 similarity, got {sim}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_encode_assigns_sequential_ids() {
+        let mut hippo = HippocampusActor::new(100);
+        let emb = vec![0.5f32; 64];
+
+        let id1 = hippo
+            .encode("first", emb.clone(), EmotionalValence::Neutral)
+            .await
+            .unwrap();
+        let id2 = hippo
+            .encode("second", emb.clone(), EmotionalValence::Neutral)
+            .await
+            .unwrap();
+        let id3 = hippo
+            .encode("third", emb, EmotionalValence::Neutral)
+            .await
+            .unwrap();
+
+        assert_eq!(id1, 1);
+        assert_eq!(id2, 2);
+        assert_eq!(id3, 3);
+    }
+
+    #[tokio::test]
+    async fn test_capacity_eviction_prunes_weakest() {
+        let mut hippo = HippocampusActor::new(10);
+        let emb = vec![0.5f32; 64];
+
+        for i in 0..11 {
+            hippo
+                .encode(
+                    format!("memory-{i}"),
+                    emb.clone(),
+                    EmotionalValence::Neutral,
+                )
+                .await
+                .unwrap();
+        }
+
+        // After inserting 11 with capacity 10, prune removes 10% = 1
+        assert_eq!(hippo.memory_count().await, 10);
+        assert_eq!(hippo.stats().pruned, 1);
+    }
+
+    #[tokio::test]
+    async fn test_recall_with_tag_filter() {
+        let mut hippo = HippocampusActor::new(100);
+        let emb = vec![0.5f32; 64];
+
+        let id1 = hippo
+            .encode("tagged memory", emb.clone(), EmotionalValence::Neutral)
+            .await
+            .unwrap();
+        let _id2 = hippo
+            .encode("untagged memory", emb.clone(), EmotionalValence::Neutral)
+            .await
+            .unwrap();
+
+        {
+            let mut memories = hippo.memories.write().await;
+            memories.iter_mut().find(|m| m.id == id1).unwrap().tags = vec!["important".to_string()];
+        }
+
+        let query = RecallQuery {
+            embedding: Some(emb.clone()),
+            tags: vec!["important".to_string()],
+            top_k: 10,
+            min_similarity: 0.0,
+            ..Default::default()
+        };
+        let result = hippo.recall(query).await.unwrap();
+        assert_eq!(result.memories.len(), 1);
+        assert_eq!(result.memories[0].id, id1);
+
+        let query_miss = RecallQuery {
+            tags: vec!["nonexistent".to_string()],
+            top_k: 10,
+            ..Default::default()
+        };
+        let result_miss = hippo.recall(query_miss).await.unwrap();
+        assert_eq!(result_miss.memories.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_recall_with_min_valence_filter() {
+        let mut hippo = HippocampusActor::new(100);
+        let emb = vec![0.5f32; 64];
+
+        hippo
+            .encode("happy memory", emb.clone(), EmotionalValence::VeryPositive)
+            .await
+            .unwrap();
+        hippo
+            .encode("sad memory", emb.clone(), EmotionalValence::VeryNegative)
+            .await
+            .unwrap();
+        hippo
+            .encode("neutral memory", emb.clone(), EmotionalValence::Neutral)
+            .await
+            .unwrap();
+
+        let query = RecallQuery {
+            embedding: Some(emb),
+            min_valence: Some(EmotionalValence::Positive),
+            top_k: 10,
+            min_similarity: 0.0,
+            ..Default::default()
+        };
+        let result = hippo.recall(query).await.unwrap();
+        assert_eq!(result.memories.len(), 1);
+        assert_eq!(result.memories[0].content, "happy memory");
+    }
+
+    #[tokio::test]
+    async fn test_recall_with_time_range_filter() {
+        let mut hippo = HippocampusActor::new(100);
+        let emb = vec![0.5f32; 64];
+
+        for i in 0..3 {
+            hippo
+                .encode(
+                    format!("memory-{i}"),
+                    emb.clone(),
+                    EmotionalValence::Neutral,
+                )
+                .await
+                .unwrap();
+        }
+
+        {
+            let mut memories = hippo.memories.write().await;
+            memories[0].timestamp = 1000;
+            memories[1].timestamp = 2000;
+            memories[2].timestamp = 3000;
+        }
+
+        let query = RecallQuery {
+            embedding: Some(emb),
+            time_range: Some((1500, 2500)),
+            top_k: 10,
+            min_similarity: 0.0,
+            ..Default::default()
+        };
+        let result = hippo.recall(query).await.unwrap();
+        assert_eq!(result.memories.len(), 1);
+        assert_eq!(result.memories[0].timestamp, 2000);
+    }
+
+    #[tokio::test]
+    async fn test_recall_text_matching() {
+        let mut hippo = HippocampusActor::new(100);
+        let emb = vec![0.5f32; 64];
+
+        hippo
+            .encode(
+                "The cat sat on the mat",
+                emb.clone(),
+                EmotionalValence::Neutral,
+            )
+            .await
+            .unwrap();
+        hippo
+            .encode(
+                "The dog ran in the park",
+                emb.clone(),
+                EmotionalValence::Neutral,
+            )
+            .await
+            .unwrap();
+
+        let query = RecallQuery::from_text("CAT");
+        let result = hippo.recall(query).await.unwrap();
+        assert!(
+            !result.memories.is_empty(),
+            "Text search for 'CAT' should match 'cat'"
+        );
+        assert!(result.memories[0].content.to_lowercase().contains("cat"));
+        assert!(result.scores[0] > 0.5, "Score should be positive for match");
+    }
+
+    #[tokio::test]
+    async fn test_recall_no_query_matches_all() {
+        let mut hippo = HippocampusActor::new(100);
+        let emb = vec![0.5f32; 64];
+
+        for i in 0..5 {
+            hippo
+                .encode(
+                    format!("memory-{i}"),
+                    emb.clone(),
+                    EmotionalValence::Neutral,
+                )
+                .await
+                .unwrap();
+        }
+
+        let query = RecallQuery {
+            top_k: 10,
+            ..Default::default()
+        };
+        let result = hippo.recall(query).await.unwrap();
+        assert_eq!(result.memories.len(), 5);
+        for score in &result.scores {
+            assert!(
+                (*score - 1.0).abs() < 0.001,
+                "No-query recall should give similarity 1.0"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_recall_min_similarity_threshold() {
+        let mut hippo = HippocampusActor::new(100);
+
+        let query_emb = vec![1.0f32; 64];
+        let similar_emb = vec![1.0f32; 64];
+        let dissimilar_emb = vec![-1.0f32; 64];
+
+        hippo
+            .encode("similar", similar_emb, EmotionalValence::Neutral)
+            .await
+            .unwrap();
+        hippo
+            .encode("dissimilar", dissimilar_emb, EmotionalValence::Neutral)
+            .await
+            .unwrap();
+
+        let query = RecallQuery::from_embedding(query_emb).with_min_similarity(0.9);
+        let result = hippo.recall(query).await.unwrap();
+        assert_eq!(result.memories.len(), 1);
+        assert_eq!(result.memories[0].content, "similar");
+    }
+
+    #[tokio::test]
+    async fn test_consolidation_strengthens_emotional_memories() {
+        let mut hippo = HippocampusActor::new(100);
+        let emb = vec![0.5f32; 64];
+
+        hippo
+            .encode(
+                "emotional event",
+                emb.clone(),
+                EmotionalValence::VeryPositive,
+            )
+            .await
+            .unwrap();
+        hippo
+            .encode("bland event", emb.clone(), EmotionalValence::Neutral)
+            .await
+            .unwrap();
+
+        {
+            let mut memories = hippo.memories.write().await;
+            for m in memories.iter_mut() {
+                m.strength = 0.5;
+                m.last_accessed = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64;
+            }
+        }
+
+        hippo.consolidate().await.unwrap();
+
+        let memories = hippo.memories.read().await;
+        let emotional = memories
+            .iter()
+            .find(|m| m.content == "emotional event")
+            .unwrap();
+        let neutral = memories
+            .iter()
+            .find(|m| m.content == "bland event")
+            .unwrap();
+
+        assert!(
+            emotional.strength > neutral.strength,
+            "Emotional memories should be strengthened more: emotional={}, neutral={}",
+            emotional.strength,
+            neutral.strength
+        );
+    }
+
+    #[tokio::test]
+    async fn test_consolidation_prunes_very_weak_memories() {
+        let mut hippo = HippocampusActor::new(100);
+        let emb = vec![0.5f32; 64];
+
+        hippo
+            .encode("strong memory", emb.clone(), EmotionalValence::VeryPositive)
+            .await
+            .unwrap();
+        hippo
+            .encode("weak memory", emb.clone(), EmotionalValence::Neutral)
+            .await
+            .unwrap();
+
+        {
+            let mut memories = hippo.memories.write().await;
+            let weak = memories
+                .iter_mut()
+                .find(|m| m.content == "weak memory")
+                .unwrap();
+            weak.strength = 0.01;
+            weak.last_accessed = 0;
+        }
+
+        hippo.consolidate().await.unwrap();
+
+        let memories = hippo.memories.read().await;
+        assert!(
+            !memories.iter().any(|m| m.content == "weak memory"),
+            "Very weak memory should be pruned during consolidation"
+        );
+        assert!(
+            memories.iter().any(|m| m.content == "strong memory"),
+            "Strong memory should survive consolidation"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stats_tracking() {
+        let mut hippo = HippocampusActor::new(100);
+        let emb = vec![0.5f32; 64];
+
+        assert_eq!(hippo.stats().total_encoded, 0);
+        assert_eq!(hippo.stats().total_recalled, 0);
+
+        hippo
+            .encode("m1", emb.clone(), EmotionalValence::Neutral)
+            .await
+            .unwrap();
+        hippo
+            .encode("m2", emb.clone(), EmotionalValence::Neutral)
+            .await
+            .unwrap();
+        assert_eq!(hippo.stats().total_encoded, 2);
+
+        let query = RecallQuery::from_embedding(emb.clone()).with_top_k(5);
+        hippo.recall(query).await.unwrap();
+        assert_eq!(hippo.stats().total_recalled, 1);
+
+        let query2 = RecallQuery::from_embedding(emb).with_top_k(5);
+        hippo.recall(query2).await.unwrap();
+        assert_eq!(hippo.stats().total_recalled, 2);
+        assert!(hippo.stats().avg_recall_time_ms >= 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_recall_empty_hippocampus() {
+        let mut hippo = HippocampusActor::new(100);
+
+        let query = RecallQuery::from_embedding(vec![1.0; 64]).with_top_k(5);
+        let result = hippo.recall(query).await.unwrap();
+        assert!(result.memories.is_empty());
+        assert_eq!(result.total_searched, 0);
+    }
+
+    #[test]
+    fn test_recall_query_builder_methods() {
+        let query = RecallQuery::from_embedding(vec![1.0; 8])
+            .with_top_k(3)
+            .with_min_similarity(0.5)
+            .with_tags(vec!["tag1".to_string()]);
+
+        assert_eq!(query.top_k, 3);
+        assert!((query.min_similarity - 0.5).abs() < f32::EPSILON);
+        assert_eq!(query.tags, vec!["tag1"]);
+        assert!(query.embedding.is_some());
+    }
+
+    #[test]
+    fn test_hippocampus_default() {
+        let hippo = HippocampusActor::default();
+        assert_eq!(hippo.max_memories, 10000);
+    }
 }

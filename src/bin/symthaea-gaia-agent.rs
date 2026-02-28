@@ -14,9 +14,9 @@ use symthaea::mind::{
     ActivatedConcept, DomainContext, EmotionalTone, EpistemicStatus, ResponseType, SemanticIntent,
     StructuredThought,
 };
-use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipStage};
-use symthaea_core::hdc::primitive_system::PrimitiveTier;
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
+use symthaea_core::hdc::primitive_system::PrimitiveTier;
+use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipStage};
 
 #[derive(Debug, Deserialize)]
 struct AgentInput {
@@ -84,21 +84,21 @@ fn build_cognitive_loop() -> Option<(CognitiveLoopService, CognitiveMeta)> {
 
     let (profile, profile_label) = parse_profile(env::var("SYMTHAEA_AGENT_PROFILE").ok());
     let backend_raw = env::var("SYMTHAEA_AGENT_TEMPORAL_BACKEND").ok();
-    let backend_key = backend_raw
-        .as_deref()
-        .unwrap_or("cfc")
-        .to_ascii_lowercase();
+    let backend_key = backend_raw.as_deref().unwrap_or("cfc").to_ascii_lowercase();
 
     let (mut config, backend_label) = match backend_key.as_str() {
-        "hdc-ltc-fast" | "hdc_ltc_fast" | "fast" => {
-            (CognitiveLoopConfig::with_hdc_ltc_fast(), "hdc-ltc-fast".to_string())
-        }
-        "hdc-ltc-accurate" | "hdc_ltc_accurate" | "accurate" => {
-            (CognitiveLoopConfig::with_hdc_ltc_accurate(), "hdc-ltc-accurate".to_string())
-        }
-        "hdc-ltc" | "hdc_ltc" | "unified" => {
-            (CognitiveLoopConfig::with_hdc_ltc_unified(), "hdc-ltc".to_string())
-        }
+        "hdc-ltc-fast" | "hdc_ltc_fast" | "fast" => (
+            CognitiveLoopConfig::with_hdc_ltc_fast(),
+            "hdc-ltc-fast".to_string(),
+        ),
+        "hdc-ltc-accurate" | "hdc_ltc_accurate" | "accurate" => (
+            CognitiveLoopConfig::with_hdc_ltc_accurate(),
+            "hdc-ltc-accurate".to_string(),
+        ),
+        "hdc-ltc" | "hdc_ltc" | "unified" => (
+            CognitiveLoopConfig::with_hdc_ltc_unified(),
+            "hdc-ltc".to_string(),
+        ),
         _ => (CognitiveLoopConfig::with_cfc(), "cfc".to_string()),
     };
 
@@ -146,12 +146,18 @@ fn build_policy(sandbox: &SandboxRoot) -> PolicyBundle {
     policy.capabilities.filesystem.read_patterns = vec![format!("{}/", root_str)];
     policy.capabilities.filesystem.write_patterns = vec![format!("{}/", root_str)];
 
-    policy.budgets.shell_commands_per_session =
-        env::var("SYMTHAEA_AGENT_SHELL_BUDGET").ok().and_then(|v| v.parse().ok()).unwrap_or(50);
-    policy.budgets.file_writes_per_session =
-        env::var("SYMTHAEA_AGENT_WRITE_BUDGET").ok().and_then(|v| v.parse().ok()).unwrap_or(50);
-    policy.budgets.bytes_written_per_session =
-        env::var("SYMTHAEA_AGENT_BYTES_BUDGET").ok().and_then(|v| v.parse().ok()).unwrap_or(10 * 1024 * 1024);
+    policy.budgets.shell_commands_per_session = env::var("SYMTHAEA_AGENT_SHELL_BUDGET")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(50);
+    policy.budgets.file_writes_per_session = env::var("SYMTHAEA_AGENT_WRITE_BUDGET")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(50);
+    policy.budgets.bytes_written_per_session = env::var("SYMTHAEA_AGENT_BYTES_BUDGET")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10 * 1024 * 1024);
 
     policy
 }
@@ -274,18 +280,20 @@ fn extract_expression(text: &str) -> Option<String> {
     let mut has_op = false;
     let mut has_digit = false;
 
-    let flush = |current: &mut String, has_op: &mut bool, has_digit: &mut bool, best: &mut Option<String>| {
-        if *has_op && *has_digit
-            && best.as_ref().map(|s| s.len()).unwrap_or(0) < current.len() {
-                *best = Some(current.clone());
-            }
+    let flush = |current: &mut String,
+                 has_op: &mut bool,
+                 has_digit: &mut bool,
+                 best: &mut Option<String>| {
+        if *has_op && *has_digit && best.as_ref().map(|s| s.len()).unwrap_or(0) < current.len() {
+            *best = Some(current.clone());
+        }
         current.clear();
         *has_op = false;
         *has_digit = false;
     };
 
     for ch in text.chars() {
-        if ch.is_ascii_digit() || matches!(ch, '+' | '-' | '*' | '/' | '(' | ')' | '.' ) {
+        if ch.is_ascii_digit() || matches!(ch, '+' | '-' | '*' | '/' | '(' | ')' | '.') {
             current.push(ch);
             if ch.is_ascii_digit() {
                 has_digit = true;
@@ -328,7 +336,10 @@ fn tokenize_keywords(text: &str) -> Vec<String> {
 
 fn score_line(line: &str, keywords: &[String]) -> usize {
     let lower = line.to_ascii_lowercase();
-    keywords.iter().filter(|k| lower.contains(k.as_str())).count()
+    keywords
+        .iter()
+        .filter(|k| lower.contains(k.as_str()))
+        .count()
 }
 
 fn best_line_from_text(text: &str, keywords: &[String]) -> Option<String> {
@@ -424,14 +435,22 @@ fn summarize_numeric(task: &str, numbers: &[f64]) -> Option<String> {
         return Some(format_number(sum));
     }
     if lower.contains("max") || lower.contains("highest") || lower.contains("largest") {
-        return numbers.iter().cloned().fold(None::<f64>, |acc, v| {
-            Some(acc.map(|a| a.max(v)).unwrap_or(v))
-        }).map(format_number);
+        return numbers
+            .iter()
+            .cloned()
+            .fold(None::<f64>, |acc, v| {
+                Some(acc.map(|a| a.max(v)).unwrap_or(v))
+            })
+            .map(format_number);
     }
     if lower.contains("min") || lower.contains("lowest") || lower.contains("smallest") {
-        return numbers.iter().cloned().fold(None::<f64>, |acc, v| {
-            Some(acc.map(|a| a.min(v)).unwrap_or(v))
-        }).map(format_number);
+        return numbers
+            .iter()
+            .cloned()
+            .fold(None::<f64>, |acc, v| {
+                Some(acc.map(|a| a.min(v)).unwrap_or(v))
+            })
+            .map(format_number);
     }
     if lower.contains("count") || lower.contains("how many") || lower.contains("number of") {
         return Some(numbers.len().to_string());
@@ -606,7 +625,11 @@ fn summarize_action(action: &ActionIR, outcome: &ActionOutcome) -> ActionLog {
         }
         ActionIR::Sequence(_) => "Sequence".to_string(),
         ActionIR::NoOp => "NoOp".to_string(),
-        ActionIR::WasmSandbox { module_path, function_name, .. } => {
+        ActionIR::WasmSandbox {
+            module_path,
+            function_name,
+            ..
+        } => {
             format!("WasmSandbox({}::{})", module_path.display(), function_name)
         }
     };
@@ -632,7 +655,10 @@ fn summarize_action(action: &ActionIR, outcome: &ActionOutcome) -> ActionLog {
             status: "sensor_data".to_string(),
             detail: Some(format!("{} channels from {}", values.len(), sensor_id)),
         },
-        ActionOutcome::ServoStatus { servo_id, current_value } => ActionLog {
+        ActionOutcome::ServoStatus {
+            servo_id,
+            current_value,
+        } => ActionLog {
             action: action_label,
             status: "servo_status".to_string(),
             detail: Some(format!("servo {} -> {}", servo_id, current_value)),
@@ -642,10 +668,18 @@ fn summarize_action(action: &ActionIR, outcome: &ActionOutcome) -> ActionLog {
             status: "simulated".to_string(),
             detail: Some(format!("{} {}", program, args.join(" "))),
         },
-        ActionOutcome::CommandOutput { stdout, stderr, exit_code } => ActionLog {
+        ActionOutcome::CommandOutput {
+            stdout,
+            stderr,
+            exit_code,
+        } => ActionLog {
             action: action_label,
             status: format!("exit_{exit_code}"),
-            detail: Some(format!("stdout={} bytes stderr={} bytes", stdout.len(), stderr.len())),
+            detail: Some(format!(
+                "stdout={} bytes stderr={} bytes",
+                stdout.len(),
+                stderr.len()
+            )),
         },
         ActionOutcome::WasmResult { output, logs } => ActionLog {
             action: action_label,
@@ -665,14 +699,20 @@ fn find_keyword(text: &str, keywords: &[&str]) -> bool {
 async fn main() {
     let mut input = String::new();
     if io::stdin().read_to_string(&mut input).is_err() {
-        println!("{}", json!({"answer": "I don't know", "status": "stdin_error"}));
+        println!(
+            "{}",
+            json!({"answer": "I don't know", "status": "stdin_error"})
+        );
         return;
     }
 
     let parsed: AgentInput = match serde_json::from_str(&input) {
         Ok(v) => v,
         Err(_) => {
-            println!("{}", json!({"answer": "I don't know", "status": "invalid_json"}));
+            println!(
+                "{}",
+                json!({"answer": "I don't know", "status": "invalid_json"})
+            );
             return;
         }
     };
@@ -687,7 +727,10 @@ async fn main() {
     let sandbox = match SandboxRoot::new(&session_id) {
         Ok(s) => s,
         Err(_) => {
-            println!("{}", json!({"answer": "I don't know", "status": "sandbox_error"}));
+            println!(
+                "{}",
+                json!({"answer": "I don't know", "status": "sandbox_error"})
+            );
             return;
         }
     };
@@ -714,10 +757,7 @@ async fn main() {
                         .get("path")
                         .and_then(|v| v.as_str())
                         .unwrap_or(&default_name);
-                    let content_val = map
-                        .get("content")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
+                    let content_val = map.get("content").and_then(|v| v.as_str()).unwrap_or("");
                     let safe_path = safe_join(sandbox.root(), path_val);
 
                     let write_action = ActionIR::WriteFile {
@@ -726,7 +766,9 @@ async fn main() {
                         create_dirs: true,
                     };
                     match executor.execute(&write_action, &policy, &sandbox, action_phi) {
-                        Ok(outcome) => action_logs.push(summarize_action(&write_action, &outcome.outcome)),
+                        Ok(outcome) => {
+                            action_logs.push(summarize_action(&write_action, &outcome.outcome))
+                        }
                         Err(err) => action_logs.push(ActionLog {
                             action: format!("WriteFile({})", safe_path.display()),
                             status: "error".to_string(),
@@ -831,7 +873,10 @@ async fn main() {
 
     if computed_answer.is_none() && has_files {
         let lower = task_text.to_lowercase();
-        if lower.contains("line count") || lower.contains("lines") || lower.contains("number of lines") {
+        if lower.contains("line count")
+            || lower.contains("lines")
+            || lower.contains("number of lines")
+        {
             if let Some((_, content)) = file_contents.first() {
                 let count = content.lines().count();
                 computed_answer = Some(count.to_string());
@@ -910,7 +955,8 @@ async fn main() {
 
     if let Some((mut cognitive, meta)) = build_cognitive_loop() {
         let limit = parse_context_limit();
-        let input = build_cognitive_input(&task_text, &file_contents, web_content.as_deref(), limit);
+        let input =
+            build_cognitive_input(&task_text, &file_contents, web_content.as_deref(), limit);
         let mut last_cycle = None;
         for _ in 0..meta.cycles {
             last_cycle = Some(cognitive.cycle(&input));
@@ -921,7 +967,8 @@ async fn main() {
             cognitive_primitives = cycle.detected_primitives.clone();
             cognitive_tiers = tiers_from_primitives(&cognitive_primitives);
             if !cognitive_primitives.is_empty() {
-                cognitive_concepts = concepts_from_primitives(&cognitive_primitives, base_activation);
+                cognitive_concepts =
+                    concepts_from_primitives(&cognitive_primitives, base_activation);
             }
         }
         cognitive_snapshot = Some(snapshot);
@@ -962,9 +1009,21 @@ async fn main() {
         thought.meta_awareness = snapshot.pattern_confidence as f64;
         thought.coherence = snapshot.temporal_coherence as f64;
     } else {
-        thought.psi = if epistemic == EpistemicStatus::Certain { 0.6 } else { 0.2 };
-        thought.meta_awareness = if epistemic == EpistemicStatus::Certain { 0.5 } else { 0.2 };
-        thought.coherence = if epistemic == EpistemicStatus::Certain { 0.6 } else { 0.3 };
+        thought.psi = if epistemic == EpistemicStatus::Certain {
+            0.6
+        } else {
+            0.2
+        };
+        thought.meta_awareness = if epistemic == EpistemicStatus::Certain {
+            0.5
+        } else {
+            0.2
+        };
+        thought.coherence = if epistemic == EpistemicStatus::Certain {
+            0.6
+        } else {
+            0.3
+        };
     }
     thought.original_input = Some(task_text.clone());
     thought.primitive_tiers = tiers;
@@ -985,7 +1044,7 @@ async fn main() {
     let backend = OllamaBackend::new();
     let mut llm = LLMOrgan::with_backend(llm_config, Arc::new(backend));
 
-                let response = llm.translate_thought(&thought, 1.0).await;
+    let response = llm.translate_thought(&thought, 1.0).await;
     let meta_note = parsed
         .metadata
         .map(|m| format!("metadata={}", m))

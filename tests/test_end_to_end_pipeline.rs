@@ -64,10 +64,10 @@ fn test_text_to_hdc_encoding() {
 fn test_hdc_through_ltc() {
     // Create a small LTC network using default config with modifications
     let config = LearnableLTCConfig {
-        input_dim: 64,      // Downsampled HDC
+        input_dim: 64, // Downsampled HDC
         num_neurons: 32,
         output_dim: 16,
-        num_steps: 10,      // Fewer steps for test speed
+        num_steps: 10, // Fewer steps for test speed
         ..Default::default()
     };
 

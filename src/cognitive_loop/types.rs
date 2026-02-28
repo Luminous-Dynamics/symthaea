@@ -480,7 +480,6 @@ pub struct NeuromodTelemetry {
     pub neuromod_snapshot: Option<super::neuromodulators::NeuromodSnapshot>,
 
     // ── Phase 4: Neuroendocrine control telemetry ──────────────────────────
-
     /// Derived cortisol level from NE/5-HT balance (0.0–1.0).
     pub neuromod_derived_cortisol: f32,
     /// NE phasic burst → ACh suppression magnitude (0.0–0.15).
@@ -507,6 +506,24 @@ pub struct NeuromodTelemetry {
     pub circadian_phase_offset: f32,
     /// Effective circadian hour after phase offset (0.0–24.0).
     pub circadian_effective_hour: f32,
+
+    // ── Phase 5: Advanced Neuroendocrine Telemetry ────────────────────────
+    /// Adenosine effective level (sleep pressure signal, 0.0–2.0).
+    pub neuromod_adenosine_effective: f32,
+    /// Sleep pressure from adenosine accumulation (0.0–2.0).
+    pub neuromod_sleep_pressure: f32,
+    /// Allostatic load (cumulative stress, 0.0–1.0).
+    pub neuromod_allostatic_load: f32,
+    /// Glutamate/GABA excitatory/inhibitory ratio.
+    pub neuromod_ei_ratio: f32,
+    /// Cumulative seizure-like E/I imbalance events.
+    pub neuromod_ei_seizure_events: u32,
+    /// Shannon entropy of bath phase space (averaged across 8 dimensions).
+    pub neuromod_bath_entropy: f32,
+    /// Whether an attractor has been detected in the bath phase space.
+    pub neuromod_attractor_detected: bool,
+    /// Number of active pharmacological injections (0–4).
+    pub active_injection_count: u8,
 }
 
 /// Metadata about internal decision-making during a cycle.
@@ -1193,6 +1210,24 @@ pub struct CycleMetadata {
     /// Circadian effective hour after phase offset (0.0–24.0).
     pub circadian_effective_hour: f32,
 
+    // ── Phase 5: Advanced Neuroendocrine Telemetry ────────────────────────
+    /// Adenosine effective level (sleep pressure signal, 0.0–2.0).
+    pub neuromod_adenosine_effective: f32,
+    /// Sleep pressure from adenosine accumulation (0.0–2.0).
+    pub neuromod_sleep_pressure: f32,
+    /// Allostatic load (cumulative stress, 0.0–1.0).
+    pub neuromod_allostatic_load: f32,
+    /// Glutamate/GABA excitatory/inhibitory ratio.
+    pub neuromod_ei_ratio: f32,
+    /// Cumulative seizure-like E/I imbalance events.
+    pub neuromod_ei_seizure_events: u32,
+    /// Shannon entropy of bath phase space (averaged across 8 dimensions).
+    pub neuromod_bath_entropy: f32,
+    /// Whether an attractor has been detected in the bath phase space.
+    pub neuromod_attractor_detected: bool,
+    /// Number of active pharmacological injections (0–4).
+    pub active_injection_count: u8,
+
     // ── Liquid-Mamba Fusion Telemetry ────────────────────────────────
     /// Semantic prediction error from Liquid-Mamba round-trip (0.0–1.0, 0.0 when off).
     /// Measures `1 - cosine(thought_hv, bundled_output_hvs)`.
@@ -1228,6 +1263,14 @@ pub struct CycleMetadata {
     pub feedback_trace_confidence: Vec<(String, String)>,
     /// Per-proposal trace for learning rate (populated when `trace_feedback = true`).
     pub feedback_trace_lr: Vec<(String, String)>,
+    /// Number of exploration proposals collected this cycle.
+    pub feedback_exploration_proposals: u32,
+    /// Number of threshold proposals collected this cycle.
+    pub feedback_threshold_proposals: u32,
+    /// Per-proposal trace for exploration (populated when `trace_feedback = true`).
+    pub feedback_trace_exploration: Vec<(String, String)>,
+    /// Per-proposal trace for threshold (populated when `trace_feedback = true`).
+    pub feedback_trace_threshold: Vec<(String, String)>,
 
     // ── Staged Computation Model Telemetry (Phase 2.3) ────────────────
     /// Number of subsystems that contributed non-neutral SubsystemOutputs.
@@ -1281,6 +1324,15 @@ impl CycleMetadata {
         self.neuromod_learning_fatigue = n.neuromod_learning_fatigue;
         self.circadian_phase_offset = n.circadian_phase_offset;
         self.circadian_effective_hour = n.circadian_effective_hour;
+        // Phase 5: advanced neuroendocrine
+        self.neuromod_adenosine_effective = n.neuromod_adenosine_effective;
+        self.neuromod_sleep_pressure = n.neuromod_sleep_pressure;
+        self.neuromod_allostatic_load = n.neuromod_allostatic_load;
+        self.neuromod_ei_ratio = n.neuromod_ei_ratio;
+        self.neuromod_ei_seizure_events = n.neuromod_ei_seizure_events;
+        self.neuromod_bath_entropy = n.neuromod_bath_entropy;
+        self.neuromod_attractor_detected = n.neuromod_attractor_detected;
+        self.active_injection_count = n.active_injection_count;
     }
 }
 
@@ -1422,7 +1474,6 @@ pub struct PsiAttestationRecord {
     /// Urgency level during measurement (Critical/Normal/Cruise)
     pub urgency: CycleUrgency,
 }
-
 
 /// Result of a single cognitive cycle
 #[derive(Debug, Clone)]
@@ -1770,9 +1821,16 @@ mod tests {
     #[test]
     fn urgency_should_run_cycle_zero() {
         // All urgencies should run at cycle 0
-        for urgency in [CycleUrgency::Critical, CycleUrgency::Normal, CycleUrgency::Cruise] {
-            assert!(urgency.should_run(0, 3, 5, 20),
-                    "{:?} should run at cycle 0", urgency);
+        for urgency in [
+            CycleUrgency::Critical,
+            CycleUrgency::Normal,
+            CycleUrgency::Cruise,
+        ] {
+            assert!(
+                urgency.should_run(0, 3, 5, 20),
+                "{:?} should run at cycle 0",
+                urgency
+            );
         }
     }
 
@@ -1911,10 +1969,16 @@ mod tests {
     fn adaptive_behavior_from_focused_pattern() {
         use crate::dynamics::temporal_signatures::ConsciousnessPattern;
         let ab = AdaptiveBehavior::from_consciousness_state(
-            ConsciousnessPattern::Focused, 0.8, 0.7, 0.6,
+            ConsciousnessPattern::Focused,
+            0.8,
+            0.7,
+            0.6,
         );
         assert!(ab.learning_rate_multiplier > 1.0, "focused should boost LR");
-        assert!(ab.speech_rate_multiplier > 1.0, "focused should speed up speech");
+        assert!(
+            ab.speech_rate_multiplier > 1.0,
+            "focused should speed up speech"
+        );
         assert_eq!(ab.action_hint, ActionHint::SpeedUp);
     }
 
@@ -1922,9 +1986,15 @@ mod tests {
     fn adaptive_behavior_from_uncertain_pattern() {
         use crate::dynamics::temporal_signatures::ConsciousnessPattern;
         let ab = AdaptiveBehavior::from_consciousness_state(
-            ConsciousnessPattern::Uncertain, 0.3, 0.3, 0.2,
+            ConsciousnessPattern::Uncertain,
+            0.3,
+            0.3,
+            0.2,
         );
-        assert!(ab.learning_rate_multiplier < 1.0, "uncertain should reduce LR");
+        assert!(
+            ab.learning_rate_multiplier < 1.0,
+            "uncertain should reduce LR"
+        );
         assert!(ab.confidence < 0.3, "uncertain should have low confidence");
         assert_eq!(ab.action_hint, ActionHint::SeekInput);
     }
@@ -1933,7 +2003,10 @@ mod tests {
     fn adaptive_behavior_transitioning_pauses_learning() {
         use crate::dynamics::temporal_signatures::ConsciousnessPattern;
         let ab = AdaptiveBehavior::from_consciousness_state(
-            ConsciousnessPattern::Transitioning, 0.5, 0.5, 0.5,
+            ConsciousnessPattern::Transitioning,
+            0.5,
+            0.5,
+            0.5,
         );
         assert!(ab.pause_learning);
         assert_eq!(ab.action_hint, ActionHint::Stabilize);
@@ -1973,8 +2046,12 @@ mod tests {
     fn adaptive_behavior_description_coverage() {
         // Ensure all variants return non-empty strings
         for hint in [
-            ActionHint::Continue, ActionHint::SlowDown, ActionHint::SpeedUp,
-            ActionHint::Stabilize, ActionHint::Explore, ActionHint::SeekInput,
+            ActionHint::Continue,
+            ActionHint::SlowDown,
+            ActionHint::SpeedUp,
+            ActionHint::Stabilize,
+            ActionHint::Explore,
+            ActionHint::SeekInput,
         ] {
             let mut ab = AdaptiveBehavior::default();
             ab.action_hint = hint;
@@ -1996,8 +2073,12 @@ mod tests {
             ConsciousnessPattern::Uncertain,
         ] {
             let ab = AdaptiveBehavior::from_consciousness_state(pattern, 1.0, 1.0, 1.0);
-            assert!(ab.confidence >= 0.0 && ab.confidence <= 1.0,
-                    "{:?}: confidence {} out of bounds", pattern, ab.confidence);
+            assert!(
+                ab.confidence >= 0.0 && ab.confidence <= 1.0,
+                "{:?}: confidence {} out of bounds",
+                pattern,
+                ab.confidence
+            );
         }
     }
 
@@ -2008,8 +2089,12 @@ mod tests {
     #[test]
     fn action_hint_serde_roundtrip() {
         for hint in [
-            ActionHint::Continue, ActionHint::SlowDown, ActionHint::SpeedUp,
-            ActionHint::Stabilize, ActionHint::Explore, ActionHint::SeekInput,
+            ActionHint::Continue,
+            ActionHint::SlowDown,
+            ActionHint::SpeedUp,
+            ActionHint::Stabilize,
+            ActionHint::Explore,
+            ActionHint::SeekInput,
         ] {
             let json = serde_json::to_string(&hint).unwrap();
             let restored: ActionHint = serde_json::from_str(&json).unwrap();

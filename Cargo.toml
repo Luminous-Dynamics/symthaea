@@ -37,6 +37,7 @@ members = [
     "crates/symthaea-zkproof",
     "crates/symthaea-broca",
     "crates/symthaea-consciousness-equation",
+    "crates/symthaea-neuromodulators",
 ]
 
 
@@ -90,6 +91,9 @@ symthaea-core = { path = "symthaea-core" }
 
 # Symthaea Consciousness Equation - Master Consciousness Equation C(t)
 symthaea-consciousness-equation = { path = "crates/symthaea-consciousness-equation" }
+
+# Symthaea Neuromodulators - DA/NE/5-HT/ACh/GABA/Oxytocin/Glutamate/Adenosine bath
+symthaea-neuromodulators = { path = "crates/symthaea-neuromodulators" }
 
 # Symthaea Causal Reasoning - Pearl's do-calculus, counterfactual reasoning, causal emergence
 symthaea-causal-reasoning = { path = "crates/symthaea-causal-reasoning", default-features = false }

@@ -145,8 +145,7 @@ impl BrocaCheckpoint {
         // Compute and set checksum before serialization
         self.checksum = self.compute_checksum();
 
-        let serialized = bincode::serialize(self)
-            .context("Failed to serialize BrocaCheckpoint")?;
+        let serialized = bincode::serialize(self).context("Failed to serialize BrocaCheckpoint")?;
 
         let mut file = std::fs::File::create(path.as_ref())
             .with_context(|| format!("creating checkpoint file: {}", path.as_ref().display()))?;
@@ -171,8 +170,8 @@ impl BrocaCheckpoint {
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
 
-        let checkpoint: Self = bincode::deserialize(&buffer)
-            .context("Failed to deserialize BrocaCheckpoint")?;
+        let checkpoint: Self =
+            bincode::deserialize(&buffer).context("Failed to deserialize BrocaCheckpoint")?;
 
         if !checkpoint.verify() {
             anyhow::bail!("Checkpoint integrity check failed: checksum mismatch");
@@ -308,10 +307,14 @@ impl ProjectionCheckpoint {
     /// Save to a file.
     pub fn save_to_file<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         self.checksum = self.compute_checksum();
-        let serialized = bincode::serialize(self)
-            .context("Failed to serialize ProjectionCheckpoint")?;
-        let mut file = std::fs::File::create(path.as_ref())
-            .with_context(|| format!("creating projection checkpoint: {}", path.as_ref().display()))?;
+        let serialized =
+            bincode::serialize(self).context("Failed to serialize ProjectionCheckpoint")?;
+        let mut file = std::fs::File::create(path.as_ref()).with_context(|| {
+            format!(
+                "creating projection checkpoint: {}",
+                path.as_ref().display()
+            )
+        })?;
         file.write_all(&serialized)?;
         file.sync_all()?;
         tracing::info!(
@@ -344,12 +347,13 @@ impl ProjectionCheckpoint {
 
     /// Load from a file with integrity and version compatibility checks.
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mut file = std::fs::File::open(path.as_ref())
-            .with_context(|| format!("opening projection checkpoint: {}", path.as_ref().display()))?;
+        let mut file = std::fs::File::open(path.as_ref()).with_context(|| {
+            format!("opening projection checkpoint: {}", path.as_ref().display())
+        })?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
-        let checkpoint: Self = bincode::deserialize(&buffer)
-            .context("Failed to deserialize ProjectionCheckpoint")?;
+        let checkpoint: Self =
+            bincode::deserialize(&buffer).context("Failed to deserialize ProjectionCheckpoint")?;
         if !checkpoint.verify() {
             anyhow::bail!("Projection checkpoint integrity check failed: checksum mismatch");
         }
@@ -418,7 +422,10 @@ mod tests {
         let (loaded_gen, adam, proj) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
         assert!(adam.is_none());
         assert!(proj.is_none());
-        assert_eq!(loaded_gen.tokenizer().vocab_size(), gen.tokenizer().vocab_size());
+        assert_eq!(
+            loaded_gen.tokenizer().vocab_size(),
+            gen.tokenizer().vocab_size()
+        );
 
         let _ = std::fs::remove_file(&path);
     }
@@ -434,7 +441,8 @@ mod tests {
         let dir = std::env::temp_dir();
         let path = dir.join("broca_test_checkpoint_adam.bin");
 
-        gen.save_checkpoint(&path, 10, 1.5, Some(adam), None).unwrap();
+        gen.save_checkpoint(&path, 10, 1.5, Some(adam), None)
+            .unwrap();
 
         let (_, loaded_adam, _) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
         assert!(loaded_adam.is_some());
@@ -515,7 +523,10 @@ mod tests {
                 symthaea_core::hdc::UnifiedNetworkConfig::default(),
                 &test_genesis(),
             ),
-            vocab: VocabFile { tokens: vec![], merges: vec![] },
+            vocab: VocabFile {
+                tokens: vec![],
+                merges: vec![],
+            },
             config: BrocaConfig::default(),
             training_epoch: 0,
             training_loss: 0.0,

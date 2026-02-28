@@ -8,6 +8,8 @@ use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use crate::wm::ssm_temporal::SsmTemporalBackend;
 use crate::wm::{WmConfig, WorkingMemory};
 use symthaea_core::hdc::ContinuousHV;
@@ -123,6 +125,7 @@ impl PsychBenchmark for SerialRecallBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         for list_len in [5, 7, 9] {
             // Collect accuracy per position across trials
@@ -135,6 +138,18 @@ impl PsychBenchmark for SerialRecallBenchmark {
                     position_samples[pos].push(acc);
                 }
                 rts.push(rt);
+                if config.trial_trace {
+                    trace.push(TrialOutcome {
+                        trial_idx: trace.len(),
+                        condition: format!("serial_{}", list_len),
+                        correct: true,
+                        rt_ticks: rt,
+                        similarity: 0.0,
+                        confidence: 0.0,
+                        response_idx: 0,
+                        extra: BTreeMap::new(),
+                    });
+                }
             }
 
             // Report per-position accuracy
@@ -187,6 +202,7 @@ impl PsychBenchmark for SerialRecallBenchmark {
 
         result.conditions = 3;
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -228,7 +244,9 @@ mod tests {
         assert!(
             diff < 0.20,
             "SSM primacy_index ({:.3}) too far from baseline ({:.3}), diff={:.3}",
-            ssm_pi, base_pi, diff
+            ssm_pi,
+            base_pi,
+            diff
         );
     }
 }

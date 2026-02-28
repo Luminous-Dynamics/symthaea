@@ -152,13 +152,22 @@ impl SomaticErrorBridge {
                     warn!(subsystem, severity, "Somatic: lock poison felt");
                 }
                 InfrastructureError::AsyncTaskPanicked { task_name } => {
-                    warn!(task_name = task_name.as_str(), severity, "Somatic: task panic felt");
+                    warn!(
+                        task_name = task_name.as_str(),
+                        severity, "Somatic: task panic felt"
+                    );
                 }
                 InfrastructureError::DatabaseFailure { operation } => {
-                    warn!(operation = operation.as_str(), severity, "Somatic: database failure felt");
+                    warn!(
+                        operation = operation.as_str(),
+                        severity, "Somatic: database failure felt"
+                    );
                 }
                 InfrastructureError::NetworkPartition { peer } => {
-                    warn!(peer = peer.as_str(), severity, "Somatic: network partition felt");
+                    warn!(
+                        peer = peer.as_str(),
+                        severity, "Somatic: network partition felt"
+                    );
                 }
                 InfrastructureError::DeserializationCorruption { module } => {
                     warn!(module, severity, "Somatic: deserialization corruption felt");
@@ -288,10 +297,8 @@ mod tests {
             task_name: "persistence".into(),
         })
         .unwrap();
-        tx.send(InfrastructureError::LockPoisoned {
-            subsystem: "mesh",
-        })
-        .unwrap();
+        tx.send(InfrastructureError::LockPoisoned { subsystem: "mesh" })
+            .unwrap();
 
         bridge.update();
         // 0.5 + 0.4 = 0.9, well above threshold
@@ -381,10 +388,7 @@ mod tests {
                 task_name: "x".into()
             }
             .severity()
-                > InfrastructureError::LockPoisoned {
-                    subsystem: "x"
-                }
-                .severity()
+                > InfrastructureError::LockPoisoned { subsystem: "x" }.severity()
         );
         assert!(
             InfrastructureError::LockPoisoned { subsystem: "x" }.severity()
@@ -398,10 +402,7 @@ mod tests {
                 operation: "x".into()
             }
             .severity()
-                > InfrastructureError::NetworkPartition {
-                    peer: "x".into()
-                }
-                .severity()
+                > InfrastructureError::NetworkPartition { peer: "x".into() }.severity()
         );
     }
 
@@ -410,10 +411,8 @@ mod tests {
         let (mut bridge, tx) = SomaticErrorBridge::new();
 
         // Low stress
-        tx.send(InfrastructureError::NetworkPartition {
-            peer: "p".into(),
-        })
-        .unwrap();
+        tx.send(InfrastructureError::NetworkPartition { peer: "p".into() })
+            .unwrap();
         bridge.update();
         let low_signals = bridge.to_interoceptive_signals();
 
@@ -424,10 +423,8 @@ mod tests {
             task_name: "t".into(),
         })
         .unwrap();
-        tx.send(InfrastructureError::LockPoisoned {
-            subsystem: "s",
-        })
-        .unwrap();
+        tx.send(InfrastructureError::LockPoisoned { subsystem: "s" })
+            .unwrap();
         bridge.update();
         let high_signals = bridge.to_interoceptive_signals();
 

@@ -181,20 +181,31 @@ impl fmt::Display for IntegrationResult {
 
 /// Decoupled feedback state for the cognitive loop.
 ///
-/// Replaces the 68-site `prediction_confidence` and 31-site `fep_lr_boost`
-/// direct mutations with attributed, integrated proposals.
+/// Replaces direct `self.prediction_confidence += X` and `self.fep_lr_boost *= X`
+/// mutations with attributed, integrated proposals.
+///
+/// Round 7 extends this to `exploration_urge` (27 sites) and
+/// `adaptive_threshold_scale` (8 sites).
 #[derive(Debug, Clone)]
 pub(crate) struct FeedbackState {
     /// Proposals for `prediction_confidence` (0.0–1.0)
     pub confidence: ProposalCollector,
     /// Proposals for `fep_lr_boost` (1.0–3.0)
     pub learning_rate: ProposalCollector,
+    /// Proposals for `exploration_urge` (0.0–1.0)
+    pub exploration: ProposalCollector,
+    /// Proposals for `adaptive_threshold_scale` (0.5–2.0)
+    pub threshold: ProposalCollector,
 
     // ── Cycle-end integration results (for telemetry / debugging) ───────
     /// Last integrated confidence result
     pub last_confidence_integration: Option<IntegrationResult>,
     /// Last integrated LR result
     pub last_lr_integration: Option<IntegrationResult>,
+    /// Last integrated exploration result
+    pub last_exploration_integration: Option<IntegrationResult>,
+    /// Last integrated threshold result
+    pub last_threshold_integration: Option<IntegrationResult>,
 }
 
 impl FeedbackState {
@@ -202,33 +213,47 @@ impl FeedbackState {
         Self {
             confidence: ProposalCollector::new(),
             learning_rate: ProposalCollector::new(),
+            exploration: ProposalCollector::new(),
+            threshold: ProposalCollector::new(),
             last_confidence_integration: None,
             last_lr_integration: None,
+            last_exploration_integration: None,
+            last_threshold_integration: None,
         }
     }
 
-    /// Clear both collectors at cycle start.
+    /// Clear all collectors at cycle start.
     pub fn begin_cycle(&mut self) {
         self.confidence.clear();
         self.learning_rate.clear();
+        self.exploration.clear();
+        self.threshold.clear();
     }
 
-    /// Integrate both feedback variables. Call at cycle end (Phase D: DECAY).
+    /// Integrate all feedback variables. Call at cycle end (Phase D: DECAY).
     ///
-    /// `current_confidence` and `current_lr` are the values produced by direct
-    /// mutations (the old path). The integration results are stored for
-    /// comparison and telemetry.
-    pub fn end_cycle(&mut self, current_confidence: f64, current_lr: f64) {
+    /// Current values are produced by direct mutations (the old path).
+    /// Integration results are stored for comparison and telemetry.
+    pub fn end_cycle(
+        &mut self,
+        current_confidence: f64,
+        current_lr: f64,
+        current_exploration: f64,
+        current_threshold: f64,
+    ) {
         self.last_confidence_integration =
             Some(self.confidence.integrate(current_confidence, 0.0, 1.0));
-        self.last_lr_integration =
-            Some(self.learning_rate.integrate(current_lr, 1.0, 3.0));
+        self.last_lr_integration = Some(self.learning_rate.integrate(current_lr, 1.0, 3.0));
+        self.last_exploration_integration =
+            Some(self.exploration.integrate(current_exploration, 0.0, 1.0));
+        self.last_threshold_integration =
+            Some(self.threshold.integrate(current_threshold, 0.5, 2.0));
     }
 
     /// How many total proposals were recorded this cycle.
     #[allow(dead_code)]
     pub fn total_proposals(&self) -> usize {
-        self.confidence.len() + self.learning_rate.len()
+        self.confidence.len() + self.learning_rate.len() + self.exploration.len() + self.threshold.len()
     }
 }
 
@@ -324,13 +349,19 @@ mod tests {
         assert_eq!(state.total_proposals(), 0);
 
         // Proposals during cycle
-        state.confidence.propose("subsys_a", FeedbackProposal::Add(0.05));
-        state.confidence.propose("subsys_b", FeedbackProposal::Scale(0.98));
-        state.learning_rate.propose("fep", FeedbackProposal::Add(0.1));
+        state
+            .confidence
+            .propose("subsys_a", FeedbackProposal::Add(0.05));
+        state
+            .confidence
+            .propose("subsys_b", FeedbackProposal::Scale(0.98));
+        state
+            .learning_rate
+            .propose("fep", FeedbackProposal::Add(0.1));
         assert_eq!(state.total_proposals(), 3);
 
         // End cycle with current values
-        state.end_cycle(0.6, 1.2);
+        state.end_cycle(0.6, 1.2, 0.4, 1.0);
         assert!(state.last_confidence_integration.is_some());
         assert!(state.last_lr_integration.is_some());
 

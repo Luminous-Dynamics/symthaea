@@ -20,8 +20,14 @@ use symthaea_broca::training::TrainingDataset;
 use symthaea_core::genesis::GenesisSeed;
 
 const INTENT_NAMES: [&str; 8] = [
-    "Acknowledge", "Answer", "Clarify", "Propose",
-    "Uncertainty", "Reflect", "Continue", "Unknown",
+    "Acknowledge",
+    "Answer",
+    "Clarify",
+    "Propose",
+    "Uncertainty",
+    "Reflect",
+    "Continue",
+    "Unknown",
 ];
 
 fn main() {
@@ -104,7 +110,9 @@ fn main() {
         tracing::info!(path = %proj_path, "Loading projection checkpoint");
         match symthaea_broca::checkpoint::ProjectionCheckpoint::load_from_file(proj_path) {
             Ok(ckpt) => {
-                lm_gen.projection_mut().load_weights(&ckpt.projection_weights);
+                lm_gen
+                    .projection_mut()
+                    .load_weights(&ckpt.projection_weights);
                 tracing::info!("Projection checkpoint loaded");
             }
             Err(e) => {
@@ -124,7 +132,9 @@ fn main() {
     let mut lm_results = Vec::new();
 
     for (i, pair) in dataset.pairs.iter().take(sample_count).enumerate() {
-        let channels = ThoughtChannels { channels: pair.channels };
+        let channels = ThoughtChannels {
+            channels: pair.channels,
+        };
         let intent_idx = dominant_intent(&pair.channels);
         let intent_name = INTENT_NAMES[intent_idx];
 
@@ -189,7 +199,11 @@ fn main() {
 
         // Progress
         if (i + 1) % 10 == 0 || i + 1 == sample_count {
-            tracing::info!(progress = i + 1, total = sample_count, "Comparison progress");
+            tracing::info!(
+                progress = i + 1,
+                total = sample_count,
+                "Comparison progress"
+            );
         }
     }
 
@@ -235,35 +249,85 @@ fn print_comparison_report(cfc: &[SampleResult], lm: &[SampleResult]) {
     let lm_veto = lm.iter().filter(|r| r.veto).count();
 
     println!("=== Comparison Report ({} samples) ===\n", cfc.len());
-    println!("{:<22} {:>12} {:>12} {:>10}", "Metric", "CfC-HDC", "L-Mamba", "Winner");
-    println!("{:<22} {:>12} {:>12} {:>10}", "------", "-------", "-------", "------");
+    println!(
+        "{:<22} {:>12} {:>12} {:>10}",
+        "Metric", "CfC-HDC", "L-Mamba", "Winner"
+    );
+    println!(
+        "{:<22} {:>12} {:>12} {:>10}",
+        "------", "-------", "-------", "------"
+    );
 
     // English ratio
-    let eng_winner = if lm_eng > cfc_eng + 0.01 { "L-Mamba" } else if cfc_eng > lm_eng + 0.01 { "CfC-HDC" } else { "Tie" };
-    println!("{:<22} {:>11.1}% {:>11.1}% {:>10}", "English ratio", cfc_eng * 100.0, lm_eng * 100.0, eng_winner);
+    let eng_winner = if lm_eng > cfc_eng + 0.01 {
+        "L-Mamba"
+    } else if cfc_eng > lm_eng + 0.01 {
+        "CfC-HDC"
+    } else {
+        "Tie"
+    };
+    println!(
+        "{:<22} {:>11.1}% {:>11.1}% {:>10}",
+        "English ratio",
+        cfc_eng * 100.0,
+        lm_eng * 100.0,
+        eng_winner
+    );
 
     // Coherence
-    let coh_winner = if lm_coh > cfc_coh + 0.01 { "L-Mamba" } else if cfc_coh > lm_coh + 0.01 { "CfC-HDC" } else { "Tie" };
-    println!("{:<22} {:>12.3} {:>12.3} {:>10}", "Avg coherence", cfc_coh, lm_coh, coh_winner);
+    let coh_winner = if lm_coh > cfc_coh + 0.01 {
+        "L-Mamba"
+    } else if cfc_coh > lm_coh + 0.01 {
+        "CfC-HDC"
+    } else {
+        "Tie"
+    };
+    println!(
+        "{:<22} {:>12.3} {:>12.3} {:>10}",
+        "Avg coherence", cfc_coh, lm_coh, coh_winner
+    );
 
     // Tokens
-    println!("{:<22} {:>12.1} {:>12.1} {:>10}", "Avg tokens", cfc_tok, lm_tok, "");
+    println!(
+        "{:<22} {:>12.1} {:>12.1} {:>10}",
+        "Avg tokens", cfc_tok, lm_tok, ""
+    );
 
     // Speed
-    let speed_winner = if cfc_ms < lm_ms * 0.9 { "CfC-HDC" } else if lm_ms < cfc_ms * 0.9 { "L-Mamba" } else { "Tie" };
-    println!("{:<22} {:>10.0}ms {:>10.0}ms {:>10}", "Avg latency", cfc_ms, lm_ms, speed_winner);
+    let speed_winner = if cfc_ms < lm_ms * 0.9 {
+        "CfC-HDC"
+    } else if lm_ms < cfc_ms * 0.9 {
+        "L-Mamba"
+    } else {
+        "Tie"
+    };
+    println!(
+        "{:<22} {:>10.0}ms {:>10.0}ms {:>10}",
+        "Avg latency", cfc_ms, lm_ms, speed_winner
+    );
 
     // Vetos
-    println!("{:<22} {:>12} {:>12} {:>10}", "Veto count", cfc_veto, lm_veto, "");
+    println!(
+        "{:<22} {:>12} {:>12} {:>10}",
+        "Veto count", cfc_veto, lm_veto, ""
+    );
 
     // Per-intent breakdown
     println!("\n--- Per-Intent Breakdown ---");
-    println!("{:<14} {:>8} {:>8} {:>8} {:>8}", "Intent", "CfC Eng%", "LM Eng%", "CfC Coh", "LM Coh");
-    println!("{:<14} {:>8} {:>8} {:>8} {:>8}", "------", "--------", "-------", "-------", "------");
+    println!(
+        "{:<14} {:>8} {:>8} {:>8} {:>8}",
+        "Intent", "CfC Eng%", "LM Eng%", "CfC Coh", "LM Coh"
+    );
+    println!(
+        "{:<14} {:>8} {:>8} {:>8} {:>8}",
+        "------", "--------", "-------", "-------", "------"
+    );
 
     for (intent_idx, name) in INTENT_NAMES.iter().enumerate() {
-        let cfc_intent: Vec<&SampleResult> = cfc.iter().filter(|r| r.intent_idx == intent_idx).collect();
-        let lm_intent: Vec<&SampleResult> = lm.iter().filter(|r| r.intent_idx == intent_idx).collect();
+        let cfc_intent: Vec<&SampleResult> =
+            cfc.iter().filter(|r| r.intent_idx == intent_idx).collect();
+        let lm_intent: Vec<&SampleResult> =
+            lm.iter().filter(|r| r.intent_idx == intent_idx).collect();
 
         if cfc_intent.is_empty() {
             continue;
@@ -278,7 +342,10 @@ fn print_comparison_report(cfc: &[SampleResult], lm: &[SampleResult]) {
         println!(
             "{:<14} {:>7.1}% {:>7.1}% {:>8.3} {:>8.3}",
             format!("{name} ({})", cfc_intent.len()),
-            cfc_ie * 100.0, lm_ie * 100.0, cfc_ic, lm_ic
+            cfc_ie * 100.0,
+            lm_ie * 100.0,
+            cfc_ic,
+            lm_ic
         );
     }
 
@@ -286,9 +353,21 @@ fn print_comparison_report(cfc: &[SampleResult], lm: &[SampleResult]) {
     println!("\n--- Verdict ---");
     let mut cfc_wins = 0u32;
     let mut lm_wins = 0u32;
-    if cfc_eng > lm_eng + 0.01 { cfc_wins += 1; } else if lm_eng > cfc_eng + 0.01 { lm_wins += 1; }
-    if cfc_coh > lm_coh + 0.01 { cfc_wins += 1; } else if lm_coh > cfc_coh + 0.01 { lm_wins += 1; }
-    if cfc_ms < lm_ms * 0.9 { cfc_wins += 1; } else if lm_ms < cfc_ms * 0.9 { lm_wins += 1; }
+    if cfc_eng > lm_eng + 0.01 {
+        cfc_wins += 1;
+    } else if lm_eng > cfc_eng + 0.01 {
+        lm_wins += 1;
+    }
+    if cfc_coh > lm_coh + 0.01 {
+        cfc_wins += 1;
+    } else if lm_coh > cfc_coh + 0.01 {
+        lm_wins += 1;
+    }
+    if cfc_ms < lm_ms * 0.9 {
+        cfc_wins += 1;
+    } else if lm_ms < cfc_ms * 0.9 {
+        lm_wins += 1;
+    }
 
     if cfc_wins > lm_wins {
         println!("  CfC-HDC leads ({cfc_wins} wins vs {lm_wins})");
@@ -331,14 +410,16 @@ fn parse_args(args: &[String]) -> Result<CompareOpts, String> {
             }
             "--max-samples" | "-n" => {
                 i += 1;
-                opts.max_samples = args.get(i)
+                opts.max_samples = args
+                    .get(i)
                     .ok_or("--max-samples requires a number")?
                     .parse()
                     .map_err(|_| "--max-samples must be a positive integer")?;
             }
             "--max-tokens" => {
                 i += 1;
-                opts.max_gen_tokens = args.get(i)
+                opts.max_gen_tokens = args
+                    .get(i)
                     .ok_or("--max-tokens requires a number")?
                     .parse()
                     .map_err(|_| "--max-tokens must be a positive integer")?;
@@ -349,11 +430,13 @@ fn parse_args(args: &[String]) -> Result<CompareOpts, String> {
             }
             "--checkpoint" => {
                 i += 1;
-                opts.cfc_checkpoint = Some(args.get(i).cloned().ok_or("--checkpoint requires a path")?);
+                opts.cfc_checkpoint =
+                    Some(args.get(i).cloned().ok_or("--checkpoint requires a path")?);
             }
             "--projection" => {
                 i += 1;
-                opts.projection_checkpoint = Some(args.get(i).cloned().ok_or("--projection requires a path")?);
+                opts.projection_checkpoint =
+                    Some(args.get(i).cloned().ok_or("--projection requires a path")?);
             }
             "--verbose" | "-v" => {
                 opts.verbose = true;

@@ -65,9 +65,15 @@ pub struct BenchmarkConfig {
     pub trial_trace: bool,
 }
 
-fn default_min_trials() -> usize { 10 }
-fn default_max_trials() -> usize { 200 }
-fn default_precision_target() -> f64 { 0.05 }
+fn default_min_trials() -> usize {
+    10
+}
+fn default_max_trials() -> usize {
+    200
+}
+fn default_precision_target() -> f64 {
+    0.05
+}
 
 impl Default for BenchmarkConfig {
     fn default() -> Self {

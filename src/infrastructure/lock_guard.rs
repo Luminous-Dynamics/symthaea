@@ -271,9 +271,7 @@ macro_rules! write_lock {
 macro_rules! lock_with_pain {
     ($mutex:expr, $context:expr, $pain_tx:expr) => {
         $crate::infrastructure::lock_guard::ResilientMutexWithPain::lock_with_pain(
-            &$mutex,
-            $context,
-            $pain_tx,
+            &$mutex, $context, $pain_tx,
         )
     };
 }

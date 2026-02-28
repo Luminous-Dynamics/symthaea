@@ -1,11 +1,11 @@
 //! Power telemetry SSM sensor (INA219 or simulated).
 
-use anyhow::Result;
 #[cfg(feature = "ssm-power-hal")]
 use anyhow::anyhow;
+use anyhow::Result;
+use std::collections::HashMap;
 #[cfg(feature = "ssm-power-hal")]
 use std::sync::Mutex;
-use std::collections::HashMap;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 #[cfg(feature = "ssm-power-hal")]
 use tracing::info;
@@ -89,7 +89,9 @@ impl PowerSource for SimulatedIna219 {
 
 #[cfg(feature = "ssm-power-hal")]
 struct Ina219PowerSource {
-    sensor: Mutex<symthaea_hal::EmbeddedSensor<linux_embedded_hal::I2cdev, symthaea_hal::Ina219Decoder>>,
+    sensor: Mutex<
+        symthaea_hal::EmbeddedSensor<linux_embedded_hal::I2cdev, symthaea_hal::Ina219Decoder>,
+    >,
 }
 
 #[cfg(feature = "ssm-power-hal")]

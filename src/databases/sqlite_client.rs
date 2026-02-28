@@ -463,19 +463,11 @@ impl SqliteMemory {
         };
 
         let encoding = Self::bytes_to_hv(&encoding_bytes).map_err(|e| {
-            rusqlite::Error::FromSqlConversionFailure(
-                1,
-                rusqlite::types::Type::Blob,
-                Box::new(e),
-            )
+            rusqlite::Error::FromSqlConversionFailure(1, rusqlite::types::Type::Blob, Box::new(e))
         })?;
         let memory_type_raw: String = row.get(3)?;
         let memory_type = Self::str_to_memory_type(&memory_type_raw).map_err(|e| {
-            rusqlite::Error::FromSqlConversionFailure(
-                3,
-                rusqlite::types::Type::Text,
-                Box::new(e),
-            )
+            rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(e))
         })?;
 
         Ok(MemoryRecord {
@@ -554,8 +546,8 @@ impl SqliteMemory {
                 .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {e}")))?;
 
             let chunk_records: Result<Vec<_>, _> = rows.collect();
-            let chunk_records =
-                chunk_records.map_err(|e| DatabaseError::QueryFailed(format!("Row decode failed: {e}")))?;
+            let chunk_records = chunk_records
+                .map_err(|e| DatabaseError::QueryFailed(format!("Row decode failed: {e}")))?;
             records.extend(chunk_records);
         }
 
@@ -1004,21 +996,32 @@ impl ConsciousnessDatabase for SqliteMemory {
     #[cfg(feature = "school_learning")]
     async fn get_curricula(&self) -> DbResult<Vec<Curriculum>> {
         self.with_connection(|conn| {
-            let mut stmt = conn.prepare("SELECT data FROM curricula")
+            let mut stmt = conn
+                .prepare("SELECT data FROM curricula")
                 .map_err(|e| DatabaseError::QueryFailed(format!("Curricula query failed: {e}")))?;
 
-            let rows = stmt.query_map([], |row| {
-                let data: String = row.get(0)?;
-                serde_json::from_str::<Curriculum>(&data)
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e)))
-            }).map_err(|e| DatabaseError::QueryFailed(format!("Curricula map failed: {e}")))?;
+            let rows = stmt
+                .query_map([], |row| {
+                    let data: String = row.get(0)?;
+                    serde_json::from_str::<Curriculum>(&data).map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            0,
+                            rusqlite::types::Type::Text,
+                            Box::new(e),
+                        )
+                    })
+                })
+                .map_err(|e| DatabaseError::QueryFailed(format!("Curricula map failed: {e}")))?;
 
             let mut curricula = Vec::new();
             for row in rows {
-                curricula.push(row.map_err(|e| DatabaseError::QueryFailed(format!("Curriculum decode failed: {e}")))?);
+                curricula.push(row.map_err(|e| {
+                    DatabaseError::QueryFailed(format!("Curriculum decode failed: {e}"))
+                })?);
             }
             Ok(curricula)
-        }).await
+        })
+        .await
     }
 
     async fn store_causal_links(&self, links: &[CausalLink]) -> DbResult<()> {
@@ -1041,34 +1044,55 @@ impl ConsciousnessDatabase for SqliteMemory {
 
     async fn get_causal_links(&self) -> DbResult<Vec<CausalLink>> {
         self.with_connection(|conn| {
-            let mut stmt = conn.prepare("SELECT action_fingerprint, state_context, outcome, weight FROM causal_links")
-                .map_err(|e| DatabaseError::QueryFailed(format!("Causal links query failed: {e}")))?;
-            
-            let rows = stmt.query_map([], |row| {
-                let fingerprint: i64 = row.get(0)?;
-                let state_bytes: Vec<u8> = row.get(1)?;
-                let outcome_bytes: Vec<u8> = row.get(2)?;
-                let weight: f64 = row.get(3)?;
-                
-                let state_context: Vec<f32> = bincode::deserialize(&state_bytes)
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(1, rusqlite::types::Type::Blob, Box::new(e)))?;
-                let outcome: Vec<f32> = bincode::deserialize(&outcome_bytes)
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(2, rusqlite::types::Type::Blob, Box::new(e)))?;
-                
-                Ok(CausalLink {
-                    action_fingerprint: fingerprint as u64,
-                    state_context,
-                    outcome,
-                    weight: weight as f32,
+            let mut stmt = conn
+                .prepare(
+                    "SELECT action_fingerprint, state_context, outcome, weight FROM causal_links",
+                )
+                .map_err(|e| {
+                    DatabaseError::QueryFailed(format!("Causal links query failed: {e}"))
+                })?;
+
+            let rows = stmt
+                .query_map([], |row| {
+                    let fingerprint: i64 = row.get(0)?;
+                    let state_bytes: Vec<u8> = row.get(1)?;
+                    let outcome_bytes: Vec<u8> = row.get(2)?;
+                    let weight: f64 = row.get(3)?;
+
+                    let state_context: Vec<f32> =
+                        bincode::deserialize(&state_bytes).map_err(|e| {
+                            rusqlite::Error::FromSqlConversionFailure(
+                                1,
+                                rusqlite::types::Type::Blob,
+                                Box::new(e),
+                            )
+                        })?;
+                    let outcome: Vec<f32> = bincode::deserialize(&outcome_bytes).map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            2,
+                            rusqlite::types::Type::Blob,
+                            Box::new(e),
+                        )
+                    })?;
+
+                    Ok(CausalLink {
+                        action_fingerprint: fingerprint as u64,
+                        state_context,
+                        outcome,
+                        weight: weight as f32,
+                    })
                 })
-            }).map_err(|e| DatabaseError::QueryFailed(format!("Causal links map failed: {e}")))?;
-            
+                .map_err(|e| DatabaseError::QueryFailed(format!("Causal links map failed: {e}")))?;
+
             let mut links = Vec::new();
             for row in rows {
-                links.push(row.map_err(|e| DatabaseError::QueryFailed(format!("Causal link decode failed: {e}")))?);
+                links.push(row.map_err(|e| {
+                    DatabaseError::QueryFailed(format!("Causal link decode failed: {e}"))
+                })?);
             }
             Ok(links)
-        }).await
+        })
+        .await
     }
 }
 #[cfg(test)]

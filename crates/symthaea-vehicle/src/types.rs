@@ -244,20 +244,48 @@ impl VehicleState {
     /// Channels are zeroed in order: speed, lateral_velocity, yaw_rate, heading,
     /// position_x/y, steering_angle, throttle/brake, accel, tire slip, pitch.
     pub fn apply_sensor_blindness(&mut self, n: usize) {
-        if n >= 1 { self.speed = 0.0; }
-        if n >= 2 { self.lateral_velocity = 0.0; }
-        if n >= 3 { self.yaw_rate = 0.0; }
-        if n >= 4 { self.heading = 0.0; }
-        if n >= 5 { self.position_x = 0.0; }
-        if n >= 6 { self.position_y = 0.0; }
-        if n >= 7 { self.steering_angle = 0.0; }
-        if n >= 8 { self.throttle_position = 0.0; }
-        if n >= 9 { self.brake_pressure = 0.0; }
-        if n >= 10 { self.longitudinal_accel = 0.0; }
-        if n >= 11 { self.lateral_accel = 0.0; }
-        if n >= 12 { self.tire_slip_front = 0.0; }
-        if n >= 13 { self.tire_slip_rear = 0.0; }
-        if n >= 14 { self.pitch = 0.0; }
+        if n >= 1 {
+            self.speed = 0.0;
+        }
+        if n >= 2 {
+            self.lateral_velocity = 0.0;
+        }
+        if n >= 3 {
+            self.yaw_rate = 0.0;
+        }
+        if n >= 4 {
+            self.heading = 0.0;
+        }
+        if n >= 5 {
+            self.position_x = 0.0;
+        }
+        if n >= 6 {
+            self.position_y = 0.0;
+        }
+        if n >= 7 {
+            self.steering_angle = 0.0;
+        }
+        if n >= 8 {
+            self.throttle_position = 0.0;
+        }
+        if n >= 9 {
+            self.brake_pressure = 0.0;
+        }
+        if n >= 10 {
+            self.longitudinal_accel = 0.0;
+        }
+        if n >= 11 {
+            self.lateral_accel = 0.0;
+        }
+        if n >= 12 {
+            self.tire_slip_front = 0.0;
+        }
+        if n >= 13 {
+            self.tire_slip_rear = 0.0;
+        }
+        if n >= 14 {
+            self.pitch = 0.0;
+        }
     }
 
     /// Apply mesh spoof: inject false brake signals from spoofed peers.
@@ -842,12 +870,21 @@ mod tests {
         state.apply_sensor_blindness(4);
 
         assert!((state.speed - 0.0).abs() < 1e-10, "speed should be zeroed");
-        assert!((state.lateral_velocity - 0.0).abs() < 1e-10, "lat_vel should be zeroed");
-        assert!((state.yaw_rate - 0.0).abs() < 1e-10, "yaw_rate should be zeroed");
-        assert!((state.heading - 0.0).abs() < 1e-10, "heading should be zeroed");
+        assert!(
+            (state.lateral_velocity - 0.0).abs() < 1e-10,
+            "lat_vel should be zeroed"
+        );
+        assert!(
+            (state.yaw_rate - 0.0).abs() < 1e-10,
+            "yaw_rate should be zeroed"
+        );
+        assert!(
+            (state.heading - 0.0).abs() < 1e-10,
+            "heading should be zeroed"
+        );
         // position_x should NOT be zeroed (only 4 channels)
         assert!((state.position_x - 0.0).abs() < 1e-10); // was already 0
-        // mesh channels should be untouched
+                                                         // mesh channels should be untouched
         assert!((state.nearest_peer_distance - 200.0).abs() < 1e-10);
     }
 
@@ -859,11 +896,23 @@ mod tests {
 
         state.apply_sensor_blindness(20); // more than 14 → clamped
 
-        assert!((state.speed - 0.0).abs() < 1e-10, "all proprioceptive zeroed");
-        assert!((state.pitch - 0.0).abs() < 1e-10, "pitch zeroed (channel 13)");
+        assert!(
+            (state.speed - 0.0).abs() < 1e-10,
+            "all proprioceptive zeroed"
+        );
+        assert!(
+            (state.pitch - 0.0).abs() < 1e-10,
+            "pitch zeroed (channel 13)"
+        );
         // Road and mesh channels should be untouched
-        assert!((state.nearest_peer_distance - 50.0).abs() < 1e-10, "mesh untouched");
-        assert!((state.mesh_brake_density - 0.5).abs() < 1e-10, "mesh untouched");
+        assert!(
+            (state.nearest_peer_distance - 50.0).abs() < 1e-10,
+            "mesh untouched"
+        );
+        assert!(
+            (state.mesh_brake_density - 0.5).abs() < 1e-10,
+            "mesh untouched"
+        );
     }
 
     #[test]

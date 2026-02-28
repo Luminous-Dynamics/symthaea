@@ -701,7 +701,6 @@ fn test_try_cycle_multiple() {
     assert_eq!(service.stats().total_cycles, 5);
 }
 
-
 #[test]
 fn test_config_validate_default_clean() {
     let config = CognitiveLoopConfig::default();

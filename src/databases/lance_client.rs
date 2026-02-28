@@ -177,15 +177,16 @@ fn batch_to_records(batch: &RecordBatch) -> Vec<MemoryRecord> {
                 arr.copy_from_slice(&encoding_bytes[..BinaryHV::BYTES]);
             }
 
-            let topics: Vec<String> = serde_json::from_str(topics_col.value(i)).unwrap_or_else(|e| {
-                tracing::warn!(
-                    row = i,
-                    raw = topics_col.value(i),
-                    error = %e,
-                    "Corrupted topics JSON in LanceDB record — defaulting to empty"
-                );
-                Vec::new()
-            });
+            let topics: Vec<String> =
+                serde_json::from_str(topics_col.value(i)).unwrap_or_else(|e| {
+                    tracing::warn!(
+                        row = i,
+                        raw = topics_col.value(i),
+                        error = %e,
+                        "Corrupted topics JSON in LanceDB record — defaulting to empty"
+                    );
+                    Vec::new()
+                });
 
             let ts = ts_col.value(i);
 
@@ -997,5 +998,267 @@ mod tests {
         assert_eq!(db.count().await.unwrap(), 1);
         let retrieved = db.get("upsert-1").await.unwrap().unwrap();
         assert_eq!(retrieved.content, "Updated content");
+    }
+
+    // ====================================================================
+    // Pure helper function tests (no LanceDB connection required)
+    // ====================================================================
+
+    #[test]
+    fn test_memory_type_to_str_roundtrip() {
+        assert_eq!(memory_type_to_str(MemoryType::Episodic), "episodic");
+        assert_eq!(memory_type_to_str(MemoryType::Semantic), "semantic");
+        assert_eq!(memory_type_to_str(MemoryType::Procedural), "procedural");
+        assert_eq!(memory_type_to_str(MemoryType::Working), "working");
+
+        for mt in [
+            MemoryType::Episodic,
+            MemoryType::Semantic,
+            MemoryType::Procedural,
+            MemoryType::Working,
+        ] {
+            assert_eq!(str_to_memory_type(memory_type_to_str(mt)), mt);
+        }
+    }
+
+    #[test]
+    fn test_str_to_memory_type_unknown_defaults_to_episodic() {
+        assert_eq!(str_to_memory_type("unknown"), MemoryType::Episodic);
+        assert_eq!(str_to_memory_type(""), MemoryType::Episodic);
+        assert_eq!(str_to_memory_type("EPISODIC"), MemoryType::Episodic);
+        assert_eq!(str_to_memory_type("Semantic"), MemoryType::Episodic);
+    }
+
+    #[test]
+    fn test_hamming_similarity_raw_identical() {
+        let a = [0xAA_u8; 64];
+        let b = [0xAA_u8; 64];
+        let sim = hamming_similarity_raw(&a, &b);
+        assert!(
+            (sim - 1.0).abs() < f32::EPSILON,
+            "Identical slices should have similarity 1.0, got {sim}"
+        );
+    }
+
+    #[test]
+    fn test_hamming_similarity_raw_opposite() {
+        let a = [0xFF_u8; 64];
+        let b = [0x00_u8; 64];
+        let sim = hamming_similarity_raw(&a, &b);
+        assert!(
+            sim.abs() < f32::EPSILON,
+            "Complementary slices should have similarity 0.0, got {sim}"
+        );
+    }
+
+    #[test]
+    fn test_hamming_similarity_raw_half_matching() {
+        let a = [0xF0_u8; 64];
+        let b = [0x0F_u8; 64];
+        let sim = hamming_similarity_raw(&a, &b);
+        assert!(
+            (sim - 0.5).abs() < f32::EPSILON,
+            "Half-matching slices should have similarity 0.5, got {sim}"
+        );
+    }
+
+    #[test]
+    fn test_hamming_similarity_raw_empty_slices() {
+        let a: [u8; 0] = [];
+        let b: [u8; 0] = [];
+        let sim = hamming_similarity_raw(&a, &b);
+        assert!(
+            sim.abs() < f32::EPSILON,
+            "Empty slices should have similarity 0.0, got {sim}"
+        );
+    }
+
+    #[test]
+    fn test_hamming_similarity_raw_single_bit_flip() {
+        let a = [0x00_u8; BinaryHV::BYTES];
+        let mut b = [0x00_u8; BinaryHV::BYTES];
+        b[0] = 0x01;
+        let sim = hamming_similarity_raw(&a, &b);
+        let expected = 1.0 - (1.0 / (BinaryHV::BYTES as f32 * 8.0));
+        assert!(
+            (sim - expected).abs() < 1e-6,
+            "Single bit flip: expected {expected}, got {sim}"
+        );
+    }
+
+    #[test]
+    fn test_hamming_similarity_raw_matches_binaryhv_similarity() {
+        let hv_a = BinaryHV::random(100);
+        let hv_b = BinaryHV::random(200);
+        let raw_sim = hamming_similarity_raw(&hv_a.0, &hv_b.0);
+        let hv_sim = hv_a.similarity(&hv_b);
+        assert!(
+            (raw_sim - hv_sim).abs() < 1e-5,
+            "Raw similarity ({raw_sim}) should match BinaryHV::similarity ({hv_sim})"
+        );
+    }
+
+    #[test]
+    fn test_record_to_batch_and_back_roundtrip() {
+        let record = MemoryRecord {
+            id: "roundtrip-1".to_string(),
+            encoding: BinaryHV::random(42),
+            timestamp_ms: 1700000000000,
+            memory_type: MemoryType::Semantic,
+            content: "Roundtrip test content".to_string(),
+            valence: -0.3,
+            arousal: 0.9,
+            psi: 0.42,
+            topics: vec!["alpha".to_string(), "beta".to_string()],
+            metadata: r#"{"key": "value"}"#.to_string(),
+            consolidation_strength: 0.55,
+            retrieval_count: 7,
+        };
+
+        let batch = record_to_batch(&record).expect("record_to_batch should succeed");
+        assert_eq!(batch.num_rows(), 1);
+
+        let records = batch_to_records(&batch);
+        assert_eq!(records.len(), 1);
+
+        let recovered = &records[0];
+        assert_eq!(recovered.id, record.id);
+        assert_eq!(recovered.content, record.content);
+        assert_eq!(recovered.memory_type, record.memory_type);
+        assert_eq!(recovered.timestamp_ms, record.timestamp_ms);
+        assert!((recovered.valence - record.valence).abs() < 1e-6);
+        assert!((recovered.arousal - record.arousal).abs() < 1e-6);
+        assert!((recovered.psi - record.psi).abs() < 1e-10);
+        assert_eq!(recovered.topics, record.topics);
+        assert_eq!(recovered.metadata, record.metadata);
+        assert!((recovered.consolidation_strength - record.consolidation_strength).abs() < 1e-10);
+        assert_eq!(recovered.retrieval_count, record.retrieval_count);
+        assert_eq!(recovered.encoding.0, record.encoding.0);
+    }
+
+    #[test]
+    fn test_record_to_batch_all_memory_types() {
+        for (mt, expected_str) in [
+            (MemoryType::Episodic, "episodic"),
+            (MemoryType::Semantic, "semantic"),
+            (MemoryType::Procedural, "procedural"),
+            (MemoryType::Working, "working"),
+        ] {
+            let mut record = test_record("mt-test", 0);
+            record.memory_type = mt;
+            let batch = record_to_batch(&record).unwrap();
+            let recovered = batch_to_records(&batch);
+            assert_eq!(
+                recovered[0].memory_type, mt,
+                "Memory type {expected_str} should survive roundtrip"
+            );
+        }
+    }
+
+    #[test]
+    fn test_batch_to_records_empty_batch() {
+        let schema = memories_schema();
+        let mut encoding_builder = FixedSizeBinaryBuilder::new(BinaryHV::BYTES as i32);
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(StringArray::from(Vec::<&str>::new())),
+                Arc::new(encoding_builder.finish()),
+                Arc::new(Int64Array::from(Vec::<i64>::new())),
+                Arc::new(StringArray::from(Vec::<&str>::new())),
+                Arc::new(StringArray::from(Vec::<&str>::new())),
+                Arc::new(Float32Array::from(Vec::<f32>::new())),
+                Arc::new(Float32Array::from(Vec::<f32>::new())),
+                Arc::new(Float64Array::from(Vec::<f64>::new())),
+                Arc::new(StringArray::from(Vec::<&str>::new())),
+                Arc::new(StringArray::from(Vec::<&str>::new())),
+                Arc::new(Float64Array::from(Vec::<f64>::new())),
+                Arc::new(Int32Array::from(Vec::<i32>::new())),
+            ],
+        )
+        .unwrap();
+
+        let records = batch_to_records(&batch);
+        assert!(records.is_empty(), "Empty batch should produce no records");
+    }
+
+    #[test]
+    fn test_record_to_batch_empty_topics() {
+        let mut record = test_record("empty-topics", 0);
+        record.topics = Vec::new();
+        let batch = record_to_batch(&record).unwrap();
+        let recovered = batch_to_records(&batch);
+        assert!(
+            recovered[0].topics.is_empty(),
+            "Empty topics should roundtrip"
+        );
+    }
+
+    #[test]
+    fn test_record_to_batch_special_characters_in_content() {
+        let mut record = test_record("special-chars", 0);
+        record.content = "Hello 'world' -- \"quoted\" & <tagged> \n newline".to_string();
+        record.id = "id-with-'quote".to_string();
+        let batch = record_to_batch(&record).unwrap();
+        let recovered = batch_to_records(&batch);
+        assert_eq!(recovered[0].content, record.content);
+        assert_eq!(recovered[0].id, record.id);
+    }
+
+    #[test]
+    fn test_memories_schema_field_count() {
+        let schema = memories_schema();
+        assert_eq!(schema.fields().len(), 12, "Schema should have 12 fields");
+        assert!(schema.field_with_name("id").is_ok());
+        assert!(schema.field_with_name("encoding").is_ok());
+        assert!(schema.field_with_name("timestamp_ms").is_ok());
+        assert!(schema.field_with_name("memory_type").is_ok());
+        assert!(schema.field_with_name("phi").is_ok());
+        assert!(schema.field_with_name("consolidation_strength").is_ok());
+        assert!(schema.field_with_name("retrieval_count").is_ok());
+    }
+
+    #[test]
+    fn test_dir_size_nonexistent_path() {
+        assert_eq!(
+            dir_size("/nonexistent/path/that/does/not/exist"),
+            0,
+            "Non-existent directory should return size 0"
+        );
+    }
+
+    #[test]
+    fn test_batch_to_records_negative_timestamp_clamped() {
+        let record = test_record("neg-ts", 0);
+        let schema = memories_schema();
+        let mut encoding_builder = FixedSizeBinaryBuilder::new(BinaryHV::BYTES as i32);
+        encoding_builder
+            .append_value(record.encoding.0.as_slice())
+            .unwrap();
+
+        let batch_neg = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(StringArray::from(vec!["neg-ts"])),
+                Arc::new(encoding_builder.finish()),
+                Arc::new(Int64Array::from(vec![-5000i64])),
+                Arc::new(StringArray::from(vec!["episodic"])),
+                Arc::new(StringArray::from(vec!["content"])),
+                Arc::new(Float32Array::from(vec![0.0f32])),
+                Arc::new(Float32Array::from(vec![0.0f32])),
+                Arc::new(Float64Array::from(vec![0.0f64])),
+                Arc::new(StringArray::from(vec!["[]"])),
+                Arc::new(StringArray::from(vec!["{}"])),
+                Arc::new(Float64Array::from(vec![0.0f64])),
+                Arc::new(Int32Array::from(vec![0i32])),
+            ],
+        )
+        .unwrap();
+
+        let records = batch_to_records(&batch_neg);
+        assert_eq!(
+            records[0].timestamp_ms, 0,
+            "Negative timestamp should be clamped to 0"
+        );
     }
 }

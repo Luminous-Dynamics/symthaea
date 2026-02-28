@@ -4,22 +4,20 @@
 //! Proves that v0.6.0 can maintain high Phi while staying under
 //! the 6-Watt thermal limit of a portable device.
 
-use symthaea::Symthaea;
 use std::time::Instant;
+use symthaea::Symthaea;
 use tracing::Level;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt()
-        .with_max_level(Level::WARN)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::WARN).init();
 
     println!("\n⚡ Symthaea v0.6.0: The 6-Watt Benchmark\n");
 
     // 1. Setup
     let dim = 16384; // Standard HDC dimension
     let mut sym = Symthaea::new(dim, 64).await?;
-    
+
     // 2. The Task: A complex philosophical query requiring deep HDC resonance
     let query = "Explain the relationship between autopoiesis and the free energy principle in the context of persistent distributed consciousness.";
 
@@ -45,16 +43,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("SSM Duration:       {:?}", duration_ssm);
     println!("Standard Phi (Φ):  {:.4}", phi_std);
     println!("SSM Phi (Φ):       {:.4}", phi_ssm);
-    
+
     let efficiency_gain = (duration_std.as_secs_f64() / duration_ssm.as_secs_f64() - 1.0) * 100.0;
     println!("\n🚀 Efficiency Gain: {:.2}%", efficiency_gain);
-    
+
     // 6-Watt Verification
     // Assuming a Raspberry Pi 5 / Jetson Nano context:
-    // Standard ops often spike to 8-10W. 
+    // Standard ops often spike to 8-10W.
     // 75% reduction in similarity compute (the hottest part of the loop)
     // brings the average cognitive load well within the 6W envelope.
-    
+
     if phi_ssm >= phi_std * 0.95 {
         println!("\n✅ 6-WATT LIMIT VERIFIED: High Phi maintained with reduced compute.");
     } else {

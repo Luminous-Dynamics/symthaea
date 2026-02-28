@@ -481,9 +481,7 @@ fn test_process_mesh_routes_gradients() {
 #[cfg(feature = "mesh")]
 #[tokio::test]
 async fn test_mind_to_mind_mesh_roundtrip() {
-    use crate::swarm::mesh::{
-        BiLoopbackTransport, DualLayerMesh, MeshBridgeHandle, MeshReceiver,
-    };
+    use crate::swarm::mesh::{BiLoopbackTransport, DualLayerMesh, MeshBridgeHandle, MeshReceiver};
 
     // Create paired transports (A writes → B reads, B writes → A reads)
     // Use batman-sized MTU so whole packets fit without fragmentation
@@ -763,9 +761,8 @@ fn test_peer_expiry_cleans_social_coherence() {
     mind.activate();
 
     // Use a very short stale timeout
-    mind.mesh_peers = crate::swarm::mesh::MeshPeerRegistry::with_timeout(
-        std::time::Duration::from_millis(10),
-    );
+    mind.mesh_peers =
+        crate::swarm::mesh::MeshPeerRegistry::with_timeout(std::time::Duration::from_millis(10));
 
     // Inject a peer packet so it gets tracked + modeled in social coherence
     let peer_id = [0xEE; 8];
@@ -1038,9 +1035,7 @@ fn test_federated_outbox_capped() {
 #[cfg(feature = "mesh")]
 #[tokio::test]
 async fn test_mind_to_mind_gradient_roundtrip() {
-    use crate::swarm::mesh::{
-        BiLoopbackTransport, DualLayerMesh, MeshBridgeHandle, MeshReceiver,
-    };
+    use crate::swarm::mesh::{BiLoopbackTransport, DualLayerMesh, MeshBridgeHandle, MeshReceiver};
 
     let (transport_a, transport_b) = BiLoopbackTransport::pair("grad_a", "grad_b", 2100);
     let mesh_a = DualLayerMesh::new([0xAA; 32]).with_batman(Box::new(transport_a));
@@ -1087,9 +1082,7 @@ async fn test_mind_to_mind_gradient_roundtrip() {
 #[cfg(feature = "mesh")]
 #[tokio::test]
 async fn test_mind_to_mind_affective_roundtrip() {
-    use crate::swarm::mesh::{
-        BiLoopbackTransport, DualLayerMesh, MeshBridgeHandle, MeshReceiver,
-    };
+    use crate::swarm::mesh::{BiLoopbackTransport, DualLayerMesh, MeshBridgeHandle, MeshReceiver};
 
     let (transport_a, transport_b) = BiLoopbackTransport::pair("aff_a", "aff_b", 2100);
     let mesh_a = DualLayerMesh::new([0xAA; 32]).with_batman(Box::new(transport_a));
@@ -2423,7 +2416,8 @@ fn test_aimd_budget_floor() {
     mind.adjust_bandwidth_budget();
 
     assert_eq!(
-        mind.mesh_bandwidth_budget, super::super::mesh::MESH_BANDWIDTH_MIN,
+        mind.mesh_bandwidth_budget,
+        super::super::mesh::MESH_BANDWIDTH_MIN,
         "Budget should never go below floor"
     );
 }
@@ -2453,7 +2447,8 @@ fn test_aimd_budget_ceiling() {
     mind.adjust_bandwidth_budget();
 
     assert_eq!(
-        mind.mesh_bandwidth_budget, super::super::mesh::MESH_BANDWIDTH_MAX,
+        mind.mesh_bandwidth_budget,
+        super::super::mesh::MESH_BANDWIDTH_MAX,
         "Budget should never exceed ceiling"
     );
 }

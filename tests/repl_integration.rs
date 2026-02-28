@@ -506,10 +506,7 @@ fn test_consciousness_trajectory_is_finite_and_non_static() {
     }
 
     // Trajectory should not be completely static (at least some variation)
-    let phi_min = phi_trajectory
-        .iter()
-        .cloned()
-        .fold(f32::INFINITY, f32::min);
+    let phi_min = phi_trajectory.iter().cloned().fold(f32::INFINITY, f32::min);
     let phi_max = phi_trajectory
         .iter()
         .cloned()
@@ -665,10 +662,7 @@ fn test_metrics_snapshot_fields_populated() {
         !metrics.cognitive_depth.is_empty(),
         "Cognitive depth should not be empty"
     );
-    assert!(
-        !metrics.strategy.is_empty(),
-        "Strategy should not be empty"
-    );
+    assert!(!metrics.strategy.is_empty(), "Strategy should not be empty");
 
     // Total cycles should reflect the processing we did
     assert!(

@@ -20,6 +20,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -85,7 +87,12 @@ const TRANSFORMS: [TransformType; 4] = [
     TransformType::Reflection,
 ];
 
-fn apply_transform(grid: &[Vec<u8>], tt: TransformType, param: u64, num_colors: u8) -> Vec<Vec<u8>> {
+fn apply_transform(
+    grid: &[Vec<u8>],
+    tt: TransformType,
+    param: u64,
+    num_colors: u8,
+) -> Vec<Vec<u8>> {
     match tt {
         TransformType::ColorFill => {
             let color = (param % num_colors as u64) as u8;
@@ -105,7 +112,11 @@ fn apply_transform(grid: &[Vec<u8>], tt: TransformType, param: u64, num_colors: 
             GridEncoder::color_replace(grid, from, to)
         }
         TransformType::Reflection => {
-            if param % 2 == 0 { GridEncoder::reflect_x(grid) } else { GridEncoder::reflect_y(grid) }
+            if param % 2 == 0 {
+                GridEncoder::reflect_x(grid)
+            } else {
+                GridEncoder::reflect_y(grid)
+            }
         }
     }
 }
@@ -210,10 +221,18 @@ impl ArcNoiseBenchmark {
         }
 
         let accuracy_per_level: [f64; 5] = std::array::from_fn(|i| {
-            if total_per_level[i] > 0 { hits_per_level[i] as f64 / total_per_level[i] as f64 } else { 0.0 }
+            if total_per_level[i] > 0 {
+                hits_per_level[i] as f64 / total_per_level[i] as f64
+            } else {
+                0.0
+            }
         });
         let similarity_per_level: [f64; 5] = std::array::from_fn(|i| {
-            if sim_count[i] > 0 { sim_per_level[i] / sim_count[i] as f64 } else { 0.0 }
+            if sim_count[i] > 0 {
+                sim_per_level[i] / sim_count[i] as f64
+            } else {
+                0.0
+            }
         });
 
         // Noise resilience: trapezoidal AUC of accuracy vs noise_fraction, normalized to [0,1]
@@ -228,7 +247,11 @@ impl ArcNoiseBenchmark {
         // Max possible AUC = 0.5 (integral from 0 to 0.5 of 1.0)
         let noise_resilience = (auc / 0.5).min(1.0);
 
-        let rt_ticks = if total_tasks > 0 { total_ticks / total_tasks as f64 } else { 0.0 };
+        let rt_ticks = if total_tasks > 0 {
+            total_ticks / total_tasks as f64
+        } else {
+            0.0
+        };
 
         TrialResult {
             accuracy_per_level,
@@ -256,6 +279,7 @@ impl PsychBenchmark for ArcNoiseBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let level_names = ["0pct", "10pct", "20pct", "30pct", "50pct"];
         let mut accs_per_level: [Vec<f64>; 5] = Default::default();
@@ -271,6 +295,18 @@ impl PsychBenchmark for ArcNoiseBenchmark {
             }
             resiliences.push(r.noise_resilience);
             rts.push(r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "arc_noise".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         for (i, name) in level_names.iter().enumerate() {
@@ -287,13 +323,16 @@ impl PsychBenchmark for ArcNoiseBenchmark {
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
 
         // Accuracy drop from clean to 50% noise
-        let drops: Vec<f64> = accs_per_level[0].iter().zip(accs_per_level[4].iter())
+        let drops: Vec<f64> = accs_per_level[0]
+            .iter()
+            .zip(accs_per_level[4].iter())
             .map(|(clean, noisy)| clean - noisy)
             .collect();
         result.insert("accuracy_drop", MetricValue::from_samples(&drops));
 
         result.conditions = 5; // 5 noise levels
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -338,7 +377,11 @@ mod tests {
         };
         let result = ArcNoiseBenchmark.run(&config);
         let acc = result.metrics["accuracy_0pct"].mean;
-        assert!(acc > 0.4, "Clean accuracy should be near/above chance, got {}", acc);
+        assert!(
+            acc > 0.4,
+            "Clean accuracy should be near/above chance, got {}",
+            acc
+        );
     }
 
     #[test]
@@ -355,7 +398,8 @@ mod tests {
         assert!(
             sim_clean >= sim_noisy - 0.05,
             "50% noise should not improve similarity: clean={}, noisy={}",
-            sim_clean, sim_noisy
+            sim_clean,
+            sim_noisy
         );
     }
 
@@ -363,7 +407,11 @@ mod tests {
     fn test_resilience_bounded() {
         let result = ArcNoiseBenchmark.run(&test_config());
         let res = result.metrics["noise_resilience"].mean;
-        assert!(res >= 0.0 && res <= 1.0, "noise_resilience should be in [0,1], got {}", res);
+        assert!(
+            res >= 0.0 && res <= 1.0,
+            "noise_resilience should be in [0,1], got {}",
+            res
+        );
     }
 
     #[test]
@@ -372,8 +420,12 @@ mod tests {
         let mut rng = 42u64 ^ 0x9E3779B97F4A7C15;
         let corrupted = corrupt_grid(&grid, 0.5, &mut rng, 6);
         // About half the cells should be changed
-        let changed: usize = grid.iter().flatten().zip(corrupted.iter().flatten())
-            .filter(|(a, b)| a != b).count();
+        let changed: usize = grid
+            .iter()
+            .flatten()
+            .zip(corrupted.iter().flatten())
+            .filter(|(a, b)| a != b)
+            .count();
         assert!(changed > 0, "50% noise should change some cells");
         assert!(changed <= 25, "50% noise should change at most 25 cells");
     }
@@ -388,6 +440,9 @@ mod tests {
         };
         let r1 = ArcNoiseBenchmark.run(&config);
         let r2 = ArcNoiseBenchmark.run(&config);
-        assert_eq!(r1.metrics["noise_resilience"].mean, r2.metrics["noise_resilience"].mean);
+        assert_eq!(
+            r1.metrics["noise_resilience"].mean,
+            r2.metrics["noise_resilience"].mean
+        );
     }
 }

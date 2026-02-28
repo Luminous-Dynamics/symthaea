@@ -55,7 +55,10 @@ impl LoopDrivable for StubBenchmark {
 #[ignore = "requires full cognitive loop infrastructure"]
 fn test_loop_runner_creation() {
     let runner = CognitiveLoopBenchmarkRunner::new("psych-bench-test-genesis");
-    assert!(runner.is_some(), "Runner should be creatable with Standard profile");
+    assert!(
+        runner.is_some(),
+        "Runner should be creatable with Standard profile"
+    );
 }
 
 // ── Benchmark Execution ─────────────────────────────────────────────
@@ -97,7 +100,9 @@ fn test_loop_runner_neuromod_clamping() {
         CognitiveLoopBenchmarkRunner::new("psych-bench-clamp-genesis").expect("runner creation");
 
     // Clamp DA high
-    runner.service_mut().clamp_neuromod_levels(Some(0.9), None, None, None);
+    runner
+        .service_mut()
+        .clamp_neuromod_levels(Some(0.9), None, None, None);
 
     let config = bench_config();
     let result = runner.run_benchmark(&StubBenchmark, &config);

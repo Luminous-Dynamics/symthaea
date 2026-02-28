@@ -68,7 +68,10 @@ fn main() {
             ("temporal_consciousness", t.temporal_consciousness),
             ("attention_schema", t.attention_schema),
             ("narrative_gwt", t.narrative_gwt),
-            ("consciousness_thermodynamics", t.consciousness_thermodynamics),
+            (
+                "consciousness_thermodynamics",
+                t.consciousness_thermodynamics,
+            ),
             ("phenomenal_binding", t.phenomenal_binding),
             ("hierarchical_free_energy", t.hierarchical_free_energy),
             ("resonator_recall", t.resonator_recall),
@@ -90,9 +93,15 @@ fn main() {
             ("hierarchical_ltc", t.hierarchical_ltc),
             ("primitive_evolution", t.primitive_evolution),
             ("consciousness_holography", t.consciousness_holography),
-            ("differentiable_consciousness", t.differentiable_consciousness),
+            (
+                "differentiable_consciousness",
+                t.differentiable_consciousness,
+            ),
             ("affective_consciousness", t.affective_consciousness),
-            ("unified_consciousness_pipeline", t.unified_consciousness_pipeline),
+            (
+                "unified_consciousness_pipeline",
+                t.unified_consciousness_pipeline,
+            ),
             ("multi_modal_integration", t.multi_modal_integration),
             ("synthetic_grounding", t.synthetic_grounding),
             ("epistemic_gate", t.epistemic_gate),
@@ -110,7 +119,10 @@ fn main() {
             ("demand_consolidation", t.demand_consolidation),
             ("episodic_replay", t.episodic_replay),
             ("living_mind", t.living_mind),
-            ("master_consciousness_equation", t.master_consciousness_equation),
+            (
+                "master_consciousness_equation",
+                t.master_consciousness_equation,
+            ),
             ("homeostasis", t.homeostasis),
             ("spectral_mip", t.spectral_mip),
             ("soul_experience", t.soul_experience),
@@ -137,7 +149,11 @@ fn main() {
     let instrumented_sum: f64 = averages.iter().map(|(_, v)| v).sum();
     let uninstrumented = avg_total - instrumented_sum;
 
-    println!("Average cycle time: {:.0} µs ({:.1} ms)", avg_total, avg_total / 1000.0);
+    println!(
+        "Average cycle time: {:.0} µs ({:.1} ms)",
+        avg_total,
+        avg_total / 1000.0
+    );
     println!(
         "Target: 20,000 µs (50Hz) | Headroom: {:.0} µs\n",
         20_000.0 - avg_total

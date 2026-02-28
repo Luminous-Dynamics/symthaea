@@ -83,14 +83,123 @@ pub fn difficulty_model_for(name: &str) -> DifficultyModel {
             interference_scale: 0.7,
         },
 
+        // Interference model: working memory benchmarks with competing representations
+        "WorM::N-back" => DifficultyModel {
+            model_type: DifficultyModelType::Interference,
+            temp_scale: 0.3,
+            snr_reduction: 0.0,
+            interference_scale: 0.50, // lure interference from recent non-target items
+        },
+        "WorM::DigitSpan" => DifficultyModel {
+            model_type: DifficultyModelType::Interference,
+            temp_scale: 0.25,
+            snr_reduction: 0.0,
+            interference_scale: 0.40, // proactive interference from prior lists
+        },
+        "WorM::SerialRecall" => DifficultyModel {
+            model_type: DifficultyModelType::Interference,
+            temp_scale: 0.3,
+            snr_reduction: 0.0,
+            interference_scale: 0.45, // output interference from earlier recalls
+        },
+        "WorM::Binding" => DifficultyModel {
+            model_type: DifficultyModelType::Interference,
+            temp_scale: 0.25,
+            snr_reduction: 0.0,
+            interference_scale: 0.35, // feature binding crosstalk between items
+        },
+        "WorM::ChangeDetection" => DifficultyModel {
+            model_type: DifficultyModelType::Interference,
+            temp_scale: 0.2,
+            snr_reduction: 0.0,
+            interference_scale: 0.30, // change blindness from similar distractors
+        },
+        "WorM::SpatialUpdating" => DifficultyModel {
+            model_type: DifficultyModelType::Interference,
+            temp_scale: 0.3,
+            snr_reduction: 0.0,
+            interference_scale: 0.40, // spatial interference from prior positions
+        },
+
+        // Interference model: memory agent tasks with temporal competition
+        "MemoryAgent::LongRange" => DifficultyModel {
+            model_type: DifficultyModelType::Interference,
+            temp_scale: 0.35,
+            snr_reduction: 0.0,
+            interference_scale: 0.50, // temporal interference across long delays
+        },
+        "MemoryAgent::ConflictResolution" => DifficultyModel {
+            model_type: DifficultyModelType::Interference,
+            temp_scale: 0.4,
+            snr_reduction: 0.0,
+            interference_scale: 0.55, // source confusion between conflicting memories
+        },
+
         // SNR model: benchmarks where signal degradation drives errors
+
+        // Executive / inhibition tasks — noise in control signals
+        "Executive::WCST" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.3,
+            snr_reduction: 0.40, // set-shifting noise: rule feedback degrades
+            interference_scale: 0.0,
+        },
+        "Inhibition::StopSignal" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.35,
+            snr_reduction: 0.45, // stop signal degradation: weaker inhibitory cue
+            interference_scale: 0.0,
+        },
+
+        // Attention tasks — target signal masked or degraded
+        "Attention::AttentionalBlink" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.4,
+            snr_reduction: 0.50, // T2 masking: second target deeply masked
+            interference_scale: 0.0,
+        },
+        "Attention::VisualSearch" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.3,
+            snr_reduction: 0.35, // distractor noise: target-distractor similarity
+            interference_scale: 0.0,
+        },
+
+        // Sustained attention tasks — vigilance decrement
+        "SustainedAttention::CPT" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.25,
+            snr_reduction: 0.30, // target degradation: perceptual load on go trials
+            interference_scale: 0.0,
+        },
+        "SustainedAttention::SART" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.3,
+            snr_reduction: 0.35, // inhibition noise: no-go target less salient
+            interference_scale: 0.0,
+        },
+        "SustainedAttention::PVT" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.2,
+            snr_reduction: 0.25, // vigilance signal: stimulus intensity decrement
+            interference_scale: 0.0,
+        },
+
+        // Social cognition — cue subtlety
+        "ToMBench::Hinting" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.3,
+            snr_reduction: 0.35, // social cue noise: indirect hints harder to detect
+            interference_scale: 0.0,
+        },
+
         "Social::RME" => DifficultyModel {
             model_type: DifficultyModelType::Snr,
             temp_scale: 0.3,
             snr_reduction: 0.4,
             interference_scale: 0.0,
         },
-        "Metacognition::FOK" => DifficultyModel {
+        "Metacognition::FeelingOfKnowing" => DifficultyModel {
             model_type: DifficultyModelType::Snr,
             temp_scale: 0.3,
             snr_reduction: 0.35,
@@ -241,5 +350,105 @@ mod tests {
         let t_over = model.temperature_multiplier(2.0);
         assert!((t_neg - model.temperature_multiplier(0.0)).abs() < 1e-10);
         assert!((t_over - model.temperature_multiplier(1.0)).abs() < 1e-10);
+    }
+
+    /// All registered benchmark difficulty models have valid, consistent parameters.
+    #[test]
+    fn test_difficulty_model_coverage() {
+        let registered = [
+            // Interference models
+            "Executive::Stroop",
+            "Executive::Flanker",
+            "Motor::Bimanual",
+            "Affect::EmotionalStroop",
+            "WorM::N-back",
+            "WorM::DigitSpan",
+            "WorM::SerialRecall",
+            "WorM::Binding",
+            "WorM::ChangeDetection",
+            "WorM::SpatialUpdating",
+            "MemoryAgent::LongRange",
+            "MemoryAgent::ConflictResolution",
+            // SNR models
+            "Executive::WCST",
+            "Inhibition::StopSignal",
+            "Attention::AttentionalBlink",
+            "Attention::VisualSearch",
+            "SustainedAttention::CPT",
+            "SustainedAttention::SART",
+            "SustainedAttention::PVT",
+            "ToMBench::Hinting",
+            "Social::RME",
+            "Metacognition::FeelingOfKnowing",
+            "ToMBench::FalseBelief",
+            "Language::SemanticPriming",
+            "Language::LexicalDecision",
+            "Social::UltimatumGame",
+            "Social::SocialNorm",
+            "ToMBench::FauxPas",
+            "ToMBench::Persuasion",
+            "ToMBench::StrangeStory",
+        ];
+
+        for name in &registered {
+            let model = difficulty_model_for(name);
+
+            // Must NOT be Default — every registered name should have a specific model
+            assert_ne!(
+                model.model_type,
+                DifficultyModelType::Default,
+                "{name} fell through to Default model"
+            );
+
+            // temp_scale must be positive
+            assert!(
+                model.temp_scale > 0.0,
+                "{name}: temp_scale must be positive, got {}",
+                model.temp_scale
+            );
+
+            // SNR-specific checks
+            if model.model_type == DifficultyModelType::Snr {
+                assert!(
+                    model.snr_reduction > 0.0 && model.snr_reduction <= 1.0,
+                    "{name}: snr_reduction must be in (0, 1], got {}",
+                    model.snr_reduction
+                );
+                assert!(
+                    model.interference_scale == 0.0,
+                    "{name}: SNR model should have zero interference_scale, got {}",
+                    model.interference_scale
+                );
+                // Signal at max difficulty must remain positive
+                let sig = model.signal_multiplier(1.0);
+                assert!(
+                    sig > 0.0,
+                    "{name}: signal_multiplier at difficulty=1.0 must be > 0, got {}",
+                    sig
+                );
+            }
+
+            // Interference-specific checks
+            if model.model_type == DifficultyModelType::Interference {
+                assert!(
+                    model.interference_scale > 0.0 && model.interference_scale <= 1.0,
+                    "{name}: interference_scale must be in (0, 1], got {}",
+                    model.interference_scale
+                );
+                assert!(
+                    model.snr_reduction == 0.0,
+                    "{name}: Interference model should have zero snr_reduction, got {}",
+                    model.snr_reduction
+                );
+            }
+
+            // Monotonicity: difficulty=1 must be harder than difficulty=0
+            let t0 = model.temperature_multiplier(0.0);
+            let t1 = model.temperature_multiplier(1.0);
+            assert!(
+                t1 > t0,
+                "{name}: temperature must increase with difficulty ({t0} -> {t1})"
+            );
+        }
     }
 }

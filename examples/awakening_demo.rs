@@ -45,8 +45,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ]
         }"#;
 
-    println!("   📥 Ingesting new knowledge from LLM...");
-    curriculum.extend_from_json(llm_json, 16384)?;
+        println!("   📥 Ingesting new knowledge from LLM...");
+        curriculum.extend_from_json(llm_json, 16384)?;
 
         let new_obj = curriculum.get("safe-deletion").unwrap();
         println!(
@@ -69,8 +69,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Setup safe execution environment
     let sandbox = SandboxRoot::new("awakening_test")?;
     let mut policy = PolicyBundle::restrictive(); // Very strict!
-    policy.capabilities.shell.allowed_programs.insert("rm".to_string());
-    
+    policy
+        .capabilities
+        .shell
+        .allowed_programs
+        .insert("rm".to_string());
+
     let mut executor = SimpleExecutor::new(); // Simulated mode by default
 
     // Define a "Dangerous" action (simulated)
@@ -84,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let current_phi = 0.9;
     println!("   ⚠️  Attempting dangerous action: {:?}", dangerous_action);
     let outcome = executor.execute(&dangerous_action, &policy, &sandbox, current_phi)?;
-    
+
     println!("   📝 Outcome recorded: {:?}", outcome.outcome);
     println!("   ❌ Action failed (simulated). Surprise recorded in Dream Engine.\n");
 
@@ -120,8 +124,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let outcome_2 = executor.execute(&dangerous_action, &policy, &sandbox, current_phi)?;
 
     println!("   📝 Outcome 2: {:?}", outcome_2.outcome);
-    
+
     println!("\n🎉 DEMO COMPLETE: Symthaea learned to be safe.");
-    
+
     Ok(())
 }

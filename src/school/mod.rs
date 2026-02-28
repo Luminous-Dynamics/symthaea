@@ -105,8 +105,8 @@ pub mod curriculum;
 pub mod curriculum_extender;
 pub mod curriculum_loader;
 pub mod objective;
-pub mod reality_check;
 pub mod polymath_drive;
+pub mod reality_check;
 
 pub mod coherence_bridge;
 pub mod lookahead;
@@ -117,9 +117,7 @@ pub use assessment::{
 };
 pub use curriculum::{Curriculum, CurriculumBuilder, CurriculumType};
 #[cfg(feature = "web_research_module")]
-pub use curriculum_extender::{
-    CurriculumExtender, ResearchSummary, CURRICULUM_ARCHITECT_PROMPT,
-};
+pub use curriculum_extender::{CurriculumExtender, ResearchSummary, CURRICULUM_ARCHITECT_PROMPT};
 pub use curriculum_loader::{
     CurriculumLoader, CurriculumMeta, CurriculumSpec, CurriculumStore, LoadError, ObjectiveSpec,
 };

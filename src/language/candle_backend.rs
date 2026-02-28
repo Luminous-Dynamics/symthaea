@@ -1,13 +1,13 @@
 use anyhow::{anyhow, Result};
 use candle_core::{DType, Device, Tensor};
-use candle_transformers::models::llama as llama_model;
 use candle_transformers::generation::LogitsProcessor;
+use candle_transformers::models::llama as llama_model;
 use hf_hub::{api::sync::Api, Repo};
-use tokenizers::Tokenizer;
 use std::sync::Arc;
+use tokenizers::Tokenizer;
 use tokio::sync::Mutex;
 
-use super::llm_backend::{LLMBackend, GenerationParams};
+use super::llm_backend::{GenerationParams, LLMBackend};
 
 /// Affective Logits Processor that warps vocabulary based on physics.
 pub struct AffectiveLogitsProcessor {
@@ -32,7 +32,7 @@ impl AffectiveLogitsProcessor {
         } else {
             logits.clone()
         };
-        
+
         // Use internal candle sampler
         let token = self.inner.sample(&logits)?;
         Ok(token)
@@ -76,13 +76,21 @@ impl CandleBackend {
     }
 
     pub fn set_affect(&self, load: f32, temp: f32) {
-        self.thermodynamic_load.store(load.to_bits(), std::sync::atomic::Ordering::Relaxed);
-        self.mood_temperature.store(temp.to_bits(), std::sync::atomic::Ordering::Relaxed);
+        self.thermodynamic_load
+            .store(load.to_bits(), std::sync::atomic::Ordering::Relaxed);
+        self.mood_temperature
+            .store(temp.to_bits(), std::sync::atomic::Ordering::Relaxed);
     }
 
     fn get_affect(&self) -> (f32, f32) {
-        let load = f32::from_bits(self.thermodynamic_load.load(std::sync::atomic::Ordering::Relaxed));
-        let temp = f32::from_bits(self.mood_temperature.load(std::sync::atomic::Ordering::Relaxed));
+        let load = f32::from_bits(
+            self.thermodynamic_load
+                .load(std::sync::atomic::Ordering::Relaxed),
+        );
+        let temp = f32::from_bits(
+            self.mood_temperature
+                .load(std::sync::atomic::Ordering::Relaxed),
+        );
         (load, temp)
     }
 }
@@ -99,9 +107,14 @@ impl LLMBackend for CandleBackend {
     }
 
     async fn generate(&self, prompt: &str, params: &GenerationParams) -> Result<String> {
-        let mut tokens = self.tokenizer.encode(prompt, true).map_err(|e| anyhow!(e))?.get_ids().to_vec();
+        let mut tokens = self
+            .tokenizer
+            .encode(prompt, true)
+            .map_err(|e| anyhow!(e))?
+            .get_ids()
+            .to_vec();
         let (load, mood_temp) = self.get_affect();
-        
+
         // 1. Affective Logit Warping
         // High load -> Low repetition penalty (stuttering), Small Top-K (limited vocabulary)
         // Rested -> High repetition penalty (diverse), Large Top-K
@@ -109,9 +122,10 @@ impl LLMBackend for CandleBackend {
         let top_k = if load > 0.8 { Some(10) } else { Some(50) };
         let temperature = mood_temp.clamp(0.1, 2.0);
 
-        let mut logits_processor = AffectiveLogitsProcessor::new(42, temperature, rep_penalty, top_k);
+        let mut logits_processor =
+            AffectiveLogitsProcessor::new(42, temperature, rep_penalty, top_k);
         let mut generated_text = String::new();
-        
+
         let mut model = self.model.lock().await;
 
         for i in 0..params.max_tokens {
@@ -119,11 +133,14 @@ impl LLMBackend for CandleBackend {
             let logits = model.forward(&input, tokens.len())?;
             let logits = logits.squeeze(0)?;
             let logits = logits.get(logits.dim(0)? - 1)?;
-            
+
             let next_token = logits_processor.sample(&logits)?;
             tokens.push(next_token);
-            
-            let token_text = self.tokenizer.decode(&[next_token], true).map_err(|e| anyhow!(e))?;
+
+            let token_text = self
+                .tokenizer
+                .decode(&[next_token], true)
+                .map_err(|e| anyhow!(e))?;
             generated_text.push_str(&token_text);
 
             if token_text.contains("<|end_of_text|>") || token_text.contains("</s>") {

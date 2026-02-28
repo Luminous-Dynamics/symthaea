@@ -236,7 +236,7 @@ impl SleepStateProof {
 
     fn compute_confidence(&self) -> f64 {
         // More epochs = higher confidence
-        
+
         (self.epoch_count as f64 / 20.0).min(1.0)
     }
 }

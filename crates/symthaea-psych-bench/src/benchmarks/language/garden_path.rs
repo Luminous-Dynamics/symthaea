@@ -18,6 +18,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Garden-Path benchmark.
@@ -110,10 +112,8 @@ impl GardenPathBenchmark {
 
                 // Reanalysis success: must overcome initial parse
                 xor_shift(&mut rng);
-                let reanalysis_noise_val =
-                    (rng % 10000) as f32 / 10000.0 * reanalysis_noise;
-                let reanalysis_score = revised_parse.similarity(&role_verb)
-                    + reanalysis_noise_val;
+                let reanalysis_noise_val = (rng % 10000) as f32 / 10000.0 * reanalysis_noise;
+                let reanalysis_score = revised_parse.similarity(&role_verb) + reanalysis_noise_val;
 
                 // Higher cost → harder to reanalyze correctly
                 let threshold = 0.15 + cost as f32 * 0.30;
@@ -202,6 +202,7 @@ impl PsychBenchmark for GardenPathBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut costs = Vec::new();
         let mut overall_accs = Vec::new();
@@ -216,6 +217,18 @@ impl PsychBenchmark for GardenPathBenchmark {
             gp_accs.push(r.garden_path_accuracy);
             ctrl_accs.push(r.control_accuracy);
             rts.push(r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "garden_path".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("disambiguation_cost", MetricValue::from_samples(&costs));
@@ -226,6 +239,7 @@ impl PsychBenchmark for GardenPathBenchmark {
 
         result.conditions = 2; // garden-path vs control
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -271,7 +285,11 @@ mod tests {
         };
         let result = GardenPathBenchmark.run(&config);
         let cost = result.metrics["disambiguation_cost"].mean;
-        assert!(cost > 0.0, "disambiguation cost ({:.3}) should be > 0", cost);
+        assert!(
+            cost > 0.0,
+            "disambiguation cost ({:.3}) should be > 0",
+            cost
+        );
     }
 
     #[test]
@@ -293,7 +311,8 @@ mod tests {
         assert!(
             rt_press <= rt_base + 0.5,
             "time pressure should reduce RT: base={:.2}, pressed={:.2}",
-            rt_base, rt_press
+            rt_base,
+            rt_press
         );
     }
 }

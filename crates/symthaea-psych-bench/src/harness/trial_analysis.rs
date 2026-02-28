@@ -153,7 +153,10 @@ impl TrialAnalysis {
     /// Compute calibration metrics (ECE and gamma) from per-trial confidence and accuracy.
     pub fn trial_calibration(trace: &[TrialOutcome]) -> CalibrationResult {
         if trace.is_empty() {
-            return CalibrationResult { ece: 0.0, gamma: 0.0 };
+            return CalibrationResult {
+                ece: 0.0,
+                gamma: 0.0,
+            };
         }
 
         // ECE: bin trials by confidence into 10 bins
@@ -185,7 +188,11 @@ impl TrialAnalysis {
         let mut concordant = 0u64;
         let mut discordant = 0u64;
         // Sample pairs to keep O(n log n) manageable — use stride for large traces
-        let stride = if trace.len() > 500 { trace.len() / 250 } else { 1 };
+        let stride = if trace.len() > 500 {
+            trace.len() / 250
+        } else {
+            1
+        };
         let mut i = 0;
         while i < trace.len() {
             let mut j = i + stride;
@@ -216,10 +223,16 @@ impl TrialAnalysis {
     }
 
     /// Compute speed-accuracy tradeoff: Pearson r between block mean RT and block accuracy.
-    pub fn speed_accuracy_tradeoff(trace: &[TrialOutcome], block_size: usize) -> SpeedAccuracyResult {
+    pub fn speed_accuracy_tradeoff(
+        trace: &[TrialOutcome],
+        block_size: usize,
+    ) -> SpeedAccuracyResult {
         let curve = Self::learning_curve(trace, block_size);
         if curve.len() < 3 {
-            return SpeedAccuracyResult { pearson_r: 0.0, n_blocks: curve.len() };
+            return SpeedAccuracyResult {
+                pearson_r: 0.0,
+                n_blocks: curve.len(),
+            };
         }
 
         let n = curve.len() as f64;
@@ -275,7 +288,9 @@ mod tests {
     #[test]
     fn test_learning_curve_basic() {
         let trace = make_trace(
-            &[true, true, false, true, true, true, false, false, true, true],
+            &[
+                true, true, false, true, true, true, false, false, true, true,
+            ],
             &[5.0, 4.0, 6.0, 3.0, 5.0, 4.0, 7.0, 8.0, 3.0, 4.0],
         );
         let curve = TrialAnalysis::learning_curve(&trace, 5);
@@ -294,7 +309,9 @@ mod tests {
     #[test]
     fn test_error_bursts_detection() {
         // Pattern: 2 correct, 4 errors (burst!), 1 correct, 3 errors (burst!)
-        let correct = [true, true, false, false, false, false, true, false, false, false];
+        let correct = [
+            true, true, false, false, false, false, true, false, false, false,
+        ];
         let rts = [5.0; 10];
         let trace = make_trace(&correct, &rts);
         let bursts = TrialAnalysis::error_bursts(&trace);
@@ -348,7 +365,11 @@ mod tests {
             });
         }
         let cal = TrialAnalysis::trial_calibration(&trace);
-        assert!(cal.gamma > 0.5, "gamma should be positive for well-calibrated: {}", cal.gamma);
+        assert!(
+            cal.gamma > 0.5,
+            "gamma should be positive for well-calibrated: {}",
+            cal.gamma
+        );
         assert!(cal.ece.is_finite());
     }
 
@@ -380,6 +401,10 @@ mod tests {
         }
         let sat = TrialAnalysis::speed_accuracy_tradeoff(&trace, 10);
         assert_eq!(sat.n_blocks, 4);
-        assert!(sat.pearson_r < 0.0, "expected negative SAT correlation, got {}", sat.pearson_r);
+        assert!(
+            sat.pearson_r < 0.0,
+            "expected negative SAT correlation, got {}",
+            sat.pearson_r
+        );
     }
 }

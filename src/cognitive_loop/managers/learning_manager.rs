@@ -15,7 +15,9 @@
 //! Tracks learning dynamics meta-state (surprise history, plasticity windows).
 //! Does NOT own actual learning algorithms — models the meta-level gating.
 
-use super::super::subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags};
+use super::super::subsystem_trait::{
+    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+};
 
 /// Learning Manager — meta-level learning rate gating and plasticity control.
 ///
@@ -118,8 +120,8 @@ impl CognitiveSubsystem for LearningManager {
         } else {
             0.0 // neutral zone
         };
-        self.plasticity = (self.plasticity + plasticity_drive)
-            .clamp(Self::MIN_PLASTICITY, Self::MAX_PLASTICITY);
+        self.plasticity =
+            (self.plasticity + plasticity_drive).clamp(Self::MIN_PLASTICITY, Self::MAX_PLASTICITY);
 
         // Plasticity → LR modulation
         // High plasticity = higher learning rate
@@ -178,7 +180,10 @@ impl CognitiveSubsystem for LearningManager {
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
         if data.len() < 13 {
-            return Err(format!("LearningManager checkpoint too short: {} < 13", data.len()));
+            return Err(format!(
+                "LearningManager checkpoint too short: {} < 13",
+                data.len()
+            ));
         }
         self.plasticity = f32::from_le_bytes(data[0..4].try_into().unwrap());
         self.error_trend = f32::from_le_bytes(data[4..8].try_into().unwrap());
@@ -227,8 +232,11 @@ mod tests {
             lm.process(&surprising);
         }
 
-        assert!(lm.plasticity > 0.5,
-            "Plasticity should increase on surprise: {}", lm.plasticity);
+        assert!(
+            lm.plasticity > 0.5,
+            "Plasticity should increase on surprise: {}",
+            lm.plasticity
+        );
     }
 
     #[test]
@@ -240,8 +248,11 @@ mod tests {
             lm.process(&boring);
         }
 
-        assert!(lm.plasticity < 0.5,
-            "Plasticity should decrease on low error: {}", lm.plasticity);
+        assert!(
+            lm.plasticity < 0.5,
+            "Plasticity should decrease on low error: {}",
+            lm.plasticity
+        );
     }
 
     #[test]
@@ -253,7 +264,10 @@ mod tests {
             lm.process(&drowsy);
         }
 
-        assert!(lm.in_dream_phase, "Should enter dream phase on sustained low arousal");
+        assert!(
+            lm.in_dream_phase,
+            "Should enter dream phase on sustained low arousal"
+        );
     }
 
     #[test]
@@ -276,8 +290,11 @@ mod tests {
         let stressed = snapshot(0.3, 0.5, 0.2);
 
         let output = lm.process(&stressed);
-        assert!(output.lr_modulation < 1.0,
-            "Low health should dampen learning: {}", output.lr_modulation);
+        assert!(
+            output.lr_modulation < 1.0,
+            "Low health should dampen learning: {}",
+            output.lr_modulation
+        );
     }
 
     #[test]

@@ -16,6 +16,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// SART benchmark.
@@ -50,7 +52,6 @@ impl SartBenchmark {
         let target_hv = &digits[target_idx];
 
         let total_stimuli = 225; // Standard SART: 225 trials (25 per digit)
-        let _target_rate = 1.0 / 9.0; // Each digit appears equally
 
         // Time pressure: raises response criterion noise, modeling impulsive responding
         // under deadline (Robertson et al., 1997).
@@ -161,7 +162,11 @@ fn probit(p: f64) -> f64 {
     let d2 = 0.189269;
     let d3 = 0.001308;
     let z = t - (c0 + c1 * t + c2 * t * t) / (1.0 + d1 * t + d2 * t * t + d3 * t * t * t);
-    if p < 0.5 { -z } else { z }
+    if p < 0.5 {
+        -z
+    } else {
+        z
+    }
 }
 
 impl PsychBenchmark for SartBenchmark {
@@ -181,6 +186,7 @@ impl PsychBenchmark for SartBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut commissions = Vec::new();
         let mut omissions = Vec::new();
@@ -193,6 +199,18 @@ impl PsychBenchmark for SartBenchmark {
             omissions.push(r.omission_errors);
             dprimes.push(r.d_prime);
             rts.push(r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "sart".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("commission_errors", MetricValue::from_samples(&commissions));
@@ -202,6 +220,7 @@ impl PsychBenchmark for SartBenchmark {
 
         result.conditions = 2; // go vs no-go
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -247,7 +266,11 @@ mod tests {
         };
         let result = SartBenchmark.run(&config);
         let comm = result.metrics["commission_errors"].mean;
-        assert!(comm >= 0.0 && comm <= 1.0, "commission rate ({:.3}) out of bounds", comm);
+        assert!(
+            comm >= 0.0 && comm <= 1.0,
+            "commission rate ({:.3}) out of bounds",
+            comm
+        );
     }
 
     #[test]
@@ -270,7 +293,8 @@ mod tests {
         assert!(
             rt_press <= rt_base + 0.5,
             "time pressure should reduce or maintain RT: base={:.2}, pressed={:.2}",
-            rt_base, rt_press
+            rt_base,
+            rt_press
         );
     }
 }

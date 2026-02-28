@@ -18,8 +18,8 @@ use std::io::Write;
 use std::process;
 
 use symthaea_broca::encoder::ThoughtChannels;
-use symthaea_broca::training::{generate_diverse_thoughts, thought_to_prompt, TrainingPair};
 use symthaea_broca::tokenizer::BpeTokenizer;
+use symthaea_broca::training::{generate_diverse_thoughts, thought_to_prompt, TrainingPair};
 
 fn main() {
     tracing_subscriber::fmt()
@@ -95,11 +95,22 @@ fn main() {
 
             // Query each model and write separate training pairs
             for (model_idx, model_name) in models.iter().enumerate() {
-                match query_ollama(&opts.ollama_url, model_name, &system_prompt, &prompt, opts.temperature, max_tokens) {
+                match query_ollama(
+                    &opts.ollama_url,
+                    model_name,
+                    &system_prompt,
+                    &prompt,
+                    opts.temperature,
+                    max_tokens,
+                ) {
                     Ok(response) => {
                         let response = response.trim().to_string();
                         if response.is_empty() {
-                            if model_idx == 0 { error_count += 1; } else { model2_errors += 1; }
+                            if model_idx == 0 {
+                                error_count += 1;
+                            } else {
+                                model2_errors += 1;
+                            }
                             continue;
                         }
 
@@ -108,7 +119,11 @@ fn main() {
                             Ok(line) => {
                                 if let Err(e) = writeln!(file, "{line}") {
                                     eprintln!("Write error: {e}");
-                                    if model_idx == 0 { error_count += 1; } else { model2_errors += 1; }
+                                    if model_idx == 0 {
+                                        error_count += 1;
+                                    } else {
+                                        model2_errors += 1;
+                                    }
                                 } else {
                                     if model_idx == 0 {
                                         success_count += 1;
@@ -121,7 +136,11 @@ fn main() {
                             }
                             Err(e) => {
                                 tracing::warn!(error = %e, model = %model_name, "Failed to serialize pair");
-                                if model_idx == 0 { error_count += 1; } else { model2_errors += 1; }
+                                if model_idx == 0 {
+                                    error_count += 1;
+                                } else {
+                                    model2_errors += 1;
+                                }
                             }
                         }
                     }
@@ -133,7 +152,11 @@ fn main() {
                             error = %e,
                             "Ollama query failed"
                         );
-                        if model_idx == 0 { error_count += 1; } else { model2_errors += 1; }
+                        if model_idx == 0 {
+                            error_count += 1;
+                        } else {
+                            model2_errors += 1;
+                        }
                     }
                 }
             }
@@ -157,8 +180,14 @@ fn main() {
     }
 
     let intent_names = [
-        "Acknowledge", "Answer", "Query", "Suggest",
-        "Wonder", "Reflect", "Continue", "General",
+        "Acknowledge",
+        "Answer",
+        "Query",
+        "Suggest",
+        "Wonder",
+        "Reflect",
+        "Continue",
+        "General",
     ];
 
     println!("\n--- Collection Summary ---");
@@ -168,7 +197,10 @@ fn main() {
     }
     println!("  Total configs: {}", base_thoughts.len());
     println!("  Repeats:       {}", opts.repeats);
-    println!("  Curriculum:    {}", if opts.curriculum { "yes" } else { "no" });
+    println!(
+        "  Curriculum:    {}",
+        if opts.curriculum { "yes" } else { "no" }
+    );
     println!("  Model 1 ok:    {success_count}");
     println!("  Model 1 err:   {error_count}");
     if opts.model2.is_some() {
@@ -254,14 +286,14 @@ fn intent_max_tokens(channels: &ThoughtChannels) -> usize {
         .max_by(|&a, &b| channels.channels[a].total_cmp(&channels.channels[b]))
         .unwrap_or(7);
     match intent_idx {
-        0 => 64,   // Acknowledge — short and warm
-        1 => 96,   // Answer — moderate detail
-        2 => 80,   // Query — concise question
-        3 => 96,   // Suggest — actionable proposal
-        4 => 80,   // Wonder — brief uncertainty
-        5 => 128,  // Reflect — room for depth
-        6 => 128,  // Continue — extended thought
-        _ => 96,   // Fallback
+        0 => 64,  // Acknowledge — short and warm
+        1 => 96,  // Answer — moderate detail
+        2 => 80,  // Query — concise question
+        3 => 96,  // Suggest — actionable proposal
+        4 => 80,  // Wonder — brief uncertainty
+        5 => 128, // Reflect — room for depth
+        6 => 128, // Continue — extended thought
+        _ => 96,  // Fallback
     }
 }
 
@@ -302,8 +334,8 @@ fn query_ollama(
         .into_string()
         .map_err(|e| format!("Failed to read response: {e}"))?;
 
-    let parsed: serde_json::Value = serde_json::from_str(&response_body)
-        .map_err(|e| format!("Failed to parse JSON: {e}"))?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(&response_body).map_err(|e| format!("Failed to parse JSON: {e}"))?;
 
     parsed["response"]
         .as_str()
@@ -353,7 +385,8 @@ fn parse_args(args: &[String]) -> Result<CollectOpts, String> {
             }
             "--repeats" => {
                 i += 1;
-                opts.repeats = args.get(i)
+                opts.repeats = args
+                    .get(i)
                     .ok_or("--repeats requires a number")?
                     .parse()
                     .map_err(|_| "--repeats must be a positive integer")?;
@@ -367,7 +400,8 @@ fn parse_args(args: &[String]) -> Result<CollectOpts, String> {
             }
             "--temperature" => {
                 i += 1;
-                opts.temperature = args.get(i)
+                opts.temperature = args
+                    .get(i)
                     .ok_or("--temperature requires a number")?
                     .parse()
                     .map_err(|_| "--temperature must be a float")?;

@@ -80,9 +80,7 @@ fn main() {
         );
     }
 
-    println!(
-        "\n  \u{26A0} Palladium/Erbium fail in MINUTES under fusion conditions"
-    );
+    println!("\n  \u{26A0} Palladium/Erbium fail in MINUTES under fusion conditions");
 
     // Search for self-healing alloys
     println!("\n{}", "━".repeat(72));
@@ -219,7 +217,8 @@ fn main() {
 
     if let Some(liq) = liquid {
         println!(
-            "\n  \u{1F4A7} {} - The Ultimate Self-Healer", liq.alloy.name
+            "\n  \u{1F4A7} {} - The Ultimate Self-Healer",
+            liq.alloy.name
         );
         println!();
         println!(

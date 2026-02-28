@@ -9,8 +9,8 @@
 // Metrics: final_10_avg_error, coherence at cycle 100
 // ==================================================================================
 
-use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 use std::sync::OnceLock;
+use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
 const GENESIS_SEED: &str = "ablation_test_deterministic_seed_v061";
 const PATTERN: &[&str] = &["alpha beta", "gamma delta", "epsilon zeta", "eta theta"];

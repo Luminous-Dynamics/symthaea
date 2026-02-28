@@ -470,7 +470,11 @@ mod tests {
             (cll.exploration_rate() - 0.2).abs() < f32::EPSILON,
             "exploration_rate should reset to 0.2"
         );
-        assert_eq!(cll.total_interactions(), 0, "total_interactions should reset to 0");
+        assert_eq!(
+            cll.total_interactions(),
+            0,
+            "total_interactions should reset to 0"
+        );
         assert!(
             cll.average_reward().abs() < f32::EPSILON,
             "average_reward should reset to 0.0"
@@ -480,7 +484,10 @@ mod tests {
             &[0; 5],
             "strategy_counts should reset to zeros"
         );
-        assert!(cll.last_result.is_none(), "last_result should reset to None");
+        assert!(
+            cll.last_result.is_none(),
+            "last_result should reset to None"
+        );
     }
 
     #[test]

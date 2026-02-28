@@ -6,6 +6,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 
 use super::sample_action;
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
@@ -152,6 +154,7 @@ impl PsychBenchmark for TemporalDiscountingBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut scores = Vec::new();
         let mut all_rts = Vec::new();
@@ -160,6 +163,18 @@ impl PsychBenchmark for TemporalDiscountingBenchmark {
             let (s, rts) = self.run_trial(config, trial);
             scores.push(s);
             all_rts.extend_from_slice(&rts);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "discounting".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("discounting_score_S", MetricValue::from_samples(&scores));
@@ -167,6 +182,7 @@ impl PsychBenchmark for TemporalDiscountingBenchmark {
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

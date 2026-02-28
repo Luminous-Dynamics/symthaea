@@ -13,9 +13,7 @@
 
 #![cfg(feature = "liquid-mamba")]
 
-use symthaea_broca::{
-    LiquidMambaConfig, LiquidMambaGenerator, ThoughtChannels,
-};
+use symthaea_broca::{LiquidMambaConfig, LiquidMambaGenerator, ThoughtChannels};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -80,7 +78,10 @@ fn test_output_hvs_collected() {
     }
 
     // Semantic PE should be finite and in [0, 2] (1 - cosine similarity)
-    assert!(result.semantic_pe.is_finite(), "semantic_pe should be finite");
+    assert!(
+        result.semantic_pe.is_finite(),
+        "semantic_pe should be finite"
+    );
     assert!(
         result.semantic_pe >= 0.0 && result.semantic_pe <= 2.0,
         "semantic_pe {} should be in [0, 2]",
@@ -90,7 +91,8 @@ fn test_output_hvs_collected() {
     // Each output HV should have the HDC dimension (16384 by default)
     for (i, hv) in result.output_hvs.iter().enumerate() {
         assert_eq!(
-            hv.values.len(), 16384,
+            hv.values.len(),
+            16384,
             "output_hvs[{i}] should have 16384 dimensions"
         );
         assert!(
@@ -113,10 +115,8 @@ fn test_different_intents_differ() {
         ..Default::default()
     };
 
-    let mut gen1 = LiquidMambaGenerator::new(&genesis, config.clone())
-        .expect("load failed");
-    let mut gen2 = LiquidMambaGenerator::new(&genesis, config)
-        .expect("load failed");
+    let mut gen1 = LiquidMambaGenerator::new(&genesis, config.clone()).expect("load failed");
+    let mut gen2 = LiquidMambaGenerator::new(&genesis, config).expect("load failed");
 
     let ch_answer = ThoughtChannels::with_intent(1); // Answer
     let ch_reflect = ThoughtChannels::with_intent(5); // Reflect
@@ -146,8 +146,7 @@ fn test_coherence_monitoring() {
         ..Default::default()
     };
 
-    let mut gen = LiquidMambaGenerator::new(&genesis, config)
-        .expect("load failed");
+    let mut gen = LiquidMambaGenerator::new(&genesis, config).expect("load failed");
     let channels = ThoughtChannels::default();
     let result = gen.generate(&channels);
 
@@ -165,10 +164,8 @@ fn test_coherence_monitoring() {
 fn test_direct_neural_path() {
     use symthaea::language::ssm_backend::thought_to_channels;
     use symthaea::mind::structured_thought::{
-        ActivatedConcept, EmotionalTone, StructuredThought, SemanticIntent,
-        EpistemicStatus,
+        ActivatedConcept, EmotionalTone, EpistemicStatus, SemanticIntent, StructuredThought,
     };
-
 
     let mut thought = StructuredThought::default();
     thought.semantic_intent = SemanticIntent::Answer;
@@ -180,13 +177,11 @@ fn test_direct_neural_path() {
     };
     thought.psi = 0.7;
     thought.coherence = 0.8;
-    thought.activated_concepts = vec![
-        ActivatedConcept {
-            name: "test".to_string(),
-            activation: 0.9,
-            relevance: 0.8,
-        },
-    ];
+    thought.activated_concepts = vec![ActivatedConcept {
+        name: "test".to_string(),
+        activation: 0.9,
+        relevance: 0.8,
+    }];
 
     let channels = thought_to_channels(&thought, 1.0);
     let mut gen = make_generator();
@@ -221,7 +216,8 @@ fn test_gradient_convergence() {
         let refs: Vec<&ContinuousHV> = result.output_hvs.iter().collect();
         let bundled = ContinuousHV::bundle(&refs).normalize();
 
-        gen.projection_mut().compute_gradients(&thought_hv, &bundled);
+        gen.projection_mut()
+            .compute_gradients(&thought_hv, &bundled);
         gen.projection_mut().apply_gradients(0.001, 1.0);
 
         last_pe = result.semantic_pe;
@@ -251,8 +247,7 @@ fn test_biological_modulation() {
         ..Default::default()
     };
 
-    let mut gen = LiquidMambaGenerator::new(&genesis, config)
-        .expect("load failed");
+    let mut gen = LiquidMambaGenerator::new(&genesis, config).expect("load failed");
 
     // Simulate exhausted state
     gen.update_affect(0.95, 0.5);
@@ -282,7 +277,10 @@ fn test_distill_step_end_to_end() {
 
     // PE should be tracked after generation
     let pe_after_gen = gen.last_semantic_pe();
-    assert!(pe_after_gen.is_finite(), "PE should be finite after generate()");
+    assert!(
+        pe_after_gen.is_finite(),
+        "PE should be finite after generate()"
+    );
     assert_eq!(
         pe_after_gen, result.semantic_pe,
         "last_semantic_pe() should match result.semantic_pe"
@@ -292,11 +290,17 @@ fn test_distill_step_end_to_end() {
     gen.distill_step(&channels, &result);
 
     // Generation count should have incremented
-    assert!(gen.generation_count() >= 1, "generation_count should increment");
+    assert!(
+        gen.generation_count() >= 1,
+        "generation_count should increment"
+    );
 
     // Generate again — PE may change
     let result2 = gen.generate(&channels);
-    assert!(result2.semantic_pe.is_finite(), "PE should stay finite after distill");
+    assert!(
+        result2.semantic_pe.is_finite(),
+        "PE should stay finite after distill"
+    );
     assert!(
         gen.last_semantic_pe().is_finite(),
         "last_semantic_pe should stay finite after second generation"
@@ -354,14 +358,12 @@ fn test_update_affect_changes_delta_modulation() {
     };
 
     // Normal state: load=0, temp=1.0
-    let mut gen_normal = LiquidMambaGenerator::new(&genesis, config.clone())
-        .expect("load failed");
+    let mut gen_normal = LiquidMambaGenerator::new(&genesis, config.clone()).expect("load failed");
     gen_normal.update_affect(0.0, 1.0);
     assert!((gen_normal.mood_temperature() - 1.0).abs() < 0.01);
 
     // Hot mood: load=0.5, temp=2.0
-    let mut gen_hot = LiquidMambaGenerator::new(&genesis, config)
-        .expect("load failed");
+    let mut gen_hot = LiquidMambaGenerator::new(&genesis, config).expect("load failed");
     gen_hot.update_affect(0.5, 2.0);
     assert!((gen_hot.mood_temperature() - 2.0).abs() < 0.01);
 
@@ -378,7 +380,8 @@ fn test_update_affect_changes_delta_modulation() {
     if result_normal.num_tokens > 2 && result_hot.num_tokens > 2 {
         // They may differ in tokens or coherence
         let token_diff = result_normal.token_ids != result_hot.token_ids;
-        let coherence_diff = (result_normal.final_coherence - result_hot.final_coherence).abs() > 0.01;
+        let coherence_diff =
+            (result_normal.final_coherence - result_hot.final_coherence).abs() > 0.01;
         eprintln!(
             "Affect modulation: normal={} tokens, hot={} tokens, token_diff={}, coherence_diff={}",
             result_normal.num_tokens, result_hot.num_tokens, token_diff, coherence_diff

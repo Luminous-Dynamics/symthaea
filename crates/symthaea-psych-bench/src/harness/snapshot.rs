@@ -174,10 +174,16 @@ impl RegressionSnapshot {
         for (bench, bench_metrics) in &self.metrics {
             for (metric_name, val) in bench_metrics {
                 if !val.mean.is_finite() {
-                    errors.push(format!("{}/{}: mean is not finite ({:?})", bench, metric_name, val.mean));
+                    errors.push(format!(
+                        "{}/{}: mean is not finite ({:?})",
+                        bench, metric_name, val.mean
+                    ));
                 }
                 if !val.std_dev.is_finite() {
-                    errors.push(format!("{}/{}: std_dev is not finite ({:?})", bench, metric_name, val.std_dev));
+                    errors.push(format!(
+                        "{}/{}: std_dev is not finite ({:?})",
+                        bench, metric_name, val.std_dev
+                    ));
                 }
             }
         }

@@ -146,10 +146,7 @@ mod tests {
 
     #[test]
     fn test_primitive_to_intent_acknowledge() {
-        assert_eq!(
-            primitive_to_intent_index(&["assert".to_string()]),
-            0
-        );
+        assert_eq!(primitive_to_intent_index(&["assert".to_string()]), 0);
         assert_eq!(
             primitive_to_intent_index(&["confirm_result".to_string()]),
             0
@@ -158,10 +155,7 @@ mod tests {
 
     #[test]
     fn test_primitive_to_intent_answer() {
-        assert_eq!(
-            primitive_to_intent_index(&["answer_user".to_string()]),
-            1
-        );
+        assert_eq!(primitive_to_intent_index(&["answer_user".to_string()]), 1);
         assert_eq!(
             primitive_to_intent_index(&["explain_concept".to_string()]),
             1
@@ -170,14 +164,8 @@ mod tests {
 
     #[test]
     fn test_primitive_to_intent_clarify() {
-        assert_eq!(
-            primitive_to_intent_index(&["query_db".to_string()]),
-            2
-        );
-        assert_eq!(
-            primitive_to_intent_index(&["ask_question".to_string()]),
-            2
-        );
+        assert_eq!(primitive_to_intent_index(&["query_db".to_string()]), 2);
+        assert_eq!(primitive_to_intent_index(&["ask_question".to_string()]), 2);
     }
 
     #[test]
@@ -190,34 +178,22 @@ mod tests {
 
     #[test]
     fn test_primitive_to_intent_uncertainty() {
-        assert_eq!(
-            primitive_to_intent_index(&["maybe_true".to_string()]),
-            4
-        );
+        assert_eq!(primitive_to_intent_index(&["maybe_true".to_string()]), 4);
     }
 
     #[test]
     fn test_primitive_to_intent_reflect() {
-        assert_eq!(
-            primitive_to_intent_index(&["reflect_on".to_string()]),
-            5
-        );
+        assert_eq!(primitive_to_intent_index(&["reflect_on".to_string()]), 5);
     }
 
     #[test]
     fn test_primitive_to_intent_continue() {
-        assert_eq!(
-            primitive_to_intent_index(&["continue_task".to_string()]),
-            6
-        );
+        assert_eq!(primitive_to_intent_index(&["continue_task".to_string()]), 6);
     }
 
     #[test]
     fn test_primitive_to_intent_unknown_fallback() {
-        assert_eq!(
-            primitive_to_intent_index(&["random_word".to_string()]),
-            7
-        );
+        assert_eq!(primitive_to_intent_index(&["random_word".to_string()]), 7);
         assert_eq!(primitive_to_intent_index(&[]), 7);
     }
 

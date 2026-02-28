@@ -229,10 +229,12 @@ fn bench_similarity_matching(c: &mut Criterion) {
 
     // Sample question and candidate answers
     let question = "What is the capital of France?";
-    let candidates = ["Paris is the capital of France.",
+    let candidates = [
+        "Paris is the capital of France.",
         "London is the capital of England.",
         "Berlin is the capital of Germany.",
-        "The capital city is Paris."];
+        "The capital city is Paris.",
+    ];
 
     let question_vec = semantic
         .encode(question)

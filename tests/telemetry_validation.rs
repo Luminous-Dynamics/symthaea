@@ -89,10 +89,7 @@ fn consciousness_metrics_nonzero() {
     let any_cl = results[10..]
         .iter()
         .any(|r| r.metadata.consciousness_level > 0.0);
-    assert!(
-        any_cl,
-        "consciousness_level should be > 0 after 10 cycles"
-    );
+    assert!(any_cl, "consciousness_level should be > 0 after 10 cycles");
 }
 
 // ========================================================================
@@ -104,8 +101,10 @@ fn urgency_transitions_occur() {
     let mut svc = build_service();
     let results = run_cycles(&mut svc, N_CYCLES);
 
-    let urgency_levels: std::collections::HashSet<_> =
-        results.iter().map(|r| format!("{:?}", r.metadata.urgency)).collect();
+    let urgency_levels: std::collections::HashSet<_> = results
+        .iter()
+        .map(|r| format!("{:?}", r.metadata.urgency))
+        .collect();
 
     // With Full profile, urgency may stay at a single level (Critical) for
     // the entire run since all consciousness modules are active and the
@@ -168,10 +167,7 @@ fn feedback_proposals_counted() {
         total_conf > 0,
         "feedback_confidence_proposals total should be > 0"
     );
-    assert!(
-        total_lr > 0,
-        "feedback_lr_proposals total should be > 0"
-    );
+    assert!(total_lr > 0, "feedback_lr_proposals total should be > 0");
 }
 
 // ========================================================================
@@ -261,7 +257,10 @@ fn cycle_duration_reasonable() {
     }
 
     // Median of warm cycles (skip first 5) should be under 2 seconds
-    let mut warm: Vec<u64> = results[5..].iter().map(|r| r.metadata.cycle_duration_us).collect();
+    let mut warm: Vec<u64> = results[5..]
+        .iter()
+        .map(|r| r.metadata.cycle_duration_us)
+        .collect();
     warm.sort_unstable();
     let median = warm[warm.len() / 2];
     assert!(
@@ -282,10 +281,7 @@ fn module_timings_sum_reasonable() {
     // Check the last few cycles (warm pipeline)
     for r in &results[N_CYCLES - 5..] {
         let t = &r.metadata.module_timings_us;
-        let sum = t.core_hdc_encode
-            + t.core_cfc_step
-            + t.core_predict
-            + t.core_training;
+        let sum = t.core_hdc_encode + t.core_cfc_step + t.core_predict + t.core_training;
 
         let total = r.metadata.cycle_duration_us;
 

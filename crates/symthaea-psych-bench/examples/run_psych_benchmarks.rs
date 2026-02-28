@@ -41,7 +41,9 @@ use std::path::PathBuf;
 use symthaea_psych_bench::benchmarks::affect::{
     EmotionalStroopBenchmark, MoodCongruentRecallBenchmark, ValenceClassificationBenchmark,
 };
-use symthaea_psych_bench::benchmarks::attention::{AttentionalBlinkBenchmark, VisualSearchBenchmark};
+use symthaea_psych_bench::benchmarks::attention::{
+    AttentionalBlinkBenchmark, VisualSearchBenchmark,
+};
 use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
@@ -52,31 +54,34 @@ use symthaea_psych_bench::benchmarks::creativity::{
     AlternateUsesBenchmark, RemoteAssociatesBenchmark,
 };
 use symthaea_psych_bench::benchmarks::executive::{
-    DualTaskBenchmark, FlankerBenchmark, IowaGamblingBenchmark,
-    RavensProgressiveMatricesBenchmark, StroopBenchmark, TowerOfLondonBenchmark,
-    WisconsinCardSortingBenchmark,
+    DualTaskBenchmark, FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark,
+    StroopBenchmark, TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
 };
 use symthaea_psych_bench::benchmarks::inhibition::{GoNoGoBenchmark, StopSignalBenchmark};
 use symthaea_psych_bench::benchmarks::language::{
     GardenPathBenchmark, LexicalDecisionBenchmark, SemanticCoherenceBenchmark,
     SemanticPrimingBenchmark,
 };
-use symthaea_psych_bench::benchmarks::motor::{BimanualBenchmark, FittsLawBenchmark, SrttBenchmark};
-use symthaea_psych_bench::benchmarks::reasoning::{
-    ArcAbductiveBenchmark, ArcAlgebraBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
-    ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark,
-    ArcNoiseBenchmark, ArcRsaBenchmark, ArcScalingBenchmark, ArcStaircaseBenchmark,
-};
-use symthaea_psych_bench::benchmarks::social::{
-    RmeBenchmark, SocialNormBenchmark, UltimatumGameBenchmark,
-};
-use symthaea_psych_bench::benchmarks::sustained_attention::{CptBenchmark, PvtBenchmark, SartBenchmark};
 use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
     ProspectiveMemoryBenchmark, TestTimeLearningBenchmark,
 };
 use symthaea_psych_bench::benchmarks::metacognition::{
     FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark,
+};
+use symthaea_psych_bench::benchmarks::motor::{
+    BimanualBenchmark, FittsLawBenchmark, SrttBenchmark,
+};
+use symthaea_psych_bench::benchmarks::reasoning::{
+    ArcAbductiveBenchmark, ArcAlgebraBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
+    ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark, ArcNoiseBenchmark,
+    ArcRsaBenchmark, ArcScalingBenchmark, ArcStaircaseBenchmark,
+};
+use symthaea_psych_bench::benchmarks::social::{
+    RmeBenchmark, SocialNormBenchmark, UltimatumGameBenchmark,
+};
+use symthaea_psych_bench::benchmarks::sustained_attention::{
+    CptBenchmark, PvtBenchmark, SartBenchmark,
 };
 use symthaea_psych_bench::benchmarks::tombench::{
     FalseBeliefBenchmark, FauxPasBenchmark, HintingBenchmark, PersuasionBenchmark,
@@ -271,9 +276,14 @@ fn main() {
         .map(|(i, _)| i)
         .collect();
 
-    eprintln!("Running {} benchmarks{}...",
+    eprintln!(
+        "Running {} benchmarks{}...",
         active_indices.len(),
-        if sequential_mode { " (sequential)" } else { " (parallel)" }
+        if sequential_mode {
+            " (sequential)"
+        } else {
+            " (parallel)"
+        }
     );
 
     if sequential_mode {
@@ -293,7 +303,12 @@ fn main() {
             })
             .collect();
         for result in results {
-            eprintln!("  {} ... {}ms ({} metrics)", result.benchmark, result.elapsed_ms, result.metrics.len());
+            eprintln!(
+                "  {} ... {}ms ({} metrics)",
+                result.benchmark,
+                result.elapsed_ms,
+                result.metrics.len()
+            );
             report.add(result);
         }
     }
@@ -542,7 +557,9 @@ fn main() {
 
     // Speed-accuracy tradeoff: 6-level sweep with Wickelgren curve fitting
     if sat_mode {
-        use symthaea_psych_bench::harness::analysis::{SatCurvePoint, fit_sat_curve, sat_curve_ascii};
+        use symthaea_psych_bench::harness::analysis::{
+            fit_sat_curve, sat_curve_ascii, SatCurvePoint,
+        };
 
         println!("\n--- Speed-Accuracy Tradeoff (6-level sweep) ---");
         let pressures = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0];
@@ -553,7 +570,14 @@ fn main() {
         );
         println!(
             "| {:25} | {:>7} | {:>7} | {:>7} | {:>7} | {:>7} | {:>7} | {:>6} |",
-            "-------------------------", "-------", "-------", "-------", "-------", "-------", "-------", "------"
+            "-------------------------",
+            "-------",
+            "-------",
+            "-------",
+            "-------",
+            "-------",
+            "-------",
+            "------"
         );
 
         let mut all_curves = Vec::new();
@@ -575,8 +599,16 @@ fn main() {
                 };
                 let result = bench.run(&sat_config);
                 let acc = result.metrics.get(key).map(|m| m.mean).unwrap_or(0.0);
-                let rt = result.metrics.get("rt_ticks").map(|m| m.mean).unwrap_or(0.0);
-                sat_points.push(SatCurvePoint { time_pressure: pressure, accuracy: acc, rt_ticks: rt });
+                let rt = result
+                    .metrics
+                    .get("rt_ticks")
+                    .map(|m| m.mean)
+                    .unwrap_or(0.0);
+                sat_points.push(SatCurvePoint {
+                    time_pressure: pressure,
+                    accuracy: acc,
+                    rt_ticks: rt,
+                });
             }
 
             let curve = fit_sat_curve(bench.name(), &sat_points);
@@ -702,10 +734,13 @@ fn main() {
     // Individual differences simulation: per-participant WM + time_pressure variation
     if let Some(n_participants) = participants_count {
         use symthaea_psych_bench::harness::analysis::{
-            individual_differences, format_individual_differences,
+            format_individual_differences, individual_differences,
         };
 
-        println!("\n--- Individual Differences Simulation (N={}) ---\n", n_participants);
+        println!(
+            "\n--- Individual Differences Simulation (N={}) ---\n",
+            n_participants
+        );
 
         for bench in &benchmarks {
             if let Some(ref f) = filter {
@@ -720,14 +755,19 @@ fn main() {
             for p in 0..n_participants {
                 // Derive per-participant parameters deterministically
                 let mut rng = config.seed.wrapping_add(p as u64 * 7919) ^ 0x9E3779B97F4A7C15;
-                let xor_shift = |s: &mut u64| { *s ^= *s << 13; *s ^= *s >> 7; *s ^= *s << 17; };
+                let xor_shift = |s: &mut u64| {
+                    *s ^= *s << 13;
+                    *s ^= *s >> 7;
+                    *s ^= *s << 17;
+                };
 
                 // WM capacity: normal(7, 1), clamped [3, 11]
                 xor_shift(&mut rng);
                 let u1 = (rng % 10000) as f64 / 10000.0;
                 xor_shift(&mut rng);
                 let u2 = (rng % 10000) as f64 / 10000.0;
-                let z_wm = (-2.0 * u1.max(1e-10).ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
+                let z_wm =
+                    (-2.0 * u1.max(1e-10).ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
                 let wm_cap = (7.0 + z_wm).round().clamp(3.0, 11.0) as usize;
 
                 // Time pressure: normal(0.3, 0.15), clamped [0.0, 1.0]
@@ -735,7 +775,8 @@ fn main() {
                 let u3 = (rng % 10000) as f64 / 10000.0;
                 xor_shift(&mut rng);
                 let u4 = (rng % 10000) as f64 / 10000.0;
-                let z_tp = (-2.0 * u3.max(1e-10).ln()).sqrt() * (2.0 * std::f64::consts::PI * u4).cos();
+                let z_tp =
+                    (-2.0 * u3.max(1e-10).ln()).sqrt() * (2.0 * std::f64::consts::PI * u4).cos();
                 let tp = (0.3 + 0.15 * z_tp).clamp(0.0, 1.0);
 
                 let p_config = BenchmarkConfig {
@@ -762,18 +803,28 @@ fn main() {
     // HDC dimensionality scaling sweep
     if dim_sweep_mode {
         use symthaea_psych_bench::harness::analysis::{
-            dim_scaling_slope, DimScalingResult, format_dim_scaling,
+            dim_scaling_slope, format_dim_scaling, DimScalingResult,
         };
 
         let sweep_dims = [128, 256, 512, 1024, 2048];
-        println!("\n--- HDC Dimensionality Scaling (dims: {:?}) ---\n", sweep_dims);
+        println!(
+            "\n--- HDC Dimensionality Scaling (dims: {:?}) ---\n",
+            sweep_dims
+        );
         println!(
             "| {:25} | {:>7} | {:>7} | {:>7} | {:>7} | {:>7} | {:>+8} | {:>6} |",
             "Benchmark", "d=128", "d=256", "d=512", "d=1024", "d=2048", "Slope", "R²"
         );
         println!(
             "| {:25} | {:>7} | {:>7} | {:>7} | {:>7} | {:>7} | {:>8} | {:>6} |",
-            "-------------------------", "-------", "-------", "-------", "-------", "-------", "--------", "------"
+            "-------------------------",
+            "-------",
+            "-------",
+            "-------",
+            "-------",
+            "-------",
+            "--------",
+            "------"
         );
 
         for bench in &benchmarks {
@@ -803,8 +854,13 @@ fn main() {
             println!(
                 "| {:25} | {:>7.3} | {:>7.3} | {:>7.3} | {:>7.3} | {:>7.3} | {:>+8.4} | {:>6.3} |",
                 &short[..short.len().min(25)],
-                values[0], values[1], values[2], values[3], values[4],
-                slope, r2,
+                values[0],
+                values[1],
+                values[2],
+                values[3],
+                values[4],
+                slope,
+                r2,
             );
 
             let _result = DimScalingResult {
@@ -1037,9 +1093,14 @@ fn main() {
         // Bootstrap CIs are computed via from_samples_bootstrap in MetricValue
         // Re-display results with bootstrap CIs
         for result in &report.results {
-            let key = symthaea_psych_bench::harness::report::key_metric_for_benchmark(&result.benchmark);
+            let key =
+                symthaea_psych_bench::harness::report::key_metric_for_benchmark(&result.benchmark);
             if let Some(metric) = result.metrics.get(key) {
-                let short = result.benchmark.split("::").last().unwrap_or(&result.benchmark);
+                let short = result
+                    .benchmark
+                    .split("::")
+                    .last()
+                    .unwrap_or(&result.benchmark);
                 println!(
                     "  {:<25} {:.3} [{:.3}, {:.3}] (parametric)  →  bootstrap available via MetricValue::from_samples_bootstrap()",
                     short, metric.mean, metric.ci_lower, metric.ci_upper,
@@ -1059,14 +1120,29 @@ fn main() {
         );
         println!(
             "| {:25} | {:>25} | {:>8} | {:>10} | {:>10} | {:>8} |",
-            "-------------------------", "-------------------------",
-            "--------", "----------", "----------", "--------"
+            "-------------------------",
+            "-------------------------",
+            "--------",
+            "----------",
+            "----------",
+            "--------"
         );
         for result in &report.results {
-            let llm_comparisons = symthaea_psych_bench::harness::report::BenchmarkReport::find_llm_comparisons(&report, result, &bl);
+            let llm_comparisons =
+                symthaea_psych_bench::harness::report::BenchmarkReport::find_llm_comparisons(
+                    &report, result, &bl,
+                );
             for (key, comp) in &llm_comparisons {
-                let agent_val = result.metrics.get(key.as_str()).map(|m| m.mean).unwrap_or(0.0);
-                let short = result.benchmark.split("::").last().unwrap_or(&result.benchmark);
+                let agent_val = result
+                    .metrics
+                    .get(key.as_str())
+                    .map(|m| m.mean)
+                    .unwrap_or(0.0);
+                let short = result
+                    .benchmark
+                    .split("::")
+                    .last()
+                    .unwrap_or(&result.benchmark);
                 let short_key = if key.len() > 25 { &key[..25] } else { key };
                 println!(
                     "| {:25} | {:>25} | {:>8.3} | {:>10} | {:>10.3} | {:>7.1}% |",
@@ -1083,7 +1159,9 @@ fn main() {
 
     // Meta-analysis (random-effects, DerSimonian-Laird)
     if meta_analysis_mode {
-        use symthaea_psych_bench::harness::analysis::{format_meta_analysis, meta_analysis_from_forest};
+        use symthaea_psych_bench::harness::analysis::{
+            format_meta_analysis, meta_analysis_from_forest,
+        };
         let rows = report.forest_plot_data();
         if let Some(result) = meta_analysis_from_forest(&rows) {
             println!("\n{}", format_meta_analysis(&result));
@@ -1094,7 +1172,10 @@ fn main() {
 
     // Citations / provenance table
     if citations_mode {
-        let refs: Vec<&dyn PsychBenchmark> = active_indices.iter().map(|&i| &*benchmarks[i] as &dyn PsychBenchmark).collect();
+        let refs: Vec<&dyn PsychBenchmark> = active_indices
+            .iter()
+            .map(|&i| &*benchmarks[i] as &dyn PsychBenchmark)
+            .collect();
         let table = symthaea_psych_bench::harness::provenance_table(&refs);
         println!("\n{}", table);
     }
@@ -1104,10 +1185,13 @@ fn main() {
         use symthaea_psych_bench::harness::html;
         // Collect provenance entries for the HTML report
         let prov_entries: Vec<(&str, symthaea_psych_bench::harness::BenchmarkProvenance)> =
-            active_indices.iter().filter_map(|&i| {
-                let b = &*benchmarks[i];
-                b.provenance().map(|p| (b.name(), p))
-            }).collect();
+            active_indices
+                .iter()
+                .filter_map(|&i| {
+                    let b = &*benchmarks[i];
+                    b.provenance().map(|p| (b.name(), p))
+                })
+                .collect();
         let mut html_content = html::generate_report(&report, llm_baselines);
         // Insert provenance section before closing footer if entries exist
         if !prov_entries.is_empty() {
@@ -1120,19 +1204,30 @@ fn main() {
         }
         // Insert SAT curves SVG if we have benchmarks to sweep
         {
-            use symthaea_psych_bench::harness::analysis::{SatCurvePoint, fit_sat_curve};
+            use symthaea_psych_bench::harness::analysis::{fit_sat_curve, SatCurvePoint};
             let pressures = [0.0, 0.5, 1.0];
             let mut sat_curves = Vec::new();
             for &i in &active_indices {
                 let bench = &benchmarks[i];
-                let key = symthaea_psych_bench::harness::report::key_metric_for_benchmark(bench.name());
-                let points: Vec<SatCurvePoint> = pressures.iter().map(|&p| {
-                    let c = BenchmarkConfig { time_pressure: p, ..config.clone() };
-                    let r = bench.run(&c);
-                    let acc = r.metrics.get(key).map(|m| m.mean).unwrap_or(0.0);
-                    let rt = r.metrics.get("rt_ticks").map(|m| m.mean).unwrap_or(0.0);
-                    SatCurvePoint { time_pressure: p, accuracy: acc, rt_ticks: rt }
-                }).collect();
+                let key =
+                    symthaea_psych_bench::harness::report::key_metric_for_benchmark(bench.name());
+                let points: Vec<SatCurvePoint> = pressures
+                    .iter()
+                    .map(|&p| {
+                        let c = BenchmarkConfig {
+                            time_pressure: p,
+                            ..config.clone()
+                        };
+                        let r = bench.run(&c);
+                        let acc = r.metrics.get(key).map(|m| m.mean).unwrap_or(0.0);
+                        let rt = r.metrics.get("rt_ticks").map(|m| m.mean).unwrap_or(0.0);
+                        SatCurvePoint {
+                            time_pressure: p,
+                            accuracy: acc,
+                            rt_ticks: rt,
+                        }
+                    })
+                    .collect();
                 sat_curves.push(fit_sat_curve(bench.name(), &points));
             }
             if !sat_curves.is_empty() {
@@ -1152,7 +1247,11 @@ fn main() {
         use symthaea_psych_bench::benchmarks::reasoning::arc_dataset;
         match arc_dataset::load_arc_tasks(arc_dir) {
             Ok(tasks) => {
-                eprintln!("Loaded {} ARC tasks from {}", tasks.len(), arc_dir.display());
+                eprintln!(
+                    "Loaded {} ARC tasks from {}",
+                    tasks.len(),
+                    arc_dir.display()
+                );
                 let result = arc_dataset::evaluate_arc_tasks(&tasks, config.dimension, config.seed);
                 println!("\n{}", arc_dataset::format_arc_dataset_result(&result));
             }
@@ -1162,7 +1261,9 @@ fn main() {
 
     // ── Reasoning domain validity analysis ──
     if reasoning_validity {
-        use symthaea_psych_bench::harness::analysis::{reasoning_validity_single_run, format_reasoning_validity};
+        use symthaea_psych_bench::harness::analysis::{
+            format_reasoning_validity, reasoning_validity_single_run,
+        };
         let validity = reasoning_validity_single_run(&report);
         println!("\n{}", format_reasoning_validity(&validity));
     }
@@ -1175,14 +1276,18 @@ fn main() {
 
     // ── ARC split-half reliability ──
     if arc_reliability_mode {
-        use symthaea_psych_bench::harness::analysis::{arc_split_half_reliability, format_arc_reliability};
+        use symthaea_psych_bench::harness::analysis::{
+            arc_split_half_reliability, format_arc_reliability,
+        };
         let results = arc_split_half_reliability(&report);
         println!("\n{}", format_arc_reliability(&results));
     }
 
     // ── Cross-domain prediction analysis ──
     if cross_domain_mode {
-        use symthaea_psych_bench::harness::analysis::{cross_domain_prediction, format_cross_domain_prediction};
+        use symthaea_psych_bench::harness::analysis::{
+            cross_domain_prediction, format_cross_domain_prediction,
+        };
         // Run 10-seed battery for stable estimates
         let mut seed_reports = Vec::new();
         for seed_offset in 0..10u64 {
@@ -1196,7 +1301,10 @@ fn main() {
         }
         let target = "Reasoning::ArcFluid";
         let predictors = &[
-            "WorM::NBack", "Executive::WCST", "Attention::VisualSearch", "Motor::SRTT",
+            "WorM::NBack",
+            "Executive::WCST",
+            "Attention::VisualSearch",
+            "Motor::SRTT",
         ];
         match cross_domain_prediction(&seed_reports, target, predictors) {
             Some(result) => println!("\n{}", format_cross_domain_prediction(&result)),

@@ -64,14 +64,15 @@ impl StroopBenchmark {
         // Reading automaticity: how strongly the word activates its color.
         // Difficulty amplifies interference (reading automaticity).
         let base_automaticity: f32 = 0.45;
-        let reading_automaticity: f32 =
-            (base_automaticity * diff_model.interference_multiplier(config.difficulty) as f32)
-                .min(0.95);
+        let reading_automaticity: f32 = (base_automaticity
+            * diff_model.interference_multiplier(config.difficulty) as f32)
+            .min(0.95);
 
         // Decision temperature: controls stochasticity of response selection.
         // Difficulty increases temperature (more stochastic responses).
         let base_temperature: f64 = 0.25 + config.time_pressure * 0.15;
-        let temperature: f64 = base_temperature * diff_model.temperature_multiplier(config.difficulty);
+        let temperature: f64 =
+            base_temperature * diff_model.temperature_multiplier(config.difficulty);
 
         let trials_per_condition = 40;
         let mut congruent_correct = 0u32;
@@ -96,9 +97,7 @@ impl StroopBenchmark {
             // Build the combined activation:
             // ink_activation (strength 1.0) + word_activation (strength reading_automaticity)
             let combined = match condition {
-                Condition::Congruent => {
-                    color_hvs[ink_idx].scale(1.0 + reading_automaticity)
-                }
+                Condition::Congruent => color_hvs[ink_idx].scale(1.0 + reading_automaticity),
                 Condition::Incongruent => {
                     xor_shift(&mut rng);
                     let mut word_idx = (rng % 3) as usize;
@@ -234,7 +233,6 @@ impl PsychBenchmark for StroopBenchmark {
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
-        use crate::harness::report::RtSummary;
 
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
@@ -251,7 +249,13 @@ impl PsychBenchmark for StroopBenchmark {
         let mut global_trial_idx = 0usize;
 
         for trial in 0..config.trials_per_condition {
-            let r = self.run_trial_with_difficulty(config, trial, &diff_model, &mut trace, &mut global_trial_idx);
+            let r = self.run_trial_with_difficulty(
+                config,
+                trial,
+                &diff_model,
+                &mut trace,
+                &mut global_trial_idx,
+            );
             cong.push(r.congruent_accuracy);
             incong.push(r.incongruent_accuracy);
             neutral.push(r.neutral_accuracy);
@@ -276,10 +280,6 @@ impl PsychBenchmark for StroopBenchmark {
             MetricValue::from_samples(&all_incong_rt),
         );
         result.insert("neutral::rt_ticks", MetricValue::from_samples(&all_neut_rt));
-
-        // Ex-Gaussian RT summaries (stored in result metadata for paper reporting)
-        let _cong_rt_summary = RtSummary::from_rt_samples(&all_cong_rt);
-        let _incong_rt_summary = RtSummary::from_rt_samples(&all_incong_rt);
 
         if config.trial_trace {
             result.trial_trace = trace;

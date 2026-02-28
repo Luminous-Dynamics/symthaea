@@ -1472,203 +1472,296 @@ pub fn embodied_baselines() -> BTreeMap<&'static str, Baseline> {
 /// Johnson et al. (2021), "Fast and slow learning from ARC"
 pub fn reasoning_baselines() -> BaselineMap {
     let mut m = BTreeMap::new();
-    m.insert("arc_rule_consistency", Baseline {
-        value: 0.85,
-        sd: Some(0.10),
-        source: "Johnson et al. (2021), estimated from ARC task analysis",
-        population: "human adults",
-    });
-    m.insert("arc_transfer_accuracy", Baseline {
-        value: 0.80,
-        sd: Some(0.12),
-        source: "Chollet (2019), human performance on ARC evaluation set",
-        population: "human adults",
-    });
-    m.insert("arc_transfer_similarity", Baseline {
-        value: 0.70,
-        sd: Some(0.15),
-        source: "Johnson et al. (2021), HDC proxy for structural match",
-        population: "human adults",
-    });
-    m.insert("arc_rt_ticks", Baseline {
-        value: 6.0,
-        sd: Some(2.0),
-        source: "Johnson et al. (2021), deliberation time estimate (1 tick ≈ 50ms)",
-        population: "human adults",
-    });
+    m.insert(
+        "arc_rule_consistency",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.10),
+            source: "Johnson et al. (2021), estimated from ARC task analysis",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_transfer_accuracy",
+        Baseline {
+            value: 0.80,
+            sd: Some(0.12),
+            source: "Chollet (2019), human performance on ARC evaluation set",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_transfer_similarity",
+        Baseline {
+            value: 0.70,
+            sd: Some(0.15),
+            source: "Johnson et al. (2021), HDC proxy for structural match",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_rt_ticks",
+        Baseline {
+            value: 6.0,
+            sd: Some(2.0),
+            source: "Johnson et al. (2021), deliberation time estimate (1 tick ≈ 50ms)",
+            population: "human adults",
+        },
+    );
     // ARC Compositional baselines (estimated from harder ARC subsets)
-    m.insert("arc_compositional_accuracy", Baseline {
-        value: 0.65,
-        sd: Some(0.15),
-        source: "Johnson et al. (2021), estimated for chained transforms",
-        population: "human adults",
-    });
-    m.insert("arc_size_generalization", Baseline {
-        value: 0.70,
-        sd: Some(0.12),
-        source: "Johnson et al. (2021), cross-size transfer estimate",
-        population: "human adults",
-    });
-    m.insert("arc_symmetry_detection", Baseline {
-        value: 0.90,
-        sd: Some(0.08),
-        source: "Treder (2010), symmetry detection in visual arrays",
-        population: "human adults",
-    });
-    m.insert("arc_compositional_rt_ticks", Baseline {
-        value: 8.0,
-        sd: Some(3.0),
-        source: "Johnson et al. (2021), harder tasks deliberation estimate",
-        population: "human adults",
-    });
+    m.insert(
+        "arc_compositional_accuracy",
+        Baseline {
+            value: 0.65,
+            sd: Some(0.15),
+            source: "Johnson et al. (2021), estimated for chained transforms",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_size_generalization",
+        Baseline {
+            value: 0.70,
+            sd: Some(0.12),
+            source: "Johnson et al. (2021), cross-size transfer estimate",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_symmetry_detection",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.08),
+            source: "Treder (2010), symmetry detection in visual arrays",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_compositional_rt_ticks",
+        Baseline {
+            value: 8.0,
+            sd: Some(3.0),
+            source: "Johnson et al. (2021), harder tasks deliberation estimate",
+            population: "human adults",
+        },
+    );
     // ARC Analogy baselines (Lovett & Forbus 2017; Chollet 2019)
-    m.insert("arc_analogy_accuracy", Baseline {
-        value: 0.75,
-        sd: Some(0.12),
-        source: "Lovett & Forbus (2017), visual analogy accuracy",
-        population: "human adults",
-    });
-    m.insert("arc_cross_domain_accuracy", Baseline {
-        value: 0.60,
-        sd: Some(0.15),
-        source: "Lovett & Forbus (2017), cross-domain transfer estimate",
-        population: "human adults",
-    });
-    m.insert("arc_multi_example_accuracy", Baseline {
-        value: 0.70,
-        sd: Some(0.13),
-        source: "Chollet (2019), multi-pair analogy estimate",
-        population: "human adults",
-    });
-    m.insert("arc_analogy_rt_ticks", Baseline {
-        value: 5.0,
-        sd: Some(2.0),
-        source: "Lovett & Forbus (2017), analogy deliberation estimate (1 tick ≈ 50ms)",
-        population: "human adults",
-    });
+    m.insert(
+        "arc_analogy_accuracy",
+        Baseline {
+            value: 0.75,
+            sd: Some(0.12),
+            source: "Lovett & Forbus (2017), visual analogy accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_cross_domain_accuracy",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.15),
+            source: "Lovett & Forbus (2017), cross-domain transfer estimate",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_multi_example_accuracy",
+        Baseline {
+            value: 0.70,
+            sd: Some(0.13),
+            source: "Chollet (2019), multi-pair analogy estimate",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_analogy_rt_ticks",
+        Baseline {
+            value: 5.0,
+            sd: Some(2.0),
+            source: "Lovett & Forbus (2017), analogy deliberation estimate (1 tick ≈ 50ms)",
+            population: "human adults",
+        },
+    );
     // ARC Abductive baselines (Harman 1965; backward inference harder than forward)
-    m.insert("arc_abduction_accuracy", Baseline {
-        value: 0.70,
-        sd: Some(0.15),
-        source: "Johnson et al. (2021), estimated backward inference accuracy",
-        population: "human adults",
-    });
-    m.insert("arc_unbinding_similarity", Baseline {
-        value: 0.30,
-        sd: Some(0.10),
-        source: "Johnson et al. (2021), HDC unbinding cosine estimate",
-        population: "human adults",
-    });
-    m.insert("arc_abduction_rt_ticks", Baseline {
-        value: 7.0,
-        sd: Some(2.5),
-        source: "Harman (1965), backward inference longer than forward (1 tick ≈ 50ms)",
-        population: "human adults",
-    });
+    m.insert(
+        "arc_abduction_accuracy",
+        Baseline {
+            value: 0.70,
+            sd: Some(0.15),
+            source: "Johnson et al. (2021), estimated backward inference accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_unbinding_similarity",
+        Baseline {
+            value: 0.30,
+            sd: Some(0.10),
+            source: "Johnson et al. (2021), HDC unbinding cosine estimate",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_abduction_rt_ticks",
+        Baseline {
+            value: 7.0,
+            sd: Some(2.5),
+            source: "Harman (1965), backward inference longer than forward (1 tick ≈ 50ms)",
+            population: "human adults",
+        },
+    );
     // ARC Learning curve baselines
-    m.insert("arc_single_pair_accuracy", Baseline {
-        value: 0.65,
-        sd: Some(0.15),
-        source: "Johnson et al. (2021), single-example transfer estimate",
-        population: "human adults",
-    });
-    m.insert("arc_learning_efficiency", Baseline {
-        value: 0.15,
-        sd: Some(0.10),
-        source: "Johnson et al. (2021), benefit of additional training examples",
-        population: "human adults",
-    });
+    m.insert(
+        "arc_single_pair_accuracy",
+        Baseline {
+            value: 0.65,
+            sd: Some(0.15),
+            source: "Johnson et al. (2021), single-example transfer estimate",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_learning_efficiency",
+        Baseline {
+            value: 0.15,
+            sd: Some(0.10),
+            source: "Johnson et al. (2021), benefit of additional training examples",
+            population: "human adults",
+        },
+    );
     // ARC Chain baselines (Lake & Baroni 2018; compositional generalization)
-    m.insert("arc_chain_accuracy", Baseline {
-        value: 0.55,
-        sd: Some(0.15),
-        source: "Lake & Baroni (2018), multi-step composition estimate",
-        population: "human adults",
-    });
-    m.insert("arc_chain_2_accuracy", Baseline {
-        value: 0.65,
-        sd: Some(0.15),
-        source: "Chollet (2019), 2-step composition estimate",
-        population: "human adults",
-    });
-    m.insert("arc_chain_degradation", Baseline {
-        value: 0.09,
-        sd: Some(0.05),
-        source: "Lake & Baroni (2018), accuracy drop per added step",
-        population: "human adults",
-    });
+    m.insert(
+        "arc_chain_accuracy",
+        Baseline {
+            value: 0.55,
+            sd: Some(0.15),
+            source: "Lake & Baroni (2018), multi-step composition estimate",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_chain_2_accuracy",
+        Baseline {
+            value: 0.65,
+            sd: Some(0.15),
+            source: "Chollet (2019), 2-step composition estimate",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_chain_degradation",
+        Baseline {
+            value: 0.09,
+            sd: Some(0.05),
+            source: "Lake & Baroni (2018), accuracy drop per added step",
+            population: "human adults",
+        },
+    );
     // ARC Noise baselines (Kanerva 2009; noise tolerance of distributed representations)
-    m.insert("arc_noise_resilience", Baseline {
-        value: 0.85,
-        sd: Some(0.08),
-        source: "Kanerva (2009), estimated noise tolerance of HDC",
-        population: "human adults",
-    });
-    m.insert("arc_accuracy_0pct", Baseline {
-        value: 0.80,
-        sd: Some(0.12),
-        source: "Chollet (2019), clean baseline accuracy",
-        population: "human adults",
-    });
+    m.insert(
+        "arc_noise_resilience",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.08),
+            source: "Kanerva (2009), estimated noise tolerance of HDC",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_accuracy_0pct",
+        Baseline {
+            value: 0.80,
+            sd: Some(0.12),
+            source: "Chollet (2019), clean baseline accuracy",
+            population: "human adults",
+        },
+    );
     // ARC FewShot baselines (Lake et al. 2015; few-shot learning)
-    m.insert("arc_accuracy_1shot", Baseline {
-        value: 0.60,
-        sd: Some(0.15),
-        source: "Lake et al. (2015), single-example transfer",
-        population: "human adults",
-    });
-    m.insert("arc_accuracy_5shot", Baseline {
-        value: 0.85,
-        sd: Some(0.10),
-        source: "Lake et al. (2015), five-example transfer",
-        population: "human adults",
-    });
-    m.insert("arc_learning_rate", Baseline {
-        value: 0.06,
-        sd: Some(0.03),
-        source: "Lake et al. (2015), accuracy gain per training example",
-        population: "human adults",
-    });
+    m.insert(
+        "arc_accuracy_1shot",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.15),
+            source: "Lake et al. (2015), single-example transfer",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_accuracy_5shot",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.10),
+            source: "Lake et al. (2015), five-example transfer",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_learning_rate",
+        Baseline {
+            value: 0.06,
+            sd: Some(0.03),
+            source: "Lake et al. (2015), accuracy gain per training example",
+            population: "human adults",
+        },
+    );
     // ARC Scaling baselines (Kanerva 2009; capacity limits)
-    m.insert("arc_grid_3x3_accuracy", Baseline {
-        value: 0.90,
-        sd: Some(0.08),
-        source: "Chollet (2019), small grid estimate",
-        population: "human adults",
-    });
-    m.insert("arc_capacity_ratio", Baseline {
-        value: 1.3,
-        sd: Some(0.3),
-        source: "Kanerva (2009), small-to-large grid accuracy ratio",
-        population: "human adults",
-    });
+    m.insert(
+        "arc_grid_3x3_accuracy",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.08),
+            source: "Chollet (2019), small grid estimate",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_capacity_ratio",
+        Baseline {
+            value: 1.3,
+            sd: Some(0.3),
+            source: "Kanerva (2009), small-to-large grid accuracy ratio",
+            population: "human adults",
+        },
+    );
     // ARC RSA baselines (Kriegeskorte et al. 2008)
-    m.insert("arc_rsa_correlation", Baseline {
-        value: 0.60,
-        sd: Some(0.15),
-        source: "Kriegeskorte et al. (2008), RSA correlation estimate",
-        population: "human adults",
-    });
-    m.insert("arc_rsa_discriminability", Baseline {
-        value: 0.20,
-        sd: Some(0.10),
-        source: "Kriegeskorte et al. (2008), within-between type gap",
-        population: "human adults",
-    });
+    m.insert(
+        "arc_rsa_correlation",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.15),
+            source: "Kriegeskorte et al. (2008), RSA correlation estimate",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "arc_rsa_discriminability",
+        Baseline {
+            value: 0.20,
+            sd: Some(0.10),
+            source: "Kriegeskorte et al. (2008), within-between type gap",
+            population: "human adults",
+        },
+    );
     // ARC Algebra baselines (Plate 2003; Kanerva 2009)
-    m.insert("arc_algebra_score", Baseline {
-        value: 0.50,
-        sd: Some(0.15),
-        source: "Plate (2003), mean algebraic property satisfaction",
-        population: "theoretical",
-    });
+    m.insert(
+        "arc_algebra_score",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "Plate (2003), mean algebraic property satisfaction",
+            population: "theoretical",
+        },
+    );
     // ARC Staircase baselines (Levitt 1971)
-    m.insert("arc_capacity_threshold", Baseline {
-        value: 10.0,
-        sd: Some(4.0),
-        source: "Chollet (2019), estimated grid size capacity",
-        population: "human adults",
-    });
+    m.insert(
+        "arc_capacity_threshold",
+        Baseline {
+            value: 10.0,
+            sd: Some(4.0),
+            source: "Chollet (2019), estimated grid size capacity",
+            population: "human adults",
+        },
+    );
     m
 }
 
@@ -2591,16 +2684,30 @@ mod tests {
     #[test]
     fn test_llm_baselines_nonempty() {
         let cogbench = llm_cogbench_baselines();
-        assert!(!cogbench.is_empty(), "LLM CogBench baselines should not be empty");
-        assert!(cogbench.len() >= 5, "Expected >= 5 LLM CogBench entries, got {}", cogbench.len());
+        assert!(
+            !cogbench.is_empty(),
+            "LLM CogBench baselines should not be empty"
+        );
+        assert!(
+            cogbench.len() >= 5,
+            "Expected >= 5 LLM CogBench entries, got {}",
+            cogbench.len()
+        );
         // Verify all have GPT-4 population
         for (_, bl) in &cogbench {
             assert_eq!(bl.population, "GPT-4");
         }
 
         let tombench = llm_tombench_baselines();
-        assert!(!tombench.is_empty(), "LLM ToMBench baselines should not be empty");
-        assert!(tombench.len() >= 3, "Expected >= 3 LLM ToMBench entries, got {}", tombench.len());
+        assert!(
+            !tombench.is_empty(),
+            "LLM ToMBench baselines should not be empty"
+        );
+        assert!(
+            tombench.len() >= 3,
+            "Expected >= 3 LLM ToMBench entries, got {}",
+            tombench.len()
+        );
         for (_, bl) in &tombench {
             assert_eq!(bl.population, "GPT-4");
         }
@@ -2610,10 +2717,18 @@ mod tests {
     fn test_llm_baselines_have_sd() {
         // All LLM baselines should have SD values for z-score computation
         for (key, bl) in &llm_cogbench_baselines() {
-            assert!(bl.sd.is_some(), "LLM CogBench baseline '{}' missing SD", key);
+            assert!(
+                bl.sd.is_some(),
+                "LLM CogBench baseline '{}' missing SD",
+                key
+            );
         }
         for (key, bl) in &llm_tombench_baselines() {
-            assert!(bl.sd.is_some(), "LLM ToMBench baseline '{}' missing SD", key);
+            assert!(
+                bl.sd.is_some(),
+                "LLM ToMBench baseline '{}' missing SD",
+                key
+            );
         }
     }
 }

@@ -125,7 +125,11 @@ impl GoNoGoBenchmark {
             if config.trial_trace {
                 outcomes.push(TrialOutcome {
                     trial_idx: *global_trial_idx,
-                    condition: if is_go { "go".to_string() } else { "nogo".to_string() },
+                    condition: if is_go {
+                        "go".to_string()
+                    } else {
+                        "nogo".to_string()
+                    },
                     correct,
                     rt_ticks: deliberation_ticks,
                     similarity: go_sim,
@@ -137,27 +141,43 @@ impl GoNoGoBenchmark {
             }
         }
 
-        let go_acc = if go_total > 0 { go_correct as f64 / go_total as f64 } else { 0.0 };
-        let nogo_acc = if nogo_total > 0 { nogo_correct as f64 / nogo_total as f64 } else { 0.0 };
-        let mean_rt = if !go_rts.is_empty() { go_rts.iter().sum::<f64>() / go_rts.len() as f64 } else { 0.0 };
+        let go_acc = if go_total > 0 {
+            go_correct as f64 / go_total as f64
+        } else {
+            0.0
+        };
+        let nogo_acc = if nogo_total > 0 {
+            nogo_correct as f64 / nogo_total as f64
+        } else {
+            0.0
+        };
+        let mean_rt = if !go_rts.is_empty() {
+            go_rts.iter().sum::<f64>() / go_rts.len() as f64
+        } else {
+            0.0
+        };
 
         let ssrt = if go_rts.len() >= 3 {
             let commission_rate = 1.0 - nogo_acc;
             let mut sorted_rts = go_rts.clone();
             sorted_rts.sort_by(|a, b| a.total_cmp(b));
-            let idx = ((commission_rate * sorted_rts.len() as f64) as usize).min(sorted_rts.len() - 1);
+            let idx =
+                ((commission_rate * sorted_rts.len() as f64) as usize).min(sorted_rts.len() - 1);
             sorted_rts[idx]
         } else {
             0.0
         };
 
-        (TrialResult {
-            go_accuracy: go_acc,
-            nogo_accuracy: nogo_acc,
-            inhibition_cost: go_acc - nogo_acc,
-            go_rt_ticks: mean_rt,
-            ssrt_ticks: ssrt,
-        }, outcomes)
+        (
+            TrialResult {
+                go_accuracy: go_acc,
+                nogo_accuracy: nogo_acc,
+                inhibition_cost: go_acc - nogo_acc,
+                go_rt_ticks: mean_rt,
+                ssrt_ticks: ssrt,
+            },
+            outcomes,
+        )
     }
 }
 
@@ -189,7 +209,8 @@ impl PsychBenchmark for GoNoGoBenchmark {
         let mut global_trial_idx = 0usize;
 
         for trial in 0..config.trials_per_condition {
-            let (r, outcomes) = self.run_trial_traced(config, trial, &diff_model, &mut global_trial_idx);
+            let (r, outcomes) =
+                self.run_trial_traced(config, trial, &diff_model, &mut global_trial_idx);
             go_accs.push(r.go_accuracy);
             nogo_accs.push(r.nogo_accuracy);
             costs.push(r.inhibition_cost);

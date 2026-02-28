@@ -17,6 +17,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -77,7 +79,11 @@ fn apply_transform(grid: &[Vec<u8>], tt: TaskType, param: u64, num_colors: u8) -
             GridEncoder::color_replace(grid, from, to)
         }
         TaskType::Reflection => {
-            if param % 2 == 0 { GridEncoder::reflect_x(grid) } else { GridEncoder::reflect_y(grid) }
+            if param % 2 == 0 {
+                GridEncoder::reflect_x(grid)
+            } else {
+                GridEncoder::reflect_y(grid)
+            }
         }
     }
 }
@@ -178,10 +184,18 @@ impl ArcFewShotBenchmark {
         }
 
         let accuracy_per_shot: [f64; MAX_SHOTS] = std::array::from_fn(|i| {
-            if total_per_shot[i] > 0 { hits_per_shot[i] as f64 / total_per_shot[i] as f64 } else { 0.0 }
+            if total_per_shot[i] > 0 {
+                hits_per_shot[i] as f64 / total_per_shot[i] as f64
+            } else {
+                0.0
+            }
         });
         let similarity_per_shot: [f64; MAX_SHOTS] = std::array::from_fn(|i| {
-            if sim_count[i] > 0 { sim_per_shot[i] / sim_count[i] as f64 } else { 0.0 }
+            if sim_count[i] > 0 {
+                sim_per_shot[i] / sim_count[i] as f64
+            } else {
+                0.0
+            }
         });
 
         // Linear regression slope: accuracy = slope * k + intercept
@@ -205,12 +219,17 @@ impl ArcFewShotBenchmark {
         // Saturation point: first k where accuracy >= 90% of max accuracy
         let max_acc = accuracy_per_shot.iter().cloned().fold(0.0f64, f64::max);
         let threshold = max_acc * 0.9;
-        let saturation_point = accuracy_per_shot.iter()
+        let saturation_point = accuracy_per_shot
+            .iter()
             .position(|&a| a >= threshold)
             .map(|i| (i + 1) as f64) // 1-indexed shot count
             .unwrap_or(MAX_SHOTS as f64);
 
-        let rt_ticks = if total_tasks > 0 { total_ticks / total_tasks as f64 } else { 0.0 };
+        let rt_ticks = if total_tasks > 0 {
+            total_ticks / total_tasks as f64
+        } else {
+            0.0
+        };
 
         TrialResult {
             accuracy_per_shot,
@@ -239,6 +258,7 @@ impl PsychBenchmark for ArcFewShotBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut accs_per_shot: [Vec<f64>; MAX_SHOTS] = Default::default();
         let mut sims_per_shot: [Vec<f64>; MAX_SHOTS] = Default::default();
@@ -255,6 +275,18 @@ impl PsychBenchmark for ArcFewShotBenchmark {
             learning_rates.push(r.learning_rate);
             saturation_points.push(r.saturation_point);
             rts.push(r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "arc_fewshot".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         for k in 1..=MAX_SHOTS {
@@ -268,17 +300,23 @@ impl PsychBenchmark for ArcFewShotBenchmark {
             );
         }
         result.insert("learning_rate", MetricValue::from_samples(&learning_rates));
-        result.insert("saturation_point", MetricValue::from_samples(&saturation_points));
+        result.insert(
+            "saturation_point",
+            MetricValue::from_samples(&saturation_points),
+        );
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
 
         // Few-shot gain: 5-shot minus 1-shot accuracy
-        let gains: Vec<f64> = accs_per_shot[0].iter().zip(accs_per_shot[4].iter())
+        let gains: Vec<f64> = accs_per_shot[0]
+            .iter()
+            .zip(accs_per_shot[4].iter())
             .map(|(one, five)| five - one)
             .collect();
         result.insert("fewshot_gain", MetricValue::from_samples(&gains));
 
         result.conditions = MAX_SHOTS; // 5 shot counts
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -330,7 +368,8 @@ mod tests {
         assert!(
             sim_5 >= sim_1 - 0.1,
             "5-shot similarity should not be much worse than 1-shot: 1-shot={}, 5-shot={}",
-            sim_1, sim_5
+            sim_1,
+            sim_5
         );
     }
 
@@ -338,7 +377,11 @@ mod tests {
     fn test_saturation_bounded() {
         let result = ArcFewShotBenchmark.run(&test_config());
         let sat = result.metrics["saturation_point"].mean;
-        assert!(sat >= 1.0 && sat <= 5.0, "Saturation should be in [1,5], got {}", sat);
+        assert!(
+            sat >= 1.0 && sat <= 5.0,
+            "Saturation should be in [1,5], got {}",
+            sat
+        );
     }
 
     #[test]
@@ -347,7 +390,11 @@ mod tests {
         let lr = result.metrics["learning_rate"].mean;
         assert!(lr.is_finite(), "learning_rate should be finite");
         // Learning rate is slope of accuracy vs shot count — can be positive or negative
-        assert!(lr > -0.5 && lr < 0.5, "learning_rate out of reasonable range: {}", lr);
+        assert!(
+            lr > -0.5 && lr < 0.5,
+            "learning_rate out of reasonable range: {}",
+            lr
+        );
     }
 
     #[test]
@@ -367,6 +414,9 @@ mod tests {
         };
         let r1 = ArcFewShotBenchmark.run(&config);
         let r2 = ArcFewShotBenchmark.run(&config);
-        assert_eq!(r1.metrics["learning_rate"].mean, r2.metrics["learning_rate"].mean);
+        assert_eq!(
+            r1.metrics["learning_rate"].mean,
+            r2.metrics["learning_rate"].mean
+        );
     }
 }

@@ -1,6 +1,6 @@
+use std::time::Duration;
 use symthaea::mind::{AsyncMind, MindConfig};
 use symthaea::swarm::SwarmMessage;
-use std::time::Duration;
 use tokio::time::sleep;
 
 #[tokio::main]
@@ -23,11 +23,11 @@ async fn main() {
     node_b.update_thermodynamics(0.9).await; // Battery / High load
 
     println!("\n[PHASE 1] Initializing Swarm Link...");
-    
+
     // 3. EVOLUTION: Node A discovers a mutation
     println!("\n[PHASE 2] Node A (Heavy) running Meta-Forge...");
     sleep(Duration::from_millis(500)).await;
-    
+
     let mutation = SwarmMessage::BrainMutation {
         mutation_id: "breakthrough_001".to_string(),
         tau_scale: 1.15,
@@ -38,14 +38,17 @@ async fn main() {
     // 4. TELEPATHY: Node A broadcasts to Node B
     println!("\n[PHASE 3] Telepathic Transmission (Swarm Gossip)...");
     node_b.receive_swarm_gossip(mutation).await;
-    
+
     // 5. VERIFICATION: Node B hot-swaps
     sleep(Duration::from_millis(200)).await;
     let state_b = node_b.snapshot().await;
-    
+
     println!("\n[PHASE 4] Node B (Light) hot-swap audit:");
     if let Some(scale) = state_b.last_mutation_suggestion {
-        println!("   ✅ SUCCESS: Node B received and recognized DNA mutation (scale: {:.2})", scale);
+        println!(
+            "   ✅ SUCCESS: Node B received and recognized DNA mutation (scale: {:.2})",
+            scale
+        );
         println!("   -> Node B is now evolving toward Node A's discovery.");
     } else {
         println!("   ❌ FAILURE: Node B did not receive the mutation.");

@@ -178,18 +178,13 @@ impl HdcContinuousClassifier {
 
         for (class, accumulator) in accumulators.iter_mut().enumerate().take(self.n_classes) {
             if self.class_counts[class] > 0 {
-                let norm: f32 = accumulator
-                    .iter()
-                    .map(|x| x * x)
-                    .sum::<f32>()
-                    .sqrt();
+                let norm: f32 = accumulator.iter().map(|x| x * x).sum::<f32>().sqrt();
                 if norm > 0.0 {
                     for v in accumulator.iter_mut() {
                         *v /= norm;
                     }
                 }
-                self.class_prototypes[class] =
-                    Some(ContinuousHV::from_vec(accumulator.clone()));
+                self.class_prototypes[class] = Some(ContinuousHV::from_vec(accumulator.clone()));
             }
         }
 

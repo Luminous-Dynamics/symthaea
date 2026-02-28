@@ -88,7 +88,12 @@ pub trait LLMBackend: Send + Sync {
     /// Export projection weights for federated swarm exchange.
     /// Returns `None` if this backend doesn't support swarm gradient exchange.
     #[cfg(feature = "liquid-mamba")]
-    fn export_gradient(&self, _source_id: [u8; 32], _trust: f32, _version: u64) -> Option<Vec<f32>> {
+    fn export_gradient(
+        &self,
+        _source_id: [u8; 32],
+        _trust: f32,
+        _version: u64,
+    ) -> Option<Vec<f32>> {
         None
     }
 
@@ -118,19 +123,26 @@ pub trait LLMBackend: Send + Sync {
         _thermodynamic_load: f32,
         _prediction_confidence: f32,
         _fep_lr_boost: f32,
-    ) {}
+    ) {
+    }
 
     /// Current effective distillation learning rate (0.0 for non-L-SSM backends).
     #[cfg(feature = "liquid-mamba")]
-    fn current_distillation_lr(&self) -> f32 { 0.0 }
+    fn current_distillation_lr(&self) -> f32 {
+        0.0
+    }
 
     /// Last cached effective rank of projection bottleneck activations (0.0 for non-L-SSM).
     #[cfg(feature = "liquid-mamba")]
-    fn last_effective_rank(&self) -> f32 { 0.0 }
+    fn last_effective_rank(&self) -> f32 {
+        0.0
+    }
 
     /// Total number of generation/distillation cycles completed (0 for non-L-SSM).
     #[cfg(feature = "liquid-mamba")]
-    fn generation_count(&self) -> u32 { 0 }
+    fn generation_count(&self) -> u32 {
+        0
+    }
 
     /// Get the backend name for logging.
     fn name(&self) -> &str;
@@ -260,7 +272,10 @@ impl LLMBackend for OllamaBackend {
 
         if !response.status().is_success() {
             let status = response.status();
-            let body = response.text().await.unwrap_or_else(|_| "<body unreadable>".to_string());
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "<body unreadable>".to_string());
             anyhow::bail!("Ollama returned {status}: {body}");
         }
 
@@ -301,7 +316,10 @@ impl LLMBackend for OllamaBackend {
 
         if !response.status().is_success() {
             let status = response.status();
-            let body = response.text().await.unwrap_or_else(|_| "<body unreadable>".to_string());
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "<body unreadable>".to_string());
             anyhow::bail!("Ollama returned {status}: {body}");
         }
 
@@ -378,9 +396,10 @@ impl LLMBackend for SimulatedBackend {
     async fn generate(&self, prompt: &str, _params: &GenerationParams) -> Result<String> {
         let lower = prompt.to_lowercase();
         // Produce a simple response based on the prompt
-        let response = if lower.contains("fix") && (lower.contains("flake") || lower.contains("nix")) {
-            // Return a fixed Nix flake for the demo
-            r#"{
+        let response =
+            if lower.contains("fix") && (lower.contains("flake") || lower.contains("nix")) {
+                // Return a fixed Nix flake for the demo
+                r#"{
   description = "A fixed flake for Symthaea";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   outputs = { self, nixpkgs }: {
@@ -391,14 +410,15 @@ impl LLMBackend for SimulatedBackend {
       shellHook = "hello"; 
     };
   };
-}"#.to_string()
-        } else if prompt.contains("translate") || prompt.contains("Translate") {
-            format!("I understand your input. {}", summarize_prompt(prompt))
-        } else if prompt.contains('?') {
-            format!("Regarding your question: {}", summarize_prompt(prompt))
-        } else {
-            format!("Acknowledged. {}", summarize_prompt(prompt))
-        };
+}"#
+                .to_string()
+            } else if prompt.contains("translate") || prompt.contains("Translate") {
+                format!("I understand your input. {}", summarize_prompt(prompt))
+            } else if prompt.contains('?') {
+                format!("Regarding your question: {}", summarize_prompt(prompt))
+            } else {
+                format!("Acknowledged. {}", summarize_prompt(prompt))
+            };
         Ok(response)
     }
 
@@ -459,15 +479,20 @@ pub fn create_backend_from_env() -> Arc<dyn LLMBackend> {
                 tracing::warn!("SYMTHAEA_LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY not set, falling back to Ollama");
             }
             "ollama" => {
-                let model = std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "llama3".to_string());
+                let model =
+                    std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "llama3".to_string());
                 return Arc::new(OllamaBackend::with_model(&model));
             }
             "candle" => {
                 #[cfg(feature = "full_language")]
                 {
-                    let model_id = std::env::var("SYMTHAEA_CANDLE_MODEL").unwrap_or_else(|_| "bartowski/Llama-3.2-1B-Instruct-GGUF".to_string());
-                    let file_name = std::env::var("SYMTHAEA_CANDLE_FILE").unwrap_or_else(|_| "Llama-3.2-1B-Instruct-Q4_K_M.gguf".to_string());
-                    if let Ok(backend) = super::candle_backend::CandleBackend::new(&model_id, "main", &file_name) {
+                    let model_id = std::env::var("SYMTHAEA_CANDLE_MODEL")
+                        .unwrap_or_else(|_| "bartowski/Llama-3.2-1B-Instruct-GGUF".to_string());
+                    let file_name = std::env::var("SYMTHAEA_CANDLE_FILE")
+                        .unwrap_or_else(|_| "Llama-3.2-1B-Instruct-Q4_K_M.gguf".to_string());
+                    if let Ok(backend) =
+                        super::candle_backend::CandleBackend::new(&model_id, "main", &file_name)
+                    {
                         return Arc::new(backend);
                     }
                 }
@@ -477,7 +502,8 @@ pub fn create_backend_from_env() -> Arc<dyn LLMBackend> {
             "ssm" | "broca" => {
                 #[cfg(feature = "ssm_language")]
                 {
-                    let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-broca-default");
+                    let genesis =
+                        symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-broca-default");
                     return Arc::new(super::ssm_backend::SsmBackend::new(&genesis));
                 }
                 #[cfg(not(feature = "ssm_language"))]
@@ -488,7 +514,9 @@ pub fn create_backend_from_env() -> Arc<dyn LLMBackend> {
             "liquid-mamba" | "l-ssm" => {
                 #[cfg(feature = "liquid-mamba")]
                 {
-                    let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-broca-liquid-mamba");
+                    let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(
+                        "symthaea-broca-liquid-mamba",
+                    );
                     let config = symthaea_broca::LiquidMambaConfig::default();
                     match super::ssm_backend::LiquidMambaBackend::new(&genesis, config) {
                         Ok(backend) => return Arc::new(backend),
@@ -518,7 +546,7 @@ pub fn create_backend_from_env() -> Arc<dyn LLMBackend> {
     if let Some(backend) = super::anthropic_backend::AnthropicBackend::from_env() {
         return Arc::new(backend);
     }
-    
+
     let model = std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "llama3".to_string());
     Arc::new(OllamaBackend::with_model(&model))
 }

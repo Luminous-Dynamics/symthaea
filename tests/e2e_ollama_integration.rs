@@ -112,14 +112,18 @@ async fn test_ollama_multi_turn_state_evolution() {
 
     // All confidence values should be finite and bounded
     assert!(
-        confidences.iter().all(|c| c.is_finite() && *c >= 0.0 && *c <= 1.0),
+        confidences
+            .iter()
+            .all(|c| c.is_finite() && *c >= 0.0 && *c <= 1.0),
         "All confidences should be finite and in [0,1]: {:?}",
         confidences
     );
 
     // All consciousness levels should be finite and non-negative
     assert!(
-        consciousness_levels.iter().all(|c| c.is_finite() && *c >= 0.0),
+        consciousness_levels
+            .iter()
+            .all(|c| c.is_finite() && *c >= 0.0),
         "All consciousness levels should be finite and non-negative: {:?}",
         consciousness_levels
     );
@@ -147,10 +151,7 @@ async fn test_ollama_structured_thought_propagation() {
     let mut s = Symthaea::new(256, 16).await.unwrap();
 
     // Question about something factual — should produce high-confidence thought
-    let resp = s
-        .process("Explain what water is made of.")
-        .await
-        .unwrap();
+    let resp = s.process("Explain what water is made of.").await.unwrap();
 
     let thought = resp
         .structured_thought
@@ -252,7 +253,10 @@ async fn test_ollama_emotional_content_handling() {
     let mut s = Symthaea::new(256, 16).await.unwrap();
 
     // Neutral baseline
-    let neutral = s.process("What is the boiling point of water?").await.unwrap();
+    let neutral = s
+        .process("What is the boiling point of water?")
+        .await
+        .unwrap();
 
     // Emotionally charged input
     let emotional = s

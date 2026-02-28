@@ -419,8 +419,14 @@ mod tests {
 
         let task = ArcTask {
             train: vec![
-                ArcPair { input: input1, output: output1 },
-                ArcPair { input: input2, output: output2 },
+                ArcPair {
+                    input: input1,
+                    output: output1,
+                },
+                ArcPair {
+                    input: input2,
+                    output: output2,
+                },
             ],
             test: vec![ArcPair {
                 input: test_input,

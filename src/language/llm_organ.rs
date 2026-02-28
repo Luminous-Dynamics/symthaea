@@ -287,7 +287,8 @@ impl LLMOrgan {
             stats: LLMOrganStats::default(),
             backend: None,
             #[cfg(feature = "ssm_language")]
-            distillation_collector: super::distillation::DistillationCollector::from_env().map(Arc::new),
+            distillation_collector: super::distillation::DistillationCollector::from_env()
+                .map(Arc::new),
             #[cfg(feature = "liquid-mamba")]
             last_liquid_mamba_pe: 0.0,
         }
@@ -310,7 +311,8 @@ impl LLMOrgan {
             stats: LLMOrganStats::default(),
             backend: Some(backend),
             #[cfg(feature = "ssm_language")]
-            distillation_collector: super::distillation::DistillationCollector::from_env().map(Arc::new),
+            distillation_collector: super::distillation::DistillationCollector::from_env()
+                .map(Arc::new),
             #[cfg(feature = "liquid-mamba")]
             last_liquid_mamba_pe: 0.0,
         }
@@ -668,26 +670,40 @@ impl LLMOrgan {
         fep_lr_boost: f32,
     ) {
         if let Some(ref backend) = self.backend {
-            backend.cycle_level_distill(fep_precision, thermodynamic_load, prediction_confidence, fep_lr_boost);
+            backend.cycle_level_distill(
+                fep_precision,
+                thermodynamic_load,
+                prediction_confidence,
+                fep_lr_boost,
+            );
         }
     }
 
     /// Current effective distillation learning rate (0.0 when liquid-mamba is off).
     #[cfg(feature = "liquid-mamba")]
     pub fn current_distillation_lr(&self) -> f32 {
-        self.backend.as_ref().map(|b| b.current_distillation_lr()).unwrap_or(0.0)
+        self.backend
+            .as_ref()
+            .map(|b| b.current_distillation_lr())
+            .unwrap_or(0.0)
     }
 
     /// Last cached effective rank of projection bottleneck (0.0 when liquid-mamba is off).
     #[cfg(feature = "liquid-mamba")]
     pub fn last_effective_rank(&self) -> f32 {
-        self.backend.as_ref().map(|b| b.last_effective_rank()).unwrap_or(0.0)
+        self.backend
+            .as_ref()
+            .map(|b| b.last_effective_rank())
+            .unwrap_or(0.0)
     }
 
     /// Total generation/distillation cycles completed (0 when liquid-mamba is off).
     #[cfg(feature = "liquid-mamba")]
     pub fn generation_count(&self) -> u32 {
-        self.backend.as_ref().map(|b| b.generation_count()).unwrap_or(0)
+        self.backend
+            .as_ref()
+            .map(|b| b.generation_count())
+            .unwrap_or(0)
     }
 
     /// Apply a linguistic LoRA adapter to the voice.
@@ -718,7 +734,11 @@ impl LLMOrgan {
     /// Dynamic parameterization based on mood_temperature:
     /// - High Mood Temp (Exhausted/Hot) -> Higher LLM temperature, shorter max_length.
     /// - Low Mood Temp (Rested/Cool) -> Lower LLM temperature, longer max_length.
-    pub async fn translate_thought(&mut self, thought: &StructuredThought, mood_temperature: f32) -> LLMGenerationResult {
+    pub async fn translate_thought(
+        &mut self,
+        thought: &StructuredThought,
+        mood_temperature: f32,
+    ) -> LLMGenerationResult {
         // ── Direct Neural Path ───────────────────────────────────────────────
         // Try the direct path first: StructuredThought → ThoughtChannels → HDC → text
         // No text-prompt serialization. No prompt engineering. Pure signal.
@@ -726,8 +746,8 @@ impl LLMOrgan {
         {
             // Clone the Arc to avoid holding a borrow on self.backend across await + mut self
             let direct_result = if let Some(backend) = self.backend.clone() {
-                use super::ssm_backend::thought_to_channels;
                 use super::llm_backend::GenerationParams;
+                use super::ssm_backend::thought_to_channels;
 
                 let backend_name = backend.name().to_string();
                 if backend_name == "symthaea-ssm-broca" || backend_name == "liquid-mamba-l-ssm" {
@@ -739,7 +759,8 @@ impl LLMOrgan {
                     // All 20 channels (intent, epistemic, emotion, psi, meta_awareness,
                     // coherence, trust, relationship_stage, structured_data, concept_count)
                     // flow directly into the HDC encoder.
-                    if let Some(result) = backend.generate_from_channels_direct(&channels, &params) {
+                    if let Some(result) = backend.generate_from_channels_direct(&channels, &params)
+                    {
                         match result {
                             Ok(text) => Some((text, start, backend_name)),
                             Err(e) => {
@@ -850,7 +871,11 @@ impl LLMOrgan {
     ///
     /// Creates a structured representation that the translation system prompt
     /// can parse and faithfully render into natural language.
-    fn build_translation_prompt(&self, thought: &StructuredThought, mood_temperature: f32) -> String {
+    fn build_translation_prompt(
+        &self,
+        thought: &StructuredThought,
+        mood_temperature: f32,
+    ) -> String {
         let mut prompt = String::new();
 
         prompt.push_str("=== STRUCTURED THOUGHT TO TRANSLATE ===\n\n");

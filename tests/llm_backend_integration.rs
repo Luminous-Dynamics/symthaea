@@ -9,11 +9,11 @@
 //! ANTHROPIC_API_KEY=sk-... cargo test --test llm_backend_integration -- --ignored
 //! ```
 
+use std::sync::{Mutex, OnceLock};
 use symthaea::language::{
     create_backend_from_env, AnthropicBackend, GenerationParams, LLMBackend, OpenAiBackend,
     SimulatedBackend,
 };
-use std::sync::{Mutex, OnceLock};
 
 fn env_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();

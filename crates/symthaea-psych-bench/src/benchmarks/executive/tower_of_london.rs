@@ -22,6 +22,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Tower of London planning benchmark.
@@ -489,6 +491,7 @@ impl PsychBenchmark for TowerOfLondonBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut easy = Vec::new();
         let mut medium = Vec::new();
@@ -509,6 +512,18 @@ impl PsychBenchmark for TowerOfLondonBenchmark {
             excess.push(r.avg_excess_moves);
             gradient.push(r.difficulty_gradient);
             all_rts.extend_from_slice(&r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "tower".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("easy_optimal_rate", MetricValue::from_samples(&easy));
@@ -525,6 +540,7 @@ impl PsychBenchmark for TowerOfLondonBenchmark {
 
         result.conditions = 3;
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

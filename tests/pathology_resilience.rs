@@ -15,9 +15,7 @@
 // ==================================================================================
 
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
-use symthaea::infrastructure::{
-    InfrastructureError, SomaticErrorBridge, TaskSupervisor,
-};
+use symthaea::infrastructure::{InfrastructureError, SomaticErrorBridge, TaskSupervisor};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Unit-level: SomaticErrorBridge mechanics
@@ -131,10 +129,8 @@ fn test_bridge_signals_proportional_to_stress() {
 
     // High stress: multiple severe errors
     let (mut bridge2, tx2) = SomaticErrorBridge::new();
-    tx2.send(InfrastructureError::LockPoisoned {
-        subsystem: "mesh",
-    })
-    .unwrap();
+    tx2.send(InfrastructureError::LockPoisoned { subsystem: "mesh" })
+        .unwrap();
     tx2.send(InfrastructureError::AsyncTaskPanicked {
         task_name: "critical".to_string(),
     })
@@ -563,7 +559,10 @@ fn test_error_severity_ordering() {
     assert!(panic_stress > lock_stress, "Panic > Lock poison");
     assert!(lock_stress > db_stress, "Lock poison > DB failure");
     assert!(db_stress > deser_stress, "DB failure > Deserialization");
-    assert!(deser_stress > net_stress, "Deserialization > Network partition");
+    assert!(
+        deser_stress > net_stress,
+        "Deserialization > Network partition"
+    );
 }
 
 #[test]

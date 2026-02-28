@@ -16,6 +16,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use crate::wm::ssm_temporal::SsmTemporalBackend;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -197,6 +199,7 @@ impl PsychBenchmark for SrttBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut effects = Vec::new();
         let mut seq_accs = Vec::new();
@@ -211,6 +214,18 @@ impl PsychBenchmark for SrttBenchmark {
             rand_accs.push(r.random_accuracy);
             seq_rts.push(r.sequence_rt);
             rand_rts.push(r.random_rt);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "srtt".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("learning_effect", MetricValue::from_samples(&effects));
@@ -221,6 +236,7 @@ impl PsychBenchmark for SrttBenchmark {
 
         result.conditions = 2; // sequence vs random
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -265,7 +281,11 @@ mod tests {
         };
         let result = SrttBenchmark.run(&config);
         let effect = result.metrics["learning_effect"].mean;
-        assert!(effect >= 0.0, "learning effect ({:.3}) should be >= 0", effect);
+        assert!(
+            effect >= 0.0,
+            "learning effect ({:.3}) should be >= 0",
+            effect
+        );
     }
 
     #[test]
@@ -288,7 +308,8 @@ mod tests {
         assert!(
             seq_rt_press <= seq_rt_base + 0.5,
             "time pressure should reduce sequence RT: base={:.2}, pressed={:.2}",
-            seq_rt_base, seq_rt_press
+            seq_rt_base,
+            seq_rt_press
         );
     }
 }

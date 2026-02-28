@@ -60,8 +60,7 @@ impl TrainingDataset {
             .filter(|l| !l.trim().is_empty())
             .enumerate()
             .map(|(i, line)| {
-                serde_json::from_str(line)
-                    .with_context(|| format!("parsing line {i}"))
+                serde_json::from_str(line).with_context(|| format!("parsing line {i}"))
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -76,8 +75,7 @@ impl TrainingDataset {
             out.push_str(&line);
             out.push('\n');
         }
-        std::fs::write(path, out)
-            .with_context(|| format!("writing training data: {path}"))?;
+        std::fs::write(path, out).with_context(|| format!("writing training data: {path}"))?;
         Ok(())
     }
 
@@ -230,18 +228,31 @@ impl GradientDiagnostics {
         let mut s = String::new();
         s.push_str("=== Gradient Diagnostics ===\n");
         s.push_str(&format!("Total steps:       {}\n", self.total_steps));
-        s.push_str(&format!("Mean grad norm:    {:.6}\n", self.mean_grad_norm()));
+        s.push_str(&format!(
+            "Mean grad norm:    {:.6}\n",
+            self.mean_grad_norm()
+        ));
         s.push_str(&format!("Max grad norm:     {:.6}\n", self.max_grad));
-        let min_display = if self.min_grad == f32::INFINITY { 0.0 } else { self.min_grad };
+        let min_display = if self.min_grad == f32::INFINITY {
+            0.0
+        } else {
+            self.min_grad
+        };
         s.push_str(&format!("Min grad norm:     {:.6}\n", min_display));
-        s.push_str(&format!("Clip count:        {} ({:.1}%)\n",
+        s.push_str(&format!(
+            "Clip count:        {} ({:.1}%)\n",
             self.clip_count,
-            if self.total_steps > 0 { self.clip_count as f32 / self.total_steps as f32 * 100.0 } else { 0.0 }
+            if self.total_steps > 0 {
+                self.clip_count as f32 / self.total_steps as f32 * 100.0
+            } else {
+                0.0
+            }
         ));
         s.push_str(&format!("Vanishing (<1e-6): {}\n", self.vanishing_count()));
         s.push_str(&format!("Exploding (>10):   {}\n", self.exploding_count()));
         if !self.embedding_norms.is_empty() {
-            let mean_emb: f32 = self.embedding_norms.iter().sum::<f32>() / self.embedding_norms.len() as f32;
+            let mean_emb: f32 =
+                self.embedding_norms.iter().sum::<f32>() / self.embedding_norms.len() as f32;
             s.push_str(&format!("Mean emb norm:     {:.4}\n", mean_emb));
         }
         s
@@ -287,20 +298,29 @@ pub fn train_with_adam(
     dataset: &TrainingDataset,
     config: &TrainingConfig,
     mut adam_state: Option<AdamState>,
-) -> (Vec<EpochMetrics>, Option<AdamState>, Option<GradientDiagnostics>) {
+) -> (
+    Vec<EpochMetrics>,
+    Option<AdamState>,
+    Option<GradientDiagnostics>,
+) {
     let mut metrics = Vec::with_capacity(config.epochs);
 
     // Initialize Adam state if requested and not provided
     if config.use_adam && adam_state.is_none() {
         let vocab_size = generator.tokenizer().vocab_size();
-        let dim = generator.controller().token_embeddings().first()
+        let dim = generator
+            .controller()
+            .token_embeddings()
+            .first()
             .map(|e| e.dim())
             .unwrap_or(16384);
         adam_state = Some(AdamState::new(vocab_size, dim));
     }
 
     // Calculate total steps for warmup
-    let tokens_per_epoch: usize = dataset.pairs.iter()
+    let tokens_per_epoch: usize = dataset
+        .pairs
+        .iter()
         .map(|p| p.target_ids.len().min(config.bptt_window))
         .sum();
     let total_steps = tokens_per_epoch * config.epochs;
@@ -323,7 +343,9 @@ pub fn train_with_adam(
                 continue;
             }
 
-            let channels = ThoughtChannels { channels: pair.channels };
+            let channels = ThoughtChannels {
+                channels: pair.channels,
+            };
             let thought_hv = generator.encoder().encode(&channels);
 
             // Reset controller for this sequence
@@ -335,10 +357,17 @@ pub fn train_with_adam(
             let window_end = pair.target_ids.len().min(config.bptt_window);
 
             for (pos, &target_id) in pair.target_ids[..window_end].iter().enumerate() {
-                let lr = warmup_lr(config.learning_rate, global_step, total_steps, config.warmup_fraction);
+                let lr = warmup_lr(
+                    config.learning_rate,
+                    global_step,
+                    total_steps,
+                    config.warmup_fraction,
+                );
                 generator.controller_mut().set_learning_rate(lr);
 
-                let logits = generator.controller_mut().forward_step(&thought_hv, prev_token, pos);
+                let logits = generator
+                    .controller_mut()
+                    .forward_step(&thought_hv, prev_token, pos);
 
                 // Cross-entropy loss: -log(softmax[target])
                 let loss = cross_entropy_loss(&logits, target_id as usize);
@@ -594,9 +623,9 @@ pub fn generate_diverse_thoughts() -> Vec<ThoughtChannels> {
 
     // Emotional clusters: (valence, arousal, warmth)
     let emotions = [
-        (0.7, 0.3, 0.8),   // Calm-warm
-        (-0.3, 0.7, 0.4),  // Tense-cool
-        (0.5, 0.5, 0.6),   // Neutral-balanced
+        (0.7, 0.3, 0.8),  // Calm-warm
+        (-0.3, 0.7, 0.4), // Tense-cool
+        (0.5, 0.5, 0.6),  // Neutral-balanced
     ];
 
     // Relationship stages
@@ -610,11 +639,11 @@ pub fn generate_diverse_thoughts() -> Vec<ThoughtChannels> {
                     channels.set_epistemic(epistemic as f32);
                     channels.set_emotion(valence, arousal, warmth);
                     channels.channels[15] = stage; // relationship_stage
-                    channels.channels[16] = 0.5;   // trust: mid
-                    channels.channels[17] = 1.0;   // mood_temperature: neutral
-                    channels.channels[12] = 0.5;   // psi: mid
-                    channels.channels[13] = 0.5;   // meta_awareness: mid
-                    channels.channels[14] = 0.5;   // coherence: mid
+                    channels.channels[16] = 0.5; // trust: mid
+                    channels.channels[17] = 1.0; // mood_temperature: neutral
+                    channels.channels[12] = 0.5; // psi: mid
+                    channels.channels[13] = 0.5; // meta_awareness: mid
+                    channels.channels[14] = 0.5; // coherence: mid
                     thoughts.push(channels);
                 }
             }
@@ -630,8 +659,14 @@ pub fn generate_diverse_thoughts() -> Vec<ThoughtChannels> {
 pub fn thought_to_prompt(channels: &ThoughtChannels) -> String {
     // Find the active intent
     let intent_names = [
-        "Acknowledge", "Answer", "Clarify", "Propose",
-        "Uncertainty", "Reflect", "Continue", "Unknown",
+        "Acknowledge",
+        "Answer",
+        "Clarify",
+        "Propose",
+        "Uncertainty",
+        "Reflect",
+        "Continue",
+        "Unknown",
     ];
     let active_intent = (0..8)
         .max_by(|&a, &b| channels.channels[a].total_cmp(&channels.channels[b]))
@@ -642,18 +677,16 @@ pub fn thought_to_prompt(channels: &ThoughtChannels) -> String {
 
     format!(
         "SEMANTIC_INTENT: {}\nEPISTEMIC_STATUS: {}\nMOOD_TEMPERATURE: {:.2}\n",
-        intent_names[active_intent],
-        epistemic_names[epistemic_idx],
-        channels.channels[17],
+        intent_names[active_intent], epistemic_names[epistemic_idx], channels.channels[17],
     )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::generator::BrocaConfig;
     use crate::controller::LanguageControllerConfig;
     use crate::gating::GatingConfig;
+    use crate::generator::BrocaConfig;
     use crate::generator::SamplingStrategy;
     use symthaea_core::genesis::GenesisSeed;
 
@@ -711,7 +744,10 @@ mod tests {
         // When target has low logit, loss should be high
         let loss_wrong = cross_entropy_loss(&logits, 0);
 
-        assert!(loss_correct < loss_wrong, "Loss for correct prediction should be lower");
+        assert!(
+            loss_correct < loss_wrong,
+            "Loss for correct prediction should be lower"
+        );
         assert!(loss_correct >= 0.0, "Loss should be non-negative");
     }
 
@@ -747,7 +783,11 @@ mod tests {
 
         // Loss should be finite
         for m in &metrics {
-            assert!(m.avg_loss.is_finite(), "Loss should be finite: {}", m.avg_loss);
+            assert!(
+                m.avg_loss.is_finite(),
+                "Loss should be finite: {}",
+                m.avg_loss
+            );
         }
 
         // Loss should decrease: first epoch > last epoch
@@ -787,7 +827,10 @@ mod tests {
         let (metrics, adam, diag) = train_with_adam(&mut gen, &dataset, &train_config, None);
         assert_eq!(metrics.len(), 10);
         assert!(adam.is_some());
-        assert!(diag.is_none(), "Diagnostics should be None when not enabled");
+        assert!(
+            diag.is_none(),
+            "Diagnostics should be None when not enabled"
+        );
 
         let adam = adam.unwrap();
         assert!(adam.t > 0, "Adam should have stepped");
@@ -819,7 +862,11 @@ mod tests {
 
         let metrics = train(&mut gen, &dataset, &train_config);
         // With near-zero LR, loss changes are < 1e-6, so patience triggers
-        assert!(metrics.len() < 100, "Early stopping should trigger: got {} epochs", metrics.len());
+        assert!(
+            metrics.len() < 100,
+            "Early stopping should trigger: got {} epochs",
+            metrics.len()
+        );
     }
 
     #[test]
@@ -827,11 +874,17 @@ mod tests {
         let base_lr = 0.01;
         // At step 0, should be 10% of base
         let lr0 = warmup_lr(base_lr, 0, 100, 0.1);
-        assert!((lr0 - 0.001).abs() < 1e-5, "Step 0 should be 10% of base: {lr0}");
+        assert!(
+            (lr0 - 0.001).abs() < 1e-5,
+            "Step 0 should be 10% of base: {lr0}"
+        );
 
         // At step 10 (end of warmup), should be full base
         let lr10 = warmup_lr(base_lr, 10, 100, 0.1);
-        assert!((lr10 - base_lr).abs() < 1e-5, "After warmup should be full base: {lr10}");
+        assert!(
+            (lr10 - base_lr).abs() < 1e-5,
+            "After warmup should be full base: {lr10}"
+        );
 
         // At step 50, should be full base
         let lr50 = warmup_lr(base_lr, 50, 100, 0.1);
@@ -869,7 +922,11 @@ mod tests {
     #[test]
     fn test_generate_diverse_thoughts() {
         let thoughts = generate_diverse_thoughts();
-        assert_eq!(thoughts.len(), 360, "8 intents x 5 epistemic x 3 emotions x 3 stages = 360");
+        assert_eq!(
+            thoughts.len(),
+            360,
+            "8 intents x 5 epistemic x 3 emotions x 3 stages = 360"
+        );
 
         // Verify all are distinct
         for (i, a) in thoughts.iter().enumerate() {
@@ -889,8 +946,14 @@ mod tests {
 
         let prompt = thought_to_prompt(&channels);
         assert!(prompt.contains("Answer"), "Should contain intent name");
-        assert!(prompt.contains("Certain"), "Should contain epistemic status");
-        assert!(prompt.contains("MOOD_TEMPERATURE"), "Should contain mood temp marker");
+        assert!(
+            prompt.contains("Certain"),
+            "Should contain epistemic status"
+        );
+        assert!(
+            prompt.contains("MOOD_TEMPERATURE"),
+            "Should contain mood temp marker"
+        );
     }
 
     #[test]
@@ -926,7 +989,10 @@ mod tests {
         assert!(mean < 100.0, "Mean grad norm should not explode: {mean}");
 
         // Embedding norms should be sampled (5 epochs × vocab_size samples)
-        assert!(!diag.embedding_norms.is_empty(), "Should have embedding norms");
+        assert!(
+            !diag.embedding_norms.is_empty(),
+            "Should have embedding norms"
+        );
         for &norm in &diag.embedding_norms {
             assert!(norm > 0.01, "Embedding norm should be positive: {norm}");
             assert!(norm < 10000.0, "Embedding norm should not explode: {norm}");
@@ -941,8 +1007,17 @@ mod tests {
         diag.record_step(0.001, false);
 
         let summary = diag.format_summary();
-        assert!(summary.contains("Gradient Diagnostics"), "Should have header");
-        assert!(summary.contains("Total steps:       3"), "Should show 3 steps");
-        assert!(summary.contains("Clip count:        1"), "Should show 1 clip");
+        assert!(
+            summary.contains("Gradient Diagnostics"),
+            "Should have header"
+        );
+        assert!(
+            summary.contains("Total steps:       3"),
+            "Should show 3 steps"
+        );
+        assert!(
+            summary.contains("Clip count:        1"),
+            "Should show 1 clip"
+        );
     }
 }

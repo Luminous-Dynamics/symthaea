@@ -18,6 +18,8 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Ultimatum Game benchmark.
@@ -49,7 +51,8 @@ impl UltimatumGameBenchmark {
         let unfair_proto = ContinuousHV::random(dim, seed.wrapping_add(2));
 
         // Time pressure lowers deliberation: more impulsive rejections
-        let noise_level: f32 = (0.15 + config.time_pressure as f32 * 0.20) * diff_model.interference_multiplier(config.difficulty) as f32;
+        let noise_level: f32 = (0.15 + config.time_pressure as f32 * 0.20)
+            * diff_model.interference_multiplier(config.difficulty) as f32;
         let threshold_shift: f32 = config.time_pressure as f32 * 0.10; // lower acceptance threshold
 
         // Social cognition: empathy reduces rejection of low offers
@@ -189,6 +192,7 @@ impl PsychBenchmark for UltimatumGameBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut sensitivities = Vec::new();
         let mut rejection_rates = Vec::new();
@@ -203,13 +207,28 @@ impl PsychBenchmark for UltimatumGameBenchmark {
             thresholds.push(r.offer_threshold);
             strategic_ratios.push(r.strategic_ratio);
             rts.push(r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "ultimatum".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert(
             "fairness_sensitivity",
             MetricValue::from_samples(&sensitivities),
         );
-        result.insert("rejection_rate", MetricValue::from_samples(&rejection_rates));
+        result.insert(
+            "rejection_rate",
+            MetricValue::from_samples(&rejection_rates),
+        );
         result.insert("offer_threshold", MetricValue::from_samples(&thresholds));
         result.insert(
             "strategic_ratio",
@@ -219,6 +238,7 @@ impl PsychBenchmark for UltimatumGameBenchmark {
 
         result.conditions = 5; // 5 offer levels
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -307,7 +327,8 @@ mod tests {
         assert!(
             rt_press <= rt_base + 0.5,
             "time pressure should reduce RT: base={:.2}, pressed={:.2}",
-            rt_base, rt_press
+            rt_base,
+            rt_press
         );
     }
 }

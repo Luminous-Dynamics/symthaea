@@ -491,12 +491,19 @@ impl AffectiveNSMGrounding {
     }
 
     /// Get grounding for a specific emotion
-    pub(crate) fn grounding(&self, emotion: &EmotionCategory) -> Option<&EmotionPrimitiveGrounding> {
+    pub(crate) fn grounding(
+        &self,
+        emotion: &EmotionCategory,
+    ) -> Option<&EmotionPrimitiveGrounding> {
         self.emotion_groundings.get(emotion)
     }
 
     /// Find emotions semantically similar to a query vector
-    pub(crate) fn find_similar(&self, query: &BinaryHV, threshold: f64) -> Vec<(&EmotionCategory, f64)> {
+    pub(crate) fn find_similar(
+        &self,
+        query: &BinaryHV,
+        threshold: f64,
+    ) -> Vec<(&EmotionCategory, f64)> {
         let mut similar: Vec<_> = self
             .emotion_groundings
             .iter()

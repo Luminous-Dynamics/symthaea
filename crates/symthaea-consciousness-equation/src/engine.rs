@@ -369,9 +369,9 @@ impl MasterConsciousnessEquation {
 #[cfg(test)]
 #[allow(clippy::field_reassign_with_default)]
 mod tests {
+    use super::*;
     use crate::config::MasterEquationConfig;
     use crate::types::ConsciousnessInputs;
-    use super::*;
 
     fn all_high_inputs() -> ConsciousnessInputs {
         ConsciousnessInputs {

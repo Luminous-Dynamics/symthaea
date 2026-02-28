@@ -188,7 +188,7 @@ pub enum SwarmMessage {
     /// Request for distributed reasoning task (v1.8.0)
     TaskRequest {
         task_id: String,
-        sub_thought: Vec<f32>, // HDC sub-segment
+        sub_thought: Vec<f32>,       // HDC sub-segment
         required_resolution: String, // e.g. "2^16"
     },
 

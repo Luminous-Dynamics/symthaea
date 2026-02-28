@@ -676,9 +676,6 @@ fn power_iteration(matrix: &[Vec<f64>], max_iter: usize) -> (f64, Vec<f64>) {
             }
         }
 
-        // eigenvalue = v^T * w
-        let _eigenval: f64 = v.iter().zip(w.iter()).map(|(a, b)| a * b).sum();
-
         // Normalize
         let norm: f64 = w.iter().map(|x| x * x).sum::<f64>().sqrt();
         if norm < 1e-15 {
@@ -853,7 +850,9 @@ pub fn bootstrap_ci_bca(samples: &[f64], n_resamples: usize, alpha: f64, seed: u
     let nf = n as f64;
     let jackknife_means: Vec<f64> = (0..n)
         .map(|i| {
-            let sum: f64 = samples.iter().enumerate()
+            let sum: f64 = samples
+                .iter()
+                .enumerate()
                 .filter(|&(j, _)| j != i)
                 .map(|(_, &x)| x)
                 .sum();
@@ -861,8 +860,14 @@ pub fn bootstrap_ci_bca(samples: &[f64], n_resamples: usize, alpha: f64, seed: u
         })
         .collect();
     let jack_mean = jackknife_means.iter().sum::<f64>() / nf;
-    let num: f64 = jackknife_means.iter().map(|&x| (jack_mean - x).powi(3)).sum();
-    let den: f64 = jackknife_means.iter().map(|&x| (jack_mean - x).powi(2)).sum();
+    let num: f64 = jackknife_means
+        .iter()
+        .map(|&x| (jack_mean - x).powi(3))
+        .sum();
+    let den: f64 = jackknife_means
+        .iter()
+        .map(|&x| (jack_mean - x).powi(2))
+        .sum();
     let a = if den.abs() > 1e-15 {
         num / (6.0 * den.powf(1.5))
     } else {
@@ -885,7 +890,7 @@ pub fn bootstrap_ci_bca(samples: &[f64], n_resamples: usize, alpha: f64, seed: u
 }
 
 /// Standard normal CDF (Abramowitz & Stegun approximation).
-fn normal_cdf(z: f64) -> f64 {
+pub fn normal_cdf(z: f64) -> f64 {
     if !z.is_finite() {
         return if z > 0.0 { 1.0 } else { 0.0 };
     }
@@ -895,30 +900,38 @@ fn normal_cdf(z: f64) -> f64 {
     let poly = t
         * (0.319381530
             + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
-    if z >= 0.0 { 1.0 - p * poly } else { p * poly }
+    if z >= 0.0 {
+        1.0 - p * poly
+    } else {
+        p * poly
+    }
 }
 
 /// Inverse standard normal CDF (rational approximation).
 ///
 /// Abramowitz & Stegun 26.2.23 approximation for p in (0,1).
 fn inv_normal_cdf(p: f64) -> f64 {
-    if p <= 0.0 { return -3.0; }
-    if p >= 1.0 { return 3.0; }
+    if p <= 0.0 {
+        return -3.0;
+    }
+    if p >= 1.0 {
+        return 3.0;
+    }
 
     // Rational approximation (Peter Acklam's algorithm)
     let a = [
         -3.969683028665376e+01,
-         2.209460984245205e+02,
+        2.209460984245205e+02,
         -2.759285104469687e+02,
-         1.383577518672690e+02,
+        1.383577518672690e+02,
         -3.066479806614716e+01,
-         2.506628277459239e+00,
+        2.506628277459239e+00,
     ];
     let b = [
         -5.447609879822406e+01,
-         1.615858368580409e+02,
+        1.615858368580409e+02,
         -1.556989798598866e+02,
-         6.680131188771972e+01,
+        6.680131188771972e+01,
         -1.328068155288572e+01,
     ];
     let c = [
@@ -926,14 +939,14 @@ fn inv_normal_cdf(p: f64) -> f64 {
         -3.223964580411365e-01,
         -2.400758277161838e+00,
         -2.549732539343734e+00,
-         4.374664141464968e+00,
-         2.938163982698783e+00,
+        4.374664141464968e+00,
+        2.938163982698783e+00,
     ];
     let d = [
-         7.784695709041462e-03,
-         3.224671290700398e-01,
-         2.445134137142996e+00,
-         3.754408661907416e+00,
+        7.784695709041462e-03,
+        3.224671290700398e-01,
+        2.445134137142996e+00,
+        3.754408661907416e+00,
     ];
 
     let p_low = 0.02425;
@@ -941,17 +954,17 @@ fn inv_normal_cdf(p: f64) -> f64 {
 
     if p < p_low {
         let q = (-2.0 * p.ln()).sqrt();
-        (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
-        ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1.0)
+        (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+            / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
     } else if p <= p_high {
         let q = p - 0.5;
         let r = q * q;
-        (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q /
-        (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1.0)
+        (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q
+            / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0)
     } else {
         let q = (-2.0 * (1.0 - p).ln()).sqrt();
-        -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
-        ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1.0)
+        -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+            / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
     }
 }
 
@@ -1026,7 +1039,10 @@ pub fn fit_sat_curve(benchmark: &str, points: &[SatCurvePoint]) -> SatCurve {
     }
 
     let max_acc = points.iter().map(|p| p.accuracy).fold(0.0_f64, f64::max);
-    let min_tp = points.iter().map(|p| p.time_pressure).fold(1.0_f64, f64::min);
+    let min_tp = points
+        .iter()
+        .map(|p| p.time_pressure)
+        .fold(1.0_f64, f64::min);
 
     // Grid search
     let mut best_r2 = f64::NEG_INFINITY;
@@ -1040,21 +1056,29 @@ pub fn fit_sat_curve(benchmark: &str, points: &[SatCurvePoint]) -> SatCurve {
                 let delta = min_tp * delta_i as f64 / 10.0;
 
                 // Compute R²
-                let mean_acc: f64 = points.iter().map(|p| p.accuracy).sum::<f64>() / points.len() as f64;
+                let mean_acc: f64 =
+                    points.iter().map(|p| p.accuracy).sum::<f64>() / points.len() as f64;
                 let ss_tot: f64 = points.iter().map(|p| (p.accuracy - mean_acc).powi(2)).sum();
 
-                let ss_res: f64 = points.iter().map(|p| {
-                    // Map time_pressure to "available time": t = 1 - time_pressure
-                    let t = 1.0 - p.time_pressure;
-                    let predicted = if t > delta {
-                        lambda * (1.0 - (-beta * (t - delta)).exp())
-                    } else {
-                        0.0
-                    };
-                    (p.accuracy - predicted).powi(2)
-                }).sum();
+                let ss_res: f64 = points
+                    .iter()
+                    .map(|p| {
+                        // Map time_pressure to "available time": t = 1 - time_pressure
+                        let t = 1.0 - p.time_pressure;
+                        let predicted = if t > delta {
+                            lambda * (1.0 - (-beta * (t - delta)).exp())
+                        } else {
+                            0.0
+                        };
+                        (p.accuracy - predicted).powi(2)
+                    })
+                    .sum();
 
-                let r2 = if ss_tot > 1e-15 { 1.0 - ss_res / ss_tot } else { 0.0 };
+                let r2 = if ss_tot > 1e-15 {
+                    1.0 - ss_res / ss_tot
+                } else {
+                    0.0
+                };
 
                 if r2 > best_r2 {
                     best_r2 = r2;
@@ -1144,9 +1168,10 @@ pub fn meta_analysis(effects: &[(f64, f64)]) -> Option<MetaAnalysisResult> {
     }
 
     // Fixed-effect weights: w_i = 1/SE_i²
-    let weights: Vec<f64> = effects.iter().map(|(_, se)| {
-        if *se > 0.0 { 1.0 / (se * se) } else { 0.0 }
-    }).collect();
+    let weights: Vec<f64> = effects
+        .iter()
+        .map(|(_, se)| if *se > 0.0 { 1.0 / (se * se) } else { 0.0 })
+        .collect();
 
     let sum_w: f64 = weights.iter().sum();
     if sum_w < 1e-15 {
@@ -1154,10 +1179,19 @@ pub fn meta_analysis(effects: &[(f64, f64)]) -> Option<MetaAnalysisResult> {
     }
 
     // Fixed-effect estimate
-    let d_fixed: f64 = effects.iter().zip(&weights).map(|((d, _), w)| w * d).sum::<f64>() / sum_w;
+    let d_fixed: f64 = effects
+        .iter()
+        .zip(&weights)
+        .map(|((d, _), w)| w * d)
+        .sum::<f64>()
+        / sum_w;
 
     // Cochran's Q
-    let q: f64 = effects.iter().zip(&weights).map(|((d, _), w)| w * (d - d_fixed).powi(2)).sum();
+    let q: f64 = effects
+        .iter()
+        .zip(&weights)
+        .map(|((d, _), w)| w * (d - d_fixed).powi(2))
+        .sum();
 
     // tau² via DerSimonian-Laird
     let sum_w2: f64 = weights.iter().map(|w| w * w).sum();
@@ -1169,18 +1203,29 @@ pub fn meta_analysis(effects: &[(f64, f64)]) -> Option<MetaAnalysisResult> {
     };
 
     // Random-effects weights: w_i* = 1/(SE_i² + τ²)
-    let re_weights: Vec<f64> = effects.iter().map(|(_, se)| {
-        let denom = se * se + tau_sq;
-        if denom > 0.0 { 1.0 / denom } else { 0.0 }
-    }).collect();
+    let re_weights: Vec<f64> = effects
+        .iter()
+        .map(|(_, se)| {
+            let denom = se * se + tau_sq;
+            if denom > 0.0 {
+                1.0 / denom
+            } else {
+                0.0
+            }
+        })
+        .collect();
 
     let sum_re_w: f64 = re_weights.iter().sum();
     if sum_re_w < 1e-15 {
         return None;
     }
 
-    let summary_d: f64 = effects.iter().zip(&re_weights)
-        .map(|((d, _), w)| w * d).sum::<f64>() / sum_re_w;
+    let summary_d: f64 = effects
+        .iter()
+        .zip(&re_weights)
+        .map(|((d, _), w)| w * d)
+        .sum::<f64>()
+        / sum_re_w;
     let summary_se = (1.0 / sum_re_w).sqrt();
 
     // I² = max(0, (Q - (k-1)) / Q) × 100
@@ -1193,8 +1238,7 @@ pub fn meta_analysis(effects: &[(f64, f64)]) -> Option<MetaAnalysisResult> {
     // p-value for Q via Wilson-Hilferty chi-squared approximation
     let df = (k - 1) as f64;
     let q_p_value = if df > 0.0 {
-        let z = ((q / df).powf(1.0 / 3.0) - (1.0 - 2.0 / (9.0 * df)))
-            / (2.0 / (9.0 * df)).sqrt();
+        let z = ((q / df).powf(1.0 / 3.0) - (1.0 - 2.0 / (9.0 * df))) / (2.0 / (9.0 * df)).sqrt();
         1.0 - normal_cdf(z)
     } else {
         1.0
@@ -1217,15 +1261,20 @@ pub fn meta_analysis(effects: &[(f64, f64)]) -> Option<MetaAnalysisResult> {
 /// Run meta-analysis from forest plot rows.
 ///
 /// Computes SE for each row's Cohen's d using SE = sqrt(1/n + d²/(2n)).
-pub fn meta_analysis_from_forest(rows: &[super::report::ForestPlotRow]) -> Option<MetaAnalysisResult> {
-    let effects: Vec<(f64, f64)> = rows.iter().filter_map(|row| {
-        let d = row.cohens_d?;
-        // n from the benchmark's trial count isn't in ForestPlotRow,
-        // so estimate from CI width: SE ≈ (ci_upper - ci_lower) / 3.92
-        let ci_width = row.ci_upper - row.ci_lower;
-        let se = if ci_width > 0.0 { ci_width / 3.92 } else { 0.1 };
-        Some((d, se))
-    }).collect();
+pub fn meta_analysis_from_forest(
+    rows: &[super::report::ForestPlotRow],
+) -> Option<MetaAnalysisResult> {
+    let effects: Vec<(f64, f64)> = rows
+        .iter()
+        .filter_map(|row| {
+            let d = row.cohens_d?;
+            // n from the benchmark's trial count isn't in ForestPlotRow,
+            // so estimate from CI width: SE ≈ (ci_upper - ci_lower) / 3.92
+            let ci_width = row.ci_upper - row.ci_lower;
+            let se = if ci_width > 0.0 { ci_width / 3.92 } else { 0.1 };
+            Some((d, se))
+        })
+        .collect();
 
     meta_analysis(&effects)
 }
@@ -1326,7 +1375,11 @@ fn probit_approx(p: f64) -> f64 {
     let d2 = 0.189269;
     let d3 = 0.001308;
     let z = t - (c0 + c1 * t + c2 * t * t) / (1.0 + d1 * t + d2 * t * t + d3 * t * t * t);
-    if p < 0.5 { -z } else { z }
+    if p < 0.5 {
+        -z
+    } else {
+        z
+    }
 }
 
 /// Compute individual differences summary for a set of participant scores.
@@ -1340,8 +1393,15 @@ pub fn individual_differences(
         return IndividualDifferencesResult {
             benchmark: benchmark.to_string(),
             metric: metric.to_string(),
-            n: 0, mean: 0.0, sd: 0.0, min: 0.0, max: 0.0,
-            skewness: 0.0, shapiro_wilk_w: 1.0, ci_lower: 0.0, ci_upper: 0.0,
+            n: 0,
+            mean: 0.0,
+            sd: 0.0,
+            min: 0.0,
+            max: 0.0,
+            skewness: 0.0,
+            shapiro_wilk_w: 1.0,
+            ci_lower: 0.0,
+            ci_upper: 0.0,
         };
     }
 
@@ -1357,7 +1417,11 @@ pub fn individual_differences(
 
     // Skewness (Fisher's)
     let skewness = if sd > 1e-15 && n > 2 {
-        let m3 = scores.iter().map(|x| ((x - mean) / sd).powi(3)).sum::<f64>() / n as f64;
+        let m3 = scores
+            .iter()
+            .map(|x| ((x - mean) / sd).powi(3))
+            .sum::<f64>()
+            / n as f64;
         m3 * (n as f64).sqrt() * (n as f64 - 1.0).sqrt() / (n as f64 - 2.0)
     } else {
         0.0
@@ -1373,8 +1437,15 @@ pub fn individual_differences(
     IndividualDifferencesResult {
         benchmark: benchmark.to_string(),
         metric: metric.to_string(),
-        n, mean, sd, min, max, skewness,
-        shapiro_wilk_w: w, ci_lower, ci_upper,
+        n,
+        mean,
+        sd,
+        min,
+        max,
+        skewness,
+        shapiro_wilk_w: w,
+        ci_lower,
+        ci_upper,
     }
 }
 
@@ -1385,9 +1456,15 @@ pub fn format_individual_differences(r: &IndividualDifferencesResult) -> String 
          skew={:>+6.2} W={:.3} | 95%CI [{:.3}, {:.3}]",
         r.benchmark.split("::").last().unwrap_or(&r.benchmark),
         r.metric,
-        r.n, r.mean, r.sd, r.min, r.max,
-        r.skewness, r.shapiro_wilk_w,
-        r.ci_lower, r.ci_upper,
+        r.n,
+        r.mean,
+        r.sd,
+        r.min,
+        r.max,
+        r.skewness,
+        r.shapiro_wilk_w,
+        r.ci_lower,
+        r.ci_upper,
     )
 }
 
@@ -1431,7 +1508,9 @@ pub fn dim_scaling_slope(dims: &[usize], values: &[f64]) -> (f64, f64) {
     // R²
     let ss_tot: f64 = values.iter().map(|y| (y - y_mean).powi(2)).sum();
     let r_squared = if ss_tot > 1e-15 {
-        let ss_res: f64 = xs.iter().zip(values.iter())
+        let ss_res: f64 = xs
+            .iter()
+            .zip(values.iter())
             .map(|(x, y)| {
                 let predicted = y_mean + slope * (x - x_mean);
                 (y - predicted).powi(2)
@@ -1448,7 +1527,9 @@ pub fn dim_scaling_slope(dims: &[usize], values: &[f64]) -> (f64, f64) {
 /// Format dimensionality scaling result as a table row.
 pub fn format_dim_scaling(r: &DimScalingResult) -> String {
     let short = r.benchmark.split("::").last().unwrap_or(&r.benchmark);
-    let vals_str: String = r.values.iter()
+    let vals_str: String = r
+        .values
+        .iter()
         .map(|v| format!("{:.3}", v))
         .collect::<Vec<_>>()
         .join(" | ");
@@ -1485,7 +1566,9 @@ pub struct ReasoningValidityResult {
 ///
 /// This is a lightweight analysis based on within-run metric values.
 /// For proper validity with correlations, use `CrossBenchmarkAnalysis`.
-pub fn reasoning_validity_single_run(report: &super::report::BenchmarkReport) -> ReasoningValidityResult {
+pub fn reasoning_validity_single_run(
+    report: &super::report::BenchmarkReport,
+) -> ReasoningValidityResult {
     let reasoning_benchmarks = ["ArcFluid", "ArcCompositional", "ArcAnalogy", "ArcAbductive"];
     let executive_benchmarks = ["Stroop", "Wisconsin", "Ravens", "TowerOfLondon"];
 
@@ -1522,7 +1605,10 @@ pub fn reasoning_validity_single_run(report: &super::report::BenchmarkReport) ->
         reasoning_vals.iter().sum::<f64>() / reasoning_vals.len() as f64
     };
     let reasoning_var = if reasoning_vals.len() > 1 {
-        reasoning_vals.iter().map(|v| (v - reasoning_mean).powi(2)).sum::<f64>()
+        reasoning_vals
+            .iter()
+            .map(|v| (v - reasoning_mean).powi(2))
+            .sum::<f64>()
             / (reasoning_vals.len() - 1) as f64
     } else {
         0.0
@@ -1670,7 +1756,11 @@ pub fn arc_split_half_reliability(report: &super::report::BenchmarkReport) -> Ve
                 seed = seed.wrapping_mul(31).wrapping_add(b as u64);
             }
             seed ^= 0x9E3779B97F4A7C15;
-            let xor_shift = |s: &mut u64| { *s ^= *s << 13; *s ^= *s >> 7; *s ^= *s << 17; };
+            let xor_shift = |s: &mut u64| {
+                *s ^= *s << 13;
+                *s ^= *s >> 7;
+                *s ^= *s << 17;
+            };
             let total = 2 * n;
             let mut samples = Vec::with_capacity(total);
             for _ in 0..((total + 1) / 2) {
@@ -1691,7 +1781,11 @@ pub fn arc_split_half_reliability(report: &super::report::BenchmarkReport) -> Ve
             let half_n = odd.len().min(even.len());
             if half_n >= 2 {
                 let r = spearman_correlation(&odd[..half_n], &even[..half_n]);
-                let r_sb = if (1.0 + r).abs() > 1e-10 { 2.0 * r / (1.0 + r) } else { 0.0 };
+                let r_sb = if (1.0 + r).abs() > 1e-10 {
+                    2.0 * r / (1.0 + r)
+                } else {
+                    0.0
+                };
                 results.push(SplitHalfResult {
                     benchmark: bench_result.benchmark.clone(),
                     metric: key.to_string(),
@@ -1750,7 +1844,11 @@ pub fn format_arc_report(report: &super::report::BenchmarkReport) -> String {
         }
         let key = super::report::key_metric_for_benchmark(&result.benchmark);
         if let Some(m) = result.metrics.get(key) {
-            let short = result.benchmark.split("::").last().unwrap_or(&result.benchmark);
+            let short = result
+                .benchmark
+                .split("::")
+                .last()
+                .unwrap_or(&result.benchmark);
             lines.push(format!(
                 "| {} | {} | {:.3} | {:.3} | [{:.3}, {:.3}] |",
                 short, key, m.mean, m.std_dev, m.ci_lower, m.ci_upper
@@ -1765,7 +1863,12 @@ pub fn format_arc_report(report: &super::report::BenchmarkReport) -> String {
         if result.benchmark.contains("ArcScaling") {
             lines.push(String::new());
             lines.push("### Grid Complexity".to_string());
-            for name in &["grid_3x3_accuracy", "grid_5x5_accuracy", "grid_8x8_accuracy", "grid_12x12_accuracy"] {
+            for name in &[
+                "grid_3x3_accuracy",
+                "grid_5x5_accuracy",
+                "grid_8x8_accuracy",
+                "grid_12x12_accuracy",
+            ] {
                 if let Some(m) = result.metrics.get(*name) {
                     lines.push(format!("  {}: {:.3} (±{:.3})", name, m.mean, m.std_dev));
                 }
@@ -1775,7 +1878,12 @@ pub fn format_arc_report(report: &super::report::BenchmarkReport) -> String {
             }
             lines.push(String::new());
             lines.push("### Dimension Scaling".to_string());
-            for name in &["dim_128d_accuracy", "dim_256d_accuracy", "dim_512d_accuracy", "dim_1024d_accuracy"] {
+            for name in &[
+                "dim_128d_accuracy",
+                "dim_256d_accuracy",
+                "dim_512d_accuracy",
+                "dim_1024d_accuracy",
+            ] {
                 if let Some(m) = result.metrics.get(*name) {
                     lines.push(format!("  {}: {:.3} (±{:.3})", name, m.mean, m.std_dev));
                 }
@@ -1795,7 +1903,10 @@ pub fn format_arc_report(report: &super::report::BenchmarkReport) -> String {
             for k in 1..=5 {
                 let key = format!("accuracy_{}shot", k);
                 if let Some(m) = result.metrics.get(&key) {
-                    lines.push(format!("  {}-shot accuracy: {:.3} (±{:.3})", k, m.mean, m.std_dev));
+                    lines.push(format!(
+                        "  {}-shot accuracy: {:.3} (±{:.3})",
+                        k, m.mean, m.std_dev
+                    ));
                 }
             }
             if let Some(m) = result.metrics.get("learning_rate") {
@@ -1813,7 +1924,13 @@ pub fn format_arc_report(report: &super::report::BenchmarkReport) -> String {
             lines.push(String::new());
             lines.push("## 4. Noise Robustness".to_string());
             lines.push(String::new());
-            for name in &["accuracy_0pct", "accuracy_10pct", "accuracy_20pct", "accuracy_30pct", "accuracy_50pct"] {
+            for name in &[
+                "accuracy_0pct",
+                "accuracy_10pct",
+                "accuracy_20pct",
+                "accuracy_30pct",
+                "accuracy_50pct",
+            ] {
                 if let Some(m) = result.metrics.get(*name) {
                     lines.push(format!("  {}: {:.3}", name, m.mean));
                 }
@@ -1833,9 +1950,16 @@ pub fn format_arc_report(report: &super::report::BenchmarkReport) -> String {
             lines.push(String::new());
             lines.push("## 5. Chain Composition".to_string());
             lines.push(String::new());
-            for (len, key) in &[(2, "chain_2_accuracy"), (3, "chain_3_accuracy"), (4, "chain_4_accuracy")] {
+            for (len, key) in &[
+                (2, "chain_2_accuracy"),
+                (3, "chain_3_accuracy"),
+                (4, "chain_4_accuracy"),
+            ] {
                 if let Some(m) = result.metrics.get(*key) {
-                    lines.push(format!("  {}-step chain: {:.3} (±{:.3})", len, m.mean, m.std_dev));
+                    lines.push(format!(
+                        "  {}-step chain: {:.3} (±{:.3})",
+                        len, m.mean, m.std_dev
+                    ));
                 }
             }
             if let Some(m) = result.metrics.get("chain_degradation") {
@@ -1874,7 +1998,10 @@ pub fn format_arc_report(report: &super::report::BenchmarkReport) -> String {
             lines.push("## 7. Representational Similarity Analysis".to_string());
             lines.push(String::new());
             if let Some(m) = result.metrics.get("rsa_correlation") {
-                lines.push(format!("  RSA correlation (encoding ↔ structural): {:.3}", m.mean));
+                lines.push(format!(
+                    "  RSA correlation (encoding ↔ structural): {:.3}",
+                    m.mean
+                ));
             }
             if let Some(m) = result.metrics.get("within_type_similarity") {
                 lines.push(format!("  Within-type encoding similarity: {:.3}", m.mean));
@@ -1883,7 +2010,10 @@ pub fn format_arc_report(report: &super::report::BenchmarkReport) -> String {
                 lines.push(format!("  Between-type encoding similarity: {:.3}", m.mean));
             }
             if let Some(m) = result.metrics.get("discriminability") {
-                lines.push(format!("  Representational discriminability: {:.3}", m.mean));
+                lines.push(format!(
+                    "  Representational discriminability: {:.3}",
+                    m.mean
+                ));
             }
         }
     }
@@ -1895,7 +2025,10 @@ pub fn format_arc_report(report: &super::report::BenchmarkReport) -> String {
             lines.push("## 8. Adaptive Staircase".to_string());
             lines.push(String::new());
             if let Some(m) = result.metrics.get("capacity_threshold") {
-                lines.push(format!("  Capacity threshold (75% acc): {:.1} grid size", m.mean));
+                lines.push(format!(
+                    "  Capacity threshold (75% acc): {:.1} grid size",
+                    m.mean
+                ));
             }
             if let Some(m) = result.metrics.get("psychometric_slope") {
                 lines.push(format!("  Psychometric slope: {:.4}", m.mean));
@@ -2055,10 +2188,7 @@ pub fn cross_domain_prediction(
 /// Format cross-domain prediction as a markdown table.
 pub fn format_cross_domain_prediction(result: &CrossDomainPrediction) -> String {
     let mut lines = Vec::new();
-    lines.push(format!(
-        "### Cross-Domain Prediction: {}",
-        result.target
-    ));
+    lines.push(format!("### Cross-Domain Prediction: {}", result.target));
     lines.push(String::new());
     lines.push("| Predictor | Beta |".to_string());
     lines.push("|-----------|------|".to_string());
@@ -2788,8 +2918,12 @@ mod tests {
         // N(5.0, 1.0) — true mean should be within CI
         let samples: Vec<f64> = (0..100).map(|i| 5.0 + (i as f64 - 50.0) * 0.02).collect();
         let (lo, hi) = bootstrap_ci(&samples, 2000, 0.05, 42);
-        assert!(lo <= 5.0 && hi >= 5.0,
-            "CI [{:.4}, {:.4}] should contain true mean 5.0", lo, hi);
+        assert!(
+            lo <= 5.0 && hi >= 5.0,
+            "CI [{:.4}, {:.4}] should contain true mean 5.0",
+            lo,
+            hi
+        );
     }
 
     #[test]
@@ -2800,8 +2934,12 @@ mod tests {
         let (lo_l, hi_l) = bootstrap_ci(&large, 2000, 0.05, 42);
         let width_s = hi_s - lo_s;
         let width_l = hi_l - lo_l;
-        assert!(width_l < width_s,
-            "large sample width ({:.4}) should be < small sample width ({:.4})", width_l, width_s);
+        assert!(
+            width_l < width_s,
+            "large sample width ({:.4}) should be < small sample width ({:.4})",
+            width_l,
+            width_s
+        );
     }
 
     #[test]
@@ -2810,18 +2948,29 @@ mod tests {
         let samples: Vec<f64> = (0..50).map(|i| (i as f64 * 0.1).exp()).collect();
         let (lo, hi) = bootstrap_ci_bca(&samples, 2000, 0.05, 42);
         let mean = samples.iter().sum::<f64>() / samples.len() as f64;
-        assert!(lo < mean && hi > mean,
-            "BCa CI [{:.4}, {:.4}] should bracket mean {:.4}", lo, hi, mean);
+        assert!(
+            lo < mean && hi > mean,
+            "BCa CI [{:.4}, {:.4}] should bracket mean {:.4}",
+            lo,
+            hi,
+            mean
+        );
         // For right-skewed data, upper tail should extend further
-        assert!(hi - mean > mean - lo,
-            "BCa should show asymmetry for skewed data");
+        assert!(
+            hi - mean > mean - lo,
+            "BCa should show asymmetry for skewed data"
+        );
     }
 
     #[test]
     fn test_bootstrap_single_sample() {
         let (lo, hi) = bootstrap_ci(&[42.0], 2000, 0.05, 42);
-        assert!((lo - 42.0).abs() < 1e-10 && (hi - 42.0).abs() < 1e-10,
-            "single sample CI should be (x, x), got ({}, {})", lo, hi);
+        assert!(
+            (lo - 42.0).abs() < 1e-10 && (hi - 42.0).abs() < 1e-10,
+            "single sample CI should be (x, x), got ({}, {})",
+            lo,
+            hi
+        );
     }
 
     #[test]
@@ -2829,8 +2978,10 @@ mod tests {
         let samples = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
         let (lo1, hi1) = bootstrap_ci(&samples, 2000, 0.05, 42);
         let (lo2, hi2) = bootstrap_ci(&samples, 2000, 0.05, 42);
-        assert!((lo1 - lo2).abs() < 1e-10 && (hi1 - hi2).abs() < 1e-10,
-            "same seed should produce identical CIs");
+        assert!(
+            (lo1 - lo2).abs() < 1e-10 && (hi1 - hi2).abs() < 1e-10,
+            "same seed should produce identical CIs"
+        );
     }
 
     // ──── Meta-analysis tests ────
@@ -2849,7 +3000,11 @@ mod tests {
         let effects = vec![(0.5, 0.1), (0.5, 0.1), (0.5, 0.1), (0.5, 0.1)];
         let result = meta_analysis(&effects).unwrap();
         assert!((result.i_squared).abs() < 1e-10, "I²={}", result.i_squared);
-        assert!((result.summary_d - 0.5).abs() < 0.01, "d={}", result.summary_d);
+        assert!(
+            (result.summary_d - 0.5).abs() < 0.01,
+            "d={}",
+            result.summary_d
+        );
     }
 
     #[test]
@@ -2857,8 +3012,16 @@ mod tests {
         // Very different effects → I² should be high
         let effects = vec![(0.1, 0.05), (0.9, 0.05), (-0.5, 0.05), (1.5, 0.05)];
         let result = meta_analysis(&effects).unwrap();
-        assert!(result.i_squared > 50.0, "I²={} should be >50", result.i_squared);
-        assert!(result.tau_squared > 0.0, "τ²={} should be >0", result.tau_squared);
+        assert!(
+            result.i_squared > 50.0,
+            "I²={} should be >50",
+            result.i_squared
+        );
+        assert!(
+            result.tau_squared > 0.0,
+            "τ²={} should be >0",
+            result.tau_squared
+        );
     }
 
     #[test]
@@ -2871,7 +3034,9 @@ mod tests {
 
     #[test]
     fn test_meta_large_k() {
-        let effects: Vec<(f64, f64)> = (0..50).map(|i| (0.5 + (i as f64 - 25.0) * 0.01, 0.1)).collect();
+        let effects: Vec<(f64, f64)> = (0..50)
+            .map(|i| (0.5 + (i as f64 - 25.0) * 0.01, 0.1))
+            .collect();
         let result = meta_analysis(&effects).unwrap();
         assert_eq!(result.k, 50);
         assert!(result.summary_d.is_finite());
@@ -2882,7 +3047,11 @@ mod tests {
     fn test_meta_negative_effects() {
         let effects = vec![(-0.3, 0.1), (-0.5, 0.15), (-0.2, 0.08)];
         let result = meta_analysis(&effects).unwrap();
-        assert!(result.summary_d < 0.0, "summary should be negative: {}", result.summary_d);
+        assert!(
+            result.summary_d < 0.0,
+            "summary should be negative: {}",
+            result.summary_d
+        );
     }
 
     #[test]
@@ -2915,16 +3084,30 @@ mod tests {
         use crate::harness::report::ForestPlotRow;
         let rows = vec![
             ForestPlotRow {
-                domain: "A".into(), benchmark: "X".into(), metric: "acc".into(),
-                agent_mean: 0.8, human_mean: 0.85, human_sd: Some(0.1),
-                cohens_d: Some(-0.5), ci_lower: 0.75, ci_upper: 0.85,
-                ratio: 0.94, z_score: Some(-0.5),
+                domain: "A".into(),
+                benchmark: "X".into(),
+                metric: "acc".into(),
+                agent_mean: 0.8,
+                human_mean: 0.85,
+                human_sd: Some(0.1),
+                cohens_d: Some(-0.5),
+                ci_lower: 0.75,
+                ci_upper: 0.85,
+                ratio: 0.94,
+                z_score: Some(-0.5),
             },
             ForestPlotRow {
-                domain: "B".into(), benchmark: "Y".into(), metric: "acc".into(),
-                agent_mean: 0.9, human_mean: 0.88, human_sd: Some(0.08),
-                cohens_d: Some(0.25), ci_lower: 0.86, ci_upper: 0.94,
-                ratio: 1.02, z_score: Some(0.25),
+                domain: "B".into(),
+                benchmark: "Y".into(),
+                metric: "acc".into(),
+                agent_mean: 0.9,
+                human_mean: 0.88,
+                human_sd: Some(0.08),
+                cohens_d: Some(0.25),
+                ci_lower: 0.86,
+                ci_upper: 0.94,
+                ratio: 1.02,
+                z_score: Some(0.25),
             },
         ];
         let result = meta_analysis_from_forest(&rows).unwrap();
@@ -2946,8 +3129,11 @@ mod tests {
     fn test_meta_p_value_range() {
         let effects = vec![(0.3, 0.1), (0.5, 0.12), (0.4, 0.09)];
         let result = meta_analysis(&effects).unwrap();
-        assert!(result.q_p_value >= 0.0 && result.q_p_value <= 1.0,
-            "p={} out of range", result.q_p_value);
+        assert!(
+            result.q_p_value >= 0.0 && result.q_p_value <= 1.0,
+            "p={} out of range",
+            result.q_p_value
+        );
     }
 
     // ──── SAT Curve tests ────
@@ -2956,12 +3142,36 @@ mod tests {
     fn test_sat_fit_monotonic() {
         // Accuracy should decrease with time_pressure (less time → less accuracy)
         let points = vec![
-            SatCurvePoint { time_pressure: 0.0, accuracy: 0.95, rt_ticks: 10.0 },
-            SatCurvePoint { time_pressure: 0.2, accuracy: 0.90, rt_ticks: 8.0 },
-            SatCurvePoint { time_pressure: 0.4, accuracy: 0.82, rt_ticks: 6.0 },
-            SatCurvePoint { time_pressure: 0.6, accuracy: 0.70, rt_ticks: 4.5 },
-            SatCurvePoint { time_pressure: 0.8, accuracy: 0.55, rt_ticks: 3.0 },
-            SatCurvePoint { time_pressure: 1.0, accuracy: 0.40, rt_ticks: 2.0 },
+            SatCurvePoint {
+                time_pressure: 0.0,
+                accuracy: 0.95,
+                rt_ticks: 10.0,
+            },
+            SatCurvePoint {
+                time_pressure: 0.2,
+                accuracy: 0.90,
+                rt_ticks: 8.0,
+            },
+            SatCurvePoint {
+                time_pressure: 0.4,
+                accuracy: 0.82,
+                rt_ticks: 6.0,
+            },
+            SatCurvePoint {
+                time_pressure: 0.6,
+                accuracy: 0.70,
+                rt_ticks: 4.5,
+            },
+            SatCurvePoint {
+                time_pressure: 0.8,
+                accuracy: 0.55,
+                rt_ticks: 3.0,
+            },
+            SatCurvePoint {
+                time_pressure: 1.0,
+                accuracy: 0.40,
+                rt_ticks: 2.0,
+            },
         ];
         let curve = fit_sat_curve("Test", &points);
         assert!(curve.lambda > 0.0, "λ={}", curve.lambda);
@@ -2971,15 +3181,17 @@ mod tests {
     #[test]
     fn test_sat_fit_r_squared_high() {
         // Perfect exponential data should yield high R²
-        let points: Vec<SatCurvePoint> = (0..6).map(|i| {
-            let tp = i as f64 * 0.2;
-            let t = 1.0 - tp;
-            SatCurvePoint {
-                time_pressure: tp,
-                accuracy: 0.9 * (1.0 - (-2.0 * t).exp()),
-                rt_ticks: 10.0 - tp * 8.0,
-            }
-        }).collect();
+        let points: Vec<SatCurvePoint> = (0..6)
+            .map(|i| {
+                let tp = i as f64 * 0.2;
+                let t = 1.0 - tp;
+                SatCurvePoint {
+                    time_pressure: tp,
+                    accuracy: 0.9 * (1.0 - (-2.0 * t).exp()),
+                    rt_ticks: 10.0 - tp * 8.0,
+                }
+            })
+            .collect();
         let curve = fit_sat_curve("Perfect", &points);
         assert!(curve.r_squared > 0.8, "R²={}", curve.r_squared);
     }
@@ -2988,8 +3200,16 @@ mod tests {
     fn test_sat_fit_degenerate() {
         // All same accuracy → R²=0
         let points = vec![
-            SatCurvePoint { time_pressure: 0.0, accuracy: 0.5, rt_ticks: 5.0 },
-            SatCurvePoint { time_pressure: 1.0, accuracy: 0.5, rt_ticks: 2.0 },
+            SatCurvePoint {
+                time_pressure: 0.0,
+                accuracy: 0.5,
+                rt_ticks: 5.0,
+            },
+            SatCurvePoint {
+                time_pressure: 1.0,
+                accuracy: 0.5,
+                rt_ticks: 2.0,
+            },
         ];
         let curve = fit_sat_curve("Flat", &points);
         assert!(curve.r_squared >= 0.0);
@@ -2998,8 +3218,16 @@ mod tests {
     #[test]
     fn test_sat_fit_two_points() {
         let points = vec![
-            SatCurvePoint { time_pressure: 0.0, accuracy: 0.9, rt_ticks: 10.0 },
-            SatCurvePoint { time_pressure: 1.0, accuracy: 0.4, rt_ticks: 2.0 },
+            SatCurvePoint {
+                time_pressure: 0.0,
+                accuracy: 0.9,
+                rt_ticks: 10.0,
+            },
+            SatCurvePoint {
+                time_pressure: 1.0,
+                accuracy: 0.4,
+                rt_ticks: 2.0,
+            },
         ];
         let curve = fit_sat_curve("TwoPoint", &points);
         assert!(curve.lambda.is_finite());
@@ -3009,8 +3237,16 @@ mod tests {
     #[test]
     fn test_sat_ascii_output() {
         let points = vec![
-            SatCurvePoint { time_pressure: 0.0, accuracy: 0.9, rt_ticks: 10.0 },
-            SatCurvePoint { time_pressure: 0.5, accuracy: 0.7, rt_ticks: 5.0 },
+            SatCurvePoint {
+                time_pressure: 0.0,
+                accuracy: 0.9,
+                rt_ticks: 10.0,
+            },
+            SatCurvePoint {
+                time_pressure: 0.5,
+                accuracy: 0.7,
+                rt_ticks: 5.0,
+            },
         ];
         let curve = fit_sat_curve("Bench", &points);
         let ascii = sat_curve_ascii(&curve);
@@ -3022,7 +3258,11 @@ mod tests {
     #[test]
     fn test_sat_point_serde() {
         // SatCurvePoint should have all finite fields
-        let p = SatCurvePoint { time_pressure: 0.3, accuracy: 0.85, rt_ticks: 7.0 };
+        let p = SatCurvePoint {
+            time_pressure: 0.3,
+            accuracy: 0.85,
+            rt_ticks: 7.0,
+        };
         assert!(p.time_pressure.is_finite());
         assert!(p.accuracy.is_finite());
         assert!(p.rt_ticks.is_finite());
@@ -3030,11 +3270,13 @@ mod tests {
 
     #[test]
     fn test_sat_sweep_all_finite() {
-        let points: Vec<SatCurvePoint> = (0..=10).map(|i| SatCurvePoint {
-            time_pressure: i as f64 * 0.1,
-            accuracy: 0.9 - i as f64 * 0.04,
-            rt_ticks: 10.0 - i as f64 * 0.8,
-        }).collect();
+        let points: Vec<SatCurvePoint> = (0..=10)
+            .map(|i| SatCurvePoint {
+                time_pressure: i as f64 * 0.1,
+                accuracy: 0.9 - i as f64 * 0.04,
+                rt_ticks: 10.0 - i as f64 * 0.8,
+            })
+            .collect();
         let curve = fit_sat_curve("Sweep", &points);
         assert!(curve.lambda.is_finite());
         assert!(curve.beta.is_finite());
@@ -3045,9 +3287,21 @@ mod tests {
     #[test]
     fn test_sat_accuracy_decreases() {
         let points = vec![
-            SatCurvePoint { time_pressure: 0.0, accuracy: 0.95, rt_ticks: 10.0 },
-            SatCurvePoint { time_pressure: 0.5, accuracy: 0.75, rt_ticks: 5.0 },
-            SatCurvePoint { time_pressure: 1.0, accuracy: 0.50, rt_ticks: 2.0 },
+            SatCurvePoint {
+                time_pressure: 0.0,
+                accuracy: 0.95,
+                rt_ticks: 10.0,
+            },
+            SatCurvePoint {
+                time_pressure: 0.5,
+                accuracy: 0.75,
+                rt_ticks: 5.0,
+            },
+            SatCurvePoint {
+                time_pressure: 1.0,
+                accuracy: 0.50,
+                rt_ticks: 2.0,
+            },
         ];
         // Accuracy should decrease with pressure
         assert!(points[0].accuracy > points[2].accuracy);
@@ -3058,8 +3312,16 @@ mod tests {
     #[test]
     fn test_sat_rt_decreases() {
         let points = vec![
-            SatCurvePoint { time_pressure: 0.0, accuracy: 0.95, rt_ticks: 10.0 },
-            SatCurvePoint { time_pressure: 1.0, accuracy: 0.50, rt_ticks: 2.0 },
+            SatCurvePoint {
+                time_pressure: 0.0,
+                accuracy: 0.95,
+                rt_ticks: 10.0,
+            },
+            SatCurvePoint {
+                time_pressure: 1.0,
+                accuracy: 0.50,
+                rt_ticks: 2.0,
+            },
         ];
         // RT should decrease with pressure
         assert!(points[0].rt_ticks > points[1].rt_ticks);
@@ -3070,11 +3332,13 @@ mod tests {
     #[test]
     fn test_shapiro_wilk_normal() {
         // Approximately normal data — W should be close to 1.0
-        let data: Vec<f64> = (0..50).map(|i| {
-            // Linear approximation of normal quantiles
-            let z = (i as f64 - 25.0) / 12.5;
-            5.0 + z * 1.0
-        }).collect();
+        let data: Vec<f64> = (0..50)
+            .map(|i| {
+                // Linear approximation of normal quantiles
+                let z = (i as f64 - 25.0) / 12.5;
+                5.0 + z * 1.0
+            })
+            .collect();
         let w = shapiro_wilk_approx(&data);
         assert!(w > 0.9, "Normal-ish data should have W > 0.9, got {:.4}", w);
     }
@@ -3084,7 +3348,10 @@ mod tests {
         // Uniform data — W should be lower than normal
         let data: Vec<f64> = (0..50).map(|i| i as f64 / 50.0).collect();
         let w = shapiro_wilk_approx(&data);
-        assert!(w.is_finite(), "Shapiro-Wilk should be finite for uniform data");
+        assert!(
+            w.is_finite(),
+            "Shapiro-Wilk should be finite for uniform data"
+        );
         assert!(w > 0.0 && w <= 1.0, "W={:.4} out of bounds", w);
     }
 
@@ -3104,7 +3371,11 @@ mod tests {
         let scores = vec![0.80, 0.85, 0.75, 0.90, 0.70, 0.88, 0.82, 0.79, 0.91, 0.77];
         let result = individual_differences("TestBench", "accuracy", &scores);
         assert_eq!(result.n, 10);
-        assert!(result.mean > 0.7 && result.mean < 0.95, "mean={:.3}", result.mean);
+        assert!(
+            result.mean > 0.7 && result.mean < 0.95,
+            "mean={:.3}",
+            result.mean
+        );
         assert!(result.sd > 0.0, "sd should be positive");
         assert!(result.min <= result.mean);
         assert!(result.max >= result.mean);
@@ -3149,9 +3420,12 @@ mod tests {
         let high_wm: Vec<f64> = (0..20).map(|i| 0.80 + (i as f64 % 5.0) * 0.01).collect();
         let r_low = individual_differences("Low", "acc", &low_wm);
         let r_high = individual_differences("High", "acc", &high_wm);
-        assert!(r_low.mean < r_high.mean,
+        assert!(
+            r_low.mean < r_high.mean,
             "low WM mean ({:.3}) should be < high WM mean ({:.3})",
-            r_low.mean, r_high.mean);
+            r_low.mean,
+            r_high.mean
+        );
     }
 
     // ──── Dimensionality Scaling tests ────
@@ -3172,8 +3446,16 @@ mod tests {
         let dims = vec![128, 256, 512, 1024];
         let values: Vec<f64> = dims.iter().map(|&d| (d as f64).log2() * 0.1).collect();
         let (slope, r2) = dim_scaling_slope(&dims, &values);
-        assert!((r2 - 1.0).abs() < 1e-10, "perfect linear should give R²=1.0, got {:.6}", r2);
-        assert!((slope - 0.1).abs() < 1e-10, "slope should be 0.1, got {:.6}", slope);
+        assert!(
+            (r2 - 1.0).abs() < 1e-10,
+            "perfect linear should give R²=1.0, got {:.6}",
+            r2
+        );
+        assert!(
+            (slope - 0.1).abs() < 1e-10,
+            "slope should be 0.1, got {:.6}",
+            slope
+        );
     }
 
     #[test]
@@ -3182,7 +3464,11 @@ mod tests {
         let dims = vec![128, 256, 512, 1024, 2048];
         let values = vec![0.5, 0.5, 0.5, 0.5, 0.5];
         let (slope, r2) = dim_scaling_slope(&dims, &values);
-        assert!(slope.abs() < 1e-10, "flat data slope should be ~0, got {:.6}", slope);
+        assert!(
+            slope.abs() < 1e-10,
+            "flat data slope should be ~0, got {:.6}",
+            slope
+        );
         assert_eq!(r2, 0.0, "flat data R² should be 0");
     }
 
@@ -3208,10 +3494,17 @@ mod tests {
             let result = StroopBenchmark.run(&config);
             values.push(result.metrics["stroop_effect"].mean);
         }
-        let (slope, r2) = dim_scaling_slope(&dims.iter().map(|&d| d as usize).collect::<Vec<_>>(), &values);
+        let (slope, r2) = dim_scaling_slope(
+            &dims.iter().map(|&d| d as usize).collect::<Vec<_>>(),
+            &values,
+        );
         assert!(slope.is_finite(), "slope should be finite");
         assert!(r2.is_finite(), "R² should be finite");
-        assert!(r2 >= 0.0 && r2 <= 1.0, "R² should be in [0,1], got {:.4}", r2);
+        assert!(
+            r2 >= 0.0 && r2 <= 1.0,
+            "R² should be in [0,1], got {:.4}",
+            r2
+        );
     }
 
     #[test]
@@ -3297,10 +3590,7 @@ mod tests {
     fn test_format_cross_domain_prediction() {
         let pred = CrossDomainPrediction {
             target: "ArcFluid".to_string(),
-            predictors: vec![
-                ("NBack".to_string(), 0.45),
-                ("Stroop".to_string(), -0.12),
-            ],
+            predictors: vec![("NBack".to_string(), 0.45), ("Stroop".to_string(), -0.12)],
             r_squared: 0.67,
             adjusted_r_squared: 0.62,
         };

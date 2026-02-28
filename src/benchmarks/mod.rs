@@ -1,4 +1,31 @@
-//! Benchmarks module - performance and validation benchmarks
+//! Validation benchmark experiments for the cognitive loop architecture.
+//!
+//! This module contains runnable experiment harnesses that validate emergent
+//! properties of the HDC-LTC bidirectional learning loop, causal discovery,
+//! and prediction gating. Unlike the Criterion micro-benchmarks in `benches/`,
+//! these are scientific validation experiments that measure learning curves,
+//! convergence, and causal accuracy over extended trial sequences.
+//!
+//! # Feature gate
+//!
+//! Gated behind `--features benchmarks`. The module is consumed by ~10 examples
+//! in `examples/` (e.g., `cognitive_loop_validation`, `causal_tower_test`,
+//! `prediction_gate_experiment`) and is **not** used by the Criterion harnesses
+//! in `benches/`.
+//!
+//! # Sub-modules
+//!
+//! | Module | Purpose |
+//! |--------|---------|
+//! | [`cognitive_loop_validation`] | HDC-LTC loop convergence & attention emergence |
+//! | [`prediction_gate`] | Prediction error reduction & generalization |
+//! | [`causal_tower`] | Hierarchical causal discovery accuracy |
+//! | [`causal_cantor`] | Cantor-LTC multi-timescale causal reasoning |
+//! | [`unified_causal_understanding`] | Combined causal + HDC reasoning |
+//! | [`primitive_learning`] | Basic LTC weight update validation |
+//! | [`primitive_learning_cognitive`] | Cognitive-loop-integrated learning |
+//! | [`unified_architecture`] | End-to-end architecture validation |
+//! | [`fep_temporal_benchmark`] | Free-energy principle temporal dynamics |
 
 pub mod causal_cantor;
 pub mod causal_tower;

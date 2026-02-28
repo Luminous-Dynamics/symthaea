@@ -15,7 +15,9 @@
 //! Tracks attention budget utilization and perceptual sensitivity as internal state.
 //! Proposes arousal/confidence/exploration adjustments based on perceptual quality.
 
-use super::super::subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags};
+use super::super::subsystem_trait::{
+    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+};
 
 /// Perception Manager — attention gating and perceptual quality assessment.
 ///
@@ -94,7 +96,11 @@ impl CognitiveSubsystem for PerceptionManager {
         let mut output = SubsystemOutput::NEUTRAL;
 
         // ── 1. Attention budget management ────────────────────────────────
-        let budget_frac = if snapshot.attention_budget_exceeded != 0 { 1.0 } else { 0.5 };
+        let budget_frac = if snapshot.attention_budget_exceeded != 0 {
+            1.0
+        } else {
+            0.5
+        };
         self.budget_utilization = self.budget_utilization * 0.8 + budget_frac * 0.2;
 
         if snapshot.attention_budget_exceeded != 0 {
@@ -174,7 +180,10 @@ impl CognitiveSubsystem for PerceptionManager {
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
         if data.len() < 13 {
-            return Err(format!("PerceptionManager checkpoint too short: {} < 13", data.len()));
+            return Err(format!(
+                "PerceptionManager checkpoint too short: {} < 13",
+                data.len()
+            ));
         }
         self.attention_sensitivity = f32::from_le_bytes(data[0..4].try_into().unwrap());
         self.budget_utilization = f32::from_le_bytes(data[4..8].try_into().unwrap());
@@ -224,8 +233,10 @@ mod tests {
         }
 
         let output = pm.process(&exceeded);
-        assert!(output.flags & output_flags::ESCALATE_URGENCY != 0,
-            "Should escalate urgency on sustained budget exceeded");
+        assert!(
+            output.flags & output_flags::ESCALATE_URGENCY != 0,
+            "Should escalate urgency on sustained budget exceeded"
+        );
     }
 
     #[test]
@@ -238,8 +249,11 @@ mod tests {
         }
 
         let output = pm.process(&coherent);
-        assert!(output.confidence_delta > 0.0,
-            "High coherence should boost confidence: {}", output.confidence_delta);
+        assert!(
+            output.confidence_delta > 0.0,
+            "High coherence should boost confidence: {}",
+            output.confidence_delta
+        );
     }
 
     #[test]
@@ -252,8 +266,11 @@ mod tests {
         }
 
         let output = pm.process(&incoherent);
-        assert!(output.exploration_delta > 0.0,
-            "Low coherence should drive exploration: {}", output.exploration_delta);
+        assert!(
+            output.exploration_delta > 0.0,
+            "Low coherence should drive exploration: {}",
+            output.exploration_delta
+        );
     }
 
     #[test]
@@ -262,8 +279,11 @@ mod tests {
         let high_arousal = snapshot(0.5, 0.3, 0.9, false);
 
         let output = pm.process(&high_arousal);
-        assert!(output.arousal_delta < 0.0,
-            "High arousal should be pulled down: {}", output.arousal_delta);
+        assert!(
+            output.arousal_delta < 0.0,
+            "High arousal should be pulled down: {}",
+            output.arousal_delta
+        );
     }
 
     #[test]
@@ -272,8 +292,11 @@ mod tests {
         let low_arousal = snapshot(0.5, 0.3, 0.1, false);
 
         let output = pm.process(&low_arousal);
-        assert!(output.arousal_delta > 0.0,
-            "Low arousal should be pulled up: {}", output.arousal_delta);
+        assert!(
+            output.arousal_delta > 0.0,
+            "Low arousal should be pulled up: {}",
+            output.arousal_delta
+        );
     }
 
     #[test]
@@ -282,9 +305,15 @@ mod tests {
         let alarming = snapshot(0.2, 0.7, 0.5, false);
 
         pm.process(&alarming);
-        assert!(pm.vigilant, "Should enter vigilant mode on low coherence + high error");
-        assert!(pm.attention_sensitivity > 1.0,
-            "Sensitivity should increase in vigilance: {}", pm.attention_sensitivity);
+        assert!(
+            pm.vigilant,
+            "Should enter vigilant mode on low coherence + high error"
+        );
+        assert!(
+            pm.attention_sensitivity > 1.0,
+            "Sensitivity should increase in vigilance: {}",
+            pm.attention_sensitivity
+        );
     }
 
     #[test]

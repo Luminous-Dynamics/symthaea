@@ -228,7 +228,7 @@ impl MemoryCoordinator {
             // Verified information gets a significant boost to its consolidation strength.
             let persistence_bonus = (event.steps_survived as f64 / 10.0).min(0.2);
             let sigma_bonus = self.signals.sigma.map_or(0.0, |s| (s * 0.15).min(0.1));
-            
+
             let verification_bonus = if event.is_verified {
                 match event.source {
                     MemorySource::ActionFeedback => 0.3, // "Proven" by reality
@@ -239,7 +239,9 @@ impl MemoryCoordinator {
                 0.0
             };
 
-            let adjusted_phi = (event.psi_at_graduation + persistence_bonus + sigma_bonus + verification_bonus).min(1.0);
+            let adjusted_phi =
+                (event.psi_at_graduation + persistence_bonus + sigma_bonus + verification_bonus)
+                    .min(1.0);
 
             // Create episode from graduation event
             let episode = Episode::with_metadata(

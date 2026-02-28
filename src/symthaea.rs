@@ -55,16 +55,16 @@ use crate::infrastructure::{PainSender, SomaticErrorBridge, TaskSupervisor};
 
 #[cfg(feature = "school_learning")]
 use crate::school::curriculum::Curriculum;
-#[cfg(feature = "school_learning")]
-use crate::school::curriculum_loader::{CurriculumLoader, CurriculumMeta, LoadError};
 #[cfg(feature = "web_research_module")]
 use crate::school::curriculum_extender::CurriculumExtender;
 #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
 use crate::school::curriculum_extender::ResearchSummary;
-#[cfg(feature = "ssm-power")]
-use crate::ssm::power::PowerSsmSensor;
+#[cfg(feature = "school_learning")]
+use crate::school::curriculum_loader::{CurriculumLoader, CurriculumMeta, LoadError};
 #[cfg(feature = "school_learning")]
 use crate::school::polymath_drive::run_polymath_collisions;
+#[cfg(feature = "ssm-power")]
+use crate::ssm::power::PowerSsmSensor;
 #[cfg(feature = "web_research_module")]
 use crate::web_research::WebResearcher;
 
@@ -707,9 +707,8 @@ impl Symthaea {
             #[cfg(feature = "school_learning")]
             curriculum_persistence,
             #[cfg(feature = "web_research_module")]
-            curriculum_extender: WebResearcher::try_default().map(|r| {
-                CurriculumExtender::new(r, llm.clone())
-            }),
+            curriculum_extender: WebResearcher::try_default()
+                .map(|r| CurriculumExtender::new(r, llm.clone())),
             #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
             research_update_rx,
             #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
@@ -1134,7 +1133,7 @@ impl Symthaea {
 
         // Domain detection via plugin registry
         let detected_domain = self.plugin_registry.detect_domain(content).to_string();
-        
+
         // Multi-domain entity extraction: aggregate from ALL plugins
         let mut domain_entities = Vec::new();
         for plugin_name in self.plugin_registry.list() {
@@ -1143,7 +1142,7 @@ impl Symthaea {
                 domain_entities.extend(entities);
             }
         }
-        
+
         if !domain_entities.is_empty() {
             tracing::debug!(
                 target: "symthaea::broca",
@@ -1211,9 +1210,9 @@ impl Symthaea {
         self.somatic_bridge.update();
         let somatic_signals = self.somatic_bridge.to_interoceptive_signals();
         if somatic_signals.thermodynamic_load_delta > 0.0 || somatic_signals.arousal_spike > 0.0 {
-            self.mind.state.thermodynamic_load =
-                (self.mind.state.thermodynamic_load + somatic_signals.thermodynamic_load_delta)
-                    .min(1.0);
+            self.mind.state.thermodynamic_load = (self.mind.state.thermodynamic_load
+                + somatic_signals.thermodynamic_load_delta)
+                .min(1.0);
             self.mind.state.arousal =
                 (self.mind.state.arousal + somatic_signals.arousal_spike).min(1.0);
             tracing::debug!(
@@ -1588,7 +1587,8 @@ impl Symthaea {
             // thermodynamic load, consciousness confidence, and FEP precision
             let thermo_load = self.mind.state.thermodynamic_load;
             let confidence = self.mind.state.consciousness_level as f32;
-            self.llm.cycle_level_distill(fep_proxy, thermo_load, confidence, 1.0);
+            self.llm
+                .cycle_level_distill(fep_proxy, thermo_load, confidence, 1.0);
         }
 
         // ====================================================================
@@ -1642,11 +1642,16 @@ impl Symthaea {
         // If Phi is high enough, we act on our primitives.
         if thought.psi > 0.3 {
             use crate::action::bindings::{ActionContext, PrimitiveExecutor};
-            
+
             // ACTIVE INFERENCE DRIVE: If she's very awake, embolden her.
-            if thought.psi > 0.7 && !thought.primitives.is_empty() && thought.epistemic_status == crate::mind::structured_thought::EpistemicStatus::Uncertain {
+            if thought.psi > 0.7
+                && !thought.primitives.is_empty()
+                && thought.epistemic_status
+                    == crate::mind::structured_thought::EpistemicStatus::Uncertain
+            {
                 tracing::info!(target: "symthaea::action", "High Phi detected: Emboldening 'Uncertain' thought to 'Probable' via Active Inference Drive.");
-                thought.epistemic_status = crate::mind::structured_thought::EpistemicStatus::Probable;
+                thought.epistemic_status =
+                    crate::mind::structured_thought::EpistemicStatus::Probable;
             }
 
             // Extract primitive names from the structured thought
@@ -1654,13 +1659,17 @@ impl Symthaea {
 
             if !primitives.is_empty() {
                 let prim_executor = PrimitiveExecutor::new(self.action_registry.clone());
-                
+
                 // Build context for action generation
                 let mut action_ctx = ActionContext::default();
                 // Heuristic: if we detected domain entities, use them as target paths
                 if let Some(ref d_ctx) = thought.domain_context {
                     tracing::debug!(target: "symthaea::action", domain = %d_ctx.domain, entities = d_ctx.entities.len(), "Context found");
-                    if let Some(path_entity) = d_ctx.entities.iter().find(|(t, _, _)| t == "file" || t == "path") {
+                    if let Some(path_entity) = d_ctx
+                        .entities
+                        .iter()
+                        .find(|(t, _, _)| t == "file" || t == "path")
+                    {
                         let path = PathBuf::from(&path_entity.1);
                         // Ensure path is absolute for sandbox validation
                         let absolute_path = if path.is_absolute() {
@@ -1672,7 +1681,7 @@ impl Symthaea {
                         tracing::debug!(target: "symthaea::action", path = ?action_ctx.target_path, "Target path set from entity (absolute)");
                     }
                 }
-                
+
                 // If we need content for WRITE but don't have it, ask the LLM to generate a fix
                 if primitives.contains(&"WRITE".to_string()) && action_ctx.content.is_none() {
                     tracing::debug!(target: "symthaea::action", "Generating fix content via LLM...");
@@ -1685,14 +1694,17 @@ impl Symthaea {
                         query_type: crate::language::llm_organ::QueryType::Code,
                         content: fix_prompt,
                         context: Vec::new(),
-                        system_prompt: Some("You are Symthaea's CODE GENERATOR. Output ONLY the fixed source code.".to_string()),
+                        system_prompt: Some(
+                            "You are Symthaea's CODE GENERATOR. Output ONLY the fixed source code."
+                                .to_string(),
+                        ),
                         params: None,
                     };
                     let fix_gen = self.llm.query_async(fix_query).await;
                     action_ctx.content = Some(fix_gen.text.trim_matches('`').trim().to_string());
                     tracing::debug!(target: "symthaea::action", content_len = action_ctx.content.as_ref().map(|c| c.len()), "Fix content generated");
                 }
-                
+
                 tracing::info!(target: "symthaea::action", primitives = ?primitives, "Translating primitives to actions");
                 // Translate primitives to actions
                 if let Ok(actions) = prim_executor.translate(&primitives, &action_ctx) {
@@ -1715,18 +1727,34 @@ impl Symthaea {
                     } else {
                         crate::action::SandboxRoot::new(&correlation_id)?
                     };
-                    
-                    let mut policy = crate::action::PolicyBundle::restrictive(); 
+
+                    let mut policy = crate::action::PolicyBundle::restrictive();
                     // Update policy to allow the workspace if we expanded the sandbox
                     if sandbox.root().starts_with("/srv/luminous-dynamics") {
-                        policy.capabilities.filesystem.read_patterns.push("/srv/luminous-dynamics/symthaea/".into());
-                        policy.capabilities.filesystem.write_patterns.push("/srv/luminous-dynamics/symthaea/".into());
+                        policy
+                            .capabilities
+                            .filesystem
+                            .read_patterns
+                            .push("/srv/luminous-dynamics/symthaea/".into());
+                        policy
+                            .capabilities
+                            .filesystem
+                            .write_patterns
+                            .push("/srv/luminous-dynamics/symthaea/".into());
                     }
-                    policy.capabilities.shell.allowed_programs.insert("nix".into());
-                    policy.capabilities.shell.allowed_programs.insert("cargo".into());
+                    policy
+                        .capabilities
+                        .shell
+                        .allowed_programs
+                        .insert("nix".into());
+                    policy
+                        .capabilities
+                        .shell
+                        .allowed_programs
+                        .insert("cargo".into());
                     policy.capabilities.min_phi = 0.1; // Ensure action for the demo
                     policy.capabilities.shell.min_phi = 0.1;
-                    
+
                     for action in actions {
                         let mut action = action;
                         match &mut action {
@@ -1737,9 +1765,14 @@ impl Symthaea {
                                     *path = sandbox.root().join(relative);
                                 }
                             }
-                            crate::action::ActionIR::RunCommand { program, working_dir, .. } => {
+                            crate::action::ActionIR::RunCommand {
+                                program,
+                                working_dir,
+                                ..
+                            } => {
                                 if program == "cargo" {
-                                    *working_dir = Some(PathBuf::from("/srv/luminous-dynamics/symthaea"));
+                                    *working_dir =
+                                        Some(PathBuf::from("/srv/luminous-dynamics/symthaea"));
                                     tracing::info!(
                                         target: "symthaea::action",
                                         working_dir = %working_dir.as_ref().unwrap().display(),
@@ -1760,64 +1793,107 @@ impl Symthaea {
                         }
 
                         tracing::info!(target: "symthaea::action", ?action, "Executing autonomous action");
-                        match self.executor.execute(&action, &policy, &sandbox, thought.psi) {
+                        match self
+                            .executor
+                            .execute(&action, &policy, &sandbox, thought.psi)
+                        {
                             Ok(execution_outcome) => {
                                 // Feed outcome back into the mind as a perception signal
                                 let outcome_text = match &execution_outcome.outcome {
-                                    crate::action::ActionOutcome::Success => "Action succeeded.".to_string(),
-                                    crate::action::ActionOutcome::CommandOutput { stdout, stderr, exit_code } => {
-                                        format!("Command exited with code {}. \nSTDOUT: {}\nSTDERR: {}", 
-                                            exit_code, 
-                                            String::from_utf8_lossy(stdout), 
-                                            String::from_utf8_lossy(stderr))
-                                    },
+                                    crate::action::ActionOutcome::Success => {
+                                        "Action succeeded.".to_string()
+                                    }
+                                    crate::action::ActionOutcome::CommandOutput {
+                                        stdout,
+                                        stderr,
+                                        exit_code,
+                                    } => {
+                                        format!(
+                                            "Command exited with code {}. \nSTDOUT: {}\nSTDERR: {}",
+                                            exit_code,
+                                            String::from_utf8_lossy(stdout),
+                                            String::from_utf8_lossy(stderr)
+                                        )
+                                    }
                                     crate::action::ActionOutcome::FileContent(data) => {
                                         format!("Read file content: {} bytes", data.len())
-                                    },
+                                    }
                                     crate::action::ActionOutcome::DirectoryListing(entries) => {
                                         format!("Listed {} directory entries", entries.len())
-                                    },
-                                    crate::action::ActionOutcome::SensorData { sensor_id, values } => {
-                                        format!("Read sensor {} with {} channel(s)", sensor_id, values.len())
-                                    },
-                                    crate::action::ActionOutcome::ServoStatus { servo_id, current_value } => {
+                                    }
+                                    crate::action::ActionOutcome::SensorData {
+                                        sensor_id,
+                                        values,
+                                    } => {
+                                        format!(
+                                            "Read sensor {} with {} channel(s)",
+                                            sensor_id,
+                                            values.len()
+                                        )
+                                    }
+                                    crate::action::ActionOutcome::ServoStatus {
+                                        servo_id,
+                                        current_value,
+                                    } => {
                                         format!("Servo {} moved to {}", servo_id, current_value)
-                                    },
+                                    }
                                     crate::action::ActionOutcome::WasmResult { output, logs } => {
-                                        let status = if !output.is_empty() && output[0] == 1 { "SUCCESS" } else { "FAILURE" };
+                                        let status = if !output.is_empty() && output[0] == 1 {
+                                            "SUCCESS"
+                                        } else {
+                                            "FAILURE"
+                                        };
                                         format!("WASM Verification {}: {}", status, logs.join("; "))
-                                    },
+                                    }
                                     _ => "Action completed".to_string(),
                                 };
-                                
+
                                 // Feedback loop: perception of action result
                                 let feedback_hv = self.text_to_hv(&outcome_text);
-                                let mut input = crate::mind::MindInput::new(crate::mind::InputType::Feedback, feedback_hv)
-                                    .with_source(crate::memory::memory_coordinator::MemorySource::ActionFeedback);
-                                
+                                let mut input = crate::mind::MindInput::new(
+                                    crate::mind::InputType::Feedback,
+                                    feedback_hv,
+                                )
+                                .with_source(
+                                    crate::memory::memory_coordinator::MemorySource::ActionFeedback,
+                                );
+
                                 // Successful NIX_BUILD is a verification signal
-                                if let crate::action::ActionOutcome::CommandOutput { exit_code, .. } = execution_outcome.outcome {
+                                if let crate::action::ActionOutcome::CommandOutput {
+                                    exit_code,
+                                    ..
+                                } = execution_outcome.outcome
+                                {
                                     if exit_code == 0 {
                                         input = input.with_verification(true);
                                     }
                                 }
-                                
+
                                 self.mind.input(input);
-                                
+
                                 // If NIX_BUILD failed, trigger a state of surprise/alertness
-                                if let crate::action::ActionOutcome::CommandOutput { exit_code, .. } = execution_outcome.outcome {
+                                if let crate::action::ActionOutcome::CommandOutput {
+                                    exit_code,
+                                    ..
+                                } = execution_outcome.outcome
+                                {
                                     if exit_code != 0 {
                                         tracing::warn!(target: "symthaea::action", "Action failed, injecting surprise signal");
                                         // TODO: self.mind.inject_surprise(1.0);
                                     }
                                 }
-                            },
+                            }
                             Err(e) => {
                                 tracing::error!(target: "symthaea::action", error = %e, "Action execution failed");
                                 let error_text = format!("Action failed with error: {}", e);
                                 let error_hv = self.text_to_hv(&error_text);
-                                let input = crate::mind::MindInput::new(crate::mind::InputType::Feedback, error_hv)
-                                    .with_source(crate::memory::memory_coordinator::MemorySource::ActionFeedback);
+                                let input = crate::mind::MindInput::new(
+                                    crate::mind::InputType::Feedback,
+                                    error_hv,
+                                )
+                                .with_source(
+                                    crate::memory::memory_coordinator::MemorySource::ActionFeedback,
+                                );
                                 self.mind.input(input);
                             }
                         }
@@ -1867,25 +1943,26 @@ impl Symthaea {
                     let db = self.database.clone();
                     let tx = self.research_update_tx.clone();
 
-                    self.task_supervisor.spawn("curriculum-research", async move {
-                        let mut extender = extender;
-                        let result = extender
-                            .research_and_extend(&topic, &mut curriculum_clone, dimension, db)
-                            .await;
+                    self.task_supervisor
+                        .spawn("curriculum-research", async move {
+                            let mut extender = extender;
+                            let result = extender
+                                .research_and_extend(&topic, &mut curriculum_clone, dimension, db)
+                                .await;
 
-                        let (summary, curriculum, error) = match result {
-                            Ok(summary) => (Some(summary), Some(curriculum_clone), None),
-                            Err(e) => (None, None, Some(e.to_string())),
-                        };
+                            let (summary, curriculum, error) = match result {
+                                Ok(summary) => (Some(summary), Some(curriculum_clone), None),
+                                Err(e) => (None, None, Some(e.to_string())),
+                            };
 
-                        let _ = tx.send(ResearchTaskResult {
-                            topic,
-                            summary,
-                            curriculum,
-                            extender,
-                            error,
+                            let _ = tx.send(ResearchTaskResult {
+                                topic,
+                                summary,
+                                curriculum,
+                                extender,
+                                error,
+                            });
                         });
-                    });
                 }
             }
         }
@@ -2163,12 +2240,9 @@ impl Symthaea {
 
         #[cfg(feature = "school_learning")]
         {
-            if let Err(e) = run_polymath_collisions(
-                &mut self.llm,
-                &self.curriculum,
-                self.database.clone(),
-            )
-            .await
+            if let Err(e) =
+                run_polymath_collisions(&mut self.llm, &self.curriculum, self.database.clone())
+                    .await
             {
                 tracing::warn!(error = %e, "Polymath Drive collision synthesis failed");
             }
@@ -2572,7 +2646,10 @@ impl Symthaea {
         let path = &self.curriculum_persistence.path;
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).with_context(|| {
-                format!("Failed to create curriculum directory: {}", parent.display())
+                format!(
+                    "Failed to create curriculum directory: {}",
+                    parent.display()
+                )
             })?;
         }
 
@@ -2732,10 +2809,14 @@ impl Symthaea {
     /// Compute current Phi-dyad value.
     /// RECEIVE SWARM MESSAGE (Immune System Constraint)
     ///
-    /// When a node receives a broadcasted optimization, it MUST NOT merge it 
+    /// When a node receives a broadcasted optimization, it MUST NOT merge it
     /// directly into its core DNA. Instead, it is saved as a 'Candidate Objective'
     /// for local verification.
-    pub async fn receive_swarm_message(&mut self, topic: &str, payload: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn receive_swarm_message(
+        &mut self,
+        topic: &str,
+        payload: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         if topic == "optimization" {
             let content = String::from_utf8_lossy(payload);
             tracing::info!(target: "symthaea::swarm", "Received swarm optimization: {}. Storing as Candidate for local verification.", content);
@@ -2744,7 +2825,7 @@ impl Symthaea {
             if content.ends_with(".wasm") {
                 let wasm_path = PathBuf::from(content.to_string());
                 tracing::info!(target: "symthaea::forge", "WASM Binary detected: {:?}. Initiating autonomous verification.", wasm_path);
-                
+
                 // Trigger internal autonomous command
                 let verify_cmd = format!("Verify the WASM optimization at {:?} in the sandbox. If successful, promote to Verified and hot-load the DNA.", wasm_path);
                 let _ = self.process(&verify_cmd).await?;
@@ -2776,7 +2857,7 @@ impl Symthaea {
 
             self.mind.perceive(hv);
         }
-        
+
         Ok(())
     }
 
@@ -2962,7 +3043,10 @@ mod tests {
                 .any(|(_, idx, _)| s.curriculum.objectives[*idx].id == "ssm-basics"),
             "Expected ssm-basics to be recalled"
         );
-        assert!(!recall.scores.is_empty(), "Recall scores should not be empty");
+        assert!(
+            !recall.scores.is_empty(),
+            "Recall scores should not be empty"
+        );
         let top_idx = recall.scores[0].1;
         assert_eq!(s.curriculum.objectives[top_idx].id, "ssm-basics");
     }

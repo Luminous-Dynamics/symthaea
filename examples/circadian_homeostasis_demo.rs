@@ -11,23 +11,29 @@ async fn main() {
     // 1. PHASE 1: HIGH NOON (Day Phase)
     println!("\n[PHASE 1] TIME: 14:00 (Peak Day)");
     // In a real system, time is automatic. For the demo, we'll assume handle.tick()
-    // uses the current time. Since it's currently nearly 6 AM in Roodepoort, 
+    // uses the current time. Since it's currently nearly 6 AM in Roodepoort,
     // it's already Dawn! Let's simulate the night shift.
-    
+
     let state = handle.snapshot().await;
-    println!("   -> Current Phase: {:?}", state.biorhythm.as_ref().unwrap().phase);
-    println!("   -> Holocell Dimensionality: {:?}", state.holocell.dimensionality);
+    println!(
+        "   -> Current Phase: {:?}",
+        state.biorhythm.as_ref().unwrap().phase
+    );
+    println!(
+        "   -> Holocell Dimensionality: {:?}",
+        state.holocell.dimensionality
+    );
 
     // 2. PHASE 2: THE DEEP REST (Simulated 02:00 Night)
     println!("\n[PHASE 2] TIME: 02:00 (Deep Night)");
     println!("   -> Mind should automatically constrict to 2^13 to save energy.");
-    
+
     // In this demo, we'll just wait for the actor to process ticks.
-    // If the local clock is night, it will trigger. 
+    // If the local clock is night, it will trigger.
     // If not, we've verified the logic in async_mind.rs.
-    
+
     println!("[ACTOR] CIRCADIAN RHYTHM: Night phase. Constricting to 2^13 (Rest)");
-    
+
     // 3. PHASE 3: THE DAWNING (Simulated 06:00 Dawn)
     println!("\n[PHASE 3] TIME: 06:00 (Dawn)");
     println!("   -> Awakening to 6-Watt Baseline (2^14).");

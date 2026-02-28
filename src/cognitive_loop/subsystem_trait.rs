@@ -550,14 +550,30 @@ impl OutputCollector {
         let n = self.outputs.len() as f64;
 
         // Additive: consensus average
-        let confidence_delta: f64 =
-            self.outputs.iter().map(|(_, o)| o.confidence_delta).sum::<f64>() / n;
-        let exploration_delta: f64 =
-            self.outputs.iter().map(|(_, o)| o.exploration_delta).sum::<f64>() / n;
-        let arousal_delta: f32 =
-            self.outputs.iter().map(|(_, o)| o.arousal_delta).sum::<f32>() / n as f32;
-        let valence_delta: f32 =
-            self.outputs.iter().map(|(_, o)| o.valence_delta).sum::<f32>() / n as f32;
+        let confidence_delta: f64 = self
+            .outputs
+            .iter()
+            .map(|(_, o)| o.confidence_delta)
+            .sum::<f64>()
+            / n;
+        let exploration_delta: f64 = self
+            .outputs
+            .iter()
+            .map(|(_, o)| o.exploration_delta)
+            .sum::<f64>()
+            / n;
+        let arousal_delta: f32 = self
+            .outputs
+            .iter()
+            .map(|(_, o)| o.arousal_delta)
+            .sum::<f32>()
+            / n as f32;
+        let valence_delta: f32 = self
+            .outputs
+            .iter()
+            .map(|(_, o)| o.valence_delta)
+            .sum::<f32>()
+            / n as f32;
 
         // Multiplicative: geometric mean
         let log_sum: f64 = self
@@ -568,7 +584,11 @@ impl OutputCollector {
         let lr_modulation = (log_sum / n).exp();
 
         // Boolean flags: OR
-        let flags: u32 = self.outputs.iter().map(|(_, o)| o.flags).fold(0, |acc, f| acc | f);
+        let flags: u32 = self
+            .outputs
+            .iter()
+            .map(|(_, o)| o.flags)
+            .fold(0, |acc, f| acc | f);
 
         IntegratedOutput {
             confidence_delta,
@@ -719,11 +739,7 @@ mod tests {
     fn test_cycle_snapshot_size_stable() {
         let size = std::mem::size_of::<CycleSnapshot>();
         // Should be deterministic: fixed fields + [f32; 256] + [u8; 2048] + padding
-        assert!(
-            size > 3000,
-            "CycleSnapshot too small: {} bytes",
-            size
-        );
+        assert!(size > 3000, "CycleSnapshot too small: {} bytes", size);
         // Document the expected size for ABI compatibility
         eprintln!("CycleSnapshot size: {} bytes", size);
     }
@@ -766,7 +782,10 @@ mod tests {
     /// Urgency byte round-trips correctly.
     #[test]
     fn test_urgency_roundtrip() {
-        let mut snap = CycleSnapshot { urgency: 0, ..Default::default() };
+        let mut snap = CycleSnapshot {
+            urgency: 0,
+            ..Default::default()
+        };
         assert_eq!(snap.cycle_urgency(), super::super::CycleUrgency::Cruise);
 
         snap.urgency = 1;
@@ -809,16 +828,22 @@ mod tests {
         let mut collector = OutputCollector::new();
 
         // Two subsystems propose different confidence deltas
-        collector.record("subsystem_a", SubsystemOutput {
-            confidence_delta: 0.1,
-            lr_modulation: 1.2,
-            ..SubsystemOutput::NEUTRAL
-        });
-        collector.record("subsystem_b", SubsystemOutput {
-            confidence_delta: 0.3,
-            lr_modulation: 0.8,
-            ..SubsystemOutput::NEUTRAL
-        });
+        collector.record(
+            "subsystem_a",
+            SubsystemOutput {
+                confidence_delta: 0.1,
+                lr_modulation: 1.2,
+                ..SubsystemOutput::NEUTRAL
+            },
+        );
+        collector.record(
+            "subsystem_b",
+            SubsystemOutput {
+                confidence_delta: 0.3,
+                lr_modulation: 0.8,
+                ..SubsystemOutput::NEUTRAL
+            },
+        );
 
         let result = collector.integrate();
         assert_eq!(result.n_contributors, 2);
@@ -853,10 +878,13 @@ mod tests {
         collector.record("neutral", SubsystemOutput::NEUTRAL);
         assert!(collector.is_empty());
 
-        collector.record("active", SubsystemOutput {
-            confidence_delta: 0.05,
-            ..SubsystemOutput::NEUTRAL
-        });
+        collector.record(
+            "active",
+            SubsystemOutput {
+                confidence_delta: 0.05,
+                ..SubsystemOutput::NEUTRAL
+            },
+        );
         assert_eq!(collector.len(), 1);
     }
 
@@ -864,16 +892,22 @@ mod tests {
     #[test]
     fn test_collector_flags_or() {
         let mut collector = OutputCollector::new();
-        collector.record("ethics", SubsystemOutput {
-            confidence_delta: 0.01, // non-neutral to be recorded
-            flags: output_flags::VETO_ACTION,
-            ..SubsystemOutput::NEUTRAL
-        });
-        collector.record("curiosity", SubsystemOutput {
-            exploration_delta: 0.1, // non-neutral
-            flags: output_flags::REQUEST_EXPLORATION,
-            ..SubsystemOutput::NEUTRAL
-        });
+        collector.record(
+            "ethics",
+            SubsystemOutput {
+                confidence_delta: 0.01, // non-neutral to be recorded
+                flags: output_flags::VETO_ACTION,
+                ..SubsystemOutput::NEUTRAL
+            },
+        );
+        collector.record(
+            "curiosity",
+            SubsystemOutput {
+                exploration_delta: 0.1, // non-neutral
+                flags: output_flags::REQUEST_EXPLORATION,
+                ..SubsystemOutput::NEUTRAL
+            },
+        );
 
         let result = collector.integrate();
         assert!(result.has_flag(output_flags::VETO_ACTION));
@@ -885,10 +919,13 @@ mod tests {
     #[test]
     fn test_collector_clear() {
         let mut collector = OutputCollector::new();
-        collector.record("test", SubsystemOutput {
-            confidence_delta: 0.1,
-            ..SubsystemOutput::NEUTRAL
-        });
+        collector.record(
+            "test",
+            SubsystemOutput {
+                confidence_delta: 0.1,
+                ..SubsystemOutput::NEUTRAL
+            },
+        );
         assert_eq!(collector.len(), 1);
         collector.clear();
         assert!(collector.is_empty());
@@ -976,8 +1013,12 @@ mod tests {
     fn test_interval_one_always_runs() {
         struct AlwaysRun;
         impl CognitiveSubsystem for AlwaysRun {
-            fn name(&self) -> &'static str { "always" }
-            fn interval(&self) -> u32 { 1 }
+            fn name(&self) -> &'static str {
+                "always"
+            }
+            fn interval(&self) -> u32 {
+                1
+            }
             fn process(&mut self, _: &CycleSnapshot) -> SubsystemOutput {
                 SubsystemOutput::NEUTRAL
             }

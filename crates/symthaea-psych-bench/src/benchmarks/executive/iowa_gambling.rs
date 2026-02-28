@@ -12,6 +12,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Iowa Gambling Task benchmark.
@@ -138,7 +140,6 @@ impl IowaGamblingBenchmark {
             deck_draw_count[chosen] += 1;
             let gain = DECK_GAINS[chosen];
             let loss = DECK_LOSS_SCHEDULES[chosen][draw_idx];
-            let _net = gain + loss;
 
             // Track block scores: good decks (C=2, D=3) vs bad (A=0, B=1)
             if chosen >= 2 {
@@ -234,6 +235,7 @@ impl PsychBenchmark for IowaGamblingBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut overall_scores = Vec::new();
         let mut block5_scores = Vec::new();
@@ -248,6 +250,18 @@ impl PsychBenchmark for IowaGamblingBenchmark {
             rates.push(r.learning_rate);
             preferences.push(r.deck_preference_good);
             all_rts.extend_from_slice(&r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "igt".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert(
@@ -267,6 +281,7 @@ impl PsychBenchmark for IowaGamblingBenchmark {
 
         result.conditions = 5; // 5 blocks
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

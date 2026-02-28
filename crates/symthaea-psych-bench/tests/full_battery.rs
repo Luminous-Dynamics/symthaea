@@ -21,7 +21,10 @@ use symthaea_psych_bench::benchmarks::{
         WisconsinCardSortingBenchmark,
     },
     inhibition::{GoNoGoBenchmark, StopSignalBenchmark},
-    language::{GardenPathBenchmark, LexicalDecisionBenchmark, SemanticCoherenceBenchmark, SemanticPrimingBenchmark},
+    language::{
+        GardenPathBenchmark, LexicalDecisionBenchmark, SemanticCoherenceBenchmark,
+        SemanticPrimingBenchmark,
+    },
     memory_agent::{
         AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
         ProspectiveMemoryBenchmark, TestTimeLearningBenchmark,
@@ -30,8 +33,8 @@ use symthaea_psych_bench::benchmarks::{
     motor::{BimanualBenchmark, FittsLawBenchmark, SrttBenchmark},
     reasoning::{
         ArcAbductiveBenchmark, ArcAlgebraBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
-        ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark,
-        ArcNoiseBenchmark, ArcRsaBenchmark, ArcScalingBenchmark, ArcStaircaseBenchmark,
+        ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark, ArcNoiseBenchmark,
+        ArcRsaBenchmark, ArcScalingBenchmark, ArcStaircaseBenchmark,
     },
     social::{RmeBenchmark, SocialNormBenchmark, UltimatumGameBenchmark},
     sustained_attention::{CptBenchmark, PvtBenchmark, SartBenchmark},

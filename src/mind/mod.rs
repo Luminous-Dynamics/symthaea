@@ -13,8 +13,8 @@ pub mod intent;
 pub mod knowledge;
 #[cfg(feature = "mesh")]
 mod mesh;
-pub mod structured_thought;
 mod social;
+pub mod structured_thought;
 mod swarm;
 mod tick;
 mod utils;
@@ -345,7 +345,9 @@ impl ContinuousMind {
     ) {
         let mut input = MindInput::new(InputType::Goal, embedding);
         input.priority = priority;
-        input.metadata.insert("description".to_string(), description.into());
+        input
+            .metadata
+            .insert("description".to_string(), description.into());
 
         self.input(input);
     }
@@ -391,7 +393,14 @@ impl ContinuousMind {
     pub fn take_evicted(&mut self) -> Vec<(ContinuousHV, u64, MemorySource, bool)> {
         self.evicted_items
             .drain(..)
-            .map(|item| (item.content, item.steps_survived, item.source, item.is_verified))
+            .map(|item| {
+                (
+                    item.content,
+                    item.steps_survived,
+                    item.source,
+                    item.is_verified,
+                )
+            })
             .collect()
     }
 
@@ -467,7 +476,10 @@ impl ContinuousMind {
     /// HDC world-model gradients, and `process_federated()` applies incoming
     /// aggregated peer weights to the backend.
     #[cfg(feature = "liquid-mamba")]
-    pub fn set_llm_backend(&mut self, backend: std::sync::Arc<dyn crate::language::llm_backend::LLMBackend>) {
+    pub fn set_llm_backend(
+        &mut self,
+        backend: std::sync::Arc<dyn crate::language::llm_backend::LLMBackend>,
+    ) {
         self.llm_backend = Some(backend);
     }
 }

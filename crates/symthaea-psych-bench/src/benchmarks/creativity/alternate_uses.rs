@@ -9,6 +9,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Alternate Uses Task benchmark.
@@ -75,9 +77,6 @@ impl AlternateUsesBenchmark {
             .zip(feature_vals.iter())
             .map(|(d, v)| d.bind(v))
             .collect();
-        let bound_refs: Vec<&ContinuousHV> = bound_features.iter().collect();
-        let _object_hv = ContinuousHV::bundle(&bound_refs);
-
         // Create "useful action" prototype
         let useful_action_proto = ContinuousHV::random(dim, next_seed(&mut rng));
 
@@ -182,6 +181,7 @@ impl PsychBenchmark for AlternateUsesBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut fluencies = Vec::new();
         let mut originalities = Vec::new();
@@ -194,6 +194,18 @@ impl PsychBenchmark for AlternateUsesBenchmark {
             originalities.push(o);
             flexibilities.push(flex);
             rt_ticks.push(rt);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "alternate_uses".to_string(),
+                    correct: true,
+                    rt_ticks: rt,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("fluency", MetricValue::from_samples(&fluencies));
@@ -203,6 +215,7 @@ impl PsychBenchmark for AlternateUsesBenchmark {
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

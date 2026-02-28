@@ -437,8 +437,7 @@ mod tests {
     #[test]
     fn test_from_action_error() {
         use crate::action::ActionError;
-        let err: SymthaeaError =
-            ActionError::ValidationFailed("missing param".into()).into();
+        let err: SymthaeaError = ActionError::ValidationFailed("missing param".into()).into();
         match &err {
             SymthaeaError::Runtime(msg) => {
                 assert!(msg.contains("missing param"), "got: {msg}")

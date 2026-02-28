@@ -1,6 +1,6 @@
+use symthaea::language::llm_backend::create_backend_from_env;
 use symthaea::language::llm_organ::LLMOrgan;
 use symthaea::mind::structured_thought::StructuredThought;
-use symthaea::language::llm_backend::create_backend_from_env;
 
 #[tokio::main]
 async fn main() {
@@ -24,8 +24,15 @@ async fn main() {
         psi: 0.85,
         domain_context: Some(symthaea::mind::DomainContext {
             domain: "consciousness".to_string(),
-            entities: vec![("IIT".to_string(), "Integrated Information Theory".to_string(), 0.9)],
-            computed_answer: Some("Consciousness is the irreducible unity of a system's causal power over itself.".to_string()),
+            entities: vec![(
+                "IIT".to_string(),
+                "Integrated Information Theory".to_string(),
+                0.9,
+            )],
+            computed_answer: Some(
+                "Consciousness is the irreducible unity of a system's causal power over itself."
+                    .to_string(),
+            ),
             cube: None,
             psi: None,
         }),
@@ -39,7 +46,11 @@ async fn main() {
     let rested_start = std::time::Instant::now();
     let rested_resp = llm.translate_thought(&thought, rested_temp).await;
     println!("\nSYMTHAEA (Rested): \"{}\"", rested_resp.text);
-    println!("   (Time: {:?}, Tokens: {})", rested_start.elapsed(), rested_resp.tokens_generated);
+    println!(
+        "   (Time: {:?}, Tokens: {})",
+        rested_start.elapsed(),
+        rested_resp.tokens_generated
+    );
 
     // 3. PHASE 2: Exhausted State (High Load)
     println!("\n[PHASE 2] Physics: EXHAUSTED (Load: 0.9, Mood Temp: 1.85)");
@@ -48,7 +59,11 @@ async fn main() {
     let exhausted_start = std::time::Instant::now();
     let exhausted_resp = llm.translate_thought(&thought, exhausted_temp).await;
     println!("\nSYMTHAEA (Exhausted): \"{}\"", exhausted_resp.text);
-    println!("   (Time: {:?}, Tokens: {})", exhausted_start.elapsed(), exhausted_resp.tokens_generated);
+    println!(
+        "   (Time: {:?}, Tokens: {})",
+        exhausted_start.elapsed(),
+        exhausted_resp.tokens_generated
+    );
 
     println!("\n[CONCLUSION] The neural network's entropy genuinely shifted with the physics.");
 }
@@ -62,6 +77,6 @@ impl AliveCheck for LLMOrgan {
     fn is_alive(&self) -> bool {
         // In a real implementation we'd call the backend's is_available
         // For the demo we just check if it was initialized with a backend
-        true 
+        true
     }
 }

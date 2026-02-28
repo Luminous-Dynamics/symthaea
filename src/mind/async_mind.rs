@@ -160,7 +160,12 @@ impl AsyncMindHandle {
 
     /// Update thermodynamic load (power/heat).
     pub async fn update_thermodynamics(&self, load: f32) {
-        if self.tx.send(MindCommand::UpdateThermodynamics(load)).await.is_err() {
+        if self
+            .tx
+            .send(MindCommand::UpdateThermodynamics(load))
+            .await
+            .is_err()
+        {
             tracing::warn!("AsyncMind actor has stopped — update_thermodynamics command dropped");
         }
     }
@@ -261,7 +266,7 @@ impl AsyncMind {
                         // Every 100 ticks, sync dimensionality with biorhythm
                         if mind.state.tick % 100 == 0 {
                             let phase = mind.state.biorhythm.as_ref().map(|b| b.phase).unwrap_or(crate::chronobiology::CircadianPhase::Day);
-                            
+
                             match phase {
                                 crate::chronobiology::CircadianPhase::Night => {
                                     if mind.state.holocell.dimensionality != symthaea_core::hdc::HdcDimensionality::Rest {
@@ -280,7 +285,7 @@ impl AsyncMind {
                         }
                     }
                 }
-                
+
                 // Command processing (Wake-up events)
                 Some(cmd) = rx.recv() => {
                     match cmd {
@@ -325,8 +330,8 @@ impl AsyncMind {
                                     // In production, we spawn a blocking task to verify the RISC Zero receipt
                                     // For now, we use the core verification logic or simulate it
                                     // If valid, we apply the mutation to mind
-                                    mind.receive_swarm_message(crate::swarm::SwarmMessage::ZkProof { 
-                                        mutation_id, proof_bytes, public_inputs 
+                                    mind.receive_swarm_message(crate::swarm::SwarmMessage::ZkProof {
+                                        mutation_id, proof_bytes, public_inputs
                                     });
                                 }
                                 _ => {
@@ -338,7 +343,7 @@ impl AsyncMind {
                         MindCommand::UpdateThermodynamics(load) => {
                             mind.state.thermodynamic_load = load;
                             mind.state.mood_temperature = 0.5 + (load * 1.5);
-                            
+
                             // HOLOGRAPHIC DILATION
                             // Trigger dilation to 2^16 when load > 0.75 (Entering 20W regime)
                             // Retract to 2^14 when load < 0.4 (Returning to 6W baseline)
@@ -428,7 +433,11 @@ mod tests {
 
         // Check state — tick count may exceed 1 due to metabolic baseline timer
         let state = handle.snapshot().await;
-        assert!(state.tick >= 1, "expected at least 1 tick, got {}", state.tick);
+        assert!(
+            state.tick >= 1,
+            "expected at least 1 tick, got {}",
+            state.tick
+        );
         assert!(state.is_active);
 
         handle.shutdown().await;
@@ -446,7 +455,11 @@ mod tests {
         let _output = handle.tick().await;
         let stats = handle.stats().await;
         // perceive() triggers an immediate tick + explicit tick() + possible metabolic ticks
-        assert!(stats.total_ticks >= 1, "expected at least 1 tick, got {}", stats.total_ticks);
+        assert!(
+            stats.total_ticks >= 1,
+            "expected at least 1 tick, got {}",
+            stats.total_ticks
+        );
         assert!(stats.inputs_processed >= 1);
 
         handle.shutdown().await;
@@ -466,7 +479,11 @@ mod tests {
         let state = handle.snapshot().await;
         // Each perceive triggers an immediate tick + explicit tick = 10 minimum,
         // plus possible metabolic baseline ticks from the 100ms timer
-        assert!(state.tick >= 5, "expected at least 5 ticks, got {}", state.tick);
+        assert!(
+            state.tick >= 5,
+            "expected at least 5 ticks, got {}",
+            state.tick
+        );
 
         handle.shutdown().await;
         join.await.unwrap();
@@ -483,7 +500,11 @@ mod tests {
 
         let state = handle.snapshot().await;
         // perceive triggers immediate tick + explicit tick + possible metabolic ticks
-        assert!(state.tick >= 1, "expected at least 1 tick, got {}", state.tick);
+        assert!(
+            state.tick >= 1,
+            "expected at least 1 tick, got {}",
+            state.tick
+        );
 
         handle.shutdown().await;
         join.await.unwrap();

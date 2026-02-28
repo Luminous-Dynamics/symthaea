@@ -43,7 +43,8 @@ impl NeuromodProfile {
                 ne: None,
                 sht: None,
                 ach: None,
-                phenotype: "Enhanced dopaminergic tone (reward sensitivity, flexibility)".to_string(),
+                phenotype: "Enhanced dopaminergic tone (reward sensitivity, flexibility)"
+                    .to_string(),
             },
             Self {
                 name: "High-NE".to_string(),
@@ -67,7 +68,8 @@ impl NeuromodProfile {
                 ne: None,
                 sht: None,
                 ach: Some(0.85),
-                phenotype: "Enhanced cholinergic tone (focused attention, memory encoding)".to_string(),
+                phenotype: "Enhanced cholinergic tone (focused attention, memory encoding)"
+                    .to_string(),
             },
         ]
     }
@@ -131,7 +133,10 @@ impl DissociationMatrix {
         // Group by profile
         let mut by_profile: BTreeMap<String, Vec<&ProfilePerformance>> = BTreeMap::new();
         for entry in &self.entries {
-            by_profile.entry(entry.profile.clone()).or_default().push(entry);
+            by_profile
+                .entry(entry.profile.clone())
+                .or_default()
+                .push(entry);
         }
 
         for (profile, entries) in &by_profile {
@@ -190,8 +195,16 @@ pub fn expected_dissociations() -> Vec<(&'static str, &'static str, &'static str
         // (profile, expected_enhancement, expected_impairment)
         ("High-DA", "Executive::WCST", "SustainedAttention::CPT"),
         ("High-NE", "SustainedAttention::PVT", "Motor::FittsLaw"),
-        ("High-5HT", "Metacognition::Calibration", "Creativity::AlternateUses"),
-        ("High-ACh", "Attention::VisualSearch", "Creativity::RemoteAssociates"),
+        (
+            "High-5HT",
+            "Metacognition::Calibration",
+            "Creativity::AlternateUses",
+        ),
+        (
+            "High-ACh",
+            "Attention::VisualSearch",
+            "Creativity::RemoteAssociates",
+        ),
     ]
 }
 

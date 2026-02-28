@@ -125,8 +125,7 @@ fn test_benchmark_manifest_parses() {
         return;
     }
 
-    let contents =
-        std::fs::read_to_string(&manifest_path).expect("failed to read manifest.json");
+    let contents = std::fs::read_to_string(&manifest_path).expect("failed to read manifest.json");
     let manifest: Manifest =
         serde_json::from_str(&contents).expect("failed to parse manifest.json");
 
@@ -245,12 +244,17 @@ fn test_psych_bench_regression_snapshot_loads() {
         // Fall back to v0.5.2 or any available version
         let fallback = baselines_dir.join("v0.5.2.json");
         if !fallback.exists() {
-            eprintln!("Skipping test_psych_bench_regression_snapshot_loads: no baseline files found");
+            eprintln!(
+                "Skipping test_psych_bench_regression_snapshot_loads: no baseline files found"
+            );
             return;
         }
-        let snapshot = RegressionSnapshot::load(&fallback)
-            .expect("failed to load fallback baseline snapshot");
-        assert!(!snapshot.name.is_empty(), "snapshot name should be non-empty");
+        let snapshot =
+            RegressionSnapshot::load(&fallback).expect("failed to load fallback baseline snapshot");
+        assert!(
+            !snapshot.name.is_empty(),
+            "snapshot name should be non-empty"
+        );
         assert!(
             !snapshot.metrics.is_empty(),
             "snapshot should contain benchmark metrics"
@@ -262,14 +266,16 @@ fn test_psych_bench_regression_snapshot_loads() {
         RegressionSnapshot::load(&snapshot_path).expect("failed to load v0.6.0 baseline snapshot");
 
     // Structural validation
-    assert!(!snapshot.name.is_empty(), "snapshot name should be non-empty");
+    assert!(
+        !snapshot.name.is_empty(),
+        "snapshot name should be non-empty"
+    );
     assert!(
         !snapshot.metrics.is_empty(),
         "snapshot should contain benchmark metrics"
     );
     assert_eq!(
-        snapshot.schema_version,
-        SNAPSHOT_SCHEMA_VERSION,
+        snapshot.schema_version, SNAPSHOT_SCHEMA_VERSION,
         "snapshot schema version should match current"
     );
 
@@ -280,8 +286,12 @@ fn test_psych_bench_regression_snapshot_loads() {
 
     // Verify expected benchmark domains are present
     let bench_names: Vec<&str> = snapshot.metrics.keys().map(|k| k.as_str()).collect();
-    let has_executive = bench_names.iter().any(|n| n.contains("Executive") || n.contains("Stroop"));
-    let has_worm = bench_names.iter().any(|n| n.contains("WorM") || n.contains("NBack") || n.contains("N-back"));
+    let has_executive = bench_names
+        .iter()
+        .any(|n| n.contains("Executive") || n.contains("Stroop"));
+    let has_worm = bench_names
+        .iter()
+        .any(|n| n.contains("WorM") || n.contains("NBack") || n.contains("N-back"));
     assert!(
         has_executive || has_worm,
         "baseline should contain Executive or WorM benchmarks, found: {:?}",
@@ -356,7 +366,10 @@ fn test_psych_bench_report_generation() {
     // JSON serialization should work
     let json = report.to_json().expect("report should serialize to JSON");
     assert!(!json.is_empty(), "JSON output should be non-empty");
-    assert!(json.contains("Stroop"), "JSON should contain benchmark names");
+    assert!(
+        json.contains("Stroop"),
+        "JSON should contain benchmark names"
+    );
 
     // CSV serialization should work
     let csv = report.to_csv().expect("report should serialize to CSV");
@@ -804,10 +817,13 @@ fn test_snapshot_json_roundtrip_from_live_run() {
         .with_git_hash("test-hash-abc123".to_string());
 
     // Serialize to JSON
-    let json = snapshot.to_json().expect("snapshot should serialize to JSON");
+    let json = snapshot
+        .to_json()
+        .expect("snapshot should serialize to JSON");
 
     // Deserialize back
-    let loaded = RegressionSnapshot::from_json(&json).expect("snapshot should deserialize from JSON");
+    let loaded =
+        RegressionSnapshot::from_json(&json).expect("snapshot should deserialize from JSON");
 
     // Verify round-trip fidelity
     assert_eq!(loaded.name, "roundtrip-test");
@@ -822,9 +838,9 @@ fn test_snapshot_json_roundtrip_from_live_run() {
             .get(bench)
             .unwrap_or_else(|| panic!("missing benchmark '{}' after roundtrip", bench));
         for (metric_name, val) in bench_metrics {
-            let loaded_val = loaded_metrics
-                .get(metric_name)
-                .unwrap_or_else(|| panic!("missing metric '{}/{}' after roundtrip", bench, metric_name));
+            let loaded_val = loaded_metrics.get(metric_name).unwrap_or_else(|| {
+                panic!("missing metric '{}/{}' after roundtrip", bench, metric_name)
+            });
             assert!(
                 (val.mean - loaded_val.mean).abs() < 1e-10,
                 "mean mismatch for {}/{}: {} vs {}",

@@ -350,7 +350,7 @@ impl ContinuousHV {
             // SSM Selective Scan: We use the global dynamic STRIDE for
             // biological homeostasis (Cognitive Throttle).
             let stride = STRIDE.load(Ordering::Relaxed);
-            
+
             for i in (0..self.values.len()).step_by(stride) {
                 let a = self.values[i];
                 let b = other.values[i];

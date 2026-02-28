@@ -72,8 +72,11 @@ impl CognitiveLoopService {
         // stable state), double all consciousness subsystem intervals to save
         // ~30% cycle time. Science: Botvinick & Braver (2015) — cognitive
         // control scales with demand.
-        let cruise_mult: usize =
-            if matches!(state.urgency, super::CycleUrgency::Cruise) { 2 } else { 1 };
+        let cruise_mult: usize = if matches!(state.urgency, super::CycleUrgency::Cruise) {
+            2
+        } else {
+            1
+        };
         let interval_mult = budget_interval_mult * cruise_mult;
         let input = state.input;
         // ═══════════════════════════════════════════════════════════════════════
@@ -83,7 +86,8 @@ impl CognitiveLoopService {
         // Science: Hasani et al. (2021), Dehaene et al. (2003).
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let hierarchical_ltc_phi = if let Some(ref mut hltc) = self.primitive_tier.hierarchical_ltc {
+        let hierarchical_ltc_phi = if let Some(ref mut hltc) = self.primitive_tier.hierarchical_ltc
+        {
             if self.stats.total_cycles % 11 == 0 {
                 let input_vec: Vec<f32> = (0..64)
                     .map(|i| {
@@ -453,7 +457,9 @@ impl CognitiveLoopService {
                     Err(_) => (0.0, 1.0),
                 }
             } else {
-                self.primitive_tier.primitive_validation_result.unwrap_or((0.0, 1.0))
+                self.primitive_tier
+                    .primitive_validation_result
+                    .unwrap_or((0.0, 1.0))
             };
 
         // FEEDBACK: Validated primitives boost LR; falsified primitives dampen it
@@ -572,35 +578,36 @@ impl CognitiveLoopService {
         // Science: Plate (2003) — VSA for structured representations.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let code_primitives_selected = if let Some(ref router) = self.primitive_tier.code_primitive_router {
-            if self.stats.total_cycles % 11 == 0 {
-                // Heuristic: detect code-related input
-                let code_related = input.contains("code")
-                    || input.contains("function")
-                    || input.contains("debug")
-                    || input.contains("refactor")
-                    || input.contains("parse")
-                    || input.contains("compile");
-                if code_related {
-                    let operation = if input.contains("debug") {
-                        crate::consciousness::code_primitives::CodeOperation::Debug
-                    } else if input.contains("refactor") {
-                        crate::consciousness::code_primitives::CodeOperation::Refactor
-                    } else if input.contains("parse") {
-                        crate::consciousness::code_primitives::CodeOperation::Parse
+        let code_primitives_selected =
+            if let Some(ref router) = self.primitive_tier.code_primitive_router {
+                if self.stats.total_cycles % 11 == 0 {
+                    // Heuristic: detect code-related input
+                    let code_related = input.contains("code")
+                        || input.contains("function")
+                        || input.contains("debug")
+                        || input.contains("refactor")
+                        || input.contains("parse")
+                        || input.contains("compile");
+                    if code_related {
+                        let operation = if input.contains("debug") {
+                            crate::consciousness::code_primitives::CodeOperation::Debug
+                        } else if input.contains("refactor") {
+                            crate::consciousness::code_primitives::CodeOperation::Refactor
+                        } else if input.contains("parse") {
+                            crate::consciousness::code_primitives::CodeOperation::Parse
+                        } else {
+                            crate::consciousness::code_primitives::CodeOperation::Explain
+                        };
+                        router.select_primitives(operation).len()
                     } else {
-                        crate::consciousness::code_primitives::CodeOperation::Explain
-                    };
-                    router.select_primitives(operation).len()
+                        0
+                    }
                 } else {
                     0
                 }
             } else {
                 0
-            }
-        } else {
-            0
-        };
+            };
         module_timings.code_primitive_routing = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -642,18 +649,19 @@ impl CognitiveLoopService {
         // Science: Deb et al. (2002) — NSGA-II multi-objective optimization.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let multi_obj_frontier_size = if let Some(ref mut moe) = self.primitive_tier.multi_objective_evolution {
-            if self.stats.total_cycles % 997 == 0 && self.stats.total_cycles > 0 {
-                match moe.evolve() {
-                    Ok(result) => result.frontier_size,
-                    Err(_) => 0,
+        let multi_obj_frontier_size =
+            if let Some(ref mut moe) = self.primitive_tier.multi_objective_evolution {
+                if self.stats.total_cycles % 997 == 0 && self.stats.total_cycles > 0 {
+                    match moe.evolve() {
+                        Ok(result) => result.frontier_size,
+                        Err(_) => 0,
+                    }
+                } else {
+                    0
                 }
             } else {
                 0
-            }
-        } else {
-            0
-        };
+            };
         module_timings.multi_objective_evolution = _t.elapsed().as_micros() as u64;
 
         SubsystemMetrics {
@@ -683,5 +691,194 @@ impl CognitiveLoopService {
             grid_encoding_norm,
             grid_spatial_complexity,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleUrgency};
+
+    fn make_service() -> CognitiveLoopService {
+        CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+    }
+
+    fn make_cycle_state<'a>(
+        compressed_state: &'a [f32],
+        output: &'a [f32],
+        hv: &'a symthaea_core::hdc::BinaryHV,
+        input: &'a str,
+        urgency: CycleUrgency,
+    ) -> super::super::CycleState<'a> {
+        super::super::CycleState {
+            compressed_state,
+            output,
+            prediction_error: 0.2,
+            coherence: 0.5,
+            unified_psi: 0.3,
+            phi_attention_weight: 0.5,
+            hv16_cached: hv,
+            input,
+            urgency,
+            attention_budget_exceeded: false,
+            predictive_budget_gated: false,
+        }
+    }
+
+    // ── Budget interval multiplier ────────────────────────────────────
+
+    #[test]
+    fn budget_interval_mult_default_is_one() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![0.0f32; 64];
+        let output = vec![0.0f32; 64];
+        let hv = symthaea_core::hdc::BinaryHV::random(42);
+        let state = make_cycle_state(&compressed, &output, &hv, "test", CycleUrgency::Normal);
+        let primitives: Vec<String> = vec![];
+        let mut timings = super::super::ModuleTimings::default();
+        let metrics = s.run_advanced_subsystems(&state, &primitives, &mut timings);
+        assert!(metrics.hierarchical_ltc_phi.is_finite());
+        assert!(metrics.epistemic_gate_confidence.is_finite());
+    }
+
+    #[test]
+    fn budget_gated_doubles_interval() {
+        let mut s = make_service();
+        s.stats.total_cycles = 47;
+        s.stats.attention_budget_exceeded_count = 5;
+        let compressed = vec![0.0f32; 64];
+        let output = vec![0.0f32; 64];
+        let hv = symthaea_core::hdc::BinaryHV::random(42);
+        let mut state = make_cycle_state(
+            &compressed,
+            &output,
+            &hv,
+            "budget test",
+            CycleUrgency::Normal,
+        );
+        state.attention_budget_exceeded = true;
+        let primitives: Vec<String> = vec![];
+        let mut timings = super::super::ModuleTimings::default();
+        let metrics = s.run_advanced_subsystems(&state, &primitives, &mut timings);
+        assert!(s.stats.attention_budget_gated_count >= 1);
+        assert!(metrics.holographic_unity.is_finite());
+    }
+
+    #[test]
+    fn cruise_mode_doubles_interval() {
+        let mut s = make_service();
+        s.stats.total_cycles = 94;
+        let compressed = vec![0.0f32; 64];
+        let output = vec![0.0f32; 64];
+        let hv = symthaea_core::hdc::BinaryHV::random(42);
+        let state = make_cycle_state(&compressed, &output, &hv, "cruise", CycleUrgency::Cruise);
+        let primitives: Vec<String> = vec![];
+        let mut timings = super::super::ModuleTimings::default();
+        let metrics = s.run_advanced_subsystems(&state, &primitives, &mut timings);
+        assert!(metrics.holographic_unity.is_finite());
+        assert!(metrics.consciousness_gradient_magnitude.is_finite());
+    }
+
+    #[test]
+    fn combined_budget_and_cruise_quadruples_interval() {
+        let mut s = make_service();
+        s.stats.total_cycles = 188;
+        s.stats.attention_budget_exceeded_count = 5;
+        let compressed = vec![0.0f32; 64];
+        let output = vec![0.0f32; 64];
+        let hv = symthaea_core::hdc::BinaryHV::random(42);
+        let mut state =
+            make_cycle_state(&compressed, &output, &hv, "combined", CycleUrgency::Cruise);
+        state.attention_budget_exceeded = true;
+        let primitives: Vec<String> = vec![];
+        let mut timings = super::super::ModuleTimings::default();
+        let metrics = s.run_advanced_subsystems(&state, &primitives, &mut timings);
+        assert!(s.stats.attention_budget_gated_count >= 1);
+        assert!(metrics.holographic_binding.is_finite());
+    }
+
+    // ── Subsystem outputs ─────────────────────────────────────────────
+
+    #[test]
+    fn advanced_subsystems_all_fields_finite() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![0.3f32; 64];
+        let output = vec![0.1f32; 64];
+        let hv = symthaea_core::hdc::BinaryHV::random(7);
+        let state = make_cycle_state(
+            &compressed,
+            &output,
+            &hv,
+            "all fields",
+            CycleUrgency::Normal,
+        );
+        let primitives: Vec<String> = vec![];
+        let mut timings = super::super::ModuleTimings::default();
+        let m = s.run_advanced_subsystems(&state, &primitives, &mut timings);
+        assert!(m.hierarchical_ltc_phi.is_finite());
+        assert!(m.evolution_phi_delta.is_finite());
+        assert!(m.holographic_unity.is_finite());
+        assert!(m.holographic_binding.is_finite());
+        assert!(m.consciousness_gradient_magnitude.is_finite());
+        assert!(m.affect_cons_valence.is_finite());
+        assert!(m.affect_cons_arousal.is_finite());
+        assert!(m.pipeline_consciousness.is_finite());
+        assert!(m.multimodal_integrated_phi.is_finite());
+        assert!(m.epistemic_gate_confidence.is_finite());
+        assert!(m.meta_reasoning_confidence.is_finite());
+        assert!(m.empathic_compassion.is_finite());
+        assert!(m.empathic_tone_adj.is_finite());
+        assert!(m.grid_encoding_norm.is_finite());
+        assert!(m.grid_spatial_complexity.is_finite());
+    }
+
+    #[test]
+    fn code_input_does_not_panic() {
+        let mut s = make_service();
+        s.stats.total_cycles = 11;
+        let compressed = vec![0.0f32; 64];
+        let output = vec![0.0f32; 64];
+        let hv = symthaea_core::hdc::BinaryHV::random(42);
+        let state = make_cycle_state(
+            &compressed,
+            &output,
+            &hv,
+            "debug this code function",
+            CycleUrgency::Normal,
+        );
+        let primitives: Vec<String> = vec![];
+        let mut timings = super::super::ModuleTimings::default();
+        let m = s.run_advanced_subsystems(&state, &primitives, &mut timings);
+        assert!(m.code_primitives_selected == 0 || m.code_primitives_selected > 0);
+    }
+
+    #[test]
+    fn empty_input_does_not_panic() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![0.0f32; 64];
+        let output = vec![0.0f32; 64];
+        let hv = symthaea_core::hdc::BinaryHV::zero();
+        let state = make_cycle_state(&compressed, &output, &hv, "", CycleUrgency::Normal);
+        let primitives: Vec<String> = vec![];
+        let mut timings = super::super::ModuleTimings::default();
+        let m = s.run_advanced_subsystems(&state, &primitives, &mut timings);
+        assert!(m.grid_encoding_norm.is_finite());
+    }
+
+    #[test]
+    fn predictive_budget_gating_activates() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![0.0f32; 64];
+        let output = vec![0.0f32; 64];
+        let hv = symthaea_core::hdc::BinaryHV::random(42);
+        let mut state = make_cycle_state(&compressed, &output, &hv, "budget", CycleUrgency::Normal);
+        state.predictive_budget_gated = true;
+        let primitives: Vec<String> = vec![];
+        let mut timings = super::super::ModuleTimings::default();
+        let _m = s.run_advanced_subsystems(&state, &primitives, &mut timings);
+        assert!(s.stats.attention_budget_gated_count >= 1);
     }
 }

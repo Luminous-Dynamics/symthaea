@@ -753,7 +753,11 @@ impl PredictiveSelfModel {
 
     /// Learn from actual outcome
     #[allow(dead_code)]
-    pub(crate) fn learn_from_outcome(&mut self, predicted: &SelfState, actual: &NarrativeSelfModel) {
+    pub(crate) fn learn_from_outcome(
+        &mut self,
+        predicted: &SelfState,
+        actual: &NarrativeSelfModel,
+    ) {
         let actual_state = SelfState::from_narrative_self(actual);
         self.predictor.update_with_outcome(predicted, &actual_state);
         self.stats.predictions_verified += 1;

@@ -16,7 +16,9 @@
 //! any CognitiveLoopService fields directly. Instead, it proposes changes via
 //! `SubsystemOutput` which the `OutputCollector` integrates via consensus averaging.
 
-use super::super::subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags};
+use super::super::subsystem_trait::{
+    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+};
 
 /// Drive Manager — consolidates curiosity, boredom, flow, and exploration drives.
 ///
@@ -161,7 +163,8 @@ impl CognitiveSubsystem for DriveManager {
         // Flow = sustained low error + high coherence (optimal challenge-skill)
         let meets_flow = pe < Self::FLOW_ERROR_MAX
             && snapshot.coherence > Self::FLOW_COHERENCE_MIN
-            && snapshot.arousal > 0.3 && snapshot.arousal < 0.8;
+            && snapshot.arousal > 0.3
+            && snapshot.arousal < 0.8;
 
         if meets_flow {
             self.flow_streak += 1;
@@ -250,7 +253,10 @@ impl CognitiveSubsystem for DriveManager {
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
         if data.len() < 25 {
-            return Err(format!("DriveManager checkpoint too short: {} < 25", data.len()));
+            return Err(format!(
+                "DriveManager checkpoint too short: {} < 25",
+                data.len()
+            ));
         }
         self.boredom = f32::from_le_bytes(data[0..4].try_into().unwrap());
         self.flow_intensity = f32::from_le_bytes(data[4..8].try_into().unwrap());
@@ -307,7 +313,11 @@ mod tests {
             dm.process(&snapshot);
         }
 
-        assert!(dm.boredom > 0.0, "Boredom should accumulate: {}", dm.boredom);
+        assert!(
+            dm.boredom > 0.0,
+            "Boredom should accumulate: {}",
+            dm.boredom
+        );
     }
 
     #[test]
@@ -321,10 +331,15 @@ mod tests {
         }
 
         let output = dm.process(&snapshot);
-        assert!(output.exploration_delta > 0.0,
-            "Boredom should drive exploration: {}", output.exploration_delta);
-        assert!(output.flags & output_flags::REQUEST_EXPLORATION != 0,
-            "Should request exploration flag");
+        assert!(
+            output.exploration_delta > 0.0,
+            "Boredom should drive exploration: {}",
+            output.exploration_delta
+        );
+        assert!(
+            output.flags & output_flags::REQUEST_EXPLORATION != 0,
+            "Should request exploration flag"
+        );
     }
 
     #[test]
@@ -345,8 +360,12 @@ mod tests {
             dm.process(&surprising);
         }
 
-        assert!(dm.boredom < boredom_peak,
-            "Boredom should decay on surprise: {} < {}", dm.boredom, boredom_peak);
+        assert!(
+            dm.boredom < boredom_peak,
+            "Boredom should decay on surprise: {} < {}",
+            dm.boredom,
+            boredom_peak
+        );
     }
 
     #[test]
@@ -376,10 +395,16 @@ mod tests {
         assert!(dm.in_flow);
 
         let output = dm.process(&flow_snapshot);
-        assert!(output.exploration_delta < 0.0,
-            "Flow should suppress exploration: {}", output.exploration_delta);
-        assert!(output.lr_modulation > 1.0,
-            "Flow should boost learning: {}", output.lr_modulation);
+        assert!(
+            output.exploration_delta < 0.0,
+            "Flow should suppress exploration: {}",
+            output.exploration_delta
+        );
+        assert!(
+            output.lr_modulation > 1.0,
+            "Flow should boost learning: {}",
+            output.lr_modulation
+        );
     }
 
     #[test]
@@ -409,10 +434,16 @@ mod tests {
         let surprising = snapshot_with(0.8, 0.5, 0.5, 0.0);
 
         let output = dm.process(&surprising);
-        assert!(output.exploration_delta > 0.0,
-            "Surprise should drive exploration: {}", output.exploration_delta);
-        assert!(output.arousal_delta > 0.0,
-            "Surprise should increase arousal: {}", output.arousal_delta);
+        assert!(
+            output.exploration_delta > 0.0,
+            "Surprise should drive exploration: {}",
+            output.exploration_delta
+        );
+        assert!(
+            output.arousal_delta > 0.0,
+            "Surprise should increase arousal: {}",
+            output.arousal_delta
+        );
     }
 
     #[test]
@@ -426,9 +457,12 @@ mod tests {
             dm.process(&surprising);
         }
 
-        assert!(dm.exploration_threshold > initial_threshold,
+        assert!(
+            dm.exploration_threshold > initial_threshold,
             "Threshold should adapt up on repeated surprise: {} > {}",
-            dm.exploration_threshold, initial_threshold);
+            dm.exploration_threshold,
+            initial_threshold
+        );
     }
 
     #[test]
@@ -443,9 +477,12 @@ mod tests {
         let unstressed = snapshot_with(0.8, 0.5, 0.5, 0.0);
         let output_normal = dm2.process(&unstressed);
 
-        assert!(output_stressed.exploration_delta < output_normal.exploration_delta,
+        assert!(
+            output_stressed.exploration_delta < output_normal.exploration_delta,
             "Stressed exploration should be dampened: {} < {}",
-            output_stressed.exploration_delta, output_normal.exploration_delta);
+            output_stressed.exploration_delta,
+            output_normal.exploration_delta
+        );
     }
 
     #[test]
@@ -489,9 +526,15 @@ mod tests {
         let output = dm.process(&neutral);
 
         // Should be close to neutral (small deltas only)
-        assert!(output.exploration_delta.abs() < 0.1,
-            "Neutral input should produce small exploration delta: {}", output.exploration_delta);
-        assert!((output.lr_modulation - 1.0).abs() < 0.2,
-            "Neutral input should not drastically change LR: {}", output.lr_modulation);
+        assert!(
+            output.exploration_delta.abs() < 0.1,
+            "Neutral input should produce small exploration delta: {}",
+            output.exploration_delta
+        );
+        assert!(
+            (output.lr_modulation - 1.0).abs() < 0.2,
+            "Neutral input should not drastically change LR: {}",
+            output.lr_modulation
+        );
     }
 }

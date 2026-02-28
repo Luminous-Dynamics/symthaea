@@ -100,7 +100,7 @@ pub fn domain_assignments() -> BTreeMap<&'static str, Vec<&'static str>> {
 
     map.insert(
         "Metacognition",
-        vec!["Metacognition::Calibration", "Metacognition::FOK"],
+        vec!["Metacognition::Calibration", "Metacognition::FeelingOfKnowing"],
     );
 
     map.insert(

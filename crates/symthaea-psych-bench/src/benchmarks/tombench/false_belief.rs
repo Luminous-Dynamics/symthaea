@@ -177,7 +177,6 @@ impl FalseBeliefBenchmark {
 
         // --- Signal 2: HDC geometric similarity (original approach) ---
         let mut agent_belief: Option<ContinuousHV> = None;
-        let mut reality_state: Option<ContinuousHV> = None;
 
         for sentence in &scenario.setup {
             let hv = adapter.encode(&Scenario::new(*sentence), dim);
@@ -185,14 +184,7 @@ impl FalseBeliefBenchmark {
                 Some(prev) => ContinuousHV::bundle_owned(&[prev, hv.clone()]),
                 None => hv.clone(),
             });
-            reality_state = agent_belief.clone();
         }
-
-        let change_hv = adapter.encode(&Scenario::new(scenario.change), dim);
-        let _reality_state = Some(match reality_state {
-            Some(prev) => ContinuousHV::bundle_owned(&[prev, change_hv]),
-            None => change_hv,
-        });
 
         let belief_hv = adapter.encode(&Scenario::new(scenario.belief_location), dim);
         let reality_hv = adapter.encode(&Scenario::new(scenario.reality_location), dim);
@@ -229,9 +221,6 @@ impl FalseBeliefBenchmark {
     #[cfg(feature = "symthaea-backend")]
     fn run_trial_full(&self, _config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
         use super::applied_tom::{inject_belief, predict_behavior, social_agent};
-
-        let scenarios = Self::scenarios();
-        let _scenario = &scenarios[trial_idx % scenarios.len()];
 
         // Create FEP agent modeling Sally's mental state
         let mut agent = social_agent(2, 2, 2);

@@ -62,8 +62,14 @@ pub struct IntentScore {
 }
 
 const INTENT_NAMES: [&str; 8] = [
-    "Acknowledge", "Answer", "Clarify", "Propose",
-    "Uncertainty", "Reflect", "Continue", "Unknown",
+    "Acknowledge",
+    "Answer",
+    "Clarify",
+    "Propose",
+    "Uncertainty",
+    "Reflect",
+    "Continue",
+    "Unknown",
 ];
 
 /// Identify the active intent from channels (argmax of channels 0..8).
@@ -77,7 +83,7 @@ fn active_intent(channels: &[f32; 20]) -> &'static str {
 /// Cross-entropy loss for a single position (read-only, no weight updates).
 fn cross_entropy_loss(logits: &[f32], target: usize) -> f32 {
     if target >= logits.len() {
-        return 0.0;
+        return f32::INFINITY;
     }
     let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     let sum_exp: f32 = logits.iter().map(|&l| (l - max_logit).exp()).sum();
@@ -136,7 +142,9 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
             continue;
         }
 
-        let channels = ThoughtChannels { channels: pair.channels };
+        let channels = ThoughtChannels {
+            channels: pair.channels,
+        };
         let intent = active_intent(&pair.channels).to_string();
 
         // --- Perplexity: teacher-forced forward pass ---
@@ -150,7 +158,9 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
             let window = pair.target_ids.len().min(config.max_gen_tokens);
 
             for (pos, &target_id) in pair.target_ids[..window].iter().enumerate() {
-                let logits = generator.controller_mut().forward_step(&thought_hv, prev_token, pos);
+                let logits = generator
+                    .controller_mut()
+                    .forward_step(&thought_hv, prev_token, pos);
                 let loss = cross_entropy_loss(&logits, target_id as usize);
                 pair_ce += loss;
                 pair_tokens += 1;
@@ -176,7 +186,9 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
 
         // --- Per-intent accumulation ---
         if config.per_intent_breakdown {
-            let entry = intent_accum.entry(intent).or_insert((0.0, 0.0, 0.0, 0.0, 0, 0));
+            let entry = intent_accum
+                .entry(intent)
+                .or_insert((0.0, 0.0, 0.0, 0.0, 0, 0));
             if pair_tokens > 0 {
                 entry.0 += pair_ce;
                 entry.1 += pair_tokens as f32;
@@ -194,7 +206,7 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
     let perplexity = if total_ce_tokens > 0 {
         (total_ce / total_ce_tokens as f32).exp()
     } else {
-        0.0
+        f32::INFINITY
     };
 
     let english_word_ratio_avg = if gen_count > 0 {
@@ -215,16 +227,27 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
         let ppl = if *sum_ce_tok > 0.0 {
             (sum_ce / sum_ce_tok).exp()
         } else {
+            f32::INFINITY
+        };
+        let er = if *intent_gen_count > 0 {
+            sum_er / *intent_gen_count as f32
+        } else {
             0.0
         };
-        let er = if *intent_gen_count > 0 { sum_er / *intent_gen_count as f32 } else { 0.0 };
-        let coh = if *intent_gen_count > 0 { sum_coh / *intent_gen_count as f32 } else { 0.0 };
-        intent_scores.insert(intent.clone(), IntentScore {
-            perplexity: ppl,
-            english_ratio: er,
-            avg_coherence: coh,
-            count: *count,
-        });
+        let coh = if *intent_gen_count > 0 {
+            sum_coh / *intent_gen_count as f32
+        } else {
+            0.0
+        };
+        intent_scores.insert(
+            intent.clone(),
+            IntentScore {
+                perplexity: ppl,
+                english_ratio: er,
+                avg_coherence: coh,
+                count: *count,
+            },
+        );
     }
 
     EvalResult {
@@ -242,13 +265,22 @@ pub fn format_eval_report(result: &EvalResult) -> String {
     s.push_str("=== Broca Evaluation Report ===\n\n");
     s.push_str(&format!("Samples:           {}\n", result.num_samples));
     s.push_str(&format!("Perplexity:        {:.4}\n", result.perplexity));
-    s.push_str(&format!("English ratio:     {:.4}\n", result.english_word_ratio));
+    s.push_str(&format!(
+        "English ratio:     {:.4}\n",
+        result.english_word_ratio
+    ));
     s.push_str(&format!("Avg coherence:     {:.4}\n", result.avg_coherence));
 
     if !result.intent_scores.is_empty() {
         s.push_str("\n--- Per-Intent Breakdown ---\n");
-        s.push_str(&format!("{:<14} {:>8} {:>10} {:>6}\n", "Intent", "PPL", "English%", "N"));
-        s.push_str(&format!("{:<14} {:>8} {:>10} {:>6}\n", "------", "---", "--------", "-"));
+        s.push_str(&format!(
+            "{:<14} {:>8} {:>10} {:>6}\n",
+            "Intent", "PPL", "English%", "N"
+        ));
+        s.push_str(&format!(
+            "{:<14} {:>8} {:>10} {:>6}\n",
+            "------", "---", "--------", "-"
+        ));
 
         let mut intents: Vec<_> = result.intent_scores.iter().collect();
         intents.sort_by(|(a, _), (b, _)| a.cmp(b));
@@ -256,7 +288,10 @@ pub fn format_eval_report(result: &EvalResult) -> String {
         for (intent, score) in intents {
             s.push_str(&format!(
                 "{:<14} {:>8.2} {:>9.1}% {:>6}\n",
-                intent, score.perplexity, score.english_ratio * 100.0, score.count
+                intent,
+                score.perplexity,
+                score.english_ratio * 100.0,
+                score.count
             ));
         }
     }
@@ -358,8 +393,16 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 /// Hedging tokens that indicate epistemic uncertainty in generated text.
 #[cfg(feature = "mamba")]
 const HEDGING_WORDS: &[&str] = &[
-    "perhaps", "maybe", "might", "possibly", "uncertain",
-    "unclear", "likely", "probably", "could", "seem",
+    "perhaps",
+    "maybe",
+    "might",
+    "possibly",
+    "uncertain",
+    "unclear",
+    "likely",
+    "probably",
+    "could",
+    "seem",
 ];
 
 /// Count the fraction of tokens that contain hedging words.
@@ -370,7 +413,8 @@ fn hedging_ratio(text: &str) -> f32 {
     if words.is_empty() {
         return 0.0;
     }
-    let hedging_count = words.iter()
+    let hedging_count = words
+        .iter()
         .filter(|w| HEDGING_WORDS.iter().any(|h| w.contains(h)))
         .count();
     hedging_count as f32 / words.len() as f32
@@ -381,7 +425,10 @@ fn hedging_ratio(text: &str) -> f32 {
 /// A token counts as "English" if it decodes to a multi-character alphabetic string
 /// (not a single byte, not a byte-escape).
 #[cfg(feature = "mamba")]
-pub fn english_word_ratio_mamba(token_ids: &[u32], wrapper: &dyn crate::mamba::MambaBackend) -> f32 {
+pub fn english_word_ratio_mamba(
+    token_ids: &[u32],
+    wrapper: &dyn crate::mamba::MambaBackend,
+) -> f32 {
     if token_ids.is_empty() {
         return 0.0;
     }
@@ -434,7 +481,9 @@ pub fn evaluate_liquid_mamba(
             continue;
         }
 
-        let channels = ThoughtChannels { channels: pair.channels };
+        let channels = ThoughtChannels {
+            channels: pair.channels,
+        };
         let intent = active_intent(&pair.channels).to_string();
 
         // --- Perplexity: teacher-forced through frozen Mamba ---
@@ -484,7 +533,9 @@ pub fn evaluate_liquid_mamba(
             gen_count += 1;
 
             // Collect words for distinct-n
-            let words: Vec<String> = result.text.split_whitespace()
+            let words: Vec<String> = result
+                .text
+                .split_whitespace()
                 .map(|w| w.to_lowercase())
                 .collect();
             all_generated_words.extend(words);
@@ -515,7 +566,9 @@ pub fn evaluate_liquid_mamba(
 
         // --- Per-intent accumulation ---
         if config.per_intent_breakdown {
-            let entry = intent_accum.entry(intent).or_insert((0.0, 0.0, 0.0, 0.0, 0, 0));
+            let entry = intent_accum
+                .entry(intent)
+                .or_insert((0.0, 0.0, 0.0, 0.0, 0, 0));
             if pair_tokens > 0 {
                 entry.0 += pair_ce;
                 entry.1 += pair_tokens as f32;
@@ -533,7 +586,7 @@ pub fn evaluate_liquid_mamba(
     let perplexity = if total_ce_tokens > 0 {
         (total_ce / total_ce_tokens as f32).exp()
     } else {
-        0.0
+        f32::INFINITY
     };
 
     let english_word_ratio_avg = if gen_count > 0 {
@@ -564,15 +617,30 @@ pub fn evaluate_liquid_mamba(
     // Per-intent scores
     let mut intent_scores = HashMap::new();
     for (intent, (sum_ce, sum_ce_tok, sum_er, sum_coh, intent_gen_count, count)) in &intent_accum {
-        let ppl = if *sum_ce_tok > 0.0 { (sum_ce / sum_ce_tok).exp() } else { 0.0 };
-        let er = if *intent_gen_count > 0 { sum_er / *intent_gen_count as f32 } else { 0.0 };
-        let coh = if *intent_gen_count > 0 { sum_coh / *intent_gen_count as f32 } else { 0.0 };
-        intent_scores.insert(intent.clone(), IntentScore {
-            perplexity: ppl,
-            english_ratio: er,
-            avg_coherence: coh,
-            count: *count,
-        });
+        let ppl = if *sum_ce_tok > 0.0 {
+            (sum_ce / sum_ce_tok).exp()
+        } else {
+            f32::INFINITY
+        };
+        let er = if *intent_gen_count > 0 {
+            sum_er / *intent_gen_count as f32
+        } else {
+            0.0
+        };
+        let coh = if *intent_gen_count > 0 {
+            sum_coh / *intent_gen_count as f32
+        } else {
+            0.0
+        };
+        intent_scores.insert(
+            intent.clone(),
+            IntentScore {
+                perplexity: ppl,
+                english_ratio: er,
+                avg_coherence: coh,
+                count: *count,
+            },
+        );
     }
 
     let base = EvalResult {
@@ -584,11 +652,12 @@ pub fn evaluate_liquid_mamba(
     };
 
     // --- Consciousness gating test ---
-    let gating_verification = if config.consciousness_gating_test && !config.dataset.pairs.is_empty() {
-        consciousness_gating_test(gen, &config.dataset)
-    } else {
-        None
-    };
+    let gating_verification =
+        if config.consciousness_gating_test && !config.dataset.pairs.is_empty() {
+            consciousness_gating_test(gen, &config.dataset)
+        } else {
+            None
+        };
 
     // --- Diversity metrics ---
     let d1 = distinct_n(&all_generated_words, 1);
@@ -631,12 +700,16 @@ fn consciousness_gating_test(
 
     for pair in dataset.pairs.iter().take(sample_size) {
         // Generate with Certain epistemic (0.0)
-        let mut certain_channels = ThoughtChannels { channels: pair.channels };
+        let mut certain_channels = ThoughtChannels {
+            channels: pair.channels,
+        };
         certain_channels.set_epistemic(0.0);
         let certain_result = gen.generate(&certain_channels);
 
         // Generate with Unknown epistemic (3.0)
-        let mut unknown_channels = ThoughtChannels { channels: pair.channels };
+        let mut unknown_channels = ThoughtChannels {
+            channels: pair.channels,
+        };
         unknown_channels.set_epistemic(3.0);
         let unknown_result = gen.generate(&unknown_channels);
 
@@ -660,14 +733,32 @@ pub fn format_liquid_mamba_eval_report(result: &LiquidMambaEvalResult) -> String
     let mut s = String::new();
     s.push_str("=== Liquid-Mamba Evaluation Report ===\n\n");
     s.push_str(&format!("Samples:           {}\n", result.base.num_samples));
-    s.push_str(&format!("Perplexity:        {:.4}\n", result.base.perplexity));
-    s.push_str(&format!("English ratio:     {:.4}\n", result.base.english_word_ratio));
-    s.push_str(&format!("Avg coherence:     {:.4}\n", result.base.avg_coherence));
-    s.push_str(&format!("Avg semantic PE:   {:.4}\n", result.avg_semantic_pe));
-    s.push_str(&format!("Effective rank:    {:.2}\n", result.avg_effective_rank));
+    s.push_str(&format!(
+        "Perplexity:        {:.4}\n",
+        result.base.perplexity
+    ));
+    s.push_str(&format!(
+        "English ratio:     {:.4}\n",
+        result.base.english_word_ratio
+    ));
+    s.push_str(&format!(
+        "Avg coherence:     {:.4}\n",
+        result.base.avg_coherence
+    ));
+    s.push_str(&format!(
+        "Avg semantic PE:   {:.4}\n",
+        result.avg_semantic_pe
+    ));
+    s.push_str(&format!(
+        "Effective rank:    {:.2}\n",
+        result.avg_effective_rank
+    ));
     s.push_str(&format!("Distinct-1:        {:.4}\n", result.distinct_1));
     s.push_str(&format!("Distinct-2:        {:.4}\n", result.distinct_2));
-    s.push_str(&format!("Thought-output sim:{:.4}\n", result.avg_thought_output_similarity));
+    s.push_str(&format!(
+        "Thought-output sim:{:.4}\n",
+        result.avg_thought_output_similarity
+    ));
     s.push_str(&format!("PE trend:          {:.6}\n", result.pe_trend));
     s.push_str(&format!("PE mean:           {:.4}\n", result.pe_mean));
     s.push_str(&format!("PE std dev:        {:.4}\n", result.pe_std_dev));
@@ -685,8 +776,14 @@ pub fn format_liquid_mamba_eval_report(result: &LiquidMambaEvalResult) -> String
 
     if !result.base.intent_scores.is_empty() {
         s.push_str("\n--- Per-Intent Breakdown ---\n");
-        s.push_str(&format!("{:<14} {:>8} {:>10} {:>6}\n", "Intent", "PPL", "English%", "N"));
-        s.push_str(&format!("{:<14} {:>8} {:>10} {:>6}\n", "------", "---", "--------", "-"));
+        s.push_str(&format!(
+            "{:<14} {:>8} {:>10} {:>6}\n",
+            "Intent", "PPL", "English%", "N"
+        ));
+        s.push_str(&format!(
+            "{:<14} {:>8} {:>10} {:>6}\n",
+            "------", "---", "--------", "-"
+        ));
 
         let mut intents: Vec<_> = result.base.intent_scores.iter().collect();
         intents.sort_by(|(a, _), (b, _)| a.cmp(b));
@@ -694,7 +791,10 @@ pub fn format_liquid_mamba_eval_report(result: &LiquidMambaEvalResult) -> String
         for (intent, score) in intents {
             s.push_str(&format!(
                 "{:<14} {:>8.2} {:>9.1}% {:>6}\n",
-                intent, score.perplexity, score.english_ratio * 100.0, score.count
+                intent,
+                score.perplexity,
+                score.english_ratio * 100.0,
+                score.count
             ));
         }
     }
@@ -705,9 +805,9 @@ pub fn format_liquid_mamba_eval_report(result: &LiquidMambaEvalResult) -> String
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::generator::{BrocaConfig, SamplingStrategy};
     use crate::controller::LanguageControllerConfig;
     use crate::gating::GatingConfig;
+    use crate::generator::{BrocaConfig, SamplingStrategy};
     use crate::tokenizer::BpeTokenizer;
     use crate::training::TrainingPair;
     use symthaea_core::genesis::GenesisSeed;
@@ -752,7 +852,10 @@ mod tests {
         // Encode a sentence of known English words
         let ids = tok.encode("the cat is on the mat");
         let ratio = english_word_ratio(&ids, &tok);
-        assert!(ratio > 0.3, "Known English sentence should have high English ratio: {ratio}");
+        assert!(
+            ratio > 0.3,
+            "Known English sentence should have high English ratio: {ratio}"
+        );
     }
 
     #[test]
@@ -778,8 +881,16 @@ mod tests {
         };
 
         let result = evaluate(&mut gen, &eval_config);
-        assert!(result.perplexity.is_finite(), "Perplexity should be finite: {}", result.perplexity);
-        assert!(result.perplexity > 0.0, "Perplexity should be positive: {}", result.perplexity);
+        assert!(
+            result.perplexity.is_finite(),
+            "Perplexity should be finite: {}",
+            result.perplexity
+        );
+        assert!(
+            result.perplexity > 0.0,
+            "Perplexity should be positive: {}",
+            result.perplexity
+        );
     }
 
     #[test]
@@ -816,7 +927,11 @@ mod tests {
         let answer_ch = ThoughtChannels::with_intent(1);
         let clarify_ch = ThoughtChannels::with_intent(2);
         dataset.push(TrainingPair::new(answer_ch, "yes it is".to_string(), &tok));
-        dataset.push(TrainingPair::new(clarify_ch, "I mean that".to_string(), &tok));
+        dataset.push(TrainingPair::new(
+            clarify_ch,
+            "I mean that".to_string(),
+            &tok,
+        ));
 
         let eval_config = EvalConfig {
             dataset,
@@ -827,8 +942,14 @@ mod tests {
         };
 
         let result = evaluate(&mut gen, &eval_config);
-        assert!(result.intent_scores.contains_key("Answer"), "Should have Answer intent");
-        assert!(result.intent_scores.contains_key("Clarify"), "Should have Clarify intent");
+        assert!(
+            result.intent_scores.contains_key("Answer"),
+            "Should have Answer intent"
+        );
+        assert!(
+            result.intent_scores.contains_key("Clarify"),
+            "Should have Clarify intent"
+        );
         assert_eq!(result.intent_scores["Answer"].count, 1);
         assert_eq!(result.intent_scores["Clarify"].count, 1);
     }
@@ -836,12 +957,15 @@ mod tests {
     #[test]
     fn test_format_report() {
         let mut intent_scores = HashMap::new();
-        intent_scores.insert("Answer".to_string(), IntentScore {
-            perplexity: 45.2,
-            english_ratio: 0.65,
-            avg_coherence: 0.5,
-            count: 10,
-        });
+        intent_scores.insert(
+            "Answer".to_string(),
+            IntentScore {
+                perplexity: 45.2,
+                english_ratio: 0.65,
+                avg_coherence: 0.5,
+                count: 10,
+            },
+        );
 
         let result = EvalResult {
             perplexity: 50.0,
@@ -856,6 +980,38 @@ mod tests {
         assert!(report.contains("50.0"), "Should contain perplexity");
         assert!(report.contains("Answer"), "Should contain intent name");
         assert!(report.contains("10"), "Should contain sample count");
+    }
+
+    #[test]
+    fn test_cross_entropy_oob_returns_inf() {
+        let logits = vec![1.0, 2.0, 3.0];
+        assert!(
+            cross_entropy_loss(&logits, 999).is_infinite(),
+            "Out-of-bounds target should return INFINITY"
+        );
+    }
+
+    #[test]
+    fn test_perplexity_no_tokens_is_inf() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        // Empty dataset → no CE tokens → perplexity should be INFINITY
+        let eval_config = EvalConfig {
+            dataset: TrainingDataset::default(),
+            compute_perplexity: true,
+            compute_english_ratio: false,
+            per_intent_breakdown: false,
+            max_gen_tokens: 16,
+        };
+
+        let result = evaluate(&mut gen, &eval_config);
+        assert!(
+            result.perplexity.is_infinite(),
+            "Perplexity with no tokens should be INFINITY, got: {}",
+            result.perplexity
+        );
     }
 
     #[test]
@@ -918,13 +1074,18 @@ mod tests {
             assert!(report.contains("120.5"), "Should contain perplexity");
             assert!(report.contains("semantic PE"), "Should contain semantic PE");
             assert!(report.contains("Effective rank"), "Should contain rank");
-            assert!(report.contains("PASS"), "Should pass gating test (0.15 > 0.05)");
+            assert!(
+                report.contains("PASS"),
+                "Should pass gating test (0.15 > 0.05)"
+            );
         }
 
         #[test]
         fn test_distinct_n_all_unique() {
             let words: Vec<String> = vec!["the", "cat", "sat", "on", "mat"]
-                .into_iter().map(String::from).collect();
+                .into_iter()
+                .map(String::from)
+                .collect();
             let d1 = distinct_n(&words, 1);
             assert!((d1 - 1.0).abs() < 1e-6, "All unique unigrams: d1={d1}");
             let d2 = distinct_n(&words, 2);
@@ -934,12 +1095,17 @@ mod tests {
         #[test]
         fn test_distinct_n_repetitive() {
             let words: Vec<String> = vec!["the", "the", "the", "the"]
-                .into_iter().map(String::from).collect();
+                .into_iter()
+                .map(String::from)
+                .collect();
             let d1 = distinct_n(&words, 1);
             assert!((d1 - 0.25).abs() < 1e-6, "One unique out of 4: d1={d1}");
             let d2 = distinct_n(&words, 2);
             // All bigrams are "the the" — 1 unique out of 3
-            assert!((d2 - 1.0/3.0).abs() < 1e-3, "One unique bigram of 3: d2={d2}");
+            assert!(
+                (d2 - 1.0 / 3.0).abs() < 1e-3,
+                "One unique bigram of 3: d2={d2}"
+            );
         }
 
         #[test]
@@ -987,15 +1153,18 @@ mod tests {
             };
 
             let report = format_liquid_mamba_eval_report(&result);
-            assert!(report.contains("FAIL"), "Should fail gating test (0.05 < 0.10)");
+            assert!(
+                report.contains("FAIL"),
+                "Should fail gating test (0.05 < 0.10)"
+            );
         }
 
         #[test]
         #[ignore = "Requires network access to download mamba-130m"]
         fn test_liquid_mamba_perplexity_finite() {
-            use symthaea_core::genesis::GenesisSeed;
-            use crate::liquid_mamba::{LiquidMambaGenerator, LiquidMambaConfig};
+            use crate::liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
             use crate::training::TrainingPair;
+            use symthaea_core::genesis::GenesisSeed;
 
             let genesis = GenesisSeed::from_phrase("test-lm-eval");
             let config = LiquidMambaConfig {
@@ -1023,18 +1192,24 @@ mod tests {
             };
 
             let result = evaluate_liquid_mamba(&mut gen, &eval_config);
-            assert!(result.base.perplexity.is_finite(),
-                "Perplexity should be finite: {}", result.base.perplexity);
-            assert!(result.base.perplexity > 0.0,
-                "Perplexity should be positive: {}", result.base.perplexity);
+            assert!(
+                result.base.perplexity.is_finite(),
+                "Perplexity should be finite: {}",
+                result.base.perplexity
+            );
+            assert!(
+                result.base.perplexity > 0.0,
+                "Perplexity should be positive: {}",
+                result.base.perplexity
+            );
         }
 
         #[test]
         #[ignore = "Requires network access to download mamba-130m"]
         fn test_liquid_mamba_gating_verification() {
-            use symthaea_core::genesis::GenesisSeed;
-            use crate::liquid_mamba::{LiquidMambaGenerator, LiquidMambaConfig};
+            use crate::liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
             use crate::training::TrainingPair;
+            use symthaea_core::genesis::GenesisSeed;
 
             let genesis = GenesisSeed::from_phrase("test-lm-gating");
             let config = LiquidMambaConfig {
@@ -1064,8 +1239,10 @@ mod tests {
             };
 
             let result = evaluate_liquid_mamba(&mut gen, &eval_config);
-            assert!(result.gating_verification.is_some(),
-                "Gating verification should produce results");
+            assert!(
+                result.gating_verification.is_some(),
+                "Gating verification should produce results"
+            );
             let (certain, unknown) = result.gating_verification.unwrap();
             assert!(certain.is_finite(), "Certain hedging should be finite");
             assert!(unknown.is_finite(), "Unknown hedging should be finite");

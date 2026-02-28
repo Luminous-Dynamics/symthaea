@@ -28,6 +28,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -172,13 +174,18 @@ impl ArcAlgebraBenchmark {
             // apply_rule(A) + apply_rule(B)
             let result_d1 = encoder.apply_rule(&hv_d1, &rule_d1);
             let result_d2 = encoder.apply_rule(&hv_d2, &rule_d2);
-            let result_right = ContinuousHV::weighted_bundle(&[&result_d1, &result_d2], &[0.5, 0.5]);
+            let result_right =
+                ContinuousHV::weighted_bundle(&[&result_d1, &result_d2], &[0.5, 0.5]);
 
             distributivity_vals.push(result_left.similarity(&result_right) as f64);
         }
 
         let mean = |v: &[f64]| -> f64 {
-            if v.is_empty() { 0.0 } else { v.iter().sum::<f64>() / v.len() as f64 }
+            if v.is_empty() {
+                0.0
+            } else {
+                v.iter().sum::<f64>() / v.len() as f64
+            }
         };
 
         xor_shift(&mut rng);
@@ -212,6 +219,7 @@ impl PsychBenchmark for ArcAlgebraBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut consistencies = Vec::new();
         let mut associativities = Vec::new();
@@ -228,26 +236,52 @@ impl PsychBenchmark for ArcAlgebraBenchmark {
             identities.push(r.identity_preservation);
             distributivities.push(r.distributivity);
             rts.push(r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "arc_algebra".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
-        result.insert("rule_consistency", MetricValue::from_samples(&consistencies));
+        result.insert(
+            "rule_consistency",
+            MetricValue::from_samples(&consistencies),
+        );
         result.insert("associativity", MetricValue::from_samples(&associativities));
         result.insert("inverse_similarity", MetricValue::from_samples(&inverses));
-        result.insert("identity_preservation", MetricValue::from_samples(&identities));
-        result.insert("distributivity", MetricValue::from_samples(&distributivities));
+        result.insert(
+            "identity_preservation",
+            MetricValue::from_samples(&identities),
+        );
+        result.insert(
+            "distributivity",
+            MetricValue::from_samples(&distributivities),
+        );
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
 
         // Algebra score: mean of all 5 property scores
         let algebra_scores: Vec<f64> = (0..config.trials_per_condition)
             .map(|i| {
-                (consistencies[i] + associativities[i] + inverses[i]
-                    + identities[i] + distributivities[i]) / 5.0
+                (consistencies[i]
+                    + associativities[i]
+                    + inverses[i]
+                    + identities[i]
+                    + distributivities[i])
+                    / 5.0
             })
             .collect();
         result.insert("algebra_score", MetricValue::from_samples(&algebra_scores));
 
         result.conditions = 5; // 5 algebraic properties
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -294,7 +328,11 @@ mod tests {
         let result = ArcAlgebraBenchmark.run(&config);
         let id = result.metrics["identity_preservation"].mean;
         // Identity rule (same input→output) should produce positive similarity
-        assert!(id > 0.0, "identity_preservation should be positive, got {}", id);
+        assert!(
+            id > 0.0,
+            "identity_preservation should be positive, got {}",
+            id
+        );
     }
 
     #[test]
@@ -307,7 +345,11 @@ mod tests {
         let result = ArcAlgebraBenchmark.run(&config);
         let inv = result.metrics["inverse_similarity"].mean;
         // Unbinding should recover input above noise floor
-        assert!(inv > 0.0, "inverse_similarity should be positive, got {}", inv);
+        assert!(
+            inv > 0.0,
+            "inverse_similarity should be positive, got {}",
+            inv
+        );
     }
 
     #[test]
@@ -326,6 +368,9 @@ mod tests {
         };
         let r1 = ArcAlgebraBenchmark.run(&config);
         let r2 = ArcAlgebraBenchmark.run(&config);
-        assert_eq!(r1.metrics["algebra_score"].mean, r2.metrics["algebra_score"].mean);
+        assert_eq!(
+            r1.metrics["algebra_score"].mean,
+            r2.metrics["algebra_score"].mean
+        );
     }
 }

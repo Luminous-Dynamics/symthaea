@@ -757,7 +757,9 @@ mod tests {
         let raw_bytes = original.to_bytes(); // no compression header
 
         // receive_whole should fall back to direct from_bytes
-        let result = receiver.receive_whole(&raw_bytes).expect("backward compat parse");
+        let result = receiver
+            .receive_whole(&raw_bytes)
+            .expect("backward compat parse");
         assert_eq!(result.sequence, original.sequence);
         assert_eq!(result.wisdom.0, original.wisdom.0);
     }

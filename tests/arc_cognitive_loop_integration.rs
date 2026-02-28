@@ -37,10 +37,8 @@ fn test_arc_grid_through_cognitive_loop() {
     // as it forms internal predictions. Verify errors stabilize: the second
     // half's mean should not be dramatically larger than the first half's mean.
     let mid = errors.len() / 2;
-    let first_half_mean: f32 =
-        errors[..mid].iter().sum::<f32>() / mid as f32;
-    let second_half_mean: f32 =
-        errors[mid..].iter().sum::<f32>() / (errors.len() - mid) as f32;
+    let first_half_mean: f32 = errors[..mid].iter().sum::<f32>() / mid as f32;
+    let second_half_mean: f32 = errors[mid..].iter().sum::<f32>() / (errors.len() - mid) as f32;
     assert!(
         second_half_mean <= first_half_mean * 2.0 + 0.15,
         "Prediction error should stabilize, not diverge: first_half={:.4}, second_half={:.4}, errors={:?}",
@@ -127,10 +125,7 @@ fn test_arc_consciousness_during_reasoning() {
         result.prediction_error.is_finite(),
         "prediction_error should be finite"
     );
-    assert!(
-        result.cycle_time_us > 0,
-        "cycle_time_us should be > 0"
-    );
+    assert!(result.cycle_time_us > 0, "cycle_time_us should be > 0");
     assert!(
         !result.output.is_empty(),
         "output vector should not be empty"

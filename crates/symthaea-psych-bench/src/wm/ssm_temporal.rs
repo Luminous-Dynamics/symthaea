@@ -86,7 +86,12 @@ mod tests {
         let after2 = ssm.step(0.0);
         assert!(initial > 0.0, "initial={}", initial);
         assert!(after1 < initial, "should decay: {} vs {}", after1, initial);
-        assert!(after2 < after1, "should decay further: {} vs {}", after2, after1);
+        assert!(
+            after2 < after1,
+            "should decay further: {} vs {}",
+            after2,
+            after1
+        );
     }
 
     #[test]
@@ -95,14 +100,21 @@ mod tests {
         ssm.step(1.0);
         let before_refresh = ssm.step(0.0);
         let after_refresh = ssm.step(1.0);
-        assert!(after_refresh > before_refresh,
-            "refresh should increase output: {} vs {}", after_refresh, before_refresh);
+        assert!(
+            after_refresh > before_refresh,
+            "refresh should increase output: {} vs {}",
+            after_refresh,
+            before_refresh
+        );
     }
 
     #[test]
     fn test_ssm_temporal_memory_strength() {
         let mut ssm = SsmTemporalBackend::new(-0.2, 4);
-        assert!((ssm.memory_strength() - 0.0).abs() < 1e-6, "initial strength should be ~0");
+        assert!(
+            (ssm.memory_strength() - 0.0).abs() < 1e-6,
+            "initial strength should be ~0"
+        );
         ssm.step(1.0);
         let s1 = ssm.memory_strength();
         assert!(s1 > 0.0, "strength after input should be >0: {}", s1);
@@ -118,7 +130,10 @@ mod tests {
         ssm.step(1.0);
         assert!(ssm.memory_strength() > 0.0);
         ssm.reset();
-        assert!((ssm.memory_strength() - 0.0).abs() < 1e-6, "reset should zero state");
+        assert!(
+            (ssm.memory_strength() - 0.0).abs() < 1e-6,
+            "reset should zero state"
+        );
     }
 
     #[test]
@@ -133,8 +148,12 @@ mod tests {
             fast.step(0.0);
             slow.step(0.0);
         }
-        assert!(fast.memory_strength() < slow.memory_strength(),
-            "fast decay {} should be < slow decay {}", fast.memory_strength(), slow.memory_strength());
+        assert!(
+            fast.memory_strength() < slow.memory_strength(),
+            "fast decay {} should be < slow decay {}",
+            fast.memory_strength(),
+            slow.memory_strength()
+        );
     }
 
     #[test]
@@ -144,7 +163,12 @@ mod tests {
         for input in &[1.0, 0.0, 0.5, 0.0, 1.0] {
             let o1 = ssm1.step(*input);
             let o2 = ssm2.step(*input);
-            assert!((o1 - o2).abs() < 1e-10, "outputs should match: {} vs {}", o1, o2);
+            assert!(
+                (o1 - o2).abs() < 1e-10,
+                "outputs should match: {} vs {}",
+                o1,
+                o2
+            );
         }
     }
 }

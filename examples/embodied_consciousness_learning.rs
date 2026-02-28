@@ -335,7 +335,10 @@ fn main() {
     );
     println!("  Avg coherence: {:.2}", final_metrics.average_coherence);
     println!("  Boundary integrity: {:.2}", closure.boundary_integrity);
-    println!("  Self-production rate: {:.2}", closure.self_production_rate);
+    println!(
+        "  Self-production rate: {:.2}",
+        closure.self_production_rate
+    );
     println!();
     println!("  Operational Closure: {:.2}", closure.closure_level);
     println!(

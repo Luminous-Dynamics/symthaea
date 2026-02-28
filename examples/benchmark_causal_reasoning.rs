@@ -38,7 +38,9 @@ fn main() {
 #[cfg(not(feature = "reasoning_engine"))]
 fn main() {
     println!("This benchmark requires the 'reasoning_engine' feature.");
-    println!("Run with: cargo run --example benchmark_causal_reasoning --features reasoning_engine");
+    println!(
+        "Run with: cargo run --example benchmark_causal_reasoning --features reasoning_engine"
+    );
 }
 
 #[cfg(feature = "reasoning_engine")]

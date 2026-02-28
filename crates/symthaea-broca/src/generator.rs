@@ -6,11 +6,14 @@
 //! 3. Semantic veto: mid-sentence self-correction when coherence drops
 //! 4. Thermodynamic subjective time: dt varies with system load
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::controller::{LanguageController, LanguageControllerConfig};
 use crate::encoder::{ThoughtChannels, ThoughtLanguageEncoder};
-use crate::gating::{CoherenceFeedback, EmotionalModulator, EpistemicGate, GatingConfig, consciousness_gated_max_tokens};
+use crate::gating::{
+    consciousness_gated_max_tokens, CoherenceFeedback, EmotionalModulator, EpistemicGate,
+    GatingConfig,
+};
 use crate::tokenizer::BpeTokenizer;
 
 use symthaea_core::genesis::GenesisSeed;
@@ -134,7 +137,11 @@ impl BrocaGenerator {
     }
 
     /// Create a generator with a custom tokenizer.
-    pub fn with_tokenizer(genesis: &GenesisSeed, config: BrocaConfig, tokenizer: BpeTokenizer) -> Self {
+    pub fn with_tokenizer(
+        genesis: &GenesisSeed,
+        config: BrocaConfig,
+        tokenizer: BpeTokenizer,
+    ) -> Self {
         let mut ctrl_config = config.controller.clone();
         ctrl_config.vocab_size = tokenizer.vocab_size();
 
@@ -192,7 +199,8 @@ impl BrocaGenerator {
 
             // Apply gating
             if self.config.enable_epistemic_gate {
-                self.epistemic_gate.apply(&mut logits, channels.epistemic_ordinal());
+                self.epistemic_gate
+                    .apply(&mut logits, channels.epistemic_ordinal());
             }
 
             if self.config.enable_emotional_modulation {
@@ -205,7 +213,10 @@ impl BrocaGenerator {
                 let _weight = self.coherence_feedback.update(&output_hv, &thought_hv);
 
                 // Semantic veto: mid-sentence self-correction
-                if self.config.enable_semantic_veto && self.coherence_feedback.should_veto() && pos > 2 {
+                if self.config.enable_semantic_veto
+                    && self.coherence_feedback.should_veto()
+                    && pos > 2
+                {
                     veto_triggered = true;
                     text.push_str(&self.config.veto_hesitation);
                     on_token(&self.config.veto_hesitation);
@@ -470,7 +481,11 @@ mod tests {
         let channels = ThoughtChannels::default();
         let result = gen.generate(&channels);
 
-        assert!(result.num_tokens <= 5, "Should respect max_tokens limit: got {}", result.num_tokens);
+        assert!(
+            result.num_tokens <= 5,
+            "Should respect max_tokens limit: got {}",
+            result.num_tokens
+        );
     }
 
     #[test]
@@ -485,7 +500,10 @@ mod tests {
             streamed.push_str(token);
         });
 
-        assert_eq!(streamed, result.text, "Streamed tokens should match final text");
+        assert_eq!(
+            streamed, result.text,
+            "Streamed tokens should match final text"
+        );
     }
 
     #[test]
@@ -529,24 +547,27 @@ mod tests {
         low_psi.set_consciousness(0.1, 0.5, 0.5);
         let result_low = gen.generate(&low_psi);
 
-        let mut gen2 = BrocaGenerator::new(&test_genesis(), BrocaConfig {
-            controller: LanguageControllerConfig {
-                network_layers: 2,
-                neurons_per_layer: 4,
-                vocab_size: 32,
-                max_seq_len: 16,
+        let mut gen2 = BrocaGenerator::new(
+            &test_genesis(),
+            BrocaConfig {
+                controller: LanguageControllerConfig {
+                    network_layers: 2,
+                    neurons_per_layer: 4,
+                    vocab_size: 32,
+                    max_seq_len: 16,
+                    ..Default::default()
+                },
+                gating: GatingConfig {
+                    base_max_tokens: 100,
+                    ..Default::default()
+                },
+                enable_consciousness_gating: true,
+                enable_coherence_feedback: false,
+                enable_semantic_veto: false,
+                sampling: SamplingStrategy::Greedy,
                 ..Default::default()
             },
-            gating: GatingConfig {
-                base_max_tokens: 100,
-                ..Default::default()
-            },
-            enable_consciousness_gating: true,
-            enable_coherence_feedback: false,
-            enable_semantic_veto: false,
-            sampling: SamplingStrategy::Greedy,
-            ..Default::default()
-        });
+        );
 
         // High psi → longer (but may hit EOS or max_tokens)
         let mut high_psi = ThoughtChannels::default();

@@ -8,7 +8,10 @@
 use super::report::{ButlinIndicatorReport, IndicatorEvidence, IndicatorStatus};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
+
 
 /// Suite that evaluates all 14 Butlin consciousness indicators
 /// via static architectural analysis.
@@ -242,6 +245,23 @@ impl PsychBenchmark for ButlinIndicatorSuite {
         let start = std::time::Instant::now();
         let report = Self::evaluate(config);
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
+
+        // Emit one trace entry per indicator for consistency
+        for ind in &report.indicators {
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: ind.id.to_string(),
+                    correct: ind.status == IndicatorStatus::Present,
+                    rt_ticks: 0.0,
+                    similarity: ind.score.unwrap_or(0.0),
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
+        }
 
         result.insert(
             "present_count",
@@ -302,6 +322,7 @@ impl PsychBenchmark for ButlinIndicatorSuite {
 
         result.conditions = 14;
         result.trials_per_condition = 1;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

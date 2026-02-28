@@ -27,8 +27,7 @@ pub fn projection_to_gradient_msg(
     trust: f32,
     version: u64,
 ) -> GradientMessage {
-    GradientMessage::new(source_id, proj.flatten_weights(), trust)
-        .with_model_version(version)
+    GradientMessage::new(source_id, proj.flatten_weights(), trust).with_model_version(version)
 }
 
 /// Apply aggregated weights to a projection after federated averaging.
@@ -79,7 +78,9 @@ mod tests {
         // Create aggregator, feed single gradient, aggregate
         let mut aggregator = create_projection_aggregator(&proj);
         assert!(aggregator.receive_gradient(msg));
-        let aggregated = aggregator.aggregate().expect("should aggregate with 1 gradient");
+        let aggregated = aggregator
+            .aggregate()
+            .expect("should aggregate with 1 gradient");
 
         // Apply back — should succeed with matching dimensions
         let mut proj2 = small_projection();
@@ -109,7 +110,9 @@ mod tests {
         assert!(aggregator.receive_gradient(msg_a));
         assert!(aggregator.receive_gradient(msg_b));
 
-        let aggregated = aggregator.aggregate().expect("should aggregate with 2 gradients");
+        let aggregated = aggregator
+            .aggregate()
+            .expect("should aggregate with 2 gradients");
         assert_eq!(aggregated.len(), proj.num_params());
 
         // All values should be finite

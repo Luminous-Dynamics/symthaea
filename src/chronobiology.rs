@@ -230,7 +230,11 @@ mod tests {
         let mut bio = Biorhythm::for_hour(10.0);
         assert!((bio.effective_hour() - 10.0).abs() < 0.01);
         bio.shift_phase(3.0);
-        assert!((bio.effective_hour() - 13.0).abs() < 0.01, "Shifted +3h: {}", bio.effective_hour());
+        assert!(
+            (bio.effective_hour() - 13.0).abs() < 0.01,
+            "Shifted +3h: {}",
+            bio.effective_hour()
+        );
     }
 
     #[test]
@@ -242,7 +246,11 @@ mod tests {
         for _ in 0..20 {
             bio.entrain();
         }
-        assert!(bio.phase_offset.abs() < 0.5, "Should recover near 0: {}", bio.phase_offset);
+        assert!(
+            bio.phase_offset.abs() < 0.5,
+            "Should recover near 0: {}",
+            bio.phase_offset
+        );
     }
 
     #[test]
@@ -250,7 +258,11 @@ mod tests {
         let mut bio = Biorhythm::for_hour(23.0);
         bio.shift_phase(3.0);
         // 23 + 3 = 26 → wraps to 2.0
-        assert!((bio.effective_hour() - 2.0).abs() < 0.01, "Should wrap: {}", bio.effective_hour());
+        assert!(
+            (bio.effective_hour() - 2.0).abs() < 0.01,
+            "Should wrap: {}",
+            bio.effective_hour()
+        );
     }
 
     #[test]

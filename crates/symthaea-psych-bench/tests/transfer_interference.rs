@@ -6,7 +6,7 @@
 // Live cognitive loop tests require `symthaea-backend` feature and are #[ignore].
 // ==================================================================================
 
-use symthaea_psych_bench::harness::transfer::{TransferDirection, TransferScore, TransferMatrix};
+use symthaea_psych_bench::harness::transfer::{TransferDirection, TransferMatrix, TransferScore};
 
 // ── Transfer Score Computation ──────────────────────────────────────
 
@@ -81,7 +81,9 @@ mod live_tests {
     struct TrainingBenchmark;
 
     impl LoopDrivable for TrainingBenchmark {
-        fn loop_name(&self) -> &str { "Transfer::Training" }
+        fn loop_name(&self) -> &str {
+            "Transfer::Training"
+        }
         fn generate_stimuli(&self, config: &BenchmarkConfig) -> Vec<LoopStimulus> {
             let dim = config.dimension;
             let pattern = ContinuousHV::random(dim, 100);
@@ -101,7 +103,9 @@ mod live_tests {
     struct TestBenchmark;
 
     impl LoopDrivable for TestBenchmark {
-        fn loop_name(&self) -> &str { "Transfer::Test" }
+        fn loop_name(&self) -> &str {
+            "Transfer::Test"
+        }
         fn generate_stimuli(&self, config: &BenchmarkConfig) -> Vec<LoopStimulus> {
             let dim = config.dimension;
             let probe = ContinuousHV::random(dim, 300);

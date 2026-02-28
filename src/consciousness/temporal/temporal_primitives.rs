@@ -100,7 +100,10 @@ pub(crate) struct AllenRelationPrimitiveGrounding {
 #[allow(dead_code)]
 impl AllenRelationPrimitiveGrounding {
     /// Get the NSM primitive grounding for a specific Allen relation
-    pub(crate) fn for_relation(relation: AllenRelation, primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn for_relation(
+        relation: AllenRelation,
+        primitive_system: &PrimitiveSystem,
+    ) -> Self {
         let (primitives, directionality, overlap_degree, is_causal) = match relation {
             // === 7 Basic Relations ===
 
@@ -242,7 +245,9 @@ impl AllenRelationPrimitiveGrounding {
     }
 
     /// Get all 13 Allen relation groundings
-    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<AllenRelation, Self> {
+    pub(crate) fn all_groundings(
+        primitive_system: &PrimitiveSystem,
+    ) -> HashMap<AllenRelation, Self> {
         AllenRelation::all()
             .into_iter()
             .map(|r| (r, Self::for_relation(r, primitive_system)))

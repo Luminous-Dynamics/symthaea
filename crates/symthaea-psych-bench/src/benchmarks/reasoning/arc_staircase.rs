@@ -22,6 +22,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -103,8 +105,16 @@ fn probe_accuracy(
         }
     }
 
-    let accuracy = if total > 0 { hits as f64 / total as f64 } else { 0.0 };
-    let similarity = if total > 0 { sim_sum / total as f64 } else { 0.0 };
+    let accuracy = if total > 0 {
+        hits as f64 / total as f64
+    } else {
+        0.0
+    };
+    let similarity = if total > 0 {
+        sim_sum / total as f64
+    } else {
+        0.0
+    };
     (accuracy, similarity)
 }
 
@@ -186,7 +196,10 @@ impl ArcStaircaseBenchmark {
         // Capacity threshold: mean of last 4 reversal points (or last probe if not enough)
         let capacity_threshold = if reversal_sizes.len() >= 2 {
             let last_n = reversal_sizes.len().min(4);
-            reversal_sizes[reversal_sizes.len() - last_n..].iter().sum::<f64>() / last_n as f64
+            reversal_sizes[reversal_sizes.len() - last_n..]
+                .iter()
+                .sum::<f64>()
+                / last_n as f64
         } else {
             current_size
         };
@@ -202,7 +215,11 @@ impl ArcStaircaseBenchmark {
                 num += (x - mean_x) * (y - mean_y);
                 den += (x - mean_x) * (x - mean_x);
             }
-            if den.abs() > 1e-10 { num / den } else { 0.0 }
+            if den.abs() > 1e-10 {
+                num / den
+            } else {
+                0.0
+            }
         } else {
             0.0
         };
@@ -238,6 +255,7 @@ impl PsychBenchmark for ArcStaircaseBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut thresholds = Vec::new();
         let mut acc_easy = Vec::new();
@@ -254,6 +272,18 @@ impl PsychBenchmark for ArcStaircaseBenchmark {
             slopes.push(r.psychometric_slope);
             steps.push(r.steps_taken);
             rts.push(r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "arc_staircase".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("capacity_threshold", MetricValue::from_samples(&thresholds));
@@ -265,6 +295,7 @@ impl PsychBenchmark for ArcStaircaseBenchmark {
 
         result.conditions = 1; // adaptive (variable)
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -303,8 +334,11 @@ mod tests {
     fn test_threshold_reasonable() {
         let result = ArcStaircaseBenchmark.run(&test_config());
         let thresh = result.metrics["capacity_threshold"].mean;
-        assert!(thresh >= 2.0 && thresh <= 20.0,
-            "capacity_threshold should be in [2,20], got {}", thresh);
+        assert!(
+            thresh >= 2.0 && thresh <= 20.0,
+            "capacity_threshold should be in [2,20], got {}",
+            thresh
+        );
     }
 
     #[test]
@@ -360,6 +394,9 @@ mod tests {
         };
         let r1 = ArcStaircaseBenchmark.run(&config);
         let r2 = ArcStaircaseBenchmark.run(&config);
-        assert_eq!(r1.metrics["capacity_threshold"].mean, r2.metrics["capacity_threshold"].mean);
+        assert_eq!(
+            r1.metrics["capacity_threshold"].mean,
+            r2.metrics["capacity_threshold"].mean
+        );
     }
 }

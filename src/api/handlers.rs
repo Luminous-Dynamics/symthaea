@@ -277,16 +277,12 @@ pub async fn submit_model(
     State(state): State<Arc<AppState>>,
     Json(request): Json<SubmissionRequest>,
 ) -> Result<(StatusCode, Json<SubmissionResponse>), (StatusCode, Json<ApiError>)> {
-    let _permit = state
-        .request_semaphore
-        .acquire()
-        .await
-        .map_err(|_| {
-            (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(ApiError::service_unavailable("server is busy")),
-            )
-        })?;
+    let _permit = state.request_semaphore.acquire().await.map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ApiError::service_unavailable("server is busy")),
+        )
+    })?;
 
     // Validate request
     if request.model_name.is_empty() {
@@ -416,12 +412,7 @@ pub async fn submit_model(
 
     let process_inline = n_nodes <= 16;
     if process_inline {
-        if let Some(submission) = state
-            .submissions
-            .write()
-            .await
-            .get_mut(&submission_id)
-        {
+        if let Some(submission) = state.submissions.write().await.get_mut(&submission_id) {
             submission.status = SubmissionStatus::Processing;
         }
 
@@ -465,11 +456,7 @@ fn process_submission_inline(state: &AppState, submission_id: Uuid, request: &Su
     let (node_representations, _n_nodes) = match build_node_representations(request) {
         Ok(values) => values,
         Err(_) => {
-            if let Some(submission) = state
-                .submissions
-                .blocking_write()
-                .get_mut(&submission_id)
-            {
+            if let Some(submission) = state.submissions.blocking_write().get_mut(&submission_id) {
                 submission.status = SubmissionStatus::Failed;
             }
             return;
@@ -530,17 +517,10 @@ fn process_submission_inline(state: &AppState, submission_id: Uuid, request: &Su
     };
 
     // Store result
-    state
-        .results
-        .blocking_write()
-        .insert(submission_id, result);
+    state.results.blocking_write().insert(submission_id, result);
 
     // Update submission status
-    if let Some(sub) = state
-        .submissions
-        .blocking_write()
-        .get_mut(&submission_id)
-    {
+    if let Some(sub) = state.submissions.blocking_write().get_mut(&submission_id) {
         sub.status = SubmissionStatus::Completed;
     }
 }
@@ -552,22 +532,12 @@ pub async fn get_results(
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<EvaluationResult>, (StatusCode, Json<ApiError>)> {
     // Check if result exists
-    if let Some(result) = state
-        .results
-        .read()
-        .await
-        .get(&submission_id)
-    {
+    if let Some(result) = state.results.read().await.get(&submission_id) {
         return Ok(Json(result.clone()));
     }
 
     // Check if submission exists and is still processing
-    if let Some(submission) = state
-        .submissions
-        .read()
-        .await
-        .get(&submission_id)
-    {
+    if let Some(submission) = state.submissions.read().await.get(&submission_id) {
         if submission.status == SubmissionStatus::Failed {
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -726,16 +696,12 @@ pub async fn compare_models(
     State(state): State<Arc<AppState>>,
     Json(request): Json<ComparisonRequest>,
 ) -> Result<Json<ComparisonResult>, (StatusCode, Json<ApiError>)> {
-    let _permit = state
-        .request_semaphore
-        .acquire()
-        .await
-        .map_err(|_| {
-            (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(ApiError::service_unavailable("server is busy")),
-            )
-        })?;
+    let _permit = state.request_semaphore.acquire().await.map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ApiError::service_unavailable("server is busy")),
+        )
+    })?;
 
     // Get model A info
     let model_a = get_model_info(&state, &request.model_a).await?;
@@ -809,12 +775,7 @@ async fn get_model_info(
 ) -> Result<ModelInfo, (StatusCode, Json<ApiError>)> {
     match reference {
         ModelReference::SubmissionId(id) => {
-            if let Some(result) = state
-                .results
-                .read()
-                .await
-                .get(id)
-            {
+            if let Some(result) = state.results.read().await.get(id) {
                 Ok(ModelInfo {
                     name: result.model_name.clone(),
                     phi: result.phi,
@@ -852,16 +813,12 @@ pub async fn dimensional_sweep(
     State(state): State<Arc<AppState>>,
     Json(request): Json<DimensionalSweepRequest>,
 ) -> Result<(StatusCode, Json<SubmissionResponse>), (StatusCode, Json<ApiError>)> {
-    let _permit = state
-        .request_semaphore
-        .acquire()
-        .await
-        .map_err(|_| {
-            (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(ApiError::service_unavailable("server is busy")),
-            )
-        })?;
+    let _permit = state.request_semaphore.acquire().await.map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ApiError::service_unavailable("server is busy")),
+        )
+    })?;
 
     let submission_id = Uuid::new_v4();
     let now = chrono::Utc::now();

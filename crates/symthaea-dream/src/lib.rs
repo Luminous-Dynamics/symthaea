@@ -80,9 +80,7 @@ impl DreamableAction for Vec<f32> {
         let action_influence = self.magnitude();
         state
             .iter()
-            .map(|&s| {
-                (s * 0.7 + action_influence * 0.1).clamp(-1.0, 1.0)
-            })
+            .map(|&s| (s * 0.7 + action_influence * 0.1).clamp(-1.0, 1.0))
             .collect()
     }
 
@@ -362,7 +360,7 @@ impl<A: DreamableAction> DreamEngine<A> {
             // Check if this counterfactual is better (improvement in Phi OR EI)
             let phi_improvement = alt_phi - actual_phi;
             let ei_improvement = alt_ei - actual_ei;
-            
+
             if phi_improvement > self.config.wisdom_threshold || ei_improvement > 0.01 {
                 result.insights += 1;
                 self.stats.total_insights += 1;
@@ -421,7 +419,7 @@ impl<A: DreamableAction> DreamEngine<A> {
             let perturbed = action.perturb(i as u64);
             let outcome = self.simulate_outcome(state, &perturbed);
             let phi = Self::estimate_phi(&outcome);
-            
+
             total_phi += phi;
             // Failure heuristic: Phi < 0.2 is considered a failure
             if phi < 0.2 {
@@ -479,7 +477,7 @@ impl<A: DreamableAction> DreamEngine<A> {
     /// Simulate outcome given state and action
     fn simulate_outcome(&self, state: &[f32], action: &A) -> Vec<f32> {
         let fingerprint = self.hash_action(action);
-        
+
         // Causal reasoning: find the most similar observed state for this action
         let mut best_sim = -1.0f32;
         let mut best_outcome = None;
@@ -497,7 +495,9 @@ impl<A: DreamableAction> DreamEngine<A> {
         if let Some(obs_outcome) = best_outcome {
             // Pearl counterfactual: Blend observed reality with heuristic prediction
             let predicted = action.predict_outcome(state);
-            obs_outcome.iter().zip(predicted.iter())
+            obs_outcome
+                .iter()
+                .zip(predicted.iter())
                 .map(|(&o, &p)| (o * 0.6 + p * 0.4).clamp(-1.0, 1.0))
                 .collect()
         } else {
@@ -507,11 +507,15 @@ impl<A: DreamableAction> DreamEngine<A> {
     }
 
     fn cosine_similarity(&self, a: &[f32], b: &[f32]) -> f32 {
-        if a.len() != b.len() || a.is_empty() { return 0.0; }
+        if a.len() != b.len() || a.is_empty() {
+            return 0.0;
+        }
         let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
         let mag_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
         let mag_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if mag_a == 0.0 || mag_b == 0.0 { return 0.0; }
+        if mag_a == 0.0 || mag_b == 0.0 {
+            return 0.0;
+        }
         dot / (mag_a * mag_b)
     }
 
@@ -541,10 +545,10 @@ impl<A: DreamableAction> DreamEngine<A> {
 
         let n = outcome.len() as f32;
         let mean: f32 = outcome.iter().sum::<f32>() / n;
-        
+
         // High determinism = low variance around a strong signal (near 1 or -1)
         let variance: f32 = outcome.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / n;
-        
+
         // EI proxy: inverse of variance (how "certain" is the outcome)
         (1.0 - variance.sqrt()).clamp(0.0, 1.0)
     }

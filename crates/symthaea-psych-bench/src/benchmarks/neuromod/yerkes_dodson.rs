@@ -8,6 +8,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Yerkes-Dodson inverted-U benchmark.
@@ -150,23 +152,19 @@ fn compute_quadratic_r2(data: &[(f64, f64)]) -> f64 {
     }
 
     // Solve via Cramer's rule (3x3)
-    let det = sx[0] * (sx[2] * sx[4] - sx[3] * sx[3])
-        - sx[1] * (sx[1] * sx[4] - sx[3] * sx[2])
+    let det = sx[0] * (sx[2] * sx[4] - sx[3] * sx[3]) - sx[1] * (sx[1] * sx[4] - sx[3] * sx[2])
         + sx[2] * (sx[1] * sx[3] - sx[2] * sx[2]);
     if det.abs() < 1e-10 {
         return 0.0;
     }
 
-    let c = (sxy[0] * (sx[2] * sx[4] - sx[3] * sx[3])
-        - sx[1] * (sxy[1] * sx[4] - sx[3] * sxy[2])
+    let c = (sxy[0] * (sx[2] * sx[4] - sx[3] * sx[3]) - sx[1] * (sxy[1] * sx[4] - sx[3] * sxy[2])
         + sx[2] * (sxy[1] * sx[3] - sx[2] * sxy[2]))
         / det;
-    let b = (sx[0] * (sxy[1] * sx[4] - sxy[2] * sx[3])
-        - sxy[0] * (sx[1] * sx[4] - sx[3] * sx[2])
+    let b = (sx[0] * (sxy[1] * sx[4] - sxy[2] * sx[3]) - sxy[0] * (sx[1] * sx[4] - sx[3] * sx[2])
         + sx[2] * (sx[1] * sxy[2] - sxy[1] * sx[2]))
         / det;
-    let a = (sx[0] * (sx[2] * sxy[2] - sx[3] * sxy[1])
-        - sx[1] * (sx[1] * sxy[2] - sxy[1] * sx[2])
+    let a = (sx[0] * (sx[2] * sxy[2] - sx[3] * sxy[1]) - sx[1] * (sx[1] * sxy[2] - sxy[1] * sx[2])
         + sxy[0] * (sx[1] * sx[3] - sx[2] * sx[2]))
         / det;
 
@@ -198,6 +196,7 @@ impl PsychBenchmark for YerkesDodsonBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut peak_ne_levels = Vec::new();
         let mut r2_values = Vec::new();
@@ -208,6 +207,18 @@ impl PsychBenchmark for YerkesDodsonBenchmark {
             peak_ne_levels.push(peak_ne);
             r2_values.push(r2);
             peak_shifts.push(shift);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "yerkes_dodson".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("peak_ne_level", MetricValue::from_samples(&peak_ne_levels));
@@ -216,6 +227,7 @@ impl PsychBenchmark for YerkesDodsonBenchmark {
 
         result.conditions = 9; // 9 NE levels
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

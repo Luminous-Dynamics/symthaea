@@ -12,7 +12,6 @@
 use serde::{Deserialize, Serialize};
 
 use super::config::BenchmarkConfig;
-use super::difficulty::difficulty_model_for;
 use super::report::BenchmarkResult;
 #[cfg(test)]
 use super::report::MetricValue;
@@ -157,7 +156,6 @@ pub fn run_staircase(
     base_config: &BenchmarkConfig,
     staircase: &StaircaseConfig,
 ) -> StaircaseResult {
-    let _model = difficulty_model_for(bench.name());
     let rule = staircase.rule;
     let needed = rule.correct_streak_needed();
 
@@ -357,8 +355,20 @@ mod tests {
             threshold: 0.45,
             threshold_se: 0.05,
             trajectory: vec![
-                StaircaseStep { step: 0, difficulty: 0.3, accuracy: 0.9, reversal: false, direction: 1 },
-                StaircaseStep { step: 1, difficulty: 0.4, accuracy: 0.6, reversal: true, direction: -1 },
+                StaircaseStep {
+                    step: 0,
+                    difficulty: 0.3,
+                    accuracy: 0.9,
+                    reversal: false,
+                    direction: 1,
+                },
+                StaircaseStep {
+                    step: 1,
+                    difficulty: 0.4,
+                    accuracy: 0.6,
+                    reversal: true,
+                    direction: -1,
+                },
             ],
             n_reversals: 1,
             target_accuracy: 0.707,

@@ -17,6 +17,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -81,7 +83,10 @@ fn get_chains(param: u64, num_colors: u8) -> Vec<Vec<AtomicTransform>> {
     vec![
         // 2-step chains
         vec![AtomicTransform::ReflectX, AtomicTransform::TranslateRight],
-        vec![AtomicTransform::ColorReplace(c0, c1), AtomicTransform::ReflectY],
+        vec![
+            AtomicTransform::ColorReplace(c0, c1),
+            AtomicTransform::ReflectY,
+        ],
         // 3-step chains
         vec![
             AtomicTransform::ReflectX,
@@ -139,9 +144,9 @@ impl ArcChainBenchmark {
 
         // Group chains by length
         let chain_groups: [(usize, &[Vec<AtomicTransform>]); 3] = [
-            (2, &chains[0..2]),  // 2-step chains
-            (3, &chains[2..4]),  // 3-step chains
-            (4, &chains[4..6]),  // 4-step chains
+            (2, &chains[0..2]), // 2-step chains
+            (3, &chains[2..4]), // 3-step chains
+            (4, &chains[4..6]), // 4-step chains
         ];
 
         let mut hits_by_length = [0u32; 3];
@@ -214,19 +219,51 @@ impl ArcChainBenchmark {
         }
 
         let accuracy_by_length = [
-            if total_by_length[0] > 0 { hits_by_length[0] as f64 / total_by_length[0] as f64 } else { 0.0 },
-            if total_by_length[1] > 0 { hits_by_length[1] as f64 / total_by_length[1] as f64 } else { 0.0 },
-            if total_by_length[2] > 0 { hits_by_length[2] as f64 / total_by_length[2] as f64 } else { 0.0 },
+            if total_by_length[0] > 0 {
+                hits_by_length[0] as f64 / total_by_length[0] as f64
+            } else {
+                0.0
+            },
+            if total_by_length[1] > 0 {
+                hits_by_length[1] as f64 / total_by_length[1] as f64
+            } else {
+                0.0
+            },
+            if total_by_length[2] > 0 {
+                hits_by_length[2] as f64 / total_by_length[2] as f64
+            } else {
+                0.0
+            },
         ];
         let similarity_by_length = [
-            if sim_count_by_length[0] > 0 { sim_by_length[0] / sim_count_by_length[0] as f64 } else { 0.0 },
-            if sim_count_by_length[1] > 0 { sim_by_length[1] / sim_count_by_length[1] as f64 } else { 0.0 },
-            if sim_count_by_length[2] > 0 { sim_by_length[2] / sim_count_by_length[2] as f64 } else { 0.0 },
+            if sim_count_by_length[0] > 0 {
+                sim_by_length[0] / sim_count_by_length[0] as f64
+            } else {
+                0.0
+            },
+            if sim_count_by_length[1] > 0 {
+                sim_by_length[1] / sim_count_by_length[1] as f64
+            } else {
+                0.0
+            },
+            if sim_count_by_length[2] > 0 {
+                sim_by_length[2] / sim_count_by_length[2] as f64
+            } else {
+                0.0
+            },
         ];
         let total_hits: u32 = hits_by_length.iter().sum();
         let total_total: u32 = total_by_length.iter().sum();
-        let overall_accuracy = if total_total > 0 { total_hits as f64 / total_total as f64 } else { 0.0 };
-        let rt_ticks = if total_tasks > 0 { total_ticks / (total_tasks as f64 * 3.0) } else { 0.0 };
+        let overall_accuracy = if total_total > 0 {
+            total_hits as f64 / total_total as f64
+        } else {
+            0.0
+        };
+        let rt_ticks = if total_tasks > 0 {
+            total_ticks / (total_tasks as f64 * 3.0)
+        } else {
+            0.0
+        };
 
         TrialResult {
             accuracy_by_length,
@@ -254,6 +291,7 @@ impl PsychBenchmark for ArcChainBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut chain_2_accs = Vec::new();
         let mut chain_3_accs = Vec::new();
@@ -274,25 +312,49 @@ impl PsychBenchmark for ArcChainBenchmark {
             chain_4_sims.push(r.similarity_by_length[2]);
             overall_accs.push(r.overall_accuracy);
             rts.push(r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "arc_chain".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("chain_2_accuracy", MetricValue::from_samples(&chain_2_accs));
         result.insert("chain_3_accuracy", MetricValue::from_samples(&chain_3_accs));
         result.insert("chain_4_accuracy", MetricValue::from_samples(&chain_4_accs));
-        result.insert("chain_2_similarity", MetricValue::from_samples(&chain_2_sims));
-        result.insert("chain_3_similarity", MetricValue::from_samples(&chain_3_sims));
-        result.insert("chain_4_similarity", MetricValue::from_samples(&chain_4_sims));
+        result.insert(
+            "chain_2_similarity",
+            MetricValue::from_samples(&chain_2_sims),
+        );
+        result.insert(
+            "chain_3_similarity",
+            MetricValue::from_samples(&chain_3_sims),
+        );
+        result.insert(
+            "chain_4_similarity",
+            MetricValue::from_samples(&chain_4_sims),
+        );
         result.insert("chain_accuracy", MetricValue::from_samples(&overall_accs));
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
 
         // Chain degradation: mean accuracy drop per step (linear fit slope)
-        let degradation: Vec<f64> = chain_2_accs.iter().zip(chain_4_accs.iter())
+        let degradation: Vec<f64> = chain_2_accs
+            .iter()
+            .zip(chain_4_accs.iter())
             .map(|(a2, a4)| (a2 - a4) / 2.0) // (2-step - 4-step) / 2 additional steps
             .collect();
         result.insert("chain_degradation", MetricValue::from_samples(&degradation));
 
         result.conditions = 3; // 3 chain lengths
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -340,7 +402,11 @@ mod tests {
         let result = ArcChainBenchmark.run(&config);
         let acc = result.metrics["chain_2_accuracy"].mean;
         // 2-AFC chance = 0.50
-        assert!(acc > 0.4, "2-step chain accuracy should be near/above chance, got {}", acc);
+        assert!(
+            acc > 0.4,
+            "2-step chain accuracy should be near/above chance, got {}",
+            acc
+        );
     }
 
     #[test]
@@ -378,7 +444,10 @@ mod tests {
         };
         let r1 = ArcChainBenchmark.run(&config);
         let r2 = ArcChainBenchmark.run(&config);
-        assert_eq!(r1.metrics["chain_accuracy"].mean, r2.metrics["chain_accuracy"].mean);
+        assert_eq!(
+            r1.metrics["chain_accuracy"].mean,
+            r2.metrics["chain_accuracy"].mean
+        );
     }
 
     #[test]
@@ -390,10 +459,15 @@ mod tests {
             time_pressure: 0.0,
             ..Default::default()
         };
-        let pressed = BenchmarkConfig { time_pressure: 0.8, ..base.clone() };
+        let pressed = BenchmarkConfig {
+            time_pressure: 0.8,
+            ..base.clone()
+        };
         let r1 = ArcChainBenchmark.run(&base);
         let r2 = ArcChainBenchmark.run(&pressed);
-        assert!(r2.metrics["rt_ticks"].mean < r1.metrics["rt_ticks"].mean,
-            "Time pressure should reduce RT");
+        assert!(
+            r2.metrics["rt_ticks"].mean < r1.metrics["rt_ticks"].mean,
+            "Time pressure should reduce RT"
+        );
     }
 }

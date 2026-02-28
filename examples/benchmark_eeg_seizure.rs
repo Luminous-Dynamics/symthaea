@@ -191,46 +191,16 @@ fn main() {
 
     #[allow(clippy::type_complexity)]
     let phases: Vec<(&str, Box<dyn Fn(usize, f64, u64) -> (Vec<f64>, Vec<f64>)>)> = vec![
-        (
-            "Normal",
-            Box::new(generate_normal_eeg),
-        ),
-        (
-            "Normal",
-            Box::new(generate_normal_eeg),
-        ),
-        (
-            "Pre-ictal",
-            Box::new(generate_preictal_eeg),
-        ),
-        (
-            "Pre-ictal",
-            Box::new(generate_preictal_eeg),
-        ),
-        (
-            "Seizure",
-            Box::new(generate_seizure_eeg),
-        ),
-        (
-            "Seizure",
-            Box::new(generate_seizure_eeg),
-        ),
-        (
-            "Seizure",
-            Box::new(generate_seizure_eeg),
-        ),
-        (
-            "Post-ictal",
-            Box::new(generate_postictal_eeg),
-        ),
-        (
-            "Normal",
-            Box::new(generate_normal_eeg),
-        ),
-        (
-            "Normal",
-            Box::new(generate_normal_eeg),
-        ),
+        ("Normal", Box::new(generate_normal_eeg)),
+        ("Normal", Box::new(generate_normal_eeg)),
+        ("Pre-ictal", Box::new(generate_preictal_eeg)),
+        ("Pre-ictal", Box::new(generate_preictal_eeg)),
+        ("Seizure", Box::new(generate_seizure_eeg)),
+        ("Seizure", Box::new(generate_seizure_eeg)),
+        ("Seizure", Box::new(generate_seizure_eeg)),
+        ("Post-ictal", Box::new(generate_postictal_eeg)),
+        ("Normal", Box::new(generate_normal_eeg)),
+        ("Normal", Box::new(generate_normal_eeg)),
     ];
 
     let mut phi_trajectory = Vec::new();

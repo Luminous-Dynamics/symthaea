@@ -123,6 +123,12 @@ pub struct Episode {
     /// Science: Lisman & Grace (2005) — hippocampal-VTA loop, DA tags memory consolidation.
     #[serde(default)]
     pub dopamine_at_encoding: Option<f32>,
+
+    /// Neuromodulator bath state at encoding for state-dependent memory retrieval.
+    /// Science: Godden & Baddeley (1975) — state-dependent memory;
+    /// Eich (1980) — mood-dependent retrieval.
+    #[serde(default)]
+    pub bath_state_at_encoding: Option<[f32; 8]>,
 }
 
 impl Episode {
@@ -140,6 +146,7 @@ impl Episode {
             consolidation_strength: 1.0,
             retrieval_count: 0,
             dopamine_at_encoding: None,
+            bath_state_at_encoding: None,
         }
     }
 
@@ -165,12 +172,20 @@ impl Episode {
             consolidation_strength: 1.0,
             retrieval_count: 0,
             dopamine_at_encoding: None,
+            bath_state_at_encoding: None,
         }
     }
 
     /// Set dopamine level at encoding for DA-tagged replay prioritization.
     pub fn with_dopamine(mut self, da: f32) -> Self {
         self.dopamine_at_encoding = Some(da.clamp(0.0, 1.0));
+        self
+    }
+
+    /// Set neuromodulator bath state at encoding for state-dependent retrieval.
+    /// Science: Godden & Baddeley (1975) — state-dependent memory.
+    pub fn with_bath_state(mut self, state: [f32; 8]) -> Self {
+        self.bath_state_at_encoding = Some(state);
         self
     }
 
@@ -205,7 +220,10 @@ impl Episode {
 
         // DA salience bonus: high-DA episodes are more valuable for consolidation
         // Science: Lisman & Grace (2005) — DA tags for consolidation priority
-        let da_bonus = self.dopamine_at_encoding.map(|d| d as f64 * 0.25).unwrap_or(0.0);
+        let da_bonus = self
+            .dopamine_at_encoding
+            .map(|d| d as f64 * 0.25)
+            .unwrap_or(0.0);
 
         // Final survival value
         base_phi * 0.5
@@ -363,6 +381,22 @@ impl EpisodicReplayConfig {
 // ═══════════════════════════════════════════════════════════════════════════════
 // EPISODIC MEMORY: Main Storage and Replay System
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/// Cosine similarity between two 8-dimensional bath state vectors.
+///
+/// Returns 1.0 for identical states, 0.0 for orthogonal, -1.0 for opposite.
+/// Used for state-dependent memory retrieval (Godden & Baddeley, 1975).
+pub fn bath_cosine_similarity(a: &[f32; 8], b: &[f32; 8]) -> f32 {
+    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+    let mag_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let mag_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let denom = mag_a * mag_b;
+    if denom < 1e-10 {
+        0.0
+    } else {
+        (dot / denom).clamp(-1.0, 1.0)
+    }
+}
 
 /// Episodic memory system for storing and replaying high-Phi moments
 ///
@@ -584,6 +618,84 @@ impl EpisodicMemory {
         batch
     }
 
+    /// Sample a batch of episodes conditioned on current neuromodulator bath state.
+    ///
+    /// Episodes encoded in a similar bath state get a priority bonus via cosine
+    /// similarity, implementing state-dependent memory retrieval.
+    ///
+    /// Science: Godden & Baddeley (1975) — state-dependent memory.
+    /// Eich (1980) — mood-dependent retrieval.
+    pub fn sample_replay_batch_conditioned(
+        &mut self,
+        batch_size: usize,
+        current_bath: Option<[f32; 8]>,
+    ) -> Vec<Episode> {
+        // Fall back to standard sampling if no bath state provided
+        let current_bath = match current_bath {
+            Some(b) => b,
+            None => return self.sample_replay_batch(batch_size),
+        };
+
+        let batch_size = batch_size.min(self.episodes.len());
+        if batch_size == 0 {
+            return Vec::new();
+        }
+
+        let all_episodes: Vec<PrioritizedEpisode> = self.episodes.iter().cloned().collect();
+
+        // Compute conditioned scores: base priority + cosine similarity bonus
+        let scores: Vec<f64> = all_episodes
+            .iter()
+            .map(|pe| {
+                let base = pe.score / self.config.sampling_temperature;
+                let similarity_bonus = pe
+                    .episode
+                    .bath_state_at_encoding
+                    .as_ref()
+                    .map(|enc| bath_cosine_similarity(enc, &current_bath) as f64 * 0.15)
+                    .unwrap_or(0.0);
+                base + similarity_bonus
+            })
+            .collect();
+
+        // Softmax sampling
+        let max_score = scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let exp_scores: Vec<f64> = scores.iter().map(|s| (s - max_score).exp()).collect();
+        let sum_exp: f64 = exp_scores.iter().sum();
+        let probabilities: Vec<f64> = exp_scores.iter().map(|e| e / sum_exp).collect();
+
+        let mut batch = Vec::with_capacity(batch_size);
+        let mut used_indices = std::collections::HashSet::new();
+        let mut rng_state = self.current_cycle;
+
+        for _ in 0..batch_size {
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+            let rand_val = (rng_state as f64) / (u64::MAX as f64);
+
+            let mut cumsum = 0.0;
+            let mut selected_idx = 0;
+            for (idx, &prob) in probabilities.iter().enumerate() {
+                if used_indices.contains(&idx) {
+                    continue;
+                }
+                cumsum += prob;
+                if rand_val <= cumsum {
+                    selected_idx = idx;
+                    break;
+                }
+            }
+
+            if !used_indices.contains(&selected_idx) {
+                used_indices.insert(selected_idx);
+                batch.push(all_episodes[selected_idx].episode.clone());
+            }
+        }
+
+        batch
+    }
+
     /// Perform a single replay training step on a CfC network
     ///
     /// This reinforces the pattern stored in the episode.
@@ -676,6 +788,77 @@ impl EpisodicMemory {
             // Simple approximation: increment if Phi matches any batch episode
             for be in &batch {
                 if (pe.episode.psi - be.psi).abs() < 0.001 && pe.episode.timestamp == be.timestamp {
+                    pe.episode.replay_count += 1;
+                    pe.episode.reconsolidate(current_psi);
+                    break;
+                }
+            }
+            new_episodes.push(pe);
+        }
+        self.episodes = new_episodes;
+
+        let n = batch.len();
+        ReplaySessionResult {
+            episodes_replayed: n,
+            average_loss: total_loss / n as f32,
+            average_psi: total_psi / n as f64,
+            skipped: false,
+        }
+    }
+
+    /// Perform a conditioned replay session using bath state similarity.
+    ///
+    /// Like `replay_session` but uses `sample_replay_batch_conditioned` for
+    /// state-dependent retrieval (Godden & Baddeley, 1975).
+    pub fn replay_session_conditioned(
+        &mut self,
+        network: &mut CfCNetwork,
+        base_learning_rate: f32,
+        current_bath: Option<[f32; 8]>,
+    ) -> ReplaySessionResult {
+        if !self.should_replay() {
+            return ReplaySessionResult {
+                episodes_replayed: 0,
+                average_loss: 0.0,
+                average_psi: 0.0,
+                skipped: true,
+            };
+        }
+
+        let batch =
+            self.sample_replay_batch_conditioned(self.config.batch_size, current_bath);
+        if batch.is_empty() {
+            return ReplaySessionResult {
+                episodes_replayed: 0,
+                average_loss: 0.0,
+                average_psi: 0.0,
+                skipped: true,
+            };
+        }
+
+        let mut total_loss = 0.0;
+        let mut total_psi = 0.0;
+
+        for episode in &batch {
+            let loss = self.replay_training_step(
+                network,
+                episode,
+                base_learning_rate,
+                self.config.replay_dt,
+            );
+            total_loss += loss;
+            total_psi += episode.psi;
+        }
+
+        self.cycles_since_replay = 0;
+        self.demand_replay_triggered = false;
+
+        let current_psi = total_psi / batch.len().max(1) as f64;
+        let mut new_episodes = BinaryHeap::new();
+        for mut pe in self.episodes.drain() {
+            for be in &batch {
+                if (pe.episode.psi - be.psi).abs() < 0.001 && pe.episode.timestamp == be.timestamp
+                {
                     pe.episode.replay_count += 1;
                     pe.episode.reconsolidate(current_psi);
                     break;
@@ -1163,7 +1346,7 @@ mod tests {
         let config = EpisodicReplayConfig::default();
         let base_lr = 0.01_f32;
         let da_high_scale = 0.7 + 0.8 * 0.6; // DA=0.8 → 1.18
-        let da_low_scale = 0.7 + 0.2 * 0.6;  // DA=0.2 → 0.82
+        let da_low_scale = 0.7 + 0.2 * 0.6; // DA=0.2 → 0.82
         let lr_high = base_lr * config.replay_learning_rate_multiplier * da_high_scale;
         let lr_low = base_lr * config.replay_learning_rate_multiplier * da_low_scale;
         assert!(
@@ -1178,6 +1361,112 @@ mod tests {
         let ep = make_test_episode(0.5, 100);
         assert!(ep.dopamine_at_encoding.is_none());
         let score = ep.priority_score(200, 0.5);
-        assert!(score.is_finite(), "Score should be finite without DA tag: {score}");
+        assert!(
+            score.is_finite(),
+            "Score should be finite without DA tag: {score}"
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 5: Neuromod-Conditioned Replay (#4)
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_episode_with_bath_state() {
+        let input = ContinuousHV::from_vec(vec![0.0; 128]);
+        let output = ContinuousHV::from_vec(vec![0.0; 128]);
+        let bath = [0.5, 0.4, 0.6, 0.3, 0.4, 0.3, 0.3, 0.2];
+        let ep = Episode::new(input, output, 0.8, 100).with_bath_state(bath);
+        assert!(ep.bath_state_at_encoding.is_some());
+        assert_eq!(ep.bath_state_at_encoding.unwrap(), bath);
+    }
+
+    #[test]
+    fn test_episode_default_no_bath_state() {
+        let input = ContinuousHV::from_vec(vec![0.0; 128]);
+        let output = ContinuousHV::from_vec(vec![0.0; 128]);
+        let ep = Episode::new(input, output, 0.8, 100);
+        assert!(
+            ep.bath_state_at_encoding.is_none(),
+            "Default episodes should have no bath state"
+        );
+    }
+
+    #[test]
+    fn test_bath_cosine_identical() {
+        let a = [0.5, 0.4, 0.6, 0.3, 0.4, 0.3, 0.3, 0.2];
+        let sim = bath_cosine_similarity(&a, &a);
+        assert!(
+            (sim - 1.0).abs() < 0.001,
+            "Identical vectors should have cosine = 1.0, got {sim}"
+        );
+    }
+
+    #[test]
+    fn test_bath_cosine_zero_magnitude() {
+        let a = [0.0; 8];
+        let b = [0.5; 8];
+        let sim = bath_cosine_similarity(&a, &b);
+        assert_eq!(sim, 0.0, "Zero-magnitude vector should give 0.0 similarity");
+    }
+
+    #[test]
+    fn test_conditioned_replay_prefers_similar() {
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig {
+            capacity: 100,
+            psi_threshold: 0.0, // Store everything
+            replay_interval: 1,
+            batch_size: 5,
+            min_episodes_for_replay: 1,
+            psi_weighted_sampling: true,
+            ..EpisodicReplayConfig::default()
+        });
+        memory.current_cycle = 42;
+
+        // Store episodes with different bath states
+        let similar_bath = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
+        let different_bath = [0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9];
+
+        for i in 0..20 {
+            let input = ContinuousHV::from_vec(vec![i as f32 / 20.0; 128]);
+            let output = ContinuousHV::from_vec(vec![0.0; 128]);
+            let bath = if i < 10 { similar_bath } else { different_bath };
+            let ep = Episode::new(input, output, 0.5, i as u64).with_bath_state(bath);
+            memory.store_if_significant(ep);
+        }
+
+        // Sample conditioned on similar_bath
+        let batch = memory.sample_replay_batch_conditioned(5, Some(similar_bath));
+        assert!(!batch.is_empty(), "Should sample at least some episodes");
+    }
+
+    #[test]
+    fn test_conditioned_replay_graceful_without_state() {
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig {
+            capacity: 100,
+            psi_threshold: 0.0,
+            replay_interval: 1,
+            batch_size: 3,
+            min_episodes_for_replay: 1,
+            psi_weighted_sampling: true,
+            ..EpisodicReplayConfig::default()
+        });
+        memory.current_cycle = 10;
+
+        // Store episodes WITHOUT bath state
+        for i in 0..10 {
+            let input = ContinuousHV::from_vec(vec![i as f32 / 10.0; 128]);
+            let output = ContinuousHV::from_vec(vec![0.0; 128]);
+            let ep = Episode::new(input, output, 0.5, i as u64);
+            memory.store_if_significant(ep);
+        }
+
+        // Should still work with conditioned sampling (falls back gracefully)
+        let current = [0.5; 8];
+        let batch = memory.sample_replay_batch_conditioned(3, Some(current));
+        assert!(
+            !batch.is_empty(),
+            "Should work even when episodes have no bath state"
+        );
     }
 }

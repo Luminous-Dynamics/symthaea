@@ -1,6 +1,6 @@
-use anyhow::Result;
 #[cfg(feature = "ina219-linux")]
 use anyhow::anyhow;
+use anyhow::Result;
 use std::time::{Duration, Instant};
 
 use symthaea_ssm::{SelectiveParams, SsmState};
@@ -40,7 +40,10 @@ impl PowerSource for SimulatedIna219 {
 
 #[cfg(feature = "ina219-linux")]
 struct Ina219PowerSource {
-    sensor: symthaea_hal::sensor::EmbeddedSensor<linux_embedded_hal::I2cdev, symthaea_hal::Ina219Decoder>,
+    sensor: symthaea_hal::sensor::EmbeddedSensor<
+        linux_embedded_hal::I2cdev,
+        symthaea_hal::Ina219Decoder,
+    >,
 }
 
 #[cfg(feature = "ina219-linux")]
@@ -104,7 +107,8 @@ fn build_source() -> Result<Box<dyn PowerSource>> {
     if use_real {
         #[cfg(feature = "ina219-linux")]
         {
-            let bus_path = std::env::var("SYMTHAEA_INA219_BUS").unwrap_or_else(|_| "/dev/i2c-1".to_string());
+            let bus_path =
+                std::env::var("SYMTHAEA_INA219_BUS").unwrap_or_else(|_| "/dev/i2c-1".to_string());
             let shunt = env_f32("SYMTHAEA_INA219_SHUNT_OHMS", 0.1);
             let address = env_hex_u8("SYMTHAEA_INA219_ADDRESS", 0x45);
             let sensor = Ina219PowerSource::new(&bus_path, shunt, address)?;
@@ -156,7 +160,10 @@ fn main() -> Result<()> {
             *v = last_watts;
         }
         state.step(&input, &params, &mut output);
-        println!("step {:04} | watts {:6.3} | ssm_out {:8.4}", idx, last_watts, output[0]);
+        println!(
+            "step {:04} | watts {:6.3} | ssm_out {:8.4}",
+            idx, last_watts, output[0]
+        );
 
         let elapsed = started.elapsed();
         if tick > elapsed {

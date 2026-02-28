@@ -72,11 +72,11 @@ mod federated_network;
 mod holochain;
 #[cfg(feature = "mycelix")]
 pub mod hybrid_bft;
-#[cfg(feature = "liquid-mamba")]
-pub mod projection_federated;
 mod hyperfeel;
 #[cfg(feature = "mesh")]
 pub mod mesh;
+#[cfg(feature = "liquid-mamba")]
+pub mod projection_federated;
 mod service;
 mod types;
 

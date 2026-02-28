@@ -19,6 +19,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
 
 /// Representational Similarity Analysis benchmark for HDC grid encodings.
@@ -53,7 +55,11 @@ fn structural_similarity(a: &[Vec<u8>], b: &[Vec<u8>]) -> f64 {
             }
         }
     }
-    if total > 0 { matches as f64 / total as f64 } else { 0.0 }
+    if total > 0 {
+        matches as f64 / total as f64
+    } else {
+        0.0
+    }
 }
 
 /// Spearman rank correlation between two vectors.
@@ -70,9 +76,7 @@ fn spearman(x: &[f64], y: &[f64]) -> f64 {
         let mut i = 0;
         while i < n {
             let mut j = i;
-            while j < n - 1
-                && (indexed[j + 1].1 - indexed[j].1).abs() < 1e-12
-            {
+            while j < n - 1 && (indexed[j + 1].1 - indexed[j].1).abs() < 1e-12 {
                 j += 1;
             }
             let avg_rank = (i + j) as f64 / 2.0 + 1.0;
@@ -101,7 +105,11 @@ fn spearman(x: &[f64], y: &[f64]) -> f64 {
         dy2 += dyi * dyi;
     }
     let den = (dx2 * dy2).sqrt();
-    if den > 1e-12 { num / den } else { 0.0 }
+    if den > 1e-12 {
+        num / den
+    } else {
+        0.0
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -119,7 +127,12 @@ const TRANSFORMS: [TransformType; 4] = [
     TransformType::Reflection,
 ];
 
-fn apply_transform(grid: &[Vec<u8>], tt: TransformType, param: u64, num_colors: u8) -> Vec<Vec<u8>> {
+fn apply_transform(
+    grid: &[Vec<u8>],
+    tt: TransformType,
+    param: u64,
+    num_colors: u8,
+) -> Vec<Vec<u8>> {
     match tt {
         TransformType::ColorFill => {
             let color = (param % num_colors as u64) as u8;
@@ -139,7 +152,11 @@ fn apply_transform(grid: &[Vec<u8>], tt: TransformType, param: u64, num_colors: 
             GridEncoder::color_replace(grid, from, to)
         }
         TransformType::Reflection => {
-            if param % 2 == 0 { GridEncoder::reflect_x(grid) } else { GridEncoder::reflect_y(grid) }
+            if param % 2 == 0 {
+                GridEncoder::reflect_x(grid)
+            } else {
+                GridEncoder::reflect_y(grid)
+            }
         }
     }
 }
@@ -260,6 +277,7 @@ impl PsychBenchmark for ArcRsaBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut rsa_corrs = Vec::new();
         let mut within_sims = Vec::new();
@@ -274,16 +292,35 @@ impl PsychBenchmark for ArcRsaBenchmark {
             between_sims.push(r.between_type_similarity);
             discrims.push(r.discriminability);
             rts.push(r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "arc_rsa".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("rsa_correlation", MetricValue::from_samples(&rsa_corrs));
-        result.insert("within_type_similarity", MetricValue::from_samples(&within_sims));
-        result.insert("between_type_similarity", MetricValue::from_samples(&between_sims));
+        result.insert(
+            "within_type_similarity",
+            MetricValue::from_samples(&within_sims),
+        );
+        result.insert(
+            "between_type_similarity",
+            MetricValue::from_samples(&between_sims),
+        );
         result.insert("discriminability", MetricValue::from_samples(&discrims));
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
 
         result.conditions = 4; // 4 transform types
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -322,7 +359,11 @@ mod tests {
     fn test_rsa_correlation_bounded() {
         let result = ArcRsaBenchmark.run(&test_config());
         let rsa = result.metrics["rsa_correlation"].mean;
-        assert!(rsa >= -1.0 && rsa <= 1.0, "RSA should be in [-1,1], got {}", rsa);
+        assert!(
+            rsa >= -1.0 && rsa <= 1.0,
+            "RSA should be in [-1,1], got {}",
+            rsa
+        );
     }
 
     #[test]
@@ -362,6 +403,9 @@ mod tests {
         };
         let r1 = ArcRsaBenchmark.run(&config);
         let r2 = ArcRsaBenchmark.run(&config);
-        assert_eq!(r1.metrics["rsa_correlation"].mean, r2.metrics["rsa_correlation"].mean);
+        assert_eq!(
+            r1.metrics["rsa_correlation"].mean,
+            r2.metrics["rsa_correlation"].mean
+        );
     }
 }

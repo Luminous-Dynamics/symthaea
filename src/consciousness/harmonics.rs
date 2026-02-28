@@ -73,7 +73,10 @@ pub(crate) struct FiduciaryHarmonicPrimitiveGrounding {
 #[allow(dead_code)]
 impl FiduciaryHarmonicPrimitiveGrounding {
     /// Get NSM grounding for a specific fiduciary harmonic
-    pub(crate) fn for_harmonic(harmonic: FiduciaryHarmonic, primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn for_harmonic(
+        harmonic: FiduciaryHarmonic,
+        primitive_system: &PrimitiveSystem,
+    ) -> Self {
         let (primitives, love, unity, growth) = match harmonic {
             // Resonant Coherence: luminous order, harmonious integration
             FiduciaryHarmonic::ResonantCoherence => (
@@ -162,7 +165,9 @@ impl FiduciaryHarmonicPrimitiveGrounding {
     }
 
     /// Get all fiduciary harmonic groundings
-    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<FiduciaryHarmonic, Self> {
+    pub(crate) fn all_groundings(
+        primitive_system: &PrimitiveSystem,
+    ) -> HashMap<FiduciaryHarmonic, Self> {
         FiduciaryHarmonic::all()
             .into_iter()
             .map(|h| (h, Self::for_harmonic(h, primitive_system)))
