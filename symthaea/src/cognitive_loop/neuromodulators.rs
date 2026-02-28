@@ -40,6 +40,13 @@ pub(crate) struct Transmitter {
     phasic: f32,
     /// Phasic decay rate per cycle (default 0.3 → ~5-cycle half-life via ×0.7).
     phasic_decay: f32,
+    /// Consecutive cycles with level > baseline+0.2 (fast tachyphylaxis tracking).
+    /// Science: Gainetdinov et al. (2004) — rapid GPCR desensitization.
+    #[serde(default)]
+    pub high_exposure_cycles: u32,
+    /// Remaining rebound sensitization cycles after withdrawal from sustained high.
+    #[serde(default)]
+    pub withdrawal_cycles: u32,
 }
 
 impl Default for Transmitter {
@@ -51,6 +58,8 @@ impl Default for Transmitter {
             baseline: 0.5,
             phasic: 0.0,
             phasic_decay: 0.3,
+            high_exposure_cycles: 0,
+            withdrawal_cycles: 0,
         }
     }
 }
@@ -86,6 +95,12 @@ impl Transmitter {
         self.baseline = baseline.clamp(0.2, 0.8);
     }
 
+    /// Read-only access to baseline (non-test, for allostatic load and other callers).
+    #[inline]
+    pub(crate) fn baseline_val(&self) -> f32 {
+        self.baseline
+    }
+
     /// Read-only access to baseline for testing.
     #[cfg(test)]
     pub fn baseline_for_test(&self) -> f32 {
@@ -113,7 +128,39 @@ impl Transmitter {
         } else if self.level < low {
             self.receptor_sensitivity *= 1.002; // sensitization
         }
+        // ── Fast tachyphylaxis (Gainetdinov et al. 2004) ─────────────────
+        // Rapid GPCR desensitization via phosphorylation under sustained high exposure.
+        // 10× faster than slow adaptation above. Triggers withdrawal rebound on cessation.
+        let high_thresh = self.baseline + 0.2;
+        if self.level > high_thresh {
+            self.high_exposure_cycles = self.high_exposure_cycles.saturating_add(1);
+            if self.high_exposure_cycles > 20 {
+                self.receptor_sensitivity *= 0.99; // 10× faster than slow adaptation
+            }
+        } else {
+            if self.high_exposure_cycles > 20 && self.level < self.baseline {
+                self.withdrawal_cycles = 30; // rebound sensitization
+            }
+            self.high_exposure_cycles = 0;
+        }
+        if self.withdrawal_cycles > 0 {
+            self.receptor_sensitivity *= 1.01;
+            self.withdrawal_cycles -= 1;
+        }
         self.receptor_sensitivity = self.receptor_sensitivity.clamp(0.5, 2.0);
+    }
+
+    /// Whether receptor is in tolerance state (sustained high exposure >20 cycles).
+    /// Science: Gainetdinov et al. (2004) — GPCR desensitization.
+    #[inline]
+    pub fn is_tolerant(&self) -> bool {
+        self.high_exposure_cycles > 20
+    }
+
+    /// Whether transmitter is in withdrawal rebound (sensitization after high-exposure drop).
+    #[inline]
+    pub fn is_in_withdrawal(&self) -> bool {
+        self.withdrawal_cycles > 0
     }
 
     /// Boost reuptake rate by factor (clamped 0.01–0.5).
@@ -296,6 +343,8 @@ impl Default for NeuromodulatorBath {
                 baseline: 0.4,
                 phasic: 0.0,
                 phasic_decay: 0.2,
+                high_exposure_cycles: 0,
+                withdrawal_cycles: 0,
             },
             oxytocin: Transmitter {
                 level: 0.3,
@@ -304,6 +353,8 @@ impl Default for NeuromodulatorBath {
                 baseline: 0.3,
                 phasic: 0.0,
                 phasic_decay: 0.15,
+                high_exposure_cycles: 0,
+                withdrawal_cycles: 0,
             },
             glutamate: Transmitter {
                 level: 0.3,
@@ -312,6 +363,8 @@ impl Default for NeuromodulatorBath {
                 baseline: 0.3,
                 phasic: 0.0,
                 phasic_decay: 0.25,
+                high_exposure_cycles: 0,
+                withdrawal_cycles: 0,
             },
             glutamate_high_cycles: 0,
             cross_mod: CrossModulationMatrix::default(),
@@ -770,6 +823,22 @@ impl NeuromodulatorBath {
         self.glutamate.set_baseline(glut_base as f32);
     }
 
+    /// Count of transmitters currently in tolerance state (high_exposure > 20).
+    pub fn tolerant_count(&self) -> u8 {
+        [
+            &self.dopamine, &self.noradrenaline, &self.serotonin,
+            &self.acetylcholine, &self.gaba, &self.oxytocin, &self.glutamate,
+        ].iter().filter(|t| t.is_tolerant()).count() as u8
+    }
+
+    /// Count of transmitters currently in withdrawal rebound.
+    pub fn withdrawal_count(&self) -> u8 {
+        [
+            &self.dopamine, &self.noradrenaline, &self.serotonin,
+            &self.acetylcholine, &self.gaba, &self.oxytocin, &self.glutamate,
+        ].iter().filter(|t| t.is_in_withdrawal()).count() as u8
+    }
+
     /// Whether the system should query the exocortex (swarm network).
     ///
     /// Trigger: high NE (uncertainty) + low DA (no reward prediction) + low 5-HT (low confidence).
@@ -992,6 +1061,9 @@ pub struct NeuromodSnapshot {
     pub trust_factor: f32,
     pub learning_fatigue: f32,
     pub excitotoxicity_risk: f32,
+    // ── Phase 5: Tachyphylaxis ──
+    pub tolerant_count: u8,
+    pub withdrawal_count: u8,
 }
 
 impl NeuromodulatorBath {
@@ -1035,6 +1107,8 @@ impl NeuromodulatorBath {
             trust_factor: self.trust_factor(),
             learning_fatigue: self.learning_fatigue_factor(),
             excitotoxicity_risk: self.excitotoxicity_risk(),
+            tolerant_count: self.tolerant_count(),
+            withdrawal_count: self.withdrawal_count(),
         }
     }
 }
@@ -1079,6 +1153,35 @@ pub struct NeurochemistryCheckpoint {
     /// Sustained glutamate high cycles
     #[serde(default)]
     pub glutamate_high_cycles: u32,
+    // ── Phase 5: Tachyphylaxis state (Gainetdinov 2004) ──────────────
+    #[serde(default)]
+    pub da_high_exposure: u32,
+    #[serde(default)]
+    pub da_withdrawal: u32,
+    #[serde(default)]
+    pub ne_high_exposure: u32,
+    #[serde(default)]
+    pub ne_withdrawal: u32,
+    #[serde(default)]
+    pub sht_high_exposure: u32,
+    #[serde(default)]
+    pub sht_withdrawal: u32,
+    #[serde(default)]
+    pub ach_high_exposure: u32,
+    #[serde(default)]
+    pub ach_withdrawal: u32,
+    #[serde(default)]
+    pub gaba_high_exposure: u32,
+    #[serde(default)]
+    pub gaba_withdrawal: u32,
+    #[serde(default)]
+    pub oxytocin_high_exposure: u32,
+    #[serde(default)]
+    pub oxytocin_withdrawal: u32,
+    #[serde(default)]
+    pub glutamate_high_exposure: u32,
+    #[serde(default)]
+    pub glutamate_withdrawal: u32,
 }
 
 fn default_one() -> f32 {
@@ -1102,6 +1205,21 @@ impl NeuromodulatorBath {
             oxytocin_sensitivity: self.oxytocin.receptor_sensitivity,
             glutamate_sensitivity: self.glutamate.receptor_sensitivity,
             glutamate_high_cycles: self.glutamate_high_cycles,
+            // Phase 5: tachyphylaxis state
+            da_high_exposure: self.dopamine.high_exposure_cycles,
+            da_withdrawal: self.dopamine.withdrawal_cycles,
+            ne_high_exposure: self.noradrenaline.high_exposure_cycles,
+            ne_withdrawal: self.noradrenaline.withdrawal_cycles,
+            sht_high_exposure: self.serotonin.high_exposure_cycles,
+            sht_withdrawal: self.serotonin.withdrawal_cycles,
+            ach_high_exposure: self.acetylcholine.high_exposure_cycles,
+            ach_withdrawal: self.acetylcholine.withdrawal_cycles,
+            gaba_high_exposure: self.gaba.high_exposure_cycles,
+            gaba_withdrawal: self.gaba.withdrawal_cycles,
+            oxytocin_high_exposure: self.oxytocin.high_exposure_cycles,
+            oxytocin_withdrawal: self.oxytocin.withdrawal_cycles,
+            glutamate_high_exposure: self.glutamate.high_exposure_cycles,
+            glutamate_withdrawal: self.glutamate.withdrawal_cycles,
         }
     }
 
@@ -1127,6 +1245,21 @@ impl NeuromodulatorBath {
         self.oxytocin.receptor_sensitivity = ckpt.oxytocin_sensitivity.clamp(0.5, 2.0);
         self.glutamate.receptor_sensitivity = ckpt.glutamate_sensitivity.clamp(0.5, 2.0);
         self.glutamate_high_cycles = ckpt.glutamate_high_cycles;
+        // Phase 5: restore tachyphylaxis state
+        self.dopamine.high_exposure_cycles = ckpt.da_high_exposure;
+        self.dopamine.withdrawal_cycles = ckpt.da_withdrawal;
+        self.noradrenaline.high_exposure_cycles = ckpt.ne_high_exposure;
+        self.noradrenaline.withdrawal_cycles = ckpt.ne_withdrawal;
+        self.serotonin.high_exposure_cycles = ckpt.sht_high_exposure;
+        self.serotonin.withdrawal_cycles = ckpt.sht_withdrawal;
+        self.acetylcholine.high_exposure_cycles = ckpt.ach_high_exposure;
+        self.acetylcholine.withdrawal_cycles = ckpt.ach_withdrawal;
+        self.gaba.high_exposure_cycles = ckpt.gaba_high_exposure;
+        self.gaba.withdrawal_cycles = ckpt.gaba_withdrawal;
+        self.oxytocin.high_exposure_cycles = ckpt.oxytocin_high_exposure;
+        self.oxytocin.withdrawal_cycles = ckpt.oxytocin_withdrawal;
+        self.glutamate.high_exposure_cycles = ckpt.glutamate_high_exposure;
+        self.glutamate.withdrawal_cycles = ckpt.glutamate_withdrawal;
     }
 }
 
@@ -1926,6 +2059,13 @@ mod tests {
             oxytocin_sensitivity: 1.0,
             glutamate_sensitivity: 1.0,
             glutamate_high_cycles: 0,
+            da_high_exposure: 0, da_withdrawal: 0,
+            ne_high_exposure: 0, ne_withdrawal: 0,
+            sht_high_exposure: 0, sht_withdrawal: 0,
+            ach_high_exposure: 0, ach_withdrawal: 0,
+            gaba_high_exposure: 0, gaba_withdrawal: 0,
+            oxytocin_high_exposure: 0, oxytocin_withdrawal: 0,
+            glutamate_high_exposure: 0, glutamate_withdrawal: 0,
         };
         let mut bath = NeuromodulatorBath::default();
         bath.restore(&ckpt);
@@ -2174,6 +2314,7 @@ mod tests {
             baseline: 0.3,
             phasic: 0.0,
             phasic_decay: 0.3,
+            ..Default::default()
         };
         let eff_before = t.effective();
         // Produce adds to both level and phasic
@@ -2871,5 +3012,162 @@ mod tests {
         bath.report_learning(0.05, 0.3, true); // is_sleep = true
         // Sleep clearance: glutamate *= 0.9
         assert!(bath.glutamate.level < 0.6, "Sleep should clear glutamate: {}", bath.glutamate.level);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Phase 5: Advanced Neuroendocrine Dynamics
+    // ══════════════════════════════════════════════════════════════════
+
+    // ── #1: Receptor Desensitization (Gainetdinov 2004) ───────────────
+
+    #[test]
+    fn test_tachyphylaxis_no_trigger_under_threshold() {
+        let mut t = Transmitter {
+            level: 0.65, // baseline+0.15, below threshold of +0.2
+            reuptake_rate: 0.0,
+            baseline: 0.5,
+            ..Default::default()
+        };
+        for _ in 0..30 {
+            t.reuptake();
+        }
+        assert_eq!(t.high_exposure_cycles, 0, "Should not accumulate below threshold");
+        assert!(!t.is_tolerant());
+    }
+
+    #[test]
+    fn test_tachyphylaxis_triggers_after_20_cycles() {
+        let mut t = Transmitter {
+            level: 0.8, // baseline+0.3 > threshold of +0.2
+            reuptake_rate: 0.0, // disable reuptake to keep level high
+            baseline: 0.5,
+            ..Default::default()
+        };
+        let initial_sens = t.receptor_sensitivity;
+        // First 20 cycles: accumulates but no fast desensitization yet
+        for _ in 0..20 {
+            t.reuptake();
+        }
+        assert_eq!(t.high_exposure_cycles, 20);
+        assert!(!t.is_tolerant()); // exactly 20, not >20
+        // Cycle 21+: fast desensitization kicks in
+        for _ in 0..10 {
+            t.reuptake();
+        }
+        assert!(t.is_tolerant());
+        // Sensitivity should have dropped significantly (0.99^10 + slow adaptation)
+        assert!(
+            t.receptor_sensitivity < initial_sens - 0.05,
+            "Fast tachy should desensitize: {}", t.receptor_sensitivity
+        );
+    }
+
+    #[test]
+    fn test_tachyphylaxis_withdrawal_rebound() {
+        let mut t = Transmitter {
+            level: 0.8,
+            reuptake_rate: 0.0,
+            baseline: 0.5,
+            ..Default::default()
+        };
+        // Accumulate 25 high-exposure cycles
+        for _ in 0..25 {
+            t.reuptake();
+        }
+        let sens_before_withdrawal = t.receptor_sensitivity;
+        // Drop below baseline → triggers withdrawal
+        t.level = 0.3;
+        t.reuptake();
+        assert!(t.is_in_withdrawal(), "Should enter withdrawal");
+        assert_eq!(t.withdrawal_cycles, 29); // 30 - 1 (decremented this cycle)
+        assert_eq!(t.high_exposure_cycles, 0, "Exposure counter resets");
+        // During withdrawal: sensitivity increases (rebound)
+        for _ in 0..10 {
+            t.reuptake();
+        }
+        assert!(
+            t.receptor_sensitivity > sens_before_withdrawal,
+            "Withdrawal should increase sensitivity: {} vs {}",
+            t.receptor_sensitivity, sens_before_withdrawal
+        );
+    }
+
+    #[test]
+    fn test_tachyphylaxis_is_tolerant_getter() {
+        let mut t = Transmitter::default();
+        assert!(!t.is_tolerant());
+        t.high_exposure_cycles = 21;
+        assert!(t.is_tolerant());
+        t.high_exposure_cycles = 20;
+        assert!(!t.is_tolerant());
+    }
+
+    #[test]
+    fn test_tachyphylaxis_is_in_withdrawal_getter() {
+        let mut t = Transmitter::default();
+        assert!(!t.is_in_withdrawal());
+        t.withdrawal_cycles = 1;
+        assert!(t.is_in_withdrawal());
+        t.withdrawal_cycles = 0;
+        assert!(!t.is_in_withdrawal());
+    }
+
+    #[test]
+    fn test_tachyphylaxis_clamp_bounds() {
+        let mut t = Transmitter {
+            level: 0.8,
+            reuptake_rate: 0.0,
+            baseline: 0.5,
+            receptor_sensitivity: 0.52, // near lower bound
+            ..Default::default()
+        };
+        // Sustained high → fast desensitization should clamp at 0.5
+        for _ in 0..500 {
+            t.reuptake();
+        }
+        assert!(t.receptor_sensitivity >= 0.5, "Should clamp at 0.5: {}", t.receptor_sensitivity);
+
+        // Withdrawal rebound should clamp at 2.0
+        let mut t2 = Transmitter {
+            level: 0.3,
+            reuptake_rate: 0.0,
+            baseline: 0.5,
+            receptor_sensitivity: 1.98, // near upper bound
+            withdrawal_cycles: 100,
+            ..Default::default()
+        };
+        for _ in 0..100 {
+            t2.reuptake();
+        }
+        assert!(t2.receptor_sensitivity <= 2.0, "Should clamp at 2.0: {}", t2.receptor_sensitivity);
+    }
+
+    #[test]
+    fn test_tachyphylaxis_bath_integration() {
+        let mut bath = NeuromodulatorBath::default();
+        // Push DA high and sustain
+        bath.dopamine.level = 0.9;
+        bath.dopamine.reuptake_rate = 0.0;
+        bath.dopamine.baseline = 0.5;
+        for _ in 0..30 {
+            bath.dopamine.reuptake();
+        }
+        assert!(bath.dopamine.is_tolerant(), "DA should be tolerant after sustained high");
+        assert_eq!(bath.tolerant_count(), 1);
+        assert_eq!(bath.withdrawal_count(), 0);
+    }
+
+    #[test]
+    fn test_tachyphylaxis_checkpoint_roundtrip() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.dopamine.high_exposure_cycles = 25;
+        bath.dopamine.withdrawal_cycles = 10;
+        bath.serotonin.high_exposure_cycles = 15;
+        let ckpt = bath.checkpoint();
+        let mut bath2 = NeuromodulatorBath::default();
+        bath2.restore(&ckpt);
+        assert_eq!(bath2.dopamine.high_exposure_cycles, 25);
+        assert_eq!(bath2.dopamine.withdrawal_cycles, 10);
+        assert_eq!(bath2.serotonin.high_exposure_cycles, 15);
     }
 }
