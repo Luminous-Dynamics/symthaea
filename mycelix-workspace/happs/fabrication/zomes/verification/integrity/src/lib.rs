@@ -81,6 +81,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::VerificationRequest(r) => validate_verification_request(r),
         },
         FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            let max_len: usize = 256;
+            check!(validation::require_max_tag_len(&tag, max_len, &format!("{:?}", link_type)));
+            Ok(ValidateCallbackResult::Valid)
+        }
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -309,5 +314,23 @@ mod tests {
         r.bounty = Some(1_000_000_001);
         let result = validate_verification_request(r).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("bounty")));
+    }
+
+    // =========================================================================
+    // Link tag validation tests
+    // =========================================================================
+
+    #[test]
+    fn test_link_tag_at_max_passes() {
+        let tag = LinkTag::new(vec![0u8; 256]);
+        let result = validation::require_max_tag_len(&tag, 256, "test");
+        assert!(result.is_err()); // Err(()) means "no validation issue found"
+    }
+
+    #[test]
+    fn test_link_tag_over_max_rejected() {
+        let tag = LinkTag::new(vec![0u8; 257]);
+        let result = validation::require_max_tag_len(&tag, 256, "test");
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(msg)) if msg.contains("link tag")));
     }
 }

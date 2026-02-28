@@ -15,16 +15,85 @@
 use hdk::prelude::*;
 use bridge_integrity::*;
 use fabrication_common::*;
+use std::cell::RefCell;
+
+// =============================================================================
+// CONFIG (loaded from DNA properties)
+// =============================================================================
+
+thread_local! {
+    static CONFIG: RefCell<Option<FabricationConfig>> = const { RefCell::new(None) };
+}
+
+fn get_config() -> FabricationConfig {
+    CONFIG.with(|c| {
+        c.borrow_mut()
+            .get_or_insert_with(|| {
+                dna_info()
+                    .map(|info| FabricationConfig::from_properties_or_default(info.modifiers.properties.bytes()))
+                    .unwrap_or_default()
+            })
+            .clone()
+    })
+}
+
+// =============================================================================
+// CONSCIOUSNESS GATING
+// =============================================================================
+
+use std::collections::HashMap;
+
+const CONSCIOUSNESS_CACHE_TTL_MICROS: i64 = 300_000_000; // 5 minutes
+
+thread_local! {
+    static CONSCIOUSNESS_CACHE: RefCell<HashMap<AgentPubKey, (i64, bool)>> = RefCell::new(HashMap::new());
+}
+
+/// Gate operations behind consciousness verification from the identity hApp.
+/// Graceful fallback: if the identity hApp is unreachable, allow the operation.
+fn require_fabrication_consciousness(action_name: &str) -> ExternResult<()> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let now = sys_time()?.as_micros() as i64;
+
+    // Check cache first
+    let cached = CONSCIOUSNESS_CACHE.with(|c| {
+        c.borrow().get(&agent).and_then(|(ts, eligible)| {
+            if now - ts < CONSCIOUSNESS_CACHE_TTL_MICROS { Some(*eligible) } else { None }
+        })
+    });
+
+    let eligible = match cached {
+        Some(e) => e,
+        None => {
+            let result = call(
+                CallTargetCell::OtherRole("mycelix-identity".into()),
+                ZomeName::from("governance"),
+                FunctionName::from("check_consciousness_level"),
+                None,
+                action_name,
+            );
+            // Pass on success OR if identity hApp is unreachable (graceful fallback)
+            let e = matches!(result, Ok(ZomeCallResponse::Ok(_)) | Err(_));
+            CONSCIOUSNESS_CACHE.with(|c| { c.borrow_mut().insert(agent, (now, e)); });
+            e
+        }
+    };
+
+    if eligible {
+        Ok(())
+    } else {
+        Err(FabricationError::Unauthorized {
+            action: action_name.to_string(),
+            reason: "Consciousness gate denied".to_string(),
+        }.to_wasm_error())
+    }
+}
 
 // =============================================================================
 // RATE LIMITING
 // =============================================================================
 
-/// Maximum operations allowed per agent within the rate-limit window.
-const RATE_LIMIT_MAX_OPS: usize = 100;
-
-/// Rate-limit window in microseconds (60 seconds).
-const RATE_LIMIT_WINDOW_MICROS: i64 = 60_000_000;
+// Rate limiting now uses get_config().rate_limit_max_ops and rate_limit_window_secs
 
 /// Build a deterministic anchor hash for a given agent's rate-limit bucket.
 fn rate_limit_anchor(agent: &AgentPubKey) -> ExternResult<EntryHash> {
@@ -35,8 +104,12 @@ fn rate_limit_anchor(agent: &AgentPubKey) -> ExternResult<EntryHash> {
 }
 
 /// Enforce per-agent rate limiting. Returns an error when the caller has
-/// exceeded [`RATE_LIMIT_MAX_OPS`] operations within the sliding window.
+/// exceeded the configured rate limit within the sliding window.
 fn enforce_rate_limit(caller: &AgentPubKey) -> ExternResult<()> {
+    let cfg = get_config();
+    let max_ops = cfg.rate_limit_max_ops as usize;
+    let window_micros = cfg.rate_limit_window_secs as i64 * 1_000_000;
+
     let anchor = rate_limit_anchor(caller)?;
     let links = get_links(
         LinkQuery::try_new(anchor.clone(), LinkTypes::RateLimitBucket)?,
@@ -44,17 +117,18 @@ fn enforce_rate_limit(caller: &AgentPubKey) -> ExternResult<()> {
     )?;
 
     let now = sys_time()?;
-    let window_start = now.as_micros() - RATE_LIMIT_WINDOW_MICROS;
+    let window_start = now.as_micros() - window_micros;
 
     let recent_count = links
         .iter()
         .filter(|l| l.timestamp.as_micros() >= window_start)
         .count();
 
-    if recent_count >= RATE_LIMIT_MAX_OPS {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Rate limit exceeded: max 100 operations per 60 seconds".into()
-        )));
+    if recent_count >= max_ops {
+        return Err(FabricationError::RateLimited {
+            max_ops: cfg.rate_limit_max_ops,
+            window_secs: cfg.rate_limit_window_secs,
+        }.to_wasm_error());
     }
 
     // Record this operation
@@ -84,31 +158,7 @@ pub struct GetRecentEventsInput {
     pub pagination: Option<PaginationInput>,
 }
 
-/// Apply optional pagination to a collected `Vec`, returning a
-/// [`PaginatedResponse`]. When `pagination` is `None` all items are returned.
-fn paginate<T: Serialize>(items: Vec<T>, pagination: Option<&PaginationInput>) -> PaginatedResponse<T> {
-    let total = items.len() as u32;
-
-    match pagination {
-        Some(p) => {
-            let (offset, limit) = p.clamp();
-            let start = (offset as usize).min(items.len());
-            let end = (start + limit as usize).min(items.len());
-            PaginatedResponse {
-                items: items.into_iter().skip(start).take(end - start).collect(),
-                total,
-                offset,
-                limit,
-            }
-        }
-        None => PaginatedResponse {
-            items,
-            total,
-            offset: 0,
-            limit: total,
-        },
-    }
-}
+// paginate() is now imported from fabrication_common
 
 // =============================================================================
 // ANTICIPATORY REPAIR SYSTEM
@@ -127,8 +177,17 @@ pub struct CreateRepairPredictionInput {
 
 #[hdk_extern]
 pub fn create_repair_prediction(input: CreateRepairPredictionInput) -> ExternResult<Record> {
+    // Consciousness gate
+    require_fabrication_consciousness("create_repair_prediction")?;
+
     // Rate limit state-changing operation
     rate_limit_caller()?;
+
+    // Validate referenced hash exists on DHT
+    get(input.property_asset_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "property_asset_hash not found on DHT".into()
+        )))?;
 
     let now = sys_time()?;
 
@@ -155,11 +214,18 @@ pub fn create_repair_prediction(input: CreateRepairPredictionInput) -> ExternRes
     let entry = RepairPredictionEntry { prediction };
     let hash = create_entry(EntryTypes::RepairPrediction(entry))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "prediction_created".to_string(),
-        source_zome: "bridge".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Bridge,
+        event_type: FabricationEventType::PredictionCreated,
         payload: format!(r#"{{"hash":"{}"}}"#, hash),
     });
+
+    log_audit_event(
+        FabricationDomain::Bridge,
+        FabricationEventType::PredictionCreated,
+        hash.clone(),
+        "repair prediction created",
+    );
 
     create_link(input.property_asset_hash, hash.clone(), LinkTypes::AssetToPredictions, ())?;
 
@@ -199,11 +265,18 @@ pub fn create_repair_workflow(prediction_hash: ActionHash) -> ExternResult<Recor
 
     let hash = create_entry(EntryTypes::RepairWorkflow(workflow))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "workflow_created".to_string(),
-        source_zome: "bridge".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Bridge,
+        event_type: FabricationEventType::WorkflowCreated,
         payload: format!(r#"{{"hash":"{}"}}"#, hash),
     });
+
+    log_audit_event(
+        FabricationDomain::Bridge,
+        FabricationEventType::WorkflowCreated,
+        hash.clone(),
+        "repair workflow created",
+    );
 
     create_link(prediction_hash, hash.clone(), LinkTypes::PredictionToWorkflow, ())?;
 
@@ -226,6 +299,9 @@ pub struct UpdateWorkflowInput {
 
 #[hdk_extern]
 pub fn update_repair_workflow(input: UpdateWorkflowInput) -> ExternResult<Record> {
+    // Consciousness gate
+    require_fabrication_consciousness("update_repair_workflow")?;
+
     let record = get(input.workflow_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Workflow not found".into())))?;
 
@@ -248,11 +324,18 @@ pub fn update_repair_workflow(input: UpdateWorkflowInput) -> ExternResult<Record
 
     let new_hash = update_entry(input.workflow_hash, EntryTypes::RepairWorkflow(workflow))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "workflow_updated".to_string(),
-        source_zome: "bridge".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Bridge,
+        event_type: FabricationEventType::WorkflowUpdated,
         payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
     });
+
+    log_audit_event(
+        FabricationDomain::Bridge,
+        FabricationEventType::WorkflowUpdated,
+        new_hash.clone(),
+        "repair workflow updated",
+    );
 
     get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
@@ -308,11 +391,18 @@ pub fn emit_fabrication_event(input: EmitEventInput) -> ExternResult<Record> {
 
     let hash = create_entry(EntryTypes::FabricationEvent(event))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "event_emitted".to_string(),
-        source_zome: "bridge".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Bridge,
+        event_type: FabricationEventType::EventEmitted,
         payload: format!(r#"{{"hash":"{}"}}"#, hash),
     });
+
+    log_audit_event(
+        FabricationDomain::Bridge,
+        FabricationEventType::EventEmitted,
+        hash.clone(),
+        "fabrication event emitted",
+    );
 
     let events_anchor = recent_events_anchor()?;
     create_link(events_anchor, hash.clone(), LinkTypes::RecentEvents, ())?;
@@ -358,8 +448,17 @@ pub struct ListDesignInput {
 
 #[hdk_extern]
 pub fn list_design_on_marketplace(input: ListDesignInput) -> ExternResult<Record> {
+    // Consciousness gate
+    require_fabrication_consciousness("list_design_on_marketplace")?;
+
     // Rate limit state-changing operation
     rate_limit_caller()?;
+
+    // Validate design exists on DHT
+    get(input.design_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "design_hash not found on DHT".into()
+        )))?;
 
     let now = sys_time()?;
 
@@ -373,11 +472,18 @@ pub fn list_design_on_marketplace(input: ListDesignInput) -> ExternResult<Record
 
     let hash = create_entry(EntryTypes::MarketplaceListing(listing))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "design_listed".to_string(),
-        source_zome: "bridge".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Bridge,
+        event_type: FabricationEventType::DesignListed,
         payload: format!(r#"{{"hash":"{}"}}"#, hash),
     });
+
+    log_audit_event(
+        FabricationDomain::Bridge,
+        FabricationEventType::DesignListed,
+        hash.clone(),
+        "design listed on marketplace",
+    );
 
     create_link(input.design_hash.clone(), hash.clone(), LinkTypes::DesignToListings, ())?;
 
@@ -416,6 +522,12 @@ pub fn link_material_to_supplier(input: LinkSupplierInput) -> ExternResult<Recor
     // Rate limit state-changing operation
     rate_limit_caller()?;
 
+    // Validate material exists on DHT
+    get(input.material_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "material_hash not found on DHT".into()
+        )))?;
+
     let now = sys_time()?;
 
     let link_entry = SupplyChainLinkEntry {
@@ -427,15 +539,130 @@ pub fn link_material_to_supplier(input: LinkSupplierInput) -> ExternResult<Recor
 
     let hash = create_entry(EntryTypes::SupplyChainLink(link_entry))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "supplier_linked".to_string(),
-        source_zome: "bridge".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Bridge,
+        event_type: FabricationEventType::SupplierLinked,
         payload: format!(r#"{{"hash":"{}"}}"#, hash),
     });
+
+    log_audit_event(
+        FabricationDomain::Bridge,
+        FabricationEventType::SupplierLinked,
+        hash.clone(),
+        "material linked to supplier",
+    );
 
     create_link(input.material_hash, hash.clone(), LinkTypes::MaterialToSuppliers, ())?;
 
     get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+}
+
+// =============================================================================
+// AUDIT TRAIL
+// =============================================================================
+
+/// Best-effort audit logging. If DHT commit fails, emits a diagnostic signal
+/// rather than failing the parent operation.
+fn log_audit_event(
+    domain: FabricationDomain,
+    event_type: FabricationEventType,
+    action_hash: ActionHash,
+    payload: &str,
+) {
+    let _ = (|| -> ExternResult<()> {
+        let agent = agent_info()?.agent_initial_pubkey;
+        let now = sys_time()?;
+        let truncated = if payload.len() > 120 { &payload[..120] } else { payload };
+
+        let entry = bridge_integrity::AuditEntryRecord {
+            domain,
+            event_type,
+            action_hash,
+            agent: agent.clone(),
+            payload: truncated.to_string(),
+            created_at: Timestamp::from_micros(now.as_micros() as i64),
+        };
+
+        let hash = create_entry(EntryTypes::AuditEntry(entry))?;
+
+        // Index: all audits
+        let all_anchor = audit_anchor("all")?;
+        create_link(all_anchor, hash.clone(), LinkTypes::AllAudits, ())?;
+
+        // Index: by agent
+        let agent_anchor = audit_anchor(&format!("agent:{}", agent))?;
+        create_link(agent_anchor, hash.clone(), LinkTypes::AgentAudits, ())?;
+
+        // Index: by domain
+        let domain_anchor = audit_anchor(&format!("domain:{}", domain))?;
+        create_link(domain_anchor, hash, LinkTypes::DomainAudits, ())?;
+
+        Ok(())
+    })()
+    .or_else(|e| -> Result<(), ()> {
+        // Diagnostic fallback: emit signal so UI/conductor knows audit failed
+        let _ = emit_signal(&TypedFabricationSignal {
+            domain: FabricationDomain::Bridge,
+            event_type: FabricationEventType::AuditFallback,
+            payload: format!("Audit commit failed: {:?}", e),
+        });
+        Ok(())
+    });
+}
+
+/// Query audit trail with optional filters
+#[hdk_extern]
+pub fn get_audit_trail(filter: AuditTrailFilter) -> ExternResult<Vec<Record>> {
+    // Determine which anchor to query
+    let anchor = if let Some(ref agent) = filter.agent {
+        audit_anchor(&format!("agent:{}", agent))?
+    } else if let Some(ref domain) = filter.domain {
+        audit_anchor(&format!("domain:{}", domain))?
+    } else {
+        audit_anchor("all")?
+    };
+
+    let link_type = if filter.agent.is_some() {
+        LinkTypes::AgentAudits
+    } else if filter.domain.is_some() {
+        LinkTypes::DomainAudits
+    } else {
+        LinkTypes::AllAudits
+    };
+
+    let links = get_links(LinkQuery::try_new(anchor, link_type)?, GetStrategy::default())?;
+    let limit = filter.limit.unwrap_or(100) as usize;
+
+    let mut results = Vec::new();
+    for link in links {
+        if results.len() >= limit {
+            break;
+        }
+        if let Some(hash) = link.target.into_action_hash() {
+            if let Some(record) = get(hash, GetOptions::default())? {
+                if let Some(audit) = record.entry().to_app_option::<bridge_integrity::AuditEntryRecord>().ok().flatten() {
+                    // Apply time filters
+                    if let Some(after) = filter.after {
+                        if audit.created_at.as_micros() < after.as_micros() {
+                            continue;
+                        }
+                    }
+                    if let Some(before) = filter.before {
+                        if audit.created_at.as_micros() > before.as_micros() {
+                            continue;
+                        }
+                    }
+                    results.push(record);
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+fn audit_anchor(name: &str) -> ExternResult<EntryHash> {
+    make_anchor(&format!("audit:{}", name))
 }
 
 // =============================================================================
@@ -585,15 +812,28 @@ mod tests {
     }
 
     #[test]
-    fn test_fabrication_signal_serde() {
-        let signal = FabricationSignal {
-            event_type: "prediction_created".to_string(),
-            source_zome: "bridge".to_string(),
+    fn test_typed_signal_serde() {
+        let signal = TypedFabricationSignal {
+            domain: FabricationDomain::Bridge,
+            event_type: FabricationEventType::PredictionCreated,
             payload: r#"{"hash":"uhCAk_test"}"#.to_string(),
         };
         let json = serde_json::to_string(&signal).unwrap();
-        assert!(json.contains("prediction_created"));
-        assert!(json.contains("bridge"));
+        assert!(json.contains("PredictionCreated"));
+        assert!(json.contains("Bridge"));
+        let parsed: TypedFabricationSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.domain, FabricationDomain::Bridge);
+        assert_eq!(parsed.event_type, FabricationEventType::PredictionCreated);
+    }
+
+    #[test]
+    fn test_legacy_signal_still_serdeable() {
+        let signal = FabricationSignal {
+            event_type: "prediction_created".to_string(),
+            source_zome: "bridge".to_string(),
+            payload: "{}".to_string(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
         let parsed: FabricationSignal = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.event_type, "prediction_created");
     }
@@ -607,12 +847,77 @@ mod tests {
     }
 
     #[test]
-    fn test_rate_limit_constants() {
-        // Verify rate limit thresholds are reasonable
-        assert!(RATE_LIMIT_WINDOW_MICROS > 0, "Window must be positive");
-        assert!(RATE_LIMIT_MAX_OPS > 0, "Max ops must be positive");
-        assert!(RATE_LIMIT_MAX_OPS <= 1000, "Max ops should be reasonable");
-        // 60 seconds in micros
-        assert_eq!(RATE_LIMIT_WINDOW_MICROS, 60_000_000);
+    fn test_rate_limit_config_defaults() {
+        let cfg = FabricationConfig::default();
+        assert!(cfg.rate_limit_max_ops > 0, "Max ops must be positive");
+        assert!(cfg.rate_limit_max_ops <= 1000, "Max ops should be reasonable");
+        assert_eq!(cfg.rate_limit_max_ops, 100);
+        assert_eq!(cfg.rate_limit_window_secs, 60);
+    }
+
+    #[test]
+    fn test_audit_entry_record_serde() {
+        let entry = bridge_integrity::AuditEntryRecord {
+            domain: FabricationDomain::Bridge,
+            event_type: FabricationEventType::PredictionCreated,
+            action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            agent: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            payload: "test".to_string(),
+            created_at: Timestamp::from_micros(1000000),
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        let parsed: bridge_integrity::AuditEntryRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.domain, FabricationDomain::Bridge);
+        assert_eq!(parsed.payload, "test");
+    }
+
+    #[test]
+    fn test_audit_trail_filter_serde() {
+        let filter = AuditTrailFilter {
+            domain: Some(FabricationDomain::Design),
+            agent: None,
+            after: Some(Timestamp::from_micros(100)),
+            before: None,
+            limit: Some(50),
+        };
+        let json = serde_json::to_string(&filter).unwrap();
+        let parsed: AuditTrailFilter = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.domain.unwrap(), FabricationDomain::Design);
+        assert_eq!(parsed.limit.unwrap(), 50);
+    }
+
+    #[test]
+    fn test_fabrication_error_variants() {
+        let err = FabricationError::RateLimited { max_ops: 100, window_secs: 60 };
+        let wasm_err = err.to_wasm_error();
+        let msg = format!("{:?}", wasm_err);
+        assert!(msg.contains("RateLimited"));
+    }
+
+    #[test]
+    fn test_consciousness_cache_ttl_constant() {
+        assert_eq!(CONSCIOUSNESS_CACHE_TTL_MICROS, 300_000_000);
+        // 5 minutes in micros
+        assert_eq!(CONSCIOUSNESS_CACHE_TTL_MICROS / 1_000_000, 300);
+    }
+
+    #[test]
+    fn test_consciousness_gate_error_format() {
+        let err = FabricationError::Unauthorized {
+            action: "create_repair_prediction".to_string(),
+            reason: "Consciousness gate denied".to_string(),
+        };
+        let wasm_err = err.to_wasm_error();
+        let msg = format!("{:?}", wasm_err);
+        assert!(msg.contains("Unauthorized"));
+        assert!(msg.contains("create_repair_prediction"));
+        assert!(msg.contains("Consciousness gate denied"));
+    }
+
+    #[test]
+    fn test_identity_role_name() {
+        let role = "mycelix-identity";
+        assert!(!role.is_empty());
+        assert!(role.contains('-'));
     }
 }

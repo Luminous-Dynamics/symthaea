@@ -61,6 +61,17 @@ pub struct CompatibilityResult {
     pub recommendations: Vec<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetAvailablePrintersInput {
+    pub pagination: Option<PaginationInput>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FindByCapabilityInput {
+    pub requirements: PrinterRequirements,
+    pub pagination: Option<PaginationInput>,
+}
+
 // =============================================================================
 // CRUD OPERATIONS
 // =============================================================================
@@ -87,9 +98,9 @@ pub fn register_printer(input: RegisterPrinterInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(EntryTypes::Printer(printer.clone()))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "printer_registered".to_string(),
-        source_zome: "printers".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Printer,
+        event_type: FabricationEventType::PrinterRegistered,
         payload: format!(r#"{{"hash":"{}"}}"#, action_hash),
     });
 
@@ -197,9 +208,9 @@ pub fn update_printer(input: UpdatePrinterInput) -> ExternResult<Record> {
         EntryTypes::Printer(updated_printer),
     )?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "printer_updated".to_string(),
-        source_zome: "printers".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Printer,
+        event_type: FabricationEventType::PrinterUpdated,
         payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
     });
 
@@ -242,9 +253,9 @@ pub fn deactivate_printer(hash: ActionHash) -> ExternResult<ActionHash> {
 
     let deactivated_hash = update_entry(hash.clone(), EntryTypes::Printer(deactivated))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "printer_deactivated".to_string(),
-        source_zome: "printers".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Printer,
+        event_type: FabricationEventType::PrinterDeactivated,
         payload: format!(r#"{{"hash":"{}"}}"#, deactivated_hash),
     });
 
@@ -280,10 +291,11 @@ pub fn get_my_printers(_: ()) -> ExternResult<Vec<Record>> {
 pub struct FindNearbyInput {
     pub location: GeoLocation,
     pub radius_km: u32,
+    pub pagination: Option<PaginationInput>,
 }
 
 #[hdk_extern]
-pub fn find_printers_nearby(input: FindNearbyInput) -> ExternResult<Vec<PrinterMatch>> {
+pub fn find_printers_nearby(input: FindNearbyInput) -> ExternResult<PaginatedResponse<PrinterMatch>> {
     // Use geohash prefixes for proximity search
     // Shorter geohash = larger area
     let precision = match input.radius_km {
@@ -305,6 +317,13 @@ pub fn find_printers_nearby(input: FindNearbyInput) -> ExternResult<Vec<PrinterM
         LinkQuery::try_new(geo_anchor, LinkTypes::GeohashToPrinters)?, GetStrategy::default(),
     )?;
 
+    // Stage 1: collect all printers found via geohash prefix.
+    // Stage 2: refine with Haversine when both the query and the printer
+    //          carry lat/lon coordinates.
+    let query_lat = input.location.lat;
+    let query_lon = input.location.lon;
+    let radius_km = input.radius_km as f64;
+
     let mut matches = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
@@ -315,23 +334,62 @@ pub fn find_printers_nearby(input: FindNearbyInput) -> ExternResult<Vec<PrinterM
                     .ok()
                     .flatten()
                 {
+                    // --- Stage 2: Haversine refinement ---
+                    let distance_km: Option<f32> =
+                        match (query_lat, query_lon, printer.location.as_ref()) {
+                            (Some(qlat), Some(qlon), Some(ploc))
+                                if ploc.lat.is_some() && ploc.lon.is_some() =>
+                            {
+                                let plat = ploc.lat.unwrap();
+                                let plon = ploc.lon.unwrap();
+                                let d = haversine_distance_km(qlat, qlon, plat, plon);
+                                Some(d as f32)
+                            }
+                            _ => None,
+                        };
+
+                    // If we could compute a precise distance, enforce the radius filter.
+                    // Printers without lat/lon are included as geohash-only matches.
+                    if let Some(d) = distance_km {
+                        if d as f64 > radius_km {
+                            continue;
+                        }
+                    }
+
+                    // Compatibility score: 1.0 at the query point, decays linearly to 0.5
+                    // at the edge of the radius.  Geohash-only matches receive 1.0.
+                    let compatibility_score = match distance_km {
+                        Some(d) if radius_km > 0.0 => {
+                            (1.0_f32 - (d / radius_km as f32) * 0.5).max(0.5)
+                        }
+                        _ => 1.0,
+                    };
+
                     matches.push(PrinterMatch {
                         printer_hash: hash,
                         printer,
-                        compatibility_score: 1.0, // Would calculate based on distance
-                        distance_km: None,        // Would calculate actual distance
+                        compatibility_score,
+                        distance_km,
                     });
                 }
             }
         }
     }
 
-    Ok(matches)
+    // Sort by distance ascending (printers without distance go last).
+    matches.sort_by(|a, b| match (a.distance_km, b.distance_km) {
+        (Some(da), Some(db)) => da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal),
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (None, None) => std::cmp::Ordering::Equal,
+    });
+
+    Ok(paginate(matches, input.pagination.as_ref()))
 }
 
 /// Find printers by capability requirements
 #[hdk_extern]
-pub fn find_printers_by_capability(requirements: PrinterRequirements) -> ExternResult<Vec<PrinterMatch>> {
+pub fn find_printers_by_capability(input: FindByCapabilityInput) -> ExternResult<PaginatedResponse<PrinterMatch>> {
     // Get all printers then filter
     let all_anchor = all_printers_anchor()?;
     let links = get_links(
@@ -348,7 +406,7 @@ pub fn find_printers_by_capability(requirements: PrinterRequirements) -> ExternR
                     .ok()
                     .flatten()
                 {
-                    let result = check_printer_meets_requirements(&printer, &requirements);
+                    let result = check_printer_meets_requirements(&printer, &input.requirements);
                     if result.compatible {
                         matches.push(PrinterMatch {
                             printer_hash: hash,
@@ -369,12 +427,12 @@ pub fn find_printers_by_capability(requirements: PrinterRequirements) -> ExternR
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    Ok(matches)
+    Ok(paginate(matches, input.pagination.as_ref()))
 }
 
 /// Get all available printers
 #[hdk_extern]
-pub fn get_available_printers(_: ()) -> ExternResult<Vec<Record>> {
+pub fn get_available_printers(input: GetAvailablePrintersInput) -> ExternResult<PaginatedResponse<Record>> {
     let available_anchor = available_printers_anchor()?;
     let links = get_links(
         LinkQuery::try_new(available_anchor, LinkTypes::AvailablePrinters)?, GetStrategy::default(),
@@ -399,7 +457,7 @@ pub fn get_available_printers(_: ()) -> ExternResult<Vec<Record>> {
         }
     }
 
-    Ok(printers)
+    Ok(paginate(printers, input.pagination.as_ref()))
 }
 
 // =============================================================================
@@ -414,29 +472,121 @@ pub struct MatchDesignInput {
     pub limit: Option<u32>,
 }
 
+/// Minimal view of a Design entry used for printer matching.
+///
+/// The full `Design` type is defined in `designs_integrity` which is not a
+/// dependency of this crate.  We implement `TryFrom<SerializedBytes>` via the
+/// `holochain_serialized_bytes` derive so that `to_app_option::<DesignSummary>()`
+/// works without coupling the two zomes at the Rust type level.  Extra fields
+/// present in the real Design entry are silently ignored; missing fields use
+/// their serde defaults.
+#[derive(Serialize, Deserialize, Debug, Default, SerializedBytes)]
+struct DesignSummary {
+    /// Materials that are compatible with this design (best-fit first).
+    #[serde(default)]
+    material_compatibility: Vec<MaterialCompatibilityEntry>,
+}
+
+/// Minimal copy of `MaterialBinding` fields needed for printer matching.
+#[derive(Serialize, Deserialize, Debug)]
+struct MaterialCompatibilityEntry {
+    material: MaterialType,
+    #[serde(default)]
+    compatibility: f32,
+}
+
 #[hdk_extern]
 pub fn match_design_to_printers(input: MatchDesignInput) -> ExternResult<Vec<PrinterMatch>> {
-    // This would normally fetch the design and determine requirements
-    // For now, return available printers
-    let available = get_available_printers(())?;
+    // --- Step 1: Fetch and validate the design record. ---
+    let design_record = get(input.design_hash.clone(), GetOptions::default())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Design not found — invalid design_hash".to_string()
+        ))
+    })?;
+
+    // --- Step 2: Extract a minimal design summary to build requirements. ---
+    // `DesignSummary` derives `SerializedBytes` so `to_app_option` can
+    // decode the MessagePack entry bytes.  Extra fields from the real Design
+    // are silently ignored; missing ones use serde defaults.
+    let design_summary: DesignSummary = design_record
+        .entry()
+        .to_app_option::<DesignSummary>()
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+
+    // Pick the highest-compatibility material binding (if any) as the primary
+    // material requirement.
+    let preferred_material: Option<MaterialType> = design_summary
+        .material_compatibility
+        .iter()
+        .max_by(|a, b| a.compatibility.partial_cmp(&b.compatibility).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|mb| mb.material.clone());
+
+    let requirements = PrinterRequirements {
+        min_build_volume: None,
+        material: preferred_material,
+        printer_type: None,
+        min_layer_height: None,
+        max_layer_height: None,
+        heated_bed_required: false,
+        enclosure_required: false,
+        min_hotend_temp: None,
+    };
+
+    // --- Step 3: Score every available printer against the requirements. ---
+    let available = get_available_printers(GetAvailablePrintersInput { pagination: None })?;
     let limit = input.limit.unwrap_or(10) as usize;
 
-    let mut matches = Vec::new();
-    for record in available.into_iter().take(limit) {
+    let mut matches: Vec<PrinterMatch> = Vec::new();
+    for record in available.items {
         if let Some(printer) = record
             .entry()
             .to_app_option::<Printer>()
             .ok()
             .flatten()
         {
-            matches.push(PrinterMatch {
-                printer_hash: record.action_address().clone(),
-                printer,
-                compatibility_score: 0.8, // Placeholder
-                distance_km: None,
-            });
+            let result = check_printer_meets_requirements(&printer, &requirements);
+            if result.compatible {
+                // Optionally compute distance if location is provided.
+                let distance_km: Option<f32> = match (
+                    input.location.as_ref(),
+                    printer.location.as_ref(),
+                ) {
+                    (Some(qloc), Some(ploc))
+                        if qloc.lat.is_some()
+                            && qloc.lon.is_some()
+                            && ploc.lat.is_some()
+                            && ploc.lon.is_some() =>
+                    {
+                        let d = haversine_distance_km(
+                            qloc.lat.unwrap(),
+                            qloc.lon.unwrap(),
+                            ploc.lat.unwrap(),
+                            ploc.lon.unwrap(),
+                        );
+                        Some(d as f32)
+                    }
+                    _ => None,
+                };
+
+                matches.push(PrinterMatch {
+                    printer_hash: record.action_address().clone(),
+                    printer,
+                    compatibility_score: result.score,
+                    distance_km,
+                });
+            }
         }
     }
+
+    // --- Step 4: Sort by compatibility score descending, apply limit. ---
+    matches.sort_by(|a, b| {
+        b.compatibility_score
+            .partial_cmp(&a.compatibility_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    matches.truncate(limit);
 
     Ok(matches)
 }
@@ -527,9 +677,9 @@ pub fn update_availability(input: UpdateAvailabilityInput) -> ExternResult<Recor
 
     let status_hash = create_entry(EntryTypes::PrinterStatus(status))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "availability_changed".to_string(),
-        source_zome: "printers".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Printer,
+        event_type: FabricationEventType::AvailabilityChanged,
         payload: format!(r#"{{"hash":"{}"}}"#, status_hash),
     });
 
@@ -671,4 +821,274 @@ fn all_printers_anchor() -> ExternResult<EntryHash> {
 
 fn available_printers_anchor() -> ExternResult<EntryHash> {
     make_anchor("available_printers")
+}
+
+// =============================================================================
+// TESTS
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -------------------------------------------------------------------------
+    // Test helpers
+    // -------------------------------------------------------------------------
+
+    fn test_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0u8; 36])
+    }
+
+    /// A full-featured FDM printer with 220×220×250 mm build volume,
+    /// heated bed, no enclosure, 260 °C hotend, PLA + PETG available.
+    fn base_printer() -> Printer {
+        Printer {
+            id: "printer-test-001".to_string(),
+            name: "Test Printer".to_string(),
+            owner: test_agent(),
+            location: None,
+            printer_type: PrinterType::FDM,
+            capabilities: PrinterCapabilities {
+                build_volume: BuildVolume {
+                    x: 220.0,
+                    y: 220.0,
+                    z: 250.0,
+                },
+                layer_heights: vec![0.1, 0.2, 0.3],
+                nozzle_diameters: vec![0.4],
+                heated_bed: true,
+                enclosure: false,
+                multi_material: None,
+                max_temp_hotend: 260,
+                max_temp_bed: 100,
+                features: vec![],
+            },
+            materials_available: vec![MaterialType::PLA, MaterialType::PETG],
+            availability: AvailabilityStatus::Available,
+            rates: None,
+            created_at: Timestamp::from_micros(0),
+            updated_at: Timestamp::from_micros(0),
+        }
+    }
+
+    /// Minimal requirements — no constraints at all.
+    fn empty_requirements() -> PrinterRequirements {
+        PrinterRequirements {
+            min_build_volume: None,
+            material: None,
+            printer_type: None,
+            min_layer_height: None,
+            max_layer_height: None,
+            heated_bed_required: false,
+            enclosure_required: false,
+            min_hotend_temp: None,
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 1. All requirements met → score = 1.0, compatible = true
+    // -------------------------------------------------------------------------
+    #[test]
+    fn test_all_requirements_met() {
+        let printer = base_printer();
+        let requirements = PrinterRequirements {
+            min_build_volume: Some(BuildVolume { x: 200.0, y: 200.0, z: 200.0 }),
+            material: Some(MaterialType::PLA),
+            printer_type: Some(PrinterType::FDM),
+            min_layer_height: None,
+            max_layer_height: None,
+            heated_bed_required: true,
+            enclosure_required: false,
+            min_hotend_temp: Some(240),
+        };
+
+        let result = check_printer_meets_requirements(&printer, &requirements);
+
+        assert!(result.compatible, "Should be compatible when all requirements are met");
+        assert!((result.score - 1.0).abs() < f32::EPSILON, "Score should be 1.0, got {}", result.score);
+        assert!(result.issues.is_empty(), "Should have no issues, got: {:?}", result.issues);
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. Build volume too small → score deducted by 0.3
+    // -------------------------------------------------------------------------
+    #[test]
+    fn test_volume_too_small() {
+        let printer = base_printer(); // 220×220×250
+        let requirements = PrinterRequirements {
+            // Requires 300×300×300 — exceeds printer on all axes
+            min_build_volume: Some(BuildVolume { x: 300.0, y: 300.0, z: 300.0 }),
+            ..empty_requirements()
+        };
+
+        let result = check_printer_meets_requirements(&printer, &requirements);
+
+        assert!(result.issues.iter().any(|i| i.contains("Build volume")),
+            "Should report build volume issue, issues: {:?}", result.issues);
+        // Score 1.0 - 0.3 = 0.7; compatible threshold is > 0.5 so still compatible
+        let expected_score = 0.7_f32;
+        assert!((result.score - expected_score).abs() < 1e-5, "Score should be ~0.7, got {}", result.score);
+        assert!(result.compatible, "Score 0.7 is above 0.5 threshold so should be compatible");
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. Required material not in printer's list → score deducted by 0.2
+    // -------------------------------------------------------------------------
+    #[test]
+    fn test_material_missing() {
+        let printer = base_printer(); // has PLA + PETG
+        let requirements = PrinterRequirements {
+            material: Some(MaterialType::ABS), // not available
+            ..empty_requirements()
+        };
+
+        let result = check_printer_meets_requirements(&printer, &requirements);
+
+        assert!(result.issues.iter().any(|i| i.contains("ABS") || i.contains("Material")),
+            "Should report material issue, issues: {:?}", result.issues);
+        let expected_score = 0.8_f32;
+        assert!((result.score - expected_score).abs() < 1e-5, "Score should be ~0.8, got {}", result.score);
+        assert!(result.compatible, "Score 0.8 is above 0.5 threshold so should be compatible");
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. Heated bed required but printer lacks one → score deducted by 0.3
+    // -------------------------------------------------------------------------
+    #[test]
+    fn test_heated_bed_missing() {
+        let mut printer = base_printer();
+        printer.capabilities.heated_bed = false; // no heated bed
+        let requirements = PrinterRequirements {
+            heated_bed_required: true,
+            ..empty_requirements()
+        };
+
+        let result = check_printer_meets_requirements(&printer, &requirements);
+
+        assert!(result.issues.iter().any(|i| i.contains("Heated bed") || i.contains("heated bed")),
+            "Should report heated bed issue, issues: {:?}", result.issues);
+        let expected_score = 0.7_f32;
+        assert!((result.score - expected_score).abs() < 1e-5, "Score should be ~0.7, got {}", result.score);
+        assert!(result.compatible, "Score 0.7 is above 0.5 threshold so should be compatible");
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. Enclosure required but printer has none → score deducted by 0.2
+    // -------------------------------------------------------------------------
+    #[test]
+    fn test_enclosure_missing() {
+        let printer = base_printer(); // enclosure = false
+        let requirements = PrinterRequirements {
+            enclosure_required: true, // requires enclosure
+            ..empty_requirements()
+        };
+
+        let result = check_printer_meets_requirements(&printer, &requirements);
+
+        assert!(result.issues.iter().any(|i| i.contains("nclosure")),
+            "Should report enclosure issue, issues: {:?}", result.issues);
+        let expected_score = 0.8_f32;
+        assert!((result.score - expected_score).abs() < 1e-5, "Score should be ~0.8, got {}", result.score);
+        assert!(result.compatible, "Score 0.8 is above 0.5 threshold so should be compatible");
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. Hotend max_temp lower than required → score deducted by 0.4
+    // -------------------------------------------------------------------------
+    #[test]
+    fn test_temp_too_low() {
+        let printer = base_printer(); // max_temp_hotend = 260
+        let requirements = PrinterRequirements {
+            min_hotend_temp: Some(300), // requires 300 °C
+            ..empty_requirements()
+        };
+
+        let result = check_printer_meets_requirements(&printer, &requirements);
+
+        assert!(result.issues.iter().any(|i| i.contains("temp") || i.contains("Hotend")),
+            "Should report temperature issue, issues: {:?}", result.issues);
+        let expected_score = 0.6_f32;
+        assert!((result.score - expected_score).abs() < 1e-5, "Score should be ~0.6, got {}", result.score);
+        assert!(result.compatible, "Score 0.6 is above 0.5 threshold so should be compatible");
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. Wrong printer type → score = 0.0, compatible = false (hard fail)
+    // -------------------------------------------------------------------------
+    #[test]
+    fn test_wrong_printer_type() {
+        let printer = base_printer(); // FDM
+        let requirements = PrinterRequirements {
+            printer_type: Some(PrinterType::SLA), // requires resin printer
+            ..empty_requirements()
+        };
+
+        let result = check_printer_meets_requirements(&printer, &requirements);
+
+        assert!(!result.compatible, "Different printer type should be incompatible");
+        assert!((result.score).abs() < f32::EPSILON, "Score should be 0.0 for wrong printer type, got {}", result.score);
+        assert!(!result.issues.is_empty(), "Should have at least one issue reported");
+    }
+
+    // -------------------------------------------------------------------------
+    // 8. Volume too small AND material missing → combined deduction (0.3 + 0.2 = 0.5)
+    // -------------------------------------------------------------------------
+    #[test]
+    fn test_volume_and_material_combined() {
+        let printer = base_printer(); // 220×220×250, has PLA + PETG
+        let requirements = PrinterRequirements {
+            min_build_volume: Some(BuildVolume { x: 300.0, y: 300.0, z: 300.0 }), // too big
+            material: Some(MaterialType::PEEK),  // not available
+            ..empty_requirements()
+        };
+
+        let result = check_printer_meets_requirements(&printer, &requirements);
+
+        // volume issue (-0.3) + material issue (-0.2) = score 0.5
+        // compatible threshold is > 0.5, so 0.5 is NOT compatible
+        let expected_score = 0.5_f32;
+        assert!((result.score - expected_score).abs() < 1e-5,
+            "Score should be ~0.5, got {}", result.score);
+        assert!(!result.compatible,
+            "Score of 0.5 is not > 0.5, so should be incompatible");
+        assert_eq!(result.issues.len(), 2, "Should have exactly 2 issues, got: {:?}", result.issues);
+    }
+
+    // -------------------------------------------------------------------------
+    // 9. Volume small + no enclosure + temp too low → multiple failures, incompatible
+    // -------------------------------------------------------------------------
+    #[test]
+    fn test_volume_enclosure_temp_combined() {
+        let printer = base_printer(); // 220×220×250, no enclosure, 260 °C
+        let requirements = PrinterRequirements {
+            min_build_volume: Some(BuildVolume { x: 400.0, y: 400.0, z: 400.0 }), // -0.3
+            enclosure_required: true,  // -0.2
+            min_hotend_temp: Some(400), // -0.4
+            ..empty_requirements()
+        };
+
+        let result = check_printer_meets_requirements(&printer, &requirements);
+
+        // 1.0 - 0.3 - 0.2 - 0.4 = 0.1, clamped at 0.1 (max(0.0, 0.1))
+        // compatible = 0.1 > 0.5 → false
+        assert!(!result.compatible, "Should be incompatible with score well below 0.5");
+        assert!(result.score < 0.5, "Score should be below 0.5, got {}", result.score);
+        assert_eq!(result.issues.len(), 3, "Should have exactly 3 issues, got: {:?}", result.issues);
+    }
+
+    // -------------------------------------------------------------------------
+    // 10. No requirements specified → perfect compatibility, score = 1.0
+    // -------------------------------------------------------------------------
+    #[test]
+    fn test_no_requirements_specified() {
+        let printer = base_printer();
+        let requirements = empty_requirements();
+
+        let result = check_printer_meets_requirements(&printer, &requirements);
+
+        assert!(result.compatible, "No requirements should always be compatible");
+        assert!((result.score - 1.0).abs() < f32::EPSILON,
+            "No requirements should yield score 1.0, got {}", result.score);
+        assert!(result.issues.is_empty(), "No requirements should yield no issues");
+    }
 }

@@ -7,6 +7,50 @@ use hdk::prelude::*;
 use verification_integrity::*;
 use fabrication_common::*;
 
+use std::cell::RefCell;
+use std::collections::HashMap;
+
+const EPISTEMIC_CACHE_TTL_MICROS: i64 = 300_000_000; // 5 min
+
+thread_local! {
+    static EPISTEMIC_CACHE: RefCell<HashMap<String, (i64, ClaimEpistemic)>> = RefCell::new(HashMap::new());
+}
+
+/// Fetch epistemic classification from Knowledge hApp with cache.
+/// Falls back to default values if the Knowledge hApp is unreachable.
+fn fetch_epistemic(claim_text: &str, claim_type_key: &str) -> ClaimEpistemic {
+    let now = sys_time().map(|t| t.as_micros()).unwrap_or(0);
+
+    // Check cache by claim_type_key (not full text)
+    let cached = EPISTEMIC_CACHE.with(|c| {
+        c.borrow().get(claim_type_key).and_then(|(ts, ep)| {
+            if now - ts < EPISTEMIC_CACHE_TTL_MICROS { Some(ep.clone()) } else { None }
+        })
+    });
+    if let Some(ep) = cached { return ep; }
+
+    let ep = match call(
+        CallTargetCell::OtherRole("mycelix-knowledge".into()),
+        ZomeName::from("epistemic"),
+        FunctionName::from("classify_claim"),
+        None,
+        claim_text,
+    ) {
+        Ok(ZomeCallResponse::Ok(bytes)) => {
+            bytes.decode().unwrap_or_else(|_| default_epistemic())
+        }
+        _ => default_epistemic(),
+    };
+    EPISTEMIC_CACHE.with(|c| {
+        c.borrow_mut().insert(claim_type_key.to_string(), (now, ep.clone()));
+    });
+    ep
+}
+
+fn default_epistemic() -> ClaimEpistemic {
+    ClaimEpistemic { empirical: 0.5, normative: 0.3, mythic: 0.2 }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SubmitVerificationInput {
     pub design_hash: ActionHash,
@@ -59,9 +103,9 @@ pub fn submit_verification(input: SubmitVerificationInput) -> ExternResult<Recor
 
     let hash = create_entry(EntryTypes::DesignVerification(verification))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "verification_submitted".to_string(),
-        source_zome: "verification".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Verification,
+        event_type: FabricationEventType::VerificationSubmitted,
         payload: format!(r#"{{"hash":"{}"}}"#, hash),
     });
 
@@ -129,12 +173,9 @@ pub fn submit_safety_claim(input: SubmitClaimInput) -> ExternResult<Record> {
     let author = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
-    // Default epistemic scores (would be calculated by Knowledge hApp)
-    let epistemic = ClaimEpistemic {
-        empirical: 0.5,
-        normative: 0.3,
-        mythic: 0.2,
-    };
+    // Fetch epistemic scores from Knowledge hApp (falls back to defaults)
+    let claim_type_key = format!("{:?}", input.claim_type);
+    let epistemic = fetch_epistemic(&input.claim_text, &claim_type_key);
 
     let claim = SafetyClaim {
         design_hash: input.design_hash.clone(),
@@ -149,9 +190,9 @@ pub fn submit_safety_claim(input: SubmitClaimInput) -> ExternResult<Record> {
 
     let hash = create_entry(EntryTypes::SafetyClaim(claim))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "claim_submitted".to_string(),
-        source_zome: "verification".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Verification,
+        event_type: FabricationEventType::ClaimSubmitted,
         payload: format!(r#"{{"hash":"{}"}}"#, hash),
     });
 
@@ -199,4 +240,198 @@ pub fn get_epistemic_score(design_hash: ActionHash) -> ExternResult<EpistemicSco
         mythic: m_sum / count_f,
         overall_confidence: (e_sum + n_sum) / (2.0 * count_f),
     })
+}
+
+/// Return the default epistemic values applied when no Knowledge hApp score is available.
+pub fn default_epistemic_values() -> (f32, f32, f32) {
+    let ep = default_epistemic();
+    (ep.empirical, ep.normative, ep.mythic)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    fn test_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn test_agent_key() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0u8; 36])
+    }
+
+    // ── 1. SubmitVerificationInput serde roundtrip ────────────────────────────
+
+    #[test]
+    fn test_submit_verification_input_serde() {
+        let input = SubmitVerificationInput {
+            design_hash: test_action_hash(),
+            verification_type: VerificationType::StructuralAnalysis,
+            result: VerificationResult::Passed {
+                confidence: 0.95,
+                notes: "All finite-element checks passed".to_string(),
+            },
+            evidence: vec![ActionHash::from_raw_36(vec![1u8; 36])],
+            credentials: vec!["PE License #12345".to_string()],
+        };
+
+        let json = serde_json::to_string(&input)
+            .expect("SubmitVerificationInput should serialize to JSON");
+        let restored: SubmitVerificationInput = serde_json::from_str(&json)
+            .expect("SubmitVerificationInput should deserialize from JSON");
+
+        // Verify structural fields survive the roundtrip.
+        assert_eq!(restored.design_hash, input.design_hash);
+        assert_eq!(restored.verification_type, input.verification_type);
+        assert_eq!(restored.credentials, input.credentials);
+        assert_eq!(restored.evidence.len(), 1);
+
+        // Verify the result variant and its inner values.
+        match restored.result {
+            VerificationResult::Passed { confidence, ref notes } => {
+                assert!((confidence - 0.95).abs() < f32::EPSILON);
+                assert_eq!(notes, "All finite-element checks passed");
+            }
+            other => panic!("Expected Passed variant, got {:?}", other),
+        }
+    }
+
+    // ── 2. SubmitClaimInput serde roundtrip ───────────────────────────────────
+
+    #[test]
+    fn test_submit_safety_claim_input_serde() {
+        let input = SubmitClaimInput {
+            design_hash: test_action_hash(),
+            claim_type: SafetyClaimType::LoadCapacity("Supports 50kg static load".to_string()),
+            claim_text: "Bracket rated for 50 kg at SWL 3:1 safety factor".to_string(),
+            supporting_evidence: vec!["FEA report v2.1".to_string(), "Physical test #7".to_string()],
+        };
+
+        let json = serde_json::to_string(&input)
+            .expect("SubmitClaimInput should serialize to JSON");
+        let restored: SubmitClaimInput = serde_json::from_str(&json)
+            .expect("SubmitClaimInput should deserialize from JSON");
+
+        assert_eq!(restored.design_hash, input.design_hash);
+        assert_eq!(restored.claim_text, input.claim_text);
+        assert_eq!(restored.supporting_evidence, input.supporting_evidence);
+        assert_eq!(
+            restored.claim_type,
+            SafetyClaimType::LoadCapacity("Supports 50kg static load".to_string())
+        );
+    }
+
+    // ── 3. VerificationType — all variants roundtrip ──────────────────────────
+
+    #[test]
+    fn test_verification_type_all_variants_serde() {
+        let variants = vec![
+            VerificationType::StructuralAnalysis,
+            VerificationType::MaterialCompatibility,
+            VerificationType::PrintabilityTest,
+            VerificationType::SafetyReview,
+            VerificationType::FoodSafeCertification,
+            VerificationType::MedicalCertification,
+            VerificationType::CommunityReview,
+        ];
+
+        for variant in &variants {
+            let json = serde_json::to_string(variant)
+                .unwrap_or_else(|e| panic!("Failed to serialize {:?}: {}", variant, e));
+            let restored: VerificationType = serde_json::from_str(&json)
+                .unwrap_or_else(|e| panic!("Failed to deserialize {:?}: {}", json, e));
+            assert_eq!(
+                &restored, variant,
+                "VerificationType::{:?} did not survive serde roundtrip",
+                variant
+            );
+        }
+    }
+
+    // ── 4. SafetyClaimType — all variants roundtrip ───────────────────────────
+
+    #[test]
+    fn test_safety_claim_type_variants_serde() {
+        let variants = vec![
+            SafetyClaimType::LoadCapacity("Supports 80kg".to_string()),
+            SafetyClaimType::MaterialSafety("Food-safe in PETG".to_string()),
+            SafetyClaimType::DimensionalAccuracy("Fits M8 bolt".to_string()),
+            SafetyClaimType::TemperatureRange("Safe to 80°C".to_string()),
+            SafetyClaimType::ChemicalResistance("Resistant to IPA".to_string()),
+            SafetyClaimType::Custom("Outdoor UV rating 10yr".to_string()),
+        ];
+
+        for variant in &variants {
+            let json = serde_json::to_string(variant)
+                .unwrap_or_else(|e| panic!("Failed to serialize {:?}: {}", variant, e));
+            let restored: SafetyClaimType = serde_json::from_str(&json)
+                .unwrap_or_else(|e| panic!("Failed to deserialize {:?}: {}", json, e));
+            assert_eq!(
+                &restored, variant,
+                "SafetyClaimType::{:?} did not survive serde roundtrip",
+                variant
+            );
+        }
+    }
+
+    // ── 5. default_epistemic_values matches hard-coded submit_safety_claim defaults ──
+
+    #[test]
+    fn test_claim_epistemic_defaults() {
+        let (empirical, normative, mythic) = default_epistemic_values();
+
+        // Values must match the ClaimEpistemic hard-coded in submit_safety_claim.
+        assert!(
+            (empirical - 0.5).abs() < f32::EPSILON,
+            "Default empirical should be 0.5, got {}",
+            empirical
+        );
+        assert!(
+            (normative - 0.3).abs() < f32::EPSILON,
+            "Default normative should be 0.3, got {}",
+            normative
+        );
+        assert!(
+            (mythic - 0.2).abs() < f32::EPSILON,
+            "Default mythic should be 0.2, got {}",
+            mythic
+        );
+
+        // They must also be valid for ClaimEpistemic (all in 0.0..=1.0).
+        assert!(empirical >= 0.0 && empirical <= 1.0);
+        assert!(normative >= 0.0 && normative <= 1.0);
+        assert!(mythic >= 0.0 && mythic <= 1.0);
+
+        // Serde roundtrip of ClaimEpistemic using the defaults.
+        let epistemic = ClaimEpistemic { empirical, normative, mythic };
+        let json = serde_json::to_string(&epistemic)
+            .expect("ClaimEpistemic should serialize");
+        let restored: ClaimEpistemic = serde_json::from_str(&json)
+            .expect("ClaimEpistemic should deserialize");
+        assert!((restored.empirical - empirical).abs() < f32::EPSILON);
+        assert!((restored.normative - normative).abs() < f32::EPSILON);
+        assert!((restored.mythic - mythic).abs() < f32::EPSILON);
+
+        // Unused variable suppression — agent key and action hash constructors
+        // are available in coordinator tests via hdk::prelude::*.
+        let _ = test_action_hash();
+        let _ = test_agent_key();
+    }
+
+    #[test]
+    fn test_default_epistemic_function() {
+        let ep = default_epistemic();
+        assert!((ep.empirical - 0.5).abs() < f32::EPSILON);
+        assert!((ep.normative - 0.3).abs() < f32::EPSILON);
+        assert!((ep.mythic - 0.2).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_epistemic_cache_ttl_constant() {
+        assert_eq!(EPISTEMIC_CACHE_TTL_MICROS, 300_000_000);
+        // 5 minutes in micros
+        assert_eq!(EPISTEMIC_CACHE_TTL_MICROS / 1_000_000, 300);
+    }
 }

@@ -360,8 +360,10 @@ fn validate_create_link(
     link_type: LinkTypes,
     _base_address: AnyLinkableHash,
     _target_address: AnyLinkableHash,
-    _tag: LinkTag,
+    tag: LinkTag,
 ) -> ExternResult<ValidateCallbackResult> {
+    let max_len: usize = 256;
+    check!(validation::require_max_tag_len(&tag, max_len, &format!("{:?}", link_type)));
     match link_type {
         LinkTypes::DesignToPrints => Ok(ValidateCallbackResult::Valid),
         LinkTypes::PrinterToPrints => Ok(ValidateCallbackResult::Valid),
@@ -761,5 +763,23 @@ mod tests {
         let mut a2 = valid_cincinnati_anomaly_entry();
         a2.event.severity = 1.0;
         assert!(is_valid(&validate_cincinnati_anomaly(a2)));
+    }
+
+    // =========================================================================
+    // Link tag validation tests
+    // =========================================================================
+
+    #[test]
+    fn test_link_tag_at_max_passes() {
+        let tag = LinkTag::new(vec![0u8; 256]);
+        let result = validation::require_max_tag_len(&tag, 256, "test");
+        assert!(result.is_err()); // Err(()) means "no validation issue found"
+    }
+
+    #[test]
+    fn test_link_tag_over_max_rejected() {
+        let tag = LinkTag::new(vec![0u8; 257]);
+        let result = validation::require_max_tag_len(&tag, 256, "test");
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(msg)) if msg.contains("link tag")));
     }
 }

@@ -12,5 +12,6 @@ name = "printers_coordinator"
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
 fabrication_common = { workspace = true }
 printers_integrity = { path = "../integrity" }

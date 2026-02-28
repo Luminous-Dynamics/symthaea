@@ -335,4 +335,45 @@ describe('Bridge Zome - Anticipatory Repair', () => {
       expect(linkRecord).toBeDefined();
     });
   });
+
+  it('should log audit trail entries for state-changing operations', async () => {
+    await runScenario(async (scenario: Scenario) => {
+      const [alice] = await scenario.addPlayersWithApps([
+        { appBundleSource: { path: HAPP_PATH } },
+      ]);
+
+      await scenario.shareAllAgents();
+
+      // Create a prediction (triggers audit logging)
+      await alice.cells[0].callZome({
+        zome_name: 'bridge',
+        fn_name: 'create_repair_prediction',
+        payload: {
+          property_asset_hash: new Uint8Array(39).fill(10),
+          asset_model: 'Audit-Test-Model',
+          predicted_failure_component: 'test-component',
+          failure_probability: 0.5,
+          estimated_failure_date: Date.now() * 1000 + 30 * 24 * 60 * 60 * 1000000,
+          confidence_interval_days: 7,
+          sensor_data_summary: '{"test": true}',
+        },
+      });
+
+      // Query audit trail — should have at least 1 entry
+      const auditTrail: Record[] = await alice.cells[0].callZome({
+        zome_name: 'bridge',
+        fn_name: 'get_audit_trail',
+        payload: {
+          domain: 'Bridge',
+          agent: null,
+          after: null,
+          before: null,
+          limit: 50,
+        },
+      });
+
+      expect(auditTrail).toBeDefined();
+      expect(auditTrail.length).toBeGreaterThanOrEqual(1);
+    });
+  });
 });

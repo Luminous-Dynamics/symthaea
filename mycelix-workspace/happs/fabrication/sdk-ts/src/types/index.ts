@@ -221,6 +221,10 @@ export type PrinterFeature =
 
 export interface GeoLocation {
   geohash: string;
+  /** Latitude in decimal degrees (-90 to 90). Optional; used for Haversine distance. */
+  lat?: number;
+  /** Longitude in decimal degrees (-180 to 180). Optional; used for Haversine distance. */
+  lon?: number;
   city?: string;
   region?: string;
   country: string;

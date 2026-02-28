@@ -272,8 +272,17 @@ fn validate_create_link(
     link_type: LinkTypes,
     _base_address: AnyLinkableHash,
     _target_address: AnyLinkableHash,
-    _tag: LinkTag,
+    tag: LinkTag,
 ) -> ExternResult<ValidateCallbackResult> {
+    // Validate tag length per link type:
+    // - GeohashToPrinters: 512 bytes (encodes geohash prefix data)
+    // - All others: 256 bytes
+    let max_len = match link_type {
+        LinkTypes::GeohashToPrinters => 512,
+        _ => 256,
+    };
+    check!(validation::require_max_tag_len(&tag, max_len, &format!("{:?}", link_type)));
+
     match link_type {
         LinkTypes::OwnerToPrinters => Ok(ValidateCallbackResult::Valid),
         LinkTypes::GeohashToPrinters => Ok(ValidateCallbackResult::Valid),
@@ -330,6 +339,8 @@ mod tests {
             owner: test_agent(),
             location: Some(GeoLocation {
                 geohash: "9q5c".to_string(),
+                lat: Some(32.9483),
+                lon: Some(-96.7299),
                 city: Some("Richardson".to_string()),
                 region: Some("TX".to_string()),
                 country: "US".to_string(),
@@ -478,6 +489,8 @@ mod tests {
         let mut p = valid_printer();
         p.location = Some(GeoLocation {
             geohash: "9q5c".to_string(),
+            lat: None,
+            lon: None,
             city: None,
             region: None,
             country: "".to_string(),
@@ -508,5 +521,55 @@ mod tests {
     fn test_valid_status_passes() {
         let result = validate_status(valid_status());
         assert!(is_valid(&result), "Valid status should pass: {:?}", result);
+    }
+
+    // --- Link tag validation tests ---
+
+    #[test]
+    fn test_link_tag_at_max_length_passes() {
+        let max_tag = LinkTag(vec![0u8; 256]);
+        let result = validate_create_link(
+            LinkTypes::OwnerToPrinters,
+            AnyLinkableHash::from(AgentPubKey::from_raw_36(vec![0u8; 36])),
+            AnyLinkableHash::from(AgentPubKey::from_raw_36(vec![0u8; 36])),
+            max_tag,
+        );
+        assert!(is_valid(&result), "Tag at max length (256) should pass: {:?}", result);
+    }
+
+    #[test]
+    fn test_link_tag_over_max_length_rejected() {
+        let oversized_tag = LinkTag(vec![0u8; 257]);
+        let result = validate_create_link(
+            LinkTypes::OwnerToPrinters,
+            AnyLinkableHash::from(AgentPubKey::from_raw_36(vec![0u8; 36])),
+            AnyLinkableHash::from(AgentPubKey::from_raw_36(vec![0u8; 36])),
+            oversized_tag,
+        );
+        assert!(is_invalid(&result), "Tag over max length (257) should be rejected");
+    }
+
+    #[test]
+    fn test_geohash_link_tag_at_512_bytes_passes() {
+        let max_tag = LinkTag(vec![0u8; 512]);
+        let result = validate_create_link(
+            LinkTypes::GeohashToPrinters,
+            AnyLinkableHash::from(AgentPubKey::from_raw_36(vec![0u8; 36])),
+            AnyLinkableHash::from(AgentPubKey::from_raw_36(vec![0u8; 36])),
+            max_tag,
+        );
+        assert!(is_valid(&result), "Geohash tag at max length (512) should pass: {:?}", result);
+    }
+
+    #[test]
+    fn test_geohash_link_tag_over_512_bytes_rejected() {
+        let oversized_tag = LinkTag(vec![0u8; 513]);
+        let result = validate_create_link(
+            LinkTypes::GeohashToPrinters,
+            AnyLinkableHash::from(AgentPubKey::from_raw_36(vec![0u8; 36])),
+            AnyLinkableHash::from(AgentPubKey::from_raw_36(vec![0u8; 36])),
+            oversized_tag,
+        );
+        assert!(is_invalid(&result), "Geohash tag over max length (513) should be rejected");
     }
 }

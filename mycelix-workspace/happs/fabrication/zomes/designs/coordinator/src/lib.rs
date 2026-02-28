@@ -71,6 +71,24 @@ pub struct DesignSearchQuery {
     pub min_circularity: Option<f32>,
     pub license: Option<License>,
     pub limit: Option<u32>,
+    pub pagination: Option<PaginationInput>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetDesignsByAuthorInput {
+    pub author: AgentPubKey,
+    pub pagination: Option<PaginationInput>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetDesignsByCategoryInput {
+    pub category: DesignCategory,
+    pub pagination: Option<PaginationInput>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetFeaturedDesignsInput {
+    pub pagination: Option<PaginationInput>,
 }
 
 // =============================================================================
@@ -114,9 +132,9 @@ pub fn create_design(input: CreateDesignInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(EntryTypes::Design(design.clone()))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "design_created".to_string(),
-        source_zome: "designs".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Design,
+        event_type: FabricationEventType::DesignCreated,
         payload: format!(r#"{{"hash":"{}"}}"#, action_hash),
     });
 
@@ -207,9 +225,9 @@ pub fn update_design(input: UpdateDesignInput) -> ExternResult<Record> {
 
     let new_hash = update_entry(input.original_action_hash, EntryTypes::Design(updated_design))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "design_updated".to_string(),
-        source_zome: "designs".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Design,
+        event_type: FabricationEventType::DesignUpdated,
         payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
     });
 
@@ -244,9 +262,9 @@ pub fn delete_design(hash: ActionHash) -> ExternResult<ActionHash> {
 
     let delete_hash = delete_entry(hash.clone())?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "design_deleted".to_string(),
-        source_zome: "designs".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Design,
+        event_type: FabricationEventType::DesignDeleted,
         payload: format!(r#"{{"hash":"{}"}}"#, hash),
     });
 
@@ -272,9 +290,9 @@ pub fn add_design_file(input: AddFileInput) -> ExternResult<Record> {
 
     let file_hash = create_entry(EntryTypes::DesignFile(file_entry))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "file_added".to_string(),
-        source_zome: "designs".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Design,
+        event_type: FabricationEventType::FileAdded,
         payload: format!(r#"{{"hash":"{}"}}"#, file_hash),
     });
 
@@ -383,9 +401,9 @@ pub fn fork_design(input: ForkDesignInput) -> ExternResult<Record> {
 
     let child_hash = create_entry(EntryTypes::Design(forked_design.clone()))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "design_forked".to_string(),
-        source_zome: "designs".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Design,
+        event_type: FabricationEventType::DesignForked,
         payload: format!(r#"{{"hash":"{}"}}"#, child_hash),
     });
 
@@ -482,9 +500,9 @@ pub fn get_design_forks(hash: ActionHash) -> ExternResult<Vec<Record>> {
 
 /// Get all designs by an author
 #[hdk_extern]
-pub fn get_designs_by_author(author: AgentPubKey) -> ExternResult<Vec<Record>> {
+pub fn get_designs_by_author(input: GetDesignsByAuthorInput) -> ExternResult<PaginatedResponse<Record>> {
     let links = get_links(
-        LinkQuery::try_new(author, LinkTypes::AuthorToDesigns)?, GetStrategy::default(),
+        LinkQuery::try_new(input.author, LinkTypes::AuthorToDesigns)?, GetStrategy::default(),
     )?;
 
     let mut designs = Vec::new();
@@ -496,13 +514,13 @@ pub fn get_designs_by_author(author: AgentPubKey) -> ExternResult<Vec<Record>> {
         }
     }
 
-    Ok(designs)
+    Ok(paginate(designs, input.pagination.as_ref()))
 }
 
 /// Get all designs in a category
 #[hdk_extern]
-pub fn get_designs_by_category(category: DesignCategory) -> ExternResult<Vec<Record>> {
-    let anchor = category_anchor(&category)?;
+pub fn get_designs_by_category(input: GetDesignsByCategoryInput) -> ExternResult<PaginatedResponse<Record>> {
+    let anchor = category_anchor(&input.category)?;
     let links = get_links(
         LinkQuery::try_new(anchor, LinkTypes::CategoryToDesigns)?, GetStrategy::default(),
     )?;
@@ -516,24 +534,19 @@ pub fn get_designs_by_category(category: DesignCategory) -> ExternResult<Vec<Rec
         }
     }
 
-    Ok(designs)
+    Ok(paginate(designs, input.pagination.as_ref()))
 }
 
 /// Search designs with various filters
 #[hdk_extern]
-pub fn search_designs(query: DesignSearchQuery) -> ExternResult<Vec<Record>> {
+pub fn search_designs(query: DesignSearchQuery) -> ExternResult<PaginatedResponse<Record>> {
     // Get all designs
     let anchor = all_designs_anchor()?;
     let links = get_links(LinkQuery::try_new(anchor, LinkTypes::AllDesigns)?, GetStrategy::default())?;
 
-    let limit = query.limit.unwrap_or(100) as usize;
     let mut results = Vec::new();
 
     for link in links {
-        if results.len() >= limit {
-            break;
-        }
-
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get(hash, GetOptions::default())? {
                 if let Some(design) = record
@@ -580,19 +593,19 @@ pub fn search_designs(query: DesignSearchQuery) -> ExternResult<Vec<Record>> {
         }
     }
 
-    Ok(results)
+    Ok(paginate(results, query.pagination.as_ref()))
 }
 
 /// Get featured designs
 #[hdk_extern]
-pub fn get_featured_designs(limit: u32) -> ExternResult<Vec<Record>> {
+pub fn get_featured_designs(input: GetFeaturedDesignsInput) -> ExternResult<PaginatedResponse<Record>> {
     let anchor = featured_designs_anchor()?;
     let links = get_links(
         LinkQuery::try_new(anchor, LinkTypes::FeaturedDesigns)?, GetStrategy::default(),
     )?;
 
     let mut designs = Vec::new();
-    for link in links.into_iter().take(limit as usize) {
+    for link in links {
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get(hash, GetOptions::default())? {
                 designs.push(record);
@@ -600,7 +613,7 @@ pub fn get_featured_designs(limit: u32) -> ExternResult<Vec<Record>> {
         }
     }
 
-    Ok(designs)
+    Ok(paginate(designs, input.pagination.as_ref()))
 }
 
 // =============================================================================
@@ -626,7 +639,7 @@ pub fn get_parameters(hash: ActionHash) -> ExternResult<Option<ParametricSchema>
     Ok(design.parametric_schema)
 }
 
-/// Generate a parametric variant (placeholder for actual generation)
+/// Generate a parametric variant by delegating to the symthaea CSG zome.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GenerateVariantInput {
     pub design_hash: ActionHash,
@@ -639,11 +652,94 @@ pub struct GeneratedVariant {
     pub parameters_used: HashMap<String, ParameterValue>,
     pub output_file: Option<DesignFile>,
     pub generation_status: String,
+    /// The action hash of the GeneratedDesignEntry created in the symthaea
+    /// zome, if the cross-zome call succeeded.
+    pub csg_record_hash: Option<ActionHash>,
+}
+
+/// Mirror of symthaea coordinator's `GenerateVariantInput` for the cross-zome
+/// call.  Field names must match exactly so that MessagePack serialization on
+/// the caller side deserializes correctly on the callee side.
+#[derive(Serialize, Deserialize, Debug)]
+struct SynthaaeVariantInput {
+    pub base_design_hash: ActionHash,
+    pub intent_modifiers: Vec<SerializedBindingForCall>,
+    pub material_constraints: Vec<String>,
+    pub printer_constraints: Option<String>,
+}
+
+/// Minimal mirror of `SerializedBinding` from the symthaea integrity crate.
+/// We only need the wire-format fields; the type lives in the symthaea crate
+/// so we cannot import it directly from the designs coordinator.
+#[derive(Serialize, Deserialize, Debug)]
+struct SerializedBindingForCall {
+    pub concept: String,
+    pub role: String,
+    pub weight: f32,
+}
+
+/// Convert the caller's flat `HashMap<String, ParameterValue>` into the
+/// symthaea zome's intent-modifier + material-constraint representation.
+///
+/// Rules:
+/// - Every parameter becomes a `SerializedBinding` with the parameter key as
+///   `concept`.
+/// - The `role` is derived from the value type:
+///   - `Number` / `Integer` → "dimension"
+///   - `Boolean`            → "feature"
+///   - `String` → "material" when the key contains "material",
+///     "modifier" otherwise
+/// - Parameters whose key contains "material" or whose `ParameterValue` is a
+///   `String` with key containing "material" are also collected into
+///   `material_constraints` as plain strings.
+/// - `weight` is 1.0 for all generated bindings (the symthaea zome uses it
+///   only for tie-breaking in HDC cosine similarity, so a uniform weight is
+///   correct when the caller does not specify priority).
+fn params_to_symthaea_input(
+    design_hash: ActionHash,
+    parameters: &HashMap<String, ParameterValue>,
+) -> SynthaaeVariantInput {
+    let mut intent_modifiers: Vec<SerializedBindingForCall> = Vec::new();
+    let mut material_constraints: Vec<String> = Vec::new();
+
+    for (key, value) in parameters {
+        let key_lower = key.to_lowercase();
+        let is_material_key = key_lower.contains("material") || key_lower.contains("filament");
+
+        let (role, concept_value) = match value {
+            ParameterValue::Number(n) => ("dimension".to_string(), format!("{}={}", key, n)),
+            ParameterValue::Integer(i) => ("dimension".to_string(), format!("{}={}", key, i)),
+            ParameterValue::Boolean(b) => ("feature".to_string(), format!("{}={}", key, b)),
+            ParameterValue::String(s) => {
+                if is_material_key {
+                    material_constraints.push(s.clone());
+                    ("material".to_string(), s.clone())
+                } else {
+                    ("modifier".to_string(), format!("{}={}", key, s))
+                }
+            }
+        };
+
+        intent_modifiers.push(SerializedBindingForCall {
+            concept: concept_value,
+            role,
+            weight: 1.0,
+        });
+    }
+
+    SynthaaeVariantInput {
+        base_design_hash: design_hash,
+        intent_modifiers,
+        material_constraints,
+        printer_constraints: None,
+    }
 }
 
 #[hdk_extern]
 pub fn generate_variant(input: GenerateVariantInput) -> ExternResult<GeneratedVariant> {
-    // Validate the design exists and has parametric schema
+    // -------------------------------------------------------------------------
+    // 1. Validate: design must exist on DHT and have a parametric schema.
+    // -------------------------------------------------------------------------
     let record = get(input.design_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Design not found".to_string()
@@ -663,19 +759,73 @@ pub fn generate_variant(input: GenerateVariantInput) -> ExternResult<GeneratedVa
         )));
     }
 
-    // In a real implementation, this would:
-    // 1. Fetch the template from IPFS
-    // 2. Apply parameters using OpenSCAD/CadQuery
-    // 3. Generate the output file
-    // 4. Upload to IPFS
-    // 5. Return the generated file info
+    // -------------------------------------------------------------------------
+    // 2. Attempt cross-zome call to symthaea's parametric variant generator.
+    // -------------------------------------------------------------------------
+    let symthaea_input =
+        params_to_symthaea_input(input.design_hash.clone(), &input.parameters);
 
-    Ok(GeneratedVariant {
-        design_hash: input.design_hash,
-        parameters_used: input.parameters,
-        output_file: None, // Would be populated by actual generation
-        generation_status: "Parametric generation requires external processing".to_string(),
-    })
+    let csg_result = call(
+        CallTargetCell::Local,
+        ZomeName::from("symthaea"),
+        FunctionName::from("generate_parametric_variant"),
+        None,
+        &symthaea_input,
+    );
+
+    // -------------------------------------------------------------------------
+    // 3. Interpret the cross-zome result.
+    // -------------------------------------------------------------------------
+    match csg_result {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            // Decode the returned Record to extract the action hash.  The
+            // symthaea zome returns ExternResult<Record>, so the outer
+            // ExternResult is already unwrapped by the HDK call machinery;
+            // the payload is the serialized Record.
+            let csg_record: Record = extern_io
+                .decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode symthaea response: {}",
+                    e
+                ))))?;
+
+            let csg_hash = csg_record.action_address().clone();
+
+            Ok(GeneratedVariant {
+                design_hash: input.design_hash,
+                parameters_used: input.parameters,
+                // generated_file_cid is populated later by the native
+                // fabrication-kernel service; the Record on DHT carries it.
+                output_file: None,
+                generation_status: "csg_resolved".to_string(),
+                csg_record_hash: Some(csg_hash),
+            })
+        }
+
+        // Any non-Ok ZomeCallResponse or an HDK-level error falls through to
+        // the fallback branch.  The `generation_status` field communicates
+        // the failure reason to callers; verbose logging is not needed here.
+        Ok(ZomeCallResponse::NetworkError(_))
+        | Ok(ZomeCallResponse::Unauthorized(..))
+        | Ok(_) => Ok(GeneratedVariant {
+            design_hash: input.design_hash,
+            parameters_used: input.parameters,
+            output_file: None,
+            generation_status: "csg_unavailable".to_string(),
+            csg_record_hash: None,
+        }),
+        Err(_) => {
+            // HDK-level error (e.g., symthaea zome absent from DNA) — still a
+            // graceful fallback so callers continue to function without CSG.
+            Ok(GeneratedVariant {
+                design_hash: input.design_hash,
+                parameters_used: input.parameters,
+                output_file: None,
+                generation_status: "csg_unavailable".to_string(),
+                csg_record_hash: None,
+            })
+        }
+    }
 }
 
 // =============================================================================
@@ -712,4 +862,218 @@ fn all_designs_anchor() -> ExternResult<EntryHash> {
 /// Get the anchor for featured designs
 fn featured_designs_anchor() -> ExternResult<EntryHash> {
     make_anchor("featured_designs")
+}
+
+// =============================================================================
+// UNIT TESTS
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_create_design_input_serde() {
+        let input = CreateDesignInput {
+            title: "Test Bracket".to_string(),
+            description: "A simple test bracket".to_string(),
+            category: DesignCategory::Parts,
+            intent_vector: Some(HdcHypervector {
+                dimensions: 10000,
+                vector: vec![0i8; 10000],
+                semantic_bindings: vec![],
+                generation_method: HdcMethod::ManualEncoding,
+            }),
+            parametric_schema: None,
+            constraint_graph: None,
+            material_compatibility: vec![],
+            circularity_score: 0.5,
+            embodied_energy_kwh: 1.0,
+            repair_manifest: None,
+            license: License::PublicDomain,
+            safety_class: SafetyClass::Class0Decorative,
+        };
+
+        let json = serde_json::to_string(&input).expect("serialization failed");
+        let decoded: CreateDesignInput =
+            serde_json::from_str(&json).expect("deserialization failed");
+
+        assert_eq!(decoded.title, "Test Bracket");
+        assert_eq!(decoded.description, "A simple test bracket");
+        assert!(matches!(decoded.category, DesignCategory::Parts));
+        assert_eq!(decoded.circularity_score, 0.5);
+        assert_eq!(decoded.embodied_energy_kwh, 1.0);
+        assert!(matches!(decoded.license, License::PublicDomain));
+        assert!(matches!(decoded.safety_class, SafetyClass::Class0Decorative));
+        assert!(decoded.parametric_schema.is_none());
+        assert!(decoded.constraint_graph.is_none());
+        assert!(decoded.repair_manifest.is_none());
+        assert!(decoded.material_compatibility.is_empty());
+
+        let hv = decoded.intent_vector.expect("intent_vector missing");
+        assert_eq!(hv.dimensions, 10000);
+        assert_eq!(hv.vector.len(), 10000);
+        assert!(matches!(hv.generation_method, HdcMethod::ManualEncoding));
+    }
+
+    #[test]
+    fn test_update_design_input_serde() {
+        let original_action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        let input = UpdateDesignInput {
+            original_action_hash: original_action_hash.clone(),
+            title: Some("Updated Title".to_string()),
+            description: Some("Updated description".to_string()),
+            category: Some(DesignCategory::Tools),
+            intent_vector: None,
+            parametric_schema: None,
+            constraint_graph: None,
+            material_compatibility: None,
+            circularity_score: Some(0.75),
+            embodied_energy_kwh: None,
+            repair_manifest: None,
+            license: Some(License::OpenHardware),
+            safety_class: Some(SafetyClass::Class1Functional),
+            epistemic: Some(DesignEpistemic {
+                manufacturability: 0.8,
+                safety: 0.9,
+                usability: 0.7,
+            }),
+        };
+
+        let json = serde_json::to_string(&input).expect("serialization failed");
+        let decoded: UpdateDesignInput =
+            serde_json::from_str(&json).expect("deserialization failed");
+
+        assert_eq!(decoded.original_action_hash, original_action_hash);
+        assert_eq!(decoded.title.as_deref(), Some("Updated Title"));
+        assert_eq!(decoded.description.as_deref(), Some("Updated description"));
+        assert!(matches!(decoded.category, Some(DesignCategory::Tools)));
+        assert_eq!(decoded.circularity_score, Some(0.75));
+        assert!(matches!(decoded.license, Some(License::OpenHardware)));
+        assert!(matches!(decoded.safety_class, Some(SafetyClass::Class1Functional)));
+        assert!(decoded.intent_vector.is_none());
+        assert!(decoded.parametric_schema.is_none());
+        assert!(decoded.repair_manifest.is_none());
+
+        let ep = decoded.epistemic.expect("epistemic missing");
+        assert_eq!(ep.manufacturability, 0.8);
+        assert_eq!(ep.safety, 0.9);
+        assert_eq!(ep.usability, 0.7);
+    }
+
+    #[test]
+    fn test_design_search_query_serde() {
+        let input = DesignSearchQuery {
+            query: Some("bracket".to_string()),
+            category: Some(DesignCategory::Repair),
+            safety_class: Some(SafetyClass::Class2LoadBearing),
+            min_circularity: Some(0.6),
+            license: Some(License::CreativeCommons(CCVariant::BY)),
+            limit: Some(20),
+            pagination: Some(PaginationInput {
+                offset: 0,
+                limit: 20,
+            }),
+        };
+
+        let json = serde_json::to_string(&input).expect("serialization failed");
+        let decoded: DesignSearchQuery =
+            serde_json::from_str(&json).expect("deserialization failed");
+
+        assert_eq!(decoded.query.as_deref(), Some("bracket"));
+        assert!(matches!(decoded.category, Some(DesignCategory::Repair)));
+        assert!(matches!(decoded.safety_class, Some(SafetyClass::Class2LoadBearing)));
+        assert_eq!(decoded.min_circularity, Some(0.6));
+        assert_eq!(decoded.limit, Some(20));
+
+        let lic = decoded.license.expect("license missing");
+        assert!(matches!(lic, License::CreativeCommons(CCVariant::BY)));
+
+        let page = decoded.pagination.expect("pagination missing");
+        assert_eq!(page.offset, 0);
+        assert_eq!(page.limit, 20);
+    }
+
+    #[test]
+    fn test_fork_design_input_serde() {
+        let parent_hash = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        let input = ForkDesignInput {
+            parent_hash: parent_hash.clone(),
+            modification_notes: "Increased wall thickness for outdoor use".to_string(),
+            title: Some("Outdoor Bracket (Fork)".to_string()),
+            description: Some("Weather-resistant variant".to_string()),
+            intent_modifications: Some(vec![SemanticBinding {
+                concept: "weatherproof".to_string(),
+                role: BindingRole::Modifier,
+                weight: 0.9,
+            }]),
+        };
+
+        let json = serde_json::to_string(&input).expect("serialization failed");
+        let decoded: ForkDesignInput =
+            serde_json::from_str(&json).expect("deserialization failed");
+
+        assert_eq!(decoded.parent_hash, parent_hash);
+        assert_eq!(
+            decoded.modification_notes,
+            "Increased wall thickness for outdoor use"
+        );
+        assert_eq!(decoded.title.as_deref(), Some("Outdoor Bracket (Fork)"));
+        assert_eq!(
+            decoded.description.as_deref(),
+            Some("Weather-resistant variant")
+        );
+
+        let mods = decoded.intent_modifications.expect("intent_modifications missing");
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].concept, "weatherproof");
+        assert!(matches!(mods[0].role, BindingRole::Modifier));
+        assert_eq!(mods[0].weight, 0.9);
+    }
+
+    #[test]
+    fn test_generate_variant_input_serde() {
+        let design_hash = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        let mut parameters: HashMap<String, ParameterValue> = HashMap::new();
+        parameters.insert("wall_thickness".to_string(), ParameterValue::Number(3.0));
+        parameters.insert("height".to_string(), ParameterValue::Integer(50));
+        parameters.insert("include_holes".to_string(), ParameterValue::Boolean(true));
+        parameters.insert(
+            "material_grade".to_string(),
+            ParameterValue::String("PETG-CF".to_string()),
+        );
+
+        let input = GenerateVariantInput {
+            design_hash: design_hash.clone(),
+            parameters,
+        };
+
+        let json = serde_json::to_string(&input).expect("serialization failed");
+        let decoded: GenerateVariantInput =
+            serde_json::from_str(&json).expect("deserialization failed");
+
+        assert_eq!(decoded.design_hash, design_hash);
+        assert_eq!(decoded.parameters.len(), 4);
+
+        assert!(matches!(
+            decoded.parameters.get("wall_thickness"),
+            Some(ParameterValue::Number(v)) if (*v - 3.0).abs() < f64::EPSILON
+        ));
+        assert!(matches!(
+            decoded.parameters.get("height"),
+            Some(ParameterValue::Integer(50))
+        ));
+        assert!(matches!(
+            decoded.parameters.get("include_holes"),
+            Some(ParameterValue::Boolean(true))
+        ));
+        assert!(matches!(
+            decoded.parameters.get("material_grade"),
+            Some(ParameterValue::String(s)) if s == "PETG-CF"
+        ));
+    }
 }

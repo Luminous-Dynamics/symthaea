@@ -278,8 +278,20 @@ fn validate_create_link(
     link_type: LinkTypes,
     _base_address: AnyLinkableHash,
     _target_address: AnyLinkableHash,
-    _tag: LinkTag,
+    tag: LinkTag,
 ) -> ExternResult<ValidateCallbackResult> {
+    // Validate tag length for all link types (default: 256 bytes)
+    let max_len = match link_type {
+        LinkTypes::AuthorToDesigns => 256,
+        LinkTypes::CategoryToDesigns => 256,
+        LinkTypes::ParentToForks => 256,
+        LinkTypes::DesignToFiles => 256,
+        LinkTypes::DesignToVerifications => 256,
+        LinkTypes::AllDesigns => 256,
+        LinkTypes::FeaturedDesigns => 256,
+    };
+    check!(validation::require_max_tag_len(&tag, max_len, &format!("{:?}", link_type)));
+
     match link_type {
         LinkTypes::AuthorToDesigns => {
             // Any agent can link their own designs
@@ -506,5 +518,21 @@ mod tests {
         m.child_hash = same_hash;
         let result = validate_modification(m).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("Parent and child")));
+    }
+
+    // ---- Link tag validation tests ----
+
+    #[test]
+    fn test_link_tag_at_max_length_passes() {
+        let tag = LinkTag::new(vec![0u8; 256]);
+        let result = validation::require_max_tag_len(&tag, 256, "test");
+        assert!(result.is_err()); // Err(()) means "no validation issue found"
+    }
+
+    #[test]
+    fn test_link_tag_over_max_length_rejected() {
+        let tag = LinkTag::new(vec![0u8; 257]);
+        let result = validation::require_max_tag_len(&tag, 256, "test");
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(msg)) if msg.contains("link tag")));
     }
 }

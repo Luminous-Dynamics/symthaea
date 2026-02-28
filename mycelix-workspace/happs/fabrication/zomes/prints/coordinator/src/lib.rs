@@ -12,6 +12,24 @@ use hdk::prelude::*;
 use prints_integrity::*;
 use fabrication_common::*;
 
+use std::cell::RefCell;
+
+thread_local! {
+    static CONFIG: RefCell<Option<FabricationConfig>> = const { RefCell::new(None) };
+}
+
+fn get_config() -> FabricationConfig {
+    CONFIG.with(|c| {
+        c.borrow_mut()
+            .get_or_insert_with(|| {
+                dna_info()
+                    .map(|info| FabricationConfig::from_properties_or_default(info.modifiers.properties.bytes()))
+                    .unwrap_or_default()
+            })
+            .clone()
+    })
+}
+
 // Local Printer type for cross-zome data deserialization
 // (importing printers_integrity causes duplicate symbol errors)
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
@@ -33,45 +51,36 @@ pub struct Printer {
 // PROOF OF GROUNDED FABRICATION (PoGF)
 // =============================================================================
 
-/// PoGF scoring weights
-const POG_ENERGY_WEIGHT: f32 = 0.3;
-const POG_MATERIAL_WEIGHT: f32 = 0.3;
-const POG_QUALITY_WEIGHT: f32 = 0.2;
-const POG_LOCAL_WEIGHT: f32 = 0.2;
-
-/// Minimum PoGF score to earn MYCELIUM reputation
-const MIN_POG_FOR_MYCELIUM: f32 = 0.6;
-
-/// Base MYCELIUM reward per successful print
-const BASE_MYCELIUM_REWARD: u64 = 10;
-
 /// Calculate Proof of Grounded Fabrication score
-/// PoG = (E_renewable × 0.3) + (M_circular × 0.3) + (Q_verified × 0.2) + (L_local × 0.2)
+/// PoG = (E_renewable × w_e) + (M_circular × w_m) + (Q_verified × w_q) + (L_local × w_l)
+/// Weights loaded from DNA properties via FabricationConfig.
 fn calculate_pog_score(
     energy_renewable_fraction: f32,
     material_circularity: f32,
     quality_verified: f32,
     local_participation: f32,
 ) -> f32 {
+    let cfg = get_config();
     let e = energy_renewable_fraction.clamp(0.0, 1.0);
     let m = material_circularity.clamp(0.0, 1.0);
     let q = quality_verified.clamp(0.0, 1.0);
     let l = local_participation.clamp(0.0, 1.0);
 
-    (e * POG_ENERGY_WEIGHT) + (m * POG_MATERIAL_WEIGHT) + (q * POG_QUALITY_WEIGHT) + (l * POG_LOCAL_WEIGHT)
+    (e * cfg.pog_energy_weight) + (m * cfg.pog_material_weight) + (q * cfg.pog_quality_weight) + (l * cfg.pog_local_weight)
 }
 
 /// Calculate MYCELIUM (CIV) reputation earned from a print
 fn calculate_mycelium_reward(pog_score: f32, quality_score: f32) -> u64 {
-    if pog_score < MIN_POG_FOR_MYCELIUM {
+    let cfg = get_config();
+    if pog_score < cfg.min_pog_for_mycelium {
         return 0;
     }
 
     // Base reward multiplied by PoGF and quality scores
     let multiplier = (pog_score + quality_score) / 2.0;
-    let bonus = (pog_score - MIN_POG_FOR_MYCELIUM) * 50.0; // Bonus for exceeding minimum
+    let bonus = (pog_score - cfg.min_pog_for_mycelium) * 50.0; // Bonus for exceeding minimum
 
-    (BASE_MYCELIUM_REWARD as f32 * multiplier + bonus) as u64
+    (cfg.base_mycelium_reward as f32 * multiplier + bonus) as u64
 }
 
 // =============================================================================
@@ -265,9 +274,9 @@ pub fn create_print_job(input: CreatePrintJobInput) -> ExternResult<Record> {
                 return Err(e);
             }
             // Other errors (zome unavailable, parse error) → allow job with warning signal
-            let _ = emit_signal(&FabricationSignal {
-                event_type: "safety_check_skipped".to_string(),
-                source_zome: "prints".to_string(),
+            let _ = emit_signal(&TypedFabricationSignal {
+                domain: FabricationDomain::Print,
+                event_type: FabricationEventType::SafetyCheckSkipped,
                 payload: format!(r#"{{"reason":"{}"}}"#, msg.replace('"', "'")),
             });
         }
@@ -298,9 +307,9 @@ pub fn create_print_job(input: CreatePrintJobInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(EntryTypes::PrintJob(job))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "job_created".to_string(),
-        source_zome: "prints".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Print,
+        event_type: FabricationEventType::JobCreated,
         payload: format!(r#"{{"hash":"{}"}}"#, action_hash),
     });
 
@@ -366,9 +375,9 @@ pub fn accept_print_job(hash: ActionHash) -> ExternResult<Record> {
 
     let new_hash = update_entry(hash, EntryTypes::PrintJob(updated))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "job_accepted".to_string(),
-        source_zome: "prints".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Print,
+        event_type: FabricationEventType::JobAccepted,
         payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
     });
 
@@ -400,9 +409,9 @@ pub fn start_print(hash: ActionHash) -> ExternResult<Record> {
 
     let new_hash = update_entry(hash, EntryTypes::PrintJob(updated))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "print_started".to_string(),
-        source_zome: "prints".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Print,
+        event_type: FabricationEventType::PrintStarted,
         payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
     });
 
@@ -447,9 +456,9 @@ pub fn update_print_progress(input: UpdateProgressInput) -> ExternResult<Record>
 
     let new_hash = update_entry(input.job_hash, EntryTypes::PrintJob(updated))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "progress_updated".to_string(),
-        source_zome: "prints".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Print,
+        event_type: FabricationEventType::ProgressUpdated,
         payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
     });
 
@@ -494,9 +503,9 @@ pub fn complete_print(input: CompletePrintInput) -> ExternResult<Record> {
 
     let new_hash = update_entry(input.job_hash, EntryTypes::PrintJob(updated))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "print_completed".to_string(),
-        source_zome: "prints".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Print,
+        event_type: FabricationEventType::PrintCompleted,
         payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
     });
 
@@ -540,9 +549,9 @@ pub fn cancel_print(input: CancelPrintInput) -> ExternResult<Record> {
 
     let new_hash = update_entry(input.job_hash, EntryTypes::PrintJob(updated))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "print_cancelled".to_string(),
-        source_zome: "prints".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Print,
+        event_type: FabricationEventType::PrintCancelled,
         payload: format!(r#"{{"hash":"{}"}}"#, new_hash),
     });
 
@@ -688,9 +697,9 @@ pub fn record_print_result(input: RecordPrintInput) -> ExternResult<Record> {
 
     let record_hash = create_entry(EntryTypes::PrintRecord(record))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "result_recorded".to_string(),
-        source_zome: "prints".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Print,
+        event_type: FabricationEventType::ResultRecorded,
         payload: format!(r#"{{"hash":"{}"}}"#, record_hash),
     });
 
@@ -788,9 +797,9 @@ pub fn start_cincinnati_monitoring(input: StartCincinnatiInput) -> ExternResult<
 
     let session_hash = create_entry(EntryTypes::CincinnatiSessionEntry(session_entry))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "cincinnati_started".to_string(),
-        source_zome: "prints".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Print,
+        event_type: FabricationEventType::CincinnatiStarted,
         payload: format!(r#"{{"hash":"{}"}}"#, session_hash),
     });
 
@@ -847,9 +856,9 @@ pub fn report_cincinnati_anomaly(input: ReportAnomalyInput) -> ExternResult<Reco
 
     let anomaly_hash = create_entry(EntryTypes::CincinnatiAnomalyEntry(anomaly_entry))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "anomaly_detected".to_string(),
-        source_zome: "prints".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Print,
+        event_type: FabricationEventType::AnomalyDetected,
         payload: format!(r#"{{"hash":"{}"}}"#, anomaly_hash),
     });
 

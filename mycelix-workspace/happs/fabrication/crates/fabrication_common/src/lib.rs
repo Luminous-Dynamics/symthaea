@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 #[allow(clippy::result_unit_err)]
 pub mod validation {
-    use hdi::prelude::ValidateCallbackResult;
+    use hdi::prelude::{ValidateCallbackResult, LinkTag};
 
     pub fn require_finite(val: f32, field: &str) -> Result<ValidateCallbackResult, ()> {
         if !val.is_finite() {
@@ -91,6 +91,15 @@ pub mod validation {
         }
         Err(())
     }
+
+    pub fn require_max_tag_len(tag: &LinkTag, max: usize, name: &str) -> Result<ValidateCallbackResult, ()> {
+        if tag.as_ref().len() > max {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!("{} link tag cannot exceed {} bytes", name, max),
+            ));
+        }
+        Err(())
+    }
 }
 
 /// Check a validation result — returns early with Invalid if the check fails.
@@ -105,14 +114,209 @@ macro_rules! check {
 }
 
 // =============================================================================
+// FABRICATION CONFIG (loaded from DNA properties, falls back to defaults)
+// =============================================================================
+
+/// Consolidated configuration for all fabrication hApp constants.
+/// Loaded from DNA properties at runtime, falling back to defaults for missing fields.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FabricationConfig {
+    /// PoGF energy attestation weight
+    pub pog_energy_weight: f32,
+    /// PoGF material attestation weight
+    pub pog_material_weight: f32,
+    /// PoGF quality monitoring weight
+    pub pog_quality_weight: f32,
+    /// PoGF local participation weight
+    pub pog_local_weight: f32,
+    /// Minimum PoGF score for MYCELIUM reputation
+    pub min_pog_for_mycelium: f32,
+    /// Base MYCELIUM reward per successful print
+    pub base_mycelium_reward: u64,
+    /// Rate limit: max operations per window
+    pub rate_limit_max_ops: u32,
+    /// Rate limit: window in seconds
+    pub rate_limit_window_secs: u32,
+    /// HDC vector dimensions for symthaea coordinator
+    pub hdc_dimensions: u32,
+    /// Cosine similarity threshold for semantic matching
+    pub similarity_threshold: f32,
+}
+
+impl Default for FabricationConfig {
+    fn default() -> Self {
+        Self {
+            pog_energy_weight: 0.3,
+            pog_material_weight: 0.3,
+            pog_quality_weight: 0.2,
+            pog_local_weight: 0.2,
+            min_pog_for_mycelium: 0.6,
+            base_mycelium_reward: 10,
+            rate_limit_max_ops: 100,
+            rate_limit_window_secs: 60,
+            hdc_dimensions: 4096,
+            similarity_threshold: 0.7,
+        }
+    }
+}
+
+impl FabricationConfig {
+    /// Load from DNA properties bytes, falling back to defaults for missing fields.
+    pub fn from_properties_or_default(properties_bytes: &[u8]) -> Self {
+        serde_json::from_slice::<Self>(properties_bytes).unwrap_or_default()
+    }
+
+    /// Validate that PoGF weights sum to 1.0 (within tolerance).
+    pub fn pog_weights_valid(&self) -> bool {
+        let sum = self.pog_energy_weight
+            + self.pog_material_weight
+            + self.pog_quality_weight
+            + self.pog_local_weight;
+        (sum - 1.0).abs() < 0.001
+    }
+}
+
+// =============================================================================
 // SIGNAL TYPES
 // =============================================================================
 
+/// Legacy untyped signal — deprecated, use `TypedFabricationSignal` instead.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FabricationSignal {
     pub event_type: String,
     pub source_zome: String,
     pub payload: String,
+}
+
+// =============================================================================
+// TYPED SIGNAL TYPES
+// =============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FabricationDomain {
+    Design,
+    Print,
+    Material,
+    Verification,
+    Printer,
+    Symthaea,
+    Bridge,
+}
+
+impl std::fmt::Display for FabricationDomain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Design => write!(f, "designs"),
+            Self::Print => write!(f, "prints"),
+            Self::Material => write!(f, "materials"),
+            Self::Verification => write!(f, "verification"),
+            Self::Printer => write!(f, "printers"),
+            Self::Symthaea => write!(f, "symthaea"),
+            Self::Bridge => write!(f, "bridge"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FabricationEventType {
+    // Design events
+    DesignCreated,
+    DesignUpdated,
+    DesignDeleted,
+    DesignForked,
+    FileAdded,
+    // Printer events
+    PrinterRegistered,
+    PrinterUpdated,
+    PrinterDeactivated,
+    AvailabilityChanged,
+    // Material events
+    MaterialCreated,
+    // Verification events
+    VerificationSubmitted,
+    ClaimSubmitted,
+    // Print job events
+    SafetyCheckSkipped,
+    JobCreated,
+    JobAccepted,
+    PrintStarted,
+    ProgressUpdated,
+    PrintCompleted,
+    PrintCancelled,
+    ResultRecorded,
+    CincinnatiStarted,
+    AnomalyDetected,
+    // Bridge events
+    PredictionCreated,
+    WorkflowCreated,
+    WorkflowUpdated,
+    EventEmitted,
+    DesignListed,
+    SupplierLinked,
+    // Symthaea events
+    IntentGenerated,
+    IntentBound,
+    VariantGenerated,
+    OptimizationCompleted,
+    ConsciousnessGatedVariant,
+    // Audit diagnostic
+    AuditFallback,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TypedFabricationSignal {
+    pub domain: FabricationDomain,
+    pub event_type: FabricationEventType,
+    pub payload: String,
+}
+
+/// Known fabrication zome names for dispatch validation.
+pub const FABRICATION_ZOME_ALLOWLIST: &[&str] = &[
+    "designs", "printers", "prints", "materials",
+    "verification", "symthaea", "bridge",
+];
+
+// =============================================================================
+// ERROR TYPES
+// =============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum FabricationError {
+    NotFound { entity: String, hash: String },
+    Unauthorized { action: String, reason: String },
+    RateLimited { max_ops: u32, window_secs: u32 },
+    ValidationFailed { field: String, reason: String },
+    CrossHappUnavailable { role: String },
+    AuditFailed { reason: String },
+}
+
+impl FabricationError {
+    pub fn to_wasm_error(&self) -> WasmError {
+        wasm_error!(WasmErrorInner::Guest(format!("{:?}", self)))
+    }
+}
+
+// =============================================================================
+// AUDIT TRAIL TYPES
+// =============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct FabricationAuditEntry {
+    pub domain: FabricationDomain,
+    pub event_type: FabricationEventType,
+    pub action_hash: ActionHash,
+    pub agent: AgentPubKey,
+    pub payload: String,
+    pub created_at: Timestamp,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AuditTrailFilter {
+    pub domain: Option<FabricationDomain>,
+    pub agent: Option<AgentPubKey>,
+    pub after: Option<Timestamp>,
+    pub before: Option<Timestamp>,
+    pub limit: Option<u32>,
 }
 
 // =============================================================================
@@ -138,6 +342,32 @@ pub struct PaginatedResponse<T: Serialize> {
     pub offset: u32,
     pub limit: u32,
     pub total: u32,
+}
+
+/// Apply optional pagination to a collected `Vec`, returning a
+/// [`PaginatedResponse`]. When `pagination` is `None` all items are returned.
+pub fn paginate<T: Serialize>(items: Vec<T>, pagination: Option<&PaginationInput>) -> PaginatedResponse<T> {
+    let total = items.len() as u32;
+
+    match pagination {
+        Some(p) => {
+            let (offset, limit) = p.clamp();
+            let start = (offset as usize).min(items.len());
+            let end = (start + limit as usize).min(items.len());
+            PaginatedResponse {
+                items: items.into_iter().skip(start).take(end - start).collect(),
+                total,
+                offset,
+                limit,
+            }
+        }
+        None => PaginatedResponse {
+            items,
+            total,
+            offset: 0,
+            limit: total,
+        },
+    }
 }
 
 // =============================================================================
@@ -660,12 +890,26 @@ pub enum RepairDifficulty {
 pub struct GeoLocation {
     /// Geohash for proximity queries
     pub geohash: String,
+    /// Latitude in decimal degrees (-90 to 90)
+    pub lat: Option<f64>,
+    /// Longitude in decimal degrees (-180 to 180)
+    pub lon: Option<f64>,
     /// City name
     pub city: Option<String>,
     /// Region/State/Province
     pub region: Option<String>,
     /// Country code (ISO 3166-1 alpha-2)
     pub country: String,
+}
+
+/// Haversine distance between two lat/lon points in km. Pure function.
+pub fn haversine_distance_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+    const R: f64 = 6371.0;
+    let d_lat = (lat2 - lat1).to_radians();
+    let d_lon = (lon2 - lon1).to_radians();
+    let a = (d_lat / 2.0).sin().powi(2)
+        + lat1.to_radians().cos() * lat2.to_radians().cos() * (d_lon / 2.0).sin().powi(2);
+    R * 2.0 * a.sqrt().asin()
 }
 
 /// Type of 3D printer
@@ -2335,5 +2579,296 @@ mod tests {
         let h1 = index.hash(&hv.data);
         let h2 = index.hash(&hv.data);
         assert_eq!(h1, h2);
+    }
+
+    // === FABRICATION CONFIG TESTS ===
+
+    #[test]
+    fn test_config_default_values() {
+        let cfg = FabricationConfig::default();
+        assert_eq!(cfg.pog_energy_weight, 0.3);
+        assert_eq!(cfg.pog_material_weight, 0.3);
+        assert_eq!(cfg.pog_quality_weight, 0.2);
+        assert_eq!(cfg.pog_local_weight, 0.2);
+        assert_eq!(cfg.min_pog_for_mycelium, 0.6);
+        assert_eq!(cfg.base_mycelium_reward, 10);
+        assert_eq!(cfg.rate_limit_max_ops, 100);
+        assert_eq!(cfg.rate_limit_window_secs, 60);
+        assert_eq!(cfg.hdc_dimensions, 4096);
+        assert_eq!(cfg.similarity_threshold, 0.7);
+    }
+
+    #[test]
+    fn test_config_pog_weights_sum_to_one() {
+        let cfg = FabricationConfig::default();
+        assert!(cfg.pog_weights_valid(), "Default PoGF weights should sum to 1.0");
+    }
+
+    #[test]
+    fn test_config_serde_roundtrip() {
+        let cfg = FabricationConfig::default();
+        let json = serde_json::to_vec(&cfg).unwrap();
+        let parsed = FabricationConfig::from_properties_or_default(&json);
+        assert_eq!(parsed.pog_energy_weight, cfg.pog_energy_weight);
+        assert_eq!(parsed.rate_limit_max_ops, cfg.rate_limit_max_ops);
+    }
+
+    #[test]
+    fn test_config_from_partial_json() {
+        // Partial JSON should fall back to defaults entirely (serde strict)
+        let partial = b"{}";
+        // serde_json::from_slice with missing required fields falls back to default
+        let cfg = FabricationConfig::from_properties_or_default(partial);
+        // Since all fields are required without #[serde(default)], partial parse
+        // fails and we get the full default
+        assert_eq!(cfg.rate_limit_max_ops, 100);
+    }
+
+    #[test]
+    fn test_config_from_empty_bytes() {
+        let cfg = FabricationConfig::from_properties_or_default(&[]);
+        assert_eq!(cfg.rate_limit_max_ops, 100);
+        assert_eq!(cfg.base_mycelium_reward, 10);
+    }
+
+    // === SHARED PAGINATE TESTS ===
+
+    #[test]
+    fn test_shared_paginate_default_returns_all() {
+        let items: Vec<u32> = (0..50).collect();
+        let result = paginate(items, None);
+        assert_eq!(result.total, 50);
+        assert_eq!(result.items.len(), 50);
+        assert_eq!(result.offset, 0);
+        assert_eq!(result.limit, 50);
+    }
+
+    #[test]
+    fn test_shared_paginate_with_offset_and_limit() {
+        let items: Vec<u32> = (0..50).collect();
+        let page = PaginationInput { offset: 10, limit: 5 };
+        let result = paginate(items, Some(&page));
+        assert_eq!(result.total, 50);
+        assert_eq!(result.items, vec![10, 11, 12, 13, 14]);
+        assert_eq!(result.offset, 10);
+        assert_eq!(result.limit, 5);
+    }
+
+    #[test]
+    fn test_shared_paginate_clamp_limit_over_100() {
+        let items: Vec<u32> = (0..200).collect();
+        let page = PaginationInput { offset: 0, limit: 200 };
+        let result = paginate(items, Some(&page));
+        assert_eq!(result.total, 200);
+        assert_eq!(result.items.len(), 100);
+        assert_eq!(result.limit, 100);
+    }
+
+    #[test]
+    fn test_shared_paginate_empty_vec() {
+        let items: Vec<u32> = vec![];
+        let page = PaginationInput { offset: 0, limit: 10 };
+        let result = paginate(items, Some(&page));
+        assert_eq!(result.total, 0);
+        assert!(result.items.is_empty());
+    }
+
+    #[test]
+    fn test_shared_paginate_offset_beyond_total() {
+        let items: Vec<u32> = (0..5).collect();
+        let page = PaginationInput { offset: 100, limit: 10 };
+        let result = paginate(items, Some(&page));
+        assert_eq!(result.total, 5);
+        assert!(result.items.is_empty());
+    }
+
+    // === TYPED SIGNAL TESTS ===
+
+    #[test]
+    fn test_typed_signal_serde_roundtrip() {
+        let signal = TypedFabricationSignal {
+            domain: FabricationDomain::Design,
+            event_type: FabricationEventType::DesignCreated,
+            payload: r#"{"hash":"abc"}"#.to_string(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let parsed: TypedFabricationSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.domain, FabricationDomain::Design);
+        assert_eq!(parsed.event_type, FabricationEventType::DesignCreated);
+        assert_eq!(parsed.payload, signal.payload);
+    }
+
+    #[test]
+    fn test_fabrication_domain_display() {
+        assert_eq!(FabricationDomain::Design.to_string(), "designs");
+        assert_eq!(FabricationDomain::Print.to_string(), "prints");
+        assert_eq!(FabricationDomain::Material.to_string(), "materials");
+        assert_eq!(FabricationDomain::Verification.to_string(), "verification");
+        assert_eq!(FabricationDomain::Printer.to_string(), "printers");
+        assert_eq!(FabricationDomain::Symthaea.to_string(), "symthaea");
+        assert_eq!(FabricationDomain::Bridge.to_string(), "bridge");
+    }
+
+    #[test]
+    fn test_all_event_types_serde() {
+        let variants = [
+            FabricationEventType::DesignCreated,
+            FabricationEventType::PrinterRegistered,
+            FabricationEventType::MaterialCreated,
+            FabricationEventType::VerificationSubmitted,
+            FabricationEventType::JobCreated,
+            FabricationEventType::PredictionCreated,
+            FabricationEventType::IntentGenerated,
+            FabricationEventType::AuditFallback,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let parsed: FabricationEventType = serde_json::from_str(&json).unwrap();
+            assert_eq!(*v, parsed);
+        }
+    }
+
+    #[test]
+    fn test_allowlist_covers_all_domains() {
+        for domain in &[
+            FabricationDomain::Design,
+            FabricationDomain::Print,
+            FabricationDomain::Material,
+            FabricationDomain::Verification,
+            FabricationDomain::Printer,
+            FabricationDomain::Symthaea,
+            FabricationDomain::Bridge,
+        ] {
+            assert!(
+                FABRICATION_ZOME_ALLOWLIST.contains(&domain.to_string().as_str()),
+                "Domain {} not in allowlist", domain
+            );
+        }
+    }
+
+    // === FABRICATION ERROR TESTS ===
+
+    #[test]
+    fn test_fabrication_error_serde_roundtrip() {
+        let errors = vec![
+            FabricationError::NotFound { entity: "design".into(), hash: "abc".into() },
+            FabricationError::Unauthorized { action: "delete".into(), reason: "not owner".into() },
+            FabricationError::RateLimited { max_ops: 100, window_secs: 60 },
+            FabricationError::ValidationFailed { field: "name".into(), reason: "empty".into() },
+            FabricationError::CrossHappUnavailable { role: "knowledge".into() },
+            FabricationError::AuditFailed { reason: "DHT write failed".into() },
+        ];
+        for err in &errors {
+            let json = serde_json::to_string(err).unwrap();
+            let parsed: FabricationError = serde_json::from_str(&json).unwrap();
+            assert_eq!(*err, parsed);
+        }
+    }
+
+    #[test]
+    fn test_fabrication_error_to_wasm_error() {
+        let err = FabricationError::NotFound { entity: "design".into(), hash: "xyz".into() };
+        let wasm_err = err.to_wasm_error();
+        let msg = format!("{:?}", wasm_err);
+        assert!(msg.contains("NotFound"));
+        assert!(msg.contains("design"));
+    }
+
+    // === AUDIT TRAIL TESTS ===
+
+    #[test]
+    fn test_audit_entry_serde_roundtrip() {
+        let entry = FabricationAuditEntry {
+            domain: FabricationDomain::Bridge,
+            event_type: FabricationEventType::PredictionCreated,
+            action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            agent: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            payload: "test payload".to_string(),
+            created_at: Timestamp::from_micros(1000000),
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        let parsed: FabricationAuditEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.domain, FabricationDomain::Bridge);
+        assert_eq!(parsed.event_type, FabricationEventType::PredictionCreated);
+        assert_eq!(parsed.payload, "test payload");
+    }
+
+    #[test]
+    fn test_audit_payload_truncation() {
+        let long = "x".repeat(200);
+        let truncated = if long.len() > 120 { &long[..120] } else { &long };
+        assert_eq!(truncated.len(), 120);
+    }
+
+    #[test]
+    fn test_audit_filter_serde() {
+        let filter = AuditTrailFilter {
+            domain: Some(FabricationDomain::Design),
+            agent: None,
+            after: None,
+            before: None,
+            limit: Some(50),
+        };
+        let json = serde_json::to_string(&filter).unwrap();
+        let parsed: AuditTrailFilter = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.domain.unwrap(), FabricationDomain::Design);
+        assert_eq!(parsed.limit.unwrap(), 50);
+    }
+
+    // === HAVERSINE DISTANCE TESTS ===
+
+    /// Richardson TX to Dallas TX — known real-world distance ≈ 19–20 km.
+    #[test]
+    fn test_haversine_richardson_to_dallas() {
+        let dist = haversine_distance_km(32.9483, -96.7299, 32.7767, -96.7970);
+        assert!(
+            dist > 19.0 && dist < 21.0,
+            "Richardson→Dallas should be ~19-20 km, got {:.2} km",
+            dist
+        );
+    }
+
+    /// Same point must yield exactly 0.0.
+    #[test]
+    fn test_haversine_same_point_zero() {
+        let dist = haversine_distance_km(32.9483, -96.7299, 32.9483, -96.7299);
+        assert!(
+            dist.abs() < 1e-9,
+            "Same point should be 0.0 km, got {:.10} km",
+            dist
+        );
+    }
+
+    /// Antipodal points — (0, 0) to (0, 180) — should be half the Earth's circumference ≈ 20015 km.
+    #[test]
+    fn test_haversine_antipodal_points() {
+        let dist = haversine_distance_km(0.0, 0.0, 0.0, 180.0);
+        assert!(
+            dist > 20010.0 && dist < 20020.0,
+            "Antipodal points should be ~20015 km, got {:.2} km",
+            dist
+        );
+    }
+
+    /// Equator quarter-arc: (0, 0) to (0, 90) ≈ 10007–10009 km.
+    #[test]
+    fn test_haversine_equator_quarter_arc() {
+        let dist = haversine_distance_km(0.0, 0.0, 0.0, 90.0);
+        assert!(
+            dist > 10000.0 && dist < 10015.0,
+            "Equator 90° arc should be ~10008 km, got {:.2} km",
+            dist
+        );
+    }
+
+    /// Poles: North Pole (90, 0) to South Pole (-90, 0) ≈ 20015 km.
+    #[test]
+    fn test_haversine_pole_to_pole() {
+        let dist = haversine_distance_km(90.0, 0.0, -90.0, 0.0);
+        assert!(
+            dist > 20010.0 && dist < 20020.0,
+            "Pole-to-pole should be ~20015 km, got {:.2} km",
+            dist
+        );
     }
 }

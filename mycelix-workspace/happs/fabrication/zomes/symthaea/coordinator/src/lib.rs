@@ -12,11 +12,25 @@
 use hdk::prelude::*;
 use symthaea_integrity::*;
 use fabrication_common::hdc::{FabHV, FabTextEncoder, FAB_HDC_DIM};
-use fabrication_common::FabricationSignal;
+use fabrication_common::*;
 
-// HDC Configuration
-const HDC_DIMENSIONS: u32 = 4_096;
-const SIMILARITY_THRESHOLD: f32 = 0.7;
+use std::cell::RefCell;
+
+thread_local! {
+    static CONFIG: RefCell<Option<FabricationConfig>> = const { RefCell::new(None) };
+}
+
+fn get_config() -> FabricationConfig {
+    CONFIG.with(|c| {
+        c.borrow_mut()
+            .get_or_insert_with(|| {
+                dna_info()
+                    .map(|info| FabricationConfig::from_properties_or_default(info.modifiers.properties.bytes()))
+                    .unwrap_or_default()
+            })
+            .clone()
+    })
+}
 
 // =============================================================================
 // HDC INTENT CREATION
@@ -54,7 +68,7 @@ pub fn generate_intent_vector(input: CreateIntentInput) -> ExternResult<IntentRe
 
     let intent = HdcIntentEntry {
         description: input.description,
-        vector_dimensions: HDC_DIMENSIONS,
+        vector_dimensions: get_config().hdc_dimensions,
         vector_hash: vector_hash.clone(),
         semantic_bindings: bindings.clone(),
         generation_method: "symthaea_hdc".to_string(),
@@ -65,9 +79,9 @@ pub fn generate_intent_vector(input: CreateIntentInput) -> ExternResult<IntentRe
 
     let hash = create_entry(EntryTypes::HdcIntent(intent))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "intent_generated".to_string(),
-        source_zome: "symthaea".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Symthaea,
+        event_type: FabricationEventType::IntentGenerated,
         payload: format!(r#"{{"hash":"{}"}}"#, hash),
     });
 
@@ -251,7 +265,7 @@ pub fn lateral_bind(input: LateralBindInput) -> ExternResult<IntentResult> {
 
     let combined_intent = HdcIntentEntry {
         description: combined_description,
-        vector_dimensions: HDC_DIMENSIONS,
+        vector_dimensions: get_config().hdc_dimensions,
         vector_hash: vector_hash.clone(),
         semantic_bindings: all_bindings.clone(),
         generation_method: "lateral_binding".to_string(),
@@ -262,9 +276,9 @@ pub fn lateral_bind(input: LateralBindInput) -> ExternResult<IntentResult> {
 
     let hash = create_entry(EntryTypes::HdcIntent(combined_intent))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "intent_bound".to_string(),
-        source_zome: "symthaea".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Symthaea,
+        event_type: FabricationEventType::IntentBound,
         payload: format!(r#"{{"hash":"{}"}}"#, hash),
     });
 
@@ -302,7 +316,7 @@ pub struct SearchResult {
 /// Find designs by semantic similarity (cosine similarity in 4096D HDC space)
 #[hdk_extern]
 pub fn semantic_search(input: SemanticSearchInput) -> ExternResult<Vec<SearchResult>> {
-    let threshold = input.threshold.unwrap_or(SIMILARITY_THRESHOLD);
+    let threshold = input.threshold.unwrap_or(get_config().similarity_threshold);
     let limit = input.limit.unwrap_or(10) as usize;
 
     // Get query intent
@@ -375,7 +389,7 @@ pub fn semantic_search(input: SemanticSearchInput) -> ExternResult<Vec<SearchRes
 /// Semantic search filtered by category — scans only intents in the same category.
 #[hdk_extern]
 pub fn semantic_search_by_category(input: SemanticSearchInput) -> ExternResult<Vec<SearchResult>> {
-    let threshold = input.threshold.unwrap_or(SIMILARITY_THRESHOLD);
+    let threshold = input.threshold.unwrap_or(get_config().similarity_threshold);
     let limit = input.limit.unwrap_or(10) as usize;
 
     let query_record = get(input.intent_hash.clone(), GetOptions::default())?
@@ -445,7 +459,7 @@ pub struct LshSearchInput {
 pub fn semantic_search_lsh(input: LshSearchInput) -> ExternResult<Vec<SearchResult>> {
     use fabrication_common::lsh::{LshIndex, LSH_NUM_PLANES};
 
-    let threshold = input.threshold.unwrap_or(SIMILARITY_THRESHOLD);
+    let threshold = input.threshold.unwrap_or(get_config().similarity_threshold);
     let limit = input.limit.unwrap_or(10) as usize;
 
     let encoder = FabTextEncoder::new(FAB_HDC_DIM);
@@ -579,9 +593,9 @@ pub fn generate_parametric_variant(input: GenerateVariantInput) -> ExternResult<
 
     let hash = create_entry(EntryTypes::GeneratedDesign(generated))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "variant_generated".to_string(),
-        source_zome: "symthaea".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Symthaea,
+        event_type: FabricationEventType::VariantGenerated,
         payload: format!(r#"{{"hash":"{}"}}"#, hash),
     });
 
@@ -634,9 +648,9 @@ pub fn optimize_for_local(input: OptimizeLocalInput) -> ExternResult<Record> {
 
     let hash = create_entry(EntryTypes::OptimizationResult(optimization))?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "optimization_completed".to_string(),
-        source_zome: "symthaea".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Symthaea,
+        event_type: FabricationEventType::OptimizationCompleted,
         payload: format!(r#"{{"hash":"{}"}}"#, hash),
     });
 
@@ -1389,9 +1403,9 @@ pub fn generate_consciousness_gated_variant(
         printer_constraints: input.printer_constraints,
     })?;
 
-    let _ = emit_signal(&FabricationSignal {
-        event_type: "consciousness_gated_variant".to_string(),
-        source_zome: "symthaea".to_string(),
+    let _ = emit_signal(&TypedFabricationSignal {
+        domain: FabricationDomain::Symthaea,
+        event_type: FabricationEventType::ConsciousnessGatedVariant,
         payload: serde_json::to_string(&params).unwrap_or_else(|_| "{}".to_string()),
     });
 

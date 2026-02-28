@@ -24,6 +24,8 @@ pub enum EntryTypes {
     MarketplaceListing(MarketplaceListingEntry),
     #[entry_type(visibility = "public")]
     SupplyChainLink(SupplyChainLinkEntry),
+    #[entry_type(visibility = "public")]
+    AuditEntry(AuditEntryRecord),
 }
 
 #[hdk_link_types]
@@ -35,6 +37,21 @@ pub enum LinkTypes {
     RecentEvents,
     ActiveWorkflows,
     RateLimitBucket,
+    AllAudits,
+    AgentAudits,
+    DomainAudits,
+}
+
+/// Wrapper for FabricationAuditEntry that implements hdk_entry_helper.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct AuditEntryRecord {
+    pub domain: FabricationDomain,
+    pub event_type: FabricationEventType,
+    pub action_hash: ActionHash,
+    pub agent: AgentPubKey,
+    pub payload: String,
+    pub created_at: Timestamp,
 }
 
 #[hdk_entry_helper]
@@ -204,6 +221,17 @@ fn validate_supply_chain_link(s: &SupplyChainLinkEntry) -> ExternResult<Validate
 // VALIDATION DISPATCH
 // =============================================================================
 
+fn validate_audit_entry(a: &AuditEntryRecord) -> ExternResult<ValidateCallbackResult> {
+    check!(validation::require_max_len(&a.payload, 120, "audit payload"));
+    // Validate domain is in allowlist
+    if !FABRICATION_ZOME_ALLOWLIST.contains(&a.domain.to_string().as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!("invalid audit domain: {:?}", a.domain),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
 fn validate_entry(app_entry: EntryTypes) -> ExternResult<ValidateCallbackResult> {
     match app_entry {
         EntryTypes::RepairPrediction(p) => validate_repair_prediction(&p),
@@ -212,6 +240,7 @@ fn validate_entry(app_entry: EntryTypes) -> ExternResult<ValidateCallbackResult>
         EntryTypes::FabricationEvent(e) => validate_fabrication_event(&e),
         EntryTypes::MarketplaceListing(ml) => validate_marketplace_listing(&ml),
         EntryTypes::SupplyChainLink(s) => validate_supply_chain_link(&s),
+        EntryTypes::AuditEntry(a) => validate_audit_entry(&a),
     }
 }
 
@@ -228,6 +257,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             OpEntry::UpdateEntry { app_entry, .. } => validate_entry(app_entry),
             _ => Ok(ValidateCallbackResult::Valid),
         },
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            let max_len: usize = 256;
+            check!(validation::require_max_tag_len(&tag, max_len, &format!("{:?}", link_type)));
+            Ok(ValidateCallbackResult::Valid)
+        }
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -506,5 +540,61 @@ mod tests {
         p.prediction.confidence_interval_days = 3651;
         let result = validate_repair_prediction(&p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // =========================================================================
+    // Link tag validation tests
+    // =========================================================================
+
+    #[test]
+    fn test_link_tag_at_max_passes() {
+        let tag = LinkTag::new(vec![0u8; 256]);
+        let result = validation::require_max_tag_len(&tag, 256, "test");
+        assert!(result.is_err()); // Err(()) means "no validation issue found"
+    }
+
+    #[test]
+    fn test_link_tag_over_max_rejected() {
+        let tag = LinkTag::new(vec![0u8; 257]);
+        let result = validation::require_max_tag_len(&tag, 256, "test");
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(msg)) if msg.contains("link tag")));
+    }
+
+    // =========================================================================
+    // Audit Entry validation
+    // =========================================================================
+
+    fn valid_audit_entry() -> AuditEntryRecord {
+        AuditEntryRecord {
+            domain: FabricationDomain::Bridge,
+            event_type: FabricationEventType::PredictionCreated,
+            action_hash: make_action_hash(),
+            agent: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            payload: "prediction created".to_string(),
+            created_at: make_timestamp(),
+        }
+    }
+
+    #[test]
+    fn valid_audit_entry_passes() {
+        let a = valid_audit_entry();
+        let result = validate_audit_entry(&a).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn audit_payload_too_long_rejected() {
+        let mut a = valid_audit_entry();
+        a.payload = "x".repeat(121);
+        let result = validate_audit_entry(&a).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("audit payload")));
+    }
+
+    #[test]
+    fn audit_payload_at_max_passes() {
+        let mut a = valid_audit_entry();
+        a.payload = "x".repeat(120);
+        let result = validate_audit_entry(&a).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
     }
 }
