@@ -219,7 +219,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (meta_cognitive_accuracy, meta_cognitive_depth) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-                if let Some(ref mut meta) = self.meta_cognition {
+                if let Some(ref mut meta) = self.self_model_tier.meta_cognition {
                     meta.update_self_model(ctx.prediction_error);
                     meta.deepen_recursion();
                     let accuracy = meta.accuracy();
@@ -234,7 +234,7 @@ impl CognitiveLoopService {
                 }
             } else {
                 // Read cached accuracy/depth without updating (avoid 0.0 in telemetry on skip)
-                self.meta_cognition
+                self.self_model_tier.meta_cognition
                     .as_ref()
                     .map(|m| (m.accuracy(), m.depth()))
                     .unwrap_or((0.0, 0))
@@ -401,7 +401,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let narrative_self_psi = if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-            if let Some(ref mut narrative) = self.narrative_self {
+            if let Some(ref mut narrative) = self.self_model_tier.narrative_self {
                 let significance = if ctx.moral_concern_detected {
                     0.8
                 } else {
@@ -420,7 +420,7 @@ impl CognitiveLoopService {
             }
         } else {
             // Read cached self_phi without processing (avoid 0.0 triggering weak-identity feedback)
-            self.narrative_self
+            self.self_model_tier.narrative_self
                 .as_ref()
                 .map(|n| n.self_phi())
                 .unwrap_or(0.0)
@@ -529,8 +529,8 @@ impl CognitiveLoopService {
         // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
         let predictive_self_safety = if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-            if let Some(ref mut pred_self) = self.predictive_self {
-                if let Some(ref narrative) = self.narrative_self {
+            if let Some(ref mut pred_self) = self.self_model_tier.predictive_self {
+                if let Some(ref narrative) = self.self_model_tier.narrative_self {
                     pred_self.observe(narrative);
                 }
                 pred_self.learn_from_outcome_raw(ctx.unified_psi, ctx.coherence as f64);
@@ -555,7 +555,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let attention_schema_focus = if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-            if let Some(ref mut schema) = self.attention_schema {
+            if let Some(ref mut schema) = self.self_model_tier.attention_schema {
                 let salience = ctx.prediction_error.max(0.1);
                 let update = schema.update(ctx.hv16_cached, salience);
                 let gain = if update.control_signal > 0.3 {
@@ -695,7 +695,10 @@ impl CognitiveLoopService {
         // FEEDBACK: GWT broadcast boosts confidence (conscious access moment)
         // Science: Baars (1988) — broadcast = conscious access, should amplify integration
         if gwt_broadcast {
-            self.adjust_confidence("gwt_broadcast", super::thresholds::GWT_BROADCAST_CONFIDENCE_BOOST);
+            self.adjust_confidence(
+                "gwt_broadcast",
+                super::thresholds::GWT_BROADCAST_CONFIDENCE_BOOST,
+            );
         }
 
         module_timings.gwt = _t.elapsed().as_micros() as u64;
@@ -836,8 +839,8 @@ impl CognitiveLoopService {
                     temporal.observe(
                         &ctx.hv16_cached,
                         ctx.unified_psi,
-                        self.narrative_self.as_ref(),
-                        self.predictive_self.as_ref(),
+                        self.self_model_tier.narrative_self.as_ref(),
+                        self.self_model_tier.predictive_self.as_ref(),
                     );
                     let coherence = temporal.overall_temporal_coherence();
                     let healthy = temporal.is_temporally_healthy();
@@ -872,8 +875,11 @@ impl CognitiveLoopService {
         if temporal_discontinuity {
             self.carryover.urgency.discontinuity_streak += 1;
         } else {
-            self.carryover.urgency.discontinuity_streak =
-                self.carryover.urgency.discontinuity_streak.saturating_sub(1);
+            self.carryover.urgency.discontinuity_streak = self
+                .carryover
+                .urgency
+                .discontinuity_streak
+                .saturating_sub(1);
         }
         let streak = self.carryover.urgency.discontinuity_streak;
         if streak >= 3 {
@@ -887,7 +893,7 @@ impl CognitiveLoopService {
         // FEEDBACK: High temporal coherence strengthens narrative self engagement
         // Science: Damasio (2010) — temporal continuity is the substrate of selfhood
         if temporal_coherence_score > 0.6 {
-            if let Some(ref mut narrative) = self.narrative_self {
+            if let Some(ref mut narrative) = self.self_model_tier.narrative_self {
                 let continuity_boost = (temporal_coherence_score - 0.6) * 0.1; // up to +4%
                 narrative.boost_coherence(continuity_boost);
             }
@@ -1217,5 +1223,267 @@ impl CognitiveLoopService {
             living_mind_coherence,
             consciousness_level,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleUrgency};
+
+    fn make_service() -> CognitiveLoopService {
+        CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+    }
+
+    fn make_default_context<'a>(
+        compressed_state: &'a [f32],
+        input: &'a str,
+    ) -> LateConsciousnessContext<'a> {
+        LateConsciousnessContext {
+            prediction_error: 0.1,
+            coherence: 0.5,
+            unified_psi: 0.3,
+            hv16_cached: symthaea_core::hdc::BinaryHV::random(42),
+            compressed_state,
+            input,
+            urgency: CycleUrgency::Normal,
+            moral_concern_detected: false,
+            surprise_triggered: false,
+            reasoning_gate_blocked: false,
+            pp_phi: 0.5,
+            peak_attention: 0.4,
+        }
+    }
+
+    // ── run_late_consciousness_monitors ────────────────────────────────
+
+    #[test]
+    fn late_monitors_default_does_not_panic() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![0.0f32; 64];
+        let ctx = make_default_context(&compressed, "test input");
+        let mut timings = super::super::ModuleTimings::default();
+        let result = s.run_late_consciousness_monitors(&ctx, &mut timings);
+        assert!(result.meta_cognitive_accuracy.is_finite());
+        assert!(result.body_psi_modulation.is_finite());
+        assert!(result.affective_valence.is_finite());
+        assert!(result.affective_arousal.is_finite());
+        assert!(result.predictive_free_energy.is_finite());
+    }
+
+    #[test]
+    fn late_monitors_no_prefrontal_veto_on_default() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![0.0f32; 64];
+        let ctx = make_default_context(&compressed, "hello");
+        let mut timings = super::super::ModuleTimings::default();
+        let result = s.run_late_consciousness_monitors(&ctx, &mut timings);
+        assert!(!result.prefrontal_veto);
+    }
+
+    #[test]
+    fn late_monitors_empty_input_does_not_panic() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![0.0f32; 64];
+        let ctx = make_default_context(&compressed, "");
+        let mut timings = super::super::ModuleTimings::default();
+        let result = s.run_late_consciousness_monitors(&ctx, &mut timings);
+        assert!(result.affective_arousal.is_finite());
+    }
+
+    #[test]
+    fn late_monitors_zero_prediction_error() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![0.0f32; 64];
+        let mut ctx = make_default_context(&compressed, "low error");
+        ctx.prediction_error = 0.0;
+        let mut timings = super::super::ModuleTimings::default();
+        let result = s.run_late_consciousness_monitors(&ctx, &mut timings);
+        assert!(result.predictive_psi_modulation.is_finite());
+        assert!(result.narrative_self_psi.is_finite());
+    }
+
+    #[test]
+    fn late_monitors_high_prediction_error() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![1.0f32; 64];
+        let mut ctx = make_default_context(&compressed, "high error");
+        ctx.prediction_error = 1.0;
+        let mut timings = super::super::ModuleTimings::default();
+        let result = s.run_late_consciousness_monitors(&ctx, &mut timings);
+        assert!(result.meta_cognitive_accuracy.is_finite());
+        assert!(result.psi_attention_avg.is_finite());
+    }
+
+    #[test]
+    fn late_monitors_critical_urgency_runs_all() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![0.5f32; 64];
+        let mut ctx = make_default_context(&compressed, "urgent");
+        ctx.urgency = CycleUrgency::Critical;
+        let mut timings = super::super::ModuleTimings::default();
+        let result = s.run_late_consciousness_monitors(&ctx, &mut timings);
+        assert!(result.body_valence.is_finite());
+        assert!(result.attention_schema_focus.is_finite());
+    }
+
+    #[test]
+    fn late_monitors_cruise_urgency_skips_subsystems() {
+        let mut s = make_service();
+        s.stats.total_cycles = 3;
+        let compressed = vec![0.2f32; 64];
+        let mut ctx = make_default_context(&compressed, "cruise mode");
+        ctx.urgency = CycleUrgency::Cruise;
+        let mut timings = super::super::ModuleTimings::default();
+        let result = s.run_late_consciousness_monitors(&ctx, &mut timings);
+        assert!(result.predictive_free_energy.is_finite());
+    }
+
+    #[test]
+    fn late_monitors_dual_veto_sets_exploration() {
+        let mut s = make_service();
+        s.carryover.quality.cached_prefrontal_veto = true;
+        let compressed = vec![0.0f32; 64];
+        let mut ctx = make_default_context(&compressed, "dual veto");
+        ctx.reasoning_gate_blocked = true;
+        ctx.urgency = CycleUrgency::Cruise;
+        s.stats.total_cycles = 3;
+        let mut timings = super::super::ModuleTimings::default();
+        let result = s.run_late_consciousness_monitors(&ctx, &mut timings);
+        assert!(result.prefrontal_veto);
+        assert!((s.curiosity_drive.exploration_urge - 0.3).abs() < 0.01);
+    }
+
+    // ── run_consciousness_integration ─────────────────────────────────
+
+    #[test]
+    fn consciousness_integration_default_does_not_panic() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![0.0f32; 64];
+        let ctx = make_default_context(&compressed, "integration test");
+        let late = LateConsciousnessResult {
+            prefrontal_veto: false,
+            meta_cognitive_accuracy: 0.5,
+            meta_cognitive_depth: 1,
+            body_psi_modulation: 1.0,
+            body_valence: 0.0,
+            body_arousal: 0.3,
+            affective_valence: 0.1,
+            affective_arousal: 0.4,
+            narrative_self_psi: 0.3,
+            predictive_free_energy: 0.1,
+            predictive_psi_modulation: 1.0,
+            hierarchical_total_free_energy: 0.0,
+            predictive_self_safety: 0.5,
+            attention_schema_focus: 0.4,
+            psi_attention_avg: 0.3,
+        };
+        let mut timings = super::super::ModuleTimings::default();
+        let result = s.run_consciousness_integration(&ctx, &late, &mut timings);
+        assert!(result.consciousness_level.is_finite());
+        assert!(result.cross_modal_binding_strength.is_finite());
+        assert!(result.resonance_frequency.is_finite());
+    }
+
+    #[test]
+    fn consciousness_integration_all_fields_finite() {
+        let mut s = make_service();
+        s.stats.total_cycles = 10;
+        let compressed = vec![0.5f32; 64];
+        let ctx = make_default_context(&compressed, "finite check");
+        let late = LateConsciousnessResult {
+            prefrontal_veto: false,
+            meta_cognitive_accuracy: 0.0,
+            meta_cognitive_depth: 0,
+            body_psi_modulation: 1.0,
+            body_valence: 0.0,
+            body_arousal: 0.0,
+            affective_valence: 0.0,
+            affective_arousal: 0.0,
+            narrative_self_psi: 0.0,
+            predictive_free_energy: 0.0,
+            predictive_psi_modulation: 1.0,
+            hierarchical_total_free_energy: 0.0,
+            predictive_self_safety: 0.0,
+            attention_schema_focus: 0.0,
+            psi_attention_avg: 0.0,
+        };
+        let mut timings = super::super::ModuleTimings::default();
+        let result = s.run_consciousness_integration(&ctx, &late, &mut timings);
+        assert!(result.thermodynamic_entropy.is_finite());
+        assert!(result.thermodynamic_free_energy.is_finite());
+        assert!(result.embodied_psi_modulation.is_finite());
+        assert!(result.embodied_agency.is_finite());
+        assert!(result.phenomenal_binding_strength.is_finite());
+        assert!(result.quantum_coherence_level.is_finite());
+        assert!(result.living_mind_vitality.is_finite());
+        assert!(result.living_mind_coherence.is_finite());
+    }
+
+    #[test]
+    fn consciousness_integration_cruise_skips_monitors() {
+        let mut s = make_service();
+        s.stats.total_cycles = 3;
+        let compressed = vec![0.0f32; 64];
+        let mut ctx = make_default_context(&compressed, "cruise integration");
+        ctx.urgency = CycleUrgency::Cruise;
+        let late = LateConsciousnessResult {
+            prefrontal_veto: false,
+            meta_cognitive_accuracy: 0.0,
+            meta_cognitive_depth: 0,
+            body_psi_modulation: 1.0,
+            body_valence: 0.0,
+            body_arousal: 0.0,
+            affective_valence: 0.0,
+            affective_arousal: 0.0,
+            narrative_self_psi: 0.0,
+            predictive_free_energy: 0.0,
+            predictive_psi_modulation: 1.0,
+            hierarchical_total_free_energy: 0.0,
+            predictive_self_safety: 0.0,
+            attention_schema_focus: 0.0,
+            psi_attention_avg: 0.0,
+        };
+        let mut timings = super::super::ModuleTimings::default();
+        let result = s.run_consciousness_integration(&ctx, &late, &mut timings);
+        assert!(!result.gwt_broadcast);
+        assert!(!result.temporal_discontinuity);
+    }
+
+    #[test]
+    fn temporal_discontinuity_streak_decrements_without_discontinuity() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        s.carryover.urgency.discontinuity_streak = 2;
+        let compressed = vec![0.0f32; 64];
+        let ctx = make_default_context(&compressed, "streak");
+        let late = LateConsciousnessResult {
+            prefrontal_veto: false,
+            meta_cognitive_accuracy: 0.0,
+            meta_cognitive_depth: 0,
+            body_psi_modulation: 1.0,
+            body_valence: 0.0,
+            body_arousal: 0.0,
+            affective_valence: 0.0,
+            affective_arousal: 0.0,
+            narrative_self_psi: 0.0,
+            predictive_free_energy: 0.0,
+            predictive_psi_modulation: 1.0,
+            hierarchical_total_free_energy: 0.0,
+            predictive_self_safety: 0.0,
+            attention_schema_focus: 0.0,
+            psi_attention_avg: 0.0,
+        };
+        let mut timings = super::super::ModuleTimings::default();
+        let result = s.run_consciousness_integration(&ctx, &late, &mut timings);
+        assert!(!result.temporal_discontinuity);
+        assert!(s.carryover.urgency.discontinuity_streak <= 2);
     }
 }

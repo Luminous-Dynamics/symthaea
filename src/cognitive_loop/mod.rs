@@ -139,6 +139,7 @@ mod moral;
 pub(crate) mod neuromodulators;
 mod prediction;
 pub(crate) mod primitive_tier;
+pub(crate) mod self_model_tier;
 pub(crate) mod subsystem_trait;
 pub(crate) mod thresholds;
 pub(crate) mod virtual_body;
@@ -150,7 +151,7 @@ pub mod motor_bridge;
 use crate::brain::affective_bridge::AffectiveBridge;
 use crate::brain::prefrontal::PrefrontalCortex;
 use crate::causal::CausalLoopEnhancer;
-use crate::consciousness::attention_schema::AttentionSchema;
+// AttentionSchema now owned by SelfModelTierManager
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::autopoietic_consciousness::AutopoieticConsciousness;
 use crate::consciousness::consciousness_resonance::ResonanceAnalyzer;
@@ -166,10 +167,10 @@ use crate::consciousness::gwt_integration::UnifiedGlobalWorkspace;
 use crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy;
 use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
 use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
-use crate::consciousness::narrative_self::NarrativeSelfModel;
+// NarrativeSelfModel now owned by SelfModelTierManager
 use crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer;
 use crate::consciousness::predictive_processing::PredictiveMind;
-use crate::consciousness::predictive_self::PredictiveSelfModel;
+// PredictiveSelfModel now owned by SelfModelTierManager
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
 use crate::consciousness::primitive_consciousness::PrimitiveConsciousnessState;
 use crate::consciousness::primitive_discovery::PrimitiveDiscoveryService;
@@ -191,7 +192,7 @@ use crate::memory::semantic_memory::SemanticMemory;
 use crate::perception::NeuralBridge;
 use crate::safety::SafetyGateway;
 use crate::voice::voice_feedback::VoiceFeedbackBridge;
-use crate::wisdom::meta_cognition::MetaCognitiveLayer;
+// MetaCognitiveLayer now owned by SelfModelTierManager
 use std::collections::VecDeque;
 use std::time::Instant;
 use symthaea_core::hdc::predictive_encoder::PredictiveHdcEncoder;
@@ -446,23 +447,8 @@ pub struct CognitiveLoopService {
     /// gates learning/exploration when memory utilization is high.
     prefrontal: Option<PrefrontalCortex>,
 
-    /// Meta-cognitive self-model layer.
-    /// When enabled, tracks prediction error tendencies and uses
-    /// self-model accuracy to modulate learning rate.
-    meta_cognition: Option<MetaCognitiveLayer>,
-
-    /// Narrative self-model for autobiographical identity.
-    /// When enabled, maintains a three-level self-model (proto/core/autobio)
-    /// and tracks self-Φ (integrated information of the self-model).
-    narrative_self: Option<NarrativeSelfModel>,
-
-    /// Predictive self-model for action safety evaluation.
-    /// When enabled, predicts future self-states and evaluates action safety.
-    predictive_self: Option<PredictiveSelfModel>,
-
-    /// Attention schema (AST) for self-modeling attention state.
-    /// When enabled, tracks attention focus, shifts, and generates control signals.
-    attention_schema: Option<AttentionSchema>,
+    /// Self-model subsystems: narrative, predictive, attention schema, meta-cognition.
+    self_model_tier: self_model_tier::SelfModelTierManager,
 
     /// Global Workspace Theory integration.
     /// When enabled, submits encodings to workspace for conscious broadcast.

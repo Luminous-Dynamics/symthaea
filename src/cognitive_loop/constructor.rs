@@ -3,7 +3,7 @@
 use super::CycleCarryover;
 use crate::brain::prefrontal::PrefrontalCortex;
 use crate::causal::{CausalEnhancerConfig, CausalLoopEnhancer};
-use crate::consciousness::attention_schema::AttentionSchema;
+// AttentionSchema now owned by SelfModelTierManager
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::autopoietic_consciousness::{
     AutopoieticConfig, AutopoieticConsciousness,
@@ -19,8 +19,7 @@ use crate::consciousness::fep_active_inference::{
 use crate::consciousness::gwt_integration::{UnifiedGWTConfig, UnifiedGlobalWorkspace};
 use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
 use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
-use crate::consciousness::narrative_self::{NarrativeSelfConfig, NarrativeSelfModel};
-use crate::consciousness::predictive_self::{PredictiveSelfConfig, PredictiveSelfModel};
+// NarrativeSelfModel + PredictiveSelfModel now owned by SelfModelTierManager
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
 use crate::consciousness::primitive_discovery::{
     DiscoveryServiceConfig, PrimitiveDiscoveryService,
@@ -45,7 +44,7 @@ use crate::memory::semantic_memory::SemanticMemory;
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridge;
 use crate::voice::voice_feedback::{VoiceFeedbackBridge, VoiceFeedbackConfig};
-use crate::wisdom::meta_cognition::MetaCognitiveLayer;
+// MetaCognitiveLayer now owned by SelfModelTierManager
 use anyhow::Result;
 use rand::Rng;
 use std::collections::VecDeque;
@@ -194,19 +193,7 @@ impl CognitiveLoopService {
             None
         };
 
-        // Build optional meta-cognitive layer
-        let meta_cognition = if config.enable_meta_cognition {
-            Some(MetaCognitiveLayer::new())
-        } else {
-            None
-        };
-
-        // Build optional narrative self-model
-        let narrative_self = if config.enable_narrative_self {
-            Some(NarrativeSelfModel::new(NarrativeSelfConfig::default()))
-        } else {
-            None
-        };
+        // Self-model subsystems now in SelfModelTierManager::new()
 
         // Build optional virtual body adapter
         let virtual_body = if config.enable_virtual_body {
@@ -215,19 +202,7 @@ impl CognitiveLoopService {
             None
         };
 
-        // Build optional predictive self-model
-        let predictive_self = if config.enable_predictive_self {
-            Some(PredictiveSelfModel::new(PredictiveSelfConfig::default()))
-        } else {
-            None
-        };
-
-        // Build optional attention schema
-        let attention_schema = if config.enable_attention_schema {
-            Some(AttentionSchema::new())
-        } else {
-            None
-        };
+        // Predictive self + attention schema now in SelfModelTierManager::new()
 
         // Build optional GWT integration
         let gwt = if config.enable_gwt {
@@ -406,6 +381,9 @@ impl CognitiveLoopService {
         // Somatic error bridge: infrastructure errors → felt interoceptive signals
         let (somatic_bridge_instance, pain_sender) =
             crate::infrastructure::somatic_error_bridge::SomaticErrorBridge::new();
+
+        // SelfModelTierManager must be created before `config` is moved into the struct
+        let self_model_tier = super::self_model_tier::SelfModelTierManager::new(&config);
 
         Ok(Self {
             config,
@@ -610,10 +588,7 @@ impl CognitiveLoopService {
             carryover: CycleCarryover::default(),
             surprise_bridge,
             prefrontal,
-            meta_cognition,
-            narrative_self,
-            predictive_self,
-            attention_schema,
+            self_model_tier,
             gwt,
             consciousness_resonance,
             quantum_coherence,
