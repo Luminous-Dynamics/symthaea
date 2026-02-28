@@ -245,6 +245,47 @@ impl ProjectionGradientDiagnostics {
     }
 }
 
+/// Serializable summary of gradient diagnostics for checkpoint persistence.
+///
+/// Captures the key metrics at checkpoint time without storing the full per-step
+/// history vectors (which can be large). Allows resuming with context about
+/// previous training health.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct GradientDiagnosticsSnapshot {
+    /// Total gradient steps recorded.
+    pub total_steps: usize,
+    /// Number of steps where clipping was applied.
+    pub clip_count: usize,
+    /// Last recorded forward-down gradient norm.
+    pub last_norm_down: f32,
+    /// Last recorded forward-up gradient norm.
+    pub last_norm_up: f32,
+    /// Last recorded backward gradient norm.
+    pub last_norm_backward: f32,
+    /// Last recorded bottleneck activation variance.
+    pub last_bottleneck_variance: f32,
+    /// Whether bottleneck collapse was detected at snapshot time.
+    pub collapse_detected: bool,
+}
+
+impl ProjectionGradientDiagnostics {
+    /// Create a serializable snapshot of the current diagnostics state.
+    ///
+    /// Captures summary metrics (latest norms, collapse status) without
+    /// the full per-step history, keeping checkpoints compact.
+    pub fn snapshot(&self) -> GradientDiagnosticsSnapshot {
+        GradientDiagnosticsSnapshot {
+            total_steps: self.total_steps,
+            clip_count: self.clip_count,
+            last_norm_down: self.grad_norms_down.last().copied().unwrap_or(0.0),
+            last_norm_up: self.grad_norms_up.last().copied().unwrap_or(0.0),
+            last_norm_backward: self.grad_norms_backward.last().copied().unwrap_or(0.0),
+            last_bottleneck_variance: self.bottleneck_variances.last().copied().unwrap_or(0.0),
+            collapse_detected: self.bottleneck_collapse_detected(),
+        }
+    }
+}
+
 /// LayerNorm epsilon for numerical stability.
 const LN_EPS: f32 = 1e-5;
 

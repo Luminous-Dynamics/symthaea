@@ -335,6 +335,10 @@ pub struct ProjectionCheckpoint {
     /// Added after v2; backward-compatible via serde(default) = 0.
     #[serde(default)]
     pub inner_dim: usize,
+    /// Optional gradient diagnostics snapshot from the training session.
+    /// Added after v2; backward-compatible via serde(default) = None.
+    #[serde(default)]
+    pub diagnostics_snapshot: Option<crate::projection::GradientDiagnosticsSnapshot>,
     /// Blake3 integrity checksum (zeroed before hashing).
     pub checksum: [u8; 32],
 }
@@ -352,6 +356,7 @@ impl ProjectionCheckpoint {
             training_epoch: self.training_epoch,
             deep: self.deep,
             inner_dim: self.inner_dim,
+            diagnostics_snapshot: self.diagnostics_snapshot.clone(),
             checksum: [0u8; 32],
         };
         let bytes = bincode::serialize(&copy).unwrap_or_default();
@@ -405,6 +410,7 @@ impl ProjectionCheckpoint {
             training_epoch,
             deep,
             inner_dim,
+            diagnostics_snapshot: None,
             checksum: [0u8; 32],
         }
     }

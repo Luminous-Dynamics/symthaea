@@ -65,10 +65,15 @@ pub use training::{GradientDiagnostics, TrainingDataset, TrainingPair};
 #[cfg(feature = "mamba")]
 pub use checkpoint::ProjectionCheckpoint;
 #[cfg(feature = "mamba")]
-pub use evaluation::{GatingTestResult, LiquidMambaEvalConfig, LiquidMambaEvalResult};
+pub use evaluation::{
+    GatingTestResult, LiquidMambaEvalConfig, LiquidMambaEvalResult, QualityGateThresholds,
+};
 #[cfg(feature = "mamba")]
 pub use liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
 #[cfg(feature = "mamba")]
 pub use mamba::MambaBackend;
 #[cfg(feature = "mamba")]
-pub use projection::{GradientStepMetrics, HdcSsmProjection, ProjectionGradientDiagnostics};
+pub use projection::{
+    GradientDiagnosticsSnapshot, GradientStepMetrics, HdcSsmProjection,
+    ProjectionGradientDiagnostics,
+};

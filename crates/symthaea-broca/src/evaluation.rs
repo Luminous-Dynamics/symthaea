@@ -771,6 +771,47 @@ fn consciousness_gating_test(
     })
 }
 
+/// Configurable thresholds for the quality gate labels in evaluation reports.
+///
+/// Each pair `(good, ok)` controls when a metric receives "GOOD", "OK", or no label.
+/// Pass to [`format_liquid_mamba_eval_report`] to customize gate sensitivity.
+#[cfg(feature = "mamba")]
+#[derive(Debug, Clone)]
+pub struct QualityGateThresholds {
+    /// Effective rank ≥ this → GOOD (default 20.0).
+    pub rank_good: f32,
+    /// Effective rank ≥ this → OK (default 10.0).
+    pub rank_ok: f32,
+    /// Distinct-1 ≥ this → GOOD (default 0.7).
+    pub distinct1_good: f32,
+    /// Distinct-1 ≥ this → OK (default 0.5).
+    pub distinct1_ok: f32,
+    /// Distinct-2 ≥ this → GOOD (default 0.8).
+    pub distinct2_good: f32,
+    /// Distinct-2 ≥ this → OK (default 0.6).
+    pub distinct2_ok: f32,
+    /// PE trend below this → IMPROVING (default 0.0).
+    pub pe_improving: f32,
+    /// PE trend above this → DIVERGING (default 0.02).
+    pub pe_diverging: f32,
+}
+
+#[cfg(feature = "mamba")]
+impl Default for QualityGateThresholds {
+    fn default() -> Self {
+        Self {
+            rank_good: 20.0,
+            rank_ok: 10.0,
+            distinct1_good: 0.7,
+            distinct1_ok: 0.5,
+            distinct2_good: 0.8,
+            distinct2_ok: 0.6,
+            pe_improving: 0.0,
+            pe_diverging: 0.02,
+        }
+    }
+}
+
 /// Classify a metric value against a threshold and return a status string.
 #[cfg(feature = "mamba")]
 fn quality_gate(value: f32, good_threshold: f32, ok_threshold: f32, higher_is_better: bool) -> &'static str {
@@ -792,8 +833,15 @@ fn quality_gate(value: f32, good_threshold: f32, ok_threshold: f32, higher_is_be
 }
 
 /// Format a Liquid-Mamba evaluation result as a human-readable report with quality gates.
+///
+/// The `thresholds` parameter controls when metrics receive "GOOD", "OK", or
+/// "IMPROVING"/"DIVERGING" labels. Use [`QualityGateThresholds::default()`] for
+/// the standard gate levels.
 #[cfg(feature = "mamba")]
-pub fn format_liquid_mamba_eval_report(result: &LiquidMambaEvalResult) -> String {
+pub fn format_liquid_mamba_eval_report(
+    result: &LiquidMambaEvalResult,
+    thresholds: &QualityGateThresholds,
+) -> String {
     let mut s = String::new();
     s.push_str("=== Liquid-Mamba Evaluation Report ===\n\n");
     s.push_str(&format!(
@@ -826,19 +874,19 @@ pub fn format_liquid_mamba_eval_report(result: &LiquidMambaEvalResult) -> String
         "Avg semantic PE", result.avg_semantic_pe
     ));
 
-    let rank_status = quality_gate(result.avg_effective_rank, 20.0, 10.0, true);
+    let rank_status = quality_gate(result.avg_effective_rank, thresholds.rank_good, thresholds.rank_ok, true);
     s.push_str(&format!(
         "{:<20} {:>10.2}  {}\n",
         "Effective rank", result.avg_effective_rank, rank_status
     ));
 
-    let d1_status = quality_gate(result.distinct_1, 0.7, 0.5, true);
+    let d1_status = quality_gate(result.distinct_1, thresholds.distinct1_good, thresholds.distinct1_ok, true);
     s.push_str(&format!(
         "{:<20} {:>10.4}  {}\n",
         "Distinct-1", result.distinct_1, d1_status
     ));
 
-    let d2_status = quality_gate(result.distinct_2, 0.8, 0.6, true);
+    let d2_status = quality_gate(result.distinct_2, thresholds.distinct2_good, thresholds.distinct2_ok, true);
     s.push_str(&format!(
         "{:<20} {:>10.4}  {}\n",
         "Distinct-2", result.distinct_2, d2_status
@@ -849,9 +897,9 @@ pub fn format_liquid_mamba_eval_report(result: &LiquidMambaEvalResult) -> String
         "Thought-output sim", result.avg_thought_output_similarity
     ));
 
-    let pe_trend_status = if result.pe_trend < 0.0 {
+    let pe_trend_status = if result.pe_trend < thresholds.pe_improving {
         "IMPROVING"
-    } else if result.pe_trend > 0.02 {
+    } else if result.pe_trend > thresholds.pe_diverging {
         "DIVERGING"
     } else {
         ""
@@ -1205,7 +1253,7 @@ mod tests {
                 pe_std_dev: 0.12,
             };
 
-            let report = format_liquid_mamba_eval_report(&result);
+            let report = format_liquid_mamba_eval_report(&result, &QualityGateThresholds::default());
             assert!(report.contains("Liquid-Mamba"), "Should have L-M header");
             assert!(report.contains("120.5"), "Should contain perplexity");
             assert!(report.contains("semantic PE"), "Should contain semantic PE");
@@ -1300,7 +1348,7 @@ mod tests {
                 pe_std_dev: 0.0,
             };
 
-            let report = format_liquid_mamba_eval_report(&result);
+            let report = format_liquid_mamba_eval_report(&result, &QualityGateThresholds::default());
             assert!(
                 report.contains("FAIL"),
                 "Should fail gating test (0.05 < 0.10)"
