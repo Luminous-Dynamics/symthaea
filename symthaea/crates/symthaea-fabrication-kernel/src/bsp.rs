@@ -192,13 +192,10 @@ mod tests {
     #[test] fn subtract_empty_b() { let a = unit_cube(); assert_eq!(csg_subtract(&a, &TriangleMesh::empty()).triangle_count(), a.triangle_count()); }
     #[test] fn intersect_overlapping() { assert!(csg_intersect(&unit_cube(), &offset_cube()).triangle_count() > 0); }
     #[test] fn intersect_nonoverlapping() {
-        // Non-overlapping BSP intersect may produce sliver triangles at boundaries;
-        // the key correctness property is tested by intersect_overlapping.
-        // Here we verify the result mesh is valid (non-panicking) and bounded.
         let a = unit_cube();
         let b = resolve_to_mesh(&CSGNode::cube().with_transform(Transform3D { translate: [10.0,0.0,0.0], ..Default::default() }));
         let r = csg_intersect(&a, &b);
-        assert_eq!(r.vertices.len(), r.normals.len(), "vertices/normals mismatch");
+        assert_eq!(r.vertices.len(), r.normals.len());
     }
     #[test] fn intersect_empty() { assert_eq!(csg_intersect(&unit_cube(), &TriangleMesh::empty()).triangle_count(), 0); }
     #[test] fn subtract_contained() { let a = unit_cube(); assert!(csg_subtract(&a, &small_cube()).triangle_count() > a.triangle_count()); }
@@ -216,5 +213,15 @@ mod tests {
     #[test] fn mesh_roundtrip() {
         let m = unit_cube();
         assert_eq!(m.triangle_count(), tris_to_mesh(&mesh_to_tris(&m)).triangle_count());
+    }
+    #[test] fn csg_tree_subtract() {
+        let tree = CSGNode::cube().subtract(CSGNode::cube().with_transform(Transform3D { scale: [0.5;3], ..Default::default() }));
+        let mesh = resolve_to_mesh(&tree);
+        assert!(mesh.triangle_count() > 12, "CSG subtract via tree should produce mesh");
+    }
+    #[test] fn csg_tree_intersect() {
+        let tree = CSGNode::cube().intersect(CSGNode::cube().with_transform(Transform3D { translate: [0.25, 0.25, 0.25], ..Default::default() }));
+        let mesh = resolve_to_mesh(&tree);
+        assert!(mesh.triangle_count() > 0, "CSG intersect via tree should produce mesh");
     }
 }

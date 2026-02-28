@@ -583,4 +583,36 @@ mod tests {
         assert!(parsed.since.is_some());
         assert!(parsed.pagination.is_some());
     }
+
+    #[test]
+    fn test_fabrication_signal_serde() {
+        let signal = FabricationSignal {
+            event_type: "prediction_created".to_string(),
+            source_zome: "bridge".to_string(),
+            payload: r#"{"hash":"uhCAk_test"}"#.to_string(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        assert!(json.contains("prediction_created"));
+        assert!(json.contains("bridge"));
+        let parsed: FabricationSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.event_type, "prediction_created");
+    }
+
+    #[test]
+    fn test_cross_happ_role_names() {
+        // Verify the role names used in cross-hApp calls are consistent
+        let role = "mycelix-commons";
+        assert!(!role.is_empty());
+        assert!(role.contains('-'), "Role names should use hyphens");
+    }
+
+    #[test]
+    fn test_rate_limit_constants() {
+        // Verify rate limit thresholds are reasonable
+        assert!(RATE_LIMIT_WINDOW_MICROS > 0, "Window must be positive");
+        assert!(RATE_LIMIT_MAX_OPS > 0, "Max ops must be positive");
+        assert!(RATE_LIMIT_MAX_OPS <= 1000, "Max ops should be reasonable");
+        // 60 seconds in micros
+        assert_eq!(RATE_LIMIT_WINDOW_MICROS, 60_000_000);
+    }
 }

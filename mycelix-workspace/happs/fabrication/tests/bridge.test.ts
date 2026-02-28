@@ -72,7 +72,7 @@ describe('Bridge Zome - Anticipatory Repair', () => {
       const workflows: Record[] = await alice.cells[0].callZome({
         zome_name: 'bridge',
         fn_name: 'get_active_workflows',
-        payload: null,
+        payload: { pagination: { offset: 0, limit: 100 } },
       });
 
       expect(workflows.length).toBeGreaterThanOrEqual(1);
@@ -204,7 +204,7 @@ describe('Bridge Zome - Anticipatory Repair', () => {
       const activeWorkflows: Record[] = await alice.cells[0].callZome({
         zome_name: 'bridge',
         fn_name: 'get_active_workflows',
-        payload: null,
+        payload: { pagination: { offset: 0, limit: 100 } },
       });
 
       const activeHashes = activeWorkflows.map(r => r.signed_action.hashed.hash);
@@ -240,7 +240,7 @@ describe('Bridge Zome - Anticipatory Repair', () => {
       const events: Record[] = await alice.cells[0].callZome({
         zome_name: 'bridge',
         fn_name: 'get_recent_events',
-        payload: null,
+        payload: { since: null, pagination: { offset: 0, limit: 100 } },
       });
 
       expect(events.length).toBeGreaterThanOrEqual(1);

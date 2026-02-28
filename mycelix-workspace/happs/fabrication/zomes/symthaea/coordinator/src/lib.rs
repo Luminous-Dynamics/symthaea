@@ -73,6 +73,15 @@ pub fn generate_intent_vector(input: CreateIntentInput) -> ExternResult<IntentRe
 
     create_link(author, hash.clone(), LinkTypes::AuthorToIntents, ())?;
 
+    // Link to global anchor for semantic_search
+    let anchor = all_intents_anchor()?;
+    create_link(anchor, hash.clone(), LinkTypes::AuthorToIntents, ())?;
+
+    // Link to category anchor for partitioned search
+    let category = extract_primary_category(&bindings);
+    let cat_anchor = category_anchor(&category)?;
+    create_link(cat_anchor, hash.clone(), LinkTypes::AuthorToIntents, ())?;
+
     let record = get(hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))?;
 
@@ -363,6 +372,65 @@ pub fn semantic_search(input: SemanticSearchInput) -> ExternResult<Vec<SearchRes
     Ok(results)
 }
 
+/// Semantic search filtered by category — scans only intents in the same category.
+#[hdk_extern]
+pub fn semantic_search_by_category(input: SemanticSearchInput) -> ExternResult<Vec<SearchResult>> {
+    let threshold = input.threshold.unwrap_or(SIMILARITY_THRESHOLD);
+    let limit = input.limit.unwrap_or(10) as usize;
+
+    let query_record = get(input.intent_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Intent not found".into())))?;
+    let query_intent: HdcIntentEntry = query_record
+        .entry().to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Parse error".into())))?;
+
+    let encoder = FabTextEncoder::new(FAB_HDC_DIM);
+    let query_hv = encoder.encode(&query_intent.description);
+
+    // Get category anchor for the query's primary category
+    let category = extract_primary_category(&query_intent.semantic_bindings);
+    let anchor = category_anchor(&category)?;
+    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::AuthorToIntents)?, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    let now = sys_time()?;
+
+    for link in links {
+        if let Some(hash) = link.target.into_action_hash() {
+            if hash == input.intent_hash { continue; }
+            if let Some(record) = get(hash.clone(), GetOptions::default())? {
+                if let Some(intent) = record.entry().to_app_option::<HdcIntentEntry>().ok().flatten() {
+                    let candidate_hv = encoder.encode(&intent.description);
+                    let similarity = query_hv.similarity(&candidate_hv);
+                    let matched = compute_binding_overlap(
+                        &query_intent.semantic_bindings, &intent.semantic_bindings,
+                    );
+                    if similarity >= threshold {
+                        let match_entry = SemanticMatchEntry {
+                            query_intent_hash: input.intent_hash.clone(),
+                            matched_design_hash: hash.clone(),
+                            similarity_score: similarity,
+                            matched_bindings: matched.clone(),
+                            searched_at: Timestamp::from_micros(now.as_micros() as i64),
+                        };
+                        let _ = create_entry(EntryTypes::SemanticMatch(match_entry));
+                        results.push(SearchResult {
+                            design_hash: hash,
+                            similarity_score: similarity,
+                            matched_bindings: matched,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    results.sort_by(|a, b| b.similarity_score.partial_cmp(&a.similarity_score).unwrap());
+    results.truncate(limit);
+    Ok(results)
+}
+
 /// Compute binding overlap between two sets of semantic bindings.
 /// Returns the list of concepts that appear in both sets with the same role.
 /// This is supplementary metadata for display; the real similarity comes from
@@ -411,16 +479,29 @@ pub fn generate_parametric_variant(input: GenerateVariantInput) -> ExternResult<
         language: None,
     })?;
 
-    // Create the generated design
+    // Build a CSG parametric config from the intent modifiers.
+    // This describes the geometry tree that the fabrication kernel
+    // resolves to mesh (STL/3MF) on the native-side service.
+    let parametric_config = build_parametric_config(&input.intent_modifiers);
+
+    // Confidence based on how many modifiers are structurally recognized
+    let recognized = input.intent_modifiers.iter()
+        .filter(|b| matches!(b.role.as_str(), "shape" | "dimension" | "material" | "feature" | "transform"))
+        .count();
+    let confidence = if input.intent_modifiers.is_empty() {
+        0.5
+    } else {
+        0.5 + 0.5 * (recognized as f32 / input.intent_modifiers.len() as f32)
+    };
+
     let generated = GeneratedDesignEntry {
         intent_hash: intent_result.record.action_address().clone(),
         base_design_hash: Some(input.base_design_hash.clone()),
-        parametric_config: serde_json::to_string(&input.intent_modifiers)
-            .unwrap_or_else(|_| "{}".to_string()),
+        parametric_config,
         material_constraints: input.material_constraints,
         printer_constraints: input.printer_constraints,
-        generated_file_cid: None, // Would be populated after actual generation
-        confidence_score: 0.8,    // Placeholder
+        generated_file_cid: None, // Populated by native fabrication-kernel service
+        confidence_score: confidence,
         generation_time_ms: 0,
         created_at: Timestamp::from_micros(now.as_micros() as i64),
     };
@@ -535,6 +616,92 @@ fn calculate_improvement_metrics(
     }
 
     metrics
+}
+
+// =============================================================================
+// PARAMETRIC CONFIG BUILDER
+// =============================================================================
+
+/// Build a CSG parametric config JSON from intent modifiers.
+/// This describes a geometry tree that the fabrication kernel resolves to mesh.
+/// Format matches symthaea-fabrication-kernel CSGNode serialization.
+fn build_parametric_config(modifiers: &[SerializedBinding]) -> String {
+    let mut shape = "Cube";
+    let mut scale = [1.0f32, 1.0, 1.0];
+    let mut features: Vec<serde_json::Value> = Vec::new();
+
+    for binding in modifiers {
+        match binding.role.as_str() {
+            "shape" => {
+                shape = match binding.concept.to_lowercase().as_str() {
+                    s if s.contains("cylinder") || s.contains("pipe") || s.contains("tube") => "Cylinder",
+                    s if s.contains("sphere") || s.contains("ball") => "Sphere",
+                    s if s.contains("cone") => "Cone",
+                    s if s.contains("torus") || s.contains("ring") || s.contains("donut") => "Torus",
+                    _ => "Cube",
+                };
+            }
+            "dimension" => {
+                // Parse dimension values like "12mm", "50x30x10"
+                let nums: Vec<f32> = binding.concept
+                    .split(|c: char| !c.is_ascii_digit() && c != '.')
+                    .filter_map(|s| s.parse::<f32>().ok())
+                    .collect();
+                match nums.len() {
+                    1 => { scale = [nums[0] / 1000.0, nums[0] / 1000.0, nums[0] / 1000.0]; }
+                    2 => { scale = [nums[0] / 1000.0, nums[1] / 1000.0, nums[0] / 1000.0]; }
+                    3.. => { scale = [nums[0] / 1000.0, nums[1] / 1000.0, nums[2] / 1000.0]; }
+                    _ => {}
+                }
+            }
+            "feature" => {
+                // Features like "mounting hole", "chamfer", "fillet"
+                if binding.concept.to_lowercase().contains("hole") {
+                    features.push(serde_json::json!({
+                        "Boolean": {
+                            "op": "Subtract",
+                            "left": {"Primitive": "Cylinder"},
+                            "right": {"Primitive": "Cylinder"}
+                        }
+                    }));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let mut tree = serde_json::json!({"Primitive": shape});
+
+    // Apply scale transform if non-default
+    if scale != [1.0, 1.0, 1.0] {
+        tree = serde_json::json!({
+            "Transform": {
+                "node": tree,
+                "transform": {
+                    "scale": scale,
+                    "rotate": [0.0, 0.0, 0.0],
+                    "translate": [0.0, 0.0, 0.0]
+                }
+            }
+        });
+    }
+
+    // Apply features via boolean operations
+    for feature in features {
+        tree = serde_json::json!({
+            "Boolean": {
+                "op": "Subtract",
+                "left": tree,
+                "right": feature
+            }
+        });
+    }
+
+    serde_json::json!({
+        "csg_tree": tree,
+        "version": "1.0",
+        "kernel": "symthaea-fabrication-kernel"
+    }).to_string()
 }
 
 // =============================================================================
@@ -709,6 +876,40 @@ fn all_intents_anchor() -> ExternResult<EntryHash> {
     make_anchor("all_intents")
 }
 
+/// Category anchor for partitioned HDC search.
+/// Intents are linked to both `all_intents` and their primary category,
+/// so `semantic_search_by_category` can scan a smaller subset.
+fn category_anchor(category: &str) -> ExternResult<EntryHash> {
+    make_anchor(&format!("category:{}", category.to_lowercase()))
+}
+
+/// Extract the primary category from semantic bindings.
+/// Falls back to "general" if no recognized category is found.
+fn extract_primary_category(bindings: &[SerializedBinding]) -> String {
+    for binding in bindings {
+        if binding.role == "Base" {
+            let concept = binding.concept.to_lowercase();
+            // Map common concepts to categories
+            if ["bracket", "mount", "clip", "holder", "stand"].iter().any(|k| concept.contains(k)) {
+                return "fasteners".to_string();
+            }
+            if ["gear", "pulley", "bearing", "shaft", "wheel"].iter().any(|k| concept.contains(k)) {
+                return "mechanical".to_string();
+            }
+            if ["pipe", "tube", "fitting", "valve", "nozzle"].iter().any(|k| concept.contains(k)) {
+                return "plumbing".to_string();
+            }
+            if ["case", "enclosure", "box", "housing", "cover"].iter().any(|k| concept.contains(k)) {
+                return "enclosures".to_string();
+            }
+            if ["tool", "jig", "fixture", "gauge", "template"].iter().any(|k| concept.contains(k)) {
+                return "tools".to_string();
+            }
+        }
+    }
+    "general".to_string()
+}
+
 // =============================================================================
 // UNIT TESTS (pure functions only -- HDK externs require conductor)
 // =============================================================================
@@ -842,5 +1043,81 @@ mod tests {
         assert!(metrics.contains_key("local_economy_boost"), "Must contain local_economy_boost");
         assert!(metrics.contains_key("grid_friendliness"),
             "Must contain grid_friendliness when print_time is present");
+    }
+
+    // =========================================================================
+    // build_parametric_config
+    // =========================================================================
+
+    #[test]
+    fn test_build_parametric_config_default_cube() {
+        let config = build_parametric_config(&[]);
+        let parsed: serde_json::Value = serde_json::from_str(&config).unwrap();
+        assert_eq!(parsed["kernel"], "symthaea-fabrication-kernel");
+        assert_eq!(parsed["csg_tree"]["Primitive"], "Cube");
+    }
+
+    #[test]
+    fn test_build_parametric_config_cylinder_shape() {
+        let modifiers = vec![SerializedBinding {
+            concept: "cylinder tube".to_string(),
+            role: "shape".to_string(),
+            weight: 1.0,
+        }];
+        let config = build_parametric_config(&modifiers);
+        let parsed: serde_json::Value = serde_json::from_str(&config).unwrap();
+        assert_eq!(parsed["csg_tree"]["Primitive"], "Cylinder");
+    }
+
+    #[test]
+    fn test_build_parametric_config_with_dimensions() {
+        let modifiers = vec![
+            SerializedBinding { concept: "bracket".to_string(), role: "shape".to_string(), weight: 1.0 },
+            SerializedBinding { concept: "50x30x10".to_string(), role: "dimension".to_string(), weight: 1.0 },
+        ];
+        let config = build_parametric_config(&modifiers);
+        let parsed: serde_json::Value = serde_json::from_str(&config).unwrap();
+        // Should have a Transform wrapping the primitive
+        assert!(parsed["csg_tree"]["Transform"].is_object(), "Should have transform for dimensions");
+        let scale = &parsed["csg_tree"]["Transform"]["transform"]["scale"];
+        assert!((scale[0].as_f64().unwrap() - 0.05).abs() < 0.001);
+    }
+
+    // =========================================================================
+    // extract_primary_category
+    // =========================================================================
+
+    #[test]
+    fn test_extract_category_fasteners() {
+        let bindings = vec![SerializedBinding { concept: "bracket".to_string(), role: "Base".to_string(), weight: 1.0 }];
+        assert_eq!(extract_primary_category(&bindings), "fasteners");
+    }
+
+    #[test]
+    fn test_extract_category_mechanical() {
+        let bindings = vec![SerializedBinding { concept: "gear".to_string(), role: "Base".to_string(), weight: 1.0 }];
+        assert_eq!(extract_primary_category(&bindings), "mechanical");
+    }
+
+    #[test]
+    fn test_extract_category_general() {
+        let bindings = vec![SerializedBinding { concept: "widget".to_string(), role: "Base".to_string(), weight: 1.0 }];
+        assert_eq!(extract_primary_category(&bindings), "general");
+    }
+
+    #[test]
+    fn test_extract_category_empty() {
+        assert_eq!(extract_primary_category(&[]), "general");
+    }
+
+    #[test]
+    fn test_build_parametric_config_with_hole_feature() {
+        let modifiers = vec![
+            SerializedBinding { concept: "mounting hole".to_string(), role: "feature".to_string(), weight: 1.0 },
+        ];
+        let config = build_parametric_config(&modifiers);
+        let parsed: serde_json::Value = serde_json::from_str(&config).unwrap();
+        assert_eq!(parsed["csg_tree"]["Boolean"]["op"], "Subtract",
+            "Hole feature should create a Boolean Subtract");
     }
 }
