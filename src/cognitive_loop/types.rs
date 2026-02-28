@@ -1300,6 +1300,12 @@ pub struct CycleMetadata {
     /// Number of subsystems that contributed non-neutral SubsystemOutputs.
     /// 0 = no subsystems using the new CognitiveSubsystem trait yet.
     pub subsystem_integration_contributors: u32,
+
+    // ── Nurture Attachment Telemetry ─────────────────────────────────────
+    /// Current attachment style (e.g., "Forming", "Secure"). Empty when nurture disabled.
+    pub attachment_style: Option<String>,
+    /// Current attachment security score (0.0–1.0). None when nurture disabled.
+    pub attachment_security: Option<f64>,
 }
 
 impl CycleMetadata {

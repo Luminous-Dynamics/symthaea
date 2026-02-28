@@ -610,6 +610,8 @@ impl CognitiveLoopService {
                 None
             },
             virtual_body,
+            #[cfg(feature = "nurture")]
+            nurture_attachment: None,
             psi_attestation_buffer: std::collections::VecDeque::with_capacity(attestation_buf_cap),
             policy_agreement_window: std::collections::VecDeque::with_capacity(20),
             master_equation: MasterConsciousnessEquation::default(),
@@ -637,6 +639,8 @@ impl CognitiveLoopService {
             neuromodulator_bath: super::neuromodulators::NeuromodulatorBath::default(),
             personality_drift_tracker: super::neuromodulators::PersonalityDriftTracker::default(),
             bath_phase_tracker: super::neuromodulators::BathPhaseTracker::default(),
+            was_sleeping: false,
+            bath_phase_detector: super::neuromodulators::PhaseTransitionDetector::new(5),
             somatic_bridge: somatic_bridge_instance,
             pain_tx: Some(pain_sender),
             subsystem_collector: super::subsystem_trait::OutputCollector::new(),

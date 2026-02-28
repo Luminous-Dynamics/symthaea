@@ -151,6 +151,9 @@ pub(crate) mod subsystem_trait;
 pub(crate) mod thresholds;
 pub(crate) mod virtual_body;
 
+#[cfg(feature = "nurture")]
+pub mod nurture_bridge;
+
 #[cfg(feature = "humanoid")]
 pub mod motor_bridge;
 
@@ -608,6 +611,12 @@ pub struct CognitiveLoopService {
     /// a phi_modulation factor that scales consciousness from somatic feedback.
     virtual_body: Option<virtual_body::VirtualBody>,
 
+    /// Nurture/attachment bridge — Bowlby attachment -> neuromodulator modulation.
+    /// When enabled, models caregiver presence/absence and modulates oxytocin, NE,
+    /// 5-HT, DA, adenosine based on attachment dynamics each cycle.
+    #[cfg(feature = "nurture")]
+    pub(crate) nurture_attachment: Option<nurture_bridge::NurtureAttachmentBridge>,
+
     /// Buffer of PsiAttestationRecords ready for governance bridge consumption.
     /// Populated when `config.enable_psi_attestation` is true.
     /// Capacity bound: attestation_buffer_capacity (max 256) — evict before push.
@@ -689,6 +698,12 @@ pub struct CognitiveLoopService {
 
     /// Bath phase space tracker — entropy, centroid, attractor detection.
     pub(crate) bath_phase_tracker: neuromodulators::BathPhaseTracker,
+
+    /// Whether the system was in sleep phase on the previous cycle (for sleep→wake transition).
+    pub(crate) was_sleeping: bool,
+
+    /// Hysteresis-based phase transition detector (prevents flicker between labels).
+    pub(crate) bath_phase_detector: neuromodulators::PhaseTransitionDetector,
 
     /// Somatic error bridge: converts infrastructure failures into felt stress.
     /// Lock poisoning, task panics, DB errors → arousal, thermodynamic load, tau slowdown.

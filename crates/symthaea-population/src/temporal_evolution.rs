@@ -165,6 +165,84 @@ impl PopulationTrajectoryPredictor {
     pub fn reset(&mut self) {
         self.neuron.reset();
     }
+
+    // ── Calibrated Prediction API ──────────────────────────────────────────
+
+    /// O(1) calibrated prediction of heterozygosity under neutral drift.
+    ///
+    /// Uses the analytical formula H(t) = H(0) * (1 - 1/(2*Ne))^t which is
+    /// itself O(1) — a single exponentiation regardless of generation count.
+    pub fn predict_heterozygosity_neutral(h0: f64, ne: f64, generations: u32) -> f64 {
+        crate::diversity::heterozygosity_after_generations(h0, ne, generations)
+    }
+
+    /// Predict the *relative diversity advantage* of a breeding strategy.
+    ///
+    /// Runs CfC evolution from two states and returns the ratio of their
+    /// decoded heterozygosities. Values > 1.0 mean `state_a` retains more
+    /// diversity than `state_b`.
+    pub fn predict_relative_advantage(
+        &mut self,
+        state_a: &ContinuousHV,
+        state_b: &ContinuousHV,
+        target_generation: u32,
+    ) -> f64 {
+        let evolved_a = self.predict_at_generation(state_a, target_generation);
+        self.reset();
+        let evolved_b = self.predict_at_generation(state_b, target_generation);
+        self.reset();
+
+        let het_a = Self::decode_heterozygosity(&evolved_a);
+        let het_b = Self::decode_heterozygosity(&evolved_b);
+
+        if het_b > 1e-10 {
+            het_a / het_b
+        } else {
+            1.0
+        }
+    }
+
+    /// CfC-calibrated heterozygosity prediction blending neural and analytical.
+    ///
+    /// Uses CfC temporal evolution to capture state trajectory *direction*
+    /// and analytical drift to anchor the *magnitude*.
+    pub fn predict_heterozygosity_calibrated(
+        &mut self,
+        population: &Population,
+        ne: f64,
+        target_generation: u32,
+    ) -> f64 {
+        if population.individuals.is_empty() {
+            return 0.0;
+        }
+
+        let initial_state = Self::encode_population_state(population);
+        let initial_het = Self::decode_heterozygosity(&initial_state);
+
+        if initial_het < 1e-10 || target_generation == 0 {
+            return initial_het;
+        }
+
+        // CfC trajectory
+        let evolved = self.predict_at_generation(&initial_state, target_generation);
+        self.reset();
+        let cfc_het = Self::decode_heterozygosity(&evolved);
+        let cfc_ratio = cfc_het / initial_het;
+
+        // Analytical baseline: neutral drift
+        let analytical = Self::predict_heterozygosity_neutral(initial_het, ne, target_generation);
+        let analytical_ratio = analytical / initial_het;
+
+        // Blend: anchor on analytical, modulated by CfC trajectory shape
+        let modulation = if analytical_ratio > 1e-10 {
+            cfc_ratio / analytical_ratio
+        } else {
+            1.0
+        };
+
+        let modulation = modulation.clamp(0.5, 2.0);
+        (analytical * modulation).clamp(0.0, 1.0)
+    }
 }
 
 impl Default for PopulationTrajectoryPredictor {
@@ -358,5 +436,98 @@ mod tests {
             sim < 0.99,
             "different populations should encode differently: sim={sim}"
         );
+    }
+
+    // ── Calibration tests ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_neutral_prediction_matches_analytical() {
+        let h0 = 0.75;
+        let ne = 100.0;
+        for gen in [1, 10, 50, 100, 500] {
+            let predicted =
+                PopulationTrajectoryPredictor::predict_heterozygosity_neutral(h0, ne, gen);
+            let expected = crate::diversity::heterozygosity_after_generations(h0, ne, gen);
+            assert!(
+                (predicted - expected).abs() < 1e-12,
+                "neutral prediction at gen {gen}: {predicted} vs {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_neutral_prediction_monotonic_decay() {
+        let h0 = 0.8;
+        let ne = 50.0;
+        let mut prev = h0;
+        for gen in 1..=20 {
+            let h = PopulationTrajectoryPredictor::predict_heterozygosity_neutral(h0, ne, gen);
+            assert!(h <= prev + 1e-12, "should decay: gen {gen}, {h} > {prev}");
+            assert!(h >= 0.0);
+            prev = h;
+        }
+    }
+
+    #[test]
+    fn test_calibrated_prediction_reasonable_range() {
+        let pop = make_test_population(50);
+        let ne = 25.0;
+        let mut pred = PopulationTrajectoryPredictor::new();
+        for gen in [1, 5, 10, 20] {
+            let h = pred.predict_heterozygosity_calibrated(&pop, ne, gen);
+            pred.reset();
+            assert!(
+                (0.0..=1.0).contains(&h),
+                "calibrated at gen {gen} should be in [0,1]: got {h}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_calibrated_gen_zero_returns_initial() {
+        let pop = make_test_population(50);
+        let mut pred = PopulationTrajectoryPredictor::new();
+        let h0 = pred.predict_heterozygosity_calibrated(&pop, 25.0, 0);
+        pred.reset();
+        let initial_state = PopulationTrajectoryPredictor::encode_population_state(&pop);
+        let initial_het = PopulationTrajectoryPredictor::decode_heterozygosity(&initial_state);
+        assert!(
+            (h0 - initial_het).abs() < 1e-10,
+            "gen 0 should equal initial: {h0} vs {initial_het}"
+        );
+    }
+
+    #[test]
+    fn test_relative_advantage_same_state_near_one() {
+        let mut pred = PopulationTrajectoryPredictor::with_generation_time(1.0);
+        let state = ContinuousHV::random(HDC_DIMENSION, 42);
+        let ratio = pred.predict_relative_advantage(&state, &state, 10);
+        assert!(
+            (ratio - 1.0).abs() < 0.1,
+            "same state ratio should be ~1.0, got {ratio}"
+        );
+    }
+
+    #[test]
+    fn test_relative_advantage_finite() {
+        let mut pred = PopulationTrajectoryPredictor::with_generation_time(1.0);
+        let state_a = ContinuousHV::random(HDC_DIMENSION, 100);
+        let state_b = ContinuousHV::random(HDC_DIMENSION, 200);
+        let ratio = pred.predict_relative_advantage(&state_a, &state_b, 50);
+        assert!(ratio.is_finite());
+        assert!(ratio >= 0.0);
+    }
+
+    #[test]
+    fn test_calibrated_empty_population_zero() {
+        let pop = Population {
+            individuals: vec![],
+            generation: 0,
+            founding_size: 0,
+            diversity_hv: ContinuousHV::zero(HDC_DIMENSION),
+        };
+        let mut pred = PopulationTrajectoryPredictor::new();
+        let h = pred.predict_heterozygosity_calibrated(&pop, 50.0, 10);
+        assert!(h.abs() < 1e-10, "empty pop should be ~0: got {h}");
     }
 }

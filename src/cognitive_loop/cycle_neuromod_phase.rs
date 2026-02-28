@@ -203,6 +203,18 @@ impl CognitiveLoopService {
             ""
         };
 
+        // ── Attachment-driven neuromodulation ──────────────────────────────
+        // Science: Bowlby (1969) — caregiver proximity modulates HPA axis
+        // and oxytocinergic circuits, shaping arousal regulation lifelong.
+        #[cfg(feature = "nurture")]
+        if let Some(ref mut nurture) = self.nurture_attachment {
+            let arousal = self.neuromodulator_bath.noradrenaline.effective();
+            let valence = self.neuromodulator_bath.serotonin.effective()
+                - self.neuromodulator_bath.noradrenaline.phasic();
+            let attachment_mod = nurture.cycle_step(arousal, valence);
+            attachment_mod.apply_to_bath(&mut self.neuromodulator_bath);
+        }
+
         NeuromodPhaseResult {
             unified_psi,
             guiding_question: guiding_question.to_owned(),
