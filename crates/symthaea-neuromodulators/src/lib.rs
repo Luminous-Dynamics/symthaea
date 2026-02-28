@@ -1521,6 +1521,41 @@ impl NeuromodulatorBath {
             }
         }
     }
+
+    /// Human-readable phase label classifying the current neurochemical state.
+    ///
+    /// Classifies the bath into one of 7 states based on transmitter profiles:
+    /// - "stressed": high NE + high cortisol (allostatic load)
+    /// - "flow": high DA + moderate NE + high ACh
+    /// - "drowsy": high adenosine (sleep pressure > 0.6)
+    /// - "alert": high NE + high ACh
+    /// - "relaxed": high 5-HT + high GABA
+    /// - "recovering": allostatic recovery in progress
+    /// - "balanced": default resting state
+    pub fn phase_label(&self) -> &'static str {
+        let da = self.dopamine.effective();
+        let ne = self.noradrenaline.effective();
+        let sht = self.serotonin.effective();
+        let ach = self.acetylcholine.effective();
+        let gaba = self.gaba.effective();
+        let aden = self.adenosine.effective();
+
+        if ne > 0.7 && self.allostatic_load > 0.5 {
+            "stressed"
+        } else if da > 0.6 && ne > 0.4 && ne < 0.7 && ach > 0.5 {
+            "flow"
+        } else if aden > 0.6 {
+            "drowsy"
+        } else if ne > 0.6 && ach > 0.5 {
+            "alert"
+        } else if sht > 0.6 && gaba > 0.5 {
+            "relaxed"
+        } else if self.allostatic_recovery_cycles > 10 {
+            "recovering"
+        } else {
+            "balanced"
+        }
+    }
 }
 
 /// Complete neurochemical state snapshot for telemetry/visualization.
@@ -2059,6 +2094,23 @@ impl BathPhaseTracker {
         } else {
             None
         }
+    }
+
+    /// Return the last N state vectors from history as a trajectory.
+    pub fn trajectory(&self, n: usize) -> Vec<[f32; 9]> {
+        let len = self.history.len();
+        let start = len.saturating_sub(n);
+        self.history.iter().skip(start).copied().collect()
+    }
+
+    /// Current number of recorded samples.
+    pub fn len(&self) -> usize {
+        self.history.len()
+    }
+
+    /// Whether the tracker has no recorded samples.
+    pub fn is_empty(&self) -> bool {
+        self.history.is_empty()
     }
 }
 

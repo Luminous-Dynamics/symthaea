@@ -352,11 +352,11 @@ fn profile_comparison_full_vs_default() {
     let full_max_cl = full_results
         .iter()
         .map(|r| r.metadata.consciousness_level)
-        .fold(0.0f32, f32::max);
+        .fold(0.0f64, f64::max);
     let default_max_cl = default_results
         .iter()
         .map(|r| r.metadata.consciousness_level)
-        .fold(0.0f32, f32::max);
+        .fold(0.0f64, f64::max);
 
     assert!(
         full_max_cl >= default_max_cl,

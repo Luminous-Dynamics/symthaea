@@ -863,9 +863,13 @@ impl CognitiveLoopService {
             // High temporal coherence → model is reliable, raise threshold (learn less often)
             self.scale_threshold("temporal_high_coherence", 1.01);
         } else {
-            // Slowly return toward baseline (homeostasis drift, not a subsystem proposal)
-            self.carryover.learning.adaptive_threshold_scale +=
-                (1.0 - self.carryover.learning.adaptive_threshold_scale) * 0.02;
+            // Slowly return toward baseline (homeostasis drift toward 1.0)
+            let drift = (1.0 - self.carryover.learning.adaptive_threshold_scale) * 0.02;
+            self.feedback_state.threshold.propose(
+                "homeostasis_drift",
+                super::feedback_state::FeedbackProposal::Add(drift as f64),
+            );
+            self.carryover.learning.adaptive_threshold_scale += drift;
         }
 
         // ── Phase 21: Temporal discontinuity recovery cascade ────────────
