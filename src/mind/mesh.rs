@@ -217,7 +217,7 @@ impl ContinuousMind {
     }
 
     /// Get the mesh source_id for this mind (first 8 bytes of node identity).
-    fn mesh_source_id(&self) -> [u8; 8] {
+    pub(crate) fn mesh_source_id(&self) -> [u8; 8] {
         let mut source_id = [0u8; 8];
         let dim_bytes = (self.config.dimension as u64).to_le_bytes();
         source_id.copy_from_slice(&dim_bytes);
@@ -237,7 +237,7 @@ impl ContinuousMind {
     ///
     /// Computes a BLAKE3 keyed MAC over the serialized packet bytes
     /// and sets the `auth_mac` field. No-op if no key is configured.
-    fn sign_mesh_packet(&self, packet: &mut crate::swarm::mesh::WisdomPacket) {
+    pub(crate) fn sign_mesh_packet(&self, packet: &mut crate::swarm::mesh::WisdomPacket) {
         if let Some(ref key) = self.mesh_auth_key {
             let bytes = packet.to_bytes();
             packet.auth_mac = crate::swarm::mesh::compute_packet_mac(&bytes, key);
@@ -251,7 +251,7 @@ impl ContinuousMind {
     /// - **Multiplicative Decrease**: If throttled or health < 0.3, halve the
     ///   budget (floored at 25 KB).
     /// - **Hold Steady**: health in [0.3, 0.5] or 0.0 (idle) -- no change.
-    fn adjust_bandwidth_budget(&mut self) {
+    pub(crate) fn adjust_bandwidth_budget(&mut self) {
         let health = self.mesh_stats.health_score(self.mesh_peers.peer_count());
         if self.mesh_bandwidth_throttled_in_window || (health > 0.0 && health < 0.3) {
             // Multiplicative decrease

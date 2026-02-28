@@ -100,7 +100,34 @@ impl ContinuousMind {
     }
 
     /// Dream Cycle: Consolidate memory and generate internal novelty.
+    ///
+    /// Neurochemical sleep dynamics (Xie 2013, Piomelli 2003, Blier & de Montigny 1994):
+    /// 1. Glymphatic clearance: adenosine reduction via `clear_adenosine_sleep()`
+    /// 2. ECB stress buffer: allostatic load reduction under chronic stress
+    /// 3. 5-HT1A up-regulation: gentle serotonin recovery for emotional balance
+    /// 4. ECB production under stress: endocannabinoid buffer
     fn process_dream(&mut self) -> Option<MindOutput> {
+        // ── Neurochemical sleep recovery ──────────────────────────────
+        // 1. Glymphatic clearance: reduce adenosine (Xie et al. 2013)
+        self.dream_bath.clear_adenosine_sleep();
+        self.stats.dream_adenosine_cleared += 1;
+
+        // 2. ECB stress buffer: reduce allostatic load under chronic stress (Piomelli 2003)
+        if self.dream_bath.allostatic_load > 0.3 {
+            self.dream_bath.allostatic_load =
+                (self.dream_bath.allostatic_load - 0.02).max(0.0);
+            self.stats.dream_allostatic_recovery += 1;
+        }
+
+        // 3. 5-HT1A up-regulation: gentle serotonin recovery (Blier & de Montigny 1994)
+        self.dream_bath.serotonin.receptor_sensitivity =
+            (self.dream_bath.serotonin.receptor_sensitivity + 0.001).min(2.0);
+
+        // 4. ECB production under stress: endocannabinoid buffer (Piomelli 2003)
+        if self.dream_bath.allostatic_load > 0.2 {
+            self.dream_bath.endocannabinoid.produce(0.03);
+        }
+
         if self.working_memory.len() >= 2 {
             let mut i = 0;
             while i < self.working_memory.len().saturating_sub(1) {
@@ -907,7 +934,7 @@ impl ContinuousMind {
             .as_millis() as u64;
 
         let arousal = self.state.arousal;
-        let mut affect = crate::swarm::AffectiveState {
+        let affect = crate::swarm::AffectiveState {
             valence: self.state.emotional_valence,
             arousal,
             dominance: 0.0,
@@ -1079,6 +1106,16 @@ mod tests {
         ContinuousMind, Goal, InputType, MindConfig, MindInput, MindOutput, OutputType,
     };
     use symthaea_core::hdc::ContinuousHV;
+
+    /// Helper: create an activated mind with a specific HDC dimension.
+    fn make_mind(dimension: usize) -> ContinuousMind {
+        let mut mind = ContinuousMind::new(MindConfig {
+            dimension,
+            ..Default::default()
+        });
+        mind.activate();
+        mind
+    }
 
     /// Helper: create an activated mind with default config.
     fn activated_mind() -> ContinuousMind {
@@ -1652,5 +1689,80 @@ mod tests {
             super::super::MAX_OUTBOX_SIZE,
             mind.federated_outbox.len()
         );
+    }
+
+    // ── Dream bath neurochemical recovery ─────────────────────────
+
+    #[test]
+    fn dream_adenosine_clears() {
+        let mut mind = make_mind(64);
+        mind.dream_bath.adenosine.produce(0.4); // raise adenosine
+        let before = mind.dream_bath.adenosine.level;
+        mind.state.is_dreaming = true;
+        mind.process_dream();
+        assert!(
+            mind.dream_bath.adenosine.level < before,
+            "adenosine should clear during dream: before={before}, after={}",
+            mind.dream_bath.adenosine.level
+        );
+    }
+
+    #[test]
+    fn dream_allostatic_recovers() {
+        let mut mind = make_mind(64);
+        mind.dream_bath.allostatic_load = 0.5;
+        mind.state.is_dreaming = true;
+        mind.process_dream();
+        assert!(
+            mind.dream_bath.allostatic_load < 0.5,
+            "allostatic load should decrease during dream: {}",
+            mind.dream_bath.allostatic_load
+        );
+    }
+
+    #[test]
+    fn dream_sht1a_boosts() {
+        let mut mind = make_mind(64);
+        let before = mind.dream_bath.serotonin.receptor_sensitivity;
+        mind.state.is_dreaming = true;
+        mind.process_dream();
+        assert!(
+            mind.dream_bath.serotonin.receptor_sensitivity > before,
+            "5-HT receptor sensitivity should increase: before={before}, after={}",
+            mind.dream_bath.serotonin.receptor_sensitivity
+        );
+    }
+
+    #[test]
+    fn dream_ecb_produces_under_stress() {
+        let mut mind = make_mind(64);
+        mind.dream_bath.allostatic_load = 0.4;
+        let before = mind.dream_bath.endocannabinoid.level;
+        mind.state.is_dreaming = true;
+        mind.process_dream();
+        assert!(
+            mind.dream_bath.endocannabinoid.level > before,
+            "ECB should increase under stress: before={before}, after={}",
+            mind.dream_bath.endocannabinoid.level
+        );
+    }
+
+    #[test]
+    fn dream_no_panic_on_defaults() {
+        let mut mind = make_mind(64);
+        mind.state.is_dreaming = true;
+        // process_dream with default bath should not panic
+        let _ = mind.process_dream();
+    }
+
+    #[test]
+    fn dream_telemetry_increments() {
+        let mut mind = make_mind(64);
+        mind.state.is_dreaming = true;
+        assert_eq!(mind.stats.dream_adenosine_cleared, 0);
+        mind.process_dream();
+        assert_eq!(mind.stats.dream_adenosine_cleared, 1);
+        mind.process_dream();
+        assert_eq!(mind.stats.dream_adenosine_cleared, 2);
     }
 }
