@@ -21,9 +21,9 @@ pub struct ObjectiveSchema {
     pub name: String,
     pub description: String,
     #[serde(default = "default_domain")]
-    pub domain: String,     // String to allow flexible parsing into Domain enum
+    pub domain: String, // String to allow flexible parsing into Domain enum
     #[serde(default = "default_difficulty")]
-    pub difficulty: f32,    // 0.0 - 1.0
+    pub difficulty: f32, // 0.0 - 1.0
     #[serde(default)]
     pub prerequisites: Vec<String>,
     #[serde(default)]
@@ -32,9 +32,15 @@ pub struct ObjectiveSchema {
     pub estimated_minutes: u32,
 }
 
-fn default_domain() -> String { "Custom".to_string() }
-fn default_difficulty() -> f32 { 0.5 }
-fn default_minutes() -> u32 { 30 }
+fn default_domain() -> String {
+    "Custom".to_string()
+}
+fn default_difficulty() -> f32 {
+    0.5
+}
+fn default_minutes() -> u32 {
+    30
+}
 
 /// Schema for a full curriculum extension
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,10 +104,7 @@ impl CurriculumSchema {
         let mut ids = HashSet::new();
         for (index, obj) in self.objectives.iter().enumerate() {
             if obj.id.trim().is_empty() {
-                return Err(CurriculumSchemaError::EmptyObjectiveField {
-                    field: "id",
-                    index,
-                });
+                return Err(CurriculumSchemaError::EmptyObjectiveField { field: "id", index });
             }
             if obj.name.trim().is_empty() {
                 return Err(CurriculumSchemaError::EmptyObjectiveField {
@@ -128,9 +131,7 @@ impl CurriculumSchema {
                 });
             }
             if !ids.insert(obj.id.clone()) {
-                return Err(CurriculumSchemaError::DuplicateObjectiveId {
-                    id: obj.id.clone(),
-                });
+                return Err(CurriculumSchemaError::DuplicateObjectiveId { id: obj.id.clone() });
             }
         }
 
@@ -144,7 +145,13 @@ impl From<ObjectiveSchema> for LearningObjective {
             .with_description(&schema.description)
             .with_domain(Domain::from(schema.domain.as_str()))
             .with_difficulty(Difficulty::from_f32(schema.difficulty))
-            .with_prerequisites(&schema.prerequisites.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+            .with_prerequisites(
+                &schema
+                    .prerequisites
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>(),
+            )
             .with_tags(&schema.tags.iter().map(|s| s.as_str()).collect::<Vec<_>>())
             .with_estimated_minutes(schema.estimated_minutes)
             .build()
@@ -373,11 +380,12 @@ impl Curriculum {
 
         for missing_id in missing_prereqs {
             if self.get(&missing_id).is_none() {
-                let stub = LearningObjective::new(&missing_id, &format!("Implicit: {}", missing_id))
-                    .with_description("Automatically created prerequisite stub.")
-                    .with_difficulty(Difficulty::Beginner)
-                    .with_dimension(dimension)
-                    .build();
+                let stub =
+                    LearningObjective::new(&missing_id, &format!("Implicit: {}", missing_id))
+                        .with_description("Automatically created prerequisite stub.")
+                        .with_difficulty(Difficulty::Beginner)
+                        .with_dimension(dimension)
+                        .build();
                 self.objectives.push(stub);
             }
         }
@@ -754,7 +762,9 @@ impl Curriculum {
                 LearningObjective::new("power-telemetry", "Power Telemetry and INA219 Monitoring")
                     .with_domain(Domain::Consciousness)
                     .with_difficulty(Difficulty::Beginner)
-                    .with_description("Track interoceptive power draw using INA219 readings and SSM smoothing")
+                    .with_description(
+                        "Track interoceptive power draw using INA219 readings and SSM smoothing",
+                    )
                     .with_prerequisite("consciousness-intro")
                     .with_tags(&["ina219", "power", "telemetry", "interoception", "ssm"])
                     .with_estimated_minutes(20),

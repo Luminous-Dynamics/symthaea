@@ -73,10 +73,8 @@ impl PvtBenchmark {
             for _ in 0..trials_per_block {
                 xor_shift(&mut rng);
                 let noise_hv = ContinuousHV::random(dim, rng);
-                let stimulus = ContinuousHV::weighted_bundle(
-                    &[&stimulus_proto, &noise_hv],
-                    &[0.80, 0.20],
-                );
+                let stimulus =
+                    ContinuousHV::weighted_bundle(&[&stimulus_proto, &noise_hv], &[0.80, 0.20]);
                 let detection = stimulus.similarity(&stimulus_proto) as f64;
 
                 xor_shift(&mut rng);
@@ -138,16 +136,18 @@ impl PvtBenchmark {
         let mut sorted_rts = all_rts.clone();
         sorted_rts.sort_by(|a, b| a.total_cmp(b));
         let top_10_count = (total_trials as f64 * 0.10).max(1.0) as usize;
-        let fastest_10pct =
-            sorted_rts[..top_10_count].iter().sum::<f64>() / top_10_count as f64;
+        let fastest_10pct = sorted_rts[..top_10_count].iter().sum::<f64>() / top_10_count as f64;
 
-        (TrialResult {
-            vigilance_decrement,
-            mean_rt,
-            lapse_rate,
-            fastest_10pct,
-            rt_ticks: mean_rt,
-        }, outcomes)
+        (
+            TrialResult {
+                vigilance_decrement,
+                mean_rt,
+                lapse_rate,
+                fastest_10pct,
+                rt_ticks: mean_rt,
+            },
+            outcomes,
+        )
     }
 }
 
@@ -180,7 +180,8 @@ impl PsychBenchmark for PvtBenchmark {
         let mut global_trial_idx = 0usize;
 
         for trial in 0..config.trials_per_condition {
-            let (r, outcomes) = self.run_trial_traced(config, trial, temp_mult, &mut global_trial_idx);
+            let (r, outcomes) =
+                self.run_trial_traced(config, trial, temp_mult, &mut global_trial_idx);
             decrements.push(r.vigilance_decrement);
             mean_rts.push(r.mean_rt);
             lapse_rates.push(r.lapse_rate);
@@ -294,7 +295,8 @@ mod tests {
         assert!(
             rt_press <= rt_base + 0.5,
             "time pressure should reduce RT: base={:.2}, pressed={:.2}",
-            rt_base, rt_press
+            rt_base,
+            rt_press
         );
     }
 }

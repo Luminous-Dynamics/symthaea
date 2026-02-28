@@ -275,10 +275,12 @@ fn main() {
     println!("-------------------------------------\n");
 
     // Find best from all searches
-    let all_results = [("Random", &random_result),
+    let all_results = [
+        ("Random", &random_result),
         ("Evolutionary", &evo_result),
         ("Gradient", &grad_result),
-        ("Hybrid", &hybrid_result)];
+        ("Hybrid", &hybrid_result),
+    ];
 
     let (best_name, best_result) = all_results
         .iter()

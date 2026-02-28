@@ -77,7 +77,10 @@ async fn main() -> Result<()> {
     // Socratic recall query.
     let query = "Reflect on your recent thermodynamic load. Was your energy consumption stable?";
     let response = sym.process(query).await?;
-    println!("\nSocratic prompt: {query}\nResponse: {}\n", response.content);
+    println!(
+        "\nSocratic prompt: {query}\nResponse: {}\n",
+        response.content
+    );
 
     if let Some(db) = sym.database() {
         let records = db.list_all().await?;

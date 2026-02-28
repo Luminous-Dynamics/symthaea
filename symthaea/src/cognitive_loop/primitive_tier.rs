@@ -57,7 +57,6 @@ pub(crate) struct PrimitiveTierManager {
     pub compositionality_engine: Option<CompositionalityEngine>,
 
     // NOTE: UnifiedValueEvaluator removed — now solely owned by EthicsEngine.
-
     /// Harmonic field: tracks strength of each of the Seven Fiduciary Harmonics.
     pub harmonic_field: Option<HarmonicField>,
 
@@ -83,7 +82,6 @@ pub(crate) struct PrimitiveTierManager {
     pub evolution_coordinator: Option<EvolutionCoordinator>,
 
     // NOTE: HarmoniesIntegrator removed — now solely owned by EthicsEngine.
-
     /// Semantic value embedder: value-aligned embeddings grounded in primitive tiers.
     pub semantic_value_embedder: Option<SemanticValueEmbedder>,
 
@@ -97,7 +95,6 @@ pub(crate) struct PrimitiveTierManager {
     pub theory_calibrator: Option<TheoryCalibrator>,
 
     // NOTE: ConsciousnessEquationV2 removed — now solely owned by ConsciousnessEngine.
-
     /// Hierarchical LTC: local circuits + global integrator.
     pub hierarchical_ltc: Option<HierarchicalLTC>,
 
@@ -112,7 +109,6 @@ pub(crate) struct PrimitiveTierManager {
 
     // NOTE: UnifiedConsciousnessPipeline removed — now solely owned by ConsciousnessEngine.
     // NOTE: MultiModalIntegrator removed — now solely owned by ConsciousnessEngine.
-
     /// Primitive composition rules: domain-specific HDC binding operators.
     pub composition_rule_engine: Option<CompositionRuleEngine>,
 
@@ -156,14 +152,14 @@ impl PrimitiveTierManager {
         };
 
         // Temporal analyzer + lattice (co-gated with primitive processor)
-        let (temporal_analyzer, primitive_lattice) = if let Some(ref processor) = primitive_processor
-        {
-            let analyzer = ConsciousnessTemporalAnalyzer::new(0.3);
-            let lattice = PrimitiveLattice::from_primitive_system(processor.primitive_system());
-            (Some(analyzer), Some(lattice))
-        } else {
-            (None, None)
-        };
+        let (temporal_analyzer, primitive_lattice) =
+            if let Some(ref processor) = primitive_processor {
+                let analyzer = ConsciousnessTemporalAnalyzer::new(0.3);
+                let lattice = PrimitiveLattice::from_primitive_system(processor.primitive_system());
+                (Some(analyzer), Some(lattice))
+            } else {
+                (None, None)
+            };
 
         // Compositionality + harmonics + reasoning + validation
         // NOTE: UnifiedValueEvaluator removed — now solely owned by EthicsEngine
@@ -184,7 +180,8 @@ impl PrimitiveTierManager {
             let hf = HarmonicField::new();
             let hr = HarmonicResolver::new();
             let pr = PrimitiveReasoner::new(ReasonerConfig::default());
-            let ar = AdaptiveReasoner::new(symthaea_core::hdc::primitive_system::PrimitiveTier::NSM);
+            let ar =
+                AdaptiveReasoner::new(symthaea_core::hdc::primitive_system::PrimitiveTier::NSM);
             let pv = PhiValidationFramework::new();
             (
                 Some(comp_engine),
@@ -261,18 +258,15 @@ impl PrimitiveTierManager {
         // Holographic + differentiable + affective
         // NOTE: UnifiedConsciousnessPipeline + MultiModalIntegrator removed —
         //       now solely owned by ConsciousnessEngine
-        let (
-            holographic_analyzer,
-            differentiable_consciousness,
-            affective_consciousness,
-        ) = if has_primitive {
-            let ha = HolographicConsciousnessAnalyzer::new(HolographicConfig::default());
-            let dc = DifferentiableConsciousness::new();
-            let ac = AffectiveConsciousnessAnalyzer::new(AffectiveConfig::default());
-            (Some(ha), Some(dc), Some(ac))
-        } else {
-            (None, None, None)
-        };
+        let (holographic_analyzer, differentiable_consciousness, affective_consciousness) =
+            if has_primitive {
+                let ha = HolographicConsciousnessAnalyzer::new(HolographicConfig::default());
+                let dc = DifferentiableConsciousness::new();
+                let ac = AffectiveConsciousnessAnalyzer::new(AffectiveConfig::default());
+                (Some(ha), Some(dc), Some(ac))
+            } else {
+                (None, None, None)
+            };
 
         // Synthetic states + epistemic gate
         let (synthetic_grounding, epistemic_gate) = if has_primitive {

@@ -163,7 +163,9 @@ impl CognitiveLoopService {
             consciousness_profile_composite,
             synergy_enhanced_composite,
             emergent_properties_count,
-        ) = if self.stats.total_cycles % 47 == 0 && self.primitive_tier.primitive_processor.is_some() {
+        ) = if self.stats.total_cycles % 47 == 0
+            && self.primitive_tier.primitive_processor.is_some()
+        {
             let profile =
                 crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
                     self.carryover.history.recent_hvs.make_contiguous(),
@@ -249,24 +251,25 @@ impl CognitiveLoopService {
         // Science: Plate (2003) — holographic reduced representations.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let composition_rule_applied = if let Some(ref rule_engine) = self.primitive_tier.composition_rule_engine {
-            if active_primitive_names.len() >= 2 {
-                let system = symthaea_core::hdc::primitive_system::PrimitiveSystem::global();
-                let tier1 = system
-                    .get(&active_primitive_names[0])
-                    .map(|p| p.tier)
-                    .unwrap_or(symthaea_core::hdc::primitive_system::PrimitiveTier::NSM);
-                let tier2 = system
-                    .get(&active_primitive_names[1])
-                    .map(|p| p.tier)
-                    .unwrap_or(symthaea_core::hdc::primitive_system::PrimitiveTier::NSM);
-                rule_engine.matching_rule_name(tier1, tier2).to_string()
+        let composition_rule_applied =
+            if let Some(ref rule_engine) = self.primitive_tier.composition_rule_engine {
+                if active_primitive_names.len() >= 2 {
+                    let system = symthaea_core::hdc::primitive_system::PrimitiveSystem::global();
+                    let tier1 = system
+                        .get(&active_primitive_names[0])
+                        .map(|p| p.tier)
+                        .unwrap_or(symthaea_core::hdc::primitive_system::PrimitiveTier::NSM);
+                    let tier2 = system
+                        .get(&active_primitive_names[1])
+                        .map(|p| p.tier)
+                        .unwrap_or(symthaea_core::hdc::primitive_system::PrimitiveTier::NSM);
+                    rule_engine.matching_rule_name(tier1, tier2).to_string()
+                } else {
+                    String::new()
+                }
             } else {
                 String::new()
-            }
-        } else {
-            String::new()
-        };
+            };
         module_timings.composition_rules = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -327,22 +330,25 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let epistemic_override = self.carryover.quality.epistemic_reasoning_override;
-        let adaptive_reasoning_phi = if let Some(ref mut reasoner) = self.primitive_tier.adaptive_reasoner {
-            if (self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0) || epistemic_override {
-                if epistemic_override {
-                    self.carryover.quality.epistemic_reasoning_override = false;
-                    self.stats.epistemic_reasoning_accelerations += 1;
-                }
-                match reasoner.reason_adaptive(hv16_cached, 5) {
-                    Ok(chain) => chain.total_phi,
-                    Err(_) => 0.0,
+        let adaptive_reasoning_phi =
+            if let Some(ref mut reasoner) = self.primitive_tier.adaptive_reasoner {
+                if (self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0)
+                    || epistemic_override
+                {
+                    if epistemic_override {
+                        self.carryover.quality.epistemic_reasoning_override = false;
+                        self.stats.epistemic_reasoning_accelerations += 1;
+                    }
+                    match reasoner.reason_adaptive(hv16_cached, 5) {
+                        Ok(chain) => chain.total_phi,
+                        Err(_) => 0.0,
+                    }
+                } else {
+                    0.0
                 }
             } else {
                 0.0
-            }
-        } else {
-            0.0
-        };
+            };
         module_timings.adaptive_reasoning = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -388,31 +394,32 @@ impl CognitiveLoopService {
         // Science: IIT empirical validation (Casali et al. 2013).
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let phi_validation_correlation = if let Some(ref mut validator) = self.primitive_tier.phi_validation {
-            if self.stats.total_cycles % 499 == 0 && self.stats.total_cycles >= 499 {
-                // Phase 16: Run every 499 cycles (co-prime, repeating validation)
-                // Science: Casali et al. (2013) — empirical Phi validation should be ongoing.
-                let results = validator.run_validation_study(10);
-                let r = results.pearson_r;
-                // Cache for adaptive weighting
-                self.carryover.quality.phi_validation_correlation = r;
-                // Adjust spectral weight based on validation quality:
-                // High correlation → trust spectral MIP more (boost weight)
-                // Low correlation → reduce spectral weight (trust eq_v2 more)
-                if r > 0.7 {
-                    self.carryover.quality.phi_spectral_weight =
-                        (0.6 + (r - 0.7) as f32 * 0.67).clamp(0.4, 0.8);
-                } else if r < 0.3 && r > 0.0 {
-                    self.carryover.quality.phi_spectral_weight =
-                        (0.6 - (0.3 - r) as f32 * 0.67).clamp(0.4, 0.8);
+        let phi_validation_correlation =
+            if let Some(ref mut validator) = self.primitive_tier.phi_validation {
+                if self.stats.total_cycles % 499 == 0 && self.stats.total_cycles >= 499 {
+                    // Phase 16: Run every 499 cycles (co-prime, repeating validation)
+                    // Science: Casali et al. (2013) — empirical Phi validation should be ongoing.
+                    let results = validator.run_validation_study(10);
+                    let r = results.pearson_r;
+                    // Cache for adaptive weighting
+                    self.carryover.quality.phi_validation_correlation = r;
+                    // Adjust spectral weight based on validation quality:
+                    // High correlation → trust spectral MIP more (boost weight)
+                    // Low correlation → reduce spectral weight (trust eq_v2 more)
+                    if r > 0.7 {
+                        self.carryover.quality.phi_spectral_weight =
+                            (0.6 + (r - 0.7) as f32 * 0.67).clamp(0.4, 0.8);
+                    } else if r < 0.3 && r > 0.0 {
+                        self.carryover.quality.phi_spectral_weight =
+                            (0.6 - (0.3 - r) as f32 * 0.67).clamp(0.4, 0.8);
+                    }
+                    r
+                } else {
+                    self.carryover.quality.phi_validation_correlation
                 }
-                r
             } else {
-                self.carryover.quality.phi_validation_correlation
-            }
-        } else {
-            0.0
-        };
+                0.0
+            };
         module_timings.phi_validation = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -1027,5 +1034,240 @@ impl CognitiveLoopService {
         module_timings.causal_explanation = _t.elapsed().as_micros() as u64;
 
         (causal_relations_count, causal_avg_confidence)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleUrgency};
+
+    fn make_service() -> CognitiveLoopService {
+        CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+    }
+
+    fn make_cycle_state<'a>(
+        compressed_state: &'a [f32],
+        output: &'a [f32],
+        hv: &'a symthaea_core::hdc::BinaryHV,
+        input: &'a str,
+    ) -> super::super::CycleState<'a> {
+        super::super::CycleState {
+            compressed_state,
+            output,
+            prediction_error: 0.2,
+            coherence: 0.5,
+            unified_psi: 0.3,
+            phi_attention_weight: 0.5,
+            hv16_cached: hv,
+            input,
+            urgency: CycleUrgency::Normal,
+            attention_budget_exceeded: false,
+            predictive_budget_gated: false,
+        }
+    }
+
+    // ── compute_consciousness_metrics ─────────────────────────────────
+
+    #[test]
+    fn consciousness_metrics_default_does_not_panic() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![0.5f32; 64];
+        let output = vec![0.0f32; 64];
+        let hv = symthaea_core::hdc::BinaryHV::random(42);
+        let state = make_cycle_state(&compressed, &output, &hv, "test input");
+        let mut timings = super::super::ModuleTimings::default();
+        let metrics = s.compute_consciousness_metrics(&state, &mut timings);
+        assert!(metrics.primitive_psi.is_finite());
+        assert!(metrics.value_evaluator_score.is_finite());
+    }
+
+    #[test]
+    fn consciousness_metrics_all_fields_finite() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![0.1f32; 64];
+        let output = vec![0.0f32; 64];
+        let hv = symthaea_core::hdc::BinaryHV::random(99);
+        let state = make_cycle_state(&compressed, &output, &hv, "fields check");
+        let mut timings = super::super::ModuleTimings::default();
+        let m = s.compute_consciousness_metrics(&state, &mut timings);
+        assert!(m.temporal_continuity.is_finite());
+        assert!(m.consciousness_profile_composite.is_finite());
+        assert!(m.synergy_enhanced_composite.is_finite());
+        assert!(m.harmonic_field_coherence.is_finite());
+        assert!(m.harmonic_love_resonance.is_finite());
+        assert!(m.dissipative_health.is_finite());
+        assert!(m.dissipative_entropy_rate.is_finite());
+        assert!(m.epistemic_phi_eff.is_finite());
+        assert!(m.equation_v2_consciousness.is_finite());
+        assert!(m.phi_validation_correlation.is_finite());
+        assert!(m.adaptive_reasoning_phi.is_finite());
+        assert!(m.epistemic_quality.is_finite());
+    }
+
+    #[test]
+    fn consciousness_metrics_empty_input() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![0.0f32; 64];
+        let output = vec![0.0f32; 64];
+        let hv = symthaea_core::hdc::BinaryHV::zero();
+        let state = make_cycle_state(&compressed, &output, &hv, "");
+        let mut timings = super::super::ModuleTimings::default();
+        let m = s.compute_consciousness_metrics(&state, &mut timings);
+        assert!(m.context_phi_weight.is_finite());
+        assert!(m.reasoning_chain_confidence.is_finite());
+    }
+
+    #[test]
+    fn consciousness_metrics_zero_psi_and_coherence() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![0.0f32; 64];
+        let output = vec![0.0f32; 64];
+        let hv = symthaea_core::hdc::BinaryHV::zero();
+        let mut state = make_cycle_state(&compressed, &output, &hv, "zero psi");
+        state.unified_psi = 0.0;
+        state.coherence = 0.0;
+        state.prediction_error = 0.0;
+        let mut timings = super::super::ModuleTimings::default();
+        let m = s.compute_consciousness_metrics(&state, &mut timings);
+        assert!(m.primitive_psi.is_finite());
+        assert!(m.value_gate_factor.is_finite());
+    }
+
+    #[test]
+    fn consciousness_metrics_high_prediction_error() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let compressed = vec![1.0f32; 64];
+        let output = vec![0.5f32; 64];
+        let hv = symthaea_core::hdc::BinaryHV::random(7);
+        let mut state = make_cycle_state(&compressed, &output, &hv, "high error");
+        state.prediction_error = 1.0;
+        let mut timings = super::super::ModuleTimings::default();
+        let m = s.compute_consciousness_metrics(&state, &mut timings);
+        assert!(m.dissipative_health.is_finite());
+        assert!(m.harmonic_field_coherence.is_finite());
+    }
+
+    // ── compute_temporal_primitives_phase ──────────────────────────────
+
+    #[test]
+    fn temporal_primitives_default_returns_zeros() {
+        let mut s = make_service();
+        s.stats.total_cycles = 1;
+        let hv = symthaea_core::hdc::BinaryHV::random(42);
+        let mut timings = super::super::ModuleTimings::default();
+        let (chains, continuity, max_len, cycle_nums, codebook, replay) =
+            s.compute_temporal_primitives_phase(hv, 0.3, 0.5, &mut timings);
+        assert_eq!(chains, 0);
+        assert!((continuity - 0.0).abs() < f64::EPSILON);
+        assert_eq!(max_len, 0);
+        assert!(cycle_nums.is_empty());
+        assert!(codebook.is_empty());
+        assert!(!replay);
+    }
+
+    // ── compute_lattice_phase ─────────────────────────────────────────
+
+    #[test]
+    fn lattice_phase_no_lattice_returns_zeros() {
+        let mut s = make_service();
+        let primitives: Vec<String> = vec![];
+        let mut timings = super::super::ModuleTimings::default();
+        let (height, width, join) = s.compute_lattice_phase(&primitives, &mut timings);
+        assert_eq!(height, 0);
+        assert_eq!(width, 0);
+        assert!(join.is_none());
+    }
+
+    // ── compute_value_evaluator_phase ─────────────────────────────────
+
+    #[test]
+    fn value_evaluator_returns_defaults() {
+        let mut s = make_service();
+        let mut timings = super::super::ModuleTimings::default();
+        let (score, decision, gate) = s.compute_value_evaluator_phase(0.5, &mut timings);
+        assert!(score.is_finite());
+        assert!(gate.is_finite());
+        // Decision is empty string when delegated to engine
+        let _ = decision; // just verify it compiles
+    }
+
+    // ── compute_fiduciary_harmonics_phase ──────────────────────────────
+
+    #[test]
+    fn fiduciary_harmonics_no_field_returns_zeros() {
+        let mut s = make_service();
+        let mut timings = super::super::ModuleTimings::default();
+        let (coherence, love, interferences) =
+            s.compute_fiduciary_harmonics_phase(0.5, 0.2, 0.3, &mut timings);
+        assert!((coherence - 0.0).abs() < f64::EPSILON);
+        assert!((love - 0.0).abs() < f64::EPSILON);
+        assert_eq!(interferences, 0);
+    }
+
+    // ── compute_dissipative_phase ─────────────────────────────────────
+
+    #[test]
+    fn dissipative_phase_no_module_returns_zeros() {
+        let mut s = make_service();
+        let mut timings = super::super::ModuleTimings::default();
+        let (health, regime, entropy_rate) =
+            s.compute_dissipative_phase(0.2, 0.5, 0.3, &mut timings);
+        assert!((health - 0.0).abs() < f64::EPSILON);
+        assert!(regime.is_empty());
+        assert!((entropy_rate - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ── compute_equation_v2_phase ─────────────────────────────────────
+
+    #[test]
+    fn equation_v2_reads_carryover() {
+        let mut s = make_service();
+        s.carryover.consciousness.last_equation_v2_consciousness = 0.42;
+        let mut timings = super::super::ModuleTimings::default();
+        let result = s.compute_equation_v2_phase(0.5, 0.5, 0.2, 0.4, &mut timings);
+        assert!((result - 0.42).abs() < f64::EPSILON);
+    }
+
+    // ── compute_causal_self_explanation_phase ──────────────────────────
+
+    #[test]
+    fn causal_self_explanation_no_explainer_returns_zeros() {
+        let mut s = make_service();
+        let hv = symthaea_core::hdc::BinaryHV::random(42);
+        let primitives = vec!["test".to_string()];
+        let mut timings = super::super::ModuleTimings::default();
+        let (count, confidence) =
+            s.compute_causal_self_explanation_phase(hv, &primitives, 0.3, &mut timings);
+        assert_eq!(count, 0);
+        assert!((confidence - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ── Multiple cycles stability ─────────────────────────────────────
+
+    #[test]
+    fn consciousness_metrics_multiple_cycles_stable() {
+        let mut s = make_service();
+        let compressed = vec![0.3f32; 64];
+        let output = vec![0.1f32; 64];
+        let hv = symthaea_core::hdc::BinaryHV::random(42);
+        for cycle in 1..=5 {
+            s.stats.total_cycles = cycle;
+            let state = make_cycle_state(&compressed, &output, &hv, "stable input");
+            let mut timings = super::super::ModuleTimings::default();
+            let m = s.compute_consciousness_metrics(&state, &mut timings);
+            assert!(
+                m.primitive_psi.is_finite(),
+                "cycle {cycle}: primitive_psi not finite"
+            );
+            assert!(
+                m.consciousness_profile_composite.is_finite(),
+                "cycle {cycle}: profile not finite"
+            );
+        }
     }
 }

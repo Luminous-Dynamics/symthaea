@@ -5273,8 +5273,14 @@ fn test_200_cycle_phase20_stress() {
         let m = &result.metadata;
 
         // All Phase 20 fields must be finite/valid
-        assert!(m.harmonic_interference_lr_mod.is_finite(), "harmonic at {i}");
-        assert!(m.resonator_error_exploration_mod.is_finite(), "resonator at {i}");
+        assert!(
+            m.harmonic_interference_lr_mod.is_finite(),
+            "harmonic at {i}"
+        );
+        assert!(
+            m.resonator_error_exploration_mod.is_finite(),
+            "resonator at {i}"
+        );
         assert!(m.binding_threshold_mod.is_finite(), "binding at {i}");
         assert!(m.epistemic_semantic_lr_mod.is_finite(), "epistemic at {i}");
     }
@@ -5611,7 +5617,10 @@ fn test_serotonin_coherence_satisfaction() {
     // All values should be finite and in range
     for (i, &sht) in sht_values.iter().enumerate() {
         assert!(sht.is_finite(), "5-HT not finite at cycle {i}");
-        assert!((0.0..=2.0).contains(&sht), "5-HT out of range at cycle {i}: {sht}");
+        assert!(
+            (0.0..=2.0).contains(&sht),
+            "5-HT out of range at cycle {i}: {sht}"
+        );
     }
     // Average 5-HT should be positive (system achieves some coherence)
     let avg: f32 = sht_values.iter().sum::<f32>() / sht_values.len() as f32;
@@ -5630,7 +5639,10 @@ fn test_acetylcholine_attention_modulation() {
     for i in 0..40 {
         let result = service.cycle("attention precision focus");
         let m = &result.metadata;
-        assert!(m.acetylcholine_effective.is_finite(), "ACh not finite at {i}");
+        assert!(
+            m.acetylcholine_effective.is_finite(),
+            "ACh not finite at {i}"
+        );
         assert!(
             m.acetylcholine_effective >= 0.0 && m.acetylcholine_effective <= 2.0,
             "ACh out of range at {i}: {}",
@@ -5684,9 +5696,6 @@ fn test_neuromodulator_300_cycle_stress() {
 
     eprintln!(
         "300-cycle neuromod stress: DA={:.3}, NE={:.3}, 5-HT={:.3}, ACh={:.3}",
-        stats.avg_dopamine,
-        stats.avg_noradrenaline,
-        stats.avg_serotonin,
-        stats.avg_acetylcholine,
+        stats.avg_dopamine, stats.avg_noradrenaline, stats.avg_serotonin, stats.avg_acetylcholine,
     );
 }

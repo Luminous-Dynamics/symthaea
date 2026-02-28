@@ -14,6 +14,8 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 #[cfg(not(feature = "symthaea-backend"))]
 use symthaea_core::hdc::ContinuousHV;
 
@@ -341,6 +343,7 @@ impl PsychBenchmark for StrangeStoryBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut accuracies = Vec::new();
         let mut rt_ticks = Vec::new();
@@ -364,6 +367,18 @@ impl PsychBenchmark for StrangeStoryBenchmark {
                 rt_ticks.push(rt);
                 type_accs.entry(stype).or_default().push(acc);
             }
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "strange_story".to_string(),
+                    correct: *accuracies.last().unwrap_or(&0.0) > 0.5,
+                    rt_ticks: rt_ticks.last().copied().unwrap_or(0.0),
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("overall_accuracy", MetricValue::from_samples(&accuracies));
@@ -381,6 +396,7 @@ impl PsychBenchmark for StrangeStoryBenchmark {
 
         result.conditions = type_accs.len();
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

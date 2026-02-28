@@ -30,13 +30,13 @@ pub mod narrative_compiler;
 
 // LLM provider backends
 pub mod anthropic_backend;
-pub mod openai_backend;
 #[cfg(feature = "full_language")]
 pub mod candle_backend;
 #[cfg(feature = "ssm_language")]
-pub mod ssm_backend;
-#[cfg(feature = "ssm_language")]
 pub mod distillation;
+pub mod openai_backend;
+#[cfg(feature = "ssm_language")]
+pub mod ssm_backend;
 
 // Code understanding & generation (Phase: Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]
@@ -993,8 +993,20 @@ impl ConsciousnessLanguageCore {
         let lower = input.to_lowercase();
 
         // 1. Detection of Fix/Update/Optimize intent
-        if classification.category == IntentCategory::NixOS || classification.category == IntentCategory::Programming {
-            let evolution_keywords = ["fix", "broken", "missing", "repair", "optimize", "implementation", "propose", "improve", "refactor"];
+        if classification.category == IntentCategory::NixOS
+            || classification.category == IntentCategory::Programming
+        {
+            let evolution_keywords = [
+                "fix",
+                "broken",
+                "missing",
+                "repair",
+                "optimize",
+                "implementation",
+                "propose",
+                "improve",
+                "refactor",
+            ];
             if evolution_keywords.iter().any(|k| lower.contains(k)) || lower.contains("look at") {
                 primitives.push("READ".to_string());
                 primitives.push("WRITE".to_string());
@@ -1007,35 +1019,62 @@ impl ConsciousnessLanguageCore {
         }
 
         // 2. Explicit action keywords (only add if not already present)
-        if (lower.contains("build") || lower.contains("compile")) && !primitives.contains(&"NIX_BUILD".to_string()) {
+        if (lower.contains("build") || lower.contains("compile"))
+            && !primitives.contains(&"NIX_BUILD".to_string())
+        {
             primitives.push("NIX_BUILD".to_string());
         }
-        if (lower.contains("commit") || lower.contains("persist")) && !primitives.contains(&"GIT_COMMIT".to_string()) {
+        if (lower.contains("commit") || lower.contains("persist"))
+            && !primitives.contains(&"GIT_COMMIT".to_string())
+        {
             primitives.push("GIT_COMMIT".to_string());
         }
-        if (lower.contains("search") || lower.contains("look up") || lower.contains("research")) && !primitives.contains(&"WEB_SEARCH".to_string()) {
+        if (lower.contains("search") || lower.contains("look up") || lower.contains("research"))
+            && !primitives.contains(&"WEB_SEARCH".to_string())
+        {
             primitives.push("WEB_SEARCH".to_string());
         }
-        if (lower.contains("list") || lower.contains("ls")) && !primitives.contains(&"LIST".to_string()) {
+        if (lower.contains("list") || lower.contains("ls"))
+            && !primitives.contains(&"LIST".to_string())
+        {
             primitives.push("LIST".to_string());
         }
-        if (lower.contains("read") || lower.contains("cat")) && !primitives.contains(&"READ".to_string()) {
+        if (lower.contains("read") || lower.contains("cat"))
+            && !primitives.contains(&"READ".to_string())
+        {
             primitives.push("READ".to_string());
         }
 
         // 3. HAL Primitives grounding
-        if lower.contains("power") || lower.contains("sensor") || lower.contains("voltage") || lower.contains("ina219") {
+        if lower.contains("power")
+            || lower.contains("sensor")
+            || lower.contains("voltage")
+            || lower.contains("ina219")
+        {
             primitives.push("READ_SENSOR".to_string());
         }
-        if lower.contains("servo") || lower.contains("joint") || lower.contains("move") || lower.contains("actuator") {
+        if lower.contains("servo")
+            || lower.contains("joint")
+            || lower.contains("move")
+            || lower.contains("actuator")
+        {
             primitives.push("WRITE_SERVO".to_string());
         }
 
-        if lower.contains("share") || lower.contains("broadcast") || lower.contains("tell the others") || lower.contains("swarm") || lower.contains("gossip") {
+        if lower.contains("share")
+            || lower.contains("broadcast")
+            || lower.contains("tell the others")
+            || lower.contains("swarm")
+            || lower.contains("gossip")
+        {
             primitives.push("SWARM_GOSSIP".to_string());
         }
 
-        if lower.contains("wasm") || lower.contains("sandbox") || lower.contains("verify") || lower.contains("binary") {
+        if lower.contains("wasm")
+            || lower.contains("sandbox")
+            || lower.contains("verify")
+            || lower.contains("binary")
+        {
             primitives.push("WASM_VERIFY".to_string());
         }
 

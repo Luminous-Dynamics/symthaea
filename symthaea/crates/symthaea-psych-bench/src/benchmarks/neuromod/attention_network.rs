@@ -7,6 +7,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Attention Network Test benchmark.
@@ -22,9 +24,9 @@ fn next_seed(state: &mut u64) -> u64 {
 /// Condition for the ANT-like paradigm.
 #[derive(Clone, Copy)]
 struct AntCondition {
-    alert_cue: bool,    // temporal alerting cue present
-    orient_cue: bool,   // spatial orienting cue valid
-    congruent: bool,    // flankers congruent with target
+    alert_cue: bool,  // temporal alerting cue present
+    orient_cue: bool, // spatial orienting cue valid
+    congruent: bool,  // flankers congruent with target
 }
 
 impl AttentionNetworkBenchmark {
@@ -41,14 +43,46 @@ impl AttentionNetworkBenchmark {
 
         // 8 conditions: 2 (alert) × 2 (orient) × 2 (congruent)
         let conditions = [
-            AntCondition { alert_cue: false, orient_cue: false, congruent: true },
-            AntCondition { alert_cue: false, orient_cue: false, congruent: false },
-            AntCondition { alert_cue: false, orient_cue: true,  congruent: true },
-            AntCondition { alert_cue: false, orient_cue: true,  congruent: false },
-            AntCondition { alert_cue: true,  orient_cue: false, congruent: true },
-            AntCondition { alert_cue: true,  orient_cue: false, congruent: false },
-            AntCondition { alert_cue: true,  orient_cue: true,  congruent: true },
-            AntCondition { alert_cue: true,  orient_cue: true,  congruent: false },
+            AntCondition {
+                alert_cue: false,
+                orient_cue: false,
+                congruent: true,
+            },
+            AntCondition {
+                alert_cue: false,
+                orient_cue: false,
+                congruent: false,
+            },
+            AntCondition {
+                alert_cue: false,
+                orient_cue: true,
+                congruent: true,
+            },
+            AntCondition {
+                alert_cue: false,
+                orient_cue: true,
+                congruent: false,
+            },
+            AntCondition {
+                alert_cue: true,
+                orient_cue: false,
+                congruent: true,
+            },
+            AntCondition {
+                alert_cue: true,
+                orient_cue: false,
+                congruent: false,
+            },
+            AntCondition {
+                alert_cue: true,
+                orient_cue: true,
+                congruent: true,
+            },
+            AntCondition {
+                alert_cue: true,
+                orient_cue: true,
+                congruent: false,
+            },
         ];
 
         let trials_per_cond = 15;
@@ -89,10 +123,7 @@ impl AttentionNetworkBenchmark {
                 let total: f32 = weights.iter().sum();
                 let norm_weights: Vec<f32> = weights.iter().map(|w| w / total).collect();
 
-                let stimulus = ContinuousHV::weighted_bundle(
-                    &components,
-                    &norm_weights,
-                );
+                let stimulus = ContinuousHV::weighted_bundle(&components, &norm_weights);
 
                 // Compute similarity-based RT (higher similarity = faster response)
                 let sim_left = stimulus.similarity(&left_proto) as f64;
@@ -132,7 +163,13 @@ impl AttentionNetworkBenchmark {
         let ne_alerting_r = alerting_effect.clamp(-2.0, 2.0);
         let ach_orienting_r = orienting_effect.clamp(-2.0, 2.0);
 
-        [alerting_effect, orienting_effect, conflict_effect, ne_alerting_r, ach_orienting_r]
+        [
+            alerting_effect,
+            orienting_effect,
+            conflict_effect,
+            ne_alerting_r,
+            ach_orienting_r,
+        ]
     }
 }
 
@@ -153,6 +190,7 @@ impl PsychBenchmark for AttentionNetworkBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut alerting_effects = Vec::new();
         let mut orienting_effects = Vec::new();
@@ -167,16 +205,41 @@ impl PsychBenchmark for AttentionNetworkBenchmark {
             conflict_effects.push(metrics[2]);
             ne_alerting_rs.push(metrics[3]);
             ach_orienting_rs.push(metrics[4]);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "ant".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
-        result.insert("alerting_effect", MetricValue::from_samples(&alerting_effects));
-        result.insert("orienting_effect", MetricValue::from_samples(&orienting_effects));
-        result.insert("conflict_effect", MetricValue::from_samples(&conflict_effects));
+        result.insert(
+            "alerting_effect",
+            MetricValue::from_samples(&alerting_effects),
+        );
+        result.insert(
+            "orienting_effect",
+            MetricValue::from_samples(&orienting_effects),
+        );
+        result.insert(
+            "conflict_effect",
+            MetricValue::from_samples(&conflict_effects),
+        );
         result.insert("ne_alerting_r", MetricValue::from_samples(&ne_alerting_rs));
-        result.insert("ach_orienting_r", MetricValue::from_samples(&ach_orienting_rs));
+        result.insert(
+            "ach_orienting_r",
+            MetricValue::from_samples(&ach_orienting_rs),
+        );
 
         result.conditions = 8;
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

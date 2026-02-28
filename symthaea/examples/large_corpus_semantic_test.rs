@@ -927,7 +927,12 @@ fn generate_enhanced_mock_embedding(text: &str, category: SemanticCategory) -> V
     for (domain_idx, &score) in domain_scores.iter().enumerate() {
         if score > 0.0 {
             let offset = domain_idx * 256;
-            for (i, emb_val) in embedding.iter_mut().enumerate().take((offset + 256).min(1024)).skip(offset) {
+            for (i, emb_val) in embedding
+                .iter_mut()
+                .enumerate()
+                .take((offset + 256).min(1024))
+                .skip(offset)
+            {
                 *emb_val += score * 0.3 * ((i - offset) as f32 / 128.0 - 1.0).sin();
             }
         }

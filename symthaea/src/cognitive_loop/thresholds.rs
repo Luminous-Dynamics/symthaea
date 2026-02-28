@@ -314,10 +314,7 @@ pub fn validate() {
     );
 
     // 4. Nonzero attention budget
-    assert!(
-        ATTENTION_BUDGET_US > 0,
-        "ATTENTION_BUDGET_US must be > 0"
-    );
+    assert!(ATTENTION_BUDGET_US > 0, "ATTENTION_BUDGET_US must be > 0");
 
     // 5. Window ordering
     assert!(
@@ -343,13 +340,21 @@ pub fn validate() {
 
     // 7. Non-negative weights
     assert!(FLOW_PSI_WEIGHT >= 0.0, "FLOW_PSI_WEIGHT must be >= 0");
-    assert!(RELATIONAL_PSI_WEIGHT >= 0.0, "RELATIONAL_PSI_WEIGHT must be >= 0");
+    assert!(
+        RELATIONAL_PSI_WEIGHT >= 0.0,
+        "RELATIONAL_PSI_WEIGHT must be >= 0"
+    );
     assert!(BODY_PSI_WEIGHT >= 0.0, "BODY_PSI_WEIGHT must be >= 0");
-    assert!(EMBODIED_PSI_WEIGHT >= 0.0, "EMBODIED_PSI_WEIGHT must be >= 0");
+    assert!(
+        EMBODIED_PSI_WEIGHT >= 0.0,
+        "EMBODIED_PSI_WEIGHT must be >= 0"
+    );
 
     // 8. Psi weights don't exceed 1.0 total
-    let psi_total = FLOW_PSI_WEIGHT as f64 + RELATIONAL_PSI_WEIGHT as f64
-        + BODY_PSI_WEIGHT + EMBODIED_PSI_WEIGHT;
+    let psi_total = FLOW_PSI_WEIGHT as f64
+        + RELATIONAL_PSI_WEIGHT as f64
+        + BODY_PSI_WEIGHT
+        + EMBODIED_PSI_WEIGHT;
     assert!(
         psi_total <= 1.0,
         "Psi weights sum ({}) must be <= 1.0",
@@ -393,8 +398,10 @@ mod tests {
 
     #[test]
     fn test_psi_weights_sum() {
-        let total = FLOW_PSI_WEIGHT as f64 + RELATIONAL_PSI_WEIGHT as f64
-            + BODY_PSI_WEIGHT + EMBODIED_PSI_WEIGHT;
+        let total = FLOW_PSI_WEIGHT as f64
+            + RELATIONAL_PSI_WEIGHT as f64
+            + BODY_PSI_WEIGHT
+            + EMBODIED_PSI_WEIGHT;
         assert!(total <= 1.0, "Psi weights sum to {}", total);
     }
 

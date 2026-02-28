@@ -176,8 +176,16 @@ impl CognitiveLoopBenchmarkRunner {
         }
 
         let n = trials.len() as f64;
-        let accuracy = if n > 0.0 { correct_count as f64 / n } else { 0.0 };
-        let mean_pe = trials.iter().map(|t| t.prediction_error as f64).sum::<f64>() / n.max(1.0);
+        let accuracy = if n > 0.0 {
+            correct_count as f64 / n
+        } else {
+            0.0
+        };
+        let mean_pe = trials
+            .iter()
+            .map(|t| t.prediction_error as f64)
+            .sum::<f64>()
+            / n.max(1.0);
         let mean_da = trials.iter().map(|t| t.da as f64).sum::<f64>() / n.max(1.0);
         let mean_ne = trials.iter().map(|t| t.ne as f64).sum::<f64>() / n.max(1.0);
         let mean_sht = trials.iter().map(|t| t.sht as f64).sum::<f64>() / n.max(1.0);
@@ -215,7 +223,11 @@ fn cosine_f32_vec(a: &[f32], b: &[f32]) -> f64 {
         norm_b += bi * bi;
     }
     let denom = (norm_a * norm_b).sqrt();
-    if denom > 1e-10 { dot / denom } else { 0.0 }
+    if denom > 1e-10 {
+        dot / denom
+    } else {
+        0.0
+    }
 }
 
 // ──── LoopDrivable implementations for 6 benchmarks ────
@@ -224,20 +236,29 @@ fn cosine_f32_vec(a: &[f32], b: &[f32]) -> f64 {
 mod impls {
     use super::*;
     use crate::benchmarks::executive::StroopBenchmark;
-    use crate::benchmarks::worm::NBackBenchmark;
     use crate::benchmarks::executive::WisconsinCardSortingBenchmark;
     use crate::benchmarks::inhibition::GoNoGoBenchmark;
-    use crate::benchmarks::sustained_attention::PvtBenchmark;
     use crate::benchmarks::reasoning::ArcFluidBenchmark;
+    use crate::benchmarks::sustained_attention::PvtBenchmark;
+    use crate::benchmarks::worm::NBackBenchmark;
 
     impl LoopDrivable for StroopBenchmark {
-        fn loop_name(&self) -> &str { "Executive::Stroop" }
+        fn loop_name(&self) -> &str {
+            "Executive::Stroop"
+        }
 
-        fn generate_stimuli(&self, config: &super::super::config::BenchmarkConfig) -> Vec<LoopStimulus> {
+        fn generate_stimuli(
+            &self,
+            config: &super::super::config::BenchmarkConfig,
+        ) -> Vec<LoopStimulus> {
             let dim = config.dimension;
             let seed = config.seed;
             let mut rng = seed ^ 0x9E3779B97F4A7C15;
-            let xor_shift = |s: &mut u64| { *s ^= *s << 13; *s ^= *s >> 7; *s ^= *s << 17; };
+            let xor_shift = |s: &mut u64| {
+                *s ^= *s << 13;
+                *s ^= *s >> 7;
+                *s ^= *s << 17;
+            };
 
             // 4 color HVs
             let colors: Vec<ContinuousHV> = (0..4)
@@ -261,7 +282,9 @@ mod impls {
                     "incongruent" => {
                         xor_shift(&mut rng);
                         let mut word_idx = (rng % 3) as usize;
-                        if word_idx >= ink_idx { word_idx += 1; }
+                        if word_idx >= ink_idx {
+                            word_idx += 1;
+                        }
                         ContinuousHV::bundle(&[&colors[ink_idx], &colors[word_idx].scale(0.45)])
                     }
                     _ => {
@@ -284,13 +307,22 @@ mod impls {
     }
 
     impl LoopDrivable for NBackBenchmark {
-        fn loop_name(&self) -> &str { "WorM::N-back" }
+        fn loop_name(&self) -> &str {
+            "WorM::N-back"
+        }
 
-        fn generate_stimuli(&self, config: &super::super::config::BenchmarkConfig) -> Vec<LoopStimulus> {
+        fn generate_stimuli(
+            &self,
+            config: &super::super::config::BenchmarkConfig,
+        ) -> Vec<LoopStimulus> {
             let dim = config.dimension;
             let seed = config.seed;
             let mut rng = seed ^ 0x9E3779B97F4A7C15;
-            let xor_shift = |s: &mut u64| { *s ^= *s << 13; *s ^= *s >> 7; *s ^= *s << 17; };
+            let xor_shift = |s: &mut u64| {
+                *s ^= *s << 13;
+                *s ^= *s >> 7;
+                *s ^= *s << 17;
+            };
 
             let n = 2; // 2-back
             let seq_len = 30;
@@ -304,7 +336,10 @@ mod impls {
             // Generate sequence
             let mut sequence = Vec::with_capacity(seq_len);
             for i in 0..seq_len {
-                let is_target = i >= n && { xor_shift(&mut rng); (rng % 100) < 30 };
+                let is_target = i >= n && {
+                    xor_shift(&mut rng);
+                    (rng % 100) < 30
+                };
                 if is_target {
                     sequence.push(sequence[i - n]);
                 } else {
@@ -334,13 +369,22 @@ mod impls {
     }
 
     impl LoopDrivable for WisconsinCardSortingBenchmark {
-        fn loop_name(&self) -> &str { "Executive::WCST" }
+        fn loop_name(&self) -> &str {
+            "Executive::WCST"
+        }
 
-        fn generate_stimuli(&self, config: &super::super::config::BenchmarkConfig) -> Vec<LoopStimulus> {
+        fn generate_stimuli(
+            &self,
+            config: &super::super::config::BenchmarkConfig,
+        ) -> Vec<LoopStimulus> {
             let dim = config.dimension;
             let seed = config.seed;
             let mut rng = seed ^ 0x9E3779B97F4A7C15;
-            let xor_shift = |s: &mut u64| { *s ^= *s << 13; *s ^= *s >> 7; *s ^= *s << 17; };
+            let xor_shift = |s: &mut u64| {
+                *s ^= *s << 13;
+                *s ^= *s >> 7;
+                *s ^= *s << 17;
+            };
 
             // 3 rule categories
             let rule_hvs: Vec<ContinuousHV> = (0..3)
@@ -368,13 +412,22 @@ mod impls {
     }
 
     impl LoopDrivable for GoNoGoBenchmark {
-        fn loop_name(&self) -> &str { "Inhibition::GoNoGo" }
+        fn loop_name(&self) -> &str {
+            "Inhibition::GoNoGo"
+        }
 
-        fn generate_stimuli(&self, config: &super::super::config::BenchmarkConfig) -> Vec<LoopStimulus> {
+        fn generate_stimuli(
+            &self,
+            config: &super::super::config::BenchmarkConfig,
+        ) -> Vec<LoopStimulus> {
             let dim = config.dimension;
             let seed = config.seed;
             let mut rng = seed ^ 0x9E3779B97F4A7C15;
-            let xor_shift = |s: &mut u64| { *s ^= *s << 13; *s ^= *s >> 7; *s ^= *s << 17; };
+            let xor_shift = |s: &mut u64| {
+                *s ^= *s << 13;
+                *s ^= *s >> 7;
+                *s ^= *s << 17;
+            };
 
             let go_proto = ContinuousHV::random(dim, seed.wrapping_add(100));
             let nogo_proto = ContinuousHV::random(dim, seed.wrapping_add(200));
@@ -397,7 +450,11 @@ mod impls {
                     stimulus_hv,
                     alternatives: alternatives.clone(),
                     correct_idx: if is_go { 1 } else { 0 }, // go=respond(1), nogo=withhold(0)
-                    condition: if is_go { "go".to_string() } else { "nogo".to_string() },
+                    condition: if is_go {
+                        "go".to_string()
+                    } else {
+                        "nogo".to_string()
+                    },
                     trial_idx: trial,
                 });
             }
@@ -406,13 +463,22 @@ mod impls {
     }
 
     impl LoopDrivable for PvtBenchmark {
-        fn loop_name(&self) -> &str { "SustainedAttention::PVT" }
+        fn loop_name(&self) -> &str {
+            "SustainedAttention::PVT"
+        }
 
-        fn generate_stimuli(&self, config: &super::super::config::BenchmarkConfig) -> Vec<LoopStimulus> {
+        fn generate_stimuli(
+            &self,
+            config: &super::super::config::BenchmarkConfig,
+        ) -> Vec<LoopStimulus> {
             let dim = config.dimension;
             let seed = config.seed;
             let mut rng = seed ^ 0x9E3779B97F4A7C15;
-            let xor_shift = |s: &mut u64| { *s ^= *s << 13; *s ^= *s >> 7; *s ^= *s << 17; };
+            let xor_shift = |s: &mut u64| {
+                *s ^= *s << 13;
+                *s ^= *s >> 7;
+                *s ^= *s << 17;
+            };
 
             let stimulus_proto = ContinuousHV::random(dim, seed.wrapping_add(1));
             let respond_hv = ContinuousHV::random(dim, seed.wrapping_add(2));
@@ -425,10 +491,8 @@ mod impls {
             for trial in 0..n_trials {
                 xor_shift(&mut rng);
                 let noise = ContinuousHV::random(dim, rng);
-                let stimulus_hv = ContinuousHV::weighted_bundle(
-                    &[&stimulus_proto, &noise],
-                    &[0.80, 0.20],
-                );
+                let stimulus_hv =
+                    ContinuousHV::weighted_bundle(&[&stimulus_proto, &noise], &[0.80, 0.20]);
 
                 stimuli.push(LoopStimulus {
                     stimulus_hv,
@@ -443,13 +507,22 @@ mod impls {
     }
 
     impl LoopDrivable for ArcFluidBenchmark {
-        fn loop_name(&self) -> &str { "Reasoning::ArcFluid" }
+        fn loop_name(&self) -> &str {
+            "Reasoning::ArcFluid"
+        }
 
-        fn generate_stimuli(&self, config: &super::super::config::BenchmarkConfig) -> Vec<LoopStimulus> {
+        fn generate_stimuli(
+            &self,
+            config: &super::super::config::BenchmarkConfig,
+        ) -> Vec<LoopStimulus> {
             let dim = config.dimension;
             let seed = config.seed;
             let mut rng = seed ^ 0x9E3779B97F4A7C15;
-            let xor_shift = |s: &mut u64| { *s ^= *s << 13; *s ^= *s >> 7; *s ^= *s << 17; };
+            let xor_shift = |s: &mut u64| {
+                *s ^= *s << 13;
+                *s ^= *s >> 7;
+                *s ^= *s << 17;
+            };
 
             let n_trials = config.trials_per_condition * 4; // 4 task types
             let mut stimuli = Vec::with_capacity(n_trials);
@@ -464,10 +537,8 @@ mod impls {
                 let distractor_hv = ContinuousHV::random(dim, rng);
 
                 // Correct should be more similar to rule than distractor
-                let stimulus_hv = ContinuousHV::weighted_bundle(
-                    &[&rule_hv, &correct_hv],
-                    &[0.6, 0.4],
-                );
+                let stimulus_hv =
+                    ContinuousHV::weighted_bundle(&[&rule_hv, &correct_hv], &[0.6, 0.4]);
 
                 stimuli.push(LoopStimulus {
                     stimulus_hv,

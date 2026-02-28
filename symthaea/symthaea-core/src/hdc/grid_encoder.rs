@@ -59,9 +59,9 @@ impl GridEncoder {
             .iter()
             .enumerate()
             .flat_map(|(r, row)| {
-                row.iter().enumerate().map(move |(c, &color)| {
-                    self.encode_cell(r, c, color as usize)
-                })
+                row.iter()
+                    .enumerate()
+                    .map(move |(c, &color)| self.encode_cell(r, c, color as usize))
             })
             .collect();
         let refs: Vec<&ContinuousHV> = cells.iter().collect();
@@ -360,10 +360,7 @@ mod tests {
 
     #[test]
     fn test_translate() {
-        let grid = vec![
-            vec![1, 2],
-            vec![3, 4],
-        ];
+        let grid = vec![vec![1, 2], vec![3, 4]];
         let result = GridEncoder::translate_grid(&grid, 1, 0, 0);
         assert_eq!(result, vec![vec![0, 1], vec![0, 3]]);
     }
@@ -384,10 +381,7 @@ mod tests {
 
     #[test]
     fn test_rotate_90() {
-        let grid = vec![
-            vec![1, 2],
-            vec![3, 4],
-        ];
+        let grid = vec![vec![1, 2], vec![3, 4]];
         let result = GridEncoder::rotate_90(&grid);
         // Clockwise 90: row 0 becomes last col, row 1 becomes first col
         assert_eq!(result, vec![vec![3, 1], vec![4, 2]]);
@@ -404,10 +398,7 @@ mod tests {
     fn test_fill_region() {
         let grid = vec![vec![0, 0, 0], vec![0, 0, 0], vec![0, 0, 0]];
         let result = GridEncoder::fill_region(&grid, 0, 1, 1, 2, 7);
-        assert_eq!(
-            result,
-            vec![vec![0, 7, 7], vec![0, 7, 7], vec![0, 0, 0]]
-        );
+        assert_eq!(result, vec![vec![0, 7, 7], vec![0, 7, 7], vec![0, 0, 0]]);
     }
 
     #[test]

@@ -344,8 +344,7 @@ impl CurriculumLoader {
         dimension: usize,
     ) -> Result<(Curriculum, CurriculumMeta), LoadError> {
         if let Ok(store) = serde_json::from_str::<CurriculumStore>(json) {
-            let curriculum =
-                Self::build_curriculum_with_dimension(store.curriculum, dimension)?;
+            let curriculum = Self::build_curriculum_with_dimension(store.curriculum, dimension)?;
             let mut meta = store.meta;
             if meta.dimension != dimension {
                 meta.dimension = dimension;

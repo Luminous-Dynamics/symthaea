@@ -91,7 +91,11 @@ impl Bath {
 
     fn update(&mut self, inputs: &Inputs) {
         let da_signal = inputs.reward_signal * 0.15
-            + if inputs.prediction_error < 0.2 { 0.05 } else { -0.05 }
+            + if inputs.prediction_error < 0.2 {
+                0.05
+            } else {
+                -0.05
+            }
             + if inputs.flow_active { 0.03 } else { 0.0 };
         self.da.produce(da_signal);
 
@@ -103,12 +107,20 @@ impl Bath {
         let sht_signal = inputs.coherence * 0.08
             + inputs.epistemic_confidence * 0.05
             + inputs.binding_strength * 0.04
-            - if inputs.reward_signal < -0.3 { 0.1 } else { 0.0 };
+            - if inputs.reward_signal < -0.3 {
+                0.1
+            } else {
+                0.0
+            };
         self.sht.produce(sht_signal);
 
         let ach_signal = (1.0 - inputs.epistemic_confidence) * 0.1
             + if inputs.flow_active { 0.06 } else { 0.0 }
-            + if inputs.binding_strength > 0.7 { 0.03 } else { 0.0 };
+            + if inputs.binding_strength > 0.7 {
+                0.03
+            } else {
+                0.0
+            };
         self.ach.produce(ach_signal);
 
         // Cross-modulation
@@ -138,10 +150,18 @@ impl Bath {
     }
 
     fn clamp(&mut self, da: Option<f32>, ne: Option<f32>, sht: Option<f32>, ach: Option<f32>) {
-        if let Some(v) = da { self.da.level = v.clamp(0.0, 1.0); }
-        if let Some(v) = ne { self.ne.level = v.clamp(0.0, 1.0); }
-        if let Some(v) = sht { self.sht.level = v.clamp(0.0, 1.0); }
-        if let Some(v) = ach { self.ach.level = v.clamp(0.0, 1.0); }
+        if let Some(v) = da {
+            self.da.level = v.clamp(0.0, 1.0);
+        }
+        if let Some(v) = ne {
+            self.ne.level = v.clamp(0.0, 1.0);
+        }
+        if let Some(v) = sht {
+            self.sht.level = v.clamp(0.0, 1.0);
+        }
+        if let Some(v) = ach {
+            self.ach.level = v.clamp(0.0, 1.0);
+        }
     }
 
     // Downstream indicators (Phase 3 versions)
@@ -352,7 +372,11 @@ mod tests {
         let result = bench.run(&config);
         // All 8 conditions should produce finite metrics
         for (key, val) in &result.metrics {
-            assert!(val.mean.is_finite(), "Non-finite metric: {key} = {}", val.mean);
+            assert!(
+                val.mean.is_finite(),
+                "Non-finite metric: {key} = {}",
+                val.mean
+            );
         }
         // Should have at least 14 metrics (4 transmitters × agonist + antagonist + baselines)
         assert!(
@@ -372,7 +396,8 @@ mod tests {
         assert!(
             ant.gradient_scale < baseline.gradient_scale,
             "DA antagonist should degrade gradient_scale: ant={} < base={}",
-            ant.gradient_scale, baseline.gradient_scale
+            ant.gradient_scale,
+            baseline.gradient_scale
         );
         // Agonist (high DA) → D1 tolerance kicks in → different pattern than baseline
         // The key inverted-U test: agonist should NOT be strictly better than baseline
@@ -395,7 +420,8 @@ mod tests {
         assert!(
             ant.exploration < baseline.exploration,
             "NE antagonist should reduce exploration: ant={} < base={}",
-            ant.exploration, baseline.exploration
+            ant.exploration,
+            baseline.exploration
         );
         // Agonist → elevated exploration (but with diminishing returns / instability)
         // Both extremes should differ from baseline exploration
@@ -415,7 +441,8 @@ mod tests {
         assert!(
             (ago.gradient_scale - ko.gradient_scale).abs() > 0.1,
             "Agonist and knockout should differ substantially: ago={} vs ko={}",
-            ago.gradient_scale, ko.gradient_scale
+            ago.gradient_scale,
+            ko.gradient_scale
         );
     }
 }

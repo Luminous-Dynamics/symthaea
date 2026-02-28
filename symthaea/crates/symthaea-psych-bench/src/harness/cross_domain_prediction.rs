@@ -11,6 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::analysis::normal_cdf;
 use super::report::{key_metric_for_benchmark, BenchmarkReport};
 use super::trial_analysis::TrialOutcome;
 
@@ -145,23 +146,6 @@ fn p_value_from_r(r: f64, n: usize) -> f64 {
     p.clamp(0.0, 1.0)
 }
 
-/// Standard normal CDF approximation (Abramowitz & Stegun 26.2.17).
-fn normal_cdf(z: f64) -> f64 {
-    let t = 1.0 / (1.0 + 0.2316419 * z.abs());
-    let d = 0.398_942_280_401_432_7; // 1/sqrt(2*pi)
-    let p = d * (-z * z / 2.0).exp();
-    let poly = t
-        * (0.319_381_530
-            + t * (-0.356_563_782
-                + t * (1.781_477_937 + t * (-1.821_255_978 + t * 1.330_274_429))));
-    let cdf = 1.0 - p * poly;
-    if z >= 0.0 {
-        cdf
-    } else {
-        1.0 - cdf
-    }
-}
-
 /// Fit an ordinary least squares linear regression: y = slope * x + intercept.
 ///
 /// Returns a `PredictionModel` with R^2 and RMSE. Requires at least 2 paired
@@ -267,7 +251,7 @@ const KEY_PAIRS: [(&str, &str, &str); 10] = [
     // 9. Shared metacognitive monitoring
     (
         "Metacognition::Calibration",
-        "Metacognition::FOK",
+        "Metacognition::FeelingOfKnowing",
         "metacognition",
     ),
     // 10. Shared fluid intelligence

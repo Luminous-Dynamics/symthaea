@@ -1,4 +1,5 @@
-//! Extracted cycle phases: resonator codebook, episodic replay, and dream engine.
+//! Extracted cycle phases: resonator codebook, episodic replay, dream engine,
+//! urgency computation, init/preprocessing, and end-of-cycle processing.
 //!
 //! Each method is a self-contained phase of the main cognitive loop, taking only
 //! the inputs it needs and returning results via dedicated result structs. All
@@ -6,6 +7,7 @@
 
 use std::time::Instant;
 
+use super::super::neuromodulators::NeuromodulatorBathExt;
 use super::super::temporal_network::TemporalNetwork;
 use super::super::CognitiveLoopService;
 
@@ -40,6 +42,21 @@ pub(in crate::cognitive_loop) struct ParameterOptimizationResult {
     pub best_tau_scale: f32,
     pub phi_gain: f64,
     pub swap_occurred: bool,
+}
+
+/// Result from the urgency computation and error pattern analysis phase.
+pub(in crate::cognitive_loop) struct UrgencyResult {
+    pub urgency: super::super::CycleUrgency,
+    pub error_pattern: &'static str,
+    pub predicted_urgency: &'static str,
+    pub prediction_coherence_urgency_bias: f32,
+}
+
+/// Result from the cycle init and preprocessing phase.
+pub(in crate::cognitive_loop) struct CycleInitResult {
+    pub exploration_urge_start: f32,
+    pub startup_suppressed: bool,
+    pub startup_warmup_progress: f32,
 }
 
 impl CognitiveLoopService {
@@ -742,6 +759,498 @@ impl CognitiveLoopService {
             dream_insights,
             dream_phi_improvement,
             dream_wisdom_count,
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Urgency computation + error pattern analysis
+    // Extracted from cycle.rs lines 472-684 (zero behavioral change).
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /// Compute urgency mode via adaptive threshold, hysteresis, error pattern
+    /// analysis, and mode transition smoothing.
+    ///
+    /// Mutates: `self.carryover.urgency`, `self.carryover.history.error_history`,
+    /// `self.carryover.learning.adaptive_threshold_scale`, `self.stats`,
+    /// `self.neuromodulator_bath`.
+    pub(in crate::cognitive_loop) fn compute_urgency_and_error_pattern(
+        &mut self,
+        prediction_error: f32,
+        surprise_triggered: bool,
+        effective_threshold: f32,
+    ) -> UrgencyResult {
+        // Track consecutive low-error cycles for Cruise eligibility
+        if prediction_error < effective_threshold {
+            self.carryover.urgency.consecutive_low_error = self
+                .carryover
+                .urgency
+                .consecutive_low_error
+                .saturating_add(1);
+        } else {
+            self.carryover.urgency.consecutive_low_error = 0;
+        }
+
+        // Use smoothed error for urgency to prevent jitter from single-cycle noise spikes.
+        // Science: Dynamical systems — threshold-based switching needs hysteresis to prevent
+        // oscillation. EMA smoothing damps transient spikes; prev_urgency adds hysteresis.
+        let smoothed_urgency_error = if self.stats.total_cycles > 5 {
+            // Blend instantaneous (70%) with running average (30%) for responsiveness + smoothing
+            prediction_error * 0.7 + self.stats.avg_prediction_error * 0.3
+        } else {
+            prediction_error // Use raw error during bootstrap
+        };
+
+        // Hysteresis: require stronger signal to LEAVE current urgency level
+        // #1: D2-mediated behavioral flexibility gates mode transitions (Frank 2005).
+        // High D2 → easier transitions (lower hysteresis), low D2 → perseveration.
+        let flexibility = self.neuromodulator_bath.behavioral_flexibility();
+        let flex_mod = 1.0 / flexibility; // 0.67–1.43 (inverted: high flex = lower threshold)
+        let base_hysteresis = match self.carryover.urgency.urgency {
+            super::super::CycleUrgency::Cruise => effective_threshold * 1.2 * flex_mod,
+            super::super::CycleUrgency::Critical => effective_threshold * 0.8 * flex_mod,
+            _ => effective_threshold * flex_mod,
+        };
+
+        // ── Phase 17: Predictive interval tuning via error pattern ──────
+        // Science: Clark (2013) — predictive brain anticipates state changes.
+        // Rising error pattern → lower threshold (prepare to escalate).
+        // Falling error pattern → raise threshold (allow settling).
+        let error_history_len = self.carryover.history.error_history.len();
+        let pattern_mod = if error_history_len >= 4 {
+            // Direct index: newest = len-1, 4th-newest = len-4 (avoids Vec alloc)
+            let newest = self.carryover.history.error_history[error_history_len - 1];
+            let oldest_4 = self.carryover.history.error_history[error_history_len - 4];
+            let slope = (newest - oldest_4) / 3.0;
+            if slope > 0.02 {
+                0.9f32
+            }
+            // Rising → easier to escalate
+            else if slope < -0.02 {
+                1.1
+            }
+            // Falling → easier to de-escalate
+            else {
+                1.0
+            }
+        } else {
+            1.0
+        };
+
+        // ── Phase 18: Prediction coherence → urgency bias ─────────────────
+        // Science: Bar (2009) — temporal prediction consistency signals model quality.
+        // Uses previous cycle's avg coherence (current not yet computed at urgency time).
+        // Low coherence (<0.3) → model confused across horizons → bias toward Critical.
+        // High coherence (>0.7) → model confident → permit Cruise (raise threshold).
+        let prev_coherence = self.stats.avg_prediction_coherence;
+        let coherence_mod = if prev_coherence < 0.3 && prev_coherence > 0.0 {
+            0.85f32 // Lower threshold → easier to escalate (model confused)
+        } else if prev_coherence > 0.7 {
+            1.1 // Raise threshold → permit Cruise (model confident)
+        } else {
+            1.0
+        };
+        let prediction_coherence_urgency_bias = coherence_mod - 1.0;
+
+        let hysteresis_threshold = base_hysteresis * pattern_mod * coherence_mod;
+        let error_urgency = super::super::CycleUrgency::from_state(
+            smoothed_urgency_error,
+            hysteresis_threshold,
+            surprise_triggered,
+            self.carryover.urgency.consecutive_low_error,
+        );
+
+        // Compose CognitiveDepth with error-based urgency:
+        // Reflex → cap at Cruise (skip heavy subsystems for familiar inputs)
+        // DeepThought → floor at Normal (force full processing for novel/high-stakes)
+        // Cortical → use error-based urgency as-is
+        let raw_urgency = match self.cognitive_depth {
+            super::super::CognitiveDepth::Reflex => match error_urgency {
+                super::super::CycleUrgency::Critical => super::super::CycleUrgency::Normal,
+                _ => super::super::CycleUrgency::Cruise,
+            },
+            super::super::CognitiveDepth::DeepThought => match error_urgency {
+                super::super::CycleUrgency::Cruise => super::super::CycleUrgency::Normal,
+                _ => error_urgency,
+            },
+            super::super::CognitiveDepth::Cortical => error_urgency,
+        };
+
+        // ── Phase 17: Cross-temporal error pattern learning ──────────────
+        // Science: Rao & Ballard (1999) — hierarchical predictive coding tracks error
+        // trajectories across time, not just instantaneous snapshots.
+        // Maintain rolling window of prediction errors, classify pattern.
+        let error_history = &mut self.carryover.history.error_history;
+        if error_history.len() >= 16 {
+            error_history.pop_front();
+        }
+        error_history.push_back(prediction_error);
+
+        let (error_pattern, predicted_urgency) = if error_history.len() >= 4 {
+            let len = error_history.len();
+            // Direct index: newest = len-1, 4th-newest = len-4 (avoids Vec alloc)
+            let newest = error_history[len - 1];
+            let oldest_of_4 = error_history[len - 4];
+            // Compute linear trend (simple slope)
+            let slope = (newest - oldest_of_4) / 3.0; // newest - oldest, normalized
+            // Count sign changes for oscillation detection (index pairs avoid collect→Vec)
+            let mut sign_changes = 0u32;
+            let ref_val = oldest_of_4;
+            for i in 0..len.saturating_sub(1) {
+                let diff_cur = error_history[i + 1] - error_history[i];
+                let diff_ref = error_history[i] - ref_val;
+                if diff_cur.signum() != diff_ref.signum() {
+                    sign_changes += 1;
+                }
+            }
+            let oscillation_ratio = if len > 2 {
+                sign_changes as f32 / (len - 1) as f32
+            } else {
+                0.0
+            };
+            // Spike detection: current error > 2× running mean
+            let mean_err = error_history.iter().sum::<f32>() / len as f32;
+            let is_spike = prediction_error > mean_err * 2.0 && prediction_error > 0.1;
+
+            let pattern = if is_spike {
+                "Spike"
+            } else if oscillation_ratio > 0.6 {
+                "Oscillating"
+            } else if slope > 0.02 {
+                "Rising"
+            } else if slope < -0.02 {
+                "Falling"
+            } else {
+                "Stable"
+            };
+            // Predict urgency 5 cycles ahead from pattern
+            let predicted = match pattern {
+                "Rising" | "Spike" => "Critical",
+                "Oscillating" => "Normal",
+                "Falling" | "Stable" => {
+                    if self.carryover.urgency.consecutive_low_error > 15 {
+                        "Cruise"
+                    } else {
+                        "Normal"
+                    }
+                }
+                _ => "Normal",
+            };
+            (pattern, predicted)
+        } else {
+            ("Warmup", "Normal")
+        };
+
+        // #9: Error trend → DA baseline modulation (Schultz 2016)
+        self.neuromodulator_bath
+            .modulate_from_error_trend(error_pattern);
+
+        // ── Phase 17: Mode transition smoothing ──────────────────────────
+        // Science: Kelso (1995) — metastable coordination dynamics: transitions between
+        // attractor states should be smooth, not abrupt. Ramp mode_confidence over 5 cycles.
+        let urgency;
+        if raw_urgency != self.carryover.urgency.prev_urgency {
+            // Mode changed — start transition
+            self.stats.mode_transitions += 1;
+            self.carryover.urgency.mode_confidence = 0.0;
+            self.carryover.urgency.mode_stability_counter = 0;
+            // During transition, stay in the HIGHER urgency (more cautious)
+            let raw_level = match raw_urgency {
+                super::super::CycleUrgency::Critical => 2,
+                super::super::CycleUrgency::Normal => 1,
+                super::super::CycleUrgency::Cruise => 0,
+            };
+            let prev_level = match self.carryover.urgency.prev_urgency {
+                super::super::CycleUrgency::Critical => 2,
+                super::super::CycleUrgency::Normal => 1,
+                super::super::CycleUrgency::Cruise => 0,
+            };
+            urgency = if raw_level > prev_level {
+                raw_urgency // escalating → use new immediately
+            } else {
+                // de-escalating → hold old urgency for 1 cycle
+                self.carryover.urgency.prev_urgency
+            };
+            self.carryover.urgency.prev_urgency = raw_urgency;
+        } else {
+            // Same mode — ramp confidence
+            self.carryover.urgency.mode_stability_counter = self
+                .carryover
+                .urgency
+                .mode_stability_counter
+                .saturating_add(1);
+            self.carryover.urgency.mode_confidence =
+                (self.carryover.urgency.mode_stability_counter as f32 / 5.0).min(1.0);
+            urgency = raw_urgency;
+        }
+        self.stats.avg_mode_stability = self.stats.avg_mode_stability * 0.9
+            + self.carryover.urgency.mode_stability_counter as f32 * 0.1;
+
+        UrgencyResult {
+            urgency,
+            error_pattern,
+            predicted_urgency,
+            prediction_coherence_urgency_bias,
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Cycle init and preprocessing
+    // Extracted from cycle.rs lines 100-216 (zero behavioral change).
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /// Startup transient suppression, biorhythm refresh, nociception, and
+    /// neuromodulator bath update. Run at the very start of each cycle.
+    ///
+    /// Mutates: `self.stats`, `self.curiosity_drive`, `self.carryover`,
+    /// `self.feedback_state`, `self.subsystem_collector`, `self.biorhythm`,
+    /// `self.neuromodulator_bath`, `self.somatic_bridge`, `self.emotion_contagion`,
+    /// `self.thermodynamic_load`, `self.bath_phase_tracker`,
+    /// `self.personality_drift_tracker`.
+    pub(in crate::cognitive_loop) fn run_cycle_init(
+        &mut self,
+        module_timings: &mut super::super::ModuleTimings,
+    ) -> CycleInitResult {
+        // ── Phase 17: Startup transient suppression ─────────────────────────
+        // Science: Hopfield (1982) — recurrent networks require settling time before
+        // producing reliable dynamics. During warmup (cycles 0–50), suppress learning
+        // rate and curiosity to prevent cementing transient noise as learned patterns.
+        let startup_warmup_cycles = super::super::thresholds::STARTUP_WARMUP_CYCLES;
+        let startup_suppressed = self.stats.total_cycles <= startup_warmup_cycles;
+        let startup_warmup_progress = if startup_suppressed {
+            self.stats.total_cycles as f32 / startup_warmup_cycles as f32
+        } else {
+            1.0
+        };
+        if startup_suppressed {
+            self.stats.startup_suppressed_cycles += 1;
+            // Ramp learning rate from 20% → 100% over warmup period
+            let lr_scale = 0.2 + 0.8 * startup_warmup_progress;
+            self.stats.adaptive_learning_rate *= lr_scale;
+            // Suppress curiosity during transient (let CfC settle)
+            self.curiosity_drive.exploration_urge *= startup_warmup_progress;
+        }
+
+        // Snapshot exploration_urge for end-of-cycle budget clamping (Task B)
+        let exploration_urge_start = self.curiosity_drive.exploration_urge;
+
+        // Snapshot confidence for end-of-cycle drift clamping (Task G)
+        self.carryover.learning.prediction_confidence = self.prediction_confidence;
+
+        // ── Phase 2.2: Begin feedback proposal collection for this cycle ────
+        self.feedback_state.begin_cycle();
+        // ── Phase 2.3: Clear subsystem output collector ────
+        self.subsystem_collector.clear();
+
+        // Chronobiology: refresh biorhythm every 97 cycles (co-prime amortization)
+        self.biorhythm_refresh_counter += 1;
+        if self.biorhythm_refresh_counter >= super::super::thresholds::BIORHYTHM_INTERVAL {
+            self.biorhythm = crate::chronobiology::Biorhythm::current();
+            // #14: Use effective_hour (with phase offset) for circadian modulation
+            let effective_hour = self.biorhythm.effective_hour();
+            self.neuromodulator_bath
+                .modulate_circadian_continuous(effective_hour);
+            // #14: Entrain phase offset toward zero each refresh
+            self.biorhythm.entrain();
+            // Record personality profile for drift detection
+            let profile = self.neuromodulator_bath.personality_profile();
+            self.personality_drift_tracker.record(&profile);
+            // #4: Personality drift → anomaly recovery (Turrigiano 2008)
+            if self.personality_drift_tracker.is_anomalous()
+                && self.carryover.urgency.anomaly_drift_recovery == 0
+            {
+                self.neuromodulator_bath.engage_anomaly_recovery();
+                self.carryover.urgency.anomaly_drift_recovery = 50;
+            }
+            self.biorhythm_refresh_counter = 0;
+        }
+        // #4: Countdown and disengage drift recovery
+        if self.carryover.urgency.anomaly_drift_recovery > 0 {
+            self.carryover.urgency.anomaly_drift_recovery -= 1;
+            if self.carryover.urgency.anomaly_drift_recovery == 0 {
+                self.neuromodulator_bath.disengage_anomaly_recovery();
+            }
+        }
+        // Apply circadian plasticity to learning rate (Night=high plasticity, Day=low)
+        // Halved: bath circadian baselines (Phase 2) provide the other 50%
+        let plasticity_half = 1.0 + (self.biorhythm.plasticity_mod as f32 - 1.0) * 0.5;
+        let circadian_lr = self.stats.adaptive_learning_rate * plasticity_half;
+        self.stats.adaptive_learning_rate = circadian_lr.clamp(0.0001, 0.1);
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // NOCICEPTION: Drain infrastructure errors and convert to felt signals
+        // ═══════════════════════════════════════════════════════════════════════
+        self.somatic_bridge.update();
+        let somatic_signals = self.somatic_bridge.to_interoceptive_signals();
+        // Apply somatic stress to thermodynamic load (additive)
+        self.thermodynamic_load =
+            (self.thermodynamic_load + somatic_signals.thermodynamic_load_delta).min(1.0);
+        // Apply arousal spike from severe infrastructure damage
+        if somatic_signals.arousal_spike > 0.0 {
+            self.emotion_contagion.arousal =
+                (self.emotion_contagion.arousal + somatic_signals.arousal_spike).min(1.0);
+        }
+        // #5: Forward somatic stress to neuromodulator bath (McEwen 2007)
+        let somatic_stress_level = self.somatic_bridge.systemic_stress() as f32;
+        self.neuromodulator_bath.apply_stress(somatic_stress_level);
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // NEUROMODULATOR BATH: Produce from previous cycle's signals (Phase A)
+        // Science: Doya (2002) — DA/NE/5-HT/ACh unify metalearning modulation.
+        // Uses carryover values (previous cycle) to avoid ordering dependencies.
+        // ═══════════════════════════════════════════════════════════════════════
+        {
+            let neuromod_inputs = super::super::neuromodulators::NeuromodulatorInputs {
+                prediction_error: self.stats.avg_prediction_error,
+                surprise: self.stats.avg_prediction_error > self.config.learning_threshold * 3.0,
+                reward_signal: self.carryover.quality.last_value_score as f32,
+                coherence: self.carryover.history.cached_coherence.unwrap_or(0.5),
+                arousal: self.emotion_contagion.arousal,
+                binding_strength: self.carryover.quality.last_phenomenal_binding as f32,
+                epistemic_confidence: self.carryover.quality.last_epistemic_confidence,
+                flow_active: self.flow_state.in_flow,
+            };
+            self.neuromodulator_bath.update(&neuromod_inputs);
+        }
+
+        // ── Phase 5: Post-update bath wiring ────────────────────────────────
+        // Record bath state for phase space analysis
+        self.bath_phase_tracker
+            .record(self.neuromodulator_bath.state_vector());
+        // Allostatic load accumulation (McEwen 1998)
+        {
+            let cortisol = self.neuromodulator_bath.to_hormone_state().cortisol as f32;
+            let is_sleep = self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
+            self.neuromodulator_bath
+                .accumulate_allostatic_load(cortisol, is_sleep);
+            // Adenosine clearance during sleep (Xie et al. 2013 — glymphatic)
+            if is_sleep {
+                self.neuromodulator_bath.clear_adenosine_sleep();
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PHASE -1: Ingest background-trained weights (non-blocking)
+        // ═══════════════════════════════════════════════════════════════════════
+        if let Some(ref mut trainer) = self.async_trainer {
+            if let TemporalNetwork::CfC(ref mut cfc) = self.temporal_network {
+                trainer.apply_latest_weights(cfc);
+            }
+        }
+
+        let _ = module_timings; // consumed by caller for timing
+        CycleInitResult {
+            exploration_urge_start,
+            startup_suppressed,
+            startup_warmup_progress,
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // End-of-cycle stats and telemetry
+    // Extracted from cycle.rs post-metadata section (zero behavioral change).
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /// Update cumulative stats, neuromod EMA, and populate remaining metadata fields.
+    ///
+    /// Called after the metadata struct literal is assembled.
+    pub(in crate::cognitive_loop) fn run_end_of_cycle_stats(
+        &mut self,
+        metadata: &mut super::super::CycleMetadata,
+        resonator_wm_primed: bool,
+        resonator_promotions: usize,
+        codebook_evictions: usize,
+        codebook_diversity: f32,
+        fep_surprise: f64,
+        surprise_thresh: f64,
+        neuromod_attention_alloc: f32,
+        phasic_da_replay_boost: usize,
+        ne_reorienting_boost: f32,
+        ne_arousal_feedback: f32,
+        confidence_velocity: f32,
+        sht_crash_dip: f32,
+        exploration_sht_drain: f32,
+    ) {
+        // Apply neuromodulator telemetry via helper (replaces 36 inline fields)
+        metadata.apply_neuromod(self.collect_neuromod_telemetry(neuromod_attention_alloc));
+
+        // Phase 4: local-variable telemetry fields (not bath-derived)
+        metadata.neuromod_phasic_replay_boost = phasic_da_replay_boost;
+        metadata.neuromod_ne_reorienting_boost = ne_reorienting_boost;
+        metadata.neuromod_drift_recovery_remaining = self.carryover.urgency.anomaly_drift_recovery;
+        metadata.ne_arousal_feedback = ne_arousal_feedback;
+        metadata.confidence_velocity = confidence_velocity;
+        metadata.sht_crash_dip = sht_crash_dip > 0.0;
+        metadata.exploration_sht_drain = exploration_sht_drain;
+
+        // Update cumulative stats for resonator-memory loop diagnostics
+        if resonator_wm_primed {
+            self.stats.resonator_wm_primed_count += 1;
+        }
+        self.stats.resonator_promotions_total += resonator_promotions as u64;
+        self.stats.codebook_evictions_total += codebook_evictions as u64;
+        if codebook_diversity > 0.0 {
+            self.stats.codebook_diversity = codebook_diversity;
+        }
+        if fep_surprise > surprise_thresh {
+            self.stats.fep_surprise_replay_boosts += 1;
+        }
+
+        // Exocortex trigger counter
+        if self.neuromodulator_bath.should_query_exocortex() {
+            self.stats.exocortex_triggers += 1;
+        }
+
+        // Neuromodulator EMA stats (alpha=0.05)
+        {
+            let alpha = 0.05_f32;
+            let da = self.neuromodulator_bath.dopamine.effective();
+            let ne = self.neuromodulator_bath.noradrenaline.effective();
+            let sht = self.neuromodulator_bath.serotonin.effective();
+            let ach = self.neuromodulator_bath.acetylcholine.effective();
+            self.stats.avg_dopamine += alpha * (da - self.stats.avg_dopamine);
+            self.stats.avg_noradrenaline += alpha * (ne - self.stats.avg_noradrenaline);
+            self.stats.avg_serotonin += alpha * (sht - self.stats.avg_serotonin);
+            self.stats.avg_acetylcholine += alpha * (ach - self.stats.avg_acetylcholine);
+        }
+
+        // Populate v0.8.0 Resonance Metadata
+        metadata.thermodynamic_load = self.thermodynamic_load;
+        metadata.somatic_stress = self.somatic_bridge.systemic_stress();
+        metadata.mood_temperature = self.mood_temperature;
+        // Phase 2.2: feedback proposal attribution telemetry
+        metadata.feedback_confidence_proposals = self.feedback_state.confidence.len() as u32;
+        metadata.feedback_lr_proposals = self.feedback_state.learning_rate.len() as u32;
+        metadata.feedback_exploration_proposals = self.feedback_state.exploration.len() as u32;
+        metadata.feedback_threshold_proposals = self.feedback_state.threshold.len() as u32;
+        if self.config.trace_feedback {
+            metadata.feedback_trace_confidence = self
+                .feedback_state
+                .confidence
+                .dump_proposals()
+                .into_iter()
+                .map(|(s, d)| (s.to_string(), d))
+                .collect();
+            metadata.feedback_trace_lr = self
+                .feedback_state
+                .learning_rate
+                .dump_proposals()
+                .into_iter()
+                .map(|(s, d)| (s.to_string(), d))
+                .collect();
+            metadata.feedback_trace_exploration = self
+                .feedback_state
+                .exploration
+                .dump_proposals()
+                .into_iter()
+                .map(|(s, d)| (s.to_string(), d))
+                .collect();
+            metadata.feedback_trace_threshold = self
+                .feedback_state
+                .threshold
+                .dump_proposals()
+                .into_iter()
+                .map(|(s, d)| (s.to_string(), d))
+                .collect();
         }
     }
 }

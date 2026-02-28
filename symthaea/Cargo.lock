@@ -13338,6 +13338,7 @@ dependencies = [
  "symthaea-hodge",
  "symthaea-humanoid",
  "symthaea-narrative-self",
+ "symthaea-neuromodulators",
  "symthaea-nix",
  "symthaea-observability",
  "symthaea-phi-search",
@@ -13567,6 +13568,13 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "symthaea-core",
+]
+
+[[package]]
+name = "symthaea-neuromodulators"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

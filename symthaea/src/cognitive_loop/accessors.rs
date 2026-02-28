@@ -6,6 +6,7 @@
 //! unit tests (e.g., `flow_state()`, `curiosity_drive()`).
 
 use crate::causal::{CausalGraph, DiscoveredRelationship};
+use super::neuromodulators::NeuromodulatorBathExt;
 use crate::consciousness::consciousness_unification::EmotionalPattern;
 use crate::consciousness::stability_regime::StabilityRegimeProcessor;
 use crate::dynamics::cfc_coherence::CoherenceSummary;

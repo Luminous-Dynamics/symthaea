@@ -231,7 +231,10 @@ impl WebResearcher {
         if query_lower.contains("rust") {
             urls.push("https://doc.rust-lang.org/book/".to_string());
             urls.push("https://docs.rs/".to_string());
-            urls.push(format!("https://github.com/search?q={}+language%3ARust", encoded_query));
+            urls.push(format!(
+                "https://github.com/search?q={}+language%3ARust",
+                encoded_query
+            ));
         }
 
         if query_lower.contains("nix") || query_lower.contains("nixos") {
@@ -250,7 +253,10 @@ impl WebResearcher {
             urls.push("https://pypi.org/".to_string());
         }
 
-        if query_lower.contains("science") || query_lower.contains("research") || query_lower.contains("paper") {
+        if query_lower.contains("science")
+            || query_lower.contains("research")
+            || query_lower.contains("paper")
+        {
             urls.push("https://arxiv.org/search/".to_string());
             urls.push("https://scholar.google.com/".to_string());
         }
@@ -281,7 +287,10 @@ impl WebResearcher {
         // 3. Always include Wikipedia and StackOverflow search
         let wiki_query = query.replace(' ', "_");
         urls.push(format!("https://en.wikipedia.org/wiki/{}", wiki_query));
-        urls.push(format!("https://stackoverflow.com/search?q={}", encoded_query));
+        urls.push(format!(
+            "https://stackoverflow.com/search?q={}",
+            encoded_query
+        ));
 
         let mut seen = HashSet::new();
         urls.retain(|url| seen.insert(url.clone()));
@@ -650,7 +659,12 @@ fn extract_openreview_ids(json: &Value) -> Vec<String> {
         let id = entry
             .get("id")
             .and_then(|v| v.as_str())
-            .or_else(|| entry.get("note").and_then(|v| v.get("id")).and_then(|v| v.as_str()))
+            .or_else(|| {
+                entry
+                    .get("note")
+                    .and_then(|v| v.get("id"))
+                    .and_then(|v| v.as_str())
+            })
             .or_else(|| entry.get("forum").and_then(|v| v.as_str()));
         if let Some(id) = id {
             urls.push(format!("https://openreview.net/forum?id={id}"));

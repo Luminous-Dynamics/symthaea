@@ -200,6 +200,10 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         supervisor.prune_completed();
-        assert_eq!(supervisor.task_count(), 0, "Completed task should be pruned");
+        assert_eq!(
+            supervisor.task_count(),
+            0,
+            "Completed task should be pruned"
+        );
     }
 }

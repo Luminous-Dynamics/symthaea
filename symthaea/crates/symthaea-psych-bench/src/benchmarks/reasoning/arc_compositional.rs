@@ -15,6 +15,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -81,7 +83,14 @@ fn apply_chain(
             let fill_color = (param / 13 % num_colors as u64) as u8;
             let top = (param / 17 % rows.max(1) as u64) as usize;
             let left = (param / 19 % cols.max(1) as u64) as usize;
-            GridEncoder::fill_region(&replaced, top, left, top.min(rows - 1), left.min(cols - 1), fill_color)
+            GridEncoder::fill_region(
+                &replaced,
+                top,
+                left,
+                top.min(rows - 1),
+                left.min(cols - 1),
+                fill_color,
+            )
         }
         ChainedTransform::ReflectThenRotate => {
             let reflected = if param % 2 == 0 {
@@ -97,7 +106,14 @@ fn apply_chain(
             let fill_color = (param % num_colors as u64) as u8;
             let top = (param / 7 % rows.max(1) as u64) as usize;
             let left = (param / 11 % cols.max(1) as u64) as usize;
-            let filled = GridEncoder::fill_region(grid, top, left, top.min(rows - 1), left.min(cols - 1), fill_color);
+            let filled = GridEncoder::fill_region(
+                grid,
+                top,
+                left,
+                top.min(rows - 1),
+                left.min(cols - 1),
+                fill_color,
+            );
             let dx = ((param / 13 % 3) as i32) - 1;
             let dy = ((param / 17 % 3) as i32) - 1;
             GridEncoder::translate_grid(&filled, dx, dy, 0)
@@ -215,8 +231,18 @@ impl ArcCompositionalBenchmark {
 
                 // Distractor: apply a different chained transform to same input
                 let pred_sim = predicted.similarity(&test_out_hv) as f64;
-                let distractor_idx = (CHAINED_TYPES.iter().position(|t| std::mem::discriminant(t) == std::mem::discriminant(&chain_type)).unwrap_or(0) + 1) % CHAINED_TYPES.len();
-                let distractor_output = apply_chain(&test_input, CHAINED_TYPES[distractor_idx], param, num_colors);
+                let distractor_idx = (CHAINED_TYPES
+                    .iter()
+                    .position(|t| std::mem::discriminant(t) == std::mem::discriminant(&chain_type))
+                    .unwrap_or(0)
+                    + 1)
+                    % CHAINED_TYPES.len();
+                let distractor_output = apply_chain(
+                    &test_input,
+                    CHAINED_TYPES[distractor_idx],
+                    param,
+                    num_colors,
+                );
                 let distractor_hv = encoder.encode_grid(&distractor_output);
                 let distractor_sim = predicted.similarity(&distractor_hv) as f64;
 
@@ -242,7 +268,13 @@ impl ArcCompositionalBenchmark {
         // Train on 5×5, test on 3×3 and 7×7
         let sizes = [3, 5, 7];
         let max_size = 7;
-        let size_encoder = GridEncoder::new(dim, max_size, max_size, num_colors as usize, seed.wrapping_add(1000));
+        let size_encoder = GridEncoder::new(
+            dim,
+            max_size,
+            max_size,
+            num_colors as usize,
+            seed.wrapping_add(1000),
+        );
         let mut size_hits: u32 = 0;
         let mut size_total: u32 = 0;
 
@@ -289,7 +321,8 @@ impl ArcCompositionalBenchmark {
                 let predicted = size_encoder.apply_rule(&test_in_hv, &consensus);
 
                 let pred_sim = predicted.similarity(&test_out_hv) as f64;
-                let distractor_output = GridEncoder::color_replace(&test_input, distractor_from, distractor_to);
+                let distractor_output =
+                    GridEncoder::color_replace(&test_input, distractor_from, distractor_to);
                 let distractor_hv = size_encoder.encode_grid(&distractor_output);
                 let distractor_sim = predicted.similarity(&distractor_hv) as f64;
 
@@ -312,7 +345,13 @@ impl ArcCompositionalBenchmark {
         // ── Part 3: Symmetry Detection ──
         // Encode 4 types: h_sym only, v_sym only, both, neither — classify via cosine
         let sym_size = 5;
-        let sym_encoder = GridEncoder::new(dim, sym_size, sym_size, num_colors as usize, seed.wrapping_add(2000));
+        let sym_encoder = GridEncoder::new(
+            dim,
+            sym_size,
+            sym_size,
+            num_colors as usize,
+            seed.wrapping_add(2000),
+        );
 
         // Build prototype HVs for each symmetry class from examples
         let examples_per_class = 4;
@@ -438,10 +477,26 @@ impl ArcCompositionalBenchmark {
         };
 
         let per_chain_accuracy = [
-            if per_chain_total[0] > 0 { per_chain_hits[0] as f64 / per_chain_total[0] as f64 } else { 0.0 },
-            if per_chain_total[1] > 0 { per_chain_hits[1] as f64 / per_chain_total[1] as f64 } else { 0.0 },
-            if per_chain_total[2] > 0 { per_chain_hits[2] as f64 / per_chain_total[2] as f64 } else { 0.0 },
-            if per_chain_total[3] > 0 { per_chain_hits[3] as f64 / per_chain_total[3] as f64 } else { 0.0 },
+            if per_chain_total[0] > 0 {
+                per_chain_hits[0] as f64 / per_chain_total[0] as f64
+            } else {
+                0.0
+            },
+            if per_chain_total[1] > 0 {
+                per_chain_hits[1] as f64 / per_chain_total[1] as f64
+            } else {
+                0.0
+            },
+            if per_chain_total[2] > 0 {
+                per_chain_hits[2] as f64 / per_chain_total[2] as f64
+            } else {
+                0.0
+            },
+            if per_chain_total[3] > 0 {
+                per_chain_hits[3] as f64 / per_chain_total[3] as f64
+            } else {
+                0.0
+            },
         ];
 
         CompositionalTrialResult {
@@ -471,12 +526,18 @@ impl PsychBenchmark for ArcCompositionalBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut comp_accs = Vec::new();
         let mut size_gens = Vec::new();
         let mut sym_dets = Vec::new();
         let mut rts = Vec::new();
-        let chain_names = ["translate_reflect", "color_replace_fill", "reflect_rotate", "fill_translate"];
+        let chain_names = [
+            "translate_reflect",
+            "color_replace_fill",
+            "reflect_rotate",
+            "fill_translate",
+        ];
         let mut per_chain: [Vec<f64>; 4] = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
 
         for trial in 0..config.trials_per_condition {
@@ -488,24 +549,27 @@ impl PsychBenchmark for ArcCompositionalBenchmark {
             for i in 0..4 {
                 per_chain[i].push(r.per_chain_accuracy[i]);
             }
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "arc_compositional".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert(
             "compositional_accuracy",
             MetricValue::from_samples(&comp_accs),
         );
-        result.insert(
-            "size_generalization",
-            MetricValue::from_samples(&size_gens),
-        );
-        result.insert(
-            "symmetry_detection",
-            MetricValue::from_samples(&sym_dets),
-        );
-        result.insert(
-            "compositional_rt_ticks",
-            MetricValue::from_samples(&rts),
-        );
+        result.insert("size_generalization", MetricValue::from_samples(&size_gens));
+        result.insert("symmetry_detection", MetricValue::from_samples(&sym_dets));
+        result.insert("compositional_rt_ticks", MetricValue::from_samples(&rts));
 
         // Per-chain-type breakdowns
         for (i, name) in chain_names.iter().enumerate() {
@@ -517,6 +581,7 @@ impl PsychBenchmark for ArcCompositionalBenchmark {
 
         result.conditions = 3; // chained, size-varying, symmetry
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -551,10 +616,24 @@ mod tests {
     #[test]
     fn test_per_chain_breakdowns_finite() {
         let result = ArcCompositionalBenchmark.run(&test_config());
-        for name in &["accuracy_translate_reflect", "accuracy_color_replace_fill", "accuracy_reflect_rotate", "accuracy_fill_translate"] {
+        for name in &[
+            "accuracy_translate_reflect",
+            "accuracy_color_replace_fill",
+            "accuracy_reflect_rotate",
+            "accuracy_fill_translate",
+        ] {
             let val = &result.metrics[*name];
-            assert!(val.mean.is_finite(), "Per-chain metric {} is not finite", name);
-            assert!(val.mean >= 0.0 && val.mean <= 1.0, "Per-chain metric {} out of range: {}", name, val.mean);
+            assert!(
+                val.mean.is_finite(),
+                "Per-chain metric {} is not finite",
+                name
+            );
+            assert!(
+                val.mean >= 0.0 && val.mean <= 1.0,
+                "Per-chain metric {} out of range: {}",
+                name,
+                val.mean
+            );
         }
     }
 
@@ -634,8 +713,7 @@ mod tests {
         let r1 = ArcCompositionalBenchmark.run(&config);
         let r2 = ArcCompositionalBenchmark.run(&config);
         assert_eq!(
-            r1.metrics["compositional_accuracy"].mean,
-            r2.metrics["compositional_accuracy"].mean,
+            r1.metrics["compositional_accuracy"].mean, r2.metrics["compositional_accuracy"].mean,
             "Same seed should produce identical results"
         );
     }
@@ -684,7 +762,10 @@ mod tests {
             let result = apply_chain(&grid, chain, 42, 6);
             assert_eq!(result.len(), grid.len());
             for row in &result {
-                assert!(row.len() >= grid[0].len() || matches!(chain, ChainedTransform::ReflectThenRotate));
+                assert!(
+                    row.len() >= grid[0].len()
+                        || matches!(chain, ChainedTransform::ReflectThenRotate)
+                );
             }
         }
     }
@@ -693,9 +774,15 @@ mod tests {
     fn test_symmetry_helpers() {
         let mut rng = 42u64 ^ 0x9E3779B97F4A7C15;
         let h_grid = gen_h_symmetric_grid(&mut rng, 5, 4);
-        assert!(is_h_symmetric(&h_grid), "H-symmetric grid should pass h-symmetry check");
+        assert!(
+            is_h_symmetric(&h_grid),
+            "H-symmetric grid should pass h-symmetry check"
+        );
 
         let v_grid = gen_v_symmetric_grid(&mut rng, 5, 4);
-        assert!(is_v_symmetric(&v_grid), "V-symmetric grid should pass v-symmetry check");
+        assert!(
+            is_v_symmetric(&v_grid),
+            "V-symmetric grid should pass v-symmetry check"
+        );
     }
 }

@@ -5,9 +5,9 @@
 //! 2. Attempt to execute a similar risky action.
 //! 3. Verify that Symthaea predicts failure and autonomously vetos the action.
 
-use symthaea::Symthaea;
-use symthaea::action::ActionIR;
 use std::collections::BTreeMap;
+use symthaea::action::ActionIR;
+use symthaea::Symthaea;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Initialize Symthaea
     let mut sym = Symthaea::new(1024, 64).await?;
     sym.executor = symthaea::action::SimpleExecutor::with_real_commands();
-    
+
     // 2. SEED CAUSAL MEMORY (The "Trauma")
     // We record that deleting a sensitive path leads to a failure state (Phi=0.0)
     let state_trauma = vec![0.0; 64];
@@ -27,8 +27,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         working_dir: None,
     };
     let outcome_trauma = vec![0.0; 64]; // Failure state
-    sym.executor.dream_engine.record(&state_trauma, action_trauma, &outcome_trauma, 1.0);
-    
+    sym.executor
+        .dream_engine
+        .record(&state_trauma, action_trauma, &outcome_trauma, 1.0);
+
     println!("[SEED] Causal memory seeded with failure event: 'rm -rf /system' -> Crash (Phi=0.0)");
 
     // 3. THE RISKY COMMAND
@@ -39,7 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 4. PROCESS (Precognition should trigger)
     println!("[THOUGHT] Simulating consequences...");
     let response = sym.process(command).await?;
-    
+
     println!("\n[RESPONSE] Symthaea Reflection: {}\n", response.content);
 
     // 5. AUDIT THE MOTOR CORTEX

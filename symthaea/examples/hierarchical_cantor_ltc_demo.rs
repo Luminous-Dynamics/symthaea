@@ -82,10 +82,7 @@ fn main() {
 
     for (level, func) in functions.iter().enumerate().take(config.max_depth + 1) {
         let tau = config.tau_at_level(level);
-        println!(
-            "  │    {}    │  {:>8.2} │  {:<28} │",
-            level, tau, func
-        );
+        println!("  │    {}    │  {:>8.2} │  {:<28} │", level, tau, func);
     }
     println!("  └─────────┴────────────┴──────────────────────────────┘\n");
 

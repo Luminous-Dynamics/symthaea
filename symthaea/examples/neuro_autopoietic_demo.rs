@@ -10,7 +10,7 @@
 
 use std::thread::sleep;
 use std::time::Duration;
-use symthaea::consciousness::neuro_bridge::NeuroAutopoieticBridge;
+use symthaea::consciousness::integration::neuro_bridge::NeuroAutopoieticBridge;
 
 fn main() -> anyhow::Result<()> {
     println!("🧠 INITIALIZING NEURO-AUTOPOIETIC BRIDGE...");
@@ -77,7 +77,7 @@ fn main() -> anyhow::Result<()> {
 fn print_status(
     cycle: usize,
     stress: f32,
-    state: &symthaea::consciousness::neuro_bridge::BridgeState,
+    state: &symthaea::consciousness::integration::neuro_bridge::BridgeState,
     status: &str,
 ) {
     // Visualize Tau with a bar (longer = slower/sluggish)

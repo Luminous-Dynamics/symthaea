@@ -82,19 +82,29 @@ impl TransferMatrix {
 
     /// Get all positive transfer pairs.
     pub fn positive_transfers(&self) -> Vec<&TransferScore> {
-        self.scores.iter().filter(|s| s.direction == TransferDirection::PositiveTransfer).collect()
+        self.scores
+            .iter()
+            .filter(|s| s.direction == TransferDirection::PositiveTransfer)
+            .collect()
     }
 
     /// Get all negative interference pairs.
     pub fn negative_interferences(&self) -> Vec<&TransferScore> {
-        self.scores.iter().filter(|s| s.direction == TransferDirection::NegativeInterference).collect()
+        self.scores
+            .iter()
+            .filter(|s| s.direction == TransferDirection::NegativeInterference)
+            .collect()
     }
 
     /// Format as markdown table.
     pub fn to_markdown(&self) -> String {
         let mut out = String::new();
-        out.push_str("| Benchmark A | Benchmark B | Baseline | Post-A | Transfer Index | Direction |\n");
-        out.push_str("|------------|------------|----------|--------|----------------|----------|\n");
+        out.push_str(
+            "| Benchmark A | Benchmark B | Baseline | Post-A | Transfer Index | Direction |\n",
+        );
+        out.push_str(
+            "|------------|------------|----------|--------|----------------|----------|\n",
+        );
         for s in &self.scores {
             let dir_str = match s.direction {
                 TransferDirection::PositiveTransfer => "+",
@@ -103,8 +113,12 @@ impl TransferMatrix {
             };
             out.push_str(&format!(
                 "| {} | {} | {:.3} | {:.3} | {:.3} | {} |\n",
-                s.benchmark_a, s.benchmark_b, s.baseline, s.performance_after,
-                s.transfer_index, dir_str
+                s.benchmark_a,
+                s.benchmark_b,
+                s.baseline,
+                s.performance_after,
+                s.transfer_index,
+                dir_str
             ));
         }
         out

@@ -7,6 +7,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use crate::wm::{WmConfig, WorkingMemory};
 use symthaea_core::hdc::ContinuousHV;
 
@@ -93,7 +95,6 @@ impl MoodCongruentRecallBenchmark {
         sims.sort_by(|(_, a), (_, b)| b.total_cmp(a));
 
         let recall_count = sims.len().min(5);
-        let _mood_is_positive = mood == "positive";
 
         // For each recalled item, check if it's valence-congruent.
         // Use median-split: items above the median similarity to mood are
@@ -143,6 +144,7 @@ impl PsychBenchmark for MoodCongruentRecallBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut all_rts = Vec::new();
         for mood in ["positive", "negative"] {
@@ -151,6 +153,18 @@ impl PsychBenchmark for MoodCongruentRecallBenchmark {
                 let (c, rt) = self.run_trial(mood, config, trial);
                 congruences.push(c);
                 all_rts.push(rt);
+                if config.trial_trace {
+                    trace.push(TrialOutcome {
+                        trial_idx: trace.len(),
+                        condition: format!("{}_mood", mood),
+                        correct: c > 0.5,
+                        rt_ticks: rt,
+                        similarity: 0.0,
+                        confidence: 0.0,
+                        response_idx: 0,
+                        extra: BTreeMap::new(),
+                    });
+                }
             }
             result.insert(
                 format!("{}_mood::congruence_ratio", mood),
@@ -176,6 +190,7 @@ impl PsychBenchmark for MoodCongruentRecallBenchmark {
 
         result.conditions = 2;
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

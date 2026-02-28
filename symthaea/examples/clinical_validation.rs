@@ -278,7 +278,7 @@ impl EyeMovementDetector {
     fn movement_energy(&self) -> f64 {
         // Normalize variance to [0, 1] range
         // Typical EOG variance ranges from ~100 (quiet) to ~10000 (active)
-        
+
         (self.variance.sqrt() / 100.0).min(1.0)
     }
 
@@ -863,9 +863,9 @@ struct SleepSentinel {
     #[allow(dead_code)]
     delta_power_threshold: f64, // For deep sleep detection
     #[allow(dead_code)]
-    sync_threshold: f64,        // For integration detection
+    sync_threshold: f64, // For integration detection
     #[allow(dead_code)]
-    complexity_threshold: f64,  // For wake detection
+    complexity_threshold: f64, // For wake detection
 
     // Temporal hysteresis: rolling vote buffer
     // Sleep stages don't flicker - we use majority vote over last N epochs

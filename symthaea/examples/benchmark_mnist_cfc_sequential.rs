@@ -383,7 +383,9 @@ fn train_cfc_supervised(
                 network.reset();
 
                 // BPTT through the sequence
-                if let Ok(loss) = network.train_step_bptt(&rows, &targets, &dts, lr) { total_loss += loss }
+                if let Ok(loss) = network.train_step_bptt(&rows, &targets, &dts, lr) {
+                    total_loss += loss
+                }
 
                 // Check classification on this sample
                 network.reset();

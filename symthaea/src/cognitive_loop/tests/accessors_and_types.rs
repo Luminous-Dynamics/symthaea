@@ -152,7 +152,10 @@ fn test_prediction_confidence_initial() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let pc = service.prediction_confidence();
     assert!(pc.is_finite(), "prediction_confidence should be finite");
-    assert!((0.0..=1.0).contains(&pc), "prediction_confidence should be in [0,1]");
+    assert!(
+        (0.0..=1.0).contains(&pc),
+        "prediction_confidence should be in [0,1]"
+    );
 }
 
 #[test]
@@ -211,8 +214,14 @@ fn test_boredom_and_curiosity_initial() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let b = service.boredom();
     let c = service.curiosity();
-    assert!(b.is_finite() && (0.0..=1.0).contains(&b), "boredom in [0,1]");
-    assert!(c.is_finite() && (0.0..=1.0).contains(&c), "curiosity in [0,1]");
+    assert!(
+        b.is_finite() && (0.0..=1.0).contains(&b),
+        "boredom in [0,1]"
+    );
+    assert!(
+        c.is_finite() && (0.0..=1.0).contains(&c),
+        "curiosity in [0,1]"
+    );
 }
 
 #[test]
@@ -232,7 +241,10 @@ fn test_consciousness_snapshot_fields_finite() {
 fn test_consciousness_level_in_range() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let cl = service.consciousness_level();
-    assert!((0.0..=1.0).contains(&cl), "consciousness_level should be in [0.0, 1.0], got {cl}");
+    assert!(
+        (0.0..=1.0).contains(&cl),
+        "consciousness_level should be in [0.0, 1.0], got {cl}"
+    );
 }
 
 #[test]

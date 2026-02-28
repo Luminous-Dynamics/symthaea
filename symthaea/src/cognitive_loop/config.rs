@@ -964,7 +964,11 @@ mod tests {
         let mut c = CognitiveLoopConfig::default();
         c.cfc_config.num_neurons = 0;
         let err = c.validate().unwrap_err();
-        assert!(err.contains("num_neurons"), "error should mention CfC field: {}", err);
+        assert!(
+            err.contains("num_neurons"),
+            "error should mention CfC field: {}",
+            err
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1014,18 +1018,24 @@ mod tests {
     fn profile_standard_subset_of_full() {
         let std = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Standard);
         let full = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Full);
-        assert!(std.count_enabled() < full.count_enabled(),
-                "Standard {} should have fewer modules than Full {}",
-                std.count_enabled(), full.count_enabled());
+        assert!(
+            std.count_enabled() < full.count_enabled(),
+            "Standard {} should have fewer modules than Full {}",
+            std.count_enabled(),
+            full.count_enabled()
+        );
     }
 
     #[test]
     fn profile_full_subset_of_research() {
         let full = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Full);
         let research = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Research);
-        assert!(full.count_enabled() < research.count_enabled(),
-                "Full {} should have fewer modules than Research {}",
-                full.count_enabled(), research.count_enabled());
+        assert!(
+            full.count_enabled() < research.count_enabled(),
+            "Full {} should have fewer modules than Research {}",
+            full.count_enabled(),
+            research.count_enabled()
+        );
     }
 
     #[test]
@@ -1046,7 +1056,11 @@ mod tests {
             ConsciousnessProfile::Research,
         ] {
             let c = CognitiveLoopConfig::from_profile(profile);
-            assert!(c.validate().is_ok(), "{:?} profile should validate", profile);
+            assert!(
+                c.validate().is_ok(),
+                "{:?} profile should validate",
+                profile
+            );
         }
     }
 
@@ -1059,8 +1073,11 @@ mod tests {
         let mut c = CognitiveLoopConfig::default();
         c.enable_temporal_consciousness = true;
         let warnings = c.validate_dependencies();
-        assert!(warnings.iter().any(|w| w.contains("narrative_self")),
-                "should warn about missing narrative_self: {:?}", warnings);
+        assert!(
+            warnings.iter().any(|w| w.contains("narrative_self")),
+            "should warn about missing narrative_self: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -1093,14 +1110,22 @@ mod tests {
     fn dependency_default_no_warnings() {
         let c = CognitiveLoopConfig::default();
         let warnings = c.validate_dependencies();
-        assert!(warnings.is_empty(), "default config should have no dependency warnings: {:?}", warnings);
+        assert!(
+            warnings.is_empty(),
+            "default config should have no dependency warnings: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn dependency_full_profile_no_warnings() {
         let c = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Full);
         let warnings = c.validate_dependencies();
-        assert!(warnings.is_empty(), "Full profile should have no warnings: {:?}", warnings);
+        assert!(
+            warnings.is_empty(),
+            "Full profile should have no warnings: {:?}",
+            warnings
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1128,7 +1153,11 @@ mod tests {
 
     #[test]
     fn training_method_serde_roundtrip() {
-        for method in [TrainingMethod::Bptt, TrainingMethod::Spsa, TrainingMethod::BpttWithSpsaFallback] {
+        for method in [
+            TrainingMethod::Bptt,
+            TrainingMethod::Spsa,
+            TrainingMethod::BpttWithSpsaFallback,
+        ] {
             let json = serde_json::to_string(&method).unwrap();
             let restored: TrainingMethod = serde_json::from_str(&json).unwrap();
             assert_eq!(restored, method);

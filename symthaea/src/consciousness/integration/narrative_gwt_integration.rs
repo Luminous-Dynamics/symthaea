@@ -71,7 +71,9 @@ Certain properties must *never* be violated:
 - Autobiographical continuity is maintained
 */
 
-use crate::consciousness::cross_modal_binding::{CrossModalBindingConfig, CrossModalBinder, Modality};
+use crate::consciousness::cross_modal_binding::{
+    CrossModalBinder, CrossModalBindingConfig, Modality,
+};
 use crate::consciousness::gwt_integration::{
     UnifiedGWTConfig, UnifiedGWTResult, UnifiedGlobalWorkspace,
 };

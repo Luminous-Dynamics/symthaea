@@ -30,9 +30,7 @@ use crate::cognitive_loop::types::CycleResult;
 use crate::voice::cognitive_bridge::CognitiveVoiceBridge;
 use crate::voice::g2p::G2PConverter;
 use crate::voice::vocoder::FormantVocoder;
-use crate::voice::{
-    FormantFrame, LTCPacing, VoiceOutput, VoiceOutputConfig,
-};
+use crate::voice::{FormantFrame, LTCPacing, VoiceOutput, VoiceOutputConfig};
 use symthaea_vocal_tract::types::SourceType;
 
 /// Voice pipeline orchestrator.
@@ -102,9 +100,7 @@ impl VoiceOrchestrator {
 
         // 3. Apply pacing to voice output and synthesize
         self.voice_output.set_pacing(ltc_pacing);
-        self.voice_output
-            .synthesize(text)
-            .unwrap_or_default()
+        self.voice_output.synthesize(text).unwrap_or_default()
     }
 
     /// Full low-level pipeline: CfC state + text -> G2P -> formant vocoder.
@@ -199,22 +195,22 @@ impl Default for VoiceOrchestrator {
 fn phoneme_formants(id: u32) -> (f32, f32, f32, f32, SourceType) {
     match id {
         // Vowels (using approximate formant values)
-        0 => (520.0, 1600.0, 2500.0, 1.0, SourceType::Vowel),  // FACE (A)
-        1 => (700.0, 1200.0, 2500.0, 1.0, SourceType::Vowel),  // PRICE (I)
-        2 => (650.0, 1100.0, 2500.0, 1.0, SourceType::Vowel),  // MOUTH (W)
-        3 => (450.0, 1200.0, 2500.0, 1.0, SourceType::Vowel),  // CHOICE (Y)
-        4 => (500.0, 900.0, 2500.0, 1.0, SourceType::Vowel),   // GOAT (O)
+        0 => (520.0, 1600.0, 2500.0, 1.0, SourceType::Vowel), // FACE (A)
+        1 => (700.0, 1200.0, 2500.0, 1.0, SourceType::Vowel), // PRICE (I)
+        2 => (650.0, 1100.0, 2500.0, 1.0, SourceType::Vowel), // MOUTH (W)
+        3 => (450.0, 1200.0, 2500.0, 1.0, SourceType::Vowel), // CHOICE (Y)
+        4 => (500.0, 900.0, 2500.0, 1.0, SourceType::Vowel),  // GOAT (O)
         // Consonants
-        5 => (200.0, 1000.0, 2200.0, 1.0, SourceType::Stop),     // b
-        6 => (200.0, 1600.0, 2600.0, 0.0, SourceType::Stop),     // d/t
+        5 => (200.0, 1000.0, 2200.0, 1.0, SourceType::Stop), // b
+        6 => (200.0, 1600.0, 2600.0, 0.0, SourceType::Stop), // d/t
         7 => (320.0, 1400.0, 2500.0, 0.0, SourceType::Fricative), // f
         8 => (500.0, 1500.0, 2500.0, 0.0, SourceType::Fricative), // h
-        10 => (300.0, 2200.0, 3000.0, 1.0, SourceType::Liquid),   // j (y)
-        11 => (200.0, 1500.0, 2500.0, 0.0, SourceType::Stop),    // k
-        12 => (350.0, 1100.0, 2900.0, 1.0, SourceType::Liquid),   // l
-        13 => (280.0, 900.0, 2200.0, 1.0, SourceType::Nasal),    // m
-        14 => (280.0, 1700.0, 2500.0, 1.0, SourceType::Nasal),   // n
-        15 => (200.0, 1000.0, 2200.0, 0.0, SourceType::Stop),    // p
+        10 => (300.0, 2200.0, 3000.0, 1.0, SourceType::Liquid), // j (y)
+        11 => (200.0, 1500.0, 2500.0, 0.0, SourceType::Stop), // k
+        12 => (350.0, 1100.0, 2900.0, 1.0, SourceType::Liquid), // l
+        13 => (280.0, 900.0, 2200.0, 1.0, SourceType::Nasal), // m
+        14 => (280.0, 1700.0, 2500.0, 1.0, SourceType::Nasal), // n
+        15 => (200.0, 1000.0, 2200.0, 0.0, SourceType::Stop), // p
         // IPA vowels
         16 => (730.0, 1090.0, 2440.0, 1.0, SourceType::Vowel), // PALM (ɑ)
         17 => (570.0, 840.0, 2410.0, 1.0, SourceType::Vowel),  // THOUGHT (ɔ)
@@ -226,12 +222,12 @@ fn phoneme_formants(id: u32) -> (f32, f32, f32, f32, SourceType) {
         23 => (640.0, 1190.0, 2390.0, 1.0, SourceType::Vowel), // STRUT (ʌ)
         24 => (270.0, 2290.0, 3010.0, 1.0, SourceType::Vowel), // FLEECE (i)
         25 => (300.0, 870.0, 2240.0, 1.0, SourceType::Vowel),  // GOOSE (u)
-        26 => (350.0, 1200.0, 2500.0, 1.0, SourceType::Liquid),  // r (ɹ)
-        27 => (350.0, 1600.0, 2600.0, 1.0, SourceType::Liquid),  // flap (ɾ)
+        26 => (350.0, 1200.0, 2500.0, 1.0, SourceType::Liquid), // r (ɹ)
+        27 => (350.0, 1600.0, 2600.0, 1.0, SourceType::Liquid), // flap (ɾ)
         28 => (400.0, 1800.0, 2500.0, 1.0, SourceType::Vowel), // unstressed KIT (ᵻ)
         29 => (320.0, 1700.0, 2600.0, 0.0, SourceType::Fricative), // z/s
         30 => (320.0, 1400.0, 2500.0, 1.0, SourceType::Fricative), // v
-        31 => (300.0, 700.0, 2500.0, 1.0, SourceType::Liquid),   // w
+        31 => (300.0, 700.0, 2500.0, 1.0, SourceType::Liquid), // w
         // Fricatives and affricates
         32 => (300.0, 1800.0, 2700.0, 0.0, SourceType::Fricative), // SH (ʃ)
         33 => (300.0, 1800.0, 2700.0, 1.0, SourceType::Fricative), // ZH (ʒ)
@@ -242,10 +238,10 @@ fn phoneme_formants(id: u32) -> (f32, f32, f32, f32, SourceType) {
         // More consonants
         38 => (300.0, 1500.0, 2500.0, 0.0, SourceType::Fricative), // TH (θ)
         39 => (300.0, 1500.0, 2500.0, 1.0, SourceType::Fricative), // TH (ð)
-        40 => (280.0, 1700.0, 2500.0, 1.0, SourceType::Nasal),    // NG (ŋ)
-        41 => (200.0, 1500.0, 2500.0, 1.0, SourceType::Stop),     // g
-        42 => (500.0, 1500.0, 2500.0, 1.0, SourceType::Vowel),  // optional schwa (ᵊ)
-        43 => (660.0, 1720.0, 2410.0, 1.0, SourceType::Vowel),  // TRAP (æ)
+        40 => (280.0, 1700.0, 2500.0, 1.0, SourceType::Nasal),     // NG (ŋ)
+        41 => (200.0, 1500.0, 2500.0, 1.0, SourceType::Stop),      // g
+        42 => (500.0, 1500.0, 2500.0, 1.0, SourceType::Vowel),     // optional schwa (ᵊ)
+        43 => (660.0, 1720.0, 2410.0, 1.0, SourceType::Vowel),     // TRAP (æ)
         // Default: neutral vowel
         _ => (500.0, 1500.0, 2500.0, 1.0, SourceType::Vowel),
     }
@@ -334,7 +330,10 @@ mod tests {
             assert!(f1 > 0.0, "phoneme {} f1 should be positive", id);
             assert!(f2 > f1, "phoneme {} f2 should be > f1", id);
             assert!(f3 > f2, "phoneme {} f3 should be > f2", id);
-            assert!((voicing - 1.0).abs() < f32::EPSILON, "vowels should be voiced");
+            assert!(
+                (voicing - 1.0).abs() < f32::EPSILON,
+                "vowels should be voiced"
+            );
             assert_eq!(source_type, SourceType::Vowel);
         }
     }
@@ -352,7 +351,10 @@ mod tests {
         for id in [13, 14, 40] {
             let (_, _, _, voicing, source_type) = phoneme_formants(id);
             assert_eq!(source_type, SourceType::Nasal);
-            assert!((voicing - 1.0).abs() < f32::EPSILON, "nasals should be voiced");
+            assert!(
+                (voicing - 1.0).abs() < f32::EPSILON,
+                "nasals should be voiced"
+            );
         }
     }
 
@@ -392,19 +394,18 @@ mod tests {
         // The id=0 in the Misaki vocab maps to FACE vowel formants (not silence)
         // But in G2P output, id=0 is the silence_id. The phoneme_formants function
         // returns vowel for id=0, so it generates frames for it.
-        assert!(frames.len() >= 8, "should have frames for non-silent phonemes");
+        assert!(
+            frames.len() >= 8,
+            "should have frames for non-silent phonemes"
+        );
     }
 
     #[test]
     fn test_thought_to_speech_produces_audio() {
         let mut orch = VoiceOrchestrator::new();
         let cfc_output = vec![0.3, -0.2, 0.5, 0.1, -0.1, 0.4, -0.3, 0.2];
-        let samples = orch.thought_to_speech(
-            "Hello world",
-            &cfc_output,
-            0.2,
-            vec!["answer".to_string()],
-        );
+        let samples =
+            orch.thought_to_speech("Hello world", &cfc_output, 0.2, vec!["answer".to_string()]);
 
         assert!(!samples.is_empty(), "should produce audio samples");
         assert!(
@@ -433,8 +434,8 @@ mod tests {
         // Fast: low prediction error, positive CfC state
         let fast_samples = orch.thought_to_speech(
             text,
-            &[0.8; 8],  // high activation
-            0.05,        // low error
+            &[0.8; 8], // high activation
+            0.05,      // low error
             vec![],
         );
 
@@ -444,8 +445,8 @@ mod tests {
         // Slow: high prediction error
         let slow_samples = orch2.thought_to_speech(
             text,
-            &[0.1; 8],  // low activation
-            0.9,         // high error -> low confidence -> slower
+            &[0.1; 8], // low activation
+            0.9,       // high error -> low confidence -> slower
             vec![],
         );
 

@@ -5,8 +5,9 @@
 //!
 //! Connects Phase 1A (per-trial traces) with Phase 4 (neuromod profiles).
 
-use serde::{Deserialize, Serialize};
+use super::analysis::normal_cdf;
 use super::live_runner::LoopTrialResult;
+use serde::{Deserialize, Serialize};
 
 /// Pearson correlation result.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,20 +110,14 @@ fn significance(r: f64, n: usize) -> (f64, f64) {
     (t, p.clamp(0.0, 1.0))
 }
 
-/// Standard normal CDF approximation (Abramowitz & Stegun).
-fn normal_cdf(z: f64) -> f64 {
-    let t = 1.0 / (1.0 + 0.2316419 * z.abs());
-    let d = 0.3989422804014327; // 1/sqrt(2*pi)
-    let p = d * (-z * z / 2.0).exp();
-    let poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
-    let cdf = 1.0 - p * poly;
-    if z >= 0.0 { cdf } else { 1.0 - cdf }
-}
-
 /// Incomplete beta function approximation (for p-value with small df).
 fn incomplete_beta(a: f64, b: f64, x: f64) -> f64 {
-    if x <= 0.0 { return 0.0; }
-    if x >= 1.0 { return 1.0; }
+    if x <= 0.0 {
+        return 0.0;
+    }
+    if x >= 1.0 {
+        return 1.0;
+    }
     // Simple numerical integration (trapezoidal, 100 points)
     let n = 100;
     let dx = x / n as f64;
@@ -141,19 +136,16 @@ fn incomplete_beta(a: f64, b: f64, x: f64) -> f64 {
 
 /// Stirling's approximation for ln(Gamma(x)).
 fn gamma_approx(x: f64) -> f64 {
-    if x <= 0.0 { return 1.0; }
-    let ln_gamma = (x - 0.5) * x.ln() - x + 0.5 * (2.0 * std::f64::consts::PI).ln()
-        + 1.0 / (12.0 * x);
+    if x <= 0.0 {
+        return 1.0;
+    }
+    let ln_gamma =
+        (x - 0.5) * x.ln() - x + 0.5 * (2.0 * std::f64::consts::PI).ln() + 1.0 / (12.0 * x);
     ln_gamma.exp()
 }
 
 /// Compute a single correlation between a named neuromod signal and a behavioral metric.
-fn compute_correlation(
-    x_name: &str,
-    y_name: &str,
-    x: &[f64],
-    y: &[f64],
-) -> Correlation {
+fn compute_correlation(x_name: &str, y_name: &str, x: &[f64], y: &[f64]) -> Correlation {
     let (r, n) = pearson_r(x, y);
     let (t_stat, p_value) = significance(r, n);
     Correlation {
@@ -183,7 +175,9 @@ impl NeuromodCorrelationMatrix {
     /// - Prediction error
     pub fn from_trials(trials: &[LoopTrialResult]) -> Self {
         if trials.is_empty() {
-            return Self { correlations: Vec::new() };
+            return Self {
+                correlations: Vec::new(),
+            };
         }
 
         let da: Vec<f64> = trials.iter().map(|t| t.da as f64).collect();
@@ -191,7 +185,10 @@ impl NeuromodCorrelationMatrix {
         let sht: Vec<f64> = trials.iter().map(|t| t.sht as f64).collect();
         let ach: Vec<f64> = trials.iter().map(|t| t.ach as f64).collect();
         let rt: Vec<f64> = trials.iter().map(|t| t.cycle_time_us as f64).collect();
-        let acc: Vec<f64> = trials.iter().map(|t| if t.correct { 1.0 } else { 0.0 }).collect();
+        let acc: Vec<f64> = trials
+            .iter()
+            .map(|t| if t.correct { 1.0 } else { 0.0 })
+            .collect();
         let pe: Vec<f64> = trials.iter().map(|t| t.prediction_error as f64).collect();
 
         let neuromods = [("DA", &da), ("NE", &ne), ("5-HT", &sht), ("ACh", &ach)];
@@ -209,7 +206,10 @@ impl NeuromodCorrelationMatrix {
 
     /// Get significant correlations (p < alpha).
     pub fn significant(&self, alpha: f64) -> Vec<&Correlation> {
-        self.correlations.iter().filter(|c| c.p_value < alpha).collect()
+        self.correlations
+            .iter()
+            .filter(|c| c.p_value < alpha)
+            .collect()
     }
 
     /// Get correlations with at least medium effect size.
@@ -317,7 +317,11 @@ mod tests {
         // So DA-RT should be positively correlated
         let trials = make_trials(50);
         let matrix = NeuromodCorrelationMatrix::from_trials(&trials);
-        let da_rt = matrix.correlations.iter().find(|c| c.x_name == "DA" && c.y_name == "RT").unwrap();
+        let da_rt = matrix
+            .correlations
+            .iter()
+            .find(|c| c.x_name == "DA" && c.y_name == "RT")
+            .unwrap();
         assert!(da_rt.r > 0.0, "DA-RT should be positive: r={}", da_rt.r);
     }
 

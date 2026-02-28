@@ -129,9 +129,7 @@ fn test_multi_turn_dialogue_coherence() {
         }
     }
     // At least one pair should show positive similarity
-    eprintln!(
-        "Multi-turn dialogue: errors={errors:?}, any_positive_sim={any_positive_similarity}"
-    );
+    eprintln!("Multi-turn dialogue: errors={errors:?}, any_positive_sim={any_positive_similarity}");
 }
 
 // ==================================================================================
@@ -168,9 +166,7 @@ fn test_strategy_convergence_over_repeated_inputs() {
     // Prediction error should plateau (variance in last 10 < variance in first 10)
     let first_10_var = variance(&errors[..10]);
     let last_10_var = variance(&errors[40..]);
-    eprintln!(
-        "Strategy convergence: first_10_var={first_10_var:.6}, last_10_var={last_10_var:.6}"
-    );
+    eprintln!("Strategy convergence: first_10_var={first_10_var:.6}, last_10_var={last_10_var:.6}");
     // Allow 3x tolerance since stochastic
     assert!(
         last_10_var <= first_10_var * 3.0 + 0.01,
@@ -275,7 +271,11 @@ fn test_goal_driven_behavior_modulation() {
     }
 
     // Add an exploration goal
-    service.add_goal("explore", "seek novel information and expand knowledge", 0.8);
+    service.add_goal(
+        "explore",
+        "seek novel information and expand knowledge",
+        0.8,
+    );
 
     // Run 10 more cycles with goal active
     let mut post_goal_curiosity = Vec::new();
@@ -411,10 +411,7 @@ fn test_consciousness_trajectory_over_session() {
     eprintln!(
         "Consciousness trajectory: {non_zero}/100 non-zero values, \
          max={:.4}",
-        consciousness_levels
-            .iter()
-            .copied()
-            .fold(0.0_f64, f64::max)
+        consciousness_levels.iter().copied().fold(0.0_f64, f64::max)
     );
     assert!(
         non_zero >= 2,
@@ -490,13 +487,8 @@ fn test_flow_state_achievement() {
 
     // Track whether flow was ever achieved
     let flow_achieved_count = in_flow_flags.iter().filter(|&&f| f).count();
-    let max_flow = flow_intensities
-        .iter()
-        .copied()
-        .fold(0.0_f32, f32::max);
-    eprintln!(
-        "Flow state: achieved={flow_achieved_count}/80, max_intensity={max_flow:.4}"
-    );
+    let max_flow = flow_intensities.iter().copied().fold(0.0_f32, f32::max);
+    eprintln!("Flow state: achieved={flow_achieved_count}/80, max_intensity={max_flow:.4}");
 
     // If flow was achieved, verify learning rate was affected
     if flow_achieved_count > 0 {
@@ -633,9 +625,7 @@ fn test_temporal_coherence_across_session() {
     // Coherence should build over cycles (later values >= earlier on average)
     let first_5_avg: f32 = coherences[..5].iter().sum::<f32>() / 5.0;
     let last_5_avg: f32 = coherences[45..].iter().sum::<f32>() / 5.0;
-    eprintln!(
-        "Temporal coherence: first_5_avg={first_5_avg:.4}, last_5_avg={last_5_avg:.4}"
-    );
+    eprintln!("Temporal coherence: first_5_avg={first_5_avg:.4}, last_5_avg={last_5_avg:.4}");
     // With the smoothed coherence bridge, later values should be at least as high
     // (the bridge uses EMA so it builds up)
     assert!(
@@ -745,14 +735,11 @@ fn test_error_recovery_after_disruption() {
     eprintln!("Stable phase avg error: {stable_avg:.4}");
 
     // Phase 2: inject disruptive novel input
-    let disruption_result = service.cycle(
-        "ALERT: completely unexpected bizarre anomaly detected in sector seven gamma",
-    );
+    let disruption_result = service
+        .cycle("ALERT: completely unexpected bizarre anomaly detected in sector seven gamma");
     let disruption_error = disruption_result.prediction_error;
     let disruption_thermo = disruption_result.metadata.thermodynamic_load;
-    eprintln!(
-        "Disruption: error={disruption_error:.4}, thermo_load={disruption_thermo:.4}"
-    );
+    eprintln!("Disruption: error={disruption_error:.4}, thermo_load={disruption_thermo:.4}");
 
     // Phase 3: recovery — return to stable input
     let mut recovery_errors = Vec::new();

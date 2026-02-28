@@ -21,7 +21,11 @@ fn test_stroop_difficulty_gradient() {
         let result = StroopBenchmark.run(&config);
         // Stroop reports per-condition accuracy; use incongruent as the most difficulty-sensitive
         let acc = result.metrics["incongruent_accuracy"].mean;
-        assert!(acc.is_finite(), "accuracy at difficulty {:.1} not finite", diff);
+        assert!(
+            acc.is_finite(),
+            "accuracy at difficulty {:.1} not finite",
+            diff
+        );
         accuracies.push(acc);
     }
 
@@ -114,10 +118,16 @@ fn test_difficulty_multipliers_monotonic() {
     // Temperature should increase with difficulty (making responses noisier)
     let t_low = model.temperature_multiplier(0.2);
     let t_high = model.temperature_multiplier(0.8);
-    assert!(t_high >= t_low, "temperature should increase with difficulty");
+    assert!(
+        t_high >= t_low,
+        "temperature should increase with difficulty"
+    );
 
     // Interference should increase with difficulty
     let i_low = model.interference_multiplier(0.2);
     let i_high = model.interference_multiplier(0.8);
-    assert!(i_high >= i_low, "interference should increase with difficulty");
+    assert!(
+        i_high >= i_low,
+        "interference should increase with difficulty"
+    );
 }

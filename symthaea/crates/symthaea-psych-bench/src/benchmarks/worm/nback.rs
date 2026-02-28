@@ -103,10 +103,22 @@ impl NBackBenchmark {
                 rt_ticks.push(ticks);
 
                 let correct = match (is_target, responded_match) {
-                    (true, true) => { hits += 1; true }
-                    (true, false) => { misses += 1; false }
-                    (false, true) => { false_alarms += 1; false }
-                    (false, false) => { correct_rejections += 1; true }
+                    (true, true) => {
+                        hits += 1;
+                        true
+                    }
+                    (true, false) => {
+                        misses += 1;
+                        false
+                    }
+                    (false, true) => {
+                        false_alarms += 1;
+                        false
+                    }
+                    (false, false) => {
+                        correct_rejections += 1;
+                        true
+                    }
                 };
 
                 if config.trial_trace {
@@ -170,8 +182,14 @@ impl PsychBenchmark for NBackBenchmark {
             let mut all_rts = Vec::new();
 
             for trial in 0..config.trials_per_condition {
-                let (hr, fa, rts, trial_outcomes) =
-                    self.run_trial_traced(n, sequence_len, config, trial, temp_mult, &mut global_trial_idx);
+                let (hr, fa, rts, trial_outcomes) = self.run_trial_traced(
+                    n,
+                    sequence_len,
+                    config,
+                    trial,
+                    temp_mult,
+                    &mut global_trial_idx,
+                );
                 hit_rates.push(hr);
                 fa_rates.push(fa);
                 accuracies.push(hr - fa);

@@ -18,6 +18,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -88,7 +90,14 @@ fn apply_analogy_transform(
             let color = (param % num_colors as u64) as u8;
             let top = (param / 7 % rows.max(1) as u64) as usize;
             let left = (param / 11 % cols.max(1) as u64) as usize;
-            GridEncoder::fill_region(grid, top, left, top.min(rows - 1), left.min(cols - 1), color)
+            GridEncoder::fill_region(
+                grid,
+                top,
+                left,
+                top.min(rows - 1),
+                left.min(cols - 1),
+                color,
+            )
         }
     }
 }
@@ -347,6 +356,7 @@ impl PsychBenchmark for ArcAnalogyBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut analogy_accs = Vec::new();
         let mut cross_accs = Vec::new();
@@ -359,6 +369,18 @@ impl PsychBenchmark for ArcAnalogyBenchmark {
             cross_accs.push(r.cross_domain_accuracy);
             multi_accs.push(r.multi_example_accuracy);
             rts.push(r.analogy_rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "arc_analogy".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("analogy_accuracy", MetricValue::from_samples(&analogy_accs));
@@ -374,6 +396,7 @@ impl PsychBenchmark for ArcAnalogyBenchmark {
 
         result.conditions = 3; // single, cross-domain, multi-example
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -459,8 +482,7 @@ mod tests {
         let r1 = ArcAnalogyBenchmark.run(&config);
         let r2 = ArcAnalogyBenchmark.run(&config);
         assert_eq!(
-            r1.metrics["analogy_accuracy"].mean,
-            r2.metrics["analogy_accuracy"].mean,
+            r1.metrics["analogy_accuracy"].mean, r2.metrics["analogy_accuracy"].mean,
             "Same seed should produce identical results"
         );
     }

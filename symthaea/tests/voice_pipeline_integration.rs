@@ -35,10 +35,7 @@ fn test_cognitive_bridge_updates_pacing() {
 
     // Rate must be positive and finite
     assert!(pacing.base_pacing.rate > 0.0, "rate should be positive");
-    assert!(
-        pacing.base_pacing.rate.is_finite(),
-        "rate should be finite"
-    );
+    assert!(pacing.base_pacing.rate.is_finite(), "rate should be finite");
 
     // Phrase and sentence pauses must be non-negative and finite
     assert!(
@@ -136,7 +133,11 @@ fn test_ltc_pacing_defaults() {
     );
 
     // Tau should be positive
-    assert!(pacing.tau > 0.0, "tau should be positive: got {}", pacing.tau);
+    assert!(
+        pacing.tau > 0.0,
+        "tau should be positive: got {}",
+        pacing.tau
+    );
 
     // All fields should be finite
     assert!(pacing.rate.is_finite());
@@ -240,11 +241,7 @@ fn test_voice_output_synthesize() {
 
     // All samples should be finite
     for (i, &s) in samples.iter().enumerate() {
-        assert!(
-            s.is_finite(),
-            "sample {} should be finite, got {}",
-            i, s
-        );
+        assert!(s.is_finite(), "sample {} should be finite, got {}", i, s);
     }
 
     // Samples should be in a reasonable range (not exploding)
@@ -844,7 +841,9 @@ fn test_full_pipeline_cognitive_loop_to_synthesis() {
     voice.set_pacing(ltc_pacing.clone());
 
     // Synthesize speech with the consciousness-modulated pacing
-    let samples = voice.synthesize("The system requires immediate attention.").unwrap();
+    let samples = voice
+        .synthesize("The system requires immediate attention.")
+        .unwrap();
 
     // Verify the full pipeline produced valid output
     assert!(!samples.is_empty(), "pipeline should produce audio");
@@ -873,10 +872,9 @@ fn test_adaptive_behavior_synthesis() {
     // Synthesis with slow, contemplative adaptive behavior
     let slow = voice
         .synthesize_with_adaptive_behavior(
-            text,
-            0.7,  // slower speech rate
-            1.5,  // longer pauses
-            0.8,  // slightly reduced emphasis
+            text, 0.7, // slower speech rate
+            1.5, // longer pauses
+            0.8, // slightly reduced emphasis
         )
         .unwrap();
 
@@ -911,13 +909,8 @@ fn test_semantic_prosody_affects_effective_pacing() {
     );
 
     // Pacing without semantics
-    let neutral_pacing = CognitivePacing::from_cognitive_loop(
-        &cfc_output,
-        tau,
-        0.1,
-        HashMap::new(),
-        vec![],
-    );
+    let neutral_pacing =
+        CognitivePacing::from_cognitive_loop(&cfc_output, tau, 0.1, HashMap::new(), vec![]);
 
     let eff_question = question_pacing.effective_pacing();
     let eff_neutral = neutral_pacing.effective_pacing();
@@ -947,9 +940,7 @@ fn test_semantic_prosody_affects_effective_pacing() {
 // Voice Pipeline Orchestrator Tests
 // ==================================================================================
 
-use symthaea::voice::{
-    aggregate_audio_hvs, binary_to_continuous, VoiceOrchestrator,
-};
+use symthaea::voice::{aggregate_audio_hvs, binary_to_continuous, VoiceOrchestrator};
 use symthaea_core::hdc::BinaryHV;
 
 // ── Test: aggregate_audio_hvs produces valid ContinuousHV ─────────────────────
@@ -957,9 +948,7 @@ use symthaea_core::hdc::BinaryHV;
 #[test]
 fn test_aggregate_audio_hvs_produces_valid_continuous() {
     // Create several random BinaryHVs (simulating audio frame projections)
-    let frames: Vec<BinaryHV> = (1..=5)
-        .map(BinaryHV::random)
-        .collect();
+    let frames: Vec<BinaryHV> = (1..=5).map(BinaryHV::random).collect();
 
     let aggregated = aggregate_audio_hvs(&frames);
 
@@ -973,15 +962,12 @@ fn test_aggregate_audio_hvs_produces_valid_continuous() {
 
     // All values should be finite and in [-1, 1]
     for (i, &v) in aggregated.values.iter().enumerate() {
-        assert!(
-            v.is_finite(),
-            "dimension {} should be finite, got {}",
-            i, v
-        );
+        assert!(v.is_finite(), "dimension {} should be finite, got {}", i, v);
         assert!(
             (-1.0..=1.0).contains(&v),
             "dimension {} should be in [-1, 1], got {}",
-            i, v
+            i,
+            v
         );
     }
 
@@ -1008,7 +994,10 @@ fn test_binary_to_continuous_maps_bits() {
     let continuous_zeros = binary_to_continuous(&zeros);
     assert_eq!(continuous_zeros.values.len(), BinaryHV::DIM);
     assert!(
-        continuous_zeros.values.iter().all(|&v| (v - (-1.0)).abs() < f32::EPSILON),
+        continuous_zeros
+            .values
+            .iter()
+            .all(|&v| (v - (-1.0)).abs() < f32::EPSILON),
         "all-zero BinaryHV should map to all -1.0"
     );
 
@@ -1017,15 +1006,26 @@ fn test_binary_to_continuous_maps_bits() {
     let continuous_ones = binary_to_continuous(&ones);
     assert_eq!(continuous_ones.values.len(), BinaryHV::DIM);
     assert!(
-        continuous_ones.values.iter().all(|&v| (v - 1.0).abs() < f32::EPSILON),
+        continuous_ones
+            .values
+            .iter()
+            .all(|&v| (v - 1.0).abs() < f32::EPSILON),
         "all-one BinaryHV should map to all +1.0"
     );
 
     // Random HV should have mix of -1 and +1
     let random = BinaryHV::random(42);
     let continuous_random = binary_to_continuous(&random);
-    let pos_count = continuous_random.values.iter().filter(|&&v| v > 0.0).count();
-    let neg_count = continuous_random.values.iter().filter(|&&v| v < 0.0).count();
+    let pos_count = continuous_random
+        .values
+        .iter()
+        .filter(|&&v| v > 0.0)
+        .count();
+    let neg_count = continuous_random
+        .values
+        .iter()
+        .filter(|&&v| v < 0.0)
+        .count();
     assert!(pos_count > 0, "random HV should have some +1.0 values");
     assert!(neg_count > 0, "random HV should have some -1.0 values");
 
@@ -1050,10 +1050,8 @@ fn test_orchestrator_synthesize_produces_audio() {
     let result = service.cycle("The system is working correctly.");
 
     // Synthesize from the cycle result
-    let samples = orchestrator.synthesize_from_cycle_result(
-        "The system is working correctly.",
-        &result,
-    );
+    let samples =
+        orchestrator.synthesize_from_cycle_result("The system is working correctly.", &result);
 
     // Should produce non-empty audio
     assert!(
@@ -1063,11 +1061,7 @@ fn test_orchestrator_synthesize_produces_audio() {
 
     // All samples should be finite
     for (i, &s) in samples.iter().enumerate() {
-        assert!(
-            s.is_finite(),
-            "sample {} should be finite, got {}",
-            i, s
-        );
+        assert!(s.is_finite(), "sample {} should be finite, got {}", i, s);
     }
 
     // Samples should be in a reasonable range
@@ -1135,11 +1129,7 @@ fn test_full_pipeline_text_to_speech() {
             _ => unreachable!(),
         };
         let samples = orchestrator.thought_to_speech(text, &cfc_output, 0.3, primitives);
-        assert!(
-            !samples.is_empty(),
-            "cycle {} should produce audio",
-            i
-        );
+        assert!(!samples.is_empty(), "cycle {} should produce audio", i);
         assert!(
             samples.iter().all(|s| s.is_finite()),
             "cycle {} samples should be finite",

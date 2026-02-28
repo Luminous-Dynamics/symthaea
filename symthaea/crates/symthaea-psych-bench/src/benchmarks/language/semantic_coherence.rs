@@ -18,6 +18,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Semantic Coherence benchmark.
@@ -77,10 +79,7 @@ impl SemanticCoherenceBenchmark {
             let effective_topic = if is_complex {
                 // Complex: blend two topics → harder to maintain coherence
                 let other_idx = (topic_idx + 1) % n_topics;
-                ContinuousHV::weighted_bundle(
-                    &[topic, &topics[other_idx]],
-                    &[0.6, 0.4],
-                ).normalize()
+                ContinuousHV::weighted_bundle(&[topic, &topics[other_idx]], &[0.6, 0.4]).normalize()
             } else {
                 topic.clone()
             };
@@ -92,10 +91,8 @@ impl SemanticCoherenceBenchmark {
                         dim,
                         seed.wrapping_add(1000 + topic_idx as u64 * 200 + i as u64 * 10),
                     );
-                    ContinuousHV::weighted_bundle(
-                        &[&effective_topic, &rand_hv],
-                        &[0.6, 0.4],
-                    ).normalize()
+                    ContinuousHV::weighted_bundle(&[&effective_topic, &rand_hv], &[0.6, 0.4])
+                        .normalize()
                 })
                 .collect();
 
@@ -105,7 +102,8 @@ impl SemanticCoherenceBenchmark {
                     ContinuousHV::random(
                         dim,
                         seed.wrapping_add(3000 + topic_idx as u64 * 200 + i as u64 * 10),
-                    ).normalize()
+                    )
+                    .normalize()
                 })
                 .collect();
 
@@ -138,10 +136,8 @@ impl SemanticCoherenceBenchmark {
                 let bound = word.bind(&positions[pos]);
                 // Running average context (EMA-like)
                 let alpha = 0.3;
-                context = ContinuousHV::weighted_bundle(
-                    &[&context, &bound],
-                    &[1.0 - alpha, alpha],
-                ).normalize();
+                context = ContinuousHV::weighted_bundle(&[&context, &bound], &[1.0 - alpha, alpha])
+                    .normalize();
 
                 // Measure coherence with topic
                 let coh = effective_topic.similarity(&context).clamp(-1.0, 1.0) as f64;
@@ -155,7 +151,9 @@ impl SemanticCoherenceBenchmark {
             // Decay: coherence of last quarter minus first quarter
             let q1_len = sequence_len / 4;
             let first_q: f64 = token_coherences[..q1_len].iter().sum::<f64>() / q1_len as f64;
-            let last_q: f64 = token_coherences[sequence_len - q1_len..].iter().sum::<f64>()
+            let last_q: f64 = token_coherences[sequence_len - q1_len..]
+                .iter()
+                .sum::<f64>()
                 / q1_len as f64;
             let decay = (first_q - last_q).max(0.0);
             decays.push(decay);
@@ -225,6 +223,7 @@ impl PsychBenchmark for SemanticCoherenceBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut coherences = Vec::new();
         let mut decays = Vec::new();
@@ -239,6 +238,18 @@ impl PsychBenchmark for SemanticCoherenceBenchmark {
             recoveries.push(r.recovery_speed);
             complexities.push(r.complexity_penalty);
             rts.push(r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "coherence".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("coherence_mean", MetricValue::from_samples(&coherences));
@@ -252,6 +263,7 @@ impl PsychBenchmark for SemanticCoherenceBenchmark {
 
         result.conditions = 2; // simple vs complex topics
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

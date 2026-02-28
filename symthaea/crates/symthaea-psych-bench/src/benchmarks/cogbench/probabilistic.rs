@@ -7,6 +7,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
 
@@ -14,10 +16,7 @@ use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation
 pub struct ProbabilisticReasoningBenchmark;
 
 impl ProbabilisticReasoningBenchmark {
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64) {
-        let seed = config.trial_seed("cogbench", "probabilistic", trial_idx);
-        let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
-
+    fn run_trial(&self, config: &BenchmarkConfig, _trial_idx: usize) -> (f64, f64, f64) {
         // Time pressure: base LR 0.15 matches human belief updating rate (Behrens et al., 2007);
         // +0.10/unit increases recency bias under deadline (Busemeyer & Townsend, 1993 DFT).
         let lr = 0.15 + config.time_pressure * 0.10;
@@ -39,10 +38,6 @@ impl ProbabilisticReasoningBenchmark {
         let belief_after_prior = agent.belief.mean.clone();
 
         // Phase 2: Present conflicting evidence
-        rng_state ^= rng_state << 13;
-        rng_state ^= rng_state >> 7;
-        rng_state ^= rng_state << 17;
-        let _rng_state = rng_state;
         let conflicting_value = 0.3;
         // Time pressure: -0.10/unit precision loss models degraded evidence accumulation
         // under speed emphasis (Ratcliff & McKoon, 2008 DDM: drift rate reduction).
@@ -99,6 +94,7 @@ impl PsychBenchmark for ProbabilisticReasoningBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut beta1s = Vec::new();
         let mut beta2s = Vec::new();
@@ -109,6 +105,18 @@ impl PsychBenchmark for ProbabilisticReasoningBenchmark {
             beta1s.push(b1);
             beta2s.push(b2);
             all_rts.push(rt);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "probabilistic".to_string(),
+                    correct: true,
+                    rt_ticks: rt,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("beta1_prior_weight", MetricValue::from_samples(&beta1s));
@@ -120,6 +128,7 @@ impl PsychBenchmark for ProbabilisticReasoningBenchmark {
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

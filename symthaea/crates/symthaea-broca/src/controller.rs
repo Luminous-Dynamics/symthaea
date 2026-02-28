@@ -15,7 +15,9 @@
 
 use rayon::prelude::*;
 use symthaea_core::genesis::GenesisSeed;
-use symthaea_core::hdc::{ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig, HDC_DIMENSION};
+use symthaea_core::hdc::{
+    ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig, HDC_DIMENSION,
+};
 
 /// Configuration for the language controller.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -45,7 +47,7 @@ impl Default for LanguageControllerConfig {
             learning_rate: 0.001,
             vocab_size: 256, // Minimal default, override for real use
             max_seq_len: 512,
-            dt_per_token: 0.02,  // 20ms per token step
+            dt_per_token: 0.02, // 20ms per token step
             logit_temperature: 1.0,
         }
     }
@@ -105,11 +107,8 @@ impl LanguageController {
             })
             .collect();
 
-        let position_base = ContinuousHV::from_genesis(
-            genesis,
-            "broca::position_base",
-            HDC_DIMENSION,
-        );
+        let position_base =
+            ContinuousHV::from_genesis(genesis, "broca::position_base", HDC_DIMENSION);
 
         Self {
             network,
@@ -209,11 +208,20 @@ impl LanguageController {
 
     /// Append a new token embedding (for swarm vocabulary extension).
     /// The embedding is algebraically composed from context if `context_hvs` is provided.
-    pub fn append_token(&mut self, genesis: &GenesisSeed, name: &str, context_hvs: Option<&[&ContinuousHV]>) {
+    pub fn append_token(
+        &mut self,
+        genesis: &GenesisSeed,
+        name: &str,
+        context_hvs: Option<&[&ContinuousHV]>,
+    ) {
         let emb = if let Some(ctx) = context_hvs {
             // Algebraically compose from surrounding semantics
             if ctx.is_empty() {
-                ContinuousHV::from_genesis(genesis, &format!("broca::token_emb::{name}"), HDC_DIMENSION)
+                ContinuousHV::from_genesis(
+                    genesis,
+                    &format!("broca::token_emb::{name}"),
+                    HDC_DIMENSION,
+                )
             } else {
                 ContinuousHV::bundle(ctx)
             }
@@ -317,9 +325,15 @@ mod tests {
 
         assert_eq!(logits.len(), 32);
         // Logits should be finite
-        assert!(logits.iter().all(|l| l.is_finite()), "all logits should be finite");
+        assert!(
+            logits.iter().all(|l| l.is_finite()),
+            "all logits should be finite"
+        );
         // At least some logits should be non-zero (network produces non-trivial output)
-        assert!(logits.iter().any(|l| l.abs() > 1e-10), "should have non-zero logits");
+        assert!(
+            logits.iter().any(|l| l.abs() > 1e-10),
+            "should have non-zero logits"
+        );
     }
 
     #[test]
@@ -355,8 +369,15 @@ mod tests {
         ctrl.reset();
         let logits_b = ctrl.forward_step(&thought_hv, 10, 0);
 
-        let diff: f32 = logits_a.iter().zip(logits_b.iter()).map(|(a, b)| (a - b).abs()).sum();
-        assert!(diff > 0.01, "Different prev tokens should yield different logits: diff={diff}");
+        let diff: f32 = logits_a
+            .iter()
+            .zip(logits_b.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        assert!(
+            diff > 0.01,
+            "Different prev tokens should yield different logits: diff={diff}"
+        );
     }
 
     #[test]
@@ -371,8 +392,15 @@ mod tests {
         ctrl.reset();
         let logits_b = ctrl.forward_step(&thought_hv, 5, 3);
 
-        let diff: f32 = logits_a.iter().zip(logits_b.iter()).map(|(a, b)| (a - b).abs()).sum();
-        assert!(diff > 0.01, "Different positions should yield different logits: diff={diff}");
+        let diff: f32 = logits_a
+            .iter()
+            .zip(logits_b.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        assert!(
+            diff > 0.01,
+            "Different positions should yield different logits: diff={diff}"
+        );
     }
 
     #[test]

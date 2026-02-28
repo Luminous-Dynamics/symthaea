@@ -4,7 +4,7 @@
 //! HDC primitives ("Thinking") with concrete `ActionIR` ("Doing").
 
 use super::{ActionError, ActionIR};
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -63,10 +63,9 @@ impl ActionRegistry {
         primitive: &str,
         context: &ActionContext,
     ) -> Result<ActionIR, ActionError> {
-        let binding = self
-            .bindings
-            .get(primitive)
-            .ok_or_else(|| ActionError::ValidationFailed(format!("Unknown primitive: {}", primitive)))?;
+        let binding = self.bindings.get(primitive).ok_or_else(|| {
+            ActionError::ValidationFailed(format!("Unknown primitive: {}", primitive))
+        })?;
 
         (binding.generator)(context)
     }
@@ -75,10 +74,9 @@ impl ActionRegistry {
     pub fn standard() -> Self {
         Self::new()
             .register("PARSE", |ctx| {
-                let path = ctx
-                    .target_path
-                    .as_ref()
-                    .ok_or_else(|| ActionError::ValidationFailed("PARSE requires target_path".into()))?;
+                let path = ctx.target_path.as_ref().ok_or_else(|| {
+                    ActionError::ValidationFailed("PARSE requires target_path".into())
+                })?;
 
                 Ok(ActionIR::RunCommand {
                     program: "tree-sitter".into(),
@@ -88,10 +86,9 @@ impl ActionRegistry {
                 })
             })
             .register("READ", |ctx| {
-                let path = ctx
-                    .target_path
-                    .as_ref()
-                    .ok_or_else(|| ActionError::ValidationFailed("READ requires target_path".into()))?;
+                let path = ctx.target_path.as_ref().ok_or_else(|| {
+                    ActionError::ValidationFailed("READ requires target_path".into())
+                })?;
 
                 Ok(ActionIR::ReadFile {
                     path: path.clone(),
@@ -99,14 +96,12 @@ impl ActionRegistry {
                 })
             })
             .register("WRITE", |ctx| {
-                let path = ctx
-                    .target_path
-                    .as_ref()
-                    .ok_or_else(|| ActionError::ValidationFailed("WRITE requires target_path".into()))?;
-                let content = ctx
-                    .content
-                    .as_ref()
-                    .ok_or_else(|| ActionError::ValidationFailed("WRITE requires content".into()))?;
+                let path = ctx.target_path.as_ref().ok_or_else(|| {
+                    ActionError::ValidationFailed("WRITE requires target_path".into())
+                })?;
+                let content = ctx.content.as_ref().ok_or_else(|| {
+                    ActionError::ValidationFailed("WRITE requires content".into())
+                })?;
 
                 Ok(ActionIR::WriteFile {
                     path: path.clone(),
@@ -115,14 +110,20 @@ impl ActionRegistry {
                 })
             })
             .register("LIST", |ctx| {
-                let path = ctx.target_path.clone().unwrap_or_else(|| PathBuf::from("."));
+                let path = ctx
+                    .target_path
+                    .clone()
+                    .unwrap_or_else(|| PathBuf::from("."));
                 Ok(ActionIR::ListDirectory {
                     path,
                     recursive: false,
                 })
             })
             .register("NIX_BUILD", |ctx| {
-                let _path = ctx.target_path.clone().unwrap_or_else(|| PathBuf::from("."));
+                let _path = ctx
+                    .target_path
+                    .clone()
+                    .unwrap_or_else(|| PathBuf::from("."));
                 Ok(ActionIR::RunCommand {
                     program: "nix".into(),
                     args: vec!["--version".into()],
@@ -131,7 +132,10 @@ impl ActionRegistry {
                 })
             })
             .register("CARGO_TEST", |ctx| {
-                let path = ctx.target_path.clone().unwrap_or_else(|| PathBuf::from("."));
+                let path = ctx
+                    .target_path
+                    .clone()
+                    .unwrap_or_else(|| PathBuf::from("."));
                 Ok(ActionIR::RunCommand {
                     program: "cargo".into(),
                     args: vec!["test".into()],
@@ -140,7 +144,10 @@ impl ActionRegistry {
                 })
             })
             .register("CARGO_CHECK", |ctx| {
-                let path = ctx.target_path.clone().unwrap_or_else(|| PathBuf::from("."));
+                let path = ctx
+                    .target_path
+                    .clone()
+                    .unwrap_or_else(|| PathBuf::from("."));
                 Ok(ActionIR::RunCommand {
                     program: "cargo".into(),
                     args: vec!["check".into()],
@@ -157,7 +164,10 @@ impl ActionRegistry {
                 })
             })
             .register("GIT_COMMIT", |ctx| {
-                let msg = ctx.content.clone().unwrap_or_else(|| "Conscious update".into());
+                let msg = ctx
+                    .content
+                    .clone()
+                    .unwrap_or_else(|| "Conscious update".into());
                 Ok(ActionIR::RunCommand {
                     program: "git".into(),
                     args: vec!["commit".into(), "-am".into(), msg],
@@ -166,7 +176,9 @@ impl ActionRegistry {
                 })
             })
             .register("WEB_SEARCH", |ctx| {
-                let query = ctx.content.clone().ok_or_else(|| ActionError::ValidationFailed("WEB_SEARCH requires content".into()))?;
+                let query = ctx.content.clone().ok_or_else(|| {
+                    ActionError::ValidationFailed("WEB_SEARCH requires content".into())
+                })?;
                 Ok(ActionIR::RunCommand {
                     program: "nix".into(),
                     args: vec!["search".into(), "nixpkgs".into(), query],
@@ -181,20 +193,40 @@ impl ActionRegistry {
                 } else {
                     vec!["voltage".into(), "current".into()]
                 };
-                Ok(ActionIR::ReadSensor { sensor_id, channels })
+                Ok(ActionIR::ReadSensor {
+                    sensor_id,
+                    channels,
+                })
             })
             .register("WRITE_SERVO", |ctx| {
-                let id = ctx.args.first().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
-                let val = ctx.args.get(1).and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.0);
-                Ok(ActionIR::WriteServo { servo_id: id, value: val })
+                let id = ctx
+                    .args
+                    .first()
+                    .and_then(|s| s.parse::<u32>().ok())
+                    .unwrap_or(0);
+                let val = ctx
+                    .args
+                    .get(1)
+                    .and_then(|s| s.parse::<f32>().ok())
+                    .unwrap_or(0.0);
+                Ok(ActionIR::WriteServo {
+                    servo_id: id,
+                    value: val,
+                })
             })
             .register("SWARM_GOSSIP", |ctx| {
-                let topic = ctx.args.first().cloned().unwrap_or_else(|| "optimization".into());
+                let topic = ctx
+                    .args
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "optimization".into());
                 let payload = ctx.content.clone().unwrap_or_default().into_bytes();
                 Ok(ActionIR::SwarmGossip { topic, payload })
             })
             .register("WASM_VERIFY", |ctx| {
-                let path = ctx.target_path.clone().ok_or_else(|| ActionError::ValidationFailed("WASM_VERIFY requires target_path".into()))?;
+                let path = ctx.target_path.clone().ok_or_else(|| {
+                    ActionError::ValidationFailed("WASM_VERIFY requires target_path".into())
+                })?;
                 let func = ctx.args.first().cloned().unwrap_or_else(|| "verify".into());
                 Ok(ActionIR::WasmSandbox {
                     module_path: path,

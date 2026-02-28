@@ -9,11 +9,11 @@
 //! - Reconsolidation during episodic replay
 //! - Working memory eviction and graduation routing
 
+use symthaea::memory::memory_coordinator::MemorySource;
 use symthaea::memory::{
     CoordinatorConfig, Episode, EpisodicMemory, EpisodicReplayConfig, GraduationEvent,
     MemoryCoordinator, SemanticMemory,
 };
-use symthaea::memory::memory_coordinator::MemorySource;
 use symthaea_core::hdc::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════

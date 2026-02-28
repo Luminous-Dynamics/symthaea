@@ -1,6 +1,6 @@
 //! Curriculum Extender - The Neural Bridge 2.0
 //!
-//! This module automates the pipeline: 
+//! This module automates the pipeline:
 //! Web Research ──▶ LLM Translation ──▶ Dynamic Curriculum Extension.
 //!
 //! It enables Symthaea to learn about new domains autonomously by
@@ -19,11 +19,11 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{info, warn};
 
+use crate::databases::{ConsciousnessDatabase, MemoryRecord, MemoryType};
+use crate::language::llm_organ::{LLMOrgan, LLMQuery, QueryType};
 use crate::school::curriculum::{Curriculum, CurriculumSchema, ObjectiveSchema};
 use crate::school::objective::{Difficulty, Domain, LearningObjective, ObjectiveBuilder};
-use crate::databases::{ConsciousnessDatabase, MemoryRecord, MemoryType};
 use crate::web_research::WebResearcher;
-use crate::language::llm_organ::{LLMOrgan, LLMQuery, QueryType};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
 use symthaea_dream::CausalLink;
@@ -124,7 +124,10 @@ impl ResearchBudgetConfig {
     fn from_env() -> Self {
         Self {
             total_budget: Duration::from_secs(env_secs("SYMTHAEA_RESEARCH_BUDGET_SECS", 0)),
-            yield_timeout: Duration::from_secs(env_secs("SYMTHAEA_RESEARCH_YIELD_TIMEOUT_SECS", 60)),
+            yield_timeout: Duration::from_secs(env_secs(
+                "SYMTHAEA_RESEARCH_YIELD_TIMEOUT_SECS",
+                60,
+            )),
         }
     }
 
@@ -168,13 +171,11 @@ fn env_f32(name: &str, default: f32) -> f32 {
 }
 
 fn similarity_threshold() -> f32 {
-    env_f32("SYMTHAEA_RESEARCH_SIMILARITY_THRESHOLD", 0.85)
-        .clamp(0.0, 1.0)
+    env_f32("SYMTHAEA_RESEARCH_SIMILARITY_THRESHOLD", 0.85).clamp(0.0, 1.0)
 }
 
 fn global_similarity_threshold() -> f32 {
-    env_f32("SYMTHAEA_GLOBAL_SIMILARITY_THRESHOLD", 0.9)
-        .clamp(0.0, 1.0)
+    env_f32("SYMTHAEA_GLOBAL_SIMILARITY_THRESHOLD", 0.9).clamp(0.0, 1.0)
 }
 
 fn min_objectives_per_5k() -> usize {
@@ -266,7 +267,10 @@ impl CurriculumExtender {
             );
             if let Ok(result) = self.researcher.research_and_verify(query).await {
                 if !result.content.is_empty() {
-                    aggregate_content.push_str(&format!("\n\n--- Source: {} ---\n{}", result.url, result.content));
+                    aggregate_content.push_str(&format!(
+                        "\n\n--- Source: {} ---\n{}",
+                        result.url, result.content
+                    ));
                 }
             }
 
@@ -297,9 +301,7 @@ impl CurriculumExtender {
             expansions += 1;
             info!(
                 "   🔎 Expanding research depth ({} of {}, target {} chars)...",
-                expansions,
-                depth.max_expansions,
-                depth.target_chars
+                expansions, depth.max_expansions, depth.target_chars
             );
 
             let expand_prompt = format!(
@@ -369,12 +371,15 @@ impl CurriculumExtender {
                 }
             }
         }
-        
+
         if aggregate_content.is_empty() {
             anyhow::bail!("No substantial content found for topic: {}", topic);
         }
 
-        info!("   ✅ Research complete. Collected {} chars of documentation.", aggregate_content.len());
+        info!(
+            "   ✅ Research complete. Collected {} chars of documentation.",
+            aggregate_content.len()
+        );
 
         let min_per_5k = min_objectives_per_5k();
         let required_min = required_objectives(aggregate_content.len(), min_per_5k);
@@ -417,7 +422,9 @@ impl CurriculumExtender {
             }
 
             let mut placeholder_detected = candidate_json.contains("\"kebab-case-id\"");
-            if let Some(normalized) = normalize_curriculum_json(&candidate_json, required_min, topic) {
+            if let Some(normalized) =
+                normalize_curriculum_json(&candidate_json, required_min, topic)
+            {
                 if normalized != candidate_json {
                     candidate_json = normalized;
                     placeholder_detected = candidate_json.contains("\"kebab-case-id\"");
@@ -428,18 +435,11 @@ impl CurriculumExtender {
             if placeholder_detected {
                 let err_msg = "Placeholder objective id detected (kebab-case-id)".to_string();
                 last_error = Some(err_msg.clone());
-                warn!(
-                    "   ❌ {}. Forcing ID regeneration...",
-                    err_msg
-                );
+                warn!("   ❌ {}. Forcing ID regeneration...", err_msg);
             } else {
                 if let Ok(schema) = serde_json::from_str::<CurriculumSchema>(&candidate_json) {
-                    let redundant = detect_redundant_pairs(
-                        &schema,
-                        dimension,
-                        similarity_threshold(),
-                        3,
-                    );
+                    let redundant =
+                        detect_redundant_pairs(&schema, dimension, similarity_threshold(), 3);
                     if !redundant.is_empty() {
                         let err_msg = format!(
                             "Semantic collapse detected: {} redundant pairs above {:.2}",
@@ -496,7 +496,9 @@ impl CurriculumExtender {
                                     "   🧠 Global HDC sweep suppressed all objectives; skipping ingestion."
                                 );
                                 if !report.causal_links.is_empty() {
-                                    if let Err(e) = db.store_causal_links(&report.causal_links).await {
+                                    if let Err(e) =
+                                        db.store_causal_links(&report.causal_links).await
+                                    {
                                         warn!("   ⚠️ Failed to persist causal links: {}", e);
                                     } else {
                                         info!(
@@ -535,44 +537,119 @@ impl CurriculumExtender {
                             }
                         }
                         Err(e) => {
-                        warn!("   ⚠️ Global HDC sweep failed: {}", e);
+                            warn!("   ⚠️ Global HDC sweep failed: {}", e);
+                        }
                     }
-                }
                 }
 
                 info!("   📥 Ingesting new objectives into knowledge graph...");
                 let mut candidate_curriculum = target_curriculum.clone();
                 match candidate_curriculum.extend_from_json(&candidate_json, dimension) {
-                Ok(_) => {
-                    let total_objectives = candidate_curriculum.objectives.len();
-                    let objectives_added = total_objectives.saturating_sub(before_count);
-                    let json_objective_count = serde_json::from_str::<CurriculumSchema>(&candidate_json)
-                        .map(|schema| schema.objectives.len())
-                        .unwrap_or(0);
-                    if objectives_added < required_min && json_objective_count < required_min {
-                        let err_msg = format!(
-                            "Low dimensionality: only {} objectives for {} chars (min {})",
-                            objectives_added,
-                            aggregate_content.len(),
-                            required_min
-                        );
-                        last_error = Some(err_msg.clone());
-                        warn!(
-                            "   ❌ {}. Expanding curriculum synthesis...",
-                            err_msg
-                        );
+                    Ok(_) => {
+                        let total_objectives = candidate_curriculum.objectives.len();
+                        let objectives_added = total_objectives.saturating_sub(before_count);
+                        let json_objective_count =
+                            serde_json::from_str::<CurriculumSchema>(&candidate_json)
+                                .map(|schema| schema.objectives.len())
+                                .unwrap_or(0);
+                        if objectives_added < required_min && json_objective_count < required_min {
+                            let err_msg = format!(
+                                "Low dimensionality: only {} objectives for {} chars (min {})",
+                                objectives_added,
+                                aggregate_content.len(),
+                                required_min
+                            );
+                            last_error = Some(err_msg.clone());
+                            warn!("   ❌ {}. Expanding curriculum synthesis...", err_msg);
 
-                        if dimensionality_retries >= MAX_DIMENSIONALITY_RETRIES {
-                            break;
-                        }
-                        dimensionality_retries += 1;
+                            if dimensionality_retries >= MAX_DIMENSIONALITY_RETRIES {
+                                break;
+                            }
+                            dimensionality_retries += 1;
 
-                        let repair_prompt = format!(
+                            let repair_prompt = format!(
                             "The previous JSON was too compressed.\n{}\n\nExpand the curriculum to at least {} objectives.\nEnsure coverage across: Core Theory, Algorithmic Structure, Implementation Constraints, Thermodynamic Impact.\nReturn ONLY valid JSON.\n\nJSON:\n{}",
                             err_msg,
                             required_min,
                             candidate_json
                         );
+
+                            let repair_query = LLMQuery {
+                                query_type: QueryType::Code,
+                                content: repair_prompt,
+                                context: Vec::new(),
+                                system_prompt: Some(CURRICULUM_REPAIR_PROMPT.to_string()),
+                                params: None,
+                            };
+
+                            let repaired = self.llm.query_async(repair_query).await;
+                            candidate_json = sanitize_json(&repaired.text);
+                            attempts += 1;
+                            continue;
+                        }
+
+                        if objectives_added < required_min && json_objective_count >= required_min {
+                            warn!(
+                            "   ⚠️ Objective count met in JSON ({}), but only {} were new (possible duplicates). Accepting.",
+                            json_objective_count,
+                            objectives_added
+                        );
+                        }
+
+                        info!("   ✨ Successfully extended curriculum with new objectives.");
+                        let added_objectives: Vec<LearningObjective> =
+                            if total_objectives >= before_count {
+                                candidate_curriculum.objectives[before_count..].to_vec()
+                            } else {
+                                Vec::new()
+                            };
+                        let (confidence, warnings) = confidence_check(&added_objectives);
+                        if warnings.is_empty() {
+                            info!(
+                                "   ✅ Curriculum confidence check passed (confidence={:.2})",
+                                confidence
+                            );
+                        } else {
+                            warn!(
+                                "   ⚠️ Curriculum confidence check warnings (confidence={:.2}): {}",
+                                confidence,
+                                warnings.join(" | ")
+                            );
+                        }
+
+                        *target_curriculum = candidate_curriculum;
+                        if let Some(db) = database.as_ref() {
+                            if let Err(e) =
+                                store_objectives_as_memories(db.as_ref(), &added_objectives).await
+                            {
+                                warn!("   ⚠️ Failed to persist objective memories: {}", e);
+                            }
+                        }
+                        return Ok(ResearchSummary {
+                            objectives_added,
+                            total_objectives,
+                            confidence,
+                            warnings,
+                        });
+                    }
+                    Err(e) => {
+                        let err_msg = e.to_string();
+                        last_error = Some(err_msg.clone());
+                        warn!(
+                            "   ❌ Ingestion failed: {}. LLM output might be malformed.",
+                            err_msg
+                        );
+
+                        if attempts + 1 >= total_attempts {
+                            break;
+                        }
+
+                        let repair_prompt = format!(
+                        "The previous JSON failed with error:\n{}\n\nFix it for topic '{}' and return ONLY valid JSON.\n\nJSON:\n{}",
+                        last_error.as_deref().unwrap_or("unknown error"),
+                        topic,
+                        candidate_json
+                    );
 
                         let repair_query = LLMQuery {
                             query_type: QueryType::Code,
@@ -584,81 +661,7 @@ impl CurriculumExtender {
 
                         let repaired = self.llm.query_async(repair_query).await;
                         candidate_json = sanitize_json(&repaired.text);
-                        attempts += 1;
-                        continue;
                     }
-
-                    if objectives_added < required_min && json_objective_count >= required_min {
-                        warn!(
-                            "   ⚠️ Objective count met in JSON ({}), but only {} were new (possible duplicates). Accepting.",
-                            json_objective_count,
-                            objectives_added
-                        );
-                    }
-
-                    info!("   ✨ Successfully extended curriculum with new objectives.");
-                    let added_objectives: Vec<LearningObjective> = if total_objectives >= before_count {
-                        candidate_curriculum.objectives[before_count..].to_vec()
-                    } else {
-                        Vec::new()
-                    };
-                    let (confidence, warnings) = confidence_check(&added_objectives);
-                    if warnings.is_empty() {
-                        info!(
-                            "   ✅ Curriculum confidence check passed (confidence={:.2})",
-                            confidence
-                        );
-                    } else {
-                        warn!(
-                            "   ⚠️ Curriculum confidence check warnings (confidence={:.2}): {}",
-                            confidence,
-                            warnings.join(" | ")
-                        );
-                    }
-
-                    *target_curriculum = candidate_curriculum;
-                    if let Some(db) = database.as_ref() {
-                        if let Err(e) = store_objectives_as_memories(db.as_ref(), &added_objectives).await {
-                            warn!("   ⚠️ Failed to persist objective memories: {}", e);
-                        }
-                    }
-                    return Ok(ResearchSummary {
-                        objectives_added,
-                        total_objectives,
-                        confidence,
-                        warnings,
-                    });
-                }
-                Err(e) => {
-                    let err_msg = e.to_string();
-                    last_error = Some(err_msg.clone());
-                    warn!(
-                        "   ❌ Ingestion failed: {}. LLM output might be malformed.",
-                        err_msg
-                    );
-
-                    if attempts + 1 >= total_attempts {
-                        break;
-                    }
-
-                    let repair_prompt = format!(
-                        "The previous JSON failed with error:\n{}\n\nFix it for topic '{}' and return ONLY valid JSON.\n\nJSON:\n{}",
-                        last_error.as_deref().unwrap_or("unknown error"),
-                        topic,
-                        candidate_json
-                    );
-
-                    let repair_query = LLMQuery {
-                        query_type: QueryType::Code,
-                        content: repair_prompt,
-                        context: Vec::new(),
-                        system_prompt: Some(CURRICULUM_REPAIR_PROMPT.to_string()),
-                        params: None,
-                    };
-
-                    let repaired = self.llm.query_async(repair_query).await;
-                    candidate_json = sanitize_json(&repaired.text);
-                }
                 }
             }
 
@@ -744,7 +747,9 @@ fn normalize_curriculum_json(raw: &str, required_min: usize, topic: &str) -> Opt
     if !changed {
         return Some(raw.to_string());
     }
-    serde_json::to_string_pretty(&schema).ok().or_else(|| Some(raw.to_string()))
+    serde_json::to_string_pretty(&schema)
+        .ok()
+        .or_else(|| Some(raw.to_string()))
 }
 
 fn normalize_schema_ids(schema: &mut CurriculumSchema) -> bool {
@@ -948,7 +953,12 @@ fn detect_redundant_pairs(
                 .with_domain(Domain::from(obj.domain.as_str()))
                 .with_difficulty(Difficulty::from_f32(obj.difficulty))
                 .with_dimension(dimension)
-                .with_prerequisites(&obj.prerequisites.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+                .with_prerequisites(
+                    &obj.prerequisites
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>(),
+                )
                 .with_tags(&obj.tags.iter().map(|s| s.as_str()).collect::<Vec<_>>())
                 .with_estimated_minutes(obj.estimated_minutes)
                 .build()
@@ -971,7 +981,11 @@ fn detect_redundant_pairs(
         }
     }
 
-    pairs.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+    pairs.sort_by(|a, b| {
+        b.similarity
+            .partial_cmp(&a.similarity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     pairs.truncate(max_pairs);
     pairs
 }
@@ -999,7 +1013,12 @@ async fn global_hdc_sweep(
             .with_domain(Domain::from(obj.domain.as_str()))
             .with_difficulty(Difficulty::from_f32(obj.difficulty))
             .with_dimension(dimension)
-            .with_prerequisites(&obj.prerequisites.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+            .with_prerequisites(
+                &obj.prerequisites
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>(),
+            )
             .with_tags(&obj.tags.iter().map(|s| s.as_str()).collect::<Vec<_>>())
             .with_estimated_minutes(obj.estimated_minutes)
             .build();

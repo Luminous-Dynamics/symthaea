@@ -2,11 +2,11 @@
 
 use crate::api::models::*;
 use std::collections::HashMap;
-use tokio::sync::{RwLock, Semaphore};
 use symthaea_core::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
     spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
 };
+use tokio::sync::{RwLock, Semaphore};
 use uuid::Uuid;
 
 /// Application state shared across all handlers
@@ -166,13 +166,7 @@ impl AppState {
 
     /// Get leaderboard entries (sorted by Φ)
     pub async fn get_leaderboard(&self, limit: usize, offset: usize) -> Vec<LeaderboardEntry> {
-        let results: Vec<EvaluationResult> = self
-            .results
-            .read()
-            .await
-            .values()
-            .cloned()
-            .collect();
+        let results: Vec<EvaluationResult> = self.results.read().await.values().cloned().collect();
         let mut entries: Vec<_> = results
             .iter()
             .filter(|r| r.status == SubmissionStatus::Completed)

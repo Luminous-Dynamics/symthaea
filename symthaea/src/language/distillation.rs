@@ -25,10 +25,7 @@ impl DistillationCollector {
     ///
     /// Opens the file in append mode so multiple sessions can accumulate data.
     pub fn new(path: &str) -> std::io::Result<Self> {
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)?;
+        let file = OpenOptions::new().create(true).append(true).open(path)?;
         Ok(Self {
             file: Mutex::new(BufWriter::new(file)),
             count: AtomicUsize::new(0),

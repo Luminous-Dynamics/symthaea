@@ -28,6 +28,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Dual-Task benchmark: choice RT under concurrent memory load.
@@ -110,8 +112,7 @@ impl DualTaskBenchmark {
         let mut rt_ticks = Vec::with_capacity(trials);
         let mut recall_scores = Vec::with_capacity(trials);
 
-        let mut rng = config.trial_seed("executive", condition.name(), 0)
-            ^ 0x9E3779B97F4A7C15;
+        let mut rng = config.trial_seed("executive", condition.name(), 0) ^ 0x9E3779B97F4A7C15;
 
         let xor_shift = |s: &mut u64| {
             *s ^= *s << 13;
@@ -130,16 +131,14 @@ impl DualTaskBenchmark {
 
             // Encode digit load into WM (occupies slots, reducing capacity).
             let load_hv: Option<ContinuousHV> = if !load_digits.is_empty() {
-                let sum: ContinuousHV = load_digits.iter().fold(
-                    ContinuousHV::zero(dim),
-                    |acc, &d| {
+                let sum: ContinuousHV =
+                    load_digits.iter().fold(ContinuousHV::zero(dim), |acc, &d| {
                         let mut combined = acc.clone();
                         for (a, b) in combined.values.iter_mut().zip(digit_hvs[d].values.iter()) {
                             *a += b;
                         }
                         combined
-                    },
-                );
+                    });
                 Some(sum)
             } else {
                 None
@@ -174,7 +173,10 @@ impl DualTaskBenchmark {
             }
 
             // Softmax response selection.
-            let max_act = activations.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let max_act = activations
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max);
             let exp_acts: Vec<f64> = activations.iter().map(|a| (a - max_act).exp()).collect();
             let sum_exp: f64 = exp_acts.iter().sum();
             let probs: Vec<f64> = exp_acts.iter().map(|e| e / sum_exp).collect();
@@ -207,9 +209,6 @@ impl DualTaskBenchmark {
             // Recall degrades only when digit count approaches WM capacity.
             // Cowan (2001): K ≈ 4 items for most adults; well within capacity = near-perfect.
             if !load_digits.is_empty() {
-                xor_shift(&mut rng);
-                let _probe_idx = (rng as usize) % digit_count;
-
                 let recall_prob = if digit_count <= wm_capacity {
                     // Digits fit within capacity: high recall with slight serial position cost.
                     0.95 - 0.05 * (digit_count as f64 / wm_capacity as f64)
@@ -246,8 +245,13 @@ impl PsychBenchmark for DualTaskBenchmark {
         let trials = config.trials_per_condition.max(10);
 
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
-        for &condition in &[LoadCondition::Single, LoadCondition::Low, LoadCondition::High] {
+        for &condition in &[
+            LoadCondition::Single,
+            LoadCondition::Low,
+            LoadCondition::High,
+        ] {
             let (accuracies, rts, recalls) = self.run_condition(config, condition, trials);
 
             let prefix = condition.name();
@@ -265,13 +269,29 @@ impl PsychBenchmark for DualTaskBenchmark {
                     MetricValue::from_samples(&recalls),
                 );
             }
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "dual_task".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         // Compute dual-task cost: single - high-load accuracy.
-        let single_acc = result.metrics.get("single_accuracy")
+        let single_acc = result
+            .metrics
+            .get("single_accuracy")
             .map(|m| m.mean)
             .unwrap_or(0.95);
-        let high_acc = result.metrics.get("dual_high_accuracy")
+        let high_acc = result
+            .metrics
+            .get("dual_high_accuracy")
             .map(|m| m.mean)
             .unwrap_or(0.85);
         result.insert(
@@ -280,10 +300,14 @@ impl PsychBenchmark for DualTaskBenchmark {
         );
 
         // Overall digit recall accuracy.
-        let low_recall = result.metrics.get("dual_low_recall")
+        let low_recall = result
+            .metrics
+            .get("dual_low_recall")
             .map(|m| m.mean)
             .unwrap_or(0.9);
-        let high_recall = result.metrics.get("dual_high_recall")
+        let high_recall = result
+            .metrics
+            .get("dual_high_recall")
             .map(|m| m.mean)
             .unwrap_or(0.7);
         result.insert(
@@ -293,6 +317,7 @@ impl PsychBenchmark for DualTaskBenchmark {
 
         result.conditions = 3;
         result.trials_per_condition = trials;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
 
         result
@@ -341,17 +366,24 @@ mod tests {
         };
         let result = DualTaskBenchmark.run(&config);
         let single = result.metrics.get("single_accuracy").unwrap().mean;
-        let _low = result.metrics.get("dual_low_accuracy").unwrap().mean;
         let high = result.metrics.get("dual_high_accuracy").unwrap().mean;
-        // Expected gradient: single >= low >= high
-        assert!(single >= high - 0.05,
-            "single ({:.3}) should be >= high ({:.3}) - tolerance", single, high);
+        // Expected gradient: single >= high
+        assert!(
+            single >= high - 0.05,
+            "single ({:.3}) should be >= high ({:.3}) - tolerance",
+            single,
+            high
+        );
     }
 
     #[test]
     fn test_dual_task_digit_recall() {
         let result = DualTaskBenchmark.run(&test_config());
         let recall = result.metrics.get("digit_recall_accuracy").unwrap().mean;
-        assert!(recall > 0.5, "digit_recall should be > 0.5, got {:.3}", recall);
+        assert!(
+            recall > 0.5,
+            "digit_recall should be > 0.5, got {:.3}",
+            recall
+        );
     }
 }

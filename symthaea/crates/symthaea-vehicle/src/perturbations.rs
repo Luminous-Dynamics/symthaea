@@ -146,12 +146,7 @@ impl PerturbationSchedule {
     /// Road impulse (speed bump / pothole) at step 150: 5 m/s² deceleration.
     pub fn road_impulse() -> Self {
         Self {
-            events: vec![(
-                150,
-                VehiclePerturbation::RoadImpulse {
-                    decel_impulse: 5.0,
-                },
-            )],
+            events: vec![(150, VehiclePerturbation::RoadImpulse { decel_impulse: 5.0 })],
             clear_step: None,
         }
     }
@@ -252,14 +247,10 @@ impl PerturbationSchedule {
         for (event_step, perturbation) in &self.events {
             if step >= *event_step {
                 match perturbation {
-                    VehiclePerturbation::SensorBlindness {
-                        affected_channels,
-                    } => {
+                    VehiclePerturbation::SensorBlindness { affected_channels } => {
                         state.apply_sensor_blindness(*affected_channels);
                     }
-                    VehiclePerturbation::MeshSpoof {
-                        num_spoofed_peers,
-                    } => {
+                    VehiclePerturbation::MeshSpoof { num_spoofed_peers } => {
                         state.apply_mesh_spoof(*num_spoofed_peers);
                     }
                     _ => {}

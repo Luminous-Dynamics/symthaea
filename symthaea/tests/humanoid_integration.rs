@@ -5,15 +5,14 @@
 //!
 //! Run: `cargo test --features humanoid --test humanoid_integration`
 
-use symthaea::humanoid::{
-    clearance_reward, cot_efficiency_reward, episode_reward, standing_reward,
-    ActiveInferenceHumanoidAgent, HumanoidCommand, HumanoidConfig, HumanoidController,
-    HumanoidFepConfig, HumanoidHdcEncoder, HumanoidPdGains, HumanoidPerturbation,
-    HumanoidPhysicsSimulator, HumanoidState, HumanoidTask, HumanoidTrainer,
-    PerturbationSchedule, SimpleHumanoidSimulator, NUM_ACTUATORS,
-    pd_standing_baseline, pd_walking_baseline,
-};
 use symthaea::humanoid::transfer::{ChannelMapping, MorphologicalTransfer};
+use symthaea::humanoid::{
+    clearance_reward, cot_efficiency_reward, episode_reward, pd_standing_baseline,
+    pd_walking_baseline, standing_reward, ActiveInferenceHumanoidAgent, HumanoidCommand,
+    HumanoidConfig, HumanoidController, HumanoidFepConfig, HumanoidHdcEncoder, HumanoidPdGains,
+    HumanoidPerturbation, HumanoidPhysicsSimulator, HumanoidState, HumanoidTask, HumanoidTrainer,
+    PerturbationSchedule, SimpleHumanoidSimulator, NUM_ACTUATORS,
+};
 use symthaea::symthaea_core::genesis::GenesisSeed;
 use symthaea::symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
@@ -28,7 +27,11 @@ fn test_encoder_produces_finite_nonzero_16384d_from_standing() {
     let state = HumanoidState::standing();
     let hv = encoder.encode(&state);
 
-    assert_eq!(hv.dim(), HDC_DIMENSION, "Encoder must produce 16384D vector");
+    assert_eq!(
+        hv.dim(),
+        HDC_DIMENSION,
+        "Encoder must produce 16384D vector"
+    );
     assert!(
         hv.norm().is_finite() && hv.norm() > 0.0,
         "Encoded HV must be finite and non-zero, got norm={}",
@@ -256,7 +259,10 @@ fn test_simulator_step_produces_valid_state() {
         assert!(v.is_finite(), "Joint velocity {i} must be finite: {v}");
     }
     for (i, &q) in state.root_quaternion.iter().enumerate() {
-        assert!(q.is_finite(), "Quaternion component {i} must be finite: {q}");
+        assert!(
+            q.is_finite(),
+            "Quaternion component {i} must be finite: {q}"
+        );
     }
     // Quaternion should be approximately unit norm
     let qnorm = state
@@ -652,7 +658,9 @@ fn test_fep_agent_produces_valid_actions_standing() {
     // tau_factor should be one of the defined action values
     let valid_tau = [0.85_f32, 1.0, 1.15];
     assert!(
-        valid_tau.iter().any(|&v| (result.tau_factor - v).abs() < 1e-5),
+        valid_tau
+            .iter()
+            .any(|&v| (result.tau_factor - v).abs() < 1e-5),
         "tau_factor should be 0.85, 1.0, or 1.15: got {}",
         result.tau_factor
     );
@@ -730,10 +738,7 @@ fn test_fep_agent_reset_clears_state() {
 
     agent.reset();
     let fe = agent.current_free_energy();
-    assert!(
-        fe.abs() < 1e-6,
-        "Reset should zero free energy: got {fe}"
-    );
+    assert!(fe.abs() < 1e-6, "Reset should zero free energy: got {fe}");
 }
 
 // ============================================================================
@@ -826,7 +831,8 @@ fn test_perturbation_external_push_has_nonzero_force() {
 
     match &push {
         HumanoidPerturbation::ExternalPush { force, .. } => {
-            let magnitude = (force[0] * force[0] + force[1] * force[1] + force[2] * force[2]).sqrt();
+            let magnitude =
+                (force[0] * force[0] + force[1] * force[1] + force[2] * force[2]).sqrt();
             assert!(
                 magnitude > 0.0,
                 "ChestShove force must be non-zero: magnitude={magnitude}"
@@ -863,7 +869,7 @@ fn test_transfer_flight_to_humanoid_channel_mapping() {
 
 #[test]
 fn test_transfer_creates_valid_controller() {
-    use symthaea::symthaea_core::hdc::{UnifiedConfig, UnifiedNetworkConfig, HdcLtcUnifiedNetwork};
+    use symthaea::symthaea_core::hdc::{HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig};
 
     // Create a small "trained" flight network
     let flight_genesis = GenesisSeed::from_phrase("symthaea-flight-quadrotor");
@@ -898,7 +904,10 @@ fn test_transfer_creates_valid_controller() {
 
     assert_eq!(cmd.torques.len(), NUM_ACTUATORS);
     for (i, &t) in cmd.torques.iter().enumerate() {
-        assert!(t.is_finite(), "Transfer ctrl torque {i} must be finite: {t}");
+        assert!(
+            t.is_finite(),
+            "Transfer ctrl torque {i} must be finite: {t}"
+        );
         assert!(
             t >= -1.0 && t <= 1.0,
             "Transfer ctrl torque {i} must be in [-1,1]: {t}"
@@ -908,7 +917,7 @@ fn test_transfer_creates_valid_controller() {
 
 #[test]
 fn test_transfer_differs_from_random_init() {
-    use symthaea::symthaea_core::hdc::{UnifiedConfig, UnifiedNetworkConfig, HdcLtcUnifiedNetwork};
+    use symthaea::symthaea_core::hdc::{HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig};
 
     let flight_genesis = GenesisSeed::from_phrase("symthaea-flight-quadrotor");
     let flight_config = UnifiedNetworkConfig {

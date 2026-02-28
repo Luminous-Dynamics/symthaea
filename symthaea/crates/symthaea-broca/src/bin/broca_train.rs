@@ -12,7 +12,7 @@ use std::process;
 
 use symthaea_broca::evaluation;
 use symthaea_broca::generator::{BrocaConfig, BrocaGenerator};
-use symthaea_broca::training::{TrainingConfig, TrainingDataset, train_with_adam};
+use symthaea_broca::training::{train_with_adam, TrainingConfig, TrainingDataset};
 
 use symthaea_core::genesis::GenesisSeed;
 
@@ -96,12 +96,8 @@ fn main() {
         "Starting training"
     );
 
-    let (metrics, final_adam, diagnostics) = train_with_adam(
-        &mut generator,
-        &dataset,
-        &train_config,
-        adam_state,
-    );
+    let (metrics, final_adam, diagnostics) =
+        train_with_adam(&mut generator, &dataset, &train_config, adam_state);
 
     // Report results
     if let Some(last) = metrics.last() {
@@ -221,35 +217,40 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
             }
             "--epochs" | "-e" => {
                 i += 1;
-                opts.epochs = args.get(i)
+                opts.epochs = args
+                    .get(i)
                     .ok_or("--epochs requires a number")?
                     .parse()
                     .map_err(|_| "--epochs must be a positive integer")?;
             }
             "--lr" => {
                 i += 1;
-                opts.learning_rate = args.get(i)
+                opts.learning_rate = args
+                    .get(i)
                     .ok_or("--lr requires a number")?
                     .parse()
                     .map_err(|_| "--lr must be a float")?;
             }
             "--bptt-window" => {
                 i += 1;
-                opts.bptt_window = args.get(i)
+                opts.bptt_window = args
+                    .get(i)
                     .ok_or("--bptt-window requires a number")?
                     .parse()
                     .map_err(|_| "--bptt-window must be a positive integer")?;
             }
             "--grad-clip" => {
                 i += 1;
-                opts.grad_clip = args.get(i)
+                opts.grad_clip = args
+                    .get(i)
                     .ok_or("--grad-clip requires a number")?
                     .parse()
                     .map_err(|_| "--grad-clip must be a float")?;
             }
             "--patience" => {
                 i += 1;
-                opts.patience = args.get(i)
+                opts.patience = args
+                    .get(i)
                     .ok_or("--patience requires a number")?
                     .parse()
                     .map_err(|_| "--patience must be a non-negative integer")?;

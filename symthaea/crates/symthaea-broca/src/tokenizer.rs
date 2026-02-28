@@ -45,10 +45,10 @@ pub struct BpeTokenizer {
 impl BpeTokenizer {
     /// Load vocabulary from a JSON file.
     pub fn from_json(path: &str) -> Result<Self> {
-        let data = std::fs::read_to_string(path)
-            .with_context(|| format!("reading vocab file: {path}"))?;
-        let vocab_file: VocabFile = serde_json::from_str(&data)
-            .with_context(|| "parsing vocab JSON")?;
+        let data =
+            std::fs::read_to_string(path).with_context(|| format!("reading vocab file: {path}"))?;
+        let vocab_file: VocabFile =
+            serde_json::from_str(&data).with_context(|| "parsing vocab JSON")?;
 
         let mut token_to_id = HashMap::new();
         let mut id_to_token = Vec::new();
@@ -91,8 +91,8 @@ impl BpeTokenizer {
     /// Embedded at compile time via `include_str!`.
     pub fn default_4k() -> Self {
         let vocab_json = include_str!("../data/broca-vocab-4k.json");
-        let vocab_file: VocabFile = serde_json::from_str(vocab_json)
-            .expect("embedded broca-vocab-4k.json is valid");
+        let vocab_file: VocabFile =
+            serde_json::from_str(vocab_json).expect("embedded broca-vocab-4k.json is valid");
         Self::from_vocab_file(&vocab_file)
     }
 
@@ -106,8 +106,8 @@ impl BpeTokenizer {
     /// Embedded at compile time via `include_str!`.
     pub fn default_16k() -> Self {
         let vocab_json = include_str!("../data/broca-vocab-16k.json");
-        let vocab_file: VocabFile = serde_json::from_str(vocab_json)
-            .expect("embedded broca-vocab-16k.json is valid");
+        let vocab_file: VocabFile =
+            serde_json::from_str(vocab_json).expect("embedded broca-vocab-16k.json is valid");
         Self::from_vocab_file(&vocab_file)
     }
 
@@ -134,28 +134,126 @@ impl BpeTokenizer {
         // Common English subwords and words
         let common_words = [
             // Articles/prepositions
-            "the", "a", "an", "of", "to", "in", "for", "on", "with", "at", "by", "from",
-            "is", "it", "that", "this", "was", "are", "be", "have", "has", "had",
+            "the",
+            "a",
+            "an",
+            "of",
+            "to",
+            "in",
+            "for",
+            "on",
+            "with",
+            "at",
+            "by",
+            "from",
+            "is",
+            "it",
+            "that",
+            "this",
+            "was",
+            "are",
+            "be",
+            "have",
+            "has",
+            "had",
             // Pronouns
-            "I", "you", "he", "she", "we", "they", "my", "your", "his", "her", "our",
+            "I",
+            "you",
+            "he",
+            "she",
+            "we",
+            "they",
+            "my",
+            "your",
+            "his",
+            "her",
+            "our",
             // Common verbs
-            "do", "not", "can", "will", "would", "could", "should", "may", "might",
-            "think", "know", "see", "say", "make", "go", "get", "take",
+            "do",
+            "not",
+            "can",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "think",
+            "know",
+            "see",
+            "say",
+            "make",
+            "go",
+            "get",
+            "take",
             // Common nouns
-            "time", "way", "thing", "man", "world", "life", "day", "part", "place",
+            "time",
+            "way",
+            "thing",
+            "man",
+            "world",
+            "life",
+            "day",
+            "part",
+            "place",
             // Connectors
-            "and", "but", "or", "if", "so", "then", "than", "when", "what", "which",
+            "and",
+            "but",
+            "or",
+            "if",
+            "so",
+            "then",
+            "than",
+            "when",
+            "what",
+            "which",
             // Common subwords
-            "ing", "tion", "er", "ed", "ly", "ness", "ment", "ful", "less", "able",
-            "un", "re", "pre", "dis", "over", "out", "up",
+            "ing",
+            "tion",
+            "er",
+            "ed",
+            "ly",
+            "ness",
+            "ment",
+            "ful",
+            "less",
+            "able",
+            "un",
+            "re",
+            "pre",
+            "dis",
+            "over",
+            "out",
+            "up",
             // Hedging / epistemic markers
-            "perhaps", "maybe", "possibly", "likely", "probably", "certainly",
-            "uncertain", "unknown", "believe", "seems", "appears", "might",
-            "however", "although", "unfortunately", "sorry",
+            "perhaps",
+            "maybe",
+            "possibly",
+            "likely",
+            "probably",
+            "certainly",
+            "uncertain",
+            "unknown",
+            "believe",
+            "seems",
+            "appears",
+            "might",
+            "however",
+            "although",
+            "unfortunately",
+            "sorry",
             // Punctuation sequences
-            ". ", ", ", "? ", "! ", ": ", "; ", "-- ", "...",
+            ". ",
+            ", ",
+            "? ",
+            "! ",
+            ": ",
+            "; ",
+            "-- ",
+            "...",
             // Whitespace
-            " ", "\n",
+            " ",
+            "\n",
         ];
 
         for word in common_words {
@@ -166,10 +264,21 @@ impl BpeTokenizer {
 
         // Generate simple merges for common bigrams
         let merge_pairs = [
-            ("t", "h"), ("th", "e"), ("t", "o"), ("i", "n"),
-            ("a", "n"), ("e", "r"), ("o", "n"), ("i", "s"),
-            ("i", "t"), ("a", "t"), ("o", "f"), ("o", "r"),
-            ("h", "e"), ("n", "o"), ("n", "ot"),
+            ("t", "h"),
+            ("th", "e"),
+            ("t", "o"),
+            ("i", "n"),
+            ("a", "n"),
+            ("e", "r"),
+            ("o", "n"),
+            ("i", "s"),
+            ("i", "t"),
+            ("a", "t"),
+            ("o", "f"),
+            ("o", "r"),
+            ("h", "e"),
+            ("n", "o"),
+            ("n", "ot"),
         ];
 
         for (left, right) in merge_pairs {
@@ -273,7 +382,11 @@ impl BpeTokenizer {
             if !text.is_char_boundary(pos) {
                 let byte = bytes[pos];
                 let byte_token = format!("<0x{:02X}>", byte);
-                let id = self.token_to_id.get(&byte_token).copied().unwrap_or(self.unk_id);
+                let id = self
+                    .token_to_id
+                    .get(&byte_token)
+                    .copied()
+                    .unwrap_or(self.unk_id);
                 result.push(id);
                 pos += 1;
                 continue;
@@ -306,7 +419,11 @@ impl BpeTokenizer {
                 // Fall back to byte token for the first byte
                 let byte = bytes[pos];
                 let byte_token = format!("<0x{:02X}>", byte);
-                let id = self.token_to_id.get(&byte_token).copied().unwrap_or(self.unk_id);
+                let id = self
+                    .token_to_id
+                    .get(&byte_token)
+                    .copied()
+                    .unwrap_or(self.unk_id);
                 result.push(id);
                 pos += 1;
             }
@@ -374,7 +491,11 @@ impl BpeTokenizer {
         for &id in ids {
             let token = self.token_str(id);
             // Skip special tokens in decoded output
-            if token == BOS_TOKEN || token == EOS_TOKEN || token == PAD_TOKEN || token == THOUGHT_TOKEN {
+            if token == BOS_TOKEN
+                || token == EOS_TOKEN
+                || token == PAD_TOKEN
+                || token == THOUGHT_TOKEN
+            {
                 continue;
             }
             if token == UNK_TOKEN {
@@ -390,13 +511,17 @@ impl BpeTokenizer {
             }
             result.extend_from_slice(token.as_bytes());
         }
-        String::from_utf8(result).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
+        String::from_utf8(result)
+            .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
     }
 
     /// Check if a token ID is a special token.
     pub fn is_special(&self, id: u32) -> bool {
-        id == self.bos_id || id == self.eos_id || id == self.pad_id
-            || id == self.unk_id || id == self.thought_id
+        id == self.bos_id
+            || id == self.eos_id
+            || id == self.pad_id
+            || id == self.unk_id
+            || id == self.thought_id
     }
 
     /// Add a new token to the vocabulary (for swarm vocabulary extension).
@@ -431,11 +556,10 @@ impl TokenizerBackend {
         match self {
             Self::Builtin(tok) => tok.encode(text),
             #[cfg(feature = "hf-tokenizer")]
-            Self::HuggingFace(tok) => {
-                tok.encode(text, false)
-                    .map(|enc| enc.get_ids().to_vec())
-                    .unwrap_or_default()
-            }
+            Self::HuggingFace(tok) => tok
+                .encode(text, false)
+                .map(|enc| enc.get_ids().to_vec())
+                .unwrap_or_default(),
         }
     }
 
@@ -444,10 +568,7 @@ impl TokenizerBackend {
         match self {
             Self::Builtin(tok) => tok.decode(ids),
             #[cfg(feature = "hf-tokenizer")]
-            Self::HuggingFace(tok) => {
-                tok.decode(ids, true)
-                    .unwrap_or_default()
-            }
+            Self::HuggingFace(tok) => tok.decode(ids, true).unwrap_or_default(),
         }
     }
 
@@ -561,7 +682,11 @@ mod tests {
     #[test]
     fn test_4k_vocab_loads() {
         let tok = BpeTokenizer::default_4k();
-        assert_eq!(tok.vocab_size(), 4096, "4K vocab should have exactly 4096 tokens");
+        assert_eq!(
+            tok.vocab_size(),
+            4096,
+            "4K vocab should have exactly 4096 tokens"
+        );
     }
 
     #[test]
@@ -595,13 +720,20 @@ mod tests {
         let text = "the world is beautiful";
         let ids = tok.encode(text);
         let decoded = tok.decode(&ids);
-        assert_eq!(decoded, text, "English sentence roundtrip should be lossless");
+        assert_eq!(
+            decoded, text,
+            "English sentence roundtrip should be lossless"
+        );
     }
 
     #[test]
     fn test_16k_vocab_loads() {
         let tok = BpeTokenizer::default_16k();
-        assert_eq!(tok.vocab_size(), 16384, "16K vocab should have exactly 16384 tokens");
+        assert_eq!(
+            tok.vocab_size(),
+            16384,
+            "16K vocab should have exactly 16384 tokens"
+        );
     }
 
     #[test]
@@ -621,7 +753,13 @@ mod tests {
     fn test_16k_common_words() {
         let tok = BpeTokenizer::default_16k();
         // These words should be in the expanded vocab
-        for word in &["algorithm", "consciousness", "prediction", "uncertainty", "perhaps"] {
+        for word in &[
+            "algorithm",
+            "consciousness",
+            "prediction",
+            "uncertainty",
+            "perhaps",
+        ] {
             let id = tok.token_id(word);
             assert_ne!(id, tok.unk_id, "'{word}' should be in 16K vocab");
         }
@@ -632,10 +770,14 @@ mod tests {
         let tok = BpeTokenizer::default_minimal();
         let vocab = VocabFile {
             tokens: tok.id_to_token.clone(),
-            merges: tok.merges.iter().map(|(l, r)| MergePair {
-                left: l.clone(),
-                right: r.clone(),
-            }).collect(),
+            merges: tok
+                .merges
+                .iter()
+                .map(|(l, r)| MergePair {
+                    left: l.clone(),
+                    right: r.clone(),
+                })
+                .collect(),
         };
         let json = serde_json::to_string(&vocab).unwrap();
         let parsed: VocabFile = serde_json::from_str(&json).unwrap();
@@ -683,13 +825,17 @@ mod tests {
         assert!(
             ids_with_merge.len() <= ids_no_merge.len(),
             "Merges should not increase token count: with={} without={}",
-            ids_with_merge.len(), ids_no_merge.len()
+            ids_with_merge.len(),
+            ids_no_merge.len()
         );
 
         // Verify decoded output is the same
         let decoded_merge = tok.decode(&ids_with_merge);
         let decoded_no = tok_no_merge.decode(&ids_no_merge);
-        assert_eq!(decoded_merge, decoded_no, "Both should decode to the same text");
+        assert_eq!(
+            decoded_merge, decoded_no,
+            "Both should decode to the same text"
+        );
     }
 
     #[test]

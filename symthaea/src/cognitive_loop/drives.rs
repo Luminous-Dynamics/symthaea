@@ -919,7 +919,11 @@ mod tests {
     fn emotion_positive_text_increases_valence() {
         let mut ec = EmotionContagion::default();
         ec.analyze("I am so happy and excited, this is wonderful!");
-        assert!(ec.valence > 0.0, "valence should be positive: {}", ec.valence);
+        assert!(
+            ec.valence > 0.0,
+            "valence should be positive: {}",
+            ec.valence
+        );
         assert!(ec.smoothed_valence > 0.0);
     }
 
@@ -927,7 +931,11 @@ mod tests {
     fn emotion_negative_text_decreases_valence() {
         let mut ec = EmotionContagion::default();
         ec.analyze("I am sad and angry, everything is terrible and awful");
-        assert!(ec.valence < 0.0, "valence should be negative: {}", ec.valence);
+        assert!(
+            ec.valence < 0.0,
+            "valence should be negative: {}",
+            ec.valence
+        );
         assert!(ec.smoothed_valence < 0.0);
     }
 
@@ -935,14 +943,22 @@ mod tests {
     fn emotion_neutral_text_near_zero() {
         let mut ec = EmotionContagion::default();
         ec.analyze("twelve purple chairs remain quite still");
-        assert!(ec.valence.abs() < 0.01, "neutral text valence: {}", ec.valence);
+        assert!(
+            ec.valence.abs() < 0.01,
+            "neutral text valence: {}",
+            ec.valence
+        );
     }
 
     #[test]
     fn emotion_exclamation_boosts_arousal() {
         let mut ec = EmotionContagion::default();
         ec.analyze("Now!!! Immediately!!!");
-        assert!(ec.arousal > 0.5, "arousal should be elevated: {}", ec.arousal);
+        assert!(
+            ec.arousal > 0.5,
+            "arousal should be elevated: {}",
+            ec.arousal
+        );
     }
 
     #[test]
@@ -950,7 +966,11 @@ mod tests {
         let mut ec = EmotionContagion::default();
         // Extreme positive
         ec.analyze("happy joy love great wonderful excellent amazing beautiful fantastic good perfect brilliant awesome");
-        assert!(ec.valence >= -1.0 && ec.valence <= 1.0, "valence out of bounds: {}", ec.valence);
+        assert!(
+            ec.valence >= -1.0 && ec.valence <= 1.0,
+            "valence out of bounds: {}",
+            ec.valence
+        );
         // Extreme negative
         ec.analyze("sad angry fear hate terrible awful horrible bad wrong fail");
         assert!(ec.valence >= -1.0 && ec.valence <= 1.0);
@@ -963,7 +983,12 @@ mod tests {
         let raw = ec.valence;
         let smoothed = ec.smoothed_valence;
         // First analysis: smoothed should lag behind raw (EMA from 0)
-        assert!(smoothed.abs() < raw.abs(), "smoothed {} should lag raw {}", smoothed, raw);
+        assert!(
+            smoothed.abs() < raw.abs(),
+            "smoothed {} should lag raw {}",
+            smoothed,
+            raw
+        );
     }
 
     #[test]
@@ -982,7 +1007,10 @@ mod tests {
     fn emotion_pattern_nudge_weak_returns_none() {
         let ec = EmotionContagion::default();
         let (pattern, strength) = ec.pattern_nudge();
-        assert!(pattern.is_none(), "neutral state should not suggest a pattern");
+        assert!(
+            pattern.is_none(),
+            "neutral state should not suggest a pattern"
+        );
         assert_eq!(strength, 0.0);
     }
 
@@ -1045,7 +1073,10 @@ mod tests {
         for _ in 0..10 {
             cd.update(0.5);
         }
-        assert!(cd.boredom < boredom_before + 0.1, "boredom should not keep growing after high error");
+        assert!(
+            cd.boredom < boredom_before + 0.1,
+            "boredom should not keep growing after high error"
+        );
     }
 
     #[test]
@@ -1055,14 +1086,20 @@ mod tests {
         for _ in 0..100 {
             cd.update(0.01); // Very low error → boredom + high curiosity
         }
-        assert!(cd.should_explore(), "should want to explore after prolonged low error");
+        assert!(
+            cd.should_explore(),
+            "should want to explore after prolonged low error"
+        );
     }
 
     #[test]
     fn curiosity_effective_lr_baseline() {
         let cd = CuriosityDrive::default();
         let lr = cd.effective_learning_rate(0.01);
-        assert!((lr - 0.01).abs() < 1e-6, "baseline novelty_bonus should be 1.0");
+        assert!(
+            (lr - 0.01).abs() < 1e-6,
+            "baseline novelty_bonus should be 1.0"
+        );
     }
 
     #[test]
@@ -1073,7 +1110,12 @@ mod tests {
             cd.update(0.01);
         }
         let lr = cd.effective_learning_rate(1.0);
-        assert!(lr <= CuriosityDrive::MAX_NOVELTY_BONUS, "LR bonus {} exceeds max {}", lr, CuriosityDrive::MAX_NOVELTY_BONUS);
+        assert!(
+            lr <= CuriosityDrive::MAX_NOVELTY_BONUS,
+            "LR bonus {} exceeds max {}",
+            lr,
+            CuriosityDrive::MAX_NOVELTY_BONUS
+        );
         assert!(lr >= 1.0, "LR bonus should be >= 1.0");
     }
 
@@ -1081,7 +1123,11 @@ mod tests {
     fn curiosity_high_error_gives_novelty_bonus() {
         let mut cd = CuriosityDrive::default();
         cd.update(0.8); // High error = novel situation
-        assert!(cd.novelty_bonus > 1.0, "high error should boost novelty: {}", cd.novelty_bonus);
+        assert!(
+            cd.novelty_bonus > 1.0,
+            "high error should boost novelty: {}",
+            cd.novelty_bonus
+        );
     }
 
     #[test]
@@ -1156,7 +1202,10 @@ mod tests {
         }
         let recs = sr.reflect();
         assert_eq!(sr.self_assessment, SelfAssessment::Struggling);
-        assert!(!recs.is_empty(), "should produce recommendations when struggling");
+        assert!(
+            !recs.is_empty(),
+            "should produce recommendations when struggling"
+        );
     }
 
     #[test]
@@ -1193,16 +1242,31 @@ mod tests {
             }
             sr.reflect();
         }
-        assert!(sr.flow_error_threshold >= 0.1 && sr.flow_error_threshold <= 0.4,
-                "flow threshold out of bounds: {}", sr.flow_error_threshold);
-        assert!(sr.boredom_threshold >= 0.05 && sr.boredom_threshold <= 0.3,
-                "boredom threshold out of bounds: {}", sr.boredom_threshold);
-        assert!(sr.trust_threshold >= 0.2 && sr.trust_threshold <= 0.7,
-                "trust threshold out of bounds: {}", sr.trust_threshold);
-        assert!(sr.coherence_gate_threshold >= 0.1 && sr.coherence_gate_threshold <= 0.6,
-                "coherence gate out of bounds: {}", sr.coherence_gate_threshold);
-        assert!(sr.surprise_threshold >= 0.5 && sr.surprise_threshold <= 0.95,
-                "surprise threshold out of bounds: {}", sr.surprise_threshold);
+        assert!(
+            sr.flow_error_threshold >= 0.1 && sr.flow_error_threshold <= 0.4,
+            "flow threshold out of bounds: {}",
+            sr.flow_error_threshold
+        );
+        assert!(
+            sr.boredom_threshold >= 0.05 && sr.boredom_threshold <= 0.3,
+            "boredom threshold out of bounds: {}",
+            sr.boredom_threshold
+        );
+        assert!(
+            sr.trust_threshold >= 0.2 && sr.trust_threshold <= 0.7,
+            "trust threshold out of bounds: {}",
+            sr.trust_threshold
+        );
+        assert!(
+            sr.coherence_gate_threshold >= 0.1 && sr.coherence_gate_threshold <= 0.6,
+            "coherence gate out of bounds: {}",
+            sr.coherence_gate_threshold
+        );
+        assert!(
+            sr.surprise_threshold >= 0.5 && sr.surprise_threshold <= 0.95,
+            "surprise threshold out of bounds: {}",
+            sr.surprise_threshold
+        );
     }
 
     #[test]
@@ -1216,8 +1280,10 @@ mod tests {
             }
             sr.reflect();
         }
-        assert!(sr.reflection_interval >= initial_interval,
-                "interval should not shrink when optimal");
+        assert!(
+            sr.reflection_interval >= initial_interval,
+            "interval should not shrink when optimal"
+        );
     }
 
     #[test]
@@ -1271,8 +1337,12 @@ mod tests {
                 sr.record_cycle(error, false, false, 0.5);
             }
             sr.reflect();
-            assert!(sr.learning_effectiveness >= 0.0 && sr.learning_effectiveness <= 1.0,
-                    "effectiveness out of bounds for error {}: {}", error, sr.learning_effectiveness);
+            assert!(
+                sr.learning_effectiveness >= 0.0 && sr.learning_effectiveness <= 1.0,
+                "effectiveness out of bounds for error {}: {}",
+                error,
+                sr.learning_effectiveness
+            );
         }
     }
 }

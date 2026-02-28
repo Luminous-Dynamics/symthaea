@@ -14,6 +14,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Stop Signal Task benchmark.
@@ -221,6 +223,7 @@ impl PsychBenchmark for StopSignalBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut go_accs = Vec::new();
         let mut go_rts = Vec::new();
@@ -237,6 +240,18 @@ impl PsychBenchmark for StopSignalBenchmark {
             ssrts.push(r.ssrt_ticks);
             ssds.push(r.ssd_mean);
             rts.push(r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "stop_signal".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("sst_go_accuracy", MetricValue::from_samples(&go_accs));
@@ -248,6 +263,7 @@ impl PsychBenchmark for StopSignalBenchmark {
 
         result.conditions = 2; // go + stop
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

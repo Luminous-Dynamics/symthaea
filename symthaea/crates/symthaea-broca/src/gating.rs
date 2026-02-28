@@ -70,23 +70,47 @@ impl EpistemicGate {
     /// Create an epistemic gate, classifying tokens from the tokenizer vocabulary.
     pub fn new(tokenizer: &BpeTokenizer, config: &GatingConfig) -> Self {
         let hedging_words = [
-            "perhaps", "maybe", "possibly", "likely", "probably",
-            "uncertain", "unknown", "believe", "seems", "appears", "might",
-            "however", "although", "unfortunately", "sorry",
+            "perhaps",
+            "maybe",
+            "possibly",
+            "likely",
+            "probably",
+            "uncertain",
+            "unknown",
+            "believe",
+            "seems",
+            "appears",
+            "might",
+            "however",
+            "although",
+            "unfortunately",
+            "sorry",
         ];
         let factual_words = [
-            "is", "are", "was", "certainly", "definitely", "always", "never",
-            "must", "shall", "every", "all", "none",
+            "is",
+            "are",
+            "was",
+            "certainly",
+            "definitely",
+            "always",
+            "never",
+            "must",
+            "shall",
+            "every",
+            "all",
+            "none",
         ];
-        let ood_words = [
-            "outside", "beyond", "cannot", "unable",
-        ];
+        let ood_words = ["outside", "beyond", "cannot", "unable"];
 
         let hedging_token_ids: Vec<u32> = hedging_words
             .iter()
             .filter_map(|w| {
                 let id = tokenizer.token_id(w);
-                if id != tokenizer.unk_id { Some(id) } else { None }
+                if id != tokenizer.unk_id {
+                    Some(id)
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -94,7 +118,11 @@ impl EpistemicGate {
             .iter()
             .filter_map(|w| {
                 let id = tokenizer.token_id(w);
-                if id != tokenizer.unk_id { Some(id) } else { None }
+                if id != tokenizer.unk_id {
+                    Some(id)
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -102,7 +130,11 @@ impl EpistemicGate {
             .iter()
             .filter_map(|w| {
                 let id = tokenizer.token_id(w);
-                if id != tokenizer.unk_id { Some(id) } else { None }
+                if id != tokenizer.unk_id {
+                    Some(id)
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -197,7 +229,11 @@ impl EmotionalModulator {
             .iter()
             .filter_map(|w| {
                 let id = tokenizer.token_id(w);
-                if id != tokenizer.unk_id { Some(id) } else { None }
+                if id != tokenizer.unk_id {
+                    Some(id)
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -205,7 +241,11 @@ impl EmotionalModulator {
             .iter()
             .filter_map(|w| {
                 let id = tokenizer.token_id(w);
-                if id != tokenizer.unk_id { Some(id) } else { None }
+                if id != tokenizer.unk_id {
+                    Some(id)
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -213,7 +253,11 @@ impl EmotionalModulator {
             .iter()
             .filter_map(|w| {
                 let id = tokenizer.token_id(w);
-                if id != tokenizer.unk_id { Some(id) } else { None }
+                if id != tokenizer.unk_id {
+                    Some(id)
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -293,7 +337,11 @@ impl CoherenceFeedback {
 
     /// Update coherence score from the current network output and thought HV.
     /// Returns a binding weight multiplier (>1.0 when drifting).
-    pub fn update(&mut self, output_hv: &symthaea_core::hdc::ContinuousHV, thought_hv: &symthaea_core::hdc::ContinuousHV) -> f32 {
+    pub fn update(
+        &mut self,
+        output_hv: &symthaea_core::hdc::ContinuousHV,
+        thought_hv: &symthaea_core::hdc::ContinuousHV,
+    ) -> f32 {
         self.current_coherence = output_hv.similarity(thought_hv);
         self.veto_triggered = self.current_coherence < self.veto_threshold;
 
@@ -414,21 +462,36 @@ mod tests {
     #[test]
     fn test_coherence_feedback_normal() {
         let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("test-coherence");
-        let thought_hv = symthaea_core::hdc::ContinuousHV::from_genesis(&genesis, "thought", symthaea_core::hdc::HDC_DIMENSION);
+        let thought_hv = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis,
+            "thought",
+            symthaea_core::hdc::HDC_DIMENSION,
+        );
 
         let mut feedback = CoherenceFeedback::new(0.3);
         let weight = feedback.update(&thought_hv, &thought_hv);
 
         // Same HV → perfect coherence → no correction
-        assert!((weight - 1.0).abs() < 0.01, "Perfect coherence should yield weight 1.0");
+        assert!(
+            (weight - 1.0).abs() < 0.01,
+            "Perfect coherence should yield weight 1.0"
+        );
         assert!(!feedback.should_veto());
     }
 
     #[test]
     fn test_coherence_feedback_drift() {
         let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("test-coherence");
-        let thought_hv = symthaea_core::hdc::ContinuousHV::from_genesis(&genesis, "thought", symthaea_core::hdc::HDC_DIMENSION);
-        let other_hv = symthaea_core::hdc::ContinuousHV::from_genesis(&genesis, "other", symthaea_core::hdc::HDC_DIMENSION);
+        let thought_hv = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis,
+            "thought",
+            symthaea_core::hdc::HDC_DIMENSION,
+        );
+        let other_hv = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis,
+            "other",
+            symthaea_core::hdc::HDC_DIMENSION,
+        );
 
         let mut feedback = CoherenceFeedback::new(0.3);
         let weight = feedback.update(&other_hv, &thought_hv);

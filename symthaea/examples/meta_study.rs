@@ -1,17 +1,15 @@
 //! Meta-Study: Self-Awareness Test
-//! 
+//!
 //! Symthaea researches the mathematics of her own mind:
 //! SSMs, LTCs, and the 6-watt consciousness limit.
 
-use symthaea::Symthaea;
 use symthaea::databases::{DatabaseBackend, DatabaseConfig};
+use symthaea::Symthaea;
 use tracing::Level;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     println!("\n🌀 Symthaea v0.6.0: The Meta-Study (Self-Awareness)\n");
 
@@ -22,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         path: Some(db_path.to_string()),
     };
     let mut sym = Symthaea::with_database(1024, 64, db_config).await?;
-    
+
     // 2. The Command: Study thy self
     let topic = "State Space Models and Liquid Time-Constant Networks for 6-watt Energy Efficiency";
     println!("🔍 Command: Researching '{}'\n", topic);
@@ -51,16 +49,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n🌙 Phase 2: Internalizing knowledge via Dream Cycle...");
     let report = sym.sleep().await?;
     println!("   💤 Consolidated {} memories.", report.consolidated);
-    println!("   💡 Extracted {} new patterns.", report.patterns_extracted);
+    println!(
+        "   💡 Extracted {} new patterns.",
+        report.patterns_extracted
+    );
 
     // 4. Final Reflection
     println!("\n🧠 [Reflection] Query: Explain how SSM linear scaling relates to your 6-watt limit based on your recent research.\n");
-    
+
     let query = "Explain how SSM linear scaling relates to your 6-watt limit based on your recent research.";
     let response = sym.process(query).await?;
     println!("🤖 Symthaea Reflection: {}\n", response.content);
 
     println!("🎉 META-STUDY COMPLETE.");
-    
+
     Ok(())
 }

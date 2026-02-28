@@ -68,9 +68,7 @@ impl CognitiveLoopService {
     ///
     /// Takes the raw predictions already computed by `get_multi_scale_prediction`.
     /// Computes average pairwise cosine similarity across prediction horizons.
-    pub(super) fn compute_prediction_coherence_from_cache(
-        predictions: &[Array1<f32>],
-    ) -> f32 {
+    pub(super) fn compute_prediction_coherence_from_cache(predictions: &[Array1<f32>]) -> f32 {
         if predictions.len() < 2 {
             return 1.0;
         }

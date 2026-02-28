@@ -96,7 +96,9 @@ impl EntropyMethodPrimitiveGrounding {
     }
 
     /// Get all entropy method groundings
-    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<EntropyMethod, Self> {
+    pub(crate) fn all_groundings(
+        primitive_system: &PrimitiveSystem,
+    ) -> HashMap<EntropyMethod, Self> {
         [
             EntropyMethod::Shannon,
             EntropyMethod::VonNeumann,
@@ -225,7 +227,9 @@ impl ConsciousnessPhasePrimitiveGrounding {
     }
 
     /// Get all consciousness phase groundings
-    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<ConsciousnessPhase, Self> {
+    pub(crate) fn all_groundings(
+        primitive_system: &PrimitiveSystem,
+    ) -> HashMap<ConsciousnessPhase, Self> {
         [
             ConsciousnessPhase::Frozen,
             ConsciousnessPhase::Normal,
@@ -325,7 +329,9 @@ impl TransitionOrderPrimitiveGrounding {
     }
 
     /// Get all transition order groundings
-    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<TransitionOrder, Self> {
+    pub(crate) fn all_groundings(
+        primitive_system: &PrimitiveSystem,
+    ) -> HashMap<TransitionOrder, Self> {
         [
             TransitionOrder::FirstOrder,
             TransitionOrder::SecondOrder,
@@ -441,7 +447,9 @@ impl FreeEnergyStatusPrimitiveGrounding {
     }
 
     /// Get all free energy status groundings
-    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<FreeEnergyStatus, Self> {
+    pub(crate) fn all_groundings(
+        primitive_system: &PrimitiveSystem,
+    ) -> HashMap<FreeEnergyStatus, Self> {
         [
             FreeEnergyStatus::Minimizing,
             FreeEnergyStatus::LocalMinimum,
@@ -491,7 +499,10 @@ pub(crate) struct EquilibriumStatusPrimitiveGrounding {
 
 impl EquilibriumStatusPrimitiveGrounding {
     /// Get NSM grounding for a specific equilibrium status
-    pub(crate) fn for_status(status: EquilibriumStatus, primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn for_status(
+        status: EquilibriumStatus,
+        primitive_system: &PrimitiveSystem,
+    ) -> Self {
         let (primitives, distance, permanence, activity) = match status {
             // Equilibrium: true balance
             EquilibriumStatus::Equilibrium => (
@@ -556,7 +567,9 @@ impl EquilibriumStatusPrimitiveGrounding {
     }
 
     /// Get all equilibrium status groundings
-    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<EquilibriumStatus, Self> {
+    pub(crate) fn all_groundings(
+        primitive_system: &PrimitiveSystem,
+    ) -> HashMap<EquilibriumStatus, Self> {
         [
             EquilibriumStatus::Equilibrium,
             EquilibriumStatus::Equilibrating,

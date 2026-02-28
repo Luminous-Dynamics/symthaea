@@ -138,8 +138,8 @@ pub use integration::narrative_gwt_integration;
 // ============================================================================
 pub mod meta;
 pub use meta::attention_schema;
-pub use meta::metacognitive_monitoring;
 pub use meta::meta_reasoning;
+pub use meta::metacognitive_monitoring;
 
 // ============================================================================
 // Layer 7: Dynamics (field, dissipative, holographic, predictive, quantum)
@@ -169,37 +169,37 @@ pub use measurement::phi_validation;
 // ============================================================================
 // External crate re-exports
 // ============================================================================
-pub use symthaea_dream as dream;
-pub use symthaea_fep as fep_active_inference;
-pub use symthaea_phi_search as phi_architecture_search;
-pub use symthaea_narrative_self as narrative_self;
 pub use symthaea_causal_reasoning::causal_calculus;
 pub use symthaea_causal_reasoning::causal_emergence;
-pub use symthaea_factor_graph as factor_graph;
-pub use symthaea_field_dynamics as consciousness_field_dynamics;
 pub use symthaea_consciousness_resonance as consciousness_resonance;
 pub use symthaea_consciousness_topology as consciousness_topology;
+pub use symthaea_dream as dream;
 pub use symthaea_enactive as enactive_cognition;
+pub use symthaea_factor_graph as factor_graph;
+pub use symthaea_fep as fep_active_inference;
+pub use symthaea_field_dynamics as consciousness_field_dynamics;
 /// Hodge Laplacian for simplicial complexes -- rigorous Betti numbers, spectral
 /// analysis, and Hodge decomposition of higher-order neural interaction signals
 pub use symthaea_hodge as hodge_laplacian;
+pub use symthaea_narrative_self as narrative_self;
+pub use symthaea_phi_search as phi_architecture_search;
 pub use symthaea_sensorimotor as sensorimotor_contingencies;
 
 // ============================================================================
 // Remaining root modules (not yet grouped into layers)
 // ============================================================================
+pub mod adaptive_reasoning;
 pub mod affective_consciousness;
-pub mod master_consciousness_equation;
-pub mod pac;
+pub mod causal_explanation;
 pub mod consciousness_thermodynamics;
 pub mod epistemic_tiers;
-pub mod harmonics;
-pub mod adaptive_reasoning;
-pub mod causal_explanation;
-pub mod negation_detector;
-pub mod synthetic_states;
 pub mod gis_integration;
+pub mod harmonics;
+pub mod master_consciousness_equation;
 pub mod multi_objective_evolution;
+pub mod negation_detector;
+pub mod pac;
+pub mod synthetic_states;
 
 // ============================================================================
 // Reasoning engine subsystems (cfg-gated)
@@ -453,27 +453,12 @@ pub use dream::{
     DreamEngine, DreamEngineConfig, DreamEngineStats, DreamEvent, DreamResult, Wisdom,
 };
 pub use fep_active_inference::{
-    ActionSelectionResult,
-    ActiveInferenceAgent,
-    ActiveInferenceAgentConfig,
-    ActiveInferenceAgentStats,
-    ActiveInferenceSummary,
-    CognitiveLoopFEPBridge,
-    CognitiveLoopFEPResult,
-    EligibilityTraces,
-    ExpectedFreeEnergyComputer,
-    ExpectedFreeEnergyResult,
-    FreeEnergyCalculator,
-    FreeEnergyComponents,
-    GenerativeModel,
-    HiddenState,
-    ModelConfidenceTracker,
-    Observation,
-    PerceptionResult,
-    PrecisionEstimator,
-    StateTransition,
-    TemporalDifferenceLearner,
-    TemporalDifferenceLearningConfig,
+    ActionSelectionResult, ActiveInferenceAgent, ActiveInferenceAgentConfig,
+    ActiveInferenceAgentStats, ActiveInferenceSummary, CognitiveLoopFEPBridge,
+    CognitiveLoopFEPResult, EligibilityTraces, ExpectedFreeEnergyComputer,
+    ExpectedFreeEnergyResult, FreeEnergyCalculator, FreeEnergyComponents, GenerativeModel,
+    HiddenState, ModelConfidenceTracker, Observation, PerceptionResult, PrecisionEstimator,
+    StateTransition, TemporalDifferenceLearner, TemporalDifferenceLearningConfig,
     TemporalDifferenceLearningStats,
 };
 pub use master_consciousness_equation::{
@@ -486,6 +471,16 @@ pub use multi_modal_integration::{
     MultiModalIntegrator,
 };
 // neuro_bridge re-exports removed (disconnected)
+pub use attention_schema::{AttentionSchema, AttentionSchemaConfig, AttentionState};
+pub use consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent, EquationConfig};
+pub use consciousness_thermodynamics::{ConsciousnessThermodynamicsAnalyzer, ThermodynamicsConfig};
+pub use epistemic_tiers::{EmpiricalTier, EpistemicCoordinate, MaterialityTier, NormativeTier};
+pub use harmonics::{FiduciaryHarmonic, HarmonicField, HarmonicResolver};
+pub use hierarchical_ltc::{HierarchicalConfig, HierarchicalLTC};
+pub use metacognitive_monitoring::{MetacognitiveMonitor, MonitoringResult};
+pub use narrative_self::{
+    AutobiographicalSelf, CoreSelf, NarrativeSelfConfig, NarrativeSelfModel, ProtoSelf,
+};
 pub use phi_architecture_search::{
     ArchitectureGenome, ArchitectureStats, BundlingGene, DecodedArchitecture, Individual,
     PhiArchitectureSearch, PhiGradient, SearchConfig, SearchResult, SearchStats, SearchStrategy,
@@ -507,16 +502,6 @@ pub use stability_regime::{
     CfCPrimitive, RegimeParams, StabilityRegimeConfig, StabilityRegimeProcessor,
     StabilityRegimeType,
 };
-pub use attention_schema::{AttentionSchema, AttentionSchemaConfig, AttentionState};
-pub use consciousness_thermodynamics::{ConsciousnessThermodynamicsAnalyzer, ThermodynamicsConfig};
-pub use epistemic_tiers::{EmpiricalTier, EpistemicCoordinate, MaterialityTier, NormativeTier};
-pub use harmonics::{FiduciaryHarmonic, HarmonicField, HarmonicResolver};
-pub use hierarchical_ltc::{HierarchicalConfig, HierarchicalLTC};
-pub use metacognitive_monitoring::{MetacognitiveMonitor, MonitoringResult};
-pub use narrative_self::{
-    AutobiographicalSelf, CoreSelf, NarrativeSelfConfig, NarrativeSelfModel, ProtoSelf,
-};
-pub use consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent, EquationConfig};
 
 // ============================================================================
 // Convenience constructors

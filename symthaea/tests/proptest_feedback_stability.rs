@@ -20,8 +20,7 @@ The CycleUrgency enum is public and tested directly.
 
 use proptest::prelude::*;
 use symthaea::cognitive_loop::{
-    CognitiveLoopConfig, CognitiveLoopService, CycleUrgency,
-    config::ConsciousnessProfile,
+    config::ConsciousnessProfile, CognitiveLoopConfig, CognitiveLoopService, CycleUrgency,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -122,16 +121,8 @@ fn assert_finite_f64(val: f64, name: &str) -> Result<(), TestCaseError> {
 }
 
 /// Assert an f32 value is within [lo, hi].
-fn assert_bounded_f32(
-    val: f32,
-    lo: f32,
-    hi: f32,
-    name: &str,
-) -> Result<(), TestCaseError> {
-    prop_assert!(
-        val >= lo && val <= hi,
-        "{name} out of [{lo}, {hi}]: {val}"
-    );
+fn assert_bounded_f32(val: f32, lo: f32, hi: f32, name: &str) -> Result<(), TestCaseError> {
+    prop_assert!(val >= lo && val <= hi, "{name} out of [{lo}, {hi}]: {val}");
     Ok(())
 }
 

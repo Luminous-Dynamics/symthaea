@@ -19,6 +19,8 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Social Norm Violation Detection benchmark.
@@ -66,7 +68,8 @@ impl SocialNormBenchmark {
             .collect();
 
         // Time pressure and social config
-        let noise_level: f32 = (0.20 + config.time_pressure as f32 * 0.15) * diff_model.interference_multiplier(config.difficulty) as f32;
+        let noise_level: f32 = (0.20 + config.time_pressure as f32 * 0.15)
+            * diff_model.interference_multiplier(config.difficulty) as f32;
         let social_boost: f32 = if config.enable_social { 0.10 } else { 0.0 };
 
         let n_items = 40; // 20 congruent + 20 violations
@@ -88,8 +91,8 @@ impl SocialNormBenchmark {
             let stimulus = if is_violation {
                 // Swap one element: replace action with mismatched action
                 xor_shift(&mut rng);
-                let swap_idx = ((scenario_idx + 1) + (rng % (n_scenarios as u64 - 1)) as usize)
-                    % n_scenarios;
+                let swap_idx =
+                    ((scenario_idx + 1) + (rng % (n_scenarios as u64 - 1)) as usize) % n_scenarios;
                 let ab = actors[scenario_idx].bind(&actions[swap_idx]);
                 ab.bind(&contexts[scenario_idx])
             } else {
@@ -191,7 +194,11 @@ fn probit(p: f64) -> f64 {
     let d2 = 0.189269;
     let d3 = 0.001308;
     let z = t - (c0 + c1 * t + c2 * t * t) / (1.0 + d1 * t + d2 * t * t + d3 * t * t * t);
-    if p < 0.5 { -z } else { z }
+    if p < 0.5 {
+        -z
+    } else {
+        z
+    }
 }
 
 impl PsychBenchmark for SocialNormBenchmark {
@@ -211,6 +218,7 @@ impl PsychBenchmark for SocialNormBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut dprimes = Vec::new();
         let mut det_accs = Vec::new();
@@ -225,6 +233,18 @@ impl PsychBenchmark for SocialNormBenchmark {
             fa_rates.push(r.false_alarm_rate);
             rt_costs.push(r.violation_rt_cost);
             rts.push(r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "social_norm".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("d_prime", MetricValue::from_samples(&dprimes));
@@ -235,6 +255,7 @@ impl PsychBenchmark for SocialNormBenchmark {
 
         result.conditions = 2; // congruent vs violation
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -297,7 +318,11 @@ mod tests {
         };
         let result = SocialNormBenchmark.run(&config);
         let dp = result.metrics["d_prime"].mean;
-        assert!(dp > 0.0, "d' ({:.3}) should be positive for above-chance detection", dp);
+        assert!(
+            dp > 0.0,
+            "d' ({:.3}) should be positive for above-chance detection",
+            dp
+        );
     }
 
     #[test]
@@ -319,7 +344,8 @@ mod tests {
         assert!(
             rt_press <= rt_base + 0.5,
             "time pressure should reduce RT: base={:.2}, pressed={:.2}",
-            rt_base, rt_press
+            rt_base,
+            rt_press
         );
     }
 }

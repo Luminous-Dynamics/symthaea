@@ -112,6 +112,10 @@ pub struct LiquidMambaConfig {
     /// When true, `new()` creates `HdcSsmProjection::new_deep()` instead of `new()`.
     /// Default false for backwards compatibility.
     pub deep_projection: bool,
+    /// Surprise gradient scaling factor (0 = disabled, 0.5 = default).
+    /// Gradients are scaled by `1 + alpha * semantic_pe` before application,
+    /// amplifying gradients for surprising/difficult examples.
+    pub surprise_gradient_alpha: f32,
 }
 
 impl Default for LiquidMambaConfig {
@@ -147,6 +151,7 @@ impl Default for LiquidMambaConfig {
             enable_ema: false,
             ema_decay: 0.999,
             deep_projection: false,
+            surprise_gradient_alpha: 0.5,
         }
     }
 }
@@ -328,166 +333,173 @@ impl LiquidMambaGenerator {
             None
         };
 
-        // 2. Project to SSM space (768D)
-        let ssm_context = self.projection.project_to_ssm(&thought_hv);
+        // Closure-based scope guard: ensures EMA live weights are unconditionally
+        // restored even if any fallible operation inside returns Err.
+        let result = (|| -> Result<GenerationResult> {
+            // 2. Project to SSM space (768D)
+            let ssm_context = self.projection.project_to_ssm(&thought_hv);
 
-        // 3. Prime Mamba's hidden state with the thought projection
-        self.mamba.inject_initial_context(&ssm_context)?;
+            // 3. Prime Mamba's hidden state with the thought projection
+            self.mamba.inject_initial_context(&ssm_context)?;
 
-        // 4. Compute max tokens (consciousness-gated)
-        let max_tokens = if self.config.enable_consciousness_gating {
-            consciousness_gated_max_tokens(self.config.max_tokens, channels.psi())
-        } else {
-            self.config.max_tokens
-        };
-
-        // 5. Update arousal from channels
-        self.arousal = channels.arousal();
-
-        // 6. Initialize coherence monitors (short + long window)
-        let mut coherence_monitor = CoherenceMonitor::new(
-            thought_hv.clone(),
-            self.config.coherence_window,
-            self.config.coherence_ema_alpha,
-            self.config.veto_threshold,
-            self.config.min_consecutive_low,
-        );
-        let mut long_coherence_monitor = CoherenceMonitor::new(
-            thought_hv.clone(),
-            self.config.long_coherence_window,
-            self.config.coherence_ema_alpha * 0.5, // Slower EMA for trend detection
-            self.config.veto_threshold * 0.5,      // Lower threshold (trend signal)
-            self.config.min_consecutive_low * 2,   // More patience for long window
-        );
-
-        // 7. Autoregressive generation loop
-        let eos_id = self.mamba.eos_token_id();
-        let mut tokens: Vec<u32> = Vec::new();
-        let mut text = String::new();
-        let mut veto_triggered = false;
-        let mut prev_token = eos_id; // Start with EOS as BOS-equivalent
-        let mut output_hvs: Vec<ContinuousHV> = Vec::new();
-        // Per-token PE feedback: boost gating when last token had low thought-coherence
-        let mut token_pe_boost: f32 = 0.0;
-
-        for pos in 0..max_tokens {
-            // 7a. Biological delta modulation
-            if self.config.enable_liquid_delta {
-                let scale = self.biological_state_scale();
-                self.mamba.scale_hidden_states(scale)?;
-            }
-
-            // 7b. Forward one token through Mamba
-            let mut logits = self.mamba.forward_one_token(prev_token)?;
-
-            // 7c. Epistemic gating (apply to Mamba's large vocab logits)
-            //     Per-token PE feedback: if last token had low coherence with thought,
-            //     boost epistemic gate by shifting toward higher uncertainty
-            if self.config.enable_gating {
-                let effective_epistemic =
-                    (channels.epistemic_ordinal() + token_pe_boost).clamp(0.0, 4.0);
-                let gate_len = logits.len().min(512);
-                self.epistemic_gate
-                    .apply(&mut logits[..gate_len], effective_epistemic);
-            }
-
-            // 7d. Emotional modulation
-            if self.config.enable_gating {
-                let gate_len = logits.len().min(512);
-                self.emotional_modulator
-                    .apply(&mut logits[..gate_len], channels, pos);
-            }
-
-            // 7e. Top-k sampling
-            let next_token = top_k_sample(&logits, self.config.top_k, self.config.temperature);
-
-            // 7f. Back-project token to HDC (unconditional — for distillation + veto)
-            let token_emb = self.mamba.embedding_vector(next_token)?;
-            let token_hdc = self.projection.project_to_hdc(&token_emb);
-            output_hvs.push(token_hdc.clone());
-
-            // 7f2. Per-token PE feedback: compute token-level coherence with thought
-            //      Low similarity → boost epistemic gating for next token
-            let token_sim = thought_hv.similarity(&token_hdc).clamp(-1.0, 1.0);
-            token_pe_boost = if token_sim < 0.3 {
-                // Low coherence: boost gating by up to +1.5 (shift toward Uncertain)
-                1.5 * (1.0 - token_sim / 0.3)
+            // 4. Compute max tokens (consciousness-gated)
+            let max_tokens = if self.config.enable_consciousness_gating {
+                consciousness_gated_max_tokens(self.config.max_tokens, channels.psi())
             } else {
-                // Adequate coherence: decay boost
-                (token_pe_boost * 0.5).max(0.0)
+                self.config.max_tokens
             };
 
-            // 7g. Coherence monitoring + semantic veto
-            // Always feed long monitor for trend tracking
-            long_coherence_monitor.push(token_hdc.clone());
+            // 5. Update arousal from channels
+            self.arousal = channels.arousal();
 
-            if self.config.enable_veto {
-                coherence_monitor.push(token_hdc);
+            // 6. Initialize coherence monitors (short + long window)
+            let mut coherence_monitor = CoherenceMonitor::new(
+                thought_hv.clone(),
+                self.config.coherence_window,
+                self.config.coherence_ema_alpha,
+                self.config.veto_threshold,
+                self.config.min_consecutive_low,
+            );
+            let mut long_coherence_monitor = CoherenceMonitor::new(
+                thought_hv.clone(),
+                self.config.long_coherence_window,
+                self.config.coherence_ema_alpha * 0.5, // Slower EMA for trend detection
+                self.config.veto_threshold * 0.5,      // Lower threshold (trend signal)
+                self.config.min_consecutive_low * 2,   // More patience for long window
+            );
 
-                // Use predictive veto with long_coherence gating
-                let long_coh = long_coherence_monitor.current_coherence();
-                if coherence_monitor.should_veto_predictive(long_coh) && pos > 2 {
-                    veto_triggered = true;
-                    text.push_str(&self.config.veto_hesitation);
-                    if let Some(ref mut cb) = on_token {
-                        cb(&self.config.veto_hesitation);
+            // 7. Autoregressive generation loop
+            let eos_id = self.mamba.eos_token_id();
+            let mut tokens: Vec<u32> = Vec::new();
+            let mut text = String::new();
+            let mut veto_triggered = false;
+            let mut prev_token = eos_id; // Start with EOS as BOS-equivalent
+            let mut output_hvs: Vec<ContinuousHV> = Vec::new();
+            // Per-token PE feedback: boost gating when last token had low thought-coherence
+            let mut token_pe_boost: f32 = 0.0;
+
+            for pos in 0..max_tokens {
+                // 7a. Biological delta modulation
+                if self.config.enable_liquid_delta {
+                    let scale = self.biological_state_scale();
+                    self.mamba.scale_hidden_states(scale)?;
+                }
+
+                // 7b. Forward one token through Mamba
+                let mut logits = self.mamba.forward_one_token(prev_token)?;
+
+                // 7c. Epistemic gating (apply to Mamba's large vocab logits)
+                //     Per-token PE feedback: if last token had low coherence with thought,
+                //     boost epistemic gate by shifting toward higher uncertainty
+                if self.config.enable_gating {
+                    let effective_epistemic =
+                        (channels.epistemic_ordinal() + token_pe_boost).clamp(0.0, 4.0);
+                    let gate_len = logits.len().min(512);
+                    self.epistemic_gate
+                        .apply(&mut logits[..gate_len], effective_epistemic);
+                }
+
+                // 7d. Emotional modulation
+                if self.config.enable_gating {
+                    let gate_len = logits.len().min(512);
+                    self.emotional_modulator
+                        .apply(&mut logits[..gate_len], channels, pos);
+                }
+
+                // 7e. Top-k sampling
+                let next_token =
+                    top_k_sample(&logits, self.config.top_k, self.config.temperature);
+
+                // 7f. Back-project token to HDC (unconditional — for distillation + veto)
+                let token_emb = self.mamba.embedding_vector(next_token)?;
+                let token_hdc = self.projection.project_to_hdc(&token_emb);
+                output_hvs.push(token_hdc.clone());
+
+                // 7f2. Per-token PE feedback: compute token-level coherence with thought
+                //      Low similarity → boost epistemic gating for next token
+                let token_sim = thought_hv.similarity(&token_hdc).clamp(-1.0, 1.0);
+                token_pe_boost = if token_sim < 0.3 {
+                    // Low coherence: boost gating by up to +1.5 (shift toward Uncertain)
+                    1.5 * (1.0 - token_sim / 0.3)
+                } else {
+                    // Adequate coherence: decay boost
+                    (token_pe_boost * 0.5).max(0.0)
+                };
+
+                // 7g. Coherence monitoring + semantic veto
+                // Always feed long monitor for trend tracking
+                long_coherence_monitor.push(token_hdc.clone());
+
+                if self.config.enable_veto {
+                    coherence_monitor.push(token_hdc);
+
+                    // Use predictive veto with long_coherence gating
+                    let long_coh = long_coherence_monitor.current_coherence();
+                    if coherence_monitor.should_veto_predictive(long_coh) && pos > 2 {
+                        veto_triggered = true;
+                        text.push_str(&self.config.veto_hesitation);
+                        if let Some(ref mut cb) = on_token {
+                            cb(&self.config.veto_hesitation);
+                        }
+
+                        // Reset Mamba and re-inject thought context
+                        self.mamba.reset();
+                        self.mamba.inject_initial_context(&ssm_context)?;
+                        coherence_monitor.reset();
+
+                        // Continue from current position (don't restart text)
+                        continue;
                     }
-
-                    // Reset Mamba and re-inject thought context
-                    self.mamba.reset();
-                    self.mamba.inject_initial_context(&ssm_context)?;
-                    coherence_monitor.reset();
-
-                    // Continue from current position (don't restart text)
-                    continue;
                 }
+
+                // 7h. Decode token
+                if next_token == eos_id {
+                    let semantic_pe =
+                        self.semantic_prediction_error(&thought_hv, &output_hvs);
+                    return Ok(GenerationResult {
+                        text,
+                        token_ids: tokens,
+                        num_tokens: pos,
+                        eos_terminated: true,
+                        veto_triggered,
+                        final_coherence: coherence_monitor.current_coherence(),
+                        long_coherence: long_coherence_monitor.current_coherence(),
+                        output_hvs,
+                        semantic_pe,
+                    });
+                }
+
+                if let Ok(token_str) = self.mamba.decode_token(next_token) {
+                    text.push_str(&token_str);
+                    if let Some(ref mut cb) = on_token {
+                        cb(&token_str);
+                    }
+                }
+
+                tokens.push(next_token);
+                prev_token = next_token;
             }
 
-            // 7h. Decode token
-            if next_token == eos_id {
-                let semantic_pe = self.semantic_prediction_error(&thought_hv, &output_hvs);
-                if let Some(live) = ema_live_backup {
-                    self.projection.restore_live_weights(&live);
-                }
-                return Ok(GenerationResult {
-                    text,
-                    token_ids: tokens,
-                    num_tokens: pos,
-                    eos_terminated: true,
-                    veto_triggered,
-                    final_coherence: coherence_monitor.current_coherence(),
-                    long_coherence: long_coherence_monitor.current_coherence(),
-                    output_hvs,
-                    semantic_pe,
-                });
-            }
+            let semantic_pe = self.semantic_prediction_error(&thought_hv, &output_hvs);
+            Ok(GenerationResult {
+                text,
+                token_ids: tokens.clone(),
+                num_tokens: tokens.len(),
+                eos_terminated: false,
+                veto_triggered,
+                final_coherence: coherence_monitor.current_coherence(),
+                long_coherence: long_coherence_monitor.current_coherence(),
+                output_hvs,
+                semantic_pe,
+            })
+        })();
 
-            if let Ok(token_str) = self.mamba.decode_token(next_token) {
-                text.push_str(&token_str);
-                if let Some(ref mut cb) = on_token {
-                    cb(&token_str);
-                }
-            }
-
-            tokens.push(next_token);
-            prev_token = next_token;
-        }
-
-        let semantic_pe = self.semantic_prediction_error(&thought_hv, &output_hvs);
+        // Unconditional restore — runs on both Ok and Err paths
         if let Some(live) = ema_live_backup {
             self.projection.restore_live_weights(&live);
         }
-        Ok(GenerationResult {
-            text,
-            token_ids: tokens.clone(),
-            num_tokens: tokens.len(),
-            eos_terminated: false,
-            veto_triggered,
-            final_coherence: coherence_monitor.current_coherence(),
-            long_coherence: long_coherence_monitor.current_coherence(),
-            output_hvs,
-            semantic_pe,
-        })
+
+        result
     }
 
     /// Compute effective learning rate with warmup + cosine annealing + biological load.
@@ -803,6 +815,12 @@ impl LiquidMambaGenerator {
                     );
                 }
             }
+        }
+
+        // Surprise-weighted gradient: amplify hard (high-PE) examples
+        if self.config.surprise_gradient_alpha > 0.0 {
+            let scale = 1.0 + self.config.surprise_gradient_alpha * result.semantic_pe;
+            self.projection.scale_accumulated_gradients(scale);
         }
 
         // Gradient accumulation: only apply every N steps

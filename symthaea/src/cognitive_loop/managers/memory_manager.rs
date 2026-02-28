@@ -16,7 +16,9 @@
 //! It does NOT own the actual memory stores (those remain in CognitiveLoopService).
 //! Instead, it models the *meta-level* memory dynamics that affect the cognitive cycle.
 
-use super::super::subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags};
+use super::super::subsystem_trait::{
+    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+};
 
 /// Memory Manager — models meta-level memory dynamics.
 ///
@@ -157,7 +159,10 @@ impl CognitiveSubsystem for MemoryManager {
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
         if data.len() < 9 {
-            return Err(format!("MemoryManager checkpoint too short: {} < 9", data.len()));
+            return Err(format!(
+                "MemoryManager checkpoint too short: {} < 9",
+                data.len()
+            ));
         }
         self.consolidation_pressure = f32::from_le_bytes(data[0..4].try_into().unwrap());
         self.cycles_since_consolidation = u32::from_le_bytes(data[4..8].try_into().unwrap());
@@ -204,8 +209,11 @@ mod tests {
             mm.process(&high_error);
         }
 
-        assert!(mm.consolidation_pressure > 0.0,
-            "Pressure should build: {}", mm.consolidation_pressure);
+        assert!(
+            mm.consolidation_pressure > 0.0,
+            "Pressure should build: {}",
+            mm.consolidation_pressure
+        );
     }
 
     #[test]
@@ -242,10 +250,15 @@ mod tests {
         let high_psi = snapshot(0.1, 0.5, 0.5, 0.8);
 
         let output = mm.process(&high_psi);
-        assert!(output.flags & output_flags::REQUEST_CONSOLIDATION != 0,
-            "High Psi should request consolidation");
-        assert!(output.lr_modulation > 1.0,
-            "High Psi should boost learning: {}", output.lr_modulation);
+        assert!(
+            output.flags & output_flags::REQUEST_CONSOLIDATION != 0,
+            "High Psi should request consolidation"
+        );
+        assert!(
+            output.lr_modulation > 1.0,
+            "High Psi should boost learning: {}",
+            output.lr_modulation
+        );
     }
 
     #[test]
@@ -259,8 +272,11 @@ mod tests {
         }
 
         let output = mm.process(&good);
-        assert!(output.confidence_delta > 0.0,
-            "Good retrieval should boost confidence: {}", output.confidence_delta);
+        assert!(
+            output.confidence_delta > 0.0,
+            "Good retrieval should boost confidence: {}",
+            output.confidence_delta
+        );
     }
 
     #[test]

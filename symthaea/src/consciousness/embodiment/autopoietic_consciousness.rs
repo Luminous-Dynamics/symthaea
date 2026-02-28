@@ -131,7 +131,9 @@ impl AutopoieticPhasePrimitiveGrounding {
     }
 
     /// Get all autopoietic phase groundings
-    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<AutopoieticPhase, Self> {
+    pub(crate) fn all_groundings(
+        primitive_system: &PrimitiveSystem,
+    ) -> HashMap<AutopoieticPhase, Self> {
         [
             AutopoieticPhase::Producing,
             AutopoieticPhase::Maintaining,
@@ -193,7 +195,10 @@ pub(crate) struct ComponentTypePrimitiveGrounding {
 #[allow(dead_code)]
 impl ComponentTypePrimitiveGrounding {
     /// Get NSM grounding for a specific component type
-    pub(crate) fn for_type(component_type: ComponentType, primitive_system: &PrimitiveSystem) -> Self {
+    pub(crate) fn for_type(
+        component_type: ComponentType,
+        primitive_system: &PrimitiveSystem,
+    ) -> Self {
         let (primitives, internal_focus, temporal_span, self_reference_level) = match component_type
         {
             // Boundary: interface/membrane
@@ -261,7 +266,9 @@ impl ComponentTypePrimitiveGrounding {
     }
 
     /// Get all component type groundings
-    pub(crate) fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<ComponentType, Self> {
+    pub(crate) fn all_groundings(
+        primitive_system: &PrimitiveSystem,
+    ) -> HashMap<ComponentType, Self> {
         [
             ComponentType::Boundary,
             ComponentType::Processing,

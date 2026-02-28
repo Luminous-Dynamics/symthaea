@@ -86,15 +86,18 @@ fn test_da_d1_d2_balance_after_warmup() {
     }
 
     // Not all identical — some variation expected from alternating reward/error
-    let gs_min = gradient_scales.iter().copied().fold(f32::INFINITY, f32::min);
-    let gs_max = gradient_scales.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let gs_min = gradient_scales
+        .iter()
+        .copied()
+        .fold(f32::INFINITY, f32::min);
+    let gs_max = gradient_scales
+        .iter()
+        .copied()
+        .fold(f32::NEG_INFINITY, f32::max);
     // Allow very small variation — the bath dynamics should produce *some* movement
     let gs_range = gs_max - gs_min;
     // Even if tiny, the values should be finite
-    assert!(
-        gs_range.is_finite(),
-        "gradient_scale range must be finite"
-    );
+    assert!(gs_range.is_finite(), "gradient_scale range must be finite");
 }
 
 // ── Test 2: NE phasic bursts on surprise ──────────────────────────────
@@ -221,8 +224,14 @@ fn test_serotonin_and_behavioral_flexibility() {
     }
 
     // Flexibility derives from DA D2 effective — verify it is populated
-    let bf_min = flexibility_values.iter().copied().fold(f32::INFINITY, f32::min);
-    let bf_max = flexibility_values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let bf_min = flexibility_values
+        .iter()
+        .copied()
+        .fold(f32::INFINITY, f32::min);
+    let bf_max = flexibility_values
+        .iter()
+        .copied()
+        .fold(f32::NEG_INFINITY, f32::max);
     assert!(
         bf_min.is_finite() && bf_max.is_finite(),
         "behavioral_flexibility bounds must be finite"
@@ -271,18 +280,33 @@ fn test_neuromod_snapshot_fires_every_10_cycles() {
         service.cycle("more warmup for snapshot");
     }
     let _r = service.cycle("snapshot at cycle 31... actually 30 + warmup"); // cycle 31
-    // Cycle 31 won't be a snapshot (31 % 10 != 0), so run to 40
-    // total_cycles is now 31, run 9 more to reach 40
+                                                                            // Cycle 31 won't be a snapshot (31 % 10 != 0), so run to 40
+                                                                            // total_cycles is now 31, run 9 more to reach 40
     for _ in 0..8 {
         service.cycle("filler cycle");
     }
     let r = service.cycle("snapshot cycle"); // cycle 40
     if let Some(snap) = &r.metadata.neuromod_snapshot {
-        assert!(snap.da_effective.is_finite(), "snapshot da_effective should be finite");
-        assert!(snap.consciousness_mod.is_finite(), "snapshot consciousness_mod should be finite");
-        assert!(snap.plasticity_gate.is_finite(), "snapshot plasticity_gate should be finite");
-        assert!(snap.gradient_scale.is_finite(), "snapshot gradient_scale should be finite");
-        assert!(snap.mcts_exploration_mod.is_finite(), "snapshot mcts_exploration_mod should be finite");
+        assert!(
+            snap.da_effective.is_finite(),
+            "snapshot da_effective should be finite"
+        );
+        assert!(
+            snap.consciousness_mod.is_finite(),
+            "snapshot consciousness_mod should be finite"
+        );
+        assert!(
+            snap.plasticity_gate.is_finite(),
+            "snapshot plasticity_gate should be finite"
+        );
+        assert!(
+            snap.gradient_scale.is_finite(),
+            "snapshot gradient_scale should be finite"
+        );
+        assert!(
+            snap.mcts_exploration_mod.is_finite(),
+            "snapshot mcts_exploration_mod should be finite"
+        );
     }
 }
 
@@ -439,10 +463,22 @@ fn test_receptor_subtypes_all_finite() {
     );
 
     // Also verify the main effective signals are finite
-    assert!(m.dopamine_effective.is_finite(), "dopamine_effective not finite");
-    assert!(m.noradrenaline_effective.is_finite(), "noradrenaline_effective not finite");
-    assert!(m.serotonin_effective.is_finite(), "serotonin_effective not finite");
-    assert!(m.acetylcholine_effective.is_finite(), "acetylcholine_effective not finite");
+    assert!(
+        m.dopamine_effective.is_finite(),
+        "dopamine_effective not finite"
+    );
+    assert!(
+        m.noradrenaline_effective.is_finite(),
+        "noradrenaline_effective not finite"
+    );
+    assert!(
+        m.serotonin_effective.is_finite(),
+        "serotonin_effective not finite"
+    );
+    assert!(
+        m.acetylcholine_effective.is_finite(),
+        "acetylcholine_effective not finite"
+    );
 }
 
 // ── Test 10: Consciousness modulation ─────────────────────────────────
@@ -500,24 +536,60 @@ fn test_full_neuromod_pipeline_coherence() {
 
         // All four effective signals must be finite every cycle
         assert!(m.dopamine_effective.is_finite(), "cycle {i}: DA not finite");
-        assert!(m.noradrenaline_effective.is_finite(), "cycle {i}: NE not finite");
-        assert!(m.serotonin_effective.is_finite(), "cycle {i}: 5-HT not finite");
-        assert!(m.acetylcholine_effective.is_finite(), "cycle {i}: ACh not finite");
+        assert!(
+            m.noradrenaline_effective.is_finite(),
+            "cycle {i}: NE not finite"
+        );
+        assert!(
+            m.serotonin_effective.is_finite(),
+            "cycle {i}: 5-HT not finite"
+        );
+        assert!(
+            m.acetylcholine_effective.is_finite(),
+            "cycle {i}: ACh not finite"
+        );
 
         // Derived control signals must be finite
-        assert!(m.neuromod_gradient_scale.is_finite(), "cycle {i}: gradient_scale not finite");
-        assert!(m.neuromod_threshold_gate.is_finite(), "cycle {i}: threshold_gate not finite");
-        assert!(m.neuromod_plasticity_gate.is_finite(), "cycle {i}: plasticity_gate not finite");
-        assert!(m.neuromod_consciousness_mod.is_finite(), "cycle {i}: consciousness_mod not finite");
-        assert!(m.neuromod_mcts_exploration_mod.is_finite(), "cycle {i}: mcts_exploration_mod not finite");
-        assert!(m.neuromod_attention_allocation.is_finite(), "cycle {i}: attention_allocation not finite");
-        assert!(m.neuromod_behavioral_flexibility.is_finite(), "cycle {i}: behavioral_flexibility not finite");
+        assert!(
+            m.neuromod_gradient_scale.is_finite(),
+            "cycle {i}: gradient_scale not finite"
+        );
+        assert!(
+            m.neuromod_threshold_gate.is_finite(),
+            "cycle {i}: threshold_gate not finite"
+        );
+        assert!(
+            m.neuromod_plasticity_gate.is_finite(),
+            "cycle {i}: plasticity_gate not finite"
+        );
+        assert!(
+            m.neuromod_consciousness_mod.is_finite(),
+            "cycle {i}: consciousness_mod not finite"
+        );
+        assert!(
+            m.neuromod_mcts_exploration_mod.is_finite(),
+            "cycle {i}: mcts_exploration_mod not finite"
+        );
+        assert!(
+            m.neuromod_attention_allocation.is_finite(),
+            "cycle {i}: attention_allocation not finite"
+        );
+        assert!(
+            m.neuromod_behavioral_flexibility.is_finite(),
+            "cycle {i}: behavioral_flexibility not finite"
+        );
 
         // Receptor subtypes must be finite
         assert!(m.neuromod_da_d1.is_finite(), "cycle {i}: DA D1 not finite");
         assert!(m.neuromod_da_d2.is_finite(), "cycle {i}: DA D2 not finite");
-        assert!(m.neuromod_ne_alpha.is_finite(), "cycle {i}: NE alpha not finite");
-        assert!(m.neuromod_ne_beta.is_finite(), "cycle {i}: NE beta not finite");
+        assert!(
+            m.neuromod_ne_alpha.is_finite(),
+            "cycle {i}: NE alpha not finite"
+        );
+        assert!(
+            m.neuromod_ne_beta.is_finite(),
+            "cycle {i}: NE beta not finite"
+        );
 
         // Track DA changes to verify the bath is not frozen
         if i > 5 && (m.dopamine_effective - last_da).abs() > 0.0001 {

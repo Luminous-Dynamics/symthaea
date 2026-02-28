@@ -68,8 +68,7 @@ fn run_live_cycles(
     for i in 0..n_cycles {
         let result = service.cycle(inputs[i % inputs.len()]);
         // Apply knockout clamp after each cycle
-        if clamp_da.is_some() || clamp_ne.is_some() || clamp_sht.is_some() || clamp_ach.is_some()
-        {
+        if clamp_da.is_some() || clamp_ne.is_some() || clamp_sht.is_some() || clamp_ach.is_some() {
             service.clamp_neuromod_levels(clamp_da, clamp_ne, clamp_sht, clamp_ach);
         }
         if i >= warmup {
@@ -106,10 +105,7 @@ impl PsychBenchmark for LiveLoopAblationBenchmark {
 
         // Baseline
         let Some(mut service) = build_loop_service() else {
-            result.insert(
-                "error",
-                MetricValue::from_samples(&[0.0]),
-            );
+            result.insert("error", MetricValue::from_samples(&[0.0]));
             return result;
         };
         let baseline = run_live_cycles(&mut service, n_cycles, None, None, None, None);
@@ -237,12 +233,18 @@ mod tests {
         // DA knockout → gradient scale drops
         let mut svc = build_loop_service().expect("build loop");
         let ko = run_live_cycles(&mut svc, n_cycles, Some(0.0), None, None, None);
-        assert!(ko.avg_gradient_scale < baseline.avg_gradient_scale, "DA knockout");
+        assert!(
+            ko.avg_gradient_scale < baseline.avg_gradient_scale,
+            "DA knockout"
+        );
 
         // NE knockout → exploration drops
         let mut svc = build_loop_service().expect("build loop");
         let ko = run_live_cycles(&mut svc, n_cycles, None, Some(0.0), None, None);
-        assert!(ko.avg_exploration_urge < baseline.avg_exploration_urge, "NE knockout");
+        assert!(
+            ko.avg_exploration_urge < baseline.avg_exploration_urge,
+            "NE knockout"
+        );
 
         // 5-HT knockout → confidence drops
         let mut svc = build_loop_service().expect("build loop");
@@ -252,6 +254,9 @@ mod tests {
         // ACh knockout → attention drops
         let mut svc = build_loop_service().expect("build loop");
         let ko = run_live_cycles(&mut svc, n_cycles, None, None, None, Some(0.0));
-        assert!(ko.avg_attention_factor < baseline.avg_attention_factor, "ACh knockout");
+        assert!(
+            ko.avg_attention_factor < baseline.avg_attention_factor,
+            "ACh knockout"
+        );
     }
 }

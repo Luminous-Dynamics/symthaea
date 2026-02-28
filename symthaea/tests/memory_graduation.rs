@@ -17,11 +17,11 @@
 // ==================================================================================
 
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+use symthaea::memory::memory_coordinator::MemorySource;
 use symthaea::memory::{
     CoordinatorConfig, Episode, EpisodicMemory, EpisodicReplayConfig, GraduationEvent,
     MemoryCoordinator, SemanticMemory,
 };
-use symthaea::memory::memory_coordinator::MemorySource;
 use symthaea::mind::{ContinuousMind, MindConfig};
 use symthaea_core::hdc::ContinuousHV;
 

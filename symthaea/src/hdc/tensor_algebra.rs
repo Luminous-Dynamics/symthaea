@@ -1088,8 +1088,7 @@ impl TensorNetwork {
                 continue;
             }
 
-            let (Some(t_from), Some(t_to)) =
-                (tensors[from_id].take(), tensors[to_id].take())
+            let (Some(t_from), Some(t_to)) = (tensors[from_id].take(), tensors[to_id].take())
             else {
                 tracing::warn!("Tensor node consumed twice during contraction");
                 continue;

@@ -52,7 +52,10 @@ fn build_network(input_dim: usize, hidden_dim: usize, output_dim: usize) -> CfCN
 #[test]
 fn test_config_low_latency_has_sensible_defaults() {
     let config = StreamingConfig::low_latency();
-    assert_eq!(config.batch_accumulation, 1, "Low latency should process every sample");
+    assert_eq!(
+        config.batch_accumulation, 1,
+        "Low latency should process every sample"
+    );
     assert_eq!(config.max_latency_ms, 10, "Low latency should target 10ms");
     assert!(
         config.warmup_samples <= 8,
@@ -148,7 +151,11 @@ fn test_default_streaming_creates_working_instance() {
     let streamer = default_streaming(8, 4);
     assert!(streamer.is_active(), "Should be active on creation");
     assert!(!streamer.is_warmed_up(), "Should not be warmed up yet");
-    assert_eq!(streamer.total_samples(), 0, "Should have zero samples initially");
+    assert_eq!(
+        streamer.total_samples(),
+        0,
+        "Should have zero samples initially"
+    );
     assert_eq!(streamer.current_sequence(), 0, "Sequence should start at 0");
 }
 
@@ -157,11 +164,13 @@ fn test_low_latency_streaming_creates_working_instance() {
     let streamer = low_latency_streaming(8, 4);
     assert!(streamer.is_active());
     assert_eq!(
-        streamer.config().batch_accumulation, 1,
+        streamer.config().batch_accumulation,
+        1,
         "Low latency factory should use batch_accumulation=1"
     );
     assert_eq!(
-        streamer.config().max_latency_ms, 10,
+        streamer.config().max_latency_ms,
+        10,
         "Low latency factory should use 10ms budget"
     );
 }
@@ -244,7 +253,11 @@ fn test_push_and_poll_output_values_are_finite() {
     let outputs = streamer.poll_all();
     for out in &outputs {
         for &val in out.output.iter() {
-            assert!(val.is_finite(), "Output value should be finite, got {}", val);
+            assert!(
+                val.is_finite(),
+                "Output value should be finite, got {}",
+                val
+            );
         }
         assert!(
             out.latency_us < 10_000_000,
@@ -426,7 +439,11 @@ fn test_state_export_and_import() {
     // Note: this may not always be true if CfC converges quickly, so we just log it
     eprintln!(
         "State changed between saves: {}",
-        if any_different { "yes" } else { "no (may have converged)" }
+        if any_different {
+            "yes"
+        } else {
+            "no (may have converged)"
+        }
     );
 }
 
@@ -547,10 +564,7 @@ fn test_warmup_detection() {
     };
     let streamer = StreamingInference::new(network, config);
 
-    assert!(
-        !streamer.is_warmed_up(),
-        "Should not be warmed up at start"
-    );
+    assert!(!streamer.is_warmed_up(), "Should not be warmed up at start");
 
     // Push fewer than warmup_samples
     for i in 0..(warmup_count - 1) {
@@ -597,7 +611,10 @@ fn test_push_batch_processes_all_inputs() {
     let batch: Vec<Array1<f32>> = (0..5).map(|i| make_input(8, i)).collect();
     let count = streamer.push_batch(batch);
 
-    assert_eq!(count, 5, "push_batch should return the number of inputs pushed");
+    assert_eq!(
+        count, 5,
+        "push_batch should return the number of inputs pushed"
+    );
     assert_eq!(
         streamer.total_samples(),
         5,
@@ -660,7 +677,9 @@ fn test_peek_does_not_consume() {
 
     // Peek should return the same output as poll
     if let Some(peeked) = streamer.peek() {
-        let polled = streamer.poll().expect("Should have an output to poll after peek");
+        let polled = streamer
+            .poll()
+            .expect("Should have an output to poll after peek");
         assert_eq!(
             peeked.sequence, polled.sequence,
             "Peek and poll should return the same output"
@@ -752,7 +771,10 @@ fn test_reset_stats_clears_statistics() {
     let _ = streamer.poll_all();
 
     let stats_before = streamer.stats();
-    assert!(stats_before.total_outputs > 0, "Should have stats before reset");
+    assert!(
+        stats_before.total_outputs > 0,
+        "Should have stats before reset"
+    );
 
     // Reset stats
     streamer.reset_stats();

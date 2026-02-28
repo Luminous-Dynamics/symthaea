@@ -123,7 +123,10 @@ impl LLMBackend for OpenAiBackend {
 
         if !response.status().is_success() {
             let status = response.status();
-            let text = response.text().await.unwrap_or_else(|_| "<body unreadable>".to_string());
+            let text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "<body unreadable>".to_string());
             anyhow::bail!("OpenAI returned {status}: {text}");
         }
 
@@ -176,7 +179,10 @@ impl LLMBackend for OpenAiBackend {
 
         if !response.status().is_success() {
             let status = response.status();
-            let text = response.text().await.unwrap_or_else(|_| "<body unreadable>".to_string());
+            let text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "<body unreadable>".to_string());
             anyhow::bail!("OpenAI returned {status}: {text}");
         }
 

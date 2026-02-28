@@ -21,6 +21,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -59,7 +61,12 @@ fn gen_grid(rng: &mut u64, size: usize, num_colors: u8) -> Vec<Vec<u8>> {
     grid
 }
 
-fn apply_transform(grid: &[Vec<u8>], task_type: TaskType, param: u64, num_colors: u8) -> Vec<Vec<u8>> {
+fn apply_transform(
+    grid: &[Vec<u8>],
+    task_type: TaskType,
+    param: u64,
+    num_colors: u8,
+) -> Vec<Vec<u8>> {
     match task_type {
         TaskType::ColorFill => {
             let color = (param % num_colors as u64) as u8;
@@ -205,10 +212,26 @@ impl ArcAbductiveBenchmark {
             0.0
         };
         let per_type_accuracy = [
-            if per_type_total[0] > 0 { per_type_hits[0] as f64 / per_type_total[0] as f64 } else { 0.0 },
-            if per_type_total[1] > 0 { per_type_hits[1] as f64 / per_type_total[1] as f64 } else { 0.0 },
-            if per_type_total[2] > 0 { per_type_hits[2] as f64 / per_type_total[2] as f64 } else { 0.0 },
-            if per_type_total[3] > 0 { per_type_hits[3] as f64 / per_type_total[3] as f64 } else { 0.0 },
+            if per_type_total[0] > 0 {
+                per_type_hits[0] as f64 / per_type_total[0] as f64
+            } else {
+                0.0
+            },
+            if per_type_total[1] > 0 {
+                per_type_hits[1] as f64 / per_type_total[1] as f64
+            } else {
+                0.0
+            },
+            if per_type_total[2] > 0 {
+                per_type_hits[2] as f64 / per_type_total[2] as f64
+            } else {
+                0.0
+            },
+            if per_type_total[3] > 0 {
+                per_type_hits[3] as f64 / per_type_total[3] as f64
+            } else {
+                0.0
+            },
         ];
 
         AbductiveTrialResult {
@@ -237,6 +260,7 @@ impl PsychBenchmark for ArcAbductiveBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut accuracies = Vec::new();
         let mut similarities = Vec::new();
@@ -251,6 +275,18 @@ impl PsychBenchmark for ArcAbductiveBenchmark {
             rts.push(r.rt_ticks);
             for i in 0..4 {
                 per_type[i].push(r.per_type_accuracy[i]);
+            }
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "arc_abductive".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
             }
         }
 
@@ -271,6 +307,7 @@ impl PsychBenchmark for ArcAbductiveBenchmark {
 
         result.conditions = 4; // 4 task types
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -361,8 +398,7 @@ mod tests {
         let r1 = ArcAbductiveBenchmark.run(&config);
         let r2 = ArcAbductiveBenchmark.run(&config);
         assert_eq!(
-            r1.metrics["abduction_accuracy"].mean,
-            r2.metrics["abduction_accuracy"].mean,
+            r1.metrics["abduction_accuracy"].mean, r2.metrics["abduction_accuracy"].mean,
             "Same seed should produce identical results"
         );
     }
@@ -385,17 +421,32 @@ mod tests {
         assert!(
             pressure_rt < base_rt,
             "Time pressure should reduce RT: base={}, pressure={}",
-            base_rt, pressure_rt
+            base_rt,
+            pressure_rt
         );
     }
 
     #[test]
     fn test_per_type_breakdowns_finite() {
         let result = ArcAbductiveBenchmark.run(&test_config());
-        for name in &["abduction_color_fill", "abduction_translation", "abduction_color_replace", "abduction_reflection"] {
+        for name in &[
+            "abduction_color_fill",
+            "abduction_translation",
+            "abduction_color_replace",
+            "abduction_reflection",
+        ] {
             let val = &result.metrics[*name];
-            assert!(val.mean.is_finite(), "Per-type metric {} is not finite", name);
-            assert!(val.mean >= 0.0 && val.mean <= 1.0, "Per-type metric {} out of range: {}", name, val.mean);
+            assert!(
+                val.mean.is_finite(),
+                "Per-type metric {} is not finite",
+                name
+            );
+            assert!(
+                val.mean >= 0.0 && val.mean <= 1.0,
+                "Per-type metric {} out of range: {}",
+                name,
+                val.mean
+            );
         }
     }
 }

@@ -58,26 +58,26 @@ const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
 
 /// Channel ranges [min, max] for normalization to [0, 1].
 const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
-    [0.0, 1.0],   // intent_acknowledge
-    [0.0, 1.0],   // intent_answer
-    [0.0, 1.0],   // intent_clarify
-    [0.0, 1.0],   // intent_propose
-    [0.0, 1.0],   // intent_uncertainty
-    [0.0, 1.0],   // intent_reflect
-    [0.0, 1.0],   // intent_continue
-    [0.0, 1.0],   // intent_unknown
-    [0.0, 4.0],   // epistemic_status (ordinal: 0=Certain..4=OutOfDomain)
-    [-1.0, 1.0],  // valence
-    [0.0, 1.0],   // arousal
-    [0.0, 1.0],   // warmth
-    [0.0, 1.0],   // psi
-    [0.0, 1.0],   // meta_awareness
-    [0.0, 1.0],   // coherence
-    [0.0, 6.0],   // relationship_stage (ordinal: 0-6)
-    [0.0, 1.0],   // trust
-    [0.5, 2.0],   // mood_temperature
-    [0.0, 1.0],   // has_computed_answer
-    [0.0, 10.0],  // concept_count
+    [0.0, 1.0],  // intent_acknowledge
+    [0.0, 1.0],  // intent_answer
+    [0.0, 1.0],  // intent_clarify
+    [0.0, 1.0],  // intent_propose
+    [0.0, 1.0],  // intent_uncertainty
+    [0.0, 1.0],  // intent_reflect
+    [0.0, 1.0],  // intent_continue
+    [0.0, 1.0],  // intent_unknown
+    [0.0, 4.0],  // epistemic_status (ordinal: 0=Certain..4=OutOfDomain)
+    [-1.0, 1.0], // valence
+    [0.0, 1.0],  // arousal
+    [0.0, 1.0],  // warmth
+    [0.0, 1.0],  // psi
+    [0.0, 1.0],  // meta_awareness
+    [0.0, 1.0],  // coherence
+    [0.0, 6.0],  // relationship_stage (ordinal: 0-6)
+    [0.0, 1.0],  // trust
+    [0.5, 2.0],  // mood_temperature
+    [0.0, 1.0],  // has_computed_answer
+    [0.0, 10.0], // concept_count
 ];
 
 /// Decoupled thought state: 20 scalar channels extracted from StructuredThought.
@@ -94,18 +94,18 @@ impl Default for ThoughtChannels {
         Self {
             channels: [
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, // intent: Unknown
-                3.0,   // epistemic: Unknown
-                0.0,   // valence: neutral
-                0.5,   // arousal: mid
-                0.5,   // warmth: mid
-                0.5,   // psi: mid
-                0.5,   // meta_awareness: mid
-                0.5,   // coherence: mid
-                0.0,   // relationship_stage: 0
-                0.5,   // trust: mid
-                1.0,   // mood_temperature: neutral
-                0.0,   // has_computed_answer: false
-                0.0,   // concept_count: none
+                3.0, // epistemic: Unknown
+                0.0, // valence: neutral
+                0.5, // arousal: mid
+                0.5, // warmth: mid
+                0.5, // psi: mid
+                0.5, // meta_awareness: mid
+                0.5, // coherence: mid
+                0.0, // relationship_stage: 0
+                0.5, // trust: mid
+                1.0, // mood_temperature: neutral
+                0.0, // has_computed_answer: false
+                0.0, // concept_count: none
             ],
         }
     }
@@ -213,11 +213,7 @@ impl ThoughtLanguageEncoder {
 
         let level_vectors: Vec<ContinuousHV> = (0..num_levels)
             .map(|i| {
-                ContinuousHV::from_genesis(
-                    genesis,
-                    &format!("broca::level::{i}"),
-                    HDC_DIMENSION,
-                )
+                ContinuousHV::from_genesis(genesis, &format!("broca::level::{i}"), HDC_DIMENSION)
             })
             .collect();
 
@@ -335,10 +331,7 @@ mod tests {
             sim < 0.995,
             "Different emotional states should produce different HVs: sim={sim}"
         );
-        assert!(
-            sim < 1.0 - 1e-4,
-            "Should not be identical: sim={sim}"
-        );
+        assert!(sim < 1.0 - 1e-4, "Should not be identical: sim={sim}");
     }
 
     #[test]

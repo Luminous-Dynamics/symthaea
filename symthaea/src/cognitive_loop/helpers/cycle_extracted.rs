@@ -16,20 +16,36 @@ use super::super::{CognitiveLoopService, CycleResult, MoralJudgmentSummary, Resp
 // Tuning constants — see `thresholds.rs` for the centralized registry.
 // ═══════════════════════════════════════════════════════════════════════════════
 use crate::cognitive_loop::thresholds::{
-    // Moral evaluation
-    MORAL_EVAL_INTERVAL, MORAL_CONCERN_THRESHOLD, NEGATION_POLARITY_THRESHOLD, NEGATION_DAMPENING,
+    BODY_PSI_WEIGHT,
+    EMBODIED_PSI_WEIGHT,
+    // Psi synthesis
+    FLOW_PSI_WEIGHT,
+    MEMORY_CONTEXT_BOOST_SCALE,
+    MEMORY_RECALL_SIM_THRESHOLD,
     // Memory recall
-    MEMORY_RECALL_TOP_K, MEMORY_RECALL_SIM_THRESHOLD, MEMORY_CONTEXT_BOOST_SCALE,
+    MEMORY_RECALL_TOP_K,
+    MORAL_CONCERN_THRESHOLD,
+    // Moral evaluation
+    MORAL_EVAL_INTERVAL,
+    NEGATION_DAMPENING,
+    NEGATION_POLARITY_THRESHOLD,
+    RELATIONAL_PSI_WEIGHT,
+    REWARD_BAD_BASE,
+    REWARD_BAD_SCALE,
+    REWARD_EXTERNAL_BLEND,
+    // Reward computation
+    REWARD_GOOD_BASE,
+    REWARD_GOOD_CONFIDENCE_SCALE,
+    REWARD_MID_BASE,
+    REWARD_MID_SCALE,
+    STRATEGY_CLARIFYING_FACTOR,
+    STRATEGY_CONCISE_SPEECH_RATE,
+    STRATEGY_DETAILED_SENSITIVITY,
+    // Strategy modulation
+    STRATEGY_EXPLORATORY_FACTOR,
+    STRATEGY_SUPPORTIVE_PAUSE,
     // Surprise & exploration
     SURPRISE_BOREDOM_DAMPEN,
-    // Psi synthesis
-    FLOW_PSI_WEIGHT, RELATIONAL_PSI_WEIGHT, BODY_PSI_WEIGHT, EMBODIED_PSI_WEIGHT,
-    // Strategy modulation
-    STRATEGY_EXPLORATORY_FACTOR, STRATEGY_DETAILED_SENSITIVITY, STRATEGY_CONCISE_SPEECH_RATE,
-    STRATEGY_CLARIFYING_FACTOR, STRATEGY_SUPPORTIVE_PAUSE,
-    // Reward computation
-    REWARD_GOOD_BASE, REWARD_GOOD_CONFIDENCE_SCALE, REWARD_BAD_BASE, REWARD_BAD_SCALE,
-    REWARD_MID_BASE, REWARD_MID_SCALE, REWARD_EXTERNAL_BLEND,
 };
 
 impl CognitiveLoopService {
@@ -633,27 +649,29 @@ impl CognitiveLoopService {
     ) -> f64 {
         // 1. Snapshot current tau
         let original_tau = self.temporal_network.all_tau_owned();
-        
+
         // 2. Apply candidate scaling
         self.temporal_network.scale_tau_all(tau_scale);
-        
+
         // 3. Replay and measure
         let mut total_phi = 0.0;
         for ep in episodes {
             let input_array = ndarray::Array1::from_vec(ep.input.values.clone());
             let _ = self.temporal_network.step(&input_array, 0.02); // Standard dt
-            
+
             // Measure integration (Layer 1 proxy)
             let phi = match &self.temporal_network {
-                super::super::temporal_network::TemporalNetwork::CfC(cfc) => cfc.consciousness_level() as f64,
+                super::super::temporal_network::TemporalNetwork::CfC(cfc) => {
+                    cfc.consciousness_level() as f64
+                }
                 _ => 0.5,
             };
             total_phi += phi;
         }
-        
+
         // 4. Restore original tau
         self.temporal_network.set_tau_all(original_tau);
-        
+
         total_phi / episodes.len().max(1) as f64
     }
 }

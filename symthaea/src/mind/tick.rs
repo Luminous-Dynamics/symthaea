@@ -7,9 +7,9 @@ use crate::chronobiology::{Biorhythm, CircadianPhase};
 use symthaea_core::hdc::ContinuousHV;
 
 use super::utils::permute_hv;
-use super::{ContinuousMind, Goal, InputType, MindOutput, OutputType};
 #[cfg(feature = "mesh")]
 use super::MindInput;
+use super::{ContinuousMind, Goal, InputType, MindOutput, OutputType};
 
 impl ContinuousMind {
     /// Process one tick of the mind.
@@ -112,21 +112,26 @@ impl ContinuousMind {
                     ]);
                     self.working_memory[i] = bundled;
                     self.working_memory.remove(i + 1);
-                    
+
                     // Keep earliest arrival tick for the merged item
                     let _merged_tick = self.working_memory_ticks.remove(i + 1);
-                    
+
                     // Consolidate source: Feedback > WebResearch > Direct > Internal
                     let s1 = self.working_memory_sources[i];
                     let s2 = self.working_memory_sources.remove(i + 1);
-                    
+
                     use crate::memory::memory_coordinator::MemorySource;
-                    self.working_memory_sources[i] = match (s1, s2) {
-                        (MemorySource::ActionFeedback, _) | (_, MemorySource::ActionFeedback) => MemorySource::ActionFeedback,
-                        (MemorySource::WebResearch, _) | (_, MemorySource::WebResearch) => MemorySource::WebResearch,
-                        (MemorySource::UserInteraction, _) | (_, MemorySource::UserInteraction) => MemorySource::UserInteraction,
-                        _ => MemorySource::Internal,
-                    };
+                    self.working_memory_sources[i] =
+                        match (s1, s2) {
+                            (MemorySource::ActionFeedback, _)
+                            | (_, MemorySource::ActionFeedback) => MemorySource::ActionFeedback,
+                            (MemorySource::WebResearch, _) | (_, MemorySource::WebResearch) => {
+                                MemorySource::WebResearch
+                            }
+                            (MemorySource::UserInteraction, _)
+                            | (_, MemorySource::UserInteraction) => MemorySource::UserInteraction,
+                            _ => MemorySource::Internal,
+                        };
 
                     // Set verified if either is verified
                     let v1 = self.working_memory_verified[i];
@@ -199,7 +204,7 @@ impl ContinuousMind {
                 let source = self.working_memory_sources.remove(0);
                 let verified = self.working_memory_verified.remove(0);
                 let metadata = self.working_memory_metadata.remove(0);
-                
+
                 let steps_survived = self.state.tick.saturating_sub(arrival_tick);
                 self.evicted_items.push(crate::mind::EvictedMemory {
                     content: evicted,
@@ -208,7 +213,7 @@ impl ContinuousMind {
                     is_verified: verified,
                     metadata,
                 });
-                
+
                 self.working_memory.push(input.content.clone());
                 self.working_memory_ticks.push(self.state.tick);
                 self.working_memory_sources.push(input.source);
@@ -300,7 +305,8 @@ impl ContinuousMind {
                 // If peers are stressed (>0.7), our local load sympathetically rises
                 if mirrored.thermodynamic_load > 0.7 {
                     let sympathy_boost = (mirrored.thermodynamic_load - 0.7) * 0.2;
-                    self.state.thermodynamic_load = (self.state.thermodynamic_load + sympathy_boost).min(1.0);
+                    self.state.thermodynamic_load =
+                        (self.state.thermodynamic_load + sympathy_boost).min(1.0);
                     // Update mood temperature accordingly
                     self.state.mood_temperature = 0.5 + (self.state.thermodynamic_load * 1.5);
                 }
@@ -318,7 +324,8 @@ impl ContinuousMind {
         // If we are in high-resolution (Ultra) and achieve high Phi, record to DHT.
         if self.state.holocell.dimensionality == symthaea_core::hdc::HdcDimensionality::Ultra
             && self.state.consciousness_level > 0.8
-            && self.state.tick % 50 == 0 // Don't spam the ledger
+            && self.state.tick % 50 == 0
+        // Don't spam the ledger
         {
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -340,7 +347,7 @@ impl ContinuousMind {
             // v1.9.0 CAUSAL VETO:
             // Simulate the thermodynamic cost of speaking this thought.
             let predicted_load = self.state.holocell.simulate(&self.state.current_thought, 5);
-            
+
             if predicted_load > 0.9 && self.state.thermodynamic_load > 0.7 {
                 tracing::warn!(load = predicted_load, "PREFRONTAL VETO: Thought predicted to cause thermodynamic red-line. Inhibiting output.");
                 return None;
@@ -1028,11 +1035,7 @@ impl ContinuousMind {
                         tick = self.state.tick,
                         "Exported L-SSM projection weights for swarm"
                     );
-                    let msg = crate::swarm::GradientMessage::new(
-                        source_id,
-                        weights,
-                        1.0,
-                    );
+                    let msg = crate::swarm::GradientMessage::new(source_id, weights, 1.0);
                     self.federated_outbox.push(msg);
                 }
             }

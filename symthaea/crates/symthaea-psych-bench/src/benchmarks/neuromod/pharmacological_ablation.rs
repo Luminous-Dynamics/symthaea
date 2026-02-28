@@ -87,7 +87,11 @@ impl Bath {
     fn update(&mut self, inputs: &Inputs) {
         // DA: reward prediction error
         let da_signal = inputs.reward_signal * 0.15
-            + if inputs.prediction_error < 0.2 { 0.05 } else { -0.05 }
+            + if inputs.prediction_error < 0.2 {
+                0.05
+            } else {
+                -0.05
+            }
             + if inputs.flow_active { 0.03 } else { 0.0 };
         self.da.produce(da_signal);
 
@@ -101,13 +105,21 @@ impl Bath {
         let sht_signal = inputs.coherence * 0.08
             + inputs.epistemic_confidence * 0.05
             + inputs.binding_strength * 0.04
-            - if inputs.reward_signal < -0.3 { 0.1 } else { 0.0 };
+            - if inputs.reward_signal < -0.3 {
+                0.1
+            } else {
+                0.0
+            };
         self.sht.produce(sht_signal);
 
         // ACh: expected uncertainty
         let ach_signal = (1.0 - inputs.epistemic_confidence) * 0.1
             + if inputs.flow_active { 0.06 } else { 0.0 }
-            + if inputs.binding_strength > 0.7 { 0.03 } else { 0.0 };
+            + if inputs.binding_strength > 0.7 {
+                0.03
+            } else {
+                0.0
+            };
         self.ach.produce(ach_signal);
 
         // Cross-modulation
@@ -129,10 +141,18 @@ impl Bath {
     }
 
     fn clamp(&mut self, da: Option<f32>, ne: Option<f32>, sht: Option<f32>, ach: Option<f32>) {
-        if let Some(v) = da { self.da.level = v.clamp(0.0, 1.0); }
-        if let Some(v) = ne { self.ne.level = v.clamp(0.0, 1.0); }
-        if let Some(v) = sht { self.sht.level = v.clamp(0.0, 1.0); }
-        if let Some(v) = ach { self.ach.level = v.clamp(0.0, 1.0); }
+        if let Some(v) = da {
+            self.da.level = v.clamp(0.0, 1.0);
+        }
+        if let Some(v) = ne {
+            self.ne.level = v.clamp(0.0, 1.0);
+        }
+        if let Some(v) = sht {
+            self.sht.level = v.clamp(0.0, 1.0);
+        }
+        if let Some(v) = ach {
+            self.ach.level = v.clamp(0.0, 1.0);
+        }
     }
 
     // Downstream indicators (mirrors NeuromodulatorBath methods)
@@ -206,7 +226,14 @@ fn run_ablation(
     }
 
     let n = n_cycles as f64;
-    (sum_lr / n, sum_exploration / n, sum_confidence / n, sum_attention / n, sum_gradient / n, sum_threshold / n)
+    (
+        sum_lr / n,
+        sum_exploration / n,
+        sum_confidence / n,
+        sum_attention / n,
+        sum_gradient / n,
+        sum_threshold / n,
+    )
 }
 
 /// Pharmacological ablation benchmark: virtual transmitter knockout.
@@ -228,31 +255,58 @@ impl PsychBenchmark for PharmacologicalAblationBenchmark {
         let (ko_lr, _, _, _, ko_grad, _) = run_ablation(Some(0.0), None, None, None);
         let da_lr_drop = ((base_lr - ko_lr) / base_lr * 100.0).max(0.0);
         let da_grad_drop = ((base_grad - ko_grad) / base_grad * 100.0).max(0.0);
-        result.insert("da_knockout_lr_drop_pct", MetricValue::from_samples(&[da_lr_drop]));
-        result.insert("da_knockout_gradient_drop_pct", MetricValue::from_samples(&[da_grad_drop]));
+        result.insert(
+            "da_knockout_lr_drop_pct",
+            MetricValue::from_samples(&[da_lr_drop]),
+        );
+        result.insert(
+            "da_knockout_gradient_drop_pct",
+            MetricValue::from_samples(&[da_grad_drop]),
+        );
 
         // NE knockout
         let (_, ko_expl, _, _, _, _) = run_ablation(None, Some(0.0), None, None);
         let ne_expl_diff = base_expl - ko_expl;
-        result.insert("ne_knockout_exploration_drop", MetricValue::from_samples(&[ne_expl_diff]));
+        result.insert(
+            "ne_knockout_exploration_drop",
+            MetricValue::from_samples(&[ne_expl_diff]),
+        );
 
         // 5-HT knockout
         let (_, _, ko_conf, _, _, _) = run_ablation(None, None, Some(0.0), None);
         let sht_conf_diff = base_conf - ko_conf;
-        result.insert("sht_knockout_confidence_drop", MetricValue::from_samples(&[sht_conf_diff]));
+        result.insert(
+            "sht_knockout_confidence_drop",
+            MetricValue::from_samples(&[sht_conf_diff]),
+        );
 
         // ACh knockout
         let (_, _, _, ko_attn, _, ko_thresh) = run_ablation(None, None, None, Some(0.0));
         let ach_attn_drop = ((base_attn - ko_attn) / base_attn * 100.0).max(0.0);
         let ach_thresh_rise = ((ko_thresh - base_thresh) / base_thresh * 100.0).max(0.0);
-        result.insert("ach_knockout_attention_drop_pct", MetricValue::from_samples(&[ach_attn_drop]));
-        result.insert("ach_knockout_threshold_rise_pct", MetricValue::from_samples(&[ach_thresh_rise]));
+        result.insert(
+            "ach_knockout_attention_drop_pct",
+            MetricValue::from_samples(&[ach_attn_drop]),
+        );
+        result.insert(
+            "ach_knockout_threshold_rise_pct",
+            MetricValue::from_samples(&[ach_thresh_rise]),
+        );
 
         // Double dissociation: each knockout's PRIMARY effect > other knockouts' off-target effect
         result.insert("baseline_lr", MetricValue::from_samples(&[base_lr]));
-        result.insert("baseline_exploration", MetricValue::from_samples(&[base_expl]));
-        result.insert("baseline_confidence", MetricValue::from_samples(&[base_conf]));
-        result.insert("baseline_attention", MetricValue::from_samples(&[base_attn]));
+        result.insert(
+            "baseline_exploration",
+            MetricValue::from_samples(&[base_expl]),
+        );
+        result.insert(
+            "baseline_confidence",
+            MetricValue::from_samples(&[base_conf]),
+        );
+        result.insert(
+            "baseline_attention",
+            MetricValue::from_samples(&[base_attn]),
+        );
 
         result
     }
@@ -319,8 +373,7 @@ mod tests {
 
     #[test]
     fn test_all_knockout_metrics_degrade() {
-        let (base_lr, base_expl, base_conf, base_attn, _, _) =
-            run_ablation(None, None, None, None);
+        let (base_lr, base_expl, base_conf, base_attn, _, _) = run_ablation(None, None, None, None);
 
         // DA knockout → LR drops
         let (ko_lr, _, _, _, _, _) = run_ablation(Some(0.0), None, None, None);
@@ -332,7 +385,10 @@ mod tests {
 
         // 5-HT knockout → confidence drops
         let (_, _, ko_conf, _, _, _) = run_ablation(None, None, Some(0.0), None);
-        assert!(ko_conf < base_conf, "5-HT knockout should reduce confidence");
+        assert!(
+            ko_conf < base_conf,
+            "5-HT knockout should reduce confidence"
+        );
 
         // ACh knockout → attention drops
         let (_, _, _, ko_attn, _, _) = run_ablation(None, None, None, Some(0.0));

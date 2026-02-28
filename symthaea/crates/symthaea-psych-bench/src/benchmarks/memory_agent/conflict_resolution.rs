@@ -9,6 +9,8 @@ use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use crate::wm::{WmConfig, WorkingMemory};
 
 /// Conflict resolution benchmark.
@@ -126,6 +128,7 @@ impl PsychBenchmark for ConflictResolutionBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut recency_accs = Vec::new();
         let mut consistencies = Vec::new();
@@ -136,6 +139,18 @@ impl PsychBenchmark for ConflictResolutionBenchmark {
             recency_accs.push(rec);
             consistencies.push(con);
             rts.push(rt);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "conflict".to_string(),
+                    correct: rec > 0.5,
+                    rt_ticks: rt,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert(
@@ -150,6 +165,7 @@ impl PsychBenchmark for ConflictResolutionBenchmark {
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

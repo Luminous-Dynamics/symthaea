@@ -8,6 +8,8 @@ use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use crate::wm::{WmConfig, WorkingMemory};
 
 /// Test-time learning benchmark.
@@ -131,6 +133,7 @@ impl PsychBenchmark for TestTimeLearningBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut accuracies = Vec::new();
         let mut rts = Vec::new();
@@ -138,6 +141,18 @@ impl PsychBenchmark for TestTimeLearningBenchmark {
             let (acc, rt) = self.run_trial(config, trial);
             accuracies.push(acc);
             rts.push(rt);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "ttl".to_string(),
+                    correct: acc > 0.5,
+                    rt_ticks: rt,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert(
@@ -148,6 +163,7 @@ impl PsychBenchmark for TestTimeLearningBenchmark {
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

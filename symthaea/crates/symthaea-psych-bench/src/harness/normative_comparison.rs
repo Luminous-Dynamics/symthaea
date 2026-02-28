@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::baselines::{BaselineCollection, BaselineMap};
-use super::report::BenchmarkReport;
+use super::report::{key_metric_for_benchmark, BenchmarkReport};
 
 /// A single normative comparison between agent performance and human baseline.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,37 +33,11 @@ pub struct NormativeScore {
     pub source: String,
 }
 
-/// Standard normal CDF using the Abramowitz & Stegun (1964) rational approximation.
+/// Convert a z-score to a percentile rank (0.0–100.0).
 ///
-/// Handbook of Mathematical Functions, formula 26.2.17.
-/// Maximum error: 7.5e-8.
-///
-/// Returns a value in [0.0, 1.0] representing P(Z <= z).
+/// Delegates to `analysis::normal_cdf` (Abramowitz & Stegun 26.2.17).
 pub fn z_to_percentile(z: f64) -> f64 {
-    // Constants from Abramowitz & Stegun 26.2.17
-    const P: f64 = 0.2316419;
-    const B1: f64 = 0.319381530;
-    const B2: f64 = -0.356563782;
-    const B3: f64 = 1.781477937;
-    const B4: f64 = -1.821255978;
-    const B5: f64 = 1.330274429;
-    const INV_SQRT_2PI: f64 = 0.398942280401432678; // 1/sqrt(2*pi)
-
-    let abs_z = z.abs();
-    let t = 1.0 / (1.0 + P * abs_z);
-    let t2 = t * t;
-    let t3 = t2 * t;
-    let t4 = t3 * t;
-    let t5 = t4 * t;
-
-    let pdf = INV_SQRT_2PI * (-0.5 * abs_z * abs_z).exp();
-    let cdf_positive = 1.0 - pdf * (B1 * t + B2 * t2 + B3 * t3 + B4 * t4 + B5 * t5);
-
-    if z >= 0.0 {
-        cdf_positive * 100.0
-    } else {
-        (1.0 - cdf_positive) * 100.0
-    }
+    super::analysis::normal_cdf(z) * 100.0
 }
 
 /// Clinical interpretation of a z-score.
@@ -110,68 +84,17 @@ pub struct NormativeReport {
 fn is_lower_better(metric: &str) -> bool {
     matches!(
         metric,
-        "mean_rt_ticks"
-            | "calibration_ece"
-            | "dual_cost"
-            | "stroop_effect"
+        "stroop_effect"
             | "flanker_effect"
-            | "perseverative_errors"
-            | "inhibition_cost"
-            | "rt_ticks"
+            | "dual_task_cost"
+            | "calibration_error_ece"
+            | "commission_errors"
+            | "ssrt_ticks"
+            | "coordination_cost"
+            | "vigilance_decrement"
+            | "disambiguation_cost"
+            | "blink_magnitude"
     )
-}
-
-/// Key metric to use for each benchmark's normative comparison.
-///
-/// Mirrors the logic in `cognitive_profile.rs` for consistency.
-fn key_metric(benchmark_name: &str) -> &'static str {
-    match benchmark_name {
-        name if name.contains("Stroop") && name.contains("Emotional") => "emotional_interference",
-        name if name.contains("Stroop") => "incongruent_accuracy",
-        name if name.contains("WCST") => "categories_completed",
-        name if name.contains("Flanker") => "accuracy",
-        name if name.contains("TowerOfLondon") => "accuracy",
-        name if name.contains("DualTask") => "dual_cost",
-        name if name.contains("Ravens") => "accuracy",
-        name if name.contains("IowaGambling") => "net_score",
-        name if name.contains("N-back") => "hit_rate",
-        name if name.contains("ChangeDetection") => "accuracy",
-        name if name.contains("SerialRecall") => "accuracy",
-        name if name.contains("SpatialUpdating") => "accuracy",
-        name if name.contains("Binding") => "accuracy",
-        name if name.contains("DigitSpan") => "max_span",
-        name if name.contains("PVT") => "mean_rt_ticks",
-        name if name.contains("CPT") => "hit_rate",
-        name if name.contains("SART") => "accuracy",
-        name if name.contains("FittsLaw") => "fitts_r_squared",
-        name if name.contains("Bimanual") => "accuracy",
-        name if name.contains("SRTT") => "accuracy",
-        name if name.contains("GoNoGo") => "overall_accuracy",
-        name if name.contains("StopSignal") => "accuracy",
-        name if name.contains("VisualSearch") => "accuracy",
-        name if name.contains("AttentionalBlink") => "t1_accuracy",
-        name if name.contains("RME") => "accuracy",
-        name if name.contains("SocialNorm") => "accuracy",
-        name if name.contains("UltimatumGame") => "acceptance_rate",
-        name if name.contains("FalseBelief") => "accuracy",
-        name if name.contains("FauxPas") => "accuracy",
-        name if name.contains("Persuasion") => "accuracy",
-        name if name.contains("StrangeStory") => "accuracy",
-        name if name.contains("Hinting") => "accuracy",
-        name if name.contains("LexicalDecision") => "word_accuracy",
-        name if name.contains("SemanticPriming") => "priming_effect",
-        name if name.contains("SemanticCoherence") => "accuracy",
-        name if name.contains("GardenPath") => "accuracy",
-        name if name.contains("Calibration") => "calibration_ece",
-        name if name.contains("FOK") => "gamma",
-        name if name.contains("Arc") => "transfer_accuracy",
-        name if name.contains("AccurateRetrieval") => "accuracy",
-        name if name.contains("LongRange") => "accuracy",
-        name if name.contains("ProspectiveMemory") => "pm_accuracy",
-        name if name.contains("ConflictResolution") => "accuracy",
-        name if name.contains("TestTimeLearning") => "accuracy",
-        _ => "accuracy",
-    }
 }
 
 /// Map a benchmark name to its corresponding baseline domain and key.
@@ -191,25 +114,17 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("WCST") || name.contains("Wisconsin") => {
             Some(("wcst_categories_completed", &bl.executive))
         }
-        name if name.contains("Flanker") => {
-            Some(("flanker_incongruent_accuracy", &bl.executive))
-        }
-        name if name.contains("TowerOfLondon") => {
-            Some(("tol_overall_optimal_rate", &bl.executive))
-        }
+        name if name.contains("Flanker") => Some(("flanker_incongruent_accuracy", &bl.executive)),
+        name if name.contains("TowerOfLondon") => Some(("tol_overall_optimal_rate", &bl.executive)),
         name if name.contains("DualTask") => Some(("dual_task_cost", &bl.executive)),
         name if name.contains("Ravens") => Some(("ravens_overall_accuracy", &bl.executive)),
-        name if name.contains("IowaGambling") => {
-            Some(("igt_overall_net_score", &bl.executive))
-        }
+        name if name.contains("IowaGambling") => Some(("igt_overall_net_score", &bl.executive)),
 
         // WorM domain
         name if name.contains("N-back") => Some(("nback_2_accuracy", &bl.worm)),
         name if name.contains("ChangeDetection") => Some(("change_detection_k4", &bl.worm)),
         name if name.contains("SerialRecall") => Some(("serial_primacy_advantage", &bl.worm)),
-        name if name.contains("SpatialUpdating") => {
-            Some(("spatial_updating_accuracy", &bl.worm))
-        }
+        name if name.contains("SpatialUpdating") => Some(("spatial_updating_accuracy", &bl.worm)),
         name if name.contains("Binding") => Some(("binding_accuracy", &bl.worm)),
         name if name.contains("DigitSpan") => Some(("digit_span_forward", &bl.worm)),
 
@@ -219,41 +134,31 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("CPT") => Some(("cpt_hit_rate", &bl.sustained_attention)),
 
         // Metacognition
-        name if name.contains("Calibration") => {
-            Some(("calibration_error_ece", &bl.metacognition))
-        }
+        name if name.contains("Calibration") => Some(("calibration_error_ece", &bl.metacognition)),
         name if name.contains("FOK") || name.contains("FeelingOfKnowing") => {
             Some(("fok_gamma", &bl.metacognition))
         }
 
         // ToMBench
-        name if name.contains("FalseBelief") => {
-            Some(("false_belief_accuracy", &bl.tombench))
-        }
+        name if name.contains("FalseBelief") => Some(("false_belief_accuracy", &bl.tombench)),
         name if name.contains("FauxPas") => Some(("faux_pas_accuracy", &bl.tombench)),
         name if name.contains("Hinting") => Some(("hinting_accuracy", &bl.tombench)),
         name if name.contains("Persuasion") => Some(("persuasion_detection", &bl.tombench)),
-        name if name.contains("StrangeStory") => {
-            Some(("strange_story_accuracy", &bl.tombench))
-        }
+        name if name.contains("StrangeStory") => Some(("strange_story_accuracy", &bl.tombench)),
 
         // Affect
         name if name.contains("Emotional") && name.contains("Stroop") => {
             Some(("emotional_interference", &bl.affect))
         }
         name if name.contains("MoodCongruent") => Some(("congruence_ratio", &bl.affect)),
-        name if name.contains("ValenceClassification") => {
-            Some(("valence_accuracy", &bl.affect))
-        }
+        name if name.contains("ValenceClassification") => Some(("valence_accuracy", &bl.affect)),
 
         // Inhibition
         name if name.contains("GoNoGo") => Some(("go_accuracy", &bl.inhibition)),
         name if name.contains("StopSignal") => Some(("sst_stop_accuracy", &bl.inhibition)),
 
         // Attention
-        name if name.contains("VisualSearch") => {
-            Some(("feature_search_accuracy", &bl.attention))
-        }
+        name if name.contains("VisualSearch") => Some(("feature_search_accuracy", &bl.attention)),
         name if name.contains("AttentionalBlink") => Some(("t1_accuracy", &bl.attention)),
 
         // Motor
@@ -262,24 +167,16 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("Bimanual") => Some(("bimanual_accuracy", &bl.motor)),
 
         // Language
-        name if name.contains("LexicalDecision") => {
-            Some(("lexical_word_accuracy", &bl.language))
-        }
-        name if name.contains("SemanticPriming") => {
-            Some(("semantic_priming_effect", &bl.language))
-        }
+        name if name.contains("LexicalDecision") => Some(("lexical_word_accuracy", &bl.language)),
+        name if name.contains("SemanticPriming") => Some(("semantic_priming_effect", &bl.language)),
         name if name.contains("SemanticCoherence") => {
             Some(("semantic_coherence_accuracy", &bl.language))
         }
-        name if name.contains("GardenPath") => {
-            Some(("garden_path_accuracy", &bl.language))
-        }
+        name if name.contains("GardenPath") => Some(("garden_path_accuracy", &bl.language)),
 
         // Social
         name if name.contains("RME") => Some(("rme_accuracy", &bl.social)),
-        name if name.contains("UltimatumGame") => {
-            Some(("ultimatum_acceptance_rate", &bl.social))
-        }
+        name if name.contains("UltimatumGame") => Some(("ultimatum_acceptance_rate", &bl.social)),
         name if name.contains("SocialNorm") => Some(("social_norm_accuracy", &bl.social)),
 
         // Reasoning (ARC)
@@ -289,34 +186,22 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("AccurateRetrieval") => {
             Some(("accurate_retrieval", &bl.memory_agent))
         }
-        name if name.contains("LongRange") => {
-            Some(("long_range_delay_50", &bl.memory_agent))
-        }
-        name if name.contains("ProspectiveMemory") => {
-            Some(("pm_hit_rate", &bl.memory_agent))
-        }
+        name if name.contains("LongRange") => Some(("long_range_delay_50", &bl.memory_agent)),
+        name if name.contains("ProspectiveMemory") => Some(("pm_hit_rate", &bl.memory_agent)),
         name if name.contains("ConflictResolution") => {
             Some(("conflict_recency_preference", &bl.memory_agent))
         }
-        name if name.contains("TestTimeLearning") => {
-            Some(("test_time_learning", &bl.memory_agent))
-        }
+        name if name.contains("TestTimeLearning") => Some(("test_time_learning", &bl.memory_agent)),
 
         // CogBench
         name if name.contains("BART") || name.contains("Bart") => {
             Some(("bart_avg_pumps", &bl.cogbench))
         }
         name if name.contains("Reversal") => Some(("reversal_win_stay", &bl.cogbench)),
-        name if name.contains("RestlessBandit") => {
-            Some(("restless_bandit_accuracy", &bl.cogbench))
-        }
-        name if name.contains("Instrumental") => {
-            Some(("instrumental_sensitivity", &bl.cogbench))
-        }
+        name if name.contains("RestlessBandit") => Some(("restless_bandit_accuracy", &bl.cogbench)),
+        name if name.contains("Instrumental") => Some(("instrumental_sensitivity", &bl.cogbench)),
         name if name.contains("Horizon") => Some(("directed_exploration", &bl.cogbench)),
-        name if name.contains("TemporalDiscounting") => {
-            Some(("discounting_score", &bl.cogbench))
-        }
+        name if name.contains("TemporalDiscounting") => Some(("discounting_score", &bl.cogbench)),
         name if name.contains("TwoStep") => Some(("model_basedness", &bl.cogbench)),
         name if name.contains("Probabilistic") => {
             Some(("probabilistic_likelihood_weight", &bl.cogbench))
@@ -324,9 +209,7 @@ fn baseline_for_benchmark<'a>(
 
         // Creativity
         name if name.contains("AlternateUses") => Some(("aut_fluency", &bl.creativity)),
-        name if name.contains("RemoteAssociates") => {
-            Some(("rat_overall_accuracy", &bl.creativity))
-        }
+        name if name.contains("RemoteAssociates") => Some(("rat_overall_accuracy", &bl.creativity)),
 
         // Butlin
         name if name.contains("Butlin") => Some(("presence_ratio", &bl.butlin)),
@@ -351,7 +234,7 @@ impl NormativeReport {
 
         for result in &report.results {
             let benchmark = &result.benchmark;
-            let metric_name = key_metric(benchmark);
+            let metric_name = key_metric_for_benchmark(benchmark);
 
             // Get agent's metric value
             let metric_value = match result.metrics.get(metric_name) {
@@ -601,20 +484,23 @@ mod tests {
         // Add Stroop result — baseline has sd
         let mut stroop = BenchmarkResult::new("Executive::Stroop", None);
         stroop.insert(
-            "incongruent_accuracy",
-            MetricValue::from_samples(&[0.90, 0.88, 0.92]),
+            "stroop_effect",
+            MetricValue::from_samples(&[0.10, 0.08, 0.12]),
         );
         report.add(stroop);
 
         // Add N-back result
         let mut nback = BenchmarkResult::new("WorM::N-back", None);
-        nback.insert("hit_rate", MetricValue::from_samples(&[0.80, 0.82, 0.78]));
+        nback.insert(
+            "nback_2::accuracy",
+            MetricValue::from_samples(&[0.80, 0.82, 0.78]),
+        );
         report.add(nback);
 
         // Add Calibration (lower-is-better metric)
         let mut calib = BenchmarkResult::new("Metacognition::Calibration", None);
         calib.insert(
-            "calibration_ece",
+            "calibration_error_ece",
             MetricValue::from_samples(&[0.10, 0.12, 0.08]),
         );
         report.add(calib);
@@ -630,7 +516,11 @@ mod tests {
 
         // Verify z-scores are finite
         for s in &normative.scores {
-            assert!(s.z_score.is_finite(), "z-score not finite for {}", s.benchmark);
+            assert!(
+                s.z_score.is_finite(),
+                "z-score not finite for {}",
+                s.benchmark
+            );
             assert!(
                 s.percentile >= 0.0 && s.percentile <= 100.0,
                 "Percentile out of range for {}: {}",
@@ -670,8 +560,8 @@ mod tests {
 
         let mut stroop = BenchmarkResult::new("Executive::Stroop", None);
         stroop.insert(
-            "incongruent_accuracy",
-            MetricValue::from_samples(&[0.90, 0.88, 0.92]),
+            "stroop_effect",
+            MetricValue::from_samples(&[0.10, 0.08, 0.12]),
         );
         report.add(stroop);
 
@@ -684,10 +574,7 @@ mod tests {
             "Missing report title"
         );
         assert!(md.contains("| Benchmark |"), "Missing table header");
-        assert!(
-            md.contains("|-----------|"),
-            "Missing table separator"
-        );
+        assert!(md.contains("|-----------|"), "Missing table separator");
         assert!(md.contains("mean z ="), "Missing overall mean z");
         assert!(md.contains("percentile ="), "Missing overall percentile");
 
@@ -772,12 +659,18 @@ mod tests {
     #[test]
     fn test_lower_better_z_negation() {
         // Verify that is_lower_better correctly identifies metrics
-        assert!(is_lower_better("mean_rt_ticks"));
-        assert!(is_lower_better("calibration_ece"));
-        assert!(is_lower_better("dual_cost"));
         assert!(is_lower_better("stroop_effect"));
+        assert!(is_lower_better("flanker_effect"));
+        assert!(is_lower_better("dual_task_cost"));
+        assert!(is_lower_better("calibration_error_ece"));
+        assert!(is_lower_better("commission_errors"));
+        assert!(is_lower_better("ssrt_ticks"));
+        assert!(is_lower_better("coordination_cost"));
+        assert!(is_lower_better("vigilance_decrement"));
+        assert!(is_lower_better("disambiguation_cost"));
+        assert!(is_lower_better("blink_magnitude"));
         assert!(!is_lower_better("accuracy"));
         assert!(!is_lower_better("hit_rate"));
-        assert!(!is_lower_better("gamma"));
+        assert!(!is_lower_better("fok_gamma"));
     }
 }

@@ -9,13 +9,10 @@ use tracing::Level;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
-    let topic = std::env::var("SYMTHAEA_RESEARCH_BENCH_TOPIC").unwrap_or_else(|_| {
-        "State Space Models and Liquid Time-Constant Networks".to_string()
-    });
+    let topic = std::env::var("SYMTHAEA_RESEARCH_BENCH_TOPIC")
+        .unwrap_or_else(|_| "State Space Models and Liquid Time-Constant Networks".to_string());
     let query = std::env::var("SYMTHAEA_RESEARCH_BENCH_QUERY").unwrap_or_else(|_| {
         "Explain how SSM linear scaling relates to energy efficiency.".to_string()
     });

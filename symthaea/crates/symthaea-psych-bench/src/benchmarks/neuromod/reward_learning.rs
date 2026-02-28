@@ -7,6 +7,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Reward learning benchmark measuring DA-driven reversal learning.
@@ -21,7 +23,10 @@ fn next_seed(state: &mut u64) -> u64 {
 
 fn softmax_choice(values: &[f64], temperature: f64, rng: &mut u64) -> usize {
     let max_v = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let exps: Vec<f64> = values.iter().map(|v| ((v - max_v) / temperature).exp()).collect();
+    let exps: Vec<f64> = values
+        .iter()
+        .map(|v| ((v - max_v) / temperature).exp())
+        .collect();
     let sum: f64 = exps.iter().sum();
     let probs: Vec<f64> = exps.iter().map(|e| e / sum).collect();
 
@@ -155,6 +160,7 @@ impl PsychBenchmark for RewardLearningBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut trials_to_crit = Vec::new();
         let mut lose_shift_ratios = Vec::new();
@@ -165,14 +171,36 @@ impl PsychBenchmark for RewardLearningBenchmark {
             trials_to_crit.push(ttc);
             lose_shift_ratios.push(lsr);
             da_correlations.push(dac);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "reward_learning".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
-        result.insert("trials_to_criterion", MetricValue::from_samples(&trials_to_crit));
-        result.insert("lose_shift_ratio", MetricValue::from_samples(&lose_shift_ratios));
-        result.insert("da_reward_correlation", MetricValue::from_samples(&da_correlations));
+        result.insert(
+            "trials_to_criterion",
+            MetricValue::from_samples(&trials_to_crit),
+        );
+        result.insert(
+            "lose_shift_ratio",
+            MetricValue::from_samples(&lose_shift_ratios),
+        );
+        result.insert(
+            "da_reward_correlation",
+            MetricValue::from_samples(&da_correlations),
+        );
 
         result.conditions = 2; // acquisition + reversal
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

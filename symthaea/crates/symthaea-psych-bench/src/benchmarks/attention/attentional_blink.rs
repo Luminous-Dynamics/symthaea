@@ -16,6 +16,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use crate::wm::ssm_temporal::SsmTemporalBackend;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -127,7 +129,7 @@ impl AttentionalBlinkBenchmark {
                         // then recovery emerges from state-space dynamics over lags
                         ssm.reset();
                         ssm.step(-1.0); // T1 depletion
-                        // Step through intervening lags (lag-1 steps of 0-input recovery)
+                                        // Step through intervening lags (lag-1 steps of 0-input recovery)
                         let mut ssm_out = 0.0_f32;
                         for _ in 0..(lag - 1) {
                             ssm_out = ssm.step(0.0);
@@ -222,6 +224,7 @@ impl PsychBenchmark for AttentionalBlinkBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut t1_accs = Vec::new();
         let mut lag3_accs = Vec::new();
@@ -240,6 +243,18 @@ impl PsychBenchmark for AttentionalBlinkBenchmark {
             all_t1_rts.extend_from_slice(&r.t1_rt_ticks);
             all_lag3_rts.extend_from_slice(&r.t2_rt_ticks_by_lag[1]); // lag 3
             all_lag8_rts.extend_from_slice(&r.t2_rt_ticks_by_lag[3]); // lag 8
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "attentional_blink".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("t1_accuracy", MetricValue::from_samples(&t1_accs));
@@ -252,6 +267,7 @@ impl PsychBenchmark for AttentionalBlinkBenchmark {
 
         result.conditions = 4; // 4 lag conditions
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -327,7 +343,9 @@ mod tests {
         assert!(
             diff < 0.20,
             "SSM lag3 ({:.3}) too far from baseline ({:.3}), diff={:.3}",
-            ssm_lag3, base_lag3, diff
+            ssm_lag3,
+            base_lag3,
+            diff
         );
     }
 }

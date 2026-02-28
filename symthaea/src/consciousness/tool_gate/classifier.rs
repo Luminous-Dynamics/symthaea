@@ -175,7 +175,8 @@ fn select_fallback(
             // Caller guards against this, but degrade gracefully if reached
             tracing::warn!("select_fallback called for Allowed decision — returning no-op");
             FallbackStrategy::RequestHumanConfirmation {
-                reason: "Unexpected: fallback requested for already-allowed gate decision".to_string(),
+                reason: "Unexpected: fallback requested for already-allowed gate decision"
+                    .to_string(),
             }
         }
     }

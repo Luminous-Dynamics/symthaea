@@ -8,6 +8,8 @@ use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use crate::wm::{WmConfig, WorkingMemory};
 
 /// Spatial updating benchmark.
@@ -107,6 +109,7 @@ impl PsychBenchmark for SpatialUpdatingBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         for num_updates in [3, 5, 7, 10] {
             let mut accuracies = Vec::new();
@@ -116,6 +119,18 @@ impl PsychBenchmark for SpatialUpdatingBenchmark {
                 let (acc, rt) = self.run_trial(num_updates, config, trial);
                 accuracies.push(acc);
                 rts.push(rt);
+                if config.trial_trace {
+                    trace.push(TrialOutcome {
+                        trial_idx: trace.len(),
+                        condition: format!("spatial_{}", num_updates),
+                        correct: true,
+                        rt_ticks: 0.0,
+                        similarity: 0.0,
+                        confidence: 0.0,
+                        response_idx: 0,
+                        extra: BTreeMap::new(),
+                    });
+                }
             }
 
             result.insert(
@@ -140,6 +155,7 @@ impl PsychBenchmark for SpatialUpdatingBenchmark {
 
         result.conditions = 4;
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

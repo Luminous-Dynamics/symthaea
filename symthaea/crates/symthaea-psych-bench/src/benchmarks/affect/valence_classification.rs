@@ -8,6 +8,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Valence classification benchmark.
@@ -108,6 +110,7 @@ impl PsychBenchmark for ValenceClassificationBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut overall_accs = Vec::new();
         let mut pos_accs = Vec::new();
@@ -122,6 +125,18 @@ impl PsychBenchmark for ValenceClassificationBenchmark {
             neg_accs.push(neg);
             neu_accs.push(neu);
             rt_ticks.push(rt);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "valence".to_string(),
+                    correct: overall > 0.5,
+                    rt_ticks: rt,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("valence_accuracy", MetricValue::from_samples(&overall_accs));
@@ -132,6 +147,7 @@ impl PsychBenchmark for ValenceClassificationBenchmark {
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

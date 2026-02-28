@@ -250,7 +250,10 @@ fn test_narrative_gwt_veto_suppresses_learning() {
     let mut veto_seen = false;
     for i in 0..20 {
         let result = service.cycle(&format!("veto test cycle {i}"));
-        assert!(result.prediction_error.is_finite(), "cycle {i} prediction_error not finite");
+        assert!(
+            result.prediction_error.is_finite(),
+            "cycle {i} prediction_error not finite"
+        );
         if veto_seen {
             // This cycle should have had learning suppressed by the veto
             // (narrative_veto_active was set to true from previous cycle's veto)
@@ -541,7 +544,10 @@ fn test_v063_affective_curiosity_feedback() {
     // Run enough cycles for affective bridge to produce positive valence
     // (low prediction error → positive valence → boredom *= 1.05)
     let initial_boredom = service.curiosity_drive().boredom;
-    assert!(initial_boredom.is_finite(), "Initial boredom should be finite");
+    assert!(
+        initial_boredom.is_finite(),
+        "Initial boredom should be finite"
+    );
     for _ in 0..15 {
         let r = service.cycle("positive affect broadens exploration");
         assert!(r.prediction_error.is_finite());

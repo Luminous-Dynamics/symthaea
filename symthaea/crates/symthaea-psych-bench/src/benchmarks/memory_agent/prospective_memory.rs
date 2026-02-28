@@ -16,6 +16,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use crate::wm::ssm_temporal::SsmTemporalBackend;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -229,6 +231,7 @@ impl PsychBenchmark for ProspectiveMemoryBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut hit_rates = Vec::new();
         let mut ongoing_accs = Vec::new();
@@ -241,6 +244,18 @@ impl PsychBenchmark for ProspectiveMemoryBenchmark {
             ongoing_accs.push(r.ongoing_accuracy);
             costs.push(r.pm_cost);
             rts.push(r.rt_ticks);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "prospective".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("pm_hit_rate", MetricValue::from_samples(&hit_rates));
@@ -253,6 +268,7 @@ impl PsychBenchmark for ProspectiveMemoryBenchmark {
 
         result.conditions = 2; // PM cue vs ongoing
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -320,7 +336,9 @@ mod tests {
         assert!(
             diff < 0.20,
             "SSM pm_hit_rate ({:.3}) too far from baseline ({:.3}), diff={:.3}",
-            ssm_hr, base_hr, diff
+            ssm_hr,
+            base_hr,
+            diff
         );
     }
 

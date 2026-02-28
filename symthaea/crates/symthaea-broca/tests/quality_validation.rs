@@ -9,13 +9,13 @@
 
 use std::collections::HashSet;
 
-use symthaea_broca::encoder::ThoughtChannels;
-use symthaea_broca::generator::{BrocaConfig, BrocaGenerator, SamplingStrategy};
 use symthaea_broca::controller::LanguageControllerConfig;
+use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::gating::GatingConfig;
+use symthaea_broca::generator::{BrocaConfig, BrocaGenerator, SamplingStrategy};
 use symthaea_broca::tokenizer::BpeTokenizer;
 use symthaea_broca::training::{
-    TrainingConfig, TrainingDataset, TrainingPair, generate_diverse_thoughts, train_with_adam,
+    generate_diverse_thoughts, train_with_adam, TrainingConfig, TrainingDataset, TrainingPair,
 };
 use symthaea_core::genesis::GenesisSeed;
 
@@ -300,7 +300,8 @@ fn test_checkpoint_training_resume() {
         enable_diagnostics: false,
     };
 
-    let (metrics_phase2, _, _) = train_with_adam(&mut resumed_gen, &dataset, &resume_cfg, loaded_adam);
+    let (metrics_phase2, _, _) =
+        train_with_adam(&mut resumed_gen, &dataset, &resume_cfg, loaded_adam);
     assert_eq!(metrics_phase2.len(), 10);
 
     let loss_at_11 = metrics_phase2[0].avg_loss;
@@ -618,16 +619,36 @@ fn test_training_with_diverse_thoughts() {
     // Use generate_diverse_thoughts() to get a broad set of channel configurations
     let all_thoughts = generate_diverse_thoughts();
     // Use a subset of 20 for speed
-    let diverse_subset: Vec<ThoughtChannels> = all_thoughts.into_iter().step_by(18).take(20).collect();
-    assert!(diverse_subset.len() >= 10, "Need at least 10 diverse thoughts");
+    let diverse_subset: Vec<ThoughtChannels> =
+        all_thoughts.into_iter().step_by(18).take(20).collect();
+    assert!(
+        diverse_subset.len() >= 10,
+        "Need at least 10 diverse thoughts"
+    );
 
     // Create training dataset with these diverse thoughts
     let tok = gen.tokenizer().clone();
     let target_texts = [
-        "hello", "the world", "perhaps", "I think", "not sure",
-        "maybe so", "yes", "no way", "good day", "however",
-        "certainly", "unknown", "we can", "likely", "seems right",
-        "perhaps not", "or maybe", "sure thing", "I believe", "quite so",
+        "hello",
+        "the world",
+        "perhaps",
+        "I think",
+        "not sure",
+        "maybe so",
+        "yes",
+        "no way",
+        "good day",
+        "however",
+        "certainly",
+        "unknown",
+        "we can",
+        "likely",
+        "seems right",
+        "perhaps not",
+        "or maybe",
+        "sure thing",
+        "I believe",
+        "quite so",
     ];
 
     let mut dataset = TrainingDataset::default();
@@ -742,10 +763,16 @@ fn test_tokenizer_4k_roundtrip_consistency() {
 
     for text in &test_strings {
         let ids = tok.encode(text);
-        assert!(!ids.is_empty(), "4K tokenizer: encode({text:?}) should be non-empty");
+        assert!(
+            !ids.is_empty(),
+            "4K tokenizer: encode({text:?}) should be non-empty"
+        );
 
         let decoded = tok.decode(&ids);
-        assert!(!decoded.is_empty(), "4K tokenizer: decode should be non-empty for {text:?}");
+        assert!(
+            !decoded.is_empty(),
+            "4K tokenizer: decode should be non-empty for {text:?}"
+        );
 
         // Idempotence after first roundtrip
         let re_ids = tok.encode(&decoded);
@@ -999,7 +1026,11 @@ fn test_generate_then_train_no_corruption() {
     };
 
     let (metrics, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
-    assert_eq!(metrics.len(), 3, "Should complete training after streaming generation");
+    assert_eq!(
+        metrics.len(),
+        3,
+        "Should complete training after streaming generation"
+    );
 
     // Generate again — should not crash
     let result2 = gen.generate(&channels);
@@ -1108,7 +1139,10 @@ fn test_training_gradient_health_after_diverse_training() {
     }
 
     // Adam state should have been used
-    assert!(adam_state.is_some(), "Adam optimizer state should be returned");
+    assert!(
+        adam_state.is_some(),
+        "Adam optimizer state should be returned"
+    );
     let adam = adam_state.unwrap();
     assert!(adam.t > 0, "Adam should have stepped at least once");
 

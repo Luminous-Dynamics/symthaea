@@ -16,14 +16,19 @@ pub use nixos_patterns::{
     SafetyLevel,
 };
 
+use serde::{Deserialize, Serialize};
 pub use symthaea_dream::CausalLink;
 use symthaea_dream::{DreamEngine, DreamEngineConfig, DreamableAction};
-use serde::{Deserialize, Serialize};
 
 impl DreamableAction for ActionIR {
     fn perturb(&self, seed: u64) -> Self {
         match self {
-            ActionIR::RunCommand { program, args, env, working_dir } => {
+            ActionIR::RunCommand {
+                program,
+                args,
+                env,
+                working_dir,
+            } => {
                 let mut new_args = args.clone();
                 if seed % 2 == 0 {
                     if new_args.is_empty() {
@@ -37,7 +42,7 @@ impl DreamableAction for ActionIR {
                         };
                     }
                 }
-                
+
                 ActionIR::RunCommand {
                     program: program.clone(),
                     args: new_args,
@@ -45,7 +50,11 @@ impl DreamableAction for ActionIR {
                     working_dir: working_dir.clone(),
                 }
             }
-            ActionIR::WriteFile { path, content, create_dirs } => {
+            ActionIR::WriteFile {
+                path,
+                content,
+                create_dirs,
+            } => {
                 let mut new_path = path.clone();
                 if let Some(ext) = path.extension() {
                     let mut new_ext = ext.to_os_string();
@@ -54,21 +63,19 @@ impl DreamableAction for ActionIR {
                 } else {
                     new_path.set_extension("dream");
                 }
-                
+
                 ActionIR::WriteFile {
                     path: new_path,
                     content: content.clone(),
                     create_dirs: *create_dirs,
                 }
             }
-            ActionIR::DeleteFile { path } => {
-                ActionIR::RunCommand { 
-                    program: "ls".to_string(), 
-                    args: vec!["-l".to_string(), path.to_string_lossy().to_string()],
-                    env: BTreeMap::new(),
-                    working_dir: None
-                }
-            }
+            ActionIR::DeleteFile { path } => ActionIR::RunCommand {
+                program: "ls".to_string(),
+                args: vec!["-l".to_string(), path.to_string_lossy().to_string()],
+                env: BTreeMap::new(),
+                working_dir: None,
+            },
             ActionIR::Sequence(actions) => {
                 let idx = (seed as usize) % actions.len().max(1);
                 let mut new_actions = actions.clone();
@@ -77,27 +84,43 @@ impl DreamableAction for ActionIR {
                 }
                 ActionIR::Sequence(new_actions)
             }
-            ActionIR::ReadSensor { sensor_id, channels } => ActionIR::ReadSensor { 
-                sensor_id: sensor_id.clone(), 
-                channels: channels.clone() 
+            ActionIR::ReadSensor {
+                sensor_id,
+                channels,
+            } => ActionIR::ReadSensor {
+                sensor_id: sensor_id.clone(),
+                channels: channels.clone(),
             },
-            ActionIR::WriteServo { servo_id, value } => ActionIR::WriteServo { 
-                servo_id: *servo_id, 
-                value: value + ((seed % 10) as f32 / 100.0) 
+            ActionIR::WriteServo { servo_id, value } => ActionIR::WriteServo {
+                servo_id: *servo_id,
+                value: value + ((seed % 10) as f32 / 100.0),
             },
-            ActionIR::SwarmGossip { topic, payload } => ActionIR::SwarmGossip { 
-                topic: topic.clone(), 
-                payload: payload.clone() 
+            ActionIR::SwarmGossip { topic, payload } => ActionIR::SwarmGossip {
+                topic: topic.clone(),
+                payload: payload.clone(),
             },
-            ActionIR::WasmSandbox { module_path, function_name, input_data } => ActionIR::WasmSandbox {
+            ActionIR::WasmSandbox {
+                module_path,
+                function_name,
+                input_data,
+            } => ActionIR::WasmSandbox {
                 module_path: module_path.clone(),
                 function_name: function_name.clone(),
                 input_data: input_data.clone(),
             },
             ActionIR::NoOp => ActionIR::NoOp,
-            ActionIR::ReadFile { path, encoding } => ActionIR::ReadFile { path: path.clone(), encoding: encoding.clone() },
-            ActionIR::CreateDirectory { path, recursive } => ActionIR::CreateDirectory { path: path.clone(), recursive: *recursive },
-            ActionIR::ListDirectory { path, recursive } => ActionIR::ListDirectory { path: path.clone(), recursive: *recursive },
+            ActionIR::ReadFile { path, encoding } => ActionIR::ReadFile {
+                path: path.clone(),
+                encoding: encoding.clone(),
+            },
+            ActionIR::CreateDirectory { path, recursive } => ActionIR::CreateDirectory {
+                path: path.clone(),
+                recursive: *recursive,
+            },
+            ActionIR::ListDirectory { path, recursive } => ActionIR::ListDirectory {
+                path: path.clone(),
+                recursive: *recursive,
+            },
         }
     }
 
@@ -109,7 +132,10 @@ impl DreamableAction for ActionIR {
             DestructivenessLevel::Destructive => 0.1,
         };
         // Mix with current state context
-        state.iter().map(|&s| (s * 0.5 + score * 0.5).clamp(-1.0, 1.0)).collect()
+        state
+            .iter()
+            .map(|&s| (s * 0.5 + score * 0.5).clamp(-1.0, 1.0))
+            .collect()
     }
 
     fn magnitude(&self) -> f32 {
@@ -186,7 +212,9 @@ pub struct Capabilities {
     pub min_phi: f64,
 }
 
-fn default_min_phi() -> f64 { 0.3 }
+fn default_min_phi() -> f64 {
+    0.3
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShellCapabilities {
@@ -199,7 +227,9 @@ pub struct ShellCapabilities {
     pub min_phi: f64,
 }
 
-fn default_shell_phi() -> f64 { 0.5 }
+fn default_shell_phi() -> f64 {
+    0.5
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FilesystemCapabilities {
@@ -446,9 +476,9 @@ impl ActionIR {
     ) -> Result<(), PolicyViolation> {
         // Consciousness Gate: Check global min_phi for any mutation
         if self.risk_tier() > RiskTier::Low && current_phi < policy.capabilities.min_phi {
-            return Err(PolicyViolation::PhiTooLow { 
-                required: policy.capabilities.min_phi, 
-                actual: current_phi 
+            return Err(PolicyViolation::PhiTooLow {
+                required: policy.capabilities.min_phi,
+                actual: current_phi,
             });
         }
 
@@ -483,7 +513,10 @@ impl ActionIR {
                     AccessKind::Write,
                 )?;
             }
-            ActionIR::ReadSensor { .. } | ActionIR::WriteServo { .. } | ActionIR::SwarmGossip { .. } | ActionIR::WasmSandbox { .. } => {
+            ActionIR::ReadSensor { .. }
+            | ActionIR::WriteServo { .. }
+            | ActionIR::SwarmGossip { .. }
+            | ActionIR::WasmSandbox { .. } => {
                 // HAL, Swarm, and Forge primitives are currently allowed by default if they pass the global Phi gate
             }
             ActionIR::RunCommand {
@@ -494,9 +527,9 @@ impl ActionIR {
             } => {
                 // Specific gate for shell execution
                 if current_phi < policy.capabilities.shell.min_phi {
-                    return Err(PolicyViolation::PhiTooLow { 
-                        required: policy.capabilities.shell.min_phi, 
-                        actual: current_phi 
+                    return Err(PolicyViolation::PhiTooLow {
+                        required: policy.capabilities.shell.min_phi,
+                        actual: current_phi,
                     });
                 }
 
@@ -588,11 +621,26 @@ pub enum PolicyViolation {
         expected: String,
         actual: String,
     },
-    ShellBudgetExceeded { allowed: u32, attempted: u32 },
-    ShellHourlyBudgetExceeded { allowed: u32, attempted: u32 },
-    FileWriteBudgetExceeded { allowed: u32, attempted: u32 },
-    BytesWrittenBudgetExceeded { allowed: u64, attempted: u64 },
-    PhiTooLow { required: f64, actual: f64 },
+    ShellBudgetExceeded {
+        allowed: u32,
+        attempted: u32,
+    },
+    ShellHourlyBudgetExceeded {
+        allowed: u32,
+        attempted: u32,
+    },
+    FileWriteBudgetExceeded {
+        allowed: u32,
+        attempted: u32,
+    },
+    BytesWrittenBudgetExceeded {
+        allowed: u64,
+        attempted: u64,
+    },
+    PhiTooLow {
+        required: f64,
+        actual: f64,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -701,7 +749,8 @@ pub enum ActionOutcome {
         output: Vec<u8>,
         logs: Vec<String>,
     },
-    SimulatedCommand {        program: String,
+    SimulatedCommand {
+        program: String,
         args: Vec<String>,
     },
     CommandOutput {
@@ -843,16 +892,22 @@ impl SimpleExecutor {
     /// Check if accumulated wisdom suggests a better action
     pub fn consult_wisdom(&self, _action: &ActionIR) -> Option<ActionIR> {
         let current_context = vec![0.0; 64];
-        
+
         for w in self.dream_engine.wisdom() {
             if w.context_state == current_context {
                 if w.confidence > 0.3 {
                     return Some(w.better_action.clone());
                 } else {
-                    println!("   (Wisdom found but confidence {:.2} <= 0.3)", w.confidence);
+                    println!(
+                        "   (Wisdom found but confidence {:.2} <= 0.3)",
+                        w.confidence
+                    );
                 }
             } else {
-                println!("   (Wisdom found but context mismatch: len={})", w.context_state.len());
+                println!(
+                    "   (Wisdom found but context mismatch: len={})",
+                    w.context_state.len()
+                );
             }
         }
         None
@@ -868,7 +923,9 @@ impl SimpleExecutor {
         // 0. Consult Wisdom (The "Pre-flight Check")
         // If the dream engine suggests a better path, we take it.
         let (final_action, wisdom_used) = if let Some(better_action) = self.consult_wisdom(action) {
-            println!("✨ Wisdom Intervention: Substituted dangerous action with safer alternative.");
+            println!(
+                "✨ Wisdom Intervention: Substituted dangerous action with safer alternative."
+            );
             (better_action, true)
         } else {
             (action.clone(), false)
@@ -876,15 +933,17 @@ impl SimpleExecutor {
 
         // 0.5. PRECOGNITION (The "Causal Veto")
         // Before executing, simulate the outcome in working memory.
-        let state_dummy = vec![0.0; 64]; 
-        let prediction = self.dream_engine.predict_outcome_distribution(&state_dummy, &final_action);
-        
+        let state_dummy = vec![0.0; 64];
+        let prediction = self
+            .dream_engine
+            .predict_outcome_distribution(&state_dummy, &final_action);
+
         if prediction.failure_probability > 0.8 {
             tracing::warn!(target: "symthaea::action", 
                 "CAUSAL VETO: Simulation predicts {:.1}% failure probability. Aborting action.", 
                 prediction.failure_probability * 100.0);
             return Err(ExecutionError::Unsupported(format!(
-                "Causal Veto: Predicted failure probability {:.1}% is too high.", 
+                "Causal Veto: Predicted failure probability {:.1}% is too high.",
                 prediction.failure_probability * 100.0
             )));
         } else if prediction.failure_probability > 0.4 {
@@ -959,7 +1018,10 @@ impl SimpleExecutor {
                 }
                 ActionOutcome::DirectoryListing(entries)
             }
-            ActionIR::ReadSensor { sensor_id, channels } => match self.mode {
+            ActionIR::ReadSensor {
+                sensor_id,
+                channels,
+            } => match self.mode {
                 ExecutionMode::Simulated => {
                     let mut values = BTreeMap::new();
                     for chan in channels {
@@ -995,9 +1057,16 @@ impl SimpleExecutor {
                     ActionOutcome::Success
                 }
             },
-            ActionIR::WasmSandbox { module_path, function_name, input_data: _ } => match self.mode {
+            ActionIR::WasmSandbox {
+                module_path,
+                function_name,
+                input_data: _,
+            } => match self.mode {
                 ExecutionMode::Simulated => {
-                    println!("🧪 WASM Sandbox: Simulating verification of module {:?}::{}()", module_path, function_name);
+                    println!(
+                        "🧪 WASM Sandbox: Simulating verification of module {:?}::{}()",
+                        module_path, function_name
+                    );
                     ActionOutcome::WasmResult {
                         output: vec![1], // 1 = success in our protocol
                         logs: vec!["Simulation: Verification successful.".to_string()],
@@ -1008,15 +1077,24 @@ impl SimpleExecutor {
                     {
                         use wasmtime::*;
                         let engine = Engine::default();
-                        let module = Module::from_file(&engine, module_path).map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
+                        let module = Module::from_file(&engine, module_path)
+                            .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
                         let mut store = Store::new(&engine, ());
-                        let instance = Instance::new(&mut store, &module, &[]).map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
-                        let func = instance.get_typed_func::<(), i32>(&mut store, function_name).map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
-                        let res = func.call(&mut store, ()).map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
-                        
+                        let instance = Instance::new(&mut store, &module, &[])
+                            .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
+                        let func = instance
+                            .get_typed_func::<(), i32>(&mut store, function_name)
+                            .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
+                        let res = func
+                            .call(&mut store, ())
+                            .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
+
                         ActionOutcome::WasmResult {
                             output: vec![res as u8],
-                            logs: vec![format!("Wasmtime: Function {} returned {}", function_name, res)],
+                            logs: vec![format!(
+                                "Wasmtime: Function {} returned {}",
+                                function_name, res
+                            )],
                         }
                     }
                     #[cfg(not(feature = "wasm-sandbox"))]
@@ -1074,7 +1152,7 @@ impl SimpleExecutor {
         // Record to dream engine (learning from experience)
         // We use a dummy state because SimpleExecutor is stateless,
         // but this allows the DreamEngine to start accumulating action-outcome pairs.
-        let state_dummy = vec![0.0; 64]; 
+        let state_dummy = vec![0.0; 64];
         let outcome_vec = self.vectorize_outcome(&outcome);
         // Surprise heuristic: 0.0 for success, 1.0 for error or dangerous simulated command
         let surprise = match &outcome {
@@ -1084,7 +1162,8 @@ impl SimpleExecutor {
         };
         // Only record if we didn't just use wisdom (prevent circular reinforcement)
         if !wisdom_used {
-            self.dream_engine.record(&state_dummy, final_action.clone(), &outcome_vec, surprise);
+            self.dream_engine
+                .record(&state_dummy, final_action.clone(), &outcome_vec, surprise);
         }
 
         Ok(ExecutionOutcome {
@@ -1111,10 +1190,18 @@ impl SimpleExecutor {
                 }
             }
             ActionOutcome::CommandOutput { exit_code, .. } => {
-                if *exit_code == 0 { 1.0 } else { 0.1 }
+                if *exit_code == 0 {
+                    1.0
+                } else {
+                    0.1
+                }
             }
             ActionOutcome::WasmResult { output, .. } => {
-                if !output.is_empty() && output[0] == 1 { 1.0 } else { 0.2 }
+                if !output.is_empty() && output[0] == 1 {
+                    1.0
+                } else {
+                    0.2
+                }
             }
         };
         vec![score; 64]
@@ -1221,10 +1308,9 @@ impl BudgetTracker {
         let allowed = policy.budgets.shell_commands_per_session;
         let attempted = self.shell_commands_used.saturating_add(1);
         if allowed > 0 && attempted > allowed {
-            return Err(ExecutionError::Policy(PolicyViolation::ShellBudgetExceeded {
-                allowed,
-                attempted,
-            }));
+            return Err(ExecutionError::Policy(
+                PolicyViolation::ShellBudgetExceeded { allowed, attempted },
+            ));
         }
 
         if self.shell_window_start.elapsed() >= Duration::from_secs(3600) {
@@ -1259,19 +1345,23 @@ impl BudgetTracker {
         let allowed_ops = policy.budgets.file_writes_per_session;
         let attempted_ops = self.file_writes_used.saturating_add(write_ops);
         if allowed_ops > 0 && attempted_ops > allowed_ops {
-            return Err(ExecutionError::Policy(PolicyViolation::FileWriteBudgetExceeded {
-                allowed: allowed_ops,
-                attempted: attempted_ops,
-            }));
+            return Err(ExecutionError::Policy(
+                PolicyViolation::FileWriteBudgetExceeded {
+                    allowed: allowed_ops,
+                    attempted: attempted_ops,
+                },
+            ));
         }
 
         let allowed_bytes = policy.budgets.bytes_written_per_session;
         let attempted_bytes = self.bytes_written.saturating_add(bytes);
         if allowed_bytes > 0 && attempted_bytes > allowed_bytes {
-            return Err(ExecutionError::Policy(PolicyViolation::BytesWrittenBudgetExceeded {
-                allowed: allowed_bytes,
-                attempted: attempted_bytes,
-            }));
+            return Err(ExecutionError::Policy(
+                PolicyViolation::BytesWrittenBudgetExceeded {
+                    allowed: allowed_bytes,
+                    attempted: attempted_bytes,
+                },
+            ));
         }
 
         Ok(())
@@ -1631,7 +1721,9 @@ mod tests {
         };
 
         assert!(executor.execute(&action, &policy, &sandbox, 1.0).is_ok());
-        let err = executor.execute(&action, &policy, &sandbox, 1.0).unwrap_err();
+        let err = executor
+            .execute(&action, &policy, &sandbox, 1.0)
+            .unwrap_err();
         assert!(matches!(
             err,
             ExecutionError::Policy(PolicyViolation::ShellBudgetExceeded { .. })

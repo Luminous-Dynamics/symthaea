@@ -816,6 +816,45 @@ impl HdcSsmProjection {
         (avg_dist, avg_recon)
     }
 
+    /// Scale all accumulated gradient buffers by a scalar factor.
+    ///
+    /// Call this between gradient accumulation and application for
+    /// per-example curriculum weighting (e.g. surprise-weighted gradients).
+    pub fn scale_accumulated_gradients(&mut self, factor: f32) {
+        for g in self.grad_down.iter_mut() {
+            *g *= factor;
+        }
+        for g in self.grad_up.iter_mut() {
+            *g *= factor;
+        }
+        for g in self.grad_back_down.iter_mut() {
+            *g *= factor;
+        }
+        for g in self.grad_back_up.iter_mut() {
+            *g *= factor;
+        }
+        for g in self.grad_ln_fwd_gamma.iter_mut() {
+            *g *= factor;
+        }
+        for g in self.grad_ln_fwd_beta.iter_mut() {
+            *g *= factor;
+        }
+        for g in self.grad_ln_bwd_gamma.iter_mut() {
+            *g *= factor;
+        }
+        for g in self.grad_ln_bwd_beta.iter_mut() {
+            *g *= factor;
+        }
+        if self.deep {
+            for g in self.grad_down2.iter_mut() {
+                *g *= factor;
+            }
+            for g in self.grad_up2.iter_mut() {
+                *g *= factor;
+            }
+        }
+    }
+
     /// Apply accumulated gradients with SGD + gradient clipping, then zero accumulators.
     pub fn apply_gradients(&mut self, lr: f32, grad_clip: f32) {
         Self::apply_grad(&mut self.w_down, &mut self.grad_down, lr, grad_clip);
@@ -2028,6 +2067,44 @@ mod tests {
         let back = proj.project_to_hdc(&ssm);
         assert_eq!(back.values.len(), 8);
         assert!(back.values.iter().all(|x| x.is_finite()));
+    }
+
+    #[test]
+    fn test_scale_accumulated_gradients() {
+        let genesis = test_genesis();
+        let dim = 256;
+        let mut proj = HdcSsmProjection::new(&genesis, dim, 32, 64);
+
+        let thought = ContinuousHV::random(dim, 42);
+        let output = ContinuousHV::random(dim, 99);
+
+        // Compute gradients, capture weights, scale by 2, apply
+        proj.compute_gradients(&thought, &output);
+        proj.scale_accumulated_gradients(2.0);
+        proj.apply_gradients(0.1, 1000.0);
+        let weights_scaled = proj.flatten_weights();
+
+        // Reset to original weights and repeat without scaling
+        let mut proj2 = HdcSsmProjection::new(&genesis, dim, 32, 64);
+        proj2.compute_gradients(&thought, &output);
+        proj2.apply_gradients(0.1, 1000.0);
+        let weights_unscaled = proj2.flatten_weights();
+
+        // The initial weights are the same for both
+        let initial = HdcSsmProjection::new(&genesis, dim, 32, 64).flatten_weights();
+
+        // Scaled delta should be ~2× the unscaled delta (modulo clipping)
+        let mut scaled_delta_sum = 0.0f64;
+        let mut unscaled_delta_sum = 0.0f64;
+        for i in 0..initial.len() {
+            scaled_delta_sum += (weights_scaled[i] - initial[i]).abs() as f64;
+            unscaled_delta_sum += (weights_unscaled[i] - initial[i]).abs() as f64;
+        }
+
+        assert!(
+            scaled_delta_sum > unscaled_delta_sum * 1.5,
+            "2x gradient scale should produce larger weight deltas: scaled={scaled_delta_sum:.6}, unscaled={unscaled_delta_sum:.6}"
+        );
     }
 
     #[test]

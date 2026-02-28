@@ -434,7 +434,7 @@ impl HolochainCortex {
         } else {
             format!("toxic_{}", self.stats.verifications_failed)
         };
-        
+
         tracing::info!(%id, "THYMUS: Imprinting semantic shape for future recognition.");
         self.thymus.store(&id, state.values.clone());
     }
@@ -447,10 +447,11 @@ impl HolochainCortex {
             "RECORDING EPIGENETIC INSIGHT TO DHT"
         );
         self.insight_ledger.push(insight);
-        
+
         // Sort by Phi (descending) to keep top insights accessible
-        self.insight_ledger.sort_by(|a, b| b.phi_achieved.total_cmp(&a.phi_achieved));
-        
+        self.insight_ledger
+            .sort_by(|a, b| b.phi_achieved.total_cmp(&a.phi_achieved));
+
         // Cap ledger size for mock
         if self.insight_ledger.len() > 100 {
             self.insight_ledger.pop();
@@ -621,11 +622,11 @@ impl HolochainCortex {
         public_inputs: &[u8],
     ) -> Result<bool, CortexError> {
         self.stats.dht_queries += 1;
-        
+
         // 1. In production, we'd use symthaea-zkproof::EvolutionaryProver::verify
         // For RC1, we'll perform a simulated verification
         let is_valid = !proof_bytes.is_empty() && !public_inputs.is_empty();
-        
+
         if is_valid {
             tracing::info!(agent = %agent_key, mutation = %mutation_id, "ZK Proof verified successfully");
             self.record_interaction(agent_key);
@@ -659,11 +660,11 @@ impl HolochainCortex {
         public_inputs: &[u8],
     ) -> Result<bool, CortexError> {
         self.stats.dht_queries += 1;
-        
+
         // 1. In production, we'd verify the RISC Zero receipt proves high Phi
         // for the specific holographic state being beamed.
         let is_valid = !proof_bytes.is_empty() && !public_inputs.is_empty();
-        
+
         if is_valid {
             tracing::info!(agent = %agent_key, "Resuscitation ZK Proof verified. State is healthy.");
             Ok(true)

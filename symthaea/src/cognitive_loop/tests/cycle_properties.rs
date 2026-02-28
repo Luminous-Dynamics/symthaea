@@ -306,7 +306,10 @@ fn test_biorhythm_refresh_fires_at_97_cycles() {
         let r = service.cycle(&format!("bio {i}"));
         // Spot-check every 20th cycle to avoid per-iteration overhead
         if i % 20 == 0 {
-            assert!(r.prediction_error.is_finite(), "cycle {i} prediction_error not finite");
+            assert!(
+                r.prediction_error.is_finite(),
+                "cycle {i} prediction_error not finite"
+            );
         }
     }
     // The 97th cycle triggers refresh, counter resets to 0, then increments to 1
@@ -367,7 +370,10 @@ fn test_carryover_urgency_persists() {
 fn test_carryover_learning_state_updated() {
     let mut service = learning_service();
     let initial_conf = service.prediction_confidence();
-    assert!((0.0..=1.0).contains(&initial_conf), "Initial confidence should be in [0, 1]: {initial_conf}");
+    assert!(
+        (0.0..=1.0).contains(&initial_conf),
+        "Initial confidence should be in [0, 1]: {initial_conf}"
+    );
     let first = service.cycle("first cycle");
     assert!(first.prediction_error.is_finite());
     // After one cycle, the carryover learning prediction_confidence should have been
@@ -538,7 +544,10 @@ fn test_error_history_bounded() {
     for i in 0..150 {
         let r = service.cycle(&format!("error hist {i}"));
         if i % 30 == 0 {
-            assert!(r.prediction_error.is_finite(), "cycle {i} prediction_error not finite");
+            assert!(
+                r.prediction_error.is_finite(),
+                "cycle {i} prediction_error not finite"
+            );
         }
     }
     // error_history is private, but avg_prediction_error is derived from it
@@ -558,7 +567,10 @@ fn test_recent_hvs_bounded() {
     for i in 0..30 {
         let r = service.cycle(&format!("recent hvs {i}"));
         if i % 10 == 0 {
-            assert!(r.prediction_error.is_finite(), "cycle {i} prediction_error not finite");
+            assert!(
+                r.prediction_error.is_finite(),
+                "cycle {i} prediction_error not finite"
+            );
         }
     }
     // If capacity weren't bounded, we'd see memory growth.
@@ -585,7 +597,10 @@ fn test_psi_attestation_buffer_bounded() {
     for i in 0..50 {
         let r = service.cycle(&format!("attestation {i}"));
         if i % 10 == 0 {
-            assert!(r.prediction_error.is_finite(), "cycle {i} prediction_error not finite");
+            assert!(
+                r.prediction_error.is_finite(),
+                "cycle {i} prediction_error not finite"
+            );
         }
     }
 

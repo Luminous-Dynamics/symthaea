@@ -16,6 +16,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Visual Search benchmark testing parallel vs serial attentional processing.
@@ -82,10 +84,7 @@ impl VisualSearchBenchmark {
 
                     let item = if is_target {
                         // Target: red circle + noise
-                        ContinuousHV::weighted_bundle(
-                            &[&target_template, &noise],
-                            &[0.85, 0.15],
-                        )
+                        ContinuousHV::weighted_bundle(&[&target_template, &noise], &[0.85, 0.15])
                     } else {
                         // Distractor: blue circle (shares shape but not color)
                         let dist = blue.bind(&circle);
@@ -127,10 +126,7 @@ impl VisualSearchBenchmark {
                     let noise = ContinuousHV::random(dim, rng);
 
                     let item = if is_target {
-                        ContinuousHV::weighted_bundle(
-                            &[&target_template, &noise],
-                            &[0.85, 0.15],
-                        )
+                        ContinuousHV::weighted_bundle(&[&target_template, &noise], &[0.85, 0.15])
                     } else {
                         // Alternate between red-square and blue-circle distractors
                         let dist = if item_idx % 2 == 0 {
@@ -209,6 +205,7 @@ impl PsychBenchmark for VisualSearchBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let set_sizes_f = [4.0, 8.0, 16.0, 24.0];
         let mut feat_accs_all = Vec::new();
@@ -257,6 +254,18 @@ impl PsychBenchmark for VisualSearchBenchmark {
             for v in fr.iter().chain(cr.iter()) {
                 all_rts.extend_from_slice(v);
             }
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "visual_search".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         let asymmetries: Vec<f64> = conj_slopes
@@ -286,6 +295,7 @@ impl PsychBenchmark for VisualSearchBenchmark {
 
         result.conditions = 8; // 2 search types × 4 set sizes
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

@@ -250,7 +250,10 @@ Output only the requested Title and Bridge lines."
         return fallback_bridge(obj_a, obj_b);
     }
 
-    BridgeText { title, body: bridge }
+    BridgeText {
+        title,
+        body: bridge,
+    }
 }
 
 fn fallback_bridge(obj_a: &LearningObjective, obj_b: &LearningObjective) -> BridgeText {

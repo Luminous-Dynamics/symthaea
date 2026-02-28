@@ -140,10 +140,7 @@ fn main() {
     match runtime.servo_mut().read_positions() {
         Ok(positions) => {
             let nonzero_count = positions.iter().filter(|&&p| p != 0).count();
-            println!(
-                "  {} of 21 channels have non-zero position",
-                nonzero_count
-            );
+            println!("  {} of 21 channels have non-zero position", nonzero_count);
             for (i, &p) in positions.iter().enumerate().take(5) {
                 if p != 0 {
                     println!("    joint {:2}: OFF count = {}", i, p);

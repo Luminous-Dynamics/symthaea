@@ -4,6 +4,7 @@
 use symthaea_psych_bench::benchmarks::affect::{
     MoodCongruentRecallBenchmark, ValenceClassificationBenchmark,
 };
+use symthaea_psych_bench::benchmarks::attention::VisualSearchBenchmark;
 use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
@@ -17,12 +18,11 @@ use symthaea_psych_bench::benchmarks::executive::{
     FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark, StroopBenchmark,
     TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
 };
+use symthaea_psych_bench::benchmarks::inhibition::StopSignalBenchmark;
 use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
     TestTimeLearningBenchmark,
 };
-use symthaea_psych_bench::benchmarks::attention::VisualSearchBenchmark;
-use symthaea_psych_bench::benchmarks::inhibition::StopSignalBenchmark;
 use symthaea_psych_bench::benchmarks::metacognition::{
     FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark,
 };

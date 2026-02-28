@@ -553,7 +553,10 @@ impl ReplSession {
 
         // Initialize voice (optional)
         let voice = if config.voice_enabled {
-            let voice_config = VoiceOutputConfig { enable_tts: true, ..Default::default() };
+            let voice_config = VoiceOutputConfig {
+                enable_tts: true,
+                ..Default::default()
+            };
             let mut v = VoiceOutput::new(voice_config);
             let _ = v.initialize();
             Some(v)
@@ -851,7 +854,8 @@ impl ReplSession {
 
         // Validate against policy
         if let Some(ref sandbox) = self.sandbox {
-            if let Err(e) = action.validate(&self.policy, sandbox, consciousness.unified_psi as f64) {
+            if let Err(e) = action.validate(&self.policy, sandbox, consciousness.unified_psi as f64)
+            {
                 self.stats.actions_blocked += 1;
                 return Ok(ActionResult {
                     command: command.clone(),
@@ -911,7 +915,12 @@ impl ReplSession {
             ExecutionMode::Real => {
                 // Real execution through sandbox
                 if let Some(ref sandbox) = self.sandbox {
-                    match self.executor.execute(&action, &self.policy, sandbox, consciousness.unified_psi as f64) {
+                    match self.executor.execute(
+                        &action,
+                        &self.policy,
+                        sandbox,
+                        consciousness.unified_psi as f64,
+                    ) {
                         Ok(outcome) => {
                             self.stats.actions_executed += 1;
                             let output_str = match &outcome.outcome {

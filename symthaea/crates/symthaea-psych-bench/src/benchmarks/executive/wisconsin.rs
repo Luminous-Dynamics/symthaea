@@ -15,7 +15,7 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
-use symthaea_core::hdc::ContinuousHV;
+
 
 /// Card features.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -65,27 +65,10 @@ pub struct WisconsinCardSortingBenchmark;
 
 impl WisconsinCardSortingBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
-        let dim = config.dimension;
         let seed = config.trial_seed("executive", "wcst", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
         let mut card_trace = Vec::new();
         let mut global_card_idx = 0usize;
-
-        // Create deterministic atomic HVs for features
-        let color_hvs: Vec<ContinuousHV> = (0..4)
-            .map(|i| ContinuousHV::random(dim, seed.wrapping_add(100 + i)))
-            .collect();
-        let shape_hvs: Vec<ContinuousHV> = (0..4)
-            .map(|i| ContinuousHV::random(dim, seed.wrapping_add(200 + i)))
-            .collect();
-        let number_hvs: Vec<ContinuousHV> = (0..4)
-            .map(|i| ContinuousHV::random(dim, seed.wrapping_add(300 + i)))
-            .collect();
-
-        // Role HVs for binding
-        let role_color = ContinuousHV::random(dim, seed.wrapping_add(400));
-        let role_shape = ContinuousHV::random(dim, seed.wrapping_add(401));
-        let role_number = ContinuousHV::random(dim, seed.wrapping_add(402));
 
         // 4 target cards with unique feature combos
         let targets = [
@@ -110,15 +93,6 @@ impl WisconsinCardSortingBenchmark {
                 number: 4,
             },
         ];
-
-        let encode_card = |card: &Card| -> ContinuousHV {
-            let c = role_color.bind(&color_hvs[card.color as usize]);
-            let s = role_shape.bind(&shape_hvs[card.shape as usize]);
-            let n = role_number.bind(&number_hvs[card.number as usize - 1]);
-            ContinuousHV::bundle(&[&c, &s, &n])
-        };
-
-        let _target_hvs: Vec<ContinuousHV> = targets.iter().map(encode_card).collect();
 
         // State tracking
         let mut current_rule = Rule::Color;
@@ -178,9 +152,8 @@ impl WisconsinCardSortingBenchmark {
                 .position(|t| t.number == response_card.number)
                 .unwrap_or(0);
 
-            // Pick action by highest-confidence rule; HDC similarity as tiebreaker
+            // Pick action by highest-confidence rule
             let candidates = [match_by_color, match_by_shape, match_by_number];
-            let _response_hv = encode_card(&response_card);
 
             // Softmax over rule confidences for stochastic selection.
             // Time pressure: gain 1.5 produces ~15% perseverative errors (Heaton, 1993 WCST norms);
@@ -388,17 +361,11 @@ impl PsychBenchmark for WisconsinCardSortingBenchmark {
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
-            let _acc = r.categories_completed as f64 / 6.0; // normalize
             categories.push(r.categories_completed as f64);
             perseverative.push(r.perseverative_errors as f64);
             non_perseverative.push(r.non_perseverative_errors as f64);
             total_errs.push(r.total_errors as f64);
             trials_first.push(r.trials_to_first as f64);
-            let _mean_rt = if r.rt_ticks.is_empty() {
-                0.0
-            } else {
-                r.rt_ticks.iter().sum::<f64>() / r.rt_ticks.len() as f64
-            };
             all_rts.extend_from_slice(&r.rt_ticks);
 
             if config.trial_trace {

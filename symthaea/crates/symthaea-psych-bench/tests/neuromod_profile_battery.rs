@@ -67,10 +67,30 @@ fn test_dissociation_detection() {
 fn test_expected_dissociations() {
     let expected = symthaea_psych_bench::harness::neuromod_profiles::expected_dissociations();
     assert_eq!(expected.len(), 4);
-    assert_eq!(expected[0], ("High-DA", "Executive::WCST", "SustainedAttention::CPT"));
-    assert_eq!(expected[1], ("High-NE", "SustainedAttention::PVT", "Motor::FittsLaw"));
-    assert_eq!(expected[2], ("High-5HT", "Metacognition::Calibration", "Creativity::AlternateUses"));
-    assert_eq!(expected[3], ("High-ACh", "Attention::VisualSearch", "Creativity::RemoteAssociates"));
+    assert_eq!(
+        expected[0],
+        ("High-DA", "Executive::WCST", "SustainedAttention::CPT")
+    );
+    assert_eq!(
+        expected[1],
+        ("High-NE", "SustainedAttention::PVT", "Motor::FittsLaw")
+    );
+    assert_eq!(
+        expected[2],
+        (
+            "High-5HT",
+            "Metacognition::Calibration",
+            "Creativity::AlternateUses"
+        )
+    );
+    assert_eq!(
+        expected[3],
+        (
+            "High-ACh",
+            "Attention::VisualSearch",
+            "Creativity::RemoteAssociates"
+        )
+    );
 }
 
 // ── Markdown Output ─────────────────────────────────────────────────
@@ -124,7 +144,9 @@ mod live_tests {
     }
 
     impl LoopDrivable for ProfileBenchmark {
-        fn loop_name(&self) -> &str { self.name }
+        fn loop_name(&self) -> &str {
+            self.name
+        }
         fn generate_stimuli(&self, config: &BenchmarkConfig) -> Vec<LoopStimulus> {
             let dim = config.dimension;
             let target = ContinuousHV::random(dim, self.seed);
@@ -146,7 +168,10 @@ mod live_tests {
     fn test_live_profile_battery() {
         let config = bench_config();
         let profiles = NeuromodProfile::standard_profiles();
-        let bench = ProfileBenchmark { name: "Test::Profile", seed: 42 };
+        let bench = ProfileBenchmark {
+            name: "Test::Profile",
+            seed: 42,
+        };
 
         let mut matrix = DissociationMatrix::new();
 
@@ -165,10 +190,14 @@ mod live_tests {
                 continue;
             }
 
-            let mut runner = CognitiveLoopBenchmarkRunner::new(&format!("profile-{}", profile.name))
-                .expect("runner");
+            let mut runner =
+                CognitiveLoopBenchmarkRunner::new(&format!("profile-{}", profile.name))
+                    .expect("runner");
             runner.service_mut().clamp_neuromod_levels(
-                profile.da, profile.ne, profile.sht, profile.ach,
+                profile.da,
+                profile.ne,
+                profile.sht,
+                profile.ach,
             );
 
             let result = runner.run_benchmark(&bench, &config);
@@ -198,8 +227,14 @@ mod live_tests {
     fn test_live_multi_benchmark_sweep() {
         let config = bench_config();
         let benchmarks = [
-            ProfileBenchmark { name: "BenchA", seed: 100 },
-            ProfileBenchmark { name: "BenchB", seed: 200 },
+            ProfileBenchmark {
+                name: "BenchA",
+                seed: 100,
+            },
+            ProfileBenchmark {
+                name: "BenchB",
+                seed: 200,
+            },
         ];
 
         let mut matrix = DissociationMatrix::new();
@@ -212,10 +247,11 @@ mod live_tests {
         }
 
         for (i, bench) in benchmarks.iter().enumerate() {
-            let mut runner =
-                CognitiveLoopBenchmarkRunner::new(&format!("sweep-da-{}", bench.name))
-                    .expect("runner");
-            runner.service_mut().clamp_neuromod_levels(Some(0.85), None, None, None);
+            let mut runner = CognitiveLoopBenchmarkRunner::new(&format!("sweep-da-{}", bench.name))
+                .expect("runner");
+            runner
+                .service_mut()
+                .clamp_neuromod_levels(Some(0.85), None, None, None);
             let result = runner.run_benchmark(bench, &config);
             let relative = if baselines[i] > 0.01 {
                 result.accuracy / baselines[i]

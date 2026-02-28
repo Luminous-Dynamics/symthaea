@@ -430,9 +430,7 @@ mod tests {
             Box::new(DynamicsError::InvalidConfig("bad".into())),
             Box::new(DynamicsError::ComputationError("fail".into())),
             Box::new(DynamicsError::NotInitialized),
-            Box::new(DynamicsError::Io(std::io::Error::other(
-                "test io error",
-            ))),
+            Box::new(DynamicsError::Io(std::io::Error::other("test io error"))),
         ];
         for err in &errors {
             // std::error::Error::to_string delegates to Display

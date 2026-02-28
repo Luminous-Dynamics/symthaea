@@ -25,6 +25,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -118,8 +120,16 @@ fn scaling_probe(
         }
     }
 
-    let accuracy = if total > 0 { hits as f64 / total as f64 } else { 0.0 };
-    let similarity = if total > 0 { sim_sum / total as f64 } else { 0.0 };
+    let accuracy = if total > 0 {
+        hits as f64 / total as f64
+    } else {
+        0.0
+    };
+    let similarity = if total > 0 {
+        sim_sum / total as f64
+    } else {
+        0.0
+    };
     (accuracy, similarity)
 }
 
@@ -146,7 +156,13 @@ impl ArcScalingBenchmark {
         let mut grid_accuracy = [0.0f64; 4];
         let mut grid_similarity = [0.0f64; 4];
         for (i, &gs) in GRID_SIZES.iter().enumerate() {
-            let (acc, sim) = scaling_probe(gs, config.dimension, num_tasks, seed ^ (i as u64), noise_weight);
+            let (acc, sim) = scaling_probe(
+                gs,
+                config.dimension,
+                num_tasks,
+                seed ^ (i as u64),
+                noise_weight,
+            );
             grid_accuracy[i] = acc;
             grid_similarity[i] = sim;
         }
@@ -155,7 +171,8 @@ impl ArcScalingBenchmark {
         let mut dim_accuracy = [0.0f64; 4];
         let mut dim_similarity = [0.0f64; 4];
         for (i, &dim) in DIMENSIONS.iter().enumerate() {
-            let (acc, sim) = scaling_probe(5, dim, num_tasks, seed ^ (100 + i as u64), noise_weight);
+            let (acc, sim) =
+                scaling_probe(5, dim, num_tasks, seed ^ (100 + i as u64), noise_weight);
             dim_accuracy[i] = acc;
             dim_similarity[i] = sim;
         }
@@ -182,7 +199,9 @@ impl ArcScalingBenchmark {
 /// Compute slope of simple linear regression.
 fn linear_slope(xs: &[f64], ys: &[f64]) -> f64 {
     let n = xs.len() as f64;
-    if n < 2.0 { return 0.0; }
+    if n < 2.0 {
+        return 0.0;
+    }
     let mean_x = xs.iter().sum::<f64>() / n;
     let mean_y = ys.iter().sum::<f64>() / n;
     let mut num = 0.0;
@@ -191,7 +210,11 @@ fn linear_slope(xs: &[f64], ys: &[f64]) -> f64 {
         num += (x - mean_x) * (y - mean_y);
         den += (x - mean_x) * (x - mean_x);
     }
-    if den.abs() > 1e-10 { num / den } else { 0.0 }
+    if den.abs() > 1e-10 {
+        num / den
+    } else {
+        0.0
+    }
 }
 
 impl PsychBenchmark for ArcScalingBenchmark {
@@ -211,6 +234,7 @@ impl PsychBenchmark for ArcScalingBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let grid_names = ["3x3", "5x5", "8x8", "12x12"];
         let dim_names = ["128d", "256d", "512d", "1024d"];
@@ -232,6 +256,18 @@ impl PsychBenchmark for ArcScalingBenchmark {
             }
             grid_slopes.push(r.grid_slope);
             dim_slopes.push(r.dim_slope);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "arc_scaling".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         for (i, name) in grid_names.iter().enumerate() {
@@ -254,17 +290,26 @@ impl PsychBenchmark for ArcScalingBenchmark {
                 MetricValue::from_samples(&dim_sims[i]),
             );
         }
-        result.insert("grid_complexity_slope", MetricValue::from_samples(&grid_slopes));
-        result.insert("dimension_efficiency_slope", MetricValue::from_samples(&dim_slopes));
+        result.insert(
+            "grid_complexity_slope",
+            MetricValue::from_samples(&grid_slopes),
+        );
+        result.insert(
+            "dimension_efficiency_slope",
+            MetricValue::from_samples(&dim_slopes),
+        );
 
         // Capacity ratio: grid_3x3 accuracy / grid_12x12 accuracy
-        let cap_ratios: Vec<f64> = grid_accs[0].iter().zip(grid_accs[3].iter())
+        let cap_ratios: Vec<f64> = grid_accs[0]
+            .iter()
+            .zip(grid_accs[3].iter())
             .map(|(small, large)| if *large > 0.0 { small / large } else { 1.0 })
             .collect();
         result.insert("capacity_ratio", MetricValue::from_samples(&cap_ratios));
 
         result.conditions = 8; // 4 grid sizes + 4 dimensions
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -312,7 +357,11 @@ mod tests {
         let result = ArcScalingBenchmark.run(&config);
         let acc = result.metrics["grid_3x3_accuracy"].mean;
         // Small grids with high dimension should work well
-        assert!(acc > 0.4, "3x3 grid at dim=512 should be near/above chance: {}", acc);
+        assert!(
+            acc > 0.4,
+            "3x3 grid at dim=512 should be near/above chance: {}",
+            acc
+        );
     }
 
     #[test]
@@ -329,8 +378,16 @@ mod tests {
         assert!(sim_128.is_finite(), "128d similarity should be finite");
         assert!(sim_1024.is_finite(), "1024d similarity should be finite");
         // Both should be in reasonable range
-        assert!(sim_128 > -1.0 && sim_128 < 1.0, "128d sim out of range: {}", sim_128);
-        assert!(sim_1024 > -1.0 && sim_1024 < 1.0, "1024d sim out of range: {}", sim_1024);
+        assert!(
+            sim_128 > -1.0 && sim_128 < 1.0,
+            "128d sim out of range: {}",
+            sim_128
+        );
+        assert!(
+            sim_1024 > -1.0 && sim_1024 < 1.0,
+            "1024d sim out of range: {}",
+            sim_1024
+        );
     }
 
     #[test]

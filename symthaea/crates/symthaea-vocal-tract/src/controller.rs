@@ -691,7 +691,6 @@ impl VocalTractController {
             .map(|d| if *d > median_dist { 20 } else { 10 })
             .collect();
 
-
         // Convergence-critical parameters:
         // - 20 warmup steps for LTC neurons to reach differentiated steady states
         // - Distance-weighted LR: extreme vowels get up to 3× the LR

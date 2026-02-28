@@ -99,7 +99,10 @@ mod tests {
         let continuous = binary_to_continuous(&hv);
         assert_eq!(continuous.values.len(), BinaryHV::DIM);
         // All zero bits -> all -1.0
-        assert!(continuous.values.iter().all(|&v| (v - (-1.0)).abs() < f32::EPSILON));
+        assert!(continuous
+            .values
+            .iter()
+            .all(|&v| (v - (-1.0)).abs() < f32::EPSILON));
     }
 
     #[test]
@@ -108,7 +111,10 @@ mod tests {
         let continuous = binary_to_continuous(&hv);
         assert_eq!(continuous.values.len(), BinaryHV::DIM);
         // All one bits -> all +1.0
-        assert!(continuous.values.iter().all(|&v| (v - 1.0).abs() < f32::EPSILON));
+        assert!(continuous
+            .values
+            .iter()
+            .all(|&v| (v - 1.0).abs() < f32::EPSILON));
     }
 
     #[test]
@@ -143,9 +149,7 @@ mod tests {
     #[test]
     fn test_aggregate_values_bounded() {
         // Random HVs should average to values in [-1, 1]
-        let frames: Vec<BinaryHV> = (0..10)
-            .map(|i| BinaryHV::random(i as u64 + 1))
-            .collect();
+        let frames: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i as u64 + 1)).collect();
         let result = aggregate_audio_hvs(&frames);
         for &v in &result.values {
             assert!(

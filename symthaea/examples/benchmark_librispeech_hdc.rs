@@ -252,10 +252,7 @@ fn generate_speaker_mfccs(
 
     // Speaker-specific base MFCC values (formant structure)
     let base: Vec<f32> = (0..n_mfcc)
-        .map(|c| {
-            
-            (speaker as f32 * 0.3 + c as f32 * 0.1).sin() * 0.5
-        })
+        .map(|c| (speaker as f32 * 0.3 + c as f32 * 0.1).sin() * 0.5)
         .collect();
 
     (0..n_frames)

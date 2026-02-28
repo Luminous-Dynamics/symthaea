@@ -267,12 +267,7 @@ fn extract_key_accuracy(result: &BenchmarkResult, benchmark_name: &str) -> f64 {
         name if name.contains("VisualSearch") => vec!["accuracy"],
         name if name.contains("FittsLaw") => vec!["fitts_r_squared", "accuracy"],
         name if name.contains("Arc") => vec!["transfer_accuracy", "accuracy"],
-        _ => vec![
-            "accuracy",
-            "overall_accuracy",
-            "word_accuracy",
-            "hit_rate",
-        ],
+        _ => vec!["accuracy", "overall_accuracy", "word_accuracy", "hit_rate"],
     };
 
     for key in keys {
@@ -400,11 +395,10 @@ pub fn fit_sat(points: &[SatPoint]) -> SatFit {
         let lambda =
             lambda_range.0 + (lambda_range.1 - lambda_range.0) * li as f64 / grid_steps as f64;
         for bi in 0..grid_steps {
-            let beta =
-                beta_range.0 + (beta_range.1 - beta_range.0) * bi as f64 / grid_steps as f64;
+            let beta = beta_range.0 + (beta_range.1 - beta_range.0) * bi as f64 / grid_steps as f64;
             for di in 0..grid_steps {
-                let delta = delta_range.0
-                    + (delta_range.1 - delta_range.0) * di as f64 / grid_steps as f64;
+                let delta =
+                    delta_range.0 + (delta_range.1 - delta_range.0) * di as f64 / grid_steps as f64;
 
                 let sse = compute_sse(points, lambda, beta, delta);
                 if sse < best_sse {
@@ -495,8 +489,8 @@ fn sat_function(t: f64, lambda: f64, beta: f64, delta: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::harness::report::MetricValue;
     use crate::benchmarks::executive::{FlankerBenchmark, StroopBenchmark};
+    use crate::harness::report::MetricValue;
 
     #[test]
     fn test_sat_point_construction() {
@@ -673,8 +667,7 @@ mod tests {
             MetricValue::from_samples(&[8.0, 9.0, 7.5]),
         );
 
-        let (accuracy, mean_rt) =
-            extract_accuracy_and_rt(&result, "Executive::Stroop");
+        let (accuracy, mean_rt) = extract_accuracy_and_rt(&result, "Executive::Stroop");
 
         // Should pick incongruent_accuracy as key metric
         let expected_acc = (0.75 + 0.80 + 0.78) / 3.0;

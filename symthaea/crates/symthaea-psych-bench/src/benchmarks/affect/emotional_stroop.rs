@@ -16,6 +16,8 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use crate::harness::trial_analysis::TrialOutcome;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Emotional Stroop benchmark.
@@ -47,16 +49,14 @@ impl EmotionalStroopBenchmark {
             .map(|i| ContinuousHV::random(dim, seed.wrapping_add(100 + i)))
             .collect();
 
-        // Valence HVs
-        let _negative_valence = ContinuousHV::random(dim, seed.wrapping_add(500));
-        let _neutral_valence = ContinuousHV::random(dim, seed.wrapping_add(600));
-
         // Emotional interference: negative valence attracts attention,
         // partially activating a competing color response
-        let emotional_weight: f32 = 0.35 * diff_model.interference_multiplier(config.difficulty) as f32;
+        let emotional_weight: f32 =
+            0.35 * diff_model.interference_multiplier(config.difficulty) as f32;
         // Time pressure: base 0.25 yields ~10% emotional interference (Williams et al., 1996);
         // +0.15/unit raises temperature, modeling noisier color selection under SAT (Heitz, 2014).
-        let temperature: f64 = (0.25 + config.time_pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
+        let temperature: f64 = (0.25 + config.time_pressure * 0.15)
+            * diff_model.temperature_multiplier(config.difficulty);
         let trials_per_condition = 40;
 
         let mut neutral_correct = 0u32;
@@ -167,6 +167,7 @@ impl PsychBenchmark for EmotionalStroopBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+        let mut trace = Vec::new();
 
         let mut neutral_accs = Vec::new();
         let mut negative_accs = Vec::new();
@@ -181,6 +182,18 @@ impl PsychBenchmark for EmotionalStroopBenchmark {
             interferences.push(r.emotional_interference);
             all_neutral_rts.extend_from_slice(&r.neutral_rts);
             all_negative_rts.extend_from_slice(&r.negative_rts);
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trace.len(),
+                    condition: "emotional_stroop".to_string(),
+                    correct: r.neutral_accuracy > 0.5,
+                    rt_ticks: r.neutral_rts.first().copied().unwrap_or(0.0),
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("neutral_accuracy", MetricValue::from_samples(&neutral_accs));
@@ -203,6 +216,7 @@ impl PsychBenchmark for EmotionalStroopBenchmark {
 
         result.conditions = 2;
         result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace { result.trial_trace = trace; }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
