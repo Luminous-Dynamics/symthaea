@@ -97,7 +97,9 @@ impl CognitiveLoopService {
             neuromod_da_phasic: self.neuromodulator_bath.da_phasic(),
             neuromod_ne_phasic: self.neuromodulator_bath.ne_phasic(),
             neuromod_consciousness_mod: self.neuromodulator_bath.consciousness_modulation(),
-            neuromod_sleep_consolidation_boost: self.neuromodulator_bath.sleep_consolidation_boost(),
+            neuromod_sleep_consolidation_boost: self
+                .neuromodulator_bath
+                .sleep_consolidation_boost(),
             neuromod_attention_allocation: neuromod_attention_alloc,
             neuromod_plasticity_gate: self.neuromodulator_bath.plasticity_gate(),
             neuromod_mcts_exploration_mod: self.neuromodulator_bath.mcts_exploration_modulation()
@@ -118,11 +120,19 @@ impl CognitiveLoopService {
             neuromod_derived_cortisol: self.neuromodulator_bath.to_hormone_state().cortisol as f32,
             ne_ach_suppression: {
                 let ne_ph = self.neuromodulator_bath.ne_phasic();
-                if ne_ph > 0.3 { ne_ph * 0.15 } else { 0.0 }
+                if ne_ph > 0.3 {
+                    ne_ph * 0.15
+                } else {
+                    0.0
+                }
             },
             ach_ne_suppression: {
                 let ach_eff = self.neuromodulator_bath.acetylcholine.effective();
-                if ach_eff > 0.6 { (ach_eff - 0.6) * 0.1 } else { 0.0 }
+                if ach_eff > 0.6 {
+                    (ach_eff - 0.6) * 0.1
+                } else {
+                    0.0
+                }
             },
             neuromod_gaba_effective: self.neuromodulator_bath.gaba.effective(),
             neuromod_global_inhibition: self.neuromodulator_bath.global_inhibition(),
@@ -539,11 +549,13 @@ impl CognitiveLoopService {
             fep_precision: self.fep_agent.precision.perceptual_precision(),
             spectral_mip_phi: self.carryover.consciousness.last_spectral_mip_phi,
             harmonies_alignment: self
-                .ethics_engine.harmonies_integrator()
+                .ethics_engine
+                .harmonies_integrator()
                 .map(|h| h.stats().avg_alignment)
                 .unwrap_or(0.0),
             empathic_compassion: self
-                .primitive_tier.empathic_unification
+                .primitive_tier
+                .empathic_unification
                 .as_ref()
                 .map(|_| 0.0) // Compassion is per-cycle; snapshot shows lifetime average
                 .unwrap_or(0.0),

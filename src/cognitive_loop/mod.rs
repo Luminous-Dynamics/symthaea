@@ -125,20 +125,20 @@ mod identity_integration;
 
 // ── Impl-block submodules (split from this file) ────────────────────────────
 mod accessors;
+pub(crate) mod consciousness_engine;
 mod constructor;
 mod cycle;
 mod cycle_consciousness;
 mod cycle_late_consciousness;
 mod cycle_subsystems;
-mod helpers;
-mod moral;
-mod prediction;
-pub(crate) mod consciousness_engine;
 pub(crate) mod ethics_engine;
 pub(crate) mod feedback_state;
-pub(crate) mod primitive_tier;
+mod helpers;
 pub(crate) mod managers;
+mod moral;
 pub(crate) mod neuromodulators;
+mod prediction;
+pub(crate) mod primitive_tier;
 pub(crate) mod subsystem_trait;
 pub(crate) mod thresholds;
 pub(crate) mod virtual_body;
@@ -426,7 +426,6 @@ pub struct CognitiveLoopService {
     // MORAL ALGEBRA: Compositional Ethical Reasoning
     // (MoralParser + MoralAlgebra now owned by EthicsEngine)
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Last moral evaluation result (for tracking and learning)
     last_moral_judgment: Option<MoralJudgmentSummary>,
 
