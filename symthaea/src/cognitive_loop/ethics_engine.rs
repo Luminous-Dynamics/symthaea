@@ -31,6 +31,7 @@ use crate::hdc::moral_parser::MoralParser;
 
 /// Unified output from the ethics engine.
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields computed for telemetry; consumed selectively by cycle.rs
 pub(crate) struct EthicsEngineOutput {
     // ── Stage 1: Moral Algebra ─────────────────────────────────────────
     /// Moral score from HDC algebra [-1.0, 1.0]
@@ -179,60 +180,87 @@ impl EthicsEngine {
         // Every 7 cycles (co-prime)
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
-        let (moral_score, moral_verdict, deontological_verdict, consent_violation, moral_confidence, violations, satisfactions) =
-            if input.cycle % 7 == 0 && input.cycle > 0 {
-                let encoded = self
-                    .moral_parser
-                    .parse_and_encode(input.input, &self.moral_algebra);
+        let (
+            moral_score,
+            moral_verdict,
+            deontological_verdict,
+            consent_violation,
+            moral_confidence,
+            violations,
+            satisfactions,
+        ) = if input.cycle % 7 == 0 && input.cycle > 0 {
+            let encoded = self
+                .moral_parser
+                .parse_and_encode(input.input, &self.moral_algebra);
 
-                let (verdict_str, good_sim, bad_sim) =
-                    if let Some(judgment) = encoded.judge(&self.moral_algebra) {
-                        let v = match judgment.verdict {
-                            MoralVerdict::Good => "Good",
-                            MoralVerdict::Bad => "Bad",
-                            MoralVerdict::Neutral => "Neutral",
-                            MoralVerdict::ConsentViolation => "ConsentViolation",
-                        };
-                        (v.to_string(), judgment.good_similarity, judgment.bad_similarity)
-                    } else {
-                        ("Neutral".to_string(), 0.0, 0.0)
+            let (verdict_str, good_sim, bad_sim) =
+                if let Some(judgment) = encoded.judge(&self.moral_algebra) {
+                    let v = match judgment.verdict {
+                        MoralVerdict::Good => "Good",
+                        MoralVerdict::Bad => "Bad",
+                        MoralVerdict::Neutral => "Neutral",
+                        MoralVerdict::ConsentViolation => "ConsentViolation",
                     };
-
-                let deont = self.moral_algebra.judge_deontological(input.input);
-                let deont_verdict_str = match deont.verdict {
-                    DeontologicalVerdict::RightDutyFulfilled => "Permissible",
-                    DeontologicalVerdict::WrongPerfectDutyViolated => "Impermissible",
-                    DeontologicalVerdict::WrongImperfectDutyViolated => "Impermissible",
-                    DeontologicalVerdict::Neutral => "Neutral",
-                }
-                .to_string();
-
-                let viols: Vec<String> = deont.violations.iter().map(|v| v.rule_name.clone()).collect();
-                let sats: Vec<String> = deont.satisfactions.iter().map(|s| s.rule_name.clone()).collect();
-
-                let cv = encoded.is_consent_violation();
-                let score: f64 = if cv {
-                    -0.8
+                    (
+                        v.to_string(),
+                        judgment.good_similarity,
+                        judgment.bad_similarity,
+                    )
                 } else {
-                    let base_score = (good_sim - bad_sim).clamp(-1.0, 1.0) as f64;
-                    let deont_factor = deont.score.clamp(-1.0, 1.0) as f64;
-                    (base_score * 0.6 + deont_factor * 0.4).clamp(-1.0, 1.0)
+                    ("Neutral".to_string(), 0.0, 0.0)
                 };
-                let confidence: f64 = encoded.parsed.confidence as f64;
 
-                self.cache.last_moral_score = score;
-                (score, verdict_str, deont_verdict_str, cv, confidence, viols, sats)
+            let deont = self.moral_algebra.judge_deontological(input.input);
+            let deont_verdict_str = match deont.verdict {
+                DeontologicalVerdict::RightDutyFulfilled => "Permissible",
+                DeontologicalVerdict::WrongPerfectDutyViolated => "Impermissible",
+                DeontologicalVerdict::WrongImperfectDutyViolated => "Impermissible",
+                DeontologicalVerdict::Neutral => "Neutral",
+            }
+            .to_string();
+
+            let viols: Vec<String> = deont
+                .violations
+                .iter()
+                .map(|v| v.rule_name.clone())
+                .collect();
+            let sats: Vec<String> = deont
+                .satisfactions
+                .iter()
+                .map(|s| s.rule_name.clone())
+                .collect();
+
+            let cv = encoded.is_consent_violation();
+            let score: f64 = if cv {
+                -0.8
             } else {
-                (
-                    self.cache.last_moral_score,
-                    String::new(),
-                    String::new(),
-                    false,
-                    0.0,
-                    Vec::new(),
-                    Vec::new(),
-                )
+                let base_score = (good_sim - bad_sim).clamp(-1.0, 1.0) as f64;
+                let deont_factor = deont.score.clamp(-1.0, 1.0) as f64;
+                (base_score * 0.6 + deont_factor * 0.4).clamp(-1.0, 1.0)
             };
+            let confidence: f64 = encoded.parsed.confidence as f64;
+
+            self.cache.last_moral_score = score;
+            (
+                score,
+                verdict_str,
+                deont_verdict_str,
+                cv,
+                confidence,
+                viols,
+                sats,
+            )
+        } else {
+            (
+                self.cache.last_moral_score,
+                String::new(),
+                String::new(),
+                false,
+                0.0,
+                Vec::new(),
+                Vec::new(),
+            )
+        };
         let moral_us = t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════
@@ -284,11 +312,8 @@ impl EthicsEngine {
             if let Some(ref mut integrator) = self.harmonies_integrator {
                 if input.cycle % 19 == 0 && input.cycle > 0 {
                     let embedding = ContinuousHV::from_slice(input.compressed_state);
-                    let action = ValuedAction::new(
-                        format!("cycle_{}", input.cycle),
-                        input.input,
-                        embedding,
-                    );
+                    let action =
+                        ValuedAction::new(format!("cycle_{}", input.cycle), input.input, embedding);
                     let eval = integrator.evaluate(&action);
                     self.cache.last_harmonies_alignment = eval.overall_alignment;
                     self.cache.last_harmonies_approved = eval.approved;
@@ -314,10 +339,7 @@ impl EthicsEngine {
         // ═══════════════════════════════════════════════════════════════════
         let unified_verdict = if consent_violation || value_decision == "Veto" {
             EthicalVerdict::Blocked
-        } else if moral_score < -0.3
-            || value_decision == "Warn"
-            || !harmonies_approved
-        {
+        } else if moral_score < -0.3 || value_decision == "Warn" || !harmonies_approved {
             EthicalVerdict::Caution
         } else {
             EthicalVerdict::Safe
@@ -365,7 +387,9 @@ impl EthicsEngine {
     /// moral parsing through the engine's owned parser/algebra without running
     /// the full pipeline (Stages 2+3 need `compressed_state` not yet available).
     pub fn evaluate_moral_input(&mut self, input: &str) -> MoralEvalResult {
-        let encoded = self.moral_parser.parse_and_encode(input, &self.moral_algebra);
+        let encoded = self
+            .moral_parser
+            .parse_and_encode(input, &self.moral_algebra);
 
         let (verdict, good_sim, bad_sim) =
             if let Some(judgment) = encoded.judge(&self.moral_algebra) {
@@ -375,7 +399,11 @@ impl EthicsEngine {
                     MoralVerdict::Neutral => "Neutral",
                     MoralVerdict::ConsentViolation => "ConsentViolation",
                 };
-                (v.to_string(), judgment.good_similarity, judgment.bad_similarity)
+                (
+                    v.to_string(),
+                    judgment.good_similarity,
+                    judgment.bad_similarity,
+                )
             } else {
                 ("Neutral".to_string(), 0.0, 0.0)
             };
@@ -389,8 +417,16 @@ impl EthicsEngine {
         }
         .to_string();
 
-        let violations: Vec<String> = deont.violations.iter().map(|v| v.rule_name.clone()).collect();
-        let satisfactions: Vec<String> = deont.satisfactions.iter().map(|s| s.rule_name.clone()).collect();
+        let violations: Vec<String> = deont
+            .violations
+            .iter()
+            .map(|v| v.rule_name.clone())
+            .collect();
+        let satisfactions: Vec<String> = deont
+            .satisfactions
+            .iter()
+            .map(|s| s.rule_name.clone())
+            .collect();
         let consent_violation = encoded.is_consent_violation();
         let moral_score = if consent_violation {
             -0.8

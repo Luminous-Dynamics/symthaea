@@ -39,6 +39,7 @@ use super::types::ConsciousnessCache;
 /// Contains all measurement results plus proposed feedback deltas.
 /// The caller applies deltas to prediction_confidence, fep_lr_boost, etc.
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields computed for telemetry; consumed selectively by cycle.rs
 pub(crate) struct ConsciousnessEngineOutput {
     // ── Raw measurements ───────────────────────────────────────────────
     /// Spectral MIP Phi — integrated information via Fiedler ordering [0, ∞)
@@ -106,8 +107,6 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     pub epistemic_quality: f64,
     /// Phi validation correlation (for adaptive weighting)
     pub phi_validation_correlation: f64,
-    /// Phi spectral weight (adaptive, from validation)
-    pub phi_spectral_weight: f64,
 }
 
 /// The unified consciousness measurement engine.
@@ -222,8 +221,7 @@ impl ConsciousnessEngine {
         // Adaptive Phi validation weighting
         if let Some(sig) = self.cache.last_sigma {
             if input.phi_validation_correlation > 0.7 {
-                let validation_boost =
-                    (input.phi_validation_correlation - 0.7) as f32 * 0.1;
+                let validation_boost = (input.phi_validation_correlation - 0.7) as f32 * 0.1;
                 confidence_delta += sig as f32 * validation_boost;
             } else if input.phi_validation_correlation > 0.0
                 && input.phi_validation_correlation < 0.3
@@ -277,14 +275,15 @@ impl ConsciousnessEngine {
             if input.cycle % 23 == 0 && input.cycle > 0 {
                 use std::collections::HashMap;
                 let mut core_values = HashMap::new();
-                core_values
-                    .insert(CoreComponent::Integration, input.unified_psi.clamp(0.0, 1.0));
+                core_values.insert(
+                    CoreComponent::Integration,
+                    input.unified_psi.clamp(0.0, 1.0),
+                );
                 core_values.insert(CoreComponent::Binding, input.coherence as f64);
                 core_values.insert(CoreComponent::Workspace, input.coherence as f64 * 0.8);
                 core_values.insert(CoreComponent::Attention, input.phi_attention_weight as f64);
                 core_values.insert(CoreComponent::Recursion, 0.5); // Placeholder: HOT depth
-                core_values
-                    .insert(CoreComponent::Efficacy, 1.0 - input.prediction_error as f64);
+                core_values.insert(CoreComponent::Efficacy, 1.0 - input.prediction_error as f64);
                 core_values.insert(CoreComponent::Knowledge, input.epistemic_quality);
 
                 let state = ConsciousnessStateV2 {
@@ -411,10 +410,8 @@ impl ConsciousnessEngine {
             .unwrap_or(0.0);
 
         // Weighted consensus
-        let unified = 0.35 * spectral_norm
-            + 0.25 * equation_v2
-            + 0.25 * pipeline
-            + 0.15 * multimodal_phi;
+        let unified =
+            0.35 * spectral_norm + 0.25 * equation_v2 + 0.25 * pipeline + 0.15 * multimodal_phi;
 
         unified.clamp(0.0, 1.0)
     }
@@ -431,28 +428,11 @@ impl ConsciousnessEngine {
         cache.last_hierarchical_mip_phi = self.cache.last_hierarchical_mip_phi;
     }
 
-    /// Get the spectral MIP finder for direct push access (HDC state feed).
-    pub fn spectral_mip_finder(&self) -> &SpectralMIPFinder {
-        &self.spectral_mip_finder
-    }
-
-    /// Get mutable access to the spectral MIP finder.
-    pub fn spectral_mip_finder_mut(&mut self) -> &mut SpectralMIPFinder {
-        &mut self.spectral_mip_finder
-    }
-
     /// Borrow the multi-modal integrator (if present).
     pub fn multi_modal_integrator(
         &self,
     ) -> Option<&crate::consciousness::multi_modal_integration::MultiModalIntegrator> {
         self.multi_modal_integrator.as_ref()
-    }
-
-    /// Mutable borrow of multi-modal integrator (if present).
-    pub fn multi_modal_integrator_mut(
-        &mut self,
-    ) -> Option<&mut crate::consciousness::multi_modal_integration::MultiModalIntegrator> {
-        self.multi_modal_integrator.as_mut()
     }
 
     /// Borrow the consciousness equation v2 (if present).
@@ -462,30 +442,9 @@ impl ConsciousnessEngine {
         self.consciousness_equation_v2.as_ref()
     }
 
-    /// Mutable borrow of consciousness equation v2 (if present).
-    pub fn consciousness_equation_v2_mut(
-        &mut self,
-    ) -> Option<&mut crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2> {
-        self.consciousness_equation_v2.as_mut()
-    }
-
     /// Borrow the unified consciousness pipeline (if present).
-    pub fn unified_consciousness_pipeline(
-        &self,
-    ) -> Option<&UnifiedConsciousnessPipeline> {
+    pub fn unified_consciousness_pipeline(&self) -> Option<&UnifiedConsciousnessPipeline> {
         self.unified_consciousness_pipeline.as_ref()
-    }
-
-    /// Mutable borrow of unified consciousness pipeline (if present).
-    pub fn unified_consciousness_pipeline_mut(
-        &mut self,
-    ) -> Option<&mut UnifiedConsciousnessPipeline> {
-        self.unified_consciousness_pipeline.as_mut()
-    }
-
-    /// Access cached sigma value (backward compatibility).
-    pub fn last_sigma(&self) -> Option<f64> {
-        self.cache.last_sigma
     }
 }
 
@@ -526,7 +485,6 @@ mod tests {
             phi_attention_weight: 0.4,
             epistemic_quality: 0.5,
             phi_validation_correlation: 0.5,
-            phi_spectral_weight: 0.6,
         }
     }
 
@@ -609,8 +567,7 @@ mod tests {
                 phi_attention_weight: 0.7,
                 epistemic_quality: 0.8,
                 phi_validation_correlation: 0.5,
-                phi_spectral_weight: 0.6,
-            };
+                };
             let output = engine.measure(&input);
 
             if cycle == 23 {
@@ -668,7 +625,6 @@ mod tests {
                 phi_attention_weight: 0.05,
                 epistemic_quality: 0.1,
                 phi_validation_correlation: 0.0,
-                phi_spectral_weight: 0.5,
             };
             let output = engine.measure(&input);
 
