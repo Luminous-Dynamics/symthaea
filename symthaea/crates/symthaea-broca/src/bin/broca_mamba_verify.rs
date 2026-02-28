@@ -11,7 +11,6 @@
 use std::process;
 use std::time::Instant;
 
-use candle_core::Device;
 use symthaea_broca::mamba::MambaWrapper;
 
 fn main() {
@@ -35,7 +34,7 @@ fn main() {
     // Check 1: Load model
     let start = Instant::now();
     print!("[1/10] Load model... ");
-    let mut wrapper = match MambaWrapper::load(&model_id, Device::Cpu) {
+    let mut wrapper = match MambaWrapper::load(&model_id, symthaea_broca::mamba::best_device()) {
         Ok(w) => {
             println!("PASS ({:.1}s)", start.elapsed().as_secs_f32());
             passed += 1;

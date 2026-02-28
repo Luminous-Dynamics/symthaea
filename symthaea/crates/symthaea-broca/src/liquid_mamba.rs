@@ -240,6 +240,8 @@ pub struct LiquidMambaGenerator {
     last_cached_rank: f32,
     // Optional gradient diagnostics (enabled via enable_diagnostics())
     diagnostics: Option<ProjectionGradientDiagnostics>,
+    // Generation at which diagnostics-triggered recovery last ran (prevents rapid re-triggering)
+    last_diag_recovery_gen: usize,
 }
 
 impl LiquidMambaGenerator {
@@ -316,6 +318,7 @@ impl LiquidMambaGenerator {
             fep_modulation: 1.0,
             last_cached_rank: 0.0,
             diagnostics: None,
+            last_diag_recovery_gen: 0,
         };
 
         if enable_ema {
@@ -912,6 +915,27 @@ impl LiquidMambaGenerator {
             // EMA teacher update after gradient application
             self.projection.update_ema();
             self.distill_accumulator = 0;
+
+            // Auto-recovery: if diagnostics detect bottleneck collapse and
+            // we haven't recovered recently (>10 generations gap)
+            let collapse_detected = self
+                .diagnostics
+                .as_ref()
+                .map_or(false, |d| d.bottleneck_collapse_detected());
+            let recovery_gap = self
+                .generation_count
+                .saturating_sub(self.last_diag_recovery_gen)
+                > 10;
+
+            if collapse_detected && recovery_gap {
+                tracing::warn!(
+                    gen = self.generation_count,
+                    "diagnostics: bottleneck collapse detected, triggering recovery"
+                );
+                let recent: Vec<_> = self.recent_thought_hvs.iter().cloned().collect();
+                self.check_projection_health(&recent);
+                self.last_diag_recovery_gen = self.generation_count;
+            }
         }
 
         // Update contrastive buffer

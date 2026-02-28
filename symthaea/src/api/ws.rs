@@ -67,6 +67,23 @@ pub struct DemoCycleData {
     /// Whether attractor detected in bath phase space
     #[serde(default)]
     pub attractor_detected: bool,
+
+    // ── Post-Phase 6: Phase tracker visualization ──
+    /// Bath centroid (9D mean of recent state vectors)
+    #[serde(default)]
+    pub bath_centroid: Vec<f32>,
+    /// Bath per-dimension variance (9D)
+    #[serde(default)]
+    pub bath_variance: Vec<f32>,
+    /// Bath trajectory (last N state vectors)
+    #[serde(default)]
+    pub bath_trajectory: Vec<Vec<f32>>,
+    /// 2D projection: [DA+NE mean, 5-HT+GABA mean]
+    #[serde(default)]
+    pub bath_projection_2d: Vec<f32>,
+    /// Human-readable phase label (stressed/flow/drowsy/alert/relaxed/recovering/balanced)
+    #[serde(default)]
+    pub bath_phase_label: String,
 }
 
 /// Client message format.

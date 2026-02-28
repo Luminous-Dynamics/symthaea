@@ -29,9 +29,9 @@
 //! - **Motor** (3) — SRTT, Fitts' Law, Bimanual coordination
 //! - **Language** (4) — Garden path, semantic coherence, lexical decision, semantic priming
 //! - **Social** (3) — Reading the Mind in the Eyes, Ultimatum Game, Social Norm
-//! - **Neuromod** (9) — Reward learning, Yerkes-Dodson, attention network,
+//! - **Neuromod** (11) — Reward learning, Yerkes-Dodson, attention network,
 //!   mood induction, pharmacological ablation/challenge, injection challenge,
-//!   allostatic stress, live-loop ablation
+//!   allostatic stress, live-loop ablation, behavioral knockout, consciousness pharmacology
 //!
 //! ## Usage
 //!
