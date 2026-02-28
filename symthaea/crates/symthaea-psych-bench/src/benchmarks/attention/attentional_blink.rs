@@ -247,8 +247,8 @@ impl PsychBenchmark for AttentionalBlinkBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "attentional_blink".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    correct: r.t1_accuracy > 0.5,
+                    rt_ticks: if r.t1_rt_ticks.is_empty() { 0.0 } else { r.t1_rt_ticks.iter().sum::<f64>() / r.t1_rt_ticks.len() as f64 },
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

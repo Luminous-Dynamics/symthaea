@@ -203,8 +203,8 @@ impl PsychBenchmark for SartBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "sart".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    correct: r.d_prime > 0.0,
+                    rt_ticks: r.rt_ticks,
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

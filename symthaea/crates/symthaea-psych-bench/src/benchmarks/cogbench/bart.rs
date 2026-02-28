@@ -243,8 +243,8 @@ impl PsychBenchmark for BartBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "bart".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    correct: pr < 0.5,
+                    rt_ticks: p,
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

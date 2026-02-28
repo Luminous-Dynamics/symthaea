@@ -167,8 +167,8 @@ impl PsychBenchmark for TemporalDiscountingBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "discounting".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    correct: s > 0.0,
+                    rt_ticks: if rts.is_empty() { 0.0 } else { rts.iter().sum::<f64>() / rts.len() as f64 },
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

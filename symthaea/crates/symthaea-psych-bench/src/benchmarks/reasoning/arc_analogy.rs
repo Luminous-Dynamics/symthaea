@@ -373,8 +373,8 @@ impl PsychBenchmark for ArcAnalogyBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "arc_analogy".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    correct: r.analogy_accuracy > 0.5,
+                    rt_ticks: r.analogy_rt_ticks,
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

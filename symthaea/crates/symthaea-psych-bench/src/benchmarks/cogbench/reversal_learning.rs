@@ -291,8 +291,8 @@ impl PsychBenchmark for ReversalLearningBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "reversal".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    correct: r.reversals_completed > 0.0,
+                    rt_ticks: if r.rt_ticks.is_empty() { 0.0 } else { r.rt_ticks.iter().sum::<f64>() / r.rt_ticks.len() as f64 },
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

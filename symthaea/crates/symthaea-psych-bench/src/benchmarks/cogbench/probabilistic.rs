@@ -109,7 +109,7 @@ impl PsychBenchmark for ProbabilisticReasoningBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "probabilistic".to_string(),
-                    correct: true,
+                    correct: b1 > 0.0,
                     rt_ticks: rt,
                     similarity: 0.0,
                     confidence: 0.0,

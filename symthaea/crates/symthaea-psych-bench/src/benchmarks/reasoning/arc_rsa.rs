@@ -296,8 +296,8 @@ impl PsychBenchmark for ArcRsaBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "arc_rsa".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    correct: r.rsa_correlation > 0.0,
+                    rt_ticks: r.rt_ticks,
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

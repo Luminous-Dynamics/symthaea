@@ -141,7 +141,7 @@ impl PsychBenchmark for MoodInductionBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "mood_induction".to_string(),
-                    correct: true,
+                    correct: bias > 0.0,
                     rt_ticks: 0.0,
                     similarity: 0.0,
                     confidence: 0.0,
