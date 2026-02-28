@@ -12,6 +12,7 @@
 //! Eval-only mode (skip training):
 //!   broca-projection-train --eval-only --resume checkpoint.bin --eval eval.jsonl
 
+use std::io::Write;
 use std::process;
 
 use symthaea_broca::checkpoint::ProjectionCheckpoint;
@@ -51,6 +52,12 @@ fn main() {
         accumulation_steps: opts.accumulation_steps,
         cosine_annealing_steps: opts.cosine_annealing_steps,
         deep_projection: opts.deep_projection,
+        // Disable runtime safety features during batch training:
+        // - consciousness_gating: the PE > 0.8 gate in distill_step() blocks all
+        //   gradient flow when projection is untrained (PE ≈ 1.0 always)
+        // - veto: truncates generation to ~3 tokens, starving distillation of signal
+        enable_consciousness_gating: false,
+        enable_veto: false,
         ..Default::default()
     };
 
@@ -64,6 +71,7 @@ fn main() {
     };
 
     // Load existing projection weights if provided
+    let mut resumed_diagnostics_snapshot = None;
     if let Some(ref resume_path) = opts.resume_path {
         tracing::info!(path = %resume_path, "Loading existing projection checkpoint");
         match ProjectionCheckpoint::load_from_file(resume_path) {
@@ -81,6 +89,7 @@ fn main() {
                         "Restored diagnostics snapshot from checkpoint"
                     );
                 }
+                resumed_diagnostics_snapshot = ckpt.diagnostics_snapshot;
             }
             Err(e) => {
                 eprintln!(
@@ -95,6 +104,18 @@ fn main() {
     // Enable gradient diagnostics if requested
     if opts.diagnostics {
         gen.enable_diagnostics();
+        // Restore cumulative counters from checkpoint so resumed training
+        // reports cumulative total_steps and clip_count
+        if let Some(ref snap) = resumed_diagnostics_snapshot {
+            if let Some(diag) = gen.projection_diagnostics_mut() {
+                diag.restore_from_snapshot(snap);
+                tracing::info!(
+                    total_steps = snap.total_steps,
+                    clip_count = snap.clip_count,
+                    "Diagnostics counters restored from checkpoint"
+                );
+            }
+        }
     }
 
     // ─── Eval-only mode: skip training, jump straight to evaluation ───
@@ -217,6 +238,13 @@ fn main() {
                     coherence = result.final_coherence,
                     "Health check"
                 );
+                // Unbuffered progress (tracing stderr is internally buffered)
+                let _ = writeln!(
+                    std::io::stderr(),
+                    "[progress] epoch={epoch} sample={}/{num_samples} pe={:.4} rank={rank:.1} coh={:.4}",
+                    i + 1, result.semantic_pe, result.final_coherence,
+                );
+                std::io::stderr().flush().ok();
             }
         }
 
@@ -260,6 +288,13 @@ fn main() {
             vetos = epoch_vetos,
             "Epoch complete"
         );
+        // Unbuffered epoch summary
+        let _ = writeln!(
+            std::io::stderr(),
+            "[epoch] {epoch}/{} avg_pe={avg_pe:.4} rank={avg_rank:.2} coh={avg_coh:.4} vetos={epoch_vetos}",
+            opts.epochs,
+        );
+        std::io::stderr().flush().ok();
 
         all_epoch_metrics.push(metrics);
     }
