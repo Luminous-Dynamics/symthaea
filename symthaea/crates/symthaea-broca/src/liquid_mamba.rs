@@ -40,7 +40,7 @@ use crate::gating::{
 };
 use crate::generator::GenerationResult;
 use crate::mamba::{MambaBackend, MambaWrapper};
-use crate::projection::HdcSsmProjection;
+use crate::projection::{HdcSsmProjection, ProjectionGradientDiagnostics};
 use crate::tokenizer::BpeTokenizer;
 
 /// Configuration for the Liquid-Mamba generator.
@@ -238,6 +238,8 @@ pub struct LiquidMambaGenerator {
     fep_modulation: f32,
     // Last cached effective rank from check_projection_health()
     last_cached_rank: f32,
+    // Optional gradient diagnostics (enabled via enable_diagnostics())
+    diagnostics: Option<ProjectionGradientDiagnostics>,
 }
 
 impl LiquidMambaGenerator {
@@ -245,7 +247,7 @@ impl LiquidMambaGenerator {
     ///
     /// Loads the Mamba model from HuggingFace Hub (requires network on first run).
     pub fn new(genesis: &GenesisSeed, config: LiquidMambaConfig) -> Result<Self> {
-        let device = candle_core::Device::Cpu;
+        let device = crate::mamba::best_device();
         let mamba = MambaWrapper::load(&config.model_id, device)?;
         Self::with_backend(genesis, config, Box::new(mamba))
     }
@@ -313,6 +315,7 @@ impl LiquidMambaGenerator {
             pe_history: VecDeque::with_capacity(64),
             fep_modulation: 1.0,
             last_cached_rank: 0.0,
+            diagnostics: None,
         };
 
         if enable_ema {
@@ -683,6 +686,19 @@ impl LiquidMambaGenerator {
         self.last_cached_rank
     }
 
+    /// Enable gradient diagnostics collection.
+    ///
+    /// Once enabled, each `distill_step()` that applies gradients will record
+    /// step metrics (norms, clipping, bottleneck stats) into the diagnostics buffer.
+    pub fn enable_diagnostics(&mut self) {
+        self.diagnostics = Some(ProjectionGradientDiagnostics::default());
+    }
+
+    /// Get a reference to the collected gradient diagnostics (if enabled).
+    pub fn projection_diagnostics(&self) -> Option<&ProjectionGradientDiagnostics> {
+        self.diagnostics.as_ref()
+    }
+
     /// Push a PE value into the history ring buffer (capacity 64).
     fn push_pe_history(&mut self, pe: f32) {
         if self.pe_history.len() >= 64 {
@@ -885,7 +901,14 @@ impl LiquidMambaGenerator {
         // Gradient accumulation: only apply every N steps
         self.distill_accumulator += 1;
         if self.distill_accumulator >= self.config.accumulation_steps.max(1) {
-            self.projection.apply_gradients(effective_lr, self.config.grad_clip);
+            let metrics = self.projection.apply_gradients(effective_lr, self.config.grad_clip);
+            // Record diagnostics if enabled
+            if let Some(ref mut diag) = self.diagnostics {
+                diag.record_step(&metrics, effective_lr);
+                // Record bottleneck activation from the thought HV
+                let bottleneck = self.projection.bottleneck_activation(&thought_hv);
+                diag.record_bottleneck(&bottleneck);
+            }
             // EMA teacher update after gradient application
             self.projection.update_ema();
             self.distill_accumulator = 0;
