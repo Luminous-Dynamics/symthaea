@@ -54,6 +54,61 @@ pub struct VocalTractConfig {
     pub transition_max_delta: f32,
 }
 
+/// Training hyperparameters for `train_on_phoneme_targets`.
+///
+/// Extracted from hardcoded constants so parameter sweeps can find optimal values.
+/// Use [`TrainingHyperparams::default()`] for the Phase 23 baseline (100 Hz avg vowel error).
+#[derive(Debug, Clone)]
+pub struct TrainingHyperparams {
+    /// Output weight initialization scale. Higher = stronger initial phoneme differentiation.
+    /// Phase 23 baseline: 0.15. Values > 0.25 risk instability.
+    pub weight_init_scale: f32,
+    /// Cosine annealing LR peak multiplier (× base learning_rate).
+    /// Phase 23 baseline: 30.0.
+    pub lr_peak_mult: f32,
+    /// Cosine annealing LR floor multiplier (× base learning_rate).
+    /// Phase 23 baseline: 10.0. Lower = finer late-epoch tuning.
+    pub lr_min_mult: f32,
+    /// Warmup forward-pass steps per phoneme per epoch (no gradient, just LTC settling).
+    /// Phase 23 baseline: 20.
+    pub warmup_steps: usize,
+    /// Gradient steps for near-schwa phonemes (distance ≤ median).
+    /// Phase 23 baseline: 10.
+    pub base_steps: usize,
+    /// Gradient steps for outlier phonemes (distance > median).
+    /// Phase 23 baseline: 20.
+    pub outlier_steps: usize,
+    /// Max distance-based LR multiplier. Maps 1.0 (schwa-like) to this value (extreme vowels).
+    /// Phase 23 baseline: 3.0.
+    pub distance_lr_cap: f32,
+    /// Weight on F2 distance from schwa in the distance metric (F1/F3 weight = 1.0).
+    /// Phase 23 baseline: 4.0 (F2 is 2× more important since it drives front/back distinction).
+    pub f2_distance_weight: f32,
+    /// ERROR_SCALE for F2 dimension (gradient normalization). Lower = stronger F2 gradient.
+    /// Phase 23 baseline: 600.0. Values < 400 risk attractor collapse.
+    pub f2_error_scale: f32,
+    /// Transition training LR multiplier (× base learning_rate).
+    /// Phase 23 baseline: 5.0.
+    pub transition_lr_mult: f32,
+}
+
+impl Default for TrainingHyperparams {
+    fn default() -> Self {
+        Self {
+            weight_init_scale: 0.15,
+            lr_peak_mult: 30.0,
+            lr_min_mult: 10.0,
+            warmup_steps: 20,
+            base_steps: 10,
+            outlier_steps: 20,
+            distance_lr_cap: 3.0,
+            f2_distance_weight: 4.0,
+            f2_error_scale: 600.0,
+            transition_lr_mult: 5.0,
+        }
+    }
+}
+
 impl Default for VocalTractConfig {
     fn default() -> Self {
         Self {
@@ -162,8 +217,23 @@ pub struct VocalTractController {
 }
 
 impl VocalTractController {
+    /// Create a new controller with custom weight initialization scale.
+    ///
+    /// Use this for parameter sweeps where you want to test different init scales.
+    pub fn new_with_weight_init(
+        genesis: &GenesisSeed,
+        config: &VocalTractConfig,
+        weight_init_scale: f32,
+    ) -> Self {
+        Self::new_internal(genesis, config, weight_init_scale)
+    }
+
     /// Create a new controller from a genesis seed and config.
     pub fn new(genesis: &GenesisSeed, config: &VocalTractConfig) -> Self {
+        Self::new_internal(genesis, config, 0.15)
+    }
+
+    fn new_internal(genesis: &GenesisSeed, config: &VocalTractConfig, weight_init_scale: f32) -> Self {
         let neuron_config = UnifiedConfig {
             tau_base: 0.005,   // 5ms — matches 200Hz frame rate
             backbone_tau: 0.1, // Moderate state dependency for smooth formant transitions
@@ -186,7 +256,7 @@ impl VocalTractController {
         let weight_hv = genesis.hv("vocal_tract::output_weights", total_weights);
         let mut output_weights = weight_hv.values;
         for w in &mut output_weights {
-            *w *= 0.15; // Large init → network can deviate far from schwa bias
+            *w *= weight_init_scale;
         }
 
         // Bias initialized to schwa (neutral vowel) defaults
@@ -600,8 +670,8 @@ impl VocalTractController {
 
     /// Train the output projection on all phoneme targets from a provided slice.
     ///
-    /// For each epoch, iterates every phoneme target, creates a deterministic cognitive HV
-    /// from the genesis seed, and runs `train_step()` against the ground-truth formants.
+    /// Uses default [`TrainingHyperparams`] (Phase 23 baseline). For parameter sweeps,
+    /// use [`train_on_phoneme_targets_configured`] instead.
     ///
     /// Returns the average loss from the final epoch.
     pub fn train_on_phoneme_targets(
@@ -609,6 +679,27 @@ impl VocalTractController {
         genesis: &GenesisSeed,
         phoneme_targets: &[(&str, &crate::types::FormantTarget)],
         epochs: usize,
+    ) -> f32 {
+        self.train_on_phoneme_targets_configured(
+            genesis,
+            phoneme_targets,
+            epochs,
+            &TrainingHyperparams::default(),
+        )
+    }
+
+    /// Train the output projection with configurable hyperparameters.
+    ///
+    /// Same as [`train_on_phoneme_targets`] but accepts a [`TrainingHyperparams`] struct
+    /// for parameter sweeps. The `weight_init_scale` and `transition_lr_mult` fields are
+    /// NOT used here — weight init is done in the constructor, and transitions use
+    /// [`train_on_transitions`].
+    pub fn train_on_phoneme_targets_configured(
+        &mut self,
+        genesis: &GenesisSeed,
+        phoneme_targets: &[(&str, &crate::types::FormantTarget)],
+        epochs: usize,
+        params: &TrainingHyperparams,
     ) -> f32 {
         if phoneme_targets.is_empty() {
             return 0.0;
@@ -665,22 +756,19 @@ impl VocalTractController {
         let distances: Vec<f32> = phoneme_hvs
             .iter()
             .map(|(_, _, frame)| {
-                // F2 weighted 2× — it has the widest range (600-3000 Hz) and drives
-                // the largest errors (IY F2=2290, UW F2=870 vs schwa 1500).
                 ((frame.f1 - schwa_f1).powi(2)
-                    + 4.0 * (frame.f2 - schwa_f2).powi(2)
+                    + params.f2_distance_weight * (frame.f2 - schwa_f2).powi(2)
                     + (frame.f3 - schwa_f3).powi(2))
                 .sqrt()
             })
             .collect();
         let max_dist = distances.iter().cloned().fold(1.0f32, f32::max);
-        // lr_scale: 1.0 for schwa-like, up to 3.0 for extreme vowels
         let lr_scales: Vec<f32> = distances
             .iter()
-            .map(|d| 1.0 + 2.0 * (d / max_dist))
+            .map(|d| 1.0 + (params.distance_lr_cap - 1.0) * (d / max_dist))
             .collect();
 
-        // Adaptive train steps: above-median distance gets 2× steps
+        // Adaptive train steps: above-median distance gets outlier_steps, below gets base_steps
         let median_dist = {
             let mut sorted = distances.clone();
             sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -688,21 +776,17 @@ impl VocalTractController {
         };
         let adaptive_steps: Vec<usize> = distances
             .iter()
-            .map(|d| if *d > median_dist { 20 } else { 10 })
+            .map(|d| {
+                if *d > median_dist {
+                    params.outlier_steps
+                } else {
+                    params.base_steps
+                }
+            })
             .collect();
 
-        // Convergence-critical parameters:
-        // - 20 warmup steps for LTC neurons to reach differentiated steady states
-        // - Distance-weighted LR: extreme vowels get up to 3× the LR
-        // - Adaptive gradient steps: outlier phonemes get 20 steps vs 10 for near-schwa
-        // - Cosine LR annealing (30×→10×) for strong early gradients + late fine-tuning
-        // - No weight decay during supervised training (prevents erosion)
-        const WARMUP_STEPS: usize = 20;
-
-        // Cosine annealing: 30× → 10× base. Wide range gives strong early gradients
-        // for extreme vowels then lower LR for fine-tuning in late epochs.
-        let lr_peak = self.learning_rate * 30.0;
-        let lr_min = self.learning_rate * 10.0;
+        let lr_peak = self.learning_rate * params.lr_peak_mult;
+        let lr_min = self.learning_rate * params.lr_min_mult;
 
         let mut last_epoch_loss = 0.0;
 
@@ -715,7 +799,7 @@ impl VocalTractController {
 
             for (idx, (_, hv, target)) in phoneme_hvs.iter().enumerate() {
                 self.reset();
-                for _ in 0..WARMUP_STEPS {
+                for _ in 0..params.warmup_steps {
                     self.forward(hv, 0.005);
                 }
                 let pred = self.forward(hv, 0.005);
