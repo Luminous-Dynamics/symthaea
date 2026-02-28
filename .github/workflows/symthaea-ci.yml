@@ -229,6 +229,7 @@ jobs:
           - full_language
           - support
           # Database & specialized features
+          - lz4_compression
           - lancedb-backend
           - school_learning
           - benchmarks

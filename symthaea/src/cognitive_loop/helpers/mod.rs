@@ -692,7 +692,7 @@ impl CognitiveLoopService {
         self.voice_feedback_bridge.reset();
         self.temporal_signature_encoder.reset();
         self.adaptive_behavior = AdaptiveBehavior::default();
-        self.prediction_confidence = 0.5; // Reset to neutral confidence
+        self.set_confidence("inference_mode_reset", 0.5);
         self.flow_state.reset();
         self.emotion_contagion.reset();
         self.curiosity_drive.reset();

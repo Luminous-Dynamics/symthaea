@@ -107,6 +107,16 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     pub epistemic_quality: f64,
     /// Phi validation correlation (for adaptive weighting)
     pub phi_validation_correlation: f64,
+
+    // ── Phase 6: Bath → consciousness coupling (Seth 2013) ──────────
+    /// Bath phase space entropy (from BathPhaseTracker).
+    pub bath_entropy: f32,
+    /// Whether an attractor has been detected.
+    pub attractor_detected: bool,
+    /// 5-HT2A signal (psychedelic consciousness amplifier).
+    pub sht_2a_signal: f32,
+    /// GABA-A signal (global gain reduction).
+    pub gaba_a_signal: f32,
 }
 
 /// The unified consciousness measurement engine.
@@ -357,12 +367,27 @@ impl ConsciousnessEngine {
         // ═══════════════════════════════════════════════════════════════════
         // UNIFIED CONSCIOUSNESS: Weighted consensus across all systems
         // ═══════════════════════════════════════════════════════════════════
-        let unified_consciousness = self.compute_unified(
+        let mut unified_consciousness = self.compute_unified(
             spectral_mip_phi,
             multimodal_phi,
             equation_v2_consciousness,
             pipeline_consciousness,
         );
+
+        // ═══════════════════════════════════════════════════════════════════
+        // BATH-CONSCIOUSNESS COUPLING (Seth 2013 — interoceptive inference)
+        // ═══════════════════════════════════════════════════════════════════
+        // High 5-HT2A amplifies perceptual richness → consciousness boost
+        let sht_2a_boost = (input.sht_2a_signal - 0.5) * 0.1; // ±5% from baseline 0.5
+        // GABA-A dampens global gain → consciousness reduction
+        let gaba_a_dampen = -(input.gaba_a_signal - 0.4) * 0.08; // baseline GABA=0.4
+        // Low entropy (stuck attractor) → consciousness depression
+        let entropy_factor = if input.attractor_detected { -0.05 } else { 0.0 };
+        unified_consciousness = (unified_consciousness
+            + sht_2a_boost as f64
+            + gaba_a_dampen as f64
+            + entropy_factor)
+            .clamp(0.0, 1.0);
 
         let total_us = total_start.elapsed().as_micros() as u64;
 
@@ -485,6 +510,10 @@ mod tests {
             phi_attention_weight: 0.4,
             epistemic_quality: 0.5,
             phi_validation_correlation: 0.5,
+            bath_entropy: 1.0,
+            attractor_detected: false,
+            sht_2a_signal: 0.5,
+            gaba_a_signal: 0.4,
         }
     }
 
@@ -567,7 +596,11 @@ mod tests {
                 phi_attention_weight: 0.7,
                 epistemic_quality: 0.8,
                 phi_validation_correlation: 0.5,
-                };
+                bath_entropy: 1.0,
+                attractor_detected: false,
+                sht_2a_signal: 0.5,
+                gaba_a_signal: 0.4,
+            };
             let output = engine.measure(&input);
 
             if cycle == 23 {
@@ -625,6 +658,10 @@ mod tests {
                 phi_attention_weight: 0.05,
                 epistemic_quality: 0.1,
                 phi_validation_correlation: 0.0,
+                bath_entropy: 1.0,
+                attractor_detected: false,
+                sht_2a_signal: 0.5,
+                gaba_a_signal: 0.4,
             };
             let output = engine.measure(&input);
 
@@ -650,5 +687,153 @@ mod tests {
 
         assert!(output.spectral_mip_us < 1_000_000);
         assert!(output.total_us < 1_000_000);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 6 #4: Bath → Consciousness Engine Tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_bath_baseline_no_change() {
+        let mut engine = make_engine();
+        let hdv = ContinuousHV::random(16384, 42);
+        let hv16 = BinaryHV::random(42);
+        // Default bath values: sht_2a=0.5, gaba_a=0.4, no attractor
+        let input = make_input(&hdv, &hv16, 1);
+        let output = engine.measure(&input);
+        // At baseline values, modulation should be near-zero
+        assert!(output.unified_consciousness >= 0.0);
+        assert!(output.unified_consciousness <= 1.0);
+    }
+
+    #[test]
+    fn test_high_sht_2a_boosts_consciousness() {
+        let mut engine = make_engine();
+        let hdv = ContinuousHV::random(16384, 42);
+        let hv16 = BinaryHV::random(42);
+        let input_baseline = ConsciousnessEngineInput {
+            hdv: &hdv,
+            hv16: &hv16,
+            cycle: 1,
+            unified_psi: 0.5,
+            coherence: 0.6,
+            prediction_error: 0.2,
+            phi_attention_weight: 0.4,
+            epistemic_quality: 0.5,
+            phi_validation_correlation: 0.5,
+            bath_entropy: 1.0,
+            attractor_detected: false,
+            sht_2a_signal: 0.5,
+            gaba_a_signal: 0.4,
+        };
+        let out_base = engine.measure(&input_baseline);
+
+        let mut engine2 = make_engine();
+        let input_high = ConsciousnessEngineInput {
+            sht_2a_signal: 1.0, // High 5-HT2A
+            ..input_baseline
+        };
+        let out_high = engine2.measure(&input_high);
+        assert!(
+            out_high.unified_consciousness >= out_base.unified_consciousness,
+            "High 5-HT2A should boost consciousness"
+        );
+    }
+
+    #[test]
+    fn test_high_gaba_a_dampens_consciousness() {
+        let mut engine = make_engine();
+        let hdv = ContinuousHV::random(16384, 42);
+        let hv16 = BinaryHV::random(42);
+        let input_baseline = ConsciousnessEngineInput {
+            hdv: &hdv,
+            hv16: &hv16,
+            cycle: 1,
+            unified_psi: 0.5,
+            coherence: 0.6,
+            prediction_error: 0.2,
+            phi_attention_weight: 0.4,
+            epistemic_quality: 0.5,
+            phi_validation_correlation: 0.5,
+            bath_entropy: 1.0,
+            attractor_detected: false,
+            sht_2a_signal: 0.5,
+            gaba_a_signal: 0.4,
+        };
+        let out_base = engine.measure(&input_baseline);
+
+        let mut engine2 = make_engine();
+        let input_high_gaba = ConsciousnessEngineInput {
+            gaba_a_signal: 1.0, // High GABA-A
+            ..input_baseline
+        };
+        let out_gaba = engine2.measure(&input_high_gaba);
+        assert!(
+            out_gaba.unified_consciousness <= out_base.unified_consciousness,
+            "High GABA-A should dampen consciousness"
+        );
+    }
+
+    #[test]
+    fn test_attractor_depresses_consciousness() {
+        let mut engine = make_engine();
+        let hdv = ContinuousHV::random(16384, 42);
+        let hv16 = BinaryHV::random(42);
+        let input_no_attractor = ConsciousnessEngineInput {
+            hdv: &hdv,
+            hv16: &hv16,
+            cycle: 1,
+            unified_psi: 0.5,
+            coherence: 0.6,
+            prediction_error: 0.2,
+            phi_attention_weight: 0.4,
+            epistemic_quality: 0.5,
+            phi_validation_correlation: 0.5,
+            bath_entropy: 1.0,
+            attractor_detected: false,
+            sht_2a_signal: 0.5,
+            gaba_a_signal: 0.4,
+        };
+        let out_no = engine.measure(&input_no_attractor);
+
+        let mut engine2 = make_engine();
+        let input_attractor = ConsciousnessEngineInput {
+            attractor_detected: true,
+            ..input_no_attractor
+        };
+        let out_att = engine2.measure(&input_attractor);
+        assert!(
+            out_att.unified_consciousness <= out_no.unified_consciousness,
+            "Attractor detection should depress consciousness"
+        );
+    }
+
+    #[test]
+    fn test_bath_modulation_clamped() {
+        let mut engine = make_engine();
+        let hdv = ContinuousHV::random(16384, 42);
+        let hv16 = BinaryHV::random(42);
+        // Extreme values to test clamping
+        let input = ConsciousnessEngineInput {
+            hdv: &hdv,
+            hv16: &hv16,
+            cycle: 1,
+            unified_psi: 0.99,
+            coherence: 0.99,
+            prediction_error: 0.01,
+            phi_attention_weight: 0.99,
+            epistemic_quality: 0.99,
+            phi_validation_correlation: 0.9,
+            bath_entropy: 0.0,
+            attractor_detected: true,
+            sht_2a_signal: 2.0, // Extreme
+            gaba_a_signal: 0.0, // Low
+        };
+        let out = engine.measure(&input);
+        assert!(
+            out.unified_consciousness >= 0.0 && out.unified_consciousness <= 1.0,
+            "Output should be clamped [0,1], got {}",
+            out.unified_consciousness
+        );
     }
 }

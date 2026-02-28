@@ -164,8 +164,16 @@ impl CognitiveSubsystem for MemoryManager {
                 data.len()
             ));
         }
-        self.consolidation_pressure = f32::from_le_bytes(data[0..4].try_into().unwrap());
-        self.cycles_since_consolidation = u32::from_le_bytes(data[4..8].try_into().unwrap());
+        self.consolidation_pressure = f32::from_le_bytes(
+            data[0..4]
+                .try_into()
+                .map_err(|_| "MemoryManager: corrupt checkpoint bytes [0..4]".to_string())?,
+        );
+        self.cycles_since_consolidation = u32::from_le_bytes(
+            data[4..8]
+                .try_into()
+                .map_err(|_| "MemoryManager: corrupt checkpoint bytes [4..8]".to_string())?,
+        );
         self.consolidation_active = data[8] != 0;
         Ok(())
     }

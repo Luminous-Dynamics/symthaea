@@ -223,14 +223,15 @@ impl StrangeStoryBenchmark {
         let diff_model = difficulty_model_for(self.name());
         let keyword_signal = keyword_signal * diff_model.signal_multiplier(config.difficulty);
 
-        // Difficulty-gated noise (breaks ceiling at higher difficulty)
+        // Difficulty-gated noise (breaks ceiling at higher difficulty).
+        // Scales with (1 + difficulty) so noise amplitude grows with task difficulty.
         let noise = if config.difficulty > 0.0 {
             let mut rng_state = (config.seed ^ (trial_idx as u64 * 0x9E3779B97F4A7C15)).wrapping_add(1);
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
             rng_state ^= rng_state << 17;
             let u = (rng_state as f64) / (u64::MAX as f64);
-            (u - 0.5) * config.difficulty * 0.4
+            (u - 0.5) * config.difficulty * 0.8 * (1.0 + config.difficulty)
         } else {
             0.0
         };
@@ -239,12 +240,26 @@ impl StrangeStoryBenchmark {
         let combined = keyword_signal + geo_signal * 0.1 + noise;
         // Time pressure: 0.25/unit raises detection threshold, modeling reduced narrative
         // integration under deadline (Happe, 1994 Strange Stories; Wickelgren, 1977 SAT).
-        // Baseline threshold offset of 0.5 makes the threshold harder to exceed.
-        let threshold = 0.5 + config.time_pressure * 0.25;
+        // Difficulty also raises the threshold: harder conditions require stronger signal.
+        let threshold = 0.5 + config.time_pressure * 0.25 + config.difficulty * 0.3;
         let detected_nonliteral = combined > threshold;
 
         // Non-literal detection = correct for these scenarios (all are non-literal)
-        let correct = if detected_nonliteral { 1.0 } else { 0.0 };
+        let mut correct = if detected_nonliteral { 1.0 } else { 0.0 };
+
+        // Difficulty-gated processing error: stochastic response flip models
+        // impaired narrative integration at higher cognitive load (Happé, 1994).
+        if config.difficulty > 0.0 {
+            let mut rng2 = (config.seed ^ (trial_idx as u64 * 0xA0761D6478BD642F)).wrapping_add(1);
+            rng2 ^= rng2 << 13;
+            rng2 ^= rng2 >> 7;
+            rng2 ^= rng2 << 17;
+            let u = (rng2 as f64) / (u64::MAX as f64);
+            if u < config.difficulty * 0.25 {
+                correct = 1.0 - correct;
+            }
+        }
+
         (correct, scenario.story_type)
     }
 

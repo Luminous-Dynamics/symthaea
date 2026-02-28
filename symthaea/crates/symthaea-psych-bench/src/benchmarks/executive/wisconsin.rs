@@ -266,14 +266,14 @@ impl WisconsinCardSortingBenchmark {
                     Rule::Shape => "shape",
                     Rule::Number => "number",
                 };
-                let is_perseverative = !is_correct && prev_rule.is_some() && {
-                    let old_rule_idx = match prev_rule.unwrap() {
+                let is_perseverative = !is_correct && prev_rule.is_some_and(|pr| {
+                    let old_rule_idx = match pr {
                         Rule::Color => 0,
                         Rule::Shape => 1,
                         Rule::Number => 2,
                     };
                     chosen_rule_idx == old_rule_idx
-                };
+                });
                 card_trace.push(TrialOutcome {
                     trial_idx: global_card_idx,
                     condition: format!("rule_{}", current_rule_name),

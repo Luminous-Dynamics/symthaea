@@ -406,6 +406,12 @@ impl ContinuousMind {
                 );
                 interactions += 1;
             }
+
+            // Phase 6: Oxytocin-mediated bath coupling (Feldman 2012)
+            #[cfg(feature = "multi_agent")]
+            if let Some(ref bath) = msg.bath_state {
+                self.cognitive_loop.neuromodulator_bath.couple_with_peer(bath);
+            }
         }
 
         if observed > 0 {
@@ -461,6 +467,7 @@ impl ContinuousMind {
                 behavior: self.state.current_thought.clone(),
                 context: self.state.current_thought.clone(),
                 interaction_outcome: None,
+                bath_state: None, // Bath lives in CognitiveLoopService, not Mind
             });
 
             // Cap outbox to prevent unbounded growth
@@ -571,6 +578,7 @@ impl ContinuousMind {
                 gradient_rx = t.stats.gradients_received,
                 bytes_tx = t.stats.bytes_sent,
                 bytes_rx = t.stats.bytes_received,
+                compress_ratio = format!("{:.1}%", t.stats.compression_ratio() * 100.0),
                 avg_phi = format!("{:.3}", t.avg_phi),
                 "Mesh telemetry"
             );
@@ -843,6 +851,10 @@ impl ContinuousMind {
             ) {
                 Some(mut packet) => {
                     self.sign_mesh_packet(&mut packet);
+                    self.mesh_stats.bytes_before_compression +=
+                        crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
+                    self.mesh_stats.bytes_after_compression +=
+                        crate::swarm::mesh::compress_packet(&packet.to_bytes()).len() as u64;
                     self.mesh_outbox
                         .push(crate::swarm::mesh::MeshOutbound { packet });
                     self.mesh_gradient_sequence = self.mesh_gradient_sequence.wrapping_add(1);
@@ -913,6 +925,10 @@ impl ContinuousMind {
         );
 
         self.sign_mesh_packet(&mut packet);
+
+        self.mesh_stats.bytes_before_compression += crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
+        self.mesh_stats.bytes_after_compression +=
+            crate::swarm::mesh::compress_packet(&packet.to_bytes()).len() as u64;
 
         self.mesh_outbox
             .push(crate::swarm::mesh::MeshOutbound { packet });
@@ -1052,5 +1068,589 @@ impl ContinuousMind {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::memory::memory_coordinator::MemorySource;
+    use crate::mind::{
+        ContinuousMind, Goal, InputType, MindConfig, MindInput, MindOutput, OutputType,
+    };
+    use symthaea_core::hdc::ContinuousHV;
+
+    /// Helper: create an activated mind with default config.
+    fn activated_mind() -> ContinuousMind {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+        mind
+    }
+
+    /// Helper: create an activated mind with a specific working memory capacity.
+    fn mind_with_capacity(cap: usize) -> ContinuousMind {
+        let mut mind = ContinuousMind::new(MindConfig {
+            working_memory_capacity: cap,
+            ..Default::default()
+        });
+        mind.activate();
+        mind
+    }
+
+    // ====================================================================
+    // tick() — top-level cognitive cycle
+    // ====================================================================
+
+    #[test]
+    fn tick_increments_counters() {
+        let mut mind = activated_mind();
+        assert_eq!(mind.state.tick, 0);
+        assert_eq!(mind.stats.total_ticks, 0);
+
+        mind.tick();
+        assert_eq!(mind.state.tick, 1);
+        assert_eq!(mind.stats.total_ticks, 1);
+
+        mind.tick();
+        assert_eq!(mind.state.tick, 2);
+        assert_eq!(mind.stats.total_ticks, 2);
+    }
+
+    #[test]
+    fn tick_updates_biorhythm() {
+        let mut mind = activated_mind();
+        assert!(mind.state.biorhythm.is_none());
+        mind.tick();
+        assert!(mind.state.biorhythm.is_some());
+    }
+
+    #[test]
+    fn tick_updates_processing_latency() {
+        let mut mind = activated_mind();
+        mind.perceive(ContinuousHV::random(512, 1));
+        mind.tick();
+        // Latency should be set to a non-negative value
+        assert!(
+            mind.state.processing_latency_ms >= 0.0,
+            "latency should be non-negative: {}",
+            mind.state.processing_latency_ms
+        );
+    }
+
+    #[test]
+    fn tick_updates_memory_utilization() {
+        let mut mind = mind_with_capacity(7);
+        mind.perceive(ContinuousHV::random(512, 1));
+        mind.perceive(ContinuousHV::random(512, 2));
+        mind.tick();
+        // 2 items out of capacity 7
+        let expected = 2.0 / 7.0;
+        let diff = (mind.state.memory_utilization - expected).abs();
+        assert!(
+            diff < 0.01,
+            "memory_utilization mismatch: got {}, expected ~{}",
+            mind.state.memory_utilization,
+            expected
+        );
+    }
+
+    #[test]
+    fn tick_tracks_average_consciousness() {
+        let mut mind = activated_mind();
+        // Tick several times to accumulate stats
+        for i in 0..5 {
+            mind.perceive(ContinuousHV::random(512, 100 + i));
+            mind.tick();
+        }
+        // Average should be between 0 and 1
+        assert!(mind.stats.avg_consciousness >= 0.0);
+        assert!(mind.stats.avg_consciousness <= 1.0);
+    }
+
+    #[test]
+    fn tick_tracks_peak_consciousness() {
+        let mut mind = activated_mind();
+        for i in 0..10 {
+            mind.perceive(ContinuousHV::random(512, i));
+            mind.tick();
+        }
+        // Peak should be >= average
+        assert!(mind.stats.peak_consciousness >= mind.stats.avg_consciousness);
+    }
+
+    // ====================================================================
+    // process_inputs() — input queue draining and working memory
+    // ====================================================================
+
+    #[test]
+    fn process_inputs_fills_working_memory() {
+        let mut mind = activated_mind();
+        mind.perceive(ContinuousHV::random(512, 42));
+        mind.process_inputs();
+        assert_eq!(mind.working_memory.len(), 1);
+        assert_eq!(mind.working_memory_ticks.len(), 1);
+        assert_eq!(mind.working_memory_sources.len(), 1);
+        assert_eq!(mind.working_memory_verified.len(), 1);
+        assert_eq!(mind.working_memory_metadata.len(), 1);
+    }
+
+    #[test]
+    fn process_inputs_respects_capacity() {
+        let cap = 3;
+        let mut mind = mind_with_capacity(cap);
+
+        for i in 0..(cap + 2) {
+            mind.perceive(ContinuousHV::random(512, i as u64));
+        }
+        mind.process_inputs();
+        assert_eq!(
+            mind.working_memory.len(),
+            cap,
+            "working memory should not exceed capacity"
+        );
+    }
+
+    #[test]
+    fn process_inputs_evicts_oldest_when_full() {
+        let cap = 3;
+        let mut mind = mind_with_capacity(cap);
+
+        // Fill to capacity
+        for i in 0..cap {
+            mind.perceive(ContinuousHV::random(512, i as u64));
+        }
+        // Advance tick so eviction computes steps_survived > 0
+        mind.state.tick = 10;
+        mind.process_inputs();
+        assert!(mind.evicted_items.is_empty(), "no eviction yet");
+
+        // Add one more — should evict the oldest
+        mind.perceive(ContinuousHV::random(512, 999));
+        mind.state.tick = 20;
+        mind.process_inputs();
+        assert_eq!(mind.evicted_items.len(), 1);
+        // The evicted item should have survived steps_survived = 20 - arrival_tick
+        assert!(mind.evicted_items[0].steps_survived > 0);
+    }
+
+    #[test]
+    fn process_inputs_preserves_source_and_verification() {
+        let mut mind = activated_mind();
+        let input = MindInput::new(InputType::Perception, ContinuousHV::random(512, 1))
+            .with_source(MemorySource::UserInteraction)
+            .with_verification(true);
+        mind.input(input);
+        mind.process_inputs();
+        assert_eq!(mind.working_memory_sources[0], MemorySource::UserInteraction);
+        assert!(mind.working_memory_verified[0]);
+    }
+
+    #[test]
+    fn process_inputs_sorts_by_priority() {
+        let mut mind = activated_mind();
+
+        let mut low = MindInput::new(InputType::Perception, ContinuousHV::random(512, 1));
+        low.priority = 0.1;
+        let mut high = MindInput::new(InputType::Perception, ContinuousHV::random(512, 2));
+        high.priority = 0.9;
+        mind.input(low);
+        mind.input(high);
+
+        // process_inputs sorts ascending then pops from back (highest priority processed last,
+        // so highest-priority item ends up last in working memory)
+        mind.process_inputs();
+        assert_eq!(mind.stats.inputs_processed, 2);
+    }
+
+    #[test]
+    fn process_inputs_creates_goal_from_goal_input() {
+        let mut mind = activated_mind();
+        mind.set_goal("learn Rust", ContinuousHV::random(512, 42), 0.8);
+        mind.process_inputs();
+        assert_eq!(mind.goals.len(), 1);
+        assert_eq!(mind.goals[0].description, "learn Rust");
+        assert!(mind.goals[0].is_active);
+        assert_eq!(mind.goals[0].progress, 0.0);
+    }
+
+    #[test]
+    fn process_inputs_applies_feedback_valence() {
+        let mut mind = activated_mind();
+        assert_eq!(mind.state.emotional_valence, 0.0);
+
+        let mut feedback = MindInput::new(InputType::Feedback, ContinuousHV::random(512, 1));
+        feedback
+            .metadata
+            .insert("valence".to_string(), "0.8".to_string());
+        mind.input(feedback);
+        mind.process_inputs();
+
+        // Valence should shift: 0.0 + 0.8 * 0.3 = 0.24
+        let expected = 0.24f32;
+        let diff = (mind.state.emotional_valence - expected).abs();
+        assert!(
+            diff < 0.01,
+            "emotional_valence should be ~{}: got {}",
+            expected,
+            mind.state.emotional_valence
+        );
+    }
+
+    #[test]
+    fn process_inputs_clamps_emotional_valence() {
+        let mut mind = activated_mind();
+        mind.state.emotional_valence = 0.95;
+
+        let mut feedback = MindInput::new(InputType::Feedback, ContinuousHV::random(512, 1));
+        feedback
+            .metadata
+            .insert("valence".to_string(), "1.0".to_string());
+        mind.input(feedback);
+        mind.process_inputs();
+
+        assert!(
+            mind.state.emotional_valence <= 1.0,
+            "valence should be clamped to 1.0: got {}",
+            mind.state.emotional_valence
+        );
+    }
+
+    // ====================================================================
+    // update_consciousness() — integration measure
+    // ====================================================================
+
+    #[test]
+    fn update_consciousness_empty_memory_gives_baseline() {
+        let mut mind = activated_mind();
+        mind.update_consciousness();
+        assert!(
+            (mind.state.consciousness_level - 0.1).abs() < 0.001,
+            "empty memory should give baseline 0.1: got {}",
+            mind.state.consciousness_level
+        );
+    }
+
+    #[test]
+    fn update_consciousness_with_diverse_memories() {
+        let mut mind = activated_mind();
+        // Add diverse random vectors — dissimilar items boost integration
+        for i in 0..5 {
+            mind.working_memory
+                .push(ContinuousHV::random(512, 100 + i));
+        }
+        mind.update_consciousness();
+        assert!(
+            mind.state.consciousness_level > 0.1,
+            "diverse memories should raise consciousness above baseline: got {}",
+            mind.state.consciousness_level
+        );
+    }
+
+    #[test]
+    fn update_consciousness_identical_memories_low_integration() {
+        let mut mind = activated_mind();
+        let hv = ContinuousHV::random(512, 42);
+        // Identical items should have high similarity, low integration
+        for _ in 0..4 {
+            mind.working_memory.push(hv.clone());
+        }
+        mind.update_consciousness();
+        // (1 - similarity) for identical vectors ≈ 0
+        assert!(
+            mind.state.consciousness_level < 0.05,
+            "identical memories should have very low integration: got {}",
+            mind.state.consciousness_level
+        );
+    }
+
+    #[test]
+    fn update_consciousness_relational_psi_boost() {
+        let mut mind = activated_mind();
+        for i in 0..5 {
+            mind.working_memory
+                .push(ContinuousHV::random(512, 200 + i));
+        }
+        mind.update_consciousness();
+        let base_level = mind.state.consciousness_level;
+
+        // Set relational psi and re-update
+        mind.relational_psi = 1.0;
+        // Need to re-add memories since consciousness is computed from scratch
+        mind.update_consciousness();
+        let boosted_level = mind.state.consciousness_level;
+
+        assert!(
+            boosted_level >= base_level,
+            "relational_psi should boost consciousness: base={}, boosted={}",
+            base_level,
+            boosted_level
+        );
+    }
+
+    #[test]
+    fn update_consciousness_relational_psi_zero_no_boost() {
+        let mut mind = activated_mind();
+        for i in 0..3 {
+            mind.working_memory
+                .push(ContinuousHV::random(512, 300 + i));
+        }
+        mind.relational_psi = 0.0;
+        mind.update_consciousness();
+        let level = mind.state.consciousness_level;
+
+        // With psi=0, boost factor is 1.0 (no change)
+        assert!(level >= 0.0 && level <= 1.0);
+    }
+
+    // ====================================================================
+    // generate_output() — consciousness-gated output
+    // ====================================================================
+
+    #[test]
+    fn generate_output_below_threshold_returns_none() {
+        let mut mind = activated_mind();
+        mind.state.consciousness_level = 0.01; // Below default min_consciousness (0.1)
+        let output = mind.generate_output();
+        assert!(
+            output.is_none(),
+            "should not generate output below consciousness threshold"
+        );
+    }
+
+    #[test]
+    fn generate_output_requires_tick_multiple_of_10() {
+        let mut mind = activated_mind();
+        mind.state.consciousness_level = 0.5;
+        mind.working_memory
+            .push(ContinuousHV::random(512, 42));
+
+        // Tick not a multiple of 10 — should return None
+        mind.state.tick = 7;
+        let output = mind.generate_output();
+        assert!(
+            output.is_none(),
+            "should not generate output on non-10-multiple tick"
+        );
+
+        // Tick is a multiple of 10
+        mind.state.tick = 10;
+        mind.state.thermodynamic_load = 0.0; // Ensure no veto
+        let output = mind.generate_output();
+        if let Some(ref out) = output {
+            assert_eq!(out.output_type, OutputType::Thought);
+            assert!(out.content.contains("working memory"));
+        }
+    }
+
+    #[test]
+    fn generate_output_thermodynamic_veto() {
+        let mut mind = activated_mind();
+        mind.state.consciousness_level = 0.5;
+        mind.state.thermodynamic_load = 0.9; // High load
+        mind.state.tick = 10;
+        mind.working_memory
+            .push(ContinuousHV::random(512, 42));
+
+        // The holocell.simulate() may or may not exceed 0.9 predicted load,
+        // but with high thermodynamic_load the veto path is possible.
+        // We just verify no panic occurs.
+        let _output = mind.generate_output();
+    }
+
+    // ====================================================================
+    // take_evicted / take_evicted_tagged
+    // ====================================================================
+
+    #[test]
+    fn take_evicted_drains_buffer() {
+        let mut mind = activated_mind();
+        mind.evicted_items.push(crate::mind::EvictedMemory {
+            content: ContinuousHV::random(512, 1),
+            steps_survived: 42,
+            source: MemorySource::Internal,
+            is_verified: false,
+            metadata: std::collections::HashMap::new(),
+        });
+        let evicted = mind.take_evicted();
+        assert_eq!(evicted.len(), 1);
+        assert_eq!(evicted[0].1, 42); // steps_survived
+        // Buffer should be empty after drain
+        assert!(mind.take_evicted().is_empty());
+    }
+
+    #[test]
+    fn take_evicted_tagged_drains_with_metadata() {
+        let mut mind = activated_mind();
+        let mut meta = std::collections::HashMap::new();
+        meta.insert("topic".to_string(), "science".to_string());
+        mind.evicted_items.push(crate::mind::EvictedMemory {
+            content: ContinuousHV::random(512, 2),
+            steps_survived: 100,
+            source: MemorySource::WebResearch,
+            is_verified: true,
+            metadata: meta,
+        });
+        let tagged = mind.take_evicted_tagged();
+        assert_eq!(tagged.len(), 1);
+        assert_eq!(tagged[0].steps_survived, 100);
+        assert!(tagged[0].is_verified);
+        assert_eq!(tagged[0].metadata.get("topic").unwrap(), "science");
+        assert!(mind.take_evicted_tagged().is_empty());
+    }
+
+    // ====================================================================
+    // Dream processing
+    // ====================================================================
+
+    #[test]
+    fn process_dream_consolidates_similar_memories() {
+        let mut mind = activated_mind();
+        // Create two very similar vectors (same seed = identical)
+        let hv = ContinuousHV::random(512, 42);
+        mind.working_memory.push(hv.clone());
+        mind.working_memory.push(hv.clone());
+        mind.working_memory_ticks.push(0);
+        mind.working_memory_ticks.push(1);
+        mind.working_memory_sources
+            .push(MemorySource::UserInteraction);
+        mind.working_memory_sources.push(MemorySource::Internal);
+        mind.working_memory_verified.push(true);
+        mind.working_memory_verified.push(false);
+        mind.working_memory_metadata
+            .push(std::collections::HashMap::new());
+        mind.working_memory_metadata
+            .push(std::collections::HashMap::new());
+
+        let output = mind.process_dream();
+        assert!(output.is_some(), "should consolidate identical memories");
+        let out = output.unwrap();
+        assert_eq!(out.output_type, OutputType::Memorize);
+        assert!(out.content.contains("Consolidating"));
+        // After consolidation, one memory should be removed
+        assert_eq!(mind.working_memory.len(), 1);
+    }
+
+    #[test]
+    fn process_dream_preserves_dissimilar_memories() {
+        let mut mind = activated_mind();
+        // Use different seeds — random 512-dim vectors will be dissimilar
+        mind.working_memory
+            .push(ContinuousHV::random(512, 100));
+        mind.working_memory
+            .push(ContinuousHV::random(512, 200));
+        mind.working_memory_ticks.push(0);
+        mind.working_memory_ticks.push(1);
+        mind.working_memory_sources.push(MemorySource::Internal);
+        mind.working_memory_sources.push(MemorySource::Internal);
+        mind.working_memory_verified.push(false);
+        mind.working_memory_verified.push(false);
+        mind.working_memory_metadata
+            .push(std::collections::HashMap::new());
+        mind.working_memory_metadata
+            .push(std::collections::HashMap::new());
+
+        // Dissimilar vectors should not consolidate (similarity < 0.8)
+        // The dream thought is stochastic, so we just verify no panic
+        let _output = mind.process_dream();
+        assert!(
+            mind.working_memory.len() >= 1,
+            "dissimilar memories should be preserved"
+        );
+    }
+
+    #[test]
+    fn process_dream_source_priority_action_feedback_wins() {
+        let mut mind = activated_mind();
+        let hv = ContinuousHV::random(512, 42);
+        mind.working_memory.push(hv.clone());
+        mind.working_memory.push(hv.clone());
+        mind.working_memory_ticks.push(0);
+        mind.working_memory_ticks.push(1);
+        mind.working_memory_sources
+            .push(MemorySource::ActionFeedback);
+        mind.working_memory_sources
+            .push(MemorySource::UserInteraction);
+        mind.working_memory_verified.push(false);
+        mind.working_memory_verified.push(false);
+        mind.working_memory_metadata
+            .push(std::collections::HashMap::new());
+        mind.working_memory_metadata
+            .push(std::collections::HashMap::new());
+
+        let _ = mind.process_dream();
+        // After consolidation, source should be ActionFeedback (highest priority)
+        assert_eq!(mind.working_memory_sources[0], MemorySource::ActionFeedback);
+    }
+
+    #[test]
+    fn process_dream_verified_flag_or_merged() {
+        let mut mind = activated_mind();
+        let hv = ContinuousHV::random(512, 42);
+        mind.working_memory.push(hv.clone());
+        mind.working_memory.push(hv.clone());
+        mind.working_memory_ticks.push(0);
+        mind.working_memory_ticks.push(1);
+        mind.working_memory_sources.push(MemorySource::Internal);
+        mind.working_memory_sources.push(MemorySource::Internal);
+        mind.working_memory_verified.push(false);
+        mind.working_memory_verified.push(true); // One is verified
+        mind.working_memory_metadata
+            .push(std::collections::HashMap::new());
+        mind.working_memory_metadata
+            .push(std::collections::HashMap::new());
+
+        let _ = mind.process_dream();
+        // Merged verified status should be true (false || true)
+        assert!(
+            mind.working_memory_verified[0],
+            "merged verification should be true if either is verified"
+        );
+    }
+
+    #[test]
+    fn process_dream_no_crash_on_empty_memory() {
+        let mut mind = activated_mind();
+        let output = mind.process_dream();
+        // With empty memory and stochastic dream roll, output may or may not appear
+        let _ = output;
+    }
+
+    #[test]
+    fn process_dream_no_crash_on_single_memory() {
+        let mut mind = activated_mind();
+        mind.working_memory
+            .push(ContinuousHV::random(512, 42));
+        mind.working_memory_ticks.push(0);
+        mind.working_memory_sources.push(MemorySource::Internal);
+        mind.working_memory_verified.push(false);
+        mind.working_memory_metadata
+            .push(std::collections::HashMap::new());
+        let _output = mind.process_dream();
+        // Single memory cannot be consolidated — should not panic
+        assert_eq!(mind.working_memory.len(), 1);
+    }
+
+    // ====================================================================
+    // Federated outbox cap
+    // ====================================================================
+
+    #[test]
+    fn federated_outbox_capped_at_max_size() {
+        let mut mind = activated_mind();
+        // Enable federated learning
+        mind.federated = Some(crate::swarm::FederatedAggregator::new(vec![0.0; 512]));
+
+        // Run many ticks to fill outbox (exports every 5 ticks)
+        for _ in 0..500 {
+            mind.state.tick += 1;
+            mind.process_federated();
+        }
+
+        assert!(
+            mind.federated_outbox.len() <= super::super::MAX_OUTBOX_SIZE,
+            "federated_outbox should be capped at {}: got {}",
+            super::super::MAX_OUTBOX_SIZE,
+            mind.federated_outbox.len()
+        );
     }
 }

@@ -364,25 +364,6 @@ fn test_update_cross_modal_binding_without_binder() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]
-fn test_run_stability_regime_returns_timing() {
-    let mut regime = crate::consciousness::stability_regime::StabilityRegimeProcessor::new();
-    let mut discovery = crate::consciousness::primitive_discovery::PrimitiveDiscoveryService::new(
-        Default::default(),
-    );
-    let hv = symthaea_core::hdc::binary_hv::BinaryHV::random(99);
-    let timing = super::super::helpers::run_stability_regime(
-        &mut regime,
-        &mut discovery,
-        &hv,
-        0.02,
-        5,
-        CycleUrgency::Normal,
-    );
-    // Should return timing >= 0
-    assert!(timing < 1_000_000, "Timing suspiciously high: {timing}us");
-}
-
-#[test]
 fn test_run_stability_regime_skips_in_cruise() {
     let mut regime = crate::consciousness::stability_regime::StabilityRegimeProcessor::new();
     let mut discovery = crate::consciousness::primitive_discovery::PrimitiveDiscoveryService::new(

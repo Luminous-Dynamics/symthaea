@@ -37,7 +37,7 @@ fn main() {
     let mut ltc = VocalTractController::new(&genesis, &config);
 
     println!(
-        "Training LTC controller on {} phonemes (100 epochs + 50 vowel finetune)...",
+        "Training LTC controller on {} phonemes (100 epochs)...",
         db.all_phonemes().len()
     );
     let final_loss = symthaea::voice::train_controller_on_phoneme_db(&mut ltc, &genesis, &db, 100);

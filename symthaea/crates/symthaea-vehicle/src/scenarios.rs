@@ -240,6 +240,50 @@ pub fn default_scenarios() -> Vec<ScenarioConfig> {
             num_episodes: ep,
             steps_per_episode: steps,
         },
+        // 13. EmergencyStop on black ice (nightmare scenario)
+        ScenarioConfig {
+            name: "estop_black_ice".into(),
+            task: VehicleTask::EmergencyStop,
+            road: Road::straight(),
+            swarm: None,
+            perturbation: PerturbationSchedule::black_ice(),
+            training_perturbations: vec![],
+            num_episodes: ep,
+            steps_per_episode: steps,
+        },
+        // 14. LaneChange under crosswind
+        ScenarioConfig {
+            name: "lanechange_crosswind".into(),
+            task: VehicleTask::LaneChange,
+            road: Road::straight(),
+            swarm: None,
+            perturbation: PerturbationSchedule::crosswind(),
+            training_perturbations: vec![],
+            num_episodes: ep,
+            steps_per_episode: steps,
+        },
+        // 15. Follow on highway (curved road with convoy)
+        ScenarioConfig {
+            name: "follow_highway".into(),
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            road: Road::gentle_highway(),
+            swarm: Some(SwarmConfig::convoy_highway(3)),
+            perturbation: PerturbationSchedule::none(),
+            training_perturbations: vec![],
+            num_episodes: ep,
+            steps_per_episode: steps,
+        },
+        // 16. Full gauntlet: ice + blindness + crosswind
+        ScenarioConfig {
+            name: "lanekeep_gauntlet".into(),
+            task: VehicleTask::LaneKeep,
+            road: Road::straight(),
+            swarm: None,
+            perturbation: PerturbationSchedule::gauntlet(),
+            training_perturbations: vec![],
+            num_episodes: ep,
+            steps_per_episode: steps,
+        },
     ]
 }
 
@@ -277,7 +321,7 @@ mod tests {
     #[test]
     fn test_default_scenarios_count() {
         let scenarios = default_scenarios();
-        assert_eq!(scenarios.len(), 12);
+        assert_eq!(scenarios.len(), 16);
     }
 
     #[test]
@@ -307,7 +351,7 @@ mod tests {
         let scenarios = default_scenarios();
         let results = run_all_scenarios(&scenarios);
 
-        assert_eq!(results.len(), 12);
+        assert_eq!(results.len(), 16);
         for r in &results {
             assert!(r.all_finite, "Scenario '{}' has non-finite metrics", r.name);
             assert!(

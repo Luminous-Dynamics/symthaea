@@ -696,15 +696,15 @@ impl VocalTractController {
         // - Distance-weighted LR: extreme vowels get up to 3× the LR
         // - Adaptive gradient steps: outlier phonemes get 20 steps vs 10 for near-schwa
         // - Cosine LR annealing with high floor (30×→20×) for sustained gradient strength
-        // - Vowel fine-tuning tail: after main training, vowels-only at low LR
         // - No weight decay during supervised training (prevents erosion)
         const WARMUP_STEPS: usize = 20;
 
-        // === Phase 1: All-phoneme training with high LR ===
         // Cosine annealing: 30× → 20× base. High floor keeps gradients strong
         // throughout (extreme vowels need sustained high LR for convergence).
         let lr_peak = self.learning_rate * 30.0;
         let lr_min = self.learning_rate * 20.0;
+
+        let mut last_epoch_loss = 0.0;
 
         for epoch in 0..epochs {
             let progress = epoch as f32 / epochs.max(1) as f32;
@@ -728,46 +728,10 @@ impl VocalTractController {
                 }
             }
 
-            let _epoch_loss = epoch_loss / phoneme_hvs.len() as f32;
+            last_epoch_loss = epoch_loss / phoneme_hvs.len() as f32;
         }
 
-        // === Phase 2: Vowel fine-tuning tail ===
-        // After all phonemes are trained, give vowels exclusive gradient access
-        // at lower LR (5×) for fine-tuning extreme vowels (IY/UW/AA) without
-        // destabilizing consonants. Runs for half the main epoch count.
-        let finetune_lr = self.learning_rate * 5.0;
-        let finetune_epochs = epochs / 2;
-
-        for _epoch in 0..finetune_epochs {
-            for (idx, (_, hv, target)) in phoneme_hvs.iter().enumerate() {
-                if !phoneme_targets[idx].1.is_vowel {
-                    continue;
-                }
-                self.reset();
-                for _ in 0..WARMUP_STEPS {
-                    self.forward(hv, 0.005);
-                }
-                self.forward(hv, 0.005);
-
-                let phoneme_lr = finetune_lr * lr_scales[idx];
-                for _ in 0..adaptive_steps[idx] {
-                    self.forward(hv, 0.005);
-                    self.train_step_impl(hv, target, 0.005, phoneme_lr, 0.0);
-                }
-            }
-        }
-
-        // Measure final loss across ALL phonemes (not just vowels)
-        let mut final_loss = 0.0;
-        for (_, hv, target) in &phoneme_hvs {
-            self.reset();
-            for _ in 0..WARMUP_STEPS {
-                self.forward(hv, 0.005);
-            }
-            let pred = self.forward(hv, 0.005);
-            final_loss += formant_mse(&pred, target);
-        }
-        final_loss / phoneme_hvs.len() as f32
+        last_epoch_loss
     }
 
     /// Train on phoneme transitions (BPTT sequence training).

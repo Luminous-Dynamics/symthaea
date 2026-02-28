@@ -154,6 +154,15 @@ impl CognitiveLoopService {
             neuromod_bath_entropy: self.bath_phase_tracker.entropy(),
             neuromod_attractor_detected: self.bath_phase_tracker.detect_attractor().is_some(),
             active_injection_count: self.neuromodulator_bath.active_injections.len() as u8,
+            // Phase 6: endocannabinoid + subtypes
+            neuromod_endocannabinoid_effective: self
+                .neuromodulator_bath
+                .endocannabinoid
+                .effective(),
+            neuromod_sht_1a_signal: self.neuromodulator_bath.sht_1a_signal(),
+            neuromod_sht_2a_signal: self.neuromodulator_bath.sht_2a_signal(),
+            neuromod_gaba_a_signal: self.neuromodulator_bath.gaba_a_signal(),
+            neuromod_gaba_b_signal: self.neuromodulator_bath.gaba_b_signal(),
         }
     }
 

@@ -506,3 +506,210 @@ pub struct LoopStats {
     #[cfg(feature = "liquid-mamba")]
     pub liquid_mamba_generation_count: u32,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Default values
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn loop_stats_default_zero_cycles() {
+        let stats = LoopStats::default();
+        assert_eq!(stats.total_cycles, 0);
+        assert_eq!(stats.learning_cycles, 0);
+    }
+
+    #[test]
+    fn loop_stats_default_zero_errors() {
+        let stats = LoopStats::default();
+        assert_eq!(stats.avg_prediction_error, 0.0);
+        assert_eq!(stats.avg_prediction_error_sq, 0.0);
+        assert_eq!(stats.avg_training_loss, 0.0);
+        assert_eq!(stats.error_trend, 0.0);
+    }
+
+    #[test]
+    fn loop_stats_default_no_flow() {
+        let stats = LoopStats::default();
+        assert!(!stats.in_flow);
+        assert_eq!(stats.flow_intensity, 0.0);
+        assert_eq!(stats.flow_streak, 0);
+        assert_eq!(stats.flow_learning_boost, 0.0);
+    }
+
+    #[test]
+    fn loop_stats_default_empty_strings() {
+        let stats = LoopStats::default();
+        assert!(stats.consciousness_pattern.is_empty());
+        assert!(stats.action_hint.is_empty());
+        assert!(stats.self_assessment.is_empty());
+        assert!(stats.cognitive_depth.is_empty());
+        assert!(stats.unified_emotion.is_empty());
+        assert!(stats.emotional_pattern.is_empty());
+        assert!(stats.current_strategy.is_empty());
+        assert!(stats.best_strategy.is_empty());
+    }
+
+    #[test]
+    fn loop_stats_default_booleans_false() {
+        let stats = LoopStats::default();
+        assert!(!stats.learning_paused);
+        assert!(!stats.curiosity_exploring);
+        assert!(!stats.consent_violation);
+        assert!(!stats.moral_review_needed);
+    }
+
+    #[test]
+    fn loop_stats_default_counters_zero() {
+        let stats = LoopStats::default();
+        assert_eq!(stats.reflection_count, 0);
+        assert_eq!(stats.semantic_hits, 0);
+        assert_eq!(stats.semantic_misses, 0);
+        assert_eq!(stats.moral_evaluations, 0);
+        assert_eq!(stats.bptt_steps, 0);
+        assert_eq!(stats.spsa_fallback_steps, 0);
+        assert_eq!(stats.brain_swaps_count, 0);
+        assert_eq!(stats.exocortex_triggers, 0);
+        assert_eq!(stats.mode_transitions, 0);
+    }
+
+    #[test]
+    fn loop_stats_default_resonator_prediction_none() {
+        let stats = LoopStats::default();
+        assert!(stats.last_resonator_prediction.is_none());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Mutation and field access
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn loop_stats_can_update_fields() {
+        let mut stats = LoopStats::default();
+        stats.total_cycles = 100;
+        stats.avg_prediction_error = 0.15;
+        stats.in_flow = true;
+        stats.flow_intensity = 0.7;
+        stats.learning_cycles = 42;
+        assert_eq!(stats.total_cycles, 100);
+        assert!((stats.avg_prediction_error - 0.15).abs() < 1e-7);
+        assert!(stats.in_flow);
+        assert!((stats.flow_intensity - 0.7).abs() < 1e-7);
+        assert_eq!(stats.learning_cycles, 42);
+    }
+
+    #[test]
+    fn loop_stats_resonator_prediction_stores_vec() {
+        let mut stats = LoopStats::default();
+        stats.last_resonator_prediction = Some(vec![0.1, 0.2, 0.3]);
+        assert_eq!(stats.last_resonator_prediction.as_ref().unwrap().len(), 3);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Clone
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn loop_stats_clone_is_independent() {
+        let mut stats = LoopStats::default();
+        stats.total_cycles = 50;
+        stats.consciousness_pattern = "Focused".to_string();
+        stats.last_resonator_prediction = Some(vec![1.0, 2.0]);
+        let cloned = stats.clone();
+        assert_eq!(cloned.total_cycles, 50);
+        assert_eq!(cloned.consciousness_pattern, "Focused");
+        assert_eq!(cloned.last_resonator_prediction, Some(vec![1.0, 2.0]));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Serialization round-trip
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn loop_stats_serialization_roundtrip() {
+        let mut stats = LoopStats::default();
+        stats.total_cycles = 200;
+        stats.avg_prediction_error = 0.123;
+        stats.in_flow = true;
+        stats.flow_intensity = 0.75;
+        stats.consciousness_pattern = "Contemplative".to_string();
+        stats.self_assessment = "Learning".to_string();
+        stats.moral_score = -0.5;
+        stats.last_resonator_prediction = Some(vec![0.5, -0.5]);
+        let json = serde_json::to_string(&stats).expect("serialize");
+        let deserialized: LoopStats = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(deserialized.total_cycles, 200);
+        assert!((deserialized.avg_prediction_error - 0.123).abs() < 1e-6);
+        assert!(deserialized.in_flow);
+        assert!((deserialized.flow_intensity - 0.75).abs() < 1e-6);
+        assert_eq!(deserialized.consciousness_pattern, "Contemplative");
+        assert_eq!(deserialized.self_assessment, "Learning");
+        assert!((deserialized.moral_score - (-0.5)).abs() < 1e-6);
+        assert_eq!(
+            deserialized.last_resonator_prediction,
+            Some(vec![0.5, -0.5])
+        );
+    }
+
+    #[test]
+    fn loop_stats_json_default_roundtrip() {
+        let stats = LoopStats::default();
+        let json = serde_json::to_string(&stats).expect("serialize default");
+        let deserialized: LoopStats = serde_json::from_str(&json).expect("deserialize default");
+        assert_eq!(deserialized.total_cycles, 0);
+        assert!(!deserialized.in_flow);
+        assert!(deserialized.last_resonator_prediction.is_none());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Prediction error variance computation (manual)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn loop_stats_error_variance_from_ema_fields() {
+        // Simulate: avg_prediction_error and avg_prediction_error_sq can be used
+        // to compute variance = E[X^2] - E[X]^2
+        let mut stats = LoopStats::default();
+        stats.avg_prediction_error = 0.3;
+        stats.avg_prediction_error_sq = 0.1; // E[X^2] = 0.1
+        let variance = stats.avg_prediction_error_sq
+            - stats.avg_prediction_error * stats.avg_prediction_error;
+        // 0.1 - 0.09 = 0.01
+        assert!((variance - 0.01).abs() < 1e-6);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Debug trait
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn loop_stats_debug_format() {
+        let stats = LoopStats::default();
+        let debug = format!("{:?}", stats);
+        assert!(debug.contains("LoopStats"));
+        assert!(debug.contains("total_cycles"));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Phase feedback counters stay independent
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn loop_stats_phase_counters_independent() {
+        let mut stats = LoopStats::default();
+        stats.causal_attention_uses = 10;
+        stats.surprise_boosted_replays = 5;
+        stats.attention_budget_exceeded_count = 3;
+        stats.epistemic_coherence_gated_count = 7;
+        stats.mode_transitions = 2;
+        // All independent fields should retain their values
+        assert_eq!(stats.causal_attention_uses, 10);
+        assert_eq!(stats.surprise_boosted_replays, 5);
+        assert_eq!(stats.attention_budget_exceeded_count, 3);
+        assert_eq!(stats.epistemic_coherence_gated_count, 7);
+        assert_eq!(stats.mode_transitions, 2);
+    }
+}

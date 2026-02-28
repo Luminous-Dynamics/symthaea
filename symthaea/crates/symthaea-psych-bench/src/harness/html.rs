@@ -17,20 +17,54 @@ use super::sat_curves::SatCurve;
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
+/// Optional supplementary data for a full HTML report.
+///
+/// SAT curves and reliability data require pre-computation that can't be
+/// derived from `BenchmarkReport` alone, so they're provided separately.
+pub struct ReportOptions<'a> {
+    /// Include LLM baseline comparison columns.
+    pub include_llm: bool,
+    /// Pre-computed SAT curves (from `SatBattery::run()`).
+    pub sat_curves: Option<&'a [SatCurve]>,
+    /// Pre-computed reliability battery (from `ReliabilityBattery`).
+    pub reliability: Option<&'a ReliabilityBattery>,
+}
+
+impl<'a> Default for ReportOptions<'a> {
+    fn default() -> Self {
+        Self {
+            include_llm: false,
+            sat_curves: None,
+            reliability: None,
+        }
+    }
+}
+
 /// Generate a self-contained HTML report from benchmark results.
 ///
 /// If `include_llm` is true, includes LLM baseline comparison columns.
 pub fn generate_report(report: &BenchmarkReport, include_llm: bool) -> String {
+    generate_full_report(report, &ReportOptions { include_llm, ..Default::default() })
+}
+
+/// Generate a full HTML report with optional SAT curves and reliability sections.
+pub fn generate_full_report(report: &BenchmarkReport, opts: &ReportOptions<'_>) -> String {
     let mut html = String::with_capacity(32_000);
 
     write_header(&mut html, report);
     write_profile_radar(&mut html, report);
-    write_domain_tables(&mut html, report, include_llm);
+    write_domain_tables(&mut html, report, opts.include_llm);
     write_forest_plot_svg(&mut html, report);
     write_composite_scores(&mut html, report);
     write_psychometric_summary(&mut html, report);
     write_normative_section(&mut html, report);
     write_cross_domain_section(&mut html, report);
+    if let Some(curves) = opts.sat_curves {
+        write_sat_curves(&mut html, curves);
+    }
+    if let Some(battery) = opts.reliability {
+        write_reliability_section(&mut html, battery);
+    }
     write_footer(&mut html);
 
     html

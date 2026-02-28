@@ -1303,4 +1303,274 @@ mod tests {
         println!("Query N -> {} (sim={:.4}, iters={})", result, sim, iters);
         assert_eq!(result, "N");
     }
+
+    #[test]
+    fn test_strip_stress_basic() {
+        assert_eq!(strip_stress("AH0"), "AH");
+        assert_eq!(strip_stress("IY1"), "IY");
+        assert_eq!(strip_stress("AE2"), "AE");
+    }
+
+    #[test]
+    fn test_strip_stress_no_stress() {
+        assert_eq!(strip_stress("T"), "T");
+        assert_eq!(strip_stress("SH"), "SH");
+        assert_eq!(strip_stress("NG"), "NG");
+    }
+
+    #[test]
+    fn test_strip_stress_underscore_format() {
+        assert_eq!(strip_stress("T_0"), "T");
+        assert_eq!(strip_stress("AH_1"), "AH");
+    }
+
+    #[test]
+    fn test_strip_stress_underscore_non_digit() {
+        // Underscore followed by non-digit should not strip
+        assert_eq!(strip_stress("T_X"), "T_X");
+    }
+
+    #[test]
+    fn test_mapper_all_consonant_categories() {
+        let mapper = ArticulatoryMapper::new();
+
+        // Stops
+        for phone in &["P", "B", "T", "D", "K", "G"] {
+            let f = mapper.get(phone).unwrap();
+            assert_eq!(f.manner, Manner::Stop, "{phone} should be Stop");
+        }
+
+        // Fricatives
+        for phone in &["F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "HH"] {
+            let f = mapper.get(phone).unwrap();
+            assert_eq!(f.manner, Manner::Fricative, "{phone} should be Fricative");
+        }
+
+        // Affricates
+        for phone in &["CH", "JH"] {
+            let f = mapper.get(phone).unwrap();
+            assert_eq!(f.manner, Manner::Affricate, "{phone} should be Affricate");
+        }
+
+        // Nasals
+        for phone in &["M", "N", "NG"] {
+            let f = mapper.get(phone).unwrap();
+            assert_eq!(f.manner, Manner::Nasal, "{phone} should be Nasal");
+            assert_eq!(f.voicing, Voicing::Voiced, "{phone} should be Voiced");
+        }
+
+        // Liquids
+        for phone in &["L", "R"] {
+            let f = mapper.get(phone).unwrap();
+            assert_eq!(f.manner, Manner::Liquid, "{phone} should be Liquid");
+        }
+
+        // Glides
+        for phone in &["W", "Y"] {
+            let f = mapper.get(phone).unwrap();
+            assert_eq!(f.manner, Manner::Glide, "{phone} should be Glide");
+        }
+    }
+
+    #[test]
+    fn test_mapper_vowel_features() {
+        let mapper = ArticulatoryMapper::new();
+
+        // All vowels should be Voiced with Manner::Vowel
+        for phone in &["IY", "IH", "EY", "EH", "AE", "AH", "ER", "UW", "UH", "OW", "AA", "AO"] {
+            let f = mapper.get(phone).unwrap();
+            assert_eq!(f.manner, Manner::Vowel, "{phone} should be Vowel");
+            assert_eq!(f.voicing, Voicing::Voiced, "{phone} should be Voiced");
+            assert!(f.height.is_some(), "{phone} should have height");
+        }
+    }
+
+    #[test]
+    fn test_mapper_voicing_pairs() {
+        let mapper = ArticulatoryMapper::new();
+
+        // Voiceless/Voiced pairs should share place and manner
+        let pairs = [("P", "B"), ("T", "D"), ("K", "G"), ("F", "V"), ("S", "Z")];
+
+        for (voiceless, voiced) in &pairs {
+            let vl = mapper.get(voiceless).unwrap();
+            let vd = mapper.get(voiced).unwrap();
+
+            assert_eq!(vl.manner, vd.manner, "{voiceless}/{voiced} manner mismatch");
+            assert_eq!(vl.place, vd.place, "{voiceless}/{voiced} place mismatch");
+            assert_eq!(vl.voicing, Voicing::Voiceless);
+            assert_eq!(vd.voicing, Voicing::Voiced);
+        }
+    }
+
+    #[test]
+    fn test_mapper_unknown_phoneme() {
+        let mapper = ArticulatoryMapper::new();
+        assert!(mapper.get("XYZ").is_none());
+    }
+
+    #[test]
+    fn test_mapper_stress_stripping() {
+        let mapper = ArticulatoryMapper::new();
+        // Should strip stress markers
+        let ah0 = mapper.get("AH0");
+        let ah = mapper.get("AH");
+        assert!(ah.is_some());
+        assert!(ah0.is_some());
+    }
+
+    #[test]
+    fn test_find_by_features_voicing() {
+        let mapper = ArticulatoryMapper::new();
+
+        let voiced_stops = mapper.find_by_features(
+            Some(Voicing::Voiced),
+            Some(Manner::Stop),
+            None,
+        );
+
+        assert!(voiced_stops.contains(&"B".to_string()));
+        assert!(voiced_stops.contains(&"D".to_string()));
+        assert!(voiced_stops.contains(&"G".to_string()));
+        assert!(!voiced_stops.contains(&"P".to_string())); // Voiceless
+    }
+
+    #[test]
+    fn test_find_by_features_place() {
+        let mapper = ArticulatoryMapper::new();
+
+        let bilabials = mapper.find_by_features(None, None, Some(Place::Bilabial));
+
+        assert!(bilabials.contains(&"P".to_string()));
+        assert!(bilabials.contains(&"B".to_string()));
+        assert!(bilabials.contains(&"M".to_string()));
+        assert!(bilabials.contains(&"W".to_string()));
+    }
+
+    #[test]
+    fn test_articulatory_hdc_all_phonemes_present() {
+        let hdc = ArticulatoryHDC::new();
+
+        let expected = [
+            "P", "B", "T", "D", "K", "G",
+            "F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "HH",
+            "CH", "JH",
+            "M", "N", "NG",
+            "L", "R",
+            "W", "Y",
+            "IY", "IH", "EY", "EH", "AE",
+            "AH", "ER",
+            "UW", "UH", "OW", "AA", "AO",
+            "AY", "AW", "OY",
+        ];
+
+        for phone in &expected {
+            assert!(
+                hdc.get_phoneme_hv(phone).is_some(),
+                "missing phoneme HV for {phone}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_articulatory_hdc_query_returns_sorted() {
+        let hdc = ArticulatoryHDC::new();
+        let p_hv = hdc.get_phoneme_hv("P").unwrap();
+
+        let results = hdc.query(p_hv);
+
+        // Results should be sorted by similarity (descending)
+        for i in 1..results.len() {
+            assert!(
+                results[i - 1].1 >= results[i].1,
+                "query results not sorted at index {i}"
+            );
+        }
+
+        // Top result should be "P" itself
+        assert_eq!(results[0].0, "P");
+    }
+
+    #[test]
+    fn test_resonator_converges_for_all_phonemes() {
+        let resonator = ArticulatoryResonator::new();
+
+        // Every phoneme should resonate back to itself
+        let phonemes = [
+            "P", "B", "T", "D", "K", "G", "F", "V",
+            "M", "N", "NG", "L", "R", "W", "Y",
+            "IY", "AH", "AA",
+        ];
+
+        for phone in &phonemes {
+            let hv = resonator.hdc().get_phoneme_hv(phone).unwrap();
+            let (result, sim, _iters) = resonator.resonate(hv);
+            assert_eq!(
+                result, *phone,
+                "resonator failed for {phone}: got {result} (sim={sim})"
+            );
+            assert!(sim > 0.5, "{phone} resonated with low similarity: {sim}");
+        }
+    }
+
+    #[test]
+    fn test_acoustic_detector_creation() {
+        let detector = AcousticArticulatoryDetector::new();
+        assert!(!detector.hdc().phoneme_hvs.is_empty());
+    }
+
+    #[test]
+    fn test_acoustic_detector_detect() {
+        let detector = AcousticArticulatoryDetector::new();
+
+        // Create a simple mel frame
+        let mel = vec![0.5; 40];
+        let hv = detector.detect(&mel, None);
+
+        // Should produce a non-zero HV
+        let popcount: u32 = hv.words.iter().map(|w| w.count_ones()).sum();
+        assert!(popcount > 0, "detect produced all-zero HV");
+    }
+
+    #[test]
+    fn test_acoustic_detector_with_prev_frame() {
+        let detector = AcousticArticulatoryDetector::new();
+
+        let mel = vec![0.5; 40];
+        let prev = vec![0.3; 40];
+        let hv = detector.detect(&mel, Some(&prev));
+
+        let popcount: u32 = hv.words.iter().map(|w| w.count_ones()).sum();
+        assert!(popcount > 0);
+    }
+
+    #[test]
+    fn test_voicing_detection_low_energy() {
+        let detector = AcousticArticulatoryDetector::new();
+
+        // Very low energy should be voiceless
+        let mel = vec![0.001; 40];
+        let voicing = detector.detect_voicing(&mel);
+        assert_eq!(voicing, Voicing::Voiceless);
+    }
+
+    #[test]
+    fn test_manner_detection_short_input() {
+        let detector = AcousticArticulatoryDetector::new();
+
+        // Short input (< 10 bins) should default to Vowel
+        let mel = vec![0.5; 5];
+        let manner = detector.detect_manner(&mel, None);
+        assert_eq!(manner, Manner::Vowel);
+    }
+
+    #[test]
+    fn test_place_detection_short_input() {
+        let detector = AcousticArticulatoryDetector::new();
+
+        // Short input (< 20 bins) should default to Alveolar
+        let mel = vec![0.5; 10];
+        let place = detector.detect_place(&mel);
+        assert_eq!(place, Place::Alveolar);
+    }
 }

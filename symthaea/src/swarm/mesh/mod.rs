@@ -40,6 +40,27 @@
 //! Drop one on a roof. It pings the Swarm. It calculates the Hodge-Laplacian
 //! flow of its environment. It shares 2 KB Wisdom Vectors with nodes 10 km
 //! away. The grid cannot kill it, because it *is* the grid.
+//!
+//! # Security & Efficiency
+//!
+//! - **Authentication**: Optional BLAKE3 keyed MAC (byte 22). When an auth key
+//!   is configured, all packets are signed on send and verified on receive.
+//!   Unsigned packets are rejected when a key is set. (Round 5)
+//!
+//! - **Gossip TTL**: Multi-hop forwarding via TTL counter (byte 23, default 3).
+//!   Each relay decrements TTL; dedup ring prevents forwarding loops. (Round 5)
+//!
+//! - **Compression**: Packets are wrapped in a 1-byte envelope before
+//!   fragmentation. `0x00` = uncompressed, `0x01` = LZ4. Heartbeats (zero
+//!   BinaryHV) compress dramatically, reducing LoRa fragments. (Round 5)
+//!
+//! - **Priority Backpressure**: When inbox/outbox overflow, lowest-priority
+//!   packets are dropped first: Heartbeat(3) > Wisdom(2) > Affective(1) >
+//!   Gradient(0). (Round 5)
+//!
+//! - **AIMD Bandwidth**: Dynamic bandwidth budget (25–200 KB/window) adjusts
+//!   via Additive Increase / Multiplicative Decrease based on mesh health and
+//!   throttle events. (Round 5)
 
 mod dual_layer;
 mod lora_fragment;
@@ -133,6 +154,15 @@ impl MeshStats {
             + self.heartbeats_received
             + self.affective_received
             + self.gradients_received
+    }
+
+    /// Returns the compression ratio (0.0–1.0, lower is better).
+    /// Returns 1.0 (no compression) if no data has been compressed.
+    pub fn compression_ratio(&self) -> f64 {
+        if self.bytes_before_compression == 0 {
+            return 1.0;
+        }
+        self.bytes_after_compression as f64 / self.bytes_before_compression as f64
     }
 
     /// Compute a composite health score for the mesh network.
@@ -1825,5 +1855,131 @@ mod tests {
         envelope.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]);
         let decompressed = decompress_packet(&envelope).unwrap();
         assert_eq!(&decompressed[..], &raw[..]);
+    }
+
+    // ====================================================================
+    // Item 2: Compression ratio telemetry tests
+    // ====================================================================
+
+    #[test]
+    fn test_compression_ratio_no_data() {
+        let stats = MeshStats::default();
+        assert_eq!(stats.compression_ratio(), 1.0);
+    }
+
+    #[test]
+    fn test_compression_ratio_with_data() {
+        let mut stats = MeshStats::default();
+        stats.bytes_before_compression = 1000;
+        stats.bytes_after_compression = 500;
+        let ratio = stats.compression_ratio();
+        assert!((ratio - 0.5).abs() < 1e-10, "Expected ~0.5, got {ratio}");
+    }
+
+    // ====================================================================
+    // Item 4: Constructor field verification tests
+    // ====================================================================
+
+    #[test]
+    fn test_from_affective_sets_ttl_and_urgency() {
+        let affect = crate::swarm::AffectiveState {
+            valence: 0.5,
+            arousal: 0.3,
+            dominance: 0.1,
+            intensity: 0.3,
+            thermodynamic_load: 0.0,
+            confidence: 0.9,
+            timestamp_ms: 1_700_000_000_000,
+            sequence: 1,
+        };
+        let pkt = WisdomPacket::from_affective([0xAF; 8], 42, &affect);
+        assert_eq!(pkt.ttl, MESH_DEFAULT_TTL);
+        assert!(matches!(pkt.urgency, MeshUrgency::Cruise));
+        assert!(matches!(pkt.payload_type, PayloadType::Affective));
+        assert_eq!(pkt.auth_mac, 0);
+    }
+
+    #[test]
+    fn test_from_gradient_sets_ttl_and_urgency() {
+        let msg = crate::swarm::GradientMessage {
+            source_id: [0; 32],
+            gradient_data: vec![0.1, 0.2, 0.3],
+            trust_score: 0.95,
+            noise_scale: 0.0,
+            timestamp: 1_700_000_000_000,
+            sample_count: 100,
+            model_version: 1,
+        };
+        let pkt = WisdomPacket::from_gradient([0xBB; 8], 10, &msg).unwrap();
+        assert_eq!(pkt.ttl, MESH_DEFAULT_TTL);
+        assert!(matches!(pkt.urgency, MeshUrgency::Normal));
+        assert!(matches!(pkt.payload_type, PayloadType::Gradient));
+        assert_eq!(pkt.auth_mac, 0);
+    }
+
+    #[test]
+    fn test_heartbeat_packet_fields() {
+        let pkt = WisdomPacket {
+            source_id: [0x01; 8],
+            sequence: 0,
+            phi: 0.5,
+            urgency: MeshUrgency::Cruise,
+            timestamp_s: 1_700_000_000,
+            payload_type: PayloadType::Heartbeat,
+            auth_mac: 0,
+            ttl: MESH_DEFAULT_TTL,
+            wisdom: BinaryHV::zero(),
+        };
+        assert_eq!(pkt.ttl, MESH_DEFAULT_TTL);
+        assert!(matches!(pkt.urgency, MeshUrgency::Cruise));
+        assert!(matches!(pkt.payload_type, PayloadType::Heartbeat));
+        assert_eq!(pkt.auth_mac, 0);
+    }
+
+    // ====================================================================
+    // Item 6: Compression edge case tests
+    // ====================================================================
+
+    #[test]
+    fn test_compress_none_envelope_size() {
+        // Random-ish data that won't compress (no LZ4 benefit)
+        let raw = test_hv(0x77);
+        let packet = WisdomPacket {
+            source_id: [0x01; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: raw,
+        };
+        let raw_bytes = packet.to_bytes();
+        let envelope = compress_packet(&raw_bytes);
+        // Without lz4_compression feature (or when LZ4 doesn't help),
+        // envelope should be exactly 1 + WISDOM_PACKET_SIZE
+        assert!(
+            envelope.len() <= 1 + WISDOM_PACKET_SIZE,
+            "Envelope {} should be <= {} (1 + WISDOM_PACKET_SIZE)",
+            envelope.len(),
+            1 + WISDOM_PACKET_SIZE
+        );
+        // First byte must be a valid compression header
+        assert!(
+            envelope[0] == COMPRESS_NONE || envelope[0] == COMPRESS_LZ4,
+            "First byte must be a valid compression header"
+        );
+    }
+
+    #[test]
+    fn test_decompress_malformed_envelope_fallback() {
+        // A buffer starting with 0xFF (unknown header) should return None
+        let mut data = vec![0xFF];
+        data.extend_from_slice(&[0u8; WISDOM_PACKET_SIZE]);
+        assert!(
+            decompress_packet(&data).is_none(),
+            "Unknown header 0xFF should return None"
+        );
     }
 }

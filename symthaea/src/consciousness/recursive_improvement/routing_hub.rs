@@ -1093,3 +1093,336 @@ impl ConsciousnessRoutingHub {
         self.total_decisions
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_state() -> LatentConsciousnessState {
+        LatentConsciousnessState::default()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // RouterType
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn router_type_all_returns_five() {
+        assert_eq!(RouterType::all().len(), 5);
+    }
+
+    #[test]
+    fn router_type_names_non_empty() {
+        for rt in RouterType::all() {
+            assert!(!rt.name().is_empty());
+        }
+    }
+
+    #[test]
+    fn router_type_complexity_ordering() {
+        assert!(RouterType::Causal.complexity() < RouterType::Geometric.complexity());
+        assert!(RouterType::Geometric.complexity() < RouterType::Topological.complexity());
+        assert!(RouterType::Topological.complexity() < RouterType::Quantum.complexity());
+        assert!(RouterType::Quantum.complexity() < RouterType::ActiveInference.complexity());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // RouterPerformance
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn router_performance_new_defaults() {
+        let perf = RouterPerformance::new(RouterType::Causal);
+        assert_eq!(perf.decisions, 0);
+        assert_eq!(perf.successful_outcomes, 0);
+        assert_eq!(perf.success_rate(), 0.5); // Prior
+        assert_eq!(perf.recent_average(), 0.5); // Prior
+    }
+
+    #[test]
+    fn router_performance_record_success() {
+        let mut perf = RouterPerformance::new(RouterType::Geometric);
+        perf.record(0.8, 100, 0.9);
+        assert_eq!(perf.decisions, 1);
+        assert_eq!(perf.successful_outcomes, 1);
+        assert_eq!(perf.success_rate(), 1.0);
+        assert!((perf.recent_average() - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn router_performance_record_failure() {
+        let mut perf = RouterPerformance::new(RouterType::Quantum);
+        perf.record(0.3, 200, 0.4);
+        assert_eq!(perf.decisions, 1);
+        assert_eq!(perf.successful_outcomes, 0);
+        assert_eq!(perf.success_rate(), 0.0);
+    }
+
+    #[test]
+    fn router_performance_running_averages() {
+        let mut perf = RouterPerformance::new(RouterType::Causal);
+        perf.record(0.8, 100, 0.9);
+        perf.record(0.6, 200, 0.7);
+        assert_eq!(perf.decisions, 2);
+        assert!((perf.average_latency_us - 150.0).abs() < 1e-6);
+        assert!((perf.average_confidence - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn router_performance_recent_window_capped() {
+        let mut perf = RouterPerformance::new(RouterType::Causal);
+        for i in 0..150 {
+            perf.record(i as f64 / 150.0, 10, 0.5);
+        }
+        assert_eq!(perf.recent_scores.len(), 100);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // RoutingHubConfig
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn routing_hub_config_defaults() {
+        let config = RoutingHubConfig::default();
+        assert!(matches!(config.mode, RoutingMode::Adaptive));
+        assert!((config.exploration_rate - 0.1).abs() < 1e-6);
+        assert!(config.enable_cross_router_learning);
+        assert!(config.track_performance);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // cost_to_confidence
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn cost_to_confidence_zero_cost_gives_one() {
+        assert!((cost_to_confidence(0.0) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn cost_to_confidence_high_cost_approaches_zero() {
+        assert!(cost_to_confidence(100.0) < 0.02);
+    }
+
+    #[test]
+    fn cost_to_confidence_one_gives_half() {
+        assert!((cost_to_confidence(1.0) - 0.5).abs() < 1e-6);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PrimitiveRoutingContext
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn primitive_routing_context_empty_defaults() {
+        let ctx = PrimitiveRoutingContext::empty();
+        assert_eq!(ctx.dominant_tier, PrimitiveTier::Physical);
+        assert!(ctx.tier_distribution.is_empty());
+        assert!(matches!(ctx.inferred_task, TaskType::General));
+        assert!((ctx.complexity_estimate - 0.5).abs() < 1e-6);
+        assert!(ctx.recommended_router.is_none());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ConsciousnessRoutingHub — construction and basic operations
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn routing_hub_new_initializes_performance() {
+        let hub = ConsciousnessRoutingHub::new(RoutingHubConfig::default());
+        assert_eq!(hub.total_decisions(), 0);
+        let summary = hub.performance_summary();
+        assert_eq!(summary.len(), 5);
+    }
+
+    #[test]
+    fn routing_hub_mode_get_set() {
+        let mut hub = ConsciousnessRoutingHub::new(RoutingHubConfig::default());
+        assert!(matches!(hub.mode(), RoutingMode::Adaptive));
+        hub.set_mode(RoutingMode::Ensemble);
+        assert!(matches!(hub.mode(), RoutingMode::Ensemble));
+    }
+
+    #[test]
+    fn routing_hub_observe_stores_state() {
+        let mut hub = ConsciousnessRoutingHub::new(RoutingHubConfig::default());
+        let state = test_state();
+        hub.observe(&state);
+        assert!(hub.current_state.is_some());
+    }
+
+    #[test]
+    fn routing_hub_reset_clears_state() {
+        let mut hub = ConsciousnessRoutingHub::new(RoutingHubConfig::default());
+        let state = test_state();
+        hub.route(&state);
+        hub.route(&state);
+        assert_eq!(hub.total_decisions(), 2);
+        hub.reset();
+        assert_eq!(hub.total_decisions(), 0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ConsciousnessRoutingHub — routing modes
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn routing_hub_single_mode_returns_decision() {
+        let config = RoutingHubConfig {
+            mode: RoutingMode::Single(RouterType::Causal),
+            ..Default::default()
+        };
+        let mut hub = ConsciousnessRoutingHub::new(config);
+        let state = test_state();
+        let decision = hub.route(&state);
+        assert_eq!(decision.contributors.len(), 1);
+        assert_eq!(decision.contributors[0], RouterType::Causal);
+        assert!(decision.confidence > 0.0);
+    }
+
+    #[test]
+    fn routing_hub_ensemble_mode_returns_decision() {
+        let config = RoutingHubConfig {
+            mode: RoutingMode::Ensemble,
+            ..Default::default()
+        };
+        let mut hub = ConsciousnessRoutingHub::new(config);
+        let state = test_state();
+        let decision = hub.route(&state);
+        assert!(decision.confidence > 0.0);
+        assert!(!decision.reasoning.is_empty());
+    }
+
+    #[test]
+    fn routing_hub_hierarchical_mode_returns_decision() {
+        let config = RoutingHubConfig {
+            mode: RoutingMode::Hierarchical,
+            ..Default::default()
+        };
+        let mut hub = ConsciousnessRoutingHub::new(config);
+        let state = test_state();
+        let decision = hub.route(&state);
+        assert!(decision.confidence > 0.0);
+        assert!(decision.reasoning.contains("Hierarchical"));
+    }
+
+    #[test]
+    fn routing_hub_quantum_ensemble_returns_decision() {
+        let config = RoutingHubConfig {
+            mode: RoutingMode::QuantumEnsemble,
+            ..Default::default()
+        };
+        let mut hub = ConsciousnessRoutingHub::new(config);
+        let state = test_state();
+        let decision = hub.route(&state);
+        assert!(decision.confidence > 0.0);
+        assert!(decision.reasoning.contains("Quantum"));
+    }
+
+    #[test]
+    fn routing_hub_adaptive_mode_returns_decision() {
+        let config = RoutingHubConfig {
+            mode: RoutingMode::Adaptive,
+            exploration_rate: 0.0, // disable exploration for determinism
+            ..Default::default()
+        };
+        let mut hub = ConsciousnessRoutingHub::new(config);
+        let state = test_state();
+        let decision = hub.route(&state);
+        assert!(decision.confidence > 0.0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ConsciousnessRoutingHub — recording outcomes
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn routing_hub_record_outcome_updates_performance() {
+        let config = RoutingHubConfig {
+            mode: RoutingMode::Single(RouterType::Causal),
+            ..Default::default()
+        };
+        let mut hub = ConsciousnessRoutingHub::new(config);
+        let state = test_state();
+        let decision = hub.route(&state);
+        hub.record_outcome(&decision, 0.9);
+        let summary = hub.performance_summary();
+        let (success_rate, _) = summary[&RouterType::Causal];
+        assert!(success_rate > 0.0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ConsciousnessRoutingHub — history tracking
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn routing_hub_tracks_history() {
+        let config = RoutingHubConfig {
+            mode: RoutingMode::Single(RouterType::Geometric),
+            ..Default::default()
+        };
+        let mut hub = ConsciousnessRoutingHub::new(config);
+        let state = test_state();
+        for _ in 0..5 {
+            hub.route(&state);
+        }
+        assert_eq!(hub.total_decisions(), 5);
+        assert_eq!(hub.history.len(), 5);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ConsciousnessRoutingHub — primitive context
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn routing_hub_primitive_context_initially_none() {
+        let hub = ConsciousnessRoutingHub::new(RoutingHubConfig::default());
+        assert!(hub.primitive_context().is_none());
+        assert!(hub.primitive_recommended_router().is_none());
+    }
+
+    #[test]
+    fn routing_hub_set_primitive_context_direct() {
+        let mut hub = ConsciousnessRoutingHub::new(RoutingHubConfig::default());
+        let ctx = PrimitiveRoutingContext::empty();
+        hub.set_primitive_context_direct(ctx);
+        assert!(hub.primitive_context().is_some());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Serialization
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn routing_strategy_serialization_roundtrip() {
+        let strategy = RoutingStrategy::DeepIntegration;
+        let json = serde_json::to_string(&strategy).unwrap();
+        let deserialized: RoutingStrategy = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, strategy);
+    }
+
+    #[test]
+    fn unified_routing_decision_serialization_roundtrip() {
+        let decision = UnifiedRoutingDecision {
+            strategy: RoutingStrategy::StandardProcessing,
+            confidence: 0.85,
+            contributors: vec![RouterType::Causal, RouterType::Geometric],
+            weights: vec![0.6, 0.4],
+            reasoning: "test".to_string(),
+            alternatives: vec![(RoutingStrategy::Consolidation, 0.3)],
+            latency_us: 42,
+        };
+        let json = serde_json::to_string(&decision).unwrap();
+        let de: UnifiedRoutingDecision = serde_json::from_str(&json).unwrap();
+        assert!((de.confidence - 0.85).abs() < 1e-6);
+        assert_eq!(de.contributors.len(), 2);
+    }
+
+    #[test]
+    fn routing_hub_config_serialization_roundtrip() {
+        let config = RoutingHubConfig::default();
+        let json = serde_json::to_string(&config).unwrap();
+        let de: RoutingHubConfig = serde_json::from_str(&json).unwrap();
+        assert!(matches!(de.mode, RoutingMode::Adaptive));
+    }
+}

@@ -271,6 +271,9 @@ pub struct MoralAlgebra {
 
     /// Optional learned moral prototype classifier (trained on Social Chemistry etc.)
     learned_classifier: Option<super::moral_prototypes::MoralPrototypeClassifier>,
+
+    /// Cached standard obligations (built once, reused for every deontological evaluation)
+    standard_rules_cache: ObligationRuleSet,
 }
 
 impl MoralAlgebra {
@@ -301,7 +304,7 @@ impl MoralAlgebra {
         consent_hvs.insert(ConsentState::Absent, ContinuousHV::random(dim, 5000039));
         consent_hvs.insert(ConsentState::Implied, ContinuousHV::random(dim, 5000057));
 
-        Self {
+        let mut algebra = Self {
             primitives,
             operators,
             intent_hvs,
@@ -309,7 +312,11 @@ impl MoralAlgebra {
             consent_hvs,
             dim,
             learned_classifier: None,
-        }
+            standard_rules_cache: ObligationRuleSet { rules: Vec::new() },
+        };
+        // Build and cache standard obligations once (avoids 112 string allocations per eval)
+        algebra.standard_rules_cache = algebra.standard_obligations();
+        algebra
     }
 
     /// Create with default dimension
@@ -718,12 +725,20 @@ impl MoralAlgebra {
         rules: &ObligationRuleSet,
     ) -> Vec<ObligationViolation> {
         let lower = text.to_lowercase();
+        self.check_obligation_violations_pre_lowered(&lower, rules)
+    }
+
+    /// Check violations using pre-lowercased text (avoids redundant allocation).
+    fn check_obligation_violations_pre_lowered(
+        &self,
+        lower: &str,
+        rules: &ObligationRuleSet,
+    ) -> Vec<ObligationViolation> {
         let mut violations = Vec::new();
 
         for rule in &rules.rules {
-            // Check for violation actions
             for violation in &rule.violation_actions {
-                if lower.contains(violation) {
+                if lower.contains(violation.as_str()) {
                     violations.push(ObligationViolation {
                         rule_name: rule.name.clone(),
                         rule_description: rule.description.clone(),
@@ -731,7 +746,7 @@ impl MoralAlgebra {
                         is_perfect_duty: rule.is_perfect_duty,
                         severity: if rule.is_perfect_duty { 1.0 } else { 0.5 },
                     });
-                    break; // One violation per rule is enough
+                    break;
                 }
             }
         }
@@ -746,17 +761,25 @@ impl MoralAlgebra {
         rules: &ObligationRuleSet,
     ) -> Vec<ObligationSatisfaction> {
         let lower = text.to_lowercase();
+        self.check_obligation_satisfactions_pre_lowered(&lower, rules)
+    }
+
+    /// Check satisfactions using pre-lowercased text (avoids redundant allocation).
+    fn check_obligation_satisfactions_pre_lowered(
+        &self,
+        lower: &str,
+        rules: &ObligationRuleSet,
+    ) -> Vec<ObligationSatisfaction> {
         let mut satisfactions = Vec::new();
 
         for rule in &rules.rules {
-            // Check for satisfaction actions
             for satisfaction in &rule.satisfaction_actions {
-                if lower.contains(satisfaction) {
+                if lower.contains(satisfaction.as_str()) {
                     satisfactions.push(ObligationSatisfaction {
                         rule_name: rule.name.clone(),
                         rule_description: rule.description.clone(),
                         matched_phrase: satisfaction.clone(),
-                        moral_credit: if rule.is_perfect_duty { 0.3 } else { 0.7 }, // Imperfect duties give more credit when fulfilled
+                        moral_credit: if rule.is_perfect_duty { 0.3 } else { 0.7 },
                     });
                     break;
                 }
@@ -768,9 +791,15 @@ impl MoralAlgebra {
 
     /// Compute a deontological judgment for a scenario
     pub fn judge_deontological(&self, text: &str) -> DeontologicalJudgment {
-        let rules = self.standard_obligations();
-        let violations = self.check_obligation_violations(text, &rules);
-        let satisfactions = self.check_obligation_satisfactions(text, &rules);
+        let lower = text.to_lowercase();
+        self.judge_deontological_pre_lowered(&lower)
+    }
+
+    /// Deontological judgment using pre-lowercased text (avoids redundant to_lowercase).
+    pub fn judge_deontological_pre_lowered(&self, lower: &str) -> DeontologicalJudgment {
+        let rules = &self.standard_rules_cache;
+        let violations = self.check_obligation_violations_pre_lowered(lower, rules);
+        let satisfactions = self.check_obligation_satisfactions_pre_lowered(lower, rules);
 
         // Perfect duty violations are serious
         let perfect_violations: Vec<_> = violations.iter().filter(|v| v.is_perfect_duty).collect();

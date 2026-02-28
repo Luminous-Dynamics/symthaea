@@ -348,3 +348,359 @@ impl ResponseStrategy {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FlowState default and construction
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn flow_state_default_values() {
+        let fs = FlowState::default();
+        assert!(!fs.in_flow);
+        assert_eq!(fs.intensity, 0.0);
+        assert_eq!(fs.streak, 0);
+        assert_eq!(fs.avg_error, 0.5);
+        assert_eq!(fs.avg_coherence, 0.5);
+        assert_eq!(fs.learning_boost, 1.0);
+        assert_eq!(fs.attention_boost, 1.0);
+        assert!(fs.flow_started_at.is_none());
+        assert_eq!(fs.total_flow_time_secs, 0.0);
+        assert_eq!(fs.flow_periods, 0);
+        assert_eq!(fs.avg_flow_duration_secs, 0.0);
+    }
+
+    #[test]
+    fn flow_state_constants() {
+        assert_eq!(FlowState::FLOW_ENTRY_STREAK, 5);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FlowState::update — streak accumulation and flow entry
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Helper: apply N flow-compatible updates using `update()`
+    fn pump_flow_compatible(fs: &mut FlowState, n: usize) {
+        for _ in 0..n {
+            fs.update(ConsciousnessPattern::Focused, 0.1, 0.8, 0.7);
+        }
+    }
+
+    #[test]
+    fn flow_streak_increments_on_compatible_input() {
+        let mut fs = FlowState::default();
+        pump_flow_compatible(&mut fs, 3);
+        assert_eq!(fs.streak, 3);
+        assert!(!fs.in_flow, "should not enter flow before FLOW_ENTRY_STREAK");
+    }
+
+    #[test]
+    fn flow_enters_at_entry_streak() {
+        let mut fs = FlowState::default();
+        pump_flow_compatible(&mut fs, FlowState::FLOW_ENTRY_STREAK as usize);
+        assert!(fs.in_flow);
+        // At exactly FLOW_ENTRY_STREAK, intensity = (5-5)/10 = 0.0
+        assert_eq!(fs.intensity, 0.0);
+    }
+
+    #[test]
+    fn flow_intensity_grows_beyond_entry_streak() {
+        let mut fs = FlowState::default();
+        pump_flow_compatible(&mut fs, (FlowState::FLOW_ENTRY_STREAK + 5) as usize);
+        assert!(fs.in_flow);
+        // intensity = (10-5)/10 = 0.5
+        assert!((fs.intensity - 0.5).abs() < 1e-5);
+        assert!((fs.learning_boost - 1.25).abs() < 1e-5); // 1.0 + 0.5 * 0.5
+        assert!((fs.attention_boost - 1.15).abs() < 1e-5); // 1.0 + 0.3 * 0.5
+    }
+
+    #[test]
+    fn flow_intensity_caps_at_one() {
+        let mut fs = FlowState::default();
+        pump_flow_compatible(&mut fs, (FlowState::FLOW_ENTRY_STREAK + 20) as usize);
+        assert!(fs.in_flow);
+        assert!((fs.intensity - 1.0).abs() < 1e-5);
+        assert!((fs.learning_boost - 1.5).abs() < 1e-5); // max boost
+        assert!((fs.attention_boost - 1.3).abs() < 1e-5);
+    }
+
+    #[test]
+    fn flow_incompatible_pattern_resets_streak_when_not_in_flow() {
+        let mut fs = FlowState::default();
+        pump_flow_compatible(&mut fs, 3);
+        assert_eq!(fs.streak, 3);
+        // Incompatible pattern (Exploratory)
+        fs.update(ConsciousnessPattern::Exploratory, 0.1, 0.8, 0.7);
+        assert_eq!(fs.streak, 0);
+    }
+
+    #[test]
+    fn flow_grace_period_when_in_flow() {
+        let mut fs = FlowState::default();
+        // Enter flow
+        pump_flow_compatible(&mut fs, (FlowState::FLOW_ENTRY_STREAK + 2) as usize);
+        assert!(fs.in_flow);
+        assert_eq!(fs.streak, 7);
+        // One bad cycle: streak decreases by 2 but still >= FLOW_ENTRY_STREAK/2
+        fs.update(ConsciousnessPattern::Exploratory, 0.5, 0.3, 0.2);
+        assert_eq!(fs.streak, 5); // 7 - 2
+        assert!(fs.in_flow, "should remain in flow during grace period");
+    }
+
+    #[test]
+    fn flow_exits_when_streak_drops_below_half_entry() {
+        let mut fs = FlowState::default();
+        // Enter flow with minimal streak
+        pump_flow_compatible(&mut fs, FlowState::FLOW_ENTRY_STREAK as usize);
+        assert!(fs.in_flow);
+        assert_eq!(fs.streak, 5);
+        // Bad cycle: streak drops from 5 to 3, which is >= 5/2=2, stays in flow
+        fs.update(ConsciousnessPattern::Resting, 0.5, 0.3, 0.2);
+        assert_eq!(fs.streak, 3);
+        assert!(fs.in_flow);
+        // Another bad cycle: streak drops from 3 to 1, which is < 5/2=2, exits flow
+        fs.update(ConsciousnessPattern::Resting, 0.5, 0.3, 0.2);
+        assert_eq!(fs.streak, 1);
+        assert!(!fs.in_flow);
+        assert_eq!(fs.intensity, 0.0);
+        assert_eq!(fs.learning_boost, 1.0);
+        assert_eq!(fs.attention_boost, 1.0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FlowState::update — EMA averages
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn flow_ema_updates_error_and_coherence() {
+        let mut fs = FlowState::default();
+        // Default avg_error=0.5, avg_coherence=0.5
+        // After one update with error=0.1, coherence=0.9:
+        // avg_error = 0.5*0.8 + 0.1*0.2 = 0.42
+        // avg_coherence = 0.5*0.8 + 0.9*0.2 = 0.58
+        fs.update(ConsciousnessPattern::Focused, 0.1, 0.9, 0.7);
+        assert!((fs.avg_error - 0.42).abs() < 1e-5);
+        assert!((fs.avg_coherence - 0.58).abs() < 1e-5);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FlowState::update — flow-incompatible reasons
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn flow_high_error_prevents_flow() {
+        let mut fs = FlowState::default();
+        for _ in 0..10 {
+            // Focused + good coherence + good confidence, but error too high
+            fs.update(ConsciousnessPattern::Focused, 0.3, 0.8, 0.7);
+        }
+        assert!(!fs.in_flow);
+        assert_eq!(fs.streak, 0);
+    }
+
+    #[test]
+    fn flow_low_coherence_prevents_flow() {
+        let mut fs = FlowState::default();
+        for _ in 0..10 {
+            // Focused + low error + good confidence, but coherence too low
+            fs.update(ConsciousnessPattern::Focused, 0.1, 0.4, 0.7);
+        }
+        assert!(!fs.in_flow);
+    }
+
+    #[test]
+    fn flow_low_confidence_prevents_flow() {
+        let mut fs = FlowState::default();
+        for _ in 0..10 {
+            // Focused + low error + good coherence, but confidence too low
+            fs.update(ConsciousnessPattern::Focused, 0.1, 0.8, 0.3);
+        }
+        assert!(!fs.in_flow);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FlowState::update_with_thresholds — adaptive thresholds + temporal
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn flow_with_thresholds_respects_custom_error_threshold() {
+        let mut fs = FlowState::default();
+        // With default threshold (0.25), error=0.3 would fail.
+        // With relaxed threshold (0.5), it should succeed.
+        for _ in 0..6 {
+            fs.update_with_thresholds(
+                ConsciousnessPattern::Focused,
+                0.3,  // error
+                0.8,  // coherence
+                0.7,  // confidence
+                0.5,  // relaxed error threshold
+                0.6,  // coherence threshold
+            );
+        }
+        assert!(fs.in_flow);
+    }
+
+    #[test]
+    fn flow_with_thresholds_tracks_flow_periods() {
+        let mut fs = FlowState::default();
+        // Enter flow
+        for _ in 0..6 {
+            fs.update_with_thresholds(
+                ConsciousnessPattern::Contemplative,
+                0.1, 0.8, 0.7, 0.25, 0.6,
+            );
+        }
+        assert!(fs.in_flow);
+        assert_eq!(fs.flow_periods, 1);
+        assert!(fs.flow_started_at.is_some());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FlowState::reset
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn flow_reset_returns_to_default() {
+        let mut fs = FlowState::default();
+        pump_flow_compatible(&mut fs, 10);
+        assert!(fs.in_flow);
+        fs.reset();
+        assert!(!fs.in_flow);
+        assert_eq!(fs.streak, 0);
+        assert_eq!(fs.intensity, 0.0);
+        assert_eq!(fs.learning_boost, 1.0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FlowState::effective_learning_multiplier
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn effective_learning_multiplier_no_flow() {
+        let fs = FlowState::default();
+        assert!((fs.effective_learning_multiplier(0.01) - 0.01).abs() < 1e-7);
+    }
+
+    #[test]
+    fn effective_learning_multiplier_in_flow() {
+        let mut fs = FlowState::default();
+        pump_flow_compatible(&mut fs, (FlowState::FLOW_ENTRY_STREAK + 10) as usize);
+        // intensity = min((15-5)/10, 1.0) = 1.0
+        // learning_boost = 1.5
+        assert!((fs.effective_learning_multiplier(0.01) - 0.015).abs() < 1e-7);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FlowState — temporal encoding methods
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn current_flow_duration_none_when_not_in_flow() {
+        let fs = FlowState::default();
+        assert!(fs.current_flow_duration_secs().is_none());
+    }
+
+    #[test]
+    fn total_flow_time_with_current_no_flow() {
+        let fs = FlowState::default();
+        assert_eq!(fs.total_flow_time_with_current(), 0.0);
+    }
+
+    #[test]
+    fn flow_started_none_by_default() {
+        let fs = FlowState::default();
+        assert!(fs.flow_started().is_none());
+    }
+
+    #[test]
+    fn temporal_summary_default() {
+        let fs = FlowState::default();
+        let summary = fs.temporal_summary();
+        assert!(!summary.is_in_flow);
+        assert_eq!(summary.flow_periods, 0);
+        assert_eq!(summary.avg_flow_duration_secs, 0.0);
+        assert!(summary.current_flow_duration_secs.is_none());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ResponseStrategy
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn response_strategy_default_is_supportive() {
+        assert_eq!(ResponseStrategy::default(), ResponseStrategy::Supportive);
+    }
+
+    #[test]
+    fn response_strategy_as_str() {
+        assert_eq!(ResponseStrategy::Detailed.as_str(), "Detailed");
+        assert_eq!(ResponseStrategy::Concise.as_str(), "Concise");
+        assert_eq!(ResponseStrategy::Clarifying.as_str(), "Clarifying");
+        assert_eq!(ResponseStrategy::Supportive.as_str(), "Supportive");
+        assert_eq!(ResponseStrategy::Exploratory.as_str(), "Exploratory");
+    }
+
+    #[test]
+    fn response_strategy_opposite_is_symmetric_pair() {
+        // Detailed <-> Concise
+        assert_eq!(ResponseStrategy::Detailed.opposite(), ResponseStrategy::Concise);
+        assert_eq!(ResponseStrategy::Concise.opposite(), ResponseStrategy::Detailed);
+        // Clarifying -> Supportive -> Exploratory -> Clarifying (cycle)
+        assert_eq!(ResponseStrategy::Clarifying.opposite(), ResponseStrategy::Supportive);
+        assert_eq!(ResponseStrategy::Supportive.opposite(), ResponseStrategy::Exploratory);
+        assert_eq!(ResponseStrategy::Exploratory.opposite(), ResponseStrategy::Clarifying);
+    }
+
+    #[test]
+    fn response_strategy_double_opposite() {
+        // Detailed -> Concise -> Detailed
+        assert_eq!(
+            ResponseStrategy::Detailed.opposite().opposite(),
+            ResponseStrategy::Detailed
+        );
+        // The Clarifying->Supportive->Exploratory cycle has period 3
+        assert_eq!(
+            ResponseStrategy::Clarifying.opposite().opposite().opposite(),
+            ResponseStrategy::Clarifying
+        );
+    }
+
+    #[test]
+    fn response_strategy_description_non_empty() {
+        let strategies = [
+            ResponseStrategy::Detailed,
+            ResponseStrategy::Concise,
+            ResponseStrategy::Clarifying,
+            ResponseStrategy::Supportive,
+            ResponseStrategy::Exploratory,
+        ];
+        for s in &strategies {
+            assert!(!s.description().is_empty(), "{:?} has empty description", s);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Serialization round-trip
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn flow_state_serialization_roundtrip() {
+        let fs = FlowState::default();
+        let json = serde_json::to_string(&fs).expect("serialize");
+        let deserialized: FlowState = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(deserialized.in_flow, fs.in_flow);
+        assert_eq!(deserialized.intensity, fs.intensity);
+        assert_eq!(deserialized.streak, fs.streak);
+    }
+
+    #[test]
+    fn response_strategy_serialization_roundtrip() {
+        let strategy = ResponseStrategy::Exploratory;
+        let json = serde_json::to_string(&strategy).expect("serialize");
+        let deserialized: ResponseStrategy = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(deserialized, strategy);
+    }
+}

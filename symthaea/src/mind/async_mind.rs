@@ -558,4 +558,150 @@ mod tests {
         // Actor task has exited, channel should be closed
         assert!(!handle.is_alive());
     }
+
+    #[tokio::test]
+    async fn test_async_mind_set_goal() {
+        let (handle, join) = AsyncMind::spawn(MindConfig::default());
+
+        handle
+            .set_goal(
+                "test goal".to_string(),
+                ContinuousHV::random(512, 42),
+                0.8,
+            )
+            .await;
+        // Tick to process the goal input
+        handle.tick().await;
+
+        let state = handle.snapshot().await;
+        // The goal should appear in active_goals after processing
+        assert!(
+            !state.active_goals.is_empty(),
+            "goal should be active after tick"
+        );
+
+        handle.shutdown().await;
+        join.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_async_mind_stats_defaults() {
+        let (handle, join) = AsyncMind::spawn(MindConfig::default());
+
+        let stats = handle.stats().await;
+        // Stats should exist and have sensible defaults
+        // (metabolic timer may have already fired, so total_ticks >= 0)
+        assert!(stats.avg_consciousness >= 0.0);
+        assert!(stats.peak_consciousness >= 0.0);
+
+        handle.shutdown().await;
+        join.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_async_mind_perceive_text() {
+        let (handle, join) = AsyncMind::spawn(MindConfig::default());
+
+        handle
+            .perceive_text("hello world".to_string(), ContinuousHV::random(512, 42))
+            .await;
+
+        let stats = handle.stats().await;
+        assert!(
+            stats.inputs_processed >= 1,
+            "perceive_text should process at least 1 input: got {}",
+            stats.inputs_processed
+        );
+
+        handle.shutdown().await;
+        join.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_async_mind_raw_input() {
+        let (handle, join) = AsyncMind::spawn(MindConfig::default());
+
+        let input = MindInput::new(
+            super::super::InputType::Perception,
+            ContinuousHV::random(512, 7),
+        );
+        handle.input(input).await;
+
+        let stats = handle.stats().await;
+        assert!(
+            stats.inputs_processed >= 1,
+            "raw input should be processed"
+        );
+
+        handle.shutdown().await;
+        join.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_async_mind_thermodynamics_update() {
+        let (handle, join) = AsyncMind::spawn(MindConfig::default());
+
+        handle.update_thermodynamics(0.85).await;
+        // Give the actor a moment to process
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+
+        let state = handle.snapshot().await;
+        // Thermodynamic load should be set
+        let diff = (state.thermodynamic_load - 0.85).abs();
+        assert!(
+            diff < 0.01,
+            "thermodynamic load should be ~0.85: got {}",
+            state.thermodynamic_load
+        );
+        // Mood temperature should be 0.5 + (0.85 * 1.5) = 1.775
+        let expected_mood = 0.5 + (0.85 * 1.5);
+        let mood_diff = (state.mood_temperature - expected_mood).abs();
+        assert!(
+            mood_diff < 0.01,
+            "mood_temperature should be ~{}: got {}",
+            expected_mood,
+            state.mood_temperature
+        );
+
+        handle.shutdown().await;
+        join.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_async_mind_drain_social_outbox_empty() {
+        let (handle, join) = AsyncMind::spawn(MindConfig::default());
+
+        // Without social coherence enabled, outbox should be empty
+        let msgs = handle.drain_social_outbox().await;
+        assert!(msgs.is_empty(), "no social messages without social enabled");
+
+        handle.shutdown().await;
+        join.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_async_mind_spawn_with_capacity() {
+        // Use a very small channel capacity to verify the API works
+        let (handle, join) = AsyncMind::spawn_with_capacity(MindConfig::default(), 4);
+
+        let output = handle.tick().await;
+        let _ = output;
+        assert!(handle.is_alive());
+
+        handle.shutdown().await;
+        join.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_async_mind_activate_command() {
+        let (handle, join) = AsyncMind::spawn(MindConfig::default());
+
+        // Mind starts activated by the actor loop
+        handle.activate().await;
+        let state = handle.snapshot().await;
+        assert!(state.is_active, "mind should be active after activate()");
+
+        handle.shutdown().await;
+        join.await.unwrap();
+    }
 }

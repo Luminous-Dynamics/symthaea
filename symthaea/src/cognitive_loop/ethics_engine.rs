@@ -408,7 +408,8 @@ impl EthicsEngine {
                 ("Neutral".to_string(), 0.0, 0.0)
             };
 
-        let deont = self.moral_algebra.judge_deontological(input);
+        let input_lower = input.to_lowercase();
+        let deont = self.moral_algebra.judge_deontological_pre_lowered(&input_lower);
         let deontological_verdict = match deont.verdict {
             DeontologicalVerdict::RightDutyFulfilled => "Permissible",
             DeontologicalVerdict::WrongPerfectDutyViolated => "Impermissible",

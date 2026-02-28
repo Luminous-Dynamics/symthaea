@@ -26,6 +26,11 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
+#[cfg(feature = "onnx")]
+use ndarray::Array2;
+#[cfg(feature = "onnx")]
+use ort::session::Session;
+
 /// Full dimension for Qwen3-1.5B embeddings
 pub const QWEN3_FULL_DIMENSION: usize = 1536;
 
@@ -161,9 +166,14 @@ pub struct Qwen3Embedder {
 
     /// Statistics
     stats: Qwen3Stats,
-    // ONNX session would be stored here when `ort` feature is enabled
-    // #[cfg(feature = "embeddings")]
-    // session: Option<ort::Session>,
+
+    /// ONNX inference session (when `onnx` feature is enabled and model loaded)
+    #[cfg(feature = "onnx")]
+    session: Option<Session>,
+
+    /// Tokenizer for text→token conversion
+    #[cfg(feature = "onnx")]
+    tokenizer: Option<tokenizers::Tokenizer>,
 }
 
 /// Statistics for the embedder
@@ -190,19 +200,87 @@ impl Qwen3Embedder {
             model_loaded: false,
             cache: std::collections::HashMap::new(),
             stats: Qwen3Stats::default(),
+            #[cfg(feature = "onnx")]
+            session: None,
+            #[cfg(feature = "onnx")]
+            tokenizer: None,
         };
 
-        // Try to load model if path is specified and not in simulation mode
+        // Try to load ONNX model if path is specified and not in simulation mode
         if !embedder.config.use_simulated {
-            if let Some(ref _path) = embedder.config.model_path {
-                // In a full implementation, this would load the ONNX model
-                // For now, we fall back to simulation
-                eprintln!("Note: ONNX model loading not implemented, using simulation");
-                embedder.config.use_simulated = true;
+            #[cfg(feature = "onnx")]
+            {
+                embedder.try_load_onnx()?;
+            }
+            #[cfg(not(feature = "onnx"))]
+            {
+                if embedder.config.model_path.is_some() {
+                    eprintln!("Note: ONNX support requires the `onnx` feature, using simulation");
+                    embedder.config.use_simulated = true;
+                }
             }
         }
 
         Ok(embedder)
+    }
+
+    /// Attempt to load ONNX model and tokenizer.
+    /// Falls back to simulation on any load failure.
+    #[cfg(feature = "onnx")]
+    fn try_load_onnx(&mut self) -> Result<()> {
+        use ort::session::builder::GraphOptimizationLevel;
+
+        let model_path = match self.config.model_path {
+            Some(ref p) => p.clone(),
+            None => {
+                self.config.use_simulated = true;
+                return Ok(());
+            }
+        };
+
+        // Load tokenizer
+        let tokenizer_path = self
+            .config
+            .tokenizer_path
+            .clone()
+            .unwrap_or_else(|| {
+                let base = std::path::Path::new(&model_path)
+                    .parent()
+                    .unwrap_or(std::path::Path::new("."));
+                base.join("tokenizer.json").to_string_lossy().to_string()
+            });
+
+        match tokenizers::Tokenizer::from_file(&tokenizer_path) {
+            Ok(tok) => self.tokenizer = Some(tok),
+            Err(e) => {
+                tracing::warn!("Failed to load tokenizer from {}: {}, using simulation", tokenizer_path, e);
+                self.config.use_simulated = true;
+                return Ok(());
+            }
+        }
+
+        // Load ONNX session
+        match Session::builder()?
+            .with_optimization_level(GraphOptimizationLevel::Level3)?
+            .with_intra_threads(self.config.num_threads)?
+            .commit_from_file(&model_path)
+        {
+            Ok(session) => {
+                self.session = Some(session);
+                self.model_loaded = true;
+                tracing::info!(
+                    "Loaded Qwen3 ONNX model from {} ({}D)",
+                    model_path,
+                    self.config.embedding_dim
+                );
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load ONNX model from {}: {}, using simulation", model_path, e);
+                self.config.use_simulated = true;
+            }
+        }
+
+        Ok(())
     }
 
     /// Embed a single text
@@ -219,8 +297,14 @@ impl Qwen3Embedder {
         let embedding = if self.config.use_simulated {
             self.simulate_embedding(text)
         } else {
-            // Would use ONNX inference here
-            self.simulate_embedding(text)
+            #[cfg(feature = "onnx")]
+            {
+                self.onnx_embed(text).unwrap_or_else(|_| self.simulate_embedding(text))
+            }
+            #[cfg(not(feature = "onnx"))]
+            {
+                self.simulate_embedding(text)
+            }
         };
 
         let elapsed = start.elapsed().as_secs_f32() * 1000.0;
@@ -246,6 +330,105 @@ impl Qwen3Embedder {
     /// Embed multiple texts in batch
     pub fn embed_batch(&mut self, texts: &[&str]) -> Result<Vec<EmbeddingResult>> {
         texts.iter().map(|t| self.embed(t)).collect()
+    }
+
+    /// Run ONNX inference to produce a real embedding.
+    #[cfg(feature = "onnx")]
+    fn onnx_embed(&self, text: &str) -> Result<Vec<f32>> {
+        let session = self
+            .session
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("ONNX session not loaded"))?;
+        let tokenizer = self
+            .tokenizer
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Tokenizer not loaded"))?;
+
+        // Tokenize
+        let encoding = tokenizer
+            .encode(text, true)
+            .map_err(|e| anyhow::anyhow!("Tokenization failed: {}", e))?;
+
+        let ids = encoding.get_ids();
+        let mask = encoding.get_attention_mask();
+        let seq_len = ids.len().min(self.config.max_seq_length);
+
+        // Create input tensors (batch=1, seq_len)
+        let input_ids: Vec<i64> = ids[..seq_len].iter().map(|&x| x as i64).collect();
+        let attention_mask: Vec<i64> = mask[..seq_len].iter().map(|&x| x as i64).collect();
+
+        let ids_array = Array2::from_shape_vec((1, seq_len), input_ids)?;
+        let mask_array = Array2::from_shape_vec((1, seq_len), attention_mask)?;
+
+        // Run inference
+        let outputs = session.run(ort::inputs![ids_array, mask_array]?)?;
+
+        // Extract embedding from output (shape: [1, seq_len, hidden_dim])
+        let output_tensor = outputs[0].try_extract_tensor::<f32>()?;
+        let view = output_tensor.view();
+        let shape = view.shape();
+
+        // Pool based on strategy
+        let hidden_dim = *shape.last().unwrap_or(&self.config.embedding_dim);
+        let mut embedding = vec![0.0f32; self.config.embedding_dim.min(hidden_dim)];
+        let out_dim = embedding.len();
+
+        match self.config.pooling {
+            PoolingStrategy::LastTokenPooling => {
+                // Use last non-padding token
+                let last_idx = mask[..seq_len]
+                    .iter()
+                    .rposition(|&m| m == 1)
+                    .unwrap_or(seq_len.saturating_sub(1));
+                for (i, val) in embedding.iter_mut().enumerate().take(out_dim) {
+                    *val = view[[0, last_idx, i]];
+                }
+            }
+            PoolingStrategy::MeanPooling => {
+                let token_count = mask[..seq_len].iter().filter(|&&m| m == 1).count() as f32;
+                for t in 0..seq_len {
+                    if mask[t] == 1 {
+                        for (i, val) in embedding.iter_mut().enumerate().take(out_dim) {
+                            *val += view[[0, t, i]];
+                        }
+                    }
+                }
+                if token_count > 0.0 {
+                    for val in embedding.iter_mut() {
+                        *val /= token_count;
+                    }
+                }
+            }
+            PoolingStrategy::ClsToken => {
+                for (i, val) in embedding.iter_mut().enumerate().take(out_dim) {
+                    *val = view[[0, 0, i]];
+                }
+            }
+            PoolingStrategy::MaxPooling => {
+                for val in embedding.iter_mut() {
+                    *val = f32::NEG_INFINITY;
+                }
+                for t in 0..seq_len {
+                    if mask[t] == 1 {
+                        for (i, val) in embedding.iter_mut().enumerate().take(out_dim) {
+                            *val = val.max(view[[0, t, i]]);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Normalize if configured
+        if self.config.normalize_output {
+            let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 1e-6 {
+                for x in embedding.iter_mut() {
+                    *x /= norm;
+                }
+            }
+        }
+
+        Ok(embedding)
     }
 
     /// Simulate a high-quality embedding for text

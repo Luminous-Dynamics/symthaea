@@ -858,14 +858,12 @@ impl CognitiveLoopService {
             self.set_lr("temporal_discontinuity", 1.0);
             self.scale_confidence("temporal_discontinuity", 0.8);
             // Lower learning threshold to learn more aggressively after discontinuity
-            self.carryover.learning.adaptive_threshold_scale =
-                (self.carryover.learning.adaptive_threshold_scale * 0.8).clamp(0.6, 1.5);
+            self.scale_threshold("temporal_discontinuity", 0.8);
         } else if temporal_coherence_score > 0.8 {
             // High temporal coherence → model is reliable, raise threshold (learn less often)
-            self.carryover.learning.adaptive_threshold_scale =
-                (self.carryover.learning.adaptive_threshold_scale * 1.01).clamp(0.6, 1.5);
+            self.scale_threshold("temporal_high_coherence", 1.01);
         } else {
-            // Slowly return toward baseline
+            // Slowly return toward baseline (homeostasis drift, not a subsystem proposal)
             self.carryover.learning.adaptive_threshold_scale +=
                 (1.0 - self.carryover.learning.adaptive_threshold_scale) * 0.02;
         }

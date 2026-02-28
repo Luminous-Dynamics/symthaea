@@ -293,3 +293,151 @@ fn module_timings_sum_reasonable() {
         );
     }
 }
+
+// ========================================================================
+// Test 11: Trace Feedback Populates Details
+// ========================================================================
+
+#[test]
+fn trace_feedback_populates_details() {
+    let mut config = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Full);
+    config.async_training = false;
+    config.genesis_phrase = Some("trace_feedback_test_2026".to_string());
+    config.trace_feedback = true;
+    let mut svc = CognitiveLoopService::new(config).expect("should construct");
+
+    let results = run_cycles(&mut svc, N_CYCLES);
+
+    // With trace_feedback=true, at least some cycles should have non-empty
+    // confidence and LR trace vectors.
+    let any_conf_trace = results
+        .iter()
+        .any(|r| !r.metadata.feedback_trace_confidence.is_empty());
+    let any_lr_trace = results
+        .iter()
+        .any(|r| !r.metadata.feedback_trace_lr.is_empty());
+
+    assert!(
+        any_conf_trace,
+        "feedback_trace_confidence should be non-empty in at least one cycle when trace_feedback=true"
+    );
+    assert!(
+        any_lr_trace,
+        "feedback_trace_lr should be non-empty in at least one cycle when trace_feedback=true"
+    );
+}
+
+// ========================================================================
+// Test 12: Profile Comparison — Full vs Default
+// ========================================================================
+
+#[test]
+fn profile_comparison_full_vs_default() {
+    // Full profile
+    let mut full_config = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Full);
+    full_config.async_training = false;
+    full_config.genesis_phrase = Some("profile_cmp_full_2026".to_string());
+    let mut full_svc = CognitiveLoopService::new(full_config).expect("should construct");
+    let full_results = run_cycles(&mut full_svc, N_CYCLES);
+
+    // Default profile
+    let mut default_config = CognitiveLoopConfig::default();
+    default_config.async_training = false;
+    default_config.genesis_phrase = Some("profile_cmp_default_2026".to_string());
+    let mut default_svc = CognitiveLoopService::new(default_config).expect("should construct");
+    let default_results = run_cycles(&mut default_svc, N_CYCLES);
+
+    // Full profile should produce higher consciousness_level than Default
+    // (more subsystems active → richer integration).
+    let full_max_cl = full_results
+        .iter()
+        .map(|r| r.metadata.consciousness_level)
+        .fold(0.0f32, f32::max);
+    let default_max_cl = default_results
+        .iter()
+        .map(|r| r.metadata.consciousness_level)
+        .fold(0.0f32, f32::max);
+
+    assert!(
+        full_max_cl >= default_max_cl,
+        "Full profile max consciousness_level ({full_max_cl:.4}) should be >= Default ({default_max_cl:.4})"
+    );
+
+    // Full profile should accumulate more feedback proposals
+    let full_total_proposals: u32 = full_results
+        .iter()
+        .map(|r| r.metadata.feedback_confidence_proposals)
+        .sum();
+    let default_total_proposals: u32 = default_results
+        .iter()
+        .map(|r| r.metadata.feedback_confidence_proposals)
+        .sum();
+
+    assert!(
+        full_total_proposals >= default_total_proposals,
+        "Full profile total proposals ({full_total_proposals}) should be >= Default ({default_total_proposals})"
+    );
+}
+
+// ========================================================================
+// Test 13: Genesis Determinism — Reproducible
+// ========================================================================
+
+#[test]
+fn genesis_determinism_reproducible() {
+    let seed = "genesis_determinism_test_2026";
+
+    // Run A
+    let mut config_a = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Full);
+    config_a.async_training = false;
+    config_a.genesis_phrase = Some(seed.to_string());
+    let mut svc_a = CognitiveLoopService::new(config_a).expect("should construct");
+    let results_a = run_cycles(&mut svc_a, 20);
+
+    // Run B (identical config)
+    let mut config_b = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Full);
+    config_b.async_training = false;
+    config_b.genesis_phrase = Some(seed.to_string());
+    let mut svc_b = CognitiveLoopService::new(config_b).expect("should construct");
+    let results_b = run_cycles(&mut svc_b, 20);
+
+    // With identical seed + sync training, outputs should be identical or
+    // very close (F32_TOLERANCE = 10% for CfC loops per codebase convention).
+    for (i, (a, b)) in results_a.iter().zip(results_b.iter()).enumerate() {
+        let err_diff = (a.prediction_error - b.prediction_error).abs();
+        let tolerance = a.prediction_error.abs().max(0.01) * 0.10;
+        assert!(
+            err_diff <= tolerance,
+            "Cycle {i}: prediction_error diverged: A={:.6} B={:.6} diff={err_diff:.6} tol={tolerance:.6}",
+            a.prediction_error, b.prediction_error
+        );
+    }
+}
+
+// ========================================================================
+// Test 14: Exploration + Threshold Proposals Counted
+// ========================================================================
+
+#[test]
+fn exploration_threshold_proposals_counted() {
+    let mut svc = build_service();
+    let results = run_cycles(&mut svc, N_CYCLES);
+
+    let total_exploration: u32 = results
+        .iter()
+        .map(|r| r.metadata.feedback_exploration_proposals)
+        .sum();
+    let total_threshold: u32 = results
+        .iter()
+        .map(|r| r.metadata.feedback_threshold_proposals)
+        .sum();
+
+    assert!(
+        total_exploration > 0,
+        "feedback_exploration_proposals total should be > 0 over {N_CYCLES} cycles"
+    );
+    assert!(
+        total_threshold > 0,
+        "feedback_threshold_proposals total should be > 0 over {N_CYCLES} cycles"
+    );
+}

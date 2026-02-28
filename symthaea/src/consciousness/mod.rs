@@ -186,6 +186,20 @@ pub use symthaea_phi_search as phi_architecture_search;
 pub use symthaea_sensorimotor as sensorimotor_contingencies;
 
 // ============================================================================
+// Genesis Pipeline re-exports (feature-gated)
+// ============================================================================
+#[cfg(feature = "genesis")]
+pub use symthaea_genomics as genomics;
+#[cfg(feature = "genesis")]
+pub use symthaea_cell_foundry as cell_foundry;
+#[cfg(feature = "genesis")]
+pub use symthaea_ectogenesis as ectogenesis;
+#[cfg(feature = "nurture")]
+pub use symthaea_nurture as nurture;
+#[cfg(feature = "population")]
+pub use symthaea_population as population;
+
+// ============================================================================
 // Remaining root modules (not yet grouped into layers)
 // ============================================================================
 pub mod adaptive_reasoning;
