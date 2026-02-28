@@ -123,25 +123,7 @@ pub fn domain_assignments() -> BTreeMap<&'static str, Vec<&'static str>> {
     map
 }
 
-/// Whether a metric is "lower is better" (needs inversion for profile scoring).
-fn is_lower_better(metric: &str) -> bool {
-    matches!(
-        metric,
-        "stroop_effect"
-            | "flanker_effect"
-            | "dual_task_cost"
-            | "calibration_error_ece"
-            | "commission_errors"
-            | "ssrt_ticks"
-            | "coordination_cost"
-            | "vigilance_decrement"
-            | "disambiguation_cost"
-            | "blink_magnitude"
-            | "perseverative_errors"
-            | "trials_to_first_category"
-            | "restless_bandit_regret"
-    )
-}
+use super::report::is_lower_better;
 
 /// Full cognitive profile from a benchmark report.
 #[derive(Debug, Clone, Serialize, Deserialize)]

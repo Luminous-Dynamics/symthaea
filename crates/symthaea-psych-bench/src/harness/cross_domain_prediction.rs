@@ -98,37 +98,11 @@ pub struct PredictionModel {
 // Statistical helpers
 // ────────────────────────────────────────────────────────────────────
 
-/// Compute Pearson r between two vectors.
-///
-/// Returns (r, n) where n is the number of paired observations used.
-/// Requires at least 3 paired values; returns (0.0, n) otherwise.
+/// Compute Pearson r between two vectors, returning (r, n).
 fn pearson_r(x: &[f64], y: &[f64]) -> (f64, usize) {
     let n = x.len().min(y.len());
-    if n < 3 {
-        return (0.0, n);
-    }
-
-    let mean_x = x[..n].iter().sum::<f64>() / n as f64;
-    let mean_y = y[..n].iter().sum::<f64>() / n as f64;
-
-    let mut cov = 0.0f64;
-    let mut var_x = 0.0f64;
-    let mut var_y = 0.0f64;
-
-    for i in 0..n {
-        let dx = x[i] - mean_x;
-        let dy = y[i] - mean_y;
-        cov += dx * dy;
-        var_x += dx * dx;
-        var_y += dy * dy;
-    }
-
-    let denom = (var_x * var_y).sqrt();
-    if denom < 1e-15 {
-        return (0.0, n);
-    }
-
-    (cov / denom, n)
+    let r = super::reliability_analysis::pearson_r(x, y);
+    (r, n)
 }
 
 /// Approximate two-tailed p-value from Pearson r and sample size.

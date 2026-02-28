@@ -9,7 +9,7 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
 use std::collections::BTreeMap;
-use symthaea_core::hdc::ContinuousHV;
+
 
 /// Reward learning benchmark measuring DA-driven reversal learning.
 pub struct RewardLearningBenchmark;
@@ -43,14 +43,8 @@ fn softmax_choice(values: &[f64], temperature: f64, rng: &mut u64) -> usize {
 
 impl RewardLearningBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64) {
-        let dim = config.dimension;
         let seed = config.trial_seed("neuromod", "reward", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
-
-        // Create stimulus prototypes
-        let stim_a = ContinuousHV::random(dim, next_seed(&mut rng));
-        let stim_b = ContinuousHV::random(dim, next_seed(&mut rng));
-        let reward_proto = ContinuousHV::random(dim, next_seed(&mut rng));
 
         // Association strengths (learned via Hebbian-like update)
         let mut q_values = [0.5_f64, 0.5]; // [A, B]
@@ -58,12 +52,9 @@ impl RewardLearningBenchmark {
         let temperature = 0.3;
 
         // Phase 1: Acquisition (A→reward, B→nothing), 40 trials
-        let mut phase1_choices = 0usize;
         let criterion = 0.8;
-        let mut _trials_to_criterion = 40usize;
-        let mut criterion_met = false;
 
-        for trial in 0..40 {
+        for _trial in 0..40 {
             let choice = softmax_choice(&q_values, temperature, &mut rng);
             let reward = if choice == 0 { 1.0 } else { 0.0 };
 
@@ -71,18 +62,6 @@ impl RewardLearningBenchmark {
             let rpe = reward - q_values[choice];
             q_values[choice] += lr * rpe;
             q_values[choice] = q_values[choice].clamp(0.0, 1.0);
-
-            if choice == 0 {
-                phase1_choices += 1;
-            }
-
-            if !criterion_met && trial > 5 {
-                let recent_a = phase1_choices as f64 / (trial + 1) as f64;
-                if recent_a > criterion {
-                    _trials_to_criterion = trial + 1;
-                    criterion_met = true;
-                }
-            }
         }
 
         // Phase 2: Reversal (B→reward, A→nothing), 40 trials
@@ -130,10 +109,6 @@ impl RewardLearningBenchmark {
 
         // DA-reward correlation: higher Q for rewarded stimulus indicates DA-driven learning
         let da_reward_corr = (q_values[1] - q_values[0]).clamp(-1.0, 1.0);
-
-        // Use reversal criterion as primary metric (bind with stimulus HVs for HDC grounding)
-        let _ = stim_a.similarity(&reward_proto);
-        let _ = stim_b.similarity(&reward_proto);
 
         (
             reversal_criterion_trials as f64,

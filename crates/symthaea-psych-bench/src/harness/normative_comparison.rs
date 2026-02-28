@@ -77,28 +77,7 @@ pub struct NormativeReport {
     pub weaknesses: Vec<String>,
 }
 
-/// Whether a metric is "lower is better" (needs z-score negation).
-///
-/// For these metrics, a value below the human mean is actually good performance,
-/// so we negate the z-score to maintain the convention that positive z = better.
-fn is_lower_better(metric: &str) -> bool {
-    matches!(
-        metric,
-        "stroop_effect"
-            | "flanker_effect"
-            | "dual_task_cost"
-            | "calibration_error_ece"
-            | "commission_errors"
-            | "ssrt_ticks"
-            | "coordination_cost"
-            | "vigilance_decrement"
-            | "disambiguation_cost"
-            | "blink_magnitude"
-            | "perseverative_errors"
-            | "trials_to_first_category"
-            | "restless_bandit_regret"
-    )
-}
+use super::report::is_lower_better;
 
 /// Map a benchmark name to its corresponding baseline domain and key.
 ///
@@ -216,6 +195,20 @@ fn baseline_for_benchmark<'a>(
 
         // Butlin
         name if name.contains("Butlin") => Some(("presence_ratio", &bl.butlin)),
+
+        // Neuromod
+        name if name.contains("RewardLearning") => {
+            Some(("trials_to_criterion", &bl.neuromod))
+        }
+        name if name.contains("YerkesDodson") => Some(("peak_ne_level", &bl.neuromod)),
+        name if name.contains("AttentionNetwork") => Some(("conflict_effect", &bl.neuromod)),
+        name if name.contains("MoodInduction") => Some(("mood_congruent_bias", &bl.neuromod)),
+        name if name.contains("PharmacologicalAblation") => {
+            Some(("da_knockout_lr_drop_pct", &bl.neuromod))
+        }
+        name if name.contains("LiveLoopAblation") => {
+            Some(("live_da_knockout_gradient_drop_pct", &bl.neuromod))
+        }
 
         _ => {
             // Try generic metric name lookup against all baseline maps
