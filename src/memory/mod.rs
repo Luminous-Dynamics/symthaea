@@ -5,12 +5,18 @@
 //! semantic memory (HDC-based similarity lookup), episodic replay for
 //! high-Phi moment consolidation, and memory consolidation systems.
 
-pub mod coherence_tracker;
+/// Re-exported from `symthaea-memory` crate (Phase A extraction).
+pub mod coherence_tracker {
+    pub use symthaea_memory::coherence::*;
+}
 pub mod conversation_memory;
 pub mod episodic_replay;
 pub mod hippocampus;
 pub mod memory_coordinator;
-pub mod semantic_memory;
+/// Re-exported from `symthaea-memory` crate (Phase A extraction).
+pub mod semantic_memory {
+    pub use symthaea_memory::semantic::*;
+}
 
 // Re-export key types
 pub use episodic_replay::{
