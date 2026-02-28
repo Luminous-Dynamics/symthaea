@@ -174,7 +174,7 @@ impl BrocaGenerator {
         on_token: &mut dyn FnMut(&str),
     ) -> GenerationResult {
         // 1. Encode thought channels once
-        let thought_hv = self.encoder.encode(channels);
+        let mut thought_hv = self.encoder.encode(channels);
 
         // 2. Compute max tokens (consciousness-gated)
         let max_tokens = if self.config.enable_consciousness_gating {
@@ -207,10 +207,13 @@ impl BrocaGenerator {
                 self.emotional_modulator.apply(&mut logits, channels, pos);
             }
 
-            // Coherence feedback
+            // Coherence feedback: scale thought HV to strengthen binding when coherence drifts
             if self.config.enable_coherence_feedback {
                 let output_hv = self.controller.output_hv();
-                let _weight = self.coherence_feedback.update(&output_hv, &thought_hv);
+                let binding_weight = self.coherence_feedback.update(&output_hv, &thought_hv);
+                if binding_weight > 1.0 + 1e-6 {
+                    thought_hv = thought_hv.scale(binding_weight);
+                }
 
                 // Semantic veto: mid-sentence self-correction
                 if self.config.enable_semantic_veto
@@ -577,5 +580,28 @@ mod tests {
         // Just verify both produce output — the effective max differs
         assert!(result_low.num_tokens > 0);
         assert!(result_high.num_tokens > 0);
+    }
+
+    #[test]
+    fn test_coherence_feedback_scales_thought() {
+        use crate::gating::CoherenceFeedback;
+        use symthaea_core::hdc::ContinuousHV;
+
+        let thought_hv = ContinuousHV::random_default(42).normalize();
+        // Create an output_hv that is very different (low coherence)
+        let output_hv = ContinuousHV::random_default(9999).normalize();
+
+        let mut feedback = CoherenceFeedback::new(0.30);
+        let weight = feedback.update(&output_hv, &thought_hv);
+
+        // Random 16384D vectors are nearly orthogonal → low coherence → weight > 1.0
+        assert!(
+            weight > 1.0,
+            "Low-coherence output should produce binding weight > 1.0, got {weight}"
+        );
+        assert!(
+            weight <= 3.0,
+            "Binding weight should be capped at 3.0, got {weight}"
+        );
     }
 }

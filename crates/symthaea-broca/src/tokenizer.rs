@@ -343,6 +343,11 @@ impl BpeTokenizer {
         }
     }
 
+    /// Get the BPE merge rules.
+    pub fn merges(&self) -> &[(String, String)] {
+        &self.merges
+    }
+
     /// Vocabulary size.
     pub fn vocab_size(&self) -> usize {
         self.vocab_size

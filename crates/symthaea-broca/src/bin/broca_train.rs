@@ -59,7 +59,7 @@ fn main() {
     let (mut generator, adam_state) = if let Some(ref resume_path) = opts.resume_path {
         tracing::info!(path = %resume_path, "Resuming from checkpoint");
         match BrocaGenerator::from_checkpoint(resume_path, &genesis) {
-            Ok((gen, adam, _proj)) => (gen, adam),
+            Ok((gen, adam, _proj, _lm_config)) => (gen, adam),
             Err(e) => {
                 eprintln!("Failed to load checkpoint '{}': {e}", resume_path);
                 process::exit(1);
@@ -133,6 +133,7 @@ fn main() {
         final_loss,
         final_adam,
         None, // No projection weights in standalone training
+        None, // No L-SSM config in CfC-HDC training
     ) {
         eprintln!("Failed to save checkpoint: {e}");
         process::exit(1);

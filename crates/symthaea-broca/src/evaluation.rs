@@ -1249,5 +1249,47 @@ mod tests {
             // With a trained projection, unknown_hedging > certain_hedging.
             // With random projection, this may not hold — just verify they're computed.
         }
+
+        #[test]
+        fn test_evaluate_liquid_mamba_mock() {
+            use crate::liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
+            use crate::training::TrainingPair;
+            use symthaea_core::genesis::GenesisSeed;
+
+            let genesis = GenesisSeed::from_phrase("test-lm-eval-mock");
+            let config = LiquidMambaConfig {
+                max_tokens: 16,
+                ..Default::default()
+            };
+            let mut gen = LiquidMambaGenerator::with_mock(&genesis, config);
+
+            let mut dataset = TrainingDataset::default();
+            for intent in 0..3 {
+                let ch = ThoughtChannels::with_intent(intent);
+                dataset.pairs.push(TrainingPair {
+                    channels: ch.channels,
+                    target_text: "hello world test".to_string(),
+                    target_ids: vec![],
+                });
+            }
+
+            let eval_config = LiquidMambaEvalConfig {
+                dataset,
+                compute_perplexity: true,
+                compute_english_ratio: true,
+                per_intent_breakdown: true,
+                max_gen_tokens: 16,
+                consciousness_gating_test: true,
+            };
+
+            let result = evaluate_liquid_mamba(&mut gen, &eval_config);
+            assert_eq!(result.base.num_samples, 3);
+            assert!(result.base.perplexity.is_finite() || result.base.perplexity.is_infinite());
+            assert!(result.avg_semantic_pe.is_finite());
+            assert!(result.distinct_1.is_finite());
+            assert!(result.distinct_2.is_finite());
+            assert!(result.pe_mean.is_finite());
+            assert!(result.gating_verification.is_some());
+        }
     }
 }
