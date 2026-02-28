@@ -273,6 +273,15 @@ impl CognitiveLoopService {
             ..Default::default()
         };
 
+        // ── Nurture/attachment telemetry ──
+        #[cfg(feature = "nurture")]
+        {
+            if let Some(ref nurture) = self.nurture_attachment {
+                metadata.attachment_style = Some(format!("{:?}", nurture.style()));
+                metadata.attachment_security = Some(nurture.security_score());
+            }
+        }
+
         // ── End-of-cycle stats ──
         self.run_end_of_cycle_stats(
             &mut metadata,
@@ -335,13 +344,14 @@ impl CognitiveLoopService {
             self.carryover.learning.adaptive_threshold_scale as f64,
         );
 
-        // Apply consensus-smoothed values for fully-mediated fields.
-        // Consensus integration (averaged adds, geometric mean scales) dampens
-        // extreme compounding from 30+ subsystem proposals per cycle while
-        // preserving mid-cycle mutation semantics.
-        self.fep_lr_boost = feedback_divergence.consensus_lr as f32;
-        self.carryover.learning.adaptive_threshold_scale =
-            feedback_divergence.consensus_threshold as f32;
+        // Store consensus-smoothed values for application at the next cycle start.
+        // Routing through `store_consensus_for_next_cycle` + `apply_pending_consensus`
+        // ensures the divergence tracker sees the writeback as a Set proposal rather
+        // than an out-of-band mutation.
+        if self.config.consensus_feedback {
+            self.feedback_state
+                .store_consensus_for_next_cycle(&feedback_divergence);
+        }
 
         if feedback_divergence.confidence > 0.01
             || feedback_divergence.learning_rate > 0.01

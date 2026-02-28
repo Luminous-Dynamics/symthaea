@@ -381,6 +381,11 @@ pub struct CognitiveLoopConfig {
     /// `feedback_trace_confidence` and `feedback_trace_lr` each cycle.
     /// Intended for debugging and development, not production.
     pub trace_feedback: bool,
+
+    /// When true, consensus-smoothed values (averaged adds, geometric-mean scales)
+    /// replace direct-mutation values for all 4 feedback variables at cycle boundaries.
+    /// Dampens compounding noise from 50+ subsystem proposals per cycle.
+    pub consensus_feedback: bool,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -442,6 +447,7 @@ impl Default for CognitiveLoopConfig {
             agent_did: None,
             attestation_buffer_capacity: 64,
             trace_feedback: false,
+            consensus_feedback: false,
         }
     }
 }
