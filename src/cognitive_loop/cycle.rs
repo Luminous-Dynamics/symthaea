@@ -914,7 +914,7 @@ impl CognitiveLoopService {
             * arousal_tau_factor
             * codebook_tau_factor
             * arousal_recovery_tau_factor
-            * self.somatic_bridge.compute_signals().tau_slowdown_factor as f32; // Nociception: infrastructure stress → slower integration
+            * self.somatic_bridge.to_interoceptive_signals().tau_slowdown_factor as f32; // Nociception: infrastructure stress → slower integration
         let _t_core = Instant::now();
         if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
             tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
@@ -1421,11 +1421,11 @@ impl CognitiveLoopService {
         // #7: Confidence crash detection → 5-HT emergency dip (Cools et al. 2008)
         let confidence_velocity =
             self.prediction_confidence - self.carryover.quality.prev_confidence_for_crash;
-        let sht_crash_dip = if confidence_velocity < -0.15 {
+        let sht_crash_dip: f32 = if confidence_velocity < -0.15 {
             self.neuromodulator_bath.serotonin.produce(-0.1);
-            true
+            confidence_velocity.abs() as f32
         } else {
-            false
+            0.0
         };
         self.carryover.quality.prev_confidence_for_crash = self.prediction_confidence;
 
@@ -2364,7 +2364,7 @@ impl CognitiveLoopService {
         let epistemic_quality = consciousness_metrics.epistemic_quality;
         let phi_validation_correlation = consciousness_metrics.phi_validation_correlation;
         let dissipative_health = consciousness_metrics.dissipative_health
-            * (1.0 - self.somatic_bridge.compute_signals().dissipative_health_penalty); // Nociception: infrastructure stress penalty
+            * (1.0 - self.somatic_bridge.to_interoceptive_signals().dissipative_health_penalty); // Nociception: infrastructure stress penalty
         let dissipative_regime = consciousness_metrics.dissipative_regime;
         let dissipative_entropy_rate = consciousness_metrics.dissipative_entropy_rate;
         let epistemic_phi_eff = consciousness_metrics.epistemic_phi_eff;
