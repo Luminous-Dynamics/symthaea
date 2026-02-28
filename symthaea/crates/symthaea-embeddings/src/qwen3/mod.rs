@@ -1,7 +1,7 @@
 //! # Qwen3 Embeddings: Semantic Text Encoding
 //!
 //! This module provides text embedding using Qwen3-Embedding models.
-//! Supports both ONNX inference (via the `ort` crate when available)
+//! Supports both Burn inference (via the `burn` feature when available)
 //! and high-quality simulated embeddings for testing.
 //!
 //! ## Model Specifications
@@ -26,10 +26,15 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
-#[cfg(feature = "onnx")]
-use ndarray::Array2;
-#[cfg(feature = "onnx")]
-use ort::session::Session;
+#[cfg(feature = "burn")]
+pub mod attention;
+#[cfg(feature = "burn")]
+pub mod mlp;
+#[cfg(feature = "burn")]
+pub mod model;
+
+#[cfg(feature = "burn")]
+use burn::backend::NdArray;
 
 /// Full dimension for Qwen3-1.5B embeddings
 pub const QWEN3_FULL_DIMENSION: usize = 1536;
@@ -40,7 +45,7 @@ pub const QWEN3_STANDARD_DIMENSION: usize = 1024;
 /// Configuration for Qwen3Embedder
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Qwen3Config {
-    /// Model path (for ONNX models)
+    /// Model path (directory containing safetensors + tokenizer.json)
     pub model_path: Option<String>,
 
     /// Tokenizer path (for HuggingFace tokenizers)
@@ -153,7 +158,7 @@ pub enum Device {
 /// Qwen3 Text Embedder
 ///
 /// Provides semantic embeddings using Qwen3-Embedding models.
-/// Falls back to high-quality simulation when ONNX is not available.
+/// Falls back to high-quality simulation when Burn model is not available.
 pub struct Qwen3Embedder {
     /// Configuration
     config: Qwen3Config,
@@ -167,13 +172,17 @@ pub struct Qwen3Embedder {
     /// Statistics
     stats: Qwen3Stats,
 
-    /// ONNX inference session (when `onnx` feature is enabled and model loaded)
-    #[cfg(feature = "onnx")]
-    session: Option<Session>,
+    /// Burn model (when `burn` feature is enabled and weights loaded)
+    #[cfg(feature = "burn")]
+    burn_model: Option<model::Qwen3Model<NdArray>>,
 
     /// Tokenizer for text→token conversion
-    #[cfg(feature = "onnx")]
+    #[cfg(feature = "burn")]
     tokenizer: Option<tokenizers::Tokenizer>,
+
+    /// Burn device handle
+    #[cfg(feature = "burn")]
+    burn_device: burn::backend::ndarray::NdArrayDevice,
 }
 
 /// Statistics for the embedder
@@ -200,22 +209,24 @@ impl Qwen3Embedder {
             model_loaded: false,
             cache: std::collections::HashMap::new(),
             stats: Qwen3Stats::default(),
-            #[cfg(feature = "onnx")]
-            session: None,
-            #[cfg(feature = "onnx")]
+            #[cfg(feature = "burn")]
+            burn_model: None,
+            #[cfg(feature = "burn")]
             tokenizer: None,
+            #[cfg(feature = "burn")]
+            burn_device: burn::backend::ndarray::NdArrayDevice::Cpu,
         };
 
-        // Try to load ONNX model if path is specified and not in simulation mode
+        // Try to load Burn model if path is specified and not in simulation mode
         if !embedder.config.use_simulated {
-            #[cfg(feature = "onnx")]
+            #[cfg(feature = "burn")]
             {
-                embedder.try_load_onnx()?;
+                embedder.try_load_burn()?;
             }
-            #[cfg(not(feature = "onnx"))]
+            #[cfg(not(feature = "burn"))]
             {
                 if embedder.config.model_path.is_some() {
-                    eprintln!("Note: ONNX support requires the `onnx` feature, using simulation");
+                    eprintln!("Note: Burn model support requires the `burn` feature, using simulation");
                     embedder.config.use_simulated = true;
                 }
             }
@@ -224,13 +235,14 @@ impl Qwen3Embedder {
         Ok(embedder)
     }
 
-    /// Attempt to load ONNX model and tokenizer.
+    /// Attempt to load Burn model and tokenizer from safetensors.
     /// Falls back to simulation on any load failure.
-    #[cfg(feature = "onnx")]
-    fn try_load_onnx(&mut self) -> Result<()> {
-        use ort::session::builder::GraphOptimizationLevel;
+    #[cfg(feature = "burn")]
+    fn try_load_burn(&mut self) -> Result<()> {
+        use burn::record::FullPrecisionSettings;
+        use burn_import::safetensors::{LoadArgs, SafetensorsFileRecorder};
 
-        let model_path = match self.config.model_path {
+        let model_dir = match self.config.model_path {
             Some(ref p) => p.clone(),
             None => {
                 self.config.use_simulated = true;
@@ -244,9 +256,7 @@ impl Qwen3Embedder {
             .tokenizer_path
             .clone()
             .unwrap_or_else(|| {
-                let base = std::path::Path::new(&model_path)
-                    .parent()
-                    .unwrap_or(std::path::Path::new("."));
+                let base = std::path::Path::new(&model_dir);
                 base.join("tokenizer.json").to_string_lossy().to_string()
             });
 
@@ -259,23 +269,36 @@ impl Qwen3Embedder {
             }
         }
 
-        // Load ONNX session
-        match Session::builder()?
-            .with_optimization_level(GraphOptimizationLevel::Level3)?
-            .with_intra_threads(self.config.num_threads)?
-            .commit_from_file(&model_path)
-        {
-            Ok(session) => {
-                self.session = Some(session);
+        // Determine model variant from embedding_dim
+        let model_cfg = if self.config.embedding_dim >= QWEN3_FULL_DIMENSION {
+            model::Qwen3ModelConfig::qwen3_15b()
+        } else {
+            model::Qwen3ModelConfig::qwen3_06b()
+        };
+
+        // Init model with random weights, then load safetensors on top
+        let device = &self.burn_device;
+        let mut burn_model = model_cfg.init::<NdArray>(device);
+
+        // Load safetensors weights — strip "model." prefix via key remap
+        let safetensors_path = std::path::Path::new(&model_dir).join("model.safetensors");
+        let recorder = SafetensorsFileRecorder::<FullPrecisionSettings>::new();
+        let load_args = LoadArgs::new(safetensors_path)
+            .with_key_remap("model\\.(.*)", "$1");
+
+        match burn::record::Recorder::load(recorder, load_args, device) {
+            Ok(record) => {
+                burn_model = burn_model.load_record(record);
+                self.burn_model = Some(burn_model);
                 self.model_loaded = true;
                 tracing::info!(
-                    "Loaded Qwen3 ONNX model from {} ({}D)",
-                    model_path,
+                    "Loaded Qwen3 Burn model from {} ({}D)",
+                    model_dir,
                     self.config.embedding_dim
                 );
             }
             Err(e) => {
-                tracing::warn!("Failed to load ONNX model from {}: {}, using simulation", model_path, e);
+                tracing::warn!("Failed to load safetensors from {}: {}, using simulation", model_dir, e);
                 self.config.use_simulated = true;
             }
         }
@@ -297,11 +320,11 @@ impl Qwen3Embedder {
         let embedding = if self.config.use_simulated {
             self.simulate_embedding(text)
         } else {
-            #[cfg(feature = "onnx")]
+            #[cfg(feature = "burn")]
             {
-                self.onnx_embed(text).unwrap_or_else(|_| self.simulate_embedding(text))
+                self.burn_embed(text).unwrap_or_else(|_| self.simulate_embedding(text))
             }
-            #[cfg(not(feature = "onnx"))]
+            #[cfg(not(feature = "burn"))]
             {
                 self.simulate_embedding(text)
             }
@@ -332,13 +355,13 @@ impl Qwen3Embedder {
         texts.iter().map(|t| self.embed(t)).collect()
     }
 
-    /// Run ONNX inference to produce a real embedding.
-    #[cfg(feature = "onnx")]
-    fn onnx_embed(&self, text: &str) -> Result<Vec<f32>> {
-        let session = self
-            .session
+    /// Run Burn inference to produce a real embedding.
+    #[cfg(feature = "burn")]
+    fn burn_embed(&self, text: &str) -> Result<Vec<f32>> {
+        let burn_model = self
+            .burn_model
             .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("ONNX session not loaded"))?;
+            .ok_or_else(|| anyhow::anyhow!("Burn model not loaded"))?;
         let tokenizer = self
             .tokenizer
             .as_ref()
@@ -353,70 +376,50 @@ impl Qwen3Embedder {
         let mask = encoding.get_attention_mask();
         let seq_len = ids.len().min(self.config.max_seq_length);
 
-        // Create input tensors (batch=1, seq_len)
-        let input_ids: Vec<i64> = ids[..seq_len].iter().map(|&x| x as i64).collect();
-        let attention_mask: Vec<i64> = mask[..seq_len].iter().map(|&x| x as i64).collect();
+        // Create Burn input tensor [1, seq_len]
+        let input_ids: Vec<i32> = ids[..seq_len].iter().map(|&x| x as i32).collect();
+        let input_tensor = burn::tensor::Tensor::<NdArray, 1, burn::tensor::Int>::from_data(
+            input_ids.as_slice(),
+            &self.burn_device,
+        )
+        .unsqueeze_dim(0); // [1, seq_len]
 
-        let ids_array = Array2::from_shape_vec((1, seq_len), input_ids)?;
-        let mask_array = Array2::from_shape_vec((1, seq_len), attention_mask)?;
+        // Forward pass → [1, seq_len, hidden_size]
+        let hidden = burn_model.forward(input_tensor);
+        let [_batch, _seq, hidden_dim] = hidden.dims();
 
-        // Run inference
-        let outputs = session.run(ort::inputs![ids_array, mask_array]?)?;
-
-        // Extract embedding from output (shape: [1, seq_len, hidden_dim])
-        let output_tensor = outputs[0].try_extract_tensor::<f32>()?;
-        let view = output_tensor.view();
-        let shape = view.shape();
+        let out_dim = self.config.embedding_dim.min(hidden_dim);
 
         // Pool based on strategy
-        let hidden_dim = *shape.last().unwrap_or(&self.config.embedding_dim);
-        let mut embedding = vec![0.0f32; self.config.embedding_dim.min(hidden_dim)];
-        let out_dim = embedding.len();
-
-        match self.config.pooling {
+        let pooled: burn::tensor::Tensor<NdArray, 2> = match self.config.pooling {
             PoolingStrategy::LastTokenPooling => {
-                // Use last non-padding token
                 let last_idx = mask[..seq_len]
                     .iter()
                     .rposition(|&m| m == 1)
                     .unwrap_or(seq_len.saturating_sub(1));
-                for (i, val) in embedding.iter_mut().enumerate().take(out_dim) {
-                    *val = view[[0, last_idx, i]];
-                }
+                hidden.slice([0..1, last_idx..last_idx + 1, 0..out_dim]).reshape([1, out_dim])
             }
             PoolingStrategy::MeanPooling => {
-                let token_count = mask[..seq_len].iter().filter(|&&m| m == 1).count() as f32;
-                for t in 0..seq_len {
-                    if mask[t] == 1 {
-                        for (i, val) in embedding.iter_mut().enumerate().take(out_dim) {
-                            *val += view[[0, t, i]];
-                        }
-                    }
-                }
-                if token_count > 0.0 {
-                    for val in embedding.iter_mut() {
-                        *val /= token_count;
-                    }
+                let token_count = mask[..seq_len].iter().filter(|&&m| m == 1).count();
+                if token_count > 0 {
+                    let sum = hidden.slice([0..1, 0..token_count, 0..out_dim]).sum_dim(1);
+                    sum.div_scalar(token_count as f32)
+                } else {
+                    hidden.slice([0..1, 0..1, 0..out_dim]).reshape([1, out_dim])
                 }
             }
             PoolingStrategy::ClsToken => {
-                for (i, val) in embedding.iter_mut().enumerate().take(out_dim) {
-                    *val = view[[0, 0, i]];
-                }
+                hidden.slice([0..1, 0..1, 0..out_dim]).reshape([1, out_dim])
             }
             PoolingStrategy::MaxPooling => {
-                for val in embedding.iter_mut() {
-                    *val = f32::NEG_INFINITY;
-                }
-                for t in 0..seq_len {
-                    if mask[t] == 1 {
-                        for (i, val) in embedding.iter_mut().enumerate().take(out_dim) {
-                            *val = val.max(view[[0, t, i]]);
-                        }
-                    }
-                }
+                hidden.slice([0..1, 0..seq_len, 0..out_dim]).max_dim(1)
             }
-        }
+        };
+
+        // Convert to Vec<f32>
+        let data = pooled.into_data();
+        let mut embedding: Vec<f32> = data.to_vec().unwrap();
+        embedding.truncate(out_dim);
 
         // Normalize if configured
         if self.config.normalize_output {
@@ -676,5 +679,86 @@ mod tests {
         for result in results {
             assert_eq!(result.dimension, QWEN3_STANDARD_DIMENSION);
         }
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "burn")]
+mod burn_tests {
+    use super::model::Qwen3ModelConfig;
+    use burn::backend::NdArray;
+    use burn::prelude::*;
+
+    type B = NdArray;
+
+    #[test]
+    fn test_burn_model_init() {
+        let device = burn::backend::ndarray::NdArrayDevice::Cpu;
+        let cfg = Qwen3ModelConfig::tiny();
+        let _model = cfg.init::<B>(&device);
+    }
+
+    #[test]
+    fn test_burn_forward_shape() {
+        let device = burn::backend::ndarray::NdArrayDevice::Cpu;
+        let cfg = Qwen3ModelConfig::tiny();
+        let model = cfg.init::<B>(&device);
+
+        let ids = Tensor::<B, 2, Int>::zeros([1, 8], &device);
+        let out = model.forward(ids);
+        let [b, s, h] = out.dims();
+        assert_eq!((b, s, h), (1, 8, 64));
+    }
+
+    #[test]
+    fn test_swiglu_mlp_shape() {
+        use super::mlp::Qwen3MlpConfig;
+        let device = burn::backend::ndarray::NdArrayDevice::Cpu;
+        let mlp = Qwen3MlpConfig {
+            hidden_size: 64,
+            intermediate_size: 128,
+        }
+        .init::<B>(&device);
+
+        let x = Tensor::<B, 3>::zeros([1, 4, 64], &device);
+        let y = mlp.forward(x);
+        assert_eq!(y.dims(), [1, 4, 64]);
+    }
+
+    #[test]
+    fn test_gqa_attention_shape() {
+        use super::attention::Qwen3AttentionConfig;
+        let device = burn::backend::ndarray::NdArrayDevice::Cpu;
+        let attn = Qwen3AttentionConfig {
+            hidden_size: 64,
+            num_heads: 4,
+            num_kv_heads: 2,
+            head_dim: 16,
+            max_position_embeddings: 128,
+            rope_theta: 10_000.0,
+        }
+        .init::<B>(&device);
+
+        let x = Tensor::<B, 3>::zeros([1, 8, 64], &device);
+        let y = attn.forward(x);
+        assert_eq!(y.dims(), [1, 8, 64]);
+    }
+
+    #[test]
+    fn test_missing_safetensors_fallback() {
+        let config = super::Qwen3Config::qwen3_06b("/nonexistent/path");
+        let embedder = super::Qwen3Embedder::new(config).unwrap();
+        // Should gracefully fall back to simulation
+        assert!(embedder.config().use_simulated);
+    }
+
+    #[test]
+    fn test_rmsnorm_preserves_shape() {
+        use burn::nn::RmsNormConfig;
+        let device = burn::backend::ndarray::NdArrayDevice::Cpu;
+        let norm = RmsNormConfig::new(64).init::<B>(&device);
+        let x = Tensor::<B, 3>::zeros([1, 4, 64], &device);
+        let y = norm.forward(x);
+        assert_eq!(y.dims(), [1, 4, 64]);
     }
 }

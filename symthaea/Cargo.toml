@@ -324,7 +324,7 @@ ctrlc = { version = "3.4", optional = true }  # Ctrl+C signal handling
 
 # Shell Sidecar TUI dependencies (optional)
 crossterm = { version = "0.27", optional = true }
-ratatui = { version = "0.30", optional = true }
+ratatui = { version = "0.29", optional = true }
 
 # GUI dependencies (optional) - for symthaea-gui
 eframe = { version = "0.33", optional = true }
@@ -369,7 +369,7 @@ vocal-tract = ["hound", "symthaea-vocal-tract/hound"]  # LTC-driven articulatory
 live-voice = ["cpal", "ringbuf", "vocal-tract"]         # Real-time speaker output (cpal + ringbuf + vocal tract pipeline)
 
 # ── Perception & Embeddings ─────────────────────────────────────────
-embeddings = ["tokenizers", "ort", "hf-hub", "symthaea-embeddings/onnx"]  # Qwen3/BGE text embeddings via ONNX
+embeddings = ["tokenizers", "hf-hub", "symthaea-embeddings/burn"]  # Qwen3/BGE text embeddings via Burn
 vision = ["ort", "hf-hub"]                            # SigLIP image embeddings via ONNX
 perception = ["embeddings", "vision"]                 # Full multimodal perception stack
 webcam = []                                           # Live webcam capture (gates cfg blocks in source)
@@ -1125,3 +1125,10 @@ strip = true
 
 [profile.bench]
 inherits = "release"
+
+# Shim: bitflags >=2.10 switched from serde → serde_core, which pins
+# serde_derive =1.0.228. holochain_serialized_bytes pins serde =1.0.219
+# (→ serde_derive =1.0.219). This local crate re-exports serde, bridging
+# the gap until holochain releases a serde_core-compatible version.
+[patch.crates-io]
+serde_core = { path = "crates/serde-core-shim" }
