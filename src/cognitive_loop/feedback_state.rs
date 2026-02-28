@@ -233,17 +233,26 @@ impl fmt::Display for IntegrationResult {
 // FEEDBACK STATE — top-level container
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Divergence between direct-mutation values and proposal-integrated values.
+/// Divergence between direct-mutation values and proposal-integrated values,
+/// plus consensus-smoothed alternatives for the next cycle.
 ///
 /// A divergence of 0.0 means the proposal system perfectly reproduces
 /// the direct-mutation behavior. Non-zero divergence indicates mutations
 /// that bypass the proposal system (not routed through helpers).
+///
+/// The `consensus_*` fields contain noise-resistant integrated values
+/// (averaged adds, geometric mean scales) that can optionally replace
+/// the direct-mutation values at cycle end.
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct FeedbackDivergence {
     pub confidence: f64,
     pub learning_rate: f64,
     pub exploration: f64,
     pub threshold: f64,
+    /// Consensus-integrated fep_lr_boost value for next cycle
+    pub consensus_lr: f64,
+    /// Consensus-integrated adaptive_threshold_scale for next cycle
+    pub consensus_threshold: f64,
 }
 
 /// Decoupled feedback state for the cognitive loop.
@@ -339,11 +348,23 @@ impl FeedbackState {
             .threshold
             .integrate_sequential(base_threshold, 0.5, 2.0);
 
+        // Also compute consensus integration (averaged adds, geometric mean scales)
+        // for the fully-mediated fields (lr and threshold). These dampened values
+        // can optionally replace the direct-mutation values at cycle end.
+        let consensus_lr = self
+            .learning_rate
+            .integrate(base_lr, 1.0, 3.0);
+        let consensus_threshold = self
+            .threshold
+            .integrate(base_threshold, 0.5, 2.0);
+
         let divergence = FeedbackDivergence {
             confidence: (current_confidence - conf_result.effective).abs(),
             learning_rate: (current_lr - lr_result.effective).abs(),
             exploration: (current_exploration - explore_result.effective).abs(),
             threshold: (current_threshold - thresh_result.effective).abs(),
+            consensus_lr: consensus_lr.effective,
+            consensus_threshold: consensus_threshold.effective,
         };
 
         self.last_confidence_integration = Some(conf_result);
