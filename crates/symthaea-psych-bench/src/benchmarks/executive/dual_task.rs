@@ -272,9 +272,9 @@ impl PsychBenchmark for DualTaskBenchmark {
             if config.trial_trace {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
-                    condition: "dual_task".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    condition: prefix.to_string(),
+                    correct: accuracies.iter().sum::<f64>() / accuracies.len().max(1) as f64 > 0.5,
+                    rt_ticks: if rts.is_empty() { 0.0 } else { rts.iter().sum::<f64>() / rts.len() as f64 },
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

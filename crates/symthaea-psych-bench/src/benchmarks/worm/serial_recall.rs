@@ -142,7 +142,7 @@ impl PsychBenchmark for SerialRecallBenchmark {
                     trace.push(TrialOutcome {
                         trial_idx: trace.len(),
                         condition: format!("serial_{}", list_len),
-                        correct: true,
+                        correct: pos_acc.iter().sum::<f64>() / pos_acc.len() as f64 > 0.5,
                         rt_ticks: rt,
                         similarity: 0.0,
                         confidence: 0.0,

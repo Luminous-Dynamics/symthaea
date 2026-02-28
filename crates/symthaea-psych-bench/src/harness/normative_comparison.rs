@@ -94,6 +94,9 @@ fn is_lower_better(metric: &str) -> bool {
             | "vigilance_decrement"
             | "disambiguation_cost"
             | "blink_magnitude"
+            | "perseverative_errors"
+            | "trials_to_first_category"
+            | "restless_bandit_regret"
     )
 }
 
@@ -167,17 +170,17 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("Bimanual") => Some(("coordination_cost", &bl.motor)),
 
         // Language
-        name if name.contains("LexicalDecision") => Some(("lexical_word_accuracy", &bl.language)),
-        name if name.contains("SemanticPriming") => Some(("semantic_priming_effect", &bl.language)),
+        name if name.contains("LexicalDecision") => Some(("lexicality_effect", &bl.language)),
+        name if name.contains("SemanticPriming") => Some(("priming_effect", &bl.language)),
         name if name.contains("SemanticCoherence") => {
-            Some(("semantic_coherence_accuracy", &bl.language))
+            Some(("coherence_mean", &bl.language))
         }
         name if name.contains("GardenPath") => Some(("garden_path_accuracy", &bl.language)),
 
         // Social
         name if name.contains("RME") => Some(("rme_accuracy", &bl.social)),
-        name if name.contains("UltimatumGame") => Some(("ultimatum_acceptance_rate", &bl.social)),
-        name if name.contains("SocialNorm") => Some(("social_norm_accuracy", &bl.social)),
+        name if name.contains("UltimatumGame") => Some(("fairness_sensitivity", &bl.social)),
+        name if name.contains("SocialNorm") => Some(("norm_d_prime", &bl.social)),
 
         // Reasoning (ARC)
         name if name.contains("Arc") => Some(("arc_transfer_accuracy", &bl.reasoning)),

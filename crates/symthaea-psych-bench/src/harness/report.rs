@@ -1395,7 +1395,16 @@ fn rt_summary_for_result(result: &BenchmarkResult) -> String {
 fn is_lower_better(metric_key: &str) -> bool {
     matches!(
         metric_key,
-        "calibration_error_ece"
+        "stroop_effect"
+            | "flanker_effect"
+            | "dual_task_cost"
+            | "calibration_error_ece"
+            | "commission_errors"
+            | "ssrt_ticks"
+            | "coordination_cost"
+            | "vigilance_decrement"
+            | "disambiguation_cost"
+            | "blink_magnitude"
             | "perseverative_errors"
             | "trials_to_first_category"
             | "restless_bandit_regret"

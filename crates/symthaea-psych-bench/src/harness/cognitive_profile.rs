@@ -137,6 +137,9 @@ fn is_lower_better(metric: &str) -> bool {
             | "vigilance_decrement"
             | "disambiguation_cost"
             | "blink_magnitude"
+            | "perseverative_errors"
+            | "trials_to_first_category"
+            | "restless_bandit_regret"
     )
 }
 

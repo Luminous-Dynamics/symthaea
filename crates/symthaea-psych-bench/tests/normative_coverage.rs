@@ -137,6 +137,13 @@ fn test_normative_coverage() {
         "Attention::AttentionalBlink",
         "Motor::SRTT",
         "Motor::Bimanual",
+        // Language (fixed baseline key mappings)
+        "Language::LexicalDecision",
+        "Language::SemanticPriming",
+        "Language::SemanticCoherence",
+        // Social (fixed baseline key mappings)
+        "Social::UltimatumGame",
+        "Social::SocialNorm",
     ];
 
     let covered: Vec<&str> = normative

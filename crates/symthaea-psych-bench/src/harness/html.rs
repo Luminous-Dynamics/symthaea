@@ -11,6 +11,7 @@
 use super::cross_domain_prediction::CrossDomainMatrix;
 use super::normative_comparison::NormativeReport;
 use super::psychometric_report::PsychometricReport;
+use super::reliability_analysis::{ReliabilityBattery, ReliabilityClass};
 use super::report::{domain_of, key_metric_for_benchmark, BenchmarkReport};
 use super::sat_curves::SatCurve;
 use std::collections::BTreeMap;
@@ -630,6 +631,74 @@ pub fn write_sat_curves(html: &mut String, curves: &[SatCurve]) {
     let _ = write!(html, "</svg>\n</div>\n");
 }
 
+/// Write a test-retest reliability table section into the HTML report.
+///
+/// Renders ICC, Pearson r, SEM, practice effect direction, and reliability
+/// classification for each benchmark. Call this explicitly (like `write_sat_curves`)
+/// since it requires pre-computed `ReliabilityBattery` results.
+pub fn write_reliability_section(html: &mut String, battery: &ReliabilityBattery) {
+    if battery.results.is_empty() {
+        return;
+    }
+
+    let _ = write!(
+        html,
+        "<h2>Test-Retest Reliability</h2>\n"
+    );
+
+    // Summary stats
+    let mean_icc: f64 =
+        battery.results.iter().map(|r| r.icc).sum::<f64>() / battery.results.len() as f64;
+    let excellent = battery
+        .results
+        .iter()
+        .filter(|r| r.reliability_class == ReliabilityClass::Excellent)
+        .count();
+    let good = battery
+        .results
+        .iter()
+        .filter(|r| r.reliability_class == ReliabilityClass::Good)
+        .count();
+
+    let _ = write!(
+        html,
+        "<div class=\"summary\"><strong>Mean ICC:</strong> {:.3} | <strong>Excellent:</strong> {} | <strong>Good:</strong> {} | <strong>Total:</strong> {}</div>\n",
+        mean_icc, excellent, good, battery.results.len(),
+    );
+
+    let _ = write!(
+        html,
+        "<table>\n<tr><th>Benchmark</th><th>Metric</th><th>ICC</th><th>Pearson r</th><th>SEM</th><th>Practice</th><th>Class</th></tr>\n"
+    );
+
+    for r in &battery.results {
+        let icc_class = match r.reliability_class {
+            ReliabilityClass::Excellent => "green",
+            ReliabilityClass::Good => "green",
+            ReliabilityClass::Moderate => "yellow",
+            ReliabilityClass::Poor => "red",
+        };
+        let practice_str = format!(
+            "{:+.1}%",
+            r.practice.change_pct,
+        );
+        let _ = write!(
+            html,
+            "<tr><td>{}</td><td>{}</td><td class=\"{}\">{:.3}</td><td>{:.3}</td><td>{:.3}</td><td>{}</td><td>{}</td></tr>\n",
+            escape_html(&r.benchmark),
+            escape_html(&r.metric),
+            icc_class,
+            r.icc,
+            r.pearson_r,
+            r.sem,
+            practice_str,
+            r.reliability_class.label(),
+        );
+    }
+
+    let _ = write!(html, "</table>\n");
+}
+
 fn write_psychometric_summary(html: &mut String, report: &BenchmarkReport) {
     if report.results.is_empty() {
         return;
@@ -977,5 +1046,66 @@ mod tests {
         // Full report should include new sections
         assert!(html.contains("Psychometric Summary"));
         assert!(html.contains("</html>"));
+    }
+
+    #[test]
+    fn test_html_reliability_section() {
+        use crate::harness::reliability_analysis::{
+            PracticeDirection, PracticeEffect, ReliabilityClass, TestRetestResult,
+        };
+        let battery = ReliabilityBattery {
+            results: vec![
+                TestRetestResult {
+                    benchmark: "Executive::Stroop".to_string(),
+                    metric: "stroop_effect".to_string(),
+                    icc: 0.85,
+                    pearson_r: 0.87,
+                    sem: 0.02,
+                    practice: PracticeEffect::compute(
+                        "Executive::Stroop",
+                        "stroop_effect",
+                        0.12,
+                        0.10,
+                    ),
+                    reliability_class: ReliabilityClass::Good,
+                },
+                TestRetestResult {
+                    benchmark: "WorM::N-back".to_string(),
+                    metric: "nback_2::accuracy".to_string(),
+                    icc: 0.92,
+                    pearson_r: 0.93,
+                    sem: 0.01,
+                    practice: PracticeEffect::compute(
+                        "WorM::N-back",
+                        "nback_2::accuracy",
+                        0.85,
+                        0.88,
+                    ),
+                    reliability_class: ReliabilityClass::Excellent,
+                },
+            ],
+        };
+        let mut html = String::new();
+        write_reliability_section(&mut html, &battery);
+        assert!(
+            html.contains("Test-Retest Reliability"),
+            "missing reliability heading"
+        );
+        assert!(html.contains("ICC"), "missing ICC column header");
+        assert!(html.contains("Stroop"), "missing Stroop benchmark");
+        assert!(html.contains("N-back"), "missing N-back benchmark");
+        assert!(html.contains("Excellent"), "missing Excellent class label");
+        assert!(html.contains("Good"), "missing Good class label");
+        assert!(html.contains("Mean ICC"), "missing mean ICC summary");
+    }
+
+    #[test]
+    fn test_html_reliability_empty() {
+        let battery = ReliabilityBattery {
+            results: vec![],
+        };
+        let mut html = String::new();
+        write_reliability_section(&mut html, &battery);
+        assert!(html.is_empty(), "empty battery should produce no output");
     }
 }

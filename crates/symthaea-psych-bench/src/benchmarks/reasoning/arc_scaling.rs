@@ -260,7 +260,7 @@ impl PsychBenchmark for ArcScalingBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "arc_scaling".to_string(),
-                    correct: true,
+                    correct: r.grid_accuracy[0] > 0.5,
                     rt_ticks: 0.0,
                     similarity: 0.0,
                     confidence: 0.0,

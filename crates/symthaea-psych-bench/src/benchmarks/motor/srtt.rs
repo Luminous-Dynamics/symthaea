@@ -218,8 +218,8 @@ impl PsychBenchmark for SrttBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "srtt".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    correct: r.sequence_accuracy > 0.5,
+                    rt_ticks: r.sequence_rt,
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

@@ -162,8 +162,8 @@ impl PsychBenchmark for BindingBenchmark {
                     trace.push(TrialOutcome {
                         trial_idx: trace.len(),
                         condition: format!("binding_{}", k),
-                        correct: true,
-                        rt_ticks: 0.0,
+                        correct: bind > 0.5,
+                        rt_ticks: rt,
                         similarity: 0.0,
                         confidence: 0.0,
                         response_idx: 0,

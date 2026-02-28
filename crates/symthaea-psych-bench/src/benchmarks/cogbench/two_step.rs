@@ -231,8 +231,8 @@ impl PsychBenchmark for TwoStepBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "two_step".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    correct: mb > 0.0,
+                    rt_ticks: if rts.is_empty() { 0.0 } else { rts.iter().sum::<f64>() / rts.len() as f64 },
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

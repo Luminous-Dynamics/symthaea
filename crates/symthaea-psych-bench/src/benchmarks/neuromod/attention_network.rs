@@ -209,8 +209,8 @@ impl PsychBenchmark for AttentionNetworkBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "ant".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    correct: metrics[2] > 0.0,
+                    rt_ticks: metrics[0],
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

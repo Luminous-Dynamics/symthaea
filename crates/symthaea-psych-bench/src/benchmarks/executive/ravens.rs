@@ -518,8 +518,8 @@ impl PsychBenchmark for RavensProgressiveMatricesBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "ravens".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    correct: r.overall_accuracy > 0.5,
+                    rt_ticks: if r.rt_ticks.is_empty() { 0.0 } else { r.rt_ticks.iter().sum::<f64>() / r.rt_ticks.len() as f64 },
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

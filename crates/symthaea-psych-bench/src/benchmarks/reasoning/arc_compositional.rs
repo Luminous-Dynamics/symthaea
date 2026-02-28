@@ -553,8 +553,8 @@ impl PsychBenchmark for ArcCompositionalBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "arc_compositional".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    correct: r.compositional_accuracy > 0.5,
+                    rt_ticks: r.compositional_rt_ticks,
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

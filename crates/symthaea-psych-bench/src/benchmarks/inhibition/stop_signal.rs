@@ -244,8 +244,8 @@ impl PsychBenchmark for StopSignalBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "stop_signal".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    correct: r.sst_go_accuracy > 0.5,
+                    rt_ticks: r.rt_ticks,
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

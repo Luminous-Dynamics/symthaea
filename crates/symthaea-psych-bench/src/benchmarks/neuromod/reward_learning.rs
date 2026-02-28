@@ -175,8 +175,8 @@ impl PsychBenchmark for RewardLearningBenchmark {
                 trace.push(TrialOutcome {
                     trial_idx: trace.len(),
                     condition: "reward_learning".to_string(),
-                    correct: true,
-                    rt_ticks: 0.0,
+                    correct: dac > 0.0,
+                    rt_ticks: ttc,
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,
