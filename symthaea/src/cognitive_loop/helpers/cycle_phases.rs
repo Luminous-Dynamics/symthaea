@@ -361,13 +361,11 @@ impl CognitiveLoopService {
             if codebook_diversity < div_low {
                 // Representational collapse risk — boost exploration
                 let diversity_boost = (div_low - codebook_diversity) * 0.2;
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + diversity_boost).clamp(0.0, 1.0);
+                self.adjust_exploration("codebook_collapse", diversity_boost);
             } else if codebook_diversity > div_high {
                 // Good coverage — allow exploitation, dampen exploration slightly
                 let exploit_dampen = (codebook_diversity - div_high) * 0.1;
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge - exploit_dampen).clamp(0.0, 1.0);
+                self.adjust_exploration("codebook_stable", -exploit_dampen);
             }
         }
 
@@ -712,9 +710,7 @@ impl CognitiveLoopService {
                     / dream.wisdom().len() as f32;
                 // Dream wisdom boosts exploration when Phi improvements are found
                 let wisdom_exploration_boost = (avg_phi_improvement * 0.5).clamp(0.0, 0.2);
-                self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
-                    + wisdom_exploration_boost)
-                    .clamp(0.0, 1.0);
+                self.adjust_exploration("dream_wisdom", wisdom_exploration_boost);
 
                 // FEEDBACK: Dream Phi insights feed forward into waking prediction confidence
                 // Science: Prospective consciousness — offline simulation prepares waking cognition.
@@ -1027,7 +1023,7 @@ impl CognitiveLoopService {
             let lr_scale = 0.2 + 0.8 * startup_warmup_progress;
             self.stats.adaptive_learning_rate *= lr_scale;
             // Suppress curiosity during transient (let CfC settle)
-            self.curiosity_drive.exploration_urge *= startup_warmup_progress;
+            self.scale_exploration("startup_warmup", startup_warmup_progress);
         }
 
         // Snapshot exploration_urge for end-of-cycle budget clamping (Task B)
@@ -1042,19 +1038,21 @@ impl CognitiveLoopService {
         // Apply consensus overrides from the previous cycle as Set proposals,
         // syncing actual fields so both direct-mutation and proposal paths
         // start from the same base value.
-        let (consensus_conf, consensus_lr, consensus_explore, consensus_threshold) =
-            self.feedback_state.apply_pending_consensus();
-        if let Some(conf) = consensus_conf {
-            self.prediction_confidence = conf as f32;
-        }
-        if let Some(lr) = consensus_lr {
-            self.fep_lr_boost = lr as f32;
-        }
-        if let Some(explore) = consensus_explore {
-            self.curiosity_drive.exploration_urge = explore as f32;
-        }
-        if let Some(thresh) = consensus_threshold {
-            self.carryover.learning.adaptive_threshold_scale = thresh as f32;
+        if self.config.consensus_feedback {
+            let (consensus_conf, consensus_lr, consensus_explore, consensus_threshold) =
+                self.feedback_state.apply_pending_consensus();
+            if let Some(conf) = consensus_conf {
+                self.prediction_confidence = conf as f32;
+            }
+            if let Some(lr) = consensus_lr {
+                self.fep_lr_boost = lr as f32;
+            }
+            if let Some(explore) = consensus_explore {
+                self.curiosity_drive.exploration_urge = explore as f32;
+            }
+            if let Some(thresh) = consensus_threshold {
+                self.carryover.learning.adaptive_threshold_scale = thresh as f32;
+            }
         }
 
         self.feedback_state.snapshot_cycle_start(
@@ -1095,6 +1093,19 @@ impl CognitiveLoopService {
                 self.neuromodulator_bath.disengage_anomaly_recovery();
             }
         }
+        // ── Sleep→Wake transition: apply sleep recovery (Xie et al. 2013) ──
+        {
+            let is_sleep_now =
+                self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
+            if self.was_sleeping && !is_sleep_now {
+                let quality = (self.neuromodulator_bath.allostatic_recovery_cycles as f32
+                    / 100.0)
+                    .clamp(0.0, 1.0);
+                self.neuromodulator_bath.apply_sleep_recovery(quality);
+            }
+            self.was_sleeping = is_sleep_now;
+        }
+
         // Apply circadian plasticity to learning rate (Night=high plasticity, Day=low)
         // Halved: bath circadian baselines (Phase 2) provide the other 50%
         let plasticity_half = 1.0 + (self.biorhythm.plasticity_mod as f32 - 1.0) * 0.5;
@@ -1151,6 +1162,26 @@ impl CognitiveLoopService {
             if is_sleep {
                 self.neuromodulator_bath.clear_adenosine_sleep();
             }
+        }
+
+        // ── Phase transition detection (hysteresis-based, Kelso 1995) ──
+        {
+            let label = self.neuromodulator_bath.phase_label();
+            self.bath_phase_detector.update(label);
+        }
+
+        // ── Bath metrics export (Prometheus gauges) ──
+        #[cfg(feature = "api_module")]
+        {
+            let sv = self.neuromodulator_bath.state_vector();
+            crate::api::metrics::update_bath_metrics(
+                crate::api::metrics::global(),
+                &sv,
+                self.neuromodulator_bath.allostatic_load,
+                self.neuromodulator_bath.ei_ratio(),
+                self.neuromodulator_bath.sleep_pressure(),
+                self.neuromodulator_bath.active_injections.len(),
+            );
         }
 
         // ═══════════════════════════════════════════════════════════════════════

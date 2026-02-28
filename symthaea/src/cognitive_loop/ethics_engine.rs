@@ -28,12 +28,13 @@ use crate::consciousness::unified_value_evaluator::{
 };
 use crate::hdc::moral_algebra::{DeontologicalVerdict, MoralAlgebra, MoralVerdict};
 use crate::hdc::moral_parser::MoralParser;
+use crate::hdc::moral_topology::{MoralTopology, MoralTopologyConfig, MoralTopologySummary};
 
 /// Unified output from the ethics engine.
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields computed for telemetry; consumed selectively by cycle.rs
 pub(crate) struct EthicsEngineOutput {
     // ── Stage 1: Moral Algebra ─────────────────────────────────────────
+    // Flows through EthicsEngine cache; cycle reads via moral_topology() accessor
     /// Moral score from HDC algebra [-1.0, 1.0]
     pub moral_score: f64,
     /// Moral verdict string (Good/Bad/Neutral/ConsentViolation)
@@ -74,6 +75,16 @@ pub(crate) struct EthicsEngineOutput {
     pub confidence_delta: f32,
     /// Multiplicative factor for subsystem_lr_factor
     pub lr_factor: f32,
+
+    // ── Stage 4: Moral Topology ────────────────────────────────────────
+    /// Compact topology summary (default when analysis not run this cycle).
+    #[allow(dead_code)] // Constructed by engine; read via ethics_engine.moral_topology() accessor
+    pub topology_summary: MoralTopologySummary,
+    /// Microseconds spent on topology analysis (0 when not run).
+    pub topology_us: u64,
+    /// Whether topology analysis was freshly computed this cycle.
+    #[allow(dead_code)] // Constructed by engine; read via ethics_engine.moral_topology() accessor
+    pub topology_fresh: bool,
 
     // ── Timing ─────────────────────────────────────────────────────────
     pub moral_us: u64,
@@ -130,6 +141,9 @@ pub(crate) struct EthicsEngine {
     // ── Stage 3: Harmonies integrator (optional) ───────────────────────
     harmonies_integrator: Option<HarmoniesIntegrator>,
 
+    // ── Stage 4: Moral topology (persistent homology) ──────────────────
+    moral_topology: MoralTopology,
+
     // ── Cached values ──────────────────────────────────────────────────
     cache: EthicsEngineCache,
 }
@@ -150,11 +164,16 @@ impl EthicsEngine {
         value_evaluator: Option<UnifiedValueEvaluator>,
         harmonies_integrator: Option<HarmoniesIntegrator>,
     ) -> Self {
+        let dim = moral_algebra.dim();
         Self {
             moral_parser,
             moral_algebra,
             value_evaluator,
             harmonies_integrator,
+            moral_topology: MoralTopology::new(MoralTopologyConfig {
+                dim,
+                ..Default::default()
+            }),
             cache: EthicsEngineCache {
                 last_harmonies_approved: true,
                 ..Default::default()
@@ -192,6 +211,11 @@ impl EthicsEngine {
             let encoded = self
                 .moral_parser
                 .parse_and_encode(input.input, &self.moral_algebra);
+
+            // Feed action HV into moral topology sliding window
+            if let Some(ref hv) = encoded.action_hv {
+                self.moral_topology.add_scenario(hv.clone());
+            }
 
             let (verdict_str, good_sim, bad_sim) =
                 if let Some(judgment) = encoded.judge(&self.moral_algebra) {
@@ -352,6 +376,19 @@ impl EthicsEngine {
             value_score.clamp(0.0, 1.0)
         };
 
+        // ═══════════════════════════════════════════════════════════════════
+        // STAGE 4: Moral Topology — persistent homology (every 97 cycles)
+        // ═══════════════════════════════════════════════════════════════════
+        let t = Instant::now();
+        let (topology_summary, topology_fresh) =
+            if input.cycle % 97 == 0 && self.moral_topology.len() >= 3 {
+                let assessment = self.moral_topology.analyze();
+                (MoralTopologySummary::from(&assessment), true)
+            } else {
+                (self.moral_topology.last_summary().clone(), false)
+            };
+        let topology_us = t.elapsed().as_micros() as u64;
+
         let total_us = total_start.elapsed().as_micros() as u64;
 
         // Clamp lr_factor
@@ -374,6 +411,9 @@ impl EthicsEngine {
             unified_confidence,
             confidence_delta,
             lr_factor,
+            topology_summary,
+            topology_us,
+            topology_fresh,
             moral_us,
             value_us,
             harmonies_us,
@@ -479,6 +519,11 @@ impl EthicsEngine {
     /// Access cached harmonies approved status.
     pub fn last_harmonies_approved(&self) -> bool {
         self.cache.last_harmonies_approved
+    }
+
+    /// Access the moral topology analyser.
+    pub fn moral_topology(&self) -> &MoralTopology {
+        &self.moral_topology
     }
 }
 

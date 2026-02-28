@@ -158,15 +158,17 @@ impl CognitiveLoopService {
         // Exploration urge per-cycle budget: clamp total change to ±0.5.
         // 15+ subsystems write exploration_urge per cycle; without bounding, cumulative
         // nudges can pin it to 0.0 or 1.0. Science: Homeostatic control of exploration.
-        self.curiosity_drive.exploration_urge = self.curiosity_drive.exploration_urge.clamp(
+        let clamped = self.curiosity_drive.exploration_urge.clamp(
             (exploration_urge_start - 0.5).max(0.0),
             (exploration_urge_start + 0.5).min(1.0),
         );
+        self.set_exploration("homeostasis_budget_clamp", clamped);
 
         // Exploration urge homeostasis: slow drift toward neutral (0.3) prevents saturation.
         // Phase 18: urgency-adaptive pull (Cruise=1.5×, Critical=0.6×)
-        self.curiosity_drive.exploration_urge +=
+        let drift_delta =
             (0.3 - self.curiosity_drive.exploration_urge) * 0.03 * homeostasis_pull_strength;
+        self.adjust_exploration("homeostasis_drift", drift_delta);
 
         // Store urgency for next cycle's hysteresis
         // NOTE: urgency is stored by the caller (perception.urgency), not here,

@@ -316,6 +316,7 @@ impl CognitiveLoopService {
         let mut surprise_triggered = false;
         let mut exploration_action = None;
 
+        let mut deferred_exploration_delta: Option<f32> = None;
         if let Some(ref mut bridge) = self.surprise_bridge {
             let predicted = self.last_prediction.as_deref().unwrap_or(&[]);
             let actual_len = predicted.len().max(1).min(compressed_state.len());
@@ -328,14 +329,13 @@ impl CognitiveLoopService {
                 let current_threshold = self.curiosity_drive.get_boredom_threshold();
                 self.curiosity_drive
                     .set_boredom_threshold(current_threshold * SURPRISE_BOREDOM_DAMPEN);
-                self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
-                    + bridge.exploration_factor * 0.3)
-                    .clamp(0.0, 1.0);
+                let expl_factor = bridge.exploration_factor;
+                deferred_exploration_delta = Some(expl_factor as f32 * 0.3);
                 exploration_action = action.map(|a| {
                     format!(
                         "perturbation[{}d,scale={:.3}]",
                         a.len(),
-                        bridge.exploration_factor
+                        expl_factor
                     )
                 });
                 tracing::debug!(
@@ -346,6 +346,10 @@ impl CognitiveLoopService {
                     "Surprise exploration triggered"
                 );
             }
+        }
+        // Apply exploration adjustment after releasing the surprise_bridge borrow
+        if let Some(delta) = deferred_exploration_delta {
+            self.curiosity_drive.exploration_urge += delta;
         }
 
         (surprise_triggered, exploration_action)
@@ -552,8 +556,7 @@ impl CognitiveLoopService {
             2 => {
                 // Boost exploration -- stronger nudge when surprised
                 let nudge = if is_surprised { 0.15 } else { 0.05 };
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + nudge).clamp(0.0, 1.0);
+                self.adjust_exploration("perturbation", nudge);
             }
             3 => {
                 // Tighten trust via precision
