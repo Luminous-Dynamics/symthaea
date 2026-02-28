@@ -31,7 +31,6 @@ pub(crate) struct NeuromodPhaseResult {
     pub(crate) exploration_sht_drain: f32,
     pub(crate) confidence_velocity: f32,
     pub(crate) guiding_priority_category: String,
-    pub(crate) neuromod_consciousness_mod: f32,
 }
 
 impl CognitiveLoopService {
@@ -214,7 +213,6 @@ impl CognitiveLoopService {
             exploration_sht_drain,
             confidence_velocity,
             guiding_priority_category: guiding_priority_category.to_owned(),
-            neuromod_consciousness_mod,
         }
     }
 }

@@ -636,8 +636,6 @@ impl CognitiveLoopService {
         }
 
         FeedbackPhaseResult {
-            consciousness_output_exploration_delta: consciousness_output.exploration_delta,
-            consciousness_output_sigma: sigma,
             cross_module_agreement,
             unified_quality_score,
             coherence_velocity_gated,

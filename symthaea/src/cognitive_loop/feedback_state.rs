@@ -104,6 +104,10 @@ impl ProposalCollector {
     /// - `Set` proposals: last one wins (they're rare and intentional)
     /// - `Add` proposals: averaged (consensus), then applied
     /// - `Scale` proposals: geometric mean, then applied
+    ///
+    /// Currently used in tests; will become the sole integration path
+    /// when dual-write bridge is removed (see module doc).
+    #[allow(dead_code)]
     pub fn integrate(&self, base_value: f64, clamp_min: f64, clamp_max: f64) -> IntegrationResult {
         self.integrate_with_mode(base_value, clamp_min, clamp_max, IntegrationMode::Consensus)
     }
@@ -196,6 +200,7 @@ impl Default for ProposalCollector {
 
 /// Integration strategy for combining proposals.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub(crate) enum IntegrationMode {
     /// Consensus: average adds, geometric mean scales. Noise-resistant.
     /// Use for final production mode (reduces compounding drift).
@@ -614,5 +619,75 @@ mod tests {
         let divergence = state.end_cycle(0.7, 1.0, 0.3, 1.0);
         // Integrated: 0.5 + 0.1 = 0.6, actual: 0.7, divergence: 0.1
         assert!((divergence.confidence - 0.1).abs() < 1e-10);
+    }
+
+    /// Multi-cycle divergence diagnostic: runs 50 cognitive cycles and checks that
+    /// lr_divergence (fep_lr_boost) and threshold_divergence are near-zero,
+    /// confirming all mutations go through helpers (100% mediated).
+    #[test]
+    fn test_multicycle_lr_divergence_near_zero() {
+        use super::super::CognitiveLoopConfig;
+        use super::super::CognitiveLoopService;
+
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+        let mut max_lr_div = 0.0f64;
+        let mut max_thresh_div = 0.0f64;
+        let mut total_lr_proposals = 0usize;
+        let mut total_thresh_proposals = 0usize;
+
+        for i in 0..50 {
+            let input = format!("divergence diagnostic cycle {i}");
+            let _ = service.cycle(&input);
+
+            // Collect divergence from the last integration
+            if let Some(ref lr_int) = service.feedback_state.last_lr_integration {
+                total_lr_proposals += lr_int.n_adds + lr_int.n_scales + lr_int.n_sets;
+            }
+            if let Some(ref thresh_int) = service.feedback_state.last_threshold_integration {
+                total_thresh_proposals += thresh_int.n_adds + thresh_int.n_scales + thresh_int.n_sets;
+            }
+
+            // Compute divergence by re-running end_cycle logic
+            let lr_actual = service.fep_lr_boost as f64;
+            let thresh_actual = service.carryover.learning.adaptive_threshold_scale as f64;
+
+            // The last_*_integration holds the sequential integration result.
+            // Compare with actual values.
+            if let Some(ref lr_int) = service.feedback_state.last_lr_integration {
+                let div = (lr_actual - lr_int.effective).abs();
+                if div > max_lr_div {
+                    max_lr_div = div;
+                }
+            }
+            if let Some(ref thresh_int) = service.feedback_state.last_threshold_integration {
+                let div = (thresh_actual - thresh_int.effective).abs();
+                if div > max_thresh_div {
+                    max_thresh_div = div;
+                }
+            }
+        }
+
+        // We expect proposals to be generated (sanity check)
+        assert!(
+            total_lr_proposals > 100,
+            "Expected 100+ lr proposals over 50 cycles, got {total_lr_proposals}"
+        );
+        assert!(
+            total_thresh_proposals > 10,
+            "Expected 10+ threshold proposals over 50 cycles, got {total_thresh_proposals}"
+        );
+
+        // Sequential integration should match direct mutations for 100% mediated fields.
+        // Allow small tolerance for f32→f64 rounding in the integration path.
+        assert!(
+            max_lr_div < 0.01,
+            "fep_lr_boost max divergence {max_lr_div:.6} exceeds 1% — \
+             some mutations bypass helpers"
+        );
+        assert!(
+            max_thresh_div < 0.01,
+            "adaptive_threshold_scale max divergence {max_thresh_div:.6} exceeds 1% — \
+             some mutations bypass helpers"
+        );
     }
 }

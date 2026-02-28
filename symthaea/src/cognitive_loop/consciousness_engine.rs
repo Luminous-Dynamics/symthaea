@@ -110,6 +110,8 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
 
     // ── Phase 6: Bath → consciousness coupling (Seth 2013) ──────────
     /// Bath phase space entropy (from BathPhaseTracker).
+    /// Reserved for bath→consciousness coupling (Seth 2013 protocol).
+    #[allow(dead_code)]
     pub bath_entropy: f32,
     /// Whether an attractor has been detected.
     pub attractor_detected: bool,

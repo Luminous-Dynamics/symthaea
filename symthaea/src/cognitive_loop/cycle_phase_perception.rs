@@ -73,7 +73,6 @@ impl CognitiveLoopService {
 
         Ok(PerceptionPhaseResult {
             encoding_result: encoding.encoding_result,
-            encoding_us: module_timings.core_hdc_encode,
             hv16_cached: encoding.hv16_cached,
             compressed_state: encoding.compressed_state,
             phi_attention_weight: encoding.phi_attention_weight,

@@ -26,7 +26,6 @@ use symthaea_core::hdc::predictive_encoder::EncodingResult;
 /// Result of the perception phase (Phases 0–1.2).
 pub(super) struct PerceptionPhaseResult {
     pub(super) encoding_result: EncodingResult,
-    pub(super) encoding_us: u64,
     pub(super) hv16_cached: BinaryHV,
     pub(super) compressed_state: Vec<f32>,
     pub(super) phi_attention_weight: f32,
@@ -62,7 +61,6 @@ pub(super) struct DynamicsPhaseResult {
     pub(super) unified_psi: f64,
     pub(super) learning_occurred: bool,
     pub(super) training_loss: Option<f32>,
-    pub(super) is_surprised: bool,
     pub(super) effective_lr: f32,
     pub(super) attention_budget_exceeded: bool,
     pub(super) attention_budget_elapsed_us: u64,
@@ -118,9 +116,6 @@ pub(super) struct DynamicsPhaseResult {
 
 /// Result of the feedback phase (Phases 14–21+).
 pub(super) struct FeedbackPhaseResult {
-    // ── Consciousness engine outputs ──
-    pub(super) consciousness_output_exploration_delta: f32,
-    pub(super) consciousness_output_sigma: Option<f64>,
     // ── Cross-module / quality ──
     pub(super) cross_module_agreement: f32,
     pub(super) unified_quality_score: f32,
