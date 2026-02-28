@@ -7,7 +7,8 @@
 //! before delegating to the sub-crate's `VocalTractController::train_on_phoneme_targets()`.
 
 pub use symthaea_vocal_tract::controller::{
-    ProsodyCorrection, ProsodyHead, SpeakerProfile, VocalTractConfig, VocalTractController,
+    ProsodyCorrection, ProsodyHead, SpeakerProfile, TrainingHyperparams, VocalTractConfig,
+    VocalTractController,
 };
 
 use super::formant_targets::FormantDatabase;
