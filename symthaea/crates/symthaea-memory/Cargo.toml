@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-memory"
+version = "0.1.0"
+edition = "2021"
+description = "Memory subsystems: semantic memory (HDC similarity lookup), coherence tracking"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+serde = { workspace = true }
+symthaea-core = { path = "../../symthaea-core" }
