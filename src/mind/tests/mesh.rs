@@ -2452,3 +2452,59 @@ fn test_aimd_budget_ceiling() {
         "Budget should never exceed ceiling"
     );
 }
+
+// ====================================================================
+// Item 1: Compression stats tracking tests
+// ====================================================================
+
+#[cfg(feature = "mesh")]
+#[test]
+fn test_compression_stats_tracked_on_emit() {
+    use crate::cognitive_loop::types::CycleUrgency;
+    use symthaea_core::hdc::BinaryHV;
+
+    let mut mind = ContinuousMind::default();
+    mind.activate();
+
+    assert_eq!(mind.mesh_stats.bytes_before_compression, 0);
+    assert_eq!(mind.mesh_stats.bytes_after_compression, 0);
+
+    // Emit 3 wisdom packets (Critical = every tick)
+    for i in 1..=3u64 {
+        mind.state.tick = i;
+        mind.emit_wisdom(BinaryHV([0xAA; 2048]), CycleUrgency::Critical, 0.5);
+    }
+
+    assert_eq!(
+        mind.mesh_stats.bytes_before_compression,
+        3 * crate::swarm::mesh::WISDOM_PACKET_SIZE as u64,
+        "bytes_before_compression should be 3 × WISDOM_PACKET_SIZE"
+    );
+    assert!(
+        mind.mesh_stats.bytes_after_compression > 0,
+        "bytes_after_compression should be non-zero after emitting"
+    );
+}
+
+#[cfg(feature = "mesh")]
+#[test]
+fn test_compression_stats_heartbeat() {
+    let mut mind = ContinuousMind::default();
+    mind.activate();
+    let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(4, 4);
+    mind.set_mesh_bridge(handle);
+
+    mind.state.tick = 1;
+    mind.emit_heartbeat();
+
+    assert!(
+        mind.mesh_stats.bytes_before_compression > 0,
+        "bytes_before should be tracked for heartbeats"
+    );
+    assert!(
+        mind.mesh_stats.bytes_after_compression <= mind.mesh_stats.bytes_before_compression,
+        "Heartbeat (zero BinaryHV) should compress well: after={} <= before={}",
+        mind.mesh_stats.bytes_after_compression,
+        mind.mesh_stats.bytes_before_compression
+    );
+}

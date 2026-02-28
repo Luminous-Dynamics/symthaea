@@ -98,15 +98,37 @@ impl ProposalCollector {
             .collect()
     }
 
-    /// Integrate all proposals into a single effective value.
+    /// Integrate all proposals using consensus mode (default).
     ///
-    /// Integration strategy:
+    /// Consensus integration strategy:
     /// - `Set` proposals: last one wins (they're rare and intentional)
     /// - `Add` proposals: averaged (consensus), then applied
     /// - `Scale` proposals: geometric mean, then applied
-    ///
-    /// Returns `(effective_value, attribution_summary)`.
     pub fn integrate(&self, base_value: f64, clamp_min: f64, clamp_max: f64) -> IntegrationResult {
+        self.integrate_with_mode(base_value, clamp_min, clamp_max, IntegrationMode::Consensus)
+    }
+
+    /// Integrate all proposals using sequential mode.
+    ///
+    /// Sequential mode matches the behavior of applying each proposal
+    /// in order (sum adds, product scales). Use this for cutover
+    /// validation — the result should match the direct-mutation value.
+    pub fn integrate_sequential(
+        &self,
+        base_value: f64,
+        clamp_min: f64,
+        clamp_max: f64,
+    ) -> IntegrationResult {
+        self.integrate_with_mode(base_value, clamp_min, clamp_max, IntegrationMode::Sequential)
+    }
+
+    fn integrate_with_mode(
+        &self,
+        base_value: f64,
+        clamp_min: f64,
+        clamp_max: f64,
+        mode: IntegrationMode,
+    ) -> IntegrationResult {
         let mut sets: Vec<(&'static str, f64)> = Vec::new();
         let mut adds: Vec<(&'static str, f64)> = Vec::new();
         let mut scales: Vec<(&'static str, f64)> = Vec::new();
@@ -126,17 +148,33 @@ impl ProposalCollector {
             base_value
         };
 
-        // Apply averaged additive proposals
-        if !adds.is_empty() {
-            let avg_delta: f64 = adds.iter().map(|(_, d)| d).sum::<f64>() / adds.len() as f64;
-            value += avg_delta;
-        }
-
-        // Apply geometric mean of multiplicative proposals
-        if !scales.is_empty() {
-            let log_sum: f64 = scales.iter().map(|(_, f)| f.ln()).sum::<f64>();
-            let geo_mean = (log_sum / scales.len() as f64).exp();
-            value *= geo_mean;
+        match mode {
+            IntegrationMode::Consensus => {
+                // Average additive proposals (noise-resistant consensus)
+                if !adds.is_empty() {
+                    let avg_delta: f64 =
+                        adds.iter().map(|(_, d)| d).sum::<f64>() / adds.len() as f64;
+                    value += avg_delta;
+                }
+                // Geometric mean of multiplicative proposals
+                if !scales.is_empty() {
+                    let log_sum: f64 = scales.iter().map(|(_, f)| f.ln()).sum::<f64>();
+                    let geo_mean = (log_sum / scales.len() as f64).exp();
+                    value *= geo_mean;
+                }
+            }
+            IntegrationMode::Sequential => {
+                // Sum additive proposals (matches sequential += behavior)
+                if !adds.is_empty() {
+                    let total_delta: f64 = adds.iter().map(|(_, d)| d).sum::<f64>();
+                    value += total_delta;
+                }
+                // Product of multiplicative proposals (matches sequential *= behavior)
+                if !scales.is_empty() {
+                    let product: f64 = scales.iter().map(|(_, f)| f).product();
+                    value *= product;
+                }
+            }
         }
 
         value = value.clamp(clamp_min, clamp_max);
@@ -154,6 +192,17 @@ impl Default for ProposalCollector {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Integration strategy for combining proposals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum IntegrationMode {
+    /// Consensus: average adds, geometric mean scales. Noise-resistant.
+    /// Use for final production mode (reduces compounding drift).
+    Consensus,
+    /// Sequential: sum adds, product scales. Matches sequential mutation behavior.
+    /// Use for cutover validation (result should match direct-mutation value).
+    Sequential,
 }
 
 /// Result of integrating proposals.
@@ -179,6 +228,19 @@ impl fmt::Display for IntegrationResult {
 // FEEDBACK STATE — top-level container
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// Divergence between direct-mutation values and proposal-integrated values.
+///
+/// A divergence of 0.0 means the proposal system perfectly reproduces
+/// the direct-mutation behavior. Non-zero divergence indicates mutations
+/// that bypass the proposal system (not routed through helpers).
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct FeedbackDivergence {
+    pub confidence: f64,
+    pub learning_rate: f64,
+    pub exploration: f64,
+    pub threshold: f64,
+}
+
 /// Decoupled feedback state for the cognitive loop.
 ///
 /// Replaces direct `self.prediction_confidence += X` and `self.fep_lr_boost *= X`
@@ -196,6 +258,12 @@ pub(crate) struct FeedbackState {
     pub exploration: ProposalCollector,
     /// Proposals for `adaptive_threshold_scale` (0.5–2.0)
     pub threshold: ProposalCollector,
+
+    // ── Cycle-start values for divergence computation ────────────────────
+    cycle_start_confidence: f64,
+    cycle_start_lr: f64,
+    cycle_start_exploration: f64,
+    cycle_start_threshold: f64,
 
     // ── Cycle-end integration results (for telemetry / debugging) ───────
     /// Last integrated confidence result
@@ -215,6 +283,10 @@ impl FeedbackState {
             learning_rate: ProposalCollector::new(),
             exploration: ProposalCollector::new(),
             threshold: ProposalCollector::new(),
+            cycle_start_confidence: 0.5,
+            cycle_start_lr: 1.0,
+            cycle_start_exploration: 0.3,
+            cycle_start_threshold: 1.0,
             last_confidence_integration: None,
             last_lr_integration: None,
             last_exploration_integration: None,
@@ -233,27 +305,73 @@ impl FeedbackState {
     /// Integrate all feedback variables. Call at cycle end (Phase D: DECAY).
     ///
     /// Current values are produced by direct mutations (the old path).
-    /// Integration results are stored for comparison and telemetry.
+    /// Sequential integration results are stored for comparison — these
+    /// should match the direct-mutation values if all mutations go through helpers.
+    ///
+    /// Returns divergence between direct mutation and sequential integration
+    /// for each variable (0.0 = perfect match).
     pub fn end_cycle(
         &mut self,
         current_confidence: f64,
         current_lr: f64,
         current_exploration: f64,
         current_threshold: f64,
+    ) -> FeedbackDivergence {
+        // Use sequential integration (sum/product) — should match direct mutation exactly
+        let base_confidence = self.cycle_start_confidence;
+        let base_lr = self.cycle_start_lr;
+        let base_exploration = self.cycle_start_exploration;
+        let base_threshold = self.cycle_start_threshold;
+
+        let conf_result = self
+            .confidence
+            .integrate_sequential(base_confidence, 0.0, 1.0);
+        let lr_result = self.learning_rate.integrate_sequential(base_lr, 1.0, 3.0);
+        let explore_result = self
+            .exploration
+            .integrate_sequential(base_exploration, 0.0, 1.0);
+        let thresh_result = self
+            .threshold
+            .integrate_sequential(base_threshold, 0.5, 2.0);
+
+        let divergence = FeedbackDivergence {
+            confidence: (current_confidence - conf_result.effective).abs(),
+            learning_rate: (current_lr - lr_result.effective).abs(),
+            exploration: (current_exploration - explore_result.effective).abs(),
+            threshold: (current_threshold - thresh_result.effective).abs(),
+        };
+
+        self.last_confidence_integration = Some(conf_result);
+        self.last_lr_integration = Some(lr_result);
+        self.last_exploration_integration = Some(explore_result);
+        self.last_threshold_integration = Some(thresh_result);
+
+        divergence
+    }
+
+    /// Record cycle-start values for divergence computation.
+    ///
+    /// Call at cycle start (after `begin_cycle()`) with the current field values.
+    pub fn snapshot_cycle_start(
+        &mut self,
+        confidence: f64,
+        lr: f64,
+        exploration: f64,
+        threshold: f64,
     ) {
-        self.last_confidence_integration =
-            Some(self.confidence.integrate(current_confidence, 0.0, 1.0));
-        self.last_lr_integration = Some(self.learning_rate.integrate(current_lr, 1.0, 3.0));
-        self.last_exploration_integration =
-            Some(self.exploration.integrate(current_exploration, 0.0, 1.0));
-        self.last_threshold_integration =
-            Some(self.threshold.integrate(current_threshold, 0.5, 2.0));
+        self.cycle_start_confidence = confidence;
+        self.cycle_start_lr = lr;
+        self.cycle_start_exploration = exploration;
+        self.cycle_start_threshold = threshold;
     }
 
     /// How many total proposals were recorded this cycle.
     #[allow(dead_code)]
     pub fn total_proposals(&self) -> usize {
-        self.confidence.len() + self.learning_rate.len() + self.exploration.len() + self.threshold.len()
+        self.confidence.len()
+            + self.learning_rate.len()
+            + self.exploration.len()
+            + self.threshold.len()
     }
 }
 
@@ -431,5 +549,70 @@ mod tests {
         let collector = ProposalCollector::new();
         let dump = collector.dump_proposals();
         assert!(dump.is_empty());
+    }
+
+    #[test]
+    fn test_sequential_integration_sums_adds() {
+        let mut collector = ProposalCollector::new();
+        collector.propose("a", FeedbackProposal::Add(0.1));
+        collector.propose("b", FeedbackProposal::Add(0.3));
+        // Sequential: sum of +0.1 and +0.3 = +0.4, applied to base 0.5 → 0.9
+        let result = collector.integrate_sequential(0.5, 0.0, 1.0);
+        assert!((result.effective - 0.9).abs() < 1e-10);
+        // Compare with consensus (average): +0.2 → 0.7
+        let consensus = collector.integrate(0.5, 0.0, 1.0);
+        assert!((consensus.effective - 0.7).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_sequential_integration_products_scales() {
+        let mut collector = ProposalCollector::new();
+        collector.propose("a", FeedbackProposal::Scale(0.9));
+        collector.propose("b", FeedbackProposal::Scale(0.9));
+        // Sequential: product 0.9 * 0.9 = 0.81, applied to base 1.0 → 0.81
+        let result = collector.integrate_sequential(1.0, 0.0, 2.0);
+        assert!((result.effective - 0.81).abs() < 1e-10);
+        // Compare with consensus (geomean): 0.9 → 0.9
+        let consensus = collector.integrate(1.0, 0.0, 2.0);
+        assert!((consensus.effective - 0.9).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_divergence_zero_when_fully_mediated() {
+        let mut state = FeedbackState::new();
+        state.begin_cycle();
+        state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
+
+        // Simulate helpers: propose and apply
+        state
+            .confidence
+            .propose("test", FeedbackProposal::Add(0.1));
+        state
+            .learning_rate
+            .propose("test", FeedbackProposal::Scale(1.05));
+
+        // end_cycle with values matching sequential integration
+        // conf: 0.5 + 0.1 = 0.6, lr: 1.0 * 1.05 = 1.05
+        let divergence = state.end_cycle(0.6, 1.05, 0.3, 1.0);
+        assert!(divergence.confidence < 1e-10);
+        assert!(divergence.learning_rate < 1e-10);
+        assert!(divergence.exploration < 1e-10);
+        assert!(divergence.threshold < 1e-10);
+    }
+
+    #[test]
+    fn test_divergence_nonzero_with_bypass() {
+        let mut state = FeedbackState::new();
+        state.begin_cycle();
+        state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
+
+        // Only confidence is proposed
+        state
+            .confidence
+            .propose("test", FeedbackProposal::Add(0.1));
+        // But actual confidence was changed by both proposal AND bypass
+        let divergence = state.end_cycle(0.7, 1.0, 0.3, 1.0);
+        // Integrated: 0.5 + 0.1 = 0.6, actual: 0.7, divergence: 0.1
+        assert!((divergence.confidence - 0.1).abs() < 1e-10);
     }
 }

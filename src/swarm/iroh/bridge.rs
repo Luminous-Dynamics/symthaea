@@ -286,6 +286,7 @@ mod tests {
                 behavior: ContinuousHV::zero(64),
                 context: ContinuousHV::zero(64),
                 interaction_outcome: None,
+                bath_state: None,
             })
             .collect();
 
@@ -337,6 +338,7 @@ mod tests {
             behavior: ContinuousHV::zero(64),
             context: ContinuousHV::zero(64),
             interaction_outcome: None,
+            bath_state: None,
         }];
         handle.flush_outbox(messages);
 

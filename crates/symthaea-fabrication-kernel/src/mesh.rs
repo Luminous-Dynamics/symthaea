@@ -4,6 +4,7 @@
 //! CSG operations via mesh merging (union) or placeholder pass-through
 //! (subtract/intersect — full CSG mesh boolean is future work).
 
+use crate::bsp;
 use crate::csg::{BooleanOp, CSGNode, Primitive, Transform3D};
 use serde::{Deserialize, Serialize};
 

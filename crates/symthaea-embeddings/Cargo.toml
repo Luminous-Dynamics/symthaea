@@ -17,3 +17,13 @@ rand = "0.8"
 rand_chacha = "0.3"
 serde = { workspace = true }
 symthaea-core = { path = "../../symthaea-core" }
+
+# ONNX inference (optional — enabled via `onnx` feature)
+ort = { version = "2.0.0-rc.10", features = ["load-dynamic", "ndarray"], optional = true }
+tokenizers = { version = "0.21", optional = true }
+ndarray = { version = "0.16", optional = true }
+tracing = { version = "0.1", optional = true }
+
+[features]
+default = []
+onnx = ["ort", "tokenizers", "ndarray", "tracing"]

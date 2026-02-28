@@ -524,6 +524,18 @@ pub struct NeuromodTelemetry {
     pub neuromod_attractor_detected: bool,
     /// Number of active pharmacological injections (0–4).
     pub active_injection_count: u8,
+
+    // ── Phase 6: Endocannabinoid + Receptor Subtype Telemetry ───────────
+    /// Endocannabinoid effective level (0.0–2.0).
+    pub neuromod_endocannabinoid_effective: f32,
+    /// 5-HT1A signal: anxiolytic/inhibitory (serotonin × 1A sensitivity).
+    pub neuromod_sht_1a_signal: f32,
+    /// 5-HT2A signal: perceptual richness/consciousness (serotonin × 2A sensitivity).
+    pub neuromod_sht_2a_signal: f32,
+    /// GABA-A signal: fast ionotropic/sedation (GABA × A sensitivity).
+    pub neuromod_gaba_a_signal: f32,
+    /// GABA-B signal: slow metabotropic (GABA × B sensitivity).
+    pub neuromod_gaba_b_signal: f32,
 }
 
 /// Metadata about internal decision-making during a cycle.
@@ -1228,6 +1240,18 @@ pub struct CycleMetadata {
     /// Number of active pharmacological injections (0–4).
     pub active_injection_count: u8,
 
+    // ── Phase 6: Endocannabinoid + Receptor Subtype Telemetry ───────────
+    /// Endocannabinoid effective level (0.0–2.0).
+    pub neuromod_endocannabinoid_effective: f32,
+    /// 5-HT1A signal: anxiolytic/inhibitory.
+    pub neuromod_sht_1a_signal: f32,
+    /// 5-HT2A signal: perceptual richness/consciousness.
+    pub neuromod_sht_2a_signal: f32,
+    /// GABA-A signal: fast ionotropic/sedation.
+    pub neuromod_gaba_a_signal: f32,
+    /// GABA-B signal: slow metabotropic.
+    pub neuromod_gaba_b_signal: f32,
+
     // ── Liquid-Mamba Fusion Telemetry ────────────────────────────────
     /// Semantic prediction error from Liquid-Mamba round-trip (0.0–1.0, 0.0 when off).
     /// Measures `1 - cosine(thought_hv, bundled_output_hvs)`.
@@ -1333,6 +1357,12 @@ impl CycleMetadata {
         self.neuromod_bath_entropy = n.neuromod_bath_entropy;
         self.neuromod_attractor_detected = n.neuromod_attractor_detected;
         self.active_injection_count = n.active_injection_count;
+        // Phase 6: endocannabinoid + subtypes
+        self.neuromod_endocannabinoid_effective = n.neuromod_endocannabinoid_effective;
+        self.neuromod_sht_1a_signal = n.neuromod_sht_1a_signal;
+        self.neuromod_sht_2a_signal = n.neuromod_sht_2a_signal;
+        self.neuromod_gaba_a_signal = n.neuromod_gaba_a_signal;
+        self.neuromod_gaba_b_signal = n.neuromod_gaba_b_signal;
     }
 }
 

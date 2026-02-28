@@ -44,6 +44,29 @@ pub struct DemoCycleData {
     pub input_text: String,
     /// 32-dim projection of the thought hypervector for fractal mapping
     pub thought_vector: Vec<f32>,
+
+    // ── Phase 6: Neuromodulator bath telemetry ──
+    /// 9-dimensional neuromodulator state vector [DA, NE, 5-HT, ACh, GABA, Oxy, Glut, Aden, ECB]
+    #[serde(default)]
+    pub neuromod_state_vector: Vec<f32>,
+    /// Bath phase space entropy
+    #[serde(default)]
+    pub bath_entropy: f32,
+    /// Allostatic load
+    #[serde(default)]
+    pub allostatic_load: f32,
+    /// E/I ratio (glutamate/GABA)
+    #[serde(default)]
+    pub ei_ratio: f32,
+    /// Sleep pressure (adenosine effective)
+    #[serde(default)]
+    pub sleep_pressure: f32,
+    /// Active injection count
+    #[serde(default)]
+    pub active_injection_count: u8,
+    /// Whether attractor detected in bath phase space
+    #[serde(default)]
+    pub attractor_detected: bool,
 }
 
 /// Client message format.

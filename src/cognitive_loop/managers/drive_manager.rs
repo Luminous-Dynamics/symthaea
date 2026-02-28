@@ -258,13 +258,37 @@ impl CognitiveSubsystem for DriveManager {
                 data.len()
             ));
         }
-        self.boredom = f32::from_le_bytes(data[0..4].try_into().unwrap());
-        self.flow_intensity = f32::from_le_bytes(data[4..8].try_into().unwrap());
-        self.exploration_threshold = f32::from_le_bytes(data[8..12].try_into().unwrap());
-        self.exploration_urge = f32::from_le_bytes(data[12..16].try_into().unwrap());
+        self.boredom = f32::from_le_bytes(
+            data[0..4]
+                .try_into()
+                .map_err(|_| "DriveManager: corrupt checkpoint bytes [0..4]".to_string())?,
+        );
+        self.flow_intensity = f32::from_le_bytes(
+            data[4..8]
+                .try_into()
+                .map_err(|_| "DriveManager: corrupt checkpoint bytes [4..8]".to_string())?,
+        );
+        self.exploration_threshold = f32::from_le_bytes(
+            data[8..12]
+                .try_into()
+                .map_err(|_| "DriveManager: corrupt checkpoint bytes [8..12]".to_string())?,
+        );
+        self.exploration_urge = f32::from_le_bytes(
+            data[12..16]
+                .try_into()
+                .map_err(|_| "DriveManager: corrupt checkpoint bytes [12..16]".to_string())?,
+        );
         self.in_flow = data[16] != 0;
-        self.low_error_streak = u32::from_le_bytes(data[17..21].try_into().unwrap());
-        self.flow_streak = u32::from_le_bytes(data[21..25].try_into().unwrap());
+        self.low_error_streak = u32::from_le_bytes(
+            data[17..21]
+                .try_into()
+                .map_err(|_| "DriveManager: corrupt checkpoint bytes [17..21]".to_string())?,
+        );
+        self.flow_streak = u32::from_le_bytes(
+            data[21..25]
+                .try_into()
+                .map_err(|_| "DriveManager: corrupt checkpoint bytes [21..25]".to_string())?,
+        );
         Ok(())
     }
 }

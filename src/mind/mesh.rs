@@ -198,6 +198,10 @@ impl ContinuousMind {
         }
         self.mesh_replay_buffer.push_back(packet.clone());
 
+        self.mesh_stats.bytes_before_compression += crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
+        self.mesh_stats.bytes_after_compression +=
+            crate::swarm::mesh::compress_packet(&packet.to_bytes()).len() as u64;
+
         self.mesh_sequence = self.mesh_sequence.wrapping_add(1);
         self.mesh_outbox.push(MeshOutbound { packet });
         self.mesh_stats.wisdom_sent += 1;
@@ -312,6 +316,10 @@ impl ContinuousMind {
         };
 
         self.sign_mesh_packet(&mut packet);
+
+        self.mesh_stats.bytes_before_compression += crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
+        self.mesh_stats.bytes_after_compression +=
+            crate::swarm::mesh::compress_packet(&packet.to_bytes()).len() as u64;
 
         self.mesh_outbox.push(MeshOutbound { packet });
         self.mesh_heartbeat_last_tick = self.state.tick;

@@ -185,9 +185,21 @@ impl CognitiveSubsystem for LearningManager {
                 data.len()
             ));
         }
-        self.plasticity = f32::from_le_bytes(data[0..4].try_into().unwrap());
-        self.error_trend = f32::from_le_bytes(data[4..8].try_into().unwrap());
-        self.low_arousal_streak = u32::from_le_bytes(data[8..12].try_into().unwrap());
+        self.plasticity = f32::from_le_bytes(
+            data[0..4]
+                .try_into()
+                .map_err(|_| "LearningManager: corrupt checkpoint bytes [0..4]".to_string())?,
+        );
+        self.error_trend = f32::from_le_bytes(
+            data[4..8]
+                .try_into()
+                .map_err(|_| "LearningManager: corrupt checkpoint bytes [4..8]".to_string())?,
+        );
+        self.low_arousal_streak = u32::from_le_bytes(
+            data[8..12]
+                .try_into()
+                .map_err(|_| "LearningManager: corrupt checkpoint bytes [8..12]".to_string())?,
+        );
         self.in_dream_phase = data[12] != 0;
         Ok(())
     }

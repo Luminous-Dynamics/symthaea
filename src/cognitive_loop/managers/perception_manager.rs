@@ -185,9 +185,23 @@ impl CognitiveSubsystem for PerceptionManager {
                 data.len()
             ));
         }
-        self.attention_sensitivity = f32::from_le_bytes(data[0..4].try_into().unwrap());
-        self.budget_utilization = f32::from_le_bytes(data[4..8].try_into().unwrap());
-        self.budget_exceeded_streak = u32::from_le_bytes(data[8..12].try_into().unwrap());
+        self.attention_sensitivity = f32::from_le_bytes(
+            data[0..4]
+                .try_into()
+                .map_err(|_| "PerceptionManager: corrupt checkpoint bytes [0..4]".to_string())?,
+        );
+        self.budget_utilization = f32::from_le_bytes(
+            data[4..8]
+                .try_into()
+                .map_err(|_| "PerceptionManager: corrupt checkpoint bytes [4..8]".to_string())?,
+        );
+        self.budget_exceeded_streak = u32::from_le_bytes(
+            data[8..12]
+                .try_into()
+                .map_err(|_| {
+                    "PerceptionManager: corrupt checkpoint bytes [8..12]".to_string()
+                })?,
+        );
         self.vigilant = data[12] != 0;
         Ok(())
     }

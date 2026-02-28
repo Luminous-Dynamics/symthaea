@@ -265,6 +265,10 @@ pub struct SocialMessage {
     /// Optional interaction outcome (positive = cooperative, negative = adversarial).
     /// When `Some`, the message is treated as an interaction record.
     pub interaction_outcome: Option<f32>,
+    /// Sender's neuromodulator bath state for empathic coupling.
+    /// Science: Feldman (2012) — oxytocin biobehavioral synchrony.
+    #[serde(default)]
+    pub bath_state: Option<Vec<f32>>,
 }
 
 /// Statistics for the mind

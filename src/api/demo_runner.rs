@@ -63,6 +63,27 @@ impl DemoRunner {
             resonance_frequency: m.resonance_frequency,
             input_text: self.current_input.clone(),
             thought_vector: result.thought_vector,
+            // Phase 6: neuromodulator bath telemetry
+            neuromod_state_vector: {
+                let nt = &m.neuromod_telemetry;
+                vec![
+                    nt.dopamine_effective,
+                    nt.noradrenaline_effective,
+                    nt.serotonin_effective,
+                    nt.acetylcholine_effective,
+                    nt.neuromod_gaba_effective,
+                    nt.neuromod_oxytocin_effective,
+                    nt.neuromod_glutamate_effective,
+                    nt.neuromod_adenosine_effective,
+                    nt.neuromod_endocannabinoid_effective,
+                ]
+            },
+            bath_entropy: m.neuromod_telemetry.neuromod_bath_entropy,
+            allostatic_load: m.neuromod_telemetry.neuromod_allostatic_load,
+            ei_ratio: m.neuromod_telemetry.neuromod_ei_ratio,
+            sleep_pressure: m.neuromod_telemetry.neuromod_sleep_pressure,
+            active_injection_count: m.neuromod_telemetry.active_injection_count,
+            attractor_detected: m.neuromod_telemetry.neuromod_attractor_detected,
         }
     }
 

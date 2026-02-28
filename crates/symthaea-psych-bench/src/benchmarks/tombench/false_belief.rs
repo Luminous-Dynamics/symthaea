@@ -314,15 +314,26 @@ impl PsychBenchmark for FalseBeliefBenchmark {
             {
                 let (mut acc, rt) = self.run_trial(config, trial);
 
-                // Curse of knowledge: stochastic response flip at higher difficulty (Birch & Bloom 2007)
+                // Curse of knowledge: stochastic response flip at higher difficulty (Birch & Bloom 2007).
+                // Two mechanisms: (1) belief-reality confusion (difficulty * 0.35 flip rate),
+                // (2) processing noise that scales with difficulty (breaks ceiling at d>=0.3).
                 if config.difficulty > 0.0 {
                     let mut rng_state = (config.seed ^ (trial as u64 * 0x517CC1B727220A95)).wrapping_add(1);
                     rng_state ^= rng_state << 13;
                     rng_state ^= rng_state >> 7;
                     rng_state ^= rng_state << 17;
                     let u = (rng_state as f64) / (u64::MAX as f64);
+                    // Primary flip: confusion between agent's belief and reality
                     if u < config.difficulty * 0.35 {
-                        acc = 1.0 - acc; // flip response
+                        acc = 1.0 - acc;
+                    }
+                    // Secondary flip: processing noise — independent draw
+                    rng_state ^= rng_state << 13;
+                    rng_state ^= rng_state >> 7;
+                    rng_state ^= rng_state << 17;
+                    let u2 = (rng_state as f64) / (u64::MAX as f64);
+                    if u2 < config.difficulty * 0.25 {
+                        acc = 1.0 - acc;
                     }
                 }
 

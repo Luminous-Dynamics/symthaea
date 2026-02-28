@@ -128,7 +128,7 @@ pub struct Episode {
     /// Science: Godden & Baddeley (1975) — state-dependent memory;
     /// Eich (1980) — mood-dependent retrieval.
     #[serde(default)]
-    pub bath_state_at_encoding: Option<[f32; 8]>,
+    pub bath_state_at_encoding: Option<[f32; 9]>,
 }
 
 impl Episode {
@@ -184,7 +184,7 @@ impl Episode {
 
     /// Set neuromodulator bath state at encoding for state-dependent retrieval.
     /// Science: Godden & Baddeley (1975) — state-dependent memory.
-    pub fn with_bath_state(mut self, state: [f32; 8]) -> Self {
+    pub fn with_bath_state(mut self, state: [f32; 9]) -> Self {
         self.bath_state_at_encoding = Some(state);
         self
     }
@@ -382,11 +382,11 @@ impl EpisodicReplayConfig {
 // EPISODIC MEMORY: Main Storage and Replay System
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Cosine similarity between two 8-dimensional bath state vectors.
+/// Cosine similarity between two 9-dimensional bath state vectors.
 ///
 /// Returns 1.0 for identical states, 0.0 for orthogonal, -1.0 for opposite.
 /// Used for state-dependent memory retrieval (Godden & Baddeley, 1975).
-pub fn bath_cosine_similarity(a: &[f32; 8], b: &[f32; 8]) -> f32 {
+pub fn bath_cosine_similarity(a: &[f32; 9], b: &[f32; 9]) -> f32 {
     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
     let mag_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
     let mag_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -628,7 +628,7 @@ impl EpisodicMemory {
     pub fn sample_replay_batch_conditioned(
         &mut self,
         batch_size: usize,
-        current_bath: Option<[f32; 8]>,
+        current_bath: Option<[f32; 9]>,
     ) -> Vec<Episode> {
         // Fall back to standard sampling if no bath state provided
         let current_bath = match current_bath {
@@ -814,7 +814,7 @@ impl EpisodicMemory {
         &mut self,
         network: &mut CfCNetwork,
         base_learning_rate: f32,
-        current_bath: Option<[f32; 8]>,
+        current_bath: Option<[f32; 9]>,
     ) -> ReplaySessionResult {
         if !self.should_replay() {
             return ReplaySessionResult {
@@ -1375,7 +1375,7 @@ mod tests {
     fn test_episode_with_bath_state() {
         let input = ContinuousHV::from_vec(vec![0.0; 128]);
         let output = ContinuousHV::from_vec(vec![0.0; 128]);
-        let bath = [0.5, 0.4, 0.6, 0.3, 0.4, 0.3, 0.3, 0.2];
+        let bath = [0.5, 0.4, 0.6, 0.3, 0.4, 0.3, 0.3, 0.2, 0.3];
         let ep = Episode::new(input, output, 0.8, 100).with_bath_state(bath);
         assert!(ep.bath_state_at_encoding.is_some());
         assert_eq!(ep.bath_state_at_encoding.unwrap(), bath);
@@ -1394,7 +1394,7 @@ mod tests {
 
     #[test]
     fn test_bath_cosine_identical() {
-        let a = [0.5, 0.4, 0.6, 0.3, 0.4, 0.3, 0.3, 0.2];
+        let a = [0.5, 0.4, 0.6, 0.3, 0.4, 0.3, 0.3, 0.2, 0.3];
         let sim = bath_cosine_similarity(&a, &a);
         assert!(
             (sim - 1.0).abs() < 0.001,
@@ -1404,8 +1404,8 @@ mod tests {
 
     #[test]
     fn test_bath_cosine_zero_magnitude() {
-        let a = [0.0; 8];
-        let b = [0.5; 8];
+        let a = [0.0; 9];
+        let b = [0.5; 9];
         let sim = bath_cosine_similarity(&a, &b);
         assert_eq!(sim, 0.0, "Zero-magnitude vector should give 0.0 similarity");
     }
@@ -1424,8 +1424,8 @@ mod tests {
         memory.current_cycle = 42;
 
         // Store episodes with different bath states
-        let similar_bath = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
-        let different_bath = [0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9];
+        let similar_bath = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.3];
+        let different_bath = [0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.3];
 
         for i in 0..20 {
             let input = ContinuousHV::from_vec(vec![i as f32 / 20.0; 128]);
@@ -1462,7 +1462,7 @@ mod tests {
         }
 
         // Should still work with conditioned sampling (falls back gracefully)
-        let current = [0.5; 8];
+        let current = [0.5; 9];
         let batch = memory.sample_replay_batch_conditioned(3, Some(current));
         assert!(
             !batch.is_empty(),

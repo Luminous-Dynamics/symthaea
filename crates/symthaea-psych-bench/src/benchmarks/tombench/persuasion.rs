@@ -196,14 +196,15 @@ impl PersuasionBenchmark {
         let diff_model = difficulty_model_for(self.name());
         let structure_score = structure_score * diff_model.signal_multiplier(config.difficulty);
 
-        // Difficulty-gated noise (breaks ceiling at higher difficulty)
+        // Difficulty-gated noise (breaks ceiling at higher difficulty).
+        // Scales with (1 + difficulty) so noise amplitude grows with task difficulty.
         let noise = if config.difficulty > 0.0 {
             let mut rng_state = (config.seed ^ (trial_idx as u64 * 0x9E3779B97F4A7C15)).wrapping_add(1);
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
             rng_state ^= rng_state << 17;
             let u = (rng_state as f64) / (u64::MAX as f64);
-            (u - 0.5) * config.difficulty * 0.4
+            (u - 0.5) * config.difficulty * 0.8 * (1.0 + config.difficulty)
         } else {
             0.0
         };
@@ -212,14 +213,30 @@ impl PersuasionBenchmark {
         let combined = structure_score + geo_signal * 0.1 + noise;
         // Time pressure: base 0.3 threshold yields ~75% persuasion detection; +0.20/unit raises
         // criterion, modeling reduced ToM inference depth under deadline (Apperly et al., 2006).
-        let threshold = 0.3 + config.time_pressure * 0.2;
+        // Difficulty also raises the threshold: harder conditions require stronger signal.
+        let threshold = 0.3 + config.time_pressure * 0.2 + config.difficulty * 0.25;
         let detected_persuasion = combined > threshold;
 
-        if detected_persuasion == scenario.has_persuasion {
+        let mut acc = if detected_persuasion == scenario.has_persuasion {
             1.0
         } else {
             0.0
+        };
+
+        // Difficulty-gated processing error: stochastic response flip models
+        // impaired ToM inference at higher cognitive load (Apperly et al., 2006).
+        if config.difficulty > 0.0 {
+            let mut rng2 = (config.seed ^ (trial_idx as u64 * 0xA0761D6478BD642F)).wrapping_add(1);
+            rng2 ^= rng2 << 13;
+            rng2 ^= rng2 >> 7;
+            rng2 ^= rng2 << 17;
+            let u = (rng2 as f64) / (u64::MAX as f64);
+            if u < config.difficulty * 0.25 {
+                acc = 1.0 - acc;
+            }
         }
+
+        acc
     }
 
     /// Full trial: FEP belief detection for persuasion recognition.

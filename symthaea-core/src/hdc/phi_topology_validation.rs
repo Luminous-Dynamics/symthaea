@@ -65,27 +65,24 @@ pub enum PhiValidationError {
 /// This preserves the essential structure while converting to binary format.
 pub fn real_hv_to_hv16(real_hv: &ContinuousHV) -> BinaryHV {
     let values = &real_hv.values;
-    let n = values.len();
+    let n = values.len().min(16_384);
 
     // Compute mean for threshold
-    let sum: f32 = values.iter().sum();
+    let sum: f32 = values[..n].iter().sum();
     let mean = sum / n as f32;
 
-    // Create binary representation
+    // Create binary representation: process 8 elements per byte
     // BinaryHV is 16,384 bits = 2048 bytes
     let mut bytes = [0u8; 2048];
 
-    for (i, &val) in values.iter().enumerate() {
-        if i >= 16_384 {
-            break; // BinaryHV is exactly 16,384 bits
+    for (byte_idx, chunk) in values[..n].chunks(8).enumerate() {
+        let mut byte = 0u8;
+        for (bit_idx, &val) in chunk.iter().enumerate() {
+            if val > mean {
+                byte |= 1 << bit_idx;
+            }
         }
-
-        // Set bit to 1 if value > mean
-        if val > mean {
-            let byte_idx = i / 8;
-            let bit_idx = i % 8;
-            bytes[byte_idx] |= 1 << bit_idx;
-        }
+        bytes[byte_idx] = byte;
     }
 
     BinaryHV(bytes)

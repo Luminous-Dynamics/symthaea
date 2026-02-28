@@ -760,4 +760,41 @@ mod tests {
         assert_eq!(stats.packets_complete, 0);
         assert_eq!(stats.fragments_received, 0);
     }
+
+    // -- Item 6: Edge case tests --
+
+    #[test]
+    fn test_receive_whole_compressed_envelope() {
+        use crate::swarm::mesh::{compress_packet, COMPRESS_NONE, WISDOM_PACKET_SIZE};
+        let mut receiver = MeshReceiver::new();
+        let packet = test_packet(10, PEER_A, 0xCC);
+        let raw = packet.to_bytes();
+        // Create a COMPRESS_NONE envelope manually
+        let mut envelope = Vec::with_capacity(1 + WISDOM_PACKET_SIZE);
+        envelope.push(COMPRESS_NONE);
+        envelope.extend_from_slice(&raw);
+        let result = receiver.receive_whole(&envelope).expect("should parse compressed envelope");
+        assert_eq!(result.sequence, 10);
+        assert_eq!(result.wisdom.0, packet.wisdom.0);
+        // Also verify that compress_packet produces a parseable envelope
+        let auto_envelope = compress_packet(&raw);
+        let mut receiver2 = MeshReceiver::new();
+        let result2 = receiver2
+            .receive_whole(&auto_envelope)
+            .expect("should parse auto-compressed envelope");
+        assert_eq!(result2.sequence, 10);
+    }
+
+    #[test]
+    fn test_receive_whole_legacy_backward_compat() {
+        let mut receiver = MeshReceiver::new();
+        let packet = test_packet(20, PEER_B, 0xDD);
+        // Feed raw packet bytes (no envelope header) — legacy format
+        let raw = packet.to_bytes();
+        let result = receiver
+            .receive_whole(&raw)
+            .expect("should parse legacy raw packet");
+        assert_eq!(result.sequence, 20);
+        assert_eq!(result.wisdom.0, packet.wisdom.0);
+    }
 }

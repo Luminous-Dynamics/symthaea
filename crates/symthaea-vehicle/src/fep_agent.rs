@@ -115,7 +115,7 @@ impl Default for VehicleFepConfig {
 /// Active Inference vehicle agent operating at cognitive rate (50Hz).
 ///
 /// At each cognitive tick, the agent:
-/// 1. Observes 10D driving error vector
+/// 1. Observes 11D driving error vector
 /// 2. Updates beliefs via variational inference
 /// 3. Selects one of 6 precision-modulation actions
 /// 4. Returns modulation parameters for the motor controller
@@ -138,6 +138,10 @@ pub struct ActiveInferenceVehicleAgent {
     task: VehicleTask,
     /// Target speed for observations.
     target_speed: f64,
+    /// Previous observation for delta computation (ambiguity detection).
+    prev_observation: Vec<f64>,
+    /// EMA of observation L2 delta (sensor stability signal).
+    obs_delta_ema: f64,
 }
 
 impl ActiveInferenceVehicleAgent {
@@ -151,8 +155,8 @@ impl ActiveInferenceVehicleAgent {
         };
 
         let agent_config = ActiveInferenceAgentConfig {
-            state_dim: 10,
-            obs_dim: 10,
+            state_dim: 11,
+            obs_dim: 11,
             num_actions: 6,
             inference_iterations: config.inference_iterations,
             belief_learning_rate: 0.1,
@@ -175,10 +179,12 @@ impl ActiveInferenceVehicleAgent {
             prev_fe: 0.0,
             task,
             target_speed: task.target_speed(),
+            prev_observation: Vec::new(),
+            obs_delta_ema: 0.5,
         }
     }
 
-    /// Build the 10D observation vector from vehicle state.
+    /// Build the 11D observation vector from vehicle state.
     ///
     /// Channels:
     /// 0. speed_error       — |speed - target| / target (normalized)
@@ -191,6 +197,7 @@ impl ActiveInferenceVehicleAgent {
     /// 7. free_energy_trend — rising (>0.5) vs falling (<0.5)
     /// 8. control_effort    — mean |command| (already 0..1)
     /// 9. mesh_brake_density— swarm brake fraction (0..1)
+    /// 10. obs_stability    — EMA of observation delta (sensor health signal)
     fn build_observation(&self, state: &VehicleState, cmd: &VehicleCommand) -> Vec<f64> {
         // 0. Speed error (normalized by target)
         let speed_error = if self.target_speed > 0.1 {
@@ -237,6 +244,10 @@ impl ActiveInferenceVehicleAgent {
         // 9. Mesh brake density (direct — the swarm's emergency signal)
         let mesh_brake = state.mesh_brake_density.clamp(0.0, 1.0);
 
+        // 10. Observation stability (sensor health signal)
+        // High = sensors changing normally; near-zero = channels frozen (sensor failure)
+        let obs_stability = self.obs_delta_ema.clamp(0.0, 1.0);
+
         vec![
             speed_error,
             lat_offset,
@@ -248,20 +259,30 @@ impl ActiveInferenceVehicleAgent {
             fe_trend,
             effort,
             mesh_brake,
+            obs_stability,
         ]
     }
 
     /// Rule-based action selection from observation channels.
     fn rule_based_action(&self, obs: &[f64]) -> VehicleAction {
+        let speed_error = obs[0];
         let slip_norm = obs[3];
         let yaw_norm = obs[4];
         let safety_trend = obs[5];
         let fe_trend = obs[7];
         let mesh_brake = obs[9];
+        let obs_stability = obs[10];
 
         // SUPREME: if mesh says brake, trust the swarm
         if mesh_brake > 0.3 {
             return VehicleAction::IncreaseMeshTrust;
+        }
+
+        // Sensor failure: observations frozen but speed error high → slow down
+        // When channels are zeroed by SensorBlindness, obs_delta drops to ~0
+        // but tire_slip falsely reads safe (0.0). This catches that ambiguity.
+        if obs_stability < 0.05 && speed_error > 0.5 {
+            return VehicleAction::SlowDown;
         }
 
         // Grip loss or spin: drop tau for faster reaction
@@ -293,6 +314,23 @@ impl ActiveInferenceVehicleAgent {
     /// Called at 50Hz (every 4th physics step at 200Hz).
     pub fn step(&mut self, state: &VehicleState, cmd: &VehicleCommand) -> VehicleFepResult {
         let obs_values = self.build_observation(state, cmd);
+
+        // Compute observation delta for sensor stability tracking.
+        // Only track the 5 direct sensor channels (0-4): speed_error, lat_offset,
+        // heading_error, tire_slip, yaw_rate. Internal channels (5-7: safety_trend,
+        // tau_ema, fe_trend) evolve from agent state and would mask sensor failure.
+        if !self.prev_observation.is_empty() {
+            let l2_delta: f64 = obs_values[..5]
+                .iter()
+                .zip(self.prev_observation.iter())
+                .map(|(a, b)| (a - b).powi(2))
+                .sum::<f64>()
+                .sqrt();
+            // Normalize: typical driving delta ~0.01-0.1 across 5 channels
+            let normalized = (l2_delta / 0.2).clamp(0.0, 1.0);
+            self.obs_delta_ema = 0.8 * self.obs_delta_ema + 0.2 * normalized;
+        }
+        self.prev_observation = obs_values[..5].to_vec();
 
         let obs = Observation::new(obs_values.clone(), 1.0, "vehicle");
 
@@ -381,6 +419,8 @@ impl ActiveInferenceVehicleAgent {
         self.tau_ema = 1.0;
         self.current_fe = 0.0;
         self.prev_fe = 0.0;
+        self.prev_observation.clear();
+        self.obs_delta_ema = 0.5;
     }
 
     /// Get the current free energy.
@@ -551,9 +591,63 @@ mod tests {
         };
 
         let obs = agent.build_observation(&state, &cmd);
-        assert_eq!(obs.len(), 10);
+        assert_eq!(obs.len(), 11);
         for (i, v) in obs.iter().enumerate() {
             assert!(*v >= 0.0 && *v <= 1.0, "Observation[{i}] out of [0,1]: {v}");
         }
+    }
+
+    #[test]
+    fn test_sensor_blindness_triggers_slowdown() {
+        let config = VehicleFepConfig::default();
+        let mut agent = ActiveInferenceVehicleAgent::new(config, VehicleTask::LaneKeep);
+
+        // First: run a few normal steps so prev_observation is populated
+        let normal_state = VehicleState::cruising(13.4);
+        let cmd = VehicleCommand::zero();
+        for _ in 0..5 {
+            agent.step(&normal_state, &cmd);
+        }
+
+        // Now apply sensor blindness (zeros 4 channels) — speed goes to 0
+        let mut blind_state = VehicleState::cruising(13.4);
+        blind_state.apply_sensor_blindness(4);
+        // The real speed is still 13.4 in the physics but sensors report 0
+
+        // Step multiple times so EMA converges toward frozen channels
+        for _ in 0..10 {
+            agent.step(&blind_state, &cmd);
+        }
+
+        // obs_delta_ema should have dropped near zero (channels frozen)
+        assert!(
+            agent.obs_delta_ema < 0.1,
+            "obs_delta_ema should be near zero under sensor blindness: {}",
+            agent.obs_delta_ema
+        );
+    }
+
+    #[test]
+    fn test_normal_driving_obs_stability() {
+        let config = VehicleFepConfig::default();
+        let mut agent = ActiveInferenceVehicleAgent::new(config, VehicleTask::LaneKeep);
+
+        // Simulate normal driving with varying state — realistic speed/heading variation
+        let cmd = VehicleCommand::zero();
+        for i in 0..20 {
+            let mut state = VehicleState::cruising(13.4 + (i as f64 * 0.5).sin() * 2.0);
+            state.heading = (i as f64 * 0.3).sin() * 0.15;
+            state.lateral_offset = (i as f64 * 0.2).sin() * 1.0;
+            state.yaw_rate = (i as f64 * 0.25).cos() * 0.2;
+            agent.step(&state, &cmd);
+        }
+
+        // Under normal driving, obs_delta_ema should be non-trivial (> 0.01)
+        // indicating that sensor channels are actively changing
+        assert!(
+            agent.obs_delta_ema > 0.01,
+            "obs_delta_ema should reflect changing observations: {}",
+            agent.obs_delta_ema
+        );
     }
 }

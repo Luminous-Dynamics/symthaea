@@ -583,8 +583,8 @@ mod tests {
     fn test_position_at_oval_wraps() {
         let road = Road::oval(200.0, 50.0);
         // s=0 and s=total_length should give the same position (closed loop)
-        let (x0, y0, h0) = road.position_at(0.0);
-        let (xn, yn, hn) = road.position_at(road.total_length);
+        let (x0, y0, _h0) = road.position_at(0.0);
+        let (xn, yn, _hn) = road.position_at(road.total_length);
         assert!((x0 - xn).abs() < 1.0, "Oval wrap x: {x0} vs {xn}");
         assert!((y0 - yn).abs() < 1.0, "Oval wrap y: {y0} vs {yn}");
     }

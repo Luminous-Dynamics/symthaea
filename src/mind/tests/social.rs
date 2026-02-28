@@ -40,6 +40,7 @@ fn test_social_inbox_processed_on_tick() {
         behavior: ContinuousHV::random(512, 0xBEEF_0001),
         context: ContinuousHV::random(512, 0xBEEF_0002),
         interaction_outcome: None,
+        bath_state: None,
     });
 
     assert_eq!(mind.social_inbox.len(), 1);
@@ -65,6 +66,7 @@ fn test_social_interaction_builds_relationship() {
         behavior: ContinuousHV::random(512, 0xA11E_0001),
         context: ContinuousHV::random(512, 0xA11E_0002),
         interaction_outcome: Some(0.9),
+        bath_state: None,
     });
     mind.tick();
 
@@ -110,6 +112,7 @@ fn test_social_no_processing_when_disabled() {
         behavior: ContinuousHV::random(512, 0xDEAD),
         context: ContinuousHV::random(512, 0xDEAD),
         interaction_outcome: None,
+        bath_state: None,
     });
     mind.tick();
 

@@ -310,3 +310,367 @@ impl ConsciousnessSnapshot {
         actions
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build a snapshot with sensible baseline values for testing.
+    /// All fields start at "healthy defaults" — individual tests override as needed.
+    fn baseline_snapshot() -> ConsciousnessSnapshot {
+        ConsciousnessSnapshot {
+            cycle: 100,
+            consciousness_level: 0.6,
+            pattern: ConsciousnessPattern::Focused,
+            pattern_confidence: 0.8,
+            prediction_error: 0.1,
+            prediction_confidence: 0.7,
+            predictions_trustworthy: true,
+            effective_learning_rate: 0.01,
+            learning_effectiveness: 0.5,
+            in_flow: false,
+            flow_intensity: 0.0,
+            flow_streak: 0,
+            flow_learning_boost: 1.0,
+            boredom: 0.2,
+            curiosity: 0.5,
+            exploration_urge: 0.3,
+            exploring: false,
+            novelty_bonus: 0.0,
+            emotional_valence: 0.0,
+            emotional_arousal: 0.3,
+            has_emotional_content: false,
+            emotion_nudge: None,
+            self_assessment: SelfAssessment::Learning,
+            reflection_count: 10,
+            adjustments_made: 2,
+            next_reflection_in: 5,
+            action_hint: ActionHint::Continue,
+            speech_rate_multiplier: 1.0,
+            pause_multiplier: 1.0,
+            learning_paused: false,
+            flow_threshold: 0.25,
+            boredom_threshold: 0.7,
+            trust_threshold: 0.5,
+            temporal_coherence: 0.6,
+            tau_mean: 0.5,
+            tau_trend: 0.0,
+            cognitive_depth: CognitiveDepth::Cortical,
+            unified_psi: 0.4,
+            unified_valence: 0.0,
+            unified_arousal: 0.3,
+            unified_dominance: 0.0,
+            unified_discrete_emotion: Some(UnifiedEmotion::Neutral),
+            emotional_pattern: EmotionalPattern::Stable,
+            emotional_description: String::new(),
+            snapshot_timestamp_nanos: 0,
+            current_flow_duration_secs: None,
+            total_flow_time_secs: 0.0,
+            flow_periods: 0,
+            avg_flow_duration_secs: 0.0,
+            fep_free_energy: 1.0,
+            fep_precision: 0.5,
+            spectral_mip_phi: None,
+            harmonies_alignment: 0.5,
+            empathic_compassion: 0.5,
+            sigma: None,
+            avg_cycle_time_us: 100.0,
+            cycles_per_second: 50.0,
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // compute_consciousness_level
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn consciousness_level_all_zero() {
+        let level = ConsciousnessSnapshot::compute_consciousness_level(0.0, 0.0, 0.0, 0.0);
+        assert_eq!(level, 0.0);
+    }
+
+    #[test]
+    fn consciousness_level_all_one() {
+        let level = ConsciousnessSnapshot::compute_consciousness_level(1.0, 1.0, 1.0, 1.0);
+        // 0.3 + 0.25 + 0.2 + 0.25 = 1.0
+        assert!((level - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn consciousness_level_weighted_correctly() {
+        // Only prediction_confidence = 1.0, rest = 0.0
+        let level = ConsciousnessSnapshot::compute_consciousness_level(1.0, 0.0, 0.0, 0.0);
+        assert!((level - 0.3).abs() < 1e-6);
+
+        // Only temporal_coherence = 1.0
+        let level = ConsciousnessSnapshot::compute_consciousness_level(0.0, 1.0, 0.0, 0.0);
+        assert!((level - 0.25).abs() < 1e-6);
+
+        // Only flow_intensity = 1.0
+        let level = ConsciousnessSnapshot::compute_consciousness_level(0.0, 0.0, 1.0, 0.0);
+        assert!((level - 0.2).abs() < 1e-6);
+
+        // Only pattern_confidence = 1.0
+        let level = ConsciousnessSnapshot::compute_consciousness_level(0.0, 0.0, 0.0, 1.0);
+        assert!((level - 0.25).abs() < 1e-6);
+    }
+
+    #[test]
+    fn consciousness_level_clamped_high() {
+        // Inputs > 1.0 should still clamp result to 1.0
+        let level = ConsciousnessSnapshot::compute_consciousness_level(2.0, 2.0, 2.0, 2.0);
+        assert_eq!(level, 1.0);
+    }
+
+    #[test]
+    fn consciousness_level_clamped_low() {
+        // Negative inputs should clamp result to 0.0
+        let level = ConsciousnessSnapshot::compute_consciousness_level(-1.0, -1.0, -1.0, -1.0);
+        assert_eq!(level, 0.0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // status()
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn status_contains_pattern() {
+        let snap = baseline_snapshot();
+        let status = snap.status();
+        assert!(status.contains("Focused"), "status: {}", status);
+    }
+
+    #[test]
+    fn status_shows_flow_when_in_flow() {
+        let mut snap = baseline_snapshot();
+        snap.in_flow = true;
+        let status = snap.status();
+        assert!(status.contains("FLOW"), "status: {}", status);
+    }
+
+    #[test]
+    fn status_shows_explore_when_exploring() {
+        let mut snap = baseline_snapshot();
+        snap.exploring = true;
+        let status = snap.status();
+        assert!(status.contains("EXPLORE"), "status: {}", status);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // is_optimal()
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn is_optimal_when_assessment_optimal() {
+        let mut snap = baseline_snapshot();
+        snap.self_assessment = SelfAssessment::Optimal;
+        assert!(snap.is_optimal());
+    }
+
+    #[test]
+    fn is_optimal_when_in_flow_with_high_confidence() {
+        let mut snap = baseline_snapshot();
+        snap.in_flow = true;
+        snap.prediction_confidence = 0.8;
+        assert!(snap.is_optimal());
+    }
+
+    #[test]
+    fn not_optimal_in_flow_with_low_confidence() {
+        let mut snap = baseline_snapshot();
+        snap.self_assessment = SelfAssessment::Learning;
+        snap.in_flow = true;
+        snap.prediction_confidence = 0.4;
+        assert!(!snap.is_optimal());
+    }
+
+    #[test]
+    fn not_optimal_baseline() {
+        let snap = baseline_snapshot();
+        assert!(!snap.is_optimal());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // needs_attention()
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn needs_attention_when_struggling() {
+        let mut snap = baseline_snapshot();
+        snap.self_assessment = SelfAssessment::Struggling;
+        assert!(snap.needs_attention());
+    }
+
+    #[test]
+    fn needs_attention_when_stagnating() {
+        let mut snap = baseline_snapshot();
+        snap.self_assessment = SelfAssessment::Stagnating;
+        assert!(snap.needs_attention());
+    }
+
+    #[test]
+    fn needs_attention_when_needs_calibration() {
+        let mut snap = baseline_snapshot();
+        snap.self_assessment = SelfAssessment::NeedsCalibration;
+        assert!(snap.needs_attention());
+    }
+
+    #[test]
+    fn no_attention_needed_when_learning() {
+        let snap = baseline_snapshot();
+        assert!(!snap.needs_attention());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // dominant_concern()
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn dominant_concern_struggling() {
+        let mut snap = baseline_snapshot();
+        snap.self_assessment = SelfAssessment::Struggling;
+        assert_eq!(
+            snap.dominant_concern(),
+            Some("High prediction error - system is struggling")
+        );
+    }
+
+    #[test]
+    fn dominant_concern_stagnating() {
+        let mut snap = baseline_snapshot();
+        snap.self_assessment = SelfAssessment::Stagnating;
+        assert_eq!(
+            snap.dominant_concern(),
+            Some("Low error but no exploration - system is stagnating")
+        );
+    }
+
+    #[test]
+    fn dominant_concern_high_boredom() {
+        let mut snap = baseline_snapshot();
+        snap.boredom = 0.8;
+        snap.exploring = false;
+        assert_eq!(
+            snap.dominant_concern(),
+            Some("High boredom - needs novel input")
+        );
+    }
+
+    #[test]
+    fn dominant_concern_low_confidence() {
+        let mut snap = baseline_snapshot();
+        snap.prediction_confidence = 0.2;
+        assert_eq!(
+            snap.dominant_concern(),
+            Some("Low confidence - predictions unreliable")
+        );
+    }
+
+    #[test]
+    fn dominant_concern_needs_calibration() {
+        let mut snap = baseline_snapshot();
+        snap.self_assessment = SelfAssessment::NeedsCalibration;
+        assert_eq!(
+            snap.dominant_concern(),
+            Some("Many adjustments made - consider manual review")
+        );
+    }
+
+    #[test]
+    fn dominant_concern_none_when_healthy() {
+        let snap = baseline_snapshot();
+        assert!(snap.dominant_concern().is_none());
+    }
+
+    #[test]
+    fn dominant_concern_priority_struggling_over_boredom() {
+        let mut snap = baseline_snapshot();
+        snap.self_assessment = SelfAssessment::Struggling;
+        snap.boredom = 0.9; // also high boredom, but Struggling is checked first
+        assert!(snap.dominant_concern().unwrap().contains("struggling"));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // recommended_actions()
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn recommended_actions_continue_adds_nothing() {
+        let snap = baseline_snapshot();
+        // action_hint=Continue, boredom low, predictions_trustworthy, not in flow
+        let actions = snap.recommended_actions();
+        assert!(
+            actions.is_empty(),
+            "expected empty actions, got: {:?}",
+            actions
+        );
+    }
+
+    #[test]
+    fn recommended_actions_slow_down() {
+        let mut snap = baseline_snapshot();
+        snap.action_hint = ActionHint::SlowDown;
+        let actions = snap.recommended_actions();
+        assert!(actions.contains(&"Reduce input rate"));
+    }
+
+    #[test]
+    fn recommended_actions_speed_up() {
+        let mut snap = baseline_snapshot();
+        snap.action_hint = ActionHint::SpeedUp;
+        let actions = snap.recommended_actions();
+        assert!(actions.contains(&"Can increase input rate"));
+    }
+
+    #[test]
+    fn recommended_actions_boredom_content_variation() {
+        let mut snap = baseline_snapshot();
+        snap.boredom = 0.6;
+        snap.exploring = false;
+        let actions = snap.recommended_actions();
+        assert!(actions.contains(&"Consider varying input content"));
+    }
+
+    #[test]
+    fn recommended_actions_untrustworthy_predictions() {
+        let mut snap = baseline_snapshot();
+        snap.predictions_trustworthy = false;
+        let actions = snap.recommended_actions();
+        assert!(actions.contains(&"Predictions currently unreliable"));
+    }
+
+    #[test]
+    fn recommended_actions_in_flow() {
+        let mut snap = baseline_snapshot();
+        snap.in_flow = true;
+        let actions = snap.recommended_actions();
+        assert!(actions.contains(&"In flow state - optimal for learning"));
+    }
+
+    #[test]
+    fn recommended_actions_multiple_conditions() {
+        let mut snap = baseline_snapshot();
+        snap.action_hint = ActionHint::Explore;
+        snap.boredom = 0.8;
+        snap.predictions_trustworthy = false;
+        snap.in_flow = true;
+        let actions = snap.recommended_actions();
+        assert!(actions.len() >= 4, "expected >= 4 actions, got: {:?}", actions);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Serialization
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn snapshot_serialization_roundtrip() {
+        let snap = baseline_snapshot();
+        let json = serde_json::to_string(&snap).expect("serialize");
+        let deserialized: ConsciousnessSnapshot =
+            serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(deserialized.cycle, snap.cycle);
+        assert_eq!(deserialized.pattern, snap.pattern);
+        assert_eq!(deserialized.self_assessment, snap.self_assessment);
+        assert_eq!(deserialized.in_flow, snap.in_flow);
+    }
+}

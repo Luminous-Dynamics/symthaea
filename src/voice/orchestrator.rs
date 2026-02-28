@@ -32,6 +32,8 @@ use crate::voice::g2p::G2PConverter;
 use crate::voice::vocoder::FormantVocoder;
 use crate::voice::{FormantFrame, LTCPacing, VoiceOutput, VoiceOutputConfig};
 use symthaea_vocal_tract::types::SourceType;
+#[cfg(feature = "vocal-tract")]
+use symthaea_vocal_tract::{VocalTractPipeline, VoiceCognitiveState};
 
 /// Voice pipeline orchestrator.
 ///
@@ -46,6 +48,9 @@ pub struct VoiceOrchestrator {
     vocoder: FormantVocoder,
     /// High-level voice output (simulated TTS or Kokoro)
     voice_output: VoiceOutput,
+    /// LTC-driven vocal tract pipeline (replaces hardcoded formant lookup when active)
+    #[cfg(feature = "vocal-tract")]
+    neural_pipeline: Option<VocalTractPipeline>,
 }
 
 impl VoiceOrchestrator {
@@ -56,6 +61,8 @@ impl VoiceOrchestrator {
             g2p: G2PConverter::new(),
             vocoder: FormantVocoder::new(),
             voice_output: VoiceOutput::new(VoiceOutputConfig::default()),
+            #[cfg(feature = "vocal-tract")]
+            neural_pipeline: None,
         }
     }
 
@@ -66,7 +73,18 @@ impl VoiceOrchestrator {
             g2p: G2PConverter::new(),
             vocoder: FormantVocoder::new(),
             voice_output: VoiceOutput::new(voice_config),
+            #[cfg(feature = "vocal-tract")]
+            neural_pipeline: None,
         }
+    }
+
+    /// Enable the LTC neural vocal tract pipeline.
+    ///
+    /// When active, `thought_to_speech_neural()` uses the trained VocalTractController
+    /// instead of the hardcoded phoneme formant lookup table.
+    #[cfg(feature = "vocal-tract")]
+    pub fn enable_neural_pipeline(&mut self, pipeline: VocalTractPipeline) {
+        self.neural_pipeline = Some(pipeline);
     }
 
     /// Process text through the cognitive voice pipeline.
@@ -176,11 +194,156 @@ impl VoiceOrchestrator {
     pub fn voice_output_mut(&mut self) -> &mut VoiceOutput {
         &mut self.voice_output
     }
+
+    /// Neural vocal tract synthesis: CfC state + text → controller-driven formants → audio.
+    ///
+    /// Uses the trained LTC `VocalTractController` to generate formant trajectories
+    /// from cognitive state, replacing the hardcoded phoneme formant lookup.
+    /// Falls back to `thought_to_speech()` if the neural pipeline isn't enabled.
+    ///
+    /// The controller produces naturally smooth coarticulation transitions (10× smoother
+    /// than the rule-based lookup) via learned temporal dynamics.
+    #[cfg(feature = "vocal-tract")]
+    pub fn thought_to_speech_neural(
+        &mut self,
+        broca_text: &str,
+        cfc_output: &[f32],
+        prediction_error: f32,
+        detected_primitives: Vec<String>,
+        cognitive_state: &VoiceCognitiveState,
+    ) -> Vec<f32> {
+        let pipeline = match self.neural_pipeline.as_mut() {
+            Some(p) => p,
+            None => {
+                // Fall back to hardcoded lookup
+                return self.thought_to_speech(
+                    broca_text,
+                    cfc_output,
+                    prediction_error,
+                    detected_primitives,
+                );
+            }
+        };
+
+        // 1. Update bridge with CfC state
+        self.voice_bridge.update(
+            cfc_output,
+            1.0,
+            prediction_error,
+            HashMap::new(),
+            detected_primitives,
+        );
+
+        // 2. G2P conversion
+        let phoneme_ids = self.g2p.text_to_phonemes(broca_text);
+        if phoneme_ids.is_empty() {
+            return Vec::new();
+        }
+
+        // 3. Convert phoneme IDs to names for the pipeline
+        let pacing = self.voice_bridge.get_ltc_pacing();
+        let base_dt = 0.005_f32; // 200Hz motor frame rate
+        let base_phoneme_duration = 0.08 / pacing.rate.max(0.1);
+        let frames_per_phoneme = (base_phoneme_duration / base_dt).round().max(1.0) as usize;
+
+        // 4. Generate formant frames via neural controller
+        let mut frames = Vec::with_capacity(phoneme_ids.len() * frames_per_phoneme);
+
+        for &id in &phoneme_ids {
+            // Skip stress markers
+            let (_, _, _, _, source_type) = phoneme_formants(id);
+            if source_type == SourceType::Silent && id != 0 {
+                continue;
+            }
+            if id == 0 {
+                // Pause — skip neural processing
+                let pause_frames = (pacing.phrase_pause / base_dt).round().max(1.0) as usize;
+                for _ in 0..pause_frames {
+                    frames.push(FormantFrame::default());
+                }
+                continue;
+            }
+
+            let phoneme_name = phoneme_id_to_name(id);
+            for _ in 0..frames_per_phoneme {
+                let frame = pipeline.tick_phoneme(
+                    cognitive_state,
+                    None,
+                    base_dt,
+                    Some(phoneme_name),
+                );
+                frames.push(frame);
+            }
+        }
+
+        if frames.is_empty() {
+            return Vec::new();
+        }
+
+        // 5. Vocoder synthesis
+        self.vocoder.synthesize(&frames)
+    }
 }
 
 impl Default for VoiceOrchestrator {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHONEME ID-TO-ARPABET MAPPING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Map a Misaki phoneme ID to its ARPABET name for the VocalTractPipeline.
+///
+/// The pipeline's `tick_phoneme()` expects ARPABET strings (e.g., "IY", "AH").
+/// This maps the numeric IDs from G2P output to those names.
+#[cfg(feature = "vocal-tract")]
+fn phoneme_id_to_name(id: u32) -> &'static str {
+    match id {
+        0 => "EY",  // FACE
+        1 => "AY",  // PRICE
+        2 => "AW",  // MOUTH
+        3 => "OY",  // CHOICE
+        4 => "OW",  // GOAT
+        5 => "B",
+        6 => "D",
+        7 => "F",
+        8 => "HH",
+        10 => "Y",  // j/y glide
+        11 => "K",
+        12 => "L",
+        13 => "M",
+        14 => "N",
+        15 => "P",
+        16 => "AA", // PALM (ɑ)
+        17 => "AO", // THOUGHT (ɔ)
+        18 => "AX", // schwa (ə)
+        19 => "EH", // DRESS (ɛ)
+        20 => "ER", // NURSE (ɜ)
+        21 => "IH", // KIT (ɪ)
+        22 => "UH", // FOOT (ʊ)
+        23 => "AH", // STRUT (ʌ)
+        24 => "IY", // FLEECE (i)
+        25 => "UW", // GOOSE (u)
+        26 => "R",
+        27 => "R",  // flap (ɾ) → closest ARPABET
+        28 => "IH", // unstressed KIT (ᵻ)
+        29 => "S",
+        30 => "V",
+        31 => "W",
+        32 => "SH",
+        33 => "ZH",
+        34 => "JH", // ʤ
+        35 => "CH", // ʧ
+        38 => "TH", // θ (voiceless)
+        39 => "DH", // ð (voiced)
+        40 => "NG",
+        41 => "G",
+        42 => "AX", // optional schwa (ᵊ)
+        43 => "AE", // TRAP (æ)
+        _ => "AX",  // fallback: schwa
     }
 }
 

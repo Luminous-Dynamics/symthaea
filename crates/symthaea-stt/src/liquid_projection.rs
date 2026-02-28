@@ -923,4 +923,359 @@ mod tests {
         assert_eq!(weights.len(), 2); // output_dim
         assert_eq!(weights[0].len(), 4); // input_dim
     }
+
+    #[test]
+    fn test_liquid_projection_config_default() {
+        let config = LiquidProjectionConfig::default();
+        assert_eq!(config.reservoir_size, 256);
+        assert!((config.ridge_lambda - 0.01).abs() < 1e-6);
+        assert!((config.frame_duration - 0.010).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_phoneme_targets_deterministic() {
+        let phonemes = vec!["AA".to_string(), "IY".to_string()];
+        let targets1 = PhonemeTargets::new(&phonemes);
+        let targets2 = PhonemeTargets::new(&phonemes);
+
+        // Same index should produce same HV
+        let aa1 = targets1.get("AA").unwrap();
+        let aa2 = targets2.get("AA").unwrap();
+        assert_eq!(aa1.words, aa2.words, "PhonemeTargets should be deterministic");
+    }
+
+    #[test]
+    fn test_phoneme_targets_empty() {
+        let targets = PhonemeTargets::new(&[]);
+        assert!(targets.is_empty());
+        assert_eq!(targets.len(), 0);
+        assert!(targets.get("AA").is_none());
+    }
+
+    #[test]
+    fn test_readout_matrix_new_is_zeros() {
+        let readout = ReadoutMatrix::new(4, 3);
+        assert_eq!(readout.output_dim, 3);
+        assert_eq!(readout.input_dim, 4);
+
+        // All weights should be zero
+        for row in &readout.weights {
+            for &w in row {
+                assert_eq!(w, 0.0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_readout_project_zero_weights() {
+        let readout = ReadoutMatrix::new(4, 3);
+        let state = vec![1.0, 2.0, 3.0, 4.0];
+        let output = readout.project(&state);
+
+        assert_eq!(output.len(), 3);
+        for &val in &output {
+            assert_eq!(val, 0.0, "zero weights should produce zero output");
+        }
+    }
+
+    #[test]
+    fn test_readout_project_identity_like() {
+        let mut readout = ReadoutMatrix::new(3, 3);
+        // Set up identity-like weights
+        readout.weights[0][0] = 1.0;
+        readout.weights[1][1] = 1.0;
+        readout.weights[2][2] = 1.0;
+
+        let state = vec![2.0, 3.0, 5.0];
+        let output = readout.project(&state);
+
+        assert!((output[0] - 2.0).abs() < 1e-6);
+        assert!((output[1] - 3.0).abs() < 1e-6);
+        assert!((output[2] - 5.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_readout_to_hv_positive_values() {
+        let mut readout = ReadoutMatrix::new(2, crate::hdc::HDC_DIM);
+        // Set all weights to positive so output is positive -> bits set to 1
+        for row in &mut readout.weights {
+            for w in row.iter_mut() {
+                *w = 1.0;
+            }
+        }
+
+        let state = vec![1.0, 1.0];
+        let hv = readout.to_hv(&state);
+
+        // All output values are positive, so all bits should be set
+        let popcount: u32 = hv.words.iter().map(|w| w.count_ones()).sum();
+        assert_eq!(popcount as usize, crate::hdc::HDC_DIM);
+    }
+
+    #[test]
+    fn test_ridge_accumulator_sample_count() {
+        let mut acc = RidgeAccumulator::new(3, 2);
+        assert_eq!(acc.n_samples(), 0);
+
+        acc.add(&[1.0, 0.0, 0.0], &[1.0, 0.0]);
+        assert_eq!(acc.n_samples(), 1);
+
+        acc.add(&[0.0, 1.0, 0.0], &[0.0, 1.0]);
+        assert_eq!(acc.n_samples(), 2);
+    }
+
+    #[test]
+    fn test_ridge_solve_identity_mapping() {
+        // Train a system where x[0] -> y[0], x[1] -> y[1]
+        let mut acc = RidgeAccumulator::new(2, 2);
+
+        for _ in 0..10 {
+            acc.add(&[1.0, 0.0], &[1.0, 0.0]);
+            acc.add(&[0.0, 1.0], &[0.0, 1.0]);
+        }
+
+        let weights = acc.solve(0.001);
+        assert_eq!(weights.len(), 2);
+
+        // Weight matrix should approximate identity
+        // weights[0] should be close to [1, 0] and weights[1] close to [0, 1]
+        assert!(weights[0][0] > 0.9, "w[0][0] = {}", weights[0][0]);
+        assert!(weights[0][1].abs() < 0.1, "w[0][1] = {}", weights[0][1]);
+        assert!(weights[1][0].abs() < 0.1, "w[1][0] = {}", weights[1][0]);
+        assert!(weights[1][1] > 0.9, "w[1][1] = {}", weights[1][1]);
+    }
+
+    #[test]
+    fn test_direct_classifier_config_default() {
+        let config = DirectClassifierConfig::default();
+        assert_eq!(config.reservoir_size, 1024);
+        assert_eq!(config.context_frames, 7);
+        assert!((config.ridge_lambda - 0.01).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_direct_classifier_new() {
+        let phonemes = vec!["AA".to_string(), "IY".to_string(), "SIL".to_string()];
+        let config = DirectClassifierConfig {
+            reservoir_size: 4,
+            ..Default::default()
+        };
+        let classifier = DirectClassifier::new(&phonemes, config);
+
+        assert_eq!(classifier.phonemes.len(), 3);
+        assert_eq!(classifier.weights.len(), 3); // n_phonemes
+        assert_eq!(classifier.weights[0].len(), 4); // reservoir_size
+        assert_eq!(classifier.bias.len(), 3);
+    }
+
+    #[test]
+    fn test_direct_classifier_phoneme_index() {
+        let phonemes = vec!["AA".to_string(), "IY".to_string(), "SIL".to_string()];
+        let config = DirectClassifierConfig {
+            reservoir_size: 4,
+            ..Default::default()
+        };
+        let classifier = DirectClassifier::new(&phonemes, config);
+
+        assert_eq!(classifier.phoneme_index("AA"), Some(0));
+        assert_eq!(classifier.phoneme_index("IY"), Some(1));
+        assert_eq!(classifier.phoneme_index("SIL"), Some(2));
+        assert_eq!(classifier.phoneme_index("NOPE"), None);
+    }
+
+    #[test]
+    fn test_direct_classifier_compute_logits() {
+        let phonemes = vec!["AA".to_string(), "IY".to_string()];
+        let config = DirectClassifierConfig {
+            reservoir_size: 3,
+            ..Default::default()
+        };
+        let mut classifier = DirectClassifier::new(&phonemes, config);
+
+        // Set weights so AA responds to dim 0, IY to dim 1
+        classifier.weights[0] = vec![1.0, 0.0, 0.0];
+        classifier.weights[1] = vec![0.0, 1.0, 0.0];
+
+        let logits = classifier.compute_logits(&[5.0, 3.0, 0.0]);
+        assert!((logits[0] - 5.0).abs() < 1e-6, "AA logit = {}", logits[0]);
+        assert!((logits[1] - 3.0).abs() < 1e-6, "IY logit = {}", logits[1]);
+    }
+
+    #[test]
+    fn test_direct_classifier_decode() {
+        let phonemes = vec!["AA".to_string(), "IY".to_string()];
+        let config = DirectClassifierConfig {
+            reservoir_size: 3,
+            ..Default::default()
+        };
+        let mut classifier = DirectClassifier::new(&phonemes, config);
+
+        classifier.weights[0] = vec![1.0, 0.0, 0.0];
+        classifier.weights[1] = vec![0.0, 1.0, 0.0];
+
+        let (label, conf) = classifier.decode(&[5.0, 3.0, 0.0]);
+        assert_eq!(label, "AA");
+        assert!(conf > 0.0 && conf <= 1.0, "confidence = {conf}");
+    }
+
+    #[test]
+    fn test_direct_classifier_normalize_weights() {
+        let phonemes = vec!["AA".to_string()];
+        let config = DirectClassifierConfig {
+            reservoir_size: 2,
+            ..Default::default()
+        };
+        let mut classifier = DirectClassifier::new(&phonemes, config);
+        classifier.weights[0] = vec![3.0, 4.0]; // norm = 5
+
+        classifier.normalize_weights();
+
+        let norm: f32 = classifier.weights[0]
+            .iter()
+            .map(|w| w * w)
+            .sum::<f32>()
+            .sqrt();
+        assert!(
+            (norm - 1.0).abs() < 1e-5,
+            "normalized norm should be 1.0, got {norm}"
+        );
+    }
+
+    #[test]
+    fn test_direct_classifier_set_log_priors() {
+        let phonemes = vec!["AA".to_string(), "IY".to_string()];
+        let config = DirectClassifierConfig {
+            reservoir_size: 2,
+            ..Default::default()
+        };
+        let mut classifier = DirectClassifier::new(&phonemes, config);
+
+        classifier.set_log_priors(&[100, 100], 1.0);
+        // Equal counts -> equal log priors
+        assert!(
+            (classifier.log_priors[0] - classifier.log_priors[1]).abs() < 1e-6,
+            "equal counts should give equal priors"
+        );
+
+        classifier.set_log_priors(&[90, 10], 1.0);
+        // More AA should give higher log prior for AA
+        assert!(
+            classifier.log_priors[0] > classifier.log_priors[1],
+            "AA (90 count) should have higher log prior than IY (10 count)"
+        );
+    }
+
+    #[test]
+    fn test_direct_accumulator_add_and_solve() {
+        let mut acc = DirectAccumulator::new(3, 2);
+        assert_eq!(acc.n_samples, 0);
+
+        // Train: state [1,0,0] -> class 0, state [0,1,0] -> class 1
+        for _ in 0..10 {
+            acc.add(&[1.0, 0.0, 0.0], 0);
+            acc.add(&[0.0, 1.0, 0.0], 1);
+        }
+
+        assert_eq!(acc.n_samples, 20);
+        assert_eq!(acc.class_counts()[0], 10);
+        assert_eq!(acc.class_counts()[1], 10);
+
+        let weights = acc.solve(0.01);
+        assert_eq!(weights.len(), 2); // n_classes
+        assert_eq!(weights[0].len(), 3); // input_dim
+    }
+
+    #[test]
+    fn test_direct_accumulator_ignores_invalid_class() {
+        let mut acc = DirectAccumulator::new(2, 2);
+        acc.add(&[1.0, 0.0], 5); // class 5 is out of range
+        assert_eq!(acc.n_samples, 0); // Should not be counted
+    }
+
+    #[test]
+    fn test_random_projection_deterministic() {
+        let rp1 = RandomProjection::new(10, 5, 42);
+        let rp2 = RandomProjection::new(10, 5, 42);
+
+        // Same seed should produce same weights
+        for i in 0..5 {
+            for j in 0..10 {
+                assert_eq!(
+                    rp1.weights[i][j], rp2.weights[i][j],
+                    "weights differ at [{i}][{j}]"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_random_projection_forward_tanh() {
+        let rp = RandomProjection::new(3, 2, 42);
+        let output = rp.forward(&[1.0, 0.0, -1.0]);
+
+        assert_eq!(output.len(), 2);
+        // Tanh output should be in [-1, 1]
+        for &v in &output {
+            assert!(
+                v >= -1.0 && v <= 1.0,
+                "tanh output out of range: {v}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_random_projection_forward_relu() {
+        let rp = RandomProjection::with_activation(3, 2, 42, RFActivation::ReLU);
+        let output = rp.forward(&[1.0, 0.0, -1.0]);
+
+        assert_eq!(output.len(), 2);
+        // ReLU output should be >= 0
+        for &v in &output {
+            assert!(v >= 0.0, "ReLU output should be non-negative: {v}");
+        }
+    }
+
+    #[test]
+    fn test_random_projection_different_seeds() {
+        let rp1 = RandomProjection::new(5, 3, 1);
+        let rp2 = RandomProjection::new(5, 3, 2);
+
+        // Different seeds should produce different weights
+        let different = rp1
+            .weights
+            .iter()
+            .zip(rp2.weights.iter())
+            .any(|(r1, r2)| r1.iter().zip(r2.iter()).any(|(a, b)| (a - b).abs() > 1e-10));
+        assert!(different, "different seeds should produce different weights");
+    }
+
+    #[test]
+    fn test_liquid_projection_new() {
+        let phonemes = vec!["AA".to_string(), "IY".to_string()];
+        let config = LiquidProjectionConfig {
+            reservoir_size: 16,
+            ..Default::default()
+        };
+        let lp = LiquidProjection::new(&phonemes, config);
+
+        assert_eq!(lp.targets.len(), 2);
+        assert!(lp.targets.get("AA").is_some());
+        assert!(lp.targets.get("IY").is_some());
+    }
+
+    #[test]
+    fn test_liquid_projection_encode_decode_roundtrip() {
+        let phonemes = vec!["AA".to_string(), "IY".to_string()];
+        let config = LiquidProjectionConfig {
+            reservoir_size: 4,
+            ..Default::default()
+        };
+        let lp = LiquidProjection::new(&phonemes, config);
+
+        // With zero readout weights, encode should produce zero HV
+        let state = vec![1.0, 2.0, 3.0, 4.0];
+        let hv = lp.encode(&state);
+        let popcount: u32 = hv.words.iter().map(|w| w.count_ones()).sum();
+        assert_eq!(popcount, 0, "zero readout should produce zero HV");
+    }
 }

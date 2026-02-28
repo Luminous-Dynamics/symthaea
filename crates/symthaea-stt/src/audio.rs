@@ -920,4 +920,210 @@ mod tests {
             prosody.pitch
         );
     }
+
+    #[test]
+    fn test_audio_config_default() {
+        let config = AudioConfig::default();
+        assert_eq!(config.sample_rate, 16000);
+        assert!((config.frame_duration - 0.025).abs() < 1e-6);
+        assert!((config.hop_duration - 0.010).abs() < 1e-6);
+        assert_eq!(config.n_mels, 40);
+        assert_eq!(config.n_fft, 512);
+    }
+
+    #[test]
+    fn test_hann_window_symmetry() {
+        let size = 64;
+        let window = AudioFrontend::hann_window(size);
+        assert_eq!(window.len(), size);
+
+        // Hann window should be symmetric
+        for i in 0..size / 2 {
+            let diff = (window[i] - window[size - 1 - i]).abs();
+            assert!(diff < 1e-5, "window not symmetric at index {i}");
+        }
+    }
+
+    #[test]
+    fn test_hann_window_endpoints() {
+        let window = AudioFrontend::hann_window(50);
+        // Endpoints should be near zero
+        assert!(window[0].abs() < 0.01, "start = {}", window[0]);
+        assert!(
+            window[49].abs() < 0.01,
+            "end = {}",
+            window[49]
+        );
+    }
+
+    #[test]
+    fn test_hann_window_peak() {
+        let window = AudioFrontend::hann_window(101);
+        // Center should be near 1.0
+        assert!(
+            (window[50] - 1.0).abs() < 0.01,
+            "center = {}",
+            window[50]
+        );
+    }
+
+    #[test]
+    fn test_mel_filterbank_properties() {
+        let config = AudioConfig::default();
+        let filters = AudioFrontend::create_mel_filterbank(&config);
+
+        assert_eq!(filters.len(), config.n_mels);
+
+        // Each filter should have non-negative values
+        for (i, filter) in filters.iter().enumerate() {
+            for &val in filter {
+                assert!(
+                    val >= 0.0,
+                    "filter {i} has negative value: {val}"
+                );
+            }
+        }
+
+        // Each filter should have at least some non-zero values
+        for (i, filter) in filters.iter().enumerate() {
+            let sum: f32 = filter.iter().sum();
+            assert!(sum > 0.0, "filter {i} is all zeros");
+        }
+    }
+
+    #[test]
+    fn test_mel_filterbank_triangular() {
+        let config = AudioConfig {
+            n_mels: 10,
+            n_fft: 256,
+            ..Default::default()
+        };
+        let filters = AudioFrontend::create_mel_filterbank(&config);
+
+        // Each filter peak should be <= 1.0 (triangular)
+        for (i, filter) in filters.iter().enumerate() {
+            let max: f32 = filter.iter().cloned().fold(0.0f32, f32::max);
+            assert!(
+                max <= 1.0 + 1e-6,
+                "filter {i} peak exceeds 1.0: {max}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_compute_deltas_constant_signal() {
+        // Constant features should produce zero deltas
+        let features = vec![vec![1.0, 2.0, 3.0]; 10];
+        let deltas = AudioFrontend::compute_deltas(&features, 2);
+
+        assert_eq!(deltas.len(), 10);
+        for frame in &deltas {
+            for &val in frame {
+                assert!(val.abs() < 1e-6, "constant signal should have zero deltas");
+            }
+        }
+    }
+
+    #[test]
+    fn test_compute_deltas_linear_ramp() {
+        // Linear ramp: feature[t] = t
+        let features: Vec<Vec<f32>> = (0..10)
+            .map(|t| vec![t as f32])
+            .collect();
+        let deltas = AudioFrontend::compute_deltas(&features, 2);
+
+        assert_eq!(deltas.len(), 10);
+        // Interior frames should have positive delta (increasing signal)
+        for t in 2..8 {
+            assert!(
+                deltas[t][0] > 0.0,
+                "delta at t={t} should be positive for linear ramp, got {}",
+                deltas[t][0]
+            );
+        }
+    }
+
+    #[test]
+    fn test_extract_features_produces_correct_dims() {
+        let config = AudioConfig::default();
+        let mut frontend = AudioFrontend::new(config);
+
+        // Create 0.5 seconds of audio
+        let sample_rate = 16000;
+        let audio: Vec<f32> = (0..sample_rate / 2)
+            .map(|i| (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
+            .collect();
+
+        let features = frontend.extract_features(&audio);
+
+        assert!(!features.is_empty(), "should produce at least one frame");
+        // Each frame should have n_mels dimensions
+        for frame in &features {
+            assert_eq!(frame.len(), 40, "each frame should have 40 mel features");
+        }
+    }
+
+    #[test]
+    fn test_extract_features_with_deltas_dims() {
+        let config = AudioConfig::default();
+        let mut frontend = AudioFrontend::new(config);
+
+        let sample_rate = 16000;
+        let audio: Vec<f32> = (0..sample_rate / 2)
+            .map(|i| (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
+            .collect();
+
+        let features = frontend.extract_features_with_deltas(&audio);
+
+        assert!(!features.is_empty());
+        // Each frame should have n_mels * 3 dimensions (mel + delta + delta-delta)
+        for frame in &features {
+            assert_eq!(
+                frame.len(),
+                120,
+                "each frame should have 120 features (40 mel * 3)"
+            );
+        }
+    }
+
+    #[test]
+    fn test_prosody_silence() {
+        let audio = vec![0.0; 1600];
+        let prosody = ProsodyFeatures::extract(&audio, 16000);
+
+        assert!(prosody.energy.abs() < 1e-6, "silence energy should be 0");
+        assert!(prosody.pitch.abs() < 1e-6, "silence pitch should be 0");
+    }
+
+    #[test]
+    fn test_prosody_default() {
+        let prosody = ProsodyFeatures::default();
+        assert_eq!(prosody.pitch, 0.0);
+        assert_eq!(prosody.energy, 0.0);
+        assert_eq!(prosody.rate, 0.0);
+    }
+
+    #[test]
+    fn test_audio_projector_empty_input() {
+        let mut projector = AudioProjector::default_config();
+        let hvs = projector.project(&[]);
+        assert!(hvs.is_empty(), "empty audio should produce no HVs");
+    }
+
+    #[test]
+    fn test_audio_projector_with_salience() {
+        let mut projector = AudioProjector::default_config();
+
+        let sample_rate = 16000;
+        let audio: Vec<f32> = (0..sample_rate)
+            .map(|i| (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
+            .collect();
+
+        let (hvs, saliences) = projector.project_with_salience(&audio);
+
+        assert_eq!(hvs.len(), saliences.len());
+        assert!(!hvs.is_empty());
+        // First salience should be 0.0 (no previous frame)
+        assert!(saliences[0].abs() < 1e-6, "first salience should be 0");
+    }
 }

@@ -161,7 +161,19 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("UltimatumGame") => Some(("fairness_sensitivity", &bl.social)),
         name if name.contains("SocialNorm") => Some(("norm_d_prime", &bl.social)),
 
-        // Reasoning (ARC)
+        // Reasoning (ARC) — variant-specific baselines
+        name if name.contains("ArcCompositional") => {
+            Some(("arc_compositional_accuracy", &bl.reasoning))
+        }
+        name if name.contains("ArcAnalogy") => Some(("arc_analogy_accuracy", &bl.reasoning)),
+        name if name.contains("ArcAbductive") => Some(("arc_abduction_accuracy", &bl.reasoning)),
+        name if name.contains("ArcChain") => Some(("arc_chain_accuracy", &bl.reasoning)),
+        name if name.contains("ArcNoise") => Some(("arc_noise_resilience", &bl.reasoning)),
+        name if name.contains("ArcFewShot") => Some(("arc_accuracy_1shot", &bl.reasoning)),
+        name if name.contains("ArcScaling") => Some(("arc_grid_3x3_accuracy", &bl.reasoning)),
+        name if name.contains("ArcRSA") => Some(("arc_rsa_correlation", &bl.reasoning)),
+        name if name.contains("ArcAlgebra") => Some(("arc_algebra_score", &bl.reasoning)),
+        name if name.contains("ArcStaircase") => Some(("arc_capacity_threshold", &bl.reasoning)),
         name if name.contains("Arc") => Some(("arc_transfer_accuracy", &bl.reasoning)),
 
         // Memory Agent

@@ -61,6 +61,38 @@ pub struct Transmitter {
     /// Remaining rebound sensitization cycles after withdrawal from sustained high.
     #[serde(default)]
     pub withdrawal_cycles: u32,
+    // ── Per-transmitter tolerance/withdrawal curves (Koob & Le Moal 2001) ──
+    /// Cycles of high exposure before tolerance onset (default 20).
+    #[serde(default = "default_tolerance_onset")]
+    pub tolerance_onset_cycles: u32,
+    /// Receptor sensitivity decay rate during tolerance (default 0.99).
+    #[serde(default = "default_tolerance_decay")]
+    pub tolerance_decay_rate: f32,
+    /// Withdrawal rebound duration in cycles (default 30).
+    #[serde(default = "default_withdrawal_duration")]
+    pub withdrawal_duration: u32,
+    /// Withdrawal sensitization rate (default 1.01).
+    #[serde(default = "default_withdrawal_recovery")]
+    pub withdrawal_recovery_rate: f32,
+    /// High-exposure threshold offset above baseline (default 0.2).
+    #[serde(default = "default_tolerance_threshold")]
+    pub tolerance_threshold: f32,
+}
+
+fn default_tolerance_onset() -> u32 {
+    20
+}
+fn default_tolerance_decay() -> f32 {
+    0.99
+}
+fn default_withdrawal_duration() -> u32 {
+    30
+}
+fn default_withdrawal_recovery() -> f32 {
+    1.01
+}
+fn default_tolerance_threshold() -> f32 {
+    0.2
 }
 
 impl Default for Transmitter {
@@ -74,6 +106,11 @@ impl Default for Transmitter {
             phasic_decay: 0.3,
             high_exposure_cycles: 0,
             withdrawal_cycles: 0,
+            tolerance_onset_cycles: 20,
+            tolerance_decay_rate: 0.99,
+            withdrawal_duration: 30,
+            withdrawal_recovery_rate: 1.01,
+            tolerance_threshold: 0.2,
         }
     }
 }
@@ -144,31 +181,33 @@ impl Transmitter {
         }
         // ── Fast tachyphylaxis (Gainetdinov et al. 2004) ─────────────────
         // Rapid GPCR desensitization via phosphorylation under sustained high exposure.
-        // 10× faster than slow adaptation above. Triggers withdrawal rebound on cessation.
-        let high_thresh = self.baseline + 0.2;
+        // Per-transmitter curves: Koob & Le Moal (2001) — allostatic addiction model.
+        let high_thresh = self.baseline + self.tolerance_threshold;
         if self.level > high_thresh {
             self.high_exposure_cycles = self.high_exposure_cycles.saturating_add(1);
-            if self.high_exposure_cycles > 20 {
-                self.receptor_sensitivity *= 0.99; // 10× faster than slow adaptation
+            if self.high_exposure_cycles > self.tolerance_onset_cycles {
+                self.receptor_sensitivity *= self.tolerance_decay_rate;
             }
         } else {
-            if self.high_exposure_cycles > 20 && self.level < self.baseline {
-                self.withdrawal_cycles = 30; // rebound sensitization
+            if self.high_exposure_cycles > self.tolerance_onset_cycles
+                && self.level < self.baseline
+            {
+                self.withdrawal_cycles = self.withdrawal_duration;
             }
             self.high_exposure_cycles = 0;
         }
         if self.withdrawal_cycles > 0 {
-            self.receptor_sensitivity *= 1.01;
+            self.receptor_sensitivity *= self.withdrawal_recovery_rate;
             self.withdrawal_cycles -= 1;
         }
         self.receptor_sensitivity = self.receptor_sensitivity.clamp(0.5, 2.0);
     }
 
-    /// Whether receptor is in tolerance state (sustained high exposure >20 cycles).
+    /// Whether receptor is in tolerance state (sustained high exposure > onset threshold).
     /// Science: Gainetdinov et al. (2004) — GPCR desensitization.
     #[inline]
     pub fn is_tolerant(&self) -> bool {
-        self.high_exposure_cycles > 20
+        self.high_exposure_cycles > self.tolerance_onset_cycles
     }
 
     /// Whether transmitter is in withdrawal rebound (sensitization after high-exposure drop).
@@ -358,19 +397,50 @@ pub struct NeuromodulatorBath {
     pub active_injections: Vec<ActiveInjection>,
     /// Learnable cross-modulation weights (Hebbian-adaptive, replaces hardcoded rules).
     pub cross_mod: CrossModulationMatrix,
+    /// Endocannabinoid: retrograde inhibitor, stress buffer, pain modulation.
+    /// Science: Piomelli (2003) — retrograde endocannabinoid signaling;
+    /// Wilson & Nicoll (2002) — DSI/DSE.
+    pub endocannabinoid: Transmitter,
     /// DA receptor subtypes: D1 (excitatory/Go) vs D2 (inhibitory/NoGo).
     pub da_subtypes: ReceptorSubtypes,
     /// NE receptor subtypes: Alpha (tonic precision) vs Beta (phasic reactivity).
     pub ne_subtypes: ReceptorSubtypes,
+    /// 5-HT receptor subtypes: 1A (inhibitory/anxiolytic) vs 2A (excitatory/hallucinogenic).
+    /// Science: Carhart-Harris & Nutt (2017) — 5-HT2A psychedelic consciousness.
+    pub sht_subtypes: ReceptorSubtypes,
+    /// GABA receptor subtypes: A (fast ionotropic/sedation) vs B (slow metabotropic/muscle relaxation).
+    /// Science: Möhler (2006) — GABA-A/B receptor pharmacology.
+    pub gaba_subtypes: ReceptorSubtypes,
 }
 
 impl Default for NeuromodulatorBath {
     fn default() -> Self {
         Self {
-            dopamine: Transmitter::default(),
-            noradrenaline: Transmitter::default(),
-            serotonin: Transmitter::default(),
-            acetylcholine: Transmitter::default(),
+            dopamine: Transmitter {
+                tolerance_onset_cycles: 15,
+                tolerance_decay_rate: 0.985,
+                withdrawal_duration: 40,
+                withdrawal_recovery_rate: 1.015,
+                tolerance_threshold: 0.2,
+                ..Transmitter::default()
+            },
+            noradrenaline: Transmitter {
+                tolerance_onset_cycles: 25,
+                tolerance_decay_rate: 0.992,
+                withdrawal_duration: 20,
+                withdrawal_recovery_rate: 1.008,
+                tolerance_threshold: 0.25,
+                ..Transmitter::default()
+            },
+            serotonin: Transmitter {
+                tolerance_onset_cycles: 30,
+                tolerance_decay_rate: 0.995,
+                withdrawal_duration: 50,
+                withdrawal_recovery_rate: 1.005,
+                tolerance_threshold: 0.15,
+                ..Transmitter::default()
+            },
+            acetylcholine: Transmitter::default(), // 20/0.99/30/1.01/0.2
             gaba: Transmitter {
                 level: 0.4,
                 receptor_sensitivity: 1.0,
@@ -380,6 +450,11 @@ impl Default for NeuromodulatorBath {
                 phasic_decay: 0.2,
                 high_exposure_cycles: 0,
                 withdrawal_cycles: 0,
+                tolerance_onset_cycles: 10,
+                tolerance_decay_rate: 0.980,
+                withdrawal_duration: 25,
+                withdrawal_recovery_rate: 1.020,
+                tolerance_threshold: 0.15,
             },
             oxytocin: Transmitter {
                 level: 0.3,
@@ -390,6 +465,11 @@ impl Default for NeuromodulatorBath {
                 phasic_decay: 0.15,
                 high_exposure_cycles: 0,
                 withdrawal_cycles: 0,
+                tolerance_onset_cycles: 35,
+                tolerance_decay_rate: 0.997,
+                withdrawal_duration: 15,
+                withdrawal_recovery_rate: 1.003,
+                tolerance_threshold: 0.2,
             },
             glutamate: Transmitter {
                 level: 0.3,
@@ -400,6 +480,11 @@ impl Default for NeuromodulatorBath {
                 phasic_decay: 0.25,
                 high_exposure_cycles: 0,
                 withdrawal_cycles: 0,
+                tolerance_onset_cycles: 12,
+                tolerance_decay_rate: 0.985,
+                withdrawal_duration: 20,
+                withdrawal_recovery_rate: 1.015,
+                tolerance_threshold: 0.15,
             },
             glutamate_high_cycles: 0,
             adenosine: Transmitter {
@@ -411,6 +496,26 @@ impl Default for NeuromodulatorBath {
                 phasic_decay: 0.1,
                 high_exposure_cycles: 0,
                 withdrawal_cycles: 0,
+                tolerance_onset_cycles: 40,
+                tolerance_decay_rate: 0.998,
+                withdrawal_duration: 10,
+                withdrawal_recovery_rate: 1.002,
+                tolerance_threshold: 0.1,
+            },
+            endocannabinoid: Transmitter {
+                level: 0.3,
+                receptor_sensitivity: 1.0,
+                reuptake_rate: 0.04,
+                baseline: 0.3,
+                phasic: 0.0,
+                phasic_decay: 0.1,
+                high_exposure_cycles: 0,
+                withdrawal_cycles: 0,
+                tolerance_onset_cycles: 50,
+                tolerance_decay_rate: 0.999,
+                withdrawal_duration: 60,
+                withdrawal_recovery_rate: 1.001,
+                tolerance_threshold: 0.2,
             },
             allostatic_load: 0.0,
             allostatic_recovery_cycles: 0,
@@ -421,6 +526,8 @@ impl Default for NeuromodulatorBath {
             cross_mod: CrossModulationMatrix::default(),
             da_subtypes: ReceptorSubtypes::default(),
             ne_subtypes: ReceptorSubtypes::default(),
+            sht_subtypes: ReceptorSubtypes::default(),
+            gaba_subtypes: ReceptorSubtypes::default(),
         }
     }
 }
@@ -574,6 +681,51 @@ impl NeuromodulatorBath {
         let adenosine_production = inputs.prediction_error * inputs.arousal * 0.04;
         self.adenosine.produce(adenosine_production);
         self.adenosine.reuptake();
+
+        // ── ENDOCANNABINOID: Retrograde inhibitor (Piomelli 2003) ───
+        // Production from glutamate excess + stress buffer
+        let ecb_production = self.glutamate.effective().max(0.3) * 0.03
+            + if self.allostatic_load > 0.3 { 0.02 } else { 0.0 };
+        self.endocannabinoid.produce(ecb_production);
+        self.endocannabinoid.reuptake();
+        // CB1 dampening: high ECB reduces glutamate release (retrograde inhibition)
+        // Wilson & Nicoll (2002) — DSE (depolarization-induced suppression of excitation)
+        if self.endocannabinoid.effective() > 0.5 {
+            self.glutamate.level *= 0.97;
+        }
+
+        // ── 5-HT RECEPTOR SUBTYPE DYNAMICS (Carhart-Harris & Nutt 2017) ──
+        // 5-HT1A: high serotonin → anxiolytic suppression (Blier & de Montigny 1994)
+        // 5-HT2A: amplifies consciousness/perceptual richness → feeds ConsciousnessEngine (#4)
+        // Adaptation: high serotonin → 1A down-regulates, 2A up-regulates
+        let sht_eff = self.serotonin.effective();
+        if sht_eff > 0.6 {
+            self.sht_subtypes.excitatory =
+                (self.sht_subtypes.excitatory * 0.999).max(0.5); // 1A tolerance
+            self.sht_subtypes.inhibitory =
+                (self.sht_subtypes.inhibitory * 1.001).min(2.0); // 2A sensitization
+        } else if sht_eff < 0.3 {
+            self.sht_subtypes.excitatory =
+                (self.sht_subtypes.excitatory * 1.001).min(2.0); // 1A up
+            self.sht_subtypes.inhibitory =
+                (self.sht_subtypes.inhibitory * 0.999).max(0.5); // 2A down
+        }
+
+        // ── GABA RECEPTOR SUBTYPE DYNAMICS (Möhler 2006) ──────────────
+        // GABA-A: fast ionotropic, desensitizes faster (benzodiazepine tolerance model)
+        // GABA-B: slow metabotropic, more stable
+        let gaba_eff = self.gaba.effective();
+        if gaba_eff > 0.6 {
+            self.gaba_subtypes.excitatory =
+                (self.gaba_subtypes.excitatory * 0.998).max(0.5); // A desensitizes fast
+            self.gaba_subtypes.inhibitory =
+                (self.gaba_subtypes.inhibitory * 0.9995).max(0.5); // B slower tolerance
+        } else if gaba_eff < 0.3 {
+            self.gaba_subtypes.excitatory =
+                (self.gaba_subtypes.excitatory * 1.002).min(2.0); // A re-sensitizes
+            self.gaba_subtypes.inhibitory =
+                (self.gaba_subtypes.inhibitory * 1.0005).min(2.0); // B slower recovery
+        }
 
         // ── E/I BALANCE HOMEOSTASIS (Bhatt 2009, Turrigiano 2012) ───
         let ei = self.ei_ratio();
@@ -913,7 +1065,7 @@ impl NeuromodulatorBath {
         self.glutamate.set_baseline(glut_base as f32);
     }
 
-    /// Count of transmitters currently in tolerance state (high_exposure > 20).
+    /// Count of transmitters currently in tolerance state.
     pub fn tolerant_count(&self) -> u8 {
         [
             &self.dopamine,
@@ -923,6 +1075,8 @@ impl NeuromodulatorBath {
             &self.gaba,
             &self.oxytocin,
             &self.glutamate,
+            &self.adenosine,
+            &self.endocannabinoid,
         ]
         .iter()
         .filter(|t| t.is_tolerant())
@@ -939,6 +1093,8 @@ impl NeuromodulatorBath {
             &self.gaba,
             &self.oxytocin,
             &self.glutamate,
+            &self.adenosine,
+            &self.endocannabinoid,
         ]
         .iter()
         .filter(|t| t.is_in_withdrawal())
@@ -1131,8 +1287,89 @@ impl NeuromodulatorBath {
         self.sleep_pressure() * circadian as f32
     }
 
-    /// 8-dimensional state vector [DA, NE, 5-HT, ACh, GABA, Oxy, Glut, Aden].
-    pub fn state_vector(&self) -> [f32; 8] {
+    // ── 5-HT Receptor Subtype Signals (Carhart-Harris & Nutt 2017) ──
+
+    /// 5-HT1A signal: serotonin × 1A sensitivity (anxiolytic/inhibitory).
+    /// Science: Blier & de Montigny (1994) — 5-HT1A autoreceptor mediated feedback.
+    #[inline]
+    pub fn sht_1a_signal(&self) -> f32 {
+        self.serotonin.effective() * self.sht_subtypes.excitatory
+    }
+
+    /// 5-HT2A signal: serotonin × 2A sensitivity (perceptual richness/consciousness).
+    /// Science: Carhart-Harris & Nutt (2017) — 5-HT2A psychedelic effects.
+    #[inline]
+    pub fn sht_2a_signal(&self) -> f32 {
+        self.serotonin.effective() * self.sht_subtypes.inhibitory
+    }
+
+    // ── GABA Receptor Subtype Signals (Möhler 2006) ────────────────
+
+    /// GABA-A signal: GABA × A sensitivity (fast ionotropic/sedation).
+    /// Science: Olsen & Sieghart (2009) — GABA-A receptor pharmacology.
+    #[inline]
+    pub fn gaba_a_signal(&self) -> f32 {
+        self.gaba.effective() * self.gaba_subtypes.excitatory
+    }
+
+    /// GABA-B signal: GABA × B sensitivity (slow metabotropic/muscle relaxation).
+    /// Science: Möhler (2006) — GABA-B receptor pharmacology.
+    #[inline]
+    pub fn gaba_b_signal(&self) -> f32 {
+        self.gaba.effective() * self.gaba_subtypes.inhibitory
+    }
+
+    // ── Transmitter Index Access (for multi-agent coupling) ─────────
+
+    /// Get transmitter reference by index (0=DA..8=ECB).
+    pub fn transmitter_by_index(&self, idx: usize) -> &Transmitter {
+        match idx {
+            0 => &self.dopamine,
+            1 => &self.noradrenaline,
+            2 => &self.serotonin,
+            3 => &self.acetylcholine,
+            4 => &self.gaba,
+            5 => &self.oxytocin,
+            6 => &self.glutamate,
+            7 => &self.adenosine,
+            8 => &self.endocannabinoid,
+            _ => &self.dopamine, // fallback
+        }
+    }
+
+    /// Get mutable transmitter reference by index (0=DA..8=ECB).
+    fn transmitter_by_index_mut(&mut self, idx: usize) -> &mut Transmitter {
+        match idx {
+            0 => &mut self.dopamine,
+            1 => &mut self.noradrenaline,
+            2 => &mut self.serotonin,
+            3 => &mut self.acetylcholine,
+            4 => &mut self.gaba,
+            5 => &mut self.oxytocin,
+            6 => &mut self.glutamate,
+            7 => &mut self.adenosine,
+            8 => &mut self.endocannabinoid,
+            _ => &mut self.dopamine, // fallback
+        }
+    }
+
+    /// Receive a peer's bath state and couple via oxytocin-mediated synchronization.
+    /// High local oxytocin → stronger coupling.
+    /// Science: Feldman (2012) — oxytocin biobehavioral synchrony.
+    pub fn couple_with_peer(&mut self, peer_state: &[f32]) {
+        let coupling = self.oxytocin.effective() * 0.05;
+        // Blend DA, NE, 5-HT, ACh toward peer (indices 0-3 only — deeper channels are private)
+        for i in 0..4.min(peer_state.len()) {
+            let local = self.transmitter_by_index(i).effective();
+            let delta = (peer_state[i] - local) * coupling;
+            self.transmitter_by_index_mut(i).produce(delta);
+        }
+        // Oxytocin boost from social interaction
+        self.oxytocin.produce(0.02);
+    }
+
+    /// 9-dimensional state vector [DA, NE, 5-HT, ACh, GABA, Oxy, Glut, Aden, ECB].
+    pub fn state_vector(&self) -> [f32; 9] {
         [
             self.dopamine.effective(),
             self.noradrenaline.effective(),
@@ -1142,6 +1379,7 @@ impl NeuromodulatorBath {
             self.oxytocin.effective(),
             self.glutamate.effective(),
             self.adenosine.effective(),
+            self.endocannabinoid.effective(),
         ]
     }
 
@@ -1231,6 +1469,7 @@ impl NeuromodulatorBath {
             "oxytocin" | "oxy" => Some(5),
             "glutamate" | "glut" => Some(6),
             "adenosine" | "aden" => Some(7),
+            "endocannabinoid" | "ecb" => Some(8),
             _ => None,
         };
         if let Some(transmitter_idx) = idx {
@@ -1270,6 +1509,7 @@ impl NeuromodulatorBath {
                 5 => &mut self.oxytocin,
                 6 => &mut self.glutamate,
                 7 => &mut self.adenosine,
+                8 => &mut self.endocannabinoid,
                 _ => continue,
             };
             if dose >= 0.0 {
@@ -1337,6 +1577,12 @@ pub struct NeuromodSnapshot {
     pub ei_ratio: f32,
     pub ei_seizure_events: u32,
     pub active_injection_count: u8,
+    // ── Phase 6: Endocannabinoid + receptor subtypes ──
+    pub endocannabinoid_effective: f32,
+    pub sht_1a_signal: f32,
+    pub sht_2a_signal: f32,
+    pub gaba_a_signal: f32,
+    pub gaba_b_signal: f32,
 }
 
 impl NeuromodulatorBath {
@@ -1388,6 +1634,11 @@ impl NeuromodulatorBath {
             ei_ratio: self.ei_ratio(),
             ei_seizure_events: self.ei_seizure_events,
             active_injection_count: self.active_injections.len() as u8,
+            endocannabinoid_effective: self.endocannabinoid.effective(),
+            sht_1a_signal: self.sht_1a_signal(),
+            sht_2a_signal: self.sht_2a_signal(),
+            gaba_a_signal: self.gaba_a_signal(),
+            gaba_b_signal: self.gaba_b_signal(),
         }
     }
 }
@@ -1473,6 +1724,22 @@ pub struct NeurochemistryCheckpoint {
     pub allostatic_load: f32,
     #[serde(default)]
     pub allostatic_recovery_cycles: u32,
+    // ── Phase 6: Endocannabinoid checkpoint ──
+    #[serde(default = "default_one")]
+    pub endocannabinoid_sensitivity: f32,
+    #[serde(default)]
+    pub endocannabinoid_high_exposure: u32,
+    #[serde(default)]
+    pub endocannabinoid_withdrawal: u32,
+    // ── Phase 6: 5-HT + GABA subtype sensitivities ──
+    #[serde(default = "default_one")]
+    pub sht_1a_sensitivity: f32,
+    #[serde(default = "default_one")]
+    pub sht_2a_sensitivity: f32,
+    #[serde(default = "default_one")]
+    pub gaba_a_sensitivity: f32,
+    #[serde(default = "default_one")]
+    pub gaba_b_sensitivity: f32,
 }
 
 fn default_one() -> f32 {
@@ -1517,6 +1784,14 @@ impl NeuromodulatorBath {
             adenosine_withdrawal: self.adenosine.withdrawal_cycles,
             allostatic_load: self.allostatic_load,
             allostatic_recovery_cycles: self.allostatic_recovery_cycles,
+            // Phase 6: endocannabinoid + subtypes
+            endocannabinoid_sensitivity: self.endocannabinoid.receptor_sensitivity,
+            endocannabinoid_high_exposure: self.endocannabinoid.high_exposure_cycles,
+            endocannabinoid_withdrawal: self.endocannabinoid.withdrawal_cycles,
+            sht_1a_sensitivity: self.sht_subtypes.excitatory,
+            sht_2a_sensitivity: self.sht_subtypes.inhibitory,
+            gaba_a_sensitivity: self.gaba_subtypes.excitatory,
+            gaba_b_sensitivity: self.gaba_subtypes.inhibitory,
         }
     }
 
@@ -1563,6 +1838,15 @@ impl NeuromodulatorBath {
         self.adenosine.withdrawal_cycles = ckpt.adenosine_withdrawal;
         self.allostatic_load = ckpt.allostatic_load.clamp(0.0, 1.0);
         self.allostatic_recovery_cycles = ckpt.allostatic_recovery_cycles;
+        // Phase 6: endocannabinoid + subtypes
+        self.endocannabinoid.receptor_sensitivity =
+            ckpt.endocannabinoid_sensitivity.clamp(0.5, 2.0);
+        self.endocannabinoid.high_exposure_cycles = ckpt.endocannabinoid_high_exposure;
+        self.endocannabinoid.withdrawal_cycles = ckpt.endocannabinoid_withdrawal;
+        self.sht_subtypes.excitatory = ckpt.sht_1a_sensitivity.clamp(0.5, 2.0);
+        self.sht_subtypes.inhibitory = ckpt.sht_2a_sensitivity.clamp(0.5, 2.0);
+        self.gaba_subtypes.excitatory = ckpt.gaba_a_sensitivity.clamp(0.5, 2.0);
+        self.gaba_subtypes.inhibitory = ckpt.gaba_b_sensitivity.clamp(0.5, 2.0);
     }
 }
 
@@ -1647,7 +1931,7 @@ impl PersonalityDriftTracker {
 /// Science: Standard PK model — C(t) = dose × e^(-t/τ).
 #[derive(Debug, Clone)]
 pub struct ActiveInjection {
-    /// Target transmitter index (0=DA, 1=NE, 2=5-HT, 3=ACh, 4=GABA, 5=Oxy, 6=Glut, 7=Aden)
+    /// Target transmitter index (0=DA, 1=NE, 2=5-HT, 3=ACh, 4=GABA, 5=Oxy, 6=Glut, 7=Aden, 8=ECB)
     pub transmitter_idx: usize,
     /// Initial dose (positive = agonist, negative = antagonist)
     pub remaining_dose: f32,
@@ -1673,12 +1957,12 @@ impl ActiveInjection {
     }
 }
 
-/// Phase space tracker for the 8-transmitter neuromodulator bath.
+/// Phase space tracker for the 9-transmitter neuromodulator bath.
 ///
 /// Records state vectors over a sliding window and computes entropy,
 /// centroid, variance, and attractor detection.
 pub struct BathPhaseTracker {
-    history: VecDeque<[f32; 8]>,
+    history: VecDeque<[f32; 9]>,
     capacity: usize,
 }
 
@@ -1693,21 +1977,21 @@ impl Default for BathPhaseTracker {
 
 impl BathPhaseTracker {
     /// Record a state vector.
-    pub fn record(&mut self, state: [f32; 8]) {
+    pub fn record(&mut self, state: [f32; 9]) {
         if self.history.len() >= self.capacity {
             self.history.pop_front();
         }
         self.history.push_back(state);
     }
 
-    /// Shannon entropy averaged across all 8 dimensions (10-bin histogram per dimension).
+    /// Shannon entropy averaged across all 9 dimensions (10-bin histogram per dimension).
     pub fn entropy(&self) -> f32 {
         if self.history.is_empty() {
             return 0.0;
         }
         let n = self.history.len() as f32;
         let mut total_entropy = 0.0_f32;
-        for dim in 0..8 {
+        for dim in 0..9 {
             let mut bins = [0u32; 10];
             for state in &self.history {
                 let idx = ((state[dim].clamp(0.0, 1.999)) * 5.0) as usize;
@@ -1722,16 +2006,16 @@ impl BathPhaseTracker {
             }
             total_entropy += dim_entropy;
         }
-        total_entropy / 8.0
+        total_entropy / 9.0
     }
 
     /// Arithmetic mean of recorded state vectors.
-    pub fn centroid(&self) -> [f32; 8] {
+    pub fn centroid(&self) -> [f32; 9] {
         if self.history.is_empty() {
-            return [0.0; 8];
+            return [0.0; 9];
         }
         let n = self.history.len() as f32;
-        let mut sum = [0.0_f32; 8];
+        let mut sum = [0.0_f32; 9];
         for state in &self.history {
             for (i, &v) in state.iter().enumerate() {
                 sum[i] += v;
@@ -1744,13 +2028,13 @@ impl BathPhaseTracker {
     }
 
     /// Per-dimension variance of recorded state vectors.
-    pub fn variance(&self) -> [f32; 8] {
+    pub fn variance(&self) -> [f32; 9] {
         if self.history.len() < 2 {
-            return [0.0; 8];
+            return [0.0; 9];
         }
         let centroid = self.centroid();
         let n = self.history.len() as f32;
-        let mut var = [0.0_f32; 8];
+        let mut var = [0.0_f32; 9];
         for state in &self.history {
             for (i, &v) in state.iter().enumerate() {
                 let diff = v - centroid[i];
@@ -1764,7 +2048,7 @@ impl BathPhaseTracker {
     }
 
     /// Detect attractor: returns Some(centroid) if total variance < 0.05 and >= 50 samples.
-    pub fn detect_attractor(&self) -> Option<[f32; 8]> {
+    pub fn detect_attractor(&self) -> Option<[f32; 9]> {
         if self.history.len() < 50 {
             return None;
         }
@@ -2519,6 +2803,13 @@ mod tests {
             adenosine_sensitivity: 1.0,
             adenosine_high_exposure: 0,
             adenosine_withdrawal: 0,
+            endocannabinoid_sensitivity: 1.0,
+            endocannabinoid_high_exposure: 0,
+            endocannabinoid_withdrawal: 0,
+            sht_1a_sensitivity: 1.0,
+            sht_2a_sensitivity: 1.0,
+            gaba_a_sensitivity: 1.0,
+            gaba_b_sensitivity: 1.0,
             allostatic_load: 0.0,
             allostatic_recovery_cycles: 0,
         };
@@ -3862,10 +4153,10 @@ mod tests {
     }
 
     #[test]
-    fn test_state_vector_8_dimensions() {
+    fn test_state_vector_9_dimensions() {
         let bath = NeuromodulatorBath::default();
         let sv = bath.state_vector();
-        assert_eq!(sv.len(), 8, "State vector should be 8-dimensional");
+        assert_eq!(sv.len(), 9, "State vector should be 9-dimensional");
         for (i, &v) in sv.iter().enumerate() {
             assert!(v.is_finite(), "Dimension {i} should be finite");
             assert!(v >= 0.0, "Dimension {i} should be non-negative");
@@ -4315,7 +4606,7 @@ mod tests {
     #[test]
     fn test_phase_tracker_records() {
         let mut tracker = BathPhaseTracker::default();
-        tracker.record([0.5; 8]);
+        tracker.record([0.5; 9]);
         assert_eq!(tracker.history.len(), 1);
     }
 
@@ -4323,7 +4614,7 @@ mod tests {
     fn test_phase_tracker_window_eviction() {
         let mut tracker = BathPhaseTracker::default();
         for i in 0..250 {
-            tracker.record([i as f32 / 250.0; 8]);
+            tracker.record([i as f32 / 250.0; 9]);
         }
         assert!(
             tracker.history.len() <= 200,
@@ -4335,7 +4626,7 @@ mod tests {
     fn test_phase_tracker_constant_low_entropy() {
         let mut tracker = BathPhaseTracker::default();
         for _ in 0..100 {
-            tracker.record([0.5; 8]);
+            tracker.record([0.5; 9]);
         }
         let entropy = tracker.entropy();
         assert!(
@@ -4349,9 +4640,9 @@ mod tests {
         let mut tracker_constant = BathPhaseTracker::default();
         let mut tracker_varied = BathPhaseTracker::default();
         for i in 0..100 {
-            tracker_constant.record([0.5; 8]);
+            tracker_constant.record([0.5; 9]);
             let v = (i as f32 / 100.0).clamp(0.0, 1.0);
-            tracker_varied.record([v, 1.0 - v, v * 0.5, 0.3, 0.7, v, 0.4, 0.6]);
+            tracker_varied.record([v, 1.0 - v, v * 0.5, 0.3, 0.7, v, 0.4, 0.6, 0.3]);
         }
         assert!(
             tracker_varied.entropy() > tracker_constant.entropy(),
@@ -4362,8 +4653,8 @@ mod tests {
     #[test]
     fn test_phase_tracker_centroid_is_mean() {
         let mut tracker = BathPhaseTracker::default();
-        tracker.record([0.2; 8]);
-        tracker.record([0.8; 8]);
+        tracker.record([0.2; 9]);
+        tracker.record([0.8; 9]);
         let centroid = tracker.centroid();
         for &v in &centroid {
             assert!(
@@ -4378,7 +4669,7 @@ mod tests {
         let mut tracker = BathPhaseTracker::default();
         // Record 60 identical states → should detect attractor
         for _ in 0..60 {
-            tracker.record([0.5; 8]);
+            tracker.record([0.5; 9]);
         }
         assert!(
             tracker.detect_attractor().is_some(),
@@ -4389,11 +4680,455 @@ mod tests {
         let mut tracker2 = BathPhaseTracker::default();
         for i in 0..60 {
             let v = (i as f32 / 60.0).clamp(0.0, 1.0);
-            tracker2.record([v, 1.0 - v, v * 0.5, 0.3 + v * 0.4, 0.7 - v * 0.3, v, 0.4, 0.6]);
+            tracker2.record([v, 1.0 - v, v * 0.5, 0.3 + v * 0.4, 0.7 - v * 0.3, v, 0.4, 0.6, 0.3]);
         }
         assert!(
             tracker2.detect_attractor().is_none(),
             "Should NOT detect attractor for varied state"
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 6 #1: Endocannabinoid Channel Tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_ecb_default_low() {
+        let bath = NeuromodulatorBath::default();
+        assert!(
+            (bath.endocannabinoid.level - 0.3).abs() < 0.01,
+            "ECB default level should be 0.3, got {}",
+            bath.endocannabinoid.level
+        );
+    }
+
+    #[test]
+    fn test_ecb_accumulates_with_glutamate_excess() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.glutamate.level = 0.8;
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.1,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.5,
+            arousal: 0.5,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+        };
+        let before = bath.endocannabinoid.level;
+        bath.update(&inputs);
+        assert!(
+            bath.endocannabinoid.level > before,
+            "ECB should rise with glutamate excess"
+        );
+    }
+
+    #[test]
+    fn test_ecb_dse_retrograde_inhibition() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.endocannabinoid.level = 0.7;
+        bath.endocannabinoid.receptor_sensitivity = 1.0;
+        bath.glutamate.level = 0.8;
+        let glut_before = bath.glutamate.level;
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.1,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.5,
+            arousal: 0.5,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+        };
+        bath.update(&inputs);
+        assert!(
+            bath.glutamate.level < glut_before,
+            "DSE: high ECB should dampen glutamate, before={glut_before} after={}",
+            bath.glutamate.level
+        );
+    }
+
+    #[test]
+    fn test_ecb_stress_buffer_production() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.allostatic_load = 0.5;
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.1,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.5,
+            arousal: 0.5,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+        };
+        let before = bath.endocannabinoid.level;
+        bath.update(&inputs);
+        assert!(
+            bath.endocannabinoid.level > before,
+            "ECB should rise as stress buffer when allostatic load > 0.3"
+        );
+    }
+
+    #[test]
+    fn test_state_vector_9d() {
+        let bath = NeuromodulatorBath::default();
+        let sv = bath.state_vector();
+        assert_eq!(sv.len(), 9, "State vector should be 9-dimensional");
+        assert!(
+            (sv[8] - bath.endocannabinoid.effective()).abs() < f32::EPSILON,
+            "sv[8] should be ECB effective"
+        );
+    }
+
+    #[test]
+    fn test_ecb_pharmacological_injection() {
+        let mut bath = NeuromodulatorBath::default();
+        let before = bath.endocannabinoid.level;
+        bath.inject("ecb", 0.3, 50);
+        assert_eq!(bath.active_injections.len(), 1);
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.1,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.5,
+            arousal: 0.5,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+        };
+        bath.update(&inputs);
+        assert!(
+            bath.endocannabinoid.level > before,
+            "ECB injection should raise level"
+        );
+    }
+
+    #[test]
+    fn test_ecb_checkpoint_roundtrip() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.endocannabinoid.receptor_sensitivity = 0.8;
+        bath.endocannabinoid.high_exposure_cycles = 10;
+        bath.endocannabinoid.withdrawal_cycles = 5;
+        let ckpt = bath.checkpoint();
+        assert!((ckpt.endocannabinoid_sensitivity - 0.8).abs() < f32::EPSILON);
+        assert_eq!(ckpt.endocannabinoid_high_exposure, 10);
+        assert_eq!(ckpt.endocannabinoid_withdrawal, 5);
+
+        let mut bath2 = NeuromodulatorBath::default();
+        bath2.restore(&ckpt);
+        assert!((bath2.endocannabinoid.receptor_sensitivity - 0.8).abs() < f32::EPSILON);
+        assert_eq!(bath2.endocannabinoid.high_exposure_cycles, 10);
+        assert_eq!(bath2.endocannabinoid.withdrawal_cycles, 5);
+    }
+
+    #[test]
+    fn test_ecb_clamp_bounds() {
+        let mut bath = NeuromodulatorBath::default();
+        // Force extreme values
+        bath.endocannabinoid.level = 2.0;
+        bath.endocannabinoid.level = bath.endocannabinoid.level.clamp(0.0, 1.0);
+        assert!(bath.endocannabinoid.level <= 1.0);
+        bath.endocannabinoid.level = -1.0;
+        bath.endocannabinoid.level = bath.endocannabinoid.level.clamp(0.0, 1.0);
+        assert!(bath.endocannabinoid.level >= 0.0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 6 #2: 5-HT1A/2A + GABA-A/B Subtype Tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_subtypes_default_balanced() {
+        let bath = NeuromodulatorBath::default();
+        assert!((bath.sht_subtypes.excitatory - 1.0).abs() < f32::EPSILON);
+        assert!((bath.sht_subtypes.inhibitory - 1.0).abs() < f32::EPSILON);
+        assert!((bath.gaba_subtypes.excitatory - 1.0).abs() < f32::EPSILON);
+        assert!((bath.gaba_subtypes.inhibitory - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_sht_1a_anxiolytic_signal() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.serotonin.level = 0.8;
+        bath.sht_subtypes.excitatory = 1.5; // sensitized 1A
+        let sig = bath.sht_1a_signal();
+        assert!(
+            sig > bath.serotonin.effective(),
+            "1A signal should exceed raw serotonin when 1A sensitized"
+        );
+    }
+
+    #[test]
+    fn test_sht_2a_perceptual_signal() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.serotonin.level = 0.7;
+        bath.sht_subtypes.inhibitory = 1.8; // sensitized 2A
+        let sig = bath.sht_2a_signal();
+        assert!(
+            sig > 1.0,
+            "2A signal with sensitized receptor should exceed 1.0, got {sig}"
+        );
+    }
+
+    #[test]
+    fn test_gaba_a_fast_signal() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.gaba.level = 0.6;
+        bath.gaba_subtypes.excitatory = 1.2;
+        let sig = bath.gaba_a_signal();
+        assert!(sig > bath.gaba.effective(), "GABA-A should amplify with sensitized receptor");
+    }
+
+    #[test]
+    fn test_gaba_b_slow_signal() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.gaba.level = 0.5;
+        let a = bath.gaba_a_signal();
+        let b = bath.gaba_b_signal();
+        assert!(
+            (a - b).abs() < 0.01,
+            "Default subtypes should give similar A/B signals"
+        );
+    }
+
+    #[test]
+    fn test_subtype_adaptation_over_cycles() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.serotonin.level = 0.8;
+        bath.serotonin.receptor_sensitivity = 1.0;
+        // Run many cycles with high serotonin
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.1,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.5,
+            arousal: 0.3,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+        };
+        let sht_1a_before = bath.sht_subtypes.excitatory;
+        let sht_2a_before = bath.sht_subtypes.inhibitory;
+        for _ in 0..200 {
+            bath.serotonin.level = 0.8; // keep high
+            bath.update(&inputs);
+        }
+        assert!(
+            bath.sht_subtypes.excitatory < sht_1a_before,
+            "1A should down-regulate under high serotonin"
+        );
+        assert!(
+            bath.sht_subtypes.inhibitory > sht_2a_before,
+            "2A should up-regulate under high serotonin"
+        );
+    }
+
+    #[test]
+    fn test_subtype_checkpoint_roundtrip() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.sht_subtypes.excitatory = 0.7;
+        bath.sht_subtypes.inhibitory = 1.3;
+        bath.gaba_subtypes.excitatory = 0.8;
+        bath.gaba_subtypes.inhibitory = 1.2;
+        let ckpt = bath.checkpoint();
+        let mut bath2 = NeuromodulatorBath::default();
+        bath2.restore(&ckpt);
+        assert!((bath2.sht_subtypes.excitatory - 0.7).abs() < f32::EPSILON);
+        assert!((bath2.sht_subtypes.inhibitory - 1.3).abs() < f32::EPSILON);
+        assert!((bath2.gaba_subtypes.excitatory - 0.8).abs() < f32::EPSILON);
+        assert!((bath2.gaba_subtypes.inhibitory - 1.2).abs() < f32::EPSILON);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 6 #3: Per-Transmitter Tolerance Curve Tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_per_transmitter_onset_differs() {
+        let bath = NeuromodulatorBath::default();
+        assert_ne!(
+            bath.dopamine.tolerance_onset_cycles,
+            bath.serotonin.tolerance_onset_cycles,
+            "DA and 5-HT should have different onset cycles"
+        );
+        assert_ne!(
+            bath.gaba.tolerance_onset_cycles,
+            bath.adenosine.tolerance_onset_cycles,
+            "GABA and adenosine should have different onset cycles"
+        );
+    }
+
+    #[test]
+    fn test_da_faster_tolerance_than_sht() {
+        let mut bath = NeuromodulatorBath::default();
+        // Force both channels to sustained high
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.1,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.5,
+            arousal: 0.5,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+        };
+        let da_start = bath.dopamine.receptor_sensitivity;
+        let sht_start = bath.serotonin.receptor_sensitivity;
+        for _ in 0..50 {
+            bath.dopamine.level = 0.9;
+            bath.serotonin.level = 0.9;
+            bath.update(&inputs);
+        }
+        let da_drop = da_start - bath.dopamine.receptor_sensitivity;
+        let sht_drop = sht_start - bath.serotonin.receptor_sensitivity;
+        assert!(
+            da_drop > sht_drop,
+            "DA should develop tolerance faster: DA_drop={da_drop:.4} vs SHT_drop={sht_drop:.4}"
+        );
+    }
+
+    #[test]
+    fn test_withdrawal_duration_varies() {
+        let bath = NeuromodulatorBath::default();
+        assert_ne!(
+            bath.dopamine.withdrawal_duration,
+            bath.gaba.withdrawal_duration,
+            "DA and GABA should have different withdrawal durations"
+        );
+        assert_eq!(bath.endocannabinoid.withdrawal_duration, 60);
+    }
+
+    #[test]
+    fn test_custom_tolerance_threshold() {
+        let bath = NeuromodulatorBath::default();
+        assert!(
+            (bath.noradrenaline.tolerance_threshold - 0.25).abs() < f32::EPSILON,
+            "NE tolerance threshold should be 0.25"
+        );
+        assert!(
+            (bath.adenosine.tolerance_threshold - 0.1).abs() < f32::EPSILON,
+            "Adenosine tolerance threshold should be 0.1"
+        );
+    }
+
+    #[test]
+    fn test_backward_compat_defaults() {
+        // Default Transmitter should match previous hardcoded behavior
+        let t = Transmitter::default();
+        assert_eq!(t.tolerance_onset_cycles, 20);
+        assert!((t.tolerance_decay_rate - 0.99).abs() < f32::EPSILON);
+        assert_eq!(t.withdrawal_duration, 30);
+        assert!((t.withdrawal_recovery_rate - 1.01).abs() < f32::EPSILON);
+        assert!((t.tolerance_threshold - 0.2).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_tolerance_checkpoint_roundtrip() {
+        let mut bath = NeuromodulatorBath::default();
+        // Simulate some tolerance state
+        bath.dopamine.high_exposure_cycles = 20;
+        bath.dopamine.withdrawal_cycles = 10;
+        bath.endocannabinoid.high_exposure_cycles = 55;
+        let ckpt = bath.checkpoint();
+        let mut bath2 = NeuromodulatorBath::default();
+        bath2.restore(&ckpt);
+        assert_eq!(bath2.dopamine.high_exposure_cycles, 20);
+        assert_eq!(bath2.dopamine.withdrawal_cycles, 10);
+        assert_eq!(bath2.endocannabinoid.high_exposure_cycles, 55);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 6 #8: Multi-Agent Bath Coupling Tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_no_coupling_at_zero_oxytocin() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.oxytocin.level = 0.0;
+        bath.oxytocin.receptor_sensitivity = 1.0;
+        let da_before = bath.dopamine.level;
+        bath.couple_with_peer(&[1.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5, 0.3]);
+        assert!(
+            (bath.dopamine.level - da_before).abs() < 0.001,
+            "Zero oxytocin should produce zero coupling"
+        );
+    }
+
+    #[test]
+    fn test_coupling_strength_scales_with_oxytocin() {
+        let mut bath_low = NeuromodulatorBath::default();
+        bath_low.oxytocin.level = 0.2;
+        let mut bath_high = NeuromodulatorBath::default();
+        bath_high.oxytocin.level = 0.8;
+        let peer = [0.9, 0.9, 0.9, 0.9, 0.5, 0.5, 0.5, 0.5, 0.3];
+        let da_before_low = bath_low.dopamine.level;
+        let da_before_high = bath_high.dopamine.level;
+        bath_low.couple_with_peer(&peer);
+        bath_high.couple_with_peer(&peer);
+        let delta_low = (bath_low.dopamine.level - da_before_low).abs();
+        let delta_high = (bath_high.dopamine.level - da_before_high).abs();
+        assert!(
+            delta_high > delta_low,
+            "Higher oxytocin should produce stronger coupling: high={delta_high} vs low={delta_low}"
+        );
+    }
+
+    #[test]
+    fn test_da_synchronization_toward_peer() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.oxytocin.level = 0.6;
+        bath.dopamine.level = 0.3;
+        let peer = [0.9, 0.5, 0.5, 0.5, 0.4, 0.3, 0.3, 0.2, 0.3];
+        bath.couple_with_peer(&peer);
+        assert!(
+            bath.dopamine.level > 0.3,
+            "DA should move toward peer's higher DA"
+        );
+    }
+
+    #[test]
+    fn test_private_channels_unaffected() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.oxytocin.level = 0.8;
+        let gaba_before = bath.gaba.level;
+        let glut_before = bath.glutamate.level;
+        let aden_before = bath.adenosine.level;
+        bath.couple_with_peer(&[0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9]);
+        assert!(
+            (bath.gaba.level - gaba_before).abs() < 0.001,
+            "GABA (idx 4) should not be coupled"
+        );
+        assert!(
+            (bath.glutamate.level - glut_before).abs() < 0.001,
+            "Glutamate (idx 6) should not be coupled"
+        );
+        assert!(
+            (bath.adenosine.level - aden_before).abs() < 0.001,
+            "Adenosine (idx 7) should not be coupled"
+        );
+    }
+
+    #[test]
+    fn test_oxytocin_self_boost_on_interaction() {
+        let mut bath = NeuromodulatorBath::default();
+        let oxy_before = bath.oxytocin.level;
+        bath.couple_with_peer(&[0.5, 0.5, 0.5, 0.5, 0.4, 0.3, 0.3, 0.2, 0.3]);
+        assert!(
+            bath.oxytocin.level > oxy_before,
+            "Oxytocin should get self-boost from social interaction"
+        );
+    }
+
+    #[test]
+    fn test_transmitter_by_index_accessor() {
+        let bath = NeuromodulatorBath::default();
+        assert!(
+            (bath.transmitter_by_index(0).level - bath.dopamine.level).abs() < f32::EPSILON
+        );
+        assert!(
+            (bath.transmitter_by_index(8).level - bath.endocannabinoid.level).abs() < f32::EPSILON
         );
     }
 }

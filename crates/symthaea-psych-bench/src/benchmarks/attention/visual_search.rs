@@ -259,7 +259,7 @@ impl PsychBenchmark for VisualSearchBenchmark {
                     trial_idx: trace.len(),
                     condition: "visual_search".to_string(),
                     correct: feat_acc > 0.5 && conj_acc > 0.5,
-                    rt_ticks: if all_rts.is_empty() { 0.0 } else { *all_rts.last().unwrap() },
+                    rt_ticks: all_rts.last().copied().unwrap_or(0.0),
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,

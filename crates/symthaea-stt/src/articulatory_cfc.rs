@@ -648,4 +648,224 @@ mod tests {
         assert!(probs[2] > probs[1]);
         assert!(probs[1] > probs[0]);
     }
+
+    #[test]
+    fn test_softmax_uniform() {
+        let logits = vec![0.0, 0.0, 0.0, 0.0];
+        let probs = LearnedArticulatoryDetector::softmax(&logits);
+
+        // All equal inputs should produce uniform distribution
+        let sum: f32 = probs.iter().sum();
+        assert!((sum - 1.0).abs() < 0.001);
+        for p in &probs {
+            assert!((*p - 0.25).abs() < 0.001, "expected 0.25, got {p}");
+        }
+    }
+
+    #[test]
+    fn test_softmax_single_element() {
+        let logits = vec![5.0];
+        let probs = LearnedArticulatoryDetector::softmax(&logits);
+
+        assert_eq!(probs.len(), 1);
+        assert!((probs[0] - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_softmax_large_values_numerical_stability() {
+        // Large logits should not overflow due to max subtraction
+        let logits = vec![1000.0, 1001.0, 1002.0];
+        let probs = LearnedArticulatoryDetector::softmax(&logits);
+
+        let sum: f32 = probs.iter().sum();
+        assert!((sum - 1.0).abs() < 0.01, "sum = {sum}");
+        assert!(probs[2] > probs[1]);
+        assert!(probs[1] > probs[0]);
+        // No NaN or Inf
+        for p in &probs {
+            assert!(p.is_finite(), "softmax produced non-finite value");
+        }
+    }
+
+    #[test]
+    fn test_softmax_negative_logits() {
+        let logits = vec![-3.0, -2.0, -1.0];
+        let probs = LearnedArticulatoryDetector::softmax(&logits);
+
+        let sum: f32 = probs.iter().sum();
+        assert!((sum - 1.0).abs() < 0.001);
+        assert!(probs[2] > probs[1]);
+        assert!(probs[1] > probs[0]);
+    }
+
+    #[test]
+    fn test_softmax_temperature_high() {
+        // High temperature should flatten the distribution
+        let logits = vec![1.0, 2.0, 3.0];
+        let probs_normal = LearnedArticulatoryDetector::softmax(&logits);
+        let probs_high_temp = LearnedArticulatoryDetector::softmax_temperature(&logits, 10.0);
+
+        // High temperature should make distribution more uniform
+        let max_normal = probs_normal.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let min_normal = probs_normal.iter().cloned().fold(f32::INFINITY, f32::min);
+        let max_temp = probs_high_temp.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let min_temp = probs_high_temp.iter().cloned().fold(f32::INFINITY, f32::min);
+
+        let range_normal = max_normal - min_normal;
+        let range_temp = max_temp - min_temp;
+        assert!(
+            range_temp < range_normal,
+            "high temp range {range_temp} should be < normal range {range_normal}"
+        );
+    }
+
+    #[test]
+    fn test_softmax_temperature_low() {
+        // Low temperature should sharpen the distribution
+        let logits = vec![1.0, 2.0, 3.0];
+        let probs_normal = LearnedArticulatoryDetector::softmax(&logits);
+        let probs_low_temp = LearnedArticulatoryDetector::softmax_temperature(&logits, 0.1);
+
+        // Low temperature should make winner more dominant
+        assert!(
+            probs_low_temp[2] > probs_normal[2],
+            "low temp peak {} should be > normal peak {}",
+            probs_low_temp[2],
+            probs_normal[2]
+        );
+    }
+
+    #[test]
+    fn test_argmax_basic() {
+        assert_eq!(LearnedArticulatoryDetector::argmax(&[0.1, 0.5, 0.3]), 1);
+        assert_eq!(LearnedArticulatoryDetector::argmax(&[0.9, 0.1, 0.0]), 0);
+        assert_eq!(LearnedArticulatoryDetector::argmax(&[0.0, 0.0, 1.0]), 2);
+    }
+
+    #[test]
+    fn test_argmax_empty() {
+        assert_eq!(LearnedArticulatoryDetector::argmax(&[]), 0);
+    }
+
+    fn make_test_weights(input_size: usize, hidden_size: usize) -> CfCWeights {
+        CfCWeights {
+            w_in_weight: vec![vec![0.01; input_size]; hidden_size],
+            w_in_bias: vec![0.0; hidden_size],
+            w_rec_weight: vec![vec![0.01; hidden_size]; hidden_size],
+            w_rec_bias: vec![0.0; hidden_size],
+            log_tau: vec![-2.0; hidden_size], // tau = exp(-2) ~ 0.135
+            voicing_layer0_weight: vec![vec![0.1; hidden_size]; 32],
+            voicing_layer0_bias: vec![0.0; 32],
+            voicing_layer2_weight: vec![vec![0.1; 32]; 2],
+            voicing_layer2_bias: vec![0.0; 2],
+            manner_layer0_weight: vec![vec![0.1; hidden_size]; 32],
+            manner_layer0_bias: vec![0.0; 32],
+            manner_layer2_weight: vec![vec![0.1; 32]; 7],
+            manner_layer2_bias: vec![0.0; 7],
+            place_layer0_weight: vec![vec![0.1; hidden_size]; 32],
+            place_layer0_bias: vec![0.0; 32],
+            place_layer2_weight: vec![vec![0.1; 32]; 10],
+            place_layer2_bias: vec![0.0; 10],
+            input_size,
+            hidden_size,
+            tau_min: 0.005,
+            tau_max: 0.1,
+        }
+    }
+
+    #[test]
+    fn test_detector_creation_and_reset() {
+        let weights = make_test_weights(40, 8);
+        let mut detector = LearnedArticulatoryDetector::new(weights);
+
+        // Initial hidden state should be zeros
+        assert!(detector.hidden_state.iter().all(|&h| h == 0.0));
+
+        // Forward pass should change hidden state
+        let mel = vec![0.5; 40];
+        detector.forward(&mel, 0.01);
+        assert!(detector.hidden_state.iter().any(|&h| h != 0.0));
+
+        // Reset should zero it again
+        detector.reset();
+        assert!(detector.hidden_state.iter().all(|&h| h == 0.0));
+    }
+
+    #[test]
+    fn test_forward_produces_valid_probabilities() {
+        let weights = make_test_weights(40, 8);
+        let mut detector = LearnedArticulatoryDetector::new(weights);
+
+        let mel = vec![0.5; 40];
+        let (voicing, manner, place) = detector.forward(&mel, 0.01);
+
+        // Check voicing probabilities
+        assert_eq!(voicing.len(), 2);
+        let v_sum: f32 = voicing.iter().sum();
+        assert!((v_sum - 1.0).abs() < 0.01, "voicing sum = {v_sum}");
+
+        // Check manner probabilities
+        assert_eq!(manner.len(), 7);
+        let m_sum: f32 = manner.iter().sum();
+        assert!((m_sum - 1.0).abs() < 0.01, "manner sum = {m_sum}");
+
+        // Check place probabilities
+        assert_eq!(place.len(), 10);
+        let p_sum: f32 = place.iter().sum();
+        assert!((p_sum - 1.0).abs() < 0.01, "place sum = {p_sum}");
+    }
+
+    #[test]
+    fn test_forward_temperature_produces_valid_probabilities() {
+        let weights = make_test_weights(40, 8);
+        let mut detector = LearnedArticulatoryDetector::new(weights);
+
+        let mel = vec![0.5; 40];
+        let (voicing, manner, place) = detector.forward_temperature(&mel, 0.01, 2.0);
+
+        let v_sum: f32 = voicing.iter().sum();
+        assert!((v_sum - 1.0).abs() < 0.01);
+        let m_sum: f32 = manner.iter().sum();
+        assert!((m_sum - 1.0).abs() < 0.01);
+        let p_sum: f32 = place.iter().sum();
+        assert!((p_sum - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_detect_returns_valid_hv() {
+        let weights = make_test_weights(40, 8);
+        let mut detector = LearnedArticulatoryDetector::new(weights);
+
+        let mel = vec![0.5; 40];
+        let hv = detector.detect(&mel, 0.01);
+
+        // HV should not be all zeros (it's built from random bases)
+        let popcount: u32 = hv.words.iter().map(|w| w.count_ones()).sum();
+        assert!(popcount > 0, "detect produced all-zero HV");
+    }
+
+    #[test]
+    fn test_detect_soft_returns_valid_hv() {
+        let weights = make_test_weights(40, 8);
+        let mut detector = LearnedArticulatoryDetector::new(weights);
+
+        let mel = vec![0.5; 40];
+        let hv = detector.detect_soft(&mel, 0.01);
+
+        let popcount: u32 = hv.words.iter().map(|w| w.count_ones()).sum();
+        assert!(popcount > 0, "detect_soft produced all-zero HV");
+    }
+
+    #[test]
+    fn test_get_raw_outputs() {
+        let weights = make_test_weights(40, 8);
+        let mut detector = LearnedArticulatoryDetector::new(weights);
+
+        let mel = vec![0.5; 40];
+        let (voicing, manner, place) = detector.get_raw_outputs(&mel, 0.01);
+
+        assert!(voicing <= 1, "voicing index out of range: {voicing}");
+        assert!(manner <= 6, "manner index out of range: {manner}");
+        assert!(place <= 9, "place index out of range: {place}");
+    }
 }

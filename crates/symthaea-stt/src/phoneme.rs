@@ -913,4 +913,287 @@ mod tests {
         let sim = p_features.similarity(&b_features);
         assert!(sim > 0.3, "p-b similarity = {}", sim);
     }
+
+    #[test]
+    fn test_inventory_has_consonants_and_vowels() {
+        let inv = PhonemeInventory::new();
+
+        let vowels: Vec<_> = inv.all().iter().filter(|p| p.is_vowel).collect();
+        let consonants: Vec<_> = inv.all().iter().filter(|p| !p.is_vowel).collect();
+
+        assert!(!vowels.is_empty(), "should have vowels");
+        assert!(!consonants.is_empty(), "should have consonants");
+        assert_eq!(vowels.len() + consonants.len(), inv.len());
+    }
+
+    #[test]
+    fn test_inventory_ipa_lookup() {
+        let inv = PhonemeInventory::new();
+
+        let s = inv.get_ipa("s").unwrap();
+        assert_eq!(s.arpabet, "S");
+        assert_eq!(s.place, Place::Alveolar);
+        assert_eq!(s.manner, Manner::Fricative);
+        assert_eq!(s.voicing, Voicing::Voiceless);
+        assert!(!s.is_vowel);
+    }
+
+    #[test]
+    fn test_inventory_vowel_always_voiced() {
+        let inv = PhonemeInventory::new();
+        for p in inv.all() {
+            if p.is_vowel {
+                assert_eq!(
+                    p.voicing,
+                    Voicing::Voiced,
+                    "vowel {} should be voiced",
+                    p.ipa
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_inventory_unknown_ipa() {
+        let inv = PhonemeInventory::new();
+        assert!(inv.get_ipa("xyz").is_none());
+    }
+
+    #[test]
+    fn test_arpabet_stress_stripping() {
+        let inv = PhonemeInventory::new();
+
+        // Stress marker 0
+        let ah0 = inv.get_arpabet("AH0").unwrap();
+        assert_eq!(ah0.ipa, "ə");
+
+        // Stress marker 2
+        let iy2 = inv.get_arpabet("IY2").unwrap();
+        assert_eq!(iy2.ipa, "i");
+    }
+
+    #[test]
+    fn test_resonator_empty_query() {
+        let res = PhonemeResonator::new();
+        let results = res.query(&HV16::random("test"), 5);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_resonator_with_beta() {
+        let res = PhonemeResonator::with_beta(16.0);
+        assert_eq!(res.len(), 0);
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn test_resonator_retrieve_empty() {
+        let res = PhonemeResonator::new();
+        let hv = res.retrieve(&HV16::random("query"));
+        // Should return zero HV
+        let popcount: u32 = hv.words.iter().map(|w| w.count_ones()).sum();
+        assert_eq!(popcount, 0);
+    }
+
+    #[test]
+    fn test_resonator_clear() {
+        let mut res = PhonemeResonator::new();
+        res.store("A", HV16::random("A"));
+        res.store("B", HV16::random("B"));
+        assert_eq!(res.len(), 2);
+
+        res.clear();
+        assert_eq!(res.len(), 0);
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn test_decoder_default_and_reset() {
+        let mut decoder = PhonemeDecoder::new();
+        assert!(decoder.prev_phoneme.is_none());
+
+        // Load some prototypes and decode
+        let protos = vec![
+            ("AA".to_string(), HV16::random("AA")),
+            ("IY".to_string(), HV16::random("IY")),
+        ];
+        decoder.load_prototypes(&protos);
+
+        // Decode should produce a result
+        let result = decoder.decode(&HV16::random("AA"));
+        assert!(result.is_some());
+
+        // Reset should clear state
+        decoder.reset();
+        assert!(decoder.prev_phoneme.is_none());
+    }
+
+    #[test]
+    fn test_decoder_min_confidence() {
+        let decoder = PhonemeDecoder::new().with_min_confidence(0.5);
+        assert!((decoder.min_confidence - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_repetition_penalty_no_history() {
+        let decoder = PhonemeDecoder::new();
+        let penalty = decoder.compute_repetition_penalty("AA");
+        assert!((penalty - 1.0).abs() < 1e-6, "no history should give 1.0 penalty");
+    }
+
+    #[test]
+    fn test_repetition_penalty_single_occurrence() {
+        let mut decoder = PhonemeDecoder::new();
+        decoder.update_history("AA".to_string());
+
+        let penalty = decoder.compute_repetition_penalty("AA");
+        assert!(
+            (penalty - 0.85).abs() < 1e-6,
+            "single occurrence should give 0.85, got {penalty}"
+        );
+    }
+
+    #[test]
+    fn test_repetition_penalty_multiple_occurrences() {
+        let mut decoder = PhonemeDecoder::new();
+        decoder.update_history("AA".to_string());
+        decoder.update_history("AA".to_string());
+
+        let penalty = decoder.compute_repetition_penalty("AA");
+        assert!(
+            (penalty - 0.6).abs() < 1e-6,
+            "two occurrences should give 0.6, got {penalty}"
+        );
+    }
+
+    #[test]
+    fn test_repetition_penalty_oscillation() {
+        let mut decoder = PhonemeDecoder::new();
+        // Create oscillating pattern: AA BB AA
+        decoder.update_history("AA".to_string());
+        decoder.update_history("BB".to_string());
+        decoder.update_history("AA".to_string());
+        decoder.update_history("BB".to_string());
+
+        // Next "AA" should trigger oscillation penalty
+        let penalty = decoder.compute_repetition_penalty("AA");
+        assert!(
+            penalty < 0.85,
+            "oscillation should give harsh penalty, got {penalty}"
+        );
+    }
+
+    #[test]
+    fn test_temporal_config_default() {
+        let config = TemporalConfig::default();
+        assert_eq!(config.window_size, 5);
+        assert_eq!(config.min_duration_frames, 3);
+        assert_eq!(config.stability_frames, 2);
+    }
+
+    #[test]
+    fn test_temporal_decoder_empty_input() {
+        let mut decoder = TemporalDecoder::new();
+        let result = decoder.decode_sequence(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_temporal_decoder_stable_sequence() {
+        let mut decoder = TemporalDecoder::with_config(TemporalConfig {
+            window_size: 1,
+            confidence_threshold: 0.1,
+            min_duration_frames: 2,
+            stability_frames: 2,
+        });
+
+        // Feed 10 frames of "AA" then 10 frames of "IY"
+        let mut sims = Vec::new();
+        for _ in 0..10 {
+            sims.push(vec![("AA".to_string(), 0.8), ("IY".to_string(), 0.2)]);
+        }
+        for _ in 0..10 {
+            sims.push(vec![("IY".to_string(), 0.8), ("AA".to_string(), 0.2)]);
+        }
+
+        let phonemes = decoder.decode_sequence(&sims);
+
+        // Should emit at least AA and IY
+        assert!(
+            phonemes.contains(&"AA".to_string()),
+            "should contain AA: {:?}",
+            phonemes
+        );
+        assert!(
+            phonemes.contains(&"IY".to_string()),
+            "should contain IY: {:?}",
+            phonemes
+        );
+    }
+
+    #[test]
+    fn test_temporal_decoder_reset() {
+        let mut decoder = TemporalDecoder::new();
+
+        // Process some frames
+        decoder.process_frame(&[("AA".to_string(), 0.8)]);
+        decoder.process_frame(&[("AA".to_string(), 0.8)]);
+
+        decoder.reset();
+        assert!(decoder.current_phoneme.is_none());
+        assert_eq!(decoder.current_duration, 0);
+        assert!(decoder.get_phonemes().is_empty());
+    }
+
+    #[test]
+    fn test_temporal_decoder_below_confidence() {
+        let mut decoder = TemporalDecoder::with_config(TemporalConfig {
+            confidence_threshold: 0.9,
+            min_duration_frames: 1,
+            ..Default::default()
+        });
+
+        // All scores below threshold
+        let sims: Vec<Vec<(String, f32)>> = (0..5)
+            .map(|_| vec![("AA".to_string(), 0.1)])
+            .collect();
+
+        let phonemes = decoder.decode_sequence(&sims);
+        // No phoneme should be emitted since confidence is below threshold
+        assert!(
+            phonemes.is_empty(),
+            "should emit nothing below confidence threshold: {:?}",
+            phonemes
+        );
+    }
+
+    #[test]
+    fn test_temporal_decoder_min_duration_filter() {
+        let mut decoder = TemporalDecoder::with_config(TemporalConfig {
+            window_size: 1,
+            confidence_threshold: 0.1,
+            min_duration_frames: 5,
+            stability_frames: 1,
+        });
+
+        // Only 2 frames of "AA" - too short
+        let sims = vec![
+            vec![("AA".to_string(), 0.8)],
+            vec![("AA".to_string(), 0.8)],
+            vec![("IY".to_string(), 0.8)],
+            vec![("IY".to_string(), 0.8)],
+            vec![("IY".to_string(), 0.8)],
+            vec![("IY".to_string(), 0.8)],
+            vec![("IY".to_string(), 0.8)],
+            vec![("IY".to_string(), 0.8)],
+        ];
+
+        let phonemes = decoder.decode_sequence(&sims);
+        // AA segment is too short (2 < 5), should be filtered
+        assert!(
+            !phonemes.contains(&"AA".to_string()),
+            "short AA segment should be filtered: {:?}",
+            phonemes
+        );
+    }
 }
