@@ -433,6 +433,14 @@ pub fn train_with_adam(
                 tokens = total_tokens,
                 "Broca training epoch"
             );
+            // Unbuffered progress (tracing stderr is internally buffered when piped)
+            use std::io::Write;
+            let _ = writeln!(
+                std::io::stderr(),
+                "[epoch] {epoch}/{} loss={avg_loss:.6} tokens={total_tokens}",
+                config.epochs,
+            );
+            std::io::stderr().flush().ok();
         }
 
         // Record embedding norms at end of each epoch
@@ -689,6 +697,43 @@ pub fn thought_to_prompt(channels: &ThoughtChannels) -> String {
         "SEMANTIC_INTENT: {}\nEPISTEMIC_STATUS: {}\nMOOD_TEMPERATURE: {:.2}\n",
         intent_names[active_intent], epistemic_names[epistemic_idx], channels.channels[17],
     )
+}
+
+/// Generate a synthetic training curriculum from diverse ThoughtChannels.
+///
+/// Uses `generate_diverse_thoughts()` to create 360 diverse ThoughtChannels,
+/// converts each to a text prompt via `thought_to_prompt()`, and encodes
+/// with the provided tokenizer. Returns pairs suitable for distillation.
+///
+/// This is "teacher-free" bootstrapping: the target text is the structured
+/// prompt itself, training the projection to reproduce thought→text mappings.
+pub fn generate_curriculum(tokenizer: &BpeTokenizer) -> TrainingDataset {
+    let thoughts = generate_diverse_thoughts();
+    let mut dataset = TrainingDataset::default();
+
+    for thought in &thoughts {
+        let prompt = thought_to_prompt(thought);
+        let ids = tokenizer.encode(&prompt);
+        dataset.pairs.push(TrainingPair {
+            channels: thought.channels,
+            target_text: prompt,
+            target_ids: ids,
+        });
+    }
+
+    dataset
+}
+
+/// Write a curriculum dataset to a JSONL file.
+///
+/// Returns the number of pairs written.
+pub fn write_curriculum_jsonl(path: &str, tokenizer: &BpeTokenizer) -> Result<usize> {
+    let dataset = generate_curriculum(tokenizer);
+    let count = dataset.pairs.len();
+    dataset
+        .to_jsonl(path)
+        .with_context(|| format!("writing curriculum to {path}"))?;
+    Ok(count)
 }
 
 #[cfg(test)]
@@ -1028,6 +1073,52 @@ mod tests {
         assert!(
             summary.contains("Clip count:        1"),
             "Should show 1 clip"
+        );
+    }
+
+    #[test]
+    fn test_generate_curriculum_produces_valid_pairs() {
+        let tokenizer = BpeTokenizer::default_minimal();
+        let dataset = generate_curriculum(&tokenizer);
+
+        assert!(
+            dataset.pairs.len() >= 100,
+            "Should produce many pairs, got {}",
+            dataset.pairs.len()
+        );
+
+        for pair in &dataset.pairs {
+            // All channels finite
+            assert!(
+                pair.channels.iter().all(|c| c.is_finite()),
+                "All channels should be finite"
+            );
+            // Non-empty target text
+            assert!(!pair.target_text.is_empty(), "Target text should not be empty");
+            // Token IDs present
+            assert!(
+                !pair.target_ids.is_empty(),
+                "Target IDs should not be empty"
+            );
+            // Round-trip: decode(encode(text)) produces non-empty output
+            let decoded = tokenizer.decode(&pair.target_ids);
+            assert!(!decoded.is_empty(), "Decoded text should not be empty");
+        }
+
+        // Verify diversity: multiple intents present
+        let unique_intents: std::collections::HashSet<usize> = dataset
+            .pairs
+            .iter()
+            .map(|p| {
+                (0..8)
+                    .max_by(|&a, &b| p.channels[a].total_cmp(&p.channels[b]))
+                    .unwrap()
+            })
+            .collect();
+        assert!(
+            unique_intents.len() >= 6,
+            "Should cover most intents, got {}",
+            unique_intents.len()
         );
     }
 }
