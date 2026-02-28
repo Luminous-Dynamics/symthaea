@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use super::cognitive_profile::CognitiveProfile;
 use super::config::BenchmarkConfig;
 use super::neuromod_correlation::NeuromodCorrelationMatrix;
-use super::report::BenchmarkReport;
-use super::staircase::{StaircaseConfig, StaircaseResult, run_staircase};
+use super::report::{key_metric_for_benchmark, BenchmarkReport};
+use super::staircase::{run_staircase, StaircaseConfig, StaircaseResult};
 use super::PsychBenchmark;
 
 /// A full psychometric assessment combining all analysis modules.
@@ -73,7 +73,7 @@ impl PsychometricReport {
         let mut n_metrics = 0usize;
 
         for result in &report.results {
-            let key_metric = key_metric_for(&result.benchmark);
+            let key_metric = key_metric_for_benchmark(&result.benchmark);
             let key_value = result
                 .metrics
                 .get(key_metric)
@@ -234,7 +234,11 @@ impl PsychometricReport {
                 d.score * 100.0,
                 d.interpretation
             ));
-            out.push_str(&format!("```\n[{}{}]\n```\n\n", bar, " ".repeat(20 - bar_len)));
+            out.push_str(&format!(
+                "```\n[{}{}]\n```\n\n",
+                bar,
+                " ".repeat(20 - bar_len)
+            ));
             for (bench, score) in &d.benchmark_scores {
                 let short = bench.split("::").last().unwrap_or(bench);
                 out.push_str(&format!("- {}: {:.1}%\n", short, score * 100.0));
@@ -243,57 +247,6 @@ impl PsychometricReport {
         }
 
         out
-    }
-}
-
-/// Map benchmark name to its primary metric.
-fn key_metric_for(benchmark_name: &str) -> &'static str {
-    match benchmark_name {
-        name if name.contains("Stroop") && name.contains("Emotional") => "emotional_interference",
-        name if name.contains("Stroop") => "incongruent_accuracy",
-        name if name.contains("WCST") => "categories_completed",
-        name if name.contains("Flanker") => "incongruent_accuracy",
-        name if name.contains("TowerOfLondon") => "accuracy",
-        name if name.contains("DualTask") => "dual_cost",
-        name if name.contains("Ravens") => "accuracy",
-        name if name.contains("IowaGambling") => "net_score",
-        name if name.contains("N-back") => "hit_rate",
-        name if name.contains("ChangeDetection") => "accuracy",
-        name if name.contains("SerialRecall") => "accuracy",
-        name if name.contains("SpatialUpdating") => "accuracy",
-        name if name.contains("Binding") => "accuracy",
-        name if name.contains("DigitSpan") => "max_span",
-        name if name.contains("PVT") => "mean_rt_ticks",
-        name if name.contains("CPT") => "hit_rate",
-        name if name.contains("SART") => "accuracy",
-        name if name.contains("FittsLaw") => "fitts_r_squared",
-        name if name.contains("Bimanual") => "accuracy",
-        name if name.contains("SRTT") => "accuracy",
-        name if name.contains("GoNoGo") => "overall_accuracy",
-        name if name.contains("StopSignal") => "accuracy",
-        name if name.contains("VisualSearch") => "accuracy",
-        name if name.contains("AttentionalBlink") => "t1_accuracy",
-        name if name.contains("RME") => "accuracy",
-        name if name.contains("SocialNorm") => "accuracy",
-        name if name.contains("UltimatumGame") => "acceptance_rate",
-        name if name.contains("FalseBelief") => "accuracy",
-        name if name.contains("FauxPas") => "accuracy",
-        name if name.contains("Persuasion") => "accuracy",
-        name if name.contains("StrangeStory") => "accuracy",
-        name if name.contains("Hinting") => "accuracy",
-        name if name.contains("LexicalDecision") => "word_accuracy",
-        name if name.contains("SemanticPriming") => "priming_effect",
-        name if name.contains("SemanticCoherence") => "accuracy",
-        name if name.contains("GardenPath") => "accuracy",
-        name if name.contains("Calibration") => "calibration_ece",
-        name if name.contains("FOK") => "gamma",
-        name if name.contains("Arc") => "transfer_accuracy",
-        name if name.contains("AccurateRetrieval") => "accuracy",
-        name if name.contains("LongRange") => "accuracy",
-        name if name.contains("ProspectiveMemory") => "pm_accuracy",
-        name if name.contains("ConflictResolution") => "accuracy",
-        name if name.contains("TestTimeLearning") => "accuracy",
-        _ => "accuracy",
     }
 }
 
@@ -306,21 +259,20 @@ mod tests {
         let mut report = BenchmarkReport::new();
 
         let mut stroop = BenchmarkResult::new("Executive::Stroop", None);
-        stroop.insert("incongruent_accuracy", MetricValue::from_samples(&[0.85]));
-        stroop.insert("congruent_accuracy", MetricValue::from_samples(&[0.95]));
         stroop.insert("stroop_effect", MetricValue::from_samples(&[0.10]));
+        stroop.insert("congruent_accuracy", MetricValue::from_samples(&[0.95]));
         stroop.elapsed_ms = 50;
         stroop.trials_per_condition = 20;
         report.add(stroop);
 
         let mut nback = BenchmarkResult::new("WorM::N-back", None);
-        nback.insert("hit_rate", MetricValue::from_samples(&[0.72]));
+        nback.insert("nback_2::accuracy", MetricValue::from_samples(&[0.72]));
         nback.elapsed_ms = 30;
         nback.trials_per_condition = 20;
         report.add(nback);
 
         let mut pvt = BenchmarkResult::new("SustainedAttention::PVT", None);
-        pvt.insert("mean_rt_ticks", MetricValue::from_samples(&[4.5]));
+        pvt.insert("vigilance_decrement", MetricValue::from_samples(&[0.15]));
         pvt.elapsed_ms = 20;
         pvt.trials_per_condition = 20;
         report.add(pvt);
@@ -351,8 +303,8 @@ mod tests {
             .iter()
             .find(|d| d.benchmark == "Executive::Stroop")
             .unwrap();
-        assert_eq!(stroop.key_metric, "incongruent_accuracy");
-        assert!((stroop.key_value - 0.85).abs() < 1e-10);
+        assert_eq!(stroop.key_metric, "stroop_effect");
+        assert!((stroop.key_value - 0.10).abs() < 1e-10);
     }
 
     #[test]
@@ -411,12 +363,33 @@ mod tests {
 
     #[test]
     fn test_key_metric_mapping() {
-        assert_eq!(key_metric_for("Executive::Stroop"), "incongruent_accuracy");
-        assert_eq!(key_metric_for("Executive::WCST"), "categories_completed");
-        assert_eq!(key_metric_for("WorM::N-back"), "hit_rate");
-        assert_eq!(key_metric_for("SustainedAttention::PVT"), "mean_rt_ticks");
-        assert_eq!(key_metric_for("Metacognition::Calibration"), "calibration_ece");
-        assert_eq!(key_metric_for("Reasoning::ArcFluid"), "transfer_accuracy");
-        assert_eq!(key_metric_for("Unknown::Bench"), "accuracy");
+        assert_eq!(
+            key_metric_for_benchmark("Executive::Stroop"),
+            "stroop_effect"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("Executive::WCST"),
+            "categories_completed"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("WorM::N-back"),
+            "nback_2::accuracy"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("SustainedAttention::PVT"),
+            "vigilance_decrement"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("Metacognition::Calibration"),
+            "calibration_error_ece"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("Reasoning::ArcFluid"),
+            "transfer_accuracy"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("Unknown::Bench"),
+            "overall_accuracy"
+        );
     }
 }

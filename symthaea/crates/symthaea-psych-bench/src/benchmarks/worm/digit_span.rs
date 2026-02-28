@@ -13,9 +13,11 @@ use crate::adapter::sequence::{SequenceAdapter, SequenceItem};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::ssm_temporal::SsmTemporalBackend;
 use crate::wm::{WmConfig, WorkingMemory};
+use std::collections::BTreeMap;
 
 /// Digit Span benchmark testing WM capacity via serial recall.
 pub struct DigitSpanBenchmark;
@@ -266,6 +268,7 @@ impl PsychBenchmark for DigitSpanBenchmark {
         let mut fwd_acc_7 = Vec::new();
         let mut fwd_rts = Vec::new();
         let mut bwd_rts = Vec::new();
+        let mut trace = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -274,6 +277,29 @@ impl PsychBenchmark for DigitSpanBenchmark {
             fwd_acc_7.push(r.fwd_accuracy_at_7);
             fwd_rts.push(r.forward_rt);
             bwd_rts.push(r.backward_rt);
+
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trial * 2,
+                    condition: "forward".to_string(),
+                    correct: r.forward_span >= 5,
+                    rt_ticks: r.forward_rt,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+                trace.push(TrialOutcome {
+                    trial_idx: trial * 2 + 1,
+                    condition: "backward".to_string(),
+                    correct: r.backward_span >= 4,
+                    rt_ticks: r.backward_rt,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("forward_span", MetricValue::from_samples(&fwd_spans));
@@ -284,6 +310,10 @@ impl PsychBenchmark for DigitSpanBenchmark {
         );
         result.insert("forward::rt_ticks", MetricValue::from_samples(&fwd_rts));
         result.insert("backward::rt_ticks", MetricValue::from_samples(&bwd_rts));
+
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
 
         result.conditions = 2; // forward + backward
         result.trials_per_condition = config.trials_per_condition;
@@ -362,7 +392,9 @@ mod tests {
         assert!(
             diff < 1.5,
             "SSM backward_span ({:.3}) too far from baseline ({:.3}), diff={:.3}",
-            ssm_bwd, base_bwd, diff
+            ssm_bwd,
+            base_bwd,
+            diff
         );
     }
 }

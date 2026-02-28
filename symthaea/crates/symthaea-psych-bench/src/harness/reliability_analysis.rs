@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::config::BenchmarkConfig;
-use super::report::BenchmarkResult;
+use super::report::{key_metric_for_benchmark, BenchmarkResult};
 use super::PsychBenchmark;
 
 // ──── Practice direction ────
@@ -230,59 +230,6 @@ pub fn pearson_r(x: &[f64], y: &[f64]) -> f64 {
     (cov / denom).clamp(-1.0, 1.0)
 }
 
-// ──── Key metric lookup ────
-
-/// Return the key metric name for a benchmark (same logic as cognitive_profile).
-pub fn key_metric_for(benchmark_name: &str) -> &'static str {
-    match benchmark_name {
-        name if name.contains("Stroop") && name.contains("Emotional") => "emotional_interference",
-        name if name.contains("Stroop") => "incongruent_accuracy",
-        name if name.contains("WCST") => "accuracy",
-        name if name.contains("Flanker") => "incongruent_accuracy",
-        name if name.contains("TowerOfLondon") => "accuracy",
-        name if name.contains("DualTask") => "dual_cost",
-        name if name.contains("Ravens") => "accuracy",
-        name if name.contains("IowaGambling") => "net_score",
-        name if name.contains("N-back") => "hit_rate",
-        name if name.contains("ChangeDetection") => "accuracy",
-        name if name.contains("SerialRecall") => "accuracy",
-        name if name.contains("SpatialUpdating") => "accuracy",
-        name if name.contains("Binding") => "accuracy",
-        name if name.contains("DigitSpan") => "max_span",
-        name if name.contains("PVT") => "mean_rt_ticks",
-        name if name.contains("CPT") => "hit_rate",
-        name if name.contains("SART") => "accuracy",
-        name if name.contains("FittsLaw") => "fitts_r_squared",
-        name if name.contains("Bimanual") => "accuracy",
-        name if name.contains("SRTT") => "accuracy",
-        name if name.contains("GoNoGo") => "overall_accuracy",
-        name if name.contains("StopSignal") => "accuracy",
-        name if name.contains("VisualSearch") => "accuracy",
-        name if name.contains("AttentionalBlink") => "t1_accuracy",
-        name if name.contains("RME") => "accuracy",
-        name if name.contains("SocialNorm") => "accuracy",
-        name if name.contains("UltimatumGame") => "acceptance_rate",
-        name if name.contains("FalseBelief") => "accuracy",
-        name if name.contains("FauxPas") => "accuracy",
-        name if name.contains("Persuasion") => "accuracy",
-        name if name.contains("StrangeStory") => "accuracy",
-        name if name.contains("Hinting") => "accuracy",
-        name if name.contains("LexicalDecision") => "word_accuracy",
-        name if name.contains("SemanticPriming") => "priming_effect",
-        name if name.contains("SemanticCoherence") => "accuracy",
-        name if name.contains("GardenPath") => "accuracy",
-        name if name.contains("Calibration") => "calibration_ece",
-        name if name.contains("FOK") => "gamma",
-        name if name.contains("Arc") => "transfer_accuracy",
-        name if name.contains("AccurateRetrieval") => "accuracy",
-        name if name.contains("LongRange") => "accuracy",
-        name if name.contains("ProspectiveMemory") => "pm_accuracy",
-        name if name.contains("ConflictResolution") => "accuracy",
-        name if name.contains("TestTimeLearning") => "accuracy",
-        _ => "accuracy",
-    }
-}
-
 // ──── Reliability battery ────
 
 /// Battery of test-retest reliability results across multiple benchmarks.
@@ -308,7 +255,7 @@ impl ReliabilityBattery {
 
         for bench in benchmarks {
             let bench_name = bench.name();
-            let metric_name = key_metric_for(bench_name);
+            let metric_name = key_metric_for_benchmark(bench_name);
 
             // Run n_sessions with different seeds
             let mut session_results: Vec<BenchmarkResult> = Vec::with_capacity(n_sessions);
@@ -502,8 +449,14 @@ mod tests {
 
     #[test]
     fn test_reliability_class_ranges() {
-        assert_eq!(ReliabilityClass::from_icc(0.95), ReliabilityClass::Excellent);
-        assert_eq!(ReliabilityClass::from_icc(0.91), ReliabilityClass::Excellent);
+        assert_eq!(
+            ReliabilityClass::from_icc(0.95),
+            ReliabilityClass::Excellent
+        );
+        assert_eq!(
+            ReliabilityClass::from_icc(0.91),
+            ReliabilityClass::Excellent
+        );
         assert_eq!(ReliabilityClass::from_icc(0.90), ReliabilityClass::Good);
         assert_eq!(ReliabilityClass::from_icc(0.80), ReliabilityClass::Good);
         assert_eq!(ReliabilityClass::from_icc(0.76), ReliabilityClass::Good);
@@ -548,7 +501,7 @@ mod tests {
 
         let result = &battery.results[0];
         assert_eq!(result.benchmark, "Executive::Stroop");
-        assert_eq!(result.metric, "incongruent_accuracy");
+        assert_eq!(result.metric, "stroop_effect");
         assert!(result.icc.is_finite(), "ICC should be finite");
         assert!(
             result.icc >= -1.0 && result.icc <= 1.0,
@@ -577,7 +530,11 @@ mod tests {
         assert_eq!(battery.results.len(), 2);
 
         // Both benchmarks should have results
-        let names: Vec<&str> = battery.results.iter().map(|r| r.benchmark.as_str()).collect();
+        let names: Vec<&str> = battery
+            .results
+            .iter()
+            .map(|r| r.benchmark.as_str())
+            .collect();
         assert!(names.contains(&"Executive::Stroop"));
         assert!(names.contains(&"Executive::Flanker"));
 
@@ -606,12 +563,30 @@ mod tests {
 
     #[test]
     fn test_key_metric_for_known_benchmarks() {
-        assert_eq!(key_metric_for("Executive::Stroop"), "incongruent_accuracy");
-        assert_eq!(key_metric_for("Executive::WCST"), "accuracy");
-        assert_eq!(key_metric_for("WorM::N-back"), "hit_rate");
-        assert_eq!(key_metric_for("Reasoning::ArcFluid"), "transfer_accuracy");
-        assert_eq!(key_metric_for("Metacognition::FOK"), "gamma");
-        assert_eq!(key_metric_for("Unknown::Bench"), "accuracy");
+        assert_eq!(
+            key_metric_for_benchmark("Executive::Stroop"),
+            "stroop_effect"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("Executive::WCST"),
+            "categories_completed"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("WorM::N-back"),
+            "nback_2::accuracy"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("Reasoning::ArcFluid"),
+            "transfer_accuracy"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("Metacognition::FeelingOfKnowing"),
+            "fok_gamma"
+        );
+        assert_eq!(
+            key_metric_for_benchmark("Unknown::Bench"),
+            "overall_accuracy"
+        );
     }
 
     #[test]

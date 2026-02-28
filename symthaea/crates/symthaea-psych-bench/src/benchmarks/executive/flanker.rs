@@ -22,7 +22,9 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Eriksen Flanker Task benchmark.
@@ -36,7 +38,13 @@ enum Condition {
 }
 
 impl FlankerBenchmark {
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
+    fn run_trial(
+        &self,
+        config: &BenchmarkConfig,
+        trial_idx: usize,
+        trace: &mut Vec<TrialOutcome>,
+        global_trial_idx: &mut usize,
+    ) -> TrialResult {
         let diff_model = difficulty_model_for(self.name());
         let dim = config.dimension;
         let seed = config.trial_seed("executive", "flanker", trial_idx);
@@ -62,7 +70,8 @@ impl FlankerBenchmark {
         // Decision temperature: controls stochasticity of response selection.
         // Time pressure: base 0.25 matches ~10% flanker interference (Eriksen & Eriksen, 1974);
         // +0.15/unit reflects boundary collapse under speed emphasis (Ratcliff & McKoon, 2008 DDM).
-        let temperature: f64 = (0.25 + config.time_pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
+        let temperature: f64 = (0.25 + config.time_pressure * 0.15)
+            * diff_model.temperature_multiplier(config.difficulty);
 
         let trials_per_condition = 40;
         let mut congruent_correct = 0u32;
@@ -145,6 +154,25 @@ impl FlankerBenchmark {
                     neut_rts.push(rt_ticks);
                 }
             }
+
+            if config.trial_trace {
+                let cond_name = match condition {
+                    Condition::Congruent => "congruent",
+                    Condition::Incongruent => "incongruent",
+                    Condition::Neutral => "neutral",
+                };
+                trace.push(TrialOutcome {
+                    trial_idx: *global_trial_idx,
+                    condition: cond_name.to_string(),
+                    correct,
+                    rt_ticks,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx,
+                    extra: BTreeMap::new(),
+                });
+                *global_trial_idx += 1;
+            }
         }
 
         let cong_acc = congruent_correct as f64 / trials_per_condition as f64;
@@ -198,9 +226,11 @@ impl PsychBenchmark for FlankerBenchmark {
         let mut all_cong_rt = Vec::new();
         let mut all_incong_rt = Vec::new();
         let mut all_neut_rt = Vec::new();
+        let mut trace = Vec::new();
+        let mut global_trial_idx = 0usize;
 
         for trial in 0..config.trials_per_condition {
-            let r = self.run_trial(config, trial);
+            let r = self.run_trial(config, trial, &mut trace, &mut global_trial_idx);
             cong.push(r.congruent_accuracy);
             incong.push(r.incongruent_accuracy);
             neutral.push(r.neutral_accuracy);
@@ -225,6 +255,10 @@ impl PsychBenchmark for FlankerBenchmark {
             MetricValue::from_samples(&all_incong_rt),
         );
         result.insert("neutral::rt_ticks", MetricValue::from_samples(&all_neut_rt));
+
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
 
         result.conditions = 3;
         result.trials_per_condition = config.trials_per_condition;

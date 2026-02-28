@@ -17,7 +17,9 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// CPT benchmark.
@@ -32,7 +34,13 @@ struct TrialResult {
 }
 
 impl CptBenchmark {
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
+    fn run_trial(
+        &self,
+        config: &BenchmarkConfig,
+        trial_idx: usize,
+        trace: &mut Vec<TrialOutcome>,
+        global_trial_idx: &mut usize,
+    ) -> TrialResult {
         let dim = config.dimension;
         let seed = config.trial_seed("sustained", "cpt", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
@@ -114,25 +122,51 @@ impl CptBenchmark {
 
                 let responded = (similarity + noise) > threshold;
 
+                let correct;
+                let trial_rt;
                 if is_target {
                     target_total += 1;
                     block_targets[block] += 1;
+                    correct = responded;
                     if responded {
                         hits += 1;
                         block_hits[block] += 1;
                         // RT for hits
                         let base_rt = 6.0 + block as f64 * 0.2; // fatigue
                         let tp_speedup = config.time_pressure * 1.0;
-                        rt_sum += (base_rt - tp_speedup).max(1.0);
+                        trial_rt = (base_rt - tp_speedup).max(1.0);
+                        rt_sum += trial_rt;
                         rt_count += 1;
+                    } else {
+                        trial_rt = 0.0;
                     }
                 } else {
                     nontarget_total += 1;
                     block_nontargets[block] += 1;
+                    correct = !responded;
+                    trial_rt = 0.0;
                     if responded {
                         false_alarms += 1;
                         block_fa[block] += 1;
                     }
+                }
+
+                if config.trial_trace {
+                    trace.push(TrialOutcome {
+                        trial_idx: *global_trial_idx,
+                        condition: if is_target {
+                            "target".to_string()
+                        } else {
+                            "nontarget".to_string()
+                        },
+                        correct,
+                        rt_ticks: trial_rt,
+                        similarity: similarity as f64,
+                        confidence: 0.0,
+                        response_idx: if responded { 1 } else { 0 },
+                        extra: BTreeMap::new(),
+                    });
+                    *global_trial_idx += 1;
                 }
             }
         }
@@ -217,7 +251,11 @@ fn probit(p: f64) -> f64 {
     let d2 = 0.189269;
     let d3 = 0.001308;
     let z = t - (c0 + c1 * t + c2 * t * t) / (1.0 + d1 * t + d2 * t * t + d3 * t * t * t);
-    if p < 0.5 { -z } else { z }
+    if p < 0.5 {
+        -z
+    } else {
+        z
+    }
 }
 
 impl PsychBenchmark for CptBenchmark {
@@ -243,9 +281,11 @@ impl PsychBenchmark for CptBenchmark {
         let mut fa_rates = Vec::new();
         let mut decrements = Vec::new();
         let mut rts = Vec::new();
+        let mut trace = Vec::new();
+        let mut global_trial_idx = 0usize;
 
         for trial in 0..config.trials_per_condition {
-            let r = self.run_trial(config, trial);
+            let r = self.run_trial(config, trial, &mut trace, &mut global_trial_idx);
             dprimes.push(r.d_prime);
             hit_rates.push(r.hit_rate);
             fa_rates.push(r.false_alarm_rate);
@@ -261,6 +301,10 @@ impl PsychBenchmark for CptBenchmark {
             MetricValue::from_samples(&decrements),
         );
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
+
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
 
         result.conditions = 2; // target vs non-target
         result.trials_per_condition = config.trials_per_condition;
@@ -348,7 +392,8 @@ mod tests {
         assert!(
             rt_press <= rt_base + 0.5,
             "time pressure should reduce RT: base={:.2}, pressed={:.2}",
-            rt_base, rt_press
+            rt_base,
+            rt_press
         );
     }
 }

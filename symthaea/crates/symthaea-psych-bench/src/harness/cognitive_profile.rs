@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-use super::report::BenchmarkReport;
+use super::report::{key_metric_for_benchmark, BenchmarkReport};
 
 /// A cognitive domain with its constituent benchmarks.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,139 +28,115 @@ pub struct DomainScore {
 pub fn domain_assignments() -> BTreeMap<&'static str, Vec<&'static str>> {
     let mut map = BTreeMap::new();
 
-    map.insert("Executive", vec![
-        "Executive::Stroop",
-        "Executive::WCST",
-        "Executive::Flanker",
-        "Executive::TowerOfLondon",
-        "Executive::DualTask",
-        "Executive::Ravens",
-        "Executive::IowaGambling",
-    ]);
+    map.insert(
+        "Executive",
+        vec![
+            "Executive::Stroop",
+            "Executive::WCST",
+            "Executive::Flanker",
+            "Executive::TowerOfLondon",
+            "Executive::DualTask",
+            "Executive::Ravens",
+            "Executive::IowaGambling",
+        ],
+    );
 
-    map.insert("Memory", vec![
-        "WorM::N-back",
-        "WorM::ChangeDetection",
-        "WorM::SerialRecall",
-        "WorM::SpatialUpdating",
-        "WorM::Binding",
-        "WorM::DigitSpan",
-        "MemoryAgent::AccurateRetrieval",
-        "MemoryAgent::LongRange",
-        "MemoryAgent::ProspectiveMemory",
-        "MemoryAgent::ConflictResolution",
-        "MemoryAgent::TestTimeLearning",
-    ]);
+    map.insert(
+        "Memory",
+        vec![
+            "WorM::N-back",
+            "WorM::ChangeDetection",
+            "WorM::SerialRecall",
+            "WorM::SpatialUpdating",
+            "WorM::Binding",
+            "WorM::DigitSpan",
+            "MemoryAgent::AccurateRetrieval",
+            "MemoryAgent::LongRange",
+            "MemoryAgent::ProspectiveMemory",
+            "MemoryAgent::ConflictResolution",
+            "MemoryAgent::TestTimeLearning",
+        ],
+    );
 
-    map.insert("Attention", vec![
-        "Attention::VisualSearch",
-        "Attention::AttentionalBlink",
-        "SustainedAttention::PVT",
-        "SustainedAttention::CPT",
-        "SustainedAttention::SART",
-    ]);
+    map.insert(
+        "Attention",
+        vec![
+            "Attention::VisualSearch",
+            "Attention::AttentionalBlink",
+            "SustainedAttention::PVT",
+            "SustainedAttention::CPT",
+            "SustainedAttention::SART",
+        ],
+    );
 
-    map.insert("Social", vec![
-        "Social::RME",
-        "Social::SocialNorm",
-        "Social::UltimatumGame",
-        "ToMBench::FalseBelief",
-        "ToMBench::FauxPas",
-        "ToMBench::Persuasion",
-        "ToMBench::StrangeStory",
-        "ToMBench::Hinting",
-    ]);
+    map.insert(
+        "Social",
+        vec![
+            "Social::RME",
+            "Social::SocialNorm",
+            "Social::UltimatumGame",
+            "ToMBench::FalseBelief",
+            "ToMBench::FauxPas",
+            "ToMBench::Persuasion",
+            "ToMBench::StrangeStory",
+            "ToMBench::Hinting",
+        ],
+    );
 
-    map.insert("Motor", vec![
-        "Motor::FittsLaw",
-        "Motor::Bimanual",
-        "Motor::SRTT",
-    ]);
+    map.insert(
+        "Motor",
+        vec!["Motor::FittsLaw", "Motor::Bimanual", "Motor::SRTT"],
+    );
 
-    map.insert("Language", vec![
-        "Language::LexicalDecision",
-        "Language::SemanticPriming",
-        "Language::SemanticCoherence",
-        "Language::GardenPath",
-    ]);
+    map.insert(
+        "Language",
+        vec![
+            "Language::LexicalDecision",
+            "Language::SemanticPriming",
+            "Language::SemanticCoherence",
+            "Language::GardenPath",
+        ],
+    );
 
-    map.insert("Metacognition", vec![
-        "Metacognition::Calibration",
-        "Metacognition::FOK",
-    ]);
+    map.insert(
+        "Metacognition",
+        vec!["Metacognition::Calibration", "Metacognition::FOK"],
+    );
 
-    map.insert("Reasoning", vec![
-        "Reasoning::ArcFluid",
-        "Reasoning::ArcCompositional",
-        "Reasoning::ArcAnalogy",
-        "Reasoning::ArcAbductive",
-        "Reasoning::ArcAlgebra",
-        "Reasoning::ArcChain",
-        "Reasoning::ArcFewShot",
-        "Reasoning::ArcNoise",
-        "Reasoning::ArcRsa",
-        "Reasoning::ArcScaling",
-        "Reasoning::ArcStaircase",
-    ]);
+    map.insert(
+        "Reasoning",
+        vec![
+            "Reasoning::ArcFluid",
+            "Reasoning::ArcCompositional",
+            "Reasoning::ArcAnalogy",
+            "Reasoning::ArcAbductive",
+            "Reasoning::ArcAlgebra",
+            "Reasoning::ArcChain",
+            "Reasoning::ArcFewShot",
+            "Reasoning::ArcNoise",
+            "Reasoning::ArcRsa",
+            "Reasoning::ArcScaling",
+            "Reasoning::ArcStaircase",
+        ],
+    );
 
     map
 }
 
-/// Key metric to use for each benchmark's score.
-fn key_metric(benchmark_name: &str) -> &'static str {
-    match benchmark_name {
-        name if name.contains("Stroop") && name.contains("Emotional") => "emotional_interference",
-        name if name.contains("Stroop") => "incongruent_accuracy",
-        name if name.contains("WCST") => "accuracy",
-        name if name.contains("Flanker") => "incongruent_accuracy",
-        name if name.contains("TowerOfLondon") => "accuracy",
-        name if name.contains("DualTask") => "dual_cost",
-        name if name.contains("Ravens") => "accuracy",
-        name if name.contains("IowaGambling") => "net_score",
-        name if name.contains("N-back") => "hit_rate",
-        name if name.contains("ChangeDetection") => "accuracy",
-        name if name.contains("SerialRecall") => "accuracy",
-        name if name.contains("SpatialUpdating") => "accuracy",
-        name if name.contains("Binding") => "accuracy",
-        name if name.contains("DigitSpan") => "max_span",
-        name if name.contains("PVT") => "mean_rt_ticks",
-        name if name.contains("CPT") => "hit_rate",
-        name if name.contains("SART") => "accuracy",
-        name if name.contains("FittsLaw") => "fitts_r_squared",
-        name if name.contains("Bimanual") => "accuracy",
-        name if name.contains("SRTT") => "accuracy",
-        name if name.contains("GoNoGo") => "overall_accuracy",
-        name if name.contains("StopSignal") => "accuracy",
-        name if name.contains("VisualSearch") => "accuracy",
-        name if name.contains("AttentionalBlink") => "t1_accuracy",
-        name if name.contains("RME") => "accuracy",
-        name if name.contains("SocialNorm") => "accuracy",
-        name if name.contains("UltimatumGame") => "acceptance_rate",
-        name if name.contains("FalseBelief") => "accuracy",
-        name if name.contains("FauxPas") => "accuracy",
-        name if name.contains("Persuasion") => "accuracy",
-        name if name.contains("StrangeStory") => "accuracy",
-        name if name.contains("Hinting") => "accuracy",
-        name if name.contains("LexicalDecision") => "word_accuracy",
-        name if name.contains("SemanticPriming") => "priming_effect",
-        name if name.contains("SemanticCoherence") => "accuracy",
-        name if name.contains("GardenPath") => "accuracy",
-        name if name.contains("Calibration") => "calibration_ece",
-        name if name.contains("FOK") => "gamma",
-        name if name.contains("Arc") => "transfer_accuracy",
-        name if name.contains("AccurateRetrieval") => "accuracy",
-        name if name.contains("LongRange") => "accuracy",
-        name if name.contains("ProspectiveMemory") => "pm_accuracy",
-        name if name.contains("ConflictResolution") => "accuracy",
-        name if name.contains("TestTimeLearning") => "accuracy",
-        _ => "accuracy",
-    }
-}
-
 /// Whether a metric is "lower is better" (needs inversion for profile scoring).
 fn is_lower_better(metric: &str) -> bool {
-    matches!(metric,
-        "mean_rt_ticks" | "dual_cost" | "calibration_ece" | "stroop_effect"
+    matches!(
+        metric,
+        "stroop_effect"
+            | "flanker_effect"
+            | "dual_task_cost"
+            | "calibration_error_ece"
+            | "commission_errors"
+            | "ssrt_ticks"
+            | "coordination_cost"
+            | "vigilance_decrement"
+            | "disambiguation_cost"
+            | "blink_magnitude"
     )
 }
 
@@ -188,15 +164,19 @@ impl CognitiveProfile {
 
             for &bench_name in benchmark_names {
                 if let Some(result) = report.results.iter().find(|r| r.benchmark == bench_name) {
-                    let metric = key_metric(bench_name);
+                    let metric = key_metric_for_benchmark(bench_name);
                     if let Some(mv) = result.metrics.get(metric) {
                         let mut score = mv.mean;
 
                         // Normalize: invert if lower-is-better
                         if is_lower_better(metric) {
-                            // Map to 0-1 where higher = better
-                            // Use sigmoid-like transform: score = 1 / (1 + value/scale)
-                            score = 1.0 / (1.0 + score.abs() / 5.0);
+                            if score > 1.0 {
+                                // RT-like values: sigmoid transform to [0,1]
+                                score = 1.0 / (1.0 + score / 5.0);
+                            } else {
+                                // Proportion-like values: simple inversion
+                                score = (1.0 - score).clamp(0.0, 1.0);
+                            }
                         }
 
                         // Clamp to [0, 1]
@@ -230,13 +210,21 @@ impl CognitiveProfile {
 
         let strongest = domains
             .iter()
-            .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.score
+                    .partial_cmp(&b.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|d| d.domain.clone())
             .unwrap_or_default();
 
         let weakest = domains
             .iter()
-            .min_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal))
+            .min_by(|a, b| {
+                a.score
+                    .partial_cmp(&b.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|d| d.domain.clone())
             .unwrap_or_default();
 
@@ -313,21 +301,21 @@ mod tests {
     fn make_report() -> BenchmarkReport {
         let mut report = BenchmarkReport::new();
 
-        // Add a few results across domains
+        // Add a few results across domains (using canonical key_metric_for_benchmark names)
         let mut stroop = BenchmarkResult::new("Executive::Stroop", None);
-        stroop.insert("incongruent_accuracy", MetricValue::from_samples(&[0.85]));
+        stroop.insert("stroop_effect", MetricValue::from_samples(&[0.10]));
         report.add(stroop);
 
         let mut nback = BenchmarkResult::new("WorM::N-back", None);
-        nback.insert("hit_rate", MetricValue::from_samples(&[0.70]));
+        nback.insert("nback_2::accuracy", MetricValue::from_samples(&[0.70]));
         report.add(nback);
 
         let mut pvt = BenchmarkResult::new("SustainedAttention::PVT", None);
-        pvt.insert("mean_rt_ticks", MetricValue::from_samples(&[4.0]));
+        pvt.insert("vigilance_decrement", MetricValue::from_samples(&[0.15]));
         report.add(pvt);
 
         let mut rme = BenchmarkResult::new("Social::RME", None);
-        rme.insert("accuracy", MetricValue::from_samples(&[0.60]));
+        rme.insert("rme_accuracy", MetricValue::from_samples(&[0.60]));
         report.add(rme);
 
         let mut fitts = BenchmarkResult::new("Motor::FittsLaw", None);
@@ -335,11 +323,11 @@ mod tests {
         report.add(fitts);
 
         let mut lex = BenchmarkResult::new("Language::LexicalDecision", None);
-        lex.insert("word_accuracy", MetricValue::from_samples(&[0.90]));
+        lex.insert("lexicality_effect", MetricValue::from_samples(&[3.5]));
         report.add(lex);
 
         let mut calib = BenchmarkResult::new("Metacognition::Calibration", None);
-        calib.insert("calibration_ece", MetricValue::from_samples(&[0.15]));
+        calib.insert("calibration_error_ece", MetricValue::from_samples(&[0.15]));
         report.add(calib);
 
         let mut arc = BenchmarkResult::new("Reasoning::ArcFluid", None);
@@ -391,15 +379,19 @@ mod tests {
 
     #[test]
     fn test_lower_better_inversion() {
-        // PVT mean_rt_ticks=4.0 should be inverted to a 0-1 score
+        // PVT vigilance_decrement=0.15 should be inverted to a 0-1 score
         let report = make_report();
         let profile = CognitiveProfile::from_report(&report);
 
         let attention = profile.domains.iter().find(|d| d.domain == "Attention");
         assert!(attention.is_some());
         let score = attention.unwrap().score;
-        // RT of 4.0 → 1/(1+4/5) = 1/1.8 ≈ 0.556
-        assert!(score > 0.3 && score < 0.8, "PVT score should be moderate: {}", score);
+        // vigilance_decrement=0.15 (proportion) → (1 - 0.15) = 0.85
+        assert!(
+            score > 0.5 && score < 1.0,
+            "PVT score should be high for low decrement: {}",
+            score
+        );
     }
 
     #[test]

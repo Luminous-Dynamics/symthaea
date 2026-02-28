@@ -132,8 +132,7 @@ impl MetricValue {
             0.0
         };
         let std_dev = variance.sqrt();
-        let (ci_lower, ci_upper) =
-            super::analysis::bootstrap_ci_bca(samples, 2000, 0.05, seed);
+        let (ci_lower, ci_upper) = super::analysis::bootstrap_ci_bca(samples, 2000, 0.05, seed);
         Self {
             mean,
             std_dev,
@@ -512,11 +511,7 @@ impl BenchmarkReport {
             ),
             // Reasoning (ARC Fluid)
             ("rule_consistency", "arc_rule_consistency", &bl.reasoning),
-            (
-                "transfer_accuracy",
-                "arc_transfer_accuracy",
-                &bl.reasoning,
-            ),
+            ("transfer_accuracy", "arc_transfer_accuracy", &bl.reasoning),
             (
                 "transfer_similarity",
                 "arc_transfer_similarity",
@@ -835,28 +830,72 @@ impl BenchmarkReport {
         }
         // ARC Compositional Reasoning
         if benchmark.contains("ArcCompositional") {
-            push_specific("compositional_accuracy", "arc_compositional_accuracy", &bl.reasoning);
-            push_specific("size_generalization", "arc_size_generalization", &bl.reasoning);
-            push_specific("symmetry_detection", "arc_symmetry_detection", &bl.reasoning);
-            push_specific("compositional_rt_ticks", "arc_compositional_rt_ticks", &bl.reasoning);
+            push_specific(
+                "compositional_accuracy",
+                "arc_compositional_accuracy",
+                &bl.reasoning,
+            );
+            push_specific(
+                "size_generalization",
+                "arc_size_generalization",
+                &bl.reasoning,
+            );
+            push_specific(
+                "symmetry_detection",
+                "arc_symmetry_detection",
+                &bl.reasoning,
+            );
+            push_specific(
+                "compositional_rt_ticks",
+                "arc_compositional_rt_ticks",
+                &bl.reasoning,
+            );
         }
         // ARC Analogy Reasoning
         if benchmark.contains("ArcAnalogy") {
             push_specific("analogy_accuracy", "arc_analogy_accuracy", &bl.reasoning);
-            push_specific("cross_domain_accuracy", "arc_cross_domain_accuracy", &bl.reasoning);
-            push_specific("multi_example_accuracy", "arc_multi_example_accuracy", &bl.reasoning);
+            push_specific(
+                "cross_domain_accuracy",
+                "arc_cross_domain_accuracy",
+                &bl.reasoning,
+            );
+            push_specific(
+                "multi_example_accuracy",
+                "arc_multi_example_accuracy",
+                &bl.reasoning,
+            );
             push_specific("analogy_rt_ticks", "arc_analogy_rt_ticks", &bl.reasoning);
         }
         // ARC Abductive Reasoning
         if benchmark.contains("ArcAbductive") {
-            push_specific("abduction_accuracy", "arc_abduction_accuracy", &bl.reasoning);
-            push_specific("unbinding_similarity", "arc_unbinding_similarity", &bl.reasoning);
-            push_specific("abduction_rt_ticks", "arc_abduction_rt_ticks", &bl.reasoning);
+            push_specific(
+                "abduction_accuracy",
+                "arc_abduction_accuracy",
+                &bl.reasoning,
+            );
+            push_specific(
+                "unbinding_similarity",
+                "arc_unbinding_similarity",
+                &bl.reasoning,
+            );
+            push_specific(
+                "abduction_rt_ticks",
+                "arc_abduction_rt_ticks",
+                &bl.reasoning,
+            );
         }
         // ARC Learning Curve (in ArcFluid)
         if benchmark.contains("ArcFluid") {
-            push_specific("single_pair_accuracy", "arc_single_pair_accuracy", &bl.reasoning);
-            push_specific("learning_efficiency", "arc_learning_efficiency", &bl.reasoning);
+            push_specific(
+                "single_pair_accuracy",
+                "arc_single_pair_accuracy",
+                &bl.reasoning,
+            );
+            push_specific(
+                "learning_efficiency",
+                "arc_learning_efficiency",
+                &bl.reasoning,
+            );
         }
         // ARC Chain (multi-step composition)
         if benchmark.contains("ArcChain") {
@@ -883,7 +922,11 @@ impl BenchmarkReport {
         // ARC RSA (representational similarity)
         if benchmark.contains("ArcRSA") {
             push_specific("rsa_correlation", "arc_rsa_correlation", &bl.reasoning);
-            push_specific("discriminability", "arc_rsa_discriminability", &bl.reasoning);
+            push_specific(
+                "discriminability",
+                "arc_rsa_discriminability",
+                &bl.reasoning,
+            );
         }
         // ARC Algebra (rule algebra probes)
         if benchmark.contains("ArcAlgebra") {
@@ -891,12 +934,24 @@ impl BenchmarkReport {
         }
         // ARC Staircase (adaptive threshold)
         if benchmark.contains("ArcStaircase") {
-            push_specific("capacity_threshold", "arc_capacity_threshold", &bl.reasoning);
+            push_specific(
+                "capacity_threshold",
+                "arc_capacity_threshold",
+                &bl.reasoning,
+            );
         }
         // SART (Sustained Attention)
         if benchmark.contains("SART") {
-            push_specific("commission_errors", "commission_errors", &bl.sustained_attention);
-            push_specific("omission_errors", "omission_errors", &bl.sustained_attention);
+            push_specific(
+                "commission_errors",
+                "commission_errors",
+                &bl.sustained_attention,
+            );
+            push_specific(
+                "omission_errors",
+                "omission_errors",
+                &bl.sustained_attention,
+            );
             push_specific("d_prime", "sart_d_prime", &bl.sustained_attention);
             push_specific("rt_ticks", "sart_rt_ticks", &bl.sustained_attention);
         }
@@ -1251,6 +1306,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("SpatialUpdating") => "overall_accuracy",
         b if b.contains("Binding") => "overall_binding_accuracy",
         b if b.contains("DigitSpan") => "forward_span",
+        b if b.contains("EmotionalStroop") => "emotional_interference",
         b if b.contains("Stroop") && !b.contains("Strange") => "stroop_effect",
         b if b.contains("Flanker") => "flanker_effect",
         b if b.contains("Wisconsin") || b.contains("WCST") => "categories_completed",
@@ -1283,7 +1339,6 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("GoNoGo") => "nogo_accuracy",
         b if b.contains("AttentionalBlink") => "blink_magnitude",
         b if b.contains("ProspectiveMemory") => "pm_hit_rate",
-        b if b.contains("EmotionalStroop") => "emotional_interference",
         b if b.contains("StopSignal") => "ssrt_ticks",
         b if b.contains("VisualSearch") => "search_asymmetry",
         b if b.contains("FeelingOfKnowing") => "fok_gamma",
@@ -2009,7 +2064,10 @@ mod tests {
         use crate::harness::baselines::BaselineCollection;
         let bl = BaselineCollection::all();
         let llm_comps = report.find_llm_comparisons(&report.results[0], &bl);
-        assert!(!llm_comps.is_empty(), "LLM comparisons should be populated for CogBench");
+        assert!(
+            !llm_comps.is_empty(),
+            "LLM comparisons should be populated for CogBench"
+        );
         // Verify population is GPT-4
         for (_, comp) in &llm_comps {
             assert_eq!(comp.population, "GPT-4");
@@ -2036,8 +2094,11 @@ mod tests {
         // Human and LLM populations should differ
         if let Some((_, h)) = human_comps.first() {
             if let Some((_, l)) = llm_comps.first() {
-                assert_ne!(h.population, l.population,
-                    "populations should differ: {} vs {}", h.population, l.population);
+                assert_ne!(
+                    h.population, l.population,
+                    "populations should differ: {} vs {}",
+                    h.population, l.population
+                );
             }
         }
     }

@@ -11,6 +11,8 @@ use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 #[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
+#[cfg(not(feature = "symthaea-backend"))]
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 
@@ -185,13 +187,30 @@ impl FauxPasBenchmark {
         let statement_signal = crit_hits * 0.5;
         let keyword_signal = reaction_signal + statement_signal;
 
+        // Difficulty-gated SNR degradation
+        let diff_model = difficulty_model_for(self.name());
+        let keyword_signal = keyword_signal * diff_model.signal_multiplier(config.difficulty);
+
+        // Difficulty-gated noise (breaks ceiling at higher difficulty)
+        let noise = if config.difficulty > 0.0 {
+            let mut rng_state = (config.seed ^ (trial_idx as u64 * 0x9E3779B97F4A7C15)).wrapping_add(1);
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+            let u = (rng_state as f64) / (u64::MAX as f64);
+            (u - 0.5) * config.difficulty * 0.4
+        } else {
+            0.0
+        };
+
         // Combined: keyword-dominant with geometric as tiebreaker.
         // Time pressure: 0.3/unit noise injection models degraded social cue integration
         // under speed emphasis (Baron-Cohen et al., 1999 faux pas; Heitz, 2014 SAT).
         let pressure_noise = config.time_pressure * 0.3;
         let combined = geometric_divergence as f64 * 0.2
             + keyword_signal * 0.8
-            + pressure_noise * (0.5 - (trial_idx as f64 % 2.0));
+            + pressure_noise * (0.5 - (trial_idx as f64 % 2.0))
+            + noise;
         let detected_faux_pas = combined > 0.0;
 
         if detected_faux_pas == scenario.is_faux_pas {

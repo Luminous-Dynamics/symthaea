@@ -17,8 +17,10 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::ssm_temporal::SsmTemporalBackend;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Bimanual Coordination benchmark.
@@ -57,8 +59,10 @@ impl BimanualBenchmark {
         let mut ssm_right = SsmTemporalBackend::new(-0.10, 2);
 
         // Time pressure and noise
-        let noise_level: f32 = (0.20 + config.time_pressure as f32 * 0.15) * diff_model.interference_multiplier(config.difficulty) as f32;
-        let crosstalk_noise: f32 = 0.25 * diff_model.interference_multiplier(config.difficulty) as f32; // cross-hand interference
+        let noise_level: f32 = (0.20 + config.time_pressure as f32 * 0.15)
+            * diff_model.interference_multiplier(config.difficulty) as f32;
+        let crosstalk_noise: f32 =
+            0.25 * diff_model.interference_multiplier(config.difficulty) as f32; // cross-hand interference
 
         let movements_per_condition = 20;
         let mut sym_left_correct = 0u32;
@@ -138,7 +142,11 @@ impl BimanualBenchmark {
             let right_up_flag = !left_up_flag; // opposite direction
 
             let left_target = if left_up_flag { &left_up } else { &left_down };
-            let right_target = if right_up_flag { &right_up } else { &right_down };
+            let right_target = if right_up_flag {
+                &right_up
+            } else {
+                &right_down
+            };
 
             let left_activation = ssm_left.step(if left_up_flag { 1.0 } else { 0.0 });
             let right_activation = ssm_right.step(if right_up_flag { 1.0 } else { 0.0 });
@@ -198,10 +206,10 @@ impl BimanualBenchmark {
             rt_sum += (base_rt - tp_speedup).max(1.0);
         }
 
-        let sym_acc = (sym_left_correct + sym_right_correct) as f64
-            / (2 * movements_per_condition) as f64;
-        let asym_acc = (asym_left_correct + asym_right_correct) as f64
-            / (2 * movements_per_condition) as f64;
+        let sym_acc =
+            (sym_left_correct + sym_right_correct) as f64 / (2 * movements_per_condition) as f64;
+        let asym_acc =
+            (asym_left_correct + asym_right_correct) as f64 / (2 * movements_per_condition) as f64;
         let left_acc = if left_total > 0 {
             (sym_left_correct + asym_left_correct) as f64 / left_total as f64
         } else {
@@ -248,6 +256,7 @@ impl PsychBenchmark for BimanualBenchmark {
         let mut sym_accs = Vec::new();
         let mut asym_accs = Vec::new();
         let mut rts = Vec::new();
+        let mut trace = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
@@ -257,20 +266,31 @@ impl PsychBenchmark for BimanualBenchmark {
             sym_accs.push(r.symmetric_accuracy);
             asym_accs.push(r.asymmetric_accuracy);
             rts.push(r.rt_ticks);
+
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx: trial,
+                    condition: "bimanual".to_string(),
+                    correct: r.symmetric_accuracy > 0.5,
+                    rt_ticks: r.rt_ticks,
+                    similarity: 0.0,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+            }
         }
 
         result.insert("coordination_cost", MetricValue::from_samples(&costs));
         result.insert("left_accuracy", MetricValue::from_samples(&left_accs));
         result.insert("right_accuracy", MetricValue::from_samples(&right_accs));
-        result.insert(
-            "symmetric_accuracy",
-            MetricValue::from_samples(&sym_accs),
-        );
-        result.insert(
-            "asymmetric_accuracy",
-            MetricValue::from_samples(&asym_accs),
-        );
+        result.insert("symmetric_accuracy", MetricValue::from_samples(&sym_accs));
+        result.insert("asymmetric_accuracy", MetricValue::from_samples(&asym_accs));
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
+
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
 
         result.conditions = 2; // symmetric vs asymmetric
         result.trials_per_condition = config.trials_per_condition;
@@ -341,7 +361,8 @@ mod tests {
         assert!(
             sym >= asym - 0.05,
             "symmetric ({:.3}) should be >= asymmetric ({:.3})",
-            sym, asym
+            sym,
+            asym
         );
     }
 
@@ -364,7 +385,8 @@ mod tests {
         assert!(
             rt_press <= rt_base + 0.5,
             "time pressure should reduce RT: base={:.2}, pressed={:.2}",
-            rt_base, rt_press
+            rt_base,
+            rt_press
         );
     }
 }

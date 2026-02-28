@@ -126,6 +126,24 @@ pub fn difficulty_model_for(name: &str) -> DifficultyModel {
             snr_reduction: 0.3,
             interference_scale: 0.0,
         },
+        "ToMBench::FauxPas" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.4,
+            snr_reduction: 0.55,
+            interference_scale: 0.0,
+        },
+        "ToMBench::Persuasion" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.4,
+            snr_reduction: 0.50,
+            interference_scale: 0.0,
+        },
+        "ToMBench::StrangeStory" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.35,
+            snr_reduction: 0.45,
+            interference_scale: 0.0,
+        },
 
         // Default model: temperature-only scaling for everything else
         _ => DifficultyModel {
@@ -154,7 +172,12 @@ mod tests {
         let model = difficulty_model_for("Executive::Stroop");
         let t0 = model.temperature_multiplier(0.0);
         let t1 = model.temperature_multiplier(1.0);
-        assert!(t1 > t0, "difficulty should increase temperature: {} > {}", t1, t0);
+        assert!(
+            t1 > t0,
+            "difficulty should increase temperature: {} > {}",
+            t1,
+            t0
+        );
     }
 
     #[test]
@@ -173,13 +196,41 @@ mod tests {
         assert_eq!(model.model_type, DifficultyModelType::Interference);
         let i0 = model.interference_multiplier(0.0);
         let i1 = model.interference_multiplier(1.0);
-        assert!(i1 > i0, "difficulty should amplify interference: {} > {}", i1, i0);
+        assert!(
+            i1 > i0,
+            "difficulty should amplify interference: {} > {}",
+            i1,
+            i0
+        );
     }
 
     #[test]
     fn test_default_model_for_unknown() {
         let model = difficulty_model_for("SomeUnknown::Benchmark");
         assert_eq!(model.model_type, DifficultyModelType::Default);
+    }
+
+    #[test]
+    fn test_tombench_faux_pas_snr() {
+        let model = difficulty_model_for("ToMBench::FauxPas");
+        assert_eq!(model.model_type, DifficultyModelType::Snr);
+        assert!((model.snr_reduction - 0.55).abs() < 1e-10);
+        let s = model.signal_multiplier(1.0);
+        assert!(s < 1.0 && s > 0.0);
+    }
+
+    #[test]
+    fn test_tombench_persuasion_snr() {
+        let model = difficulty_model_for("ToMBench::Persuasion");
+        assert_eq!(model.model_type, DifficultyModelType::Snr);
+        assert!((model.snr_reduction - 0.50).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_tombench_strange_story_snr() {
+        let model = difficulty_model_for("ToMBench::StrangeStory");
+        assert_eq!(model.model_type, DifficultyModelType::Snr);
+        assert!((model.snr_reduction - 0.45).abs() < 1e-10);
     }
 
     #[test]

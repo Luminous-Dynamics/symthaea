@@ -10,6 +10,8 @@ use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 #[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
+#[cfg(not(feature = "symthaea-backend"))]
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 #[cfg(not(feature = "symthaea-backend"))]
@@ -215,11 +217,28 @@ impl StrangeStoryBenchmark {
         let contradiction_signal = neg_count * pos_claim; // Cross-product: both needed
         let keyword_signal = contradiction_signal * 0.5 + deception_count * 0.4;
 
+        // Difficulty-gated SNR degradation
+        let diff_model = difficulty_model_for(self.name());
+        let keyword_signal = keyword_signal * diff_model.signal_multiplier(config.difficulty);
+
+        // Difficulty-gated noise (breaks ceiling at higher difficulty)
+        let noise = if config.difficulty > 0.0 {
+            let mut rng_state = (config.seed ^ (trial_idx as u64 * 0x9E3779B97F4A7C15)).wrapping_add(1);
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+            let u = (rng_state as f64) / (u64::MAX as f64);
+            (u - 0.5) * config.difficulty * 0.4
+        } else {
+            0.0
+        };
+
         // Combined: keyword-dominant, geometric as tiebreaker
-        let combined = keyword_signal + geo_signal * 0.1;
+        let combined = keyword_signal + geo_signal * 0.1 + noise;
         // Time pressure: 0.25/unit raises detection threshold, modeling reduced narrative
         // integration under deadline (Happe, 1994 Strange Stories; Wickelgren, 1977 SAT).
-        let threshold = config.time_pressure * 0.25;
+        // Baseline threshold offset of 0.5 makes the threshold harder to exceed.
+        let threshold = 0.5 + config.time_pressure * 0.25;
         let detected_nonliteral = combined > threshold;
 
         // Non-literal detection = correct for these scenarios (all are non-literal)

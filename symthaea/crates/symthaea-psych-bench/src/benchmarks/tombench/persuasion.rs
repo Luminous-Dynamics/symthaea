@@ -10,6 +10,8 @@ use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 #[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
+#[cfg(not(feature = "symthaea-backend"))]
+use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 #[cfg(not(feature = "symthaea-backend"))]
@@ -188,8 +190,24 @@ impl PersuasionBenchmark {
             incentive_count * 0.15
         };
 
+        // Difficulty-gated SNR degradation
+        let diff_model = difficulty_model_for(self.name());
+        let structure_score = structure_score * diff_model.signal_multiplier(config.difficulty);
+
+        // Difficulty-gated noise (breaks ceiling at higher difficulty)
+        let noise = if config.difficulty > 0.0 {
+            let mut rng_state = (config.seed ^ (trial_idx as u64 * 0x9E3779B97F4A7C15)).wrapping_add(1);
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+            let u = (rng_state as f64) / (u64::MAX as f64);
+            (u - 0.5) * config.difficulty * 0.4
+        } else {
+            0.0
+        };
+
         // Combined: structure-dominant, geometric as tiebreaker
-        let combined = structure_score + geo_signal * 0.1;
+        let combined = structure_score + geo_signal * 0.1 + noise;
         // Time pressure: base 0.3 threshold yields ~75% persuasion detection; +0.20/unit raises
         // criterion, modeling reduced ToM inference depth under deadline (Apperly et al., 2006).
         let threshold = 0.3 + config.time_pressure * 0.2;
