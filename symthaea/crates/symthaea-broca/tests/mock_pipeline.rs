@@ -299,6 +299,145 @@ fn test_surprise_gradient_amplifies() {
     );
 }
 
+/// Eval-only workflow: train → save checkpoint → load → evaluate.
+///
+/// Tests the same code path the binary's --eval-only mode exercises:
+/// generate+distill → ProjectionCheckpoint save → fresh gen with loaded weights → evaluate.
+#[test]
+fn test_eval_only_workflow() {
+    use symthaea_broca::checkpoint::ProjectionCheckpoint;
+    use symthaea_broca::evaluation::{
+        evaluate_liquid_mamba, format_liquid_mamba_eval_report, LiquidMambaEvalConfig,
+        QualityGateThresholds,
+    };
+    use symthaea_broca::training::{TrainingDataset, TrainingPair};
+
+    let config = LiquidMambaConfig {
+        max_tokens: 8,
+        warmup_steps: 0,
+        accumulation_steps: 1,
+        enable_consciousness_gating: false,
+        ..Default::default()
+    };
+    let mut gen = mock_gen(config.clone());
+    let channels = ThoughtChannels::with_intent(1);
+
+    // 1. Train for 5 rounds
+    for _ in 0..5 {
+        let result = gen.generate(&channels);
+        gen.distill_step(&channels, &result);
+    }
+
+    // 2. Save projection checkpoint to tempfile
+    let dir = std::env::temp_dir();
+    let path = dir.join("test_eval_only_workflow.bin");
+    let weights = gen.projection().flatten_weights();
+    let mut ckpt = ProjectionCheckpoint::new(
+        weights,
+        gen.config().hdc_dim,
+        gen.config().bottleneck_dim,
+        gen.config().ssm_dim,
+        5,
+        gen.projection().is_deep(),
+        gen.projection().inner_dim(),
+    );
+    ckpt.save_to_file(&path).unwrap();
+
+    // 3. Load fresh gen from checkpoint (simulating --resume)
+    let mut fresh_gen = mock_gen(config);
+    let loaded_ckpt = ProjectionCheckpoint::load_from_file(&path).unwrap();
+    fresh_gen
+        .projection_mut()
+        .load_weights(&loaded_ckpt.projection_weights);
+
+    // 4. Build eval config and run evaluate_liquid_mamba()
+    let mut dataset = TrainingDataset::default();
+    for intent in 0..3 {
+        let ch = ThoughtChannels::with_intent(intent);
+        dataset.pairs.push(TrainingPair {
+            channels: ch.channels,
+            target_text: "test evaluation".to_string(),
+            target_ids: vec![],
+        });
+    }
+    let eval_config = LiquidMambaEvalConfig {
+        dataset,
+        compute_perplexity: true,
+        compute_english_ratio: true,
+        per_intent_breakdown: true,
+        max_gen_tokens: 8,
+        consciousness_gating_test: false,
+    };
+    let result = evaluate_liquid_mamba(&mut fresh_gen, &eval_config);
+
+    // 5. Assert: result has finite perplexity, PE, rank
+    assert!(
+        result.base.perplexity.is_finite(),
+        "Perplexity should be finite: {}",
+        result.base.perplexity
+    );
+    assert!(
+        result.avg_semantic_pe.is_finite(),
+        "PE should be finite: {}",
+        result.avg_semantic_pe
+    );
+    assert!(
+        result.avg_effective_rank.is_finite(),
+        "Rank should be finite: {}",
+        result.avg_effective_rank
+    );
+
+    // 6. Assert: format_liquid_mamba_eval_report() produces non-empty string
+    let report = format_liquid_mamba_eval_report(&result, &QualityGateThresholds::default());
+    assert!(!report.is_empty(), "Report should be non-empty");
+    assert!(
+        report.contains("Liquid-Mamba"),
+        "Report should have header"
+    );
+
+    let _ = std::fs::remove_file(&path);
+}
+
+/// Diagnostics accumulate across multiple distill_step calls.
+#[test]
+fn test_diagnostics_across_training() {
+    let config = LiquidMambaConfig {
+        max_tokens: 8,
+        warmup_steps: 0,
+        accumulation_steps: 1,
+        enable_consciousness_gating: false,
+        ..Default::default()
+    };
+    let mut gen = mock_gen(config);
+    gen.enable_diagnostics();
+
+    let channels = ThoughtChannels::with_intent(1);
+
+    // Train 10 rounds (warmup=0, accum=1 so every step applies)
+    for _ in 0..10 {
+        let result = gen.generate(&channels);
+        gen.distill_step(&channels, &result);
+    }
+
+    let diag = gen
+        .projection_diagnostics()
+        .expect("diagnostics should be enabled");
+    assert!(
+        diag.total_steps >= 5,
+        "Expected >= 5 gradient steps, got {}",
+        diag.total_steps
+    );
+    assert_eq!(
+        diag.grad_norms_down.len(),
+        diag.total_steps,
+        "grad_norms_down length should match total_steps"
+    );
+    assert!(
+        !diag.bottleneck_collapse_detected(),
+        "Healthy mock should not detect collapse"
+    );
+}
+
 /// EMA inference swap: after 10 rounds with enable_ema, EMA should be
 /// active and all weights finite.
 #[test]
