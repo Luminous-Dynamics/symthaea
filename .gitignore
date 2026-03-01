@@ -272,6 +272,15 @@ configs/
 .claude-sessions/
 .claude/
 
+# === LaTeX Build Artifacts ===
+*.aux
+*.blg
+*.out
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+# Keep .bbl tracked (needed for arXiv submissions)
+
 # === Build Caches ===
 .sccache/
 .symthaea/
