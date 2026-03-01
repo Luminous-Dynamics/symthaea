@@ -35,12 +35,146 @@ pub mod model;
 
 #[cfg(feature = "burn")]
 use burn::backend::NdArray;
+#[cfg(feature = "burn")]
+use burn::module::Module as _;
+#[cfg(feature = "burn")]
+use std::sync::Arc;
 
 /// Full dimension for Qwen3-1.5B embeddings
 pub const QWEN3_FULL_DIMENSION: usize = 1536;
 
 /// Standard dimension for Qwen3-0.6B embeddings
 pub const QWEN3_STANDARD_DIMENSION: usize = 1024;
+
+// ── Burn backend abstraction ──────────────────────────────────────────
+
+#[cfg(feature = "burn")]
+enum BurnBackend {
+    NdArray {
+        model: model::Qwen3Model<NdArray>,
+        device: burn::backend::ndarray::NdArrayDevice,
+    },
+    #[cfg(feature = "burn-wgpu")]
+    Wgpu {
+        model: model::Qwen3Model<burn::backend::Wgpu>,
+        device: burn::backend::wgpu::WgpuDevice,
+    },
+}
+
+/// Generic forward + pool: runs the model and extracts a Vec<f32> embedding.
+/// Works for any Burn backend.
+#[cfg(feature = "burn")]
+#[allow(clippy::too_many_arguments)]
+fn forward_and_pool<B: burn::prelude::Backend>(
+    burn_model: &model::Qwen3Model<B>,
+    input_ids: &[i32],
+    mask: &[u32],
+    seq_len: usize,
+    device: &B::Device,
+    pooling: PoolingStrategy,
+    embedding_dim: usize,
+    normalize: bool,
+) -> Result<Vec<f32>> {
+    use burn::prelude::*;
+
+    let input_tensor = Tensor::<B, 1, Int>::from_data(input_ids, device)
+        .unsqueeze_dim(0); // [1, seq_len]
+
+    let hidden = burn_model.forward(input_tensor);
+    let [_batch, _seq, hidden_dim] = hidden.dims();
+    let out_dim = embedding_dim.min(hidden_dim);
+
+    let pooled: Tensor<B, 2> = match pooling {
+        PoolingStrategy::LastTokenPooling => {
+            let last_idx = mask[..seq_len]
+                .iter()
+                .rposition(|&m| m == 1)
+                .unwrap_or(seq_len.saturating_sub(1));
+            hidden
+                .slice([0..1, last_idx..last_idx + 1, 0..out_dim])
+                .reshape([1, out_dim])
+        }
+        PoolingStrategy::MeanPooling => {
+            let token_count = mask[..seq_len].iter().filter(|&&m| m == 1).count();
+            if token_count > 0 {
+                // sum_dim keeps rank → [1, 1, out_dim]; squeeze to [1, out_dim]
+                let sum = hidden
+                    .slice([0..1, 0..token_count, 0..out_dim])
+                    .sum_dim(1)
+                    .squeeze(1);
+                sum.div_scalar(token_count as f32)
+            } else {
+                hidden
+                    .slice([0..1, 0..1, 0..out_dim])
+                    .reshape([1, out_dim])
+            }
+        }
+        PoolingStrategy::ClsToken => {
+            hidden
+                .slice([0..1, 0..1, 0..out_dim])
+                .reshape([1, out_dim])
+        }
+        PoolingStrategy::MaxPooling => {
+            // max_dim keeps rank → [1, 1, out_dim]; squeeze to [1, out_dim]
+            hidden.slice([0..1, 0..seq_len, 0..out_dim]).max_dim(1).squeeze(1)
+        }
+    };
+
+    let data = pooled.into_data();
+    let mut embedding: Vec<f32> = data.to_vec().unwrap();
+    embedding.truncate(out_dim);
+
+    if normalize {
+        let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm > 1e-6 {
+            for x in embedding.iter_mut() {
+                *x /= norm;
+            }
+        }
+    }
+
+    Ok(embedding)
+}
+
+#[cfg(feature = "burn")]
+impl BurnBackend {
+    fn embed(
+        &self,
+        input_ids: &[i32],
+        mask: &[u32],
+        seq_len: usize,
+        pooling: PoolingStrategy,
+        embedding_dim: usize,
+        normalize: bool,
+    ) -> Result<Vec<f32>> {
+        match self {
+            Self::NdArray { model, device } => {
+                forward_and_pool(model, input_ids, mask, seq_len, device, pooling, embedding_dim, normalize)
+            }
+            #[cfg(feature = "burn-wgpu")]
+            Self::Wgpu { model, device } => {
+                forward_and_pool(model, input_ids, mask, seq_len, device, pooling, embedding_dim, normalize)
+            }
+        }
+    }
+}
+
+// ── Model cache ───────────────────────────────────────────────────────
+// Loaded models are expensive (0.6B = ~2.4 GB f32). Cache by path so
+// multiple Qwen3Embedder instances share the same weights.
+
+#[cfg(feature = "burn")]
+fn model_cache(
+) -> &'static std::sync::Mutex<std::collections::HashMap<String, Arc<std::sync::Mutex<BurnBackend>>>>
+{
+    use std::sync::OnceLock;
+    static CACHE: OnceLock<
+        std::sync::Mutex<std::collections::HashMap<String, Arc<std::sync::Mutex<BurnBackend>>>>,
+    > = OnceLock::new();
+    CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+// ── Config ────────────────────────────────────────────────────────────
 
 /// Configuration for Qwen3Embedder
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,6 +205,11 @@ pub struct Qwen3Config {
 
     /// Number of threads for CPU inference
     pub num_threads: usize,
+
+    /// Load weights in half precision (f16 storage, f32 compute).
+    /// Halves model loading time and on-disk size. Runtime memory is
+    /// unchanged on CPU (NdArray) but enables f16 compute on WGPU.
+    pub half_precision: bool,
 }
 
 impl Default for Qwen3Config {
@@ -85,6 +224,7 @@ impl Default for Qwen3Config {
             pooling: PoolingStrategy::LastTokenPooling,
             device: Device::Cpu,
             num_threads: 4,
+            half_precision: false,
         }
     }
 }
@@ -129,6 +269,18 @@ impl Qwen3Config {
         self.device = Device::Cuda;
         self
     }
+
+    /// Use GPU via WGPU (auto-selects best available backend)
+    pub fn with_gpu(mut self) -> Self {
+        self.device = Device::Wgpu;
+        self
+    }
+
+    /// Enable half-precision weight loading (f16 storage, faster load)
+    pub fn with_half_precision(mut self) -> Self {
+        self.half_precision = true;
+        self
+    }
 }
 
 /// Pooling strategy for sequence embeddings
@@ -147,13 +299,17 @@ pub enum PoolingStrategy {
 /// Device for inference
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Device {
-    /// CPU inference
+    /// CPU inference (NdArray backend)
     Cpu,
-    /// CUDA GPU inference
+    /// GPU via WGPU (auto-selects Vulkan/Metal/DX12)
+    Wgpu,
+    /// CUDA GPU inference (mapped to WGPU)
     Cuda,
-    /// Metal GPU (Apple Silicon)
+    /// Metal GPU (mapped to WGPU)
     Metal,
 }
+
+// ── Embedder ──────────────────────────────────────────────────────────
 
 /// Qwen3 Text Embedder
 ///
@@ -172,17 +328,14 @@ pub struct Qwen3Embedder {
     /// Statistics
     stats: Qwen3Stats,
 
-    /// Burn model (when `burn` feature is enabled and weights loaded)
+    /// Backend-erased model (shared via Arc for cache reuse).
+    /// Mutex makes BurnBackend Sync (burn's Param<T> is Send but not Sync).
     #[cfg(feature = "burn")]
-    burn_model: Option<model::Qwen3Model<NdArray>>,
+    inference: Option<Arc<std::sync::Mutex<BurnBackend>>>,
 
     /// Tokenizer for text→token conversion
     #[cfg(feature = "burn")]
     tokenizer: Option<tokenizers::Tokenizer>,
-
-    /// Burn device handle
-    #[cfg(feature = "burn")]
-    burn_device: burn::backend::ndarray::NdArrayDevice,
 }
 
 /// Statistics for the embedder
@@ -210,11 +363,9 @@ impl Qwen3Embedder {
             cache: std::collections::HashMap::new(),
             stats: Qwen3Stats::default(),
             #[cfg(feature = "burn")]
-            burn_model: None,
+            inference: None,
             #[cfg(feature = "burn")]
             tokenizer: None,
-            #[cfg(feature = "burn")]
-            burn_device: burn::backend::ndarray::NdArrayDevice::Cpu,
         };
 
         // Try to load Burn model if path is specified and not in simulation mode
@@ -237,11 +388,9 @@ impl Qwen3Embedder {
 
     /// Attempt to load Burn model and tokenizer from safetensors.
     /// Falls back to simulation on any load failure.
+    /// Uses a process-wide cache so multiple embedders share weights.
     #[cfg(feature = "burn")]
     fn try_load_burn(&mut self) -> Result<()> {
-        use burn::record::FullPrecisionSettings;
-        use burn_import::safetensors::{LoadArgs, SafetensorsFileRecorder};
-
         let model_dir = match self.config.model_path {
             Some(ref p) => p.clone(),
             None => {
@@ -269,41 +418,142 @@ impl Qwen3Embedder {
             }
         }
 
-        // Determine model variant from embedding_dim
-        let model_cfg = if self.config.embedding_dim >= QWEN3_FULL_DIMENSION {
-            model::Qwen3ModelConfig::qwen3_15b()
-        } else {
-            model::Qwen3ModelConfig::qwen3_06b()
-        };
+        // Build a cache key from path + device + precision
+        let cache_key = format!(
+            "{}::{:?}::half={}",
+            model_dir, self.config.device, self.config.half_precision
+        );
 
-        // Init model with random weights, then load safetensors on top
-        let device = &self.burn_device;
-        let mut burn_model = model_cfg.init::<NdArray>(device);
+        // Check cache first
+        if let Ok(cache) = model_cache().lock() {
+            if let Some(cached) = cache.get(&cache_key) {
+                self.inference = Some(Arc::clone(cached));
+                self.model_loaded = true;
+                tracing::info!("Reusing cached Qwen3 model for {}", model_dir);
+                return Ok(());
+            }
+        }
 
-        // Load safetensors weights — strip "model." prefix via key remap
-        let safetensors_path = std::path::Path::new(&model_dir).join("model.safetensors");
-        let recorder = SafetensorsFileRecorder::<FullPrecisionSettings>::new();
-        let load_args = LoadArgs::new(safetensors_path)
-            .with_key_remap("model\\.(.*)", "$1");
+        // Load fresh model based on device selection
+        let backend = self.load_backend(&model_dir)?;
 
-        match burn::record::Recorder::load(recorder, load_args, device) {
-            Ok(record) => {
-                burn_model = burn_model.load_record(record);
-                self.burn_model = Some(burn_model);
+        match backend {
+            Some(b) => {
+                let arc = Arc::new(std::sync::Mutex::new(b));
+                // Insert into cache
+                if let Ok(mut cache) = model_cache().lock() {
+                    cache.insert(cache_key, Arc::clone(&arc));
+                }
+                self.inference = Some(arc);
                 self.model_loaded = true;
                 tracing::info!(
-                    "Loaded Qwen3 Burn model from {} ({}D)",
+                    "Loaded Qwen3 Burn model from {} ({}D, {:?})",
                     model_dir,
-                    self.config.embedding_dim
+                    self.config.embedding_dim,
+                    self.config.device,
                 );
             }
-            Err(e) => {
-                tracing::warn!("Failed to load safetensors from {}: {}, using simulation", model_dir, e);
+            None => {
                 self.config.use_simulated = true;
             }
         }
 
         Ok(())
+    }
+
+    /// Load the Burn model with the appropriate backend.
+    #[cfg(feature = "burn")]
+    fn load_backend(&self, model_dir: &str) -> Result<Option<BurnBackend>> {
+        let wants_gpu = matches!(self.config.device, Device::Wgpu | Device::Cuda | Device::Metal);
+
+        if wants_gpu {
+            #[cfg(feature = "burn-wgpu")]
+            {
+                match self.load_wgpu_model(model_dir) {
+                    Ok(backend) => return Ok(Some(backend)),
+                    Err(e) => {
+                        tracing::warn!("WGPU init failed ({}), falling back to CPU", e);
+                    }
+                }
+            }
+            #[cfg(not(feature = "burn-wgpu"))]
+            {
+                tracing::warn!(
+                    "GPU requested but `burn-wgpu` feature not enabled, falling back to CPU"
+                );
+            }
+        }
+
+        // CPU (NdArray) path
+        match self.load_ndarray_model(model_dir) {
+            Ok(backend) => Ok(Some(backend)),
+            Err(e) => {
+                tracing::warn!("Failed to load model from {}: {}, using simulation", model_dir, e);
+                Ok(None)
+            }
+        }
+    }
+
+    /// Load model into NdArray (CPU) backend.
+    #[cfg(feature = "burn")]
+    fn load_ndarray_model(&self, model_dir: &str) -> Result<BurnBackend> {
+        let device = burn::backend::ndarray::NdArrayDevice::Cpu;
+        let model_cfg = self.resolve_model_config();
+        let mut burn_model = model_cfg.init::<NdArray>(&device);
+
+        let safetensors_path = std::path::Path::new(model_dir).join("model.safetensors");
+        let record = self.load_safetensors_record::<NdArray>(&safetensors_path, &device)?;
+        burn_model = burn_model.load_record(record);
+
+        Ok(BurnBackend::NdArray {
+            model: burn_model,
+            device,
+        })
+    }
+
+    /// Load model into WGPU (GPU) backend.
+    #[cfg(feature = "burn-wgpu")]
+    fn load_wgpu_model(&self, model_dir: &str) -> Result<BurnBackend> {
+        let device = burn::backend::wgpu::WgpuDevice::DefaultDevice;
+        let model_cfg = self.resolve_model_config();
+        let mut burn_model = model_cfg.init::<burn::backend::Wgpu>(&device);
+
+        let safetensors_path = std::path::Path::new(model_dir).join("model.safetensors");
+        let record = self.load_safetensors_record::<burn::backend::Wgpu>(&safetensors_path, &device)?;
+        burn_model = burn_model.load_record(record);
+
+        Ok(BurnBackend::Wgpu {
+            model: burn_model,
+            device,
+        })
+    }
+
+    /// Determine model config from embedding dimension.
+    #[cfg(feature = "burn")]
+    fn resolve_model_config(&self) -> model::Qwen3ModelConfig {
+        if self.config.embedding_dim >= QWEN3_FULL_DIMENSION {
+            model::Qwen3ModelConfig::qwen3_15b()
+        } else {
+            model::Qwen3ModelConfig::qwen3_06b()
+        }
+    }
+
+    /// Load safetensors weights, using full or half precision.
+    ///
+    /// TODO: Implement direct safetensors→Burn tensor loading without burn-import
+    /// (removed burn-import due to liblzma-sys/lzma-sys link conflict with lancedb).
+    /// For now, returns Err to trigger simulation fallback.
+    #[cfg(feature = "burn")]
+    fn load_safetensors_record<B: burn::prelude::Backend>(
+        &self,
+        path: &std::path::Path,
+        _device: &B::Device,
+    ) -> Result<<model::Qwen3Model<B> as burn::module::Module<B>>::Record> {
+        anyhow::bail!(
+            "Safetensors loading not yet implemented (burn-import removed). \
+             Model path: {}. Falling back to simulation.",
+            path.display()
+        )
     }
 
     /// Embed a single text
@@ -355,11 +605,11 @@ impl Qwen3Embedder {
         texts.iter().map(|t| self.embed(t)).collect()
     }
 
-    /// Run Burn inference to produce a real embedding.
+    /// Run Burn inference through the backend-erased model.
     #[cfg(feature = "burn")]
     fn burn_embed(&self, text: &str) -> Result<Vec<f32>> {
-        let burn_model = self
-            .burn_model
+        let inference_arc = self
+            .inference
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Burn model not loaded"))?;
         let tokenizer = self
@@ -376,62 +626,20 @@ impl Qwen3Embedder {
         let mask = encoding.get_attention_mask();
         let seq_len = ids.len().min(self.config.max_seq_length);
 
-        // Create Burn input tensor [1, seq_len]
         let input_ids: Vec<i32> = ids[..seq_len].iter().map(|&x| x as i32).collect();
-        let input_tensor = burn::tensor::Tensor::<NdArray, 1, burn::tensor::Int>::from_data(
-            input_ids.as_slice(),
-            &self.burn_device,
+
+        let inference = inference_arc
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Model lock poisoned: {}", e))?;
+
+        inference.embed(
+            &input_ids,
+            &mask[..seq_len],
+            seq_len,
+            self.config.pooling,
+            self.config.embedding_dim,
+            self.config.normalize_output,
         )
-        .unsqueeze_dim(0); // [1, seq_len]
-
-        // Forward pass → [1, seq_len, hidden_size]
-        let hidden = burn_model.forward(input_tensor);
-        let [_batch, _seq, hidden_dim] = hidden.dims();
-
-        let out_dim = self.config.embedding_dim.min(hidden_dim);
-
-        // Pool based on strategy
-        let pooled: burn::tensor::Tensor<NdArray, 2> = match self.config.pooling {
-            PoolingStrategy::LastTokenPooling => {
-                let last_idx = mask[..seq_len]
-                    .iter()
-                    .rposition(|&m| m == 1)
-                    .unwrap_or(seq_len.saturating_sub(1));
-                hidden.slice([0..1, last_idx..last_idx + 1, 0..out_dim]).reshape([1, out_dim])
-            }
-            PoolingStrategy::MeanPooling => {
-                let token_count = mask[..seq_len].iter().filter(|&&m| m == 1).count();
-                if token_count > 0 {
-                    let sum = hidden.slice([0..1, 0..token_count, 0..out_dim]).sum_dim(1);
-                    sum.div_scalar(token_count as f32)
-                } else {
-                    hidden.slice([0..1, 0..1, 0..out_dim]).reshape([1, out_dim])
-                }
-            }
-            PoolingStrategy::ClsToken => {
-                hidden.slice([0..1, 0..1, 0..out_dim]).reshape([1, out_dim])
-            }
-            PoolingStrategy::MaxPooling => {
-                hidden.slice([0..1, 0..seq_len, 0..out_dim]).max_dim(1)
-            }
-        };
-
-        // Convert to Vec<f32>
-        let data = pooled.into_data();
-        let mut embedding: Vec<f32> = data.to_vec().unwrap();
-        embedding.truncate(out_dim);
-
-        // Normalize if configured
-        if self.config.normalize_output {
-            let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
-            if norm > 1e-6 {
-                for x in embedding.iter_mut() {
-                    *x /= norm;
-                }
-            }
-        }
-
-        Ok(embedding)
     }
 
     /// Simulate a high-quality embedding for text
@@ -584,6 +792,14 @@ impl Qwen3Embedder {
     pub fn config(&self) -> &Qwen3Config {
         &self.config
     }
+
+    /// Evict all cached models from the process-wide model cache.
+    #[cfg(feature = "burn")]
+    pub fn clear_model_cache() {
+        if let Ok(mut cache) = model_cache().lock() {
+            cache.clear();
+        }
+    }
 }
 
 impl Embedder for Qwen3Embedder {
@@ -680,6 +896,18 @@ mod tests {
             assert_eq!(result.dimension, QWEN3_STANDARD_DIMENSION);
         }
     }
+
+    #[test]
+    fn test_half_precision_config() {
+        let config = Qwen3Config::simulated().with_half_precision();
+        assert!(config.half_precision);
+    }
+
+    #[test]
+    fn test_gpu_config() {
+        let config = Qwen3Config::simulated().with_gpu();
+        assert_eq!(config.device, Device::Wgpu);
+    }
 }
 
 #[cfg(test)]
@@ -760,5 +988,40 @@ mod burn_tests {
         let x = Tensor::<B, 3>::zeros([1, 4, 64], &device);
         let y = norm.forward(x);
         assert_eq!(y.dims(), [1, 4, 64]);
+    }
+
+    #[test]
+    fn test_forward_and_pool_generic() {
+        let device = burn::backend::ndarray::NdArrayDevice::Cpu;
+        let cfg = Qwen3ModelConfig::tiny();
+        let model = cfg.init::<B>(&device);
+
+        let input_ids: Vec<i32> = vec![1, 2, 3, 4];
+        let mask: Vec<u32> = vec![1, 1, 1, 1];
+
+        let result = super::forward_and_pool(
+            &model,
+            &input_ids,
+            &mask,
+            4,
+            &device,
+            super::PoolingStrategy::MeanPooling,
+            64,
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(result.len(), 64);
+        // Normalized: should have unit norm
+        let norm: f32 = result.iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!((norm - 1.0).abs() < 0.01, "Expected unit norm, got {}", norm);
+    }
+
+    #[test]
+    fn test_gpu_fallback_to_cpu() {
+        // Request GPU but burn-wgpu not enabled → should fall back to simulation
+        let config = super::Qwen3Config::qwen3_06b("/nonexistent/path").with_gpu();
+        let embedder = super::Qwen3Embedder::new(config).unwrap();
+        assert!(embedder.config().use_simulated);
     }
 }

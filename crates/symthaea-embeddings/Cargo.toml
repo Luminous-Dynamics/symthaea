@@ -19,11 +19,12 @@ serde = { workspace = true }
 symthaea-core = { path = "../../symthaea-core" }
 
 # Burn ML framework (optional — enabled via `burn` feature)
-burn = { version = "0.18", default-features = false, features = ["ndarray"], optional = true }
-burn-import = { version = "0.18", default-features = false, features = ["safetensors"], optional = true }
+burn = { version = "0.18", default-features = false, optional = true }
+safetensors = { version = "0.4", optional = true }
 tokenizers = { version = "0.21", optional = true }
 tracing = { version = "0.1", optional = true }
 
 [features]
 default = []
-burn = ["dep:burn", "dep:burn-import", "dep:tokenizers", "dep:tracing"]
+burn = ["dep:burn", "dep:safetensors", "dep:tokenizers", "dep:tracing", "burn/ndarray"]
+burn-wgpu = ["burn", "burn/wgpu"]
