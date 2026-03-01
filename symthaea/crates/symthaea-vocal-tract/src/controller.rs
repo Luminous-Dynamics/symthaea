@@ -2207,8 +2207,8 @@ mod tests {
         // Train 40 epochs (fast enough for CI, enough for convergence)
         ctrl.train_on_phoneme_targets(&genesis, &targets, 40);
 
-        // LS refinement (blend=0.7) — matches production pipeline
-        ctrl.refine_output_projection_ls(&genesis, &targets, 0.7);
+        // LS refinement (blend=1.0) — full analytical replacement
+        ctrl.refine_output_projection_ls(&genesis, &targets, 1.0);
 
         // Measure formant accuracy: Euclidean error across F1/F2/F3
         let mut total_error = 0.0f32;

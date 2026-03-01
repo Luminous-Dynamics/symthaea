@@ -49,8 +49,8 @@ fn main() {
     println!("  Transition loss: {:.4}", trans_loss);
 
     // Least-squares output projection refinement (analytical optimal weights)
-    println!("  Refining output projection (LS, blend=0.7)...");
-    symthaea::voice::refine_controller_ls(&mut ltc, &genesis, &db, 0.7);
+    println!("  Refining output projection (LS, blend=1.0)...");
+    symthaea::voice::refine_controller_ls(&mut ltc, &genesis, &db, 1.0);
     println!();
 
     // ── Setup rule-based synthesizer ─────────────────────────────────────
@@ -166,7 +166,7 @@ fn main() {
     // Train pipeline's controller to match the standalone one
     symthaea::voice::train_controller_on_phoneme_db(&mut pipeline.controller, &genesis, &db, 100);
     symthaea::voice::train_controller_transitions(&mut pipeline.controller, &genesis, &db, 10);
-    symthaea::voice::refine_controller_ls(&mut pipeline.controller, &genesis, &db, 0.7);
+    symthaea::voice::refine_controller_ls(&mut pipeline.controller, &genesis, &db, 1.0);
 
     let state = VoiceCognitiveState::default();
     let dt = 0.005;

@@ -108,8 +108,8 @@ fn main() {
     println!("  Transition loss: {:.4}", trans_loss);
 
     // Least-squares output projection refinement
-    println!("  Refining output projection (LS, blend=0.7)...");
-    symthaea::voice::refine_controller_ls(&mut pipeline.controller, &genesis, &db, 0.7);
+    println!("  Refining output projection (LS, blend=1.0)...");
+    symthaea::voice::refine_controller_ls(&mut pipeline.controller, &genesis, &db, 1.0);
 
     println!();
 
