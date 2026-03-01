@@ -154,7 +154,16 @@ impl ScalePredictor {
     }
 
     /// Predict state at the given time horizon. O(1) cost.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `dt_seconds` is not finite or is non-positive.
     pub fn predict(&self, current_state: &ContinuousHV, dt_seconds: f32) -> ContinuousHV {
+        assert!(
+            dt_seconds.is_finite() && dt_seconds > 0.0,
+            "dt_seconds must be finite and positive, got {}",
+            dt_seconds
+        );
         let mut neuron_copy = self.neuron.clone();
         neuron_copy.evolve_closed_form(dt_seconds, current_state);
         neuron_copy.state().clone()
@@ -167,6 +176,24 @@ impl ScalePredictor {
 
     pub fn scale(&self) -> PhysicalScale {
         self.scale
+    }
+}
+
+impl symthaea_core::temporal::TemporalPredictor for ScalePredictor {
+    fn predict_at(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
+        self.predict(current_state, horizon_seconds)
+    }
+
+    fn observe(&mut self, state: &ContinuousHV, dt_seconds: f32) {
+        self.observe(state, dt_seconds);
+    }
+
+    fn domain(&self) -> &'static str {
+        "multiscale"
+    }
+
+    fn tau_base(&self) -> f32 {
+        self.scale.tau_seconds()
     }
 }
 
@@ -209,7 +236,8 @@ impl MultiScaleUnifier {
 
     /// Encode observables at a specific scale.
     pub fn encode(&self, scale: PhysicalScale, observables: &[f64]) -> ContinuousHV {
-        let idx = PhysicalScale::ALL.iter().position(|&s| s == scale).unwrap();
+        let idx = PhysicalScale::ALL.iter().position(|&s| s == scale)
+            .expect("scale must be a known PhysicalScale variant");
         self.encoders[idx].encode(observables)
     }
 
@@ -220,13 +248,15 @@ impl MultiScaleUnifier {
         current_state: &ContinuousHV,
         dt_seconds: f32,
     ) -> ContinuousHV {
-        let idx = PhysicalScale::ALL.iter().position(|&s| s == scale).unwrap();
+        let idx = PhysicalScale::ALL.iter().position(|&s| s == scale)
+            .expect("scale must be a known PhysicalScale variant");
         self.predictors[idx].predict(current_state, dt_seconds)
     }
 
     /// Feed an observation at a specific scale.
     pub fn observe(&mut self, scale: PhysicalScale, state: &ContinuousHV, dt: f32) {
-        let idx = PhysicalScale::ALL.iter().position(|&s| s == scale).unwrap();
+        let idx = PhysicalScale::ALL.iter().position(|&s| s == scale)
+            .expect("scale must be a known PhysicalScale variant");
         self.predictors[idx].observe(state, dt);
     }
 
@@ -447,5 +477,45 @@ mod tests {
                 scale, ratio
             );
         }
+    }
+
+    // ── Track B: failure-path tests ──────────────────────────────────────
+
+    #[test]
+    #[should_panic(expected = "dt_seconds must be finite and positive")]
+    fn test_scale_predictor_rejects_nan() {
+        let predictor = ScalePredictor::new(PhysicalScale::Atomic);
+        let input = ContinuousHV::random(HDC_DIMENSION, 42);
+        predictor.predict(&input, f32::NAN);
+    }
+
+    #[test]
+    #[should_panic(expected = "dt_seconds must be finite and positive")]
+    fn test_scale_predictor_rejects_zero() {
+        let predictor = ScalePredictor::new(PhysicalScale::Atomic);
+        let input = ContinuousHV::random(HDC_DIMENSION, 42);
+        predictor.predict(&input, 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "dt_seconds must be finite and positive")]
+    fn test_scale_predictor_rejects_negative() {
+        let predictor = ScalePredictor::new(PhysicalScale::Atomic);
+        let input = ContinuousHV::random(HDC_DIMENSION, 42);
+        predictor.predict(&input, -1.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Too many observables")]
+    fn test_encoder_rejects_too_many_observables() {
+        let encoder = ScaleEncoder::new(PhysicalScale::Particle); // 4 observables
+        encoder.encode(&[0.5; 10]); // 10 > 4
+    }
+
+    #[test]
+    fn test_encoder_accepts_fewer_observables() {
+        let encoder = ScaleEncoder::new(PhysicalScale::Cellular); // 6 observables
+        let hv = encoder.encode(&[0.5; 3]); // 3 < 6, should work
+        assert_eq!(hv.dim(), HDC_DIMENSION);
     }
 }

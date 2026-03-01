@@ -70,3 +70,5 @@ pub mod phi_engine;
 /// Physics-grounded modeling: periodic table, emergence, kinetics, and thermodynamics.
 #[allow(missing_docs)]
 pub mod physics;
+/// Shared temporal prediction trait for O(1) CfC-based forecasting.
+pub mod temporal;

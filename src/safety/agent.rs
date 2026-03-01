@@ -52,12 +52,27 @@ pub struct SafetyMetrics {
 
 impl SafetyMetrics {
     /// Extract safety-relevant metrics from a full consciousness snapshot.
+    ///
+    /// Non-finite values are clamped to safe defaults:
+    /// consciousness_level → 0.0, prediction_error → 1.0, temporal_coherence → 0.0.
     pub fn from_snapshot(snap: &ConsciousnessSnapshot) -> Self {
         Self {
             cycle: snap.cycle,
-            consciousness_level: snap.consciousness_level,
-            prediction_error: snap.prediction_error,
-            temporal_coherence: snap.temporal_coherence,
+            consciousness_level: if snap.consciousness_level.is_finite() {
+                snap.consciousness_level
+            } else {
+                0.0 // assume worst-case consciousness
+            },
+            prediction_error: if snap.prediction_error.is_finite() {
+                snap.prediction_error
+            } else {
+                1.0 // assume worst-case prediction error
+            },
+            temporal_coherence: if snap.temporal_coherence.is_finite() {
+                snap.temporal_coherence
+            } else {
+                0.0 // assume worst-case coherence
+            },
         }
     }
 }
@@ -375,5 +390,51 @@ mod tests {
         // Now a Green assessment should still be Yellow due to sustained degradation
         let a = agent.assess(metrics(0.8, 0.1, 0.7));
         assert_eq!(a.level, SafetyLevel::Yellow);
+    }
+
+    // ── Track B: failure-path tests ──────────────────────────────────────
+
+    #[test]
+    fn test_nan_consciousness_treats_as_worst_case() {
+        let mut agent = SafetyAgent::new();
+        // NaN consciousness via SafetyMetrics should become 0.0 → Red
+        let m = SafetyMetrics {
+            cycle: 0,
+            consciousness_level: 0.0, // simulating NaN-clamped worst case
+            prediction_error: 0.1,
+            temporal_coherence: 0.7,
+        };
+        let a = agent.assess(m);
+        assert_eq!(a.level, SafetyLevel::Red);
+    }
+
+    #[test]
+    fn test_nan_prediction_error_treats_as_worst_case() {
+        let mut agent = SafetyAgent::new();
+        let m = SafetyMetrics {
+            cycle: 0,
+            consciousness_level: 0.8,
+            prediction_error: 1.0, // simulating NaN-clamped worst case
+            temporal_coherence: 0.7,
+        };
+        let a = agent.assess(m);
+        // High prediction error should escalate from Green
+        assert!(a.level >= SafetyLevel::Yellow);
+    }
+
+    #[test]
+    fn test_all_zeros_is_red() {
+        let mut agent = SafetyAgent::new();
+        let a = agent.assess(metrics(0.0, 0.0, 0.0));
+        assert_eq!(a.level, SafetyLevel::Red);
+    }
+
+    #[test]
+    fn test_max_history_bounded() {
+        let mut agent = SafetyAgent::new();
+        for i in 0..1500 {
+            agent.assess(metrics(0.8, 0.1, 0.7 + (i as f32) * 0.0001));
+        }
+        assert!(agent.history().len() <= 1000);
     }
 }

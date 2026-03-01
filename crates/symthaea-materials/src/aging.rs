@@ -28,7 +28,15 @@ impl MaterialAgingModel {
         Self { neuron: HdcLtcUnifiedNeuron::new(config, 0xA61_0E00), encoder: MaterialHdcEncoder::new() }
     }
 
+    /// # Panics
+    ///
+    /// Panics if `horizon_seconds` is not finite or is non-positive.
     pub fn predict_at_horizon(&self, material: &MaterialProperty, horizon_seconds: f32) -> AgingPrediction {
+        assert!(
+            horizon_seconds.is_finite() && horizon_seconds > 0.0,
+            "horizon_seconds must be finite and positive, got {}",
+            horizon_seconds
+        );
         let current_hv = self.encoder.encode(material);
         let mut neuron_copy = self.neuron.clone();
         neuron_copy.evolve_closed_form(horizon_seconds, &current_hv);
@@ -45,6 +53,26 @@ impl MaterialAgingModel {
 }
 
 impl Default for MaterialAgingModel { fn default() -> Self { Self::new() } }
+
+impl symthaea_core::temporal::TemporalPredictor for MaterialAgingModel {
+    fn predict_at(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
+        let mut neuron_copy = self.neuron.clone();
+        neuron_copy.evolve_closed_form(horizon_seconds, current_state);
+        neuron_copy.state().clone()
+    }
+
+    fn observe(&mut self, state: &ContinuousHV, dt_seconds: f32) {
+        self.neuron.evolve_closed_form(dt_seconds, state);
+    }
+
+    fn domain(&self) -> &'static str {
+        "materials"
+    }
+
+    fn tau_base(&self) -> f32 {
+        86_400.0 // 1 day (materials aging timescale)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -69,6 +97,38 @@ mod tests {
     fn test_remaining_strength_bounded() {
         for p in MaterialAgingModel::new().predict_all_horizons(&MaterialProperty::steel_a36()) {
             assert!(p.remaining_strength >= 0.0 && p.remaining_strength <= 1.0);
+        }
+    }
+
+    // ── Track B: failure-path tests ──────────────────────────────────────
+
+    #[test]
+    #[should_panic(expected = "horizon_seconds must be finite and positive")]
+    fn test_predict_rejects_nan() {
+        MaterialAgingModel::new().predict_at_horizon(&MaterialProperty::steel_a36(), f32::NAN);
+    }
+
+    #[test]
+    #[should_panic(expected = "horizon_seconds must be finite and positive")]
+    fn test_predict_rejects_zero() {
+        MaterialAgingModel::new().predict_at_horizon(&MaterialProperty::steel_a36(), 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "horizon_seconds must be finite and positive")]
+    fn test_predict_rejects_negative() {
+        MaterialAgingModel::new().predict_at_horizon(&MaterialProperty::steel_a36(), -86_400.0);
+    }
+
+    #[test]
+    fn test_all_preset_materials_age_valid() {
+        let model = MaterialAgingModel::new();
+        for mat in MaterialProperty::presets() {
+            let preds = model.predict_all_horizons(&mat);
+            for p in &preds {
+                assert!(p.state_similarity.is_finite(), "NaN state_similarity for {}", mat.name);
+                assert!(p.remaining_strength.is_finite(), "NaN remaining_strength for {}", mat.name);
+            }
         }
     }
 }
