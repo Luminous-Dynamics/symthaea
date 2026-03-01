@@ -6,6 +6,7 @@
 use super::seven_harmonies::{AlignmentResult, Harmony, SevenHarmonies};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::hdc::harmony_basis::{HarmonyBasis, MoralFreeEnergy};
@@ -119,7 +120,7 @@ pub struct HarmoniesIntegrator {
     /// Harmony embeddings (semantically grounded via HarmonyBasis)
     harmony_embeddings: HashMap<Harmony, ContinuousHV>,
     /// Shared semantic basis for harmony projection and free energy
-    harmony_basis: HarmonyBasis,
+    harmony_basis: Arc<HarmonyBasis>,
     /// Running mean of harmony coordinates (prior for moral free energy)
     harmony_prior: [f64; 7],
     /// Number of evaluations contributing to the prior (for EMA)
@@ -144,14 +145,19 @@ pub struct IntegratorStats {
 }
 
 impl HarmoniesIntegrator {
-    /// Create a new integrator with semantically grounded harmony embeddings.
+    /// Create a new integrator with its own `HarmonyBasis`.
     ///
     /// Harmony basis vectors are built by encoding keyword sets through
     /// `TextHdcEncoder`, so cosine similarity with an action's embedding
     /// reflects genuine semantic alignment rather than random projection.
     pub fn new(config: HarmoniesIntegrationConfig) -> Self {
+        let basis = Arc::new(HarmonyBasis::new(config.dimension));
+        Self::with_basis(config, basis)
+    }
+
+    /// Create a new integrator with a shared `HarmonyBasis`.
+    pub fn with_basis(config: HarmoniesIntegrationConfig, harmony_basis: Arc<HarmonyBasis>) -> Self {
         let harmonies = SevenHarmonies::default();
-        let harmony_basis = HarmonyBasis::new(config.dimension);
 
         // Build harmony embeddings from the semantic basis vectors
         let all_harmonies = Harmony::all();
@@ -353,6 +359,11 @@ impl HarmoniesIntegrator {
     /// Get alignment for the Seven Harmonies
     pub fn check_alignment(&mut self, description: &str) -> AlignmentResult {
         self.harmonies.evaluate(description)
+    }
+
+    /// Access the configuration.
+    pub fn config(&self) -> &HarmoniesIntegrationConfig {
+        &self.config
     }
 
     /// Get statistics

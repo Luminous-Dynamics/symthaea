@@ -18,6 +18,7 @@
 //! 3. **Preserves co-prime intervals**: Each subsystem fires at its original rate
 //! 4. **Backward compatible**: All existing carryover fields populated
 
+use std::sync::Arc;
 use std::time::Instant;
 
 use symthaea_core::hdc::ContinuousHV;
@@ -26,7 +27,7 @@ use crate::consciousness::harmonies_integration::{HarmoniesIntegrator, ValuedAct
 use crate::consciousness::unified_value_evaluator::{
     Decision, EvaluationContext, UnifiedValueEvaluator,
 };
-use crate::hdc::harmony_basis::MoralFreeEnergy;
+use crate::hdc::harmony_basis::{HarmonyBasis, MoralFreeEnergy};
 use crate::hdc::moral_algebra::{DeontologicalVerdict, MoralAlgebra, MoralVerdict};
 use crate::hdc::moral_parser::MoralParser;
 use crate::hdc::moral_topology::{MoralTopology, MoralTopologyConfig, MoralTopologySummary};
@@ -168,6 +169,12 @@ struct EthicsEngineCache {
 
 impl EthicsEngine {
     /// Create a new ethics engine from its component systems.
+    ///
+    /// When the `HarmoniesIntegrator` operates at the same HDC dimension as the
+    /// `MoralAlgebra`, a single `Arc<HarmonyBasis>` is shared between
+    /// `MoralTopology` and `HarmoniesIntegrator`, deduplicating ~448KB of basis
+    /// vectors. When dimensions differ (e.g., integrator uses compressed-state
+    /// dim), each keeps its own basis.
     pub fn new(
         moral_parser: MoralParser,
         moral_algebra: MoralAlgebra,
@@ -175,15 +182,32 @@ impl EthicsEngine {
         harmonies_integrator: Option<HarmoniesIntegrator>,
     ) -> Self {
         let dim = moral_algebra.dim();
+        let shared_basis = Arc::new(HarmonyBasis::new(dim));
+
+        let moral_topology = MoralTopology::with_basis(
+            MoralTopologyConfig {
+                dim,
+                ..Default::default()
+            },
+            shared_basis.clone(),
+        );
+
+        // Share basis with HarmoniesIntegrator only when dimensions match.
+        let harmonies_integrator = harmonies_integrator.map(|hi| {
+            if hi.config().dimension == dim {
+                let config = hi.config().clone();
+                HarmoniesIntegrator::with_basis(config, shared_basis.clone())
+            } else {
+                hi
+            }
+        });
+
         Self {
             moral_parser,
             moral_algebra,
             value_evaluator,
             harmonies_integrator,
-            moral_topology: MoralTopology::new(MoralTopologyConfig {
-                dim,
-                ..Default::default()
-            }),
+            moral_topology,
             cache: EthicsEngineCache {
                 last_harmonies_approved: true,
                 ..Default::default()

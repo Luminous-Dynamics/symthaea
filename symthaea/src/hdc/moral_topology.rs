@@ -12,12 +12,13 @@
 //! from BinaryHV to ContinuousHV) and PGA from [`geometric_ops`].
 
 use std::collections::VecDeque;
+use std::sync::Arc;
 
 use symthaea_core::hdc::consciousness_topology::{BettiNumbers, PersistentFeature, TopologicalFeature};
 use symthaea_core::hdc::ContinuousHV;
 
 use super::geometric_ops::{HypersphereOps, PGAResult};
-use super::harmony_basis::HarmonyBasis;
+use super::harmony_basis::{HarmonyBasis, MoralFreeEnergy};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Configuration
@@ -77,6 +78,8 @@ pub struct MoralTopologyAssessment {
     pub harmony_variance: [f64; 7],
     /// Number of scenarios in the window at analysis time.
     pub scenario_count: usize,
+    /// Moral free energy (FEP surprise on the harmony manifold).
+    pub moral_free_energy: MoralFreeEnergy,
 }
 
 /// Compact topology summary for CycleMetadata telemetry.
@@ -87,6 +90,8 @@ pub struct MoralTopologySummary {
     pub beta_2: usize,
     pub unity: f64,
     pub completeness: f64,
+    pub circularity: f64,
+    pub moral_free_energy: f64,
     pub dominant_harmony: u8,
     pub scenario_count: usize,
 }
@@ -99,6 +104,8 @@ impl From<&MoralTopologyAssessment> for MoralTopologySummary {
             beta_2: a.betti.beta_2,
             unity: a.unity,
             completeness: a.completeness,
+            circularity: a.circularity,
+            moral_free_energy: a.moral_free_energy.free_energy,
             dominant_harmony: a.dominant_harmony_idx,
             scenario_count: a.scenario_count,
         }
@@ -116,24 +123,46 @@ impl From<&MoralTopologyAssessment> for MoralTopologySummary {
 pub struct MoralTopology {
     config: MoralTopologyConfig,
     window: VecDeque<ContinuousHV>,
-    basis: HarmonyBasis,
+    basis: Arc<HarmonyBasis>,
     last_summary: MoralTopologySummary,
+    /// EMA of harmony coordinates (running prior for moral free energy).
+    harmony_prior: [f64; 7],
+    /// Number of updates to the prior (0 = uninitialised).
+    prior_count: usize,
 }
 
 impl MoralTopology {
-    /// Create a new analyser.
+    /// Create a new analyser with its own `HarmonyBasis`.
     pub fn new(config: MoralTopologyConfig) -> Self {
-        let basis = HarmonyBasis::new(config.dim);
+        let basis = Arc::new(HarmonyBasis::new(config.dim));
+        Self::with_basis(config, basis)
+    }
+
+    /// Create a new analyser with a shared `HarmonyBasis`.
+    pub fn with_basis(config: MoralTopologyConfig, basis: Arc<HarmonyBasis>) -> Self {
         Self {
             config,
             window: VecDeque::new(),
             basis,
             last_summary: MoralTopologySummary::default(),
+            harmony_prior: [0.0; 7],
+            prior_count: 0,
         }
     }
 
     /// Push a scenario hypervector into the sliding window.
+    ///
+    /// Also updates the running EMA prior of harmony coordinates for
+    /// moral free energy computation.
     pub fn add_scenario(&mut self, hv: ContinuousHV) {
+        // Update harmony prior via EMA before evicting the oldest entry
+        let coords = self.basis.project(&hv);
+        let alpha = if self.prior_count == 0 { 1.0 } else { 0.05 };
+        for i in 0..7 {
+            self.harmony_prior[i] = alpha * coords[i] + (1.0 - alpha) * self.harmony_prior[i];
+        }
+        self.prior_count += 1;
+
         if self.window.len() >= self.config.window_size {
             self.window.pop_front();
         }
@@ -153,6 +182,11 @@ impl MoralTopology {
     /// Access the last computed summary.
     pub fn last_summary(&self) -> &MoralTopologySummary {
         &self.last_summary
+    }
+
+    /// Access the shared harmony basis.
+    pub fn basis(&self) -> &Arc<HarmonyBasis> {
+        &self.basis
     }
 
     /// Perform full topological analysis on the current window.
@@ -178,6 +212,7 @@ impl MoralTopology {
                 dominant_harmony_idx: 0,
                 harmony_variance: [0.0; 7],
                 scenario_count: 0,
+                moral_free_energy: MoralFreeEnergy::default(),
             };
             self.last_summary = MoralTopologySummary::from(&assessment);
             return assessment;
@@ -267,6 +302,24 @@ impl MoralTopology {
             active as f64 / 7.0
         };
 
+        // ── Step 9: Moral free energy (FEP on harmony manifold) ───────
+        let moral_free_energy = {
+            // Mean of current window's harmony coordinates
+            let mut mean_coords = [0.0f64; 7];
+            for c in &harmony_coordinates {
+                for i in 0..7 {
+                    mean_coords[i] += c[i];
+                }
+            }
+            let n_f = harmony_coordinates.len() as f64;
+            if n_f > 0.0 {
+                for m in &mut mean_coords {
+                    *m /= n_f;
+                }
+            }
+            self.basis.moral_free_energy(&mean_coords, &self.harmony_prior, 1.0)
+        };
+
         let assessment = MoralTopologyAssessment {
             betti,
             persistent_features,
@@ -278,6 +331,7 @@ impl MoralTopology {
             dominant_harmony_idx,
             harmony_variance,
             scenario_count: n,
+            moral_free_energy,
         };
         self.last_summary = MoralTopologySummary::from(&assessment);
         assessment
@@ -783,6 +837,8 @@ mod tests {
         assert_eq!(summary.beta_2, assessment.betti.beta_2);
         assert!((summary.unity - assessment.unity).abs() < f64::EPSILON);
         assert!((summary.completeness - assessment.completeness).abs() < f64::EPSILON);
+        assert!((summary.circularity - assessment.circularity).abs() < f64::EPSILON);
+        assert!((summary.moral_free_energy - assessment.moral_free_energy.free_energy).abs() < f64::EPSILON);
         assert_eq!(summary.dominant_harmony, assessment.dominant_harmony_idx);
         assert_eq!(summary.scenario_count, assessment.scenario_count);
     }
@@ -833,5 +889,54 @@ mod tests {
                 "Persistence must be non-negative"
             );
         }
+    }
+
+    // ── Test 13: Moral free energy is finite ─────────────────────────
+
+    #[test]
+    fn test_moral_free_energy_finite() {
+        let mut topo = MoralTopology::new(test_config());
+        topo.add_scenario(encode_text("helping others is good"));
+        topo.add_scenario(encode_text("harming others is wrong"));
+        topo.add_scenario(encode_text("learning brings wisdom"));
+
+        let assessment = topo.analyze();
+        assert!(
+            assessment.moral_free_energy.free_energy.is_finite(),
+            "Moral free energy should be finite, got {:?}",
+            assessment.moral_free_energy
+        );
+        // Entropy should be non-negative
+        assert!(assessment.moral_free_energy.entropy >= 0.0);
+        // Summary should capture it
+        let summary = MoralTopologySummary::from(&assessment);
+        assert!(summary.moral_free_energy.is_finite());
+    }
+
+    // ── Test 14: Benchmark analyze at n=64 ──────────────────────────
+
+    #[test]
+    fn bench_analyze_n64() {
+        let dim = 512;
+        let mut topo = MoralTopology::new(MoralTopologyConfig {
+            dim,
+            window_size: 64,
+            ..Default::default()
+        });
+        // Fill window with 64 random scenarios
+        for seed in 0..64u64 {
+            topo.add_scenario(ContinuousHV::random(dim, seed));
+        }
+        let start = std::time::Instant::now();
+        let assessment = topo.analyze();
+        let elapsed = start.elapsed();
+        // At dim=512, should be well under 100ms
+        assert!(
+            elapsed.as_millis() < 100,
+            "analyze() took {elapsed:?} at n=64, dim={dim}"
+        );
+        assert_eq!(assessment.scenario_count, 64);
+        assert!(assessment.moral_free_energy.free_energy.is_finite());
+        eprintln!("MoralTopology::analyze() n=64, dim={dim}: {elapsed:?}");
     }
 }
