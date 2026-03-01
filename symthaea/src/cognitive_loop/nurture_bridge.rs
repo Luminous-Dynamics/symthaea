@@ -95,6 +95,7 @@ impl Default for NurtureAttachmentBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_neuromodulators::NeuromodulatorBath;
 
     #[test]
     fn test_bridge_creation() {
