@@ -10,7 +10,9 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
 
 /// Lightweight transmitter model mirroring `neuromodulators::Transmitter`.
 #[derive(Clone)]
@@ -244,12 +246,27 @@ impl PsychBenchmark for PharmacologicalAblationBenchmark {
         "Neuromod::PharmacologicalAblation"
     }
 
-    fn run(&self, _config: &BenchmarkConfig) -> BenchmarkResult {
+    fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let mut result = BenchmarkResult::new(self.name(), None);
+        let mut trace = Vec::new();
+        let mut trial_idx = 0usize;
 
         // Baseline (no knockout)
         let (base_lr, base_expl, base_conf, base_attn, base_grad, base_thresh) =
             run_ablation(None, None, None, None);
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "baseline".to_string(),
+                correct: base_lr > 0.0,
+                rt_ticks: 0.0,
+                similarity: base_lr,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+        }
 
         // DA knockout
         let (ko_lr, _, _, _, ko_grad, _) = run_ablation(Some(0.0), None, None, None);
@@ -263,6 +280,19 @@ impl PsychBenchmark for PharmacologicalAblationBenchmark {
             "da_knockout_gradient_drop_pct",
             MetricValue::from_samples(&[da_grad_drop]),
         );
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "da_knockout".to_string(),
+                correct: da_lr_drop > 0.0,
+                rt_ticks: 0.0,
+                similarity: ko_lr,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+        }
 
         // NE knockout
         let (_, ko_expl, _, _, _, _) = run_ablation(None, Some(0.0), None, None);
@@ -271,6 +301,19 @@ impl PsychBenchmark for PharmacologicalAblationBenchmark {
             "ne_knockout_exploration_drop",
             MetricValue::from_samples(&[ne_expl_diff]),
         );
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "ne_knockout".to_string(),
+                correct: ne_expl_diff > 0.0,
+                rt_ticks: 0.0,
+                similarity: ko_expl,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+        }
 
         // 5-HT knockout
         let (_, _, ko_conf, _, _, _) = run_ablation(None, None, Some(0.0), None);
@@ -279,6 +322,19 @@ impl PsychBenchmark for PharmacologicalAblationBenchmark {
             "sht_knockout_confidence_drop",
             MetricValue::from_samples(&[sht_conf_diff]),
         );
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "sht_knockout".to_string(),
+                correct: sht_conf_diff > 0.0,
+                rt_ticks: 0.0,
+                similarity: ko_conf,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+        }
 
         // ACh knockout
         let (_, _, _, ko_attn, _, ko_thresh) = run_ablation(None, None, None, Some(0.0));
@@ -292,6 +348,19 @@ impl PsychBenchmark for PharmacologicalAblationBenchmark {
             "ach_knockout_threshold_rise_pct",
             MetricValue::from_samples(&[ach_thresh_rise]),
         );
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "ach_knockout".to_string(),
+                correct: ach_attn_drop > 0.0,
+                rt_ticks: 0.0,
+                similarity: ko_attn,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+        }
 
         // Double dissociation: each knockout's PRIMARY effect > other knockouts' off-target effect
         result.insert("baseline_lr", MetricValue::from_samples(&[base_lr]));
@@ -308,6 +377,10 @@ impl PsychBenchmark for PharmacologicalAblationBenchmark {
             MetricValue::from_samples(&[base_attn]),
         );
 
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
+        let _ = trial_idx;
         result
     }
 

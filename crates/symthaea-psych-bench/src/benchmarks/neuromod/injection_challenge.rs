@@ -12,7 +12,9 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
 
 // ── Transmitter channel indices ──
 
@@ -271,8 +273,10 @@ impl PsychBenchmark for InjectionChallengeBenchmark {
         "Neuromod::InjectionChallenge"
     }
 
-    fn run(&self, _config: &BenchmarkConfig) -> BenchmarkResult {
+    fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let mut result = BenchmarkResult::new(self.name(), None);
+        let mut trace = Vec::new();
+        let mut trial_idx = 0usize;
 
         // ── Caffeine: adenosine antagonism (dose=-0.3, half_life=50) ──
         let caffeine = run_condition(&[("adenosine", -0.3, 50)], ADEN_IDX);
@@ -288,6 +292,19 @@ impl PsychBenchmark for InjectionChallengeBenchmark {
             "caffeine_duration",
             MetricValue::from_samples(&[caffeine.duration]),
         );
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "caffeine".to_string(),
+                correct: caffeine.peak_effect > 0.01,
+                rt_ticks: 0.0,
+                similarity: caffeine.peak_effect,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+        }
 
         // ── SSRI: serotonin reuptake inhibition (dose=0.3, half_life=100) ──
         let ssri = run_condition(&[("serotonin", 0.3, 100)], SHT_IDX);
@@ -303,6 +320,19 @@ impl PsychBenchmark for InjectionChallengeBenchmark {
             "ssri_duration",
             MetricValue::from_samples(&[ssri.duration]),
         );
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "ssri".to_string(),
+                correct: ssri.peak_effect > 0.01,
+                rt_ticks: 0.0,
+                similarity: ssri.peak_effect,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+        }
 
         // ── Stimulant: dopamine burst (dose=0.4, half_life=30) ──
         let stimulant = run_condition(&[("dopamine", 0.4, 30)], DA_IDX);
@@ -318,6 +348,19 @@ impl PsychBenchmark for InjectionChallengeBenchmark {
             "stimulant_duration",
             MetricValue::from_samples(&[stimulant.duration]),
         );
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "stimulant".to_string(),
+                correct: stimulant.peak_effect > 0.01,
+                rt_ticks: 0.0,
+                similarity: stimulant.peak_effect,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+        }
 
         // ── Anxiolytic: GABA potentiation (dose=0.3, half_life=60) ──
         let anxiolytic = run_condition(&[("gaba", 0.3, 60)], GABA_IDX);
@@ -333,6 +376,19 @@ impl PsychBenchmark for InjectionChallengeBenchmark {
             "anxiolytic_duration",
             MetricValue::from_samples(&[anxiolytic.duration]),
         );
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "anxiolytic".to_string(),
+                correct: anxiolytic.peak_effect > 0.01,
+                rt_ticks: 0.0,
+                similarity: anxiolytic.peak_effect,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+        }
 
         // ── Psychedelic: 5-HT2A agonism proxy (dose=0.4, half_life=80) ──
         let psychedelic = run_condition(&[("serotonin", 0.4, 80)], SHT_IDX);
@@ -348,6 +404,19 @@ impl PsychBenchmark for InjectionChallengeBenchmark {
             "psychedelic_duration",
             MetricValue::from_samples(&[psychedelic.duration]),
         );
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "psychedelic".to_string(),
+                correct: psychedelic.peak_effect > 0.01,
+                rt_ticks: 0.0,
+                similarity: psychedelic.peak_effect,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+        }
 
         // ── Polypharmacy: concurrent DA + GABA ──
         let poly_da = run_condition(&[("dopamine", 0.3, 60), ("gaba", 0.2, 60)], DA_IDX);
@@ -376,6 +445,32 @@ impl PsychBenchmark for InjectionChallengeBenchmark {
             "polypharmacy_gaba_duration",
             MetricValue::from_samples(&[poly_gaba.duration]),
         );
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "polypharmacy_da".to_string(),
+                correct: poly_da.peak_effect > 0.01,
+                rt_ticks: 0.0,
+                similarity: poly_da.peak_effect,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "polypharmacy_gaba".to_string(),
+                correct: poly_gaba.peak_effect > 0.01,
+                rt_ticks: 0.0,
+                similarity: poly_gaba.peak_effect,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+            result.trial_trace = trace;
+        }
+        let _ = trial_idx;
 
         result.conditions = 6;
         result

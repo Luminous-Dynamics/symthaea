@@ -12,7 +12,9 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
 
 /// Lightweight transmitter model (mirrors ablation benchmark).
 #[derive(Clone)]
@@ -262,10 +264,25 @@ impl PsychBenchmark for PharmacologicalChallengeBenchmark {
         "Neuromod::PharmacologicalChallenge"
     }
 
-    fn run(&self, _config: &BenchmarkConfig) -> BenchmarkResult {
+    fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let mut result = BenchmarkResult::new(self.name(), None);
+        let mut trace = Vec::new();
+        let mut trial_idx = 0usize;
 
         let baseline = run_challenge(None, None, None, None);
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "baseline".to_string(),
+                correct: baseline.gradient_scale > 0.0,
+                rt_ticks: 0.0,
+                similarity: baseline.gradient_scale,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+        }
 
         // ── DA agonist (0.9) & antagonist (0.1) ──
         let da_ago = run_challenge(Some(0.9), None, None, None);
@@ -290,6 +307,30 @@ impl PsychBenchmark for PharmacologicalChallengeBenchmark {
             "da_baseline_gradient_scale",
             MetricValue::from_samples(&[baseline.gradient_scale]),
         );
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "da_agonist".to_string(),
+                correct: (da_ago.gradient_scale - baseline.gradient_scale).abs() > 0.01,
+                rt_ticks: 0.0,
+                similarity: da_ago.gradient_scale,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "da_antagonist".to_string(),
+                correct: (da_ant.gradient_scale - baseline.gradient_scale).abs() > 0.01,
+                rt_ticks: 0.0,
+                similarity: da_ant.gradient_scale,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+        }
 
         // ── NE agonist (0.9) & antagonist (0.1) ──
         let ne_ago = run_challenge(None, Some(0.9), None, None);
@@ -306,6 +347,30 @@ impl PsychBenchmark for PharmacologicalChallengeBenchmark {
             "ne_baseline_exploration",
             MetricValue::from_samples(&[baseline.exploration]),
         );
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "ne_agonist".to_string(),
+                correct: (ne_ago.exploration - baseline.exploration).abs() > 0.01,
+                rt_ticks: 0.0,
+                similarity: ne_ago.exploration,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "ne_antagonist".to_string(),
+                correct: (ne_ant.exploration - baseline.exploration).abs() > 0.01,
+                rt_ticks: 0.0,
+                similarity: ne_ant.exploration,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+        }
 
         // ── 5-HT agonist (0.9) & antagonist (0.1) ──
         let sht_ago = run_challenge(None, None, Some(0.9), None);
@@ -322,6 +387,30 @@ impl PsychBenchmark for PharmacologicalChallengeBenchmark {
             "sht_baseline_confidence",
             MetricValue::from_samples(&[baseline.confidence]),
         );
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "sht_agonist".to_string(),
+                correct: (sht_ago.confidence - baseline.confidence).abs() > 0.01,
+                rt_ticks: 0.0,
+                similarity: sht_ago.confidence,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "sht_antagonist".to_string(),
+                correct: (sht_ant.confidence - baseline.confidence).abs() > 0.01,
+                rt_ticks: 0.0,
+                similarity: sht_ant.confidence,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+        }
 
         // ── ACh agonist (0.9) & antagonist (0.1) ──
         let ach_ago = run_challenge(None, None, None, Some(0.9));
@@ -346,6 +435,32 @@ impl PsychBenchmark for PharmacologicalChallengeBenchmark {
             "ach_baseline_attention",
             MetricValue::from_samples(&[baseline.attention]),
         );
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "ach_agonist".to_string(),
+                correct: (ach_ago.attention - baseline.attention).abs() > 0.01,
+                rt_ticks: 0.0,
+                similarity: ach_ago.attention,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "ach_antagonist".to_string(),
+                correct: (ach_ant.attention - baseline.attention).abs() > 0.01,
+                rt_ticks: 0.0,
+                similarity: ach_ant.attention,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+            result.trial_trace = trace;
+        }
+        let _ = trial_idx;
 
         result
     }

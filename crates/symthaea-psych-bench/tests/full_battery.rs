@@ -32,10 +32,11 @@ use symthaea_psych_bench::benchmarks::{
     metacognition::{FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark},
     motor::{BimanualBenchmark, FittsLawBenchmark, SrttBenchmark},
     neuromod::{
-        AllostaticStressBenchmark, AttentionNetworkBenchmark, BehavioralKnockoutBenchmark,
-        ConsciousnessPharmacologyBenchmark, InjectionChallengeBenchmark, MoodInductionBenchmark,
-        PharmacologicalAblationBenchmark, PharmacologicalChallengeBenchmark,
-        RewardLearningBenchmark, YerkesDodsonBenchmark,
+        AllostaticStressBenchmark, AntagonistProfilesBenchmark, AttentionNetworkBenchmark,
+        BehavioralKnockoutBenchmark, ConsciousnessPharmacologyBenchmark, DoseResponseBenchmark,
+        InjectionChallengeBenchmark, MoodInductionBenchmark, PharmacologicalAblationBenchmark,
+        PharmacologicalChallengeBenchmark, RewardLearningBenchmark, ToleranceWithdrawalBenchmark,
+        YerkesDodsonBenchmark,
     },
     reasoning::{
         ArcAbductiveBenchmark, ArcAlgebraBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
@@ -231,12 +232,12 @@ fn full_battery_report() {
 ///
 /// Fails on >10% degradation (critical) on any metric. Warns at >5%.
 /// To regenerate the baseline after intentional changes:
-///   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --snapshot baselines/v0.7.0.json
+///   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --snapshot baselines/v0.8.0.json
 #[test]
 fn regression_against_baseline() {
     let baseline_path = std::path::Path::new(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/baselines/v0.7.0.json"
+        "/baselines/v0.8.0.json"
     ));
 
     // Skip gracefully if no baseline snapshot exists yet
@@ -337,6 +338,9 @@ fn regression_against_baseline() {
     report.add(PharmacologicalAblationBenchmark.run(&config));
     report.add(BehavioralKnockoutBenchmark.run(&config));
     report.add(ConsciousnessPharmacologyBenchmark.run(&config));
+    report.add(DoseResponseBenchmark.run(&config));
+    report.add(AntagonistProfilesBenchmark.run(&config));
+    report.add(ToleranceWithdrawalBenchmark.run(&config));
 
     let current = RegressionSnapshot::from_report(&report, "current");
     let regression = RegressionReport::compare(&baseline, &current, 0.05, 0.10);

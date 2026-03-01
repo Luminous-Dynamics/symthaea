@@ -72,6 +72,13 @@ use symthaea_psych_bench::benchmarks::metacognition::{
 use symthaea_psych_bench::benchmarks::motor::{
     BimanualBenchmark, FittsLawBenchmark, SrttBenchmark,
 };
+use symthaea_psych_bench::benchmarks::neuromod::{
+    AllostaticStressBenchmark, AntagonistProfilesBenchmark, AttentionNetworkBenchmark,
+    BehavioralKnockoutBenchmark, ConsciousnessPharmacologyBenchmark, DoseResponseBenchmark,
+    InjectionChallengeBenchmark, MoodInductionBenchmark, PharmacologicalAblationBenchmark,
+    PharmacologicalChallengeBenchmark, RewardLearningBenchmark, ToleranceWithdrawalBenchmark,
+    YerkesDodsonBenchmark,
+};
 use symthaea_psych_bench::benchmarks::reasoning::{
     ArcAbductiveBenchmark, ArcAlgebraBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
     ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark, ArcNoiseBenchmark,
@@ -261,6 +268,20 @@ fn main() {
         Box::new(RmeBenchmark),
         Box::new(UltimatumGameBenchmark),
         Box::new(SocialNormBenchmark),
+        // Neuromod
+        Box::new(AttentionNetworkBenchmark),
+        Box::new(MoodInductionBenchmark),
+        Box::new(RewardLearningBenchmark),
+        Box::new(YerkesDodsonBenchmark),
+        Box::new(PharmacologicalChallengeBenchmark),
+        Box::new(PharmacologicalAblationBenchmark),
+        Box::new(InjectionChallengeBenchmark),
+        Box::new(BehavioralKnockoutBenchmark),
+        Box::new(ConsciousnessPharmacologyBenchmark),
+        Box::new(AllostaticStressBenchmark),
+        Box::new(DoseResponseBenchmark),
+        Box::new(AntagonistProfilesBenchmark),
+        Box::new(ToleranceWithdrawalBenchmark),
     ];
 
     // Filter benchmarks by name if --filter was specified
@@ -1204,31 +1225,12 @@ fn main() {
         }
         // Insert SAT curves SVG if we have benchmarks to sweep
         {
-            use symthaea_psych_bench::harness::analysis::{fit_sat_curve, SatCurvePoint};
+            use symthaea_psych_bench::harness::sat_curves::run_sat_curve;
             let pressures = [0.0, 0.5, 1.0];
             let mut sat_curves = Vec::new();
             for &i in &active_indices {
                 let bench = &benchmarks[i];
-                let key =
-                    symthaea_psych_bench::harness::report::key_metric_for_benchmark(bench.name());
-                let points: Vec<SatCurvePoint> = pressures
-                    .iter()
-                    .map(|&p| {
-                        let c = BenchmarkConfig {
-                            time_pressure: p,
-                            ..config.clone()
-                        };
-                        let r = bench.run(&c);
-                        let acc = r.metrics.get(key).map(|m| m.mean).unwrap_or(0.0);
-                        let rt = r.metrics.get("rt_ticks").map(|m| m.mean).unwrap_or(0.0);
-                        SatCurvePoint {
-                            time_pressure: p,
-                            accuracy: acc,
-                            rt_ticks: rt,
-                        }
-                    })
-                    .collect();
-                sat_curves.push(fit_sat_curve(bench.name(), &points));
+                sat_curves.push(run_sat_curve(bench.as_ref(), &config, &pressures));
             }
             if !sat_curves.is_empty() {
                 let mut sat_html = String::new();
