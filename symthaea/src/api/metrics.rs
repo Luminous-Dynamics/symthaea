@@ -264,6 +264,9 @@ impl MetricsRegistry {
         registry.register_gauge("memory_entries_total", "Total entries in memory store");
         registry.register_gauge("memory_cache_hit_ratio", "Memory cache hit ratio");
 
+        // Neuromodulator bath metrics
+        register_bath_metrics(&registry);
+
         registry
     }
 
@@ -420,6 +423,49 @@ pub fn global() -> &'static MetricsRegistry {
     &GLOBAL_REGISTRY
 }
 
+/// Register bath-related gauge metrics in the given registry.
+pub fn register_bath_metrics(registry: &MetricsRegistry) {
+    registry.register_gauge("bath_da_effective", "Dopamine effective level");
+    registry.register_gauge("bath_ne_effective", "Noradrenaline effective level");
+    registry.register_gauge("bath_sht_effective", "Serotonin effective level");
+    registry.register_gauge("bath_ach_effective", "Acetylcholine effective level");
+    registry.register_gauge("bath_gaba_effective", "GABA effective level");
+    registry.register_gauge("bath_oxy_effective", "Oxytocin effective level");
+    registry.register_gauge("bath_glut_effective", "Glutamate effective level");
+    registry.register_gauge("bath_aden_effective", "Adenosine effective level");
+    registry.register_gauge("bath_ecb_effective", "Endocannabinoid effective level");
+    registry.register_gauge("bath_allostatic_load", "Allostatic stress load");
+    registry.register_gauge("bath_ei_ratio", "Excitatory/inhibitory balance ratio");
+    registry.register_gauge("bath_sleep_pressure", "Adenosine-based sleep pressure");
+    registry.register_gauge("bath_active_injection_count", "Active pharmacological injections");
+    registry.register_gauge("bath_entropy", "Bath phase space entropy");
+}
+
+/// Update bath gauge values from current state.
+pub fn update_bath_metrics(
+    registry: &MetricsRegistry,
+    state: &[f32; 9],
+    allostatic_load: f32,
+    ei_ratio: f32,
+    sleep_pressure: f32,
+    injection_count: usize,
+) {
+    registry.set_gauge("bath_da_effective", state[0] as f64);
+    registry.set_gauge("bath_ne_effective", state[1] as f64);
+    registry.set_gauge("bath_sht_effective", state[2] as f64);
+    registry.set_gauge("bath_ach_effective", state[3] as f64);
+    registry.set_gauge("bath_gaba_effective", state[4] as f64);
+    registry.set_gauge("bath_oxy_effective", state[5] as f64);
+    registry.set_gauge("bath_glut_effective", state[6] as f64);
+    registry.set_gauge("bath_aden_effective", state[7] as f64);
+    registry.set_gauge("bath_ecb_effective", state[8] as f64);
+    registry.set_gauge("bath_allostatic_load", allostatic_load as f64);
+    registry.set_gauge("bath_ei_ratio", ei_ratio as f64);
+    registry.set_gauge("bath_sleep_pressure", sleep_pressure as f64);
+    registry.set_gauge("bath_active_injection_count", injection_count as f64);
+    registry.set_gauge("bath_entropy", 0.0);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -518,5 +564,42 @@ mod tests {
     fn test_global_registry() {
         let registry = global();
         assert!(registry.get("phi_current").is_some());
+    }
+
+    #[test]
+    fn test_bath_metrics_registered_in_standard() {
+        let registry = MetricsRegistry::with_standard_metrics();
+        assert!(registry.get("bath_da_effective").is_some());
+        assert!(registry.get("bath_allostatic_load").is_some());
+        assert!(registry.get("bath_ei_ratio").is_some());
+        assert!(registry.get("bath_entropy").is_some());
+    }
+
+    #[test]
+    fn test_bath_metrics_values_update() {
+        let registry = MetricsRegistry::with_standard_metrics();
+        let state = [0.5, 0.6, 0.7, 0.4, 0.3, 0.2, 0.3, 0.1, 0.15];
+        update_bath_metrics(&registry, &state, 0.25, 1.1, 0.3, 2);
+        assert_eq!(registry.get("bath_da_effective"), Some(0.5));
+        assert_eq!(registry.get("bath_allostatic_load"), Some(0.25));
+        assert_eq!(registry.get("bath_active_injection_count"), Some(2.0));
+    }
+
+    #[test]
+    fn test_bath_metrics_prometheus_output() {
+        let registry = MetricsRegistry::with_standard_metrics();
+        let state = [0.5; 9];
+        update_bath_metrics(&registry, &state, 0.1, 1.0, 0.2, 0);
+        let output = registry.to_prometheus_text();
+        assert!(output.contains("bath_da_effective"));
+    }
+
+    #[test]
+    fn test_bath_metrics_json_includes_bath() {
+        let registry = MetricsRegistry::with_standard_metrics();
+        let state = [0.5; 9];
+        update_bath_metrics(&registry, &state, 0.1, 1.0, 0.2, 0);
+        let snapshot = registry.to_json();
+        assert!(snapshot.metrics.iter().any(|m| m.name.starts_with("bath_")));
     }
 }

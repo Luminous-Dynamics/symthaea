@@ -677,4 +677,74 @@ impl CognitiveLoopService {
 
         total_phi / episodes.len().max(1) as f64
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Arousal/Seizure management
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Arousal trap state machine: detect, recover, and escape high-arousal traps.
+    ///
+    /// Three-phase approach based on Yerkes-Dodson (1908) and Porges (2011):
+    /// - Phase 1 (detect): increment counter when arousal > 0.8
+    /// - Phase 2 (recover, cycles 5–10): gradual LR dampening + exploration boost
+    /// - Phase 3 (escape, cycles >10): forced exploration=1.0, confidence×0.9, reset
+    /// - Low arousal (<0.3): consolidation LR boost (Steriade 1996)
+    ///
+    /// Note: 4 emergency exploration bypasses elsewhere are intentional (direct mutations).
+    pub(in crate::cognitive_loop) fn manage_arousal_trap(&mut self, affective_arousal: f32) {
+        if affective_arousal > 0.7 {
+            // Attenuated 50%: DA learning_rate_factor() already scales LR via the bath
+            let arousal_suppress = ((affective_arousal - 0.7) * 0.25).min(0.08);
+            self.scale_lr("affective_arousal_suppress", 1.0 - arousal_suppress);
+
+            // Arousal trap detection (Yerkes-Dodson 1908 — inverted-U performance curve)
+            if affective_arousal > 0.8 {
+                self.carryover.urgency.arousal_trap_counter = self
+                    .carryover
+                    .urgency
+                    .arousal_trap_counter
+                    .saturating_add(1);
+            }
+            // Phase 2: Active arousal recovery mode (Porges 2011 polyvagal theory)
+            if self.carryover.urgency.arousal_trap_counter > 5
+                && self.carryover.urgency.arousal_trap_counter <= 10
+            {
+                let recovery_intensity =
+                    (self.carryover.urgency.arousal_trap_counter - 5) as f32 / 5.0;
+                // Gradual LR dampening: attenuated 50% (NE exploration_delta handles arousal)
+                self.scale_lr("arousal_trap_recovery", 1.0 - recovery_intensity * 0.1);
+                // Slight exploration boost: attenuated 50% (NE exploration_delta covers this)
+                self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
+                    + recovery_intensity * 0.025)
+                    .clamp(0.0, 1.0);
+                self.stats.arousal_recovery_cycles += 1;
+                tracing::debug!(
+                    cycle = self.stats.total_cycles,
+                    counter = self.carryover.urgency.arousal_trap_counter,
+                    recovery_intensity,
+                    "Arousal recovery mode: dampening LR, boosting exploration"
+                );
+            }
+            // Phase 3: Forced escape
+            if self.carryover.urgency.arousal_trap_counter > 10 {
+                self.curiosity_drive.exploration_urge = 1.0; // forced escape attempt
+                self.scale_confidence("arousal_trap_escape", 0.9);
+                self.carryover.urgency.arousal_trap_counter = 0;
+                tracing::debug!(
+                    cycle = self.stats.total_cycles,
+                    "Arousal trap escape: forced exploration after 10 high-arousal cycles"
+                );
+            }
+        } else {
+            // Reset trap counter when arousal drops below threshold
+            self.carryover.urgency.arousal_trap_counter = 0;
+
+            if affective_arousal < 0.3 {
+                // Low arousal enhances consolidation (Steriade 1996)
+                // Attenuated 50%: DA handles low-error consolidation boost via the bath
+                let consolidation_boost = ((0.3 - affective_arousal) * 0.3).min(0.05);
+                self.scale_lr("low_arousal_consolidate", 1.0 + consolidation_boost);
+            }
+        }
+    }
 }
