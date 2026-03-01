@@ -165,6 +165,7 @@ pub struct PaginatedDependencies {
     pub total: u64,
     pub offset: u64,
     pub limit: u64,
+    pub has_more: bool,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -179,6 +180,7 @@ pub struct PaginatedUsage {
     pub total: u64,
     pub offset: u64,
     pub limit: u64,
+    pub has_more: bool,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -193,6 +195,7 @@ pub struct PaginatedPledges {
     pub total: u64,
     pub offset: u64,
     pub limit: u64,
+    pub has_more: bool,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -1353,4 +1356,288 @@ async fn test_get_maintainer_dependencies() {
         .collect();
     assert!(ids.contains(&"crate:alpha:1.0".to_string()));
     assert!(ids.contains(&"crate:beta:2.0".to_string()));
+}
+
+// ── Attestation Expiry Edge Cases ─────────────────────────────────
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_expired_attestation_filtered_from_query() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Register dep
+    let _: Record = conductor
+        .call(
+            &cell.zome("registry"),
+            "register_dependency",
+            make_dependency("crate:expiry:1.0", DependencyEcosystem::RustCrate),
+        )
+        .await;
+
+    // Submit attestation that expires in the past (already expired)
+    let mut att = make_attestation("attest-expired", "crate:expiry:1.0", "did:mycelix:user001");
+    att.expires_at = Some(Timestamp::from_micros(1_000_000)); // 1970-01-01 — definitely expired
+    let _: Record = conductor
+        .call(&cell.zome("usage"), "submit_usage_attestation", att)
+        .await;
+
+    // Submit attestation with no expiry (should appear)
+    let att2 = make_attestation("attest-forever", "crate:expiry:1.0", "did:mycelix:user001");
+    let _: Record = conductor
+        .call(&cell.zome("usage"), "submit_usage_attestation", att2)
+        .await;
+
+    // Query: should only get the non-expired one
+    let active: Vec<Record> = conductor
+        .call(
+            &cell.zome("usage"),
+            "get_dependency_attestations",
+            "crate:expiry:1.0".to_string(),
+        )
+        .await;
+    assert_eq!(active.len(), 1, "expired attestation should be filtered");
+    let a = decode_entry::<UsageAttestation>(&active[0]).unwrap();
+    assert_eq!(a.id, "attest-forever");
+}
+
+// ── Renewal Depth Limit Tests ─────────────────────────────────────
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_renewal_depth_limit_enforced() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Register dep
+    let _: Record = conductor
+        .call(
+            &cell.zome("registry"),
+            "register_dependency",
+            make_dependency("crate:renewal:1.0", DependencyEcosystem::RustCrate),
+        )
+        .await;
+
+    // Submit initial attestation
+    let att = make_attestation("attest-r0", "crate:renewal:1.0", "did:mycelix:user001");
+    let record: Record = conductor
+        .call(&cell.zome("usage"), "submit_usage_attestation", att)
+        .await;
+    let mut last_hash = record.action_address().clone();
+
+    // Renew 5 times (should succeed)
+    for _ in 0..5 {
+        let renew_input = RenewAttestationInput {
+            original_action_hash: last_hash,
+            new_proof_bytes: vec![0x02; 256],
+            new_witness_commitment: vec![0xCD; 32],
+        };
+        let renewed: Record = conductor
+            .call(&cell.zome("usage"), "renew_attestation", renew_input)
+            .await;
+        last_hash = renewed.action_address().clone();
+    }
+
+    // 6th renewal should fail (depth limit = 5)
+    let renew_input = RenewAttestationInput {
+        original_action_hash: last_hash,
+        new_proof_bytes: vec![0x02; 256],
+        new_witness_commitment: vec![0xCD; 32],
+    };
+    let result: Result<Record, _> = conductor
+        .call_fallible(&cell.zome("usage"), "renew_attestation", renew_input)
+        .await;
+    assert!(result.is_err(), "6th renewal should exceed depth limit");
+}
+
+// ── Pagination has_more Tests ─────────────────────────────────────
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_pagination_has_more_flag() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Register 3 dependencies
+    for i in 0..3 {
+        let _: Record = conductor
+            .call(
+                &cell.zome("registry"),
+                "register_dependency",
+                make_dependency(
+                    &format!("crate:hm{}:1.0", i),
+                    DependencyEcosystem::RustCrate,
+                ),
+            )
+            .await;
+    }
+
+    // Page 1: offset=0, limit=2 → has_more=true
+    let page1: PaginatedDependencies = conductor
+        .call(
+            &cell.zome("registry"),
+            "get_all_dependencies_paginated",
+            PaginationInput { offset: 0, limit: 2 },
+        )
+        .await;
+    assert_eq!(page1.total, 3);
+    assert!(page1.has_more, "should have more after first page");
+
+    // Page 2: offset=2, limit=2 → has_more=false
+    let page2: PaginatedDependencies = conductor
+        .call(
+            &cell.zome("registry"),
+            "get_all_dependencies_paginated",
+            PaginationInput { offset: 2, limit: 2 },
+        )
+        .await;
+    assert_eq!(page2.total, 3);
+    assert!(!page2.has_more, "no more items after second page");
+}
+
+// ── Verifier Authorization Tests ──────────────────────────────────
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_verify_attestation_author_only() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let apps = conductor
+        .setup_app_for_zipped_agents("attribution", &[dna], &[2])
+        .await
+        .unwrap();
+    let cell_author = apps[0].cells()[0].clone();
+    let cell_other = apps[1].cells()[0].clone();
+
+    // Agent 1 registers dep + submits attestation
+    let _: Record = conductor
+        .call(
+            &cell_author.zome("registry"),
+            "register_dependency",
+            make_dependency("crate:authz:1.0", DependencyEcosystem::RustCrate),
+        )
+        .await;
+    let att = make_attestation("attest-authz", "crate:authz:1.0", "did:mycelix:user001");
+    let record: Record = conductor
+        .call(&cell_author.zome("usage"), "submit_usage_attestation", att)
+        .await;
+    let action_hash = record.action_address().clone();
+
+    // Agent 2 tries to verify — should fail
+    let verify_input = VerifyAttestationInput {
+        original_action_hash: action_hash.clone(),
+        verifier_pubkey: vec![0u8; 32],
+        verifier_signature: vec![0u8; 64],
+    };
+    let result: Result<Record, _> = conductor
+        .call_fallible(
+            &cell_other.zome("usage"),
+            "verify_usage_attestation",
+            verify_input,
+        )
+        .await;
+    assert!(
+        result.is_err(),
+        "Non-author should not be able to verify attestation"
+    );
+
+    // Agent 1 (author) verifies — should succeed
+    let verify_input2 = VerifyAttestationInput {
+        original_action_hash: action_hash,
+        verifier_pubkey: vec![0u8; 32],
+        verifier_signature: vec![0u8; 64],
+    };
+    let verified: Record = conductor
+        .call(
+            &cell_author.zome("usage"),
+            "verify_usage_attestation",
+            verify_input2,
+        )
+        .await;
+    let v = decode_entry::<UsageAttestation>(&verified).unwrap();
+    assert!(v.verified);
+}
+
+// ── Rate Limit Boundary Tests ─────────────────────────────────────
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_attestation_rate_limit_boundary() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Attestation rate limit is 10/min.
+    // Submit 10 attestations — all should succeed.
+    for i in 0..10 {
+        let att = make_attestation(
+            &format!("rate-att-{}", i),
+            "crate:serde:1.0",
+            "did:mycelix:user001",
+        );
+        let _: Record = conductor
+            .call(&cell.zome("usage"), "submit_usage_attestation", att)
+            .await;
+    }
+
+    // 11th should fail (rate limit exceeded)
+    let att_extra = make_attestation("rate-att-11", "crate:serde:1.0", "did:mycelix:user001");
+    let result: Result<Record, _> = conductor
+        .call_fallible(
+            &cell.zome("usage"),
+            "submit_usage_attestation",
+            att_extra,
+        )
+        .await;
+    assert!(result.is_err(), "11th attestation should be rate-limited");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_pledge_rate_limit_boundary() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Register a dep for the pledges to reference
+    let _: Record = conductor
+        .call(
+            &cell.zome("registry"),
+            "register_dependency",
+            make_dependency("crate:ratepledge:1.0", DependencyEcosystem::RustCrate),
+        )
+        .await;
+
+    // Pledge rate limit is 20/min. Submit 20 pledges.
+    for i in 0..20 {
+        let _: Record = conductor
+            .call(
+                &cell.zome("reciprocity"),
+                "record_pledge",
+                make_pledge(
+                    &format!("rate-p-{}", i),
+                    "crate:ratepledge:1.0",
+                    &format!("did:mycelix:corp{:03}", i),
+                ),
+            )
+            .await;
+    }
+
+    // 21st should fail
+    let result: Result<Record, _> = conductor
+        .call_fallible(
+            &cell.zome("reciprocity"),
+            "record_pledge",
+            make_pledge("rate-p-21", "crate:ratepledge:1.0", "did:mycelix:corp021"),
+        )
+        .await;
+    assert!(result.is_err(), "21st pledge should be rate-limited");
 }

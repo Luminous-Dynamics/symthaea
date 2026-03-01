@@ -250,7 +250,7 @@ hc dna pack dna/
 ### Run Tests
 
 ```bash
-# Zome unit tests (40 tests: 12 registry + 17 reciprocity + 11 usage)
+# Zome unit tests (50 tests: 12 registry + 21 reciprocity + 17 usage)
 cargo test --lib -p registry -p registry_integrity -p usage -p usage_integrity \
   -p reciprocity -p reciprocity_integrity
 
@@ -266,10 +266,10 @@ cd prover && cargo test
 # Stark-common tests (5 tests: hash, commitment, scale, limbs, public inputs)
 cd stark-common && cargo test
 
-# Sweettest integration (25 tests, requires conductor)
+# Sweettest integration (31 tests, requires conductor)
 cd tests && cargo test -- --ignored
 
-# Total: 95 tests (70 unit + 25 sweettest)
+# Total: 111 tests (80 unit + 31 sweettest)
 ```
 
 ### Clippy

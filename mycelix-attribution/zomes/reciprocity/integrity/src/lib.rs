@@ -334,6 +334,38 @@ mod tests {
     }
 
     #[test]
+    fn test_neg_infinity_amount_rejected() {
+        let mut p = valid_pledge();
+        p.amount = Some(f64::NEG_INFINITY);
+        let result = validate_create_pledge(test_action(), p).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_zero_amount_valid() {
+        let mut p = valid_pledge();
+        p.amount = Some(0.0);
+        let result = validate_create_pledge(test_action(), p).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_description_exactly_1000_chars_valid() {
+        let mut p = valid_pledge();
+        p.description = "x".repeat(1000);
+        let result = validate_create_pledge(test_action(), p).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_empty_dependency_id_pledge_rejected() {
+        let mut p = valid_pledge();
+        p.dependency_id = String::new();
+        let result = validate_create_pledge(test_action(), p).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
     fn test_pledge_types_roundtrip() {
         let types = vec![
             PledgeType::Financial,

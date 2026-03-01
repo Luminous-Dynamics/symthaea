@@ -46,6 +46,7 @@ pub struct PaginatedPledges {
     pub total: u64,
     pub offset: u64,
     pub limit: u64,
+    pub has_more: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -69,6 +70,9 @@ const RATE_LIMIT_WINDOW_SECS: i64 = 60;
 const MAX_PAGE_SIZE: u64 = 1000;
 
 // ── Helpers ──────────────────────────────────────────────────────────
+// NOTE: anchor_hash/resolve_links are intentionally duplicated across
+// registry, usage, and reciprocity coordinators. Each zome uses its own
+// Anchor/LinkTypes from its integrity crate, preventing shared extraction.
 
 fn anchor_hash(tag: &str) -> ExternResult<EntryHash> {
     hash_entry(&Anchor(tag.to_string()))
@@ -99,11 +103,16 @@ fn validate_dependency_exists(dep_id: &str) -> ExternResult<()> {
                 )))),
             }
         }
-        _ => Ok(()),
+        other => {
+            debug!(
+                "validate_dependency_exists: registry call returned non-Ok response: {:?}",
+                other
+            );
+            Ok(()) // Graceful: allow if registry unavailable
+        }
     }
 }
 
-/// Sliding-window rate limiter using links as timestamps.
 /// Sliding-window rate limiter. Checks count BEFORE creating the link.
 fn enforce_rate_limit(limit: u64) -> ExternResult<()> {
     let agent = agent_info()?.agent_initial_pubkey;
@@ -406,11 +415,13 @@ pub fn get_dependency_pledges_paginated(
         }
     }
 
+    let has_more = input.pagination.offset + input.pagination.limit < total;
     Ok(PaginatedPledges {
         items,
         total,
         offset: input.pagination.offset,
         limit: input.pagination.limit,
+        has_more,
     })
 }
 
@@ -461,12 +472,8 @@ pub fn get_stewardship_leaderboard(limit: u64) -> ExternResult<Vec<LeaderboardEn
         }
     }
 
-    // Sort by weighted_score descending
-    entries.sort_by(|a, b| {
-        b.weighted_score
-            .partial_cmp(&a.weighted_score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    // Sort by weighted_score descending (NaN-safe: NaN sorts last)
+    entries.sort_by(|a, b| b.weighted_score.total_cmp(&a.weighted_score));
     entries.truncate(limit as usize);
 
     Ok(entries)
@@ -511,12 +518,8 @@ pub fn get_under_supported_dependencies(limit: u64) -> ExternResult<Vec<Leaderbo
         }
     }
 
-    // Sort by weighted_score ascending (most under-supported first)
-    entries.sort_by(|a, b| {
-        a.weighted_score
-            .partial_cmp(&b.weighted_score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    // Sort by weighted_score ascending (NaN-safe: NaN sorts last)
+    entries.sort_by(|a, b| a.weighted_score.total_cmp(&b.weighted_score));
     entries.truncate(limit as usize);
 
     Ok(entries)

@@ -366,6 +366,56 @@ mod tests {
     }
 
     #[test]
+    fn test_proof_boundary_500kb() {
+        // Exactly 500KB should be valid
+        let mut a = valid_attestation();
+        a.proof_bytes = vec![0x01; 500_000];
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_proof_boundary_500kb_plus_one() {
+        // 500KB + 1 byte should be rejected
+        let mut a = valid_attestation();
+        a.proof_bytes = vec![0x01; 500_001];
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_commitment_31_bytes_rejected() {
+        let mut a = valid_attestation();
+        a.witness_commitment = vec![0xAB; 31];
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_commitment_33_bytes_rejected() {
+        let mut a = valid_attestation();
+        a.witness_commitment = vec![0xAB; 33];
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_context_exactly_1000_chars_valid() {
+        let mut r = valid_receipt();
+        r.context = Some("x".repeat(1000));
+        let result = validate_create_usage_receipt(test_action(), r).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_empty_dependency_id_receipt_rejected() {
+        let mut r = valid_receipt();
+        r.dependency_id = String::new();
+        let result = validate_create_usage_receipt(test_action(), r).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
     fn test_usage_types_roundtrip() {
         let types = vec![
             UsageType::DirectDependency,

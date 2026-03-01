@@ -40,6 +40,7 @@ pub struct PaginatedDependencies {
     pub total: u64,
     pub offset: u64,
     pub limit: u64,
+    pub has_more: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -62,6 +63,9 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
 const MAX_PAGE_SIZE: u64 = 1000;
 
 // ── Helpers ──────────────────────────────────────────────────────────
+// NOTE: anchor_hash/resolve_links are intentionally duplicated across
+// registry, usage, and reciprocity coordinators. Each zome uses its own
+// Anchor/LinkTypes from its integrity crate, preventing shared extraction.
 
 fn anchor_hash(tag: &str) -> ExternResult<EntryHash> {
     hash_entry(&Anchor(tag.to_string()))
@@ -358,11 +362,13 @@ pub fn get_all_dependencies_paginated(
         }
     }
 
+    let has_more = input.offset + input.limit < total;
     Ok(PaginatedDependencies {
         items,
         total,
         offset: input.offset,
         limit: input.limit,
+        has_more,
     })
 }
 

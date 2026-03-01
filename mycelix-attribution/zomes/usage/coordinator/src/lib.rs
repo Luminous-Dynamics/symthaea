@@ -59,6 +59,7 @@ pub struct PaginatedUsage {
     pub total: u64,
     pub offset: u64,
     pub limit: u64,
+    pub has_more: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -84,8 +85,12 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
 
 const RATE_LIMIT_WINDOW_SECS: i64 = 60;
 const MAX_PAGE_SIZE: u64 = 1000;
+const MAX_RENEWAL_DEPTH: u32 = 5;
 
 // ── Helpers ──────────────────────────────────────────────────────────
+// NOTE: anchor_hash/resolve_links are intentionally duplicated across
+// registry, usage, and reciprocity coordinators. Each zome uses its own
+// Anchor/LinkTypes from its integrity crate, preventing shared extraction.
 
 fn anchor_hash(tag: &str) -> ExternResult<EntryHash> {
     hash_entry(&Anchor(tag.to_string()))
@@ -117,7 +122,13 @@ fn validate_dependency_exists(dep_id: &str) -> ExternResult<()> {
                 )))),
             }
         }
-        _ => Ok(()), // Graceful: allow if registry unavailable
+        other => {
+            debug!(
+                "validate_dependency_exists: registry call returned non-Ok response: {:?}",
+                other
+            );
+            Ok(()) // Graceful: allow if registry unavailable
+        }
     }
 }
 
@@ -307,6 +318,17 @@ pub fn verify_usage_attestation(input: VerifyAttestationInput) -> ExternResult<R
         wasm_error!(WasmErrorInner::Guest("Attestation not found".into())),
     )?;
 
+    // Authorization: only the attestation author can submit verification results.
+    // The author runs the off-chain verifier binary, which produces a signed verdict,
+    // then submits the verifier's pubkey + signature back to the DHT.
+    let author = record.action().author().clone();
+    let me = agent_info()?.agent_initial_pubkey;
+    if author != me {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the attestation author can submit verification results".into()
+        )));
+    }
+
     let mut att: UsageAttestation = record
         .entry()
         .to_app_option()
@@ -378,8 +400,31 @@ pub fn get_attestation_count(_: ()) -> ExternResult<u64> {
         LinkQuery::try_new(anchor_hash("all_attestations")?, LinkTypes::AllAttestations)?,
         GetStrategy::default(),
     )?;
-    // For a precise count we'd filter expired, but link count is a good approximation
-    Ok(links.len() as u64)
+
+    let now = sys_time()?;
+    let mut active = 0u64;
+    for link in links {
+        let entry_hash = match EntryHash::try_from(link.target) {
+            Ok(h) => h,
+            Err(_) => {
+                active += 1; // Count if we can't resolve (link exists)
+                continue;
+            }
+        };
+        match get(entry_hash, GetOptions::default())? {
+            Some(record) => {
+                let att: Option<UsageAttestation> = record.entry().to_app_option().ok().flatten();
+                match att {
+                    Some(a) if a.expires_at.is_some_and(|exp| exp < now) => {
+                        // Expired — don't count
+                    }
+                    _ => active += 1,
+                }
+            }
+            None => active += 1, // Link exists but entry not found — count it
+        }
+    }
+    Ok(active)
 }
 
 // ── Attestation Lifecycle ───────────────────────────────────────────
@@ -450,6 +495,15 @@ pub fn renew_attestation(input: RenewAttestationInput) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Record has no entry".into()
         )))?;
+
+    // Enforce renewal depth limit by counting "-renewed" suffixes
+    let depth = original.id.matches("-renewed").count() as u32;
+    if depth >= MAX_RENEWAL_DEPTH {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Renewal depth limit exceeded: max {} renewals per attestation chain",
+            MAX_RENEWAL_DEPTH
+        ))));
+    }
 
     // Create renewed attestation (unverified)
     let renewed = UsageAttestation {
@@ -541,11 +595,13 @@ pub fn get_dependency_usage_paginated(input: PaginatedUsageInput) -> ExternResul
         }
     }
 
+    let has_more = input.pagination.offset + input.pagination.limit < total;
     Ok(PaginatedUsage {
         items,
         total,
         offset: input.pagination.offset,
         limit: input.pagination.limit,
+        has_more,
     })
 }
 
