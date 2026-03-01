@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::DevelopmentalAge;
 
-/// Feeding stage progression.
+/// Feeding stage progression following WHO complementary feeding guidelines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FeedingStage {
     /// 0-6 months: exclusive breast milk or formula.

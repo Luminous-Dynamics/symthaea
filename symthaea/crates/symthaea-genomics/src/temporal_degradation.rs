@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
-/// Seconds per year (Julian year = 365.25 days).
+/// Seconds per Julian year (365.25 days), used to convert age in years to seconds for LTC evolution.
 pub const SECONDS_PER_YEAR: f32 = 31_557_600.0;
 
 /// Boltzmann constant in eV/K.

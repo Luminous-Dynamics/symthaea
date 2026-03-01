@@ -10,7 +10,9 @@ use crate::types::{CellState, CellType, CultureEnvironment, DEFAULT_GENE_EXPR_LE
 /// Useful for testing culture controllers: the mock drifts parameters
 /// away from their setpoints at a configurable rate.
 pub struct MockIncubator {
+    /// Current environmental parameters of the simulated incubator.
     pub environment: CultureEnvironment,
+    /// Rate at which parameters drift per hour (higher = faster drift).
     pub drift_rate: f64,
 }
 
@@ -70,8 +72,11 @@ impl MockIncubator {
 
 /// Mock cell population for testing growth and viability dynamics.
 pub struct MockCellPopulation {
+    /// Individual cell states in this population.
     pub cells: Vec<CellState>,
+    /// Net growth rate in doublings per day under ideal conditions.
     pub growth_rate: f64,  // Doublings per day
+    /// Fraction of cells that die per day under ideal conditions.
     pub death_rate: f64,   // Fraction dying per day
 }
 

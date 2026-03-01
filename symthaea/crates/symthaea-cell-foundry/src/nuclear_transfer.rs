@@ -15,11 +15,15 @@ use crate::types::{CellState, CellType, ScntStage};
 /// and either progresses or fails.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScntProtocol {
+    /// Current SCNT stage (enucleation → blastocyst).
     pub stage: ScntStage,
+    /// Somatic donor cell whose nucleus will be transferred.
     pub donor_cell: CellState,
+    /// Enucleated oocyte that will receive the donor nucleus.
     pub recipient_oocyte: CellState,
+    /// Base probability of success at each stage (derived from donor/oocyte viability).
     pub success_probability: f64,
-    /// Number of attempts made.
+    /// Number of advance() calls made so far.
     pub attempts: u32,
 }
 

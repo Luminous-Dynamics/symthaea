@@ -75,12 +75,12 @@ impl InfantDirectedSpeech {
     }
 }
 
-/// A language milestone event.
+/// A single language development milestone with normative age.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LanguageMilestone {
     /// Age at which milestone typically occurs (months).
     pub age_months: f64,
-    /// Description of the milestone.
+    /// Description of the language milestone (e.g., "Babbling", "Two-word phrases").
     pub milestone: String,
 }
 

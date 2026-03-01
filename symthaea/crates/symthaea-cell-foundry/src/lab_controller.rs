@@ -48,6 +48,7 @@ pub struct MockInstrument {
 }
 
 impl MockInstrument {
+    /// Create a mock instrument with default somatic cell and standard culture environment.
     pub fn new() -> Self {
         Self {
             cell_state: CellState::new_somatic(),
@@ -191,6 +192,7 @@ impl LabProtocol {
 
 /// Result of a single controller step.
 #[derive(Debug, Clone)]
+/// Result of executing a single protocol step.
 pub struct LabControllerStepResult {
     /// Current step index.
     pub step_index: usize,
@@ -208,7 +210,7 @@ pub struct LabControllerStepResult {
     pub viability: f64,
 }
 
-/// Result of running a complete protocol.
+/// Outcome of running a complete [`LabProtocol`] through the controller.
 #[derive(Debug, Clone)]
 pub struct ProtocolResult {
     /// Whether the protocol completed successfully.

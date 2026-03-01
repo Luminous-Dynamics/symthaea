@@ -7,6 +7,8 @@
 use serde::{Deserialize, Serialize};
 
 /// Actions available to the sequencing agent.
+///
+/// Each variant represents a distinct resource allocation decision that minimizes expected free energy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SequencingAction {
     /// Re-sequence a high-uncertainty region.
