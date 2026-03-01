@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-vision-manifold"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Patch-based HDC video encoding with CfC temporal manifold and surprise-driven attention"
+license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["vision", "hdc", "cfc", "temporal-manifold", "video"]
+categories = ["science", "algorithms", "multimedia::video"]
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+serde = { workspace = true }
+
+[features]
+default = []

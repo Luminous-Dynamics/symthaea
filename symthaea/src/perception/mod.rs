@@ -16,6 +16,10 @@ pub mod physio;
 pub mod social_trust;
 pub mod video;
 
+// Vision Manifold - Patch-based HDC video encoding with CfC temporal dynamics
+#[cfg(feature = "vision-manifold")]
+pub use symthaea_vision_manifold as vision_manifold;
+
 // Audio perception - Speech recognition via symthaea-stt
 pub mod audio;
 
