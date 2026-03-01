@@ -9,9 +9,15 @@
 pub mod coherence_tracker {
     pub use symthaea_memory::coherence::*;
 }
-pub mod conversation_memory;
+/// Re-exported from `symthaea-memory` crate (Phase B extraction).
+pub mod conversation_memory {
+    pub use symthaea_memory::conversation::*;
+}
 pub mod episodic_replay;
-pub mod hippocampus;
+/// Re-exported from `symthaea-memory` crate (Phase B extraction).
+pub mod hippocampus {
+    pub use symthaea_memory::hippocampus::*;
+}
 pub mod memory_coordinator;
 /// Re-exported from `symthaea-memory` crate (Phase A extraction).
 pub mod semantic_memory {
