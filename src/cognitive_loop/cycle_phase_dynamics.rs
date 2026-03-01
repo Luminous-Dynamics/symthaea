@@ -1430,7 +1430,7 @@ impl CognitiveLoopService {
             coherence,
         };
 
-        {
+        let (_, memory_confidence_boost) = {
             let stability_regime = &mut self.stability_regime;
             let discovery_service = &mut self.discovery_service;
             let semantic_memory = &mut self.semantic_memory;
@@ -1440,7 +1440,6 @@ impl CognitiveLoopService {
             let closed_learning_loop = &mut self.closed_learning_loop;
             let fep_learning_signal = &mut self.fep_learning_signal;
             let prev_primitive_state = &mut self.prev_primitive_state;
-            let prediction_confidence_ref = &mut self.prediction_confidence;
             let resonator_memory = &mut self.resonator_memory;
 
             module_timings.stability_regime = helpers::run_stability_regime(
@@ -1482,7 +1481,6 @@ impl CognitiveLoopService {
                     helpers::parallel_episodic_learning(
                         episodic_memory,
                         resonator_memory,
-                        prediction_confidence_ref,
                         primitive_belief_bridge,
                         prev_primitive_state,
                         fep_learning_signal,
@@ -1491,7 +1489,11 @@ impl CognitiveLoopService {
                         cycle_learning_result,
                     )
                 },
-            );
+            )
+        };
+        // Apply memory context boost to confidence after rayon::join (deferred from parallel branch)
+        if memory_confidence_boost.abs() > f32::EPSILON {
+            self.adjust_confidence("memory_context_boost", memory_confidence_boost);
         }
 
         module_timings.core_parallel_postprocess = _t_core.elapsed().as_micros() as u64;

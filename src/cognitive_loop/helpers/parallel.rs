@@ -95,18 +95,20 @@ pub(in crate::cognitive_loop) fn parallel_semantic_causal(
 }
 
 /// Parallel Branch B: Episodic memory + resonator storage + primitive-belief bridge + closed learning.
+///
+/// Returns the memory context boost that should be applied to prediction_confidence
+/// after the rayon::join completes (via `adjust_confidence`).
 #[allow(clippy::too_many_arguments)]
 pub(in crate::cognitive_loop) fn parallel_episodic_learning(
     episodic_memory: &mut EpisodicMemoryBridge,
     resonator_memory: &mut Option<crate::dynamics::resonator::ResonatorMemory>,
-    prediction_confidence: &mut f32,
     primitive_belief_bridge: &mut PrimitiveBeliefBridge,
     prev_primitive_state: &mut Option<PrimitiveConsciousnessState>,
     fep_learning_signal: &mut f32,
     closed_learning_loop: &mut ClosedLearningLoop,
     ctx: &EpisodicLearningContext<'_>,
     cycle_learning_result: CycleLearningResult,
-) {
+) -> f32 {
     // Episodic memory: encode significant experiences
     if ctx.prediction_error > 0.1 || ctx.in_flow {
         let hdv_sample: Vec<f32> =
@@ -168,9 +170,6 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
         }
     }
 
-    // Apply memory context boost to confidence
-    *prediction_confidence = (*prediction_confidence + ctx.memory_context_boost).clamp(0.0, 1.0);
-
     // Primitive-Belief Bridge: map primitives to beliefs, compute TD signals
     let prim_state = CognitiveLoopService::build_primitive_state(
         ctx.detected_primitives,
@@ -189,4 +188,7 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
 
     // Closed learning loop: update Q-values from cycle results
     closed_learning_loop.update(cycle_learning_result);
+
+    // Return the memory context boost for deferred application via adjust_confidence
+    ctx.memory_context_boost
 }

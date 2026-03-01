@@ -324,66 +324,9 @@ impl CognitiveLoopService {
             self.curiosity_drive.boredom *= 1.05;
         }
         // FEEDBACK: Arousal gates learning consolidation (Russell 1980 VAD model)
-        // Science: Steriade (1996) — high arousal (fight-or-flight) suppresses consolidation;
-        // low arousal (rest) enhances memory consolidation (REM/slow-wave effect)
-        if affective_arousal > 0.7 {
-            // Attenuated 50%: DA learning_rate_factor() already scales LR via the bath
-            let arousal_suppress = ((affective_arousal - 0.7) * 0.25).min(0.08);
-            self.scale_lr("affective_arousal_suppress", 1.0 - arousal_suppress);
-
-            // Arousal trap detection (Yerkes-Dodson 1908 — inverted-U performance curve)
-            // Science: Prolonged high arousal suppresses LR → error stays high → arousal stays
-            // high → positive feedback trap. After 10 stuck cycles, force exploration escape.
-            if affective_arousal > 0.8 {
-                self.carryover.urgency.arousal_trap_counter = self
-                    .carryover
-                    .urgency
-                    .arousal_trap_counter
-                    .saturating_add(1);
-            }
-            // ── Phase 15: Active arousal recovery mode ────────────────────
-            // Science: Porges (2011) — polyvagal theory: recovery from high arousal
-            // requires active parasympathetic engagement, not just waiting. After 5+
-            // consecutive high-arousal cycles, slow CfC processing (increase tau) to
-            // give the system time to stabilize before the hard reset at counter > 10.
-            if self.carryover.urgency.arousal_trap_counter > 5
-                && self.carryover.urgency.arousal_trap_counter <= 10
-            {
-                let recovery_intensity =
-                    (self.carryover.urgency.arousal_trap_counter - 5) as f32 / 5.0;
-                // Gradual LR dampening: attenuated 50% (NE exploration_delta handles arousal)
-                self.scale_lr("arousal_trap_recovery", 1.0 - recovery_intensity * 0.1);
-                // Slight exploration boost: attenuated 50% (NE exploration_delta covers this)
-                self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
-                    + recovery_intensity * 0.025)
-                    .clamp(0.0, 1.0);
-                self.stats.arousal_recovery_cycles += 1;
-                tracing::debug!(
-                    cycle = self.stats.total_cycles,
-                    counter = self.carryover.urgency.arousal_trap_counter,
-                    recovery_intensity,
-                    "Arousal recovery mode: dampening LR, boosting exploration"
-                );
-            }
-            if self.carryover.urgency.arousal_trap_counter > 10 {
-                self.curiosity_drive.exploration_urge = 1.0; // forced escape attempt
-                self.scale_confidence("arousal_trap_escape", 0.9);
-                self.carryover.urgency.arousal_trap_counter = 0;
-                tracing::debug!(
-                    cycle = self.stats.total_cycles,
-                    "Arousal trap escape: forced exploration after 10 high-arousal cycles"
-                );
-            }
-        } else {
-            // Reset trap counter when arousal drops below threshold
-            self.carryover.urgency.arousal_trap_counter = 0;
-
-            if affective_arousal < 0.3 {
-                // Attenuated 50%: DA handles low-error consolidation boost via the bath
-                let consolidation_boost = ((0.3 - affective_arousal) * 0.3).min(0.05);
-                self.scale_lr("low_arousal_consolidate", 1.0 + consolidation_boost);
-            }
-        }
+        // Science: Steriade (1996) — high arousal suppresses consolidation;
+        // low arousal enhances it. Arousal trap detection + recovery in helper.
+        self.manage_arousal_trap(affective_arousal);
         module_timings.affective_bridge = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -607,7 +550,7 @@ impl CognitiveLoopService {
         };
         if phi_suppress {
             // Attenuated: 5-HT confidence_delta implicitly reduces exploration
-            self.curiosity_drive.exploration_urge *= 0.85;
+            self.scale_exploration("phi_gate_suppress", 0.85);
         }
 
         // Attention visualization: record snapshot for debugging/introspection
