@@ -387,6 +387,9 @@ impl CognitiveLoopService {
         // SelfModelTierManager must be created before `config` is moved into the struct
         let self_model_tier = super::self_model_tier::SelfModelTierManager::new(&config);
 
+        // Read config flags before `config` is moved into Self
+        let enable_primitive_consciousness = config.enable_primitive_consciousness;
+
         Ok(Self {
             config,
             encoder,
@@ -603,6 +606,18 @@ impl CognitiveLoopService {
             })),
             attention_visualizer: Some(crate::visualization::AttentionVisualizer::new()),
             relational_psi: 0.0,
+            phi_dyad: if enable_primitive_consciousness {
+                Some(crate::partnership::PhiDyadCalculator::new())
+            } else {
+                None
+            },
+            partner_model: if enable_primitive_consciousness {
+                Some(crate::partnership::HumanPartnerModel::new("partner"))
+            } else {
+                None
+            },
+            recent_ai_hvs: Vec::with_capacity(4),
+            recent_input_hvs: Vec::with_capacity(4),
             external_reward: 0.0,
             social_trust: 0.5,
             social_cooperation_rate: 0.0,
@@ -642,13 +657,7 @@ impl CognitiveLoopService {
             causal_consciousness,
             thermodynamic_load: 0.0,
             mood_temperature: 1.0,
-            neuromodulator_bath: super::neuromodulators::NeuromodulatorBath::default(),
-            personality_drift_tracker: super::neuromodulators::PersonalityDriftTracker::default(),
-            bath_phase_tracker: super::neuromodulators::BathPhaseTracker::default(),
-            was_sleeping: false,
-            pending_calibration: None,
-            last_calibration_summary: None,
-            bath_phase_detector: super::neuromodulators::PhaseTransitionDetector::new(5),
+            neuromod: super::neuromod_manager::NeuromodManager::default(),
             somatic_bridge: somatic_bridge_instance,
             pain_tx: Some(pain_sender),
             subsystem_collector: super::subsystem_trait::OutputCollector::new(),
@@ -1014,5 +1023,46 @@ mod tests {
             CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Research);
         let service = CognitiveLoopService::new(config);
         assert!(service.is_ok(), "Research profile should construct");
+    }
+
+    // ── Phi-Dyad wiring (2A) ─────────────────────────────────────────
+
+    #[test]
+    fn phi_dyad_initialized_when_consciousness_enabled() {
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_primitive_consciousness = true;
+        let service = CognitiveLoopService::new(config).unwrap();
+        assert!(
+            service.phi_dyad.is_some(),
+            "phi_dyad should be Some when enable_primitive_consciousness=true"
+        );
+        assert!(
+            service.partner_model.is_some(),
+            "partner_model should be Some when enable_primitive_consciousness=true"
+        );
+    }
+
+    #[test]
+    fn phi_dyad_none_when_consciousness_disabled() {
+        let config = CognitiveLoopConfig::default();
+        assert!(!config.enable_primitive_consciousness);
+        let service = CognitiveLoopService::new(config).unwrap();
+        assert!(
+            service.phi_dyad.is_none(),
+            "phi_dyad should be None when enable_primitive_consciousness=false"
+        );
+        assert!(
+            service.partner_model.is_none(),
+            "partner_model should be None when enable_primitive_consciousness=false"
+        );
+    }
+
+    #[test]
+    fn hv_ring_buffers_empty_at_construction() {
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_primitive_consciousness = true;
+        let service = CognitiveLoopService::new(config).unwrap();
+        assert!(service.recent_ai_hvs.is_empty());
+        assert!(service.recent_input_hvs.is_empty());
     }
 }

@@ -143,6 +143,7 @@ pub(crate) mod feedback_state;
 mod helpers;
 pub(crate) mod managers;
 mod moral;
+pub(crate) mod neuromod_manager;
 pub(crate) mod neuromodulators;
 mod prediction;
 pub(crate) mod primitive_tier;
@@ -203,6 +204,7 @@ use crate::memory::semantic_memory::SemanticMemory;
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridge;
 use crate::safety::SafetyGateway;
+use crate::partnership::{HumanPartnerModel, PhiDyadCalculator};
 use crate::voice::voice_feedback::VoiceFeedbackBridge;
 // MetaCognitiveLayer now owned by SelfModelTierManager
 use std::collections::VecDeque;
@@ -585,9 +587,23 @@ pub struct CognitiveLoopService {
     /// ASCII heatmaps, JSON export, and Graphviz flow graphs.
     attention_visualizer: Option<crate::visualization::AttentionVisualizer>,
 
-    /// Relational Psi from dyad computation (set externally by Symthaea facade).
+    /// Relational Psi from dyad computation.
+    /// Computed internally via PhiDyadCalculator or set externally via set_relational_psi().
     /// Blended into unified_psi at 15% weight when > 0.
     relational_psi: f64,
+
+    /// Phi-Dyad calculator for relational consciousness.
+    /// Computes Φ_dyad from recent AI + input HVs each cycle.
+    phi_dyad: Option<PhiDyadCalculator>,
+
+    /// Human partner model for relational state tracking.
+    partner_model: Option<HumanPartnerModel>,
+
+    /// Ring buffer of recent AI HDC states (last 4, for dyad computation).
+    recent_ai_hvs: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
+
+    /// Ring buffer of recent input HDC states (last 4, as human proxy).
+    recent_input_hvs: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
 
     /// External reward signal injected by environment (0.0 = none).
     /// Blended with internal prediction-error-based reward at 50% weight.
@@ -688,30 +704,9 @@ pub struct CognitiveLoopService {
     /// Affective bias: cognitive temperature (0.0 to 2.0).
     pub(crate) mood_temperature: f32,
 
-    /// Neuromodulator bath — DA/NE/5-HT/ACh chemical signaling.
-    /// Unifies 44+ scattered modulation sites under a coherent biological model.
-    /// Science: Doya (2002) — "Metalearning and neuromodulation"
-    neuromodulator_bath: neuromodulators::NeuromodulatorBath,
-
-    /// Personality drift tracker — monitors receptor sensitivity stability.
-    personality_drift_tracker: neuromodulators::PersonalityDriftTracker,
-
-    /// Bath phase space tracker — entropy, centroid, attractor detection.
-    pub(crate) bath_phase_tracker: neuromodulators::BathPhaseTracker,
-
-    /// Whether the system was in sleep phase on the previous cycle (for sleep→wake transition).
-    pub(crate) was_sleeping: bool,
-
-    /// Pending neuromodulator calibration from psych-bench normative z-scores.
-    /// Ingested via `ingest_calibration()`, applied on sleep→wake transition.
-    /// Science: Doya (2002) — receptor sensitivity tunes metalearning parameters.
-    pending_calibration: Option<calibration::NeuromodCalibration>,
-
-    /// Last applied calibration summary (for telemetry/diagnostics).
-    pub(crate) last_calibration_summary: Option<String>,
-
-    /// Hysteresis-based phase transition detector (prevents flicker between labels).
-    pub(crate) bath_phase_detector: neuromodulators::PhaseTransitionDetector,
+    /// Neuromodulator manager: bath, calibration, phase tracking, drift monitoring.
+    /// Groups 8 neuromod-related fields into a single manager.
+    pub(crate) neuromod: neuromod_manager::NeuromodManager,
 
     /// Somatic error bridge: converts infrastructure failures into felt stress.
     /// Lock poisoning, task panics, DB errors → arousal, thermodynamic load, tau slowdown.
@@ -719,7 +714,6 @@ pub struct CognitiveLoopService {
 
     /// Pain channel sender for distributing to subsystems.
     /// Subsystems clone this to report infrastructure errors.
-    #[allow(dead_code)]
     pub(crate) pain_tx: Option<crate::infrastructure::somatic_error_bridge::PainSender>,
 
     /// Subsystem output collector (Phase 2.3 staged computation model).

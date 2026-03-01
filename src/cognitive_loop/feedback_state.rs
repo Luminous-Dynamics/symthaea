@@ -107,7 +107,6 @@ impl ProposalCollector {
     ///
     /// Currently used in tests; will become the sole integration path
     /// when dual-write bridge is removed (see module doc).
-    #[allow(dead_code)]
     pub fn integrate(&self, base_value: f64, clamp_min: f64, clamp_max: f64) -> IntegrationResult {
         self.integrate_with_mode(base_value, clamp_min, clamp_max, IntegrationMode::Consensus)
     }
@@ -200,7 +199,6 @@ impl Default for ProposalCollector {
 
 /// Integration strategy for combining proposals.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 pub(crate) enum IntegrationMode {
     /// Consensus: average adds, geometric mean scales. Noise-resistant.
     /// Use for final production mode (reduces compounding drift).
@@ -900,6 +898,66 @@ mod tests {
         assert!(lr.unwrap().is_finite());
         assert!(explore.unwrap().is_finite());
         assert!(thresh.unwrap().is_finite());
+    }
+
+    /// Multi-cycle divergence diagnostic for exploration_urge and prediction_confidence.
+    ///
+    /// After bypass fixes (Phase 7.5d), all exploration and confidence mutations
+    /// are routed through helpers. Divergence between direct-mutation and
+    /// sequential-integration should be near zero for both variables.
+    #[test]
+    fn test_multicycle_exploration_confidence_divergence() {
+        use super::super::CognitiveLoopConfig;
+        use super::super::CognitiveLoopService;
+
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+        let mut max_explore_div = 0.0f64;
+        let mut max_conf_div = 0.0f64;
+        let mut total_explore_proposals = 0usize;
+        let mut total_conf_proposals = 0usize;
+
+        for i in 0..50 {
+            let input = format!("exploration divergence diagnostic cycle {i}");
+            let _ = service.cycle(&input);
+
+            if let Some(ref exp_int) = service.feedback_state.last_exploration_integration {
+                total_explore_proposals += exp_int.n_adds + exp_int.n_scales + exp_int.n_sets;
+            }
+            if let Some(ref conf_int) = service.feedback_state.last_confidence_integration {
+                total_conf_proposals += conf_int.n_adds + conf_int.n_scales + conf_int.n_sets;
+            }
+
+            if let Some(ref div) = service.feedback_state.last_divergence {
+                if div.exploration > max_explore_div {
+                    max_explore_div = div.exploration;
+                }
+                if div.confidence > max_conf_div {
+                    max_conf_div = div.confidence;
+                }
+            }
+        }
+
+        // Sanity: proposals generated
+        assert!(
+            total_explore_proposals > 10,
+            "Expected 10+ exploration proposals, got {total_explore_proposals}"
+        );
+        assert!(
+            total_conf_proposals > 50,
+            "Expected 50+ confidence proposals, got {total_conf_proposals}"
+        );
+
+        // After bypass fixes, divergence should be near zero.
+        // Exploration has a slightly higher tolerance because the 0.01 floor
+        // in apply_pending_calibration introduces a minor post-helper mutation.
+        assert!(
+            max_explore_div < 0.05,
+            "exploration_urge max divergence {max_explore_div:.6} exceeds 5%"
+        );
+        assert!(
+            max_conf_div < 0.02,
+            "prediction_confidence max divergence {max_conf_div:.6} exceeds 2%"
+        );
     }
 
     /// Multi-cycle divergence diagnostic: runs 50 cognitive cycles and checks that
