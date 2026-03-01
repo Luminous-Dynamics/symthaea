@@ -200,6 +200,7 @@ impl HarmoniesIntegrator {
                 .copied()
                 .unwrap_or(1.0);
 
+            let similarity = if similarity.is_finite() { similarity } else { 0.0 };
             harmony_scores.insert(*harmony, similarity);
             weighted_sum += similarity * weight;
             weight_total += weight;
@@ -219,10 +220,14 @@ impl HarmoniesIntegrator {
             1.0, // temperature
         );
 
-        // Update running prior via EMA (alpha=0.1)
-        let alpha = if self.prior_count == 0 { 1.0 } else { 0.1 };
-        for i in 0..7 {
-            self.harmony_prior[i] = self.harmony_prior[i] * (1.0 - alpha) + coords[i] * alpha;
+        // Update running prior via EMA (alpha=0.1) — skip if coords contain NaN
+        let coords_finite = coords.iter().all(|c| c.is_finite());
+        if coords_finite {
+            let alpha = if self.prior_count == 0 { 1.0 } else { 0.1 };
+            for i in 0..7 {
+                self.harmony_prior[i] =
+                    self.harmony_prior[i] * (1.0 - alpha) + coords[i] * alpha;
+            }
         }
         self.prior_count += 1;
 
@@ -286,8 +291,8 @@ impl HarmoniesIntegrator {
         }
 
         // Find strongest and weakest harmonies
-        let mut sorted: Vec<_> = scores.iter().collect();
-        sorted.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let mut sorted: Vec<_> = scores.iter().filter(|(_, s)| s.is_finite()).collect();
+        sorted.sort_by(|a, b| b.1.total_cmp(a.1));
 
         if let Some((harmony, score)) = sorted.first() {
             reasoning.push_str(&format!(

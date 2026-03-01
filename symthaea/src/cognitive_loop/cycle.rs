@@ -697,11 +697,11 @@ mod tests {
     fn dynamics_fep_fields_finite() {
         let mut s = make_service();
         let r = s.cycle("FEP test");
-        assert!(r.metadata.fep_pragmatic_value.is_finite());
-        assert!(r.metadata.fep_accuracy.is_finite());
-        assert!(r.metadata.fep_complexity.is_finite());
-        assert!(r.metadata.fep_surprise.is_finite());
-        assert!(r.metadata.fep_td_error.is_finite());
+        assert!(r.metadata.fep.fep_pragmatic_value.is_finite());
+        assert!(r.metadata.fep.fep_accuracy.is_finite());
+        assert!(r.metadata.fep.fep_complexity.is_finite());
+        assert!(r.metadata.fep.fep_surprise.is_finite());
+        assert!(r.metadata.fep.fep_td_error.is_finite());
     }
 
     #[test]
@@ -734,8 +734,8 @@ mod tests {
     fn dynamics_neuromod_fields_populated() {
         let mut s = make_service();
         let r = s.cycle("neuromod check");
-        assert!(!r.metadata.guiding_question.is_empty());
-        assert!(!r.metadata.dominant_harmonic.is_empty());
+        assert!(!r.metadata.harmonics.guiding_question.is_empty());
+        assert!(!r.metadata.harmonics.dominant_harmonic.is_empty());
     }
 
     #[test]
@@ -758,9 +758,9 @@ mod tests {
         let mut s = make_service();
         let r = s.cycle("attention budget");
         // Budget shouldn't be exceeded on first cycle
-        let _ = r.metadata.attention_budget_exceeded;
+        let _ = r.metadata.attention.attention_budget_exceeded;
         // Elapsed should be non-negative
-        assert!(r.metadata.attention_budget_elapsed_us < u64::MAX);
+        assert!(r.metadata.attention.attention_budget_elapsed_us < u64::MAX);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -784,10 +784,10 @@ mod tests {
     fn feedback_quality_gating_fields() {
         let mut s = make_service();
         let r = s.cycle("quality check");
-        assert!(r.metadata.unified_quality_score.is_finite());
+        assert!(r.metadata.quality.unified_quality_score.is_finite());
         // Gating booleans should be accessible
-        let _ = r.metadata.coherence_velocity_gated;
-        let _ = r.metadata.dissipative_health_gated;
+        let _ = r.metadata.quality.coherence_velocity_gated;
+        let _ = r.metadata.quality.dissipative_health_gated;
         let _ = r.metadata.epistemic_gate_approved;
     }
 
@@ -803,9 +803,9 @@ mod tests {
     fn feedback_harmonic_fields_finite() {
         let mut s = make_service();
         let r = s.cycle("harmonic check");
-        assert!(r.metadata.harmonies_alignment.is_finite());
-        assert!(r.metadata.harmonic_field_coherence.is_finite());
-        assert!(r.metadata.harmonic_love_resonance.is_finite());
+        assert!(r.metadata.harmonics.harmonies_alignment.is_finite());
+        assert!(r.metadata.harmonics.harmonic_field_coherence.is_finite());
+        assert!(r.metadata.harmonics.harmonic_love_resonance.is_finite());
     }
 
     #[test]
@@ -813,15 +813,15 @@ mod tests {
         let mut s = make_service();
         let r = s.cycle("dream check");
         // Dream engine requires many cycles, so on first cycle defaults
-        assert!(r.metadata.dream_phi_improvement.is_finite());
+        assert!(r.metadata.memory.dream_phi_improvement.is_finite());
     }
 
     #[test]
     fn feedback_dissipative_fields_finite() {
         let mut s = make_service();
         let r = s.cycle("dissipative check");
-        assert!(r.metadata.dissipative_health.is_finite());
-        assert!(r.metadata.dissipative_entropy_rate.is_finite());
+        assert!(r.metadata.quality.dissipative_health.is_finite());
+        assert!(r.metadata.quality.dissipative_entropy_rate.is_finite());
     }
 
     #[test]
@@ -829,7 +829,7 @@ mod tests {
         let mut s = make_service();
         let r = s.cycle("epistemic check");
         assert!(r.metadata.epistemic_quality.is_finite());
-        assert!(r.metadata.epistemic_phi_eff.is_finite());
+        assert!(r.metadata.quality.epistemic_phi_eff.is_finite());
     }
 
     #[test]
@@ -944,7 +944,7 @@ mod tests {
     fn output_soul_alignment_finite() {
         let mut s = make_service();
         let r = s.cycle("soul alignment");
-        assert!(r.metadata.soul_alignment.is_finite());
+        assert!(r.metadata.ethics.soul_alignment.is_finite());
     }
 
     #[test]

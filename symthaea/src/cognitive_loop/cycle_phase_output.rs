@@ -306,19 +306,19 @@ impl CognitiveLoopService {
             liquid_mamba_generation_count: self.stats.liquid_mamba_generation_count,
             // Partnership / Phi-Dyad
             relational_psi: self.social.relational_psi,
-            // Resonant Speech: response profile from cognitive load.
-            // Combine allostatic load (neuromod bath) with consciousness level.
+            // Resonant Speech: response profile from neuromod bath signals.
             response_profile: {
-                use crate::resonant_speech::CognitiveLoad;
-                let allostatic = self.neuromod.bath.allostatic_load as f64;
-                let psi = feedback.consciousness_level;
-                let load_level = allostatic * 0.6 + (1.0 - psi) * 0.4;
-                let load = CognitiveLoad::from_level(load_level);
-                match load {
-                    CognitiveLoad::Low => "technical",
-                    CognitiveLoad::Medium => "balanced",
-                    CognitiveLoad::High => "simplified",
-                    CognitiveLoad::Overloaded => "empathic",
+                let user_state = crate::resonant_speech::UserState::from_neuromod(
+                    self.neuromod.bath.allostatic_load,
+                    feedback.consciousness_level,
+                    self.emotion_contagion.arousal,
+                    self.neuromod.bath.oxytocin.effective(),
+                );
+                match user_state.cognitive_load {
+                    crate::resonant_speech::CognitiveLoad::Low => "technical",
+                    crate::resonant_speech::CognitiveLoad::Medium => "balanced",
+                    crate::resonant_speech::CognitiveLoad::High => "simplified",
+                    crate::resonant_speech::CognitiveLoad::Overloaded => "empathic",
                 }
                 .to_string()
             },

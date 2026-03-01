@@ -135,6 +135,11 @@ impl CognitiveLoopService {
             neuromod_sht_2a_signal: self.neuromod.bath.sht_2a_signal(),
             neuromod_gaba_a_signal: self.neuromod.bath.gaba_a_signal(),
             neuromod_gaba_b_signal: self.neuromod.bath.gaba_b_signal(),
+            // Phase 7: self-assessment telemetry
+            self_assessment_pe_ema: self.neuromod.self_assessment.pe_ema() as f32,
+            self_assessment_coherence_ema: self.neuromod.self_assessment.coherence_ema() as f32,
+            self_assessment_calibration_fired: self.neuromod.self_assessment.last_triggered(),
+            pending_calibration_waiting: self.neuromod.pending_calibration.is_some(),
         }
     }
 

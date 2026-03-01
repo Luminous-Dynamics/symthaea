@@ -232,6 +232,16 @@ impl EmotionContagion {
     }
 }
 
+/// Describes the exploration mutation that [`CuriosityDrive::update`] wants to
+/// apply. The caller routes this through the feedback proposal system.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ExplorationUpdate {
+    /// Set exploration_urge to an absolute value (boredom × curiosity).
+    Set(f32),
+    /// Scale exploration_urge by a decay factor (e.g. 0.9).
+    Scale(f32),
+}
+
 /// Curiosity drive - novelty-seeking mechanism to prevent stagnation
 ///
 /// When predictions become too accurate/predictable, curiosity triggers
@@ -287,8 +297,13 @@ impl CuriosityDrive {
     /// Maximum novelty bonus
     const MAX_NOVELTY_BONUS: f32 = 1.5;
 
-    /// Update curiosity drive based on prediction error
-    pub fn update(&mut self, prediction_error: f32) {
+    /// Update curiosity drive based on prediction error.
+    ///
+    /// Returns an [`ExplorationUpdate`] describing the intended mutation to
+    /// `exploration_urge`. The **caller** is responsible for applying this
+    /// through the feedback proposal system (via `set_exploration` /
+    /// `scale_exploration`) so that divergence tracking captures it.
+    pub fn update(&mut self, prediction_error: f32) -> ExplorationUpdate {
         // Track error history — evict before push to prevent transient over-capacity
         if self.error_history.len() >= Self::HISTORY_SIZE {
             self.error_history.pop_front();
@@ -318,15 +333,15 @@ impl CuriosityDrive {
         let error_curiosity = (1.0 - avg_error.min(1.0)).max(0.0);
         self.curiosity = 0.8 * self.curiosity + 0.2 * error_curiosity;
 
-        // Exploration urge triggered by high boredom + high curiosity
-        if self.boredom > 0.5 && self.curiosity > 0.5 {
-            self.exploration_urge = (self.boredom * self.curiosity).min(1.0);
+        // Compute exploration intent (caller applies through feedback system)
+        let exploration_update = if self.boredom > 0.5 && self.curiosity > 0.5 {
+            ExplorationUpdate::Set((self.boredom * self.curiosity).min(1.0))
         } else {
-            self.exploration_urge *= 0.9; // Decay
-        }
+            ExplorationUpdate::Scale(0.9) // Decay
+        };
 
         // Novelty bonus: higher when exploring after boredom
-        // This encourages the system to seek novel inputs
+        // Reads current exploration_urge (set by feedback system in previous cycle)
         if self.exploration_urge > 0.3 {
             self.novelty_bonus = 1.0 + (Self::MAX_NOVELTY_BONUS - 1.0) * self.exploration_urge;
         } else if prediction_error > 0.5 {
@@ -334,6 +349,22 @@ impl CuriosityDrive {
             self.novelty_bonus = 1.0 + 0.3 * (prediction_error - 0.5);
         } else {
             self.novelty_bonus = 1.0;
+        }
+
+        exploration_update
+    }
+
+    /// Apply an [`ExplorationUpdate`] directly to this drive's exploration_urge.
+    ///
+    /// Used by the feedback system writeback and by tests.
+    pub fn apply_exploration_update(&mut self, update: ExplorationUpdate) {
+        match update {
+            ExplorationUpdate::Set(val) => {
+                self.exploration_urge = val.clamp(0.0, 1.0);
+            }
+            ExplorationUpdate::Scale(factor) => {
+                self.exploration_urge = (self.exploration_urge * factor).clamp(0.0, 1.0);
+            }
         }
     }
 
@@ -1057,7 +1088,8 @@ mod tests {
         let mut cd = CuriosityDrive::default();
         // Feed many low-error updates
         for _ in 0..30 {
-            cd.update(0.01);
+            let upd = cd.update(0.01);
+            cd.apply_exploration_update(upd);
         }
         assert!(cd.boredom > 0.3, "boredom should build: {}", cd.boredom);
     }
@@ -1066,12 +1098,14 @@ mod tests {
     fn curiosity_high_error_resets_streak() {
         let mut cd = CuriosityDrive::default();
         for _ in 0..20 {
-            cd.update(0.01);
+            let upd = cd.update(0.01);
+            cd.apply_exploration_update(upd);
         }
         let boredom_before = cd.boredom;
         // High error should reduce low_error_streak
         for _ in 0..10 {
-            cd.update(0.5);
+            let upd = cd.update(0.5);
+            cd.apply_exploration_update(upd);
         }
         assert!(
             cd.boredom < boredom_before + 0.1,
@@ -1084,7 +1118,8 @@ mod tests {
         let mut cd = CuriosityDrive::default();
         // Build up enough boredom + curiosity
         for _ in 0..100 {
-            cd.update(0.01); // Very low error → boredom + high curiosity
+            let upd = cd.update(0.01); // Very low error → boredom + high curiosity
+            cd.apply_exploration_update(upd);
         }
         assert!(
             cd.should_explore(),
@@ -1107,7 +1142,8 @@ mod tests {
         let mut cd = CuriosityDrive::default();
         // Drive exploration to max
         for _ in 0..200 {
-            cd.update(0.01);
+            let upd = cd.update(0.01);
+            cd.apply_exploration_update(upd);
         }
         let lr = cd.effective_learning_rate(1.0);
         assert!(
@@ -1122,7 +1158,8 @@ mod tests {
     #[test]
     fn curiosity_high_error_gives_novelty_bonus() {
         let mut cd = CuriosityDrive::default();
-        cd.update(0.8); // High error = novel situation
+        let upd = cd.update(0.8); // High error = novel situation
+        cd.apply_exploration_update(upd);
         assert!(
             cd.novelty_bonus > 1.0,
             "high error should boost novelty: {}",
@@ -1134,7 +1171,8 @@ mod tests {
     fn curiosity_history_bounded() {
         let mut cd = CuriosityDrive::default();
         for i in 0..200 {
-            cd.update(i as f32 * 0.005);
+            let upd = cd.update(i as f32 * 0.005);
+            cd.apply_exploration_update(upd);
         }
         assert!(cd.error_history.len() <= CuriosityDrive::HISTORY_SIZE);
     }
@@ -1152,7 +1190,8 @@ mod tests {
     fn curiosity_reset_restores_default() {
         let mut cd = CuriosityDrive::default();
         for _ in 0..50 {
-            cd.update(0.01);
+            let upd = cd.update(0.01);
+            cd.apply_exploration_update(upd);
         }
         cd.reset();
         assert_eq!(cd.boredom, 0.0);

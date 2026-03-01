@@ -257,7 +257,7 @@ impl CognitiveLoopService {
             self.scale_lr("ethics_engine", ethics_output.lr_factor);
         }
         self.carryover.quality.last_value_score = ethics_output.value_score;
-        if ethics_output.value_gate_factor < 1.0 || ethics_output.value_gate_factor > 1.0 {
+        if ethics_output.value_gate_factor != 1.0 {
             self.stats.value_gate_applied_count += 1;
         }
 

@@ -565,14 +565,14 @@ impl CognitiveLoopService {
         self.stats.novelty_bonus = self.curiosity_drive.novelty_bonus;
 
         // Self-reflection stats
-        self.stats.self_assessment = format!("{:?}", self.self_reflection.self_assessment);
-        self.stats.reflection_count = self.self_reflection.reflection_count;
-        self.stats.adjustments_made = self.self_reflection.adjustments_made;
-        self.stats.learning_effectiveness = self.self_reflection.learning_effectiveness();
-        let summary = self.self_reflection.summary();
+        self.stats.self_assessment = format!("{:?}", self.self_model_tier.self_reflection.self_assessment);
+        self.stats.reflection_count = self.self_model_tier.self_reflection.reflection_count;
+        self.stats.adjustments_made = self.self_model_tier.self_reflection.adjustments_made;
+        self.stats.learning_effectiveness = self.self_model_tier.self_reflection.learning_effectiveness();
+        let summary = self.self_model_tier.self_reflection.summary();
         self.stats.next_reflection_in = summary.next_reflection_in;
-        self.stats.adapted_flow_threshold = self.self_reflection.flow_error_threshold;
-        self.stats.adapted_boredom_threshold = self.self_reflection.boredom_threshold;
+        self.stats.adapted_flow_threshold = self.self_model_tier.self_reflection.flow_error_threshold;
+        self.stats.adapted_boredom_threshold = self.self_model_tier.self_reflection.boredom_threshold;
 
         // ═══════════════════════════════════════════════════════════════════════
         // MEGA-UNIFIED ARCHITECTURE STATS
@@ -697,12 +697,10 @@ impl CognitiveLoopService {
         self.flow_state.reset();
         self.emotion_contagion.reset();
         self.curiosity_drive.reset();
-        self.self_reflection.reset(); // Preserves learned thresholds
+        self.self_model_tier.self_reflection.reset(); // Preserves learned thresholds
         self.fep_agent = ActiveInferenceAgent::new(self.fep_agent.config.clone());
         self.coherence_tracker.reset();
-        self.external_reward = 0.0;
-        self.social_trust = 0.5;
-        self.social_cooperation_rate = 0.0;
+        self.social = super::SocialState::default();
         if let Some(ref mut usi) = self.user_state {
             usi.reset();
         }
@@ -719,18 +717,18 @@ impl CognitiveLoopService {
         if let Some(ref mut bridge) = self.affective_bridge {
             *bridge = crate::brain::affective_bridge::AffectiveBridge::default();
         }
-        if let Some(ref mut thermo) = self.consciousness_thermodynamics {
+        if let Some(ref mut thermo) = self.consciousness_monitors.thermodynamics {
             *thermo = crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynamicsAnalyzer::new(
                 crate::consciousness::consciousness_thermodynamics::ThermodynamicsConfig::default(),
             );
         }
-        if let Some(ref mut binding) = self.phenomenal_binding {
+        if let Some(ref mut binding) = self.consciousness_monitors.phenomenal_binding {
             *binding =
                 crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer::new(
                     crate::consciousness::phenomenal_binding::PhenomenalBindingConfig::default(),
                 );
         }
-        if let Some(ref mut hfe) = self.hierarchical_free_energy {
+        if let Some(ref mut hfe) = self.consciousness_monitors.hierarchical_free_energy {
             *hfe = crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy::new(
                 crate::consciousness::hierarchical_free_energy::HierarchicalFEConfig::default(),
             );

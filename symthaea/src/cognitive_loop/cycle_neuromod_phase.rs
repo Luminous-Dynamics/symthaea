@@ -57,14 +57,14 @@ impl CognitiveLoopService {
         // DA → learning rate
         self.scale_lr(
             "neuromod_dopamine",
-            self.neuromodulator_bath.learning_rate_factor(),
+            self.neuromod.bath.learning_rate_factor(),
         );
 
         // NE → exploration
-        self.adjust_exploration("neuromod_ne_delta", self.neuromodulator_bath.exploration_delta());
+        self.adjust_exploration("neuromod_ne_delta", self.neuromod.bath.exploration_delta());
 
         // #1: D2 flexibility scales exploration responsiveness (Frank 2005)
-        let flex_scale = self.neuromodulator_bath.behavioral_flexibility();
+        let flex_scale = self.neuromod.bath.behavioral_flexibility();
         self.set_exploration(
             "d2_flexibility",
             0.5 + (self.curiosity_drive.exploration_urge - 0.5) * flex_scale,
@@ -73,17 +73,17 @@ impl CognitiveLoopService {
         // 5-HT → confidence
         self.adjust_confidence(
             "neuromod_serotonin",
-            self.neuromodulator_bath.confidence_delta(),
+            self.neuromod.bath.confidence_delta(),
         );
 
         // ACh → attention sensitivity + threshold
-        self.adaptive_behavior.attention_sensitivity *= self.neuromodulator_bath.attention_factor();
+        self.adaptive_behavior.attention_sensitivity *= self.neuromod.bath.attention_factor();
         self.adaptive_behavior.attention_sensitivity =
             self.adaptive_behavior.attention_sensitivity.clamp(0.5, 2.0);
-        self.scale_threshold("neuromod_threshold", self.neuromodulator_bath.threshold_factor());
+        self.scale_threshold("neuromod_threshold", self.neuromod.bath.threshold_factor());
 
         // #3: Phasic NE burst → attentional reorienting (Corbetta & Shulman 2002)
-        let ne_ph = self.neuromodulator_bath.ne_phasic();
+        let ne_ph = self.neuromod.bath.ne_phasic();
         let ne_reorienting_boost = if ne_ph > 0.3 {
             self.adaptive_behavior.attention_sensitivity *= 1.0 + (ne_ph - 0.3) * 0.5;
             self.adaptive_behavior.attention_sensitivity =
@@ -98,7 +98,7 @@ impl CognitiveLoopService {
         // EMA: arousal pulled toward NE effective (10% per cycle)
         let ne_arousal_before = self.emotion_contagion.arousal;
         self.emotion_contagion.arousal = self.emotion_contagion.arousal * 0.9
-            + self.neuromodulator_bath.noradrenaline.effective() * 0.1;
+            + self.neuromod.bath.noradrenaline.effective() * 0.1;
         // Phasic NE burst → transient arousal spike
         if ne_ph > 0.2 {
             self.emotion_contagion.arousal += ne_ph * 0.05;
@@ -110,7 +110,7 @@ impl CognitiveLoopService {
         let confidence_velocity =
             self.prediction_confidence - self.carryover.quality.prev_confidence_for_crash;
         let sht_crash_dip: f32 = if confidence_velocity < -0.15 {
-            self.neuromodulator_bath.serotonin.produce(-0.1);
+            self.neuromod.bath.serotonin.produce(-0.1);
             confidence_velocity.abs() as f32
         } else {
             0.0
@@ -120,7 +120,7 @@ impl CognitiveLoopService {
         // #8: Exploration cost → 5-HT depletion (Tops et al. 2009)
         let exploration_sht_drain = if self.curiosity_drive.exploration_urge > 0.5 {
             let drain = (self.curiosity_drive.exploration_urge - 0.5) * 0.03;
-            self.neuromodulator_bath
+            self.neuromod.bath
                 .apply_exploration_cost(self.curiosity_drive.exploration_urge);
             drain
         } else {
@@ -128,13 +128,13 @@ impl CognitiveLoopService {
         };
 
         // #11: GABA global inhibition (Olsen & Sieghart 2009)
-        let gaba_inhibition = self.neuromodulator_bath.global_inhibition();
+        let gaba_inhibition = self.neuromod.bath.global_inhibition();
         if gaba_inhibition < 0.95 {
             self.scale_lr("gaba_inhibition", gaba_inhibition);
             self.scale_exploration("gaba_inhibition", gaba_inhibition);
         }
         // E/I seizure protection: freeze exploration during recovery (Turrigiano 2012)
-        if self.neuromodulator_bath.exploration_frozen() {
+        if self.neuromod.bath.exploration_frozen() {
             self.scale_exploration("seizure_protection", 0.1);
         }
 
@@ -144,7 +144,7 @@ impl CognitiveLoopService {
         let unified_psi = self.compute_unified_psi();
         // Neuromod → consciousness bridge: ACh/NE sustain conscious integration
         // Science: Alkire et al. (2008) — consciousness correlates with ACh/NE
-        let neuromod_consciousness_mod = self.neuromodulator_bath.consciousness_modulation();
+        let neuromod_consciousness_mod = self.neuromod.bath.consciousness_modulation();
         let unified_psi = (unified_psi * neuromod_consciousness_mod as f64).clamp(0.0, 1.0);
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -208,11 +208,11 @@ impl CognitiveLoopService {
         // and oxytocinergic circuits, shaping arousal regulation lifelong.
         #[cfg(feature = "nurture")]
         if let Some(ref mut nurture) = self.nurture_attachment {
-            let arousal = self.neuromodulator_bath.noradrenaline.effective();
-            let valence = self.neuromodulator_bath.serotonin.effective()
-                - self.neuromodulator_bath.noradrenaline.phasic();
+            let arousal = self.neuromod.bath.noradrenaline.effective();
+            let valence = self.neuromod.bath.serotonin.effective()
+                - self.neuromod.bath.noradrenaline.phasic();
             let attachment_mod = nurture.cycle_step(arousal, valence);
-            attachment_mod.apply_to_bath(&mut self.neuromodulator_bath);
+            attachment_mod.apply_to_bath(&mut self.neuromod.bath);
         }
 
         NeuromodPhaseResult {

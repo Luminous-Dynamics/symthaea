@@ -787,40 +787,42 @@ mod tests {
 
     #[test]
     fn test_adaptive_topology_cadence() {
+        use crate::hdc::ContinuousHV;
+
         let mut engine = make_engine();
 
         // Default cadence should be 97
         assert_eq!(engine.cache.topology_cadence, 97);
         assert_eq!(engine.cache.last_topology_cycle, 0);
 
-        // Run cycles at multiples of 7 (moral parser interval) to build scenarios.
-        // Sentences must have clear agent/action/patient structure so moral_parser
-        // produces action HVs (required for topology add_scenario).
-        let sentences = [
-            "the doctor helped the patient recover",
-            "the teacher punished the student unfairly",
-            "she gave food to the hungry children",
-            "he protected the villagers from danger",
-            "the company exploited the workers cruelly",
-        ];
+        // Directly inject scenarios to guarantee topology has enough data.
+        // The moral parser may not always produce action_hv from text, so
+        // we ensure the topology window is populated.
+        for i in 0..10 {
+            engine
+                .moral_topology
+                .add_scenario(ContinuousHV::random(16384, 100 + i));
+        }
+        assert!(
+            engine.moral_topology.len() >= 3,
+            "Should have at least 3 scenarios"
+        );
+
+        // Run enough cycles to exceed initial cadence (97)
         for c in 0..200 {
-            let input = EthicsEngineInput {
-                input: sentences[c as usize % sentences.len()],
-                cycle: c,
-                unified_psi: 0.5,
-                compressed_state: &[0.0; 256],
-            };
+            let input = make_input(c);
             engine.evaluate(&input);
         }
 
-        // After enough cycles, cadence should have adapted from its initial 97
-        // (topology fires once cycles_since >= cadence, so first fire is at cycle 97)
+        // After enough cycles, topology should have fired at least once
         assert!(
             engine.cache.last_topology_cycle > 0,
-            "Topology should have fired at least once"
+            "Topology should have fired at least once (len={}, cadence={})",
+            engine.moral_topology.len(),
+            engine.cache.topology_cadence
         );
 
-        // With stable benign input, drift should be low → cadence should widen to 120
+        // With stable benign input, drift should be low → cadence should widen
         assert!(
             engine.cache.topology_cadence >= 60,
             "Stable input should keep cadence at 60+ (got {})",

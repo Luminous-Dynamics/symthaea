@@ -12,4 +12,5 @@ mod cycle_properties;
 mod feedback;
 mod helpers;
 mod integration;
+mod phase_coverage;
 mod subsystems;
