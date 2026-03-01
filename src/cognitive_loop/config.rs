@@ -382,11 +382,11 @@ pub struct CognitiveLoopConfig {
     /// Intended for debugging and development, not production.
     pub trace_feedback: bool,
 
-    /// Enable consensus-mode feedback integration.
-    /// When true, the deferred consensus writeback (averaged adds, geometric-mean
-    /// scales) replaces direct-mutation values at cycle start via Set proposals.
-    /// When false (default), direct-mutation values are authoritative and
-    /// consensus values are computed but not applied.
+    /// Enable consensus-mode feedback integration (default: true).
+    /// Routes the consensus writeback (averaged adds, geometric-mean scales)
+    /// through Set proposals at cycle start, keeping the divergence tracker
+    /// in sync with actual field values. Disabling reverts to direct-mutation
+    /// semantics where consensus values are computed but not applied.
     pub consensus_feedback: bool,
 
     /// Enable nurture/attachment bridge (Bowlby attachment theory).
@@ -457,7 +457,7 @@ impl Default for CognitiveLoopConfig {
             agent_did: None,
             attestation_buffer_capacity: 64,
             trace_feedback: false,
-            consensus_feedback: false,
+            consensus_feedback: true,
             #[cfg(feature = "nurture")]
             enable_nurture_attachment: false,
         }
