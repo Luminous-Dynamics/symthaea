@@ -130,6 +130,8 @@ pub struct MeshStats {
     pub bandwidth_throttled: u64,
     /// Packets that failed authentication (MAC verification).
     pub packets_auth_failed: u64,
+    /// Packets that failed decryption (wrong key or corrupted ciphertext).
+    pub packets_decrypt_failed: u64,
     /// Packets forwarded via gossip TTL.
     pub packets_forwarded: u64,
     /// Packets replayed to newly-discovered peers.
@@ -214,6 +216,8 @@ pub struct MeshTelemetry {
     pub avg_phi: f32,
     /// Composite health score (0.0–1.0).
     pub health_score: f32,
+    /// Moral topology summary for cross-agent coherence.
+    pub moral_topology: Option<crate::hdc::moral_topology::MoralTopologySummary>,
 }
 
 use crate::cognitive_loop::types::CycleUrgency;

@@ -2697,3 +2697,118 @@ fn test_populate_mesh_metadata_compression_fields() {
         "packets_throttled should reflect stats"
     );
 }
+
+// ====================================================================
+// Encryption Pipeline Integration Tests
+// ====================================================================
+
+#[cfg(feature = "mesh-encryption")]
+#[tokio::test]
+async fn test_mind_to_mind_encrypted_roundtrip() {
+    use crate::swarm::mesh::{BiLoopbackTransport, DualLayerMesh, MeshBridgeHandle, MeshReceiver};
+
+    let key = [0x77u8; 32];
+
+    // Create paired transports with enough room for encryption overhead
+    let (transport_a, transport_b) = BiLoopbackTransport::pair("enc_a", "enc_b", 2200);
+
+    // Build encrypted DualLayerMesh for each side
+    let mesh_a = DualLayerMesh::new([0xAA; 32])
+        .with_batman(Box::new(transport_a))
+        .with_encryption_key(key);
+    let mesh_b = DualLayerMesh::new([0xBB; 32])
+        .with_batman(Box::new(transport_b))
+        .with_encryption_key(key);
+
+    // Create bridge handles + spawn actors with encrypted receivers
+    let (handle_a, actor_a) = MeshBridgeHandle::new(64, 64);
+    let (handle_b, actor_b) = MeshBridgeHandle::new(64, 64);
+    let receiver_a = MeshReceiver::new().with_encryption_key(key);
+    let receiver_b = MeshReceiver::new().with_encryption_key(key);
+    tokio::spawn(actor_a.run(mesh_a, receiver_a));
+    tokio::spawn(actor_b.run(mesh_b, receiver_b));
+
+    // Create two minds with matching encryption keys
+    let mut mind_a = ContinuousMind::new(MindConfig::default());
+    let mut mind_b = ContinuousMind::new(MindConfig::default());
+    mind_a.set_mesh_encryption_key(Some(key));
+    mind_b.set_mesh_encryption_key(Some(key));
+    mind_a.set_mesh_bridge(handle_a);
+    mind_b.set_mesh_bridge(handle_b);
+
+    // Feed mind_a a perception so it has a non-zero thought to emit
+    let hv = ContinuousHV::random(mind_a.config.dimension, 42);
+    mind_a.perceive(hv);
+
+    // Tick mind A several times (auto_emit_wisdom fires, sync_mesh_bridge flushes)
+    for _ in 0..10 {
+        mind_a.tick();
+    }
+
+    // Give the async actor time to transport packets
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    // Tick mind B (sync_mesh_bridge drains inbox, process_mesh dispatches)
+    for _ in 0..10 {
+        mind_b.tick();
+    }
+
+    // Verify mind B saw a peer — encrypted roundtrip succeeded
+    assert!(
+        mind_b.mesh_peers().peer_count() > 0,
+        "Mind B should see Mind A as a peer via encrypted mesh"
+    );
+}
+
+#[cfg(feature = "mesh-encryption")]
+#[tokio::test]
+async fn test_mind_encryption_key_mismatch_rejected() {
+    use crate::swarm::mesh::{BiLoopbackTransport, DualLayerMesh, MeshBridgeHandle, MeshReceiver};
+
+    let key_a = [0xAA; 32];
+    let key_b = [0xBB; 32];
+
+    let (transport_a, transport_b) = BiLoopbackTransport::pair("mismatch_a", "mismatch_b", 2200);
+
+    // A encrypts with key_a, B decrypts with key_b → mismatch
+    let mesh_a = DualLayerMesh::new([0xAA; 32])
+        .with_batman(Box::new(transport_a))
+        .with_encryption_key(key_a);
+    let mesh_b = DualLayerMesh::new([0xBB; 32])
+        .with_batman(Box::new(transport_b))
+        .with_encryption_key(key_b);
+
+    let (handle_a, actor_a) = MeshBridgeHandle::new(64, 64);
+    let (handle_b, actor_b) = MeshBridgeHandle::new(64, 64);
+    let receiver_a = MeshReceiver::new().with_encryption_key(key_a);
+    let receiver_b = MeshReceiver::new().with_encryption_key(key_b);
+    tokio::spawn(actor_a.run(mesh_a, receiver_a));
+    tokio::spawn(actor_b.run(mesh_b, receiver_b));
+
+    let mut mind_a = ContinuousMind::new(MindConfig::default());
+    let mut mind_b = ContinuousMind::new(MindConfig::default());
+    mind_a.set_mesh_encryption_key(Some(key_a));
+    mind_b.set_mesh_encryption_key(Some(key_b));
+    mind_a.set_mesh_bridge(handle_a);
+    mind_b.set_mesh_bridge(handle_b);
+
+    let hv = ContinuousHV::random(mind_a.config.dimension, 42);
+    mind_a.perceive(hv);
+
+    for _ in 0..10 {
+        mind_a.tick();
+    }
+
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    for _ in 0..10 {
+        mind_b.tick();
+    }
+
+    // Mind B should NOT see Mind A — wrong encryption key
+    assert_eq!(
+        mind_b.mesh_peers().peer_count(),
+        0,
+        "Mind B should NOT see peers when encryption keys mismatch"
+    );
+}

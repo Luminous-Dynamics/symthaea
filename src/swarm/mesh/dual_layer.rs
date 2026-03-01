@@ -103,6 +103,9 @@ pub struct DualLayerMesh {
     batman: Option<Box<dyn MeshTransport>>,
     /// Yggdrasil encrypted overlay transport.
     yggdrasil: Option<Box<dyn MeshTransport>>,
+    /// Optional ChaCha20-Poly1305 encryption key for packet envelopes.
+    #[cfg(feature = "mesh-encryption")]
+    encryption_key: Option<[u8; 32]>,
 }
 
 impl DualLayerMesh {
@@ -113,7 +116,19 @@ impl DualLayerMesh {
             lora: None,
             batman: None,
             yggdrasil: None,
+            #[cfg(feature = "mesh-encryption")]
+            encryption_key: None,
         }
+    }
+
+    /// Set the ChaCha20-Poly1305 encryption key for outbound packets.
+    ///
+    /// When set, all packets are encrypted after compression, before
+    /// fragmentation/transmission.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn with_encryption_key(mut self, key: [u8; 32]) -> Self {
+        self.encryption_key = Some(key);
+        self
     }
 
     /// Attach a LoRa transport (Cruise-mode routing).
@@ -189,10 +204,20 @@ impl DualLayerMesh {
         let raw = packet.to_bytes();
         let compressed = super::compress_packet(&raw);
 
+        // Optionally encrypt the compressed envelope (compress → encrypt).
+        #[cfg(feature = "mesh-encryption")]
+        let envelope = if let Some(ref key) = self.encryption_key {
+            super::encrypt_packet(&compressed, key, &packet.source_id, packet.sequence)
+        } else {
+            compressed
+        };
+        #[cfg(not(feature = "mesh-encryption"))]
+        let envelope = compressed;
+
         match route {
             MeshRoute::LoRa => {
                 let transport = self.lora.as_ref().unwrap();
-                let frags = fragment(packet.thought_id(), &compressed);
+                let frags = fragment(packet.thought_id(), &envelope);
                 let mut buf = [0u8; LORA_MTU];
                 for frag in &frags {
                     let len = frag.to_bytes(&mut buf);
@@ -201,11 +226,11 @@ impl DualLayerMesh {
             }
             MeshRoute::Batman => {
                 let transport = self.batman.as_ref().unwrap();
-                transport.send_raw(&compressed)?;
+                transport.send_raw(&envelope)?;
             }
             MeshRoute::Yggdrasil => {
                 let transport = self.yggdrasil.as_ref().unwrap();
-                transport.send_raw(&compressed)?;
+                transport.send_raw(&envelope)?;
             }
         }
 
@@ -234,8 +259,9 @@ impl DualLayerMesh {
         }
 
         // Poll B.A.T.M.A.N. (whole-packet path)
+        // Buffer includes margin for compression header + AEAD overhead (nonce + tag = 28 bytes).
         if let Some(ref transport) = self.batman {
-            let mut buf = [0u8; WISDOM_PACKET_SIZE + 64]; // small margin
+            let mut buf = [0u8; WISDOM_PACKET_SIZE + 92];
             while let Ok(n) = transport.recv_raw(&mut buf) {
                 if n == 0 {
                     break;
@@ -248,7 +274,7 @@ impl DualLayerMesh {
 
         // Poll Yggdrasil (whole-packet path)
         if let Some(ref transport) = self.yggdrasil {
-            let mut buf = [0u8; WISDOM_PACKET_SIZE + 64];
+            let mut buf = [0u8; WISDOM_PACKET_SIZE + 92];
             while let Ok(n) = transport.recv_raw(&mut buf) {
                 if n == 0 {
                     break;
@@ -762,5 +788,97 @@ mod tests {
             .expect("backward compat parse");
         assert_eq!(result.sequence, original.sequence);
         assert_eq!(result.wisdom.0, original.wisdom.0);
+    }
+
+    // -- Encryption pipeline tests --
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_send_encrypts_output() {
+        // DualLayerMesh with encryption key produces ciphertext that differs
+        // from plain compress_packet() output.
+        let key = [0x42u8; 32];
+        let packet = test_packet(MeshUrgency::Critical);
+        let unencrypted = super::super::compress_packet(&packet.to_bytes());
+
+        // Use BiLoopbackTransport to capture the encrypted output.
+        let (a_enc, b_enc) = BiLoopbackTransport::pair("A-enc", "B-enc", 4096);
+        let mesh_enc = DualLayerMesh::new([1; 32])
+            .with_batman(Box::new(a_enc))
+            .with_encryption_key(key);
+        mesh_enc.send(&packet).unwrap();
+
+        let mut buf = [0u8; WISDOM_PACKET_SIZE + 92];
+        let n = b_enc.recv_raw(&mut buf).unwrap();
+        let encrypted_bytes = &buf[..n];
+
+        // Encrypted output must differ from unencrypted compressed envelope
+        assert_ne!(
+            encrypted_bytes, &unencrypted[..],
+            "Encrypted output should differ from unencrypted compressed envelope"
+        );
+        // Encrypted output must be larger (nonce + tag overhead)
+        assert!(
+            encrypted_bytes.len() > unencrypted.len(),
+            "Encrypted output ({}) should be larger than unencrypted ({})",
+            encrypted_bytes.len(),
+            unencrypted.len()
+        );
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_encrypted_send_receive_roundtrip() {
+        // Send through DualLayerMesh with key → MeshReceiver with same key → roundtrip.
+        let key = [0xAB; 32];
+        let (a, b) = BiLoopbackTransport::pair("A-enc", "B-enc", 4096);
+
+        let mesh_a = DualLayerMesh::new([1; 32])
+            .with_batman(Box::new(a))
+            .with_encryption_key(key);
+
+        let original = test_packet(MeshUrgency::Critical);
+        mesh_a.send(&original).unwrap();
+
+        let mut receiver = super::super::MeshReceiver::new().with_encryption_key(key);
+        let mesh_b = DualLayerMesh::new([2; 32]).with_batman(Box::new(b));
+        let completed = mesh_b.poll_incoming(&mut receiver);
+
+        assert_eq!(completed.len(), 1);
+        assert_eq!(completed[0].sequence, original.sequence);
+        assert_eq!(completed[0].source_id, original.source_id);
+        assert_eq!(completed[0].wisdom.0, original.wisdom.0);
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_encrypted_wrong_key_rejected() {
+        // Send with key A → receive with key B → decryption fails,
+        // but backward-compat fallback also fails (ciphertext isn't valid
+        // compressed/raw packet), so no packet returned.
+        let key_a = [0xAA; 32];
+        let key_b = [0xBB; 32];
+        let (a, b) = BiLoopbackTransport::pair("A-enc", "B-enc", 4096);
+
+        let mesh_a = DualLayerMesh::new([1; 32])
+            .with_batman(Box::new(a))
+            .with_encryption_key(key_a);
+
+        let original = test_packet(MeshUrgency::Critical);
+        mesh_a.send(&original).unwrap();
+
+        let mut receiver = super::super::MeshReceiver::new().with_encryption_key(key_b);
+        let mesh_b = DualLayerMesh::new([2; 32]).with_batman(Box::new(b));
+        let completed = mesh_b.poll_incoming(&mut receiver);
+
+        assert!(
+            completed.is_empty(),
+            "Wrong key should produce no packets, got {}",
+            completed.len()
+        );
+        assert_eq!(
+            receiver.stats().packets_decrypt_failed, 1,
+            "Should record one decryption failure"
+        );
     }
 }
