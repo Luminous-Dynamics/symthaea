@@ -163,6 +163,9 @@ pub struct ContinuousMind {
     /// Optional BLAKE3 key for packet authentication.
     #[cfg(feature = "mesh")]
     mesh_auth_key: Option<[u8; 32]>,
+    /// Optional ChaCha20-Poly1305 encryption key for mesh packets.
+    #[cfg(feature = "mesh-encryption")]
+    pub(crate) mesh_encryption_key: Option<[u8; 32]>,
     /// Ring buffer of recently-emitted wisdom packets for partition recovery replay.
     #[cfg(feature = "mesh")]
     mesh_replay_buffer: std::collections::VecDeque<crate::swarm::mesh::WisdomPacket>,
@@ -267,6 +270,8 @@ impl ContinuousMind {
             mesh_bandwidth_window_bytes: 0,
             #[cfg(feature = "mesh")]
             mesh_auth_key: None,
+            #[cfg(feature = "mesh-encryption")]
+            mesh_encryption_key: None,
             #[cfg(feature = "mesh")]
             mesh_replay_buffer: std::collections::VecDeque::with_capacity(
                 mesh::MESH_REPLAY_BUFFER_CAPACITY,

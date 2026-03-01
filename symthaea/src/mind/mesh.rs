@@ -95,6 +95,9 @@ impl ContinuousMind {
         metadata.mesh_peer_count = peer_count as u32;
         metadata.mesh_bytes_sent = self.mesh_stats.bytes_sent;
         metadata.mesh_bytes_received = self.mesh_stats.bytes_received;
+        metadata.mesh_compression_ratio = self.mesh_stats.compression_ratio();
+        metadata.mesh_bandwidth_budget = self.mesh_stats.bandwidth_budget_current;
+        metadata.mesh_packets_throttled = self.mesh_stats.bandwidth_throttled;
     }
 
     /// Check if the bandwidth budget allows sending `packet_bytes`.
@@ -257,11 +260,13 @@ impl ContinuousMind {
             // Multiplicative decrease
             let new = (self.mesh_bandwidth_budget as f64 * MESH_BANDWIDTH_DECREASE_FACTOR) as u64;
             self.mesh_bandwidth_budget = new.max(MESH_BANDWIDTH_MIN);
+            self.mesh_stats.bandwidth_decreases += 1;
         } else if health > 0.5 {
             // Additive increase
             self.mesh_bandwidth_budget = (self.mesh_bandwidth_budget
                 + MESH_BANDWIDTH_ADDITIVE_INCREASE)
                 .min(MESH_BANDWIDTH_MAX);
+            self.mesh_stats.bandwidth_increases += 1;
         }
         // health in [0.3, 0.5] or 0.0 (idle): hold steady
         self.mesh_stats.bandwidth_budget_current = self.mesh_bandwidth_budget;
@@ -333,5 +338,15 @@ impl ContinuousMind {
             phi = self.state.consciousness_level as f32,
             "Emitted heartbeat packet"
         );
+    }
+
+    /// Set the ChaCha20-Poly1305 encryption key for mesh packets.
+    ///
+    /// When set, all outbound packets are encrypted after compression,
+    /// and all inbound packets are decrypted before decompression.
+    /// Pass `None` to disable encryption.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn set_mesh_encryption_key(&mut self, key: Option<[u8; 32]>) {
+        self.mesh_encryption_key = key;
     }
 }
