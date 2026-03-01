@@ -151,6 +151,8 @@ pub(crate) mod subsystem_trait;
 pub(crate) mod thresholds;
 pub(crate) mod virtual_body;
 
+pub mod calibration;
+
 #[cfg(feature = "nurture")]
 pub mod nurture_bridge;
 
