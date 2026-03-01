@@ -449,8 +449,8 @@ impl CognitiveLoopService {
                 self.emotion_contagion.smoothed_valence(),
                 coherence_summary.coherence,
             )
-            .with_dopamine(self.neuromodulator_bath.dopamine.effective())
-            .with_bath_state(self.neuromodulator_bath.state_vector());
+            .with_dopamine(self.neuromod.bath.dopamine.effective())
+            .with_bath_state(self.neuromod.bath.state_vector());
 
             let stored = replay.store_if_significant(episode);
             if stored {
@@ -478,14 +478,14 @@ impl CognitiveLoopService {
                 // Science: Walker & Stickgold (2006) — DA-tagged memories consolidate during sleep
                 let sleep_boost =
                     if self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night {
-                        let factor = self.neuromodulator_bath.sleep_consolidation_boost();
+                        let factor = self.neuromod.bath.sleep_consolidation_boost();
                         (base_batch as f32 * (factor - 1.0)).round() as usize
                     } else {
                         0
                     };
                 // #2: Phasic DA burst → replay amplification (Lisman & Grace 2005)
                 let phasic_da_boost = {
-                    let da_ph = self.neuromodulator_bath.da_phasic();
+                    let da_ph = self.neuromod.bath.da_phasic();
                     if da_ph > 0.3 {
                         ((da_ph - 0.3) * base_batch as f32 * 1.5).round() as usize
                     } else {
@@ -504,7 +504,7 @@ impl CognitiveLoopService {
                     let learning_rate = self.config.cfc_config.learning_rate;
                     // State-dependent replay: prioritize episodes encoded in similar bath state
                     // Science: Godden & Baddeley (1975) — state-dependent memory
-                    let current_bath = Some(self.neuromodulator_bath.state_vector());
+                    let current_bath = Some(self.neuromod.bath.state_vector());
                     let result =
                         replay.replay_session_conditioned(cfc, learning_rate, current_bath);
 
@@ -768,7 +768,7 @@ impl CognitiveLoopService {
     ///
     /// Mutates: `self.carryover.urgency`, `self.carryover.history.error_history`,
     /// `self.carryover.learning.adaptive_threshold_scale`, `self.stats`,
-    /// `self.neuromodulator_bath`.
+    /// `self.neuromod.bath`.
     pub(in crate::cognitive_loop) fn compute_urgency_and_error_pattern(
         &mut self,
         prediction_error: f32,
@@ -799,7 +799,7 @@ impl CognitiveLoopService {
         // Hysteresis: require stronger signal to LEAVE current urgency level
         // #1: D2-mediated behavioral flexibility gates mode transitions (Frank 2005).
         // High D2 → easier transitions (lower hysteresis), low D2 → perseveration.
-        let flexibility = self.neuromodulator_bath.behavioral_flexibility();
+        let flexibility = self.neuromod.bath.behavioral_flexibility();
         let flex_mod = 1.0 / flexibility; // 0.67–1.43 (inverted: high flex = lower threshold)
         let base_hysteresis = match self.carryover.urgency.urgency {
             super::super::CycleUrgency::Cruise => effective_threshold * 1.2 * flex_mod,
@@ -937,7 +937,7 @@ impl CognitiveLoopService {
         };
 
         // #9: Error trend → DA baseline modulation (Schultz 2016)
-        self.neuromodulator_bath
+        self.neuromod.bath
             .modulate_from_error_trend(error_pattern);
 
         // ── Phase 17: Mode transition smoothing ──────────────────────────
@@ -999,9 +999,9 @@ impl CognitiveLoopService {
     ///
     /// Mutates: `self.stats`, `self.curiosity_drive`, `self.carryover`,
     /// `self.feedback_state`, `self.subsystem_collector`, `self.biorhythm`,
-    /// `self.neuromodulator_bath`, `self.somatic_bridge`, `self.emotion_contagion`,
-    /// `self.thermodynamic_load`, `self.bath_phase_tracker`,
-    /// `self.personality_drift_tracker`.
+    /// `self.neuromod.bath`, `self.somatic_bridge`, `self.emotion_contagion`,
+    /// `self.thermodynamic_load`, `self.neuromod.phase_tracker`,
+    /// `self.neuromod.drift_tracker`.
     pub(in crate::cognitive_loop) fn run_cycle_init(
         &mut self,
         module_timings: &mut super::super::ModuleTimings,
@@ -1070,18 +1070,18 @@ impl CognitiveLoopService {
             self.biorhythm = crate::chronobiology::Biorhythm::current();
             // #14: Use effective_hour (with phase offset) for circadian modulation
             let effective_hour = self.biorhythm.effective_hour();
-            self.neuromodulator_bath
+            self.neuromod.bath
                 .modulate_circadian_continuous(effective_hour);
             // #14: Entrain phase offset toward zero each refresh
             self.biorhythm.entrain();
             // Record personality profile for drift detection
-            let profile = self.neuromodulator_bath.personality_profile();
-            self.personality_drift_tracker.record(&profile);
+            let profile = self.neuromod.bath.personality_profile();
+            self.neuromod.drift_tracker.record(&profile);
             // #4: Personality drift → anomaly recovery (Turrigiano 2008)
-            if self.personality_drift_tracker.is_anomalous()
+            if self.neuromod.drift_tracker.is_anomalous()
                 && self.carryover.urgency.anomaly_drift_recovery == 0
             {
-                self.neuromodulator_bath.engage_anomaly_recovery();
+                self.neuromod.bath.engage_anomaly_recovery();
                 self.carryover.urgency.anomaly_drift_recovery = 50;
             }
             self.biorhythm_refresh_counter = 0;
@@ -1090,28 +1090,30 @@ impl CognitiveLoopService {
         if self.carryover.urgency.anomaly_drift_recovery > 0 {
             self.carryover.urgency.anomaly_drift_recovery -= 1;
             if self.carryover.urgency.anomaly_drift_recovery == 0 {
-                self.neuromodulator_bath.disengage_anomaly_recovery();
+                self.neuromod.bath.disengage_anomaly_recovery();
             }
         }
         // ── Sleep→Wake transition: apply sleep recovery (Xie et al. 2013) ──
         {
             let is_sleep_now =
                 self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
-            if self.was_sleeping && !is_sleep_now {
-                let quality = (self.neuromodulator_bath.allostatic_recovery_cycles as f32
+            if self.neuromod.was_sleeping && !is_sleep_now {
+                let quality = (self.neuromod.bath.allostatic_recovery_cycles as f32
                     / 100.0)
                     .clamp(0.0, 1.0);
-                self.neuromodulator_bath.apply_sleep_recovery(quality);
+                self.neuromod.bath.apply_sleep_recovery(quality);
 
                 // ── Psych-bench calibration: receptor sensitivity tuning ──
                 // Apply any pending calibration during sleep→wake, mirroring
                 // synaptic homeostasis (Tononi & Cirelli 2006): receptor
                 // sensitivities adjust during sleep to correct performance drift.
-                if self.pending_calibration.is_some() {
+                if self.neuromod.pending_calibration.is_some() {
                     self.apply_pending_calibration();
+                    // Reset self-assessment cooldown: external calibration supersedes
+                    self.neuromod.self_assessment.reset_after_calibration();
                 }
             }
-            self.was_sleeping = is_sleep_now;
+            self.neuromod.was_sleeping = is_sleep_now;
         }
 
         // Apply circadian plasticity to learning rate (Night=high plasticity, Day=low)
@@ -1135,7 +1137,7 @@ impl CognitiveLoopService {
         }
         // #5: Forward somatic stress to neuromodulator bath (McEwen 2007)
         let somatic_stress_level = self.somatic_bridge.systemic_stress() as f32;
-        self.neuromodulator_bath.apply_stress(somatic_stress_level);
+        self.neuromod.bath.apply_stress(somatic_stress_level);
 
         // ═══════════════════════════════════════════════════════════════════════
         // NEUROMODULATOR BATH: Produce from previous cycle's signals (Phase A)
@@ -1157,43 +1159,74 @@ impl CognitiveLoopService {
                 // Moral judgment → oxytocin/DA (Zak 2012)
                 moral_signal: Some(self.carryover.quality.last_moral_score),
             };
-            self.neuromodulator_bath.update(&neuromod_inputs);
+            self.neuromod.bath.update(&neuromod_inputs);
         }
 
         // ── Phase 5: Post-update bath wiring ────────────────────────────────
         // Record bath state for phase space analysis
-        self.bath_phase_tracker
-            .record(self.neuromodulator_bath.state_vector());
+        self.neuromod.phase_tracker
+            .record(self.neuromod.bath.state_vector());
         // Allostatic load accumulation (McEwen 1998)
         {
-            let cortisol = self.neuromodulator_bath.to_hormone_state().cortisol as f32;
+            let cortisol = self.neuromod.bath.to_hormone_state().cortisol as f32;
             let is_sleep = self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
-            self.neuromodulator_bath
+            self.neuromod.bath
                 .accumulate_allostatic_load(cortisol, is_sleep);
             // Adenosine clearance during sleep (Xie et al. 2013 — glymphatic)
             if is_sleep {
-                self.neuromodulator_bath.clear_adenosine_sleep();
+                self.neuromod.bath.clear_adenosine_sleep();
             }
         }
 
         // ── Phase transition detection (hysteresis-based, Kelso 1995) ──
         {
-            let label = self.neuromodulator_bath.phase_label();
-            self.bath_phase_detector.update(label);
+            let label = self.neuromod.bath.phase_label();
+            self.neuromod.phase_detector.update(label);
         }
 
         // ── Bath metrics export (Prometheus gauges) ──
         #[cfg(feature = "api_module")]
         {
-            let sv = self.neuromodulator_bath.state_vector();
+            let sv = self.neuromod.bath.state_vector();
             crate::api::metrics::update_bath_metrics(
                 crate::api::metrics::global(),
                 &sv,
-                self.neuromodulator_bath.allostatic_load,
-                self.neuromodulator_bath.ei_ratio(),
-                self.neuromodulator_bath.sleep_pressure(),
-                self.neuromodulator_bath.active_injections.len(),
+                self.neuromod.bath.allostatic_load,
+                self.neuromod.bath.ei_ratio(),
+                self.neuromod.bath.sleep_pressure(),
+                self.neuromod.bath.active_injections.len(),
             );
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // SELF-ASSESSMENT: Metacognitive performance monitoring
+        // Tracks EMA of prediction error, coherence, confidence calibration,
+        // attention utilization. Triggers self-calibration when drift > 1σ.
+        // Science: Schmidhuber (2010) — formal theory of intrinsic motivation.
+        // ═══════════════════════════════════════════════════════════════════════
+        {
+            let sa_input = super::super::calibration::SelfAssessmentInput {
+                prediction_error: self.stats.avg_prediction_error,
+                coherence: self.carryover.history.cached_coherence.unwrap_or(0.5),
+                confidence_calibration_error: (self.prediction_confidence
+                    - (1.0 - self.stats.avg_prediction_error.min(1.0)))
+                .abs(),
+                // attention_sensitivity ranges 0.5–1.5; normalize to 0–1 utilization
+                attention_utilization: ((self.adaptive_behavior.attention_sensitivity - 0.5) / 1.0)
+                    .clamp(0.0, 1.0),
+                drift_anomalous: self.neuromod.drift_tracker.is_anomalous(),
+            };
+            self.neuromod.self_assessment.update(&sa_input);
+
+            // Check if self-assessment triggers calibration
+            if let Some(cal) = self.neuromod.self_assessment.check_trigger() {
+                tracing::info!(
+                    adjustments = cal.adjustments.len(),
+                    confidence_delta = cal.confidence_delta,
+                    "Self-assessment triggered auto-calibration"
+                );
+                self.neuromod.pending_calibration = Some(cal);
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -1206,15 +1239,40 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
-        // MORAL INCOMPLETENESS → EXPLORATION BOOST
-        // When fewer than 3 of 7 harmonies have meaningful variance, boost
-        // exploration to encounter scenarios in neglected moral dimensions.
+        // MORAL FREE ENERGY → EXPLORATION BOOST (FEP-principled)
+        // High moral free energy = novel moral territory = boost exploration
+        // to encounter scenarios in underrepresented harmony dimensions.
+        //
+        // Replaces raw topology completeness with continuous FEP signal:
+        //   F = D_KL(q || p) + H(q)
+        // where q = current harmony distribution, p = prior/expected.
+        // High F → large KL divergence from moral prior → explore more.
+        //
+        // Science: Friston (2010) — active inference drives exploration to
+        // minimize expected free energy; here applied to the moral manifold.
         // ═══════════════════════════════════════════════════════════════════════
         {
-            let topo = self.ethics_engine.moral_topology().last_summary();
-            if topo.scenario_count >= 3 && topo.completeness < 0.4 {
-                let boost = (0.4 - topo.completeness) * 0.5; // up to +0.2
-                self.adjust_exploration("moral_incompleteness", boost as f32);
+            // Copy values to avoid borrow overlap with adjust_exploration(&mut self)
+            let free_energy = self.ethics_engine.last_moral_free_energy().free_energy;
+            let (scenario_count, completeness) = {
+                let topo = self.ethics_engine.moral_topology().last_summary();
+                (topo.scenario_count, topo.completeness)
+            };
+
+            // FEP-driven: continuous moral free energy signal
+            // F > 1.0 → novel moral territory → explore (scaled by KL divergence)
+            // F < 0.5 → familiar moral ground → no exploration boost
+            if free_energy > 0.5 {
+                let fe_boost = ((free_energy - 0.5) * 0.15).min(0.2) as f32;
+                self.adjust_exploration("moral_free_energy", fe_boost);
+            }
+
+            // Topology completeness still provides structural signal:
+            // When fewer than 3 of 7 harmonies explored, boost regardless of F.
+            // This catches cold-start (prior is zero, F is undefined/zero).
+            if scenario_count >= 3 && completeness < 0.3 {
+                let structural_boost = (0.3 - completeness) * 0.3; // up to +0.09
+                self.adjust_exploration("moral_topology_gap", structural_boost as f32);
             }
         }
 
@@ -1277,17 +1335,17 @@ impl CognitiveLoopService {
         }
 
         // Exocortex trigger counter
-        if self.neuromodulator_bath.should_query_exocortex() {
+        if self.neuromod.bath.should_query_exocortex() {
             self.stats.exocortex_triggers += 1;
         }
 
         // Neuromodulator EMA stats (alpha=0.05)
         {
             let alpha = 0.05_f32;
-            let da = self.neuromodulator_bath.dopamine.effective();
-            let ne = self.neuromodulator_bath.noradrenaline.effective();
-            let sht = self.neuromodulator_bath.serotonin.effective();
-            let ach = self.neuromodulator_bath.acetylcholine.effective();
+            let da = self.neuromod.bath.dopamine.effective();
+            let ne = self.neuromod.bath.noradrenaline.effective();
+            let sht = self.neuromod.bath.serotonin.effective();
+            let ach = self.neuromod.bath.acetylcholine.effective();
             self.stats.avg_dopamine += alpha * (da - self.stats.avg_dopamine);
             self.stats.avg_noradrenaline += alpha * (ne - self.stats.avg_noradrenaline);
             self.stats.avg_serotonin += alpha * (sht - self.stats.avg_serotonin);
