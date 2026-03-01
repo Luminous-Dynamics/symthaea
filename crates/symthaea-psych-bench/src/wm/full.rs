@@ -118,7 +118,11 @@ impl WorkingMemory {
 
     /// Drain evicted items since last call.
     pub fn take_evicted(&mut self) -> Vec<(ContinuousHV, u64)> {
-        self.mind.take_evicted()
+        self.mind
+            .take_evicted()
+            .into_iter()
+            .map(|(hv, tick, _source, _consolidated)| (hv, tick))
+            .collect()
     }
 
     /// Number of items currently in WM.

@@ -246,6 +246,10 @@ impl CognitiveLoopService {
                 compressed_state: &compressed_state,
             });
         module_timings.ethics_engine = ethics_output.total_us;
+        module_timings.ethics_engine_moral = ethics_output.moral_us;
+        module_timings.ethics_engine_value = ethics_output.value_us;
+        module_timings.ethics_engine_harmonies = ethics_output.harmonies_us;
+        module_timings.moral_topology = ethics_output.topology_us;
         if ethics_output.confidence_delta != 0.0 {
             self.adjust_confidence("ethics_engine", ethics_output.confidence_delta);
         }

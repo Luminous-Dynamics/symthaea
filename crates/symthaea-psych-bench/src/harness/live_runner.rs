@@ -121,7 +121,8 @@ impl CognitiveLoopBenchmarkRunner {
 
     /// Run warmup cycles to stabilize the loop.
     fn warmup(&mut self) {
-        let warmup_hv = ContinuousHV::random(64, 0xDEAD_BEEF);
+        let dim = self.service.state_dim();
+        let warmup_hv = ContinuousHV::random(dim, 0xDEAD_BEEF);
         for _ in 0..self.warmup_cycles {
             let _ = self.service.cycle_with_hv(&warmup_hv);
         }
@@ -169,7 +170,7 @@ impl CognitiveLoopBenchmarkRunner {
                 ne: result.metadata.neuromod.noradrenaline_effective,
                 sht: result.metadata.neuromod.serotonin_effective,
                 ach: result.metadata.neuromod.acetylcholine_effective,
-                psi: result.metadata.unified_psi as f32,
+                psi: result.metadata.consciousness_level as f32,
                 cycle_time_us: result.cycle_time_us,
                 learning_occurred: result.learning_occurred,
             });
