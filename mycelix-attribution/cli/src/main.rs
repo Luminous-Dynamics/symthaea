@@ -578,6 +578,14 @@ fn extract_xml_value(line: &str, tag: &str) -> Option<String> {
 fn main() {
     let args = Args::parse();
 
+    if !args.did.starts_with("did:") {
+        eprintln!(
+            "Invalid DID: '{}'. Must start with 'did:' (e.g. did:mycelix:abc123)",
+            args.did
+        );
+        std::process::exit(1);
+    }
+
     let content = match std::fs::read_to_string(&args.lockfile) {
         Ok(c) => c,
         Err(e) => {

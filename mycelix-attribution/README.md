@@ -191,11 +191,12 @@ The `verified.json` contains `original_action_hash`, `verifier_pubkey`, and `ver
 
 ### AIR Design
 
-- **Trace**: 5 columns x 8 rows
-- **Columns**: scale, dep_hash_lo, dep_hash_hi, did_hash_lo, did_hash_hi
-- **Constraints**: Scale range check (degree 4), column constancy (degree 1)
-- **Security**: S128 (80 queries, blowup 16, grinding 16)
-- **Proof size**: ~60-63 KB
+- **Trace**: 9 columns x 16 rows
+- **Columns**: scale, dep_hash_lo, dep_hash_hi, did_hash_lo, did_hash_hi, commitment[0..3]
+- **Constraints**: Scale range check (degree 4), 8 column constancy constraints (degree 1)
+- **Boundary assertions**: 8 (dep hash, did hash, witness commitment — all bound at row 0)
+- **Security**: S128 (128 queries, blowup 16, grinding 20)
+- **Proof size**: ~80-100 KB
 
 ## SDK-TS Examples
 
@@ -249,14 +250,14 @@ hc dna pack dna/
 ### Run Tests
 
 ```bash
-# Zome unit tests (40 tests: 12 registry + 12 reciprocity + 11 usage + 5 weight)
+# Zome unit tests (40 tests: 12 registry + 17 reciprocity + 11 usage)
 cargo test --lib -p registry -p registry_integrity -p usage -p usage_integrity \
   -p reciprocity -p reciprocity_integrity
 
 # CLI tests (9 tests: 8 parsers + 1 empty lockfile)
 cd cli && cargo test
 
-# Verifier tests (9 tests: commitment, proof bounds, e2e STARK, signing)
+# Verifier tests (13 tests: commitment, proof bounds, e2e STARK, signing, cross-validation, replay)
 cd verifier && cargo test
 
 # Prover tests (3 tests: proof gen, roundtrip, scale validation)
@@ -268,7 +269,7 @@ cd stark-common && cargo test
 # Sweettest integration (25 tests, requires conductor)
 cd tests && cargo test -- --ignored
 
-# Total: 91 tests (66 unit + 25 sweettest)
+# Total: 95 tests (70 unit + 25 sweettest)
 ```
 
 ### Clippy

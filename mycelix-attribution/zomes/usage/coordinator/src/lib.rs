@@ -32,6 +32,10 @@ pub enum UsageSignal {
         attestation_id: String,
         dependency_id: String,
     },
+    AttestationRenewed {
+        attestation_id: String,
+        dependency_id: String,
+    },
 }
 
 // ── Input Types ──────────────────────────────────────────────────────
@@ -484,14 +488,20 @@ pub fn renew_attestation(input: RenewAttestationInput) -> ExternResult<Record> {
     let user_tag = format!("user_attest:{}", renewed.user_did);
     create_link(
         anchor_hash(&user_tag)?,
-        new_entry_hash,
+        new_entry_hash.clone(),
         LinkTypes::UserToAttestations,
         (),
     )?;
+    create_link(
+        anchor_hash("all_attestations")?,
+        new_entry_hash,
+        LinkTypes::AllAttestations,
+        (),
+    )?;
 
-    let _ = emit_signal(&UsageSignal::AttestationSubmitted {
+    let _ = emit_signal(&UsageSignal::AttestationRenewed {
+        attestation_id: renewed.id,
         dependency_id: renewed.dependency_id,
-        user_did: renewed.user_did,
     });
 
     get(new_action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
