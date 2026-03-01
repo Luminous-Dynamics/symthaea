@@ -162,8 +162,24 @@ impl Default for FabricationConfig {
 
 impl FabricationConfig {
     /// Load from DNA properties bytes, falling back to defaults for missing fields.
+    /// Validates all float fields are finite; falls back to default on invalid values.
     pub fn from_properties_or_default(properties_bytes: &[u8]) -> Self {
-        serde_json::from_slice::<Self>(properties_bytes).unwrap_or_default()
+        let config: Self = serde_json::from_slice::<Self>(properties_bytes).unwrap_or_default();
+        if config.all_floats_finite() {
+            config
+        } else {
+            Self::default()
+        }
+    }
+
+    /// Check that all f32 fields are finite (not NaN or Inf).
+    pub fn all_floats_finite(&self) -> bool {
+        self.pog_energy_weight.is_finite()
+            && self.pog_material_weight.is_finite()
+            && self.pog_quality_weight.is_finite()
+            && self.pog_local_weight.is_finite()
+            && self.min_pog_for_mycelium.is_finite()
+            && self.similarity_threshold.is_finite()
     }
 
     /// Validate that PoGF weights sum to 1.0 (within tolerance).
@@ -2623,6 +2639,33 @@ mod tests {
         let cfg = FabricationConfig::from_properties_or_default(&[]);
         assert_eq!(cfg.rate_limit_max_ops, 100);
         assert_eq!(cfg.base_mycelium_reward, 10);
+    }
+
+    #[test]
+    fn test_config_nan_weight_falls_back_to_default() {
+        // JSON with NaN-like value (null deserializes as default via serde)
+        // But a manually crafted config with NaN should trigger fallback
+        let mut cfg = FabricationConfig::default();
+        cfg.pog_energy_weight = f32::NAN;
+        assert!(!cfg.all_floats_finite());
+
+        // When deserialized from valid JSON, all_floats_finite should pass
+        let valid_json = serde_json::to_vec(&FabricationConfig::default()).unwrap();
+        let cfg2 = FabricationConfig::from_properties_or_default(&valid_json);
+        assert!(cfg2.all_floats_finite());
+    }
+
+    #[test]
+    fn test_config_infinity_weight_falls_back_to_default() {
+        let mut cfg = FabricationConfig::default();
+        cfg.similarity_threshold = f32::INFINITY;
+        assert!(!cfg.all_floats_finite());
+    }
+
+    #[test]
+    fn test_config_all_floats_finite_with_defaults() {
+        let cfg = FabricationConfig::default();
+        assert!(cfg.all_floats_finite());
     }
 
     // === SHARED PAGINATE TESTS ===

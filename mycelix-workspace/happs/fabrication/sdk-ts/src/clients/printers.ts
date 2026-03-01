@@ -3,13 +3,12 @@
  *
  * Handles printer registry operations including:
  * - Registration and management
- * - Discovery and matching
+ * - Discovery and matching (geohash + Haversine)
  * - Availability status
  */
 
 import type { AppClient, ActionHash, Record } from '@holochain/client';
 import type {
-  Printer,
   PrinterType,
   PrinterCapabilities,
   MaterialType,
@@ -17,15 +16,59 @@ import type {
   AvailabilityStatus,
   PrinterMatch,
   RegisterPrinterInput,
+  PrinterRates,
 } from '../types';
 
+export interface PaginationInput {
+  offset: number;
+  limit: number;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface UpdatePrinterInput {
+  original_action_hash: ActionHash;
+  name?: string;
+  location?: GeoLocation;
+  capabilities?: PrinterCapabilities;
+  materials_available?: MaterialType[];
+  rates?: PrinterRates;
+}
+
 export interface PrinterRequirements {
-  buildVolumeMin?: { x: number; y: number; z: number };
+  build_volume_min?: { x: number; y: number; z: number };
   materials?: MaterialType[];
   features?: string[];
-  maxLayerHeight?: number;
-  heatedBed?: boolean;
+  max_layer_height?: number;
+  heated_bed?: boolean;
   enclosure?: boolean;
+}
+
+export interface FindNearbyInput {
+  location: GeoLocation;
+  radius_km: number;
+  pagination?: PaginationInput;
+}
+
+export interface FindByCapabilityInput {
+  requirements: PrinterRequirements;
+  pagination?: PaginationInput;
+}
+
+export interface MatchDesignInput {
+  design_hash: ActionHash;
+  location?: GeoLocation;
+  limit?: number;
+}
+
+export interface CheckCompatibilityInput {
+  printer_hash: ActionHash;
+  design_hash: ActionHash;
 }
 
 export interface CompatibilityResult {
@@ -35,11 +78,19 @@ export interface CompatibilityResult {
   recommendations: string[];
 }
 
+export interface UpdateAvailabilityInput {
+  printer_hash: ActionHash;
+  status: AvailabilityStatus;
+  message?: string;
+  eta_available?: number;
+  current_job?: ActionHash;
+}
+
 export class PrintersClient {
   constructor(
     private client: AppClient,
     private roleName: string,
-    private zomeName: string = 'printers'
+    private zomeName: string = 'printers_coordinator'
   ) {}
 
   /**
@@ -69,13 +120,7 @@ export class PrintersClient {
   /**
    * Update printer details
    */
-  async update(input: {
-    printerHash: ActionHash;
-    name?: string;
-    capabilities?: PrinterCapabilities;
-    materialsAvailable?: MaterialType[];
-    location?: GeoLocation;
-  }): Promise<Record> {
+  async update(input: UpdatePrinterInput): Promise<Record> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
@@ -99,87 +144,84 @@ export class PrintersClient {
   /**
    * Get my registered printers
    */
-  async getMine(): Promise<Record[]> {
+  async getMine(pagination?: PaginationInput): Promise<PaginatedResponse<Record>> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'get_my_printers',
-      payload: null,
+      payload: { pagination: pagination ?? null },
     });
   }
 
   /**
-   * Find printers near a location
+   * Find printers near a location (geohash prefix + Haversine refinement)
    */
-  async findNearby(location: GeoLocation, radiusKm: number = 50): Promise<Record[]> {
+  async findNearby(input: FindNearbyInput): Promise<PaginatedResponse<PrinterMatch>> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'find_printers_nearby',
-      payload: { location, radius_km: radiusKm },
+      payload: input,
     });
   }
 
   /**
    * Find printers by capability requirements
    */
-  async findByCapability(requirements: PrinterRequirements): Promise<Record[]> {
+  async findByCapability(input: FindByCapabilityInput): Promise<PaginatedResponse<PrinterMatch>> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'find_printers_by_capability',
-      payload: requirements,
+      payload: input,
     });
   }
 
   /**
    * Get all currently available printers
    */
-  async getAvailable(): Promise<Record[]> {
+  async getAvailable(pagination?: PaginationInput): Promise<PaginatedResponse<Record>> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'get_available_printers',
-      payload: null,
+      payload: { pagination: pagination ?? null },
     });
   }
 
   /**
    * Match a design to compatible printers
    */
-  async matchDesign(designHash: ActionHash): Promise<PrinterMatch[]> {
+  async matchDesign(input: MatchDesignInput): Promise<PrinterMatch[]> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'match_design_to_printers',
-      payload: designHash,
+      payload: input,
     });
   }
 
   /**
    * Check if a specific printer is compatible with a design
    */
-  async checkCompatibility(
-    printerHash: ActionHash,
-    designHash: ActionHash
-  ): Promise<CompatibilityResult> {
+  async checkCompatibility(input: CheckCompatibilityInput): Promise<CompatibilityResult> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'check_printer_compatibility',
-      payload: { printer: printerHash, design: designHash },
+      payload: input,
     });
   }
 
   /**
    * Update printer availability status
    */
-  async updateAvailability(hash: ActionHash, status: AvailabilityStatus): Promise<Record> {
+  async updateAvailability(input: UpdateAvailabilityInput): Promise<Record> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'update_availability',
-      payload: { hash, status },
+      payload: input,
     });
   }
 

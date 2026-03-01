@@ -189,6 +189,15 @@ pub fn create_repair_prediction(input: CreateRepairPredictionInput) -> ExternRes
             "property_asset_hash not found on DHT".into()
         )))?;
 
+    // Validate float inputs
+    if !input.failure_probability.is_finite() || input.failure_probability < 0.0 || input.failure_probability > 1.0 {
+        return Err(FabricationError::ValidationFailed {
+            field: "failure_probability".to_string(),
+            reason: "must be a finite number between 0.0 and 1.0".to_string(),
+        }
+        .to_wasm_error());
+    }
+
     let now = sys_time()?;
 
     let recommended_action = if input.failure_probability > 0.8 {
@@ -243,7 +252,7 @@ pub fn create_repair_prediction(input: CreateRepairPredictionInput) -> ExternRes
         &hash,
     );
 
-    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get(hash.clone(), GetOptions::default())?.ok_or(FabricationError::not_found("RepairPrediction", &hash))
 }
 
 /// Create a repair workflow from a prediction
@@ -283,7 +292,7 @@ pub fn create_repair_workflow(prediction_hash: ActionHash) -> ExternResult<Recor
     let active_anchor = active_workflows_anchor()?;
     create_link(active_anchor, hash.clone(), LinkTypes::ActiveWorkflows, ())?;
 
-    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get(hash.clone(), GetOptions::default())?.ok_or(FabricationError::not_found("RepairWorkflow", &hash))
 }
 
 /// Update repair workflow status
@@ -303,7 +312,7 @@ pub fn update_repair_workflow(input: UpdateWorkflowInput) -> ExternResult<Record
     require_fabrication_consciousness("update_repair_workflow")?;
 
     let record = get(input.workflow_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Workflow not found".into())))?;
+        .ok_or(FabricationError::not_found("RepairWorkflow", &input.workflow_hash))?;
 
     // Only the original creator can update the workflow
     let caller = agent_info()?.agent_initial_pubkey;
@@ -317,7 +326,10 @@ pub fn update_repair_workflow(input: UpdateWorkflowInput) -> ExternResult<Record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Parse error".into())))?;
+        .ok_or(FabricationError::ValidationFailed {
+            field: "workflow_hash".to_string(),
+            reason: "Could not parse RepairWorkflowEntry".to_string(),
+        }.to_wasm_error())?;
 
     workflow.status = input.status.clone();
     if let Some(h) = input.design_hash { workflow.design_hash = Some(h); }
@@ -345,7 +357,7 @@ pub fn update_repair_workflow(input: UpdateWorkflowInput) -> ExternResult<Record
         "repair workflow updated",
     );
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get(new_hash.clone(), GetOptions::default())?.ok_or(FabricationError::not_found("RepairWorkflow", &new_hash))
 }
 
 /// Get active repair workflows with optional pagination
@@ -415,7 +427,7 @@ pub fn emit_fabrication_event(input: EmitEventInput) -> ExternResult<Record> {
     let events_anchor = recent_events_anchor()?;
     create_link(events_anchor, hash.clone(), LinkTypes::RecentEvents, ())?;
 
-    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get(hash.clone(), GetOptions::default())?.ok_or(FabricationError::not_found("FabricationEvent", &hash))
 }
 
 #[hdk_extern]
@@ -511,7 +523,7 @@ pub fn list_design_on_marketplace(input: ListDesignInput) -> ExternResult<Record
         &hash,
     );
 
-    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get(hash.clone(), GetOptions::default())?.ok_or(FabricationError::not_found("MarketplaceListing", &hash))
 }
 
 // =============================================================================
@@ -562,7 +574,7 @@ pub fn link_material_to_supplier(input: LinkSupplierInput) -> ExternResult<Recor
 
     create_link(input.material_hash, hash.clone(), LinkTypes::MaterialToSuppliers, ())?;
 
-    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get(hash.clone(), GetOptions::default())?.ok_or(FabricationError::not_found("SupplierLink", &hash))
 }
 
 // =============================================================================

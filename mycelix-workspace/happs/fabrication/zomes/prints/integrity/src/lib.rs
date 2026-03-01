@@ -44,6 +44,8 @@ pub enum LinkTypes {
     JobToCincinnati,
     /// Link from Cincinnati session to anomaly events
     CincinnatiToAnomalies,
+    /// Link from Cincinnati session anchor to session entry (for auth lookups)
+    SessionAnchorToSession,
     /// Link for all print jobs
     AllPrintJobs,
     /// Link for pending jobs
@@ -385,13 +387,13 @@ fn validate_create_link(
         LinkTypes::CincinnatiToAnomalies => Ok(ValidateCallbackResult::Valid),
         LinkTypes::AllPrintJobs => Ok(ValidateCallbackResult::Valid),
         LinkTypes::PendingJobs => Ok(ValidateCallbackResult::Valid),
+        LinkTypes::SessionAnchorToSession => Ok(ValidateCallbackResult::Valid),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hdi::prelude::*;
 
     // =========================================================================
     // Test helpers

@@ -11,31 +11,86 @@
 
 import type { AppClient, ActionHash, Record } from '@holochain/client';
 import type {
-  PrintJob,
-  PrintRecord,
-  PrintSettings,
   PrintResult,
   PrintIssue,
-  PrintStatistics,
-  GroundingCertificate,
-  CincinnatiSession,
-  CincinnatiReport,
+  PrintSettings,
+  EnergyType,
+  MaterialPassport,
+  AnomalyEvent,
+  DimensionalMeasurement,
+  PogfAttestationBundle,
   CreatePrintJobInput,
   RecordPrintInput,
 } from '../types';
 
-export interface PrintProgressUpdate {
-  jobHash: ActionHash;
-  progress: number;
-  currentLayer?: number;
-  estimatedTimeRemaining?: number;
+export interface PaginationInput {
+  offset: number;
+  limit: number;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface UpdateProgressInput {
+  job_hash: ActionHash;
+  progress_percent: number;
+  current_layer?: number;
+  material_used_grams?: number;
+}
+
+export interface CompletePrintInput {
+  job_hash: ActionHash;
+  result: PrintResult;
+}
+
+export interface CancelPrintInput {
+  job_hash: ActionHash;
+  reason: string;
+}
+
+export interface AddPhotosInput {
+  record_hash: ActionHash;
+  photos: string[];
+}
+
+export interface StartCincinnatiInput {
+  job_hash: ActionHash;
+  total_layers: number;
+  sampling_rate_hz: number;
+}
+
+export interface ReportAnomalyInput {
+  session_id: string;
+  anomaly: AnomalyEvent;
+}
+
+export interface UpdateCincinnatiInput {
+  session_hash: ActionHash;
+  current_layer: number;
+  health_score: number;
+  anomaly_count: number;
+}
+
+export interface DesignPrintStats {
+  design_hash: ActionHash;
+  total_prints: number;
+  successful_prints: number;
+  failed_prints: number;
+  average_quality: number;
+  average_pog_score: number;
+  total_mycelium_earned: number;
+  common_issues: Array<[PrintIssue, number]>;
 }
 
 export class PrintsClient {
   constructor(
     private client: AppClient,
     private roleName: string,
-    private zomeName: string = 'prints'
+    private zomeName: string = 'prints_coordinator'
   ) {}
 
   // =========================================================================
@@ -57,60 +112,60 @@ export class PrintsClient {
   /**
    * Accept a print job (as printer operator)
    */
-  async acceptJob(hash: ActionHash): Promise<Record> {
+  async acceptJob(jobHash: ActionHash): Promise<Record> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'accept_print_job',
-      payload: hash,
+      payload: jobHash,
     });
   }
 
   /**
    * Start printing
    */
-  async startPrint(hash: ActionHash): Promise<Record> {
+  async startPrint(jobHash: ActionHash): Promise<Record> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'start_print',
-      payload: hash,
+      payload: jobHash,
     });
   }
 
   /**
    * Update print progress
    */
-  async updateProgress(hash: ActionHash, progress: number): Promise<Record> {
+  async updateProgress(input: UpdateProgressInput): Promise<Record> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'update_print_progress',
-      payload: { hash, progress },
+      payload: input,
     });
   }
 
   /**
    * Complete print with result
    */
-  async completePrint(hash: ActionHash, result: PrintResult): Promise<Record> {
+  async completePrint(input: CompletePrintInput): Promise<Record> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'complete_print',
-      payload: { hash, result },
+      payload: input,
     });
   }
 
   /**
    * Cancel a print job
    */
-  async cancelPrint(hash: ActionHash, reason: string): Promise<Record> {
+  async cancelPrint(input: CancelPrintInput): Promise<Record> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'cancel_print',
-      payload: { hash, reason },
+      payload: input,
     });
   }
 
@@ -121,7 +176,7 @@ export class PrintsClient {
   /**
    * Record print result with PoGF scoring
    *
-   * PoGF Score = (E_renewable × 0.3) + (M_circular × 0.3) + (Q_verified × 0.2) + (L_local × 0.2)
+   * PoGF Score = (E_renewable * 0.3) + (M_circular * 0.3) + (Q_verified * 0.2) + (L_local * 0.2)
    */
   async recordResult(input: RecordPrintInput): Promise<Record> {
     return this.client.callZome({
@@ -147,12 +202,12 @@ export class PrintsClient {
   /**
    * Add photos to a print record
    */
-  async addPhotos(hash: ActionHash, photos: string[]): Promise<Record> {
+  async addPhotos(input: AddPhotosInput): Promise<Record> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'add_print_photos',
-      payload: { hash, photos },
+      payload: input,
     });
   }
 
@@ -161,63 +216,38 @@ export class PrintsClient {
   // =========================================================================
 
   /**
-   * Start Cincinnati monitoring session
+   * Start Cincinnati monitoring session for a print job
    */
-  async startCincinnatiSession(
-    jobHash: ActionHash,
-    baselineSignature: number[]
-  ): Promise<CincinnatiSession> {
+  async startCincinnatiMonitoring(input: StartCincinnatiInput): Promise<Record> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
-      fn_name: 'start_cincinnati_session',
-      payload: { job_hash: jobHash, baseline_signature: baselineSignature },
+      fn_name: 'start_cincinnati_monitoring',
+      payload: input,
     });
   }
 
   /**
-   * Record Cincinnati anomaly
+   * Report a Cincinnati anomaly event
    */
-  async recordAnomaly(
-    sessionId: string,
-    anomalyType: string,
-    severity: number,
-    sensorData: object
-  ): Promise<Record> {
+  async reportCincinnatiAnomaly(input: ReportAnomalyInput): Promise<Record> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
-      fn_name: 'record_cincinnati_anomaly',
-      payload: {
-        session_id: sessionId,
-        anomaly_type: anomalyType,
-        severity,
-        sensor_data: sensorData,
-      },
+      fn_name: 'report_cincinnati_anomaly',
+      payload: input,
     });
   }
 
   /**
-   * Complete Cincinnati session and get report
+   * Update Cincinnati monitoring session state
    */
-  async completeCincinnatiSession(sessionId: string): Promise<CincinnatiReport> {
+  async updateCincinnatiSession(input: UpdateCincinnatiInput): Promise<Record> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
-      fn_name: 'complete_cincinnati_session',
-      payload: sessionId,
-    });
-  }
-
-  /**
-   * Get Cincinnati report for a print job
-   */
-  async getCincinnatiReport(jobHash: ActionHash): Promise<CincinnatiReport | null> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'get_cincinnati_report',
-      payload: jobHash,
+      fn_name: 'update_cincinnati_session',
+      payload: input,
     });
   }
 
@@ -228,43 +258,49 @@ export class PrintsClient {
   /**
    * Get my print jobs
    */
-  async getMyJobs(): Promise<Record[]> {
+  async getMyJobs(pagination?: PaginationInput): Promise<PaginatedResponse<Record>> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'get_my_print_jobs',
-      payload: null,
+      payload: { pagination: pagination ?? null },
     });
   }
 
   /**
    * Get jobs for a specific printer
    */
-  async getPrinterJobs(printerHash: ActionHash): Promise<Record[]> {
+  async getPrinterJobs(
+    printerHash: ActionHash,
+    pagination?: PaginationInput
+  ): Promise<PaginatedResponse<Record>> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'get_printer_jobs',
-      payload: printerHash,
+      payload: { hash: printerHash, pagination: pagination ?? null },
     });
   }
 
   /**
    * Get all prints of a specific design
    */
-  async getDesignPrints(designHash: ActionHash): Promise<Record[]> {
+  async getDesignPrints(
+    designHash: ActionHash,
+    pagination?: PaginationInput
+  ): Promise<PaginatedResponse<Record>> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'get_design_prints',
-      payload: designHash,
+      payload: { hash: designHash, pagination: pagination ?? null },
     });
   }
 
   /**
    * Get statistics for a design
    */
-  async getStatistics(designHash: ActionHash): Promise<PrintStatistics> {
+  async getStatistics(designHash: ActionHash): Promise<DesignPrintStats> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
@@ -274,7 +310,7 @@ export class PrintsClient {
   }
 
   /**
-   * Calculate PoGF score
+   * Calculate PoGF score (client-side helper)
    *
    * @param energyRenewableFraction - Percentage of renewable energy used (0-1)
    * @param materialCircularity - Material circularity score (0-1)
@@ -297,7 +333,7 @@ export class PrintsClient {
   }
 
   /**
-   * Estimate MYCELIUM reward for a print
+   * Estimate MYCELIUM reward for a print (client-side helper)
    *
    * @param pogScore - PoGF score (0-1)
    * @param qualityScore - Quality score (0-1)

@@ -14,7 +14,7 @@ thread_local! {
     static CONFIG: RefCell<Option<FabricationConfig>> = const { RefCell::new(None) };
 }
 
-#[allow(dead_code)]
+#[allow(dead_code)] // Infrastructure for future rate limiting
 fn get_config() -> FabricationConfig {
     CONFIG.with(|c| {
         c.borrow_mut()
@@ -620,7 +620,7 @@ pub fn check_printer_compatibility(input: CheckCompatibilityInput) -> ExternResu
     let printer_record = get(input.printer_hash.clone(), GetOptions::default())?
         .ok_or(FabricationError::not_found("Printer", &input.printer_hash))?;
 
-    let _printer: Printer = printer_record
+    let printer: Printer = printer_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
@@ -628,15 +628,44 @@ pub fn check_printer_compatibility(input: CheckCompatibilityInput) -> ExternResu
             "Could not parse printer".to_string()
         )))?;
 
-    // Would fetch design and compare with printer capabilities
-    // For now, return a placeholder result
+    // Fetch design and extract material requirements via DesignSummary
+    let design_record = get(input.design_hash.clone(), GetOptions::default())?
+        .ok_or(FabricationError::not_found("Design", &input.design_hash))?;
+    let design_summary: DesignSummary = design_record
+        .entry()
+        .to_app_option::<DesignSummary>()
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+
+    // Build requirements from design's material compatibility
+    let preferred_material = design_summary
+        .material_compatibility
+        .iter()
+        .max_by(|a, b| a.compatibility.partial_cmp(&b.compatibility).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|mb| mb.material.clone());
+
+    let requirements = PrinterRequirements {
+        min_build_volume: None,
+        material: preferred_material,
+        printer_type: None,
+        min_layer_height: None,
+        max_layer_height: None,
+        heated_bed_required: false,
+        enclosure_required: false,
+        min_hotend_temp: None,
+    };
+
+    let result = check_printer_meets_requirements(&printer, &requirements);
     Ok(CompatibilityResult {
-        compatible: true,
-        score: 0.85,
-        issues: vec![],
-        recommendations: vec![
-            "Consider using supports for overhangs".to_string(),
-        ],
+        compatible: result.compatible,
+        score: result.score,
+        issues: result.issues,
+        recommendations: if result.score < 1.0 && result.compatible {
+            vec!["Some capabilities are partially matched; verify settings before printing".to_string()]
+        } else {
+            vec![]
+        },
     })
 }
 

@@ -2,82 +2,75 @@
  * Bridge Client
  *
  * Handles cross-hApp integration including:
- * - Anticipatory Repair Loop (Property → Knowledge → Fabrication)
+ * - Anticipatory Repair Loop (Property -> Fabrication -> Printer)
  * - Marketplace integration
  * - Supply Chain integration
- * - Event emission and subscription
+ * - Event emission and audit trail
  */
 
-import type { AppClient, ActionHash, Record } from '@holochain/client';
+import type { AppClient, ActionHash, AgentPubKey, Record } from '@holochain/client';
 import type {
-  RepairPrediction,
-  RepairWorkflow,
   RepairWorkflowStatus,
-  RepairAction,
-  MarketplaceListing,
   ListingType,
-  SupplyChainLink,
-  GeoLocation,
-  License,
-  SafetyClass,
 } from '../types';
 
+export interface PaginationInput {
+  offset: number;
+  limit: number;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
 export interface CreateRepairPredictionInput {
-  propertyAssetHash: ActionHash;
-  assetModel: string;
-  predictedFailureComponent: string;
-  failureProbability: number;
-  estimatedFailureDate: number;
-  confidenceIntervalDays: number;
-  sensorDataSummary: string;
+  property_asset_hash: ActionHash;
+  asset_model: string;
+  predicted_failure_component: string;
+  failure_probability: number;
+  estimated_failure_date: number;
+  confidence_interval_days: number;
+  sensor_data_summary: string;
 }
 
 export interface UpdateWorkflowInput {
-  workflowHash: ActionHash;
+  workflow_hash: ActionHash;
   status: RepairWorkflowStatus;
-  designHash?: ActionHash;
-  printerHash?: ActionHash;
-  hearthFundingHash?: ActionHash;
-  printJobHash?: ActionHash;
+  design_hash?: ActionHash;
+  printer_hash?: ActionHash;
+  hearth_funding_hash?: ActionHash;
+  print_job_hash?: ActionHash;
 }
 
-export interface FabricationEvent {
-  eventType: string;
-  designId?: ActionHash;
+export interface EmitEventInput {
+  event_type: string;
+  design_id?: ActionHash;
   payload: string;
-  sourceHapp: string;
-  timestamp: number;
 }
 
 export interface MarketplaceListingInput {
-  designHash: ActionHash;
-  price?: number;
-  listingType: ListingType;
+  design_hash: ActionHash;
+  price: number;
+  listing_type: ListingType;
 }
 
-export interface AvailabilityResult {
-  available: boolean;
-  suppliers: Array<{
-    did: string;
-    quantity: number;
-    price?: number;
-    leadTimeDays?: number;
-  }>;
-  localOptions: number;
-}
-
-export interface ComplianceResult {
-  compliant: boolean;
-  license: License;
-  restrictions: string[];
-  attributionRequired: boolean;
+export interface AuditTrailFilter {
+  domain?: string;
+  agent?: AgentPubKey;
+  after?: number;
+  before?: number;
+  limit: number;
+  pagination?: PaginationInput;
 }
 
 export class BridgeClient {
   constructor(
     private client: AppClient,
     private roleName: string,
-    private zomeName: string = 'bridge'
+    private zomeName: string = 'bridge_coordinator'
   ) {}
 
   // =========================================================================
@@ -86,9 +79,6 @@ export class BridgeClient {
 
   /**
    * Create a repair prediction from digital twin data
-   *
-   * Part of the Anticipatory Repair Loop:
-   * Property hApp → Fabrication → Knowledge → Printer → Installed
    */
   async createRepairPrediction(input: CreateRepairPredictionInput): Promise<Record> {
     return this.client.callZome({
@@ -126,24 +116,12 @@ export class BridgeClient {
   /**
    * Get active repair workflows
    */
-  async getActiveWorkflows(): Promise<Record[]> {
+  async getActiveWorkflows(pagination?: PaginationInput): Promise<PaginatedResponse<Record>> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'get_active_workflows',
-      payload: null,
-    });
-  }
-
-  /**
-   * Get repair predictions for an asset
-   */
-  async getAssetPredictions(assetHash: ActionHash): Promise<Record[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'get_asset_predictions',
-      payload: assetHash,
+      payload: { pagination: pagination ?? null },
     });
   }
 
@@ -154,28 +132,42 @@ export class BridgeClient {
   /**
    * Emit a fabrication event
    */
-  async emitEvent(
-    eventType: string,
-    designId?: ActionHash,
-    payload: string = '{}'
-  ): Promise<Record> {
+  async emitEvent(input: EmitEventInput): Promise<Record> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'emit_fabrication_event',
-      payload: { event_type: eventType, design_id: designId, payload },
+      payload: input,
     });
   }
 
   /**
    * Get recent fabrication events
    */
-  async getRecentEvents(since?: number): Promise<Record[]> {
+  async getRecentEvents(
+    since?: number,
+    pagination?: PaginationInput
+  ): Promise<PaginatedResponse<Record>> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'get_recent_events',
-      payload: since || null,
+      payload: {
+        since: since ?? null,
+        pagination: pagination ?? { offset: 0, limit: 100 },
+      },
+    });
+  }
+
+  /**
+   * Get audit trail entries
+   */
+  async getAuditTrail(filter: AuditTrailFilter): Promise<PaginatedResponse<Record>> {
+    return this.client.callZome({
+      role_name: this.roleName,
+      zome_name: this.zomeName,
+      fn_name: 'get_audit_trail',
+      payload: filter,
     });
   }
 
@@ -195,30 +187,6 @@ export class BridgeClient {
     });
   }
 
-  /**
-   * Get marketplace status for a design
-   */
-  async getMarketplaceStatus(designHash: ActionHash): Promise<Record | null> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'get_design_marketplace_status',
-      payload: designHash,
-    });
-  }
-
-  /**
-   * Handle design purchase callback
-   */
-  async onDesignPurchased(designHash: ActionHash, buyerPubKey: Uint8Array): Promise<void> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'on_design_purchased',
-      payload: { design: designHash, buyer: buyerPubKey },
-    });
-  }
-
   // =========================================================================
   // SUPPLY CHAIN INTEGRATION
   // =========================================================================
@@ -229,7 +197,7 @@ export class BridgeClient {
   async linkMaterialToSupplier(
     materialHash: ActionHash,
     supplierDid: string,
-    supplyChainItemHash?: ActionHash
+    supplychainItemHash?: ActionHash
   ): Promise<Record> {
     return this.client.callZome({
       role_name: this.roleName,
@@ -238,102 +206,8 @@ export class BridgeClient {
       payload: {
         material_hash: materialHash,
         supplier_did: supplierDid,
-        supplychain_item_hash: supplyChainItemHash,
+        supplychain_item_hash: supplychainItemHash ?? null,
       },
-    });
-  }
-
-  /**
-   * Query material availability from supply chain
-   */
-  async queryMaterialAvailability(
-    materialHash: ActionHash,
-    location: GeoLocation
-  ): Promise<AvailabilityResult> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'query_material_availability',
-      payload: { material: materialHash, location },
-    });
-  }
-
-  /**
-   * Handle material order callback
-   */
-  async onMaterialOrderPlaced(materialHash: ActionHash, orderHash: ActionHash): Promise<void> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'on_material_order_placed',
-      payload: { material: materialHash, order_hash: orderHash },
-    });
-  }
-
-  // =========================================================================
-  // KNOWLEDGE INTEGRATION
-  // =========================================================================
-
-  /**
-   * Request design verification through Knowledge hApp markets
-   */
-  async requestVerificationMarket(
-    designHash: ActionHash,
-    targetSafetyClass: SafetyClass
-  ): Promise<ActionHash> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'request_design_verification_market',
-      payload: { design: designHash, target: targetSafetyClass },
-    });
-  }
-
-  /**
-   * Sync epistemic scores from Knowledge hApp
-   */
-  async syncEpistemicScores(designHash: ActionHash): Promise<{
-    empirical: number;
-    normative: number;
-    mythic: number;
-    overallConfidence: number;
-  }> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'sync_epistemic_scores',
-      payload: designHash,
-    });
-  }
-
-  // =========================================================================
-  // PROPERTY INTEGRATION (IP/Licensing)
-  // =========================================================================
-
-  /**
-   * Register design IP
-   */
-  async registerDesignIp(designHash: ActionHash, license: License): Promise<ActionHash> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'register_design_ip',
-      payload: { design: designHash, license },
-    });
-  }
-
-  /**
-   * Check license compliance for usage
-   */
-  async checkLicenseCompliance(
-    designHash: ActionHash,
-    usageType: 'personal' | 'commercial' | 'derivative' | 'distribution'
-  ): Promise<ComplianceResult> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'check_license_compliance',
-      payload: { design: designHash, usage: usageType },
     });
   }
 }

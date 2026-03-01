@@ -363,7 +363,6 @@ pub fn accept_print_job(hash: ActionHash) -> ExternResult<Record> {
         )));
     }
 
-    let _now = sys_time()?; // Reserved for future timestamp tracking
     let updated = PrintJob {
         status: PrintJobStatus::Accepted,
         ..job
@@ -579,7 +578,12 @@ pub fn record_print_result(input: RecordPrintInput) -> ExternResult<Record> {
     // Only the printer owner may submit print results
     ensure_caller_is_printer_owner(&job.printer_hash)?;
 
-    // Basic input bounds to avoid abuse
+    // Validate float inputs
+    if !input.energy_used_kwh.is_finite() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "energy_used_kwh must be a finite number".to_string()
+        )));
+    }
     if input.energy_used_kwh < 0.0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Energy used cannot be negative".to_string()
@@ -811,6 +815,15 @@ pub fn start_cincinnati_monitoring(input: StartCincinnatiInput) -> ExternResult<
         (),
     )?;
 
+    // Link session anchor to session entry (for auth lookups in anomaly reporting)
+    let session_anchor = cincinnati_session_anchor(&session_id)?;
+    create_link(
+        session_anchor,
+        session_hash.clone(),
+        LinkTypes::SessionAnchorToSession,
+        (),
+    )?;
+
     get(session_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve session".to_string()
     )))
@@ -819,31 +832,34 @@ pub fn start_cincinnati_monitoring(input: StartCincinnatiInput) -> ExternResult<
 /// Report an anomaly detected by Cincinnati monitoring
 #[hdk_extern]
 pub fn report_cincinnati_anomaly(input: ReportAnomalyInput) -> ExternResult<Record> {
-    // For now, require anomalies to be reported by the printer owner
-    // by looking up the session and associated job.
+    // Require anomalies to be reported by the printer owner.
+    // Look up the session via SessionAnchorToSession, then trace to the job for auth.
     let session_anchor = cincinnati_session_anchor(&input.session_id)?;
-    let links = get_links(
-        LinkQuery::try_new(session_anchor.clone(), LinkTypes::CincinnatiToAnomalies)?, GetStrategy::default(),
+    let session_links = get_links(
+        LinkQuery::try_new(session_anchor.clone(), LinkTypes::SessionAnchorToSession)?,
+        GetStrategy::default(),
     )?;
-    // If there are existing anomalies, use one to trace back to the session/job; otherwise skip auth
-    if let Some(existing) = links.first() {
-        if let Some(anomaly_hash) = existing.target.clone().into_action_hash() {
-            if let Some(record) = get(anomaly_hash, GetOptions::default())? {
-                if let Some(existing_anomaly) = record
+    if let Some(session_link) = session_links.first() {
+        if let Some(session_hash) = session_link.target.clone().into_action_hash() {
+            if let Some(session_record) = get(session_hash, GetOptions::default())? {
+                if let Some(session_entry) = session_record
                     .entry()
-                    .to_app_option::<CincinnatiAnomalyEntry>()
+                    .to_app_option::<CincinnatiSessionEntry>()
                     .ok()
                     .flatten()
                 {
-                    // Use the session id to find the session entry and job
-                    let session_links = get_links(
-                        LinkQuery::try_new(
-                            cincinnati_session_anchor(&existing_anomaly.session_id)?,
-                            LinkTypes::CincinnatiToAnomalies,
-                        )?,
-                        GetStrategy::default(),
-                    )?;
-                    let _ = session_links; // Best-effort; full auth can be added when session index is richer
+                    let job_record = get(session_entry.print_job_hash, GetOptions::default())?
+                        .ok_or(wasm_error!(WasmErrorInner::Guest(
+                            "Job not found for session".to_string()
+                        )))?;
+                    let job: PrintJob = job_record
+                        .entry()
+                        .to_app_option()
+                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                        .ok_or(wasm_error!(WasmErrorInner::Guest(
+                            "Could not parse job".to_string()
+                        )))?;
+                    ensure_caller_is_printer_owner(&job.printer_hash)?;
                 }
             }
         }
@@ -913,6 +929,13 @@ pub fn update_cincinnati_session(input: UpdateCincinnatiInput) -> ExternResult<R
             "Could not parse job".to_string()
         )))?;
     ensure_caller_is_printer_owner(&job.printer_hash)?;
+
+    // Validate float inputs
+    if !input.health_score.is_finite() || input.health_score < 0.0 || input.health_score > 1.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "health_score must be a finite number between 0.0 and 1.0".to_string()
+        )));
+    }
 
     session.current_layer = input.current_layer;
     session.running_health_score = input.health_score;

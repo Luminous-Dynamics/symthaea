@@ -65,21 +65,37 @@ export type { FabricationConfig } from './client';
 // Sub-clients
 export { DesignsClient } from './clients/designs';
 export { PrintersClient } from './clients/printers';
-export type { PrinterRequirements, CompatibilityResult } from './clients/printers';
+export type {
+  PrinterRequirements,
+  CompatibilityResult,
+  UpdatePrinterInput,
+  FindNearbyInput,
+  FindByCapabilityInput,
+  MatchDesignInput,
+  CheckCompatibilityInput,
+  UpdateAvailabilityInput,
+} from './clients/printers';
 export { PrintsClient } from './clients/prints';
-export type { PrintProgressUpdate } from './clients/prints';
+export type {
+  UpdateProgressInput,
+  CompletePrintInput,
+  CancelPrintInput,
+  AddPhotosInput,
+  StartCincinnatiInput,
+  ReportAnomalyInput,
+  UpdateCincinnatiInput,
+  DesignPrintStats,
+} from './clients/prints';
 export { MaterialsClient } from './clients/materials';
-export type { CreateMaterialInput, SupplierInfo, AvailabilityInfo } from './clients/materials';
+export type { CreateMaterialInput } from './clients/materials';
 export { VerificationClient } from './clients/verification';
-export type { VerificationRequestInput, KnowledgeQueryResult } from './clients/verification';
 export { BridgeClient } from './clients/bridge';
 export type {
   CreateRepairPredictionInput,
   UpdateWorkflowInput,
-  FabricationEvent,
+  EmitEventInput,
   MarketplaceListingInput,
-  AvailabilityResult,
-  ComplianceResult,
+  AuditTrailFilter,
 } from './clients/bridge';
 export { SymthaeaClient } from './clients/symthaea';
 export type {

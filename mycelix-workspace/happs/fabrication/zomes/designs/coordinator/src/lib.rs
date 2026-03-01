@@ -685,7 +685,7 @@ pub struct GeneratedVariant {
 /// call.  Field names must match exactly so that MessagePack serialization on
 /// the caller side deserializes correctly on the callee side.
 #[derive(Serialize, Deserialize, Debug)]
-struct SynthaaeVariantInput {
+struct SymthaeaVariantInput {
     pub base_design_hash: ActionHash,
     pub intent_modifiers: Vec<SerializedBindingForCall>,
     pub material_constraints: Vec<String>,
@@ -722,7 +722,7 @@ struct SerializedBindingForCall {
 fn params_to_symthaea_input(
     design_hash: ActionHash,
     parameters: &HashMap<String, ParameterValue>,
-) -> SynthaaeVariantInput {
+) -> SymthaeaVariantInput {
     let mut intent_modifiers: Vec<SerializedBindingForCall> = Vec::new();
     let mut material_constraints: Vec<String> = Vec::new();
 
@@ -756,7 +756,7 @@ fn params_to_symthaea_input(
         });
     }
 
-    SynthaaeVariantInput {
+    SymthaeaVariantInput {
         base_design_hash: design_hash,
         intent_modifiers,
         material_constraints,

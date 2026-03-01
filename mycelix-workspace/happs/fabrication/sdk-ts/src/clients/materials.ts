@@ -1,51 +1,44 @@
 /**
  * Materials Client
  *
- * Handles material specifications and sourcing:
- * - Material registry
- * - Certification tracking
- * - Supply chain integration
+ * Handles material specifications:
+ * - Material registry (create, get)
+ * - Type-based discovery
+ * - Food-safe material filtering
  */
 
 import type { AppClient, ActionHash, Record } from '@holochain/client';
 import type {
-  Material,
   MaterialType,
   MaterialProperties,
   Certification,
-  CertificationType,
-  GeoLocation,
 } from '../types';
+
+export interface PaginationInput {
+  offset: number;
+  limit: number;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  offset: number;
+  limit: number;
+}
 
 export interface CreateMaterialInput {
   name: string;
-  materialType: MaterialType;
+  material_type: MaterialType;
   properties: MaterialProperties;
   certifications: Certification[];
-  safetyDataSheet?: string;
-}
-
-export interface SupplierInfo {
-  supplierDid: string;
-  name: string;
-  location?: GeoLocation;
-  price?: number;
-  leadTimeDays?: number;
-  minOrderQuantity?: number;
-}
-
-export interface AvailabilityInfo {
-  available: boolean;
-  suppliers: SupplierInfo[];
-  estimatedLeadTime?: number;
-  closestSupplierDistance?: number;
+  safety_data_sheet?: string;
 }
 
 export class MaterialsClient {
   constructor(
     private client: AppClient,
     private roleName: string,
-    private zomeName: string = 'materials'
+    private zomeName: string = 'materials_coordinator'
   ) {}
 
   /**
@@ -73,123 +66,29 @@ export class MaterialsClient {
   }
 
   /**
-   * Update material specification
-   */
-  async update(input: {
-    materialHash: ActionHash;
-    properties?: MaterialProperties;
-    certifications?: Certification[];
-    safetyDataSheet?: string;
-  }): Promise<Record> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'update_material',
-      payload: input,
-    });
-  }
-
-  /**
    * Get materials by type
    */
-  async getByType(materialType: MaterialType): Promise<Record[]> {
+  async getByType(
+    materialType: MaterialType,
+    pagination?: PaginationInput
+  ): Promise<PaginatedResponse<Record>> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'get_materials_by_type',
-      payload: materialType,
-    });
-  }
-
-  /**
-   * Find materials compatible with a design
-   */
-  async findCompatible(designHash: ActionHash): Promise<Record[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'find_compatible_materials',
-      payload: designHash,
+      payload: { material_type: materialType, pagination: pagination ?? null },
     });
   }
 
   /**
    * Get food-safe materials only
    */
-  async getFoodSafe(): Promise<Record[]> {
+  async getFoodSafe(pagination?: PaginationInput): Promise<PaginatedResponse<Record>> {
     return this.client.callZome({
       role_name: this.roleName,
       zome_name: this.zomeName,
       fn_name: 'get_food_safe_materials',
-      payload: null,
-    });
-  }
-
-  /**
-   * Get materials by certification type
-   */
-  async getByCertification(certType: CertificationType): Promise<Record[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'get_materials_by_certification',
-      payload: certType,
-    });
-  }
-
-  /**
-   * Get suppliers for a material (via Supply Chain bridge)
-   */
-  async getSuppliers(materialHash: ActionHash): Promise<SupplierInfo[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'get_material_suppliers',
-      payload: materialHash,
-    });
-  }
-
-  /**
-   * Check material availability at a location
-   */
-  async checkAvailability(
-    materialHash: ActionHash,
-    location: GeoLocation
-  ): Promise<AvailabilityInfo> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'check_material_availability',
-      payload: { material: materialHash, location },
-    });
-  }
-
-  /**
-   * Get all materials
-   */
-  async getAll(): Promise<Record[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'get_all_materials',
-      payload: null,
-    });
-  }
-
-  /**
-   * Search materials by name or properties
-   */
-  async search(query: {
-    name?: string;
-    minTensileStrength?: number;
-    foodSafe?: boolean;
-    uvResistant?: boolean;
-  }): Promise<Record[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: this.zomeName,
-      fn_name: 'search_materials',
-      payload: query,
+      payload: { pagination: pagination ?? null },
     });
   }
 }
