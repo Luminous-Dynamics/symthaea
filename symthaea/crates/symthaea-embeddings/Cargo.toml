@@ -23,8 +23,11 @@ burn = { version = "0.18", default-features = false, optional = true }
 safetensors = { version = "0.4", optional = true }
 tokenizers = { version = "0.21", optional = true }
 tracing = { version = "0.1", optional = true }
+half = { version = "2.4", optional = true }
+hf-hub = { version = "0.4", optional = true }
 
 [features]
 default = []
-burn = ["dep:burn", "dep:safetensors", "dep:tokenizers", "dep:tracing", "burn/ndarray"]
+burn = ["dep:burn", "dep:safetensors", "dep:tokenizers", "dep:tracing", "dep:half", "burn/ndarray"]
 burn-wgpu = ["burn", "burn/wgpu"]
+burn-hub = ["burn", "dep:hf-hub"]
