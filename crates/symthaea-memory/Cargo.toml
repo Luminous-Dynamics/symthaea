@@ -9,6 +9,7 @@ license = "MIT OR Apache-2.0"
 anyhow = { workspace = true }
 bincode = { workspace = true }
 chrono = { workspace = true }
+ndarray = { workspace = true }
 rusqlite = { workspace = true }
 serde = { workspace = true }
 symthaea-core = { path = "../../symthaea-core" }

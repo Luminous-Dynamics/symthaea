@@ -1236,6 +1236,18 @@ impl CfCNetwork {
     }
 }
 
+impl symthaea_memory::TrainableNetwork for CfCNetwork {
+    fn train_step(
+        &mut self,
+        input: &ndarray::Array1<f32>,
+        target: &ndarray::Array1<f32>,
+        dt: f32,
+        learning_rate: f32,
+    ) -> anyhow::Result<f32> {
+        CfCNetwork::train_step(self, input, target, dt, learning_rate)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

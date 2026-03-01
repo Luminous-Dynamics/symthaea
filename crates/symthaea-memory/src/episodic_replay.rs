@@ -70,7 +70,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
-use crate::dynamics::cfc::CfCNetwork;
+use crate::TrainableNetwork;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -442,6 +442,16 @@ pub struct EpisodicMemory {
 }
 
 impl EpisodicMemory {
+    /// Get the current replay batch size.
+    pub fn batch_size(&self) -> usize {
+        self.config.batch_size
+    }
+
+    /// Set the replay batch size (e.g., for surprise-boosted sessions).
+    pub fn set_batch_size(&mut self, batch_size: usize) {
+        self.config.batch_size = batch_size;
+    }
+
     /// Create a new episodic memory system
     pub fn new(config: EpisodicReplayConfig) -> Self {
         Self {
@@ -702,7 +712,7 @@ impl EpisodicMemory {
     /// The network learns to predict the output given the input.
     pub fn replay_training_step(
         &mut self,
-        network: &mut CfCNetwork,
+        network: &mut impl TrainableNetwork,
         episode: &Episode,
         base_learning_rate: f32,
         dt: f32,
@@ -737,7 +747,7 @@ impl EpisodicMemory {
     /// Returns average loss over the batch.
     pub fn replay_session(
         &mut self,
-        network: &mut CfCNetwork,
+        network: &mut impl TrainableNetwork,
         base_learning_rate: f32,
     ) -> ReplaySessionResult {
         if !self.should_replay() {
@@ -812,7 +822,7 @@ impl EpisodicMemory {
     /// state-dependent retrieval (Godden & Baddeley, 1975).
     pub fn replay_session_conditioned(
         &mut self,
-        network: &mut CfCNetwork,
+        network: &mut impl TrainableNetwork,
         base_learning_rate: f32,
         current_bath: Option<[f32; 9]>,
     ) -> ReplaySessionResult {
@@ -1217,46 +1227,7 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_replay_improves_retention() {
-        use crate::dynamics::cfc::CfCNetworkConfig;
-
-        let config = EpisodicReplayConfig {
-            psi_threshold: 0.1,
-            min_episodes_for_replay: 3,
-            batch_size: 3,
-            replay_interval: 5,
-            ..Default::default()
-        };
-        let mut memory = EpisodicMemory::new(config);
-
-        // Create a small CfC network for testing
-        let net_config = CfCNetworkConfig {
-            input_dim: 256,
-            hidden_dim: 128,
-            output_dim: 256,
-            ..Default::default()
-        };
-        let mut network = CfCNetwork::new(net_config);
-
-        // Store some episodes
-        for i in 0..10 {
-            let phi = 0.5 + (i as f64 * 0.05);
-            let episode = make_test_episode(phi, i as u64);
-            memory.store_if_significant(episode);
-        }
-
-        // Force should_replay to be true
-        memory.cycles_since_replay = 100;
-
-        // Perform replay session
-        let result = memory.replay_session(&mut network, 0.001);
-
-        assert!(!result.skipped);
-        assert!(result.episodes_replayed > 0);
-        assert!(result.average_loss.is_finite());
-        assert!(result.average_psi > 0.5);
-    }
+    // test_replay_improves_retention moved to main crate (requires CfCNetwork)
 
     #[test]
     fn test_statistics_tracking() {
