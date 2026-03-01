@@ -1,0 +1,7 @@
+{
+  "id": "#pqc-auth-1",
+  "type": "MlDsa65VerificationKey2024",
+  "controller": "did:mycelix:REPLACE_ME",
+  "publicKeyMultibase": "zREPLACE_WITH_MULTIBASE_MLDSA65_PUBLIC_KEY",
+  "algorithm": 61441
+}

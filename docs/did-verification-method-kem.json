@@ -1,0 +1,7 @@
+{
+  "id": "#pqc-kem-1",
+  "type": "MlKem768KeyAgreementKey2024",
+  "controller": "did:mycelix:REPLACE_ME",
+  "publicKeyMultibase": "zREPLACE_WITH_MULTIBASE_MLKEM768_PUBLIC_KEY",
+  "algorithm": 61472
+}
