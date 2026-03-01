@@ -58,7 +58,7 @@ impl BenchmarkPair {
 
     fn format_comparison(&self) -> String {
         format!(
-            "  {:<25} | acc: {:.3} → {:.3} (Δ{:+.3}) | PE: {:.4} → {:.4} (Δ{:+.4}) | DA: {:.3}/{:.3} NE: {:.3}/{:.3} 5HT: {:.3}/{:.3} ACh: {:.3}/{:.3}",
+            "  {:<25} | acc: {:.3} → {:.3} (Δ{:+.3}) | PE: {:.4} → {:.4} (Δ{:+.4}) | DA: {:.3}/{:.3} NE: {:.3}/{:.3} 5HT: {:.3}/{:.3} ACh: {:.3}/{:.3} | R: {:.3}/{:.3}",
             self.name,
             self.sequential.accuracy, self.consensus.accuracy, self.accuracy_delta(),
             self.sequential.mean_prediction_error, self.consensus.mean_prediction_error, self.prediction_error_delta(),
@@ -66,6 +66,7 @@ impl BenchmarkPair {
             self.sequential.mean_ne, self.consensus.mean_ne,
             self.sequential.mean_sht, self.consensus.mean_sht,
             self.sequential.mean_ach, self.consensus.mean_ach,
+            self.sequential.mean_reward, self.consensus.mean_reward,
         )
     }
 }

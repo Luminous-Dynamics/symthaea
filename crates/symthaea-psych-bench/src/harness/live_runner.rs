@@ -50,6 +50,9 @@ pub struct LoopTrialResult {
     pub cycle_time_us: u64,
     /// Whether learning occurred this cycle.
     pub learning_occurred: bool,
+    /// Reward signal delivered to neuromodulator bath.
+    #[serde(default)]
+    pub reward: f32,
 }
 
 /// Aggregate result from running a benchmark through the loop.
@@ -71,6 +74,9 @@ pub struct LoopBenchmarkResult {
     pub mean_sht: f64,
     /// Mean ACh level.
     pub mean_ach: f64,
+    /// Mean reward signal across trials.
+    #[serde(default)]
+    pub mean_reward: f64,
     /// Total wall-clock time in milliseconds.
     pub elapsed_ms: u64,
 }
@@ -101,7 +107,7 @@ impl CognitiveLoopBenchmarkRunner {
         let service = CognitiveLoopService::new(config).ok()?;
         Some(Self {
             service,
-            warmup_cycles: 20,
+            warmup_cycles: 100,
         })
     }
 
@@ -110,7 +116,7 @@ impl CognitiveLoopBenchmarkRunner {
         let service = CognitiveLoopService::new(config).ok()?;
         Some(Self {
             service,
-            warmup_cycles: 20,
+            warmup_cycles: 100,
         })
     }
 
@@ -162,6 +168,11 @@ impl CognitiveLoopBenchmarkRunner {
                 correct_count += 1;
             }
 
+            // Wire trial outcome as reward signal to neuromodulator bath.
+            // DA encodes reward prediction error (Schultz 1997).
+            let trial_reward = if correct { 0.8 } else { -0.5 };
+            self.service.provide_reward(trial_reward);
+
             trials.push(LoopTrialResult {
                 response_idx: best_idx,
                 correct,
@@ -173,6 +184,7 @@ impl CognitiveLoopBenchmarkRunner {
                 psi: result.metadata.consciousness_level as f32,
                 cycle_time_us: result.cycle_time_us,
                 learning_occurred: result.learning_occurred,
+                reward: trial_reward,
             });
         }
 
@@ -191,6 +203,7 @@ impl CognitiveLoopBenchmarkRunner {
         let mean_ne = trials.iter().map(|t| t.ne as f64).sum::<f64>() / n.max(1.0);
         let mean_sht = trials.iter().map(|t| t.sht as f64).sum::<f64>() / n.max(1.0);
         let mean_ach = trials.iter().map(|t| t.ach as f64).sum::<f64>() / n.max(1.0);
+        let mean_reward = trials.iter().map(|t| t.reward as f64).sum::<f64>() / n.max(1.0);
 
         LoopBenchmarkResult {
             benchmark: bench.loop_name().to_string(),
@@ -201,6 +214,7 @@ impl CognitiveLoopBenchmarkRunner {
             mean_ne,
             mean_sht,
             mean_ach,
+            mean_reward,
             elapsed_ms: start.elapsed().as_millis() as u64,
         }
     }
@@ -584,6 +598,7 @@ mod tests {
             psi: 0.3,
             cycle_time_us: 1000,
             learning_occurred: false,
+            reward: 0.8,
         };
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("\"correct\":true"));
@@ -600,6 +615,7 @@ mod tests {
             mean_ne: 0.5,
             mean_sht: 0.5,
             mean_ach: 0.5,
+            mean_reward: 0.5,
             elapsed_ms: 100,
         };
         assert!((result.accuracy - 0.85).abs() < 1e-10);
@@ -618,6 +634,7 @@ mod tests {
             mean_ne: 0.5,
             mean_sht: 0.5,
             mean_ach: 0.5,
+            mean_reward: 0.0,
             elapsed_ms: 0,
         };
         assert_eq!(result.benchmark, "cosine_test");

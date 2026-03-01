@@ -237,6 +237,7 @@ mod tests {
                 psi: 0.3,
                 cycle_time_us: 1000 + (i as u64 * 50),
                 learning_occurred: i % 5 == 0,
+                reward: 0.0,
             })
             .collect()
     }
