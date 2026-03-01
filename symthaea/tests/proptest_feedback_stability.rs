@@ -470,11 +470,11 @@ proptest! {
             let result = service.cycle(input);
             let m = &result.metadata;
 
-            assert_finite_f64(m.fep_accuracy, &format!("fep_accuracy@cycle{i}"))?;
-            assert_finite_f64(m.fep_complexity, &format!("fep_complexity@cycle{i}"))?;
-            assert_finite_f64(m.fep_surprise, &format!("fep_surprise@cycle{i}"))?;
-            assert_finite_f64(m.fep_td_error, &format!("fep_td_error@cycle{i}"))?;
-            assert_finite_f64(m.fep_pragmatic_value, &format!("fep_pragmatic_value@cycle{i}"))?;
+            assert_finite_f64(m.fep.fep_accuracy, &format!("fep_accuracy@cycle{i}"))?;
+            assert_finite_f64(m.fep.fep_complexity, &format!("fep_complexity@cycle{i}"))?;
+            assert_finite_f64(m.fep.fep_surprise, &format!("fep_surprise@cycle{i}"))?;
+            assert_finite_f64(m.fep.fep_td_error, &format!("fep_td_error@cycle{i}"))?;
+            assert_finite_f64(m.fep.fep_pragmatic_value, &format!("fep_pragmatic_value@cycle{i}"))?;
         }
     }
 }
@@ -514,7 +514,7 @@ proptest! {
         let mut service = feedback_service();
         for (i, input) in inputs.iter().enumerate() {
             let result = service.cycle(input);
-            let score = result.metadata.moral_score;
+            let score = result.metadata.ethics.moral_score;
             assert_finite_f32(score, &format!("moral_score@cycle{i}"))?;
             assert_bounded_f32(score, -1.0, 1.0,
                 &format!("moral_score@cycle{i}"))?;
@@ -836,27 +836,27 @@ proptest! {
             assert_finite_f64(m.embodied_agency, &format!("embodied_agency@{i}"))?;
             assert_finite_f64(m.narrative_gwt_self_psi, &format!("narrative_gwt_self_psi@{i}"))?;
             assert_finite_f64(m.narrative_self_psi, &format!("narrative_self_psi@{i}"))?;
-            assert_finite_f64(m.predictive_free_energy, &format!("predictive_free_energy@{i}"))?;
-            assert_finite_f64(m.predictive_phi_modulation, &format!("predictive_phi_modulation@{i}"))?;
+            assert_finite_f64(m.fep.predictive_free_energy, &format!("predictive_free_energy@{i}"))?;
+            assert_finite_f64(m.fep.predictive_phi_modulation, &format!("predictive_phi_modulation@{i}"))?;
 
             // Feedback loop signals
             assert_finite_f32(m.reasoning_confidence, &format!("reasoning_confidence@{i}"))?;
             assert_finite_f32(m.predictive_self_safety, &format!("predictive_self_safety@{i}"))?;
-            assert_finite_f32(m.attention_schema_focus, &format!("attention_schema_focus@{i}"))?;
+            assert_finite_f32(m.attention.attention_schema_focus, &format!("attention_schema_focus@{i}"))?;
             assert_finite_f32(m.affective_valence, &format!("affective_valence@{i}"))?;
             assert_finite_f32(m.affective_arousal, &format!("affective_arousal@{i}"))?;
             assert_finite_f64(m.thermodynamic_entropy, &format!("thermodynamic_entropy@{i}"))?;
             assert_finite_f64(m.thermodynamic_free_energy, &format!("thermodynamic_free_energy@{i}"))?;
             assert_finite_f64(m.phenomenal_binding_strength, &format!("phenomenal_binding_strength@{i}"))?;
             assert_finite_f64(m.hierarchical_total_free_energy, &format!("hierarchical_total_free_energy@{i}"))?;
-            assert_finite_f32(m.psi_attention_avg, &format!("psi_attention_avg@{i}"))?;
+            assert_finite_f32(m.attention.psi_attention_avg, &format!("psi_attention_avg@{i}"))?;
             assert_finite_f64(m.primitive_psi, &format!("primitive_psi@{i}"))?;
-            assert_finite_f64(m.value_evaluator_score, &format!("value_evaluator_score@{i}"))?;
-            assert_finite_f32(m.harmonies_alignment, &format!("harmonies_alignment@{i}"))?;
+            assert_finite_f64(m.ethics.value_evaluator_score, &format!("value_evaluator_score@{i}"))?;
+            assert_finite_f32(m.harmonics.harmonies_alignment, &format!("harmonies_alignment@{i}"))?;
             assert_finite_f64(m.consciousness_profile_composite, &format!("consciousness_profile_composite@{i}"))?;
             assert_finite_f64(m.synergy_enhanced_composite, &format!("synergy_enhanced_composite@{i}"))?;
-            assert_finite_f64(m.harmonic_field_coherence, &format!("harmonic_field_coherence@{i}"))?;
-            assert_finite_f64(m.harmonic_love_resonance, &format!("harmonic_love_resonance@{i}"))?;
+            assert_finite_f64(m.harmonics.harmonic_field_coherence, &format!("harmonic_field_coherence@{i}"))?;
+            assert_finite_f64(m.harmonics.harmonic_love_resonance, &format!("harmonic_love_resonance@{i}"))?;
             assert_finite_f32(m.reasoning_chain_confidence, &format!("reasoning_chain_confidence@{i}"))?;
             assert_finite_f64(m.adaptive_reasoning_phi, &format!("adaptive_reasoning_phi@{i}"))?;
             assert_finite_f64(m.causal_avg_confidence, &format!("causal_avg_confidence@{i}"))?;
@@ -882,18 +882,18 @@ proptest! {
             assert_finite_f64(m.primitive_validation_p_value, &format!("primitive_validation_p_value@{i}"))?;
             assert_finite_f64(m.meta_reasoning_confidence, &format!("meta_reasoning_confidence@{i}"))?;
             assert_finite_f32(m.negation_polarity, &format!("negation_polarity@{i}"))?;
-            assert_finite_f32(m.moral_score, &format!("moral_score@{i}"))?;
+            assert_finite_f32(m.ethics.moral_score, &format!("moral_score@{i}"))?;
             assert_finite_f32(m.actual_effective_lr, &format!("actual_effective_lr@{i}"))?;
             assert_finite_f32(m.cycle_reward, &format!("cycle_reward@{i}"))?;
-            assert_finite_f32(m.value_feedback_trend, &format!("value_feedback_trend@{i}"))?;
+            assert_finite_f32(m.ethics.value_feedback_trend, &format!("value_feedback_trend@{i}"))?;
             assert_finite_f64(m.support_efe, &format!("support_efe@{i}"))?;
-            assert_finite_f32(m.soul_alignment, &format!("soul_alignment@{i}"))?;
+            assert_finite_f32(m.ethics.soul_alignment, &format!("soul_alignment@{i}"))?;
             assert_finite_f32(m.meta_cognitive_accuracy, &format!("meta_cognitive_accuracy@{i}"))?;
             assert_finite_f32(m.circadian_plasticity, &format!("circadian_plasticity@{i}"))?;
-            assert_finite_f32(m.phi_attention_weight, &format!("phi_attention_weight@{i}"))?;
+            assert_finite_f32(m.attention.phi_attention_weight, &format!("phi_attention_weight@{i}"))?;
             assert_finite_f64(m.context_phi_weight, &format!("context_phi_weight@{i}"))?;
-            assert_finite_f64(m.empathic_compassion, &format!("empathic_compassion@{i}"))?;
-            assert_finite_f64(m.empathic_tone_adj, &format!("empathic_tone_adj@{i}"))?;
+            assert_finite_f64(m.ethics.empathic_compassion, &format!("empathic_compassion@{i}"))?;
+            assert_finite_f64(m.ethics.empathic_tone_adj, &format!("empathic_tone_adj@{i}"))?;
             assert_finite_f32(m.codebook_diversity, &format!("codebook_diversity@{i}"))?;
             assert_finite_f32(m.resonator_best_sim, &format!("resonator_best_sim@{i}"))?;
         }

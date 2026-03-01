@@ -225,7 +225,7 @@ fn test_metadata_reflects_profile_modules() {
         "Minimal profile should not trigger surprise exploration"
     );
     assert_eq!(
-        minimal_result.metadata.meta_cognitive_accuracy, 0.0,
+        minimal_result.metadata.quality.meta_cognitive_accuracy, 0.0,
         "Minimal profile should have zero meta-cognitive accuracy"
     );
 }

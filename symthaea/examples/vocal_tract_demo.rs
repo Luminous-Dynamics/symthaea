@@ -22,7 +22,7 @@ fn main() {
     use symthaea::voice::vocal_tract_encoder::VoiceCognitiveState;
     use symthaea::voice::vocal_tract_fep::VocalTractObservation;
     use symthaea::voice::vocal_tract_fep::{
-        populate_manner_map, Intonation, ProsodyContext, VocalTractPipeline,
+        populate_manner_map, Intonation, PitchAccent, ProsodyContext, VocalTractPipeline,
     };
     use symthaea::voice::vocoder::FormantVocoder;
     use symthaea::voice::FormantFrame;
@@ -402,8 +402,21 @@ fn main() {
             ..Default::default()
         };
 
-        for &(phoneme, stress, n_frames) in &phoneme_seq {
+        for (seq_idx, &(phoneme, stress, n_frames)) in phoneme_seq.iter().enumerate() {
             let is_silence = phoneme == "SIL" || phoneme == "SP";
+            let next_ph = phoneme_seq.get(seq_idx + 1).map(|&(ph, _, _)| ph);
+            // Skip silence as next phoneme for anticipation
+            let next_ph = match next_ph {
+                Some("SIL") | Some("SP") => phoneme_seq.get(seq_idx + 2).map(|&(ph, _, _)| ph),
+                other => other,
+            };
+
+            // Assign pitch accent: primary stress vowels get H*
+            let pitch_accent = if stress == 1 {
+                PitchAccent::High
+            } else {
+                PitchAccent::None
+            };
 
             for fi in 0..n_frames {
                 if is_silence {
@@ -412,6 +425,7 @@ fn main() {
                     let phoneme_progress = fi as f32 / n_frames as f32;
                     let utterance_progress =
                         (frame_idx as f32 / total_frames as f32).clamp(0.0, 1.0);
+                    let remaining = n_frames - fi;
 
                     let prosody = ProsodyContext {
                         utterance_progress,
@@ -420,10 +434,16 @@ fn main() {
                         base_f0: 120.0,
                         arousal: 0.5,
                         intonation,
+                        phrase_progress: utterance_progress,
+                        pitch_accent,
+                        ..ProsodyContext::default()
                     };
 
-                    let frame =
-                        pipeline.tick_with_prosody(&cog_state, None, dt, Some(phoneme), &prosody);
+                    let frame = pipeline.tick_with_anticipation(
+                        &cog_state, None, dt,
+                        Some(phoneme), next_ph, remaining,
+                        &prosody,
+                    );
                     all_frames.push(frame);
                 }
                 frame_idx += 1;

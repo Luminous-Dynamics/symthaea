@@ -398,7 +398,7 @@ fn run_depth_assessment(
         if m.prefrontal_veto {
             prefrontal_veto_count += 1;
         }
-        if m.gwt_broadcast {
+        if m.attention.gwt_broadcast {
             gwt_broadcast_count += 1;
         }
 

@@ -49,6 +49,59 @@
             </div>
         </div>
 
+        <!-- Moral Topology: Harmony Radar -->
+        <div class="card">
+            <h2>Harmony Coordinates (Moral Radar)</h2>
+            <div class="chart-container">
+                <canvas id="chartHarmony"></canvas>
+            </div>
+        </div>
+
+        <!-- Moral Topology: Free Energy -->
+        <div class="card">
+            <h2>Moral Free Energy</h2>
+            <div class="chart-container">
+                <canvas id="chartMoralFE"></canvas>
+            </div>
+        </div>
+
+        <!-- Moral Topology: Persistence Diagram -->
+        <div class="card">
+            <h2>Persistence Diagram</h2>
+            <div class="chart-container">
+                <canvas id="chartPersistence"></canvas>
+            </div>
+        </div>
+
+        <!-- Moral Topology: Betti Badges + Anomaly -->
+        <div class="card moral-card">
+            <h2>Topology Status</h2>
+            <div class="betti-row">
+                <div class="betti-badge cyan">
+                    <div class="betti-value" id="bettiBeta0">0</div>
+                    <div class="betti-label">&beta;&#8320; Unity</div>
+                </div>
+                <div class="betti-badge purple">
+                    <div class="betti-value" id="bettiBeta1">0</div>
+                    <div class="betti-label">&beta;&#8321; Circularity</div>
+                </div>
+                <div class="betti-badge green">
+                    <div class="betti-value" id="bettiBeta2">0</div>
+                    <div class="betti-label">&beta;&#8322; Completeness</div>
+                </div>
+            </div>
+            <div class="anomaly-row">
+                <span class="flag" id="flagInversion">Value Inversion</span>
+                <span class="flag" id="flagFESpike">FE Spike</span>
+                <span class="flag" id="flagDrift">Drift Alert</span>
+            </div>
+            <div class="topo-info">
+                <span>Dominant: <strong id="dominantHarmony">--</strong></span>
+                <span>Anomaly: <strong id="anomalyScore">0.00</strong></span>
+                <span>Drift: <strong id="driftValue">0.000</strong></span>
+            </div>
+        </div>
+
         <!-- Live Metrics -->
         <div class="card" style="grid-column: 1 / -1;">
             <h2>Live Metrics</h2>

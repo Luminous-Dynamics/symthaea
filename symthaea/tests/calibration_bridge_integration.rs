@@ -159,7 +159,169 @@ fn test_self_assessment_runs_during_cycle() {
     assert!(result.metadata.neuromod.serotonin_effective.is_finite());
 }
 
-// ── Test 5: Calibration confidence delta modifies prediction confidence ──
+// ── Test 5: Closed-loop self-assessment triggers and modifies bath ───────
+
+#[test]
+fn test_self_assessment_closed_loop_trigger() {
+    // This test validates the complete autonomous calibration loop:
+    // 1. Run warmup cycles to pass the 200-cycle warmup gate
+    // 2. Continuously feed high-PE input to drive pe_ema above threshold
+    // 3. Self-assessment should trigger auto-calibration
+    // 4. Verify the calibration was applied and modified the bath
+    //
+    // Science: Schmidhuber (2010) metacognitive monitoring + Turrigiano (2008)
+    // homeostatic plasticity — the system detects its own performance drift
+    // and adjusts receptor sensitivities without external psych-bench input.
+
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        async_training: false,
+        learning_threshold: 0.001, // low threshold to keep PE high
+        ..Default::default()
+    })
+    .expect("CognitiveLoopService::new should succeed");
+
+    // Phase 1: Warmup cycles (200 needed for self-assessment to become eligible).
+    // Use steady input so the temporal network learns a stable prediction,
+    // then the diverse inputs in Phase 2 will spike prediction error.
+    for _ in 0..250 {
+        service.cycle("warmup steady state pattern alpha");
+    }
+
+    // Phase 2: Feed highly variable input to drive prediction error up.
+    // The self-assessment PE_EMA threshold is (pe_ema - 0.1) / 0.05 > 1.0,
+    // meaning pe_ema > 0.15. With alpha=0.02, we need sustained high PE.
+    let mut calibration_fired = false;
+    let mut max_pe_ema: f32 = 0.0;
+    for i in 0..400 {
+        // Alternate between very different inputs to maximize prediction error
+        let input = match i % 4 {
+            0 => "unprecedented quantum turbulence anomaly detected in sector seven",
+            1 => "gentle morning sunlight warm peaceful calm stable routine",
+            2 => "CRITICAL EMERGENCY ALERT: catastrophic failure imminent evacuation",
+            _ => "abstract mathematical topology homomorphism integration convergence",
+        };
+        let result = service.cycle(input);
+        let pe_ema = result.metadata.neuromod.self_assessment_pe_ema;
+        if pe_ema > max_pe_ema {
+            max_pe_ema = pe_ema;
+        }
+
+        if result.metadata.neuromod.self_assessment_calibration_fired {
+            calibration_fired = true;
+            break;
+        }
+    }
+
+    // The self-assessment should have fired during the high-PE phase.
+    // If not, report the max PE EMA to help diagnose threshold issues.
+    assert!(
+        calibration_fired,
+        "Self-assessment should have triggered auto-calibration \
+         (max pe_ema reached: {max_pe_ema:.4}, threshold ~0.15)"
+    );
+
+    // Verify a calibration summary exists (auto-calibration produces one when
+    // apply_pending_calibration fires during sleep→wake — but in the test the
+    // pending calibration may not have been applied yet since there's no sleep
+    // transition. The key assertion above proves trigger fired.)
+    // Force-apply to verify the summary path works:
+    service.apply_pending_calibration();
+
+    // Run post-calibration cycles to verify the system is healthy
+    let post_result = service.cycle("post auto-calibration check");
+    assert!(
+        post_result.prediction_error.is_finite(),
+        "PE should be finite after auto-calibration"
+    );
+    assert!(
+        post_result.metadata.neuromod.dopamine_effective.is_finite(),
+        "DA should be finite after auto-calibration"
+    );
+
+    // DA effective may have changed from baseline (self-assessment mapped PE → DA proxy)
+    let post_da = post_result.metadata.neuromod.dopamine_effective;
+    // Not asserting direction since it depends on accumulated EMAs, just that it's reasonable
+    assert!(
+        post_da > 0.0 && post_da < 5.0,
+        "DA effective should be in reasonable range: {post_da}"
+    );
+}
+
+// ── Test 6: External calibration takes priority over self-assessment ─────
+
+#[test]
+fn test_external_calibration_priority() {
+    // Validates the overwrite guard: external (psych-bench) calibrations are not
+    // overwritten by internal self-assessment triggers.
+    let mut service = make_service();
+    warmup(&mut service, 20);
+
+    // Ingest external calibration (pending)
+    service.ingest_calibration(&[("Executive::Stroop", "stroop_effect", -2.0)]);
+
+    // Verify pending
+    assert!(
+        service.last_calibration_summary().is_none(),
+        "External cal should be pending"
+    );
+
+    // Run cycles — self-assessment should NOT overwrite the pending external
+    for _ in 0..250 {
+        service.cycle("stress test with pending external calibration");
+    }
+
+    // Force-apply the pending calibration
+    service.apply_pending_calibration();
+
+    // Should contain DA (from external), proving external was preserved
+    let summary = service.last_calibration_summary().unwrap().to_string();
+    assert!(
+        summary.contains("DA"),
+        "Applied calibration should be from external (DA): {summary}"
+    );
+}
+
+// ── Test 7: Self-assessment telemetry populates in metadata ──────────────
+
+#[test]
+fn test_self_assessment_telemetry_populated() {
+    let mut service = make_service();
+
+    // Run enough cycles for self-assessment EMAs to move from defaults
+    for _ in 0..50 {
+        service.cycle("telemetry check input");
+    }
+
+    let result = service.cycle("final telemetry check");
+    let telem = &result.metadata.neuromod;
+
+    // PE EMA and coherence EMA should be finite
+    assert!(
+        telem.self_assessment_pe_ema.is_finite(),
+        "self_assessment_pe_ema should be finite: {}",
+        telem.self_assessment_pe_ema
+    );
+    assert!(
+        telem.self_assessment_coherence_ema.is_finite(),
+        "self_assessment_coherence_ema should be finite: {}",
+        telem.self_assessment_coherence_ema
+    );
+
+    // PE EMA should have moved from 0.0 default (after 50 cycles of real input)
+    assert!(
+        telem.self_assessment_pe_ema > 0.0,
+        "PE EMA should be positive after cycles: {}",
+        telem.self_assessment_pe_ema
+    );
+
+    // pending_calibration_waiting should be false (no calibration ingested)
+    assert!(
+        !telem.pending_calibration_waiting,
+        "No pending calibration should exist"
+    );
+}
+
+// ── Test 8: Calibration confidence delta modifies prediction confidence ──
 
 #[test]
 fn test_calibration_confidence_adjustment() {

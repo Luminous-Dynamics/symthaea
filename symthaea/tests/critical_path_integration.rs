@@ -91,12 +91,12 @@ fn test_equation_v2_feedback_modulates_confidence() {
 
         // equation_v2 should be finite
         assert!(
-            result.metadata.equation_v2_consciousness.is_finite(),
+            result.metadata.quality.equation_v2_consciousness.is_finite(),
             "equation_v2_consciousness should be finite at cycle {i}: got {}",
-            result.metadata.equation_v2_consciousness,
+            result.metadata.quality.equation_v2_consciousness,
         );
 
-        if result.metadata.equation_v2_consciousness.abs() > 0.0 {
+        if result.metadata.quality.equation_v2_consciousness.abs() > 0.0 {
             saw_nonzero_eq_v2 = true;
         }
 
@@ -148,7 +148,7 @@ fn test_hierarchical_ltc_feedback_modulates_confidence() {
     for i in 0..50 {
         let result = service.cycle(input_for_cycle(i));
 
-        let hltc_phi = result.metadata.hierarchical_ltc_phi;
+        let hltc_phi = result.metadata.quality.hierarchical_ltc_phi;
         assert!(
             hltc_phi.is_finite(),
             "hierarchical_ltc_phi should be finite at cycle {i}: got {hltc_phi}"
@@ -308,8 +308,8 @@ fn test_all_primitive_feedback_loops_synergy() {
         let result = service.cycle(input_for_cycle(i));
 
         // All feedback-related metadata must be finite
-        assert!(result.metadata.equation_v2_consciousness.is_finite());
-        assert!(result.metadata.hierarchical_ltc_phi.is_finite());
+        assert!(result.metadata.quality.equation_v2_consciousness.is_finite());
+        assert!(result.metadata.quality.hierarchical_ltc_phi.is_finite());
         assert!(result.metadata.holographic_unity.is_finite());
         assert!(result.metadata.holographic_binding.is_finite());
         assert!(result.metadata.consciousness_gradient_magnitude.is_finite());
@@ -824,7 +824,7 @@ fn test_spectral_mip_and_primitives_coexist() {
         }
 
         // Track primitive consciousness firings (via equation_v2)
-        if result.metadata.equation_v2_consciousness.abs() > 0.0 {
+        if result.metadata.quality.equation_v2_consciousness.abs() > 0.0 {
             primitive_fires += 1;
         }
 
