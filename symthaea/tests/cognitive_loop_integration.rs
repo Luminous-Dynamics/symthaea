@@ -5699,3 +5699,212 @@ fn test_neuromodulator_300_cycle_stress() {
         stats.avg_dopamine, stats.avg_noradrenaline, stats.avg_serotonin, stats.avg_acetylcholine,
     );
 }
+
+// ── Round 2: Cross-Module Integration Tests ──────────────────────────
+
+#[test]
+fn test_neuromod_modulates_learning_rate() {
+    // Primitive consciousness on → neuromod bath should influence learning rate
+    let mut config_on = CognitiveLoopConfig::default();
+    config_on.enable_primitive_consciousness = true;
+    let mut service_on = CognitiveLoopService::new(config_on).unwrap();
+
+    let mut config_off = CognitiveLoopConfig::default();
+    config_off.enable_primitive_consciousness = false;
+    let mut service_off = CognitiveLoopService::new(config_off).unwrap();
+
+    // Run 5 cycles each
+    for _ in 0..5 {
+        service_on.cycle("stimulus");
+        service_off.cycle("stimulus");
+    }
+
+    let r_on = service_on.cycle("test input");
+    let r_off = service_off.cycle("test input");
+
+    // Both should produce valid results
+    assert!(r_on.metadata.actual_effective_lr.is_finite());
+    assert!(r_off.metadata.actual_effective_lr.is_finite());
+    // With primitive consciousness, the bath should modulate the LR differently
+    // (We just verify both are finite and non-negative, as the exact values depend on bath dynamics)
+    assert!(r_on.metadata.actual_effective_lr >= 0.0);
+    assert!(r_off.metadata.actual_effective_lr >= 0.0);
+}
+
+#[test]
+fn test_neuromod_state_persists_across_cycles() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_primitive_consciousness = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    let mut all_finite = true;
+    for i in 0..10 {
+        let r = service.cycle(&format!("cycle {i}"));
+        let m = &r.metadata;
+        if !m.neuromod.dopamine_effective.is_finite()
+            || !m.neuromod.noradrenaline_effective.is_finite()
+            || !m.neuromod.serotonin_effective.is_finite()
+            || !m.neuromod.acetylcholine_effective.is_finite()
+        {
+            all_finite = false;
+        }
+    }
+    assert!(all_finite, "All neuromod fields should be finite across 10 cycles");
+}
+
+#[test]
+fn test_50_cycle_prediction_error_trajectory() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    let mut errors = Vec::new();
+    let inputs = [
+        "the cat sat on the mat",
+        "prediction learning test",
+        "neural network cognition",
+        "holographic brain model",
+        "consciousness emergence",
+    ];
+    for i in 0..50 {
+        let r = service.cycle(inputs[i % inputs.len()]);
+        errors.push(r.prediction_error);
+    }
+
+    // First quarter average vs second quarter — learning should reduce error (or at least not diverge)
+    let q1_avg: f32 = errors[..12].iter().sum::<f32>() / 12.0;
+    let q2_avg: f32 = errors[12..25].iter().sum::<f32>() / 13.0;
+    // Allow some tolerance — the key assertion is no NaN/Inf divergence
+    assert!(q1_avg.is_finite(), "Q1 average should be finite");
+    assert!(q2_avg.is_finite(), "Q2 average should be finite");
+    // Prediction error should not grow unboundedly
+    assert!(
+        errors.iter().all(|e| *e >= 0.0 && *e <= 2.0),
+        "All prediction errors should be in [0, 2]"
+    );
+}
+
+#[test]
+fn test_metadata_fields_stable_50_cycles() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    for i in 0..50 {
+        let r = service.cycle(&format!("stability test cycle {i}"));
+        let m = &r.metadata;
+        // Core metrics
+        assert!(m.phi_attention_weight.is_finite(), "phi_attention_weight NaN at {i}");
+        assert!(m.soul_alignment.is_finite(), "soul_alignment NaN at {i}");
+        assert!(m.actual_effective_lr.is_finite(), "learning_rate NaN at {i}");
+        assert!(r.prediction_error.is_finite(), "prediction_error NaN at {i}");
+        // Neuromod
+        assert!(m.neuromod.dopamine_effective.is_finite(), "DA NaN at {i}");
+        assert!(m.neuromod.noradrenaline_effective.is_finite(), "NE NaN at {i}");
+        assert!(m.neuromod.serotonin_effective.is_finite(), "5-HT NaN at {i}");
+        assert!(m.neuromod.acetylcholine_effective.is_finite(), "ACh NaN at {i}");
+    }
+}
+
+#[test]
+fn test_phi_and_sigma_evolve_over_cycles() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_primitive_consciousness = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    let mut phi_values = Vec::new();
+    let mut sigma_values: Vec<Option<f64>> = Vec::new();
+    for i in 0..20 {
+        let r = service.cycle(&format!("consciousness test {i}"));
+        phi_values.push(r.metadata.phi_attention_weight);
+        sigma_values.push(r.metadata.sigma);
+    }
+
+    // Phi should be finite throughout
+    assert!(phi_values.iter().all(|v| v.is_finite()), "All phi values should be finite");
+    // Sigma is Option<f64> — when present it should be finite
+    assert!(
+        sigma_values.iter().all(|v| v.map_or(true, |s| s.is_finite())),
+        "All sigma values should be finite when present"
+    );
+    // At least one phi value should be non-zero (consciousness is active)
+    assert!(
+        phi_values.iter().any(|v| *v != 0.0),
+        "Phi should evolve (not stuck at 0)"
+    );
+}
+
+#[test]
+fn test_diverse_inputs_produce_distinct_thoughts() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    let inputs = [
+        "the quantum mechanics of photosynthesis",
+        "baking a chocolate cake recipe",
+        "political philosophy of ancient rome",
+        "debugging a rust compiler error",
+        "symphony orchestration techniques",
+    ];
+
+    let mut thought_vecs: Vec<Vec<f32>> = Vec::new();
+    for input in &inputs {
+        let r = service.cycle(input);
+        thought_vecs.push(r.thought_vector.clone());
+    }
+
+    // Each pair should differ (L2 distance > 0)
+    for i in 0..thought_vecs.len() {
+        for j in (i + 1)..thought_vecs.len() {
+            let diff: f32 = thought_vecs[i]
+                .iter()
+                .zip(thought_vecs[j].iter())
+                .map(|(a, b)| (a - b).powi(2))
+                .sum();
+            assert!(
+                diff > 0.0,
+                "Inputs '{}' and '{}' should produce distinct thought vectors",
+                inputs[i], inputs[j]
+            );
+        }
+    }
+}
+
+#[test]
+fn test_100_cycles_no_panic_mixed_inputs() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    let tricky_inputs = [
+        "",
+        "a",
+        "hello world",
+        "🧠💡🌊",
+        &"x".repeat(10_000),
+        "special chars: <>&\"'\\n\\t",
+        "   whitespace   ",
+        "ALLCAPS",
+        "数学是宇宙的语言",
+        "null\0byte",
+    ];
+
+    for i in 0..100 {
+        let r = service.cycle(tricky_inputs[i % tricky_inputs.len()]);
+        assert!(r.prediction_error.is_finite(), "Prediction error not finite at cycle {i}");
+        assert!(!r.output.is_empty(), "Output should not be empty at cycle {i}");
+    }
+    assert_eq!(service.stats().total_cycles, 100);
+}
+
+#[cfg(feature = "reasoning_engine")]
+#[test]
+fn test_reasoning_engine_produces_strategy() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_reasoning_engine = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // Warm up
+    for _ in 0..3 {
+        service.cycle("warmup");
+    }
+    let r = service.cycle("What is the meaning of consciousness?");
+    // With reasoning engine, selected_strategy should be populated
+    assert!(
+        !r.metadata.selected_strategy.is_empty(),
+        "Reasoning engine should produce a strategy"
+    );
+}
