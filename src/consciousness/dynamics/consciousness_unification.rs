@@ -2393,4 +2393,199 @@ mod tests {
         let debug_str = format!("{:?}", source);
         assert!(debug_str.contains("LivingMind"));
     }
+
+    // ======================================================================
+    // NSM PRIMITIVE GROUNDING TESTS
+    // ======================================================================
+
+    #[test]
+    fn test_encode_primitives_non_zero() {
+        let system = PrimitiveSystem::new();
+        let primitives: Vec<String> = vec!["FEEL".into(), "GOOD".into()];
+        let hv = encode_primitives(&primitives, &system);
+        assert!(hv.0.iter().any(|&b| b != 0), "Encoding should be non-zero");
+    }
+
+    #[test]
+    fn test_encode_primitives_deterministic() {
+        let system = PrimitiveSystem::new();
+        let primitives: Vec<String> = vec!["FEEL".into(), "GOOD".into()];
+        let hv1 = encode_primitives(&primitives, &system);
+        let hv2 = encode_primitives(&primitives, &system);
+        assert_eq!(hv1.0, hv2.0, "Same input must produce same output");
+    }
+
+    #[test]
+    fn test_encode_primitives_different_words_differ() {
+        let system = PrimitiveSystem::new();
+        // Different word sets should produce different encodings
+        let a: Vec<String> = vec!["FEEL".into(), "GOOD".into(), "VERY".into()];
+        let b: Vec<String> = vec!["THINK".into(), "BAD".into(), "NOT".into()];
+        let hv_a = encode_primitives(&a, &system);
+        let hv_b = encode_primitives(&b, &system);
+        assert_ne!(hv_a.0, hv_b.0, "Different word sets should produce different encodings");
+    }
+
+    #[test]
+    fn test_encode_primitives_single_word() {
+        let system = PrimitiveSystem::new();
+        let primitives: Vec<String> = vec!["KNOW".into()];
+        let hv = encode_primitives(&primitives, &system);
+        assert!(hv.0.iter().any(|&b| b != 0), "Single-word encoding should be non-zero");
+    }
+
+    #[test]
+    fn test_phi_grounding_all_methods_mapped() {
+        let system = PrimitiveSystem::new();
+        for method in &[
+            PhiMethod::IntegratedInformationTheory,
+            PhiMethod::WeightedGeometricMean,
+            PhiMethod::SimilarityApproximation,
+            PhiMethod::MultiSourceComposite,
+            PhiMethod::TheoryVotingAggregate,
+        ] {
+            let g = PhiMethodPrimitiveGrounding::new(*method, &system);
+            assert!(!g.nsm_primitives.is_empty(), "{:?} should have primitives", method);
+        }
+    }
+
+    #[test]
+    fn test_phi_grounding_rigor_bounded() {
+        let system = PrimitiveSystem::new();
+        for method in &[
+            PhiMethod::IntegratedInformationTheory,
+            PhiMethod::WeightedGeometricMean,
+            PhiMethod::SimilarityApproximation,
+            PhiMethod::MultiSourceComposite,
+            PhiMethod::TheoryVotingAggregate,
+        ] {
+            let g = PhiMethodPrimitiveGrounding::new(*method, &system);
+            assert!(
+                (0.0..=1.0).contains(&g.computational_rigor),
+                "{:?} rigor {} out of [0,1]",
+                method,
+                g.computational_rigor,
+            );
+        }
+    }
+
+    #[test]
+    fn test_phi_grounding_encoding_nonzero() {
+        let system = PrimitiveSystem::new();
+        for method in &[
+            PhiMethod::IntegratedInformationTheory,
+            PhiMethod::WeightedGeometricMean,
+            PhiMethod::SimilarityApproximation,
+            PhiMethod::MultiSourceComposite,
+            PhiMethod::TheoryVotingAggregate,
+        ] {
+            let g = PhiMethodPrimitiveGrounding::new(*method, &system);
+            assert!(
+                g.primitive_encoding.0.iter().any(|&b| b != 0),
+                "{:?} encoding is all zero",
+                method,
+            );
+        }
+    }
+
+    #[test]
+    fn test_emotion_grounding_all_19_mapped() {
+        let system = PrimitiveSystem::new();
+        let all_emotions = [
+            UnifiedEmotion::Joy, UnifiedEmotion::Sadness, UnifiedEmotion::Anger,
+            UnifiedEmotion::Fear, UnifiedEmotion::Surprise, UnifiedEmotion::Disgust,
+            UnifiedEmotion::Trust, UnifiedEmotion::Anticipation, UnifiedEmotion::Love,
+            UnifiedEmotion::Peace, UnifiedEmotion::Curiosity, UnifiedEmotion::Gratitude,
+            UnifiedEmotion::Seeking, UnifiedEmotion::Rage, UnifiedEmotion::Lust,
+            UnifiedEmotion::Care, UnifiedEmotion::Panic, UnifiedEmotion::Play,
+            UnifiedEmotion::Neutral,
+        ];
+        for emotion in &all_emotions {
+            let g = UnifiedEmotionPrimitiveGrounding::new(*emotion, &system);
+            assert!(!g.nsm_primitives.is_empty(), "{:?} should have primitives", emotion);
+        }
+    }
+
+    #[test]
+    fn test_emotion_grounding_valence_signs() {
+        let system = PrimitiveSystem::new();
+        let joy = UnifiedEmotionPrimitiveGrounding::new(UnifiedEmotion::Joy, &system);
+        let fear = UnifiedEmotionPrimitiveGrounding::new(UnifiedEmotion::Fear, &system);
+        let surprise = UnifiedEmotionPrimitiveGrounding::new(UnifiedEmotion::Surprise, &system);
+        assert_eq!(joy.valence_polarity, 1, "Joy should be positive");
+        assert_eq!(fear.valence_polarity, -1, "Fear should be negative");
+        assert_eq!(surprise.valence_polarity, 0, "Surprise should be neutral");
+    }
+
+    #[test]
+    fn test_emotion_grounding_encoding_distinct() {
+        let system = PrimitiveSystem::new();
+        let joy = UnifiedEmotionPrimitiveGrounding::new(UnifiedEmotion::Joy, &system);
+        let fear = UnifiedEmotionPrimitiveGrounding::new(UnifiedEmotion::Fear, &system);
+        let hamming: u32 = joy.primitive_encoding.0.iter()
+            .zip(fear.primitive_encoding.0.iter())
+            .map(|(a, b)| (a ^ b).count_ones())
+            .sum();
+        assert!(hamming > 0, "Joy and Fear encodings must differ");
+    }
+
+    #[test]
+    fn test_nsm_grounding_construction() {
+        let system = PrimitiveSystem::new();
+        let grounding = ConsciousnessUnificationNSMGrounding::new(&system);
+        assert_eq!(grounding.phi_methods.len(), 5);
+        assert_eq!(grounding.emotions.len(), 19);
+        assert_eq!(grounding.emotional_patterns.len(), 4);
+        assert_eq!(grounding.causal_relations.len(), 5);
+        assert_eq!(grounding.dialogue_depths.len(), 3);
+    }
+
+    #[test]
+    fn test_nsm_grounding_positive_emotions() {
+        let system = PrimitiveSystem::new();
+        let grounding = ConsciousnessUnificationNSMGrounding::new(&system);
+        let positives = grounding.positive_emotions();
+        assert!(!positives.is_empty(), "Should have positive emotions");
+        for e in &positives {
+            let g = &grounding.emotions[e];
+            assert_eq!(g.valence_polarity, 1, "{:?} should be positive", e);
+        }
+    }
+
+    #[test]
+    fn test_nsm_grounding_negative_emotions() {
+        let system = PrimitiveSystem::new();
+        let grounding = ConsciousnessUnificationNSMGrounding::new(&system);
+        let negatives = grounding.negative_emotions();
+        assert!(!negatives.is_empty(), "Should have negative emotions");
+        for e in &negatives {
+            let g = &grounding.emotions[e];
+            assert_eq!(g.valence_polarity, -1, "{:?} should be negative", e);
+        }
+    }
+
+    #[test]
+    fn test_query_emotions_self_match() {
+        let system = PrimitiveSystem::new();
+        let grounding = ConsciousnessUnificationNSMGrounding::new(&system);
+        let joy_encoding = &grounding.emotions[&UnifiedEmotion::Joy].primitive_encoding;
+        let results = grounding.query_emotions(joy_encoding, 0.0);
+        assert!(!results.is_empty(), "Self-query should return at least one result");
+        // Joy's own encoding should be top match (similarity = 1.0 for self)
+        assert_eq!(*results[0].0, UnifiedEmotion::Joy, "Top result should be Joy");
+    }
+
+    #[test]
+    fn test_query_emotions_threshold_filters() {
+        let system = PrimitiveSystem::new();
+        let grounding = ConsciousnessUnificationNSMGrounding::new(&system);
+        let joy_encoding = &grounding.emotions[&UnifiedEmotion::Joy].primitive_encoding;
+        // Very high threshold should filter out dissimilar emotions
+        let results_high = grounding.query_emotions(joy_encoding, 0.99);
+        let results_low = grounding.query_emotions(joy_encoding, 0.0);
+        assert!(
+            results_high.len() <= results_low.len(),
+            "Higher threshold should return fewer or equal results"
+        );
+    }
 }

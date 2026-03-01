@@ -837,6 +837,20 @@ impl VocalTractController {
         phoneme_targets: &[(&str, &crate::types::FormantTarget)],
         blend: f32,
     ) {
+        self.refine_output_projection_ls_configured(genesis, phoneme_targets, blend, 0.01);
+    }
+
+    /// Like [`refine_output_projection_ls`] but with configurable Tikhonov regularization `lambda`.
+    ///
+    /// Smaller lambda → tighter fit (risk of overfitting to noise in HV representations).
+    /// Larger lambda → smoother weights (risk of underfitting extreme phonemes).
+    pub fn refine_output_projection_ls_configured(
+        &mut self,
+        genesis: &GenesisSeed,
+        phoneme_targets: &[(&str, &crate::types::FormantTarget)],
+        blend: f32,
+        lambda: f32,
+    ) {
         if phoneme_targets.is_empty() {
             return;
         }
@@ -894,7 +908,7 @@ impl VocalTractController {
         // G = X X^T (n×n Gram matrix), y = targets - bias
         // alpha = (G + λI)^{-1} y
         // w_new = X^T alpha
-        let lambda = 0.01; // Tikhonov regularization to prevent huge weights
+        let lambda = lambda.max(1e-6); // Tikhonov regularization
 
         // Pre-compute Gram matrix G (n×n)
         let mut gram = vec![0.0f32; n * n];
@@ -2193,6 +2207,9 @@ mod tests {
         // Train 40 epochs (fast enough for CI, enough for convergence)
         ctrl.train_on_phoneme_targets(&genesis, &targets, 40);
 
+        // LS refinement (blend=0.7) — matches production pipeline
+        ctrl.refine_output_projection_ls(&genesis, &targets, 0.7);
+
         // Measure formant accuracy: Euclidean error across F1/F2/F3
         let mut total_error = 0.0f32;
         for (name, target) in &vowels {
@@ -2216,8 +2233,8 @@ mod tests {
         let avg_error = total_error / vowels.len() as f32;
 
         assert!(
-            avg_error < 100.0,
-            "CI REGRESSION: avg formant error {avg_error:.1} Hz exceeds 100 Hz threshold (rule-based=162)"
+            avg_error < 50.0,
+            "CI REGRESSION: avg formant error {avg_error:.1} Hz exceeds 50 Hz threshold (Phase 24 LS baseline=32.4)"
         );
 
         // Measure throughput: time 200 forward passes
