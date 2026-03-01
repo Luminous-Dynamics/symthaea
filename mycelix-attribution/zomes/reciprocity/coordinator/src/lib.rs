@@ -26,6 +26,32 @@ pub struct StewardshipScore {
     pub usage_count: u64,
     pub pledge_count: u64,
     pub ratio: f64,
+    /// Weighted score incorporating amount, recency, and pledge diversity
+    pub weighted_score: f64,
+    /// Breakdown by pledge type
+    pub pledge_type_counts: Vec<(String, u64)>,
+}
+
+// ── Input Types ─────────────────────────────────────────────────────
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PaginationInput {
+    pub offset: u64,
+    pub limit: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PaginatedPledges {
+    pub items: Vec<Record>,
+    pub total: u64,
+    pub offset: u64,
+    pub limit: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PaginatedPledgesInput {
+    pub id: String,
+    pub pagination: PaginationInput,
 }
 
 // ── Init ─────────────────────────────────────────────────────────────
@@ -180,16 +206,13 @@ pub fn get_contributor_pledges(did: String) -> ExternResult<Vec<Record>> {
 pub fn compute_stewardship_score(
     dep_id: String,
 ) -> ExternResult<StewardshipScore> {
-    // Count pledges directly
+    // Fetch all pledge records (not just count)
     let dep_tag = format!("pledges:{}", dep_id);
-    let pledge_links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&dep_tag)?,
-            LinkTypes::DependencyToPledges,
-        )?,
-        GetStrategy::default(),
+    let pledge_records = resolve_links(
+        anchor_hash(&dep_tag)?,
+        LinkTypes::DependencyToPledges,
     )?;
-    let pledge_count = pledge_links.len() as u64;
+    let pledge_count = pledge_records.len() as u64;
 
     // Cross-zome call to usage coordinator for usage count
     let usage_count: u64 = {
@@ -221,10 +244,107 @@ pub fn compute_stewardship_score(
         pledge_count as f64 / usage_count as f64
     };
 
+    // Weighted scoring: amount + recency + pledge type diversity
+    let now = sys_time()?;
+    let now_micros = now.as_micros();
+    let mut weighted_sum = 0.0;
+    let mut type_counts: std::collections::BTreeMap<String, u64> =
+        std::collections::BTreeMap::new();
+
+    for record in &pledge_records {
+        let pledge: Option<ReciprocityPledge> = record
+            .entry()
+            .to_app_option()
+            .ok()
+            .flatten();
+        if let Some(p) = pledge {
+            // Amount weight: log1p so $1000 doesn't dominate 10x over $100
+            let amount_weight = match p.amount {
+                Some(a) if a > 0.0 && a.is_finite() => (1.0 + a).ln(),
+                _ => 1.0, // non-financial pledges get base weight
+            };
+
+            // Recency weight: exponential decay, half-life ~6 months
+            let pledge_micros = p.pledged_at.as_micros();
+            let age_days = (now_micros.saturating_sub(pledge_micros) as f64)
+                / (86_400.0 * 1_000_000.0);
+            let recency_weight = (-age_days / 180.0_f64).exp();
+
+            // Type weight: Financial > DeveloperTime > Compute > others
+            let type_weight = match p.pledge_type {
+                PledgeType::Financial => 1.5,
+                PledgeType::DeveloperTime => 1.3,
+                PledgeType::Compute => 1.2,
+                PledgeType::Bandwidth => 1.1,
+                PledgeType::QA => 1.1,
+                PledgeType::Documentation => 1.0,
+                PledgeType::Other => 0.8,
+            };
+
+            weighted_sum += amount_weight * recency_weight * type_weight;
+
+            *type_counts
+                .entry(format!("{:?}", p.pledge_type))
+                .or_insert(0) += 1;
+        }
+    }
+
+    // Normalize weighted score by usage count
+    let weighted_score = if usage_count == 0 {
+        weighted_sum
+    } else {
+        weighted_sum / usage_count as f64
+    };
+
+    let pledge_type_counts: Vec<(String, u64)> =
+        type_counts.into_iter().collect();
+
     Ok(StewardshipScore {
         dependency_id: dep_id,
         usage_count,
         pledge_count,
         ratio,
+        weighted_score,
+        pledge_type_counts,
+    })
+}
+
+// ── Paginated Pledge Queries ────────────────────────────────────────
+
+#[hdk_extern]
+pub fn get_dependency_pledges_paginated(
+    input: PaginatedPledgesInput,
+) -> ExternResult<PaginatedPledges> {
+    let dep_tag = format!("pledges:{}", input.id);
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&dep_tag)?,
+            LinkTypes::DependencyToPledges,
+        )?,
+        GetStrategy::default(),
+    )?;
+    let total = links.len() as u64;
+
+    let page_links: Vec<_> = links
+        .into_iter()
+        .skip(input.pagination.offset as usize)
+        .take(input.pagination.limit as usize)
+        .collect();
+
+    let mut items = Vec::new();
+    for link in page_links {
+        let entry_hash = EntryHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
+        })?;
+        if let Some(record) = get(entry_hash, GetOptions::default())? {
+            items.push(record);
+        }
+    }
+
+    Ok(PaginatedPledges {
+        items,
+        total,
+        offset: input.pagination.offset,
+        limit: input.pagination.limit,
     })
 }

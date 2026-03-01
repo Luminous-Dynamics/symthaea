@@ -949,6 +949,39 @@ export type {
 } from './academic/index.js';
 
 // ============================================================================
+// Attribution Registry Integration (Open-Source Dependency Attribution)
+// ============================================================================
+
+export {
+  AttributionClient,
+  createAttributionClient,
+  resetAttributionClient,
+  isAttributionSignal,
+} from './attribution/index.js';
+
+export type {
+  DependencyIdentity,
+  DependencyEcosystem,
+  UpdateDependencyInput,
+  UsageReceipt,
+  UsageType,
+  UsageScale,
+  UsageAttestation,
+  VerifyAttestationInput,
+  ReciprocityPledge,
+  PledgeType,
+  Currency,
+  StewardshipScore,
+  RegistrySignal,
+  UsageSignal,
+  ReciprocitySignal,
+  AttributionSignal,
+  PaginatedResult,
+  PaginationInput,
+  TopDependency,
+} from './attribution/index.js';
+
+// ============================================================================
 // Health-FHIR Integration (Interoperability)
 // ============================================================================
 

@@ -2,6 +2,16 @@ use hdk::prelude::*;
 use serde::{Deserialize, Serialize};
 use usage_integrity::*;
 
+/// Mirror type for deserializing DependencyIdentity from registry zome.
+/// Only the `id` field is needed for top-N queries.
+/// Must implement TryFrom<SerializedBytes> for to_app_option().
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct DependencyIdRef {
+    id: String,
+}
+
+holochain_serialized_bytes::holochain_serial!(DependencyIdRef);
+
 // ── Signals ──────────────────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -28,6 +38,32 @@ pub struct VerifyAttestationInput {
     pub original_action_hash: ActionHash,
     pub verifier_pubkey: Vec<u8>,
     pub verifier_signature: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PaginationInput {
+    pub offset: u64,
+    pub limit: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PaginatedUsage {
+    pub items: Vec<Record>,
+    pub total: u64,
+    pub offset: u64,
+    pub limit: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TopDependency {
+    pub dependency_id: String,
+    pub usage_count: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PaginatedUsageInput {
+    pub id: String,
+    pub pagination: PaginationInput,
 }
 
 // ── Init ─────────────────────────────────────────────────────────────
@@ -244,3 +280,111 @@ pub fn get_dependency_attestations(
     }
     Ok(active)
 }
+
+// ── Paginated Usage Queries ─────────────────────────────────────────
+
+#[hdk_extern]
+pub fn get_dependency_usage_paginated(
+    input: PaginatedUsageInput,
+) -> ExternResult<PaginatedUsage> {
+    let dep_tag = format!("usage:{}", input.id);
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&dep_tag)?,
+            LinkTypes::DependencyToUsageReceipts,
+        )?,
+        GetStrategy::default(),
+    )?;
+    let total = links.len() as u64;
+
+    let page_links: Vec<_> = links
+        .into_iter()
+        .skip(input.pagination.offset as usize)
+        .take(input.pagination.limit as usize)
+        .collect();
+
+    let mut items = Vec::new();
+    for link in page_links {
+        let entry_hash = EntryHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
+        })?;
+        if let Some(record) = get(entry_hash, GetOptions::default())? {
+            items.push(record);
+        }
+    }
+
+    Ok(PaginatedUsage {
+        items,
+        total,
+        offset: input.pagination.offset,
+        limit: input.pagination.limit,
+    })
+}
+
+// ── Top-N Most Used Dependencies ────────────────────────────────────
+
+#[hdk_extern]
+pub fn get_top_dependencies(limit: u64) -> ExternResult<Vec<TopDependency>> {
+    // Get all dependencies via cross-zome call to registry
+    let encoded = ExternIO::encode(()).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to encode payload: {}",
+            e
+        )))
+    })?;
+
+    let dep_records: Vec<Record> = match call(
+        CallTargetCell::Local,
+        ZomeName::from("registry"),
+        FunctionName::from("get_all_dependencies"),
+        None,
+        encoded,
+    ) {
+        Ok(ZomeCallResponse::Ok(io)) => io.decode().unwrap_or_default(),
+        _ => return Ok(Vec::new()),
+    };
+
+    // For each dependency, count usage links
+    let mut scored: Vec<TopDependency> = Vec::new();
+    for record in dep_records {
+        let dep: Option<DependencyIdRef> = record
+            .entry()
+            .to_app_option()
+            .ok()
+            .flatten();
+        if let Some(d) = dep {
+            let dep_tag = format!("usage:{}", d.id);
+            let count = get_links(
+                LinkQuery::try_new(
+                    anchor_hash(&dep_tag)?,
+                    LinkTypes::DependencyToUsageReceipts,
+                )?,
+                GetStrategy::default(),
+            )?
+            .len() as u64;
+
+            if count > 0 {
+                scored.push(TopDependency {
+                    dependency_id: d.id,
+                    usage_count: count,
+                });
+            }
+        }
+    }
+
+    // Sort descending by usage count
+    scored.sort_by(|a, b| b.usage_count.cmp(&a.usage_count));
+    scored.truncate(limit as usize);
+
+    Ok(scored)
+}
+
+// ── Maintainer Notification ─────────────────────────────────────────
+
+// ── Maintainer Notification ─────────────────────────────────────────
+// Signals are emitted locally via record_usage's emit_signal(UsageRecorded).
+// All connected UI clients receive signals and can filter by dependency_id
+// to show notifications to the maintainer.
+//
+// For remote/push notifications to offline maintainers, a future integration
+// with the identity hApp would resolve DID→AgentPubKey for remote_signal().

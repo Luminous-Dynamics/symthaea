@@ -103,6 +103,10 @@
       "types": "./dist/integrations/hearth/index.d.ts",
       "import": "./dist/integrations/hearth/index.js"
     },
+    "./integrations/attribution": {
+      "types": "./dist/integrations/attribution/index.d.ts",
+      "import": "./dist/integrations/attribution/index.js"
+    },
     "./validation": {
       "types": "./dist/validation/index.d.ts",
       "import": "./dist/validation/index.js"

@@ -26,7 +26,7 @@ struct Args {
     #[arg(short, long)]
     organization: Option<String>,
 
-    /// Output format: json (array) or jsonl (one per line)
+    /// Output format: json (array), jsonl (one per line), or batch (bulk_register payload)
     #[arg(short, long, default_value = "jsonl")]
     format: OutputFormat,
 }
@@ -35,6 +35,8 @@ struct Args {
 enum OutputFormat {
     Json,
     Jsonl,
+    /// Outputs a JSON array of DependencyIdentity objects for bulk_register_dependencies
+    Batch,
 }
 
 // ── Output Types ─────────────────────────────────────────────────────
@@ -60,6 +62,22 @@ struct UsageReceiptRecord {
     organization: Option<String>,
     usage_type: String,
     version_range: Option<String>,
+}
+
+// ── Batch Output Type ───────────────────────────────────────────────
+
+/// Matches the DependencyIdentity fields expected by bulk_register_dependencies.
+/// Timestamps and booleans are omitted — the zome sets those on create.
+#[derive(Serialize, Debug)]
+struct BatchDependency {
+    id: String,
+    name: String,
+    ecosystem: String,
+    maintainer_did: String,
+    repository_url: Option<String>,
+    license: Option<String>,
+    description: String,
+    version: Option<String>,
 }
 
 // ── Cargo.lock Parser ────────────────────────────────────────────────
@@ -330,6 +348,33 @@ fn main() {
                     serde_json::to_string(receipt).unwrap()
                 );
             }
+        }
+        OutputFormat::Batch => {
+            // Output array of DependencyIdentity-shaped objects for bulk_register_dependencies
+            let batch: Vec<_> = output
+                .dependencies
+                .iter()
+                .zip(output.usage_receipts.iter())
+                .map(|(dep, receipt)| {
+                    BatchDependency {
+                        id: dep.id.clone(),
+                        name: dep.name.clone(),
+                        ecosystem: dep.ecosystem.clone(),
+                        maintainer_did: receipt.user_did.clone(),
+                        repository_url: None,
+                        license: None,
+                        description: format!(
+                            "{} {} ({})",
+                            dep.ecosystem, dep.name, dep.version.as_deref().unwrap_or("*")
+                        ),
+                        version: dep.version.clone(),
+                    }
+                })
+                .collect();
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&batch).unwrap()
+            );
         }
     }
 }

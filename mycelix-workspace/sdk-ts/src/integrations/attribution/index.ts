@@ -111,6 +111,32 @@ export interface StewardshipScore {
   usage_count: number;
   pledge_count: number;
   ratio: number;
+  weighted_score: number;
+  pledge_type_counts: [string, number][];
+}
+
+// ── Pagination Types ──────────────────────────────────────────────────
+
+export interface PaginationInput {
+  offset: number;
+  limit: number;
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface TopDependency {
+  dependency_id: string;
+  usage_count: number;
+}
+
+export interface BulkRegisterResult {
+  registered: Record<string, unknown>[];
+  skipped: string[];
 }
 
 // ── Signals ──────────────────────────────────────────────────────────
@@ -212,6 +238,28 @@ export class AttributionClient {
     }) as Promise<Record<string, unknown>[]>;
   }
 
+  async getAllDependenciesPaginated(
+    pagination: PaginationInput,
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
+    return this.client.callZome({
+      role_name: ATTRIBUTION_ROLE,
+      zome_name: 'registry',
+      fn_name: 'get_all_dependencies_paginated',
+      payload: pagination,
+    }) as Promise<PaginatedResult<Record<string, unknown>>>;
+  }
+
+  async bulkRegisterDependencies(
+    deps: DependencyIdentity[],
+  ): Promise<BulkRegisterResult> {
+    return this.client.callZome({
+      role_name: ATTRIBUTION_ROLE,
+      zome_name: 'registry',
+      fn_name: 'bulk_register_dependencies',
+      payload: deps,
+    }) as Promise<BulkRegisterResult>;
+  }
+
   async getDependenciesByEcosystem(ecosystem: string): Promise<Record<string, unknown>[]> {
     return this.client.callZome({
       role_name: ATTRIBUTION_ROLE,
@@ -257,6 +305,27 @@ export class AttributionClient {
       fn_name: 'get_dependency_usage',
       payload: depId,
     }) as Promise<Record<string, unknown>[]>;
+  }
+
+  async getDependencyUsagePaginated(
+    depId: string,
+    pagination: PaginationInput,
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
+    return this.client.callZome({
+      role_name: ATTRIBUTION_ROLE,
+      zome_name: 'usage',
+      fn_name: 'get_dependency_usage_paginated',
+      payload: { id: depId, pagination },
+    }) as Promise<PaginatedResult<Record<string, unknown>>>;
+  }
+
+  async getTopDependencies(limit: number): Promise<TopDependency[]> {
+    return this.client.callZome({
+      role_name: ATTRIBUTION_ROLE,
+      zome_name: 'usage',
+      fn_name: 'get_top_dependencies',
+      payload: limit,
+    }) as Promise<TopDependency[]>;
   }
 
   async getUserUsage(did: string): Promise<Record<string, unknown>[]> {
@@ -331,6 +400,18 @@ export class AttributionClient {
       fn_name: 'get_dependency_pledges',
       payload: depId,
     }) as Promise<Record<string, unknown>[]>;
+  }
+
+  async getDependencyPledgesPaginated(
+    depId: string,
+    pagination: PaginationInput,
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
+    return this.client.callZome({
+      role_name: ATTRIBUTION_ROLE,
+      zome_name: 'reciprocity',
+      fn_name: 'get_dependency_pledges_paginated',
+      payload: { id: depId, pagination },
+    }) as Promise<PaginatedResult<Record<string, unknown>>>;
   }
 
   async getContributorPledges(did: string): Promise<Record<string, unknown>[]> {

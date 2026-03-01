@@ -28,6 +28,26 @@ pub struct UpdateDependencyInput {
     pub dependency: DependencyIdentity,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PaginationInput {
+    pub offset: u64,
+    pub limit: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PaginatedDependencies {
+    pub items: Vec<Record>,
+    pub total: u64,
+    pub offset: u64,
+    pub limit: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BulkRegisterResult {
+    pub registered: Vec<Record>,
+    pub skipped: Vec<String>,
+}
+
 // ── Init ─────────────────────────────────────────────────────────────
 
 #[hdk_extern]
@@ -243,4 +263,116 @@ pub fn verify_dependency(id: String) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Could not fetch verified dependency".into()
         )))
+}
+
+// ── Batch Registration ──────────────────────────────────────────────
+
+#[hdk_extern]
+pub fn bulk_register_dependencies(
+    deps: Vec<DependencyIdentity>,
+) -> ExternResult<BulkRegisterResult> {
+    let mut registered = Vec::new();
+    let mut skipped = Vec::new();
+
+    for dep in deps {
+        let id_tag = format!("dep:{}", dep.id);
+        let existing = get_links(
+            LinkQuery::try_new(anchor_hash(&id_tag)?, LinkTypes::DependencyById)?,
+            GetStrategy::default(),
+        )?;
+        if !existing.is_empty() {
+            skipped.push(dep.id.clone());
+            continue;
+        }
+
+        let action_hash =
+            create_entry(&EntryTypes::DependencyIdentity(dep.clone()))?;
+        let entry_hash = hash_entry(&dep)?;
+
+        create_link(
+            anchor_hash("all_deps")?,
+            entry_hash.clone(),
+            LinkTypes::AllDependencies,
+            (),
+        )?;
+
+        let eco_tag = format!("eco:{}", dep.ecosystem);
+        create_link(
+            anchor_hash(&eco_tag)?,
+            entry_hash.clone(),
+            LinkTypes::EcosystemToDependency,
+            (),
+        )?;
+
+        let maint_tag = format!("maint:{}", dep.maintainer_did);
+        create_link(
+            anchor_hash(&maint_tag)?,
+            entry_hash.clone(),
+            LinkTypes::MaintainerToDependency,
+            (),
+        )?;
+
+        create_link(
+            anchor_hash(&id_tag)?,
+            entry_hash,
+            LinkTypes::DependencyById,
+            (),
+        )?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            registered.push(record);
+        }
+    }
+
+    if !registered.is_empty() {
+        let _ = emit_signal(&RegistrySignal::DependencyRegistered {
+            dependency_id: format!("batch:{}", registered.len()),
+            name: format!("{} dependencies", registered.len()),
+            ecosystem: "Mixed".to_string(),
+        });
+    }
+
+    Ok(BulkRegisterResult {
+        registered,
+        skipped,
+    })
+}
+
+// ── Paginated Queries ───────────────────────────────────────────────
+
+#[hdk_extern]
+pub fn get_all_dependencies_paginated(
+    input: PaginationInput,
+) -> ExternResult<PaginatedDependencies> {
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash("all_deps")?,
+            LinkTypes::AllDependencies,
+        )?,
+        GetStrategy::default(),
+    )?;
+    let total = links.len() as u64;
+
+    let page_links: Vec<_> = links
+        .into_iter()
+        .skip(input.offset as usize)
+        .take(input.limit as usize)
+        .collect();
+
+    let mut items = Vec::new();
+    for link in page_links {
+        let entry_hash = EntryHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
+        })?;
+        if let Some(record) = get(entry_hash, GetOptions::default())? {
+            items.push(record);
+        }
+    }
+
+    Ok(PaginatedDependencies {
+        items,
+        total,
+        offset: input.offset,
+        limit: input.limit,
+    })
 }
