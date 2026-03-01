@@ -24,6 +24,7 @@ description: |
   - Civic (WE): Justice, emergency, media (permissioned)
   - Commons Land (ALL): Property, housing, water, food (physical infrastructure)
   - Commons Care (ALL): Care, mutualaid, transport, support, space (social/care)
+  - Attribution (OPEN): Dependency registry, usage receipts, reciprocity pledges
   Enables cross-cluster calls between all tiers via OtherRole dispatch.
   Commons split into two sub-cluster DNAs to fit under Holochain's 16MB limit.
   Note: "HEARTH" in the finance hApp refers to commons pool governance;
@@ -91,6 +92,17 @@ roles:
       deferred: false
     dna:
       path: ./civic/dna/mycelix_civic.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: attribution
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./attribution/dna/mycelix_attribution_dna.dna
       modifiers:
         network_seed: ~
         properties: ~

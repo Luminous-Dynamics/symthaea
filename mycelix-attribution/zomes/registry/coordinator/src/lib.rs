@@ -43,6 +43,17 @@ fn anchor_hash(tag: &str) -> ExternResult<EntryHash> {
     hash_entry(&Anchor(tag.to_string()))
 }
 
+fn require_author(maintainer_did: &str) -> ExternResult<()> {
+    let info = agent_info()?;
+    let expected_did = format!("did:mycelix:{}", info.agent_initial_pubkey);
+    if maintainer_did != expected_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the maintainer can perform this action".into()
+        )));
+    }
+    Ok(())
+}
+
 fn resolve_links(base: EntryHash, link_type: LinkTypes) -> ExternResult<Vec<Record>> {
     let links = get_links(
         LinkQuery::try_new(base, link_type)?,
@@ -64,6 +75,19 @@ fn resolve_links(base: EntryHash, link_type: LinkTypes) -> ExternResult<Vec<Reco
 
 #[hdk_extern]
 pub fn register_dependency(dep: DependencyIdentity) -> ExternResult<Record> {
+    // Duplicate check: reject if ID already registered
+    let id_tag = format!("dep:{}", dep.id);
+    let existing = get_links(
+        LinkQuery::try_new(anchor_hash(&id_tag)?, LinkTypes::DependencyById)?,
+        GetStrategy::default(),
+    )?;
+    if !existing.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Dependency '{}' is already registered",
+            dep.id
+        ))));
+    }
+
     let action_hash =
         create_entry(&EntryTypes::DependencyIdentity(dep.clone()))?;
     let entry_hash = hash_entry(&dep)?;
@@ -117,6 +141,9 @@ pub fn register_dependency(dep: DependencyIdentity) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn update_dependency(input: UpdateDependencyInput) -> ExternResult<Record> {
+    // Author-only: verify caller is the maintainer
+    require_author(&input.dependency.maintainer_did)?;
+
     let action_hash = update_entry(
         input.original_action_hash,
         &EntryTypes::DependencyIdentity(input.dependency.clone()),
@@ -197,6 +224,9 @@ pub fn verify_dependency(id: String) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Record has no entry".into()
         )))?;
+
+    // Author-only: verify caller is the maintainer
+    require_author(&dep.maintainer_did)?;
 
     dep.verified = true;
 

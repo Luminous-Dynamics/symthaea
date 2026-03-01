@@ -217,8 +217,30 @@ pub fn get_dependency_attestations(
     dep_id: String,
 ) -> ExternResult<Vec<Record>> {
     let dep_tag = format!("attest:{}", dep_id);
-    resolve_links(
+    let all = resolve_links(
         anchor_hash(&dep_tag)?,
         LinkTypes::DependencyToAttestations,
-    )
+    )?;
+
+    // Filter out expired attestations
+    let now = sys_time()?;
+    let mut active = Vec::new();
+    for record in all {
+        let att: Option<UsageAttestation> = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to deserialize attestation: {}",
+                    e
+                )))
+            })?;
+        match att {
+            Some(a) if a.expires_at.is_some_and(|exp| exp < now) => {
+                // Expired — skip
+            }
+            _ => active.push(record),
+        }
+    }
+    Ok(active)
 }

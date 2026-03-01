@@ -1,0 +1,134 @@
+name: Attribution CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mycelix-attribution/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mycelix-attribution/**'
+  workflow_dispatch:
+
+concurrency:
+  group: attribution-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: stable
+  CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: '--cfg getrandom_backend="custom"'
+
+jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-attribution
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-attribution
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-attribution/target
+          key: cargo-attribution-clippy-${{ hashFiles('mycelix-attribution/Cargo.lock') }}
+      - run: cargo clippy --all-targets -- -D warnings
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-attribution
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-attribution/target
+          key: cargo-attribution-test-${{ hashFiles('mycelix-attribution/Cargo.lock') }}
+      - run: cargo test --lib
+
+  wasm-build:
+    name: WASM Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-attribution
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-attribution/target
+          key: cargo-attribution-wasm-${{ hashFiles('mycelix-attribution/Cargo.lock') }}
+      - run: cargo build --release --target wasm32-unknown-unknown
+      - name: Verify WASM artifacts
+        run: |
+          ls -lh target/wasm32-unknown-unknown/release/*.wasm
+          echo "::notice::Built $(ls target/wasm32-unknown-unknown/release/*.wasm | wc -l) WASM zomes"
+
+  cli-build:
+    name: CLI Scanner Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-attribution/cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-attribution/cli/target
+          key: cargo-attribution-cli-${{ hashFiles('mycelix-attribution/cli/Cargo.lock') }}
+      - run: cargo test
+      - run: cargo build --release
+
+  ci-pass:
+    name: CI Pass
+    if: always()
+    needs: [fmt, clippy, test, wasm-build, cli-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        run: |
+          if [[ "${{ needs.fmt.result }}" == "failure" ]] ||
+             [[ "${{ needs.clippy.result }}" == "failure" ]] ||
+             [[ "${{ needs.test.result }}" == "failure" ]] ||
+             [[ "${{ needs.wasm-build.result }}" == "failure" ]] ||
+             [[ "${{ needs.cli-build.result }}" == "failure" ]]; then
+            echo "::error::One or more CI jobs failed"
+            exit 1
+          fi
+          echo "All CI checks passed"
